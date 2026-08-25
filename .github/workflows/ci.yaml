@@ -54,7 +54,7 @@ jobs:
 
           while IFS= read -r file; do
             case "$file" in
-              .bun-version | .dockerignore | .github/workflows/* | LICENSE | NOTICE | bun.lock | package.json)
+              .bun-version | .dockerignore | .github/workflows/* | .node-version | LICENSE | NOTICE | bun.lock | package.json)
                 command=true
                 package=true
                 server=true
@@ -98,6 +98,11 @@ jobs:
         with:
           bun-version-file: .bun-version
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+
       - name: Install
         run: bun install --frozen-lockfile
 
@@ -120,6 +125,11 @@ jobs:
         uses: oven-sh/setup-bun@v2.2.0
         with:
           bun-version-file: .bun-version
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
 
       - name: Install
         run: bun install --frozen-lockfile
@@ -150,6 +160,11 @@ jobs:
         with:
           bun-version-file: .bun-version
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+
       - name: Install
         run: bun install --frozen-lockfile
 
@@ -175,6 +190,11 @@ jobs:
         uses: oven-sh/setup-bun@v2.2.0
         with:
           bun-version-file: .bun-version
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
 
       - name: Install
         run: bun install --frozen-lockfile

@@ -2,7 +2,7 @@
 
 FROM oven/bun:1.4.0 AS bun
 
-FROM node:24-bookworm AS build
+FROM node:26-bookworm AS build
 
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /workspace
@@ -14,7 +14,7 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run --filter @oomol-lab/open-flow-server build
 
-FROM node:24-bookworm-slim AS runtime
+FROM node:26-bookworm-slim AS runtime
 
 ENV NODE_ENV=production \
   OPEN_FLOW_DATA_DIR=/data/open-flow \

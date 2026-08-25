@@ -19,7 +19,7 @@
     "@hono/node-server": "2.1.1",
     "@oomol-lab/open-flow": "workspace:*",
     "hono": "4.13.3",
-    "isolated-vm": "6.2.0",
+    "isolated-vm": "7.0.1",
     "node-gyp-build": "4.8.4",
     "pino": "10.3.1",
     "react": "^18.3.1",
@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.0.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@unocss/vite": "66.7.5",

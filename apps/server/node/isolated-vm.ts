@@ -32,7 +32,7 @@ export const isolatedVmLimits: IsolatedVmLimits = {
   wallMs: 30_000,
 }
 
-export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/1 isolated-vm/6.2.0 node/24').digest('hex')}`
+export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/1 isolated-vm/7.0.1 node/26').digest('hex')}`
 
 export class IsolatedVmError extends Error {
   readonly code: 'canceled' | 'executor-crashed' | 'invalid-program' | 'limit-exceeded' | 'task-failed'
