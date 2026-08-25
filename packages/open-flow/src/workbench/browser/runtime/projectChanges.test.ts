@@ -10,6 +10,7 @@ import {
   deleteSelection,
   pasteNodes,
   updateCondition,
+  updateCodeTaskPorts,
   updateNodeDescription,
   updateTask,
   updateWebhook,
@@ -412,7 +413,7 @@ describe('Project changes', () => {
     })
   })
 
-  it('updates Connector task ports without allowing the caller to replace its action or Connection identity', () => {
+  it('updates a Connector task name without changing its action, Connection, or ports', () => {
     const current = revision({
       ...emptyDocument,
       flows: {
@@ -431,7 +432,7 @@ describe('Project changes', () => {
       },
     })
 
-    expect(updateTask(current, target, 'connector', { inputs: {}, kind: 'connector', name: 'Create GitHub issue', outputs: {} })).toEqual([
+    expect(updateTask(current, target, 'connector', { kind: 'connector', name: 'Create GitHub issue' })).toEqual([
       {
         kind: 'task.replace',
         task: {
@@ -485,10 +486,8 @@ describe('Project changes', () => {
     })
 
     expect(
-      updateTask(current, target, 'code', {
+      updateCodeTaskPorts(current, target, 'code', {
         inputs: { message: { jsonSchema: { type: 'string' }, nullable: false } },
-        kind: 'code',
-        name: 'Code',
         outputs: { text: { jsonSchema: { type: 'string' }, nullable: false } },
       }),
     ).toEqual([
@@ -556,7 +555,7 @@ describe('Project changes', () => {
       },
     })
 
-    const changes = updateTask(current, target, 'code', { inputs: {}, kind: 'code', name: 'Code', outputs: {} })!
+    const changes = updateCodeTaskPorts(current, target, 'code', { inputs: {}, outputs: {} })!
 
     expect(changes).toHaveLength(2)
     expect(changes[0]).toMatchObject({ node: { inputs: {}, task: { inputs: {}, outputs: {} } }, nodeId: 'code' })

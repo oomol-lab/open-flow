@@ -1,10 +1,11 @@
-import type { Diagnostic, Draft, TriggerNode } from '../api.ts'
+import type { Diagnostic, Draft, GraphNode, TriggerNode } from '../api.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { TriggerStore } from '../stores/triggerStore.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
+import { val } from 'value-enhancer'
 import { describe, expect, it } from 'vitest'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
@@ -64,6 +65,59 @@ function renderTrigger(trigger: TriggerNode, diagnostics: readonly Diagnostic[] 
         target={{ id: 'main', kind: 'flow' }}
         theme="light"
         triggerActiveConnections={[]}
+        triggerAuthorizationPending={false}
+        triggerConnectionLoading={false}
+        triggers={{} as TriggerStore}
+      />
+    </I18nProvider>,
+  )
+}
+
+function nodeProject(
+  nodeId: string,
+  node: GraphNode,
+  options: {
+    readonly modules?: Draft['content']['modules']
+    readonly tasks?: Draft['content']['document']['tasks']
+  } = {},
+): Draft {
+  return {
+    actorId: 'actor',
+    content: {
+      document: {
+        bindings: {},
+        flows: { main: { graph: { nodes: { [nodeId]: node } }, name: 'Main' } },
+        subflows: {},
+        tasks: options.tasks ?? {},
+      },
+      modelVersion: 1,
+      modules: options.modules ?? {},
+    },
+    createdAt: '2026-08-12T00:00:00.000Z',
+    digest: 'digest',
+    modelVersion: 1,
+    parentRevisionId: null,
+    projectId: 'project',
+    revisionId: 'revision',
+    version: 1,
+  }
+}
+
+function renderNode(draft: Draft, nodeId: string): string {
+  const revision = revisionView(draft)
+  return renderToStaticMarkup(
+    <I18nProvider i18n={createI18n('en')}>
+      <NodeInspector
+        connectorAuthorizationPending={false}
+        connectorLoading={false}
+        connectors={{} as ConnectorStore}
+        diagnostics={[]}
+        disabled={false}
+        revision={revision}
+        selection={revision.selection({ id: 'main', kind: 'flow' }, nodeId)}
+        store={{ $: { moduleDiagnostics: val([]), moduleEditor: val(undefined) } } as unknown as WorkspaceStore}
+        target={{ id: 'main', kind: 'flow' }}
+        theme="light"
         triggerAuthorizationPending={false}
         triggerConnectionLoading={false}
         triggers={{} as TriggerStore}
@@ -153,5 +207,102 @@ describe('Trigger Inspector', () => {
     expect(markup).toContain('diagnostics-section incomplete')
     expect(markup).toContain('Configuration required')
     expect(markup).toContain('Complete the required Trigger config fields: repository.')
+  })
+})
+
+describe('Task Inspector', () => {
+  it('shows Connector ports as a read-only summary', () => {
+    const markup = renderNode(
+      nodeProject(
+        'connector',
+        { concurrency: 1, inputs: {}, kind: 'task', taskId: 'connector-task' },
+        {
+          tasks: {
+            'connector-task': {
+              executor: { action: 'feishu.send_text_message', kind: 'connector' },
+              inputs: { text: { jsonSchema: { type: 'string' }, nullable: false } },
+              name: 'Send Text Message',
+              outputs: { code: { jsonSchema: { type: 'integer' }, nullable: false } },
+            },
+          },
+        },
+      ),
+      'connector',
+    )
+
+    expect(markup).toContain('Input ports')
+    expect(markup).toContain('Output ports')
+    expect(markup).toContain('text')
+    expect(markup).toContain('code')
+    expect(markup).not.toContain('Input ports (JSON)')
+    expect(markup).not.toContain('task-connector-inputs')
+    expect(markup).not.toContain('&quot;jsonSchema&quot;')
+  })
+
+  it('does not duplicate Code or LLM port editing in the Inspector', () => {
+    const codeMarkup = renderNode(
+      nodeProject(
+        'code',
+        {
+          concurrency: 1,
+          inputs: {},
+          kind: 'task',
+          task: {
+            inputs: { input: { jsonSchema: { type: 'string' }, nullable: false } },
+            moduleId: 'module',
+            name: 'Code',
+            outputs: { output: { jsonSchema: { type: 'string' }, nullable: false } },
+          },
+        },
+        {
+          modules: { module: { imports: [], name: 'Code', source: 'export default () => ({ output: "ok" })' } },
+        },
+      ),
+      'code',
+    )
+    const llmMarkup = renderNode(
+      nodeProject(
+        'llm',
+        { concurrency: 1, inputs: {}, kind: 'task', taskId: 'llm-task' },
+        {
+          tasks: {
+            'llm-task': {
+              executor: { kind: 'llm', mode: 'json' },
+              inputs: { input: { jsonSchema: { type: 'string' }, nullable: false } },
+              name: 'Structured output',
+              outputs: { output: { jsonSchema: { type: 'object' }, nullable: false } },
+            },
+          },
+        },
+      ),
+      'llm',
+    )
+
+    expect(codeMarkup).not.toContain('task-code-inputs')
+    expect(codeMarkup).not.toContain('&quot;jsonSchema&quot;')
+    expect(llmMarkup).not.toContain('task-llm-inputs')
+    expect(llmMarkup).not.toContain('&quot;jsonSchema&quot;')
+  })
+})
+
+describe('Condition Inspector', () => {
+  it('keeps routing and schema editing in the structured node controls', () => {
+    const markup = renderNode(
+      nodeProject('condition', {
+        cases: [{ expressions: [{ input: 'value', operator: 'isTrue' }], output: 'true', relation: 'any' }],
+        concurrency: 1,
+        defaultOutput: 'false',
+        input: { handle: 'value', jsonSchema: { type: 'boolean' }, nullable: true },
+        inputs: {},
+        kind: 'condition',
+        name: 'Condition',
+      }),
+      'condition',
+    )
+
+    expect(markup).not.toContain('Condition routing')
+    expect(markup).not.toContain('Input JSON Schema')
+    expect(markup).not.toContain('Cases (JSON)')
+    expect(markup).not.toContain('&quot;operator&quot;')
   })
 })

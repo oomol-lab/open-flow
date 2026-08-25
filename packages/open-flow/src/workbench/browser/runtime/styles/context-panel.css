@@ -203,13 +203,13 @@
   .inspector-section {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     padding: 16px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ui-border);
   }
 
   .inspector-disclosure {
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ui-border);
   }
 
   .inspector-disclosure > summary {
@@ -217,10 +217,13 @@
     min-height: 56px;
     align-items: center;
     gap: 10px;
-    padding: 0 16px;
+    padding: 8px 16px;
     list-style: none;
-    color: var(--text-secondary);
+    color: var(--ui-foreground);
     cursor: pointer;
+    transition:
+      background-color 150ms ease-out,
+      box-shadow 150ms ease-out;
   }
 
   .inspector-disclosure > summary::-webkit-details-marker {
@@ -229,61 +232,59 @@
 
   .inspector-disclosure > summary > svg {
     flex: none;
-    color: var(--muted);
-    transform: rotate(-90deg);
+    color: var(--ui-muted-foreground);
     transition:
       color 140ms ease-out,
       transform 160ms ease-out;
   }
 
   .inspector-disclosure[open] > summary > svg {
-    transform: rotate(0deg);
+    transform: rotate(180deg);
   }
 
   .inspector-disclosure > summary:hover {
-    background: var(--surface);
+    background: var(--ui-muted);
   }
 
   .inspector-disclosure > summary:hover > svg {
-    color: var(--text-secondary);
+    color: var(--ui-foreground);
   }
 
   .inspector-disclosure > summary:active {
-    background: var(--subtle);
+    background: color-mix(in oklch, var(--ui-muted) 82%, var(--ui-foreground));
   }
 
   .inspector-disclosure > summary:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: -2px;
+    outline: none;
+    box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--ui-ring) 72%, transparent);
   }
 
   .inspector-disclosure-summary {
     display: flex;
     min-width: 0;
-    align-items: center;
+    align-items: flex-start;
     flex: 1;
-    justify-content: space-between;
-    gap: 12px;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .inspector-disclosure-summary strong {
-    color: var(--text);
+    color: var(--ui-foreground);
     font-size: 12px;
     font-weight: 600;
+    line-height: 17px;
   }
 
   .inspector-disclosure-summary > span {
-    overflow: hidden;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 15px;
   }
 
   .inspector-disclosure-content {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     padding: 2px 16px 16px;
   }
 
@@ -296,18 +297,16 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    margin: 0 0 2px;
+    margin: 0;
     font-size: 12px;
     font-weight: 600;
+    line-height: 17px;
   }
 
-  .inspector-form label {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    color: var(--muted);
+  .inspector-form [data-slot='field-label'] {
+    color: var(--ui-muted-foreground);
     font-size: 11px;
-    font-weight: 500;
+    line-height: 16px;
   }
 
   .inspector-form textarea {
@@ -316,10 +315,14 @@
     line-height: 17px;
   }
 
+  .inspector-form [data-slot='field-group'] {
+    gap: 14px;
+  }
+
   .field-pair {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: 10px;
   }
 
   .checkbox-field {

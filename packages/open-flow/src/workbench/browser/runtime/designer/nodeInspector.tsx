@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
 import type { TriggerSettings } from '../../../../project/common/nodeChanges.ts'
-import type { ConditionNode, ConnectorAction, ConnectorConnection, Diagnostic, JsonValue } from '../api.ts'
+import type { ConnectorAction, ConnectorConnection, Diagnostic } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from '../revisionView.ts'
@@ -10,13 +10,12 @@ import type { TriggerStore } from '../stores/triggerStore.ts'
 import type { ModuleEditorStatus } from '../stores/workspaceModel.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 import type { DiagnosticFocus } from './diagnostics.ts'
-import type { ConditionSettings, DesignerTarget, TaskSettings } from './projectChanges.ts'
+import type { DesignerTarget, TaskSettings } from './projectChanges.ts'
 
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
@@ -223,9 +222,6 @@ function TaskDefinition({
   const module = selection.module
   const [name, setName] = useState(task?.name ?? '')
   const [llmMode, setLlmMode] = useState<'chat' | 'json'>(task != null && 'executor' in task && task.executor.kind == 'llm' ? task.executor.mode : 'chat')
-  const [inputs, setInputs] = useState(json(task?.inputs ?? {}))
-  const [outputs, setOutputs] = useState(json(task?.outputs ?? {}))
-  const [definitionError, setDefinitionError] = useState<string>()
   const fieldIdPrefix = `task-${selection.id}`
   const moduleDiagnostics = useVal(store.$.moduleDiagnostics)
   const moduleEditor = useVal(store.$.moduleEditor)
@@ -234,9 +230,6 @@ function TaskDefinition({
   useEffect(() => {
     setName(task?.name ?? '')
     setLlmMode(task != null && 'executor' in task && task.executor.kind == 'llm' ? task.executor.mode : 'chat')
-    setInputs(json(task?.inputs ?? {}))
-    setOutputs(json(task?.outputs ?? {}))
-    setDefinitionError(undefined)
   }, [module, task])
 
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
@@ -394,38 +387,15 @@ function TaskDefinition({
           className="inspector-form inspector-disclosure-content"
           onSubmit={(event) => {
             event.preventDefault()
-            try {
-              const nextInputs = objectValue(inputs, t('inspector.task.inputPorts'), t)
-              const nextOutputs = objectValue(outputs, t('inspector.task.outputPorts'), t)
-              let settings: TaskSettings
-              if ('moduleId' in task) {
-                settings = {
-                  inputs: nextInputs,
-                  kind: 'code',
-                  name: name.trim(),
-                  outputs: nextOutputs,
-                }
-              } else if (task.executor.kind == 'llm') {
-                settings = {
-                  inputs: nextInputs,
-                  kind: 'llm',
-                  mode: llmMode,
-                  name: name.trim(),
-                  outputs: nextOutputs,
-                }
-              } else {
-                settings = {
-                  inputs: nextInputs,
-                  kind: 'connector',
-                  name: name.trim(),
-                  outputs: nextOutputs,
-                }
-              }
-              setDefinitionError(undefined)
-              void store.saveTaskSettings(selection.id, settings)
-            } catch (error) {
-              setDefinitionError(error instanceof TypeError ? error.message : t('inspector.errors.portDefinitions'))
+            let settings: TaskSettings
+            if ('moduleId' in task) {
+              settings = { kind: 'code', name: name.trim() }
+            } else if (task.executor.kind == 'llm') {
+              settings = { kind: 'llm', mode: llmMode, name: name.trim() }
+            } else {
+              settings = { kind: 'connector', name: name.trim() }
             }
+            void store.saveTaskSettings(selection.id, settings)
           }}
         >
           <FieldGroup>
@@ -448,34 +418,21 @@ function TaskDefinition({
               </Field>
             )}
             {'executor' in task && task.executor.kind == 'connector' && (
-              <Field>
-                <FieldLabel>{t('inspector.task.connectorAction')}</FieldLabel>
-                <FieldDescription className="reference-value">{connectorAction?.name ?? task.executor.action}</FieldDescription>
-              </Field>
+              <>
+                <Field>
+                  <FieldLabel>{t('inspector.task.connectorAction')}</FieldLabel>
+                  <FieldDescription className="reference-value">{connectorAction?.name ?? task.executor.action}</FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel>{t('inspector.task.inputPorts')}</FieldLabel>
+                  <FieldDescription className="reference-value">{Object.keys(task.inputs).join(', ') || t('common.none')}</FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel>{t('inspector.task.outputPorts')}</FieldLabel>
+                  <FieldDescription className="reference-value">{Object.keys(task.outputs).join(', ') || t('common.none')}</FieldDescription>
+                </Field>
+              </>
             )}
-            <Field>
-              <FieldLabel htmlFor={`${fieldIdPrefix}-inputs`}>{t('inspector.task.inputPorts')}</FieldLabel>
-              <Textarea
-                disabled={disabled}
-                id={`${fieldIdPrefix}-inputs`}
-                onChange={(event) => setInputs(event.target.value)}
-                rows={7}
-                spellCheck={false}
-                value={inputs}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor={`${fieldIdPrefix}-outputs`}>{t('inspector.task.outputPorts')}</FieldLabel>
-              <Textarea
-                disabled={disabled}
-                id={`${fieldIdPrefix}-outputs`}
-                onChange={(event) => setOutputs(event.target.value)}
-                rows={7}
-                spellCheck={false}
-                value={outputs}
-              />
-            </Field>
-            {definitionError != null && <FieldError>{definitionError}</FieldError>}
           </FieldGroup>
           <div className="form-actions">
             <Button disabled={disabled || name.trim() == ''} size="sm" type="submit" variant="secondary">
@@ -485,107 +442,6 @@ function TaskDefinition({
         </form>
       </details>
     </>
-  )
-}
-
-function ConditionDefinition({
-  disabled,
-  node,
-  nodeId,
-  store,
-}: {
-  readonly disabled: boolean
-  readonly node: ConditionNode
-  readonly nodeId: string
-  readonly store: WorkspaceStore
-}): ReactElement {
-  const t = useTranslate()
-  const [inputHandle, setInputHandle] = useState(node.input.handle)
-  const [nullable, setNullable] = useState(node.input.nullable)
-  const [schema, setSchema] = useState(json(node.input.jsonSchema))
-  const [cases, setCases] = useState(json(node.cases))
-  const [defaultOutput, setDefaultOutput] = useState(node.defaultOutput ?? '')
-  const [error, setError] = useState<string>()
-
-  useEffect(() => {
-    setInputHandle(node.input.handle)
-    setNullable(node.input.nullable)
-    setSchema(json(node.input.jsonSchema))
-    setCases(json(node.cases))
-    setDefaultOutput(node.defaultOutput ?? '')
-    setError(undefined)
-  }, [node])
-
-  return (
-    <form
-      className="inspector-section inspector-form"
-      data-inspector-section="condition"
-      onSubmit={(event) => {
-        event.preventDefault()
-        try {
-          const parsedCases = JSON.parse(cases) as unknown
-          if (!Array.isArray(parsedCases)) throw new TypeError(t('inspector.condition.casesObjectError'))
-          setError(undefined)
-          void store.saveCondition(nodeId, {
-            cases: parsedCases as ConditionSettings['cases'],
-            ...(defaultOutput.trim() == '' ? {} : { defaultOutput: defaultOutput.trim() }),
-            input: {
-              ...node.input,
-              handle: inputHandle.trim(),
-              jsonSchema: JSON.parse(schema) as JsonValue,
-              nullable,
-            },
-          })
-        } catch (parseError) {
-          setError(parseError instanceof TypeError ? parseError.message : t('inspector.condition.invalid'))
-        }
-      }}
-    >
-      <h3>{t('inspector.condition.title')}</h3>
-      <FieldGroup>
-        <div className="field-pair">
-          <Field>
-            <FieldLabel htmlFor={`${nodeId}-input-handle`}>{t('inspector.condition.inputHandle')}</FieldLabel>
-            <Input disabled={disabled} id={`${nodeId}-input-handle`} onChange={(event) => setInputHandle(event.target.value)} value={inputHandle} />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor={`${nodeId}-default-output`}>{t('inspector.condition.defaultOutput')}</FieldLabel>
-            <Input
-              disabled={disabled}
-              id={`${nodeId}-default-output`}
-              onChange={(event) => setDefaultOutput(event.target.value)}
-              placeholder={t('common.none')}
-              value={defaultOutput}
-            />
-          </Field>
-        </div>
-        <Field orientation="horizontal">
-          <Checkbox checked={nullable} disabled={disabled} id={`${nodeId}-accept-null`} onCheckedChange={setNullable} />
-          <FieldLabel htmlFor={`${nodeId}-accept-null`}>{t('inspector.condition.acceptNull')}</FieldLabel>
-        </Field>
-        <Field>
-          <FieldLabel htmlFor={`${nodeId}-input-schema`}>{t('inspector.condition.inputSchema')}</FieldLabel>
-          <Textarea
-            disabled={disabled}
-            id={`${nodeId}-input-schema`}
-            onChange={(event) => setSchema(event.target.value)}
-            rows={5}
-            spellCheck={false}
-            value={schema}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor={`${nodeId}-cases`}>{t('inspector.condition.cases')}</FieldLabel>
-          <Textarea disabled={disabled} id={`${nodeId}-cases`} onChange={(event) => setCases(event.target.value)} rows={12} spellCheck={false} value={cases} />
-        </Field>
-        {error != null && <FieldError>{error}</FieldError>}
-      </FieldGroup>
-      <div className="form-actions">
-        <Button disabled={disabled || inputHandle.trim() == ''} size="sm" type="submit" variant="secondary">
-          {t('inspector.condition.save')}
-        </Button>
-      </div>
-    </form>
   )
 }
 
@@ -920,7 +776,6 @@ export function NodeInspector({
           ) : (
             <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
           )}
-          {selection.kind == 'condition' && <ConditionDefinition disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />}
           {selection.kind == 'subflow' && (
             <section className="inspector-section">
               <h3>{t('inspector.subflow.referenced')}</h3>

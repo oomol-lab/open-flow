@@ -180,17 +180,19 @@ test('keeps Designer node controls in the compact root normalization', async () 
 })
 
 test('keeps shared popup motion accessible without replacing Designer layout ownership', async () => {
-  const [dropdownMenu, popover, combobox, progress, designerSelect, translationInput, reactFlowContainer, nodeMenu, blockQuickPick] = await Promise.all([
-    readFile(new URL('src/ui/browser/dropdown-menu.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/ui/browser/popover.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/ui/browser/combobox.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/ui/browser/progress.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/designer/browser/components/select.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/designer/browser/components/input2.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/designer/browser/graph/Nodes/components/NodeHeadMoreMenu.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/designer/browser/graph/BlockQuickPickPanel.tsx', packageRoot), 'utf8'),
-  ])
+  const [dropdownMenu, popover, combobox, progress, designerSelect, translationInput, reactFlowContainer, reactFlowStyles, nodeMenu, blockQuickPick] =
+    await Promise.all([
+      readFile(new URL('src/ui/browser/dropdown-menu.tsx', packageRoot), 'utf8'),
+      readFile(new URL('src/ui/browser/popover.tsx', packageRoot), 'utf8'),
+      readFile(new URL('src/ui/browser/combobox.tsx', packageRoot), 'utf8'),
+      readFile(new URL('src/ui/browser/progress.tsx', packageRoot), 'utf8'),
+      readFile(new URL('src/designer/browser/components/select.tsx', packageRoot), 'utf8'),
+      readFile(new URL('src/designer/browser/components/input2.tsx', packageRoot), 'utf8'),
+      readFile(new URL('src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.tsx', packageRoot), 'utf8'),
+      readFile(new URL('src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.module.scss', packageRoot), 'utf8'),
+      readFile(new URL('src/designer/browser/graph/Nodes/components/NodeHeadMoreMenu.tsx', packageRoot), 'utf8'),
+      readFile(new URL('src/designer/browser/graph/BlockQuickPickPanel.tsx', packageRoot), 'utf8'),
+    ])
 
   for (const source of [dropdownMenu, popover, combobox]) {
     assert.match(source, /motion-reduce:animate-none/)
@@ -205,6 +207,9 @@ test('keeps shared popup motion accessible without replacing Designer layout own
   assert.match(translationInput, /<DropdownMenuGroup>[\s\S]*?<DropdownMenuItem[\s\S]*?<\/DropdownMenuGroup>/)
   assert.match(reactFlowContainer, /<DropdownMenuTrigger nativeButton=\{false\} render=\{<div/)
   assert.match(reactFlowContainer, /<PopoverTrigger nativeButton=\{false\} render=\{<div/)
+  assert.doesNotMatch(reactFlowStyles, /\.contextMenu\s*\{[^}]*padding:/)
+  assert.match(reactFlowStyles, /\.quickPickPopover\s*\{[^}]*width:\s*auto;/)
+  assert.match(reactFlowStyles, /\.quickPickPopover\s*\{[^}]*padding:\s*0;/)
   assert.match(nodeMenu, /<DropdownMenuTrigger[\s\S]*?nativeButton=\{false\}[\s\S]*?render=\{[\s\S]*?<div/)
   assert.match(blockQuickPick, /<DropdownMenuTrigger nativeButton=\{false\} render=\{row\}/)
 })

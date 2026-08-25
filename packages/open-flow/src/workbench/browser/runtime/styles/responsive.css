@@ -368,6 +368,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .code-editor,
+    .inspector-disclosure > summary,
     .inspector-disclosure > summary > svg,
     .block-library-expand svg {
       transition: none;

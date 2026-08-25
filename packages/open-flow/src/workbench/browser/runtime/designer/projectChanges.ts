@@ -59,9 +59,7 @@ export interface ValueSettings {
 export type ConditionSettings = Pick<ConditionNode, 'cases' | 'defaultOutput' | 'input'>
 
 interface TaskSettingsBase {
-  readonly inputs: TaskDefinition['inputs']
   readonly name: string
-  readonly outputs: TaskDefinition['outputs']
 }
 
 export type TaskSettings =
@@ -69,7 +67,7 @@ export type TaskSettings =
   | (TaskSettingsBase & { readonly kind: 'connector' })
   | (TaskSettingsBase & { readonly kind: 'llm'; readonly mode: 'chat' | 'json' })
 
-export type CodeTaskPorts = Pick<TaskSettingsBase, 'inputs' | 'outputs'>
+export type CodeTaskPorts = Pick<TaskDefinition, 'inputs' | 'outputs'>
 
 export interface SubflowSettings {
   readonly inputs: NonNullable<ReturnType<RevisionView['subflow']>>['inputs']
@@ -359,7 +357,7 @@ export function updateTask(revision: RevisionView, target: DesignerTarget, nodeI
   switch (settings.kind) {
     case 'code': {
       if (node.task == null) return
-      return replaceCodeTaskPorts(revision, target, nodeId, { ...node.task, inputs: settings.inputs, name: settings.name, outputs: settings.outputs })
+      return replaceCodeTaskPorts(revision, target, nodeId, { ...node.task, name: settings.name })
     }
     case 'llm': {
       if (node.task != null) return
@@ -367,9 +365,9 @@ export function updateTask(revision: RevisionView, target: DesignerTarget, nodeI
       if (task?.executor.kind != 'llm') return
       const next: typeof task = {
         executor: { kind: 'llm', mode: settings.mode },
-        inputs: settings.inputs,
+        inputs: task.inputs,
         name: settings.name,
-        outputs: settings.outputs,
+        outputs: task.outputs,
       }
       return [{ kind: 'task.replace', task: next, taskId: node.taskId }]
     }
@@ -377,7 +375,7 @@ export function updateTask(revision: RevisionView, target: DesignerTarget, nodeI
       if (node.task != null) return
       const task = revision.task(node.taskId)
       if (task?.executor.kind != 'connector') return
-      const next: typeof task = { executor: task.executor, inputs: settings.inputs, name: settings.name, outputs: settings.outputs }
+      const next: typeof task = { ...task, name: settings.name }
       return [{ kind: 'task.replace', task: next, taskId: node.taskId }]
     }
   }

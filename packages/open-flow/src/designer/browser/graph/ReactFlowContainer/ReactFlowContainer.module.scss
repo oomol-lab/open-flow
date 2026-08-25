@@ -112,12 +112,13 @@
 
 .contextMenu {
   min-width: 150px;
-  padding: 0;
   font-size: var(--base-font-size);
   box-shadow: 0 2px 16px var(--contextmenu-shadow);
 }
 
 .quickPickPopover {
+  width: auto;
+  padding: 0;
   border: 1px solid var(--border-weak);
   box-shadow: 0 3px 8px var(--contextmenu-shadow);
 }
