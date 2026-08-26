@@ -217,3 +217,17 @@ auto-hébergé.
 
 [Apache-2.0](../LICENSE). Les mentions relatives aux ressources tierces embarquées figurent dans
 [NOTICE](../NOTICE).
+
+## Contributeurs
+
+Merci à toutes les personnes qui ont contribué à Open Flow. Vous souhaitez les rejoindre ?
+Consultez le [guide de contribution](../CONTRIBUTING.md).
+
+[![Contributeurs Open Flow](https://contrib.rocks/image?repo=oomol-lab/open-flow)](https://github.com/oomol-lab/open-flow/graphs/contributors)
+
+## Historique des Stars
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../assets/star-history/star-history-dark.svg">
+  <img alt="Historique des Stars" src="../assets/star-history/star-history-light.svg">
+</picture>

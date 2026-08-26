@@ -1,0 +1,37 @@
+name: Star History
+
+# Renders this repo's star-growth chart (light/dark SVG + PNG) into
+# assets/star-history/ and rewrites the marker block in README.md. The action
+# detects whether star data actually changed and only commits when it did, with
+# a "[skip ci]" commit message so chart refreshes don't trigger the CI workflow.
+# Daily schedule keeps commit noise low; use workflow_dispatch for an on-demand
+# refresh (e.g. the first run after merging this workflow).
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+# Serialize refreshes so a manual dispatch can't race the scheduled push.
+concurrency:
+  group: star-history
+  cancel-in-progress: true
+
+# The action commits the refreshed chart and README and pushes to main.
+permissions:
+  contents: write
+
+jobs:
+  star-history:
+    name: Render & Commit Chart
+    runs-on: ubuntu-latest
+    steps:
+      # Unlike ci.yaml this checkout keeps persist-credentials on (the default):
+      # the action's push step authenticates with the persisted GITHUB_TOKEN.
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      # Pinned to an immutable SHA rather than the mutable v1 tag: this
+      # third-party action holds contents:write and pushes to the repo, so its
+      # supply chain must not be silently updatable.
+      - name: Render and commit star history
+        uses: narayann7/star-history-action@12543ab7352b91fb7c5eb0c4fbb39772baa0c168 # v1.0.6

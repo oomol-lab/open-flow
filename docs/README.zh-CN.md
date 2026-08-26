@@ -174,3 +174,16 @@ Issue。[SECURITY.md](../SECURITY.md) 说明了受支持的版本、披露流程
 ## 许可证
 
 [Apache-2.0](../LICENSE)。打包资源涉及的第三方声明见 [NOTICE](../NOTICE)。
+
+## 贡献者
+
+感谢每一位参与建设 Open Flow 的贡献者。欢迎查看 [贡献指南](../CONTRIBUTING.md)，加入我们。
+
+[![Open Flow 贡献者](https://contrib.rocks/image?repo=oomol-lab/open-flow)](https://github.com/oomol-lab/open-flow/graphs/contributors)
+
+## Star 历史
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../assets/star-history/star-history-dark.svg">
+  <img alt="Star 历史" src="../assets/star-history/star-history-light.svg">
+</picture>

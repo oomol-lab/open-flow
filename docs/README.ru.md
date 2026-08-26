@@ -209,3 +209,17 @@ Issue и pull request приветствуются. Настройка окру�
 
 [Apache-2.0](../LICENSE). Уведомления о сторонних компонентах для включённых ресурсов перечислены в
 [NOTICE](../NOTICE).
+
+## Участники
+
+Спасибо всем, кто помогает развивать Open Flow. Хотите присоединиться? Ознакомьтесь с
+[руководством по участию](../CONTRIBUTING.md).
+
+[![Участники Open Flow](https://contrib.rocks/image?repo=oomol-lab/open-flow)](https://github.com/oomol-lab/open-flow/graphs/contributors)
+
+## История звёзд
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../assets/star-history/star-history-dark.svg">
+  <img alt="История звёзд" src="../assets/star-history/star-history-light.svg">
+</picture>

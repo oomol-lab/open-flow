@@ -176,3 +176,17 @@ Issue と Pull Request を歓迎します。開発環境のセットアップ、
 ## ライセンス
 
 [Apache-2.0](../LICENSE)。同梱アセットに関するサードパーティの通知は [NOTICE](../NOTICE) に記載されています。
+
+## コントリビューター
+
+Open Flow の開発にご協力いただいたすべての皆さまに感謝します。参加方法については
+[コントリビューションガイド](../CONTRIBUTING.md) をご覧ください。
+
+[![Open Flow コントリビューター](https://contrib.rocks/image?repo=oomol-lab/open-flow)](https://github.com/oomol-lab/open-flow/graphs/contributors)
+
+## Star 履歴
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../assets/star-history/star-history-dark.svg">
+  <img alt="Star 履歴" src="../assets/star-history/star-history-light.svg">
+</picture>

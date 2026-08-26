@@ -207,3 +207,19 @@ disclosure process, what is in scope, and how to harden a self-hosted deployment
 ## License
 
 [Apache-2.0](LICENSE). Third-party notices for bundled assets are listed in [NOTICE](NOTICE).
+
+## Contributors
+
+Thanks to everyone who has helped build Open Flow. Want to join them? See
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+[![Open Flow contributors](https://contrib.rocks/image?repo=oomol-lab/open-flow)](https://github.com/oomol-lab/open-flow/graphs/contributors)
+
+## Star History
+
+<!-- star-history:start -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/star-history/star-history-dark.svg">
+  <img alt="Star history" src="assets/star-history/star-history-light.svg">
+</picture>
+<!-- star-history:end -->

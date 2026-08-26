@@ -194,3 +194,17 @@ Issue와 Pull Request를 환영합니다. 개발 환경 설정, 저장소 규칙
 ## 라이선스
 
 [Apache-2.0](../LICENSE). 번들된 자산의 서드파티 고지는 [NOTICE](../NOTICE)에 정리되어 있습니다.
+
+## 기여자
+
+Open Flow를 함께 만들어 주신 모든 기여자께 감사드립니다.
+[기여 안내](../CONTRIBUTING.md)를 확인하고 함께해 주세요.
+
+[![Open Flow 기여자](https://contrib.rocks/image?repo=oomol-lab/open-flow)](https://github.com/oomol-lab/open-flow/graphs/contributors)
+
+## Star 히스토리
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../assets/star-history/star-history-dark.svg">
+  <img alt="Star 히스토리" src="../assets/star-history/star-history-light.svg">
+</picture>
