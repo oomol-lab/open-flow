@@ -136,6 +136,29 @@ describe('Server Cron Trigger', () => {
     }
   })
 
+  it('cancels an armed process timer when the service closes', async () => {
+    const file = await databaseFile()
+    const service = ServerService.open(file, undefined, () => Date.parse('2026-08-21T00:00:59.990Z'))
+    await service.publishFlow({
+      expectedLivePublicationId: null,
+      flowId: 'main',
+      idempotencyKey: 'publish-close',
+      revision: revision([{ type: 'every', unit: 'minute', value: 1 }]),
+      revisionId: 'revision-close',
+    })
+    service.start()
+    await service.close()
+    await new Promise<void>((resolve) => setTimeout(resolve, 25))
+
+    const database = new DatabaseSync(file, { readOnly: true })
+    try {
+      expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 0 })
+      expect(database.prepare('SELECT COUNT(*) AS count FROM trigger_occurrences').get()).toEqual({ count: 0 })
+    } finally {
+      database.close()
+    }
+  })
+
   it('fences a due target when Publish advances during admission', async () => {
     const file = await databaseFile()
     let now = Date.parse('2026-08-21T00:00:30.000Z')

@@ -30,6 +30,12 @@ import { triggerDefinitions as providerTriggerDefinitions } from '@oomol-lab/ope
 import { createEventProjector } from '@oomol-lab/open-flow/run-events'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { runFlow } from '@oomol-lab/open-flow/scheduler'
+import * as Cause from 'effect/Cause'
+import * as Effect from 'effect/Effect'
+import * as Exit from 'effect/Exit'
+import * as FiberMap from 'effect/FiberMap'
+import * as FiberSet from 'effect/FiberSet'
+import * as Scope from 'effect/Scope'
 import { randomUUID } from 'node:crypto'
 import { ConnectorTaskError } from './connector.ts'
 import { ControlService } from './control-service.ts'
@@ -132,20 +138,19 @@ export class ServerService {
   readonly #llm?: InvokeLlmTask
   readonly #maxConcurrentRuns: number
   readonly #pollDefinitions: ReadonlyMap<string, PollDefinition>
+  readonly #scope = Scope.makeUnsafe('parallel')
   readonly #flowCatalogSubscribers = new Set<(event: FlowCatalogEvent) => void>()
   readonly #flowSubscribers = new Map<string, Set<(event: FlowChangeEvent) => void>>()
   readonly #runningFlows = new Set<string>()
   readonly #runTimeoutMs: number
   readonly #store: Store
-  readonly #workers = new Set<Promise<void>>()
+  readonly #timers = Effect.runSync(FiberMap.make<string>().pipe(Scope.provide(this.#scope)))
+  readonly #workers = Effect.runSync(FiberSet.make<void>().pipe(Scope.provide(this.#scope)))
   #cronTicking?: Promise<void>
-  #cronTimer?: ReturnType<typeof setTimeout>
   #cronRetryAt?: number
   #failure?: unknown
   #maintenanceTicking?: Promise<void>
-  #maintenanceTimer?: ReturnType<typeof setTimeout>
   #pollTicking?: Promise<void>
-  #pollTimer?: ReturnType<typeof setTimeout>
   #started = false
 
   private constructor(
@@ -480,15 +485,11 @@ export class ServerService {
   async close(): Promise<void> {
     this.#started = false
     this.#integration.stop()
-    if (this.#cronTimer != null) clearTimeout(this.#cronTimer)
-    this.#cronTimer = undefined
-    if (this.#pollTimer != null) clearTimeout(this.#pollTimer)
-    this.#pollTimer = undefined
-    if (this.#maintenanceTimer != null) clearTimeout(this.#maintenanceTimer)
-    this.#maintenanceTimer = undefined
     try {
+      await Effect.runPromise(FiberMap.clear(this.#timers))
       await this.waitForIdle()
     } finally {
+      await Effect.runPromise(Scope.close(this.#scope, Exit.void))
       await this.#isolatedVm.close()
       this.#store.close()
     }
@@ -656,7 +657,7 @@ export class ServerService {
     await this.#integration.waitForIdle()
     while (this.#pollTicking != null) await this.#pollTicking
     while (this.#maintenanceTicking != null) await this.#maintenanceTicking
-    while (this.#workers.size > 0) await Promise.all(this.#workers)
+    while (Effect.runSync(FiberSet.size(this.#workers)) > 0) await Effect.runPromise(FiberSet.awaitEmpty(this.#workers))
     if (this.#failure != null) throw this.#failure
   }
 
@@ -1054,63 +1055,63 @@ export class ServerService {
   }
 
   #wake(): void {
-    while (this.#started && this.#failure == null && this.#workers.size < this.#maxConcurrentRuns) {
+    while (this.#started && this.#failure == null && Effect.runSync(FiberSet.size(this.#workers)) < this.#maxConcurrentRuns) {
       const run = this.#store.claim([...this.#runningFlows])
       if (run == null) return
       this.#runningFlows.add(run.flowId)
-      const worker = this.#dispatch(run)
-        .catch((error: unknown) => {
-          this.#fail('runtime.worker.failed', error)
-        })
-        .finally(() => {
-          this.#workers.delete(worker)
-          this.#runningFlows.delete(run.flowId)
-          this.#wake()
-        })
-      this.#workers.add(worker)
+      const worker = Effect.runSync(
+        FiberSet.run(
+          this.#workers,
+          Effect.tryPromise({ try: () => this.#dispatch(run), catch: (error) => error }).pipe(
+            Effect.catchCause((cause) => Effect.sync(() => this.#fail('runtime.worker.failed', Cause.squash(cause)))),
+          ),
+        ),
+      )
+      worker.addObserver(() => {
+        this.#runningFlows.delete(run.flowId)
+        this.#wake()
+      })
     }
   }
 
   #armCron(): void {
-    if (this.#cronTimer != null) clearTimeout(this.#cronTimer)
-    this.#cronTimer = undefined
+    Effect.runSync(FiberMap.remove(this.#timers, 'cron'))
     if (!this.#started || this.#failure != null || this.#cronTicking != null) return
     const nextAt = this.#store.triggers.nextCronAt()
     if (nextAt == null) return
     const delay = Math.max(0, Math.min(Math.max(nextAt, this.#cronRetryAt ?? nextAt) - this.#clock(), maxTimerDelayMs))
-    this.#cronTimer = setTimeout(() => {
-      this.#cronTimer = undefined
-      void this.tickCron().catch((error: unknown) => {
-        this.#fail('trigger.cron.loop.failed', error)
-      })
-    }, delay)
+    this.#armTimer('cron', delay, 'trigger.cron.loop.failed', () => this.tickCron())
   }
 
   #armPoll(): void {
-    if (this.#pollTimer != null) clearTimeout(this.#pollTimer)
-    this.#pollTimer = undefined
+    Effect.runSync(FiberMap.remove(this.#timers, 'poll'))
     if (!this.#started || this.#failure != null || this.#pollTicking != null) return
     const nextAt = this.#store.triggers.nextPollAt()
     if (nextAt == null) return
     const delay = Math.max(0, Math.min(nextAt - this.#clock(), maxTimerDelayMs))
-    this.#pollTimer = setTimeout(() => {
-      this.#pollTimer = undefined
-      void this.tickPoll().catch((error: unknown) => {
-        this.#fail('trigger.poll.loop.failed', error)
-      })
-    }, delay)
+    this.#armTimer('poll', delay, 'trigger.poll.loop.failed', () => this.tickPoll())
   }
 
   #armMaintenance(delay: number): void {
-    if (this.#maintenanceTimer != null) clearTimeout(this.#maintenanceTimer)
-    this.#maintenanceTimer = undefined
+    Effect.runSync(FiberMap.remove(this.#timers, 'maintenance'))
     if (!this.#started || this.#failure != null || this.#maintenanceTicking != null) return
-    this.#maintenanceTimer = setTimeout(() => {
-      this.#maintenanceTimer = undefined
-      void this.tickMaintenance().catch((error: unknown) => {
-        this.#fail('maintenance.loop.failed', error)
-      })
-    }, delay)
+    this.#armTimer('maintenance', delay, 'maintenance.loop.failed', () => this.tickMaintenance())
+  }
+
+  #armTimer(key: string, delay: number, category: string, tick: () => Promise<void>): void {
+    Effect.runSync(
+      FiberMap.run(
+        this.#timers,
+        key,
+        Effect.sleep(delay).pipe(
+          Effect.andThen(
+            Effect.sync(() => {
+              void tick().catch((error: unknown) => this.#fail(category, error))
+            }),
+          ),
+        ),
+      ),
+    )
   }
 
   #fail(category: string, error: unknown): void {

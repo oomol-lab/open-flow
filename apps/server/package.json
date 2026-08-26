@@ -18,6 +18,7 @@
   "dependencies": {
     "@hono/node-server": "2.1.1",
     "@oomol-lab/open-flow": "workspace:*",
+    "effect": "4.0.0-rc.112",
     "hono": "4.13.3",
     "isolated-vm": "7.0.1",
     "node-gyp-build": "4.8.4",
