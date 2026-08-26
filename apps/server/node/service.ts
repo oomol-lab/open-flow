@@ -134,7 +134,7 @@ class TaskHostError extends Error {
 
 export class ServerService {
   readonly control: ControlService
-  readonly #active = new Map<string, AbortController>()
+  readonly #active = new Map<string, Deferred.Deferred<void>>()
   readonly #clock: () => number
   readonly #connector?: ConnectorHost
   readonly #cronLock = Semaphore.makeUnsafe(1)
@@ -184,7 +184,10 @@ export class ServerService {
     this.control = new ControlService(
       store,
       clock,
-      (runId) => this.#active.get(runId)?.abort(new Error('Run canceled.')),
+      (runId) => {
+        const active = this.#active.get(runId)
+        if (active != null) Effect.runSync(Deferred.succeed(active, undefined))
+      },
       () => this.#signal(),
       (input) => this.publishFlow(input),
       () => {
@@ -480,7 +483,8 @@ export class ServerService {
   cancel(runId: string): boolean {
     const committed = this.#store.cancel(runId)
     if (committed) {
-      this.#active.get(runId)?.abort(new Error('Run canceled.'))
+      const active = this.#active.get(runId)
+      if (active != null) Effect.runSync(Deferred.succeed(active, undefined))
       this.#logger.info({ category: 'run.canceled', runId }, 'Run canceled.')
     }
     return committed
@@ -661,40 +665,44 @@ export class ServerService {
       const startedAt = performance.now()
       this.#logger.info({ category: 'run.started', flowId: run.flowId, runId: run.runId }, 'Run started.')
 
-      const cancellation = new AbortController()
+      const cancellation = yield* Deferred.make<void>()
       const timeoutReason = new Error('Run exceeded its execution deadline.')
-      const timeout = setTimeout(() => cancellation.abort(timeoutReason), this.#runTimeoutMs)
+      let timedOut = false
       this.#active.set(run.runId, cancellation)
-      yield* Effect.tryPromise({
-        try: () =>
-          this.#isolatedVm.run(start.flow, {
-            capability: (capabilities, call) => this.#invokeCapability(capabilities, call),
-            emit: async (event) => {
-              if (event.type == 'run.started' && event.runId == run.runId) return
-              const projected = await start.projectEvent(event)
-              if (projected != null) this.#store.append(run.runId, projected)
-            },
-            flowId: run.flowId,
-            inputs: run.inputs,
-            invokeTask: (invocation) => {
-              if (!('taskId' in invocation)) throw new Error('Runtime Executor returned a Code Task to the Host.')
-              return this.#invokeTask(start.flow, invocation)
-            },
-            projectFailure: (error) => {
-              if (error instanceof ConnectorTaskError) return { code: error.code, message: error.message }
-              if (error instanceof TaskHostError) return { code: error.code, message: error.message }
-              return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
-            },
-            runId: run.runId,
-            signal: cancellation.signal,
-            ...(run.trigger == null ? {} : { trigger: run.trigger }),
-          }),
-        catch: (error) => error,
-      }).pipe(
+      yield* Effect.raceFirst(
+        this.#isolatedVm.run(start.flow, {
+          capability: (capabilities, call) => this.#invokeCapability(capabilities, call),
+          emit: async (event) => {
+            if (event.type == 'run.started' && event.runId == run.runId) return
+            const projected = await start.projectEvent(event)
+            if (projected != null) this.#store.append(run.runId, projected)
+          },
+          flowId: run.flowId,
+          inputs: run.inputs,
+          invokeTask: (invocation) => {
+            if (!('taskId' in invocation)) throw new Error('Runtime Executor returned a Code Task to the Host.')
+            return this.#invokeTask(start.flow, invocation)
+          },
+          projectFailure: (error) => {
+            if (error instanceof ConnectorTaskError) return { code: error.code, message: error.message }
+            if (error instanceof TaskHostError) return { code: error.code, message: error.message }
+            return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
+          },
+          runId: run.runId,
+          ...(run.trigger == null ? {} : { trigger: run.trigger }),
+        }),
+        Deferred.await(cancellation).pipe(Effect.andThen(Effect.fail(new Error('Run canceled.')))),
+      ).pipe(
+        Effect.timeoutOrElse({
+          duration: this.#runTimeoutMs,
+          orElse: () =>
+            Effect.sync(() => {
+              timedOut = true
+            }).pipe(Effect.andThen(Effect.fail(timeoutReason))),
+        }),
         Effect.matchEffect({
           onFailure: (error) =>
             Effect.sync(() => {
-              const timedOut = cancellation.signal.reason === timeoutReason
               const result = timedOut
                 ? { error: { code: 'run.timeout', message: 'The Run exceeded its execution deadline.' } }
                 : { error: { code: 'run.failed', message: 'The Flow could not be completed.' } }
@@ -723,7 +731,6 @@ export class ServerService {
         }),
         Effect.ensuring(
           Effect.sync(() => {
-            clearTimeout(timeout)
             this.#active.delete(run.runId)
           }),
         ),
@@ -1018,7 +1025,10 @@ export class ServerService {
     )
   }
 
-  async #invokeTask(prepared: PreparedFlow, invocation: Extract<TaskInvocation, { readonly taskId: string }>): Promise<JsonValue> {
+  async #invokeTask(
+    prepared: PreparedFlow,
+    invocation: Extract<TaskInvocation, { readonly taskId: string }> & { readonly signal: AbortSignal },
+  ): Promise<JsonValue> {
     const task = prepared.tasks[invocation.taskId]!
     const executor = task.executor
     switch (executor.kind) {
@@ -1086,7 +1096,10 @@ export class ServerService {
     }
 
     const canceled = this.#store.cancelFlowRuns(flowId, maintenanceBatchSize)
-    for (const runId of canceled) this.#active.get(runId)?.abort(new Error('Flow retired.'))
+    for (const runId of canceled) {
+      const active = this.#active.get(runId)
+      if (active != null) Effect.runSync(Deferred.succeed(active, undefined))
+    }
     if (canceled.length > 0) return 0
     if (this.#runningFlows.has(flowId)) return maintenanceRetryMs
     if (this.#store.flowHasIntegrationState(flowId)) return nextDelay

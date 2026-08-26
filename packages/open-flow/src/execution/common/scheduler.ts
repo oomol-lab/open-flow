@@ -91,7 +91,6 @@ interface TaskInvocationBase {
   readonly jobId: string
   readonly nodeId: string
   readonly runId: string
-  readonly signal: AbortSignal
 }
 
 export type TaskInvocation = TaskInvocationBase &
@@ -109,13 +108,12 @@ export interface SchedulerFailure {
 
 export interface FlowRunOptions {
   readonly createId: () => string
-  readonly emit?: (event: SchedulerEvent) => void | Promise<void>
+  readonly emit?: (event: SchedulerEvent) => Effect.Effect<void, Error>
   readonly flowId: string
   readonly inputs?: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>
-  readonly invokeTask: (invocation: TaskInvocation) => Promise<unknown>
+  readonly invokeTask: (invocation: TaskInvocation) => Effect.Effect<unknown, Error>
   readonly projectFailure?: (error: unknown) => SchedulerFailure
   readonly runId: string
-  readonly signal?: AbortSignal
   readonly trigger?: TriggerSeed
 }
 
@@ -405,21 +403,6 @@ function outputRecord(value: unknown, nodeId: string): Readonly<Record<string, J
   return value as Readonly<Record<string, JsonValue>>
 }
 
-function abortError(signal: AbortSignal): Error {
-  return signal.reason instanceof Error ? signal.reason : new Error('Run canceled.')
-}
-
-function awaitAbort(signal: AbortSignal): Effect.Effect<never, Error> {
-  return Effect.callback((resume) => {
-    const abort = (): void => {
-      resume(Effect.fail(abortError(signal)))
-    }
-    if (signal.aborted) abort()
-    else signal.addEventListener('abort', abort, { once: true })
-    return Effect.sync(() => signal.removeEventListener('abort', abort))
-  })
-}
-
 function runGraph(
   context: RunContext,
   target: GraphTarget,
@@ -547,18 +530,13 @@ function runGraph(
               break
             }
             case 'task': {
-              const result = yield* Effect.tryPromise({
-                try: (signal) =>
-                  context.invokeTask({
-                    input: nodeInputs,
-                    invocationId: context.createId(),
-                    jobId,
-                    nodeId,
-                    runId,
-                    signal,
-                    ...(node.task != null ? { capabilities: node.task.capabilities ?? [], moduleId: node.task.moduleId } : { taskId: node.taskId }),
-                  }),
-                catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+              const result = yield* context.invokeTask({
+                input: nodeInputs,
+                invocationId: context.createId(),
+                jobId,
+                nodeId,
+                runId,
+                ...(node.task != null ? { capabilities: node.task.capabilities ?? [], moduleId: node.task.moduleId } : { taskId: node.taskId }),
               })
               outputs = yield* Effect.try({
                 try: () => outputRecord(result, nodeId),
@@ -686,13 +664,7 @@ function runGraph(
 }
 
 export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect.Effect<FlowRunResult, Error> {
-  const emit = (event: SchedulerEvent): Effect.Effect<void, Error> =>
-    options.emit == null
-      ? Effect.void
-      : Effect.tryPromise({
-          try: () => Promise.resolve(options.emit?.(event)),
-          catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-        })
+  const emit = options.emit ?? (() => Effect.void)
   const program = Effect.gen(function* () {
     const triggerNode = options.trigger == null ? undefined : prepared.graph.nodes[options.trigger.nodeId]
     if (options.trigger != null && (triggerNode == null || 'inputs' in triggerNode)) {
@@ -709,7 +681,7 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
       options.trigger,
     )) as FlowRunResult
   })
-  return options.signal == null ? program : Effect.raceFirst(program, awaitAbort(options.signal))
+  return program
 }
 
 function executableGraph(graph: Graph): ExecutableGraph {

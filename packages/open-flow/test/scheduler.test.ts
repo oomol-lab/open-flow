@@ -2,7 +2,9 @@ import type { FlowRunOptions, SchedulerEvent, TaskInvocation } from '../src/exec
 import type { ConditionOperator, JsonValue, RevisionContent } from '../src/flow/common/change.ts'
 import type { PreparedFlow } from '../src/flow/common/semantics.ts'
 
+import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
+import * as Fiber from 'effect/Fiber'
 import { describe, expect, it } from 'vitest'
 import { currentEngineContract } from '../src/execution/common/runtime.ts'
 import { runFlow as scheduleFlow } from '../src/execution/common/scheduler.ts'
@@ -66,8 +68,8 @@ function revision(document: RevisionContent['document'], exports: readonly strin
   }
 }
 
-function waitForAbort({ signal }: TaskInvocation): Promise<never> {
-  return new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+function waitForever(_invocation: TaskInvocation): Effect.Effect<never> {
+  return Effect.never
 }
 
 describe('revision graph scheduler', () => {
@@ -102,11 +104,12 @@ describe('revision graph scheduler', () => {
     const invoked: string[] = []
     const events: SchedulerEvent[] = []
     const result = await runFlow(prepared, {
-      emit: (event) => void events.push(event),
-      invokeTask: async (invocation) => {
-        invoked.push(invocation.nodeId)
-        return { event: invocation.input.event }
-      },
+      emit: (event) => Effect.sync(() => void events.push(event)),
+      invokeTask: (invocation) =>
+        Effect.sync(() => {
+          invoked.push(invocation.nodeId)
+          return { event: invocation.input.event }
+        }),
       runId: 'run-trigger',
       trigger: { nodeId: 'incoming', payload: { action: 'opened' } },
     })
@@ -120,10 +123,11 @@ describe('revision graph scheduler', () => {
 
     invoked.length = 0
     const manual = await runFlow(prepared, {
-      invokeTask: async (invocation) => {
-        invoked.push(invocation.nodeId)
-        return { event: invocation.input.event }
-      },
+      invokeTask: (invocation) =>
+        Effect.sync(() => {
+          invoked.push(invocation.nodeId)
+          return { event: invocation.input.event }
+        }),
       runId: 'run-manual',
     })
     expect(invoked).toEqual([])
@@ -158,10 +162,8 @@ describe('revision graph scheduler', () => {
     const prepared = await prepareFlow(source, 'main', engine)
     const events: SchedulerEvent[] = []
     const result = await runFlow(prepared, {
-      emit: (event) => void events.push(event),
-      invokeTask: async () => {
-        throw new Error('Value nodes must not invoke a Task.')
-      },
+      emit: (event) => Effect.sync(() => void events.push(event)),
+      invokeTask: () => Effect.fail(new Error('Value nodes must not invoke a Task.')),
       runId: 'run-value',
     })
 
@@ -231,13 +233,15 @@ describe('revision graph scheduler', () => {
     const events: SchedulerEvent[] = []
     const invoked: string[] = []
     const result = await runFlow(prepared, {
-      emit: (event) => void events.push(event),
+      emit: (event) => Effect.sync(() => void events.push(event)),
       inputs: { source: { value: 7 } },
-      async invokeTask(invocation) {
-        invoked.push(invocation.nodeId)
-        if (invocation.nodeId == 'source') return { value: invocation.input.value }
-        if (invocation.nodeId == 'double') return { value: (invocation.input.value as number) * 2 }
-        return { value: 'low' }
+      invokeTask(invocation) {
+        return Effect.sync(() => {
+          invoked.push(invocation.nodeId)
+          if (invocation.nodeId == 'source') return { value: invocation.input.value }
+          if (invocation.nodeId == 'double') return { value: (invocation.input.value as number) * 2 }
+          return { value: 'low' }
+        })
       },
       runId: 'run-condition',
     })
@@ -324,10 +328,11 @@ describe('revision graph scheduler', () => {
       const prepared = await prepareFlow(source, 'main', engine)
       const invoked: string[] = []
       await runFlow(prepared, {
-        invokeTask: async (invocation) => {
-          invoked.push(invocation.nodeId)
-          return {}
-        },
+        invokeTask: (invocation) =>
+          Effect.sync(() => {
+            invoked.push(invocation.nodeId)
+            return {}
+          }),
         runId: `condition-${operator}`,
       })
 
@@ -395,10 +400,11 @@ describe('revision graph scheduler', () => {
     const prepared = await prepareFlow(source, 'main', engine)
     const invoked: string[] = []
     await runFlow(prepared, {
-      invokeTask: async (invocation) => {
-        invoked.push(invocation.nodeId)
-        return {}
-      },
+      invokeTask: (invocation) =>
+        Effect.sync(() => {
+          invoked.push(invocation.nodeId)
+          return {}
+        }),
       runId: 'condition-relations',
     })
 
@@ -439,18 +445,20 @@ describe('revision graph scheduler', () => {
     let maximumCollectors = 0
     const seen: JsonValue[] = []
     const result = await runFlow(prepared, {
-      async invokeTask(invocation) {
-        if (invocation.nodeId == 'a') {
-          await new Promise((resolve) => setTimeout(resolve, 20))
-          return { item: 'a' }
-        }
-        if (invocation.nodeId == 'b') return { item: 'b' }
-        activeCollectors += 1
-        maximumCollectors = Math.max(maximumCollectors, activeCollectors)
-        seen.push(invocation.input.item)
-        await new Promise((resolve) => setTimeout(resolve, 5))
-        activeCollectors -= 1
-        return { seen: invocation.input.item }
+      invokeTask(invocation) {
+        return Effect.gen(function* () {
+          if (invocation.nodeId == 'a') {
+            yield* Effect.sleep(20)
+            return { item: 'a' }
+          }
+          if (invocation.nodeId == 'b') return { item: 'b' }
+          activeCollectors += 1
+          maximumCollectors = Math.max(maximumCollectors, activeCollectors)
+          seen.push(invocation.input.item)
+          yield* Effect.sleep(5)
+          activeCollectors -= 1
+          return { seen: invocation.input.item }
+        })
       },
       runId: 'run-fifo',
     })
@@ -468,7 +476,7 @@ describe('revision graph scheduler', () => {
     ])
   })
 
-  it('enforces timeout and cancellation through each Task invocation signal', async () => {
+  it('enforces timeout and Fiber interruption for each Task invocation', async () => {
     const source = revision(
       {
         bindings: {},
@@ -480,34 +488,39 @@ describe('revision graph scheduler', () => {
     )
     const prepared = await prepareFlow(source, 'main', engine)
     const events: SchedulerEvent[] = []
-    await expect(runFlow(prepared, { emit: (event) => void events.push(event), invokeTask: waitForAbort, runId: 'run-timeout' })).rejects.toThrow('timed out')
+    await expect(
+      runFlow(prepared, {
+        emit: (event) => Effect.sync(() => void events.push(event)),
+        invokeTask: waitForever,
+        runId: 'run-timeout',
+      }),
+    ).rejects.toThrow('timed out')
     expect(events.filter((event) => event.type == 'node.failed')).toHaveLength(1)
     expect(events.filter((event) => event.type == 'run.failed')).toHaveLength(1)
 
     const slow = prepared.graph.nodes.slow!
     if (!('inputs' in slow)) throw new Error('Fixture slow node must be executable.')
-    const controller = new AbortController()
-    const canceled = runFlow(
-      { ...prepared, graph: { nodes: { slow: { ...slow, timeoutMs: undefined } } } },
-      { invokeTask: waitForAbort, runId: 'run-cancel', signal: controller.signal },
-    )
-    controller.abort(new Error('canceled by test'))
-    await expect(canceled).rejects.toThrow('canceled by test')
-
-    const raced = new AbortController()
-    await expect(
-      runFlow(
+    let interrupted = false
+    const canceled = Effect.runFork(
+      scheduleFlow(
         { ...prepared, graph: { nodes: { slow: { ...slow, timeoutMs: undefined } } } },
         {
-          invokeTask: async () => {
-            raced.abort(new Error('canceled during invocation'))
-            throw raced.signal.reason
-          },
-          runId: 'run-raced-cancel',
-          signal: raced.signal,
+          createId: () => `scheduler-${++nextId}`,
+          flowId: 'main',
+          invokeTask: () =>
+            Effect.never.pipe(
+              Effect.onInterrupt(() =>
+                Effect.sync(() => {
+                  interrupted = true
+                }),
+              ),
+            ),
+          runId: 'run-cancel',
         },
       ),
-    ).rejects.toThrow('canceled during invocation')
+    )
+    await Effect.runPromise(Fiber.interrupt(canceled))
+    expect(interrupted).toBe(true)
   })
 
   it('interrupts sibling Tasks after the first Node failure', async () => {
@@ -526,23 +539,24 @@ describe('revision graph scheduler', () => {
       ['fail', 'slow'],
     )
     const prepared = await prepareFlow(source, 'main', engine)
+    const slowStarted = Deferred.makeUnsafe<void>()
     let slowAborted = false
 
     await expect(
       runFlow(prepared, {
-        invokeTask: async (invocation) => {
-          if (invocation.nodeId == 'fail') throw new Error('first failed')
-          return await new Promise((_, reject) =>
-            invocation.signal.addEventListener(
-              'abort',
-              () => {
-                slowAborted = true
-                reject(invocation.signal.reason)
-              },
-              { once: true },
-            ),
-          )
-        },
+        invokeTask: (invocation) =>
+          invocation.nodeId == 'fail'
+            ? Deferred.await(slowStarted).pipe(Effect.andThen(Effect.fail(new Error('first failed'))))
+            : Effect.gen(function* () {
+                yield* Deferred.succeed(slowStarted, undefined)
+                return yield* Effect.never.pipe(
+                  Effect.onInterrupt(() =>
+                    Effect.sync(() => {
+                      slowAborted = true
+                    }),
+                  ),
+                )
+              }),
         runId: 'run-sibling-failure',
       }),
     ).rejects.toThrow('first failed')
@@ -574,10 +588,8 @@ describe('revision graph scheduler', () => {
 
     await expect(
       runFlow(prepared, {
-        emit: (event) => void events.push(event),
-        invokeTask: async () => {
-          throw new TaskError(code, message)
-        },
+        emit: (event) => Effect.sync(() => void events.push(event)),
+        invokeTask: () => Effect.fail(new TaskError(code, message)),
         runId: 'run-managed-failure',
       }),
     ).rejects.toMatchObject({ code })
