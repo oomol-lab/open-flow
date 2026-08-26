@@ -492,6 +492,8 @@ export class IsolatedVmHost {
   }
 }
 
+// Executor code runs in a child process outside Vitest coverage collection.
+/* v8 ignore start */
 async function execute(
   request: InvokeRequest,
   canceled: AbortSignal,
@@ -1045,3 +1047,4 @@ function runExecutor(): Effect.Effect<void> {
 if (process.argv[1] != null && fileURLToPath(import.meta.url) == process.argv[1] && process.argv[2] == '--executor') {
   void Effect.runPromise(runExecutor())
 }
+/* v8 ignore stop */

@@ -90,7 +90,7 @@
     "@unocss/preset-icons": "66.7.5",
     "@unocss/vite": "66.7.5",
     "@vitejs/plugin-react": "6.0.5",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "4.1.11",
     "@wopjs/async-seq": "^0.1.2",
     "@wopjs/cast": "^0.1.16",
     "@wopjs/disposable": "^0.1.24",

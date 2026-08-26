@@ -73,6 +73,36 @@ function waitForever(_invocation: TaskInvocation): Effect.Effect<never> {
 }
 
 describe('revision graph scheduler', () => {
+  it.each(['missing', 'capture'])('rejects Trigger input for non-Trigger node %s', async (nodeId) => {
+    const source = revision(
+      {
+        bindings: {},
+        graph: {
+          nodes: {
+            capture: {
+              concurrency: 1,
+              inputs: {},
+              kind: 'task',
+              task: task('capture', [], []),
+            },
+          },
+        },
+        subflows: {},
+        tasks: {},
+      },
+      ['capture'],
+    )
+    const prepared = await prepareFlow(source, 'main', engine)
+
+    await expect(
+      runFlow(prepared, {
+        invokeTask: () => Effect.fail(new Error('Invalid Trigger input must not invoke a Task.')),
+        runId: `run-invalid-trigger-${nodeId}`,
+        trigger: { nodeId, payload: null },
+      }),
+    ).rejects.toThrow(`Node "${nodeId}" is not a TriggerNode`)
+  })
+
   it('activates only the seeded Trigger downstream without scheduling Trigger nodes', async () => {
     const source = revision(
       {
@@ -256,6 +286,42 @@ describe('revision graph scheduler', () => {
     })
     expect(events.filter((event) => event.type == 'run.started').map((event) => event.flowId)).toEqual(['main', 'double-flow'])
     expect(events).toContainEqual(expect.objectContaining({ handle: 'high', nodeId: 'branch', type: 'node.output', value: 7 }))
+  })
+
+  it('passes a Subflow input directly to a Subflow output', async () => {
+    const source = revision(
+      {
+        bindings: {},
+        graph: {
+          nodes: {
+            source: { concurrency: 1, inputs: {}, kind: 'task', task: task('source', [], ['value']) },
+            nested: {
+              concurrency: 1,
+              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
+              kind: 'subflow',
+              subflowId: 'passthrough',
+            },
+          },
+        },
+        subflows: {
+          passthrough: {
+            graph: { nodes: {} },
+            inputs: [{ ...port, handle: 'value' }],
+            name: 'Passthrough',
+            outputs: [{ ...port, handle: 'value', sources: [{ input: 'value', kind: 'flow' }] }],
+          },
+        },
+        tasks: {},
+      },
+      ['source'],
+    )
+    const prepared = await prepareFlow(source, 'main', engine)
+    const result = await runFlow(prepared, {
+      invokeTask: () => Effect.succeed({ value: 42 }),
+      runId: 'run-passthrough',
+    })
+
+    expect(result.nodes).toEqual([{ jobs: [{ jobId: expect.any(String), outputs: { value: 42 } }], nodeId: 'nested' }])
   })
 
   it.each([
