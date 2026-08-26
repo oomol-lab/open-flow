@@ -16,10 +16,7 @@ import {
   TransientIntegrationError,
 } from '@oomol-lab/open-flow/integration-trigger'
 import * as Effect from 'effect/Effect'
-import * as Fiber from 'effect/Fiber'
-import * as FiberMap from 'effect/FiberMap'
-import * as FiberSet from 'effect/FiberSet'
-import * as Scope from 'effect/Scope'
+import * as Semaphore from 'effect/Semaphore'
 import { ConnectorTaskError } from './connector.ts'
 import { AcceptanceError } from './error.ts'
 import { errorKind } from './logger.ts'
@@ -59,7 +56,6 @@ type ValidateFlow = (revision: RevisionContent) => Promise<{ readonly content: s
 
 const batchSize = 100
 const retryMs = 1_000
-const maxTimerDelayMs = 2_147_483_647
 
 export class IntegrationRuntime {
   readonly #callbackKey?: string
@@ -67,21 +63,16 @@ export class IntegrationRuntime {
   readonly #connector?: ConnectorHost
   readonly #definitions: ReadonlyMap<string, IntegrationDefinition>
   readonly #logger: Logger
+  readonly #lock = Semaphore.makeUnsafe(1)
   readonly #publicOrigin?: string
   readonly #retrying = new Set<string>()
   readonly #store: Store
   readonly #validateFlow: ValidateFlow
   readonly #wake: () => void
   readonly #runCreated: (flowId: string, runId: string) => void
-  readonly #ticks: FiberSet.FiberSet<void, unknown>
-  readonly #timers: FiberMap.FiberMap<string, void>
-  #failure?: unknown
-  #started = false
-  #ticking?: Promise<void>
 
   constructor(
     store: Store,
-    scope: Scope.Scope,
     connector: ConnectorHost | undefined,
     clock: () => number,
     options: IntegrationOptions | undefined,
@@ -98,36 +89,9 @@ export class IntegrationRuntime {
     this.#logger = logger.child({ component: 'integration' })
     this.#publicOrigin = options == null ? undefined : new URL(options.publicOrigin).origin
     this.#store = store
-    this.#ticks = Effect.runSync(FiberSet.make<void, unknown>().pipe(Scope.provide(scope)))
-    this.#timers = Effect.runSync(FiberMap.make<string, void>().pipe(Scope.provide(scope)))
     this.#validateFlow = validateFlow
     this.#wake = wake
     this.#runCreated = runCreated
-  }
-
-  arm(): void {
-    Effect.runSync(FiberMap.remove(this.#timers, 'reconcile'))
-    if (!this.#started || this.#failure != null || this.#ticking != null) return
-    const nextAt = this.#store.triggers.nextIntegrationAt()
-    if (nextAt == null) return
-    const delay = Math.max(0, Math.min(nextAt - this.#clock(), maxTimerDelayMs))
-    Effect.runSync(
-      FiberMap.run(
-        this.#timers,
-        'reconcile',
-        Effect.sleep(delay).pipe(
-          Effect.andThen(
-            Effect.sync(() => {
-              void this.tick().catch((error: unknown) => this.#fail(error))
-            }),
-          ),
-        ),
-      ),
-    )
-  }
-
-  ready(): boolean {
-    return this.#started && this.#failure == null
   }
 
   bindings(revision: RevisionContent, prepared: PreparedFlow, publishedAt: number) {
@@ -159,11 +123,6 @@ export class IntegrationRuntime {
     return this.#store.triggers.integrationBinding(flowId, triggerNodeId)?.endpointId
   }
 
-  start(): void {
-    this.#started = true
-    this.arm()
-  }
-
   state(flowId: string, triggerNodeId: string): IntegrationRuntimeState | undefined {
     const binding = this.#store.triggers.integrationBinding(flowId, triggerNodeId)
     if (binding == null) return
@@ -176,11 +135,6 @@ export class IntegrationRuntime {
       runtimeVersion: binding.runtimeVersion,
       subscription: state == null ? null : (JSON.parse(state.subscriptionJson) as Readonly<Record<string, JsonValue>>),
     }
-  }
-
-  stop(): void {
-    this.#started = false
-    Effect.runSync(FiberMap.remove(this.#timers, 'reconcile'))
   }
 
   target(endpointId: string): IntegrationTarget | undefined {
@@ -208,43 +162,15 @@ export class IntegrationRuntime {
     }
   }
 
-  async tick(at = new Date(this.#clock()).toISOString()): Promise<void> {
-    const now = Date.parse(at)
-    if (!Number.isFinite(now)) throw new TypeError('Integration tick time must be an ISO timestamp.')
-    const previous = this.#ticking
-    const fiber = Effect.runSync(
-      FiberSet.run(
-        this.#ticks,
-        Effect.tryPromise({
-          try: async () => {
-            await previous
-            await this.#tick(now)
-          },
-          catch: (error) => error,
-        }),
-      ),
+  tick(at = new Date(this.#clock()).toISOString()): Effect.Effect<void, unknown> {
+    return this.#lock.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const now = Date.parse(at)
+        if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Integration tick time must be an ISO timestamp.'))
+        yield* this.#tick(now)
+        this.#wake()
+      }),
     )
-    const ticking = Effect.runPromise(Fiber.join(fiber))
-    this.#ticking = ticking
-    let succeeded = false
-    try {
-      await ticking
-      succeeded = true
-    } finally {
-      if (this.#ticking == ticking) {
-        this.#ticking = undefined
-        if (succeeded) this.arm()
-      }
-    }
-  }
-
-  async waitForIdle(): Promise<void> {
-    while (this.#ticking != null) {
-      const ticking = this.#ticking
-      await Effect.runPromise(FiberSet.awaitEmpty(this.#ticks))
-      await ticking
-    }
-    if (this.#failure != null) throw this.#failure
   }
 
   async receive(
@@ -335,28 +261,38 @@ export class IntegrationRuntime {
     return { status: target.trigger.definition.endpoint.successStatus }
   }
 
-  async #reconcile(binding: StoredIntegrationBinding, now: number): Promise<void> {
-    try {
-      const callbackSecret = await integrationCallbackSecret(this.#callbackKey, binding.endpointId)
+  #reconcile(binding: StoredIntegrationBinding, now: number): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const callbackSecret = yield* Effect.tryPromise({
+        try: () => integrationCallbackSecret(this.#callbackKey, binding.endpointId),
+        catch: (error) => error,
+      })
       const endpointUrl = `${this.#publicOrigin}/v1/integrations/${binding.endpointId}`
       let state = this.#store.triggers.integrationState(binding.bindingId)
       let retiredPrevious = false
       if (state != null && state.runtimeVersion != binding.runtimeVersion) {
-        const previous = this.#trigger(state.triggerJson)
-        const outcome = await previous.definition.reconcile({
-          active: false,
-          callbackSecret,
-          config: previous.trigger.config,
-          connector: this.#connectorProxy(previous.definition, binding.bindingId, state.connectionId),
-          endpointUrl,
-          now: new Date(now),
-          signal: AbortSignal.timeout(30_000),
-          state: this.#stateContext(state, now),
+        const previousState = state
+        const previous = this.#trigger(previousState.triggerJson)
+        const outcome = yield* Effect.tryPromise({
+          try: () =>
+            previous.definition.reconcile({
+              active: false,
+              callbackSecret,
+              config: previous.trigger.config,
+              connector: this.#connectorProxy(previous.definition, binding.bindingId, previousState.connectionId),
+              endpointUrl,
+              now: new Date(now),
+              signal: AbortSignal.timeout(30_000),
+              state: this.#stateContext(previousState, now),
+            }),
+          catch: (error) => error,
         })
-        if (outcome.outcome == 'pending') throw new TransientIntegrationError('Previous Integration subscription is still retiring.')
-        this.#store.triggers.deleteIntegrationState(binding.bindingId, state.runtimeVersion)
+        if (outcome.outcome == 'pending') {
+          return yield* Effect.fail(new TransientIntegrationError('Previous Integration subscription is still retiring.'))
+        }
+        this.#store.triggers.deleteIntegrationState(binding.bindingId, previousState.runtimeVersion)
         state = this.#store.triggers.integrationState(binding.bindingId)
-        if (state != null) throw new TransientIntegrationError('Previous Integration subscription is still retiring.')
+        if (state != null) return yield* Effect.fail(new TransientIntegrationError('Previous Integration subscription is still retiring.'))
         retiredPrevious = true
       }
 
@@ -364,17 +300,23 @@ export class IntegrationRuntime {
       const resolved = this.#trigger(binding.triggerJson)
       if (!active) {
         if (!retiredPrevious && (state != null || resolved.definition.initialState == null)) {
-          const outcome = await resolved.definition.reconcile({
-            active: false,
-            callbackSecret,
-            config: resolved.trigger.config,
-            connector: this.#connectorProxy(resolved.definition, binding.bindingId, binding.connectionId),
-            endpointUrl,
-            now: new Date(now),
-            signal: AbortSignal.timeout(30_000),
-            ...(state == null ? {} : { state: this.#stateContext(state, now) }),
+          const outcome = yield* Effect.tryPromise({
+            try: () =>
+              resolved.definition.reconcile({
+                active: false,
+                callbackSecret,
+                config: resolved.trigger.config,
+                connector: this.#connectorProxy(resolved.definition, binding.bindingId, binding.connectionId),
+                endpointUrl,
+                now: new Date(now),
+                signal: AbortSignal.timeout(30_000),
+                ...(state == null ? {} : { state: this.#stateContext(state, now) }),
+              }),
+            catch: (error) => error,
           })
-          if (outcome.outcome == 'pending') throw new TransientIntegrationError('Integration subscription is still retiring.')
+          if (outcome.outcome == 'pending') {
+            return yield* Effect.fail(new TransientIntegrationError('Integration subscription is still retiring.'))
+          }
           if (state != null) this.#store.triggers.deleteIntegrationState(binding.bindingId, state.runtimeVersion)
         }
         this.#store.triggers.markIntegrationSynced(binding.bindingId, binding.runtimeVersion, false, now)
@@ -386,19 +328,27 @@ export class IntegrationRuntime {
         const initial = resolved.definition.initialState ?? { checkpoint: null, subscription: {} }
         this.#store.triggers.createIntegrationState(binding, initial.checkpoint, initial.subscription, now)
         state = this.#store.triggers.integrationState(binding.bindingId)
-        if (state == null || state.runtimeVersion != binding.runtimeVersion) throw new TransientIntegrationError('Integration runtime state changed.')
+        if (state == null || state.runtimeVersion != binding.runtimeVersion) {
+          return yield* Effect.fail(new TransientIntegrationError('Integration runtime state changed.'))
+        }
       }
-      const outcome = await resolved.definition.reconcile({
-        active: true,
-        callbackSecret,
-        config: resolved.trigger.config,
-        connector: this.#connectorProxy(resolved.definition, binding.bindingId, binding.connectionId),
-        endpointUrl,
-        now: new Date(now),
-        signal: AbortSignal.timeout(30_000),
-        state: this.#stateContext(state, now),
+      const outcome = yield* Effect.tryPromise({
+        try: () =>
+          resolved.definition.reconcile({
+            active: true,
+            callbackSecret,
+            config: resolved.trigger.config,
+            connector: this.#connectorProxy(resolved.definition, binding.bindingId, binding.connectionId),
+            endpointUrl,
+            now: new Date(now),
+            signal: AbortSignal.timeout(30_000),
+            state: this.#stateContext(state, now),
+          }),
+        catch: (error) => error,
       })
-      if (outcome.outcome == 'pending') throw new TransientIntegrationError('Integration subscription is still converging.')
+      if (outcome.outcome == 'pending') {
+        return yield* Effect.fail(new TransientIntegrationError('Integration subscription is still converging.'))
+      }
       const synced = this.#store.triggers.markIntegrationSynced(binding.bindingId, binding.runtimeVersion, true, now)
       const retried = this.#retrying.delete(binding.bindingId)
       if (synced && (binding.health != 'healthy' || retried)) {
@@ -413,32 +363,38 @@ export class IntegrationRuntime {
           'Integration Trigger is healthy.',
         )
       }
-    } catch (error) {
-      const health = failure(error)
-      this.#store.triggers.failIntegration(
-        binding.bindingId,
-        binding.runtimeVersion,
-        health == null
-          ? { retryAt: now + retryMs }
-          : { errorCode: health == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid', health, now },
-      )
-      const fields = {
-        bindingId: binding.bindingId,
-        flowId: binding.flowId,
-        runtimeVersion: binding.runtimeVersion,
-        triggerNodeId: binding.triggerNodeId,
-        ...errorKind(error),
-      }
-      if (health == null) {
-        if (!this.#retrying.has(binding.bindingId)) {
-          this.#logger.warn({ category: 'trigger.integration.retrying', retryAt: now + retryMs, ...fields }, 'Integration Trigger will be retried.')
-        }
-        this.#retrying.add(binding.bindingId)
-      } else {
-        this.#retrying.delete(binding.bindingId)
-        this.#logger.warn({ category: 'trigger.integration.health_changed', health, ...fields }, 'Integration Trigger health changed.')
-      }
-    }
+    }).pipe(
+      Effect.matchEffect({
+        onFailure: (error) =>
+          Effect.sync(() => {
+            const health = failure(error)
+            this.#store.triggers.failIntegration(
+              binding.bindingId,
+              binding.runtimeVersion,
+              health == null
+                ? { retryAt: now + retryMs }
+                : { errorCode: health == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid', health, now },
+            )
+            const fields = {
+              bindingId: binding.bindingId,
+              flowId: binding.flowId,
+              runtimeVersion: binding.runtimeVersion,
+              triggerNodeId: binding.triggerNodeId,
+              ...errorKind(error),
+            }
+            if (health == null) {
+              if (!this.#retrying.has(binding.bindingId)) {
+                this.#logger.warn({ category: 'trigger.integration.retrying', retryAt: now + retryMs, ...fields }, 'Integration Trigger will be retried.')
+              }
+              this.#retrying.add(binding.bindingId)
+            } else {
+              this.#retrying.delete(binding.bindingId)
+              this.#logger.warn({ category: 'trigger.integration.health_changed', health, ...fields }, 'Integration Trigger health changed.')
+            }
+          }),
+        onSuccess: () => Effect.void,
+      }),
+    )
   }
 
   #connectorProxy(definition: IntegrationDefinition, bindingId: string, connectionId: string): ConnectorProxy {
@@ -484,18 +440,16 @@ export class IntegrationRuntime {
     }
   }
 
-  async #tick(now: number): Promise<void> {
-    while (true) {
-      const bindings = this.#store.triggers.dueIntegrations(now, batchSize)
-      if (bindings.length == 0) return
-      for (const binding of bindings) await this.#reconcile(binding, now)
-    }
-  }
-
-  #fail(error: unknown): void {
-    if (this.#failure != null) return
-    this.#failure = error
-    this.#logger.error({ category: 'trigger.integration.loop.failed', err: error }, 'Integration Trigger processing stopped.')
+  #tick(now: number): Effect.Effect<void, unknown> {
+    return Effect.gen({ self: this }, function* () {
+      while (true) {
+        const bindings = this.#store.triggers.dueIntegrations(now, batchSize)
+        if (bindings.length == 0) return
+        for (const binding of bindings) {
+          yield* this.#reconcile(binding, now)
+        }
+      }
+    })
   }
 
   #trigger(triggerJson: string): {

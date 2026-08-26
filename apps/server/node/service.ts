@@ -4,7 +4,6 @@ import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { IntegrationDefinition } from '@oomol-lab/open-flow/integration-trigger'
 import type { PollDefinition } from '@oomol-lab/open-flow/poll-trigger'
 import type { ProviderTriggerDefinition } from '@oomol-lab/open-flow/provider-triggers'
-import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { InvokeLlmTask, RuntimeCapabilityCall, RuntimeCapabilityResponse } from '@oomol-lab/open-flow/runtime-contract'
 import type { TaskInvocation } from '@oomol-lab/open-flow/scheduler'
 import type { Logger } from 'pino'
@@ -31,11 +30,15 @@ import { createEventProjector } from '@oomol-lab/open-flow/run-events'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { runFlow } from '@oomol-lab/open-flow/scheduler'
 import * as Cause from 'effect/Cause'
+import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
+import * as Fiber from 'effect/Fiber'
 import * as FiberMap from 'effect/FiberMap'
 import * as FiberSet from 'effect/FiberSet'
+import * as Queue from 'effect/Queue'
 import * as Scope from 'effect/Scope'
+import * as Semaphore from 'effect/Semaphore'
 import { randomUUID } from 'node:crypto'
 import { ConnectorTaskError } from './connector.ts'
 import { ControlService } from './control-service.ts'
@@ -115,6 +118,10 @@ const admissionRetryMs = 1_000
 const defaultMaxConcurrentRuns = 4
 const defaultRunTimeoutMs = 30 * 60 * 1_000
 
+function finishWaiters(waiters: readonly Deferred.Deferred<void>[]): Effect.Effect<void> {
+  return Effect.forEach(waiters, (deferred) => Deferred.succeed(deferred, undefined), { discard: true })
+}
+
 type TaskErrorCode = 'capability.denied' | 'capability.invalid' | 'llm.output-invalid' | 'llm.unavailable'
 
 class TaskHostError extends Error {
@@ -132,26 +139,29 @@ export class ServerService {
   readonly #active = new Map<string, AbortController>()
   readonly #clock: () => number
   readonly #connector?: ConnectorHost
+  readonly #cronLock = Semaphore.makeUnsafe(1)
   readonly #integration: IntegrationRuntime
   readonly #isolatedVm = new IsolatedVmHost()
   readonly #logger: Logger
   readonly #llm?: InvokeLlmTask
   readonly #maxConcurrentRuns: number
+  readonly #maintenanceLock = Semaphore.makeUnsafe(1)
   readonly #pollDefinitions: ReadonlyMap<string, PollDefinition>
+  readonly #pollLock = Semaphore.makeUnsafe(1)
   readonly #scope = Scope.makeUnsafe('parallel')
   readonly #flowCatalogSubscribers = new Set<(event: FlowCatalogEvent) => void>()
   readonly #flowSubscribers = new Map<string, Set<(event: FlowChangeEvent) => void>>()
   readonly #runningFlows = new Set<string>()
   readonly #runTimeoutMs: number
+  readonly #signals = Effect.runSync(Queue.unbounded<Deferred.Deferred<void> | undefined>())
   readonly #store: Store
-  readonly #timers = Effect.runSync(FiberMap.make<string>().pipe(Scope.provide(this.#scope)))
-  readonly #workers = Effect.runSync(FiberSet.make<void>().pipe(Scope.provide(this.#scope)))
-  #cronTicking?: Promise<void>
+  readonly #tasks = Effect.runSync(FiberMap.make<string, void, never>().pipe(Scope.provide(this.#scope)))
+  readonly #workers = Effect.runSync(FiberSet.make<void, never>().pipe(Scope.provide(this.#scope)))
   #cronRetryAt?: number
   #failure?: unknown
-  #maintenanceTicking?: Promise<void>
-  #pollTicking?: Promise<void>
+  #maintenanceAt = 0
   #started = false
+  #supervisor?: Fiber.Fiber<void>
 
   private constructor(
     store: Store,
@@ -177,13 +187,11 @@ export class ServerService {
       store,
       clock,
       (runId) => this.#active.get(runId)?.abort(new Error('Run canceled.')),
-      () => this.#wake(),
+      () => this.#signal(),
       (input) => this.publishFlow(input),
       () => {
-        this.#armCron()
-        this.#integration.arm()
-        this.#armPoll()
-        this.#armMaintenance(0)
+        this.#maintenanceAt = this.#clock()
+        this.#signal()
       },
       snapshots,
       (flowId, triggerNodeId) => this.#testPollTrigger(flowId, triggerNodeId),
@@ -194,13 +202,12 @@ export class ServerService {
     )
     this.#integration = new IntegrationRuntime(
       store,
-      this.#scope,
       connector,
       clock,
       runtime.integration,
       integrationDefinitions,
       validatedFlow,
-      () => this.#wake(),
+      () => this.#signal(),
       (flowId, runId) => this.#runCreated(flowId, runId),
       logger,
     )
@@ -376,7 +383,7 @@ export class ServerService {
       triggerNodeId: target.triggerNodeId,
     })
     if (accepted?.kind == 'accepted' && accepted.created) this.#runCreated(target.flowId, accepted.runId)
-    if (accepted != null) this.#wake()
+    if (accepted != null) this.#signal()
     return accepted
   }
 
@@ -468,9 +475,7 @@ export class ServerService {
       revisionId: input.revisionId,
       webhooks,
     })
-    this.#armCron()
-    this.#integration.arm()
-    this.#armPoll()
+    this.#signal()
     return accepted
   }
 
@@ -485,9 +490,9 @@ export class ServerService {
 
   async close(): Promise<void> {
     this.#started = false
-    this.#integration.stop()
+    this.#signal()
     try {
-      await Effect.runPromise(FiberMap.clear(this.#timers))
+      if (this.#supervisor != null) await Effect.runPromise(Fiber.join(this.#supervisor))
       await this.waitForIdle()
     } finally {
       await Effect.runPromise(Scope.close(this.#scope, Exit.void))
@@ -520,7 +525,7 @@ export class ServerService {
   }
 
   async ready(): Promise<boolean> {
-    return this.#started && this.#failure == null && this.#integration.ready() && (this.#connector == null || (await this.#connector.ready()))
+    return this.#started && this.#failure == null && (this.#connector == null || (await this.#connector.ready()))
   }
 
   run(runId: string): RunRecord | undefined {
@@ -529,97 +534,43 @@ export class ServerService {
 
   start(): void {
     this.#started = true
-    this.#armCron()
-    this.#integration.start()
-    this.#armPoll()
-    this.#armMaintenance(0)
-    this.#wake()
+    this.#maintenanceAt = this.#clock()
+    this.#supervisor = Effect.runFork(this.#supervise())
+    this.#signal()
   }
 
-  async tickCron(at = new Date(this.#clock()).toISOString()): Promise<void> {
-    const now = Date.parse(at)
-    if (!Number.isFinite(now)) throw new TypeError('Cron tick time must be an ISO timestamp.')
-    const previous = this.#cronTicking
-    const ticking = (previous ?? Promise.resolve()).then(() => this.#tickCron(now))
-    this.#cronTicking = ticking
-    let succeeded = false
-    try {
-      await ticking
-      succeeded = true
-    } finally {
-      if (this.#cronTicking == ticking) {
-        this.#cronTicking = undefined
-        if (succeeded) this.#armCron()
-      }
-    }
+  tickCron(at = new Date(this.#clock()).toISOString()): Promise<void> {
+    return Effect.runPromise(this.#cron(at))
   }
 
-  async tickPoll(at = new Date(this.#clock()).toISOString()): Promise<void> {
-    const now = Date.parse(at)
-    if (!Number.isFinite(now)) throw new TypeError('Poll tick time must be an ISO timestamp.')
-    const previous = this.#pollTicking
-    const ticking = (previous ?? Promise.resolve()).then(() => this.#tickPoll(now))
-    this.#pollTicking = ticking
-    let succeeded = false
-    try {
-      await ticking
-      succeeded = true
-    } finally {
-      if (this.#pollTicking == ticking) {
-        this.#pollTicking = undefined
-        if (succeeded) this.#armPoll()
-      }
-    }
+  tickPoll(at = new Date(this.#clock()).toISOString()): Promise<void> {
+    return Effect.runPromise(this.#pollDue(at))
   }
 
-  async tickIntegration(at = new Date(this.#clock()).toISOString()): Promise<void> {
-    await this.#integration.tick(at)
+  tickIntegration(at = new Date(this.#clock()).toISOString()): Promise<void> {
+    return Effect.runPromise(this.#integration.tick(at))
   }
 
-  async tickMaintenance(at = new Date(this.#clock()).toISOString()): Promise<void> {
-    const now = Date.parse(at)
-    if (!Number.isFinite(now)) throw new TypeError('Maintenance tick time must be an ISO timestamp.')
-    const previous = this.#maintenanceTicking
-    let nextDelay = maintenanceIntervalMs
-    const ticking = (previous ?? Promise.resolve()).then(() => {
-      nextDelay = this.#maintain(now)
-    })
-    this.#maintenanceTicking = ticking
-    let succeeded = false
-    try {
-      await ticking
-      succeeded = true
-    } finally {
-      if (this.#maintenanceTicking == ticking) {
-        this.#maintenanceTicking = undefined
-        if (succeeded) this.#armMaintenance(nextDelay)
-      }
-    }
+  tickMaintenance(at = new Date(this.#clock()).toISOString()): Promise<void> {
+    return Effect.runPromise(this.#maintenance(at))
   }
 
   pollState(flowId: string, triggerNodeId: string): PollState | undefined {
     return this.#store.triggers.pollState(flowId, triggerNodeId)
   }
 
-  async processPollOccurrence(input: PollOccurrenceInput): Promise<void> {
-    const now = Date.parse(input.occurredAt)
-    if (!Number.isFinite(now)) throw new TypeError('Poll occurrence time must be an ISO timestamp.')
-    const previous = this.#pollTicking
-    const ticking = (previous ?? Promise.resolve()).then(async () => {
-      const target = this.#store.triggers.pollTarget(input.bindingId, input.runtimeVersion)
-      if (target != null) await this.#poll(target, input.occurrenceId, now)
-    })
-    this.#pollTicking = ticking
-    let succeeded = false
-    try {
-      await ticking
-      succeeded = true
-    } finally {
-      if (this.#pollTicking == ticking) {
-        this.#pollTicking = undefined
-        if (succeeded) this.#armPoll()
-      }
-    }
+  processPollOccurrence(input: PollOccurrenceInput): Promise<void> {
+    return Effect.runPromise(
+      this.#pollLock.withPermit(
+        Effect.gen({ self: this }, function* () {
+          const now = Date.parse(input.occurredAt)
+          if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Poll occurrence time must be an ISO timestamp.'))
+          const target = this.#store.triggers.pollTarget(input.bindingId, input.runtimeVersion)
+          if (target != null) yield* this.#poll(target, input.occurrenceId, now)
+          this.#signal()
+        }),
+      ),
+    )
   }
 
   integrationEndpoint(flowId: string, triggerNodeId: string): string | undefined {
@@ -654,299 +605,416 @@ export class ServerService {
   }
 
   async waitForIdle(): Promise<void> {
-    while (this.#cronTicking != null) await this.#cronTicking
-    await this.#integration.waitForIdle()
-    while (this.#pollTicking != null) await this.#pollTicking
-    while (this.#maintenanceTicking != null) await this.#maintenanceTicking
-    while (Effect.runSync(FiberSet.size(this.#workers)) > 0) await Effect.runPromise(FiberSet.awaitEmpty(this.#workers))
+    if (this.#failure != null) throw this.#failure
+    if (this.#started) {
+      const settled = Deferred.makeUnsafe<void>()
+      Queue.offerUnsafe(this.#signals, settled)
+      await Effect.runPromise(Deferred.await(settled))
+    } else {
+      await Effect.runPromise(FiberMap.awaitEmpty(this.#tasks))
+      await Effect.runPromise(FiberSet.awaitEmpty(this.#workers))
+    }
     if (this.#failure != null) throw this.#failure
   }
 
-  async #dispatch(run: StoredRun): Promise<void> {
-    let prepared: Awaited<ReturnType<typeof prepareFlow>>
-    let projectEvent: ReturnType<typeof createEventProjector>
-    let started: ProjectedRunEvent | undefined
-    try {
-      if (run.engineDigest != isolatedVmEngineDigest) throw new Error('Fixed Run Engine implementation is not available.')
-      if ((await digestBytes(encoder.encode(run.content))) != run.revisionDigest) throw new Error('Fixed Flow Revision digest does not match stored content.')
-      const revision = JSON.parse(run.content) as RevisionContent
-      prepared = await prepareFlow(revision, run.engineContract)
-      if (prepared.kind != 'prepared') throw new Error(`Fixed Flow Revision can no longer be prepared: ${prepared.kind}.`)
-      projectEvent = createEventProjector(run.runId, nodeFailureCodes)
-      started = await projectEvent({ flowId: run.flowId, runId: run.runId, type: 'run.started' })
-    } catch (error) {
-      if (
-        this.#store.failStarting(run.runId, {
-          error: { code: 'execution.unavailable', message: 'The fixed Run could not be started by this deployment.' },
+  #dispatch(run: StoredRun): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const start = yield* Effect.gen({ self: this }, function* () {
+        if (run.engineDigest != isolatedVmEngineDigest) {
+          return yield* Effect.fail(new Error('Fixed Run Engine implementation is not available.'))
+        }
+        const revisionDigest = yield* Effect.tryPromise({
+          try: () => digestBytes(encoder.encode(run.content)),
+          catch: (error) => error,
         })
-      ) {
-        this.#logger.error({ category: 'run.start_failed', flowId: run.flowId, runId: run.runId, ...errorKind(error) }, 'Run could not be started.')
-      }
-      return
-    }
-    if (started == null || !this.#store.start(run.runId, started)) return
-    const startedAt = performance.now()
-    this.#logger.info({ category: 'run.started', flowId: run.flowId, runId: run.runId }, 'Run started.')
+        if (revisionDigest != run.revisionDigest) {
+          return yield* Effect.fail(new Error('Fixed Flow Revision digest does not match stored content.'))
+        }
+        const revision = JSON.parse(run.content) as RevisionContent
+        const prepared = yield* Effect.tryPromise({
+          try: () => prepareFlow(revision, run.engineContract),
+          catch: (error) => error,
+        })
+        if (prepared.kind != 'prepared') {
+          return yield* Effect.fail(new Error(`Fixed Flow Revision can no longer be prepared: ${prepared.kind}.`))
+        }
+        const projectEvent = createEventProjector(run.runId, nodeFailureCodes)
+        const started = yield* Effect.tryPromise({
+          try: () => projectEvent({ flowId: run.flowId, runId: run.runId, type: 'run.started' }),
+          catch: (error) => error,
+        })
+        return { flow: prepared.flow, projectEvent, started }
+      }).pipe(
+        Effect.matchEffect({
+          onFailure: (error) =>
+            Effect.sync(() => {
+              if (
+                this.#store.failStarting(run.runId, {
+                  error: { code: 'execution.unavailable', message: 'The fixed Run could not be started by this deployment.' },
+                })
+              ) {
+                this.#logger.error({ category: 'run.start_failed', flowId: run.flowId, runId: run.runId, ...errorKind(error) }, 'Run could not be started.')
+              }
+            }).pipe(Effect.as(undefined)),
+          onSuccess: Effect.succeed,
+        }),
+      )
+      if (start == null || start.started == null || !this.#store.start(run.runId, start.started)) return
+      const startedAt = performance.now()
+      this.#logger.info({ category: 'run.started', flowId: run.flowId, runId: run.runId }, 'Run started.')
 
-    const cancellation = new AbortController()
-    const timeoutReason = new Error('Run exceeded its execution deadline.')
-    const timeout = setTimeout(() => cancellation.abort(timeoutReason), this.#runTimeoutMs)
-    this.#active.set(run.runId, cancellation)
-    try {
-      const output = await runFlow(prepared.flow, {
-        createId: randomUUID,
-        emit: async (event) => {
-          if (event.type == 'run.started' && event.runId == run.runId) return
-          const projected = await projectEvent(event)
-          if (projected != null) this.#store.append(run.runId, projected)
-        },
-        flowId: run.flowId,
-        inputs: run.inputs,
-        invokeTask: (invocation) => this.#invokeTask(prepared.flow, invocation),
-        projectFailure: (error) => {
-          if (error instanceof ConnectorTaskError) return { code: error.code, message: error.message }
-          if (error instanceof TaskHostError) return { code: error.code, message: error.message }
-          return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
-        },
-        runId: run.runId,
-        signal: cancellation.signal,
-        ...(run.trigger == null ? {} : { trigger: run.trigger }),
-      })
-      if (this.#store.commit(run.runId, 'completed', output)) {
-        this.#logger.info(
-          { category: 'run.completed', durationMs: Math.round(performance.now() - startedAt), flowId: run.flowId, runId: run.runId },
-          'Run completed.',
-        )
-      }
-    } catch (error) {
-      const timedOut = cancellation.signal.reason === timeoutReason
-      const result = timedOut
-        ? { error: { code: 'run.timeout', message: 'The Run exceeded its execution deadline.' } }
-        : { error: { code: 'run.failed', message: 'The Flow could not be completed.' } }
-      if (this.#store.commit(run.runId, 'failed', result)) {
-        this.#logger.error(
-          {
-            category: timedOut ? 'run.timed_out' : 'run.failed',
-            durationMs: Math.round(performance.now() - startedAt),
+      const cancellation = new AbortController()
+      const timeoutReason = new Error('Run exceeded its execution deadline.')
+      const timeout = setTimeout(() => cancellation.abort(timeoutReason), this.#runTimeoutMs)
+      this.#active.set(run.runId, cancellation)
+      yield* Effect.tryPromise({
+        try: () =>
+          runFlow(start.flow, {
+            createId: randomUUID,
+            emit: async (event) => {
+              if (event.type == 'run.started' && event.runId == run.runId) return
+              const projected = await start.projectEvent(event)
+              if (projected != null) this.#store.append(run.runId, projected)
+            },
             flowId: run.flowId,
+            inputs: run.inputs,
+            invokeTask: (invocation) => this.#invokeTask(start.flow, invocation),
+            projectFailure: (error) => {
+              if (error instanceof ConnectorTaskError) return { code: error.code, message: error.message }
+              if (error instanceof TaskHostError) return { code: error.code, message: error.message }
+              return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
+            },
             runId: run.runId,
-            ...errorKind(error),
-          },
-          'Run failed.',
-        )
-      }
-    } finally {
-      clearTimeout(timeout)
-      this.#active.delete(run.runId)
-    }
-  }
-
-  async #admitCron(target: StoredCronTarget, now: number): Promise<'admitted' | 'overloaded'> {
-    const fixed = await validatedFlow(JSON.parse(target.content) as RevisionContent)
-    const trigger = fixed.prepared.graph.nodes[target.triggerNodeId]
-    if (
-      fixed.revisionDigest != target.revisionDigest ||
-      fixed.prepared.closureDigest != target.closureDigest ||
-      trigger?.kind != 'cron' ||
-      JSON.stringify(trigger) != target.triggerJson ||
-      JSON.stringify(trigger.cronTimes) != target.scheduleJson
-    ) {
-      throw new Error('Fixed Cron Trigger target does not match its Publication.')
-    }
-    const scheduledAt = new Date(target.nextAt).toISOString()
-    const occurrenceId = await scheduledTriggerOccurrenceId(target.bindingId, target.runtimeVersion, scheduledAt)
-    const requestDigest = await digestBytes(
-      canonicalJsonBytes({
-        bindingId: target.bindingId,
-        flowId: target.flowId,
-        kind: 'cron',
-        occurrenceId,
-        payload: { scheduledAt },
-        publicationId: target.publicationId,
-        revisionDigest: fixed.revisionDigest,
-        runtimeVersion: target.runtimeVersion,
-        triggerNodeId: target.triggerNodeId,
-      }),
-    )
-    const accepted = this.#store.triggers.acceptCronTarget({
-      ...target,
-      nextScheduledAt: nextTriggerScheduledAt(trigger.cronTimes, now),
-      occurrenceId,
-      requestDigest,
+            signal: cancellation.signal,
+            ...(run.trigger == null ? {} : { trigger: run.trigger }),
+          }),
+        catch: (error) => error,
+      }).pipe(
+        Effect.matchEffect({
+          onFailure: (error) =>
+            Effect.sync(() => {
+              const timedOut = cancellation.signal.reason === timeoutReason
+              const result = timedOut
+                ? { error: { code: 'run.timeout', message: 'The Run exceeded its execution deadline.' } }
+                : { error: { code: 'run.failed', message: 'The Flow could not be completed.' } }
+              if (this.#store.commit(run.runId, 'failed', result)) {
+                this.#logger.error(
+                  {
+                    category: timedOut ? 'run.timed_out' : 'run.failed',
+                    durationMs: Math.round(performance.now() - startedAt),
+                    flowId: run.flowId,
+                    runId: run.runId,
+                    ...errorKind(error),
+                  },
+                  'Run failed.',
+                )
+              }
+            }),
+          onSuccess: (output) =>
+            Effect.sync(() => {
+              if (this.#store.commit(run.runId, 'completed', output)) {
+                this.#logger.info(
+                  { category: 'run.completed', durationMs: Math.round(performance.now() - startedAt), flowId: run.flowId, runId: run.runId },
+                  'Run completed.',
+                )
+              }
+            }),
+        }),
+        Effect.ensuring(
+          Effect.sync(() => {
+            clearTimeout(timeout)
+            this.#active.delete(run.runId)
+          }),
+        ),
+      )
     })
-    if (accepted?.kind == 'overloaded') {
-      this.#cronRetryAt = now + admissionRetryMs
-      return 'overloaded'
-    }
-    this.#cronRetryAt = undefined
-    if (accepted?.kind == 'accepted' && accepted.created) this.#runCreated(target.flowId, accepted.runId)
-    if (accepted != null) this.#wake()
-    return 'admitted'
   }
 
-  async #poll(target: StoredPollTarget, occurrenceId: string, now: number): Promise<void> {
-    const rootOccurrenceId = target.continuationRootId ?? occurrenceId
-    const page = target.continuationRootId == null ? 0 : target.continuationPage
-    const claimId = page == 0 ? rootOccurrenceId : await pollPageClaimId(target.bindingId, target.runtimeVersion, rootOccurrenceId, page)
-    const claim = this.#store.triggers.claimPoll(target, claimId, now, now + pollLeaseMs)
-    if (claim.kind != 'acquired') {
-      if (claim.kind == 'completed') this.#wake()
-      return
-    }
-
-    try {
-      const revision = JSON.parse(target.content) as RevisionContent
-      const fixed = await validatedFlow(revision)
+  #admitCron(target: StoredCronTarget, now: number): Effect.Effect<'admitted' | 'overloaded', unknown> {
+    return Effect.gen({ self: this }, function* () {
+      const fixed = yield* Effect.tryPromise({
+        try: () => validatedFlow(JSON.parse(target.content) as RevisionContent),
+        catch: (error) => error,
+      })
       const trigger = fixed.prepared.graph.nodes[target.triggerNodeId]
       if (
         fixed.revisionDigest != target.revisionDigest ||
         fixed.prepared.closureDigest != target.closureDigest ||
-        trigger?.kind != 'poll' ||
+        trigger?.kind != 'cron' ||
         JSON.stringify(trigger) != target.triggerJson ||
-        JSON.stringify(trigger.pollTimes) != target.scheduleJson
+        JSON.stringify(trigger.cronTimes) != target.scheduleJson
       ) {
-        throw new PermanentPollError('Fixed Poll Trigger target does not match its Publication.')
+        return yield* Effect.fail(new Error('Fixed Cron Trigger target does not match its Publication.'))
       }
-      const definition = this.#pollDefinitions.get(trigger.definition.key)
-      if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion) {
-        throw new PermanentPollError('Fixed Poll Trigger definition is not available.')
-      }
-      const connection = revision.document.bindings[trigger.bindingId]
-      if (connection?.kind != 'connection' || connection.target != target.connectionId) {
-        throw new PermanentPollError('Fixed Poll Trigger Connection does not match its Publication.')
-      }
-      const connector = this.#connector
-      if (connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
-      const signal = AbortSignal.timeout(30_000)
-      const result = await definition.poll({
-        checkpoint: target.checkpoint,
-        config: trigger.config,
-        connector: {
-          execute: async (request, requestSignal) =>
-            await connector.proxy(definition.snapshot.provider, target.connectionId, target.bindingId, request, requestSignal ?? signal),
-        },
-        now: new Date(now),
-        signal,
+      const scheduledAt = new Date(target.nextAt).toISOString()
+      const occurrenceId = yield* Effect.tryPromise({
+        try: () => scheduledTriggerOccurrenceId(target.bindingId, target.runtimeVersion, scheduledAt),
+        catch: (error) => error,
       })
-      if (result.events.length > maximumPollEventsPerPage) {
-        throw new PermanentPollError(`Poll page exceeds ${maximumPollEventsPerPage} events.`)
-      }
-      const checkpointJson = JSON.stringify(result.checkpoint)
-      if (checkpointJson == null || encoder.encode(checkpointJson).byteLength > maximumPollCheckpointBytes) {
-        throw new RangeError('Poll checkpoint exceeds 64 KiB.')
-      }
-      const baseline = target.health == 'initializing'
-      const identified = await Promise.all(
-        result.events.map(async (event) => ({ event, id: await providerEventId(target.bindingId, definition.snapshot.key, event.dedupeKey) })),
-      )
-      const known = baseline
-        ? new Set<string>()
-        : this.#store.triggers.knownPollEvents(
-            target.bindingId,
-            identified.map((item) => item.id),
-          )
-      const pageIds = new Set<string>()
-      const fresh = baseline
-        ? []
-        : identified.filter((item) => {
-            if (known.has(item.id) || pageIds.has(item.id)) return false
-            pageIds.add(item.id)
-            return true
-          })
-      const payload = fresh.length == 0 ? null : ({ events: fresh.map((item) => item.event.payload) } satisfies JsonValue)
-      const requestDigest =
-        payload == null
-          ? null
-          : await digestBytes(
-              canonicalJsonBytes({
-                bindingId: target.bindingId,
-                claimId,
-                payload,
-                revisionDigest: target.revisionDigest,
-                runtimeVersion: target.runtimeVersion,
-              }),
-            )
-      const hasMore = result.hasMore == true
-      const completed = this.#store.triggers.completePollPage({
-        activate: baseline && !hasMore,
-        checkpointJson,
-        claimExpiresAt: now + pollClaimRetentionMs,
-        claimId,
-        completedAt: now,
-        leaseToken: claim.leaseToken,
-        nextAt: hasMore ? target.nextAt : nextTriggerScheduledAt(trigger.pollTimes, now),
-        nextContinuationPage: hasMore ? page + 1 : 0,
-        nextContinuationRootId: hasMore ? rootOccurrenceId : null,
-        page,
-        payload,
-        providerEventIds: fresh.map((item) => item.id),
+      const requestDigest = yield* Effect.tryPromise({
+        try: () =>
+          digestBytes(
+            canonicalJsonBytes({
+              bindingId: target.bindingId,
+              flowId: target.flowId,
+              kind: 'cron',
+              occurrenceId,
+              payload: { scheduledAt },
+              publicationId: target.publicationId,
+              revisionDigest: fixed.revisionDigest,
+              runtimeVersion: target.runtimeVersion,
+              triggerNodeId: target.triggerNodeId,
+            }),
+          ),
+        catch: (error) => error,
+      })
+      const accepted = this.#store.triggers.acceptCronTarget({
+        ...target,
+        nextScheduledAt: nextTriggerScheduledAt(trigger.cronTimes, now),
+        occurrenceId,
         requestDigest,
-        rootOccurrenceId,
-        target,
       })
-      if (completed.kind == 'overloaded') {
-        this.#store.triggers.failPollClaim(target.bindingId, target.runtimeVersion, claim.leaseToken, { retryAt: now + admissionRetryMs })
+      if (accepted?.kind == 'overloaded') {
+        this.#cronRetryAt = now + admissionRetryMs
+        return 'overloaded'
+      }
+      this.#cronRetryAt = undefined
+      if (accepted?.kind == 'accepted' && accepted.created) this.#runCreated(target.flowId, accepted.runId)
+      if (accepted != null) this.#signal()
+      return 'admitted'
+    })
+  }
+
+  #poll(target: StoredPollTarget, occurrenceId: string, now: number): Effect.Effect<void, unknown> {
+    return Effect.gen({ self: this }, function* () {
+      const rootOccurrenceId = target.continuationRootId ?? occurrenceId
+      const page = target.continuationRootId == null ? 0 : target.continuationPage
+      const claimId =
+        page == 0
+          ? rootOccurrenceId
+          : yield* Effect.tryPromise({
+              try: () => pollPageClaimId(target.bindingId, target.runtimeVersion, rootOccurrenceId, page),
+              catch: (error) => error,
+            })
+      const claim = this.#store.triggers.claimPoll(target, claimId, now, now + pollLeaseMs)
+      if (claim.kind != 'acquired') {
+        if (claim.kind == 'completed') this.#signal()
         return
       }
-      if (completed.kind == 'completed' && completed.accepted?.kind == 'accepted') {
-        if (completed.accepted.created) this.#runCreated(target.flowId, completed.accepted.runId)
-        this.#wake()
-      }
-      if (completed.kind == 'completed' && baseline && !hasMore) {
-        this.#logger.info(
-          {
-            bindingId: target.bindingId,
-            category: 'trigger.poll.ready',
-            flowId: target.flowId,
-            runtimeVersion: target.runtimeVersion,
-            triggerNodeId: target.triggerNodeId,
-          },
-          'Poll Trigger is ready.',
+
+      yield* Effect.gen({ self: this }, function* () {
+        const revision = JSON.parse(target.content) as RevisionContent
+        const fixed = yield* Effect.tryPromise({ try: () => validatedFlow(revision), catch: (error) => error })
+        const trigger = fixed.prepared.graph.nodes[target.triggerNodeId]
+        if (
+          fixed.revisionDigest != target.revisionDigest ||
+          fixed.prepared.closureDigest != target.closureDigest ||
+          trigger?.kind != 'poll' ||
+          JSON.stringify(trigger) != target.triggerJson ||
+          JSON.stringify(trigger.pollTimes) != target.scheduleJson
+        ) {
+          return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger target does not match its Publication.'))
+        }
+        const definition = this.#pollDefinitions.get(trigger.definition.key)
+        if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion) {
+          return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger definition is not available.'))
+        }
+        const connection = revision.document.bindings[trigger.bindingId]
+        if (connection?.kind != 'connection' || connection.target != target.connectionId) {
+          return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger Connection does not match its Publication.'))
+        }
+        const connector = this.#connector
+        if (connector == null) {
+          return yield* Effect.fail(new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.'))
+        }
+        const signal = AbortSignal.timeout(30_000)
+        const result = yield* Effect.tryPromise({
+          try: () =>
+            definition.poll({
+              checkpoint: target.checkpoint,
+              config: trigger.config,
+              connector: {
+                execute: (request, requestSignal) =>
+                  connector.proxy(definition.snapshot.provider, target.connectionId, target.bindingId, request, requestSignal ?? signal),
+              },
+              now: new Date(now),
+              signal,
+            }),
+          catch: (error) => error,
+        })
+        if (result.events.length > maximumPollEventsPerPage) {
+          return yield* Effect.fail(new PermanentPollError(`Poll page exceeds ${maximumPollEventsPerPage} events.`))
+        }
+        const checkpointJson = JSON.stringify(result.checkpoint)
+        if (checkpointJson == null || encoder.encode(checkpointJson).byteLength > maximumPollCheckpointBytes) {
+          return yield* Effect.fail(new RangeError('Poll checkpoint exceeds 64 KiB.'))
+        }
+        const baseline = target.health == 'initializing'
+        const identified = yield* Effect.forEach(
+          result.events,
+          (event) =>
+            Effect.tryPromise({
+              try: () => providerEventId(target.bindingId, definition.snapshot.key, event.dedupeKey),
+              catch: (error) => error,
+            }).pipe(Effect.map((id) => ({ event, id }))),
+          { concurrency: 'unbounded' },
         )
-      }
-      this.#store.triggers.prunePoll(now, pollBatchSize)
-    } catch (error) {
-      const failure = pollFailure(error)
-      const fields = {
-        bindingId: target.bindingId,
-        flowId: target.flowId,
-        runtimeVersion: target.runtimeVersion,
-        triggerNodeId: target.triggerNodeId,
-        ...errorKind(error),
-      }
-      this.#store.triggers.failPollClaim(
-        target.bindingId,
-        target.runtimeVersion,
-        claim.leaseToken,
-        failure == null
-          ? { retryAt: now + pollRetryMs }
-          : { errorCode: failure == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid', health: failure, now },
+        const known = baseline
+          ? new Set<string>()
+          : this.#store.triggers.knownPollEvents(
+              target.bindingId,
+              identified.map((item) => item.id),
+            )
+        const pageIds = new Set<string>()
+        const fresh = baseline
+          ? []
+          : identified.filter((item) => {
+              if (known.has(item.id) || pageIds.has(item.id)) return false
+              pageIds.add(item.id)
+              return true
+            })
+        const payload = fresh.length == 0 ? null : ({ events: fresh.map((item) => item.event.payload) } satisfies JsonValue)
+        const requestDigest =
+          payload == null
+            ? null
+            : yield* Effect.tryPromise({
+                try: () =>
+                  digestBytes(
+                    canonicalJsonBytes({
+                      bindingId: target.bindingId,
+                      claimId,
+                      payload,
+                      revisionDigest: target.revisionDigest,
+                      runtimeVersion: target.runtimeVersion,
+                    }),
+                  ),
+                catch: (error) => error,
+              })
+        const hasMore = result.hasMore == true
+        const completed = this.#store.triggers.completePollPage({
+          activate: baseline && !hasMore,
+          checkpointJson,
+          claimExpiresAt: now + pollClaimRetentionMs,
+          claimId,
+          completedAt: now,
+          leaseToken: claim.leaseToken,
+          nextAt: hasMore ? target.nextAt : nextTriggerScheduledAt(trigger.pollTimes, now),
+          nextContinuationPage: hasMore ? page + 1 : 0,
+          nextContinuationRootId: hasMore ? rootOccurrenceId : null,
+          page,
+          payload,
+          providerEventIds: fresh.map((item) => item.id),
+          requestDigest,
+          rootOccurrenceId,
+          target,
+        })
+        if (completed.kind == 'overloaded') {
+          this.#store.triggers.failPollClaim(target.bindingId, target.runtimeVersion, claim.leaseToken, { retryAt: now + admissionRetryMs })
+          return
+        }
+        if (completed.kind == 'completed' && completed.accepted?.kind == 'accepted') {
+          if (completed.accepted.created) this.#runCreated(target.flowId, completed.accepted.runId)
+          this.#signal()
+        }
+        if (completed.kind == 'completed' && baseline && !hasMore) {
+          this.#logger.info(
+            {
+              bindingId: target.bindingId,
+              category: 'trigger.poll.ready',
+              flowId: target.flowId,
+              runtimeVersion: target.runtimeVersion,
+              triggerNodeId: target.triggerNodeId,
+            },
+            'Poll Trigger is ready.',
+          )
+        }
+        this.#store.triggers.prunePoll(now, pollBatchSize)
+      }).pipe(
+        Effect.matchEffect({
+          onFailure: (error) =>
+            Effect.sync(() => {
+              const failure = pollFailure(error)
+              const fields = {
+                bindingId: target.bindingId,
+                flowId: target.flowId,
+                runtimeVersion: target.runtimeVersion,
+                triggerNodeId: target.triggerNodeId,
+                ...errorKind(error),
+              }
+              this.#store.triggers.failPollClaim(
+                target.bindingId,
+                target.runtimeVersion,
+                claim.leaseToken,
+                failure == null
+                  ? { retryAt: now + pollRetryMs }
+                  : { errorCode: failure == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid', health: failure, now },
+              )
+              if (failure == null) {
+                this.#logger.warn({ category: 'trigger.poll.retrying', retryAt: now + pollRetryMs, ...fields }, 'Poll Trigger will be retried.')
+              } else {
+                this.#logger.warn({ category: 'trigger.poll.health_changed', health: failure, ...fields }, 'Poll Trigger health changed.')
+              }
+            }),
+          onSuccess: () => Effect.void,
+        }),
       )
-      if (failure == null) {
-        this.#logger.warn({ category: 'trigger.poll.retrying', retryAt: now + pollRetryMs, ...fields }, 'Poll Trigger will be retried.')
-      } else {
-        this.#logger.warn({ category: 'trigger.poll.health_changed', health: failure, ...fields }, 'Poll Trigger health changed.')
-      }
-    }
+    })
   }
 
-  async #tickCron(now: number): Promise<void> {
-    while (true) {
-      const targets = this.#store.triggers.dueCron(now, cronBatchSize)
-      if (targets.length == 0) return
-      for (const target of targets) if ((await this.#admitCron(target, now)) == 'overloaded') return
-    }
+  #cron(at: string): Effect.Effect<void, unknown> {
+    return this.#cronLock.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const now = Date.parse(at)
+        if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Cron tick time must be an ISO timestamp.'))
+        while (true) {
+          const targets = this.#store.triggers.dueCron(now, cronBatchSize)
+          if (targets.length == 0) break
+          let overloaded = false
+          for (const target of targets) {
+            const result = yield* this.#admitCron(target, now)
+            if (result == 'overloaded') {
+              overloaded = true
+              break
+            }
+          }
+          if (overloaded) break
+        }
+        this.#signal()
+      }),
+    )
   }
 
-  async #tickPoll(now: number): Promise<void> {
-    while (true) {
-      const targets = this.#store.triggers.duePoll(now, pollBatchSize)
-      if (targets.length == 0) return
-      for (const target of targets) {
-        const scheduledAt = new Date(target.nextAt).toISOString()
-        await this.#poll(target, await scheduledTriggerOccurrenceId(target.bindingId, target.runtimeVersion, scheduledAt), now)
-      }
-    }
+  #pollDue(at: string): Effect.Effect<void, unknown> {
+    return this.#pollLock.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const now = Date.parse(at)
+        if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Poll tick time must be an ISO timestamp.'))
+        while (true) {
+          const targets = this.#store.triggers.duePoll(now, pollBatchSize)
+          if (targets.length == 0) break
+          for (const target of targets) {
+            const scheduledAt = new Date(target.nextAt).toISOString()
+            const occurrenceId = yield* Effect.tryPromise({
+              try: () => scheduledTriggerOccurrenceId(target.bindingId, target.runtimeVersion, scheduledAt),
+              catch: (error) => error,
+            })
+            yield* this.#poll(target, occurrenceId, now)
+          }
+        }
+        this.#signal()
+      }),
+    )
+  }
+
+  #maintenance(at: string): Effect.Effect<void, unknown> {
+    return this.#maintenanceLock.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const now = Date.parse(at)
+        if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Maintenance tick time must be an ISO timestamp.'))
+        this.#maintenanceAt = this.#clock() + this.#maintain(now)
+        this.#signal()
+      }),
+    )
   }
 
   async #invokeTask(prepared: PreparedFlow, invocation: TaskInvocation): Promise<JsonValue> {
@@ -1055,70 +1123,114 @@ export class ServerService {
     return nextDelay
   }
 
-  #wake(): void {
-    while (this.#started && this.#failure == null && Effect.runSync(FiberSet.size(this.#workers)) < this.#maxConcurrentRuns) {
-      const run = this.#store.claim([...this.#runningFlows])
-      if (run == null) return
-      this.#runningFlows.add(run.flowId)
-      const worker = Effect.runSync(
-        FiberSet.run(
-          this.#workers,
-          Effect.tryPromise({ try: () => this.#dispatch(run), catch: (error) => error }).pipe(
-            Effect.catchCause((cause) => Effect.sync(() => this.#fail('runtime.worker.failed', Cause.squash(cause)))),
-          ),
-        ),
-      )
-      worker.addObserver(() => {
-        this.#runningFlows.delete(run.flowId)
-        this.#wake()
-      })
-    }
+  #signal(): void {
+    Queue.offerUnsafe(this.#signals, undefined)
   }
 
-  #armCron(): void {
-    Effect.runSync(FiberMap.remove(this.#timers, 'cron'))
-    if (!this.#started || this.#failure != null || this.#cronTicking != null) return
-    const nextAt = this.#store.triggers.nextCronAt()
-    if (nextAt == null) return
-    const delay = Math.max(0, Math.min(Math.max(nextAt, this.#cronRetryAt ?? nextAt) - this.#clock(), maxTimerDelayMs))
-    this.#armTimer('cron', delay, 'trigger.cron.loop.failed', () => this.tickCron())
-  }
-
-  #armPoll(): void {
-    Effect.runSync(FiberMap.remove(this.#timers, 'poll'))
-    if (!this.#started || this.#failure != null || this.#pollTicking != null) return
-    const nextAt = this.#store.triggers.nextPollAt()
-    if (nextAt == null) return
-    const delay = Math.max(0, Math.min(nextAt - this.#clock(), maxTimerDelayMs))
-    this.#armTimer('poll', delay, 'trigger.poll.loop.failed', () => this.tickPoll())
-  }
-
-  #armMaintenance(delay: number): void {
-    Effect.runSync(FiberMap.remove(this.#timers, 'maintenance'))
-    if (!this.#started || this.#failure != null || this.#maintenanceTicking != null) return
-    this.#armTimer('maintenance', delay, 'maintenance.loop.failed', () => this.tickMaintenance())
-  }
-
-  #armTimer(key: string, delay: number, category: string, tick: () => Promise<void>): void {
-    Effect.runSync(
-      FiberMap.run(
-        this.#timers,
-        key,
-        Effect.sleep(delay).pipe(
-          Effect.andThen(
-            Effect.sync(() => {
-              void tick().catch((error: unknown) => this.#fail(category, error))
-            }),
-          ),
-        ),
+  #supervise(): Effect.Effect<void> {
+    const waiters: Deferred.Deferred<void>[] = []
+    const program = Effect.gen({ self: this }, function* () {
+      while (this.#started && this.#failure == null) {
+        for (const signal of yield* Queue.clear(this.#signals)) if (signal != null) waiters.push(signal)
+        yield* this.#startDue(this.#clock())
+        const runQueueEmpty = yield* this.#launchWorkers()
+        const tasks = yield* FiberMap.size(this.#tasks)
+        const workers = yield* FiberSet.size(this.#workers)
+        if (waiters.length > 0 && runQueueEmpty && tasks == 0 && workers == 0) {
+          yield* finishWaiters(waiters.splice(0))
+        }
+        if (!this.#started || this.#failure != null) break
+        const signal = yield* Effect.race(Queue.take(this.#signals), Effect.sleep(this.#nextDelay(this.#clock())).pipe(Effect.as(undefined)))
+        if (signal != null) waiters.push(signal)
+      }
+      yield* FiberMap.awaitEmpty(this.#tasks)
+      yield* FiberSet.awaitEmpty(this.#workers)
+      for (const signal of yield* Queue.clear(this.#signals)) if (signal != null) waiters.push(signal)
+      yield* finishWaiters(waiters.splice(0))
+    })
+    return program.pipe(
+      Effect.catchCause((cause) =>
+        Effect.gen({ self: this }, function* () {
+          this.#fail('runtime.supervisor.failed', Cause.squash(cause))
+          for (const signal of yield* Queue.clear(this.#signals)) if (signal != null) waiters.push(signal)
+          yield* finishWaiters(waiters.splice(0))
+        }),
       ),
     )
+  }
+
+  #startDue(now: number): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const cronAt = this.#store.triggers.nextCronAt()
+      if (!FiberMap.hasUnsafe(this.#tasks, 'cron') && cronAt != null && Math.max(cronAt, this.#cronRetryAt ?? cronAt) <= now) {
+        yield* this.#startTask('cron', 'trigger.cron.loop.failed', this.#cron(new Date(now).toISOString()))
+      }
+      const integrationAt = this.#store.triggers.nextIntegrationAt()
+      if (!FiberMap.hasUnsafe(this.#tasks, 'integration') && integrationAt != null && integrationAt <= now) {
+        yield* this.#startTask('integration', 'trigger.integration.loop.failed', this.#integration.tick(new Date(now).toISOString()))
+      }
+      const pollAt = this.#store.triggers.nextPollAt()
+      if (!FiberMap.hasUnsafe(this.#tasks, 'poll') && pollAt != null && pollAt <= now) {
+        yield* this.#startTask('poll', 'trigger.poll.loop.failed', this.#pollDue(new Date(now).toISOString()))
+      }
+      if (!FiberMap.hasUnsafe(this.#tasks, 'maintenance') && this.#maintenanceAt <= now) {
+        yield* this.#startTask('maintenance', 'maintenance.loop.failed', this.#maintenance(new Date(now).toISOString()))
+      }
+    })
+  }
+
+  #startTask(key: string, category: string, task: Effect.Effect<void, unknown>): Effect.Effect<void> {
+    return FiberMap.run(this.#tasks, key, task.pipe(Effect.catchCause((cause) => Effect.sync(() => this.#fail(category, Cause.squash(cause)))))).pipe(
+      Effect.asVoid,
+    )
+  }
+
+  #launchWorkers(): Effect.Effect<boolean> {
+    return Effect.gen({ self: this }, function* () {
+      while (this.#started && this.#failure == null && (yield* FiberSet.size(this.#workers)) < this.#maxConcurrentRuns) {
+        const run = this.#store.claim([...this.#runningFlows])
+        if (run == null) return true
+        this.#runningFlows.add(run.flowId)
+        yield* FiberSet.run(
+          this.#workers,
+          this.#dispatch(run).pipe(
+            Effect.catchCause((cause) => Effect.sync(() => this.#fail('runtime.worker.failed', Cause.squash(cause)))),
+            Effect.ensuring(
+              Effect.sync(() => {
+                this.#runningFlows.delete(run.flowId)
+                this.#signal()
+              }),
+            ),
+          ),
+        )
+      }
+      return false
+    })
+  }
+
+  #nextDelay(now: number): number {
+    const deadlines: number[] = []
+    if (!FiberMap.hasUnsafe(this.#tasks, 'maintenance')) deadlines.push(this.#maintenanceAt)
+    if (!FiberMap.hasUnsafe(this.#tasks, 'cron')) {
+      const nextAt = this.#store.triggers.nextCronAt()
+      if (nextAt != null) deadlines.push(Math.max(nextAt, this.#cronRetryAt ?? nextAt))
+    }
+    if (!FiberMap.hasUnsafe(this.#tasks, 'integration')) {
+      const nextAt = this.#store.triggers.nextIntegrationAt()
+      if (nextAt != null) deadlines.push(nextAt)
+    }
+    if (!FiberMap.hasUnsafe(this.#tasks, 'poll')) {
+      const nextAt = this.#store.triggers.nextPollAt()
+      if (nextAt != null) deadlines.push(nextAt)
+    }
+    return deadlines.length == 0 ? maxTimerDelayMs : Math.max(0, Math.min(Math.min(...deadlines) - now, maxTimerDelayMs))
   }
 
   #fail(category: string, error: unknown): void {
     if (this.#failure != null) return
     this.#failure = error
     this.#logger.error({ category, err: error }, 'Server background processing stopped.')
+    this.#signal()
   }
 }
 
