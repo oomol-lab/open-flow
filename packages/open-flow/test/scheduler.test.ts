@@ -629,6 +629,29 @@ describe('revision graph scheduler', () => {
     expect(slowAborted).toBe(true)
   })
 
+  it('fails the run when a Node fiber dies with a defect', async () => {
+    const source = revision(
+      {
+        bindings: {},
+        graph: { nodes: { task: { concurrency: 1, inputs: {}, kind: 'task', task: task('task', [], []) } } },
+        subflows: {},
+        tasks: {},
+      },
+      ['task'],
+    )
+    const prepared = await prepareFlow(source, 'main', engine)
+    const events: SchedulerEvent[] = []
+
+    await expect(
+      runFlow(prepared, {
+        emit: (event) => Effect.sync(() => void events.push(event)),
+        invokeTask: () => Effect.die(new Error('Node fiber defect.')),
+        runId: 'run-node-defect',
+      }),
+    ).rejects.toThrow('Node fiber defect.')
+    expect(events.some((event) => event.type == 'run.completed')).toBe(false)
+  })
+
   it.each([
     [connectorConnectionRequired, 'The selected Connector Connection must be reconnected or replaced.'],
     [connectorUnavailable, 'The Connector request could not be completed.'],

@@ -1,7 +1,9 @@
+import type * as Cause from 'effect/Cause'
 import type { ConnectorCapability, Graph, GraphNode, InputPortDefinition, JsonValue, OutputMapping, TriggerNode } from '../../flow/common/change.ts'
 import type { PreparedFlow } from '../../flow/common/semantics.ts'
 
 import * as Effect from 'effect/Effect'
+import * as Exit from 'effect/Exit'
 import * as FiberSet from 'effect/FiberSet'
 import { portsByHandle } from '../../flow/common/change.ts'
 
@@ -454,11 +456,12 @@ function runGraph(
       const scheduled = new Map<string, number>()
       const runOutputs = new Map<string, JsonValue>()
       const completedNodes = new Set<string>()
+      let firstCause: Cause.Cause<Error> | undefined
       let firstFailure: Error | undefined
 
       let scheduleReady: (nodeId: string) => void
       const deliverInput = (targetInput: InputTarget, value: JsonValue): void => {
-        if (firstFailure != null) return
+        if (firstCause != null) return
         const buffer = inputBuffers.get(targetInput.nodeId)!
         buffer.push(targetInput.handle, value)
         scheduleReady(targetInput.nodeId)
@@ -587,9 +590,14 @@ function runGraph(
             ),
             Effect.tapError((error) =>
               Effect.gen(function* () {
-                firstFailure ??= error
+                if (firstCause == null) firstFailure ??= error
                 const projected = nodeFailure(error, context.projectFailure)
                 yield* context.emit({ ...projected, jobId, nodeId, runId, type: 'node.failed' }).pipe(Effect.ignore)
+              }),
+            ),
+            Effect.tapCause((cause) =>
+              Effect.sync(() => {
+                firstCause ??= cause
               }),
             ),
             Effect.ensuring(
@@ -603,7 +611,7 @@ function runGraph(
       }
 
       scheduleReady = (nodeId) => {
-        if (firstFailure != null) return
+        if (firstCause != null) return
         const node = target.graph.nodes[nodeId]!
         const buffer = inputBuffers.get(nodeId)!
         while (buffer.ready && (activeCounts.get(nodeId) ?? 0) < node.concurrency) startNode(nodeId)
@@ -630,12 +638,17 @@ function runGraph(
       }
       for (const nodeId of order) scheduleReady(nodeId)
 
-      yield* Effect.raceFirst(FiberSet.awaitEmpty(active), FiberSet.join(active)).pipe(Effect.exit)
+      const activeExit = yield* Effect.raceFirst(FiberSet.awaitEmpty(active), FiberSet.join(active)).pipe(Effect.exit)
       if (firstFailure != null) {
         yield* FiberSet.clear(active)
         yield* context.emit({ message: firstFailure.message, runId, type: 'run.failed' }).pipe(Effect.ignore)
         return yield* Effect.fail(firstFailure)
       }
+      if (firstCause != null) {
+        yield* FiberSet.clear(active)
+        return yield* Effect.failCause(firstCause)
+      }
+      if (Exit.isFailure(activeExit)) return yield* Effect.failCause(activeExit.cause)
       if (target.kind == 'subflow') {
         const outputs = Object.fromEntries(runOutputs)
         yield* context.emit({ result: { kind: 'function-outputs', outputs, target: 'subflow' }, runId, type: 'run.completed' })

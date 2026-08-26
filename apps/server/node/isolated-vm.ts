@@ -426,7 +426,7 @@ export class IsolatedVmHost {
     operation: (signal: AbortSignal) => unknown | Promise<unknown>,
     byteLimit?: number,
   ): void {
-    Effect.runFork(
+    const fiber = Effect.runFork(
       Effect.tryPromise({
         try: (signal) => Promise.resolve(operation(signal)),
         catch: normalizedError,
@@ -463,10 +463,10 @@ export class IsolatedVmHost {
             })
           }),
         ),
-        Effect.ensuring(Effect.sync(() => pending.activeCalls.delete(id))),
       ),
-      { onFiberStart: (fiber) => pending.activeCalls.set(id, fiber as Fiber.Fiber<void, never>) },
     )
+    pending.activeCalls.set(id, fiber)
+    fiber.addObserver(() => pending.activeCalls.delete(id))
   }
 
   #send(child: ChildProcessWithoutNullStreams, message: ParentMessage): void {
