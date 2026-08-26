@@ -1,7 +1,114 @@
+@use '../../designer/browser/styles/mixins';
+
 .root {
+  @extend %theme;
+
   display: flex;
   min-width: 0;
   flex-direction: column;
+  color: var(--ui-foreground);
+  font-size: 14px;
+  --base-font-size: 14px;
+  --widget-height: 32px;
+  --widget-radius: var(--ui-radius);
+  --fill-1: var(--ui-background);
+  --fill-2: var(--ui-card);
+  --fill-3: color-mix(in srgb, var(--ui-card) 72%, var(--ui-background));
+  --fill-4: var(--ui-muted);
+  --fill-5: var(--ui-accent);
+  --fill-6: color-mix(in srgb, var(--ui-accent) 88%, var(--ui-foreground));
+  --fill-7: var(--ui-input);
+  --border-1: var(--ui-border);
+  --border-2: var(--ui-input);
+  --text-1: var(--ui-muted-foreground);
+  --text-2: var(--ui-muted-foreground);
+  --text-3: var(--ui-foreground);
+  --text-4: var(--ui-foreground);
+  --text-5: var(--ui-foreground);
+  --background: var(--ui-background);
+  --foreground: var(--ui-foreground);
+  --brand-1: color-mix(in srgb, var(--ui-primary) 10%, var(--ui-background));
+  --brand-2: color-mix(in srgb, var(--ui-primary) 16%, var(--ui-background));
+  --brand-3: color-mix(in srgb, var(--ui-primary) 24%, var(--ui-background));
+  --brand-4: color-mix(in srgb, var(--ui-primary) 34%, var(--ui-background));
+  --brand-5: var(--ui-ring);
+  --brand-6: var(--ui-primary);
+  --brand-7: var(--ui-primary);
+  --brand-8: var(--ui-primary);
+  --brand-9: var(--ui-primary);
+  --brand-color: var(--ui-primary);
+  --brand-highlight-color: var(--ui-ring);
+  --brand-hover-color: color-mix(in srgb, var(--ui-ring) 50%, transparent);
+  --node-background-color: var(--ui-background);
+  --node-border-color: var(--ui-border);
+  --node-selected-border-color: var(--ui-ring);
+  --node-head-background-color: var(--ui-muted);
+  --node-head-background-highlight-color: var(--ui-accent);
+  --node-outline-color: var(--ui-border);
+  --widget-shadow: rgb(0 0 0 / 20%);
+  --widget-font-color: var(--ui-foreground);
+  --widget-font-readonly-color: var(--ui-foreground);
+  --widget-font-placeholder-color: var(--ui-muted-foreground);
+  --widget-font-highlight-color: var(--ui-primary-foreground);
+  --widget-font-disable-color: var(--ui-muted-foreground);
+  --widget-font-error-color: var(--ui-destructive);
+  --widget-secondary-font-color: var(--ui-muted-foreground);
+  --widget-font-danger-color: var(--ui-destructive);
+  --widget-button-danger-bg: color-mix(in srgb, var(--ui-destructive) 12%, transparent);
+  --widget-button-danger-hover-bg: color-mix(in srgb, var(--ui-destructive) 20%, transparent);
+  --widget-null-color: var(--ui-primary);
+  --widget-null-bg-color: color-mix(in srgb, var(--ui-primary) 12%, transparent);
+  --widget-border-color: var(--ui-input);
+  --widget-border-highlight-color: var(--ui-ring);
+  --widget-background: var(--ui-background);
+  --widget-background-highlight-color: var(--ui-muted);
+  --widget-background-mask-highlight-color: color-mix(in srgb, var(--ui-foreground) 10%, transparent);
+  --widget-input-background: var(--ui-background);
+  --widget-input-selection-background-color: color-mix(in srgb, var(--ui-ring) 24%, transparent);
+  --widget-switch-background-color: var(--ui-input);
+  --widget-switch-border-color: transparent;
+  --widget-label-background: var(--ui-muted);
+  --widget-active-background: var(--ui-accent);
+  --widget-selector-selected-focused-bg: var(--ui-accent);
+  --widget-selector-selected-bg: var(--ui-muted);
+  --widget-popup-background: var(--ui-popover);
+  --widget-range-background: var(--ui-primary);
+  --widget-segmented-item-selected-bg: var(--ui-background);
+  --widget-segmented-item-hover-bg: var(--ui-muted);
+  --widget-segmented-track-bg: var(--ui-muted);
+  --widget-segmented-font-color: var(--ui-foreground);
+  --widget-segmented-inactive-color: var(--ui-muted-foreground);
+  --widget-time-picker-active-bg: var(--ui-primary);
+  --widget-error-tag-background: var(--ui-destructive);
+  --widget-error-tag-border-color: var(--ui-destructive);
+  --widget-error-color: var(--ui-destructive);
+  --widget-error-hover-color: var(--ui-destructive);
+  --widget-error-hover-background-color: color-mix(in srgb, var(--ui-destructive) 10%, transparent);
+  --widget-error-background: color-mix(in srgb, var(--ui-destructive) 16%, var(--ui-background));
+  --widget-error-background-highlight-color: color-mix(in srgb, var(--ui-destructive) 24%, var(--ui-background));
+  --widget-error-input-border-color: var(--ui-destructive);
+  --widget-error-input-background: color-mix(in srgb, var(--ui-destructive) 8%, var(--ui-background));
+  --widget-error-tip-border: var(--ui-destructive);
+  --widget-error-tip-background: color-mix(in srgb, var(--ui-destructive) 8%, var(--ui-popover));
+  --edge-color: var(--ui-muted-foreground);
+  --edge-string: var(--ui-primary);
+  --edge-json: var(--ui-primary);
+  --edge-primitive: var(--ui-primary);
+  --edge-bin: var(--ui-primary);
+  --edge-secret: var(--ui-primary);
+  --edge-error: var(--ui-destructive);
+  --highlight-indicate-color: var(--ui-ring);
+  --block-editor-item-background-color: var(--ui-card);
+  --contextmenu-shadow: rgb(0 0 0 / 16%);
+  --contextmenu-background: var(--ui-popover);
+  --contextmenu-hover: var(--ui-muted);
+  --text: var(--ui-foreground);
+  --text-strong: var(--ui-foreground);
+  --text-stronger: var(--ui-foreground);
+  --text-weak: var(--ui-muted-foreground);
+  --text-weaker: var(--ui-border);
+  --border-weak: var(--ui-border);
+  --pseudo-outline-color: var(--ui-ring);
 }
 
 .field {
@@ -13,7 +120,7 @@
 
 .field + .field {
   padding-top: 14px;
-  border-top: 1px solid var(--border-1);
+  border-top: 1px solid var(--ui-border);
 }
 
 .legend {
@@ -22,13 +129,13 @@
   align-items: baseline;
   gap: 8px;
   padding: 0;
-  color: var(--text-4);
+  color: var(--ui-foreground);
   font-size: 12px;
   font-weight: 600;
 }
 
 .optional {
-  color: var(--text-2);
+  color: var(--ui-muted-foreground);
   font-size: 10px;
   font-weight: 400;
 }
@@ -36,7 +143,7 @@
 .description {
   max-width: 68ch;
   margin: 4px 0 8px;
-  color: var(--text-2);
+  color: var(--ui-muted-foreground);
   font-size: 11px;
   line-height: 16px;
 }

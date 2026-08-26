@@ -1,0 +1,63 @@
+.open-flow-theme {
+  color-scheme: light;
+  --open-flow-background: #ffffff;
+  --open-flow-foreground: #09090b;
+  --open-flow-card: #fafafa;
+  --open-flow-card-foreground: #09090b;
+  --open-flow-popover: #fafafa;
+  --open-flow-popover-foreground: #09090b;
+  --open-flow-primary: #18181b;
+  --open-flow-primary-foreground: #fafafa;
+  --open-flow-secondary: #f4f4f5;
+  --open-flow-secondary-foreground: #09090b;
+  --open-flow-muted: #f4f4f5;
+  --open-flow-muted-foreground: #71717a;
+  --open-flow-accent: #f4f4f5;
+  --open-flow-accent-foreground: #09090b;
+  --open-flow-destructive: #dc2626;
+  --open-flow-border: #e4e4e7;
+  --open-flow-input: #d4d4d8;
+  --open-flow-ring: #a1a1aa;
+  --open-flow-radius: 6px;
+  --ui-background: var(--open-flow-background);
+  --ui-foreground: var(--open-flow-foreground);
+  --ui-card: var(--open-flow-card);
+  --ui-card-foreground: var(--open-flow-card-foreground);
+  --ui-popover: var(--open-flow-popover);
+  --ui-popover-foreground: var(--open-flow-popover-foreground);
+  --ui-primary: var(--open-flow-primary);
+  --ui-primary-foreground: var(--open-flow-primary-foreground);
+  --ui-secondary: var(--open-flow-secondary);
+  --ui-secondary-foreground: var(--open-flow-secondary-foreground);
+  --ui-muted: var(--open-flow-muted);
+  --ui-muted-foreground: var(--open-flow-muted-foreground);
+  --ui-accent: var(--open-flow-accent);
+  --ui-accent-foreground: var(--open-flow-accent-foreground);
+  --ui-destructive: var(--open-flow-destructive);
+  --ui-border: var(--open-flow-border);
+  --ui-input: var(--open-flow-input);
+  --ui-ring: var(--open-flow-ring);
+  --ui-radius: var(--open-flow-radius);
+}
+
+.open-flow-theme[data-theme='dark'] {
+  color-scheme: dark;
+  --open-flow-background: #111111;
+  --open-flow-foreground: #f4f4f5;
+  --open-flow-card: #1b1b1b;
+  --open-flow-card-foreground: #f4f4f5;
+  --open-flow-popover: #1b1b1b;
+  --open-flow-popover-foreground: #f4f4f5;
+  --open-flow-primary: #f4f4f5;
+  --open-flow-primary-foreground: #18181b;
+  --open-flow-secondary: #222222;
+  --open-flow-secondary-foreground: #f4f4f5;
+  --open-flow-muted: #222222;
+  --open-flow-muted-foreground: #a1a1aa;
+  --open-flow-accent: #222222;
+  --open-flow-accent-foreground: #f4f4f5;
+  --open-flow-destructive: #f87171;
+  --open-flow-border: #393939;
+  --open-flow-input: #52525b;
+  --open-flow-ring: #a1a1aa;
+}

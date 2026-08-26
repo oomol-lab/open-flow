@@ -5,12 +5,12 @@
     min-height: 0;
     grid-template-rows: auto auto minmax(0, 1fr);
     overflow: hidden;
-    background: var(--canvas);
+    background: var(--ui-background);
   }
 
   .publication-summary {
     padding: 22px 24px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ui-border);
   }
 
   .publication-summary-heading,
@@ -47,7 +47,7 @@
   .publication-summary-heading p {
     max-width: 68ch;
     margin: 5px 0 0;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
     line-height: 17px;
   }
@@ -55,13 +55,13 @@
   .publication-status {
     flex: none;
     gap: 7px;
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
     font-weight: 500;
   }
 
   .publication-loading {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
   }
 
@@ -72,7 +72,7 @@
     align-items: stretch;
     margin-top: 20px;
     padding-top: 18px;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--ui-border);
   }
 
   .publication-revision-overview {
@@ -97,11 +97,11 @@
 
   .publication-revision-group + .publication-revision-group {
     padding-left: 24px;
-    border-left: 1px solid var(--border);
+    border-left: 1px solid var(--ui-border);
   }
 
   .publication-revision-group > strong {
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
     font-weight: 600;
   }
@@ -132,11 +132,11 @@
   }
 
   .publication-revision-group dt {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
   }
 
   .publication-revision-group dd {
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-weight: 500;
   }
 
@@ -153,8 +153,8 @@
     justify-content: stretch;
     gap: 16px;
     padding: 14px 16px;
-    border-radius: 7px;
-    background: var(--surface);
+    border-radius: calc(var(--ui-radius) + 1px);
+    background: var(--ui-card);
   }
 
   .publication-publish-action > div {
@@ -165,13 +165,13 @@
   }
 
   .publication-publish-action strong {
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-size: 12px;
     font-weight: 600;
   }
 
   .publication-publish-action span {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
     line-height: 15px;
   }
@@ -188,16 +188,16 @@
     gap: 16px;
     margin-top: 18px;
     padding: 10px 12px;
-    border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--border));
-    border-radius: 6px;
-    background: color-mix(in srgb, var(--danger) 7%, var(--canvas));
-    color: var(--danger);
+    border: 1px solid color-mix(in srgb, var(--ui-destructive) 28%, var(--ui-border));
+    border-radius: var(--ui-radius);
+    background: color-mix(in srgb, var(--ui-destructive) 7%, var(--ui-background));
+    color: var(--ui-destructive);
     font-size: 11px;
   }
 
   .publication-triggers {
     min-width: 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ui-border);
   }
 
   .publication-triggers > header {
@@ -218,22 +218,22 @@
 
   .publication-triggers > header span {
     max-width: 72ch;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
     line-height: 15px;
   }
 
   .publication-trigger-empty {
     padding: 12px 24px;
-    border-top: 1px solid var(--border);
-    color: var(--muted);
+    border-top: 1px solid var(--ui-border);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
   }
 
   .trigger-binding-list {
     max-height: 300px;
     overflow: auto;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--ui-border);
     scrollbar-gutter: stable;
   }
 
@@ -245,11 +245,11 @@
     gap: 12px;
     min-height: 44px;
     padding: 0 16px 0 24px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ui-border);
   }
 
   .trigger-binding-row.selected {
-    background: var(--surface);
+    background: var(--ui-card);
   }
 
   .trigger-binding-summary {
@@ -265,7 +265,7 @@
 
   .trigger-binding-summary:hover strong,
   .trigger-binding-summary:focus-visible strong {
-    color: var(--text);
+    color: var(--ui-foreground);
   }
 
   .trigger-binding-summary strong,
@@ -277,19 +277,19 @@
   }
 
   .trigger-binding-summary strong {
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-size: 12px;
     font-weight: 600;
   }
 
   .trigger-binding-summary code {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 10px;
   }
 
   .trigger-binding-summary > span:not(.status-dot) {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
   }
 
@@ -306,7 +306,7 @@
   }
 
   .trigger-binding-summary > .trigger-binding-state.danger {
-    color: var(--danger);
+    color: var(--ui-destructive);
   }
 
   .trigger-binding-summary > .trigger-binding-state.running {
@@ -315,8 +315,8 @@
 
   .trigger-binding-detail {
     padding: 14px 24px 16px 44px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
+    border-bottom: 1px solid var(--ui-border);
+    background: var(--ui-card);
   }
 
   .trigger-binding-detail > dl {
@@ -341,13 +341,13 @@
   }
 
   .trigger-binding-detail dt {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
   }
 
   .trigger-binding-detail dd {
     overflow: hidden;
     max-width: 520px;
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -355,7 +355,7 @@
 
   .trigger-recovery {
     margin: 12px 0 0;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
     line-height: 15px;
   }
@@ -367,14 +367,14 @@
     align-items: center;
     gap: 8px;
     margin-top: 12px;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
   }
 
   .trigger-webhook code {
     flex: 1;
     overflow: hidden;
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -398,7 +398,7 @@
     gap: 24px;
     margin-top: 16px;
     padding-top: 16px;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--ui-border);
   }
 
   .trigger-binding-detail-sections > section {
@@ -407,7 +407,7 @@
 
   .trigger-binding-detail-sections > section + section {
     padding-left: 24px;
-    border-left: 1px solid var(--border);
+    border-left: 1px solid var(--ui-border);
   }
 
   .trigger-binding-detail-sections > section:only-child {
@@ -431,7 +431,7 @@
   .trigger-test h3,
   .trigger-activities h3 {
     margin: 0;
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
     font-weight: 600;
   }
@@ -445,7 +445,7 @@
   .trigger-activities-description,
   .trigger-activities-empty {
     margin: 0;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
     line-height: 15px;
   }
@@ -459,7 +459,7 @@
   }
 
   .trigger-test-result > strong {
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
     font-weight: 600;
   }
@@ -469,7 +469,7 @@
     flex-wrap: wrap;
     gap: 6px 14px;
     margin: 6px 0 8px;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
   }
 
@@ -477,14 +477,14 @@
     max-height: 180px;
     overflow: auto;
     padding: 8px 10px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    background: var(--canvas);
-    --text-color: var(--text-secondary);
+    border: 1px solid var(--ui-border);
+    border-radius: calc(var(--ui-radius) - 1px);
+    background: var(--ui-background);
+    --text-color: var(--ui-muted-foreground);
   }
 
   .trigger-activity-list {
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--ui-border);
   }
 
   .trigger-activity {
@@ -494,7 +494,7 @@
     align-items: start;
     gap: 8px;
     padding: 8px 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ui-border);
   }
 
   .trigger-activity > div {
@@ -514,18 +514,18 @@
   }
 
   .trigger-activity strong {
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-weight: 500;
   }
 
   .trigger-activity code,
   .trigger-activity time {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
   }
 
   .trigger-activity-message {
     margin: 0;
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
     line-height: 15px;
     overflow-wrap: anywhere;
@@ -543,7 +543,7 @@
 
   .publication-history > header {
     padding: 0 24px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ui-border);
   }
 
   .publication-history > header > div {
@@ -553,7 +553,7 @@
   }
 
   .publication-history > header span {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
   }
 
@@ -573,7 +573,7 @@
   .publication-table td {
     height: 54px;
     padding: 8px 16px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ui-border);
     text-align: left;
     vertical-align: middle;
   }
@@ -583,8 +583,8 @@
     z-index: 1;
     top: 0;
     height: 34px;
-    background: var(--surface);
-    color: var(--muted);
+    background: var(--ui-card);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
     font-weight: 500;
   }
@@ -610,7 +610,7 @@
   }
 
   .publication-table td {
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
   }
 
@@ -626,24 +626,15 @@
   .publication-table td > span,
   .publication-table td > time {
     margin-top: 4px;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
   }
 
   .publication-operation {
     gap: 7px;
     margin: 0 0 4px !important;
-    color: var(--text) !important;
+    color: var(--ui-foreground) !important;
     font-size: 11px !important;
-    font-weight: 500;
-  }
-
-  .publication-current {
-    padding: 2px 5px;
-    border-radius: 4px;
-    background: color-mix(in srgb, var(--success) 9%, var(--canvas));
-    color: var(--success);
-    font-size: 9px;
     font-weight: 500;
   }
 
@@ -654,7 +645,7 @@
   .publication-confirm-row td {
     height: auto;
     padding: 0;
-    background: var(--surface);
+    background: var(--ui-card);
   }
 
   .publication-confirm {
@@ -677,7 +668,7 @@
   }
 
   .publication-confirm span {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
     line-height: 15px;
   }
@@ -691,13 +682,13 @@
     flex-direction: column;
     gap: 7px;
     padding: 24px;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
     text-align: center;
   }
 
   .publication-history-empty strong {
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-size: 12px;
     font-weight: 500;
   }

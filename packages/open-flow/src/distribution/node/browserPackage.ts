@@ -2,7 +2,7 @@ import tailwindcss from '@tailwindcss/vite'
 import UnoCSS from '@unocss/vite'
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -61,6 +61,7 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   await buildRuntime(options, browserOutputPath, flowChangeEntryPath, 'flow-change', true)
   await buildRuntime(options, browserOutputPath, flowAuthoringEntryPath, 'flow-authoring', false)
   await buildRuntime(options, browserOutputPath, workbenchEntryPath, 'workbench', false)
+  await copyFile(path.join(options.sourceRoot, 'src/ui/browser/theme.css'), path.join(browserOutputPath, 'theme.css'))
   await writeDeclarations(options, browserOutputPath, commonOutputPath)
 }
 
@@ -264,6 +265,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(browserOutputPath, 'workbench-contract.d.ts'), workbenchContract),
       writeFile(path.join(browserOutputPath, 'flow-notifications.d.ts'), flowNotificationsDeclaration),
       writeFile(path.join(browserOutputPath, 'workbench.css.d.ts'), 'export {}\n'),
+      writeFile(path.join(browserOutputPath, 'theme.css.d.ts'), 'export {}\n'),
       writeFile(path.join(commonOutputPath, 'run-lifecycle.d.ts'), runLifecycleDeclaration),
       writeFile(path.join(commonOutputPath, 'run-events.d.ts'), runEventsDeclaration),
       writeFile(path.join(commonOutputPath, 'engine-contract.d.ts'), engineContractDeclaration),

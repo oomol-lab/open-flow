@@ -4,8 +4,8 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  color: #09090b;
-  background: #ffffff;
+  color: var(--ui-foreground);
+  background: var(--ui-background);
   font-size: 14px;
   font-family:
     ui-sans-serif,
@@ -16,65 +16,17 @@
   font-synthesis: none;
   font-kerning: normal;
   text-rendering: optimizeLegibility;
-  --canvas: #ffffff;
-  --surface: #fafafa;
-  --subtle: #f4f4f5;
-  --border: #e4e4e7;
-  --input: #d4d4d8;
-  --text: #09090b;
-  --text-secondary: #3f3f46;
-  --text-tertiary: #52525b;
-  --muted: #71717a;
-  --primary: #18181b;
-  --primary-foreground: #fafafa;
   --signature: #7c6ee6;
-  --focus: #a1a1aa;
   --success: #16a34a;
   --warning: #d97706;
-  --danger: #dc2626;
-  --warning-surface: color-mix(in srgb, var(--warning) 12%, var(--canvas));
-  --warning-border: color-mix(in srgb, var(--warning) 35%, var(--border));
-  --warning-foreground: color-mix(in srgb, var(--warning) 58%, var(--text));
-  --danger-surface: color-mix(in srgb, var(--danger) 12%, var(--canvas));
-  --danger-border: color-mix(in srgb, var(--danger) 35%, var(--border));
-  --danger-foreground: color-mix(in srgb, var(--danger) 58%, var(--text));
-  --ui-background: var(--canvas);
-  --ui-foreground: var(--text);
-  --ui-card: var(--surface);
-  --ui-card-foreground: var(--text);
-  --ui-popover: var(--surface);
-  --ui-popover-foreground: var(--text);
-  --ui-primary: var(--primary);
-  --ui-primary-foreground: var(--primary-foreground);
-  --ui-secondary: var(--subtle);
-  --ui-secondary-foreground: var(--text);
-  --ui-muted: var(--subtle);
-  --ui-muted-foreground: var(--muted);
-  --ui-accent: var(--subtle);
-  --ui-accent-foreground: var(--text);
-  --ui-destructive: var(--danger);
-  --ui-border: var(--border);
-  --ui-input: var(--input);
-  --ui-ring: var(--focus);
-  --ui-radius: 6px;
-
+  --warning-surface: color-mix(in srgb, var(--warning) 12%, var(--ui-background));
+  --warning-border: color-mix(in srgb, var(--warning) 35%, var(--ui-border));
+  --warning-foreground: color-mix(in srgb, var(--warning) 58%, var(--ui-foreground));
+  --danger-surface: color-mix(in srgb, var(--ui-destructive) 12%, var(--ui-background));
+  --danger-border: color-mix(in srgb, var(--ui-destructive) 35%, var(--ui-border));
+  --danger-foreground: color-mix(in srgb, var(--ui-destructive) 58%, var(--ui-foreground));
   &[data-theme='dark'] {
-    color: #f4f4f5;
-    background: #111111;
-    --canvas: #111111;
-    --surface: #1b1b1b;
-    --subtle: #222222;
-    --border: #393939;
-    --input: #52525b;
-    --text: #f4f4f5;
-    --text-secondary: #d4d4d8;
-    --text-tertiary: #a1a1aa;
-    --muted: #a1a1aa;
-    --primary: #f4f4f5;
-    --primary-foreground: #18181b;
-    --focus: #a1a1aa;
     --success: #4ade80;
     --warning: #fbbf24;
-    --danger: #f87171;
   }
 }

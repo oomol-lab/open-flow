@@ -411,7 +411,7 @@ export default function FlowWorkspace({
           onRunLive={() => void runLive()}
           store={store}
         />
-        <RunInputPanel onStarted={revealRun} store={store.runRequests} />
+        <RunInputPanel onStarted={revealRun} store={store.runRequests} theme={theme} />
         {view == 'design' && (workspaceLoading || draft == null) ? (
           <div aria-labelledby="workspace-tab-design" className="editor-grid context-panel-closed" id="workspace-panel-design" role="tabpanel" tabIndex={0}>
             <section aria-busy={!workspaceLoadFailed} className="canvas-panel workbench-designer">

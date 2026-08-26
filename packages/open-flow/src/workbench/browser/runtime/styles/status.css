@@ -5,7 +5,7 @@
     height: 7px;
     flex: 0 0 auto;
     border-radius: 50%;
-    background: var(--muted);
+    background: var(--ui-muted-foreground);
   }
 
   .status-dot.success {
@@ -17,10 +17,10 @@
   }
 
   .status-dot.danger {
-    background: var(--danger);
+    background: var(--ui-destructive);
   }
 
   .status-dot.neutral {
-    background: var(--muted);
+    background: var(--ui-muted-foreground);
   }
 }

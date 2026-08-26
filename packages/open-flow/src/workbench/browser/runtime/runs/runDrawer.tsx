@@ -10,6 +10,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { OverlayScrollbar } from '../../../../designer/browser/components/overlayScrollbar.tsx'
 import { collapseAllNested, CompactValue, JSONViewer } from '../../../../designer/browser/jsonViewer/index.ts'
+import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { ToggleGroup, ToggleGroupItem } from '../../../../ui/browser/toggle-group.tsx'
@@ -765,7 +766,7 @@ export function RunDrawer({
       )}
       {open && (
         <header className="run-header">
-          <strong>{t('run.timeline')}</strong>
+          <Badge variant="secondary">{t('run.timeline')}</Badge>
           <span className="run-header-spacer" />
           <RunLogFilters
             container={drawer.current}

@@ -55,6 +55,8 @@ for (const expected of [
   'package/dist/browser/flow-change.d.ts',
   'package/dist/browser/flow-change.js',
   'package/dist/browser/workbench-contract.d.ts',
+  'package/dist/browser/theme.css',
+  'package/dist/browser/theme.css.d.ts',
   'package/dist/browser/workbench.css',
   'package/dist/browser/workbench.css.d.ts',
   'package/dist/browser/workbench.d.ts',
@@ -202,6 +204,10 @@ assert.deepEqual(packedManifest.exports, {
     import: './dist/common/scheduler.js',
     types: './dist/common/scheduler.d.ts',
   },
+  './theme.css': {
+    default: './dist/browser/theme.css',
+    types: './dist/browser/theme.css.d.ts',
+  },
   './webhook-trigger': {
     import: './dist/common/webhook-trigger.js',
     types: './dist/common/webhook-trigger.d.ts',
@@ -250,6 +256,12 @@ assert.ok(workbenchStyle.includes('aria-current\\:bg-muted'))
 assert.match(workbenchStyle, /\.justify-start\\!\{[^}]*justify-content:flex-start!important/)
 assert.match(workbenchStyle, /\.mb-\\\[2px\\\]\{[^}]*margin-bottom:2px/)
 for (const token of sharedUiTokens) assert.ok(workbenchStyle.includes(`${token}:`), `Missing ${token} from the published Workbench CSS.`)
+const themeStyleEntry = entries.find((entry) => entry.header.name == 'package/dist/browser/theme.css')
+assert.ok(themeStyleEntry?.data)
+const themeStyle = new TextDecoder().decode(themeStyleEntry.data)
+assert.match(themeStyle, /\.open-flow-theme\s*\{/)
+assert.match(themeStyle, /\.open-flow-theme\[data-theme='dark'\]/)
+for (const token of sharedUiTokens) assert.ok(themeStyle.includes(`${token}:`), `Missing ${token} from the published product theme CSS.`)
 assert.doesNotMatch(workbenchStyle, /--rf-/)
 assert.doesNotMatch(workbenchStyle, /(?:font-size-4|mb-2px|\\!justify-start|bg-dark)/)
 assert.doesNotMatch(workbenchStyle, /(?:^|[{},])\.hidden\{display:none\}/)
@@ -335,6 +347,7 @@ async function verifyConsumer(versions: { readonly react: string; readonly react
         "import { OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'",
         "import { createElement } from 'react'",
         "import '@oomol-lab/open-flow/workbench.css'",
+        "import '@oomol-lab/open-flow/theme.css'",
         'const connector: ConnectorProxy = { execute: async () => ({ data: {}, status: 200 }) }',
         "const connectorAction: ConnectorAction = { actionId: 'mail.send', description: '', inputs: {}, name: 'send', outputs: {}, serviceId: 'mail', serviceName: 'Mail' }",
         "const controlError: ControlErrorCode = 'flow.not-found'",
@@ -414,7 +427,7 @@ async function verifyConsumer(versions: { readonly react: string; readonly react
       process.execPath,
       [
         '-e',
-        "const api = await import('@oomol-lab/open-flow/control-api'); if (typeof api.ControlClient !== 'function') throw new Error('Missing Control API client.'); if (api.controlErrorMetadata[api.controlErrorCode.runNotFound].status !== 404) throw new Error('Missing Control API errors.'); const proxy = await import('@oomol-lab/open-flow/connector-proxy'); if (Object.keys(proxy).length !== 0) throw new Error('Connector Proxy should be type-only.'); const control = await import('@oomol-lab/open-flow/control-api-conformance'); if (control.controlApiConformanceCases.length !== 5 || control.publicationControlApiConformanceCases.length !== 2 || control.triggerControlApiConformanceCases.length !== 2 || control.connectorControlApiConformanceCases.length !== 2) throw new Error('Missing Control API conformance.'); const cron = await import('@oomol-lab/open-flow/cron-trigger'); if (typeof cron.nextTriggerScheduledAt !== 'function') throw new Error('Missing Cron Trigger contract.'); const integration = await import('@oomol-lab/open-flow/integration-trigger'); if (integration.integrationConformanceCases.length === 0) throw new Error('Missing Integration Trigger contract.'); const poll = await import('@oomol-lab/open-flow/poll-trigger'); if (poll.maximumPollEventsPerPage !== 100) throw new Error('Missing Poll Trigger contract.'); const providers = await import('@oomol-lab/open-flow/provider-triggers'); if (providers.triggerDefinitions.length !== 17) throw new Error('Missing Provider Trigger definitions.'); const slack = providers.triggerDefinitions.find((definition) => definition.snapshot.key === 'slack.on_message_posted'); if (slack == null || !('poll' in slack)) throw new Error('Missing Slack Trigger definition.'); let sharedPollError = false; try { await slack.poll({ checkpoint: null, config: { channelId: 'C1' }, connector: { execute: async () => ({ data: { error: 'invalid_auth', ok: false }, status: 200 }) }, now: new Date() }) } catch (error) { sharedPollError = error instanceof poll.PollConnectionError } if (!sharedPollError) throw new Error('Provider Trigger does not share the Poll error identity.'); const lifecycle = await import('@oomol-lab/open-flow/run-lifecycle'); if (lifecycle.transitionRun('queued', { kind: 'claim' }).kind !== 'ready') throw new Error('Missing Run lifecycle runtime.'); const events = await import('@oomol-lab/open-flow/run-events'); if (typeof events.createEventProjector !== 'function') throw new Error('Missing Run event projection.'); const runtime = await import('@oomol-lab/open-flow/runtime-contract'); if (runtime.runtimeConformanceCases.length === 0) throw new Error('Missing Runtime contract.'); const scheduler = await import('@oomol-lab/open-flow/scheduler'); if (typeof scheduler.runFlow !== 'function') throw new Error('Missing Scheduler runtime.'); const webhook = await import('@oomol-lab/open-flow/webhook-trigger'); if (webhook.maximumWebhookBodyBytes !== 65536) throw new Error('Missing Webhook Trigger contract.'); const encoding = await import('@oomol-lab/open-flow/flow-encoding'); if (typeof encoding.encodeRevision !== 'function') throw new Error('Missing Flow encoding runtime.'); const semantics = await import('@oomol-lab/open-flow/flow-semantics'); if (typeof semantics.prepareFlow !== 'function') throw new Error('Missing Flow semantics runtime.'); const workbench = await import('@oomol-lab/open-flow/workbench'); if (typeof workbench.OpenFlowWorkbench !== 'function') throw new Error('Missing Workbench runtime.'); await import.meta.resolve('@oomol-lab/open-flow/workbench.css')",
+        "const api = await import('@oomol-lab/open-flow/control-api'); if (typeof api.ControlClient !== 'function') throw new Error('Missing Control API client.'); if (api.controlErrorMetadata[api.controlErrorCode.runNotFound].status !== 404) throw new Error('Missing Control API errors.'); const proxy = await import('@oomol-lab/open-flow/connector-proxy'); if (Object.keys(proxy).length !== 0) throw new Error('Connector Proxy should be type-only.'); const control = await import('@oomol-lab/open-flow/control-api-conformance'); if (control.controlApiConformanceCases.length !== 5 || control.publicationControlApiConformanceCases.length !== 2 || control.triggerControlApiConformanceCases.length !== 2 || control.connectorControlApiConformanceCases.length !== 2) throw new Error('Missing Control API conformance.'); const cron = await import('@oomol-lab/open-flow/cron-trigger'); if (typeof cron.nextTriggerScheduledAt !== 'function') throw new Error('Missing Cron Trigger contract.'); const integration = await import('@oomol-lab/open-flow/integration-trigger'); if (integration.integrationConformanceCases.length === 0) throw new Error('Missing Integration Trigger contract.'); const poll = await import('@oomol-lab/open-flow/poll-trigger'); if (poll.maximumPollEventsPerPage !== 100) throw new Error('Missing Poll Trigger contract.'); const providers = await import('@oomol-lab/open-flow/provider-triggers'); if (providers.triggerDefinitions.length !== 17) throw new Error('Missing Provider Trigger definitions.'); const slack = providers.triggerDefinitions.find((definition) => definition.snapshot.key === 'slack.on_message_posted'); if (slack == null || !('poll' in slack)) throw new Error('Missing Slack Trigger definition.'); let sharedPollError = false; try { await slack.poll({ checkpoint: null, config: { channelId: 'C1' }, connector: { execute: async () => ({ data: { error: 'invalid_auth', ok: false }, status: 200 }) }, now: new Date() }) } catch (error) { sharedPollError = error instanceof poll.PollConnectionError } if (!sharedPollError) throw new Error('Provider Trigger does not share the Poll error identity.'); const lifecycle = await import('@oomol-lab/open-flow/run-lifecycle'); if (lifecycle.transitionRun('queued', { kind: 'claim' }).kind !== 'ready') throw new Error('Missing Run lifecycle runtime.'); const events = await import('@oomol-lab/open-flow/run-events'); if (typeof events.createEventProjector !== 'function') throw new Error('Missing Run event projection.'); const runtime = await import('@oomol-lab/open-flow/runtime-contract'); if (runtime.runtimeConformanceCases.length === 0) throw new Error('Missing Runtime contract.'); const scheduler = await import('@oomol-lab/open-flow/scheduler'); if (typeof scheduler.runFlow !== 'function') throw new Error('Missing Scheduler runtime.'); const webhook = await import('@oomol-lab/open-flow/webhook-trigger'); if (webhook.maximumWebhookBodyBytes !== 65536) throw new Error('Missing Webhook Trigger contract.'); const encoding = await import('@oomol-lab/open-flow/flow-encoding'); if (typeof encoding.encodeRevision !== 'function') throw new Error('Missing Flow encoding runtime.'); const semantics = await import('@oomol-lab/open-flow/flow-semantics'); if (typeof semantics.prepareFlow !== 'function') throw new Error('Missing Flow semantics runtime.'); const workbench = await import('@oomol-lab/open-flow/workbench'); if (typeof workbench.OpenFlowWorkbench !== 'function') throw new Error('Missing Workbench runtime.'); await import.meta.resolve('@oomol-lab/open-flow/workbench.css'); await import.meta.resolve('@oomol-lab/open-flow/theme.css')",
       ],
       { cwd: directory },
     )

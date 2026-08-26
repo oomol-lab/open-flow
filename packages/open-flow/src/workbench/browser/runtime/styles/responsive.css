@@ -97,7 +97,7 @@
     .trigger-binding-detail-sections > section + section {
       padding-top: 16px;
       padding-left: 0;
-      border-top: 1px solid var(--border);
+      border-top: 1px solid var(--ui-border);
       border-left: 0;
     }
   }
@@ -210,7 +210,7 @@
     .publication-revision-group + .publication-revision-group {
       padding-top: 16px;
       padding-left: 0;
-      border-top: 1px solid var(--border);
+      border-top: 1px solid var(--ui-border);
       border-left: 0;
     }
 

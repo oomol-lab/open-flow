@@ -1,4 +1,5 @@
 import type { FormEvent, KeyboardEvent, ReactElement } from 'react'
+import type { WorkbenchTheme } from '../contract.ts'
 import type { RunInputGroup, RunInputRequest, RunRequestStore } from './runRequestStore.ts'
 
 import { useEffect, useRef } from 'react'
@@ -13,9 +14,10 @@ import { Icon } from '../icons.tsx'
 interface Props {
   readonly onStarted: () => void
   readonly store: RunRequestStore
+  readonly theme: WorkbenchTheme
 }
 
-function InputGroup({ attempted, group }: { readonly attempted: boolean; readonly group: RunInputGroup }): ReactElement {
+function InputGroup({ attempted, group, theme }: { readonly attempted: boolean; readonly group: RunInputGroup; readonly theme: WorkbenchTheme }): ReactElement {
   const t = useTranslate()
   const valid = useVal(group.editor.valid$)
   return (
@@ -27,12 +29,12 @@ function InputGroup({ attempted, group }: { readonly attempted: boolean; readonl
         </div>
         {attempted && !valid && <span>{t('runInput.groupInvalid')}</span>}
       </header>
-      <FlowRunInputEditor store={group.editor} />
+      <FlowRunInputEditor store={group.editor} theme={theme} />
     </section>
   )
 }
 
-function Panel({ onStarted, request, store }: Props & { readonly request: RunInputRequest }): ReactElement {
+function Panel({ onStarted, request, store, theme }: Props & { readonly request: RunInputRequest }): ReactElement {
   const t = useTranslate()
   const valid = useVal(request.valid)
   const starting = useVal(store.$.starting)
@@ -92,7 +94,7 @@ function Panel({ onStarted, request, store }: Props & { readonly request: RunInp
             </Alert>
           )}
           {request.groups.map((group) => (
-            <InputGroup attempted={request.attempted} group={group} key={group.nodeId} />
+            <InputGroup attempted={request.attempted} group={group} key={group.nodeId} theme={theme} />
           ))}
         </div>
         <footer>
@@ -109,7 +111,7 @@ function Panel({ onStarted, request, store }: Props & { readonly request: RunInp
   )
 }
 
-export function RunInputPanel({ onStarted, store }: Props): ReactElement | null {
+export function RunInputPanel({ onStarted, store, theme }: Props): ReactElement | null {
   const request = useVal(store.$.inputRequest)
-  return request == null ? null : <Panel onStarted={onStarted} request={request} store={store} />
+  return request == null ? null : <Panel onStarted={onStarted} request={request} store={store} theme={theme} />
 }

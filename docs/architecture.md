@@ -61,7 +61,9 @@ RunEvent 明细可以按部署声明的 retention 到期，但唯一 terminal re
 - 其他部署只拥有自己的基础设施接入、认证、application lifecycle、Capability mediation 和正式 Workbench 宿主。
 
 部署必须消费精确版本的公开 package artifact 并运行其中的 conformance cases，不能通过源码复制、deep import 或同步脚本保留公共实现的第二份
-可编辑副本。Workbench runtime、类型声明和样式只通过 `@oomol-lab/open-flow/workbench` 与 `workbench.css` 同版本发布。
+可编辑副本。Workbench runtime、类型声明和样式只通过 `@oomol-lab/open-flow/workbench`、`workbench.css` 与 `theme.css` 同版本发布。
+`theme.css` 是部署宿主与 Workbench 共用的产品语义主题合同；Canvas Content 的 Designer token 仍由 Designer 独立拥有，只有 Canvas Chrome
+显式桥接产品主题。
 
 Common 代码不能依赖 Browser 或 Node，Browser 代码不能依赖 Node。部署应用通过公开 subpath 消费 package，不 deep-import 另一个 workspace 的源码。
 

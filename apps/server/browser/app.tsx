@@ -193,7 +193,7 @@ export function App(): ReactElement {
   }
 
   return (
-    <div className="server-host" data-theme={theme}>
+    <div className="open-flow-theme server-host" data-theme={theme}>
       {session.kind == 'signed-in' ? (
         <>
           <div className="operator-menu" ref={operatorMenu}>

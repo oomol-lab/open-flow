@@ -4,6 +4,7 @@ import type { DiagnosticItem, DiagnosticScope } from '../designer/diagnostics.ts
 
 import { useEffect, useRef } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
 import { Skeleton } from '../../../../ui/browser/skeleton.tsx'
@@ -85,7 +86,7 @@ export function DiagnosticsPanel({ checked, checking, items, onClose, onRefresh,
             const content = (
               <>
                 <span className="diagnostic-row-heading">
-                  <span className="diagnostic-scope">{scopeLabel(item.scope, t)}</span>
+                  <Badge variant="secondary">{scopeLabel(item.scope, t)}</Badge>
                   <code>{item.diagnostic.code}</code>
                   {item.scope == 'code' && <span>{t('diagnostics.sourceLocation', { column: item.diagnostic.column + 1, line: item.diagnostic.line })}</span>}
                 </span>

@@ -120,7 +120,7 @@ function Session({ host, hrefFor, language, location, onLanguageChange, onNaviga
   }, [i18n, language])
   return (
     <I18nProvider i18n={i18n}>
-      <div className="open-flow-workbench" data-theme={theme}>
+      <div className="open-flow-theme open-flow-workbench" data-theme={theme}>
         <NotificationBridge host={host} store={store} />
         <Workbench hrefFor={hrefFor} language={language} navigation={navigation} onLanguageChange={onLanguageChange} store={store} theme={theme} />
       </div>

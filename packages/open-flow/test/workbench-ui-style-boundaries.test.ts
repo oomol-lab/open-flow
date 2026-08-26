@@ -4,6 +4,7 @@ import { test } from 'vitest'
 
 const packageRoot = new URL('..', import.meta.url)
 const workbenchStyleImports = [
+  "@import '../../../ui/browser/theme.css';",
   "@import '../../../ui/browser/styles.css';",
   "@import './styles/tokens.css';",
   "@import './styles/shell.css';",
@@ -106,7 +107,8 @@ test('keeps Workbench feature styles in their original cascade order', async () 
   for (const source of [tokens, shell, resourceBrowser, status, workspace, canvas, contextPanel, runs, publications, responsive]) {
     assert.match(source, /^\.open-flow-workbench \{/)
   }
-  assert.match(tokens, /--ui-background:/)
+  assert.match(tokens, /background: var\(--ui-background\)/)
+  assert.doesNotMatch(tokens, /--ui-[\w-]+\s*:/)
   assert.match(shell, /\.app-shell \{/)
   assert.match(resourceBrowser, /\.resource-browser \{/)
   assert.match(status, /\.status-dot \{/)
@@ -288,29 +290,42 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
   assert.match(workbenchDesigner, /aria-label=\{t\('designer\.toggleInspector'\)\}[\s\S]*?size="icon"[\s\S]*?variant="outline"/)
   assert.match(workbenchDesigner, /recommendedOptions\.map[\s\S]*?size="sm"[\s\S]*?variant="outline"/)
   assert.match(contextPanel, /<InputGroup>/)
+  assert.match(contextPanel, /buttonVariants\(\{ variant: 'ghost' \}\)/)
+  assert.match(contextPanel, /<LibraryGroup key=/)
+  assert.match(contextPanel, /<Separator \/>/)
   assert.doesNotMatch(contextPanel, /block-library-search/)
+  assert.doesNotMatch(contextPanel, /BlockPickerRow|designerThemeClass/)
   assert.match(runs, /aria-current=\{candidate\.runId == run\?\.runId \? 'true' : undefined\}/)
   assert.match(runs, /className="run-list-item"/)
   assert.match(runs, /className="mx-2 mb-2"[\s\S]*?size="lg"[\s\S]*?variant="outline"/)
   assert.match(runs, /<Empty className="h-full"/)
+  assert.match(runs, /<Badge variant="secondary">\{sourceLabel\(run, t\)\}<\/Badge>/)
   assert.doesNotMatch(runs, /border-0/)
   assert.doesNotMatch(runs, /className="run-tabs"/)
   assert.doesNotMatch(runDrawer, /className="run-tabs"/)
   assert.match(runDrawer, /aria-label=\{t\(open \? 'run\.collapse' : 'run\.expand'\)\}[\s\S]*?size="icon-xs"/)
+  assert.match(runDrawer, /<Badge variant="secondary">\{t\('run\.timeline'\)\}<\/Badge>/)
   assert.match(publications, /className="m-2"[\s\S]*?size="lg"[\s\S]*?variant="outline"/)
+  assert.match(publications, /<Badge variant="secondary">\{t\('publication\.current'\)\}<\/Badge>/)
+  assert.match(diagnostics, /<Badge variant="secondary">\{scopeLabel\(item\.scope, t\)\}<\/Badge>/)
   assert.doesNotMatch(workspaceStyles, /\.diagnostics-(?:empty|loading)/)
   assert.doesNotMatch(workspaceStyles, /\.run-input-error/)
   assert.doesNotMatch(workspaceStyles, /\.workspace-title button|\.validation-state:(?:hover|focus)|\.validation-state\.(?:invalid|active)/)
+  assert.doesNotMatch(workspaceStyles, /\.diagnostic-scope/)
+  assert.doesNotMatch(workspaceStyles, /\[data-slot='tabs-trigger'\]/)
   assert.doesNotMatch(canvasStyles, /\.designer-overlay\.top-right > \[data-slot='button'\]/)
   assert.doesNotMatch(canvasStyles, /\.designer-delete-action/)
   assert.doesNotMatch(canvasStyles, /\.canvas-empty-recommendations \[data-slot='button'\]/)
   assert.doesNotMatch(contextPanelStyles, /\.block-library-search/)
+  assert.doesNotMatch(contextPanelStyles, /oo-designer-picker/)
   assert.doesNotMatch(contextPanelStyles, /\.block-library \[data-slot='button'\]:hover/)
   assert.doesNotMatch(contextPanelStyles, /\.inspector-form input:not/)
   assert.doesNotMatch(runStyles, /\.run-list-item\.active|\.run-load-more/)
+  assert.doesNotMatch(runStyles, /\.run-source|\.run-header strong/)
   assert.doesNotMatch(runStyles, /\.run-summary > \[data-slot='button'\]/)
   assert.doesNotMatch(runStyles, /\.event-locate \{[^}]*?(?:padding|border-radius|background|color):/)
   assert.doesNotMatch(publicationStyles, /\.publication-load-more/)
+  assert.doesNotMatch(publicationStyles, /\.publication-current/)
   assert.doesNotMatch(responsiveStyles, /\.diagnostics-loading/)
   assert.doesNotMatch(responsiveStyles, /\.run-history-back/)
   const diagnosticRow = workspaceStyles.match(/\.diagnostic-row \{([^}]*)\}/)
@@ -428,7 +443,7 @@ test('keeps responsive overlays aligned with the Workbench container and keyboar
   assert.match(diagnostics, /aria-busy=\{checking\}/)
   assert.match(diagnostics, /<span aria-live="polite">/)
   assert.match(runInput, /aria-busy=\{starting\}/)
-  assert.match(workspaceStyles, /\.diagnostics-panel:focus-visible,[\s\S]*?outline: 2px solid var\(--focus\)/)
+  assert.match(workspaceStyles, /\.diagnostics-panel:focus-visible,[\s\S]*?outline: 2px solid var\(--ui-ring\)/)
   assert.match(workspaceStyles, /overscroll-behavior: contain/)
   assert.match(contextPanelStyles, /\.context-panel:focus-visible[\s\S]*?outline: 2px solid var\(--ui-ring\)/)
   assert.match(contextPanelStyles, /overscroll-behavior: contain/)
@@ -458,6 +473,25 @@ test('keeps Run input values on the WorkbenchRunInputs public contract', async (
   assert.match(runInputs, /public readonly inputValues\$: ReadonlyVal/)
   assert.match(editorStore, /get\(inputs\.inputValues\$\)/)
   assert.doesNotMatch(editorStore, /handleInputsFrom!/)
+})
+
+test('keeps the Run input editor on the product theme adapter', async () => {
+  const [editor, editorStyles, panel, workspace] = await Promise.all([
+    readFile(new URL('src/workbench/browser/flowRunInputEditor.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/flowRunInputEditor.module.scss', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/runs/runInputPanel.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/flowWorkspace.tsx', packageRoot), 'utf8'),
+  ])
+
+  assert.match(editor, /data-workbench-control-scope/)
+  assert.match(editor, /<ThemeProvider dark=\{theme == 'dark'\}/)
+  assert.doesNotMatch(editor, /designerThemeClass/)
+  assert.match(editorStyles, /--widget-height: 32px/)
+  assert.match(editorStyles, /--widget-radius: var\(--ui-radius\)/)
+  assert.match(editorStyles, /--widget-background: var\(--ui-background\)/)
+  assert.doesNotMatch(editorStyles, /var\(--(?:border-[12]|text-[1-5])\)/)
+  assert.match(panel, /<FlowRunInputEditor store=\{group\.editor\} theme=\{theme\}/)
+  assert.match(workspace, /<RunInputPanel onStarted=\{revealRun\} store=\{store\.runRequests\} theme=\{theme\}/)
 })
 
 test('uses React Flow ownership for canvas chrome without custom toolbar primitives', async () => {
@@ -532,6 +566,7 @@ test('keeps concrete Designer theme modules behind the Designer theme adapter', 
   const adapter = await readFile(new URL('src/designer/browser/theme/designerThemeClass.ts', packageRoot), 'utf8')
 
   assert.doesNotMatch(workbenchSources.join('\n'), /designer\/browser\/styles\/(?:dark|light)\.module\.scss/)
+  assert.doesNotMatch(workbenchSources.join('\n'), /designerThemeClass/)
   assert.match(adapter, /styles\/dark\.module\.scss/)
   assert.match(adapter, /styles\/light\.module\.scss/)
 })
@@ -550,20 +585,45 @@ test('maps canvas chrome through React Flow theme variables', async () => {
   }
 })
 
-test('keeps the shared UI token contract synchronized across every theme owner', async () => {
+test('keeps the product theme contract separate from the Designer theme', async () => {
   const uiPaths: URL[] = []
   for await (const path of glob('src/ui/browser/**/*.{ts,tsx,css}', { cwd: packageRoot })) uiPaths.push(new URL(path, packageRoot))
-  const [uiSources, workbench, light, dark] = await Promise.all([
+  const [uiSources, productTheme, workbench, light, dark, workbenchRoot, reactFlowStyles] = await Promise.all([
     Promise.all(uiPaths.map((path) => readFile(path, 'utf8'))),
+    readFile(new URL('src/ui/browser/theme.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/tokens.css', packageRoot), 'utf8'),
     readFile(new URL('src/designer/browser/styles/light.module.scss', packageRoot), 'utf8'),
     readFile(new URL('src/designer/browser/styles/dark.module.scss', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/openFlowWorkbench.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.scss', packageRoot), 'utf8'),
   ])
 
   assert.deepEqual(referencedTokens(uiSources.join('\n'), '--ui-'), sharedUiTokens)
-  for (const [owner, source] of Object.entries({ workbench, light, dark })) {
+  assert.deepEqual(Object.keys(declarations(productTheme, '--ui-')).toSorted(), sharedUiTokens)
+  for (const [owner, source] of Object.entries({ light, dark })) {
     assert.deepEqual(Object.keys(declarations(source, '--ui-')).toSorted(), sharedUiTokens, `${owner} does not implement the shared UI token contract.`)
   }
+  assert.match(productTheme, /\.open-flow-theme\s*\{[\s\S]*?--open-flow-background: #ffffff;/)
+  assert.match(productTheme, /\.open-flow-theme\[data-theme='dark'\]/)
+  assert.match(productTheme, /--ui-background: var\(--open-flow-background\);/)
+  assert.doesNotMatch(workbench, /--ui-[\w-]+\s*:/)
+  assert.doesNotMatch(workbench, /--(?:canvas|surface|subtle|border|input|text|muted|primary|primary-foreground|focus|danger):/)
+  assert.match(workbenchRoot, /className="open-flow-theme open-flow-workbench"/)
+  assert.match(reactFlowStyles, /:where\(\.react-flow__controls, \[data-canvas-control-scope\]\)/)
+  assert.match(reactFlowStyles, /--ui-background: var\(--open-flow-background, var\(--fill-1\)\);/)
+  assert.doesNotMatch(reactFlowStyles, /\.oo-designer-root\s*\{\s*--ui-background:/)
+})
+
+test('keeps Workbench feature styles on the shared semantic theme', async () => {
+  const sources: string[] = []
+  for await (const path of glob('src/workbench/browser/runtime/styles/*.css', { cwd: packageRoot })) {
+    sources.push(await readFile(new URL(path, packageRoot), 'utf8'))
+  }
+
+  assert.doesNotMatch(
+    sources.join('\n'),
+    /var\(--(?:canvas|surface|subtle|border|input|text|text-secondary|text-tertiary|muted|primary|primary-foreground|focus|danger)\)/,
+  )
 })
 
 test('keeps React Flow canvas chrome on one theme mapping', async () => {

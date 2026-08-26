@@ -1,6 +1,6 @@
+@import '@oomol-lab/open-flow/theme.css';
+
 :root {
-  color: #09090b;
-  background: #ffffff;
   font-family:
     ui-sans-serif,
     -apple-system,
@@ -41,7 +41,7 @@ body {
 .operator-menu button:focus-visible,
 .session-form button:focus-visible,
 .session-form input:focus-visible {
-  outline: 2px solid #a1a1aa;
+  outline: 2px solid var(--ui-ring);
   outline-offset: 2px;
 }
 
@@ -50,19 +50,15 @@ body {
   display: flex;
   height: 100%;
   flex-direction: column;
-  background: #ffffff;
-}
-
-.server-host[data-theme='dark'] {
-  background: #111111;
-  color: #f4f4f5;
+  background: var(--ui-background);
+  color: var(--ui-foreground);
 }
 
 .operator-menu button,
 .session-form button,
 .session-form input {
   height: 32px;
-  border-radius: 6px;
+  border-radius: var(--ui-radius);
 }
 
 .workbench-frame {
@@ -85,15 +81,15 @@ body {
   padding: 0;
   place-items: center;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--ui-radius);
   background: transparent;
-  color: #52525b;
+  color: var(--ui-muted-foreground);
 }
 
 .operator-menu .operator-menu-trigger:hover,
 .operator-menu .operator-menu-trigger[aria-expanded='true'] {
-  background: #f4f4f5;
-  color: #09090b;
+  background: var(--ui-muted);
+  color: var(--ui-foreground);
 }
 
 .operator-menu-popup {
@@ -102,15 +98,16 @@ body {
   right: 0;
   width: 168px;
   padding: 4px;
-  border: 1px solid #e4e4e7;
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid var(--ui-border);
+  border-radius: calc(var(--ui-radius) + 2px);
+  background: var(--ui-popover);
+  color: var(--ui-popover-foreground);
   box-shadow: 0 8px 24px rgb(0 0 0 / 14%);
 }
 
 .operator-menu-label {
   padding: 6px 8px;
-  color: #71717a;
+  color: var(--ui-muted-foreground);
   font-size: 11px;
   font-weight: 600;
 }
@@ -120,13 +117,13 @@ body {
   padding: 0 8px;
   border: 0;
   background: transparent;
-  color: #dc2626;
+  color: var(--ui-destructive);
   font-size: 12px;
   text-align: left;
 }
 
 .operator-menu-sign-out:hover {
-  background: #fef2f2;
+  background: color-mix(in srgb, var(--ui-destructive) 12%, transparent);
 }
 
 .server-host .workspace-actions,
@@ -154,27 +151,27 @@ body {
 .session-form p {
   min-height: 40px;
   margin: 0 0 6px;
-  color: #52525b;
+  color: var(--ui-muted-foreground);
   line-height: 20px;
 }
 
 .session-form label {
-  color: #52525b;
+  color: var(--ui-muted-foreground);
   font-size: 12px;
   font-weight: 600;
 }
 
 .session-form input {
   padding: 0 9px;
-  border: 1px solid #d4d4d8;
-  background: #ffffff;
+  border: 1px solid var(--ui-input);
+  background: var(--ui-background);
 }
 
 .session-form button {
   padding: 0 12px;
   border: 0;
-  background: #18181b;
-  color: #fafafa;
+  background: var(--ui-primary);
+  color: var(--ui-primary-foreground);
   font-weight: 600;
 }
 
@@ -184,32 +181,6 @@ body {
 }
 
 .session-error {
-  color: #dc2626;
+  color: var(--ui-destructive);
   font-size: 12px;
-}
-
-.server-host[data-theme='dark'] .operator-menu-popup,
-.server-host[data-theme='dark'] .session-form input {
-  border-color: #52525b;
-  background: #18181b;
-  color: #f4f4f5;
-}
-
-.server-host[data-theme='dark'] .operator-menu-trigger {
-  color: #a1a1aa;
-}
-
-.server-host[data-theme='dark'] .operator-menu-trigger:hover,
-.server-host[data-theme='dark'] .operator-menu-trigger[aria-expanded='true'] {
-  background: #27272a;
-  color: #f4f4f5;
-}
-
-.server-host[data-theme='dark'] .operator-menu-sign-out:hover {
-  background: rgb(248 113 113 / 12%);
-}
-
-.server-host[data-theme='dark'] .session-form label,
-.server-host[data-theme='dark'] .session-form p {
-  color: #a1a1aa;
 }

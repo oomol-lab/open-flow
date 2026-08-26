@@ -8,6 +8,7 @@ import { Fragment, useEffect, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { collapseAllNested, JSONViewer } from '../../../../designer/browser/jsonViewer/index.ts'
+import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Icon } from '../icons.tsx'
 
@@ -456,7 +457,7 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
                         <td>
                           <span className="publication-operation">
                             {t(publication.operation == 'publish' ? 'publication.published' : 'publication.rolledBack')}
-                            {current && <span className="publication-current">{t('publication.current')}</span>}
+                            {current && <Badge variant="secondary">{t('publication.current')}</Badge>}
                           </span>
                           <CompactId value={publication.publicationId} />
                         </td>

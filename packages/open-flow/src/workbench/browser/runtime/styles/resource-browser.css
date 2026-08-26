@@ -3,7 +3,7 @@
     width: 100%;
     height: 100%;
     overflow: auto;
-    background: var(--canvas);
+    background: var(--ui-background);
   }
 
   .resource-page {
@@ -31,7 +31,7 @@
     align-items: center;
     gap: 7px;
     margin-bottom: 8px;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 12px;
     font-weight: 500;
   }
@@ -39,14 +39,14 @@
   .resource-breadcrumb > span:last-child {
     min-width: 0;
     overflow: hidden;
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .resource-heading h1 {
     margin: 0;
-    color: var(--text);
+    color: var(--ui-foreground);
     font-size: 25px;
     font-weight: 650;
     letter-spacing: -0.025em;
@@ -55,7 +55,7 @@
 
   .resource-heading p {
     margin: 7px 0 0;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 13px;
     line-height: 20px;
   }
@@ -66,7 +66,7 @@
   }
 
   .resource-row-form label {
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
     font-size: 12px;
     font-weight: 500;
   }
@@ -108,7 +108,7 @@
   }
 
   .resource-list-title span {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
   }
 
@@ -121,18 +121,18 @@
   }
 
   .resource-name-message {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
     font-weight: 400;
     line-height: 16px;
   }
 
   .resource-name-message.error {
-    color: var(--danger);
+    color: var(--ui-destructive);
   }
 
   .resource-list {
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--ui-border);
   }
 
   .resource-list-columns,
@@ -154,7 +154,7 @@
   .resource-list-columns {
     min-height: 30px;
     padding: 0 12px;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
     font-weight: 500;
   }
@@ -163,7 +163,7 @@
     width: 100%;
     min-height: 56px;
     padding: 8px 12px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ui-border);
     text-align: left;
   }
 
@@ -194,13 +194,13 @@
   }
 
   .resource-primary-cell strong {
-    color: var(--text);
+    color: var(--ui-foreground);
     font-size: 13px;
     font-weight: 600;
   }
 
   .resource-primary-cell code {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
   }
 
@@ -210,17 +210,17 @@
     height: 30px;
     place-items: center;
     flex: 0 0 auto;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--canvas);
-    color: var(--text-tertiary);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius);
+    background: var(--ui-background);
+    color: var(--ui-muted-foreground);
   }
 
   .resource-list-row time,
   .resource-change,
   .resource-status {
     min-width: 0;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
   }
 
@@ -232,14 +232,14 @@
   }
 
   .resource-change.pending {
-    color: var(--text-secondary);
+    color: var(--ui-muted-foreground);
   }
 
   .resource-item-row {
     position: relative;
     display: grid;
     grid-template-columns: minmax(0, 1fr) 40px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ui-border);
   }
 
   .resource-item-row > .resource-list-row {
@@ -268,8 +268,8 @@
   .resource-row-confirm {
     grid-column: 1 / -1;
     padding: 12px;
-    border-top: 1px solid var(--border);
-    background: var(--surface);
+    border-top: 1px solid var(--ui-border);
+    background: var(--ui-card);
   }
 
   .resource-row-form {
@@ -301,7 +301,7 @@
   }
 
   .resource-row-confirm small {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
   }
 }

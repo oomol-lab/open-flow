@@ -4,18 +4,18 @@ import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
 import type { AddNodeOption } from './addNodeOptions.ts'
 
-import { clsx } from 'clsx'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { OverlayScrollbar } from '../../../../designer/browser/components/overlayScrollbar.tsx'
 import { filterBlockPickerItems, useBlockPickerItems } from '../../../../designer/browser/graph/blockPicker.ts'
-import { BlockPickerRow } from '../../../../designer/browser/graph/BlockQuickPickPanel.tsx'
 import { setAddItemId } from '../../../../designer/browser/graph/ReactFlowContainer/addItemDrag.ts'
-import { designerThemeClass } from '../../../../designer/browser/theme/designerThemeClass.ts'
+import { DesignerIcon } from '../../../../designer/browser/icons/DesignerIcon.tsx'
 import { ThemeProvider } from '../../../../designer/browser/theme/ThemeProvider.tsx'
-import { Button } from '../../../../ui/browser/button.tsx'
+import { Button, buttonVariants } from '../../../../ui/browser/button.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
+import { Separator } from '../../../../ui/browser/separator.tsx'
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
+import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
 import { cycleContextPanelFocus, observeContextPanelOverlay } from './contextPanelBehavior.ts'
@@ -106,7 +106,7 @@ export function ContextPanel({ children, focusOnOpen, icon, onClose, theme, titl
         <aside
           aria-labelledby={titleId}
           aria-modal={overlay || undefined}
-          className={clsx('context-panel', designerThemeClass(theme == 'dark'))}
+          className="context-panel"
           data-theme={theme}
           onKeyDown={keyDown}
           ref={panel}
@@ -171,6 +171,48 @@ function menuItems(options: readonly AddNodeOption[]): IAddNodeMenuItem[] {
   return items
 }
 
+function fallbackIcon(item: Exclude<IAddNodeMenuItem, { type: 'divider' }>): IconName {
+  switch (item.type) {
+    case 'condition':
+      return 'condition'
+    case 'connector':
+      return 'connection'
+    case 'llm':
+      return 'llm'
+    case 'trigger':
+      return 'trigger'
+    case 'value':
+      return 'value'
+    case 'block':
+    case 'comment':
+    case 'scriptlet':
+      return 'task'
+  }
+}
+
+function LibraryRow({ item, trailing }: { readonly item: Exclude<IAddNodeMenuItem, { type: 'divider' }>; readonly trailing?: ReactNode }): ReactElement {
+  const fallback = <Icon name={fallbackIcon(item)} />
+  return (
+    <span className="block-library-row" title={item.detail ?? item.description ?? item.label}>
+      <span className="block-library-row-icon">
+        <DesignerIcon className="block-library-row-glyph" fallback={fallback} src={item.icon} />
+      </span>
+      <span className="block-library-row-label">{item.label}</span>
+      {item.description && <span className="block-library-row-description">{item.description}</span>}
+      {trailing}
+    </span>
+  )
+}
+
+function LibraryGroup({ label }: { readonly label: string }): ReactElement {
+  return (
+    <div className="block-library-group">
+      <span>{label}</span>
+      <Separator />
+    </div>
+  )
+}
+
 function LibraryItem({ disabled, item, onAdd, onDrag, onLoadChoices }: LibraryItemProps): ReactElement {
   const t = useTranslate()
   const connectionChoices = item.type == 'trigger'
@@ -213,9 +255,12 @@ function LibraryItem({ disabled, item, onAdd, onDrag, onLoadChoices }: LibraryIt
   if (item.choices != null) {
     return (
       <details className="block-library-choices" onToggle={(event) => event.currentTarget.open && !loaded && load()}>
-        <summary aria-disabled={disabled} onClick={(event) => disabled && event.preventDefault()}>
-          <BlockPickerRow
-            disabled={disabled}
+        <summary
+          aria-disabled={disabled}
+          className={cn(buttonVariants({ variant: 'ghost' }), 'block-library-item h-auto min-h-12 justify-start whitespace-normal px-2 py-2')}
+          onClick={(event) => disabled && event.preventDefault()}
+        >
+          <LibraryRow
             item={item}
             trailing={
               <span className="block-library-expand">
@@ -230,7 +275,7 @@ function LibraryItem({ disabled, item, onAdd, onDrag, onLoadChoices }: LibraryIt
             const choiceItem = { ...item, choices: undefined, data: choice.data, description: choice.description, label: choice.label }
             return (
               <Button
-                className="block-library-item h-auto min-h-0 justify-start whitespace-normal"
+                className="block-library-item h-auto min-h-12 justify-start whitespace-normal px-2 py-2"
                 disabled={disabled}
                 draggable={!disabled}
                 key={choice.data}
@@ -239,7 +284,7 @@ function LibraryItem({ disabled, item, onAdd, onDrag, onLoadChoices }: LibraryIt
                 type="button"
                 variant="ghost"
               >
-                <BlockPickerRow disabled={disabled} item={choiceItem} />
+                <LibraryRow item={choiceItem} />
               </Button>
             )
           })}
@@ -263,7 +308,7 @@ function LibraryItem({ disabled, item, onAdd, onDrag, onLoadChoices }: LibraryIt
   }
   return (
     <Button
-      className="block-library-item h-auto min-h-0 justify-start whitespace-normal"
+      className="block-library-item h-auto min-h-12 justify-start whitespace-normal px-2 py-2"
       disabled={disabled}
       draggable={!disabled}
       onClick={() => item.data != null && onAdd(item.data)}
@@ -271,7 +316,7 @@ function LibraryItem({ disabled, item, onAdd, onDrag, onLoadChoices }: LibraryIt
       type="button"
       variant="ghost"
     >
-      <BlockPickerRow disabled={disabled} item={item} />
+      <LibraryRow item={item} />
     </Button>
   )
 }
@@ -357,7 +402,7 @@ export function BlockLibrary({ browseOptions, disabled, focusRequest, onAdd, onR
         <div className="block-library-list-content">
           {items.map((item) =>
             item.type == 'divider' ? (
-              <BlockPickerRow item={item} key={`group:${item.label}`} />
+              <LibraryGroup key={`group:${item.label}`} label={item.label} />
             ) : (
               <LibraryItem
                 disabled={busy || item.disabled == true}

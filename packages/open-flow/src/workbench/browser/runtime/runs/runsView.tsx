@@ -6,6 +6,7 @@ import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
+import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
 import { Tabs, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
@@ -158,7 +159,7 @@ export function RunsView({ onLocateEvent, store }: { readonly onLocateEvent: (se
               <div>
                 <span className={`status-dot ${statusClass(run)}`} />
                 <strong>{runLabel(run, t)}</strong>
-                <span className="run-source">{sourceLabel(run, t)}</span>
+                <Badge variant="secondary">{sourceLabel(run, t)}</Badge>
               </div>
               <div className="run-detail-actions">
                 <div className="run-detail-meta">

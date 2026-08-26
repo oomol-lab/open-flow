@@ -16,7 +16,7 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    background-color: var(--canvas);
+    background-color: var(--ui-background);
   }
 
   .canvas-panel:focus-visible {
@@ -61,9 +61,9 @@
     height: 30px;
     place-items: center;
     flex: 0 0 auto;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text-secondary);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius);
+    color: var(--ui-muted-foreground);
   }
 
   .node-icon.small {
@@ -80,7 +80,7 @@
     justify-content: center;
     flex-direction: column;
     gap: 8px;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     text-align: center;
     pointer-events: none;
   }
@@ -92,7 +92,7 @@
   }
 
   .canvas-empty strong {
-    color: var(--text);
+    color: var(--ui-foreground);
     font-size: 14px;
     font-weight: 600;
   }
@@ -113,7 +113,7 @@
 
   .canvas-empty-shortcut {
     margin-top: 2px;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
     pointer-events: auto;
   }
@@ -124,9 +124,9 @@
     height: 40px;
     place-items: center;
     margin-bottom: 4px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    color: var(--text-secondary);
+    border: 1px solid var(--ui-border);
+    border-radius: calc(var(--ui-radius) + 2px);
+    background: var(--ui-card);
+    color: var(--ui-muted-foreground);
   }
 }

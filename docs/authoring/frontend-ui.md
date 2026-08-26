@@ -105,8 +105,14 @@ UnoCSS 只负责现有 Iconify 图标，包括 `i-carbon:*`、`i-codicon:*`、`i
 
 ## 共享 UI 主题合同
 
-共享 shadcn/Base UI primitive 只消费 `--ui-*` 语义 token。Workbench、Designer Light 和 Designer Dark 必须定义完全相同的 token key；它们可以使用
-不同的颜色值，但不能遗漏、重命名或增加只由单个宿主理解的共享 token。新增 primitive token 时，必须同时更新三个 theme owner 和发布 CSS 产物测试。
+共享 shadcn/Base UI primitive 只消费 `--ui-*` 语义 token。`src/ui/browser/theme.css` 是 Workbench 与部署宿主唯一的产品 palette owner；Designer Light 和
+Designer Dark 只在 Canvas Content compatibility scope 内实现相同的 token key。新增 primitive token 时，必须同时更新产品主题、两个 Designer compatibility
+theme 和发布 CSS 产物测试，不能遗漏、重命名或增加只由单个宿主理解的共享 token。
+
+Workbench 的 `styles/tokens.css` 只能消费共享 `--ui-*` token，并定义非 palette 的 Workbench 状态扩展；不得声明或覆盖 light/dark `--ui-*` 值，也不得重新引入
+`--canvas`、`--surface`、`--subtle`、`--border`、`--text`、`--muted`、`--primary`、`--focus` 或 `--danger` 作为平行主题事实源。Server-owned chrome
+不能 deep-import Workbench 源码，但必须消费同名 `--ui-*` 合同，避免通过逐组件 dark selector 维护第二套视觉。Designer 的 `--widget-*`、`--node-*`、
+`--edge-*` 和 `--fill-*` 继续只服务 Canvas Content compatibility scope，不能成为 Workbench shell 的主题来源。
 
 React Flow 画布外围通过固定的 `--xy-*` 映射消费共享 UI、node 和 widget token。Light/Dark 必须保持同一组 `--xy-*` key 与引用关系；不要重新增加
 `--rf-*` 中间 token，也不要在单个 Canvas component 中重新定义 palette。
@@ -130,12 +136,25 @@ ContextMenu 保留右键和长按触发，并遵循相同的持久关闭规则�
 
 ## Workbench stylesheet 入口
 
-`src/workbench/browser/runtime/styles.css` 是发布 Workbench CSS 的唯一 feature entry。它按 cascade 顺序导入共享 UI、tokens、shell、resource browser、status、
+`src/ui/browser/theme.css` 是产品主题的唯一 palette 事实源，并以 `.open-flow-theme[data-theme]` 发布 `--open-flow-*` 语义 token，再映射到 shadcn 使用的
+`--ui-*` token。Workbench 与部署宿主必须在自己的根元素同时挂载 `.open-flow-theme` 和 `data-theme`；不得在各自 feature stylesheet 复制 light/dark palette。
+宿主若只需要产品主题，可单独导入公开的 `@oomol-lab/open-flow/theme.css`。
+
+`src/workbench/browser/runtime/styles.css` 是发布 Workbench CSS 的唯一 feature entry。它按 cascade 顺序导入产品主题、共享 UI、tokens、shell、resource browser、status、
 workspace、canvas、context panel、runs、publications 和 responsive 样式。拆分样式时只移动连续的原始区段，并同步入口顺序测试；第一轮不得同时改
 selector、property、class name 或 TSX。
 
 所有 Workbench feature stylesheet 继续以 `.open-flow-workbench` 为根 scope。不要在 feature 文件中引入未限定的全局 reset，也不要因为拆文件而改变
 规则相对顺序。
+
+Designer 的 Node、Handle、Edge、节点字段和节点 popup 继续使用 Designer 自己的 `--widget-*`、`--node-*`、`--edge-*`、`--fill-*` 与本地 `--ui-*` 映射。
+React Flow Controls 和带 `[data-canvas-control-scope]` 的浮层属于 Canvas Chrome，必须在最小 scope 内把 `--ui-*` 重新桥接到继承的 `--open-flow-*`；禁止把桥接
+放到 `.oo-designer-root`，否则会把产品主题扩散到 Canvas Content。
+
+Workbench 的 Block Library 不得复用 Designer `BlockPickerRow`、`designerThemeClass` 或 `.oo-designer-picker-*` selector；列表行、分组与展开入口使用共享 Button variant、
+Separator 和 Workbench 布局。Run Input Editor 可以继续复用 Designer 的 schema/HandleEditor 行为，但必须通过局部 `data-workbench-control-scope` adapter 把尺寸、颜色、
+边框、focus 和 radius 映射到 `--ui-*`，不得挂载 Designer light/dark theme class。普通 Workbench panel、card、icon surface 的圆角必须从 `--ui-radius` 派生；状态圆点、
+拖拽手柄和 inline code token 可以保留自身几何圆角。
 
 ## Resource Browser primitive 所有权
 

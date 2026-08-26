@@ -7,7 +7,7 @@
     min-width: 0;
     min-height: 0;
     grid-template-rows: 52px minmax(0, 1fr);
-    background: var(--canvas);
+    background: var(--ui-background);
   }
 
   .workspace-header {
@@ -18,8 +18,8 @@
     align-items: center;
     gap: 12px;
     padding: 0 12px;
-    border-bottom: 1px solid var(--border);
-    background: var(--canvas);
+    border-bottom: 1px solid var(--ui-border);
+    background: var(--ui-background);
   }
 
   .workspace-title,
@@ -57,7 +57,7 @@
   }
 
   .workspace-title > span {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 14px;
     white-space: nowrap;
   }
@@ -75,15 +75,6 @@
   .workspace-actions {
     justify-content: flex-end;
     gap: 4px;
-  }
-
-  .workspace-tabs {
-    height: 36px;
-  }
-
-  .workspace-tabs [data-slot='tabs-trigger'] {
-    padding-inline: 10px;
-    font-size: 12px;
   }
 
   .workspace-more {
@@ -109,8 +100,8 @@
     min-width: 0;
     flex-direction: column;
     overscroll-behavior: contain;
-    border-left: 1px solid var(--border);
-    background: var(--canvas);
+    border-left: 1px solid var(--ui-border);
+    background: var(--ui-background);
     outline: none;
   }
 
@@ -123,14 +114,14 @@
     width: 460px;
     min-width: 0;
     overscroll-behavior: contain;
-    border-left: 1px solid var(--border);
-    background: var(--canvas);
+    border-left: 1px solid var(--ui-border);
+    background: var(--ui-background);
     outline: none;
   }
 
   .diagnostics-panel:focus-visible,
   .run-input-panel:focus-visible {
-    outline: 2px solid var(--focus);
+    outline: 2px solid var(--ui-ring);
     outline-offset: -2px;
   }
 
@@ -149,7 +140,7 @@
     justify-content: space-between;
     gap: 12px;
     padding: 10px 12px 10px 16px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ui-border);
   }
 
   .run-input-panel > form > header > div {
@@ -166,7 +157,7 @@
 
   .run-input-panel > form > header span {
     overflow: hidden;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -184,14 +175,14 @@
   .run-input-content > p {
     max-width: 58ch;
     margin: 0 0 16px;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
     line-height: 17px;
   }
 
   .run-input-group {
     padding: 16px 0;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--ui-border);
   }
 
   .run-input-group:first-of-type {
@@ -225,7 +216,7 @@
 
   .run-input-group > header code {
     overflow: hidden;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -233,7 +224,7 @@
 
   .run-input-group > header > span {
     flex: none;
-    color: var(--danger);
+    color: var(--ui-destructive);
     font-size: 10px;
   }
 
@@ -245,7 +236,7 @@
     justify-content: flex-end;
     gap: 8px;
     padding: 10px 16px;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--ui-border);
   }
 
   .diagnostics-panel > header {
@@ -255,7 +246,7 @@
     justify-content: space-between;
     gap: 12px;
     padding: 10px 12px 10px 16px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ui-border);
   }
 
   .diagnostics-panel > header > div:first-child {
@@ -271,7 +262,7 @@
   }
 
   .diagnostics-panel > header span {
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 11px;
   }
 
@@ -293,7 +284,7 @@
   }
 
   .diagnostics-list li {
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ui-border);
   }
 
   .diagnostic-row {
@@ -315,7 +306,7 @@
     min-width: 0;
     align-items: center;
     gap: 7px;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
   }
 
@@ -325,17 +316,11 @@
     white-space: nowrap;
   }
 
-  .diagnostic-scope {
+  .diagnostic-row-heading [data-slot='badge'] {
     flex: none;
-    padding: 2px 5px;
-    border-radius: 4px;
-    background: var(--subtle);
-    color: var(--text-secondary);
-    font-weight: 500;
   }
-
   .diagnostic-row > strong {
-    color: var(--text);
+    color: var(--ui-foreground);
     font-size: 12px;
     font-weight: 500;
     line-height: 18px;
@@ -343,14 +328,14 @@
 
   .diagnostic-path {
     overflow: hidden;
-    color: var(--muted);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
     line-height: 15px;
     overflow-wrap: anywhere;
   }
 
   .diagnostic-row-action {
-    color: var(--text-tertiary);
+    color: var(--ui-muted-foreground);
     font-size: 10px;
     font-weight: 500;
   }
@@ -364,7 +349,7 @@
     flex: 0 0 112px;
     gap: 5px;
     margin-right: 4px;
-    color: var(--text-tertiary);
+    color: var(--ui-muted-foreground);
     font-size: 12px;
   }
 }

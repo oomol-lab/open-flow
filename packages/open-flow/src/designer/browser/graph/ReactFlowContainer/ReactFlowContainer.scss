@@ -1,4 +1,26 @@
 .oo-designer-root {
+  :where(.react-flow__controls, [data-canvas-control-scope]) {
+    --ui-background: var(--open-flow-background, var(--fill-1));
+    --ui-foreground: var(--open-flow-foreground, var(--text-5));
+    --ui-card: var(--open-flow-card, var(--widget-popup-background));
+    --ui-card-foreground: var(--open-flow-card-foreground, var(--widget-font-color));
+    --ui-popover: var(--open-flow-popover, var(--widget-popup-background));
+    --ui-popover-foreground: var(--open-flow-popover-foreground, var(--widget-font-color));
+    --ui-primary: var(--open-flow-primary, var(--brand-highlight-color));
+    --ui-primary-foreground: var(--open-flow-primary-foreground, var(--widget-font-highlight-color));
+    --ui-secondary: var(--open-flow-secondary, var(--fill-4));
+    --ui-secondary-foreground: var(--open-flow-secondary-foreground, var(--text-4));
+    --ui-muted: var(--open-flow-muted, var(--fill-4));
+    --ui-muted-foreground: var(--open-flow-muted-foreground, var(--text-2));
+    --ui-accent: var(--open-flow-accent, var(--fill-5));
+    --ui-accent-foreground: var(--open-flow-accent-foreground, var(--text-5));
+    --ui-destructive: var(--open-flow-destructive, var(--accent-red-1));
+    --ui-border: var(--open-flow-border, var(--border-2));
+    --ui-input: var(--open-flow-input, var(--border-2));
+    --ui-ring: var(--open-flow-ring, var(--brand-highlight-color));
+    --ui-radius: var(--open-flow-radius, 6px);
+  }
+
   .react-flow__controls.horizontal {
     flex-direction: row !important;
   }
