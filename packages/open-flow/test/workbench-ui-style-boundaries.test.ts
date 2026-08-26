@@ -471,7 +471,7 @@ test('uses React Flow ownership for canvas chrome without custom toolbar primiti
       readFile(new URL('src/ui/browser/button-group.tsx', packageRoot), 'utf8'),
       readFile(new URL('src/workbench/browser/runtime/styles/canvas.css', packageRoot), 'utf8'),
       readFile(new URL('src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.tsx', packageRoot), 'utf8'),
-      readFile(new URL('src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.module.scss', packageRoot), 'utf8'),
+      readFile(new URL('src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.scss', packageRoot), 'utf8'),
       readFile(new URL('src/designer/browser/styles/_mixins.scss', packageRoot), 'utf8'),
     ])
 

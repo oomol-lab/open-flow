@@ -1,6 +1,7 @@
 import darkTheme from '../../styles/dark.module.scss'
 import lightTheme from '../../styles/light.module.scss'
 import styles from './ReactFlowContainer.module.scss'
+import './ReactFlowContainer.scss'
 import type {
   Dimensions,
   EdgeTypes,
