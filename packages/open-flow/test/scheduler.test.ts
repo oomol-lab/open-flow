@@ -2,6 +2,7 @@ import type { FlowRunOptions, SchedulerEvent, TaskInvocation } from '../src/exec
 import type { ConditionOperator, JsonValue, RevisionContent } from '../src/flow/common/change.ts'
 import type { PreparedFlow } from '../src/flow/common/semantics.ts'
 
+import * as Effect from 'effect/Effect'
 import { describe, expect, it } from 'vitest'
 import { currentEngineContract } from '../src/execution/common/runtime.ts'
 import { runFlow as scheduleFlow } from '../src/execution/common/scheduler.ts'
@@ -14,15 +15,17 @@ const connectorUnavailable = 'connector.unavailable'
 let nextId = 0
 
 function runFlow(prepared: PreparedFlow, options: Omit<FlowRunOptions, 'createId' | 'flowId'>) {
-  return scheduleFlow(prepared, {
-    createId: () => `scheduler-${++nextId}`,
-    flowId: 'main',
-    projectFailure: (error) => {
-      if (error instanceof TaskError) return { code: error.code, message: error.message }
-      return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
-    },
-    ...options,
-  })
+  return Effect.runPromise(
+    scheduleFlow(prepared, {
+      createId: () => `scheduler-${++nextId}`,
+      flowId: 'main',
+      projectFailure: (error) => {
+        if (error instanceof TaskError) return { code: error.code, message: error.message }
+        return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
+      },
+      ...options,
+    }),
+  )
 }
 
 async function prepareFlow(source: RevisionContent, _flowId: string, contract: string): Promise<PreparedFlow> {
@@ -505,6 +508,45 @@ describe('revision graph scheduler', () => {
         },
       ),
     ).rejects.toThrow('canceled during invocation')
+  })
+
+  it('interrupts sibling Tasks after the first Node failure', async () => {
+    const source = revision(
+      {
+        bindings: {},
+        graph: {
+          nodes: {
+            fail: { concurrency: 1, inputs: {}, kind: 'task', task: task('fail', [], []) },
+            slow: { concurrency: 1, inputs: {}, kind: 'task', task: task('slow', [], []) },
+          },
+        },
+        subflows: {},
+        tasks: {},
+      },
+      ['fail', 'slow'],
+    )
+    const prepared = await prepareFlow(source, 'main', engine)
+    let slowAborted = false
+
+    await expect(
+      runFlow(prepared, {
+        invokeTask: async (invocation) => {
+          if (invocation.nodeId == 'fail') throw new Error('first failed')
+          return await new Promise((_, reject) =>
+            invocation.signal.addEventListener(
+              'abort',
+              () => {
+                slowAborted = true
+                reject(invocation.signal.reason)
+              },
+              { once: true },
+            ),
+          )
+        },
+        runId: 'run-sibling-failure',
+      }),
+    ).rejects.toThrow('first failed')
+    expect(slowAborted).toBe(true)
   })
 
   it.each([

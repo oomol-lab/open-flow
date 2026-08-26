@@ -127,6 +127,7 @@ assert.deepEqual(Object.keys(packedManifest).toSorted(), [
   'version',
 ])
 assert.deepEqual(packedManifest.peerDependencies, {
+  'effect': '4.0.0-rc.112',
   'react': '^18.3.1 || ^19.0.0',
   'react-dom': '^18.3.1 || ^19.0.0',
 })

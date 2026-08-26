@@ -100,7 +100,7 @@ async function buildRuntime(
     define: { 'process.env': '{}' },
     logLevel: options.quiet ? 'silent' : 'info',
     plugins: [
-      esmExternalRequirePlugin({ external: [/^react(?:\/.*)?$/, /^react-dom(?:\/.*)?$/] }),
+      esmExternalRequirePlugin({ external: [/^effect(?:\/.*)?$/, /^react(?:\/.*)?$/, /^react-dom(?:\/.*)?$/] }),
       twemojiCollectionPlugin(),
       tailwindcss(),
       UnoCSS(designerUnoConfig),

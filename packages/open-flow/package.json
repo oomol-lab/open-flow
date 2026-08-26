@@ -19,6 +19,9 @@
   "license": "Apache-2.0",
   "type": "module",
   "private": true,
+  "dependencies": {
+    "effect": "4.0.0-rc.112"
+  },
   "exports": {
     "./connector-action": "./src/connector/common/actionSchema.ts",
     "./connector-proxy": "./src/connector/common/proxy.ts",

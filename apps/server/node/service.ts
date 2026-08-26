@@ -667,28 +667,24 @@ export class ServerService {
       const timeoutReason = new Error('Run exceeded its execution deadline.')
       const timeout = setTimeout(() => cancellation.abort(timeoutReason), this.#runTimeoutMs)
       this.#active.set(run.runId, cancellation)
-      yield* Effect.tryPromise({
-        try: () =>
-          runFlow(start.flow, {
-            createId: randomUUID,
-            emit: async (event) => {
-              if (event.type == 'run.started' && event.runId == run.runId) return
-              const projected = await start.projectEvent(event)
-              if (projected != null) this.#store.append(run.runId, projected)
-            },
-            flowId: run.flowId,
-            inputs: run.inputs,
-            invokeTask: (invocation) => this.#invokeTask(start.flow, invocation),
-            projectFailure: (error) => {
-              if (error instanceof ConnectorTaskError) return { code: error.code, message: error.message }
-              if (error instanceof TaskHostError) return { code: error.code, message: error.message }
-              return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
-            },
-            runId: run.runId,
-            signal: cancellation.signal,
-            ...(run.trigger == null ? {} : { trigger: run.trigger }),
-          }),
-        catch: (error) => error,
+      yield* runFlow(start.flow, {
+        createId: randomUUID,
+        emit: async (event) => {
+          if (event.type == 'run.started' && event.runId == run.runId) return
+          const projected = await start.projectEvent(event)
+          if (projected != null) this.#store.append(run.runId, projected)
+        },
+        flowId: run.flowId,
+        inputs: run.inputs,
+        invokeTask: (invocation) => this.#invokeTask(start.flow, invocation),
+        projectFailure: (error) => {
+          if (error instanceof ConnectorTaskError) return { code: error.code, message: error.message }
+          if (error instanceof TaskHostError) return { code: error.code, message: error.message }
+          return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
+        },
+        runId: run.runId,
+        signal: cancellation.signal,
+        ...(run.trigger == null ? {} : { trigger: run.trigger }),
       }).pipe(
         Effect.matchEffect({
           onFailure: (error) =>

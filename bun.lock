@@ -61,6 +61,9 @@
     "packages/open-flow": {
       "name": "@oomol-lab/open-flow",
       "version": "0.1.0-alpha.9",
+      "dependencies": {
+        "effect": "4.0.0-rc.112",
+      },
       "devDependencies": {
         "@babel/parser": "8.0.4",
         "@babel/traverse": "8.0.4",

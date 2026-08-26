@@ -1,6 +1,8 @@
 import type { ConnectorCapability, Graph, GraphNode, InputPortDefinition, JsonValue, OutputMapping, TriggerNode } from '../../flow/common/change.ts'
 import type { PreparedFlow } from '../../flow/common/semantics.ts'
 
+import * as Effect from 'effect/Effect'
+import * as FiberSet from 'effect/FiberSet'
 import { portsByHandle } from '../../flow/common/change.ts'
 
 type ExecutableNode = Exclude<GraphNode, TriggerNode>
@@ -147,7 +149,7 @@ function nodeFailure(error: unknown, project: FlowRunOptions['projectFailure']):
 
 interface RunContext {
   readonly createId: FlowRunOptions['createId']
-  readonly emit: (event: SchedulerEvent) => Promise<void>
+  readonly emit: (event: SchedulerEvent) => Effect.Effect<void, Error>
   readonly invokeTask: FlowRunOptions['invokeTask']
   readonly prepared: PreparedFlow
   readonly projectFailure: FlowRunOptions['projectFailure']
@@ -407,301 +409,307 @@ function abortError(signal: AbortSignal): Error {
   return signal.reason instanceof Error ? signal.reason : new Error('Run canceled.')
 }
 
-function raceAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
+function awaitAbort(signal: AbortSignal): Effect.Effect<never, Error> {
+  return Effect.callback((resume) => {
     const abort = (): void => {
-      signal.removeEventListener('abort', abort)
-      reject(abortError(signal))
+      resume(Effect.fail(abortError(signal)))
     }
-    operation.then(
-      (value) => {
-        signal.removeEventListener('abort', abort)
-        resolve(value)
-      },
-      (error: unknown) => {
-        signal.removeEventListener('abort', abort)
-        reject(error)
-      },
-    )
     if (signal.aborted) abort()
     else signal.addEventListener('abort', abort, { once: true })
+    return Effect.sync(() => signal.removeEventListener('abort', abort))
   })
 }
 
-async function runGraph(
+function runGraph(
   context: RunContext,
   target: GraphTarget,
   runId: string,
   inputs: Readonly<Record<string, JsonValue>>,
-  signal: AbortSignal,
   parent?: ParentRun,
   launchInputs: Readonly<Record<string, Readonly<Record<string, JsonValue>>>> = {},
-  onOutput?: (handle: string, value: JsonValue) => void | Promise<void>,
+  onOutput?: (handle: string, value: JsonValue) => Effect.Effect<void, Error>,
   trigger?: TriggerSeed,
-): Promise<FlowRunResult | Readonly<Record<string, JsonValue>>> {
-  signal.throwIfAborted()
-  await context.emit({
-    flowId: target.flowId,
-    ...(parent == null ? {} : { parentJobId: parent.jobId, parentRunId: parent.runId }),
-    runId,
-    type: 'run.started',
-  })
-  const order = graphOrder(target.graph)
-  const nodeCount = order.length
-  const inputBuffers = new Map(
-    Object.entries(target.graph.nodes).map(([nodeId, node]) => [nodeId, new InputBuffer(nodeId, node, nodePorts(context.prepared, node))]),
-  )
-  const flowInputTargets = new Map<string, InputTarget[]>()
-  const nodeInputTargets = new Map<string, Map<string, InputTarget[]>>()
-  const runOutputTargets = new Map<string, Map<string, string[]>>()
-  for (const [nodeId, node] of Object.entries(target.graph.nodes)) {
-    for (const [handle, mapping] of Object.entries(node.inputs)) {
-      if (mapping.kind != 'sources') continue
-      for (const source of mapping.sources) {
-        if (source.kind == 'flow') {
-          const targets = flowInputTargets.get(source.input) ?? []
-          targets.push({ handle, nodeId })
-          flowInputTargets.set(source.input, targets)
-        } else if (source.kind == 'node') {
-          addTarget(nodeInputTargets, source.nodeId, source.output, { handle, nodeId })
+): Effect.Effect<FlowRunResult | Readonly<Record<string, JsonValue>>, Error> {
+  return Effect.scoped(
+    Effect.gen(function* () {
+      yield* context.emit({
+        flowId: target.flowId,
+        ...(parent == null ? {} : { parentJobId: parent.jobId, parentRunId: parent.runId }),
+        runId,
+        type: 'run.started',
+      })
+      const order = graphOrder(target.graph)
+      const nodeCount = order.length
+      const inputBuffers = new Map(
+        Object.entries(target.graph.nodes).map(([nodeId, node]) => [nodeId, new InputBuffer(nodeId, node, nodePorts(context.prepared, node))]),
+      )
+      const flowInputTargets = new Map<string, InputTarget[]>()
+      const nodeInputTargets = new Map<string, Map<string, InputTarget[]>>()
+      const runOutputTargets = new Map<string, Map<string, string[]>>()
+      for (const [nodeId, node] of Object.entries(target.graph.nodes)) {
+        for (const [handle, mapping] of Object.entries(node.inputs)) {
+          if (mapping.kind != 'sources') continue
+          for (const source of mapping.sources) {
+            if (source.kind == 'flow') {
+              const targets = flowInputTargets.get(source.input) ?? []
+              targets.push({ handle, nodeId })
+              flowInputTargets.set(source.input, targets)
+            } else if (source.kind == 'node') {
+              addTarget(nodeInputTargets, source.nodeId, source.output, { handle, nodeId })
+            }
+          }
         }
       }
-    }
-  }
-  for (const [handle, output] of Object.entries(target.outputs)) {
-    for (const source of output.sources) if (source.kind == 'node') addTarget(runOutputTargets, source.nodeId, source.output, handle)
-  }
-
-  const activeCounts = new Map<string, number>()
-  const active = new Set<Promise<void>>()
-  const completed = new Map<string, NodeJob[]>()
-  const scheduled = new Map<string, number>()
-  const runOutputs = new Map<string, JsonValue>()
-  const completedNodes = new Set<string>()
-  const failure = new AbortController()
-  const runSignal = AbortSignal.any([signal, failure.signal])
-  let firstFailure: unknown
-  let failed = false
-
-  let scheduleReady: (nodeId: string) => void
-  const deliverInput = (targetInput: InputTarget, value: JsonValue): void => {
-    if (failure.signal.aborted) return
-    const buffer = inputBuffers.get(targetInput.nodeId)!
-    buffer.push(targetInput.handle, value)
-    scheduleReady(targetInput.nodeId)
-  }
-  const emitNodeOutput = async (nodeId: string, jobId: string, handle: string, value: JsonValue): Promise<void> => {
-    await context.emit({ handle, jobId, nodeId, runId, type: 'node.output', value })
-    for (const targetInput of targetsFor(nodeInputTargets, nodeId, handle)) deliverInput(targetInput, value)
-    for (const outputHandle of targetsFor(runOutputTargets, nodeId, handle)) {
-      runOutputs.set(outputHandle, value)
-      await onOutput?.(outputHandle, value)
-    }
-  }
-
-  const executeNode = async (nodeId: string, node: ExecutableNode, jobId: string, nodeInputs: Readonly<Record<string, JsonValue>>) => {
-    const kind = nodeKind(context.prepared, node)
-    const title = nodeTitle(context.prepared, node)
-    await context.emit({
-      inputs: nodeInputs,
-      jobId,
-      nodeId,
-      nodeKind: kind,
-      ...(title == null ? {} : { nodeTitle: title }),
-      runId,
-      type: 'node.started',
-    })
-    const timeout = node.timeoutMs == null ? undefined : new AbortController()
-    const timer = timeout == null ? undefined : setTimeout(() => timeout.abort(new Error(`Node "${nodeId}" timed out.`)), node.timeoutMs)
-    const nodeSignal = timeout == null ? runSignal : AbortSignal.any([runSignal, timeout.signal])
-    try {
-      let outputs: Readonly<Record<string, JsonValue>>
-      switch (node.kind) {
-        case 'condition': {
-          const matched = node.cases.find((condition) => {
-            if (condition.expressions.length == 0) return false
-            const matches = condition.expressions.map((expression) => conditionMatches(node, expression, nodeInputs))
-            return condition.relation == 'all' ? matches.every(Boolean) : matches.some(Boolean)
-          })
-          const handle = matched?.output ?? node.defaultOutput
-          outputs = handle == null ? {} : { [handle]: nodeInputs[node.input.handle] ?? null }
-          if (handle != null) await emitNodeOutput(nodeId, jobId, handle, outputs[handle]!)
-          break
-        }
-        case 'value': {
-          outputs = Object.fromEntries(node.values.map((port) => [port.handle, port.value ?? null]))
-          for (const [handle, value] of Object.entries(outputs)) await emitNodeOutput(nodeId, jobId, handle, value)
-          break
-        }
-        case 'subflow': {
-          const subflow = context.prepared.subflows[node.subflowId]!
-          const result = await raceAbort(
-            runGraph(
-              context,
-              {
-                flowId: node.subflowId,
-                graph: executableGraph(subflow.graph),
-                inputs: portsByHandle(subflow.inputs),
-                kind: 'subflow',
-                outputs: portsByHandle(subflow.outputs),
-              },
-              context.createId(),
-              nodeInputs,
-              nodeSignal,
-              { jobId, runId },
-              {},
-              (handle, value) => emitNodeOutput(nodeId, jobId, handle, value),
-            ),
-            nodeSignal,
-          )
-          outputs = result as Readonly<Record<string, JsonValue>>
-          break
-        }
-        case 'task': {
-          const result = await raceAbort(
-            context.invokeTask({
-              input: nodeInputs,
-              invocationId: context.createId(),
-              jobId,
-              nodeId,
-              runId,
-              signal: nodeSignal,
-              ...(node.task != null ? { capabilities: node.task.capabilities ?? [], moduleId: node.task.moduleId } : { taskId: node.taskId }),
-            }),
-            nodeSignal,
-          )
-          outputs = outputRecord(result, nodeId)
-          for (const [handle, value] of Object.entries(outputs)) await emitNodeOutput(nodeId, jobId, handle, value)
-          break
-        }
+      for (const [handle, output] of Object.entries(target.outputs)) {
+        for (const source of output.sources) if (source.kind == 'node') addTarget(runOutputTargets, source.nodeId, source.output, handle)
       }
-      await context.emit({ jobId, nodeId, runId, type: 'node.completed' })
-      return outputs
-    } finally {
-      if (timer != null) clearTimeout(timer)
-    }
-  }
 
-  const startNode = (nodeId: string): void => {
-    const node = target.graph.nodes[nodeId]!
-    const buffer = inputBuffers.get(nodeId)!
-    const nodeInputs = buffer.take()
-    const jobId = context.createId()
-    const jobOrder = scheduled.get(nodeId) ?? 0
-    scheduled.set(nodeId, jobOrder + 1)
-    activeCounts.set(nodeId, (activeCounts.get(nodeId) ?? 0) + 1)
-    let execution = Promise.resolve()
-    execution = executeNode(nodeId, node, jobId, nodeInputs)
-      .then(async (outputs) => {
-        const jobs = completed.get(nodeId) ?? []
-        jobs.push({ jobId, order: jobOrder, outputs })
-        completed.set(nodeId, jobs)
-        if (!completedNodes.has(nodeId)) {
-          completedNodes.add(nodeId)
-          await context.emit({
-            ...(parent == null ? {} : { parentJobId: parent.jobId, parentRunId: parent.runId }),
-            progress: (completedNodes.size / nodeCount) * 100,
+      const activeCounts = new Map<string, number>()
+      const active = yield* FiberSet.make<void, Error>()
+      const runNode = yield* FiberSet.runtime(active)()
+      const completed = new Map<string, NodeJob[]>()
+      const scheduled = new Map<string, number>()
+      const runOutputs = new Map<string, JsonValue>()
+      const completedNodes = new Set<string>()
+      let firstFailure: Error | undefined
+
+      let scheduleReady: (nodeId: string) => void
+      const deliverInput = (targetInput: InputTarget, value: JsonValue): void => {
+        if (firstFailure != null) return
+        const buffer = inputBuffers.get(targetInput.nodeId)!
+        buffer.push(targetInput.handle, value)
+        scheduleReady(targetInput.nodeId)
+      }
+      const emitNodeOutput = (nodeId: string, jobId: string, handle: string, value: JsonValue): Effect.Effect<void, Error> =>
+        Effect.gen(function* () {
+          yield* context.emit({ handle, jobId, nodeId, runId, type: 'node.output', value })
+          for (const targetInput of targetsFor(nodeInputTargets, nodeId, handle)) deliverInput(targetInput, value)
+          for (const outputHandle of targetsFor(runOutputTargets, nodeId, handle)) {
+            runOutputs.set(outputHandle, value)
+            if (onOutput != null) yield* onOutput(outputHandle, value)
+          }
+        })
+
+      const executeNode = (
+        nodeId: string,
+        node: ExecutableNode,
+        jobId: string,
+        nodeInputs: Readonly<Record<string, JsonValue>>,
+      ): Effect.Effect<Readonly<Record<string, JsonValue>>, Error> => {
+        const execution = Effect.gen(function* () {
+          const kind = nodeKind(context.prepared, node)
+          const title = nodeTitle(context.prepared, node)
+          yield* context.emit({
+            inputs: nodeInputs,
+            jobId,
+            nodeId,
+            nodeKind: kind,
+            ...(title == null ? {} : { nodeTitle: title }),
             runId,
-            type: 'run.progress',
+            type: 'node.started',
           })
-        }
-      })
-      .catch(async (error: unknown) => {
-        if (!failed) {
-          failed = true
-          firstFailure = error
-          failure.abort(error)
-        }
-        const projected = nodeFailure(error, context.projectFailure)
-        await context.emit({ ...projected, jobId, nodeId, runId, type: 'node.failed' }).catch(() => undefined)
-      })
-      .finally(() => {
-        active.delete(execution)
-        activeCounts.set(nodeId, (activeCounts.get(nodeId) ?? 1) - 1)
-        scheduleReady(nodeId)
-      })
-    active.add(execution)
-  }
-
-  scheduleReady = (nodeId) => {
-    if (failure.signal.aborted) return
-    const node = target.graph.nodes[nodeId]!
-    const buffer = inputBuffers.get(nodeId)!
-    while (buffer.ready && (activeCounts.get(nodeId) ?? 0) < node.concurrency) startNode(nodeId)
-  }
-
-  for (const [nodeId, values] of Object.entries(launchInputs)) {
-    const buffer = inputBuffers.get(nodeId)
-    if (buffer == null) continue
-    for (const [handle, value] of Object.entries(values)) buffer.launch(handle, value)
-  }
-  for (const [handle, port] of Object.entries(target.inputs)) {
-    const provided = Object.hasOwn(inputs, handle) ? inputs[handle] : port.value
-    if (provided === undefined) continue
-    for (const output of Object.entries(target.outputs)) {
-      if (output[1].sources.some((source) => source.kind == 'flow' && source.input == handle)) {
-        runOutputs.set(output[0], provided)
-        await onOutput?.(output[0], provided)
+          let outputs: Readonly<Record<string, JsonValue>>
+          switch (node.kind) {
+            case 'condition': {
+              const matched = node.cases.find((condition) => {
+                if (condition.expressions.length == 0) return false
+                const matches = condition.expressions.map((expression) => conditionMatches(node, expression, nodeInputs))
+                return condition.relation == 'all' ? matches.every(Boolean) : matches.some(Boolean)
+              })
+              const handle = matched?.output ?? node.defaultOutput
+              outputs = handle == null ? {} : { [handle]: nodeInputs[node.input.handle] ?? null }
+              if (handle != null) yield* emitNodeOutput(nodeId, jobId, handle, outputs[handle]!)
+              break
+            }
+            case 'value': {
+              outputs = Object.fromEntries(node.values.map((port) => [port.handle, port.value ?? null]))
+              for (const [handle, value] of Object.entries(outputs)) yield* emitNodeOutput(nodeId, jobId, handle, value)
+              break
+            }
+            case 'subflow': {
+              const subflow = context.prepared.subflows[node.subflowId]!
+              const result = yield* runGraph(
+                context,
+                {
+                  flowId: node.subflowId,
+                  graph: executableGraph(subflow.graph),
+                  inputs: portsByHandle(subflow.inputs),
+                  kind: 'subflow',
+                  outputs: portsByHandle(subflow.outputs),
+                },
+                context.createId(),
+                nodeInputs,
+                { jobId, runId },
+                {},
+                (handle, value) => emitNodeOutput(nodeId, jobId, handle, value),
+              )
+              outputs = result as Readonly<Record<string, JsonValue>>
+              break
+            }
+            case 'task': {
+              const result = yield* Effect.tryPromise({
+                try: (signal) =>
+                  context.invokeTask({
+                    input: nodeInputs,
+                    invocationId: context.createId(),
+                    jobId,
+                    nodeId,
+                    runId,
+                    signal,
+                    ...(node.task != null ? { capabilities: node.task.capabilities ?? [], moduleId: node.task.moduleId } : { taskId: node.taskId }),
+                  }),
+                catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+              })
+              outputs = yield* Effect.try({
+                try: () => outputRecord(result, nodeId),
+                catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+              })
+              for (const [handle, value] of Object.entries(outputs)) yield* emitNodeOutput(nodeId, jobId, handle, value)
+              break
+            }
+          }
+          yield* context.emit({ jobId, nodeId, runId, type: 'node.completed' })
+          return outputs
+        })
+        return node.timeoutMs == null
+          ? execution
+          : execution.pipe(
+              Effect.timeoutOrElse({
+                duration: node.timeoutMs,
+                orElse: () => Effect.fail(new Error(`Node "${nodeId}" timed out.`)),
+              }),
+            )
       }
-    }
-    for (const targetInput of flowInputTargets.get(handle) ?? []) deliverInput(targetInput, provided)
-  }
-  if (trigger != null) {
-    for (const targetInput of targetsFor(nodeInputTargets, trigger.nodeId, 'payload')) deliverInput(targetInput, trigger.payload)
-  }
-  for (const nodeId of order) scheduleReady(nodeId)
 
-  while (active.size > 0) await Promise.race(active)
-  if (failed) {
-    await context
-      .emit({ message: firstFailure instanceof Error ? firstFailure.message : String(firstFailure), runId, type: 'run.failed' })
-      .catch(() => undefined)
-    throw firstFailure
-  }
-  runSignal.throwIfAborted()
-  if (target.kind == 'subflow') {
-    const outputs = Object.fromEntries(runOutputs)
-    await context.emit({ result: { kind: 'function-outputs', outputs, target: 'subflow' }, runId, type: 'run.completed' })
-    return outputs
-  }
-  const dependencies = new Set(
-    Object.values(target.graph.nodes).flatMap((node) =>
-      Object.values(node.inputs).flatMap((mapping) =>
-        mapping.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node').map((source) => source.nodeId) : [],
-      ),
-    ),
+      const startNode = (nodeId: string): void => {
+        const node = target.graph.nodes[nodeId]!
+        const buffer = inputBuffers.get(nodeId)!
+        const nodeInputs = buffer.take()
+        const jobId = context.createId()
+        const jobOrder = scheduled.get(nodeId) ?? 0
+        scheduled.set(nodeId, jobOrder + 1)
+        activeCounts.set(nodeId, (activeCounts.get(nodeId) ?? 0) + 1)
+        runNode(
+          executeNode(nodeId, node, jobId, nodeInputs).pipe(
+            Effect.tap((outputs) =>
+              Effect.gen(function* () {
+                const jobs = completed.get(nodeId) ?? []
+                jobs.push({ jobId, order: jobOrder, outputs })
+                completed.set(nodeId, jobs)
+                if (!completedNodes.has(nodeId)) {
+                  completedNodes.add(nodeId)
+                  yield* context.emit({
+                    ...(parent == null ? {} : { parentJobId: parent.jobId, parentRunId: parent.runId }),
+                    progress: (completedNodes.size / nodeCount) * 100,
+                    runId,
+                    type: 'run.progress',
+                  })
+                }
+              }),
+            ),
+            Effect.tapError((error) =>
+              Effect.gen(function* () {
+                firstFailure ??= error
+                const projected = nodeFailure(error, context.projectFailure)
+                yield* context.emit({ ...projected, jobId, nodeId, runId, type: 'node.failed' }).pipe(Effect.ignore)
+              }),
+            ),
+            Effect.ensuring(
+              Effect.sync(() => {
+                activeCounts.set(nodeId, (activeCounts.get(nodeId) ?? 1) - 1)
+                scheduleReady(nodeId)
+              }),
+            ),
+          ),
+        )
+      }
+
+      scheduleReady = (nodeId) => {
+        if (firstFailure != null) return
+        const node = target.graph.nodes[nodeId]!
+        const buffer = inputBuffers.get(nodeId)!
+        while (buffer.ready && (activeCounts.get(nodeId) ?? 0) < node.concurrency) startNode(nodeId)
+      }
+
+      for (const [nodeId, values] of Object.entries(launchInputs)) {
+        const buffer = inputBuffers.get(nodeId)
+        if (buffer == null) continue
+        for (const [handle, value] of Object.entries(values)) buffer.launch(handle, value)
+      }
+      for (const [handle, port] of Object.entries(target.inputs)) {
+        const provided = Object.hasOwn(inputs, handle) ? inputs[handle] : port.value
+        if (provided === undefined) continue
+        for (const output of Object.entries(target.outputs)) {
+          if (output[1].sources.some((source) => source.kind == 'flow' && source.input == handle)) {
+            runOutputs.set(output[0], provided)
+            if (onOutput != null) yield* onOutput(output[0], provided)
+          }
+        }
+        for (const targetInput of flowInputTargets.get(handle) ?? []) deliverInput(targetInput, provided)
+      }
+      if (trigger != null) {
+        for (const targetInput of targetsFor(nodeInputTargets, trigger.nodeId, 'payload')) deliverInput(targetInput, trigger.payload)
+      }
+      for (const nodeId of order) scheduleReady(nodeId)
+
+      yield* Effect.raceFirst(FiberSet.awaitEmpty(active), FiberSet.join(active)).pipe(Effect.exit)
+      if (firstFailure != null) {
+        yield* FiberSet.clear(active)
+        yield* context.emit({ message: firstFailure.message, runId, type: 'run.failed' }).pipe(Effect.ignore)
+        return yield* Effect.fail(firstFailure)
+      }
+      if (target.kind == 'subflow') {
+        const outputs = Object.fromEntries(runOutputs)
+        yield* context.emit({ result: { kind: 'function-outputs', outputs, target: 'subflow' }, runId, type: 'run.completed' })
+        return outputs
+      }
+      const dependencies = new Set(
+        Object.values(target.graph.nodes).flatMap((node) =>
+          Object.values(node.inputs).flatMap((mapping) =>
+            mapping.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node').map((source) => source.nodeId) : [],
+          ),
+        ),
+      )
+      const result: FlowRunResult = {
+        kind: 'node-results',
+        nodes: order
+          .filter((nodeId) => !dependencies.has(nodeId))
+          .map((nodeId) => ({
+            jobs: (completed.get(nodeId) ?? []).toSorted((left, right) => left.order - right.order).map(({ jobId, outputs }) => ({ jobId, outputs })),
+            nodeId,
+          })),
+      }
+      yield* context.emit({ result, runId, type: 'run.completed' })
+      return result
+    }),
   )
-  const result: FlowRunResult = {
-    kind: 'node-results',
-    nodes: order
-      .filter((nodeId) => !dependencies.has(nodeId))
-      .map((nodeId) => ({
-        jobs: (completed.get(nodeId) ?? []).toSorted((left, right) => left.order - right.order).map(({ jobId, outputs }) => ({ jobId, outputs })),
-        nodeId,
-      })),
-  }
-  await context.emit({ result, runId, type: 'run.completed' })
-  return result
 }
 
-export async function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Promise<FlowRunResult> {
-  const emit = async (event: SchedulerEvent): Promise<void> => await options.emit?.(event)
-  const signal = options.signal ?? new AbortController().signal
-  const triggerNode = options.trigger == null ? undefined : prepared.graph.nodes[options.trigger.nodeId]
-  if (options.trigger != null && (triggerNode == null || 'inputs' in triggerNode)) {
-    throw new Error(`Node "${options.trigger.nodeId}" is not a TriggerNode in Flow "${options.flowId}".`)
-  }
-  return (await runGraph(
-    { createId: options.createId, emit, invokeTask: options.invokeTask, prepared, projectFailure: options.projectFailure },
-    { flowId: options.flowId, graph: executableGraph(prepared.graph), inputs: {}, kind: 'flow', outputs: {} },
-    options.runId,
-    {},
-    signal,
-    undefined,
-    options.inputs,
-    undefined,
-    options.trigger,
-  )) as FlowRunResult
+export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect.Effect<FlowRunResult, Error> {
+  const emit = (event: SchedulerEvent): Effect.Effect<void, Error> =>
+    options.emit == null
+      ? Effect.void
+      : Effect.tryPromise({
+          try: () => Promise.resolve(options.emit?.(event)),
+          catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+        })
+  const program = Effect.gen(function* () {
+    const triggerNode = options.trigger == null ? undefined : prepared.graph.nodes[options.trigger.nodeId]
+    if (options.trigger != null && (triggerNode == null || 'inputs' in triggerNode)) {
+      return yield* Effect.fail(new Error(`Node "${options.trigger.nodeId}" is not a TriggerNode in Flow "${options.flowId}".`))
+    }
+    return (yield* runGraph(
+      { createId: options.createId, emit, invokeTask: options.invokeTask, prepared, projectFailure: options.projectFailure },
+      { flowId: options.flowId, graph: executableGraph(prepared.graph), inputs: {}, kind: 'flow', outputs: {} },
+      options.runId,
+      {},
+      undefined,
+      options.inputs,
+      undefined,
+      options.trigger,
+    )) as FlowRunResult
+  })
+  return options.signal == null ? program : Effect.raceFirst(program, awaitAbort(options.signal))
 }
 
 function executableGraph(graph: Graph): ExecutableGraph {
