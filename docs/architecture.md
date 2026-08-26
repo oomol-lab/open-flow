@@ -73,6 +73,10 @@ credential value、Provider 当前状态、调用权限或部署资源。非确�
 Engine Contract、部署中立 Runtime invocation、Scheduler 图执行语义、RunEvent 投影和 conformance 属于 `packages/open-flow`。具体执行隔离、
 Engine digest、资源限制和恢复属于部署实现；`isolated-vm` RuntimeHost 只属于 Server。
 
+Server 将一次 Flow Run 作为一个逻辑 Runtime session 交给 Executor，Scheduler 和内联 Code Task 执行都在该 session 内；SQLite、RunEvent 投影、
+外部 Task 和 Capability mediation 仍由 Host 持有。Executor process 可以承载多个并发 session，但每次 Code Task invocation 使用新的 isolate；process
+与 isolate 的物理拓扑不是公共执行语义。
+
 Run admission 通过固定 Draft Revision path 或当前 Live Publication identity 固定 Flow、Revision、closure 和 Engine identity。接受后，`runId` 是部署
 scope 内唯一资源 identity。用户代码开始执行后不能通过重试创建第二次执行；无法确认的恢复结果必须显式结束为不确定失败。取消与完成竞争时，
 权威 Run store 中只能有一个 terminal。

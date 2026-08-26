@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ServerService } from '../node/service.ts'
 import { acceptRun } from './runFixture.ts'
 
@@ -290,7 +290,7 @@ describe('Server application service', () => {
     service.start()
     await Promise.all([waitForStatus(service, first.runId, 'running'), waitForStatus(service, other.runId, 'running')])
     expect(service.run(second.runId)?.status).toBe('queued')
-    expect(releases).toHaveLength(2)
+    await vi.waitFor(() => expect(releases).toHaveLength(2))
 
     for (const release of releases) release()
     await service.waitForIdle()

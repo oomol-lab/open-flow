@@ -55,17 +55,66 @@ describe('isolated-vm runtime conformance', () => {
   it('does not expose Node or network globals to the user realm', async () => {
     await expect(
       invoke(`export default () => ({
+        Buffer: typeof Buffer,
         fetch: typeof fetch,
         process: typeof process,
         require: typeof require,
+        WebSocket: typeof WebSocket,
       })`),
-    ).resolves.toEqual({ fetch: 'undefined', process: 'undefined', require: 'undefined' })
+    ).resolves.toEqual({ Buffer: 'undefined', fetch: 'undefined', process: 'undefined', require: 'undefined', WebSocket: 'undefined' })
+  })
+
+  it('provides invocation-scoped timers', async () => {
+    await expect(
+      invoke(`export default async () => {
+  let canceledTimerFired = false
+  const canceled = setTimeout(() => { canceledTimerFired = true }, 0)
+  clearTimeout(canceled)
+  const value = await new Promise((resolve) => setTimeout(resolve, 10, 'timer-result'))
+  return { canceledTimerFired, value }
+}`),
+    ).resolves.toEqual({ canceledTimerFired: false, value: 'timer-result' })
+  })
+
+  it('provides safe Web globals', async () => {
+    await expect(
+      invoke(`export default async () => {
+  let microtask = false
+  queueMicrotask(() => { microtask = true })
+  await Promise.resolve()
+
+  const ticks = await new Promise((resolve) => {
+    let count = 0
+    const interval = setInterval(() => {
+      count += 1
+      if (count == 2) {
+        clearInterval(interval)
+        resolve(count)
+      }
+    }, 1)
+  })
+
+  const source = { nested: { value: 1 } }
+  const clone = structuredClone(source)
+  clone.nested.value = 2
+  const encoded = new TextEncoder().encode('你好')
+  return {
+    base64: atob(btoa('open-flow')),
+    clone: clone.nested.value,
+    decoded: new TextDecoder().decode(encoded),
+    microtask,
+    performance: performance.now() >= 0 && Number.isFinite(performance.timeOrigin),
+    source: source.nested.value,
+    ticks,
+  }
+}`),
+    ).resolves.toEqual({ base64: 'open-flow', clone: 2, decoded: '你好', microtask: true, performance: true, source: 1, ticks: 2 })
   })
 
   it('preserves user error messages', async () => {
-    await expect(invoke('export default () => setTimeout(() => undefined, 0)')).rejects.toMatchObject({
+    await expect(invoke("export default () => { throw new Error('Task failed with detail.') }")).rejects.toMatchObject({
       code: 'task-failed',
-      message: 'setTimeout is not defined',
+      message: 'Task failed with detail.',
     })
   })
 

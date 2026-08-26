@@ -16,7 +16,7 @@ import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId, validateTriggerSchedule } from '@oomol-lab/open-flow/cron-trigger'
 import { canonicalJsonBytes, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
-import { createRuntimeProgram, matchesSchema, prepareFlow, triggerPayloadSchema } from '@oomol-lab/open-flow/flow-semantics'
+import { matchesSchema, prepareFlow, triggerPayloadSchema } from '@oomol-lab/open-flow/flow-semantics'
 import {
   maximumPollCheckpointBytes,
   maximumPollEventsPerPage,
@@ -28,7 +28,6 @@ import {
 import { triggerDefinitions as providerTriggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { createEventProjector } from '@oomol-lab/open-flow/run-events'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
-import { runFlow } from '@oomol-lab/open-flow/scheduler'
 import * as Cause from 'effect/Cause'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
@@ -39,12 +38,11 @@ import * as FiberSet from 'effect/FiberSet'
 import * as Queue from 'effect/Queue'
 import * as Scope from 'effect/Scope'
 import * as Semaphore from 'effect/Semaphore'
-import { randomUUID } from 'node:crypto'
 import { ConnectorTaskError } from './connector.ts'
 import { ControlService } from './control-service.ts'
 import { AcceptanceError, ControlError, serverErrorCode } from './error.ts'
 import { IntegrationRuntime } from './integration-runtime.ts'
-import { IsolatedVmError, isolatedVmEngineDigest, IsolatedVmHost } from './isolated-vm.ts'
+import { isolatedVmEngineDigest, IsolatedVmHost } from './isolated-vm.ts'
 import { errorKind, silentLogger } from './logger.ts'
 import { migrateDatabase } from './migrate.ts'
 import { Store } from './store.ts'
@@ -667,24 +665,31 @@ export class ServerService {
       const timeoutReason = new Error('Run exceeded its execution deadline.')
       const timeout = setTimeout(() => cancellation.abort(timeoutReason), this.#runTimeoutMs)
       this.#active.set(run.runId, cancellation)
-      yield* runFlow(start.flow, {
-        createId: randomUUID,
-        emit: async (event) => {
-          if (event.type == 'run.started' && event.runId == run.runId) return
-          const projected = await start.projectEvent(event)
-          if (projected != null) this.#store.append(run.runId, projected)
-        },
-        flowId: run.flowId,
-        inputs: run.inputs,
-        invokeTask: (invocation) => this.#invokeTask(start.flow, invocation),
-        projectFailure: (error) => {
-          if (error instanceof ConnectorTaskError) return { code: error.code, message: error.message }
-          if (error instanceof TaskHostError) return { code: error.code, message: error.message }
-          return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
-        },
-        runId: run.runId,
-        signal: cancellation.signal,
-        ...(run.trigger == null ? {} : { trigger: run.trigger }),
+      yield* Effect.tryPromise({
+        try: () =>
+          this.#isolatedVm.run(start.flow, {
+            capability: (capabilities, call) => this.#invokeCapability(capabilities, call),
+            emit: async (event) => {
+              if (event.type == 'run.started' && event.runId == run.runId) return
+              const projected = await start.projectEvent(event)
+              if (projected != null) this.#store.append(run.runId, projected)
+            },
+            flowId: run.flowId,
+            inputs: run.inputs,
+            invokeTask: (invocation) => {
+              if (!('taskId' in invocation)) throw new Error('Runtime Executor returned a Code Task to the Host.')
+              return this.#invokeTask(start.flow, invocation)
+            },
+            projectFailure: (error) => {
+              if (error instanceof ConnectorTaskError) return { code: error.code, message: error.message }
+              if (error instanceof TaskHostError) return { code: error.code, message: error.message }
+              return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
+            },
+            runId: run.runId,
+            signal: cancellation.signal,
+            ...(run.trigger == null ? {} : { trigger: run.trigger }),
+          }),
+        catch: (error) => error,
       }).pipe(
         Effect.matchEffect({
           onFailure: (error) =>
@@ -1013,32 +1018,7 @@ export class ServerService {
     )
   }
 
-  async #invokeTask(prepared: PreparedFlow, invocation: TaskInvocation): Promise<JsonValue> {
-    if ('moduleId' in invocation) {
-      const program = createRuntimeProgram(prepared, invocation.moduleId, isolatedVmEngineDigest)
-      if (program == null) throw new Error('Task Module is not part of the fixed Flow closure.')
-      let capabilityFailure: unknown
-      try {
-        return await this.#isolatedVm.invoke({
-          capability: async (call) => {
-            try {
-              return await this.#invokeCapability(invocation.capabilities, call)
-            } catch (error) {
-              capabilityFailure = error
-              throw error
-            }
-          },
-          input: invocation.input,
-          invocationId: invocation.invocationId,
-          program,
-          signal: invocation.signal,
-        })
-      } catch (error) {
-        if (capabilityFailure != null && error instanceof IsolatedVmError && error.code == 'task-failed') throw capabilityFailure
-        throw error
-      }
-    }
-
+  async #invokeTask(prepared: PreparedFlow, invocation: Extract<TaskInvocation, { readonly taskId: string }>): Promise<JsonValue> {
     const task = prepared.tasks[invocation.taskId]!
     const executor = task.executor
     switch (executor.kind) {
