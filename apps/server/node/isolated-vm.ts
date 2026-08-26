@@ -354,6 +354,7 @@ export class IsolatedVmHost {
     if (message.type == 'result') {
       if (message.retire && this.#child == child) {
         this.#child = undefined
+        this.#output?.close()
         this.#output = undefined
       }
       this.#finish(message.executionId, () => {
