@@ -194,6 +194,7 @@ export class ServerService {
     )
     this.#integration = new IntegrationRuntime(
       store,
+      this.#scope,
       connector,
       clock,
       runtime.integration,

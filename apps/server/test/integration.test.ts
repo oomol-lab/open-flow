@@ -147,6 +147,77 @@ it('rejects Integration publication when the callback runtime is not configured'
 })
 
 describe('Server Integration reconciliation', () => {
+  it('serializes concurrent reconciliation ticks', async () => {
+    let active = 0
+    let calls = 0
+    let entered!: () => void
+    let release!: () => void
+    const enteredPromise = new Promise<void>((resolve) => (entered = resolve))
+    const releasePromise = new Promise<void>((resolve) => (release = resolve))
+    let maximumActive = 0
+    const definition: IntegrationDefinition = {
+      initialState: { checkpoint: null, subscription: {} },
+      receive: () => ({ outcome: 'ignored', reason: 'unused' }),
+      async reconcile() {
+        calls += 1
+        active += 1
+        maximumActive = Math.max(maximumActive, active)
+        if (calls == 1) {
+          entered()
+          await releasePromise
+        }
+        active -= 1
+        throw new TransientIntegrationError('retry')
+      },
+      snapshot,
+    }
+    const at = Date.parse('2026-08-21T00:00:00.000Z')
+    const service = ServerService.open(await databaseFile(), undefined, () => at, runtime(), undefined, undefined, [definition])
+    try {
+      await publish(service, 'transient', null)
+      const first = service.tickIntegration(new Date(at).toISOString())
+      await enteredPromise
+      const second = service.tickIntegration(new Date(at + 1_000).toISOString())
+      await Promise.resolve()
+      expect(calls).toBe(1)
+      release()
+      await Promise.all([first, second])
+      expect(calls).toBe(2)
+      expect(maximumActive).toBe(1)
+    } finally {
+      release()
+      await service.close()
+    }
+  })
+
+  it('cancels an armed reconciliation timer when the service closes', async () => {
+    let calls = 0
+    const at = Date.parse('2026-08-21T00:00:00.000Z')
+    const definition: IntegrationDefinition = {
+      initialState: { checkpoint: null, subscription: {} },
+      receive: () => ({ outcome: 'ignored', reason: 'unused' }),
+      async reconcile(context) {
+        calls += 1
+        await context.state?.saveSubscription({}, new Date(at + 10))
+        return { outcome: 'ready' }
+      },
+      snapshot,
+    }
+    const service = ServerService.open(await databaseFile(), undefined, () => at, runtime(), undefined, undefined, [definition])
+    let closed = false
+    try {
+      await publish(service, 'ready', null)
+      await service.tickIntegration(new Date(at).toISOString())
+      service.start()
+      await service.close()
+      closed = true
+      await new Promise<void>((resolve) => setTimeout(resolve, 25))
+      expect(calls).toBe(1)
+    } finally {
+      if (!closed) await service.close()
+    }
+  })
+
   it('applies a one-second transient retry floor without a busy loop', async () => {
     let calls = 0
     const captured = captureLogger()

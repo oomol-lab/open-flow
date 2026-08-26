@@ -15,6 +15,11 @@ import {
   PermanentIntegrationError,
   TransientIntegrationError,
 } from '@oomol-lab/open-flow/integration-trigger'
+import * as Effect from 'effect/Effect'
+import * as Fiber from 'effect/Fiber'
+import * as FiberMap from 'effect/FiberMap'
+import * as FiberSet from 'effect/FiberSet'
+import * as Scope from 'effect/Scope'
 import { ConnectorTaskError } from './connector.ts'
 import { AcceptanceError } from './error.ts'
 import { errorKind } from './logger.ts'
@@ -68,13 +73,15 @@ export class IntegrationRuntime {
   readonly #validateFlow: ValidateFlow
   readonly #wake: () => void
   readonly #runCreated: (flowId: string, runId: string) => void
+  readonly #ticks: FiberSet.FiberSet<void, unknown>
+  readonly #timers: FiberMap.FiberMap<string, void>
   #failure?: unknown
   #started = false
   #ticking?: Promise<void>
-  #timer?: ReturnType<typeof setTimeout>
 
   constructor(
     store: Store,
+    scope: Scope.Scope,
     connector: ConnectorHost | undefined,
     clock: () => number,
     options: IntegrationOptions | undefined,
@@ -91,24 +98,32 @@ export class IntegrationRuntime {
     this.#logger = logger.child({ component: 'integration' })
     this.#publicOrigin = options == null ? undefined : new URL(options.publicOrigin).origin
     this.#store = store
+    this.#ticks = Effect.runSync(FiberSet.make<void, unknown>().pipe(Scope.provide(scope)))
+    this.#timers = Effect.runSync(FiberMap.make<string, void>().pipe(Scope.provide(scope)))
     this.#validateFlow = validateFlow
     this.#wake = wake
     this.#runCreated = runCreated
   }
 
   arm(): void {
-    if (this.#timer != null) clearTimeout(this.#timer)
-    this.#timer = undefined
+    Effect.runSync(FiberMap.remove(this.#timers, 'reconcile'))
     if (!this.#started || this.#failure != null || this.#ticking != null) return
     const nextAt = this.#store.triggers.nextIntegrationAt()
     if (nextAt == null) return
     const delay = Math.max(0, Math.min(nextAt - this.#clock(), maxTimerDelayMs))
-    this.#timer = setTimeout(() => {
-      this.#timer = undefined
-      void this.tick().catch((error: unknown) => {
-        this.#fail(error)
-      })
-    }, delay)
+    Effect.runSync(
+      FiberMap.run(
+        this.#timers,
+        'reconcile',
+        Effect.sleep(delay).pipe(
+          Effect.andThen(
+            Effect.sync(() => {
+              void this.tick().catch((error: unknown) => this.#fail(error))
+            }),
+          ),
+        ),
+      ),
+    )
   }
 
   ready(): boolean {
@@ -165,8 +180,7 @@ export class IntegrationRuntime {
 
   stop(): void {
     this.#started = false
-    if (this.#timer != null) clearTimeout(this.#timer)
-    this.#timer = undefined
+    Effect.runSync(FiberMap.remove(this.#timers, 'reconcile'))
   }
 
   target(endpointId: string): IntegrationTarget | undefined {
@@ -198,7 +212,19 @@ export class IntegrationRuntime {
     const now = Date.parse(at)
     if (!Number.isFinite(now)) throw new TypeError('Integration tick time must be an ISO timestamp.')
     const previous = this.#ticking
-    const ticking = (previous ?? Promise.resolve()).then(() => this.#tick(now))
+    const fiber = Effect.runSync(
+      FiberSet.run(
+        this.#ticks,
+        Effect.tryPromise({
+          try: async () => {
+            await previous
+            await this.#tick(now)
+          },
+          catch: (error) => error,
+        }),
+      ),
+    )
+    const ticking = Effect.runPromise(Fiber.join(fiber))
     this.#ticking = ticking
     let succeeded = false
     try {
@@ -213,7 +239,11 @@ export class IntegrationRuntime {
   }
 
   async waitForIdle(): Promise<void> {
-    while (this.#ticking != null) await this.#ticking
+    while (this.#ticking != null) {
+      const ticking = this.#ticking
+      await Effect.runPromise(FiberSet.awaitEmpty(this.#ticks))
+      await ticking
+    }
     if (this.#failure != null) throw this.#failure
   }
 
