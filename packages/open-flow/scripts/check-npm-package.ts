@@ -293,6 +293,7 @@ async function verifyConsumer(versions: { readonly react: string; readonly react
         {
           dependencies: {
             '@oomol-lab/open-flow': `file:${tarballPath}`,
+            'effect': '4.0.0-rc.112',
             'react': versions.react,
             'react-dom': versions.react,
           },
@@ -398,6 +399,14 @@ async function verifyConsumer(versions: { readonly react: string; readonly react
       [
         '-e',
         "const action = await import('@oomol-lab/open-flow/connector-action'); if (typeof action.connectorActionPorts !== 'function') throw new Error('Missing Connector Action contract.')",
+      ],
+      { cwd: directory },
+    )
+    await execFileAsync(
+      process.execPath,
+      [
+        '-e',
+        "const Effect = await import('effect/Effect'); const { runFlow } = await import('@oomol-lab/open-flow/scheduler'); const result = await Effect.runPromise(runFlow({ closureDigest: 'consumer', engineContract: 'open-flow-engine/v1', graph: { nodes: {} }, modules: {}, subflows: {}, tasks: {} }, { createId: () => 'consumer-job', flowId: 'main', invokeTask: () => Effect.fail(new Error('Unexpected Task invocation.')), runId: 'consumer-run' })); if (result.kind !== 'node-results' || result.nodes.length !== 0) throw new Error('Scheduler Effect is not interoperable with the consumer Effect runtime.')",
       ],
       { cwd: directory },
     )

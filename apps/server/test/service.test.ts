@@ -1,14 +1,17 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
+import { execFile } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { promisify } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ServerService } from '../node/service.ts'
 import { acceptRun } from './runFixture.ts'
 
 const directories: string[] = []
+const execFileAsync = promisify(execFile)
 const port = { jsonSchema: {}, nullable: false } as const
 
 afterEach(async () => {
@@ -295,6 +298,68 @@ describe('Server application service', () => {
     for (const release of releases) release()
     await service.waitForIdle()
     expect([first.runId, second.runId, other.runId].map((runId) => service.run(runId)?.status)).toEqual(['completed', 'completed', 'completed'])
+    await service.close()
+  })
+
+  it('fails concurrent Flow sessions once on shared Executor loss and rebuilds for later Runs', async () => {
+    let aborted = 0
+    let calls = 0
+    const started = Promise.withResolvers<void>()
+    const service = ServerService.open(await databaseFile(), undefined, Date.now, {
+      llm: async ({ signal }) => {
+        calls += 1
+        if (calls > 2) return { kind: 'completed', value: { answer: 'recovered' }, version: 1 }
+        if (calls == 2) started.resolve()
+        return await new Promise<never>((_resolve, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => {
+              aborted += 1
+              reject(signal.reason)
+            },
+            { once: true },
+          )
+        })
+      },
+      maxConcurrentRuns: 2,
+    })
+    const first = await acceptRun(service, { flowId: 'main', idempotencyKey: 'executor-loss-a', revision: llmFlow(), revisionId: 'executor-loss-a' })
+    const second = await acceptRun(service, { flowId: 'main', idempotencyKey: 'executor-loss-b', revision: llmFlow(), revisionId: 'executor-loss-b' })
+    if (first.kind != 'accepted' || second.kind != 'accepted') throw new Error('Concurrent Run setup conflicted.')
+
+    service.start()
+    await started.promise
+    const { stdout } = await execFileAsync('ps', ['-A', '-o', 'pid=,ppid=,command='])
+    const executor = stdout
+      .split('\n')
+      .map((line) => /^(\s*\d+)\s+(\d+)\s+(.+)$/.exec(line))
+      .find((match) => match?.[2] == String(process.pid) && match[3].includes('--executor'))
+    if (executor == null) throw new Error('Runtime Executor process was not found.')
+    process.kill(Number(executor[1]), 'SIGKILL')
+
+    await service.waitForIdle()
+    await vi.waitFor(() => expect(aborted).toBe(2))
+    expect(calls).toBe(2)
+    for (const runId of [first.runId, second.runId]) {
+      expect(service.run(runId)?.status).toBe('failed')
+      expect(
+        service
+          .events(runId)
+          .filter((event) => ['run.canceled', 'run.completed', 'run.failed'].includes(event.kind))
+          .map((event) => event.kind),
+      ).toEqual(['run.failed'])
+    }
+
+    const recovered = await acceptRun(service, {
+      flowId: 'main',
+      idempotencyKey: 'executor-recovered',
+      revision: llmFlow(),
+      revisionId: 'executor-recovered',
+    })
+    if (recovered.kind != 'accepted') throw new Error('Recovery Run setup conflicted.')
+    await service.waitForIdle()
+    expect(service.run(recovered.runId)?.status).toBe('completed')
+    expect(calls).toBe(3)
     await service.close()
   })
 

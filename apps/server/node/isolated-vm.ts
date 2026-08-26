@@ -102,8 +102,15 @@ type ExecutorMessage =
   | { readonly event: SchedulerEvent; readonly executionId: number; readonly id: number; readonly type: 'event' }
   | { readonly executionId: number; readonly id: number; readonly invocation: TaskInvocation; readonly type: 'task' }
   | { readonly executionId: number; readonly id: number; readonly type: 'call.cancel' }
-  | { readonly code: IsolatedVmError['code']; readonly executionId: number; readonly message: string; readonly ok: false; readonly type: 'result' }
-  | { readonly executionId: number; readonly ok: true; readonly type: 'result'; readonly value: FlowRunResult | JsonValue }
+  | {
+      readonly code: IsolatedVmError['code']
+      readonly executionId: number
+      readonly message: string
+      readonly ok: false
+      readonly retire?: true
+      readonly type: 'result'
+    }
+  | { readonly executionId: number; readonly ok: true; readonly retire?: true; readonly type: 'result'; readonly value: FlowRunResult | JsonValue }
 
 interface PendingCapability {
   readonly deferred: Deferred.Deferred<CapabilityResult, Error>
@@ -128,6 +135,8 @@ interface PendingInvocation {
 }
 
 const encoder = new TextEncoder()
+const executorIsolateBudget = 1_000
+let completedIsolates = 0
 
 function serializedBytes(value: unknown): number {
   return encoder.encode(JSON.stringify(value)).byteLength
@@ -343,6 +352,10 @@ export class IsolatedVmHost {
     const pending = this.#pending.get(message.executionId)
     if (pending == null) return
     if (message.type == 'result') {
+      if (message.retire && this.#child == child) {
+        this.#child = undefined
+        this.#output = undefined
+      }
       this.#finish(message.executionId, () => {
         if (message.ok) pending.resolve(message.value)
         else pending.reject(new IsolatedVmError(message.code, message.message))
@@ -788,7 +801,10 @@ export async function invoke(source) {
   } finally {
     if (abort != null) canceled.removeEventListener('abort', abort)
     clearTimers?.()
-    if (isolate != null && !isolate.isDisposed) isolate.dispose()
+    if (isolate != null) {
+      if (!isolate.isDisposed) isolate.dispose()
+      completedIsolates += 1
+    }
   }
 }
 
@@ -881,7 +897,7 @@ function executeFlow(
   })
 }
 
-function executeWithCapabilities(request: InvokeRequest, pending: Map<number, PendingCapability>): Effect.Effect<void> {
+function executeWithCapabilities(request: InvokeRequest, pending: Map<number, PendingCapability>, retire: () => boolean): Effect.Effect<void> {
   let nextId = 0
   const call = (
     message:
@@ -925,7 +941,10 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
           }),
         )
       }
-      yield* Effect.sync(() => writeMessage({ executionId: request.executionId, ok: true, type: 'result', value }))
+      yield* Effect.sync(() => {
+        const retiring = retire()
+        writeMessage({ executionId: request.executionId, ok: true, ...(retiring ? { retire: true } : {}), type: 'result', value })
+      })
     }).pipe(
       Effect.catch((error) =>
         Effect.sync(() => {
@@ -933,7 +952,15 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
             error instanceof IsolatedVmError
               ? error
               : new IsolatedVmError('flow' in request ? 'task-failed' : 'executor-crashed', normalizedError(error).message)
-          writeMessage({ code: failure.code, executionId: request.executionId, message: failure.message, ok: false, type: 'result' })
+          const retiring = retire()
+          writeMessage({
+            code: failure.code,
+            executionId: request.executionId,
+            message: failure.message,
+            ok: false,
+            ...(retiring ? { retire: true } : {}),
+            type: 'result',
+          })
         }),
       ),
       Effect.ensuring(Effect.sync(() => pending.clear())),
@@ -990,7 +1017,11 @@ function runExecutor(): Effect.Effect<void> {
           }
           const pending = new Map<number, PendingCapability>()
           const fiber = run(
-            executeWithCapabilities(message, pending).pipe(
+            executeWithCapabilities(message, pending, () => {
+              if (completedIsolates < executorIsolateBudget || executions.size != 1) return false
+              queueMicrotask(() => input.close())
+              return true
+            }).pipe(
               Effect.ensuring(
                 Effect.sync(() => {
                   executions.delete(message.executionId)

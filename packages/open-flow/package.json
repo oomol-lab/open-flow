@@ -19,9 +19,6 @@
   "license": "Apache-2.0",
   "type": "module",
   "private": true,
-  "dependencies": {
-    "effect": "4.0.0-rc.112"
-  },
   "exports": {
     "./connector-action": "./src/connector/common/actionSchema.ts",
     "./connector-proxy": "./src/connector/common/proxy.ts",
@@ -114,6 +111,7 @@
     "dayjs": "^1.11.21",
     "deepmerge": "^4.3.1",
     "dequal": "^2.0.3",
+    "effect": "4.0.0-rc.112",
     "fzf": "^0.5.2",
     "katex": "0.16.27",
     "lucide-react": "^0.468",

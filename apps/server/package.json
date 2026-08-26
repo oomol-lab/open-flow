@@ -5,6 +5,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
+    "benchmark:runtime": "bun run build && node --expose-gc --no-node-snapshot scripts/benchmark-runtime.mjs",
     "build": "bun scripts/build.ts",
     "check": "bun run format -- --check && bun run lint && tsc --noEmit",
     "dev": "bun scripts/dev.ts",

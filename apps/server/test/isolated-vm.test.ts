@@ -343,4 +343,11 @@ describe('isolated-vm runtime conformance', () => {
     await expect(invoke('export default () => "rebuilt"')).resolves.toBe('rebuilt')
     expect(capabilityCalls).toBe(1)
   })
+
+  it('retires an idle Executor after its isolate budget and rebuilds transparently', async () => {
+    const initialPid = await executorPid()
+    for (let index = 0; index < 1_000; index += 1) await invoke('export default () => true')
+    await expect(invoke('export default () => "retired-and-rebuilt"')).resolves.toBe('retired-and-rebuilt')
+    expect(await executorPid()).not.toBe(initialPid)
+  })
 })

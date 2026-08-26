@@ -61,9 +61,6 @@
     "packages/open-flow": {
       "name": "@oomol-lab/open-flow",
       "version": "0.1.0-alpha.9",
-      "dependencies": {
-        "effect": "4.0.0-rc.112",
-      },
       "devDependencies": {
         "@babel/parser": "8.0.4",
         "@babel/traverse": "8.0.4",
@@ -120,6 +117,7 @@
         "dayjs": "^1.11.21",
         "deepmerge": "^4.3.1",
         "dequal": "^2.0.3",
+        "effect": "4.0.0-rc.112",
         "fzf": "^0.5.2",
         "katex": "0.16.27",
         "lucide-react": "^0.468",
