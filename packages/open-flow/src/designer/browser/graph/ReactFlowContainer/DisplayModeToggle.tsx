@@ -28,7 +28,7 @@ export const DisplayModeToggle: React.FC<DisplayModeToggleProps> = /*#__PURE__*/
           if (value != null) displayMode$.set(value)
         }}
         spacing={0}
-        size="sm"
+        size="default"
         value={[displayMode]}
         variant="outline"
       >

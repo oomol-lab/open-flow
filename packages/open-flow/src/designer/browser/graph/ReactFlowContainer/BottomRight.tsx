@@ -7,6 +7,9 @@ import { memo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { setValue } from 'value-enhancer'
+import { buttonGroupVariants } from '../../../../ui/browser/button-group.tsx'
+import { buttonVariants } from '../../../../ui/browser/button.tsx'
+import { cn } from '../../../../ui/browser/utils.ts'
 import { iconOf } from '../../jsonSchema/preset.ts'
 
 export interface BottomRightProps {
@@ -27,12 +30,32 @@ export const BottomRight: React.FC<BottomRightProps> = /* @__PURE__ */ memo(func
   return (
     <>
       {!miniMapExpanded && (
-        <Controls position="bottom-right" showFitView={false} showInteractive={false} showZoom={false}>
-          <ControlButton aria-label={modeBtnTitle} onClick={() => props.interactiveMode$.set(isMouse ? 'touchpad' : 'mouse')} title={modeBtnTitle}>
+        <Controls
+          className={buttonGroupVariants({ orientation: 'horizontal' })}
+          orientation="horizontal"
+          position="bottom-right"
+          showFitView={false}
+          showInteractive={false}
+          showZoom={false}
+        >
+          <ControlButton
+            aria-label={modeBtnTitle}
+            className={buttonVariants({ size: 'icon', variant: 'outline' })}
+            data-slot="button"
+            onClick={() => props.interactiveMode$.set(isMouse ? 'touchpad' : 'mouse')}
+            title={modeBtnTitle}
+          >
             {isMouse ? <i className={`${styles.interactionIcon} i-custom:mouse`} /> : <i className={`${styles.interactionIcon} i-custom:touchpad`} />}
           </ControlButton>
           {props.miniMapExpanded$ && (
-            <ControlButton aria-label={t('miniMap')} aria-expanded={false} onClick={() => props.miniMapExpanded$?.set(true)} title={t('miniMap')}>
+            <ControlButton
+              aria-label={t('miniMap')}
+              aria-expanded={false}
+              className={buttonVariants({ size: 'icon', variant: 'outline' })}
+              data-slot="button"
+              onClick={() => props.miniMapExpanded$?.set(true)}
+              title={t('miniMap')}
+            >
               <i className={`${styles.miniMapIcon} i-custom:minimap`} />
             </ControlButton>
           )}
@@ -40,6 +63,8 @@ export const BottomRight: React.FC<BottomRightProps> = /* @__PURE__ */ memo(func
             <ControlButton
               aria-label={settingsBtnTitle}
               aria-expanded={showSettings}
+              className={buttonVariants({ size: 'icon', variant: 'outline' })}
+              data-slot="button"
               onClick={() => setValue(props.showSettings$!, !showSettings)}
               title={settingsBtnTitle}
             >
@@ -51,8 +76,22 @@ export const BottomRight: React.FC<BottomRightProps> = /* @__PURE__ */ memo(func
       {props.miniMapExpanded$ && miniMapExpanded && (
         <>
           <RFMiniMap ariaLabel={t('miniMap')} className={styles.miniMap} pannable position="bottom-right" zoomable />
-          <Controls className={styles.miniMapToggle} position="bottom-right" showFitView={false} showInteractive={false} showZoom={false}>
-            <ControlButton aria-label={t('miniMap')} aria-expanded onClick={() => props.miniMapExpanded$?.set(false)} title={t('miniMap')}>
+          <Controls
+            className={cn(buttonGroupVariants({ orientation: 'horizontal' }), styles.miniMapToggle)}
+            orientation="horizontal"
+            position="bottom-right"
+            showFitView={false}
+            showInteractive={false}
+            showZoom={false}
+          >
+            <ControlButton
+              aria-label={t('miniMap')}
+              aria-expanded
+              className={buttonVariants({ size: 'icon', variant: 'outline' })}
+              data-slot="button"
+              onClick={() => props.miniMapExpanded$?.set(false)}
+              title={t('miniMap')}
+            >
               <i className={`${styles.miniMapIcon} i-carbon:shrink-screen`} />
             </ControlButton>
           </Controls>

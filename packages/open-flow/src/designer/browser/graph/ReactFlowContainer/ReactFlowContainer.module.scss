@@ -47,34 +47,49 @@
   }
 
   :global(.react-flow__controls) {
-    width: var(--canvas-control-container-size);
-    border: 1px solid var(--canvas-control-border, var(--ui-border));
-    border-radius: var(--canvas-control-radius);
-    background: var(--canvas-control-background, var(--ui-background));
-    box-shadow: var(--floating-control-shadow);
-    overflow: hidden;
+    width: auto;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
   }
 
-  :global(.react-flow__controls-button) {
-    width: var(--canvas-control-size);
-    height: var(--canvas-control-size);
-    padding: var(--canvas-control-padding);
-    border-radius: 0;
-    font-size: 16px;
-    transition:
-      color 100ms ease,
-      background-color 100ms ease;
+  :global(.react-flow__controls.horizontal) {
+    flex-direction: row !important;
   }
 
-  :global(.react-flow__controls-button:active),
-  :global(.react-flow__controls-button[aria-expanded='true']) {
-    background-color: var(--canvas-control-active-background, var(--ui-muted));
-    color: var(--canvas-control-active-foreground, var(--ui-foreground));
+  :global(.react-flow__controls:is(.horizontal, .vertical) > [data-slot='button']) {
+    width: var(--canvas-control-container-size) !important;
+    height: var(--canvas-control-container-size) !important;
+    border-radius: 0 !important;
   }
 
-  :global(.react-flow__controls-button:focus-visible) {
-    outline: 2px solid var(--ui-ring);
-    outline-offset: -2px;
+  :global(.react-flow__controls.vertical > [data-slot='button']:not(:last-child)) {
+    border-bottom-color: color-mix(in srgb, var(--ui-border) 55%, transparent) !important;
+  }
+
+  :global(.react-flow__controls.horizontal > [data-slot='button']:not(:last-child)) {
+    border-right-color: color-mix(in srgb, var(--ui-border) 55%, transparent) !important;
+  }
+
+  :global(.react-flow__controls.vertical > [data-slot='button']:first-child) {
+    border-top-left-radius: calc(var(--ui-radius) + 2px) !important;
+    border-top-right-radius: calc(var(--ui-radius) + 2px) !important;
+  }
+
+  :global(.react-flow__controls.vertical > [data-slot='button']:last-child) {
+    border-bottom-right-radius: calc(var(--ui-radius) + 2px) !important;
+    border-bottom-left-radius: calc(var(--ui-radius) + 2px) !important;
+  }
+
+  :global(.react-flow__controls.horizontal > [data-slot='button']:first-child) {
+    border-top-left-radius: calc(var(--ui-radius) + 2px) !important;
+    border-bottom-left-radius: calc(var(--ui-radius) + 2px) !important;
+  }
+
+  :global(.react-flow__controls.horizontal > [data-slot='button']:last-child) {
+    border-top-right-radius: calc(var(--ui-radius) + 2px) !important;
+    border-bottom-right-radius: calc(var(--ui-radius) + 2px) !important;
   }
 
   :global(.react-flow__controls-button path) {

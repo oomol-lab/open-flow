@@ -11,6 +11,7 @@ import { BottomRight } from './BottomRight.tsx'
 
 const captured = vi.hoisted(() => ({
   buttons: [] as ButtonHTMLAttributes<HTMLButtonElement>[],
+  controls: [] as Array<{ readonly className?: string; readonly orientation?: 'horizontal' | 'vertical'; readonly position?: string }>,
   miniMap: undefined as
     | {
         readonly ariaLabel?: string | null
@@ -30,7 +31,19 @@ vi.mock('@xyflow/react', () => ({
       </button>
     )
   },
-  Controls: ({ children, position }: HTMLAttributes<HTMLDivElement> & { readonly position?: string }) => <div data-position={position}>{children}</div>,
+  Controls: ({
+    children,
+    className,
+    orientation,
+    position,
+  }: HTMLAttributes<HTMLDivElement> & { readonly orientation?: 'horizontal' | 'vertical'; readonly position?: string }) => {
+    captured.controls.push({ className, orientation, position })
+    return (
+      <div data-orientation={orientation} data-position={position}>
+        {children}
+      </div>
+    )
+  },
   MiniMap: (props: NonNullable<typeof captured.miniMap>) => {
     captured.miniMap = props
     return <div data-mini-map data-position={props.position} />
@@ -48,6 +61,7 @@ function render(interactiveMode$: Val<InteractiveMode>, miniMapExpanded$: Val<bo
 describe('BottomRight', () => {
   beforeEach(() => {
     captured.buttons = []
+    captured.controls = []
     captured.miniMap = undefined
   })
 
@@ -59,8 +73,12 @@ describe('BottomRight', () => {
     const markup = render(interactiveMode$, miniMapExpanded$, showSettings$)
 
     expect(markup).toContain('data-position="bottom-right"')
+    expect(markup).toContain('data-orientation="horizontal"')
+    expect(captured.controls[0]).toMatchObject({ orientation: 'horizontal', position: 'bottom-right' })
+    expect(captured.controls[0]?.className).toContain('rounded-r-none')
     expect(captured.miniMap).toBeUndefined()
     expect(captured.buttons).toHaveLength(3)
+    expect(captured.buttons.every((button) => button.className?.includes('size-8'))).toBe(true)
 
     captured.buttons[0]?.onClick?.({} as never)
     captured.buttons[1]?.onClick?.({} as never)

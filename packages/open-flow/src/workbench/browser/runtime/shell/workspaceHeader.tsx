@@ -125,7 +125,7 @@ export function WorkspaceHeader({
           nativeButton={false}
           onClick={(event) => followWorkbenchLink(event, onOpenFlow)}
           render={<a href={flowHref} />}
-          size="sm"
+          size="default"
           variant="ghost"
         >
           <Icon data-icon="inline-start" name="flow" />
@@ -193,7 +193,7 @@ export function WorkspaceHeader({
             aria-expanded={runInputRequest?.source == 'draft'}
             disabled={busy != null || invalid || subflow || runInputRequest != null}
             onClick={onRunDraft}
-            size="sm"
+            size="default"
             variant="outline"
           >
             <Icon data-icon="inline-start" name="play" />
@@ -204,7 +204,7 @@ export function WorkspaceHeader({
           <Button
             disabled={busy != null || invalid || subflow || live?.hasUnpublishedChanges == false}
             onClick={() => void store.publications.publish()}
-            size="sm"
+            size="default"
           >
             <Icon data-icon="inline-start" name="publish" />
             {t(busy == 'publish' ? 'workspace.publishing' : 'publication.publishDraft')}
@@ -216,7 +216,7 @@ export function WorkspaceHeader({
               <DropdownMenuTrigger
                 aria-label={t('workspace.moreActions')}
                 render={
-                  <Button size="icon-sm" title={t('workspace.moreActions')} variant="ghost">
+                  <Button size="icon" title={t('workspace.moreActions')} variant="ghost">
                     <Icon name="more" />
                   </Button>
                 }

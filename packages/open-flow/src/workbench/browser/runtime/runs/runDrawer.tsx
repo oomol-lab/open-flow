@@ -813,7 +813,7 @@ export function RunDrawer({
         </div>
         <span className="run-meta">{duration(run)}</span>
         {run != null && <code className="run-id">{t('run.runId', { id: run.runId })}</code>}
-        <Button aria-label={t(open ? 'run.collapse' : 'run.expand')} onClick={onToggle} size="icon-sm" variant="ghost">
+        <Button aria-label={t(open ? 'run.collapse' : 'run.expand')} onClick={onToggle} size="icon-xs" variant="ghost">
           <Icon name={open ? 'chevron-down' : 'chevron-up'} />
         </Button>
       </div>

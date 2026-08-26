@@ -1,13 +1,5 @@
 .group {
   --display-mode-button-width: 76px;
-
-  height: var(--canvas-control-container-size);
-  gap: 0;
-  border: 1px solid var(--canvas-control-border, var(--ui-border));
-  border-radius: var(--canvas-control-radius);
-  background: var(--canvas-control-background, var(--ui-background));
-  box-shadow: var(--floating-control-shadow);
-  overflow: hidden;
 }
 
 .compact {
@@ -16,26 +8,5 @@
 
 .button {
   width: var(--display-mode-button-width);
-  height: var(--canvas-control-size);
   min-width: 0;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 0;
-  color: var(--canvas-control-foreground, var(--ui-muted-foreground));
-  background: var(--canvas-control-background, var(--ui-background));
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1;
-  box-shadow: none;
-
-  & + & {
-    border-left: 1px solid var(--canvas-control-border, var(--ui-border));
-  }
-
-  &[aria-pressed='true'] {
-    color: var(--canvas-control-active-foreground, var(--ui-foreground));
-    background: var(--canvas-control-active-background, var(--ui-muted));
-    font-weight: 500;
-    box-shadow: none;
-  }
 }

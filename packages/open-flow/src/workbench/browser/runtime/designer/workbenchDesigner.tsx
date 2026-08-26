@@ -367,7 +367,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         }}
         selectedNodeIds={selectedNodeIds}
       />
-      <Badge className="designer-draft-status designer-overlay top-left" variant="secondary">
+      <Badge className="designer-overlay top-left" variant="secondary">
         <span className="status-dot neutral" />
         {t('designer.draftBadge', { kind: t(target?.kind == 'subflow' ? 'common.subflow' : 'common.flow') })}
       </Badge>
@@ -376,24 +376,23 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
           aria-expanded={blocksOpen}
           disabled={disabled || target == null}
           onClick={(event) => onOpenBlocks(event.currentTarget)}
-          size="sm"
+          size="default"
           title={t('designer.openBlocks')}
           type="button"
-          variant="ghost"
+          variant="outline"
         >
           <Icon data-icon="inline-start" name="plus" /> {t('designer.addNode')}
         </Button>
         {(selectedNodeIds.length > 0 || selectedEdge != null) && (
           <Button
-            className="designer-delete-action"
             disabled={disabled}
             onClick={() => {
               if (selectedNodeIds.length > 0) onDeleteNodes()
               else if (selectedEdge != null) onDeleteEdge(selectedEdge)
             }}
-            size="sm"
+            size="default"
             type="button"
-            variant="ghost"
+            variant="destructive"
           >
             {t('designer.delete')}
           </Button>
@@ -402,10 +401,10 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
           aria-label={t('designer.toggleInspector')}
           aria-expanded={inspectorOpen}
           onClick={(event) => onToggleInspector(event.currentTarget)}
-          size="icon-sm"
+          size="icon"
           title={t('designer.toggleInspector')}
           type="button"
-          variant="ghost"
+          variant="outline"
         >
           <Icon name="panel" />
         </Button>

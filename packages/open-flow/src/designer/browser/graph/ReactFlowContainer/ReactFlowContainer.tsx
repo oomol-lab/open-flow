@@ -59,9 +59,12 @@ import { useVal } from 'use-value-enhancer'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { derive } from 'value-enhancer'
 import { shallowPlainObjectEqual } from '../../../../base/common/equality.ts'
+import { buttonGroupVariants } from '../../../../ui/browser/button-group.tsx'
+import { buttonVariants } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { TooltipProvider } from '../../../../ui/browser/tooltip.tsx'
+import { cn } from '../../../../ui/browser/utils.ts'
 import { DESIGNER_CLASSNAME, HANDLE_ROW_CLASSNAME } from '../../base/designer.ts'
 import { getScriptletType, getSharedBlockPath, getTriggerType, isWithCommentType, isWithConditionType, isWithValueType } from '../../base/dragNDrop.ts'
 import { makeConnection, toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
@@ -212,9 +215,16 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
   return (
     <>
       {props.dottedBackground && <Background id={bgId} color="var(--canvas-grid)" gap={GRID_GAP} variant={BackgroundVariant.Dots} />}
-      <Controls showInteractive={false} showFitView={false} showZoom={false}>
+      <Controls
+        className={buttonGroupVariants({ orientation: 'vertical' })}
+        orientation="vertical"
+        showInteractive={false}
+        showFitView={false}
+        showZoom={false}
+      >
         <ControlButton
-          className={`${styles.btnCtrl} react-flow__controls-button-zoom-in`}
+          className={cn(buttonVariants({ size: 'icon', variant: 'outline' }), styles.btnCtrl, 'react-flow__controls-button-zoom-in')}
+          data-slot="button"
           onClick={() => rf.zoomIn()}
           title={t('zoomIn')}
           aria-label={t('zoomIn')}
@@ -223,7 +233,8 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
           <i className="i-codicon:zoom-in" />
         </ControlButton>
         <ControlButton
-          className={`${styles.btnCtrl} react-flow__controls-button-zoom-out`}
+          className={cn(buttonVariants({ size: 'icon', variant: 'outline' }), styles.btnCtrl, 'react-flow__controls-button-zoom-out')}
+          data-slot="button"
           onClick={() => rf.zoomOut()}
           title={t('zoomOut')}
           aria-label={t('zoomOut')}
@@ -232,7 +243,8 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
           <i className="i-codicon:zoom-out" />
         </ControlButton>
         <ControlButton
-          className={`${styles.btnCtrl} react-flow__controls-button-fit-view`}
+          className={cn(buttonVariants({ size: 'icon', variant: 'outline' }), styles.btnCtrl, 'react-flow__controls-button-fit-view')}
+          data-slot="button"
           onClick={() => {
             props.onBeforeFitView?.()
             // Wait for the node description height before fitting the view to avoid overlap.
@@ -251,7 +263,8 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
         </ControlButton>
         {props.onRelayout && (
           <ControlButton
-            className={`${styles.btnCtrl} react-flow__controls-button-optimize`}
+            className={cn(buttonVariants({ size: 'icon', variant: 'outline' }), styles.btnCtrl, 'react-flow__controls-button-optimize')}
+            data-slot="button"
             onClick={() => {
               props.onRelayout?.()
               props.onBeforeFitView?.()

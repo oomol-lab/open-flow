@@ -25,16 +25,11 @@
   }
 
   .workbench-designer-canvas {
-    --canvas-control-background: var(--surface);
-    --canvas-control-border: var(--border);
-    --canvas-control-foreground: var(--text-secondary);
-    --canvas-control-active-background: var(--subtle);
-    --canvas-control-active-foreground: var(--text);
-    --xy-controls-button-background-color: var(--surface);
-    --xy-controls-button-background-color-hover: var(--subtle);
-    --xy-controls-button-border-color: var(--border);
-    --xy-controls-button-color: var(--text-secondary);
-    --xy-controls-button-color-hover: var(--text);
+    --xy-controls-button-background-color: var(--ui-background);
+    --xy-controls-button-background-color-hover: var(--ui-muted);
+    --xy-controls-button-border-color: var(--ui-border);
+    --xy-controls-button-color: var(--ui-muted-foreground);
+    --xy-controls-button-color-hover: var(--ui-foreground);
 
     width: 100%;
     height: 100%;
@@ -52,51 +47,12 @@
 
   .designer-overlay.top-right {
     right: 15px;
-    gap: 0;
-  }
-
-  .designer-overlay.top-right > [data-slot='button'] {
-    border-radius: 0;
-    background: transparent;
-    background-clip: border-box;
-  }
-
-  .designer-overlay.top-right > [data-slot='button'] + [data-slot='button'] {
-    border-left-color: var(--border);
-  }
-
-  .designer-draft-status {
-    height: 30px;
-    gap: 6px;
-    padding: 0 10px;
-    border-color: var(--border);
-    border-radius: 7px;
-    background: var(--surface);
-    color: var(--text-secondary);
-    font-size: 12px;
-    font-weight: 500;
-    box-shadow: 0 1px 3px rgb(0 0 0 / 16%);
-  }
-
-  .designer-delete-action {
-    color: var(--danger);
-  }
-
-  .designer-delete-action:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--danger) 10%, transparent);
-    color: var(--danger);
   }
 
   .designer-actions {
     display: flex;
-    height: 30px;
     align-items: center;
-    gap: 0;
-    border: 1px solid var(--border);
-    border-radius: 7px;
-    background: var(--surface);
-    box-shadow: 0 1px 3px rgb(0 0 0 / 16%);
-    overflow: hidden;
+    gap: 4px;
   }
 
   .node-icon {

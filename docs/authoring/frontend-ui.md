@@ -56,6 +56,20 @@ primitive 家族。页面级和 Canvas overlay 的 shadcn 组件可以采用自�
 
 ## React Flow 画布外围
 
+### Canvas Content 与 Canvas Chrome
+
+Canvas Content 包括 Node、Node 内参数编辑器、Handle、Edge、选择框和随 viewport transform 的内容。它们继续使用 Designer 的紧凑字段密度、
+`--widget-*` token 和节点组件样式；不能为了统一 Workbench 视觉而修改这套规则，也不能通过全局 `button`、`input` 或共享 radius token 间接改变它们。
+
+Canvas Chrome 包括固定在画布四周的状态标记、添加或删除操作、Inspector 开关、缩放与布局控制、Display Mode、MiniMap 和设置控制。它们虽然视觉上
+覆盖画布，但不属于 Canvas Content。Workbench 持有的 Chrome 使用共享 shadcn/Base UI primitive 的原生 variant、size、radius、surface、focus 和 disabled
+状态，feature CSS 只负责定位与 gap。React Flow 持有的 `Controls` 和 `ControlButton` 保留官方结构与行为，并通过 `--xy-*` 映射共享 `--ui-*` token；官方
+组件未覆盖的圆角与 focus ring 只允许在 React Flow 的 Chrome selector 中补齐，不能影响 `.react-flow__node` 或其后代。
+
+独立操作必须作为有间距的独立圆角 Button；不要把它们包成一个 surface 后再对所有子按钮设置 `border-radius: 0`。有单一组合语义的 ToggleGroup 可以保留
+原生的整体圆角和内部连接边，但 feature stylesheet 不得重新声明其 border、background、radius、color、typography 或状态样式。不要为 Canvas Chrome 新增
+平行的颜色或 radius token，也不要为了调整 Chrome 修改 `--ui-radius`，因为共享 primitive 同样会出现在 Node 内部。
+
 Designer 持有、固定在画布 viewport 四周的内容优先使用 React Flow 官方定位与控制结构：
 
 - 任意固定浮层使用 `Panel`；
@@ -68,7 +82,10 @@ React Flow 已提供的颜色、边框和阴影优先通过官方 `--xy-*` CSS v
 
 React Flow `ControlButton` 不转发 DOM ref，不能作为 Base UI `TooltipTrigger render` 的 child。图标 ControlButton 使用 React Flow 官方的 `title` 和
 `aria-label`；不要用 Tooltip wrapper 破坏 Controls 的直接子元素、边框或 ref 语义。共享 shadcn `Button` 必须保持 `forwardRef<HTMLButtonElement>`，以支持
-Dialog、Tooltip 和宿主 focus restoration。
+Dialog、Tooltip 和宿主 focus restoration。连续的 React Flow 命令组在 `Controls` 上按实际布局复用共享 `ButtonGroup` 的 horizontal 或 vertical variant，并在每个
+`ControlButton` 上复用共享 Button 的 `outline`、`icon` variant 与 `data-slot="button"`；这样保留 React Flow 行为，同时由 shadcn 原生规则负责整体圆角、
+内部连接边、focus 和 disabled 状态。方向必须通过 `Controls orientation` 传入，并以 React Flow 实际输出的 `.horizontal` / `.vertical` class 作为 Chrome
+适配 selector；`Controls` 不转发任意 `data-*` 属性，不能依赖调用方添加的 `data-orientation` 或 `data-slot`。
 
 React Flow 没有提供的通用应用控件可以组合在 `Panel` 中，例如 Display Mode 使用共享 shadcn/Base UI `ToggleGroup`。这类 primitive 需要放在
 `[data-canvas-control-scope]` 内，避免接受节点字段网格的紧凑归一化。
