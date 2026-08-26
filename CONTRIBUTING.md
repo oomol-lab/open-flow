@@ -89,7 +89,8 @@ change touches.
 - Put exact serialized and protocol contracts in their technical references under
   [docs/control](docs/control/contracts/control-api.md) and
   [docs/distribution](docs/distribution/command-artifact.md). Implementation history stays in Git.
-- Keep [README.md](README.md) and [README.zh-CN.md](README.zh-CN.md) in sync when changing either.
+- Keep [README.md](README.md) and the translated READMEs under `docs/README.<locale>.md` in sync
+  when changing any of them.
 
 ## Commits and Pull Requests
 

@@ -4,11 +4,11 @@
 
 **在画布上搭工作流，需要时直接写代码，最后部署到自己的环境。**
 
-[English](README.md) | 简体中文
+[English](../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Русский](README.ru.md) | [Français](README.fr.md)
 
 [![CI](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml/badge.svg)](https://github.com/oomol-lab/open-flow/actions/workflows/ci.yaml)
 [![npm](https://img.shields.io/npm/v/%40oomol-lab%2Fopen-flow/next?label=%40oomol-lab%2Fopen-flow)](https://www.npmjs.com/package/@oomol-lab/open-flow)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../LICENSE)
 ![Node.js 26](https://img.shields.io/badge/Node.js-26-339933)
 ![Bun 1.4](https://img.shields.io/badge/Bun-1.4-000000)
 
@@ -19,9 +19,9 @@ TypeScript，直接运行和调试 Flow，再把它发布成持续工作的自�
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="./docs/assets/light.png">
-    <img alt="Open Flow Workbench 中正在运行的 Hacker News 工作流" src="./docs/assets/light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="assets/light.png">
+    <img alt="Open Flow Workbench 中正在运行的 Hacker News 工作流" src="assets/light.png">
   </picture>
 </p>
 
@@ -81,7 +81,7 @@ docker run --rm \
 时会拒绝执行，不会退回到来源不明的服务。
 
 生产环境所需的配置、TLS、健康检查、数据持久化、备份和资源限制，参见
-[Server 部署文档](docs/server/container-delivery.md) 和 [SECURITY.md](SECURITY.md#hardening-your-deployment) 中的加固清单。
+[Server 部署文档](server/container-delivery.md) 和 [SECURITY.md](../SECURITY.md#hardening-your-deployment) 中的加固清单。
 
 ## 接入 Connector
 
@@ -96,7 +96,7 @@ OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN=https://connector.example.com
 
 runtime origin 是 Server 访问 Connector 的地址，console origin 是用户浏览器打开 Connector Console 授权账号的地址。Provider Trigger
 定义随 Open Flow 内置，不需要额外注册。Integration callback 的配置和各 origin 的约束参见
-[配置说明](docs/server/container-delivery.md#4-配置)。
+[配置说明](server/container-delivery.md#4-配置)。
 
 ## 一套产品，多种部署
 
@@ -105,14 +105,14 @@ Project 格式，也不会在请求失败时暗中切换后端。
 
 仓库主要包含：
 
-- [`packages/open-flow`](packages/open-flow)：公开的 `@oomol-lab/open-flow` npm 包，提供 Authoring、Execution、Trigger、Control
+- [`packages/open-flow`](../packages/open-flow)：公开的 `@oomol-lab/open-flow` npm 包，提供 Authoring、Execution、Trigger、Control
   API、Conformance 和 Workbench Runtime 入口；
-- [`packages/command`](packages/command)：`oo flow` 命令运行时和交付给 [oo CLI](https://github.com/oomol-lab/oo-cli) 的不可变
+- [`packages/command`](../packages/command)：`oo flow` 命令运行时和交付给 [oo CLI](https://github.com/oomol-lab/oo-cli) 的不可变
   Command Artifact；
-- [`apps/server`](apps/server)：可自行部署的 Workbench、Control API、SQLite 存储、Trigger Scheduler 和隔离的 JavaScript Runtime。
+- [`apps/server`](../apps/server)：可自行部署的 Workbench、Control API、SQLite 存储、Trigger Scheduler 和隔离的 JavaScript Runtime。
 
-长期成立的产品模型记录在[产品与架构边界](docs/architecture.md)中，HTTP 接口定义参见
-[Control API 文档](docs/control/contracts/control-api.md)。
+长期成立的产品模型记录在[产品与架构边界](architecture.md)中，HTTP 接口定义参见
+[Control API 文档](control/contracts/control-api.md)。
 
 ## 从源码开发
 
@@ -138,20 +138,20 @@ bun run build
 ```
 
 改动发布包或 CLI 时加跑 `bun run test:package`；本机有 Docker 时运行 `bun run test:docker`，检查发布镜像、隔离运行时、Workbench、正常退出和
-SQLite volume 恢复。不要在仓库根目录直接运行 `bun test`，它会绕过各工作区的测试脚本。完整的开发规则见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+SQLite volume 恢复。不要在仓库根目录直接运行 `bun test`，它会绕过各工作区的测试脚本。完整的开发规则见 [CONTRIBUTING.md](../CONTRIBUTING.md)。
 
 ## 文档
 
-可以从[文档索引](docs/README.md)开始，常用内容包括：
+可以从[文档索引](README.md)开始，常用内容包括：
 
-- [产品与架构边界](docs/architecture.md)
-- [Control API](docs/control/contracts/control-api.md)
-- [Command Artifact 分发合同](docs/distribution/command-artifact.md)
-- [Workbench 与 Designer 前端注意事项](docs/authoring/frontend-ui.md)
-- [Server 部署](docs/server/container-delivery.md)
-- [参与贡献](CONTRIBUTING.md)
-- [行为准则](CODE_OF_CONDUCT.md)
-- [安全政策](SECURITY.md)
+- [产品与架构边界](architecture.md)
+- [Control API](control/contracts/control-api.md)
+- [Command Artifact 分发合同](distribution/command-artifact.md)
+- [Workbench 与 Designer 前端注意事项](authoring/frontend-ui.md)
+- [Server 部署](server/container-delivery.md)
+- [参与贡献](../CONTRIBUTING.md)
+- [行为准则](../CODE_OF_CONDUCT.md)
+- [安全政策](../SECURITY.md)
 
 ## 相关项目
 
@@ -161,14 +161,14 @@ SQLite volume 恢复。不要在仓库根目录直接运行 `bun test`，它会�
 
 ## 参与贡献
 
-欢迎提交 Issue 和 Pull Request。开发环境、仓库规则和提交前需要运行的检查见 [CONTRIBUTING.md](CONTRIBUTING.md)。参与本项目需遵守
-[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。
+欢迎提交 Issue 和 Pull Request。开发环境、仓库规则和提交前需要运行的检查见 [CONTRIBUTING.md](../CONTRIBUTING.md)。参与本项目需遵守
+[CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)。
 
 ## 安全
 
 请通过 [GitHub 私密漏洞报告](https://github.com/oomol-lab/open-flow/security/advisories/new) 报告安全问题，不要提交公开
-Issue。[SECURITY.md](SECURITY.md) 说明了受支持的版本、披露流程、报告范围以及自行部署时的加固建议。
+Issue。[SECURITY.md](../SECURITY.md) 说明了受支持的版本、披露流程、报告范围以及自行部署时的加固建议。
 
 ## 许可证
 
-[Apache-2.0](LICENSE)。打包资源涉及的第三方声明见 [NOTICE](NOTICE)。
+[Apache-2.0](../LICENSE)。打包资源涉及的第三方声明见 [NOTICE](../NOTICE)。
