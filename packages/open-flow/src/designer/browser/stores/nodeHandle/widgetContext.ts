@@ -25,7 +25,7 @@ export interface WidgetContextConfig {
   readonly inout: InOut
   /** If not set, will derive from `inout`. */
   readonly handlePosition?: InOut
-  /** Set `false` to disable `any`, `anyOf`, and `binary` types. */
+  /** Set `false` to disable `any`, `anyOf`, `allOf`, `oneOf`, and `binary` types. */
   readonly enableAny?: boolean
   /** Enable schema description editor. */
   readonly enableSchemaDesc?: boolean

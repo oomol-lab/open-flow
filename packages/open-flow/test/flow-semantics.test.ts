@@ -249,10 +249,17 @@ export default () => value`,
 
   it('validates Variable bindings as exclusive unconstrained string inputs', async () => {
     await expect(validateFlow(variableRevision({ type: 'string' }), engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
+    await expect(validateFlow(variableRevision({ type: ['string', 'null'] }), engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
     await expect(validateFlow(variableRevision({}), engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
 
     const restricted = await validateFlow(variableRevision({ enum: ['allowed'], type: 'string' }), engine)
     expect(restricted.diagnostics).toEqual([expect.objectContaining({ code: 'graph.variable-incompatible' })])
+
+    const restrictedUnion = await validateFlow(variableRevision({ pattern: '^allowed$', type: ['string', 'null'] }), engine)
+    expect(restrictedUnion.diagnostics).toEqual([expect.objectContaining({ code: 'graph.variable-incompatible' })])
+
+    const numberUnion = await validateFlow(variableRevision({ type: ['number', 'null'] }), engine)
+    expect(numberUnion.diagnostics).toEqual([expect.objectContaining({ code: 'graph.variable-incompatible' })])
 
     const connection = variableRevision({ type: 'string' })
     const connectionResult = await validateFlow(

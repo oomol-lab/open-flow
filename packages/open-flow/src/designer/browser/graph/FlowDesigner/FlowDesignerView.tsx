@@ -408,7 +408,12 @@ function variableInputs(nodes: readonly FlowDesignerViewNode[]): ReadonlyMap<str
   for (const node of nodes) {
     if (node.kind == 'comment') continue
     for (const input of node.inputs) {
-      if (input.variableCompatible) inputs.set(`${node.id}\0${input.handle}`, { compatible: true, ...(input.variable == null ? {} : { name: input.variable }) })
+      if (input.variableCompatible || input.variable != null) {
+        inputs.set(`${node.id}\0${input.handle}`, {
+          compatible: input.variableCompatible ?? false,
+          ...(input.variable == null ? {} : { name: input.variable }),
+        })
+      }
     }
   }
   return inputs

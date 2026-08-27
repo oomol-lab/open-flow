@@ -226,6 +226,19 @@ describe('FlowDesignerView model synchronization', () => {
     store.dispose()
   })
 
+  it('keeps an incompatible Variable binding available for clearing', () => {
+    const onChangeInputVariable = vi.fn()
+    const value = model([task([{ handle: 'value', jsonSchema: { type: 'number' }, variable: 'OLD_TOKEN', variableCompatible: false }])])
+    const view = FlowDesignerView(props(value, { onChangeInputVariable })) as React.ReactElement<FlowDesignerProps>
+    const store = view.props.flowDesignerStore
+
+    expect(store.$.variableInputs.value.get('target\0value')).toEqual({ compatible: false, name: 'OLD_TOKEN' })
+    store.onChangeInputVariable?.('target', 'value', undefined)
+
+    expect(onChangeInputVariable).toHaveBeenCalledWith('target', 'value', undefined)
+    store.dispose()
+  })
+
   it('restores editable handle controls for inline code Tasks only', async () => {
     const onChangeTaskPorts = vi.fn()
     const editable = { ...task([{ handle: 'value', jsonSchema: {} }]), editablePorts: true }

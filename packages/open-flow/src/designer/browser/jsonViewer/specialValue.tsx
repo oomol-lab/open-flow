@@ -13,7 +13,7 @@ export const SpecialValue = ({ type, value }: SpecialValueProps): JSX.Element =>
   let title = type
   let icon = ''
 
-  if (type === 'bin') {
+  if (type == 'bin') {
     title = t('jsonViewer.bin')
     value = `${title}…`
     icon = 'i-carbon:transform-binary'

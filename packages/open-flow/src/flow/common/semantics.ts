@@ -471,6 +471,9 @@ function schemaAssignable(sourceSchema: JsonValue, targetSchema: JsonValue): boo
 }
 
 export function variableInputCompatible(jsonSchema: JsonValue): boolean {
+  const schema = schemaObject(jsonSchema)
+  const types = schemaList(schema?.type)
+  if (schema != null && types?.includes('string')) return schemaAssignable({ type: 'string' }, { ...schema, type: 'string' })
   return schemaAssignable({ type: 'string' }, jsonSchema)
 }
 

@@ -132,7 +132,7 @@ Flow、Revision、Publication、Run、RunEvent、Variable、Trigger binding、Pr
 verifier 只属于 Trigger runtime state，不进入 Flow Revision、Workbench 或 RunEvent。当前只承诺 quiesced backup：先停止入口流量并让容器正常退出，
 再备份 volume；恢复时把完整数据目录挂载到相同路径后启动一个 Server 容器。
 
-Variable value 以明文存在于 SQLite 主文件、WAL、SHM 和备份中，并可由已认证 Operator 通过 Control API 和管理面读取。它不是加密存储或
+Variable value 以明文存在于 SQLite 主文件、WAL 和备份中，并可由已认证 Operator 通过 Control API 和管理面读取。它不是加密存储或
 不可导出的 Secret Manager；如果其中保存敏感配置，部署者必须把数据卷、备份、Operator token 和管理网络视为同一信任边界。
 
 不能只复制主 `.sqlite` 文件而遗漏同目录中的 WAL/SHM 状态，也不能在一个仍写入的容器和一个恢复容器之间共享数据卷。Connector 持久化是外部服务自己的备份边界，不属于 `/data/open-flow`。

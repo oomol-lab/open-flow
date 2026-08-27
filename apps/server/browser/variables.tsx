@@ -4,7 +4,7 @@ import type { FormEvent, ReactElement } from 'react'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { validVariableName } from '@oomol-lab/open-flow/flow-change'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslate } from 'val-i18n-react'
 
@@ -22,16 +22,21 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
   const [name, setName] = useState('')
   const [value, setValue] = useState('')
   const [removing, setRemoving] = useState<string>()
+  const loadSequence = useRef(0)
   const load = useCallback(async (): Promise<void> => {
+    const sequence = ++loadSequence.current
     setLoading(true)
     setFailed(false)
     try {
-      setVariables((await client.listVariables()).variables)
+      const result = await client.listVariables()
+      if (sequence != loadSequence.current) return
+      setVariables(result.variables)
     } catch (error) {
+      if (sequence != loadSequence.current) return
       setFailed(true)
       toast.error(error instanceof Error ? error.message : t('variables.loadFailed'))
     } finally {
-      setLoading(false)
+      if (sequence == loadSequence.current) setLoading(false)
     }
   }, [client, t])
 
@@ -39,7 +44,10 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
     void load()
     const refresh = (): void => void load()
     globalThis.addEventListener('focus', refresh)
-    return () => globalThis.removeEventListener('focus', refresh)
+    return () => {
+      loadSequence.current += 1
+      globalThis.removeEventListener('focus', refresh)
+    }
   }, [load])
 
   const visible = useMemo(() => {

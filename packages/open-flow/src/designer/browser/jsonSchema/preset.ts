@@ -300,12 +300,12 @@ export function typeOfSchema(source: unknown): WidgetType {
 }
 
 export function isAny(schemaType: WidgetType): boolean {
-  return schemaType === 'any'
+  return schemaType == 'any'
 }
 
 // These schema kinds can be overridden at a node input.
 export function isUndecidable(schemaType: WidgetType): boolean {
-  return schemaType === 'any' || schemaType === 'anyOf' || schemaType === 'oneOf' || schemaType === 'allOf'
+  return schemaType == 'any' || schemaType == 'anyOf' || schemaType == 'oneOf' || schemaType == 'allOf'
 }
 
 /**
