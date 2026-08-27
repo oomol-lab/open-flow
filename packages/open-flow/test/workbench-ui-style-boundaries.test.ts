@@ -164,6 +164,18 @@ test('keeps Resource Browser primitives on shared visual ownership', async () =>
   assert.doesNotMatch(rowRules.at(-1)![1]!, /background:|color:/)
 })
 
+test('keeps the public session gate on shared form primitives', async () => {
+  const source = await readFile(new URL('src/workbench/browser/runtime/openFlowWorkbench.tsx', packageRoot), 'utf8')
+
+  assert.match(source, /export function OpenFlowSessionGate/)
+  assert.match(source, /from '\.\.\/\.\.\/\.\.\/ui\/browser\/button\.tsx'/)
+  assert.match(source, /from '\.\.\/\.\.\/\.\.\/ui\/browser\/field\.tsx'/)
+  assert.match(source, /from '\.\.\/\.\.\/\.\.\/ui\/browser\/input\.tsx'/)
+  assert.match(source, /from '\.\.\/\.\.\/\.\.\/ui\/browser\/spinner\.tsx'/)
+  assert.match(source, /className="open-flow-workbench"/)
+  assert.doesNotMatch(source, /session-(?:gate|form|error)/)
+})
+
 test('keeps Designer node controls in the compact root normalization', async () => {
   const [designerRootStyles, toggleGroup] = await Promise.all([
     readFile(new URL('src/designer/browser/styles/root.scss', packageRoot), 'utf8'),

@@ -148,6 +148,8 @@ import { OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
 import '@oomol-lab/open-flow/workbench.css'
 \`\`\`
 
+Hosts can render \`OpenFlowSessionGate\` before authentication to keep login, retry, pending, and error states on the same shared shadcn composition as the Workbench.
+
 Deployment chrome can import \`@oomol-lab/open-flow/theme.css\` and apply \`open-flow-theme\` plus \`data-theme\` to its root.
 
 The Open Flow command and hosted Workbench applications are distributed separately.

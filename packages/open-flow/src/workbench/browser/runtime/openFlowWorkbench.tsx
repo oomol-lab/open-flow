@@ -1,10 +1,14 @@
 import './styles.css'
-import type { ReactElement } from 'react'
+import type { FormEvent, ReactElement } from 'react'
 import type { WorkbenchHost, WorkbenchLanguage, WorkbenchLocation, WorkbenchNavigationOptions, WorkbenchPreferences, WorkbenchTheme } from './contract.ts'
 
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
+import { Button } from '../../../ui/browser/button.tsx'
+import { Field, FieldError, FieldGroup, FieldLabel } from '../../../ui/browser/field.tsx'
+import { Input } from '../../../ui/browser/input.tsx'
+import { Spinner } from '../../../ui/browser/spinner.tsx'
 import { WorkbenchClient } from './api.ts'
 import { createI18n } from './i18n.ts'
 import { NavigationStore } from './navigation.ts'
@@ -12,6 +16,81 @@ import { FlowBrowser } from './shell/resourceBrowser.tsx'
 import { WorkbenchStore } from './stores/workbenchStore.ts'
 
 const FlowWorkspace = lazy(() => import('./flowWorkspace.tsx'))
+
+export function OpenFlowSessionGate({
+  action,
+  description,
+  error,
+  onSubmit,
+  onTokenChange,
+  pending = false,
+  title,
+  token,
+  tokenLabel,
+}: {
+  readonly action?: string | undefined
+  readonly description: string
+  readonly error?: string | undefined
+  readonly onSubmit?: ((event: FormEvent<HTMLFormElement>) => void) | undefined
+  readonly onTokenChange?: ((value: string) => void) | undefined
+  readonly pending?: boolean
+  readonly title: string
+  readonly token?: string | undefined
+  readonly tokenLabel?: string | undefined
+}): ReactElement {
+  const hasToken = token != null && tokenLabel != null && onTokenChange != null
+  const tokenValue = token ?? ''
+  const fields = (
+    <>
+      <header className="flex flex-col gap-1.5">
+        <h1 className="text-lg font-semibold">{title}</h1>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </header>
+      {hasToken && (
+        <FieldGroup>
+          <Field data-invalid={error != null}>
+            <FieldLabel htmlFor="operator-token">{tokenLabel}</FieldLabel>
+            <Input autoComplete="username" name="username" type="hidden" value="operator" readOnly />
+            <Input
+              autoComplete="current-password"
+              aria-invalid={error != null}
+              autoFocus
+              id="operator-token"
+              name="operator-token"
+              onChange={(event) => onTokenChange?.(event.target.value)}
+              spellCheck={false}
+              type="password"
+              value={tokenValue}
+            />
+            {error != null && <FieldError>{error}</FieldError>}
+          </Field>
+        </FieldGroup>
+      )}
+      {action != null && onSubmit != null && (
+        <Button disabled={pending || (hasToken && tokenValue.length == 0)} type="submit">
+          {pending && <Spinner aria-label={action} data-icon="inline-start" />}
+          {action}
+        </Button>
+      )}
+      {pending && action == null && <Spinner aria-label={description} />}
+    </>
+  )
+  return (
+    <main className="open-flow-workbench">
+      <div className="grid h-full place-items-center p-6">
+        {onSubmit == null ? (
+          <section aria-busy={pending} className="flex w-full max-w-sm flex-col gap-4">
+            {fields}
+          </section>
+        ) : (
+          <form aria-busy={pending} className="flex w-full max-w-sm flex-col gap-4" onSubmit={onSubmit}>
+            {fields}
+          </form>
+        )}
+      </div>
+    </main>
+  )
+}
 
 function NotificationBridge({ host, store }: { readonly host: WorkbenchHost; readonly store: WorkbenchStore }): null {
   const notice = useVal(store.$.notice)

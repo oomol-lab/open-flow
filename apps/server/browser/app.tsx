@@ -1,7 +1,7 @@
 import type { WorkbenchLanguage, WorkbenchLocation, WorkbenchNavigationOptions, WorkbenchNotification, WorkbenchTheme } from '@oomol-lab/open-flow/workbench'
 import type { FormEvent, ReactElement } from 'react'
 
-import { OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
+import { OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
 import { useEffect, useMemo, useState } from 'react'
 import { Toaster, toast } from 'sonner'
 import { createBrowserHost } from './host.ts'
@@ -189,38 +189,26 @@ export function App(): ReactElement {
           />
         </div>
       ) : (
-        <main className="session-gate">
-          {session.kind == 'checking' ? (
-            <p>{t.checking}</p>
-          ) : (
-            <form className="session-form" onSubmit={(event) => void signIn(event)}>
-              <strong>Open Flow Server</strong>
-              <p>{sessionMessage}</p>
-              {session.configured === false || session.configured == null ? (
-                <button onClick={() => void checkSession()} type="button">
-                  {t.retry}
-                </button>
-              ) : (
-                <>
-                  <input autoComplete="username" name="username" type="hidden" value="operator" />
-                  <label htmlFor="operator-token">{t.token}</label>
-                  <input
-                    autoComplete="current-password"
-                    autoFocus
-                    id="operator-token"
-                    onChange={(event) => setToken(event.target.value)}
-                    type="password"
-                    value={token}
-                  />
-                  {session.error == 'invalid' ? <span className="session-error">{t.invalid}</span> : null}
-                  <button disabled={token.length == 0 || submitting} type="submit">
-                    {t.signIn}
-                  </button>
-                </>
-              )}
-            </form>
-          )}
-        </main>
+        <OpenFlowSessionGate
+          action={session.kind == 'checking' ? undefined : session.configured === false || session.configured == null ? t.retry : t.signIn}
+          description={session.kind == 'checking' ? t.checking : sessionMessage}
+          error={session.kind == 'signed-out' && session.error == 'invalid' ? t.invalid : undefined}
+          onSubmit={
+            session.kind == 'checking'
+              ? undefined
+              : session.configured === false || session.configured == null
+                ? (event) => {
+                    event.preventDefault()
+                    void checkSession()
+                  }
+                : (event) => void signIn(event)
+          }
+          onTokenChange={session.kind == 'signed-out' && session.configured !== false ? setToken : undefined}
+          pending={session.kind == 'checking' || submitting}
+          title="Open Flow Server"
+          token={session.kind == 'signed-out' && session.configured !== false ? token : undefined}
+          tokenLabel={session.kind == 'signed-out' && session.configured !== false ? t.token : undefined}
+        />
       )}
       <Toaster
         closeButton
