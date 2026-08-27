@@ -311,16 +311,8 @@
     line-height: 17px;
   }
 
-  .inspector-form [data-slot='field-label'] {
-    color: var(--ui-muted-foreground);
-    font-size: 11px;
-    line-height: 16px;
-  }
-
   .inspector-form textarea {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 11px;
-    line-height: 17px;
   }
 
   .inspector-form [data-slot='field-group'] {
@@ -331,16 +323,6 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-  }
-
-  .checkbox-field {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center;
-  }
-
-  .checkbox-field input {
-    margin: 0;
   }
 
   .form-actions {

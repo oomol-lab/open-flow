@@ -124,7 +124,7 @@ React Flow 画布外围通过固定的 `--xy-*` 映射消费共享 UI、node 和
 
 ## 共享 popup 动画与 Designer 例外
 
-共享 Dialog、Select、DropdownMenu、Popover 和 Combobox 的 Popup 必须统一使用语义 popover surface、`tw-animate-css` 的 open/closed 动画，并同时提供
+共享 Dialog、Select、DropdownMenu、Popover 和 Tooltip 的 Popup 必须统一使用语义 surface、`tw-animate-css` 的 open/closed 动画，并同时提供
 `motion-reduce:animate-none` 与 `motion-reduce:transition-none`。不要在 feature stylesheet 重复声明同类淡入、缩放或关闭动画。Progress Indicator 只允许
 过渡实际变化的 `width`；不要使用会让颜色、布局和未来新增属性一起进入动画的 `transition-all`。
 

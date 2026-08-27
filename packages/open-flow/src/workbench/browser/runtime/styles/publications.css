@@ -615,7 +615,7 @@
   }
 
   .publication-table td > code,
-  .publication-table td > span,
+  .publication-table td > span:not(.publication-operation),
   .publication-table td > time {
     display: block;
     overflow: hidden;
@@ -623,7 +623,7 @@
     white-space: nowrap;
   }
 
-  .publication-table td > span,
+  .publication-table td > span:not(.publication-operation),
   .publication-table td > time {
     margin-top: 4px;
     color: var(--ui-muted-foreground);
@@ -631,10 +631,12 @@
   }
 
   .publication-operation {
+    display: flex;
+    align-items: center;
     gap: 7px;
-    margin: 0 0 4px !important;
-    color: var(--ui-foreground) !important;
-    font-size: 11px !important;
+    margin: 0 0 4px;
+    color: var(--ui-foreground);
+    font-size: 11px;
     font-weight: 500;
   }
 

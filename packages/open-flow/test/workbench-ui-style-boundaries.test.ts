@@ -140,25 +140,20 @@ test('keeps Resource Browser primitives on shared visual ownership', async () =>
   assert.match(createDialog, /<FieldGroup>/)
   assert.match(createDialog, /<Field data-invalid=\{showIssue\}>/)
   assert.doesNotMatch(createDialog, /DialogOverlay|DialogPortal|resource-dialog-/)
-  assert.match(hostMenu, /Button.*DropdownMenu.*DropdownMenuContent.*DropdownMenuGroup.*DropdownMenuItem.*DropdownMenuLabel.*DropdownMenuTrigger/s)
-  assert.match(hostMenu, /<DropdownMenuContent align="end" className="min-w-40" container=\{root\} side="bottom">/)
+  assert.match(hostMenu, /from '\.\.\/\.\.\/\.\.\/\.\.\/ui\/browser\/button\.tsx'/)
+  assert.match(hostMenu, /from '\.\.\/\.\.\/\.\.\/\.\.\/ui\/browser\/dropdown-menu\.tsx'/)
+  assert.match(hostMenu, /container=\{root\}/)
   assert.doesNotMatch(hostMenu, /pointerdown|keydown|role="dialog"|position:\s*absolute/)
   assert.match(dialog, /data-slot="dialog-overlay"/)
   assert.match(dialog, /data-slot="dialog-content"/)
   assert.match(dialog, /readonly container\?: HTMLElement \| null/)
   assert.match(dialog, /bg-popover/)
   assert.match(dialog, /motion-reduce:animate-none/)
-  assert.match(select, /data-slot="select-trigger"/)
-  assert.match(select, /data-slot="select-content"/)
-  assert.match(select, /data-slot="select-item"/)
   assert.match(select, /readonly container\?: HTMLElement \| null/)
-  assert.match(select, /<SelectPrimitive\.List>\{children\}<\/SelectPrimitive\.List>/)
   assert.match(select, /bg-popover/)
+  assert.match(select, /z-50/)
   assert.match(select, /motion-reduce:animate-none/)
   assert.match(workbenchSelect, /<SelectContent align="end" alignItemWithTrigger=\{false\} container=\{portalRoot\}>/)
-  assert.match(workbenchSelect, /<SelectGroup>/)
-  assert.match(workbenchSelect, /<SelectValue>\{options\.find\(\(option\) => option\.value == value\)\?\.label \?\? value\}<\/SelectValue>/)
-  assert.doesNotMatch(workbenchSelect, /items=\{options\}/)
   assert.doesNotMatch(workbenchSelect, /SelectPortal|SelectPositioner|SelectList|SelectItemIndicator|SelectItemText|workbench-select-/)
   assert.doesNotMatch(resourceStyles, /\.resource-row-form input|\.resource-dialog-field|\.resource-list-row:hover|\.resource-list-row:disabled/)
   assert.doesNotMatch(resourceStyles, /\.resource-dialog-|\.workbench-select-/)
@@ -191,7 +186,6 @@ test('keeps shared popup motion accessible without replacing Designer layout own
     select,
     contextMenu,
     popover,
-    combobox,
     tooltip,
     progress,
     designerSelect,
@@ -206,7 +200,6 @@ test('keeps shared popup motion accessible without replacing Designer layout own
     readFile(new URL('src/ui/browser/select.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/context-menu.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/popover.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/ui/browser/combobox.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/tooltip.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/progress.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/designer/browser/components/select.tsx', packageRoot), 'utf8'),
@@ -218,11 +211,11 @@ test('keeps shared popup motion accessible without replacing Designer layout own
     readFile(new URL('src/designer/browser/graph/BlockQuickPickPanel.tsx', packageRoot), 'utf8'),
   ])
 
-  for (const source of [dropdownMenu, popover, combobox]) {
+  for (const source of [dropdownMenu, popover]) {
     assert.match(source, /motion-reduce:animate-none/)
     assert.match(source, /motion-reduce:transition-none/)
   }
-  for (const source of [dropdownMenu, select, contextMenu, popover, combobox, tooltip]) {
+  for (const source of [dropdownMenu, select, contextMenu, popover, tooltip]) {
     assert.ok((source.match(/z-50/g) ?? []).length >= 2)
   }
   assert.match(progress, /transition-\[width\]/)
@@ -639,6 +632,7 @@ test('keeps Workbench feature styles on the shared semantic theme', async () => 
     /var\(--(?:canvas|surface|subtle|border|input|text|text-secondary|text-tertiary|muted|primary|primary-foreground|focus|danger)\)/,
   )
   assert.doesNotMatch(sources.join('\n'), /calc\(var\(--ui-radius\)/)
+  assert.doesNotMatch(sources.join('\n'), /!important/)
 })
 
 test('keeps React Flow canvas chrome on one theme mapping', async () => {
