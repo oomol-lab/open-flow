@@ -20,6 +20,7 @@ import type {
   TriggerNode,
   TriggerSchedule,
 } from '@oomol-lab/open-flow/flow-change'
+import type { UiLanguage } from '@oomol-lab/open-flow/localization'
 
 import { ApiError, ControlClient } from '@oomol-lab/open-flow/control-api'
 import { resourceNameIssue, resourceNameMaxLength } from '@oomol-lab/open-flow/flow-change'
@@ -32,7 +33,7 @@ export interface CommandHost {
 
 export interface Runtime {
   readonly env: Readonly<Record<string, string | undefined>>
-  readonly language: 'en' | 'zh-CN'
+  readonly language: UiLanguage
   openUrl(url: string): Promise<void>
   readFile(path: string): Promise<string>
   readStdin(): Promise<string>
@@ -150,10 +151,6 @@ export const publicationPageLimit = 100
 export const runPageLimit = 100
 const terminalRunStatuses = new Set<RunStatus>(['canceled', 'completed', 'failed', 'indeterminate'])
 const runStatuses: ReadonlySet<RunStatus> = new Set(runStatusValues)
-
-export function localized(language: Runtime['language'], english: string, chinese: string): string {
-  return language == 'zh-CN' ? chinese : english
-}
 
 export function parseArguments(args: readonly string[]): ParsedArguments {
   const positionals: string[] = []

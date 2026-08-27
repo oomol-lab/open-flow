@@ -8,6 +8,7 @@ import { lazy, Suspense, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { resourceNameIssue, resourceNameMaxLength } from '../../../../flow/common/change.ts'
+import { uiLanguageNames, uiLanguages } from '../../../../localization/common/languages.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
@@ -19,6 +20,8 @@ import { followWorkbenchLink } from '../navigationLink.ts'
 import { WorkbenchSelect } from './workbenchSelect.tsx'
 
 const CreateResourceDialog = lazy(() => import('./createResourceDialog.tsx'))
+
+const languageOptions = uiLanguages.map((language) => ({ label: uiLanguageNames[language], value: language }))
 
 interface LanguageSelectProps {
   readonly language: WorkbenchLanguage
@@ -35,10 +38,7 @@ export function LanguageSelect({ language, onLanguageChange }: LanguageSelectPro
       <WorkbenchSelect
         ariaLabel={t('language.label')}
         onValueChange={(value) => onLanguageChange(value as WorkbenchLanguage)}
-        options={[
-          { label: t('language.english'), value: 'en' },
-          { label: t('language.simplifiedChinese'), value: 'zh-CN' },
-        ]}
+        options={languageOptions}
         portalRoot={portalRoot}
         value={language}
       />

@@ -1,0 +1,7 @@
+{
+  "help": {
+    "usage": "Utilisation : {{command}}",
+    "title": "Commandes Open Flow",
+    "options": "Options : --json, --cursor <cursor>, --limit <count>"
+  }
+}

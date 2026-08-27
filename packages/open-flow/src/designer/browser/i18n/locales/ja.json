@@ -1,0 +1,655 @@
+{
+  "addNode": {
+    "comment": "コメント",
+    "condition": "条件",
+    "connectorActions": "Connector アクション",
+    "connectorConnections": "Connection {{count}} 件",
+    "connectorNewConnection": "新しい Connection",
+    "connectorNoActiveConnection": "利用可能な Connection がありません",
+    "connectorPopupBlocked": "接続ウィンドウがブロックされました。ポップアップを許可して再試行してください。",
+    "connectorUnavailable": "このプロジェクトホストでは Connector アクションを利用できません。",
+    "llmChat": "LLM チャット",
+    "llmStructured": "LLM 構造化出力",
+    "scriptletUnsupported": "このプロジェクトホストではスクリプトレットの作成に対応していません。",
+    "sharedBlocks": "タスクと Subflow",
+    "triggers": "Trigger",
+    "value": "値"
+  },
+  "blockEditor": {
+    "addDefaultAdditionalInput": "デフォルトの追加入力を追加",
+    "addDefaultAdditionalOutput": "デフォルトの追加出力を追加",
+    "additionalInputs": "追加入力",
+    "additionalInputsHelp": {
+      "allow": "任意の追加入力を許可",
+      "disallow": "追加入力を許可しない",
+      "restrict": "指定した追加入力のみ許可"
+    },
+    "additionalOutputs": "追加出力",
+    "additionalOutputsHelp": {
+      "allow": "任意の追加出力を許可",
+      "disallow": "追加出力を許可しない",
+      "restrict": "指定した追加出力のみ許可"
+    },
+    "configHeader": "ブロック設定",
+    "defaultAdditionalInputs": "デフォルトの追加入力",
+    "defaultAdditionalOutputs": "デフォルトの追加出力",
+    "description": "説明",
+    "executor": {
+      "action": "アクション",
+      "connection": "Connection",
+      "connectionAccount": "アカウント",
+      "connectionDetails": "現在の Connection",
+      "connectionId": "Connection ID",
+      "connectionStatus": "状態",
+      "connectionStatus_active": "有効",
+      "connectionStatus_disconnected": "切断済み",
+      "connectionStatus_error": "エラー",
+      "connectionStatus_reauth_required": "再認証が必要",
+      "connectionUnresolved": "未解決",
+      "entry": "エントリー",
+      "function": "関数名",
+      "mode": "モード",
+      "mode_chat": "チャット",
+      "mode_json": "JSON",
+      "name": "名前",
+      "title": "エグゼキューター"
+    },
+    "folder": "フォルダー名",
+    "icon": "アイコン",
+    "metadata": "基本情報",
+    "nodeTitlePlaceholder": "タイトルを入力…",
+    "private": "はい",
+    "privateField": "プライベート",
+    "privateHelp": "共有ブロックをプライベートに設定すると、AI や他のユーザーが使用できないことを示せます。",
+    "public": "いいえ",
+    "runningConfig": {
+      "concurrency": "並列数",
+      "progressWeight": "進捗の重み",
+      "timeout": "タイムアウト",
+      "title": "実行設定"
+    },
+    "sourceNotFound": "ブロックのソースファイルが見つかりません",
+    "task": "ブロック名",
+    "taskHeader": "共有ブロックから",
+    "title": "タイトル"
+  },
+  "cancel": "キャンセル",
+  "clipboard": {
+    "copySuccess": "{{@}} 個のノードをコピーしました",
+    "copySuccess@1": "1 個のノードをコピーしました",
+    "pasteScriptletUnsupported": "このプロジェクトホストではスクリプトレットの貼り付けに対応していません。"
+  },
+  "comment": {
+    "editWithMarkdown": "Markdown で編集",
+    "preview": "プレビュー",
+    "source": "ソースを表示"
+  },
+  "components": {
+    "chooseColor": "色を選択",
+    "clear": "クリア",
+    "clearDateTime": "日付と時刻をクリア",
+    "colorValue": "カラー値",
+    "loading": "読み込み中",
+    "noMatching": "一致する項目がありません",
+    "numOptions": "選択肢 {{count}} 件",
+    "pickColorFromScreen": "画面から色を取得"
+  },
+  "trigger": {
+    "catalogEmpty": "一致する Trigger がありません",
+    "catalogEmptyHelp": "サービス名やイベント名で検索してください。",
+    "catalogUnavailable": "Provider Trigger カタログを利用できません",
+    "catalogUnavailableHelp": "組み込みの Trigger とプロジェクト内の既存の定義は引き続き利用できます。",
+    "configuration": "設定",
+    "configInvalid": "有効な設定値を入力してください。",
+    "connection": "アカウント",
+    "integrationSummary": "イベントを受信したとき",
+    "pollSchedule": "ポーリングスケジュール",
+    "pollScheduleHelp": "この Trigger が新しいイベントを確認する頻度を設定します。",
+    "scheduleCron": "Cron",
+    "scheduleDays": "日",
+    "scheduleEvery": "間隔",
+    "scheduleEveryDay": "{{value}} 日ごと",
+    "scheduleEveryHour": "{{value}} 時間ごと",
+    "scheduleEveryMinute": "{{value}} 分ごと",
+    "scheduleEveryMonth": "{{value}} か月ごと",
+    "scheduleEveryWeek": "{{value}} 週間ごと",
+    "scheduleExpression": "Cron 式",
+    "scheduleHours": "時間",
+    "scheduleInterval": "ポーリング間隔",
+    "scheduleMinutes": "分",
+    "scheduleMonths": "か月",
+    "scheduleTimezone": "タイムゾーン",
+    "scheduleType": "スケジュール種別",
+    "scheduleUnit": "間隔の単位",
+    "scheduleWeeks": "週間",
+    "scheduleMissing": "スケジュールが未設定です",
+    "summaryCron": "実行スケジュール",
+    "summaryIntegration": "イベントソース",
+    "summaryPoll": "ポーリングスケジュール",
+    "summaryWebhook": "リクエスト起動",
+    "webhookAddField": "フィールドを追加",
+    "webhookAddHeader": "レスポンスヘッダーを追加",
+    "webhookCustomType": "カスタムスキーマ",
+    "webhookDeleteField": "ペイロードフィールドを削除",
+    "webhookDeleteHeader": "レスポンスヘッダーを削除",
+    "webhookFieldName": "フィールド名",
+    "webhookFieldNameDuplicate": "フィールド名は重複できません。",
+    "webhookFieldNameRequired": "フィールド名を入力してください。",
+    "webhookFieldType": "型",
+    "webhookHeaderName": "レスポンスヘッダー名",
+    "webhookHeaders": "レスポンスヘッダー",
+    "webhookHeaderValue": "レスポンスヘッダーの値",
+    "webhookMethods": "許可するメソッド",
+    "webhookNoPayloadFields": "リクエストペイロードは空のオブジェクトを受け付けます。",
+    "webhookNoResponseBody": "レスポンスボディなし",
+    "webhookNullable": "null を許可",
+    "webhookOrigins": "許可するオリジン",
+    "webhookPayloadFields": "ペイロードフィールド",
+    "webhookRequest": "リクエスト",
+    "webhookResponse": "レスポンス",
+    "webhookResponseData": "レスポンスボディ",
+    "webhookStatus": "ステータスコード",
+    "webhookSummary": "HTTP リクエストを受信したとき",
+    "webhookDescription": "生成された HTTP エンドポイントで JSON オブジェクトを受信します。"
+  },
+  "condition": {
+    "addCondition": "条件を追加",
+    "configPanelTitle": "設定",
+    "default": "デフォルト",
+    "defaultDescription": "デフォルトの条件",
+    "defaultHelp": "他のどの条件にも一致しない場合に、この分岐を実行します",
+    "deleteCondition": "条件を削除",
+    "handleKeyTitle": "Handle 名",
+    "handleLogicalTitle": "論理演算",
+    "inputHelp": "最初に一致した条件の出力 Handle が、1 番目の入力 Handle のデータを出力します",
+    "label": "条件",
+    "logical": {
+      "AND": "かつ (AND)",
+      "OR": "または (OR)"
+    },
+    "operator": {
+      "!=": "≠",
+      "<": "<",
+      "<=": "≤",
+      "==": "=",
+      ">": ">",
+      ">=": "≥",
+      "contains": "含む",
+      "ends_with": "で終わる",
+      "has_key": "キーを含む",
+      "has_value": "値を含む",
+      "is_empty": "空である",
+      "is_false": "false である",
+      "is_not_empty": "空でない",
+      "is_not_null": "null でない",
+      "is_null": "null である",
+      "is_true": "true である",
+      "not_contains": "含まない",
+      "not_has_key": "キーを含まない",
+      "not_has_value": "値を含まない",
+      "starts_with": "で始まる"
+    },
+    "title": "条件の出力 Handle",
+    "toggleDefault": "デフォルトの条件"
+  },
+  "contextMenu": {
+    "addNode": "ノードを追加",
+    "empty": "一致するノードがありません",
+    "loadFailed": "Connector アクションを読み込めませんでした。",
+    "paste": "貼り付け",
+    "retry": "再試行",
+    "search": "検索"
+  },
+  "copy": "コピー",
+  "close": "閉じる",
+  "create": "作成",
+  "delete": "削除",
+  "edit": "編集",
+  "edgeError": {
+    "aggregateSummary": "{{connectionCount}} 本の接続のうち {{errorCount}} 本にエラーがあります",
+    "binDiffType": "バイナリデータに互換性がありません",
+    "default": "データ型に互換性がありません",
+    "diffKind": "Handle の種別が一致しません",
+    "errorNode": "破損したノードに接続されています",
+    "nullable": "接続元は null を許可しますが、接続先は許可していません",
+    "varDiffPkg": "変数が異なるプロジェクトに属しています",
+    "varDiffType": "変数の出力は変数の入力にのみ接続できます"
+  },
+  "errorNode": {
+    "blockManifestUnrenderable": "ブロックマニフェスト {{path}} を描画できません",
+    "blockNotFound": "タスクまたは Subflow の YAML ファイルが見つかりません",
+    "unsupportedNode": "サポートされていないノードのメタデータです"
+  },
+  "fitView": "ビューに合わせる",
+  "flowEditor": {
+    "node": {
+      "configHeader": "ノード設定",
+      "id": "Node ID"
+    }
+  },
+  "flowSettings": {
+    "title": "Flow 設定"
+  },
+  "handleEditor": {
+    "addItem": "項目を追加",
+    "additionalInputs": "追加入力",
+    "additionalOutputs": "追加出力",
+    "click": "クリック",
+    "descButton": "JSON Schema の説明",
+    "dropOr": "ドロップまたは",
+    "editSharedBlock": "共有ブロックを編集",
+    "handle": "Handle",
+    "inputHandle": "入力 Handle",
+    "noInputOutput": "入力または出力の Handle がありません",
+    "of": "要素の型",
+    "renaming": {
+      "banned": "Handle 名に {{name}} は使用できません",
+      "duplicate": "他の Handle と名前が重複しています",
+      "empty": "Handle 名を空にはできません"
+    },
+    "schemaDescription": "JSON Schema の説明…",
+    "secretUnavailable": "シークレットカタログを利用できません",
+    "selectSecret": "シークレットを選択",
+    "unknown": "不明"
+  },
+  "handleGroup": {
+    "delete": "グループを削除",
+    "dropAdd": "ドロップして新しいグループを作成",
+    "fallback": "グループ名を入力…",
+    "renaming": {
+      "banned": "グループ名に {{name}} は使用できません",
+      "duplicate": "他のグループと名前が重複しています",
+      "empty": "グループ名を空にはできません"
+    }
+  },
+  "inputHandleEditor": {
+    "addField": "フィールドを追加",
+    "addInput": "入力 Handle を追加",
+    "canPassNull": "{{null}} を許可",
+    "cannotPassNull": "{{null}} を許可しない",
+    "configPanelTitle": "入力 Handle 設定",
+    "connectionRequired": "入力が必要",
+    "defineOptions": "選択肢を定義",
+    "defineSchema": "型を定義",
+    "deleteField": "フィールドを削除",
+    "enumError": "enum の値を指定してください",
+    "handleKeyTitle": "キー",
+    "handleName": "Handle 名",
+    "handleTypeTitle": "型",
+    "handleValueTitle": "値",
+    "noData": "データなし",
+    "nullable": "null を許可",
+    "presetType": "プリセット型",
+    "reference": "接続済み",
+    "requiredFieldsUnset": "必須項目を設定してください：{{fields}}。",
+    "secretNotFound": "シークレットが見つかりません",
+    "title": "入力 Handle",
+    "typeError": "{{expected}} 型を指定してください",
+    "unset": "<未設定>",
+    "validationError": "設定を確認してください：{{message}}",
+    "valueUnset": "未設定",
+    "widget": {
+      "array": {
+        "itemType": "項目の型",
+        "maxItems": "最大項目数",
+        "minItems": "最小項目数"
+      },
+      "color": {
+        "type": "型"
+      },
+      "conditions": {
+        "title": "<条件 {{index}}>"
+      },
+      "date": {
+        "format": "形式"
+      },
+      "number": {
+        "exclusiveMaximum": "最大値(<)",
+        "exclusiveMinimum": "最小値(>)",
+        "maximum": "最大値(≤)",
+        "minimum": "最小値(≥)",
+        "step": "刻み幅"
+      },
+      "object": {
+        "additionalProperties": "追加プロパティ",
+        "banned": "オブジェクトのプロパティに {{name}} は使用できません"
+      },
+      "string": {
+        "format": "形式",
+        "maxLength": "最大文字数",
+        "minLength": "最小文字数",
+        "pattern": "正規表現"
+      }
+    }
+  },
+  "interactiveMode": {
+    "mouse": "マウス操作向け",
+    "touchpad": "タッチパッド操作向け"
+  },
+  "jsonViewer": {
+    "bin": "バイナリ",
+    "secret": "シークレット",
+    "showLess": "折りたたむ",
+    "showMore": "展開",
+    "var": "変数"
+  },
+  "l10n": {
+    "createKey": "翻訳を追加",
+    "deleteKey": "翻訳を削除",
+    "emptyKey": "このパネルを閉じると翻訳は削除されます",
+    "en": "英語",
+    "invalidKey": "翻訳キーに __proto__ は使用できません",
+    "openPanel": "多言語",
+    "translateKey": "キー",
+    "zh-CN": "中国語"
+  },
+  "miniMap": "ミニマップ",
+  "flowDisplayMode": {
+    "detail": "詳細",
+    "detailDescription": "ノード、ポート、エディター、コントロールをすべて表示します",
+    "overview": "概要",
+    "overviewDescription": "簡易表示のノードと読み取り専用の接続を表示します"
+  },
+  "settingsPanel": {
+    "hide": "設定を隠す",
+    "show": "設定を表示"
+  },
+  "more": "その他の操作",
+  "ms": "ミリ秒",
+  "s": "秒",
+  "nodeActions": {
+    "configSharedBlock": "共有ブロックの設定",
+    "delete": "削除",
+    "deleteConfirm": "{{name}} を削除しますか？\n{{shortcut}} で直接削除できます",
+    "duplicate": "複製",
+    "execute": "実行",
+    "executeWithoutCache": "キャッシュなしで実行",
+    "nodeSetting": "ノード設定",
+    "openSharedBlockCode": "タスクブロックのコードを開く",
+    "skipDisable": "このノードの無視を解除",
+    "skipDisableAll": "選択したノードの無視を解除",
+    "skipEnable": "このノードを無視",
+    "skipEnableAll": "選択したノードを無視",
+    "toggleLanguage": "{{lang}} に切り替え"
+  },
+  "nodeContent": {
+    "addDescription": "説明を追加"
+  },
+  "nodeStatus": {
+    "error": "エラー",
+    "hasError": "エラーあり",
+    "running": "実行中",
+    "skipped": "無視済み",
+    "success": "成功",
+    "waiting": "待機中"
+  },
+  "ok": "OK",
+  "optimize": "自動レイアウト",
+  "llmEditor": {
+    "addMessage": "メッセージを追加",
+    "chooseModel": "モデル一覧から選択",
+    "customModel": "カスタムモデル…",
+    "defaultModel": "デフォルトモデル",
+    "deleteMessage": "メッセージを削除",
+    "maxTokens": "最大 Token 数",
+    "messageCount": "メッセージ {{count}} 件",
+    "messageCountOne": "メッセージ 1 件",
+    "messagePlaceholder": "メッセージ本文",
+    "loadingModels": "モデルを読み込み中…",
+    "model": "モデル",
+    "modelOptions": "モデルオプション",
+    "moveMessageDown": "メッセージを下へ移動",
+    "moveMessageUp": "メッセージを上へ移動",
+    "role": {
+      "assistant": "アシスタント",
+      "system": "システム",
+      "user": "ユーザー"
+    },
+    "temperature": "Temperature",
+    "topP": "Top P"
+  },
+  "outputHandleEditor": {
+    "addOutput": "出力 Handle を追加",
+    "configPanelTitle": "出力 Handle 設定",
+    "handleKeyTitle": "キー",
+    "handleTypeTitle": "型",
+    "nullable": "null を許可",
+    "title": "出力 Handle"
+  },
+  "preset": {
+    "Applicators": "Applicators",
+    "Select": "Select",
+    "allOf": "AllOf",
+    "any": "Any",
+    "anyOf": "AnyOf",
+    "array": "Array",
+    "binary": "Binary",
+    "boolean": "Boolean",
+    "color": "Color",
+    "date": "Date",
+    "integer": "Integer",
+    "multiSelect": "Multi",
+    "null": "Null",
+    "number": "Number",
+    "object": "Object",
+    "oneOf": "OneOf",
+    "secret": "Secret",
+    "select": "Single",
+    "string": "String",
+    "text": "Textarea",
+    "variable": "Variable"
+  },
+  "preview": {
+    "title": "プレビュー",
+    "textAriaLabel": "テキストプレビュー",
+    "videoBilibili": "Bilibili 動画プレーヤー",
+    "videoYouTube": "YouTube 動画プレーヤー",
+    "audio": {
+      "mute": "ミュート",
+      "pause": "音声を一時停止",
+      "play": "音声を再生",
+      "seek": "再生位置を調整",
+      "title": "音声プレビュー",
+      "unmute": "ミュートを解除",
+      "volume": "音量"
+    },
+    "table": {
+      "footer": "全 {{columns}} 列、{{rows}} 行"
+    }
+  },
+  "schemaEditor": {
+    "description": "説明",
+    "kind": "カスタム型名",
+    "kindTooltip": "型にカスタム名を指定します。指定した場合、同じ名前を持つ Handle 同士だけが接続できます",
+    "label": "ラベル",
+    "name": "名前",
+    "namePlaceholder": "例：Images",
+    "stringFormat": {
+      "email": "メールアドレス",
+      "uri": "URI"
+    },
+    "value": "値"
+  },
+  "scriptlet": "スクリプトレット",
+  "subflowEditor": {
+    "blockMode": "ブロックビュー",
+    "flowMode": "Flow ビュー"
+  },
+  "subflowSettings": {
+    "forwardPreview": "プレビューを転送",
+    "title": "Subflow 設定"
+  },
+  "validation": {
+    "nodeIdBanned": "Node ID に {{name}} は使用できません",
+    "nodeIdExists": "Node ID は既に存在します",
+    "nodeIdInvalid": "Node ID には半角英字、数字、アンダースコア、ハイフンのみ使用できます",
+    "sharedBlockNameBanned": "タスクまたは Subflow の名前に {{name}} は使用できません",
+    "sharedBlockNameExists": "同じ名前のタスクまたは Subflow が既に存在します",
+    "sharedBlockNameInvalid": "タスクと Subflow の名前には半角英字、数字、アンダースコア、ハイフンのみ使用できます"
+  },
+  "workbench": {
+    "conflict": {
+      "keepLocal": "ローカルの変更を保持",
+      "reload": "ディスクから再読み込み"
+    },
+    "empty": {
+      "description": "Flow、Subflow、Task のソースファイルを追加してから、ワークベンチを再読み込みしてください。",
+      "title": "このプロジェクトには実行できるターゲットがまだありません。"
+    },
+    "noTargets": "実行できるターゲットがありません",
+    "resource": {
+      "openInCodeEditor": "コードエディターで開く",
+      "showDesigner": "Designer ビューを開く",
+      "showSource": "YAML ソースを開く",
+      "unknownType": "不明なファイル形式",
+      "unsupported": "このファイル形式には対応していません"
+    },
+    "run": {
+      "cancel": "キャンセル",
+      "cancelled": "実行をキャンセルしました。",
+      "clearLogs": "ログをクリア",
+      "closeInputs": "実行入力を閉じる",
+      "current": "現在の実行",
+      "emptyEvents": "このターゲットを実行すると、ここでイベントを確認できます。",
+      "exportLogs": "ログをエクスポート",
+      "event": {
+        "cacheHit": "{{handle}} を再利用",
+        "completed": "実行が完了しました",
+        "nodeCompleted": "完了",
+        "nodeStarted": "開始",
+        "output": "{{handle}} を出力",
+        "outputs": "出力を生成",
+        "preview": "{{type}} をプレビュー",
+        "progress": "{{progress}}%",
+        "started": "実行を開始しました"
+      },
+      "filter": {
+        "cache": "キャッシュ",
+        "empty": "現在の絞り込み条件に一致するイベントはありません。",
+        "error": "エラー",
+        "finish": "完了",
+        "label": "イベントを絞り込む",
+        "log": "ログ",
+        "output": "出力",
+        "preview": "プレビュー",
+        "progress": "進捗",
+        "reset": "リセット",
+        "selectAll": "すべて選択",
+        "selected": "{{count}} 件を選択中",
+        "start": "開始",
+        "warning": "警告"
+      },
+      "hideDetails": "実行詳細を隠す",
+      "history": "実行履歴",
+      "historyItem": "{{index}} 回目の実行",
+      "inputs": "実行入力",
+      "form": "フォーム入力",
+      "invalidInputs": "実行入力は、入力定義に一致するオブジェクトである必要があります。",
+      "invalidJson": "実行入力は有効な JSON である必要があります。",
+      "logs": "ログ",
+      "completed": "実行が完了しました：{{target}}",
+      "externalTarget": "実行中の {{target}} を開く",
+      "failed": "実行に失敗しました（{{target}}）：{{message}}",
+      "openExternal": "ワークベンチの外で開始されたターゲットを開く：{{target}}",
+      "phase": {
+        "cancelled": "キャンセル済み",
+        "error": "失敗",
+        "idle": "準備完了",
+        "running": "実行中",
+        "success": "完了"
+      },
+      "run": "実行",
+      "showDetails": "実行詳細を表示",
+      "trigger": "Trigger"
+    },
+    "secrets": {
+      "add": "シークレットを追加",
+      "addField": "フィールドを追加",
+      "close": "閉じる",
+      "confirmDelete": "現在のランタイムからこのシークレットを削除しますか？",
+      "delete": "削除",
+      "hideValue": "値を隠す",
+      "key": "キー",
+      "name": "名前",
+      "removeField": "フィールドを削除",
+      "save": "保存",
+      "saved": "シークレットを現在のランタイムに保存しました。",
+      "showValue": "値を表示",
+      "template": "テンプレート",
+      "title": "シークレット",
+      "value": "値"
+    },
+    "settings": {
+      "categories": "設定カテゴリ",
+      "autoFollowAgent": "Agent が実行を開始したとき、そのターゲットに自動で追従する",
+      "clearSearch": "設定の検索条件をクリア",
+      "close": "設定を閉じる",
+      "connector": "エグゼキューター",
+      "connectorBaseUrl": "Connector Base URL",
+      "connectorCleared": "ローカルの上書き設定を削除しました。",
+      "connectorClear": "ローカルの上書き設定を削除",
+      "connectorNotConfigured": "未設定",
+      "connectorSave": "保存",
+      "connectorSaved": "保存しました。",
+      "connectorSource": {
+        "cli": "コマンドライン設定",
+        "environment": "環境変数の設定",
+        "oo-cli-account": "継承した oo-cli アカウント",
+        "oo-cli-connector": "継承した oo-cli Connector 設定",
+        "open-flow-settings": "Open Flow のローカル設定"
+      },
+      "connectorSourceLabel": "設定元",
+      "connectorTest": "接続をテスト",
+      "connectorTestSucceeded": "接続に成功しました。",
+      "connectorToken": "Bearer Token",
+      "connectorTokenConfigured": "設定済み",
+      "connectorTokenNotConfigured": "未設定",
+      "connectorTokenOverride": "Token を入力すると、ローカルの上書き設定を作成します",
+      "connectorTokenUnchanged": "保存済みの Token は変更されません",
+      "editor": "エディター",
+      "defaultFlowDisplayMode": "Flow または Subflow を開いたときに使用する表示モードを設定します。",
+      "expandScriptletEditor": "新規作成したスクリプトレットのエディターを展開する",
+      "llm": "大規模言語モデル",
+      "llmApiKey": "API Key",
+      "llmApiKeyConfigured": "設定済み",
+      "llmApiKeyNotConfigured": "未設定",
+      "llmApiKeyOverride": "API Key を入力すると、ローカルの上書き設定を作成します",
+      "llmApiKeyUnchanged": "保存済みの API Key は変更されません",
+      "llmBaseUrl": "OpenAI 互換 Base URL",
+      "llmCleared": "LLM のローカル上書き設定を削除しました。",
+      "llmModel": "デフォルトモデル",
+      "llmSaved": "LLM 設定を保存しました。",
+      "llmSource": {
+        "cli": "コマンドライン設定",
+        "environment": "環境変数の設定",
+        "oo-cli": "継承した oo-cli LLM 設定",
+        "open-flow-settings": "Open Flow のローカル設定"
+      },
+      "noResults": "設定が見つかりません",
+      "openLogPanelOnRun": "実行開始時にログパネルを開く",
+      "runtime": "ランタイム",
+      "searchPlaceholder": "設定を検索",
+      "title": "設定"
+    },
+    "status": {
+      "conflict": "{{fileName}} がワークベンチの外で変更されました",
+      "error": "{{fileName}} の保存に失敗しました",
+      "invalid": "{{fileName}} に無効な YAML が含まれています",
+      "ready": "準備完了",
+      "saved": "{{fileName}} を保存しました",
+      "saving": "{{fileName}} を保存中…",
+      "synced": "{{fileName}} をディスクから更新しました"
+    },
+    "target": "ターゲット"
+  },
+  "valueHandleEditor": {
+    "title": "Handle"
+  },
+  "widgetAction": {
+    "download": "ダウンロード",
+    "openInNewTab": "新しいタブで開く",
+    "reload": "再読み込み"
+  },
+  "zoomIn": "拡大",
+  "zoomOut": "縮小"
+}

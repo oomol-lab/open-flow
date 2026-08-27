@@ -1,5 +1,16 @@
+import type { UiLanguage } from '@oomol-lab/open-flow/localization'
+
+import { uiLanguages } from '@oomol-lab/open-flow/localization'
 import { describe, expect, it, vi } from 'vitest'
 import { runCli } from './cli.ts'
+import { locales } from './i18n.ts'
+
+/** Reads one help message straight from the locale bundle the CLI ships. */
+function helpMessage(language: UiLanguage, key: 'options' | 'title'): string {
+  const help = locales[language].help
+  if (typeof help == 'string') throw new Error(`Locale ${language} must nest help messages.`)
+  return String(help[key])
+}
 
 const flow = {
   createdAt: '2026-08-14T00:00:00.000Z',
@@ -11,7 +22,7 @@ const flow = {
   version: 1,
 } as const
 
-function runtime() {
+function runtime(language: UiLanguage = 'en') {
   let stdout = ''
   let stderr = ''
   const opened: string[] = []
@@ -21,7 +32,7 @@ function runtime() {
     stdout: () => stdout,
     value: {
       env: {},
-      language: 'en' as const,
+      language,
       openUrl: async (url: string) => void opened.push(url),
       readFile: async () => '',
       readStdin: async () => '',
@@ -41,6 +52,27 @@ describe('CLI', () => {
 
     expect(output.stdout()).toContain('Open Flow commands')
     expect(request).not.toHaveBeenCalled()
+  })
+
+  it('prints the full command listing in every supported language', async () => {
+    for (const language of uiLanguages) {
+      const output = runtime(language)
+
+      await expect(runCli([], { request: vi.fn() }, output.value)).resolves.toBe(0)
+
+      const text = output.stdout()
+      expect([language, text.includes(helpMessage(language, 'title'))]).toEqual([language, true])
+      expect([language, text.includes('  oo flow list')]).toEqual([language, true])
+      expect([language, text.includes(helpMessage(language, 'options'))]).toEqual([language, true])
+    }
+  })
+
+  it('prints the localized usage line for a code subcommand', async () => {
+    const output = runtime('fr')
+
+    await expect(runCli(['code', 'list', '--help'], { request: vi.fn() }, output.value)).resolves.toBe(0)
+
+    expect(output.stdout()).toBe('Utilisation : oo flow code list <flow> [--json]\n')
   })
 
   it('creates a top-level Flow through POST /v1/flows', async () => {

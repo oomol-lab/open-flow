@@ -1,0 +1,655 @@
+{
+  "addNode": {
+    "comment": "Комментарий",
+    "condition": "Условие",
+    "connectorActions": "Действия Connector",
+    "connectorConnections": "Connection: {{count}}",
+    "connectorNewConnection": "Новый Connection",
+    "connectorNoActiveConnection": "Нет активного Connection",
+    "connectorPopupBlocked": "Окно подключения заблокировано. Разрешите всплывающие окна и повторите попытку.",
+    "connectorUnavailable": "Текущий хост проекта не поддерживает действия Connector.",
+    "llmChat": "Чат LLM",
+    "llmStructured": "Структурированный вывод LLM",
+    "scriptletUnsupported": "Текущий хост проекта не поддерживает написание скриптлетов.",
+    "sharedBlocks": "Задачи и Subflow",
+    "triggers": "Triggers",
+    "value": "Значение"
+  },
+  "blockEditor": {
+    "addDefaultAdditionalInput": "Добавить дополнительный вход по умолчанию",
+    "addDefaultAdditionalOutput": "Добавить дополнительный выход по умолчанию",
+    "additionalInputs": "Дополнительные входы",
+    "additionalInputsHelp": {
+      "allow": "Разрешены",
+      "disallow": "Запрещены",
+      "restrict": "Ограничены"
+    },
+    "additionalOutputs": "Дополнительные выходы",
+    "additionalOutputsHelp": {
+      "allow": "Разрешены",
+      "disallow": "Запрещены",
+      "restrict": "Ограничены"
+    },
+    "configHeader": "Настройки блока",
+    "defaultAdditionalInputs": "Дополнительные входы по умолчанию",
+    "defaultAdditionalOutputs": "Дополнительные выходы по умолчанию",
+    "description": "Описание",
+    "executor": {
+      "action": "Действие",
+      "connection": "Connection",
+      "connectionAccount": "Аккаунт",
+      "connectionDetails": "Текущий Connection",
+      "connectionId": "Connection ID",
+      "connectionStatus": "Статус",
+      "connectionStatus_active": "Активно",
+      "connectionStatus_disconnected": "Отключено",
+      "connectionStatus_error": "Ошибка",
+      "connectionStatus_reauth_required": "Нужна повторная авторизация",
+      "connectionUnresolved": "Не определено",
+      "entry": "Точка входа",
+      "function": "Функция",
+      "mode": "Режим",
+      "mode_chat": "Чат",
+      "mode_json": "JSON",
+      "name": "Имя",
+      "title": "Исполнитель"
+    },
+    "folder": "Имя папки",
+    "icon": "Значок",
+    "metadata": "Метаданные",
+    "nodeTitlePlaceholder": "Введите заголовок…",
+    "private": "Да",
+    "privateField": "Приватный",
+    "privateHelp": "Отметьте общий блок как приватный, чтобы указать, что он недоступен AI и другим пользователям.",
+    "public": "Нет",
+    "runningConfig": {
+      "concurrency": "Параллелизм",
+      "progressWeight": "Вес прогресса",
+      "timeout": "Время ожидания",
+      "title": "Параметры выполнения"
+    },
+    "sourceNotFound": "Исходный файл блока не найден",
+    "task": "Имя блока",
+    "taskHeader": "Из общего блока",
+    "title": "Заголовок"
+  },
+  "cancel": "Отмена",
+  "clipboard": {
+    "copySuccess": "Скопировано узлов: {{@}}",
+    "copySuccess@1": "Скопирован 1 узел",
+    "pasteScriptletUnsupported": "Текущий хост проекта не поддерживает вставку скриптлетов."
+  },
+  "comment": {
+    "editWithMarkdown": "Редактировать в Markdown",
+    "preview": "Предпросмотр",
+    "source": "Показать исходный текст"
+  },
+  "components": {
+    "chooseColor": "Выбрать цвет",
+    "clear": "Очистить",
+    "clearDateTime": "Очистить дату и время",
+    "colorValue": "Значение цвета",
+    "loading": "Загрузка",
+    "noMatching": "Нет подходящих элементов",
+    "numOptions": "Вариантов: {{count}}",
+    "pickColorFromScreen": "Выбрать цвет с экрана"
+  },
+  "trigger": {
+    "catalogEmpty": "Нет подходящих Trigger",
+    "catalogEmptyHelp": "Попробуйте указать название сервиса или события.",
+    "catalogUnavailable": "Каталог Provider Triggers недоступен",
+    "catalogUnavailableHelp": "Встроенные Trigger и уже сохранённые определения остаются доступными.",
+    "configuration": "Конфигурация",
+    "configInvalid": "Введите корректное значение конфигурации.",
+    "connection": "Аккаунт",
+    "integrationSummary": "При получении события",
+    "pollSchedule": "Расписание опроса",
+    "pollScheduleHelp": "Выберите, как часто этот Trigger проверяет новые события.",
+    "scheduleCron": "Cron",
+    "scheduleDays": "Дни",
+    "scheduleEvery": "Каждые",
+    "scheduleEveryDay": "Каждые {{value}} дн",
+    "scheduleEveryHour": "Каждые {{value}} ч",
+    "scheduleEveryMinute": "Каждые {{value}} мин",
+    "scheduleEveryMonth": "Каждые {{value}} мес",
+    "scheduleEveryWeek": "Каждые {{value}} нед",
+    "scheduleExpression": "Cron-выражение",
+    "scheduleHours": "Часы",
+    "scheduleInterval": "Интервал опроса",
+    "scheduleMinutes": "Минуты",
+    "scheduleMonths": "Месяцы",
+    "scheduleTimezone": "Часовой пояс",
+    "scheduleType": "Тип расписания",
+    "scheduleUnit": "Единица интервала",
+    "scheduleWeeks": "Недели",
+    "scheduleMissing": "Расписание не настроено",
+    "summaryCron": "Расписание",
+    "summaryIntegration": "Источник событий",
+    "summaryPoll": "Расписание опроса",
+    "summaryWebhook": "Запуск по запросу",
+    "webhookAddField": "Добавить поле",
+    "webhookAddHeader": "Добавить заголовок",
+    "webhookCustomType": "Своя схема",
+    "webhookDeleteField": "Удалить поле полезной нагрузки",
+    "webhookDeleteHeader": "Удалить заголовок ответа",
+    "webhookFieldName": "Имя поля",
+    "webhookFieldNameDuplicate": "Имена полей не должны повторяться.",
+    "webhookFieldNameRequired": "Введите имя поля.",
+    "webhookFieldType": "Тип",
+    "webhookHeaderName": "Имя заголовка",
+    "webhookHeaders": "Заголовки ответа",
+    "webhookHeaderValue": "Значение заголовка",
+    "webhookMethods": "Разрешённые методы",
+    "webhookNoPayloadFields": "Полезная нагрузка запроса принимает пустой объект.",
+    "webhookNoResponseBody": "Без тела ответа",
+    "webhookNullable": "Разрешить null",
+    "webhookOrigins": "Разрешённые источники",
+    "webhookPayloadFields": "Поля полезной нагрузки",
+    "webhookRequest": "Запрос",
+    "webhookResponse": "Ответ",
+    "webhookResponseData": "Тело ответа",
+    "webhookStatus": "Код статуса",
+    "webhookSummary": "При получении HTTP-запроса",
+    "webhookDescription": "Получать JSON-объект через сгенерированный HTTP-адрес."
+  },
+  "condition": {
+    "addCondition": "Добавить условие",
+    "configPanelTitle": "Настройки",
+    "default": "По умолчанию",
+    "defaultDescription": "Ветка по умолчанию",
+    "defaultHelp": "Выполнять эту ветку, если ни одно другое условие не подошло",
+    "deleteCondition": "Удалить условие",
+    "handleKeyTitle": "Handle",
+    "handleLogicalTitle": "Логика",
+    "inputHelp": "Первое подошедшее условие выдаст данные из первого входного Handle",
+    "label": "Ветка",
+    "logical": {
+      "AND": "И (AND)",
+      "OR": "ИЛИ (OR)"
+    },
+    "operator": {
+      "!=": "≠",
+      "<": "<",
+      "<=": "≤",
+      "==": "=",
+      ">": ">",
+      ">=": "≥",
+      "contains": "содержит",
+      "ends_with": "заканчивается на",
+      "has_key": "содержит ключ",
+      "has_value": "содержит значение",
+      "is_empty": "пусто",
+      "is_false": "равно false",
+      "is_not_empty": "не пусто",
+      "is_not_null": "не равно null",
+      "is_null": "равно null",
+      "is_true": "равно true",
+      "not_contains": "не содержит",
+      "not_has_key": "не содержит ключ",
+      "not_has_value": "не содержит значение",
+      "starts_with": "начинается с"
+    },
+    "title": "Handle условий",
+    "toggleDefault": "Условие по умолчанию"
+  },
+  "contextMenu": {
+    "addNode": "Добавить узел",
+    "empty": "Нет подходящих узлов",
+    "loadFailed": "Не удалось загрузить действия Connector.",
+    "paste": "Вставить",
+    "retry": "Повторить",
+    "search": "Поиск"
+  },
+  "copy": "Копировать",
+  "close": "Закрыть",
+  "create": "Создать",
+  "delete": "Удалить",
+  "edit": "Изменить",
+  "edgeError": {
+    "aggregateSummary": "Ошибки в {{errorCount}} из {{connectionCount}} соединений",
+    "binDiffType": "Двоичные данные несовместимы",
+    "default": "Типы данных несовместимы",
+    "diffKind": "Виды Handle не совпадают",
+    "errorNode": "Подключено к повреждённому узлу",
+    "nullable": "Источник допускает null, а получатель — нет",
+    "varDiffPkg": "Переменные принадлежат разным проектам",
+    "varDiffType": "Выход-переменная может подключаться только ко входу-переменной"
+  },
+  "errorNode": {
+    "blockManifestUnrenderable": "Не удалось отобразить манифест блока {{path}}",
+    "blockNotFound": "YAML-файл задачи или Subflow не найден",
+    "unsupportedNode": "Неподдерживаемые метаданные узла"
+  },
+  "fitView": "вписать в экран",
+  "flowEditor": {
+    "node": {
+      "configHeader": "Настройки узла",
+      "id": "Node ID"
+    }
+  },
+  "flowSettings": {
+    "title": "Настройки Flow"
+  },
+  "handleEditor": {
+    "addItem": "Добавить элемент",
+    "additionalInputs": "Дополнительные входы",
+    "additionalOutputs": "Дополнительные выходы",
+    "click": "нажмите",
+    "descButton": "Описание JSON Schema",
+    "dropOr": "Перетащите или",
+    "editSharedBlock": "Изменить общий блок",
+    "handle": "Handle",
+    "inputHandle": "Входной Handle",
+    "noInputOutput": "Нет входных и выходных Handle",
+    "of": "тип элемента",
+    "renaming": {
+      "banned": "Имя Handle не может быть {{name}}",
+      "duplicate": "Совпадает с именем другого Handle",
+      "empty": "Имя Handle не может быть пустым"
+    },
+    "schemaDescription": "Описание JSON Schema…",
+    "secretUnavailable": "Каталог секретов недоступен",
+    "selectSecret": "Выбрать секрет",
+    "unknown": "Неизвестно"
+  },
+  "handleGroup": {
+    "delete": "Удалить группу",
+    "dropAdd": "Перетащите, чтобы создать группу",
+    "fallback": "Введите имя группы…",
+    "renaming": {
+      "banned": "Имя группы не может быть {{name}}",
+      "duplicate": "Совпадает с именем другой группы",
+      "empty": "Имя группы не может быть пустым"
+    }
+  },
+  "inputHandleEditor": {
+    "addField": "Добавить поле",
+    "addInput": "Добавить вход",
+    "canPassNull": "Принимает {{null}}",
+    "cannotPassNull": "Не принимает {{null}}",
+    "configPanelTitle": "Настройки входного Handle",
+    "connectionRequired": "Требуется вход",
+    "defineOptions": "задать варианты",
+    "defineSchema": "задать схему",
+    "deleteField": "Удалить поле",
+    "enumError": "Ожидается значение enum",
+    "handleKeyTitle": "Ключ",
+    "handleName": "Handle",
+    "handleTypeTitle": "Тип",
+    "handleValueTitle": "Значение",
+    "noData": "нет данных",
+    "nullable": "Допускает null",
+    "presetType": "Готовый тип",
+    "reference": "подключено",
+    "requiredFieldsUnset": "Заполните обязательные поля: {{fields}}.",
+    "secretNotFound": "Секрет не найден",
+    "title": "Входные Handle",
+    "typeError": "Ожидается тип {{expected}}",
+    "unset": "<не задано>",
+    "validationError": "Проверьте конфигурацию: {{message}}",
+    "valueUnset": "не задано",
+    "widget": {
+      "array": {
+        "itemType": "тип элемента",
+        "maxItems": "макс. элементов",
+        "minItems": "мин. элементов"
+      },
+      "color": {
+        "type": "тип"
+      },
+      "conditions": {
+        "title": "<условие {{index}}>"
+      },
+      "date": {
+        "format": "формат"
+      },
+      "number": {
+        "exclusiveMaximum": "макс.(<)",
+        "exclusiveMinimum": "мин.(>)",
+        "maximum": "макс.(≤)",
+        "minimum": "мин.(≥)",
+        "step": "шаг"
+      },
+      "object": {
+        "additionalProperties": "доп. свойства",
+        "banned": "Свойство объекта не может быть {{name}}"
+      },
+      "string": {
+        "format": "формат",
+        "maxLength": "макс. длина",
+        "minLength": "мин. длина",
+        "pattern": "шаблон"
+      }
+    }
+  },
+  "interactiveMode": {
+    "mouse": "Для мыши",
+    "touchpad": "Для тачпада"
+  },
+  "jsonViewer": {
+    "bin": "Двоичные данные",
+    "secret": "Секрет",
+    "showLess": "Свернуть",
+    "showMore": "Развернуть",
+    "var": "Переменная"
+  },
+  "l10n": {
+    "createKey": "Включить перевод",
+    "deleteKey": "Удалить перевод",
+    "emptyKey": "После закрытия панели перевод будет удалён",
+    "en": "Английский",
+    "invalidKey": "Ключ перевода не может быть __proto__",
+    "openPanel": "Перевод",
+    "translateKey": "Ключ",
+    "zh-CN": "Китайский"
+  },
+  "miniMap": "Мини-карта",
+  "flowDisplayMode": {
+    "detail": "Подробно",
+    "detailDescription": "Полные узлы, порты, редакторы и элементы управления",
+    "overview": "Обзор",
+    "overviewDescription": "Упрощённые узлы и связи только для чтения"
+  },
+  "settingsPanel": {
+    "hide": "Скрыть настройки",
+    "show": "Показать настройки"
+  },
+  "more": "Другие действия",
+  "ms": "мс",
+  "s": "с",
+  "nodeActions": {
+    "configSharedBlock": "Настройки общего блока",
+    "delete": "Удалить",
+    "deleteConfirm": "Удалить {{name}}?\n{{shortcut}} — удалить сразу",
+    "duplicate": "Дублировать",
+    "execute": "Выполнить",
+    "executeWithoutCache": "Выполнить без кеша",
+    "nodeSetting": "Настройки узла",
+    "openSharedBlockCode": "Код блока задачи",
+    "skipDisable": "Не игнорировать этот узел",
+    "skipDisableAll": "Не игнорировать выбранные узлы",
+    "skipEnable": "Игнорировать этот узел",
+    "skipEnableAll": "Игнорировать выбранные узлы",
+    "toggleLanguage": "Переключить на {{lang}}"
+  },
+  "nodeContent": {
+    "addDescription": "Добавить описание"
+  },
+  "nodeStatus": {
+    "error": "Ошибка",
+    "hasError": "Есть ошибки",
+    "running": "Выполняется",
+    "skipped": "Игнорируется",
+    "success": "Успешно",
+    "waiting": "Ожидание"
+  },
+  "ok": "ОК",
+  "optimize": "упорядочить схему",
+  "llmEditor": {
+    "addMessage": "Добавить сообщение",
+    "chooseModel": "Выбрать из списка моделей",
+    "customModel": "Своя модель…",
+    "defaultModel": "Модель по умолчанию",
+    "deleteMessage": "Удалить сообщение",
+    "maxTokens": "Максимум Token",
+    "messageCount": "Сообщений: {{count}}",
+    "messageCountOne": "1 сообщение",
+    "messagePlaceholder": "Текст сообщения",
+    "loadingModels": "Загрузка моделей…",
+    "model": "Модель",
+    "modelOptions": "Параметры модели",
+    "moveMessageDown": "Переместить сообщение вниз",
+    "moveMessageUp": "Переместить сообщение вверх",
+    "role": {
+      "assistant": "Ассистент",
+      "system": "Система",
+      "user": "Пользователь"
+    },
+    "temperature": "Температура",
+    "topP": "Top P"
+  },
+  "outputHandleEditor": {
+    "addOutput": "Добавить выход",
+    "configPanelTitle": "Настройки выходного Handle",
+    "handleKeyTitle": "Ключ",
+    "handleTypeTitle": "Тип",
+    "nullable": "Допускает null",
+    "title": "Выходные Handle"
+  },
+  "preset": {
+    "Applicators": "Applicators",
+    "Select": "Select",
+    "allOf": "AllOf",
+    "any": "Any",
+    "anyOf": "AnyOf",
+    "array": "Array",
+    "binary": "Binary",
+    "boolean": "Boolean",
+    "color": "Color",
+    "date": "Date",
+    "integer": "Integer",
+    "multiSelect": "Multi",
+    "null": "Null",
+    "number": "Number",
+    "object": "Object",
+    "oneOf": "OneOf",
+    "secret": "Secret",
+    "select": "Single",
+    "string": "String",
+    "text": "Textarea",
+    "variable": "Variable"
+  },
+  "preview": {
+    "title": "Предпросмотр",
+    "textAriaLabel": "Предпросмотр текста",
+    "videoBilibili": "Видеоплеер Bilibili",
+    "videoYouTube": "Видеоплеер YouTube",
+    "audio": {
+      "mute": "Выключить звук",
+      "pause": "Приостановить аудио",
+      "play": "Воспроизвести аудио",
+      "seek": "Перемотать аудио",
+      "title": "Предпросмотр аудио",
+      "unmute": "Включить звук",
+      "volume": "Громкость"
+    },
+    "table": {
+      "footer": "Всего столбцов: {{columns}}, строк: {{rows}}"
+    }
+  },
+  "schemaEditor": {
+    "description": "Описание",
+    "kind": "Имя пользовательского типа",
+    "kindTooltip": "Задайте собственное имя типа. Если оно задано, подключаться смогут только Handle с таким же именем",
+    "label": "Подпись",
+    "name": "Имя",
+    "namePlaceholder": "например, Images",
+    "stringFormat": {
+      "email": "Эл. почта",
+      "uri": "URI"
+    },
+    "value": "Значение"
+  },
+  "scriptlet": "Скриптлет",
+  "subflowEditor": {
+    "blockMode": "Вид блока",
+    "flowMode": "Вид Flow"
+  },
+  "subflowSettings": {
+    "forwardPreview": "Пересылать предпросмотр",
+    "title": "Настройки Subflow"
+  },
+  "validation": {
+    "nodeIdBanned": "Node ID не может быть {{name}}",
+    "nodeIdExists": "Такой Node ID уже существует",
+    "nodeIdInvalid": "Node ID может содержать только буквы, цифры, подчёркивания и дефисы",
+    "sharedBlockNameBanned": "Имя задачи или Subflow не может быть {{name}}",
+    "sharedBlockNameExists": "Задача или Subflow с таким именем уже существует",
+    "sharedBlockNameInvalid": "Имена задач и Subflow могут содержать только буквы, цифры, подчёркивания и дефисы"
+  },
+  "workbench": {
+    "conflict": {
+      "keepLocal": "Сохранить локальные изменения",
+      "reload": "Перезагрузить с диска"
+    },
+    "empty": {
+      "description": "Добавьте исходный файл Flow, Subflow или задачи и перезагрузите рабочую среду.",
+      "title": "В этом проекте пока нет запускаемых целей."
+    },
+    "noTargets": "Нет запускаемых целей",
+    "resource": {
+      "openInCodeEditor": "Открыть в редакторе кода",
+      "showDesigner": "Открыть вид конструктора",
+      "showSource": "Открыть исходный YAML",
+      "unknownType": "Неизвестный тип файла",
+      "unsupported": "Этот тип файла не поддерживается"
+    },
+    "run": {
+      "cancel": "Отмена",
+      "cancelled": "Запуск отменён.",
+      "clearLogs": "Очистить логи",
+      "closeInputs": "Закрыть входные данные запуска",
+      "current": "Текущий запуск",
+      "emptyEvents": "Запустите эту цель, чтобы посмотреть её события.",
+      "exportLogs": "Экспортировать логи",
+      "event": {
+        "cacheHit": "повторно использовано {{handle}}",
+        "completed": "Запуск завершён",
+        "nodeCompleted": "завершён",
+        "nodeStarted": "запущен",
+        "output": "выдано {{handle}}",
+        "outputs": "выданы выходные данные",
+        "preview": "предпросмотр {{type}}",
+        "progress": "{{progress}}%",
+        "started": "Запуск начат"
+      },
+      "filter": {
+        "cache": "Кеш",
+        "empty": "Нет событий, подходящих под текущие фильтры.",
+        "error": "Ошибки",
+        "finish": "Завершение",
+        "label": "Фильтровать события",
+        "log": "Логи",
+        "output": "Выходные данные",
+        "preview": "Предпросмотры",
+        "progress": "Прогресс",
+        "reset": "Сбросить",
+        "selectAll": "Выбрать все",
+        "selected": "Выбрано: {{count}}",
+        "start": "Начало",
+        "warning": "Предупреждения"
+      },
+      "hideDetails": "Скрыть детали запуска",
+      "history": "История запусков",
+      "historyItem": "Запуск {{index}}",
+      "inputs": "Входные данные запуска",
+      "form": "Ввод через форму",
+      "invalidInputs": "Входные данные запуска должны быть объектом, соответствующим определениям входов.",
+      "invalidJson": "Входные данные запуска должны быть корректным JSON.",
+      "logs": "Логи",
+      "completed": "Запуск завершён: {{target}}",
+      "externalTarget": "Открыть выполняемую цель {{target}}",
+      "failed": "Запуск не удался ({{target}}): {{message}}",
+      "openExternal": "Открыть цель, запущенную вне рабочей среды: {{target}}",
+      "phase": {
+        "cancelled": "Отменено",
+        "error": "Ошибка",
+        "idle": "Готово",
+        "running": "Выполняется",
+        "success": "Завершено"
+      },
+      "run": "Запустить",
+      "showDetails": "Показать детали запуска",
+      "trigger": "Trigger"
+    },
+    "secrets": {
+      "add": "Добавить секрет",
+      "addField": "Добавить поле",
+      "close": "Закрыть",
+      "confirmDelete": "Удалить этот секрет из текущей среды выполнения?",
+      "delete": "Удалить",
+      "hideValue": "Скрыть значение",
+      "key": "Ключ",
+      "name": "Имя",
+      "removeField": "Удалить поле",
+      "save": "Сохранить",
+      "saved": "Секрет сохранён для этой среды выполнения.",
+      "showValue": "Показать значение",
+      "template": "Шаблон",
+      "title": "Секреты",
+      "value": "Значение"
+    },
+    "settings": {
+      "categories": "Категории настроек",
+      "autoFollowAgent": "Автоматически переходить к цели, когда агент начинает запуск",
+      "clearSearch": "Очистить поиск по настройкам",
+      "close": "Закрыть настройки",
+      "connector": "Исполнители",
+      "connectorBaseUrl": "Base URL для Connector",
+      "connectorCleared": "Локальное переопределение сброшено.",
+      "connectorClear": "Сбросить локальное переопределение",
+      "connectorNotConfigured": "Не настроено",
+      "connectorSave": "Сохранить",
+      "connectorSaved": "Сохранено.",
+      "connectorSource": {
+        "cli": "Настройка из командной строки",
+        "environment": "Настройка из переменных окружения",
+        "oo-cli-account": "Унаследованный аккаунт oo-cli",
+        "oo-cli-connector": "Унаследованная настройка Connector из oo-cli",
+        "open-flow-settings": "Локальные настройки Open Flow"
+      },
+      "connectorSourceLabel": "Источник",
+      "connectorTest": "Проверить подключение",
+      "connectorTestSucceeded": "Подключение выполнено успешно.",
+      "connectorToken": "Bearer Token",
+      "connectorTokenConfigured": "настроен",
+      "connectorTokenNotConfigured": "не настроен",
+      "connectorTokenOverride": "Введите Token, чтобы создать локальное переопределение",
+      "connectorTokenUnchanged": "Сохранённый Token не изменился",
+      "editor": "Редактор",
+      "defaultFlowDisplayMode": "Задаёт режим отображения при открытии Flow или Subflow.",
+      "expandScriptletEditor": "Разворачивать редакторы для новых скриптлетов",
+      "llm": "Языковая модель",
+      "llmApiKey": "Ключ API",
+      "llmApiKeyConfigured": "настроен",
+      "llmApiKeyNotConfigured": "не настроен",
+      "llmApiKeyOverride": "Введите ключ API, чтобы создать локальное переопределение",
+      "llmApiKeyUnchanged": "Сохранённый ключ API не изменился",
+      "llmBaseUrl": "OpenAI-совместимый Base URL",
+      "llmCleared": "Локальное переопределение LLM сброшено.",
+      "llmModel": "Модель по умолчанию",
+      "llmSaved": "Настройки LLM сохранены.",
+      "llmSource": {
+        "cli": "Настройка из командной строки",
+        "environment": "Настройка из переменных окружения",
+        "oo-cli": "Унаследованная настройка LLM из oo-cli",
+        "open-flow-settings": "Локальные настройки Open Flow"
+      },
+      "noResults": "Настройки не найдены",
+      "openLogPanelOnRun": "Открывать панель логов при начале запуска",
+      "runtime": "Среда выполнения",
+      "searchPlaceholder": "Поиск по настройкам",
+      "title": "Настройки"
+    },
+    "status": {
+      "conflict": "{{fileName}} изменён вне рабочей среды",
+      "error": "Не удалось сохранить {{fileName}}",
+      "invalid": "{{fileName}} содержит некорректный YAML",
+      "ready": "Готово",
+      "saved": "Сохранён {{fileName}}",
+      "saving": "Сохранение {{fileName}}…",
+      "synced": "{{fileName}} обновлён с диска"
+    },
+    "target": "Цель"
+  },
+  "valueHandleEditor": {
+    "title": "Handle"
+  },
+  "widgetAction": {
+    "download": "Скачать",
+    "openInNewTab": "Открыть в новой вкладке",
+    "reload": "Обновить"
+  },
+  "zoomIn": "увеличить",
+  "zoomOut": "уменьшить"
+}

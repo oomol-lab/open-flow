@@ -1,5 +1,6 @@
 import type { Node, NodeProps } from '@xyflow/react'
 import type { ReactNode } from 'react'
+import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { DesignerStory, LogAction } from './stories.tsx'
 
 import { Background, Controls, ReactFlow } from '@xyflow/react'
@@ -10,6 +11,7 @@ import { GetPopupContainerContext } from '../../src/designer/browser/graph/React
 import { createI18n } from '../../src/designer/browser/i18n/i18n-loader.ts'
 import { designerThemeClass } from '../../src/designer/browser/theme/designerThemeClass.ts'
 import { ThemeProvider } from '../../src/designer/browser/theme/ThemeProvider.tsx'
+import { defaultUiLanguage, uiLanguageNames, uiLanguages } from '../../src/localization/common/languages.ts'
 import { TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
 import { CodeEditor } from '../../src/workbench/browser/runtime/designer/codeEditor.tsx'
 import { stories } from './stories.tsx'
@@ -73,7 +75,7 @@ export function DesignerLab() {
   const [story, setStory] = useState(initialStory)
   const [theme, setTheme] = useState<ThemeMode>('system')
   const [systemDark, setSystemDark] = useState(() => matchMedia('(prefers-color-scheme: dark)').matches)
-  const [language, setLanguage] = useState('en')
+  const [language, setLanguage] = useState<UiLanguage>(defaultUiLanguage)
   const [action, setAction] = useState<ActionEntry | null>(null)
   const dark = theme == 'system' ? systemDark : theme == 'dark'
   const i18n = useMemo(() => createI18n(language), [language])
@@ -83,6 +85,9 @@ export function DesignerLab() {
     query.addEventListener('change', update)
     return () => query.removeEventListener('change', update)
   }, [])
+  useEffect(() => {
+    document.documentElement.lang = language
+  }, [language])
   const log: LogAction = (name, value) => setAction({ message: `${name}${value === undefined ? '' : ` ${print(value)}`}` })
   const selectStory = (next: DesignerStory) => {
     setStory(next)
@@ -126,13 +131,14 @@ export function DesignerLab() {
               <Moon />
             </ToolbarButton>
           </div>
-          <div aria-label="Language" className="toolbar-segment">
-            <ToolbarButton active={language == 'en'} label="English" onClick={() => setLanguage('en')}>
-              EN
-            </ToolbarButton>
-            <ToolbarButton active={language == 'zh-CN'} label="简体中文" onClick={() => setLanguage('zh-CN')}>
-              中
-            </ToolbarButton>
+          <div className="toolbar-segment">
+            <select aria-label="Language" onChange={(event) => setLanguage(event.target.value as UiLanguage)} value={language}>
+              {uiLanguages.map((entry) => (
+                <option key={entry} value={entry}>
+                  {uiLanguageNames[entry]}
+                </option>
+              ))}
+            </select>
           </div>
         </header>
         <div className="lab-workspace">

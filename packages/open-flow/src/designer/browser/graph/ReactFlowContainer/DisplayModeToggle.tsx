@@ -7,6 +7,7 @@ import { clsx } from 'clsx'
 import { memo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
+import { isCjkLanguage } from '../../../../localization/common/languages.ts'
 import { ToggleGroup, ToggleGroupItem } from '../../../../ui/browser/toggle-group.tsx'
 
 export interface DisplayModeToggleProps {
@@ -22,7 +23,7 @@ export const DisplayModeToggle: React.FC<DisplayModeToggleProps> = /*#__PURE__*/
     <Panel className={styles.container} data-canvas-control-scope position="bottom-center">
       <ToggleGroup<FlowDisplayMode>
         aria-label={t('flowDisplayMode.overviewDescription')}
-        className={clsx(styles.group, lang == 'zh-CN' && styles.compact)}
+        className={clsx(styles.group, isCjkLanguage(lang) && styles.compact)}
         onValueChange={(values) => {
           const value = values.at(-1)
           if (value != null) displayMode$.set(value)

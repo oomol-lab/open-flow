@@ -58,6 +58,10 @@ function createManifest(version: string): object {
         types: './dist/common/integration-trigger.d.ts',
         import: './dist/common/integration-trigger.js',
       },
+      './localization': {
+        types: './dist/common/localization.d.ts',
+        import: './dist/common/localization.js',
+      },
       './poll-trigger': {
         types: './dist/common/poll-trigger.d.ts',
         import: './dist/common/poll-trigger.js',

@@ -1,8 +1,9 @@
 import type { FlowCatalogEvent, FlowChangeEvent } from '../../../control/common/flowNotifications.ts'
+import type { UiLanguage } from '../../../localization/common/languages.ts'
 
 export type { FlowCatalogEvent, FlowChangeEvent } from '../../../control/common/flowNotifications.ts'
 
-export type WorkbenchLanguage = 'en' | 'zh-CN'
+export type WorkbenchLanguage = UiLanguage
 export type WorkbenchTheme = 'dark' | 'light'
 export type WorkbenchView = 'design' | 'publications' | 'runs'
 

@@ -1,0 +1,655 @@
+{
+  "addNode": {
+    "comment": "註解",
+    "condition": "條件",
+    "connectorActions": "Connector 操作",
+    "connectorConnections": "{{count}} 個 Connection",
+    "connectorNewConnection": "新增 Connection",
+    "connectorNoActiveConnection": "沒有可用的 Connection",
+    "connectorPopupBlocked": "連線視窗被瀏覽器封鎖，請允許彈出式視窗後再試一次。",
+    "connectorUnavailable": "此專案環境不支援 Connector 操作。",
+    "llmChat": "LLM 對話",
+    "llmStructured": "LLM 結構化輸出",
+    "scriptletUnsupported": "此專案環境不支援編寫小腳本。",
+    "sharedBlocks": "任務與 Subflow",
+    "triggers": "Trigger",
+    "value": "值"
+  },
+  "blockEditor": {
+    "addDefaultAdditionalInput": "新增預設額外輸入",
+    "addDefaultAdditionalOutput": "新增預設額外輸出",
+    "additionalInputs": "額外輸入",
+    "additionalInputsHelp": {
+      "allow": "允許",
+      "disallow": "不允許",
+      "restrict": "限定"
+    },
+    "additionalOutputs": "額外輸出",
+    "additionalOutputsHelp": {
+      "allow": "允許",
+      "disallow": "不允許",
+      "restrict": "限定"
+    },
+    "configHeader": "區塊設定",
+    "defaultAdditionalInputs": "預設額外輸入",
+    "defaultAdditionalOutputs": "預設額外輸出",
+    "description": "描述",
+    "executor": {
+      "action": "操作",
+      "connection": "Connection",
+      "connectionAccount": "帳號",
+      "connectionDetails": "目前的 Connection",
+      "connectionId": "Connection ID",
+      "connectionStatus": "狀態",
+      "connectionStatus_active": "可用",
+      "connectionStatus_disconnected": "已中斷",
+      "connectionStatus_error": "錯誤",
+      "connectionStatus_reauth_required": "需要重新授權",
+      "connectionUnresolved": "未解析",
+      "entry": "進入點",
+      "function": "函式",
+      "mode": "模式",
+      "mode_chat": "對話",
+      "mode_json": "JSON",
+      "name": "名稱",
+      "title": "執行器"
+    },
+    "folder": "區塊資料夾名稱",
+    "icon": "圖示",
+    "metadata": "基本資訊",
+    "nodeTitlePlaceholder": "請輸入標題…",
+    "private": "已私有",
+    "privateField": "私有",
+    "privateHelp": "將共享區塊標記為私有，表示 AI 和其他使用者無法使用它。",
+    "public": "已公開",
+    "runningConfig": {
+      "concurrency": "並行數",
+      "progressWeight": "進度權重",
+      "timeout": "逾時時間",
+      "title": "執行設定"
+    },
+    "sourceNotFound": "找不到區塊原始檔",
+    "task": "區塊名稱",
+    "taskHeader": "來自共享區塊",
+    "title": "標題"
+  },
+  "cancel": "取消",
+  "clipboard": {
+    "copySuccess": "已複製 {{@}} 個節點",
+    "copySuccess@1": "已複製 1 個節點",
+    "pasteScriptletUnsupported": "此專案環境不支援貼上小腳本。"
+  },
+  "comment": {
+    "editWithMarkdown": "使用 Markdown 編輯",
+    "preview": "預覽",
+    "source": "檢視原始文字"
+  },
+  "components": {
+    "chooseColor": "選擇顏色",
+    "clear": "清除",
+    "clearDateTime": "清除日期和時間",
+    "colorValue": "顏色值",
+    "loading": "載入中",
+    "noMatching": "沒有符合的項目",
+    "numOptions": "{{count}} 個選項",
+    "pickColorFromScreen": "從螢幕取色"
+  },
+  "trigger": {
+    "catalogEmpty": "沒有符合的 Trigger",
+    "catalogEmptyHelp": "請試著搜尋服務或事件名稱。",
+    "catalogUnavailable": "Provider Trigger 目錄無法使用",
+    "catalogUnavailableHelp": "內建 Trigger 和已儲存的定義仍可使用。",
+    "configuration": "設定",
+    "configInvalid": "請輸入有效的設定值。",
+    "connection": "帳號",
+    "integrationSummary": "事件送達時觸發",
+    "pollSchedule": "輪詢排程",
+    "pollScheduleHelp": "設定這個 Trigger 檢查新事件的頻率。",
+    "scheduleCron": "Cron",
+    "scheduleDays": "天",
+    "scheduleEvery": "每隔",
+    "scheduleEveryDay": "每 {{value}} 天",
+    "scheduleEveryHour": "每 {{value}} 小時",
+    "scheduleEveryMinute": "每 {{value}} 分鐘",
+    "scheduleEveryMonth": "每 {{value}} 個月",
+    "scheduleEveryWeek": "每 {{value}} 週",
+    "scheduleExpression": "Cron 運算式",
+    "scheduleHours": "小時",
+    "scheduleInterval": "輪詢間隔",
+    "scheduleMinutes": "分鐘",
+    "scheduleMonths": "月",
+    "scheduleTimezone": "時區",
+    "scheduleType": "排程類型",
+    "scheduleUnit": "間隔單位",
+    "scheduleWeeks": "週",
+    "scheduleMissing": "尚未設定排程",
+    "summaryCron": "排程",
+    "summaryIntegration": "事件來源",
+    "summaryPoll": "輪詢排程",
+    "summaryWebhook": "請求觸發",
+    "webhookAddField": "新增欄位",
+    "webhookAddHeader": "新增標頭",
+    "webhookCustomType": "自訂結構描述",
+    "webhookDeleteField": "刪除酬載欄位",
+    "webhookDeleteHeader": "刪除回應標頭",
+    "webhookFieldName": "欄位名稱",
+    "webhookFieldNameDuplicate": "欄位名稱不能重複。",
+    "webhookFieldNameRequired": "請輸入欄位名稱。",
+    "webhookFieldType": "類型",
+    "webhookHeaderName": "標頭名稱",
+    "webhookHeaders": "回應標頭",
+    "webhookHeaderValue": "標頭值",
+    "webhookMethods": "允許的請求方法",
+    "webhookNoPayloadFields": "請求酬載可以接受空物件。",
+    "webhookNoResponseBody": "不回傳回應內容",
+    "webhookNullable": "允許 null",
+    "webhookOrigins": "允許的來源",
+    "webhookPayloadFields": "酬載欄位",
+    "webhookRequest": "請求",
+    "webhookResponse": "回應",
+    "webhookResponseData": "回應內容",
+    "webhookStatus": "狀態碼",
+    "webhookSummary": "收到 HTTP 請求時觸發",
+    "webhookDescription": "透過產生的 HTTP 端點接收 JSON 物件。"
+  },
+  "condition": {
+    "addCondition": "新增條件",
+    "configPanelTitle": "設定",
+    "default": "預設",
+    "defaultDescription": "預設條件",
+    "defaultHelp": "當沒有其他條件符合時，執行這個條件",
+    "deleteCondition": "刪除條件",
+    "handleKeyTitle": "Handle 名稱",
+    "handleLogicalTitle": "組合邏輯",
+    "inputHelp": "第一個符合的條件會輸出第一個輸入 Handle 的資料",
+    "label": "條件",
+    "logical": {
+      "AND": "且 (AND)",
+      "OR": "或 (OR)"
+    },
+    "operator": {
+      "!=": "≠",
+      "<": "<",
+      "<=": "≤",
+      "==": "=",
+      ">": ">",
+      ">=": "≥",
+      "contains": "包含",
+      "ends_with": "結尾是",
+      "has_key": "包含鍵",
+      "has_value": "包含值",
+      "is_empty": "為空",
+      "is_false": "為 false",
+      "is_not_empty": "不為空",
+      "is_not_null": "不為 null",
+      "is_null": "為 null",
+      "is_true": "為 true",
+      "not_contains": "不包含",
+      "not_has_key": "不包含鍵",
+      "not_has_value": "不包含值",
+      "starts_with": "開頭是"
+    },
+    "title": "條件輸出 Handle",
+    "toggleDefault": "預設條件"
+  },
+  "contextMenu": {
+    "addNode": "新增節點",
+    "empty": "沒有符合的節點",
+    "loadFailed": "無法載入 Connector 操作。",
+    "paste": "貼上",
+    "retry": "重試",
+    "search": "搜尋"
+  },
+  "copy": "複製",
+  "close": "關閉",
+  "create": "建立",
+  "delete": "刪除",
+  "edit": "編輯",
+  "edgeError": {
+    "aggregateSummary": "{{connectionCount}} 條連線中有 {{errorCount}} 條發生錯誤",
+    "binDiffType": "二進位資料不相容",
+    "default": "資料類型不相容",
+    "diffKind": "Handle 種類不相符",
+    "errorNode": "連接到已損毀的節點",
+    "nullable": "來源允許 null，但目標不允許",
+    "varDiffPkg": "變數來自不同的專案",
+    "varDiffType": "變數輸出只能連接到變數輸入"
+  },
+  "errorNode": {
+    "blockManifestUnrenderable": "無法轉譯區塊資訊清單 {{path}}",
+    "blockNotFound": "找不到任務或 Subflow 的 YAML 檔案",
+    "unsupportedNode": "不支援的節點中繼資料"
+  },
+  "fitView": "適應檢視",
+  "flowEditor": {
+    "node": {
+      "configHeader": "節點設定",
+      "id": "Node ID"
+    }
+  },
+  "flowSettings": {
+    "title": "Flow 設定"
+  },
+  "handleEditor": {
+    "addItem": "新增項目",
+    "additionalInputs": "額外輸入",
+    "additionalOutputs": "額外輸出",
+    "click": "點擊",
+    "descButton": "JSON Schema 說明",
+    "dropOr": "拖放或",
+    "editSharedBlock": "編輯共享區塊",
+    "handle": "Handle",
+    "inputHandle": "輸入 Handle",
+    "noInputOutput": "沒有輸入或輸出 Handle",
+    "of": "元素類型",
+    "renaming": {
+      "banned": "Handle 名稱不能為 {{name}}",
+      "duplicate": "與其他 Handle 重複",
+      "empty": "Handle 名稱不能為空"
+    },
+    "schemaDescription": "JSON Schema 說明...",
+    "secretUnavailable": "Secret 目錄無法使用",
+    "selectSecret": "選擇 Secret",
+    "unknown": "未知"
+  },
+  "handleGroup": {
+    "delete": "刪除群組",
+    "dropAdd": "拖放以建立新群組",
+    "fallback": "請輸入群組名稱…",
+    "renaming": {
+      "banned": "群組名稱不能為 {{name}}",
+      "duplicate": "與其他群組重複",
+      "empty": "群組名稱不能為空"
+    }
+  },
+  "inputHandleEditor": {
+    "addField": "新增欄位",
+    "addInput": "新增輸入 Handle",
+    "canPassNull": "允許傳入 {{null}}",
+    "cannotPassNull": "不接受 {{null}}",
+    "configPanelTitle": "輸入 Handle 設定",
+    "connectionRequired": "需要輸入",
+    "defineOptions": "定義選項",
+    "defineSchema": "定義類型",
+    "deleteField": "刪除欄位",
+    "enumError": "應為 enum 值",
+    "handleKeyTitle": "鍵名",
+    "handleName": "Handle 名稱",
+    "handleTypeTitle": "類型",
+    "handleValueTitle": "值",
+    "noData": "沒有資料",
+    "nullable": "可為 null",
+    "presetType": "預設類型",
+    "reference": "已連線",
+    "requiredFieldsUnset": "請設定必填欄位：{{fields}}。",
+    "secretNotFound": "找不到 Secret",
+    "title": "輸入 Handle",
+    "typeError": "應為 {{expected}} 類型",
+    "unset": "<未設定>",
+    "validationError": "請檢查設定：{{message}}",
+    "valueUnset": "未設定",
+    "widget": {
+      "array": {
+        "itemType": "項目類型",
+        "maxItems": "最多項目數",
+        "minItems": "最少項目數"
+      },
+      "color": {
+        "type": "類型"
+      },
+      "conditions": {
+        "title": "<條件 {{index}}>"
+      },
+      "date": {
+        "format": "格式"
+      },
+      "number": {
+        "exclusiveMaximum": "最大值(<)",
+        "exclusiveMinimum": "最小值(>)",
+        "maximum": "最大值(≤)",
+        "minimum": "最小值(≥)",
+        "step": "間距"
+      },
+      "object": {
+        "additionalProperties": "額外屬性",
+        "banned": "Object 屬性不能為 {{name}}"
+      },
+      "string": {
+        "format": "格式",
+        "maxLength": "最大長度",
+        "minLength": "最小長度",
+        "pattern": "正規表示式"
+      }
+    }
+  },
+  "interactiveMode": {
+    "mouse": "滑鼠友善",
+    "touchpad": "觸控板友善"
+  },
+  "jsonViewer": {
+    "bin": "二進位",
+    "secret": "Secret",
+    "showLess": "收合",
+    "showMore": "展開",
+    "var": "變數"
+  },
+  "l10n": {
+    "createKey": "啟用翻譯",
+    "deleteKey": "刪除翻譯",
+    "emptyKey": "關閉此面板後翻譯會被移除",
+    "en": "英文",
+    "invalidKey": "翻譯識別碼不能為 __proto__",
+    "openPanel": "翻譯",
+    "translateKey": "識別碼",
+    "zh-CN": "中文"
+  },
+  "miniMap": "迷你地圖",
+  "flowDisplayMode": {
+    "detail": "詳細",
+    "detailDescription": "顯示完整的節點、Handle、編輯器和控制項",
+    "overview": "概覽",
+    "overviewDescription": "顯示簡化的節點和唯讀連線"
+  },
+  "settingsPanel": {
+    "hide": "隱藏設定",
+    "show": "顯示設定"
+  },
+  "more": "更多操作",
+  "ms": "毫秒",
+  "s": "秒",
+  "nodeActions": {
+    "configSharedBlock": "共享區塊設定",
+    "delete": "刪除",
+    "deleteConfirm": "確定要刪除 {{name}} 嗎？\n按 {{shortcut}} 可直接刪除",
+    "duplicate": "建立副本",
+    "execute": "執行",
+    "executeWithoutCache": "無快取執行",
+    "nodeSetting": "節點設定",
+    "openSharedBlockCode": "任務區塊程式碼",
+    "skipDisable": "取消忽略此節點",
+    "skipDisableAll": "取消忽略選取的節點",
+    "skipEnable": "忽略此節點",
+    "skipEnableAll": "忽略選取的節點",
+    "toggleLanguage": "切換為{{lang}}"
+  },
+  "nodeContent": {
+    "addDescription": "新增描述"
+  },
+  "nodeStatus": {
+    "error": "錯誤",
+    "hasError": "有錯誤",
+    "running": "執行中",
+    "skipped": "已忽略",
+    "success": "成功",
+    "waiting": "等待中"
+  },
+  "ok": "確定",
+  "optimize": "自動排版",
+  "llmEditor": {
+    "addMessage": "新增訊息",
+    "chooseModel": "從模型清單選擇",
+    "customModel": "自訂模型...",
+    "defaultModel": "預設模型",
+    "deleteMessage": "刪除訊息",
+    "maxTokens": "最大 Token 數",
+    "messageCount": "{{count}} 則訊息",
+    "messageCountOne": "1 則訊息",
+    "messagePlaceholder": "訊息內容",
+    "loadingModels": "正在載入模型...",
+    "model": "模型",
+    "modelOptions": "模型選項",
+    "moveMessageDown": "下移訊息",
+    "moveMessageUp": "上移訊息",
+    "role": {
+      "assistant": "助理",
+      "system": "系統",
+      "user": "使用者"
+    },
+    "temperature": "Temperature",
+    "topP": "Top P"
+  },
+  "outputHandleEditor": {
+    "addOutput": "新增輸出 Handle",
+    "configPanelTitle": "輸出 Handle 設定",
+    "handleKeyTitle": "鍵名",
+    "handleTypeTitle": "類型",
+    "nullable": "可為 null",
+    "title": "輸出 Handle"
+  },
+  "preset": {
+    "Applicators": "Applicators",
+    "Select": "Select",
+    "allOf": "AllOf",
+    "any": "Any",
+    "anyOf": "AnyOf",
+    "array": "Array",
+    "binary": "Binary",
+    "boolean": "Boolean",
+    "color": "Color",
+    "date": "Date",
+    "integer": "Integer",
+    "multiSelect": "Multi",
+    "null": "Null",
+    "number": "Number",
+    "object": "Object",
+    "oneOf": "OneOf",
+    "secret": "Secret",
+    "select": "Single",
+    "string": "String",
+    "text": "Textarea",
+    "variable": "Variable"
+  },
+  "preview": {
+    "title": "預覽",
+    "textAriaLabel": "文字預覽",
+    "videoBilibili": "Bilibili 影片播放器",
+    "videoYouTube": "YouTube 影片播放器",
+    "audio": {
+      "mute": "靜音",
+      "pause": "暫停音訊",
+      "play": "播放音訊",
+      "seek": "調整音訊播放進度",
+      "title": "音訊預覽",
+      "unmute": "取消靜音",
+      "volume": "音量"
+    },
+    "table": {
+      "footer": "共 {{columns}} 欄、{{rows}} 列"
+    }
+  },
+  "schemaEditor": {
+    "description": "描述",
+    "kind": "自訂類型名稱",
+    "kindTooltip": "為類型指定一個自訂名稱。填寫後，只有名稱相同的 Handle 才能連接",
+    "label": "標籤",
+    "name": "名稱",
+    "namePlaceholder": "例如 Images",
+    "stringFormat": {
+      "email": "電子郵件",
+      "uri": "URI"
+    },
+    "value": "值"
+  },
+  "scriptlet": "小腳本",
+  "subflowEditor": {
+    "blockMode": "區塊檢視",
+    "flowMode": "Flow 檢視"
+  },
+  "subflowSettings": {
+    "forwardPreview": "轉發預覽",
+    "title": "Subflow 設定"
+  },
+  "validation": {
+    "nodeIdBanned": "Node ID 不能為 {{name}}",
+    "nodeIdExists": "Node ID 已存在",
+    "nodeIdInvalid": "Node ID 只能包含英文字母、數字、底線和連字號",
+    "sharedBlockNameBanned": "任務或 Subflow 的名稱不能為 {{name}}",
+    "sharedBlockNameExists": "已有同名的任務或 Subflow",
+    "sharedBlockNameInvalid": "任務和 Subflow 的名稱只能包含英文字母、數字、底線和連字號"
+  },
+  "workbench": {
+    "conflict": {
+      "keepLocal": "保留本機變更",
+      "reload": "從磁碟重新載入"
+    },
+    "empty": {
+      "description": "新增 Flow、Subflow 或任務的原始檔，然後重新載入工作台。",
+      "title": "這個專案還沒有可執行的目標。"
+    },
+    "noTargets": "沒有可執行的目標",
+    "resource": {
+      "openInCodeEditor": "在程式碼編輯器中開啟",
+      "showDesigner": "開啟 Designer 檢視",
+      "showSource": "開啟 YAML 原始碼",
+      "unknownType": "未知的檔案類型",
+      "unsupported": "不支援這種檔案類型"
+    },
+    "run": {
+      "cancel": "取消",
+      "cancelled": "已取消執行。",
+      "clearLogs": "清除日誌",
+      "closeInputs": "關閉執行輸入",
+      "current": "目前的執行",
+      "emptyEvents": "執行這個目標後，就可以在這裡檢視事件。",
+      "exportLogs": "匯出日誌",
+      "event": {
+        "cacheHit": "重複使用 {{handle}}",
+        "completed": "執行完成",
+        "nodeCompleted": "已完成",
+        "nodeStarted": "已開始",
+        "output": "產生 {{handle}}",
+        "outputs": "產生輸出",
+        "preview": "預覽 {{type}}",
+        "progress": "{{progress}}%",
+        "started": "開始執行"
+      },
+      "filter": {
+        "cache": "快取",
+        "empty": "沒有符合目前篩選條件的事件。",
+        "error": "錯誤",
+        "finish": "已完成",
+        "label": "篩選事件",
+        "log": "日誌",
+        "output": "輸出",
+        "preview": "預覽",
+        "progress": "進度",
+        "reset": "重設",
+        "selectAll": "全選",
+        "selected": "已選取 {{count}} 項",
+        "start": "已開始",
+        "warning": "警告"
+      },
+      "hideDetails": "隱藏執行詳情",
+      "history": "執行歷程",
+      "historyItem": "第 {{index}} 次執行",
+      "inputs": "執行輸入",
+      "form": "表單輸入",
+      "invalidInputs": "執行輸入必須是符合輸入定義的物件。",
+      "invalidJson": "執行輸入必須是有效的 JSON。",
+      "logs": "日誌",
+      "completed": "執行完成：{{target}}",
+      "externalTarget": "開啟執行中的 {{target}}",
+      "failed": "執行失敗（{{target}}）：{{message}}",
+      "openExternal": "開啟在工作台外啟動的目標：{{target}}",
+      "phase": {
+        "cancelled": "已取消",
+        "error": "失敗",
+        "idle": "就緒",
+        "running": "執行中",
+        "success": "已完成"
+      },
+      "run": "執行",
+      "showDetails": "顯示執行詳情",
+      "trigger": "Trigger"
+    },
+    "secrets": {
+      "add": "新增 Secret",
+      "addField": "新增欄位",
+      "close": "關閉",
+      "confirmDelete": "要從目前的執行環境刪除這個 Secret 嗎？",
+      "delete": "刪除",
+      "hideValue": "隱藏值",
+      "key": "鍵名",
+      "name": "名稱",
+      "removeField": "移除欄位",
+      "save": "儲存",
+      "saved": "Secret 已儲存至目前的執行環境。",
+      "showValue": "顯示值",
+      "template": "範本",
+      "title": "Secrets",
+      "value": "值"
+    },
+    "settings": {
+      "categories": "設定分類",
+      "autoFollowAgent": "Agent 開始執行時自動跟隨對應的目標",
+      "clearSearch": "清除設定搜尋",
+      "close": "關閉設定",
+      "connector": "執行器",
+      "connectorBaseUrl": "Connector Base URL",
+      "connectorCleared": "已清除本機覆寫。",
+      "connectorClear": "清除本機覆寫",
+      "connectorNotConfigured": "未設定",
+      "connectorSave": "儲存",
+      "connectorSaved": "已儲存。",
+      "connectorSource": {
+        "cli": "命令列設定",
+        "environment": "環境變數設定",
+        "oo-cli-account": "繼承的 oo-cli 帳號",
+        "oo-cli-connector": "繼承的 oo-cli Connector 設定",
+        "open-flow-settings": "Open Flow 本機設定"
+      },
+      "connectorSourceLabel": "來源",
+      "connectorTest": "測試連線",
+      "connectorTestSucceeded": "連線成功。",
+      "connectorToken": "Bearer Token",
+      "connectorTokenConfigured": "已設定",
+      "connectorTokenNotConfigured": "未設定",
+      "connectorTokenOverride": "輸入 Token 以建立本機覆寫",
+      "connectorTokenUnchanged": "已儲存的 Token 未變更",
+      "editor": "編輯器",
+      "defaultFlowDisplayMode": "設定開啟 Flow 或 Subflow 時使用的顯示模式。",
+      "expandScriptletEditor": "新建立的小腳本自動展開編輯器",
+      "llm": "大型語言模型",
+      "llmApiKey": "API Key",
+      "llmApiKeyConfigured": "已設定",
+      "llmApiKeyNotConfigured": "未設定",
+      "llmApiKeyOverride": "輸入 API Key 以建立本機覆寫",
+      "llmApiKeyUnchanged": "已儲存的 API Key 未變更",
+      "llmBaseUrl": "OpenAI 相容的 Base URL",
+      "llmCleared": "已清除 LLM 的本機覆寫。",
+      "llmModel": "預設模型",
+      "llmSaved": "LLM 設定已儲存。",
+      "llmSource": {
+        "cli": "命令列設定",
+        "environment": "環境變數設定",
+        "oo-cli": "繼承的 oo-cli LLM 設定",
+        "open-flow-settings": "Open Flow 本機設定"
+      },
+      "noResults": "找不到設定",
+      "openLogPanelOnRun": "開始執行時開啟日誌面板",
+      "runtime": "執行環境",
+      "searchPlaceholder": "搜尋設定",
+      "title": "設定"
+    },
+    "status": {
+      "conflict": "{{fileName}} 已在工作台外被修改",
+      "error": "儲存 {{fileName}} 失敗",
+      "invalid": "{{fileName}} 含有無效的 YAML",
+      "ready": "就緒",
+      "saved": "已儲存 {{fileName}}",
+      "saving": "正在儲存 {{fileName}}…",
+      "synced": "已從磁碟更新 {{fileName}}"
+    },
+    "target": "目標"
+  },
+  "valueHandleEditor": {
+    "title": "Handle"
+  },
+  "widgetAction": {
+    "download": "下載",
+    "openInNewTab": "在新分頁開啟",
+    "reload": "重新載入"
+  },
+  "zoomIn": "放大",
+  "zoomOut": "縮小"
+}

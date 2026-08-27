@@ -2,8 +2,7 @@ import type { ErrorObject, Options, ValidateFunction } from 'ajv'
 
 import Ajv from 'ajv'
 import addFormats from 'ajv-formats'
-import ajvEN from 'ajv-i18n/localize/en/index.js'
-import ajvZH from 'ajv-i18n/localize/zh/index.js'
+import { localizeAjvErrors } from './ajvLocalize.ts'
 
 /** Call this on top of the program. */
 export function createAjv(options?: Options): Ajv {
@@ -36,7 +35,6 @@ export function compile(schema?: unknown): [ValidateFunction | undefined, Error 
 export function validate(fn: ValidateFunction | undefined, data: unknown, locale?: string): ErrorObject[] | null | undefined {
   if (!fn) return []
   if (fn(data)) return []
-  if (locale && locale.startsWith('zh')) ajvZH(fn.errors)
-  else ajvEN(fn.errors)
+  localizeAjvErrors(locale, fn.errors)
   return fn.errors
 }

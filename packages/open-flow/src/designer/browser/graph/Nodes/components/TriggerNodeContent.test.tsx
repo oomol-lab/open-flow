@@ -1,3 +1,4 @@
+import type { UiLanguage } from '../../../../../localization/common/languages.ts'
 import type { TriggerNodePresentation, TriggerNodeStore } from '../../../stores/node/triggerNode.store.ts'
 
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -7,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 import { createI18n } from '../../../i18n/index.ts'
 import { TriggerNodeContent } from './TriggerNodeContent.tsx'
 
-function renderTrigger(presentation: TriggerNodePresentation, language: 'en' | 'zh-CN'): string {
+function renderTrigger(presentation: TriggerNodePresentation, language: UiLanguage): string {
   const presentation$ = val<TriggerNodePresentation | undefined>(presentation)
   const editable$ = val(true)
   const outputs$ = val([{ handle: 'payload', json_schema: { type: 'object' }, nullable: false }])

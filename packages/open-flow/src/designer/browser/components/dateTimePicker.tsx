@@ -3,6 +3,7 @@ import type { JSX } from 'react/jsx-runtime'
 
 import { clsx } from 'clsx'
 import { useState } from 'react'
+import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../ui/browser/button.tsx'
 import { Input } from '../../../ui/browser/input.tsx'
 
@@ -20,6 +21,7 @@ export interface DateTimePickerProps {
 }
 
 export function DateTimePicker(props: DateTimePickerProps): JSX.Element {
+  const t = useTranslate()
   const showDate = props.showDate ?? true
   const showTime = props.showTime ?? false
   const [uncontrolledValue, setUncontrolledValue] = useState<Date | null>(props.defaultValue ?? null)
@@ -40,7 +42,7 @@ export function DateTimePicker(props: DateTimePickerProps): JSX.Element {
         value={formatValue(selected, showDate, showTime)}
       />
       {props.isClearable && selected && !props.disabled && (
-        <Button aria-label="Clear date and time" className={styles.clear} onClick={() => onChange(null)} size="icon-xs" type="button" variant="ghost">
+        <Button aria-label={t('components.clearDateTime')} className={styles.clear} onClick={() => onChange(null)} size="icon-xs" type="button" variant="ghost">
           <i className="i-codicon:close" />
         </Button>
       )}

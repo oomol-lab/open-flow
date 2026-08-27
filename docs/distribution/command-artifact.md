@@ -72,7 +72,7 @@ export const commandArtifactVersion = 2
 interface OpenFlowCommandHost {
   readonly cloudRequest: (path: string, init?: RequestInit) => Promise<Response>
   readonly getWorkbenchUrl: (flowId?: string) => Promise<string>
-  readonly language?: 'en' | 'zh-CN'
+  readonly language?: 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko' | 'ru' | 'fr'
 }
 
 export function runOpenFlowCommand(args: readonly string[], host: OpenFlowCommandHost): Promise<number>
@@ -81,6 +81,12 @@ export function runOpenFlowCommand(args: readonly string[], host: OpenFlowComman
 `args` 是删除 `oo flow` 前缀后的参数，返回值是 `0..255` 的整数 exit code，entry 不调用 `process.exit()`。`cloudRequest` 只能请求当前
 deployment 的 `/v1/` Control API path，不是通用 authenticated fetch；`getWorkbenchUrl` 只返回当前 deployment 的正式 Workbench deep
 link。Artifact 不保存 Flow 或 deployment 选择，也不从当前工作目录推断资源 scope。
+
+`language` 接受 en、zh-CN、zh-TW、ja、ko、ru、fr。宿主也可以传入完整 BCP 47 tag，entry 会按 tag 解析（fr-CA 归到 fr，zh-HK 与
+zh-Hant-\* 归到 zh-TW，其余 zh\* 归到 zh-CN），无法识别的 tag 回退到 en。
+
+CLI 的用户可见文案全部来自 `packages/command/src/cli/node/locales/<tag>.json`，由 val-i18n 加载并在构建时内联进 `entry.js`，
+artifact 不额外分发 locale 文件。`--help` 在每种语言下都输出同一份完整命令清单，只有标题行、用法行和选项行被翻译。
 
 Artifact 与宿主在同一个受信任 Bun process 中运行，不构成 JavaScript sandbox。宿主负责注入当前身份，并拒绝跨 origin、非 Control API
 path 和 Artifact 伪造的授权 header。Artifact 不能直连 Connector、Provider 或 Cloud 返回的任意 URL。

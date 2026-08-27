@@ -146,7 +146,7 @@ export class TaskBlockDesignerService extends AbstractDesignerService {
 
   private createErrorNodeStore(designerUIStore: DesignerUIStore, blockPath: string, error?: string): ErrorNodeStore {
     return new ErrorNodeStore(blockPath as NodeId, {
-      error: error || `Unable to render block manifest ${blockPath}`,
+      error: error || this.i18n.t('errorNode.blockManifestUnrenderable', { path: blockPath }),
       designerUIStore,
       outputHandles: val([]),
     })

@@ -1,0 +1,7 @@
+{
+  "help": {
+    "usage": "사용법: {{command}}",
+    "title": "Open Flow 명령어",
+    "options": "옵션: --json, --cursor <cursor>, --limit <count>"
+  }
+}

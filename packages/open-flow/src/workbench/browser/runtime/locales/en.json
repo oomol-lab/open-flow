@@ -210,9 +210,7 @@
     "title": "Inspector"
   },
   "language": {
-    "english": "English",
-    "label": "Language",
-    "simplifiedChinese": "简体中文"
+    "label": "Language"
   },
   "jsonViewer": {
     "bin": "Binary",

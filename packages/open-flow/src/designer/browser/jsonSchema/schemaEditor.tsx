@@ -16,8 +16,6 @@ import type { WidgetType } from './preset.ts'
 import { seq } from '@wopjs/async-seq'
 import { disposableStore } from '@wopjs/disposable'
 import Ajv from 'ajv'
-import ajvEN from 'ajv-i18n/localize/en/index.js'
-import ajvZH from 'ajv-i18n/localize/zh/index.js'
 import { clsx } from 'clsx'
 import { isEqual } from 'radash'
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -38,6 +36,7 @@ import { DesignerCombobox as Select } from '../components/select.tsx'
 import { LabeledSwitch } from '../components/toggleSwitch.tsx'
 import { DesignerTooltip } from '../components/tooltip.tsx'
 import { optionOfStringFormat, stringFormatOptions, typeHasSubpanel } from '../stores/schemaEditor/constants.ts'
+import { localizeAjvErrors } from '../validate/ajvLocalize.ts'
 import { getBaseSchema, iconOf, isUndecidable, optionOf, ui_options, widgetSelectOptions } from './preset.ts'
 import { useHandleTrack } from './useHandleTrack.ts'
 
@@ -133,8 +132,7 @@ function CodeEditor({ store }: CodeEditorProps) {
               await ajv.validateSchema(schema as any)
               if (isMounted) {
                 if (ajv.errors && ajv.errors.length > 0) {
-                  if (i18n.lang.startsWith('zh')) ajvZH(ajv.errors)
-                  else ajvEN(ajv.errors)
+                  localizeAjvErrors(i18n.lang, ajv.errors)
                   setError(ajv.errorsText(ajv.errors))
                 } else {
                   setError(null)
@@ -412,8 +410,8 @@ function SubpanelString(props: SubpanelProps) {
     <>
       <Field context={context} level={props.level} isLast={false} name={t('inputHandleEditor.widget.string.format')} title="format">
         <Select
-          options={stringFormatOptions(t('inputHandleEditor.unset'))}
-          value={optionOfStringFormat(format, t('inputHandleEditor.unset'))}
+          options={stringFormatOptions(t)}
+          value={optionOfStringFormat(format, t)}
           onChange={(e) => e && setValue(format$, e.value || undefined)}
           disabled={restricted || !context.canEditSchema}
         />

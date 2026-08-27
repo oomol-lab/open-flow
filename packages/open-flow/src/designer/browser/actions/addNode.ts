@@ -90,7 +90,7 @@ export async function addNodeStore(context: AddNodeStoreContext, type: AddNodeTy
   //#region Connector
   else if (type === 'connector') {
     if (connectorCatalog == null) {
-      notification.error('Connector actions are not available in this project host.')
+      notification.error(i18n.t('addNode.connectorUnavailable'))
       return
     }
     try {
@@ -202,7 +202,7 @@ export async function addNodeStore(context: AddNodeStoreContext, type: AddNodeTy
   //#region Scriptlet
   else if (type === 'scriptlet') {
     if (!packageAuthoring.canWriteScriptlets) {
-      notification.error('Writing scriptlets is not supported by this project host.')
+      notification.error(i18n.t('addNode.scriptletUnsupported'))
       return
     }
     const scriptletConfig = scriptletPresets.get(payload)

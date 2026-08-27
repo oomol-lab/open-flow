@@ -5,6 +5,7 @@ import { isArray, isBoolean, isPlainObject, isString } from '@wopjs/cast'
 import { cluster, isDate, isNumber } from 'radash'
 import { useEffect, useRef } from 'react'
 import { ReadMoreWeb } from 'react-shorten'
+import { useTranslate } from 'val-i18n-react'
 import { CompactValue } from './CompactValue.tsx'
 import { useBool, useComponentId } from './hooks.ts'
 import { getSpecialValueKind, SpecialValue } from './specialValue.tsx'
@@ -241,6 +242,7 @@ function JsonPrimitiveValue({
   lastElement,
   stringTruncateLength,
 }: JsonRenderProps<string | number | bigint | boolean | Date | null | undefined>) {
+  const t = useTranslate()
   let stringValue: React.ReactNode
   let valueStyle = styles['value-other']
 
@@ -259,7 +261,12 @@ function JsonPrimitiveValue({
       valueStyle = `${styles['value-oo']} ${internalType}`
     } else {
       stringValue = (
-        <ReadMoreWeb truncate={stringTruncateLength} showMoreText="Show more" showLessText="Show less" className={styles['read-more']}>
+        <ReadMoreWeb
+          truncate={stringTruncateLength}
+          showMoreText={t('jsonViewer.showMore')}
+          showLessText={t('jsonViewer.showLess')}
+          className={styles['read-more']}
+        >
           "{value}"
         </ReadMoreWeb>
       )

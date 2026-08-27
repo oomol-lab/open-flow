@@ -12,6 +12,7 @@
     "noUnusedParameters": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
     "target": "ES2024",

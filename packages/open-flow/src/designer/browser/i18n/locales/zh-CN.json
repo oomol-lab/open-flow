@@ -1,15 +1,19 @@
 {
   "addNode": {
     "comment": "注释",
+    "condition": "条件",
     "connectorActions": "Connector Actions",
-    "connectorConnections": "{count} 个连接",
+    "connectorConnections": "{{count}} 个连接",
     "connectorNewConnection": "新建 Connection",
     "connectorNoActiveConnection": "没有可用连接",
     "connectorPopupBlocked": "连接窗口被浏览器拦截，请允许弹出窗口后重试。",
+    "connectorUnavailable": "当前项目宿主不支持 Connector 操作。",
     "llmChat": "LLM 对话",
     "llmStructured": "LLM 结构化输出",
+    "scriptletUnsupported": "当前项目宿主不支持编写脚本。",
     "sharedBlocks": "任务与子流程",
-    "triggers": "触发器"
+    "triggers": "触发器",
+    "value": "值"
   },
   "blockEditor": {
     "addDefaultAdditionalInput": "添加默认额外输入",
@@ -72,7 +76,8 @@
   "cancel": "取消",
   "clipboard": {
     "copySuccess": "已复制 {{@}} 个节点",
-    "copySuccess@1": "已复制 1 个节点"
+    "copySuccess@1": "已复制 1 个节点",
+    "pasteScriptletUnsupported": "当前项目宿主不支持粘贴脚本。"
   },
   "comment": {
     "editWithMarkdown": "使用 Markdown 编辑",
@@ -82,6 +87,7 @@
   "components": {
     "chooseColor": "选择颜色",
     "clear": "清除",
+    "clearDateTime": "清除日期和时间",
     "colorValue": "颜色值",
     "loading": "加载中",
     "noMatching": "无匹配项",
@@ -210,7 +216,9 @@
     "varDiffType": "变量输出只能连接到变量输入"
   },
   "errorNode": {
-    "blockNotFound": "未找到任务或子流程 YAML 文件"
+    "blockManifestUnrenderable": "无法渲染 Block 清单 {{path}}",
+    "blockNotFound": "未找到任务或子流程 YAML 文件",
+    "unsupportedNode": "不支持的节点元数据"
   },
   "fitView": "适应视图",
   "flowEditor": {
@@ -233,6 +241,7 @@
     "handle": "接口",
     "inputHandle": "输入接口",
     "noInputOutput": "没有输入或输出接口",
+    "of": "元素类型",
     "renaming": {
       "banned": "Handle 名不能为 {{name}}",
       "duplicate": "与其他 Handle 重名",
@@ -240,7 +249,8 @@
     },
     "schemaDescription": "JSON Schema 说明...",
     "secretUnavailable": "Secret 目录不可用",
-    "selectSecret": "选择密钥"
+    "selectSecret": "选择密钥",
+    "unknown": "未知"
   },
   "handleGroup": {
     "delete": "删除组",
@@ -319,6 +329,8 @@
   "jsonViewer": {
     "bin": "二进制",
     "secret": "密钥",
+    "showLess": "收起",
+    "showMore": "展开",
     "var": "变量"
   },
   "l10n": {
@@ -429,6 +441,9 @@
   },
   "preview": {
     "title": "预览",
+    "textAriaLabel": "文本预览",
+    "videoBilibili": "Bilibili 视频播放器",
+    "videoYouTube": "YouTube 视频播放器",
     "audio": {
       "mute": "静音",
       "pause": "暂停音频",
@@ -449,6 +464,10 @@
     "label": "标签",
     "name": "名称",
     "namePlaceholder": "例如 Images",
+    "stringFormat": {
+      "email": "邮箱",
+      "uri": "URI"
+    },
     "value": "值"
   },
   "scriptlet": "小脚本",

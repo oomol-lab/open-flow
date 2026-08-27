@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { resolveUiLanguage } from '@oomol-lab/open-flow/localization'
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { setTimeout } from 'node:timers/promises'
@@ -44,7 +45,7 @@ export async function runOpenFlowCommand(args: readonly string[], host: OpenFlow
     },
     {
       env: process.env,
-      language: host.language == 'zh-CN' ? 'zh-CN' : 'en',
+      language: resolveUiLanguage([host.language]),
       openUrl: openExternalUrl,
       readFile: async (path) => await readFile(path, 'utf8'),
       readStdin: async () => {

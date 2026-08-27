@@ -136,7 +136,7 @@ export function setupOnPasteListener(
       )
       if (!clipboardData) return
       if (!canWriteScriptlets && clipboardData.nodes.some((node) => node.scriptletSource != null)) {
-        notification.error('Pasting scriptlets is not supported by this project host.')
+        notification.error(i18n.t('clipboard.pasteScriptletUnsupported'))
         return
       }
 

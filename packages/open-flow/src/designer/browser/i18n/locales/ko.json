@@ -1,0 +1,655 @@
+{
+  "addNode": {
+    "comment": "주석",
+    "condition": "조건",
+    "connectorActions": "Connector 액션",
+    "connectorConnections": "Connection {{count}}개",
+    "connectorNewConnection": "새 Connection",
+    "connectorNoActiveConnection": "사용 가능한 Connection이 없습니다",
+    "connectorPopupBlocked": "연결 창이 차단되었습니다. 팝업을 허용한 뒤 다시 시도하세요.",
+    "connectorUnavailable": "이 프로젝트 호스트에서는 Connector 액션을 사용할 수 없습니다.",
+    "llmChat": "LLM 대화",
+    "llmStructured": "LLM 구조화 출력",
+    "scriptletUnsupported": "이 프로젝트 호스트에서는 스크립틀릿 작성을 지원하지 않습니다.",
+    "sharedBlocks": "태스크와 Subflow",
+    "triggers": "Trigger",
+    "value": "값"
+  },
+  "blockEditor": {
+    "addDefaultAdditionalInput": "기본 추가 입력 만들기",
+    "addDefaultAdditionalOutput": "기본 추가 출력 만들기",
+    "additionalInputs": "추가 입력",
+    "additionalInputsHelp": {
+      "allow": "허용",
+      "disallow": "허용 안 함",
+      "restrict": "제한적 허용"
+    },
+    "additionalOutputs": "추가 출력",
+    "additionalOutputsHelp": {
+      "allow": "허용",
+      "disallow": "허용 안 함",
+      "restrict": "제한적 허용"
+    },
+    "configHeader": "블록 설정",
+    "defaultAdditionalInputs": "기본 추가 입력",
+    "defaultAdditionalOutputs": "기본 추가 출력",
+    "description": "설명",
+    "executor": {
+      "action": "액션",
+      "connection": "Connection",
+      "connectionAccount": "계정",
+      "connectionDetails": "현재 Connection",
+      "connectionId": "Connection ID",
+      "connectionStatus": "상태",
+      "connectionStatus_active": "사용 가능",
+      "connectionStatus_disconnected": "연결 끊김",
+      "connectionStatus_error": "오류",
+      "connectionStatus_reauth_required": "재인증 필요",
+      "connectionUnresolved": "확인되지 않음",
+      "entry": "진입점",
+      "function": "함수명",
+      "mode": "모드",
+      "mode_chat": "대화",
+      "mode_json": "JSON",
+      "name": "이름",
+      "title": "실행기"
+    },
+    "folder": "폴더 이름",
+    "icon": "아이콘",
+    "metadata": "메타데이터",
+    "nodeTitlePlaceholder": "제목 입력...",
+    "private": "비공개",
+    "privateField": "비공개",
+    "privateHelp": "AI와 외부 사용자가 사용할 수 없도록 공유 블록을 비공개로 표시합니다.",
+    "public": "공개",
+    "runningConfig": {
+      "concurrency": "동시 실행 수",
+      "progressWeight": "진행률 가중치",
+      "timeout": "제한 시간",
+      "title": "실행 설정"
+    },
+    "sourceNotFound": "블록 소스 파일을 찾을 수 없습니다",
+    "task": "블록 이름",
+    "taskHeader": "공유 블록에서 가져옴",
+    "title": "제목"
+  },
+  "cancel": "취소",
+  "clipboard": {
+    "copySuccess": "노드 {{@}}개를 복사했습니다",
+    "copySuccess@1": "노드 1개를 복사했습니다",
+    "pasteScriptletUnsupported": "이 프로젝트 호스트에서는 스크립틀릿 붙여넣기를 지원하지 않습니다."
+  },
+  "comment": {
+    "editWithMarkdown": "Markdown으로 편집",
+    "preview": "미리 보기",
+    "source": "원본 보기"
+  },
+  "components": {
+    "chooseColor": "색상 선택",
+    "clear": "지우기",
+    "clearDateTime": "날짜와 시간 지우기",
+    "colorValue": "색상 값",
+    "loading": "불러오는 중",
+    "noMatching": "일치하는 항목이 없습니다",
+    "numOptions": "옵션 {{count}}개",
+    "pickColorFromScreen": "화면에서 색상 추출"
+  },
+  "trigger": {
+    "catalogEmpty": "일치하는 Trigger가 없습니다",
+    "catalogEmptyHelp": "서비스 또는 이벤트 이름으로 검색해 보세요.",
+    "catalogUnavailable": "Provider Trigger 카탈로그를 사용할 수 없습니다",
+    "catalogUnavailableHelp": "기본 제공 Trigger와 이미 저장된 정의는 계속 사용할 수 있습니다.",
+    "configuration": "구성",
+    "configInvalid": "유효한 구성 값을 입력하세요.",
+    "connection": "계정",
+    "integrationSummary": "이벤트가 도착하면 실행",
+    "pollSchedule": "폴링 일정",
+    "pollScheduleHelp": "이 Trigger가 새 이벤트를 확인하는 주기를 선택하세요.",
+    "scheduleCron": "Cron",
+    "scheduleDays": "일",
+    "scheduleEvery": "주기",
+    "scheduleEveryDay": "{{value}}일마다",
+    "scheduleEveryHour": "{{value}}시간마다",
+    "scheduleEveryMinute": "{{value}}분마다",
+    "scheduleEveryMonth": "{{value}}개월마다",
+    "scheduleEveryWeek": "{{value}}주마다",
+    "scheduleExpression": "Cron 표현식",
+    "scheduleHours": "시간",
+    "scheduleInterval": "폴링 간격",
+    "scheduleMinutes": "분",
+    "scheduleMonths": "개월",
+    "scheduleTimezone": "시간대",
+    "scheduleType": "일정 유형",
+    "scheduleUnit": "간격 단위",
+    "scheduleWeeks": "주",
+    "scheduleMissing": "설정된 일정이 없습니다",
+    "summaryCron": "일정",
+    "summaryIntegration": "이벤트 소스",
+    "summaryPoll": "폴링 일정",
+    "summaryWebhook": "요청 Trigger",
+    "webhookAddField": "필드 추가",
+    "webhookAddHeader": "헤더 추가",
+    "webhookCustomType": "사용자 지정 스키마",
+    "webhookDeleteField": "페이로드 필드 삭제",
+    "webhookDeleteHeader": "응답 헤더 삭제",
+    "webhookFieldName": "필드 이름",
+    "webhookFieldNameDuplicate": "필드 이름은 중복될 수 없습니다.",
+    "webhookFieldNameRequired": "필드 이름을 입력하세요.",
+    "webhookFieldType": "타입",
+    "webhookHeaderName": "헤더 이름",
+    "webhookHeaders": "응답 헤더",
+    "webhookHeaderValue": "헤더 값",
+    "webhookMethods": "허용 메서드",
+    "webhookNoPayloadFields": "요청 페이로드는 빈 객체를 허용합니다.",
+    "webhookNoResponseBody": "응답 본문 없음",
+    "webhookNullable": "null 허용",
+    "webhookOrigins": "허용 출처",
+    "webhookPayloadFields": "페이로드 필드",
+    "webhookRequest": "요청",
+    "webhookResponse": "응답",
+    "webhookResponseData": "응답 본문",
+    "webhookStatus": "상태 코드",
+    "webhookSummary": "HTTP 요청이 도착하면 실행",
+    "webhookDescription": "생성된 HTTP 엔드포인트로 JSON 객체를 수신합니다."
+  },
+  "condition": {
+    "addCondition": "조건 추가",
+    "configPanelTitle": "설정",
+    "default": "기본",
+    "defaultDescription": "기본 케이스",
+    "defaultHelp": "다른 조건이 하나도 일치하지 않을 때 이 케이스를 실행합니다",
+    "deleteCondition": "조건 삭제",
+    "handleKeyTitle": "Handle",
+    "handleLogicalTitle": "논리 연산",
+    "inputHelp": "가장 먼저 일치한 조건이 첫 번째 입력 Handle의 데이터를 출력합니다",
+    "label": "케이스",
+    "logical": {
+      "AND": "그리고 (AND)",
+      "OR": "또는 (OR)"
+    },
+    "operator": {
+      "!=": "≠",
+      "<": "<",
+      "<=": "≤",
+      "==": "=",
+      ">": ">",
+      ">=": "≥",
+      "contains": "포함",
+      "ends_with": "다음으로 끝남",
+      "has_key": "키 있음",
+      "has_value": "값 있음",
+      "is_empty": "비어 있음",
+      "is_false": "false임",
+      "is_not_empty": "비어 있지 않음",
+      "is_not_null": "null 아님",
+      "is_null": "null임",
+      "is_true": "true임",
+      "not_contains": "포함 안 함",
+      "not_has_key": "키 없음",
+      "not_has_value": "값 없음",
+      "starts_with": "다음으로 시작함"
+    },
+    "title": "조건 Handle",
+    "toggleDefault": "기본 조건"
+  },
+  "contextMenu": {
+    "addNode": "노드 추가",
+    "empty": "일치하는 블록이 없습니다",
+    "loadFailed": "Connector 액션을 불러오지 못했습니다.",
+    "paste": "붙여넣기",
+    "retry": "다시 시도",
+    "search": "검색"
+  },
+  "copy": "복사",
+  "close": "닫기",
+  "create": "만들기",
+  "delete": "삭제",
+  "edit": "편집",
+  "edgeError": {
+    "aggregateSummary": "연결 {{connectionCount}}개 중 {{errorCount}}개에 오류가 있습니다",
+    "binDiffType": "바이너리 데이터가 호환되지 않습니다",
+    "default": "데이터 타입이 호환되지 않습니다",
+    "diffKind": "Handle 종류가 일치하지 않습니다",
+    "errorNode": "손상된 노드에 연결되어 있습니다",
+    "nullable": "소스는 null을 허용하지만 대상은 허용하지 않습니다",
+    "varDiffPkg": "변수가 서로 다른 프로젝트에 속해 있습니다",
+    "varDiffType": "변수 출력은 변수 입력에만 연결할 수 있습니다"
+  },
+  "errorNode": {
+    "blockManifestUnrenderable": "블록 매니페스트를 렌더링할 수 없습니다: {{path}}",
+    "blockNotFound": "태스크 또는 Subflow YAML 파일을 찾을 수 없습니다",
+    "unsupportedNode": "지원하지 않는 노드 메타데이터입니다"
+  },
+  "fitView": "화면 맞춤",
+  "flowEditor": {
+    "node": {
+      "configHeader": "노드 설정",
+      "id": "Node ID"
+    }
+  },
+  "flowSettings": {
+    "title": "Flow 설정"
+  },
+  "handleEditor": {
+    "addItem": "항목 추가",
+    "additionalInputs": "추가 입력",
+    "additionalOutputs": "추가 출력",
+    "click": "클릭",
+    "descButton": "JSON Schema 설명",
+    "dropOr": "드롭 또는",
+    "editSharedBlock": "공유 블록 편집",
+    "handle": "Handle",
+    "inputHandle": "입력 Handle",
+    "noInputOutput": "입력 또는 출력 Handle이 없습니다",
+    "of": "요소 타입",
+    "renaming": {
+      "banned": "Handle 이름을 {{name}}(으)로 지정할 수 없습니다",
+      "duplicate": "다른 Handle과 이름이 중복됩니다",
+      "empty": "Handle 이름은 비워 둘 수 없습니다"
+    },
+    "schemaDescription": "JSON Schema 설명...",
+    "secretUnavailable": "시크릿 카탈로그를 사용할 수 없습니다",
+    "selectSecret": "시크릿 선택",
+    "unknown": "알 수 없음"
+  },
+  "handleGroup": {
+    "delete": "그룹 삭제",
+    "dropAdd": "드롭하여 새 그룹 추가",
+    "fallback": "그룹 이름 입력…",
+    "renaming": {
+      "banned": "그룹 이름을 {{name}}(으)로 지정할 수 없습니다",
+      "duplicate": "다른 그룹과 이름이 중복됩니다",
+      "empty": "그룹 이름은 비워 둘 수 없습니다"
+    }
+  },
+  "inputHandleEditor": {
+    "addField": "필드 추가",
+    "addInput": "입력 추가",
+    "canPassNull": "{{null}} 허용",
+    "cannotPassNull": "{{null}} 허용 안 함",
+    "configPanelTitle": "입력 Handle 설정",
+    "connectionRequired": "입력 필요",
+    "defineOptions": "옵션 정의",
+    "defineSchema": "스키마 정의",
+    "deleteField": "필드 삭제",
+    "enumError": "enum 값이 필요합니다",
+    "handleKeyTitle": "키",
+    "handleName": "Handle",
+    "handleTypeTitle": "타입",
+    "handleValueTitle": "값",
+    "noData": "데이터 없음",
+    "nullable": "null 허용",
+    "presetType": "사전 설정 타입",
+    "reference": "연결됨",
+    "requiredFieldsUnset": "필수 항목을 설정하세요: {{fields}}.",
+    "secretNotFound": "시크릿을 찾을 수 없습니다",
+    "title": "입력 Handle",
+    "typeError": "{{expected}} 타입이 필요합니다",
+    "unset": "<설정 안 됨>",
+    "validationError": "설정을 확인하세요: {{message}}",
+    "valueUnset": "설정 안 됨",
+    "widget": {
+      "array": {
+        "itemType": "항목 타입",
+        "maxItems": "최대 항목 수",
+        "minItems": "최소 항목 수"
+      },
+      "color": {
+        "type": "타입"
+      },
+      "conditions": {
+        "title": "<조건 {{index}}>"
+      },
+      "date": {
+        "format": "형식"
+      },
+      "number": {
+        "exclusiveMaximum": "최댓값(<)",
+        "exclusiveMinimum": "최솟값(>)",
+        "maximum": "최댓값(≤)",
+        "minimum": "최솟값(≥)",
+        "step": "증가폭"
+      },
+      "object": {
+        "additionalProperties": "추가 속성",
+        "banned": "Object 속성 이름을 {{name}}(으)로 지정할 수 없습니다"
+      },
+      "string": {
+        "format": "형식",
+        "maxLength": "최대 길이",
+        "minLength": "최소 길이",
+        "pattern": "정규식"
+      }
+    }
+  },
+  "interactiveMode": {
+    "mouse": "마우스 최적화",
+    "touchpad": "터치패드 최적화"
+  },
+  "jsonViewer": {
+    "bin": "바이너리",
+    "secret": "시크릿",
+    "showLess": "간략히 보기",
+    "showMore": "더 보기",
+    "var": "변수"
+  },
+  "l10n": {
+    "createKey": "번역 사용",
+    "deleteKey": "번역 삭제",
+    "emptyKey": "이 패널을 닫으면 번역이 삭제됩니다",
+    "en": "영어",
+    "invalidKey": "번역 키로 __proto__를 사용할 수 없습니다",
+    "openPanel": "번역",
+    "translateKey": "키",
+    "zh-CN": "중국어"
+  },
+  "miniMap": "미니맵",
+  "flowDisplayMode": {
+    "detail": "상세",
+    "detailDescription": "노드, 포트, 편집기, 컨트롤을 모두 표시",
+    "overview": "개요",
+    "overviewDescription": "간략한 노드와 읽기 전용 연결을 표시"
+  },
+  "settingsPanel": {
+    "hide": "설정 숨기기",
+    "show": "설정 표시"
+  },
+  "more": "추가 작업",
+  "ms": "밀리초",
+  "s": "초",
+  "nodeActions": {
+    "configSharedBlock": "공유 블록 설정",
+    "delete": "삭제",
+    "deleteConfirm": "{{name}} 노드를 삭제하시겠습니까?\n{{shortcut}} 키를 누르면 바로 삭제됩니다",
+    "duplicate": "복제",
+    "execute": "실행",
+    "executeWithoutCache": "캐시 없이 실행",
+    "nodeSetting": "노드 설정",
+    "openSharedBlockCode": "태스크 블록 코드",
+    "skipDisable": "이 노드 무시 해제",
+    "skipDisableAll": "선택한 노드 무시 해제",
+    "skipEnable": "이 노드 무시",
+    "skipEnableAll": "선택한 노드 무시",
+    "toggleLanguage": "{{lang}}로 전환"
+  },
+  "nodeContent": {
+    "addDescription": "설명 추가"
+  },
+  "nodeStatus": {
+    "error": "오류",
+    "hasError": "오류 있음",
+    "running": "실행 중",
+    "skipped": "무시됨",
+    "success": "성공",
+    "waiting": "대기 중"
+  },
+  "ok": "확인",
+  "optimize": "레이아웃 정리",
+  "llmEditor": {
+    "addMessage": "메시지 추가",
+    "chooseModel": "모델 목록에서 선택",
+    "customModel": "사용자 지정 모델...",
+    "defaultModel": "기본 모델",
+    "deleteMessage": "메시지 삭제",
+    "maxTokens": "최대 Token 수",
+    "messageCount": "메시지 {{count}}개",
+    "messageCountOne": "메시지 1개",
+    "messagePlaceholder": "메시지 내용",
+    "loadingModels": "모델 불러오는 중...",
+    "model": "모델",
+    "modelOptions": "모델 옵션",
+    "moveMessageDown": "메시지 아래로 이동",
+    "moveMessageUp": "메시지 위로 이동",
+    "role": {
+      "assistant": "어시스턴트",
+      "system": "시스템",
+      "user": "사용자"
+    },
+    "temperature": "Temperature",
+    "topP": "Top P"
+  },
+  "outputHandleEditor": {
+    "addOutput": "출력 추가",
+    "configPanelTitle": "출력 Handle 설정",
+    "handleKeyTitle": "키",
+    "handleTypeTitle": "타입",
+    "nullable": "null 허용",
+    "title": "출력 Handle"
+  },
+  "preset": {
+    "Applicators": "Applicators",
+    "Select": "Select",
+    "allOf": "AllOf",
+    "any": "Any",
+    "anyOf": "AnyOf",
+    "array": "Array",
+    "binary": "Binary",
+    "boolean": "Boolean",
+    "color": "Color",
+    "date": "Date",
+    "integer": "Integer",
+    "multiSelect": "Multi",
+    "null": "Null",
+    "number": "Number",
+    "object": "Object",
+    "oneOf": "OneOf",
+    "secret": "Secret",
+    "select": "Single",
+    "string": "String",
+    "text": "Textarea",
+    "variable": "Variable"
+  },
+  "preview": {
+    "title": "미리 보기",
+    "textAriaLabel": "텍스트 미리 보기",
+    "videoBilibili": "Bilibili 동영상 플레이어",
+    "videoYouTube": "YouTube 동영상 플레이어",
+    "audio": {
+      "mute": "음소거",
+      "pause": "오디오 일시 정지",
+      "play": "오디오 재생",
+      "seek": "오디오 탐색",
+      "title": "오디오 미리 보기",
+      "unmute": "음소거 해제",
+      "volume": "오디오 볼륨"
+    },
+    "table": {
+      "footer": "전체 {{columns}}열, {{rows}}행"
+    }
+  },
+  "schemaEditor": {
+    "description": "설명",
+    "kind": "사용자 지정 타입 이름",
+    "kindTooltip": "타입에 사용할 사용자 지정 이름을 지정합니다. 지정하면 같은 이름을 가진 Handle끼리만 연결할 수 있습니다",
+    "label": "레이블",
+    "name": "이름",
+    "namePlaceholder": "예: Images",
+    "stringFormat": {
+      "email": "이메일",
+      "uri": "URI"
+    },
+    "value": "값"
+  },
+  "scriptlet": "스크립틀릿",
+  "subflowEditor": {
+    "blockMode": "블록 보기",
+    "flowMode": "Flow 보기"
+  },
+  "subflowSettings": {
+    "forwardPreview": "미리 보기 전달",
+    "title": "Subflow 설정"
+  },
+  "validation": {
+    "nodeIdBanned": "Node ID를 {{name}}(으)로 지정할 수 없습니다",
+    "nodeIdExists": "이미 존재하는 Node ID입니다",
+    "nodeIdInvalid": "Node ID에는 영문자, 숫자, 밑줄, 하이픈만 사용할 수 있습니다",
+    "sharedBlockNameBanned": "태스크 또는 Subflow 이름을 {{name}}(으)로 지정할 수 없습니다",
+    "sharedBlockNameExists": "같은 이름의 태스크 또는 Subflow가 이미 있습니다",
+    "sharedBlockNameInvalid": "태스크와 Subflow 이름에는 영문자, 숫자, 밑줄, 하이픈만 사용할 수 있습니다"
+  },
+  "workbench": {
+    "conflict": {
+      "keepLocal": "로컬 변경 사항 유지",
+      "reload": "디스크에서 다시 불러오기"
+    },
+    "empty": {
+      "description": "Flow, Subflow 또는 태스크 소스 파일을 추가한 뒤 워크벤치를 다시 불러오세요.",
+      "title": "이 프로젝트에는 아직 실행할 수 있는 대상이 없습니다."
+    },
+    "noTargets": "실행 가능한 대상 없음",
+    "resource": {
+      "openInCodeEditor": "코드 편집기에서 열기",
+      "showDesigner": "Designer 보기 열기",
+      "showSource": "YAML 소스 열기",
+      "unknownType": "알 수 없는 파일 형식",
+      "unsupported": "지원하지 않는 파일 형식입니다"
+    },
+    "run": {
+      "cancel": "취소",
+      "cancelled": "실행이 취소되었습니다.",
+      "clearLogs": "로그 지우기",
+      "closeInputs": "실행 입력 닫기",
+      "current": "현재 실행",
+      "emptyEvents": "이 대상을 실행하면 이벤트를 확인할 수 있습니다.",
+      "exportLogs": "로그 내보내기",
+      "event": {
+        "cacheHit": "{{handle}} 재사용",
+        "completed": "실행 완료",
+        "nodeCompleted": "완료됨",
+        "nodeStarted": "시작됨",
+        "output": "{{handle}} 생성",
+        "outputs": "출력 생성",
+        "preview": "{{type}} 미리 보기",
+        "progress": "{{progress}}%",
+        "started": "실행 시작"
+      },
+      "filter": {
+        "cache": "캐시",
+        "empty": "현재 필터와 일치하는 이벤트가 없습니다.",
+        "error": "오류",
+        "finish": "완료",
+        "label": "이벤트 필터",
+        "log": "로그",
+        "output": "출력",
+        "preview": "미리 보기",
+        "progress": "진행률",
+        "reset": "초기화",
+        "selectAll": "전체 선택",
+        "selected": "{{count}}개 선택됨",
+        "start": "시작",
+        "warning": "경고"
+      },
+      "hideDetails": "실행 세부 정보 숨기기",
+      "history": "실행 기록",
+      "historyItem": "{{index}}번째 실행",
+      "inputs": "실행 입력",
+      "form": "폼 입력",
+      "invalidInputs": "실행 입력은 입력 정의와 일치하는 객체여야 합니다.",
+      "invalidJson": "실행 입력은 유효한 JSON이어야 합니다.",
+      "logs": "로그",
+      "completed": "실행 완료: {{target}}",
+      "externalTarget": "실행 중인 {{target}} 열기",
+      "failed": "{{target}} 실행 실패: {{message}}",
+      "openExternal": "워크벤치 외부에서 시작된 대상 열기: {{target}}",
+      "phase": {
+        "cancelled": "취소됨",
+        "error": "실패",
+        "idle": "준비됨",
+        "running": "실행 중",
+        "success": "완료됨"
+      },
+      "run": "실행",
+      "showDetails": "실행 세부 정보 표시",
+      "trigger": "Trigger"
+    },
+    "secrets": {
+      "add": "시크릿 추가",
+      "addField": "필드 추가",
+      "close": "닫기",
+      "confirmDelete": "현재 런타임에서 이 시크릿을 삭제하시겠습니까?",
+      "delete": "삭제",
+      "hideValue": "값 숨기기",
+      "key": "키",
+      "name": "이름",
+      "removeField": "필드 삭제",
+      "save": "저장",
+      "saved": "이 런타임에 시크릿을 저장했습니다.",
+      "showValue": "값 표시",
+      "template": "템플릿",
+      "title": "시크릿",
+      "value": "값"
+    },
+    "settings": {
+      "categories": "설정 분류",
+      "autoFollowAgent": "Agent가 실행을 시작하면 해당 대상으로 자동 이동",
+      "clearSearch": "설정 검색 지우기",
+      "close": "설정 닫기",
+      "connector": "실행기",
+      "connectorBaseUrl": "Connector 기본 URL",
+      "connectorCleared": "로컬 재정의를 지웠습니다.",
+      "connectorClear": "로컬 재정의 지우기",
+      "connectorNotConfigured": "설정 안 됨",
+      "connectorSave": "저장",
+      "connectorSaved": "저장했습니다.",
+      "connectorSource": {
+        "cli": "명령줄 설정",
+        "environment": "환경 변수 설정",
+        "oo-cli-account": "상속된 oo-cli 계정",
+        "oo-cli-connector": "상속된 oo-cli Connector 설정",
+        "open-flow-settings": "Open Flow 로컬 설정"
+      },
+      "connectorSourceLabel": "출처",
+      "connectorTest": "연결 테스트",
+      "connectorTestSucceeded": "연결에 성공했습니다.",
+      "connectorToken": "Bearer Token",
+      "connectorTokenConfigured": "설정됨",
+      "connectorTokenNotConfigured": "설정 안 됨",
+      "connectorTokenOverride": "로컬 재정의를 만들려면 Token을 입력하세요",
+      "connectorTokenUnchanged": "저장된 Token이 변경되지 않았습니다",
+      "editor": "편집기",
+      "defaultFlowDisplayMode": "Flow 또는 Subflow를 열 때 사용할 표시 모드를 설정합니다.",
+      "expandScriptletEditor": "새로 만든 스크립틀릿의 편집기를 펼쳐서 표시",
+      "llm": "언어 모델",
+      "llmApiKey": "API 키",
+      "llmApiKeyConfigured": "설정됨",
+      "llmApiKeyNotConfigured": "설정 안 됨",
+      "llmApiKeyOverride": "로컬 재정의를 만들려면 API 키를 입력하세요",
+      "llmApiKeyUnchanged": "저장된 API 키가 변경되지 않았습니다",
+      "llmBaseUrl": "OpenAI 호환 기본 URL",
+      "llmCleared": "LLM 로컬 재정의를 지웠습니다.",
+      "llmModel": "기본 모델",
+      "llmSaved": "LLM 설정을 저장했습니다.",
+      "llmSource": {
+        "cli": "명령줄 설정",
+        "environment": "환경 변수 설정",
+        "oo-cli": "상속된 oo-cli LLM 설정",
+        "open-flow-settings": "Open Flow 로컬 설정"
+      },
+      "noResults": "설정을 찾을 수 없습니다",
+      "openLogPanelOnRun": "실행이 시작되면 로그 패널 열기",
+      "runtime": "런타임",
+      "searchPlaceholder": "설정 검색",
+      "title": "설정"
+    },
+    "status": {
+      "conflict": "{{fileName}} 파일이 워크벤치 외부에서 변경되었습니다",
+      "error": "{{fileName}} 저장 실패",
+      "invalid": "{{fileName}} 파일에 잘못된 YAML이 있습니다",
+      "ready": "준비됨",
+      "saved": "{{fileName}} 저장됨",
+      "saving": "{{fileName}} 저장 중…",
+      "synced": "디스크에서 {{fileName}} 업데이트됨"
+    },
+    "target": "대상"
+  },
+  "valueHandleEditor": {
+    "title": "Handle"
+  },
+  "widgetAction": {
+    "download": "다운로드",
+    "openInNewTab": "새 탭에서 열기",
+    "reload": "다시 불러오기"
+  },
+  "zoomIn": "확대",
+  "zoomOut": "축소"
+}

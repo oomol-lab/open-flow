@@ -34,6 +34,7 @@ export function eventHasDetails(event: RunEvent): boolean {
 }
 
 export function RunEventDetail({ event }: { readonly event: RunEvent }): ReactElement | null {
+  const language = useLang()
   const t = useTranslate()
   switch (event.kind) {
     case 'node.output': {
@@ -62,7 +63,7 @@ export function RunEventDetail({ event }: { readonly event: RunEvent }): ReactEl
               </div>
               <div>
                 <dt>{t('run.encodedBytes')}</dt>
-                <dd>{typeof output.encodedBytes == 'number' ? output.encodedBytes.toLocaleString() : String(output.encodedBytes)}</dd>
+                <dd>{typeof output.encodedBytes == 'number' ? output.encodedBytes.toLocaleString(language) : String(output.encodedBytes)}</dd>
               </div>
             </dl>
             <p className="run-detail-note">{t('run.storedOutputUnavailable')}</p>

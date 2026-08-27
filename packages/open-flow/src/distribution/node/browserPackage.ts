@@ -32,6 +32,7 @@ const runEventsEntryPath = 'src/execution/common/events.ts'
 const runtimeContractEntryPath = 'src/execution/common/runtime.ts'
 const schedulerEntryPath = 'src/execution/common/scheduler.ts'
 const webhookTriggerEntryPath = 'src/trigger/common/webhook.ts'
+const localizationEntryPath = 'src/localization/common/languages.ts'
 const workbenchEntryPath = 'src/workbench/browser/runtime/openFlowWorkbench.tsx'
 
 interface BuildBrowserPackageOptions {
@@ -58,6 +59,7 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   await buildRuntime(options, commonOutputPath, pollTriggerEntryPath, 'poll-trigger', false)
   await buildRuntime(options, commonOutputPath, providerTriggersEntryPath, 'provider-triggers', false)
   await buildRuntime(options, commonOutputPath, webhookTriggerEntryPath, 'webhook-trigger', false)
+  await buildRuntime(options, commonOutputPath, localizationEntryPath, 'localization', false)
   await buildRuntime(options, browserOutputPath, flowChangeEntryPath, 'flow-change', true)
   await buildRuntime(options, browserOutputPath, flowAuthoringEntryPath, 'flow-authoring', false)
   await buildRuntime(options, browserOutputPath, workbenchEntryPath, 'workbench', false)
@@ -180,6 +182,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         path.join(options.sourceRoot, pollTriggerEntryPath),
         path.join(options.sourceRoot, providerTriggersEntryPath),
         path.join(options.sourceRoot, webhookTriggerEntryPath),
+        path.join(options.sourceRoot, localizationEntryPath),
         path.join(options.sourceRoot, flowAuthoringEntryPath),
         path.join(options.sourceRoot, flowChangeEntryPath),
         path.join(options.sourceRoot, workbenchEntryPath),
@@ -189,10 +192,10 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
     const workbenchDeclaration = await readFile(path.join(declarationRoot, 'workbench/browser/runtime/openFlowWorkbench.d.ts'), 'utf8')
     const workbenchStyleImport = "import './styles.css';\n"
     if (!workbenchDeclaration.startsWith(workbenchStyleImport)) throw new Error('Workbench declaration did not contain the expected style import.')
-    const workbenchContract = (await readFile(path.join(declarationRoot, 'workbench/browser/runtime/contract.d.ts'), 'utf8')).replaceAll(
-      "'../../../control/common/flowNotifications.ts'",
-      "'./flow-notifications.js'",
-    )
+    const workbenchContract = (await readFile(path.join(declarationRoot, 'workbench/browser/runtime/contract.d.ts'), 'utf8'))
+      .replaceAll("'../../../control/common/flowNotifications.ts'", "'./flow-notifications.js'")
+      .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'")
+    const localizationDeclaration = await readFile(path.join(declarationRoot, 'localization/common/languages.d.ts'), 'utf8')
     const flowNotificationsDeclaration = await readFile(path.join(declarationRoot, 'control/common/flowNotifications.d.ts'), 'utf8')
     const flowAuthoringDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/authoring.d.ts'), 'utf8'))
       .replaceAll("'./edgeChanges.ts'", "'./flow-authoring-edge.js'")
@@ -260,7 +263,10 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(commonOutputPath, 'flow-semantics.d.ts'), flowSemanticsDeclaration),
       writeFile(
         path.join(browserOutputPath, 'workbench.d.ts'),
-        workbenchDeclaration.slice(workbenchStyleImport.length).replaceAll("'./contract.ts'", "'./workbench-contract.js'"),
+        workbenchDeclaration
+          .slice(workbenchStyleImport.length)
+          .replaceAll("'./contract.ts'", "'./workbench-contract.js'")
+          .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'"),
       ),
       writeFile(path.join(browserOutputPath, 'workbench-contract.d.ts'), workbenchContract),
       writeFile(path.join(browserOutputPath, 'flow-notifications.d.ts'), flowNotificationsDeclaration),
@@ -282,6 +288,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(commonOutputPath, 'poll-trigger.d.ts'), pollTriggerDeclaration),
       writeFile(path.join(commonOutputPath, 'provider-triggers.d.ts'), providerTriggersDeclaration),
       writeFile(path.join(commonOutputPath, 'webhook-trigger.d.ts'), webhookTriggerDeclaration),
+      writeFile(path.join(commonOutputPath, 'localization.d.ts'), localizationDeclaration),
     ])
   } finally {
     await rm(declarationRoot, { force: true, recursive: true })

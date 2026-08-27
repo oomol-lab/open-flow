@@ -22,13 +22,13 @@ export interface StringFormatOption extends IBasicOption {
   value: StringFormat | ''
 }
 
-export const stringFormatOptions = (unset: string): StringFormatOption[] => [
-  { label: 'Email', value: 'email' },
-  { label: 'URI', value: 'uri' },
-  { label: unset, value: '' },
+export const stringFormatOptions = (t: (key: string) => string): StringFormatOption[] => [
+  { label: t('schemaEditor.stringFormat.email'), value: 'email' },
+  { label: t('schemaEditor.stringFormat.uri'), value: 'uri' },
+  { label: t('inputHandleEditor.unset'), value: '' },
 ]
 
-export function optionOfStringFormat(format: StringFormat | undefined, unset: string): StringFormatOption {
+export function optionOfStringFormat(format: StringFormat | undefined, t: (key: string) => string): StringFormatOption {
   const value: StringFormat | '' = format || ''
-  return stringFormatOptions(unset).find((option) => option.value === value)!
+  return stringFormatOptions(t).find((option) => option.value === value)!
 }

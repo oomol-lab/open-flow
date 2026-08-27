@@ -27,7 +27,10 @@ export function provideAddNodeMenuItems(
     { type: 'llm', data: 'chat', label: i18n.t('addNode.llmChat'), icon: LLM_NODE_ICON },
     { type: 'llm', data: 'json', label: i18n.t('addNode.llmStructured'), icon: LLM_NODE_ICON },
   )
-  items.push({ type: 'value', label: 'Value', icon: VALUE_BLOCK_ICON }, { type: 'condition', label: 'Condition', icon: CONDITION_BLOCK_ICON })
+  items.push(
+    { type: 'value', label: i18n.t('addNode.value'), icon: VALUE_BLOCK_ICON },
+    { type: 'condition', label: i18n.t('addNode.condition'), icon: CONDITION_BLOCK_ICON },
+  )
   items.push({
     type: 'comment',
     label: i18n.t('addNode.comment'),

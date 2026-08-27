@@ -1,4 +1,5 @@
 import styles from './IconPicker.module.scss'
+import type { UiLanguage } from '../../../../localization/common/languages.ts'
 import type { GeneralIconifyData } from '../iconifyContext.tsx'
 import type { IconifyIconProps } from '../IconifyIcon.tsx'
 
@@ -10,27 +11,35 @@ import { createRoot } from 'react-dom/client'
 import { useVal } from 'use-value-enhancer'
 import { useI18n } from 'val-i18n-react'
 import { Virtualizer } from 'virtua'
+import { resolveUiLanguage } from '../../../../localization/common/languages.ts'
 import { IconifyProvider, useIconifyCollectionLoader, useIconifyData } from '../iconifyContext.tsx'
 import { IconifyIcon } from '../IconifyIcon.tsx'
 import en from './locales/en.json'
+import fr from './locales/fr.json'
+import ja from './locales/ja.json'
+import ko from './locales/ko.json'
+import ru from './locales/ru.json'
 import zhCN from './locales/zh-CN.json'
+import zhTW from './locales/zh-TW.json'
 
-const translations = {
-  en,
+type IconPickerLocale = Readonly<Record<string, string>>
+
+const translations: Readonly<Record<UiLanguage, IconPickerLocale>> = {
+  'en': en,
   'zh-CN': zhCN,
+  'zh-TW': zhTW,
+  'ja': ja,
+  'ko': ko,
+  'ru': ru,
+  'fr': fr,
 }
 
 let rememberLastTab: IconPickerTab | undefined
 let rememberLastColor: string | undefined
 
 function getTranslate(lang: string) {
-  let data: { [key: string]: string }
-  if (lang.startsWith('zh')) {
-    data = translations['zh-CN']
-  } else {
-    data = translations['en']
-  }
-  return (key: string) => data[key] || key
+  const data = translations[resolveUiLanguage([lang])]
+  return (key: string) => data[key] || translations.en[key] || key
 }
 
 export interface IconPickerProps {
@@ -408,8 +417,14 @@ const IconPickerImpl = ({
           </button>
         )}
         {carbon && (
-          <button aria-pressed={tab === 'carbon'} data-tab="carbon" className={clsx(styles.tab, tab === 'carbon' && 'is-active')} title="Carbon" type="button">
-            Carbon
+          <button
+            aria-pressed={tab === 'carbon'}
+            data-tab="carbon"
+            className={clsx(styles.tab, tab === 'carbon' && 'is-active')}
+            title={t('carbon')}
+            type="button"
+          >
+            {t('carbon')}
           </button>
         )}
         <button aria-label={t('close')} className={styles.close} onClick={onClickClose} type="button">

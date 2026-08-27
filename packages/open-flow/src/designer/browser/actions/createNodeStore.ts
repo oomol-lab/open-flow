@@ -116,7 +116,7 @@ export function createNodeStore(ctx: CreateNodeStoreContext, nodeMeta: NodeMeta,
     return createTaskNodeStore(ctx, nodeMeta, blockMeta)
   }
 
-  return createErrorNodeStore(nodeMeta.nodeId, 'Not supported nodeMeta', ctx.designerStore.designerUIStore, flowLikeMeta)
+  return createErrorNodeStore(nodeMeta.nodeId, ctx.i18n.t('errorNode.unsupportedNode'), ctx.designerStore.designerUIStore, flowLikeMeta)
 }
 
 function createTriggerNodeStore(ctx: CreateNodeStoreContext, nodeMeta: NodeMeta): TriggerNodeStore {

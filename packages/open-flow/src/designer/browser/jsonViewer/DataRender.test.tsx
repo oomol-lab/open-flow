@@ -1,11 +1,15 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it } from 'vitest'
+import { createI18n } from '../i18n/index.ts'
 import { CompactValue } from './CompactValue.tsx'
 import { DataRender } from './DataRender.tsx'
 
 const renderValue = (value: unknown, stringTruncateLength?: number): string => {
   return renderToStaticMarkup(
-    <DataRender value={value} lastElement level={0} shouldExpandNode={() => true} clickToExpandNode stringTruncateLength={stringTruncateLength} />,
+    <I18nProvider i18n={createI18n('en')}>
+      <DataRender value={value} lastElement level={0} shouldExpandNode={() => true} clickToExpandNode stringTruncateLength={stringTruncateLength} />
+    </I18nProvider>,
   )
 }
 

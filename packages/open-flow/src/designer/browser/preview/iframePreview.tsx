@@ -5,6 +5,7 @@ import type { ReadonlyVal } from 'value-enhancer'
 import { listen } from '@wopjs/dom'
 import { clsx } from 'clsx'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslate } from 'val-i18n-react'
 import { getIframeSandbox } from './iframePolicy.ts'
 
 export interface IframePreviewProps {
@@ -17,7 +18,8 @@ export interface IframePreviewProps {
   dark$: ReadonlyVal<boolean>
 }
 
-export const IframePreview: FC<IframePreviewProps> = ({ src, data: html, className, iframeClassName, nodeSelected$, dark$, title = 'Preview' }) => {
+export const IframePreview: FC<IframePreviewProps> = ({ src, data: html, className, iframeClassName, nodeSelected$, dark$, title }) => {
+  const t = useTranslate()
   const [focus, setFocus] = useState(false)
 
   useEffect(() => nodeSelected$?.subscribe((selected) => !selected && setFocus(false)), [nodeSelected$])
@@ -65,7 +67,7 @@ export const IframePreview: FC<IframePreviewProps> = ({ src, data: html, classNa
         src={src}
         srcDoc={html}
         sandbox={getIframeSandbox(html != null)}
-        title={title}
+        title={title ?? t('preview.title')}
         onLoad={onLoad}
       />
     </div>

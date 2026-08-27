@@ -29,6 +29,7 @@
     "./designer-twemoji-plugin": "./src/build/node/twemojiCollection.ts",
     "./designer-vite-config": "./src/build/node/designerUnoConfig.ts",
     "./integration-trigger": "./src/trigger/common/integration.ts",
+    "./localization": "./src/localization/common/languages.ts",
     "./poll-trigger": "./src/trigger/common/poll.ts",
     "./provider-triggers": "./src/trigger/providers/definitions.ts",
     "./flow-authoring": "./src/flow/common/authoring.ts",

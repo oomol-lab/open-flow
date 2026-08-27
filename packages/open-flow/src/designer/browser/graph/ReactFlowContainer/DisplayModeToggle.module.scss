@@ -1,12 +1,14 @@
 .group {
-  --display-mode-button-width: 76px;
+  --display-mode-button-min-width: 76px;
 }
 
+// CJK labels are two or three glyphs wide, so they keep a tighter floor.
 .compact {
-  --display-mode-button-width: 52px;
+  --display-mode-button-min-width: 52px;
 }
 
+// Latin and Cyrillic labels ("Overview", "Подробно", "Détaillé") grow past the floor instead of clipping.
 .button {
-  width: var(--display-mode-button-width);
-  min-width: 0;
+  width: auto;
+  min-width: var(--display-mode-button-min-width);
 }

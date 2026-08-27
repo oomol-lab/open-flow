@@ -1,0 +1,7 @@
+{
+  "help": {
+    "usage": "用法：{{command}}",
+    "title": "Open Flow 命令",
+    "options": "選項：--json、--cursor <cursor>、--limit <count>"
+  }
+}

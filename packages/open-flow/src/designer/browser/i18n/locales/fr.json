@@ -1,0 +1,655 @@
+{
+  "addNode": {
+    "comment": "Commentaire",
+    "condition": "Condition",
+    "connectorActions": "Actions Connector",
+    "connectorConnections": "{{count}} Connections",
+    "connectorNewConnection": "Nouvelle Connection",
+    "connectorNoActiveConnection": "Aucune Connection active",
+    "connectorPopupBlocked": "La fenêtre de connexion a été bloquée. Autorisez les fenêtres contextuelles, puis réessayez.",
+    "connectorUnavailable": "Les actions Connector ne sont pas disponibles dans cet hôte de projet.",
+    "llmChat": "Conversation LLM",
+    "llmStructured": "Sortie structurée LLM",
+    "scriptletUnsupported": "Cet hôte de projet ne prend pas en charge l'écriture de mini-scripts.",
+    "sharedBlocks": "Tâches et Subflows",
+    "triggers": "Triggers",
+    "value": "Valeur"
+  },
+  "blockEditor": {
+    "addDefaultAdditionalInput": "Ajouter une entrée supplémentaire par défaut",
+    "addDefaultAdditionalOutput": "Ajouter une sortie supplémentaire par défaut",
+    "additionalInputs": "Entrées supplémentaires",
+    "additionalInputsHelp": {
+      "allow": "Autorisées",
+      "disallow": "Non autorisées",
+      "restrict": "Restreintes"
+    },
+    "additionalOutputs": "Sorties supplémentaires",
+    "additionalOutputsHelp": {
+      "allow": "Autorisées",
+      "disallow": "Non autorisées",
+      "restrict": "Restreintes"
+    },
+    "configHeader": "Configuration du bloc",
+    "defaultAdditionalInputs": "Entrées supplémentaires par défaut",
+    "defaultAdditionalOutputs": "Sorties supplémentaires par défaut",
+    "description": "Description",
+    "executor": {
+      "action": "Action",
+      "connection": "Connection",
+      "connectionAccount": "Compte",
+      "connectionDetails": "Connection actuelle",
+      "connectionId": "ID de Connection",
+      "connectionStatus": "Statut",
+      "connectionStatus_active": "Active",
+      "connectionStatus_disconnected": "Déconnectée",
+      "connectionStatus_error": "Erreur",
+      "connectionStatus_reauth_required": "Réautorisation requise",
+      "connectionUnresolved": "Non résolue",
+      "entry": "Point d'entrée",
+      "function": "Fonction",
+      "mode": "Mode",
+      "mode_chat": "Conversation",
+      "mode_json": "JSON",
+      "name": "Nom",
+      "title": "Exécuteur"
+    },
+    "folder": "Nom du dossier",
+    "icon": "Icône",
+    "metadata": "Métadonnées",
+    "nodeTitlePlaceholder": "Saisissez un titre...",
+    "private": "Privé",
+    "privateField": "Privé",
+    "privateHelp": "Marquez le bloc partagé comme privé pour indiquer qu'il ne peut être utilisé ni par l'IA ni par d'autres utilisateurs.",
+    "public": "Public",
+    "runningConfig": {
+      "concurrency": "Parallélisme",
+      "progressWeight": "Poids de progression",
+      "timeout": "Délai d'expiration",
+      "title": "Configuration d'exécution"
+    },
+    "sourceNotFound": "Fichier source du bloc introuvable",
+    "task": "Nom du bloc",
+    "taskHeader": "Depuis un bloc partagé",
+    "title": "Titre"
+  },
+  "cancel": "Annuler",
+  "clipboard": {
+    "copySuccess": "{{@}} nœuds copiés",
+    "copySuccess@1": "1 nœud copié",
+    "pasteScriptletUnsupported": "Cet hôte de projet ne prend pas en charge le collage de mini-scripts."
+  },
+  "comment": {
+    "editWithMarkdown": "Modifier en Markdown",
+    "preview": "Aperçu",
+    "source": "Afficher la source"
+  },
+  "components": {
+    "chooseColor": "Choisir une couleur",
+    "clear": "Effacer",
+    "clearDateTime": "Effacer la date et l'heure",
+    "colorValue": "Valeur de la couleur",
+    "loading": "Chargement",
+    "noMatching": "Aucun élément correspondant",
+    "numOptions": "{{count}} options",
+    "pickColorFromScreen": "Prélever une couleur à l'écran"
+  },
+  "trigger": {
+    "catalogEmpty": "Aucun Trigger correspondant",
+    "catalogEmptyHelp": "Essayez un nom de service ou d'événement.",
+    "catalogUnavailable": "Catalogue de Triggers Provider indisponible",
+    "catalogUnavailableHelp": "Les Triggers intégrés et les définitions déjà enregistrées restent disponibles.",
+    "configuration": "Configuration",
+    "configInvalid": "Saisissez une valeur de configuration valide.",
+    "connection": "Compte",
+    "integrationSummary": "À la réception d'un événement",
+    "pollSchedule": "Planification de l'interrogation",
+    "pollScheduleHelp": "Choisissez la fréquence à laquelle ce Trigger recherche de nouveaux événements.",
+    "scheduleCron": "Cron",
+    "scheduleDays": "Jours",
+    "scheduleEvery": "Fréquence",
+    "scheduleEveryDay": "Tous les {{value}} j",
+    "scheduleEveryHour": "Toutes les {{value}} h",
+    "scheduleEveryMinute": "Toutes les {{value}} min",
+    "scheduleEveryMonth": "Tous les {{value}} mois",
+    "scheduleEveryWeek": "Toutes les {{value}} sem.",
+    "scheduleExpression": "Expression Cron",
+    "scheduleHours": "Heures",
+    "scheduleInterval": "Intervalle d'interrogation",
+    "scheduleMinutes": "Minutes",
+    "scheduleMonths": "Mois",
+    "scheduleTimezone": "Fuseau horaire",
+    "scheduleType": "Type de planification",
+    "scheduleUnit": "Unité d'intervalle",
+    "scheduleWeeks": "Semaines",
+    "scheduleMissing": "Aucune planification configurée",
+    "summaryCron": "Planification",
+    "summaryIntegration": "Source d'événement",
+    "summaryPoll": "Planification de l'interrogation",
+    "summaryWebhook": "Déclenchement par requête",
+    "webhookAddField": "Ajouter un champ",
+    "webhookAddHeader": "Ajouter un en-tête",
+    "webhookCustomType": "Schéma personnalisé",
+    "webhookDeleteField": "Supprimer le champ de charge utile",
+    "webhookDeleteHeader": "Supprimer l'en-tête de réponse",
+    "webhookFieldName": "Nom du champ",
+    "webhookFieldNameDuplicate": "Les noms de champ doivent être uniques.",
+    "webhookFieldNameRequired": "Saisissez un nom de champ.",
+    "webhookFieldType": "Type",
+    "webhookHeaderName": "Nom de l'en-tête",
+    "webhookHeaders": "En-têtes de réponse",
+    "webhookHeaderValue": "Valeur de l'en-tête",
+    "webhookMethods": "Méthodes autorisées",
+    "webhookNoPayloadFields": "La charge utile de la requête accepte un objet vide.",
+    "webhookNoResponseBody": "Aucun corps de réponse",
+    "webhookNullable": "Autoriser null",
+    "webhookOrigins": "Origines autorisées",
+    "webhookPayloadFields": "Champs de la charge utile",
+    "webhookRequest": "Requête",
+    "webhookResponse": "Réponse",
+    "webhookResponseData": "Corps de la réponse",
+    "webhookStatus": "Code de statut",
+    "webhookSummary": "À la réception d'une requête HTTP",
+    "webhookDescription": "Recevoir un objet JSON via un point de terminaison HTTP généré."
+  },
+  "condition": {
+    "addCondition": "Ajouter une condition",
+    "configPanelTitle": "Configuration",
+    "default": "Par défaut",
+    "defaultDescription": "Cas par défaut",
+    "defaultHelp": "Exécuter ce cas lorsqu'aucune autre condition ne correspond",
+    "deleteCondition": "Supprimer la condition",
+    "handleKeyTitle": "Handle",
+    "handleLogicalTitle": "Logique",
+    "inputHelp": "La première condition satisfaite renvoie les données du premier Handle d'entrée",
+    "label": "Cas",
+    "logical": {
+      "AND": "ET (AND)",
+      "OR": "OU (OR)"
+    },
+    "operator": {
+      "!=": "≠",
+      "<": "<",
+      "<=": "≤",
+      "==": "=",
+      ">": ">",
+      ">=": "≥",
+      "contains": "contient",
+      "ends_with": "se termine par",
+      "has_key": "possède la clé",
+      "has_value": "possède la valeur",
+      "is_empty": "est vide",
+      "is_false": "vaut false",
+      "is_not_empty": "n'est pas vide",
+      "is_not_null": "n'est pas null",
+      "is_null": "est null",
+      "is_true": "vaut true",
+      "not_contains": "ne contient pas",
+      "not_has_key": "ne possède pas la clé",
+      "not_has_value": "ne possède pas la valeur",
+      "starts_with": "commence par"
+    },
+    "title": "Handles de condition",
+    "toggleDefault": "Condition par défaut"
+  },
+  "contextMenu": {
+    "addNode": "Ajouter un nœud",
+    "empty": "Aucun bloc correspondant",
+    "loadFailed": "Impossible de charger les actions Connector.",
+    "paste": "Coller",
+    "retry": "Réessayer",
+    "search": "Rechercher"
+  },
+  "copy": "Copier",
+  "close": "Fermer",
+  "create": "Créer",
+  "delete": "Supprimer",
+  "edit": "Modifier",
+  "edgeError": {
+    "aggregateSummary": "{{errorCount}} connexions sur {{connectionCount}} présentent des erreurs",
+    "binDiffType": "Les données binaires ne sont pas compatibles",
+    "default": "Les types de données ne sont pas compatibles",
+    "diffKind": "Les types de Handle ne correspondent pas",
+    "errorNode": "Connecté à un nœud défectueux",
+    "nullable": "La source accepte null, mais pas la cible",
+    "varDiffPkg": "Les variables appartiennent à des projets différents",
+    "varDiffType": "Une sortie de type variable ne peut se connecter qu'à une entrée de type variable"
+  },
+  "errorNode": {
+    "blockManifestUnrenderable": "Impossible d'afficher le manifeste de bloc {{path}}",
+    "blockNotFound": "Fichier YAML de tâche ou de Subflow introuvable",
+    "unsupportedNode": "Métadonnées de nœud non prises en charge"
+  },
+  "fitView": "ajuster la vue",
+  "flowEditor": {
+    "node": {
+      "configHeader": "Paramètres du nœud",
+      "id": "Node ID"
+    }
+  },
+  "flowSettings": {
+    "title": "Configuration du Flow"
+  },
+  "handleEditor": {
+    "addItem": "Ajouter un élément",
+    "additionalInputs": "Entrées supplémentaires",
+    "additionalOutputs": "Sorties supplémentaires",
+    "click": "Cliquez",
+    "descButton": "Description JSON Schema",
+    "dropOr": "Déposez ou",
+    "editSharedBlock": "Modifier le bloc partagé",
+    "handle": "Handle",
+    "inputHandle": "Handle d'entrée",
+    "noInputOutput": "Aucun Handle d'entrée ou de sortie",
+    "of": "de",
+    "renaming": {
+      "banned": "Le nom de Handle ne peut pas être {{name}}",
+      "duplicate": "Doublon avec un autre Handle",
+      "empty": "Le nom de Handle ne peut pas être vide"
+    },
+    "schemaDescription": "Description JSON Schema...",
+    "secretUnavailable": "Catalogue de Secrets indisponible",
+    "selectSecret": "Choisir un Secret",
+    "unknown": "Inconnu"
+  },
+  "handleGroup": {
+    "delete": "Supprimer le groupe",
+    "dropAdd": "Déposez ici pour créer un groupe",
+    "fallback": "Saisissez un nom de groupe…",
+    "renaming": {
+      "banned": "Le nom de groupe ne peut pas être {{name}}",
+      "duplicate": "Doublon avec un autre groupe",
+      "empty": "Le nom de groupe ne peut pas être vide"
+    }
+  },
+  "inputHandleEditor": {
+    "addField": "Ajouter un champ",
+    "addInput": "Ajouter une entrée",
+    "canPassNull": "Accepte {{null}}",
+    "cannotPassNull": "N'accepte pas {{null}}",
+    "configPanelTitle": "Configuration du Handle d'entrée",
+    "connectionRequired": "Entrée requise",
+    "defineOptions": "définir les options",
+    "defineSchema": "définir le schéma",
+    "deleteField": "Supprimer le champ",
+    "enumError": "Valeur enum attendue",
+    "handleKeyTitle": "Clé",
+    "handleName": "Handle",
+    "handleTypeTitle": "Type",
+    "handleValueTitle": "Valeur",
+    "noData": "aucune donnée",
+    "nullable": "Accepte null",
+    "presetType": "Type prédéfini",
+    "reference": "connecté",
+    "requiredFieldsUnset": "Renseignez les champs obligatoires : {{fields}}.",
+    "secretNotFound": "Secret introuvable",
+    "title": "Handles d'entrée",
+    "typeError": "Type {{expected}} attendu",
+    "unset": "<non défini>",
+    "validationError": "Vérifiez la configuration : {{message}}",
+    "valueUnset": "non défini",
+    "widget": {
+      "array": {
+        "itemType": "type d'élément",
+        "maxItems": "éléments max",
+        "minItems": "éléments min"
+      },
+      "color": {
+        "type": "type"
+      },
+      "conditions": {
+        "title": "<condition {{index}}>"
+      },
+      "date": {
+        "format": "format"
+      },
+      "number": {
+        "exclusiveMaximum": "max(<)",
+        "exclusiveMinimum": "min(>)",
+        "maximum": "max(≤)",
+        "minimum": "min(≥)",
+        "step": "pas"
+      },
+      "object": {
+        "additionalProperties": "propriétés supplémentaires",
+        "banned": "Les propriétés d'objet ne peuvent pas être {{name}}"
+      },
+      "string": {
+        "format": "format",
+        "maxLength": "longueur max",
+        "minLength": "longueur min",
+        "pattern": "motif"
+      }
+    }
+  },
+  "interactiveMode": {
+    "mouse": "Adapté à la souris",
+    "touchpad": "Adapté au pavé tactile"
+  },
+  "jsonViewer": {
+    "bin": "Binaire",
+    "secret": "Secret",
+    "showLess": "Réduire",
+    "showMore": "Afficher plus",
+    "var": "Variable"
+  },
+  "l10n": {
+    "createKey": "Activer la traduction",
+    "deleteKey": "Supprimer la traduction",
+    "emptyKey": "La traduction sera supprimée à la fermeture de ce panneau",
+    "en": "Anglais",
+    "invalidKey": "La clé de traduction ne peut pas être __proto__",
+    "openPanel": "Traduction",
+    "translateKey": "Clé",
+    "zh-CN": "Chinois"
+  },
+  "miniMap": "Mini-carte",
+  "flowDisplayMode": {
+    "detail": "Détaillé",
+    "detailDescription": "Nœuds, ports, éditeurs et contrôles complets",
+    "overview": "Simplifié",
+    "overviewDescription": "Nœuds simplifiés et connexions en lecture seule"
+  },
+  "settingsPanel": {
+    "hide": "Masquer les paramètres",
+    "show": "Afficher les paramètres"
+  },
+  "more": "Plus d'actions",
+  "ms": "ms",
+  "s": "s",
+  "nodeActions": {
+    "configSharedBlock": "Configuration du bloc partagé",
+    "delete": "Supprimer",
+    "deleteConfirm": "Voulez-vous vraiment supprimer {{name}} ?\n{{shortcut}} pour supprimer directement",
+    "duplicate": "Dupliquer",
+    "execute": "Exécuter",
+    "executeWithoutCache": "Exécution sans cache",
+    "nodeSetting": "Paramètres du nœud",
+    "openSharedBlockCode": "Code du bloc de tâche",
+    "skipDisable": "Activer ce nœud",
+    "skipDisableAll": "Activer les nœuds sélectionnés",
+    "skipEnable": "Ignorer ce nœud",
+    "skipEnableAll": "Ignorer les nœuds sélectionnés",
+    "toggleLanguage": "Passer en {{lang}}"
+  },
+  "nodeContent": {
+    "addDescription": "Ajouter une description"
+  },
+  "nodeStatus": {
+    "error": "Erreur",
+    "hasError": "Contient des erreurs",
+    "running": "En cours",
+    "skipped": "Ignoré",
+    "success": "Réussi",
+    "waiting": "En attente"
+  },
+  "ok": "OK",
+  "optimize": "optimiser la disposition",
+  "llmEditor": {
+    "addMessage": "Ajouter un message",
+    "chooseModel": "Choisir dans la liste des modèles",
+    "customModel": "Modèle personnalisé...",
+    "defaultModel": "Modèle par défaut",
+    "deleteMessage": "Supprimer le message",
+    "maxTokens": "Tokens max",
+    "messageCount": "{{count}} messages",
+    "messageCountOne": "1 message",
+    "messagePlaceholder": "Contenu du message",
+    "loadingModels": "Chargement des modèles...",
+    "model": "Modèle",
+    "modelOptions": "Options du modèle",
+    "moveMessageDown": "Descendre le message",
+    "moveMessageUp": "Monter le message",
+    "role": {
+      "assistant": "Assistant",
+      "system": "Système",
+      "user": "Utilisateur"
+    },
+    "temperature": "Température",
+    "topP": "Top P"
+  },
+  "outputHandleEditor": {
+    "addOutput": "Ajouter une sortie",
+    "configPanelTitle": "Configuration du Handle de sortie",
+    "handleKeyTitle": "Clé",
+    "handleTypeTitle": "Type",
+    "nullable": "Accepte null",
+    "title": "Handles de sortie"
+  },
+  "preset": {
+    "Applicators": "Applicators",
+    "Select": "Select",
+    "allOf": "AllOf",
+    "any": "Any",
+    "anyOf": "AnyOf",
+    "array": "Array",
+    "binary": "Binary",
+    "boolean": "Boolean",
+    "color": "Color",
+    "date": "Date",
+    "integer": "Integer",
+    "multiSelect": "Multi",
+    "null": "Null",
+    "number": "Number",
+    "object": "Object",
+    "oneOf": "OneOf",
+    "secret": "Secret",
+    "select": "Single",
+    "string": "String",
+    "text": "Textarea",
+    "variable": "Variable"
+  },
+  "preview": {
+    "title": "Aperçu",
+    "textAriaLabel": "Aperçu du texte",
+    "videoBilibili": "Lecteur vidéo Bilibili",
+    "videoYouTube": "Lecteur vidéo YouTube",
+    "audio": {
+      "mute": "Couper le son",
+      "pause": "Mettre l'audio en pause",
+      "play": "Lire l'audio",
+      "seek": "Naviguer dans l'audio",
+      "title": "Aperçu audio",
+      "unmute": "Rétablir le son",
+      "volume": "Volume audio"
+    },
+    "table": {
+      "footer": "{{columns}} colonnes, {{rows}} lignes au total"
+    }
+  },
+  "schemaEditor": {
+    "description": "Description",
+    "kind": "Nom de type personnalisé",
+    "kindTooltip": "Donnez un nom personnalisé au type. S'il est renseigné, seuls les Handles portant le même nom peuvent être connectés",
+    "label": "Libellé",
+    "name": "Nom",
+    "namePlaceholder": "ex. Images",
+    "stringFormat": {
+      "email": "E-mail",
+      "uri": "URI"
+    },
+    "value": "Valeur"
+  },
+  "scriptlet": "Mini-script",
+  "subflowEditor": {
+    "blockMode": "Vue bloc",
+    "flowMode": "Vue Flow"
+  },
+  "subflowSettings": {
+    "forwardPreview": "Transférer l'aperçu",
+    "title": "Configuration du Subflow"
+  },
+  "validation": {
+    "nodeIdBanned": "Le Node ID ne peut pas être {{name}}",
+    "nodeIdExists": "Ce Node ID existe déjà",
+    "nodeIdInvalid": "Le Node ID ne peut contenir que des lettres, des chiffres, des tirets bas et des traits d'union",
+    "sharedBlockNameBanned": "Le nom de tâche ou de Subflow ne peut pas être {{name}}",
+    "sharedBlockNameExists": "Une tâche ou un Subflow portant ce nom existe déjà",
+    "sharedBlockNameInvalid": "Les noms de tâche et de Subflow ne peuvent contenir que des lettres, des chiffres, des tirets bas et des traits d'union"
+  },
+  "workbench": {
+    "conflict": {
+      "keepLocal": "Conserver les modifications locales",
+      "reload": "Recharger depuis le disque"
+    },
+    "empty": {
+      "description": "Ajoutez un fichier source Flow, Subflow ou Tâche, puis rechargez l'atelier.",
+      "title": "Ce projet n'a pas encore de cible exécutable."
+    },
+    "noTargets": "Aucune cible exécutable",
+    "resource": {
+      "openInCodeEditor": "Ouvrir dans l'éditeur de code",
+      "showDesigner": "Ouvrir la vue Designer",
+      "showSource": "Ouvrir la source YAML",
+      "unknownType": "Type de fichier inconnu",
+      "unsupported": "Ce type de fichier n'est pas pris en charge"
+    },
+    "run": {
+      "cancel": "Annuler",
+      "cancelled": "Exécution annulée.",
+      "clearLogs": "Effacer les journaux",
+      "closeInputs": "Fermer les entrées d'exécution",
+      "current": "Exécution en cours",
+      "emptyEvents": "Exécutez cette cible pour inspecter ses événements.",
+      "exportLogs": "Exporter les journaux",
+      "event": {
+        "cacheHit": "{{handle}} réutilisé",
+        "completed": "Exécution terminée",
+        "nodeCompleted": "terminé",
+        "nodeStarted": "démarré",
+        "output": "{{handle}} produit",
+        "outputs": "sorties produites",
+        "preview": "{{type}} prévisualisé",
+        "progress": "{{progress}} %",
+        "started": "Exécution démarrée"
+      },
+      "filter": {
+        "cache": "Cache",
+        "empty": "Aucun événement ne correspond aux filtres actuels.",
+        "error": "Erreurs",
+        "finish": "Terminés",
+        "label": "Filtrer les événements",
+        "log": "Journaux",
+        "output": "Sorties",
+        "preview": "Aperçus",
+        "progress": "Progression",
+        "reset": "Réinitialiser",
+        "selectAll": "Tout sélectionner",
+        "selected": "{{count}} sélectionnés",
+        "start": "Démarrés",
+        "warning": "Avertissements"
+      },
+      "hideDetails": "Masquer les détails d'exécution",
+      "history": "Historique des exécutions",
+      "historyItem": "Exécution {{index}}",
+      "inputs": "Entrées d'exécution",
+      "form": "Entrées du formulaire",
+      "invalidInputs": "Les entrées d'exécution doivent être un objet conforme aux définitions d'entrée.",
+      "invalidJson": "Les entrées d'exécution doivent être du JSON valide.",
+      "logs": "Journaux",
+      "completed": "Exécution terminée : {{target}}",
+      "externalTarget": "Ouvrir l'exécution de {{target}}",
+      "failed": "Échec de l'exécution de {{target}} : {{message}}",
+      "openExternal": "Ouvrir la cible démarrée hors de cet atelier : {{target}}",
+      "phase": {
+        "cancelled": "Annulée",
+        "error": "Échec",
+        "idle": "Prêt",
+        "running": "En cours",
+        "success": "Terminée"
+      },
+      "run": "Exécuter",
+      "showDetails": "Afficher les détails d'exécution",
+      "trigger": "Trigger"
+    },
+    "secrets": {
+      "add": "Ajouter un Secret",
+      "addField": "Ajouter un champ",
+      "close": "Fermer",
+      "confirmDelete": "Supprimer ce Secret du runtime actuel ?",
+      "delete": "Supprimer",
+      "hideValue": "Masquer la valeur",
+      "key": "Clé",
+      "name": "Nom",
+      "removeField": "Retirer le champ",
+      "save": "Enregistrer",
+      "saved": "Secret enregistré pour ce runtime.",
+      "showValue": "Afficher la valeur",
+      "template": "Modèle",
+      "title": "Secrets",
+      "value": "Valeur"
+    },
+    "settings": {
+      "categories": "Catégories de paramètres",
+      "autoFollowAgent": "Suivre automatiquement la cible lorsqu'un Agent démarre une exécution",
+      "clearSearch": "Effacer la recherche de paramètres",
+      "close": "Fermer les paramètres",
+      "connector": "Exécuteurs",
+      "connectorBaseUrl": "URL de base du Connector",
+      "connectorCleared": "Remplacement local effacé.",
+      "connectorClear": "Effacer le remplacement local",
+      "connectorNotConfigured": "Non configuré",
+      "connectorSave": "Enregistrer",
+      "connectorSaved": "Enregistré.",
+      "connectorSource": {
+        "cli": "Configuration en ligne de commande",
+        "environment": "Configuration par variables d'environnement",
+        "oo-cli-account": "Compte oo-cli hérité",
+        "oo-cli-connector": "Configuration Connector oo-cli héritée",
+        "open-flow-settings": "Paramètres locaux Open Flow"
+      },
+      "connectorSourceLabel": "Source",
+      "connectorTest": "Tester la connexion",
+      "connectorTestSucceeded": "Connexion réussie.",
+      "connectorToken": "Bearer Token",
+      "connectorTokenConfigured": "configuré",
+      "connectorTokenNotConfigured": "non configuré",
+      "connectorTokenOverride": "Saisissez un Token pour créer un remplacement local",
+      "connectorTokenUnchanged": "Le Token enregistré est inchangé",
+      "editor": "Éditeur",
+      "defaultFlowDisplayMode": "Définit le mode d'affichage utilisé à l'ouverture d'un Flow ou d'un Subflow.",
+      "expandScriptletEditor": "Déplier l'éditeur des mini-scripts nouvellement créés",
+      "llm": "Modèle de langage",
+      "llmApiKey": "Clé API",
+      "llmApiKeyConfigured": "configurée",
+      "llmApiKeyNotConfigured": "non configurée",
+      "llmApiKeyOverride": "Saisissez une clé API pour créer un remplacement local",
+      "llmApiKeyUnchanged": "La clé API enregistrée est inchangée",
+      "llmBaseUrl": "URL de base compatible OpenAI",
+      "llmCleared": "Remplacement local LLM effacé.",
+      "llmModel": "Modèle par défaut",
+      "llmSaved": "Paramètres LLM enregistrés.",
+      "llmSource": {
+        "cli": "Configuration en ligne de commande",
+        "environment": "Configuration par variables d'environnement",
+        "oo-cli": "Configuration LLM oo-cli héritée",
+        "open-flow-settings": "Paramètres locaux Open Flow"
+      },
+      "noResults": "Aucun paramètre trouvé",
+      "openLogPanelOnRun": "Ouvrir le panneau des journaux au démarrage d'une exécution",
+      "runtime": "Runtime",
+      "searchPlaceholder": "Rechercher un paramètre",
+      "title": "Paramètres"
+    },
+    "status": {
+      "conflict": "{{fileName}} a été modifié hors de cet atelier",
+      "error": "Échec de l'enregistrement de {{fileName}}",
+      "invalid": "{{fileName}} contient du YAML invalide",
+      "ready": "Prêt",
+      "saved": "{{fileName}} enregistré",
+      "saving": "Enregistrement de {{fileName}}…",
+      "synced": "{{fileName}} mis à jour depuis le disque"
+    },
+    "target": "Cible"
+  },
+  "valueHandleEditor": {
+    "title": "Handles"
+  },
+  "widgetAction": {
+    "download": "Télécharger",
+    "openInNewTab": "Ouvrir dans un nouvel onglet",
+    "reload": "Recharger"
+  },
+  "zoomIn": "zoom avant",
+  "zoomOut": "zoom arrière"
+}

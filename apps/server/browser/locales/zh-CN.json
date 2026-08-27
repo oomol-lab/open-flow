@@ -1,0 +1,18 @@
+{
+  "session": {
+    "checking": "正在检查 operator session…",
+    "configured": "使用当前 deployment 配置的 operator token 登录。",
+    "invalid": "Operator token 不正确。",
+    "notConfigured": "请先在服务端配置 OPEN_FLOW_TOKEN。",
+    "retry": "重试",
+    "signIn": "登录",
+    "signOut": "退出",
+    "token": "Operator token",
+    "unavailable": "无法连接 Server 服务。"
+  },
+  "shell": {
+    "closeNotification": "关闭通知",
+    "moreActions": "服务操作",
+    "notifications": "通知"
+  }
+}

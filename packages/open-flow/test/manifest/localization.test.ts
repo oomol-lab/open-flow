@@ -68,6 +68,49 @@ describe('package localization', () => {
     }
   })
 
+  it('reads Simplified Chinese before English for a Traditional Chinese UI', () => {
+    const { context, locales } = createUserLocales()
+    try {
+      locales.updateSource('en', {
+        source: JSON.stringify({ 'package-title': 'English title' }),
+        revision: 'en-revision-1' as Revision,
+      })
+      locales.updateSource('zh-CN', {
+        source: JSON.stringify({ 'package-title': 'Chinese title' }),
+        revision: 'zh-revision-1' as Revision,
+      })
+
+      context.lang$.set('zh-TW')
+
+      expect(locales.localize('package-title')).toBe('Chinese title')
+      expect(locales.localize('package-missing', 'fallback')).toBe('fallback')
+    } finally {
+      locales.dispose()
+    }
+  })
+
+  it('reads English first for languages without an authored locale file', () => {
+    const { context, locales } = createUserLocales()
+    try {
+      locales.updateSource('en', {
+        source: JSON.stringify({ 'package-title': 'English title' }),
+        revision: 'en-revision-1' as Revision,
+      })
+      locales.updateSource('zh-CN', {
+        source: JSON.stringify({ 'package-title': 'Chinese title', 'package-note': 'Chinese note' }),
+        revision: 'zh-revision-1' as Revision,
+      })
+
+      context.lang$.set('ja')
+
+      expect(locales.localize('package-title')).toBe('English title')
+      // English carries no such key, so the chain continues into Simplified Chinese.
+      expect(locales.localize('package-note')).toBe('Chinese note')
+    } finally {
+      locales.dispose()
+    }
+  })
+
   it('advances revisions only for valid source updates and stops after disposal', () => {
     const { locales } = createUserLocales()
     const english = locales.locales.en

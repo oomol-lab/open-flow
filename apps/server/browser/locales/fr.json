@@ -1,0 +1,18 @@
+{
+  "session": {
+    "checking": "Vérification de la session operator…",
+    "configured": "Connectez-vous avec l'operator token configuré pour ce déploiement.",
+    "invalid": "L'operator token n'est pas valide.",
+    "notConfigured": "Définissez OPEN_FLOW_TOKEN sur le serveur avant de vous connecter.",
+    "retry": "Réessayer",
+    "signIn": "Se connecter",
+    "signOut": "Se déconnecter",
+    "token": "Operator token",
+    "unavailable": "Impossible de contacter le serveur."
+  },
+  "shell": {
+    "closeNotification": "Fermer la notification",
+    "moreActions": "Actions du serveur",
+    "notifications": "Notifications"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "session": {
+    "checking": "Checking operator session…",
+    "configured": "Sign in with the operator token configured for this deployment.",
+    "invalid": "The operator token is invalid.",
+    "notConfigured": "Set OPEN_FLOW_TOKEN on the server before signing in.",
+    "retry": "Retry",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "token": "Operator token",
+    "unavailable": "The Server server could not be reached."
+  },
+  "shell": {
+    "closeNotification": "Close notification",
+    "moreActions": "Server actions",
+    "notifications": "Notifications"
+  }
+}

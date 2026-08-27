@@ -64,6 +64,13 @@ export type {
   WorkbenchView,
 } from './contract.ts'
 
+export {
+  isUiLanguage as isWorkbenchLanguage,
+  resolveUiLanguage as resolveWorkbenchLanguage,
+  uiLanguageNames as workbenchLanguageNames,
+  uiLanguages as workbenchLanguages,
+} from '../../../localization/common/languages.ts'
+
 export interface OpenFlowWorkbenchProps {
   readonly host: WorkbenchHost
   readonly hrefFor: (location: WorkbenchLocation) => string

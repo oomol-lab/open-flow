@@ -1,0 +1,18 @@
+{
+  "session": {
+    "checking": "正在檢查 operator session…",
+    "configured": "使用這個部署所設定的 operator token 登入。",
+    "invalid": "Operator token 無效。",
+    "notConfigured": "請先在伺服器上設定 OPEN_FLOW_TOKEN，然後再登入。",
+    "retry": "重試",
+    "signIn": "登入",
+    "signOut": "登出",
+    "token": "Operator token",
+    "unavailable": "無法連線到伺服器。"
+  },
+  "shell": {
+    "closeNotification": "關閉通知",
+    "moreActions": "伺服器操作",
+    "notifications": "通知"
+  }
+}

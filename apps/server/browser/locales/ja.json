@@ -1,0 +1,18 @@
+{
+  "session": {
+    "checking": "operator session を確認中…",
+    "configured": "この deployment に設定されている operator token でログインします。",
+    "invalid": "Operator token が正しくありません。",
+    "notConfigured": "ログインする前に、サーバーで OPEN_FLOW_TOKEN を設定してください。",
+    "retry": "再試行",
+    "signIn": "ログイン",
+    "signOut": "ログアウト",
+    "token": "Operator token",
+    "unavailable": "サーバーに接続できませんでした。"
+  },
+  "shell": {
+    "closeNotification": "通知を閉じる",
+    "moreActions": "サーバー操作",
+    "notifications": "通知"
+  }
+}

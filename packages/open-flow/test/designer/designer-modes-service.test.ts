@@ -197,6 +197,10 @@ describe('Task and Subflow Designer services', () => {
             connectorNewConnection: 'New Connection',
             connectorNoActiveConnection: 'No active connection',
             connectorPopupBlocked: 'The connection window was blocked. Allow pop-ups and try again.',
+            scriptletUnsupported: 'Writing scriptlets is not supported by this project host.',
+          },
+          clipboard: {
+            pasteScriptletUnsupported: 'Pasting scriptlets is not supported by this project host.',
           },
           trigger: {
             webhookDescription: 'Receive a JSON object through a generated HTTP endpoint.',

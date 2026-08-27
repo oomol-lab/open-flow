@@ -63,7 +63,8 @@ test('keeps labels, iframe previews, and JSON expansion on semantic controls', a
   expect(iframePreview).toMatch(/listen\(window, 'pointerup', \(\) => setFocus\(false\), true\)/)
   expect(iframePreview).toMatch(/onBlur=\{\(\) => setFocus\(false\)\}/)
   expect(iframePreview).toMatch(/onFocus=\{\(\) => setFocus\(true\)\}/)
-  expect(iframePreview).toMatch(/title=\{title\}/)
+  // The iframe always carries an accessible name, falling back to the localized default title.
+  expect(iframePreview).toMatch(/title=\{title \?\? t\('preview\.title'\)\}/)
   expect(jsonViewer).not.toMatch(/<(?:span|div)[^>]*onClick=/)
   expect(jsonViewer).toMatch(/<button[\s\S]*?aria-label=\{ariaLabel\}/)
   expect(jsonViewer).not.toMatch(/role="button"/)

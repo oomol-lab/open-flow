@@ -4,6 +4,7 @@ import type { StringEditorFactory } from '../textareaStringEditor.ts'
 
 import { clsx } from 'clsx'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslate } from 'val-i18n-react'
 
 export interface TextPreviewProps {
   readonly dark$: ReadonlyVal<boolean>
@@ -27,6 +28,7 @@ export function formatPreviewText(data: unknown): string {
 }
 
 export function TextPreview({ dark$, data, editorFactory, language }: TextPreviewProps): React.ReactElement {
+  const t = useTranslate()
   const container = useRef<HTMLDivElement>(null)
   const [failed, setFailed] = useState(false)
   const [focused, setFocused] = useState(false)
@@ -40,7 +42,7 @@ export function TextPreview({ dark$, data, editorFactory, language }: TextPrevie
     let editor: Awaited<ReturnType<StringEditorFactory['create']>> | undefined
     void editorFactory
       .create(parent, `open-flow://preview/${crypto.randomUUID()}`, {
-        ariaLabel: 'Text preview',
+        ariaLabel: t('preview.textAriaLabel'),
         automaticLayout: true,
         domReadOnly: true,
         language: language ?? 'plaintext',
@@ -63,7 +65,7 @@ export function TextPreview({ dark$, data, editorFactory, language }: TextPrevie
       disposed = true
       editor?.dispose()
     }
-  }, [dark$, editorFactory, failed, language, source])
+  }, [dark$, editorFactory, failed, language, source, t])
 
   if (failed) {
     return (

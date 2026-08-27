@@ -2,60 +2,57 @@ import type { CommandHost, Runtime, ParsedArguments } from './support.ts'
 
 import { ApiError, ControlClient } from '@oomol-lab/open-flow/control-api'
 import { flowCommand } from './flowCommands.ts'
-import { CliError, localized, parseArguments, cloudError } from './support.ts'
+import { createI18n } from './i18n.ts'
+import { CliError, parseArguments, cloudError } from './support.ts'
+
+const commandSyntax: readonly string[] = [
+  '  oo flow list',
+  '  oo flow create <name>',
+  '  oo flow show <flow>',
+  '  oo flow inspect <flow> [--summary]',
+  '  oo flow apply <flow> --file <path|-> [--expected-revision <revision>]',
+  '  oo flow rename <flow> <new-name>',
+  '  oo flow delete <flow> --yes',
+  '  oo flow check <flow>',
+  '  oo flow node <list|show|add|set|remove> <flow>',
+  '  oo flow node add <flow> code <name> [--code <javascript|@file|->]',
+  '  oo flow connect <flow> <source> <source-output> <target-node> <target-input>',
+  '  oo flow disconnect <flow> <source> <source-output> <target-node> <target-input>',
+  '  oo flow code <list|show|edit|set>',
+  '  oo flow connector <list|search|show|connections|add|set>',
+  '  oo flow trigger <search|show|list|add|set|remove>',
+  '  oo flow run <flow> [--source draft|live] [--input <json|@file|->] [--wait]',
+  '  oo flow runs <list|show|events|result|cancel>',
+  '  oo flow publish <flow>',
+  '  oo flow publications <list|show> <flow>',
+  '  oo flow rollback <flow> <publication>',
+  '  oo flow open [flow]',
+  '  oo flow workbench [flow]',
+]
+
+function codeUsage(subcommand: string | undefined): string {
+  switch (subcommand) {
+    case 'list':
+      return 'oo flow code list <flow> [--json]'
+    case 'show':
+      return 'oo flow code show <flow> <module> [--json]'
+    case 'edit':
+      return 'oo flow code edit <flow> <module> --code <javascript|@file|-> [--json]'
+    case 'set':
+      return 'oo flow code set <flow> <module> --name <name> [--json]'
+    default:
+      return 'oo flow code <list|show|edit|set>'
+  }
+}
 
 function help(runtime: Runtime, args: readonly string[]): string {
-  if (args[0] == 'code') {
-    const usage =
-      args[1] == 'list'
-        ? 'oo flow code list <flow> [--json]'
-        : args[1] == 'show'
-          ? 'oo flow code show <flow> <module> [--json]'
-          : args[1] == 'edit'
-            ? 'oo flow code edit <flow> <module> --code <javascript|@file|-> [--json]'
-            : args[1] == 'set'
-              ? 'oo flow code set <flow> <module> --name <name> [--json]'
-              : 'oo flow code <list|show|edit|set>'
-    return localized(runtime.language, `Usage: ${usage}`, `用法：${usage}`)
+  const i18n = createI18n(runtime.language)
+  try {
+    if (args[0] == 'code') return i18n.t('help.usage', { command: codeUsage(args[1]) })
+    return [i18n.t('help.title'), '', ...commandSyntax, '', i18n.t('help.options')].join('\n')
+  } finally {
+    i18n.dispose()
   }
-  return localized(
-    runtime.language,
-    [
-      'Open Flow commands',
-      '',
-      '  oo flow list',
-      '  oo flow create <name>',
-      '  oo flow show <flow>',
-      '  oo flow inspect <flow> [--summary]',
-      '  oo flow apply <flow> --file <path|-> [--expected-revision <revision>]',
-      '  oo flow rename <flow> <new-name>',
-      '  oo flow delete <flow> --yes',
-      '  oo flow check <flow>',
-      '  oo flow node <list|show|add|set|remove> <flow>',
-      '  oo flow node add <flow> code <name> [--code <javascript|@file|->]',
-      '  oo flow connect <flow> <source> <source-output> <target-node> <target-input>',
-      '  oo flow disconnect <flow> <source> <source-output> <target-node> <target-input>',
-      '  oo flow code <list|show|edit|set>',
-      '  oo flow connector <list|search|show|connections|add|set>',
-      '  oo flow trigger <search|show|list|add|set|remove>',
-      '  oo flow run <flow> [--source draft|live] [--input <json|@file|->] [--wait]',
-      '  oo flow runs <list|show|events|result|cancel>',
-      '  oo flow publish <flow>',
-      '  oo flow publications <list|show> <flow>',
-      '  oo flow rollback <flow> <publication>',
-      '  oo flow open [flow]',
-      '  oo flow workbench [flow]',
-      '',
-      'Options: --json, --cursor <cursor>, --limit <count>',
-    ].join('\n'),
-    [
-      'Open Flow 命令',
-      '',
-      '  oo flow <list|create|show|inspect|apply|rename|delete|check|node|connect|disconnect|code|connector|trigger|run|runs|publish|publications|rollback|open|workbench>',
-      '',
-      '选项：--json、--cursor <cursor>、--limit <count>',
-    ].join('\n'),
-  )
 }
 
 export async function runCli(args: readonly string[], host: CommandHost, runtime: Runtime): Promise<number> {

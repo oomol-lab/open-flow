@@ -134,6 +134,20 @@ select {
   background: var(--lab-surface);
   box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
 }
+.toolbar-segment select {
+  min-width: 96px;
+  height: 26px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--lab-text);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+}
+.toolbar-segment select:hover {
+  background: var(--lab-hover);
+}
 .toolbar-icons button {
   width: 28px;
   padding: 0;

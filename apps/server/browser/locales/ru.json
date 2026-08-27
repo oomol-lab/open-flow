@@ -1,0 +1,18 @@
+{
+  "session": {
+    "checking": "Проверка operator session…",
+    "configured": "Войдите с помощью operator token, настроенного для этого развёртывания.",
+    "invalid": "Operator token недействителен.",
+    "notConfigured": "Задайте OPEN_FLOW_TOKEN на сервере перед входом.",
+    "retry": "Повторить",
+    "signIn": "Войти",
+    "signOut": "Выйти",
+    "token": "Operator token",
+    "unavailable": "Не удалось подключиться к серверу."
+  },
+  "shell": {
+    "closeNotification": "Закрыть уведомление",
+    "moreActions": "Действия сервера",
+    "notifications": "Уведомления"
+  }
+}

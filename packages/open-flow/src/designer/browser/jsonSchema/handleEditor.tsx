@@ -1236,7 +1236,7 @@ function ValueArray(props: ValueProps & { readonly store: ArrayWidgetStore }) {
 
   return (
     <div className={styles.inlineArray}>
-      <span className={styles.of}>of</span>
+      <span className={styles.of}>{t('handleEditor.of')}</span>
       <Select
         isSuffix
         value={optionOf(t, itemsWidgetType)}
@@ -1443,9 +1443,11 @@ function ValueNull(props: ValueProps) {
 }
 
 function ValueUnknown(props: ValueProps) {
+  const t = useTranslate()
+
   return (
     <Label disabled={!props.store.context.canEditValue} isSuffix={props.isSuffix}>
-      Unknown
+      {t('handleEditor.unknown')}
     </Label>
   )
 }

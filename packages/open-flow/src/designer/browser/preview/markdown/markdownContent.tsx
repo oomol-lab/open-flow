@@ -6,10 +6,11 @@ import './highlight.dark.scss'
 import type { FC } from 'react'
 import type { Components, Options } from 'react-markdown'
 import type { RehypeRewriteOptions } from 'rehype-rewrite'
+import type { TFunction } from 'val-i18n'
 
 import { isString } from '@wopjs/cast'
 import deepmerge from 'deepmerge'
-import { memo, useEffect, useRef } from 'react'
+import { memo, useEffect, useMemo, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import rehypeKatex from 'rehype-katex'
@@ -19,42 +20,47 @@ import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import remarkFrontmatter from 'remark-frontmatter'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
+import { useTranslate } from 'val-i18n-react'
 
 const remarkPlugins: Options['remarkPlugins'] = [remarkGfm, remarkMath, remarkFrontmatter]
 type RewriteNode = Parameters<RehypeRewriteOptions['rewrite']>[0]
 
-const rewriteOptions: RehypeRewriteOptions = {
-  rewrite: (node) => {
-    if (node.type == 'element') {
-      if (isString(node.properties.src)) {
-        node.properties.src = node.properties.src.replace(/([^:/])\/+/g, '$1/')
+function createRewriteOptions(t: TFunction): RehypeRewriteOptions {
+  return {
+    rewrite: (node) => {
+      if (node.type == 'element') {
+        if (isString(node.properties.src)) {
+          node.properties.src = node.properties.src.replace(/([^:/])\/+/g, '$1/')
+        }
+        if (isString(node.properties.href)) {
+          node.properties.href = node.properties.href.replace(/([^:/])\/+/g, '$1/')
+        }
       }
-      if (isString(node.properties.href)) {
-        node.properties.href = node.properties.href.replace(/([^:/])\/+/g, '$1/')
-      }
-    }
-    rewriteMaybeVideoLinkToIframe(node)
-  },
+      rewriteMaybeVideoLinkToIframe(node, t)
+    },
+  }
 }
 
-const rehypePlugins: Options['rehypePlugins'] = [
-  rehypeRaw,
-  rehypeHighlight,
-  rehypeKatex,
-  [rehypeRewrite, rewriteOptions],
-  [
-    rehypeSanitize,
-    deepmerge(defaultSchema, {
-      tagNames: ['video', 'iframe'],
-      attributes: {
-        'video': ['src', 'controls', 'autoplay', 'loop', 'muted'],
-        'source': ['src', 'type'],
-        'iframe': ['src', 'allow', 'referrerpolicy', 'allowfullscreen'],
-        '*': ['className', 'style'],
-      },
-    }),
-  ],
-]
+function createRehypePlugins(t: TFunction): Options['rehypePlugins'] {
+  return [
+    rehypeRaw,
+    rehypeHighlight,
+    rehypeKatex,
+    [rehypeRewrite, createRewriteOptions(t)],
+    [
+      rehypeSanitize,
+      deepmerge(defaultSchema, {
+        tagNames: ['video', 'iframe'],
+        attributes: {
+          'video': ['src', 'controls', 'autoplay', 'loop', 'muted'],
+          'source': ['src', 'type'],
+          'iframe': ['src', 'allow', 'referrerpolicy', 'allowfullscreen'],
+          '*': ['className', 'style'],
+        },
+      }),
+    ],
+  ]
+}
 
 // Embedded video links are available only in HTTP(S) browser contexts.
 let isWebProtocol = false
@@ -63,7 +69,7 @@ if (typeof window !== 'undefined') {
   isWebProtocol = protocol === 'http:' || protocol === 'https:'
 }
 
-function rewriteMaybeVideoLinkToIframe(node: RewriteNode): void {
+function rewriteMaybeVideoLinkToIframe(node: RewriteNode, t: TFunction): void {
   if (!isWebProtocol) {
     return
   }
@@ -71,7 +77,7 @@ function rewriteMaybeVideoLinkToIframe(node: RewriteNode): void {
   if (node.type === 'element' && node.tagName === 'a' && firstChild?.type == 'element' && firstChild.tagName === 'img') {
     const href = node.properties.href
     if (isString(href) && isSupportedVideoLink(href)) {
-      inPlaceEditVideoLink(node, href)
+      inPlaceEditVideoLink(node, href, t)
     }
   }
 }
@@ -92,14 +98,14 @@ function isSupportedVideoLink(url: string): boolean {
   return youtubeRegex.test(url) || bilibiliRegex.test(url)
 }
 
-function inPlaceEditVideoLink(node: Extract<RewriteNode, { type: 'element' }>, url: string): void {
+function inPlaceEditVideoLink(node: Extract<RewriteNode, { type: 'element' }>, url: string, t: TFunction): void {
   let match = url.match(youtubeRegex)
   if (match) {
     const videoId = match[1]
     node.tagName = 'iframe'
     node.properties = {
       src: `https://www.youtube.com/embed/${videoId}`,
-      title: 'YouTube video player',
+      title: t('preview.videoYouTube'),
       ...commonIframeProps,
     }
     node.children = []
@@ -110,7 +116,7 @@ function inPlaceEditVideoLink(node: Extract<RewriteNode, { type: 'element' }>, u
     node.tagName = 'iframe'
     node.properties = {
       src: `https://player.bilibili.com/player.html?bvid=${videoId}`,
-      title: 'Bilibili video player',
+      title: t('preview.videoBilibili'),
       ...commonIframeProps,
     }
     node.children = []
@@ -126,6 +132,8 @@ export interface MarkdownContentProps {
 }
 
 const MarkdownContent: FC<MarkdownContentProps> = /* @__PURE__ */ memo(function MarkdownContent({ dark, text, className = '', components, mermaid }) {
+  const t = useTranslate()
+  const rehypePlugins = useMemo(() => createRehypePlugins(t), [t])
   const ref = useRef<HTMLDivElement>(null)
   const diagramSourcesRef = useRef(new WeakMap<HTMLElement, string>())
 

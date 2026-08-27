@@ -14,6 +14,7 @@ import { mapValues } from 'radash'
 import { compute, isVal, val } from 'value-enhancer'
 import { shallowPlainObjectEqual } from '../../../../base/common/equality.ts'
 import { join } from '../../../../base/common/posixPath.ts'
+import { localeChain } from '../../../../localization/common/localization.ts'
 import { isGroupDividerDef } from '../../model/block/base/blockManifest.ts'
 import { unchangedManifestSource } from '../../source.ts'
 
@@ -148,15 +149,10 @@ export class UserLocales {
 
   // The manifest domain implements localization without depending on Designer.
   public localize$(get: ComputeGet, key: string, defaultValue?: string): string {
-    const lang = get(this.ctx.lang$) as UserLanguage
-    const locale = this.locales[lang] || this.locales['en']
-
-    let value = locale.localize$(get, key)
-    if (value) return value
-
-    const fallbackLocale = locale === this.locales['en'] ? this.locales['zh-CN'] : this.locales['en']
-    value = fallbackLocale.localize$(get, key)
-    if (value) return value
+    for (const locale of localeChain(this.locales, get(this.ctx.lang$))) {
+      const value = locale.localize$(get, key)
+      if (value) return value
+    }
 
     return defaultValue || key
   }
@@ -237,8 +233,7 @@ export class UserLocales {
   public setManifestValue($: Val<string | undefined>, value: string | undefined): void {
     const key = toUserTranslateKey($.value)
     if (key) {
-      const lang = this.ctx.lang$.value as UserLanguage
-      const locale = this.locales[lang] || this.locales['en']
+      const locale = localeChain(this.locales, this.ctx.lang$.value)[0] || this.locales['en']
       if (value == null) {
         const { [key]: _, ...data } = locale.data$.value
         locale.data$.set(data)

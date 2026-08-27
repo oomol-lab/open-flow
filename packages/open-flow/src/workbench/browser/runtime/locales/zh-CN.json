@@ -210,9 +210,7 @@
     "title": "检查器"
   },
   "language": {
-    "english": "English",
-    "label": "语言",
-    "simplifiedChinese": "简体中文"
+    "label": "语言"
   },
   "jsonViewer": {
     "bin": "二进制",

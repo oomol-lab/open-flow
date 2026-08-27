@@ -1,0 +1,18 @@
+{
+  "session": {
+    "checking": "Operator session을 확인하는 중…",
+    "configured": "현재 deployment에 설정된 operator token으로 로그인하세요.",
+    "invalid": "Operator token이 올바르지 않습니다.",
+    "notConfigured": "로그인하기 전에 서버에서 OPEN_FLOW_TOKEN을 설정하세요.",
+    "retry": "다시 시도",
+    "signIn": "로그인",
+    "signOut": "로그아웃",
+    "token": "Operator token",
+    "unavailable": "서버에 연결할 수 없습니다."
+  },
+  "shell": {
+    "closeNotification": "알림 닫기",
+    "moreActions": "서버 작업",
+    "notifications": "알림"
+  }
+}
