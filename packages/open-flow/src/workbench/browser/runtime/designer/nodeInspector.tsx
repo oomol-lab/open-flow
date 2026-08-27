@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../ui/browser
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Icon } from '../icons.tsx'
 import { CodeEditor } from './codeEditor.tsx'
+import { taskDiagnosticReady, taskInspectorSection } from './nodeInspectorBehavior.ts'
 
 export function inspectorIcon(node: ResolvedSelection | undefined, target: DesignerTarget): IconName {
   if (node?.kind == 'trigger') return 'trigger'
@@ -197,6 +198,8 @@ function TaskDefinition({
   connectorLoading,
   disabled,
   focus,
+  onSectionChange,
+  section,
   selection,
   store,
   theme,
@@ -212,6 +215,8 @@ function TaskDefinition({
   readonly connectorLoading: boolean
   readonly disabled: boolean
   readonly focus?: DiagnosticFocus
+  readonly onSectionChange: (section: 'code' | 'settings') => void
+  readonly section: 'code' | 'settings'
   readonly selection: Extract<ResolvedNode, { readonly kind: 'task' }>
   readonly store: WorkspaceStore
   readonly theme: WorkbenchTheme
@@ -223,7 +228,6 @@ function TaskDefinition({
   const module = selection.module
   const [name, setName] = useState(task?.name ?? '')
   const [llmMode, setLlmMode] = useState<'chat' | 'json'>(task != null && 'executor' in task && task.executor.kind == 'llm' ? task.executor.mode : 'chat')
-  const [section, setSection] = useState<'code' | 'settings'>('code')
   const fieldIdPrefix = `task-${selection.id}`
   const moduleDiagnostics = useVal(store.$.moduleDiagnostics)
   const moduleEditor = useVal(store.$.moduleEditor)
@@ -233,10 +237,6 @@ function TaskDefinition({
     setName(task?.name ?? '')
     setLlmMode(task != null && 'executor' in task && task.executor.kind == 'llm' ? task.executor.mode : 'chat')
   }, [module, task])
-
-  useEffect(() => {
-    setSection(focus?.section == 'node' || focus?.section == 'task' ? 'settings' : 'code')
-  }, [focus?.section, selection.id])
 
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
   const connector = 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
@@ -459,7 +459,7 @@ function TaskDefinition({
       {codeEditor == null ? (
         settingsPanel
       ) : (
-        <Tabs className="inspector-task-tabs gap-0" onValueChange={(value) => value != null && setSection(value as 'code' | 'settings')} value={section}>
+        <Tabs className="inspector-task-tabs gap-0" onValueChange={(value) => value != null && onSectionChange(value as 'code' | 'settings')} value={section}>
           <TabsList aria-label={t('inspector.title')} className="w-full shrink-0 justify-start px-3 pt-1" variant="line">
             <TabsTrigger value="code">{t('inspector.task.javascriptModule')}</TabsTrigger>
             <TabsTrigger value="settings">{t('inspector.node.title')}</TabsTrigger>
@@ -750,11 +750,20 @@ export function NodeInspector({
 }: Props): ReactElement {
   const t = useTranslate()
   const content = useRef<HTMLDivElement>(null)
+  const locatedRequest = useRef<number>()
+  const [taskSection, setTaskSection] = useState<'code' | 'settings'>(() => taskInspectorSection(focus?.section))
+
+  useEffect(() => {
+    setTaskSection(taskInspectorSection(focus?.section))
+  }, [focus?.requestId, focus?.section, selection?.id])
 
   useEffect(() => {
     if (focus == null) return
+    if (locatedRequest.current == focus.requestId) return
+    if (selection?.kind == 'task' && !taskDiagnosticReady(focus.section, taskSection)) return
     const section = content.current?.querySelector<HTMLElement>(`[data-inspector-section="${focus.section}"]`)
     if (section == null) return
+    locatedRequest.current = focus.requestId
     if (section instanceof HTMLDetailsElement) section.open = true
     section.scrollIntoView({ block: 'nearest' })
     section.classList.remove('diagnostic-located')
@@ -762,7 +771,7 @@ export function NodeInspector({
     section.classList.add('diagnostic-located')
     const timer = globalThis.setTimeout(() => section.classList.remove('diagnostic-located'), 1_200)
     return () => globalThis.clearTimeout(timer)
-  }, [focus])
+  }, [focus, selection?.id, selection?.kind, taskSection])
 
   return (
     <div className="inspector-content" ref={content}>
@@ -798,6 +807,8 @@ export function NodeInspector({
               connectorLoading={connectorLoading}
               disabled={disabled}
               focus={focus}
+              onSectionChange={setTaskSection}
+              section={taskSection}
               selection={selection}
               store={store}
               theme={theme}
