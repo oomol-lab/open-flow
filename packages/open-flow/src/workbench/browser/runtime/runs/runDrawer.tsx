@@ -494,7 +494,7 @@ export function RunDetails({
                   )}
                   <code>{event.kind}</code>
                   <span className="event-summary">{eventSummary(event, t)}</span>
-                  <time>{eventTime(event.createdAt, language)}</time>
+                  <time dateTime={event.createdAt}>{eventTime(event.createdAt, language)}</time>
                 </div>
                 <RunEventDetails events={groupedEvents} />
               </Fragment>

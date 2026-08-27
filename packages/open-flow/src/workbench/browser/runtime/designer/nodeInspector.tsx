@@ -19,6 +19,7 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Icon } from '../icons.tsx'
 import { CodeEditor } from './codeEditor.tsx'
@@ -222,6 +223,7 @@ function TaskDefinition({
   const module = selection.module
   const [name, setName] = useState(task?.name ?? '')
   const [llmMode, setLlmMode] = useState<'chat' | 'json'>(task != null && 'executor' in task && task.executor.kind == 'llm' ? task.executor.mode : 'chat')
+  const [section, setSection] = useState<'code' | 'settings'>('code')
   const fieldIdPrefix = `task-${selection.id}`
   const moduleDiagnostics = useVal(store.$.moduleDiagnostics)
   const moduleEditor = useVal(store.$.moduleEditor)
@@ -232,11 +234,130 @@ function TaskDefinition({
     setLlmMode(task != null && 'executor' in task && task.executor.kind == 'llm' ? task.executor.mode : 'chat')
   }, [module, task])
 
+  useEffect(() => {
+    setSection(focus?.section == 'node' || focus?.section == 'task' ? 'settings' : 'code')
+  }, [focus?.section, selection.id])
+
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
   const connector = 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
   const activeConnections = activeConnectorConnections ?? []
   const connectionRequired =
     connector != null && (connector.connectionId == null || (activeConnectorConnections != null && connectorConnection?.status != 'active'))
+  const codeEditor =
+    module != null && 'moduleId' in task && moduleEditor?.moduleId == task.moduleId ? (
+      <form
+        className="inspector-section inspector-form code-section"
+        data-inspector-section="module"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void store.saveModuleEditor()
+        }}
+      >
+        <div className="code-section-heading">
+          <h3>{t('inspector.task.javascriptModule')}</h3>
+          <span className={`code-save-status ${moduleEditor.status}`} aria-live="polite">
+            <span /> {codeStatusLabel(moduleEditor.status, t)}
+          </span>
+        </div>
+        <CodeEditor
+          ariaLabel={t('inspector.task.source')}
+          disabled={disabled || moduleEditor.status == 'saving'}
+          errorLabel={t('inspector.task.editorUnavailable')}
+          loadingLabel={t('inspector.task.editorLoading')}
+          location={moduleLocation == null ? undefined : { column: moduleLocation.column, line: moduleLocation.line }}
+          onChange={(value) => store.updateModuleSource(value)}
+          theme={theme}
+          uri={`file:///modules/${moduleEditor.moduleId}.js`}
+          value={moduleEditor.source}
+        />
+        <span className="code-source-note">{t('inspector.task.importsFromSource')}</span>
+        <div className="form-actions code-actions">
+          {(moduleEditor.status == 'dirty' || moduleEditor.status == 'failed') && (
+            <Button disabled={disabled} onClick={() => store.discardModuleChanges()} size="sm" type="button" variant="secondary">
+              {t('inspector.task.discardCode')}
+            </Button>
+          )}
+          <Button disabled={disabled || moduleEditor.status == 'saved' || moduleEditor.status == 'saving'} size="sm" type="submit">
+            {t('inspector.task.saveCode')}
+          </Button>
+        </div>
+      </form>
+    ) : undefined
+  const settingsPanel = (
+    <>
+      {children}
+      <details className="inspector-disclosure" data-inspector-section="task">
+        <summary>
+          <Icon name="chevron-down" size={14} />
+          <span className="inspector-disclosure-summary">
+            <strong>{t('inspector.task.definition')}</strong>
+            <span>{t('inspector.task.definitionDescription')}</span>
+          </span>
+        </summary>
+        <form
+          className="inspector-form inspector-disclosure-content"
+          onSubmit={(event) => {
+            event.preventDefault()
+            let settings: TaskSettings
+            if ('moduleId' in task) {
+              settings = { kind: 'code', name: name.trim() }
+            } else if (task.executor.kind == 'llm') {
+              settings = { kind: 'llm', mode: llmMode, name: name.trim() }
+            } else {
+              settings = { kind: 'connector', name: name.trim() }
+            }
+            void store.saveTaskSettings(selection.id, settings)
+          }}
+        >
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor={`${fieldIdPrefix}-name`}>{t('common.name')}</FieldLabel>
+              <Input disabled={disabled} id={`${fieldIdPrefix}-name`} onChange={(event) => setName(event.target.value)} value={name} />
+            </Field>
+            {'executor' in task && task.executor.kind == 'llm' && (
+              <Field>
+                <FieldLabel htmlFor={`${fieldIdPrefix}-response-mode`}>{t('inspector.task.responseMode')}</FieldLabel>
+                <NativeSelect
+                  disabled={disabled}
+                  id={`${fieldIdPrefix}-response-mode`}
+                  onChange={(event) => setLlmMode(event.target.value as 'chat' | 'json')}
+                  value={llmMode}
+                >
+                  <NativeSelectOption value="chat">{t('inspector.task.chatText')}</NativeSelectOption>
+                  <NativeSelectOption value="json">{t('inspector.task.structuredJson')}</NativeSelectOption>
+                </NativeSelect>
+              </Field>
+            )}
+            {'executor' in task && task.executor.kind == 'connector' && (
+              <>
+                <Field>
+                  <FieldLabel>{t('inspector.task.connectorAction')}</FieldLabel>
+                  <FieldDescription className="reference-value">{connectorAction?.name ?? task.executor.action}</FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel>{t('inspector.task.inputPorts')}</FieldLabel>
+                  <FieldDescription className="reference-value">
+                    {task.inputs.flatMap((port) => ('handle' in port ? [port.handle] : [])).join(', ') || t('common.none')}
+                  </FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel>{t('inspector.task.outputPorts')}</FieldLabel>
+                  <FieldDescription className="reference-value">
+                    {task.outputs.flatMap((port) => ('handle' in port ? [port.handle] : [])).join(', ') || t('common.none')}
+                  </FieldDescription>
+                </Field>
+              </>
+            )}
+          </FieldGroup>
+          <div className="form-actions">
+            <Button disabled={disabled || name.trim() == ''} size="sm" type="submit" variant="secondary">
+              {t('inspector.task.save')}
+            </Button>
+          </div>
+        </form>
+      </details>
+    </>
+  )
   return (
     <>
       {connector != null && (
@@ -335,116 +456,22 @@ function TaskDefinition({
           )}
         </section>
       )}
-      {module != null && 'moduleId' in task && moduleEditor?.moduleId == task.moduleId && (
-        <form
-          className="inspector-section inspector-form code-section"
-          data-inspector-section="module"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void store.saveModuleEditor()
-          }}
-        >
-          <div className="code-section-heading">
-            <h3>{t('inspector.task.javascriptModule')}</h3>
-            <span className={`code-save-status ${moduleEditor.status}`} aria-live="polite">
-              <span /> {codeStatusLabel(moduleEditor.status, t)}
-            </span>
-          </div>
-          <CodeEditor
-            ariaLabel={t('inspector.task.source')}
-            disabled={disabled || moduleEditor.status == 'saving'}
-            errorLabel={t('inspector.task.editorUnavailable')}
-            loadingLabel={t('inspector.task.editorLoading')}
-            location={moduleLocation == null ? undefined : { column: moduleLocation.column, line: moduleLocation.line }}
-            onChange={(value) => store.updateModuleSource(value)}
-            theme={theme}
-            uri={`file:///modules/${moduleEditor.moduleId}.js`}
-            value={moduleEditor.source}
-          />
-          <span className="code-source-note">{t('inspector.task.importsFromSource')}</span>
-          <div className="form-actions">
-            {(moduleEditor.status == 'dirty' || moduleEditor.status == 'failed') && (
-              <Button disabled={disabled} onClick={() => store.discardModuleChanges()} size="sm" type="button" variant="secondary">
-                {t('inspector.task.discardCode')}
-              </Button>
-            )}
-            <Button disabled={disabled || moduleEditor.status == 'saved' || moduleEditor.status == 'saving'} size="sm" type="submit">
-              {t('inspector.task.saveCode')}
-            </Button>
-          </div>
-        </form>
+      {codeEditor == null ? (
+        settingsPanel
+      ) : (
+        <Tabs className="inspector-task-tabs gap-0" onValueChange={(value) => value != null && setSection(value as 'code' | 'settings')} value={section}>
+          <TabsList aria-label={t('inspector.title')} className="w-full shrink-0 justify-start px-3 pt-1" variant="line">
+            <TabsTrigger value="code">{t('inspector.task.javascriptModule')}</TabsTrigger>
+            <TabsTrigger value="settings">{t('inspector.node.title')}</TabsTrigger>
+          </TabsList>
+          <TabsContent className="inspector-task-tab-panel code-tab" keepMounted value="code">
+            {codeEditor}
+          </TabsContent>
+          <TabsContent className="inspector-task-tab-panel settings-tab" value="settings">
+            {settingsPanel}
+          </TabsContent>
+        </Tabs>
       )}
-      {children}
-      <details className="inspector-disclosure" data-inspector-section="task">
-        <summary>
-          <Icon name="chevron-down" size={14} />
-          <span className="inspector-disclosure-summary">
-            <strong>{t('inspector.task.definition')}</strong>
-            <span>{t('inspector.task.definitionDescription')}</span>
-          </span>
-        </summary>
-        <form
-          className="inspector-form inspector-disclosure-content"
-          onSubmit={(event) => {
-            event.preventDefault()
-            let settings: TaskSettings
-            if ('moduleId' in task) {
-              settings = { kind: 'code', name: name.trim() }
-            } else if (task.executor.kind == 'llm') {
-              settings = { kind: 'llm', mode: llmMode, name: name.trim() }
-            } else {
-              settings = { kind: 'connector', name: name.trim() }
-            }
-            void store.saveTaskSettings(selection.id, settings)
-          }}
-        >
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor={`${fieldIdPrefix}-name`}>{t('common.name')}</FieldLabel>
-              <Input disabled={disabled} id={`${fieldIdPrefix}-name`} onChange={(event) => setName(event.target.value)} value={name} />
-            </Field>
-            {'executor' in task && task.executor.kind == 'llm' && (
-              <Field>
-                <FieldLabel htmlFor={`${fieldIdPrefix}-response-mode`}>{t('inspector.task.responseMode')}</FieldLabel>
-                <NativeSelect
-                  disabled={disabled}
-                  id={`${fieldIdPrefix}-response-mode`}
-                  onChange={(event) => setLlmMode(event.target.value as 'chat' | 'json')}
-                  value={llmMode}
-                >
-                  <NativeSelectOption value="chat">{t('inspector.task.chatText')}</NativeSelectOption>
-                  <NativeSelectOption value="json">{t('inspector.task.structuredJson')}</NativeSelectOption>
-                </NativeSelect>
-              </Field>
-            )}
-            {'executor' in task && task.executor.kind == 'connector' && (
-              <>
-                <Field>
-                  <FieldLabel>{t('inspector.task.connectorAction')}</FieldLabel>
-                  <FieldDescription className="reference-value">{connectorAction?.name ?? task.executor.action}</FieldDescription>
-                </Field>
-                <Field>
-                  <FieldLabel>{t('inspector.task.inputPorts')}</FieldLabel>
-                  <FieldDescription className="reference-value">
-                    {task.inputs.flatMap((port) => ('handle' in port ? [port.handle] : [])).join(', ') || t('common.none')}
-                  </FieldDescription>
-                </Field>
-                <Field>
-                  <FieldLabel>{t('inspector.task.outputPorts')}</FieldLabel>
-                  <FieldDescription className="reference-value">
-                    {task.outputs.flatMap((port) => ('handle' in port ? [port.handle] : [])).join(', ') || t('common.none')}
-                  </FieldDescription>
-                </Field>
-              </>
-            )}
-          </FieldGroup>
-          <div className="form-actions">
-            <Button disabled={disabled || name.trim() == ''} size="sm" type="submit" variant="secondary">
-              {t('inspector.task.save')}
-            </Button>
-          </div>
-        </form>
-      </details>
     </>
   )
 }

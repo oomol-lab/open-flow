@@ -45,6 +45,7 @@ async function loadBundle(name: string, dir: string, sources: string): Promise<L
 const bundles: readonly LocaleBundle[] = [
   await loadBundle('designer', 'src/designer/browser/i18n/locales', 'src/designer/browser/**/*.{ts,tsx}'),
   await loadBundle('IconPicker', 'src/designer/browser/icons/IconPicker/locales', 'src/designer/browser/icons/IconPicker/**/*.{ts,tsx}'),
+  await loadBundle('workbench', 'src/workbench/browser/runtime/locales', 'src/workbench/browser/runtime/**/*.{ts,tsx}'),
 ]
 
 const iconPickerPath = '/icons/IconPicker/'

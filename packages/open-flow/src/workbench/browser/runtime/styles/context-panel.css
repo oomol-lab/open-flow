@@ -58,6 +58,26 @@
     scrollbar-gutter: stable;
   }
 
+  .inspector-task-tabs {
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .inspector-task-tab-panel {
+    min-height: 0;
+  }
+
+  .inspector-task-tab-panel.code-tab {
+    overflow: hidden;
+  }
+
+  .inspector-task-tab-panel.settings-tab {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
   .block-library {
     display: flex;
     height: 100%;
@@ -397,6 +417,22 @@
     transition:
       border-color 140ms ease-out,
       box-shadow 140ms ease-out;
+  }
+
+  .code-tab .code-section {
+    height: 100%;
+    min-height: 0;
+    border-bottom: 0;
+  }
+
+  .code-tab .code-editor {
+    height: auto;
+    min-height: 240px;
+    flex: 1;
+  }
+
+  .code-actions {
+    flex: none;
   }
 
   .code-editor:focus-within {

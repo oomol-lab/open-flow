@@ -33,10 +33,12 @@
     "refresh": "重新整理",
     "retry": "重試",
     "save": "儲存",
+    "saveFailed": "無法儲存 Variable。",
     "search": "搜尋 Variable",
     "title": "Variables",
     "updated": "更新時間",
     "value": "值",
-    "valueTooLarge": "值經 UTF-8 編碼後不能超過 64 KiB。"
+    "valueTooLarge": "值經 UTF-8 編碼後不能超過 64 KiB。",
+    "deleteFailed": "無法刪除 Variable。"
   }
 }

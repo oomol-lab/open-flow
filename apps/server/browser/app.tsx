@@ -1,5 +1,5 @@
 import type { WorkbenchLanguage, WorkbenchLocation, WorkbenchNavigationOptions, WorkbenchNotification, WorkbenchTheme } from '@oomol-lab/open-flow/workbench'
-import type { FormEvent, ReactElement } from 'react'
+import type { FormEvent, MouseEvent, ReactElement } from 'react'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
@@ -109,6 +109,12 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
     if (path == '/') setRoute({ view: 'design' })
   }
 
+  function followPage(event: MouseEvent<HTMLAnchorElement>, path: '/' | '/variables'): void {
+    if (event.defaultPrevented || event.button != 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    openPage(path)
+  }
+
   async function signIn(event: FormEvent): Promise<void> {
     event.preventDefault()
     if (token.length == 0 || submitting) return
@@ -151,14 +157,14 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
           <header className="server-nav">
             <div className="server-nav-title">Open Flow Server</div>
             <nav aria-label="Open Flow Server">
-              <button aria-current={variablesOpen ? undefined : 'page'} onClick={() => openPage('/')} type="button">
+              <a aria-current={variablesOpen ? undefined : 'page'} href="/" onClick={(event) => followPage(event, '/')}>
                 {t('shell.flows')}
-              </button>
-              <button aria-current={variablesOpen ? 'page' : undefined} onClick={() => openPage('/variables')} type="button">
+              </a>
+              <a aria-current={variablesOpen ? 'page' : undefined} href="/variables" onClick={(event) => followPage(event, '/variables')}>
                 {t('shell.variables')}
-              </button>
+              </a>
             </nav>
-            <button className="server-sign-out" onClick={() => void signOut()} type="button">
+            <button className="server-button server-button-ghost server-sign-out" onClick={() => void signOut()} type="button">
               {t('session.signOut')}
             </button>
           </header>

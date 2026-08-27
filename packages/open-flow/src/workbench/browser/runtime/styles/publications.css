@@ -172,7 +172,7 @@
 
   .publication-publish-action span {
     color: var(--ui-muted-foreground);
-    font-size: 10px;
+    font-size: 11px;
     line-height: 15px;
   }
 
@@ -219,7 +219,7 @@
   .publication-triggers > header span {
     max-width: 72ch;
     color: var(--ui-muted-foreground);
-    font-size: 10px;
+    font-size: 11px;
     line-height: 15px;
   }
 
@@ -290,7 +290,7 @@
 
   .trigger-binding-summary > span:not(.status-dot) {
     color: var(--ui-muted-foreground);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .trigger-binding-summary > span:last-child {
@@ -337,7 +337,7 @@
   .trigger-binding-detail dt,
   .trigger-binding-detail dd {
     margin: 0;
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .trigger-binding-detail dt {
@@ -356,8 +356,8 @@
   .trigger-recovery {
     margin: 12px 0 0;
     color: var(--ui-muted-foreground);
-    font-size: 10px;
-    line-height: 15px;
+    font-size: 11px;
+    line-height: 16px;
   }
 
   .trigger-webhook {
@@ -368,7 +368,7 @@
     gap: 8px;
     margin-top: 12px;
     color: var(--ui-muted-foreground);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .trigger-webhook code {
@@ -432,7 +432,7 @@
   .trigger-activities h3 {
     margin: 0;
     color: var(--ui-muted-foreground);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
   }
 
@@ -446,8 +446,8 @@
   .trigger-activities-empty {
     margin: 0;
     color: var(--ui-muted-foreground);
-    font-size: 10px;
-    line-height: 15px;
+    font-size: 11px;
+    line-height: 16px;
   }
 
   .trigger-activities-description {
@@ -460,7 +460,7 @@
 
   .trigger-test-result > strong {
     color: var(--ui-muted-foreground);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
   }
 
@@ -470,7 +470,7 @@
     gap: 6px 14px;
     margin: 6px 0 8px;
     color: var(--ui-muted-foreground);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .trigger-test-events {
@@ -508,7 +508,7 @@
   .trigger-activity code,
   .trigger-activity time {
     overflow: hidden;
-    font-size: 10px;
+    font-size: 11px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -526,8 +526,8 @@
   .trigger-activity-message {
     margin: 0;
     color: var(--ui-muted-foreground);
-    font-size: 10px;
-    line-height: 15px;
+    font-size: 11px;
+    line-height: 16px;
     overflow-wrap: anywhere;
   }
 
@@ -554,7 +554,7 @@
 
   .publication-history > header span {
     color: var(--ui-muted-foreground);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .publication-table-wrap {
@@ -627,7 +627,7 @@
   .publication-table td > time {
     margin-top: 4px;
     color: var(--ui-muted-foreground);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .publication-operation {
@@ -671,11 +671,11 @@
 
   .publication-confirm span {
     color: var(--ui-muted-foreground);
-    font-size: 10px;
-    line-height: 15px;
+    font-size: 11px;
+    line-height: 16px;
   }
 
-  .publication-history-empty,
+  .publication-history-loading,
   .publication-empty {
     display: flex;
     min-height: 0;
@@ -687,11 +687,5 @@
     color: var(--ui-muted-foreground);
     font-size: 11px;
     text-align: center;
-  }
-
-  .publication-history-empty strong {
-    color: var(--ui-muted-foreground);
-    font-size: 12px;
-    font-weight: 500;
   }
 }

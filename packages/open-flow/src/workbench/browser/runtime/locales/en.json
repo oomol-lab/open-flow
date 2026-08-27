@@ -223,6 +223,7 @@
     "draftConflict": "The Draft changed elsewhere. Loaded the latest revision; your edit was not applied.",
     "draftUpdated": "The Draft changed in another client. Loaded the latest revision.",
     "flowDeleted": "Deleted {{name}}.",
+    "flowDeleteAccepted": "Deleting {{name}}.",
     "flowRenamed": "Renamed the Flow to {{name}}.",
     "layoutConflict": "The layout changed elsewhere. Loaded the latest layout; your move was not applied.",
     "moduleUpdated": "The Draft changed elsewhere. Your local code is preserved; review it before saving again.",

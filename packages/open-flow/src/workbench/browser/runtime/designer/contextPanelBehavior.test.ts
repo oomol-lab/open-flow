@@ -24,9 +24,9 @@ describe('Context Panel overlay behavior', () => {
     )
 
     expect(changes).toEqual([false])
-    notifyWidth?.(980)
+    notifyWidth?.(721)
     notifyWidth?.(720)
-    notifyWidth?.(981)
+    notifyWidth?.(721)
     expect(changes).toEqual([false, true, false])
     cleanup()
     expect(disconnect).toHaveBeenCalledOnce()

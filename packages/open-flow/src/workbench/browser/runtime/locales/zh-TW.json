@@ -223,6 +223,7 @@
     "draftConflict": "草稿已在其他地方變更。已載入最新修訂，這次的編輯未套用。",
     "draftUpdated": "草稿已在其他用戶端變更，已載入最新修訂。",
     "flowDeleted": "已刪除 {{name}}。",
+    "flowDeleteAccepted": "正在刪除 {{name}}。",
     "flowRenamed": "已將 Flow 重新命名為 {{name}}。",
     "layoutConflict": "版面已在其他地方變更。已載入最新版面，這次的移動未套用。",
     "moduleUpdated": "草稿已在其他地方變更。本機程式碼仍保留，請檢查後再儲存。",

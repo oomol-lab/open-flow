@@ -223,6 +223,7 @@
     "draftConflict": "草稿已在其他位置发生变化。已加载最新修订，本次编辑未应用。",
     "draftUpdated": "草稿已在其他客户端发生变化，已加载最新修订。",
     "flowDeleted": "已删除 {{name}}。",
+    "flowDeleteAccepted": "正在删除 {{name}}。",
     "flowRenamed": "已将 Flow 重命名为 {{name}}。",
     "layoutConflict": "布局已在其他位置发生变化。已加载最新布局，本次移动未应用。",
     "moduleUpdated": "草稿已在其他位置发生变化。你的本地代码仍保留，请检查后再保存。",

@@ -31,10 +31,10 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
       const result = await client.listVariables()
       if (sequence != loadSequence.current) return
       setVariables(result.variables)
-    } catch (error) {
+    } catch {
       if (sequence != loadSequence.current) return
       setFailed(true)
-      toast.error(error instanceof Error ? error.message : t('variables.loadFailed'))
+      toast.error(t('variables.loadFailed'))
     } finally {
       if (sequence == loadSequence.current) setLoading(false)
     }
@@ -68,8 +68,8 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
       setEditing(undefined)
       setName('')
       setValue('')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t('variables.loadFailed'))
+    } catch {
+      toast.error(t('variables.saveFailed'))
     } finally {
       setPending(false)
     }
@@ -83,8 +83,8 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
       await load()
       setRemoving(undefined)
       if (editing == variableName) setEditing(undefined)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t('variables.loadFailed'))
+    } catch {
+      toast.error(t('variables.deleteFailed'))
     } finally {
       setPending(false)
     }
@@ -94,30 +94,46 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
     <main className="variables-page">
       <div className="variables-content">
         <header className="variables-header">
-          <div>
-            <span>Open Flow Server</span>
-            <h1>{t('variables.title')}</h1>
-            <p>{t('variables.description')}</p>
-          </div>
+          <h1>{t('variables.title')}</h1>
         </header>
-        <section className="variables-section" aria-labelledby="variables-title">
+        <section aria-busy={loading || pending} aria-labelledby="variables-title" className="variables-section">
           <div className="variables-toolbar">
             <div className="variables-heading">
               <h2 id="variables-title">{t('variables.all')}</h2>
               <span>{t('variables.count', { count: variables.length })}</span>
             </div>
             <div className="variables-actions">
-              <input
-                aria-label={t('variables.search')}
-                onChange={(event) => setFilter(event.target.value)}
-                placeholder={t('variables.search')}
-                type="search"
-                value={filter}
-              />
-              <button disabled={loading || pending} onClick={() => void load()} type="button">
-                {t('variables.refresh')}
+              <div className="server-input-group">
+                <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="6" />
+                  <path d="m16 16 4 4" />
+                </svg>
+                <input
+                  aria-label={t('variables.search')}
+                  autoComplete="off"
+                  name="variable-search"
+                  onChange={(event) => setFilter(event.target.value)}
+                  placeholder={t('variables.search')}
+                  type="search"
+                  value={filter}
+                />
+              </div>
+              <button
+                aria-label={t('variables.refresh')}
+                className="server-button server-button-icon server-button-outline"
+                disabled={loading || pending}
+                onClick={() => void load()}
+                title={t('variables.refresh')}
+                type="button"
+              >
+                <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+                  <path d="M20 6v5h-5" />
+                  <path d="M4 18v-5h5" />
+                  <path d="M6.1 9a7 7 0 0 1 11.7-2.6L20 11M4 13l2.2 4.6A7 7 0 0 0 17.9 15" />
+                </svg>
               </button>
               <button
+                className="server-button server-button-primary"
                 disabled={pending || variables.length >= maxCount}
                 onClick={() => {
                   setEditing('')
@@ -127,6 +143,9 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                 }}
                 type="button"
               >
+                <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
                 {t('variables.create')}
               </button>
             </div>
@@ -135,22 +154,44 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
             <form className="variable-form" onSubmit={(event) => void save(event)}>
               <label htmlFor="variable-name">{t('variables.name')}</label>
               <input
-                autoFocus
+                aria-describedby={nameInvalid && name != '' ? 'variable-name-error' : undefined}
+                aria-invalid={nameInvalid && name != ''}
+                autoComplete="off"
                 disabled={editing != ''}
                 id="variable-name"
                 maxLength={256}
+                name="variable-name"
                 onChange={(event) => setName(event.target.value)}
+                spellCheck={false}
                 value={editing == '' ? name : editing}
               />
-              {nameInvalid && name != '' && <span className="variable-error">{t('variables.invalidName')}</span>}
+              {nameInvalid && name != '' && (
+                <span className="variable-error" id="variable-name-error">
+                  {t('variables.invalidName')}
+                </span>
+              )}
               <label htmlFor="variable-value">{t('variables.value')}</label>
-              <textarea id="variable-value" onChange={(event) => setValue(event.target.value)} rows={6} value={value} />
-              {valueTooLarge && <span className="variable-error">{t('variables.valueTooLarge')}</span>}
+              <textarea
+                aria-describedby={valueTooLarge ? 'variable-value-error' : undefined}
+                aria-invalid={valueTooLarge}
+                autoComplete="off"
+                id="variable-value"
+                name="variable-value"
+                onChange={(event) => setValue(event.target.value)}
+                rows={6}
+                spellCheck={false}
+                value={value}
+              />
+              {valueTooLarge && (
+                <span className="variable-error" id="variable-value-error">
+                  {t('variables.valueTooLarge')}
+                </span>
+              )}
               <div className="variable-form-actions">
-                <button disabled={pending} onClick={() => setEditing(undefined)} type="button">
+                <button className="server-button server-button-outline" disabled={pending} onClick={() => setEditing(undefined)} type="button">
                   {t('variables.cancel')}
                 </button>
-                <button disabled={pending || nameInvalid || valueTooLarge} type="submit">
+                <button className="server-button server-button-primary" disabled={pending || nameInvalid || valueTooLarge} type="submit">
                   {t('variables.save')}
                 </button>
               </div>
@@ -164,16 +205,48 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
           </div>
           <div className="variable-list">
             {loading ? (
-              <p className="variables-state">{t('variables.refresh')}…</p>
+              Array.from({ length: 5 }, (_, index) => (
+                <div aria-hidden="true" className="variable-row variable-skeleton-row" key={index}>
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              ))
             ) : failed ? (
               <div className="variables-state" role="alert">
-                <p>{t('variables.loadFailed')}</p>
-                <button onClick={() => void load()} type="button">
+                <span aria-hidden="true" className="variables-state-icon">
+                  !
+                </span>
+                <strong>{t('variables.loadFailed')}</strong>
+                <span>{t('variables.description')}</span>
+                <button className="server-button server-button-outline" onClick={() => void load()} type="button">
                   {t('variables.retry')}
                 </button>
               </div>
             ) : visible.length == 0 ? (
-              <p className="variables-state">{t(filter.trim() == '' ? 'variables.empty' : 'variables.noMatch')}</p>
+              <div className="variables-state">
+                <span aria-hidden="true" className="variables-state-icon">
+                  V
+                </span>
+                <strong>{t(filter.trim() == '' ? 'variables.empty' : 'variables.noMatch')}</strong>
+                <span>{t('variables.description')}</span>
+                {filter.trim() == '' && (
+                  <button
+                    className="server-button server-button-outline"
+                    disabled={pending || variables.length >= maxCount}
+                    onClick={() => {
+                      setEditing('')
+                      setName('')
+                      setValue('')
+                      setRemoving(undefined)
+                    }}
+                    type="button"
+                  >
+                    {t('variables.create')}
+                  </button>
+                )}
+              </div>
             ) : (
               visible.map((variable) => (
                 <div className="variable-row" key={variable.name}>
@@ -184,16 +257,27 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                     {removing == variable.name ? (
                       <span className="variable-confirm">
                         {t('variables.deleteConfirm', { name: variable.name })}
-                        <button disabled={pending} onClick={() => setRemoving(undefined)} type="button">
+                        <button
+                          className="server-button server-button-sm server-button-outline"
+                          disabled={pending}
+                          onClick={() => setRemoving(undefined)}
+                          type="button"
+                        >
                           {t('variables.cancel')}
                         </button>
-                        <button disabled={pending} onClick={() => void remove(variable.name)} type="button">
+                        <button
+                          className="server-button server-button-destructive server-button-sm"
+                          disabled={pending}
+                          onClick={() => void remove(variable.name)}
+                          type="button"
+                        >
                           {t('variables.delete')}
                         </button>
                       </span>
                     ) : (
                       <>
                         <button
+                          className="server-button server-button-outline server-button-sm"
                           disabled={pending}
                           onClick={() => {
                             setEditing(variable.name)
@@ -205,7 +289,12 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                         >
                           {t('variables.edit')}
                         </button>
-                        <button disabled={pending} onClick={() => setRemoving(variable.name)} type="button">
+                        <button
+                          className="server-button server-button-destructive server-button-sm"
+                          disabled={pending}
+                          onClick={() => setRemoving(variable.name)}
+                          type="button"
+                        >
                           {t('variables.delete')}
                         </button>
                       </>

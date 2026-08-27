@@ -33,10 +33,12 @@
     "refresh": "Actualiser",
     "retry": "Réessayer",
     "save": "Enregistrer",
+    "saveFailed": "Impossible d’enregistrer la Variable.",
     "search": "Rechercher des Variables",
     "title": "Variables",
     "updated": "Mise à jour",
     "value": "Valeur",
-    "valueTooLarge": "La valeur encodée en UTF-8 ne doit pas dépasser 64 KiB."
+    "valueTooLarge": "La valeur encodée en UTF-8 ne doit pas dépasser 64 KiB.",
+    "deleteFailed": "Impossible de supprimer la Variable."
   }
 }

@@ -42,9 +42,15 @@ export function OpenFlowSessionGate({
   const tokenValue = token ?? ''
   const fields = (
     <>
-      <header className="flex flex-col gap-1.5">
-        <h1 className="text-lg font-semibold">{title}</h1>
-        <p className="text-sm text-muted-foreground">{description}</p>
+      <div aria-hidden="true" className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+        <svg className="size-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+          <rect height="9" rx="2" width="14" x="5" y="11" />
+          <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+        </svg>
+      </div>
+      <header className="flex flex-col gap-2">
+        <h1 className="text-xl font-semibold tracking-tight text-balance">{title}</h1>
+        <p className="text-sm/relaxed text-muted-foreground text-pretty">{description}</p>
       </header>
       {hasToken && (
         <FieldGroup>
@@ -55,6 +61,7 @@ export function OpenFlowSessionGate({
               autoComplete="current-password"
               aria-invalid={error != null}
               autoFocus
+              className="h-9"
               id="session-token"
               name="session-token"
               onChange={(event) => onTokenChange?.(event.target.value)}
@@ -67,7 +74,7 @@ export function OpenFlowSessionGate({
         </FieldGroup>
       )}
       {action != null && onSubmit != null && (
-        <Button disabled={pending || (hasToken && tokenValue.length == 0)} type="submit">
+        <Button disabled={pending || (hasToken && tokenValue.length == 0)} size="lg" type="submit">
           {pending && <Spinner aria-label={action} data-icon="inline-start" />}
           {action}
         </Button>
@@ -75,15 +82,16 @@ export function OpenFlowSessionGate({
       {pending && action == null && <Spinner aria-label={description} />}
     </>
   )
+  const className = 'm-auto flex w-full max-w-[420px] flex-col gap-5 rounded-xl bg-card p-6 shadow-lg shadow-black/10'
   return (
     <main className="open-flow-workbench">
-      <div className="grid h-full place-items-center p-6">
+      <div className="grid h-full overflow-auto bg-muted/20 p-4">
         {onSubmit == null ? (
-          <section aria-busy={pending} className="flex w-full max-w-sm flex-col gap-4">
+          <section aria-busy={pending} className={className}>
             {fields}
           </section>
         ) : (
-          <form aria-busy={pending} className="flex w-full max-w-sm flex-col gap-4" onSubmit={onSubmit}>
+          <form aria-busy={pending} className={className} onSubmit={onSubmit}>
             {fields}
           </form>
         )}

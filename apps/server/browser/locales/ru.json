@@ -33,10 +33,12 @@
     "refresh": "Обновить",
     "retry": "Повторить",
     "save": "Сохранить",
+    "saveFailed": "Не удалось сохранить Variable.",
     "search": "Поиск Variables",
     "title": "Variables",
     "updated": "Обновлено",
     "value": "Значение",
-    "valueTooLarge": "Значение в кодировке UTF-8 не должно превышать 64 KiB."
+    "valueTooLarge": "Значение в кодировке UTF-8 не должно превышать 64 KiB.",
+    "deleteFailed": "Не удалось удалить Variable."
   }
 }

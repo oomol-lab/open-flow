@@ -10,6 +10,7 @@ import { useLang, useTranslate } from 'val-i18n-react'
 import { collapseAllNested, JSONViewer } from '../../../../designer/browser/jsonViewer/index.ts'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
 import { Icon } from '../icons.tsx'
 
 function compactId(value: string): string {
@@ -379,7 +380,7 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
                                         {activity.errorCode != null && <code>{activity.errorCode}</code>}
                                         {activity.errorMessage != null && <p className="trigger-activity-message">{activity.errorMessage}</p>}
                                       </div>
-                                      <time>{new Date(activity.createdAt).toLocaleString(language)}</time>
+                                      <time dateTime={activity.createdAt}>{new Date(activity.createdAt).toLocaleString(language)}</time>
                                     </div>
                                   ))}
                                 </div>
@@ -426,15 +427,17 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
           </div>
         </header>
         {loading ? (
-          <div className="publication-history-empty">{t('publication.loading')}</div>
+          <div className="publication-history-loading">{t('publication.loading')}</div>
         ) : publications.length == 0 ? (
-          <div className="publication-history-empty">
-            <span className="empty-icon">
-              <Icon name="publish" size={20} />
-            </span>
-            <strong>{t('publication.historyEmpty')}</strong>
-            <span>{t('publication.historyEmptyDescription')}</span>
-          </div>
+          <Empty className="h-full rounded-none">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Icon name="publish" />
+              </EmptyMedia>
+              <EmptyTitle>{t('publication.historyEmpty')}</EmptyTitle>
+              <EmptyDescription>{t('publication.historyEmptyDescription')}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
           <div className="publication-table-wrap">
             <table className="publication-table">

@@ -33,10 +33,12 @@
     "refresh": "Refresh",
     "retry": "Retry",
     "save": "Save",
+    "saveFailed": "The Variable could not be saved.",
     "search": "Search Variables",
     "title": "Variables",
     "updated": "Updated",
     "value": "Value",
-    "valueTooLarge": "Value must be no larger than 64 KiB when encoded as UTF-8."
+    "valueTooLarge": "Value must be no larger than 64 KiB when encoded as UTF-8.",
+    "deleteFailed": "The Variable could not be deleted."
   }
 }

@@ -62,8 +62,10 @@ function duplicateJsonKeys(source: string): readonly string[] {
 }
 
 const english = new Map(messages(en))
+const keyPattern = /(?:\b(?:t|translate)|\.t)\(\s*(['"`])([^'"`$]+)\1/g
 
 const localeDirectory = new URL('../browser/locales/', import.meta.url)
+const sourceDirectory = new URL('../browser/', import.meta.url)
 const localeFiles: string[] = []
 for await (const name of glob('*.json', { cwd: localeDirectory })) localeFiles.push(name)
 localeFiles.sort()
@@ -96,6 +98,15 @@ describe('Server browser i18n', () => {
       })
     })
   }
+
+  it('defines every statically referenced browser message', async () => {
+    const missing = new Set<string>()
+    for await (const name of glob('**/*.{ts,tsx}', { cwd: sourceDirectory })) {
+      const source = await readFile(new URL(name, sourceDirectory), 'utf8')
+      for (const match of source.matchAll(keyPattern)) if (!english.has(match[2]!)) missing.add(match[2]!)
+    }
+    expect([...missing].toSorted()).toEqual([])
+  })
 
   it('reports duplicate keys with their path', () => {
     expect(duplicateJsonKeys('{"a": {"b": 1, "b": 2}, "a": 3}')).toEqual(['a.b', 'a'])

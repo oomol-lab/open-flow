@@ -1,4 +1,4 @@
-export const contextPanelOverlayMaxWidth = 980
+export const contextPanelOverlayMaxWidth = 720
 
 interface FocusTarget {
   focus(): void

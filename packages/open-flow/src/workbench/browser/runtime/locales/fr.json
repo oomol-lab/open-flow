@@ -223,6 +223,7 @@
     "draftConflict": "Le Brouillon a changé ailleurs. La dernière révision a été chargée ; votre modification n'a pas été appliquée.",
     "draftUpdated": "Le Brouillon a changé dans un autre client. La dernière révision a été chargée.",
     "flowDeleted": "{{name}} supprimé.",
+    "flowDeleteAccepted": "Suppression de {{name}}.",
     "flowRenamed": "Le Flow a été renommé en {{name}}.",
     "layoutConflict": "La disposition a changé ailleurs. La dernière disposition a été chargée ; votre déplacement n'a pas été appliqué.",
     "moduleUpdated": "Le Brouillon a changé ailleurs. Votre code local est conservé ; vérifiez-le avant de l'enregistrer à nouveau.",

@@ -675,7 +675,7 @@
   .run-list-meta,
   .run-list-time {
     color: var(--ui-muted-foreground);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .run-list-time {
@@ -742,13 +742,13 @@
   .run-detail-meta {
     justify-content: flex-end;
     color: var(--ui-muted-foreground);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .run-detail-meta code {
     overflow: hidden;
     max-width: 220px;
-    font-size: 10px;
+    font-size: 11px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

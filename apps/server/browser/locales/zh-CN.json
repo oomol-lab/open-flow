@@ -33,10 +33,12 @@
     "refresh": "刷新",
     "retry": "重试",
     "save": "保存",
+    "saveFailed": "无法保存 Variable。",
     "search": "搜索 Variable",
     "title": "Variables",
     "updated": "更新时间",
     "value": "值",
-    "valueTooLarge": "值经 UTF-8 编码后不能超过 64 KiB。"
+    "valueTooLarge": "值经 UTF-8 编码后不能超过 64 KiB。",
+    "deleteFailed": "无法删除 Variable。"
   }
 }

@@ -103,6 +103,22 @@ Tailwind CSS v4 是 `src/ui/browser`、`src/designer/browser` 和 `src/workbench
 UnoCSS 只负责现有 Iconify 图标，包括 `i-carbon:*`、`i-codicon:*`、`i-custom:*` 和 file icon。不要重新启用 `presetWind3`，也不要依赖 UnoCSS 为
 `flex`、`gap-*`、`w-*`、`text-*` 等普通 utility 生成样式。复杂 Designer 布局继续优先使用 SCSS Modules，避免为了 Tailwind 统一而迁移精调节点。
 
+## 产品术语与 I18n
+
+所有面向用户的普通操作、状态、说明、错误和可访问名称必须来自当前 feature 的 locale bundle；稳定的产品名、协议标识、代码值、JSON Schema keyword、
+Handle、ID、URL 示例和 `null` / `undefined` 等代码 token 不翻译。Server Browser、Workbench、Designer、Icon Picker 与 CLI 的 locale bundle 都必须覆盖
+`uiLanguages`，保持与 English 相同的 key、占位符和非空值，并扫描源码中静态 `t('key')` 引用，防止所有语言同时遗漏新 key。
+
+产品术语在同一种语言和语境内保持一致。当前中文资源页、资源操作和普通用户说明使用“工作流”，引用 serialized domain token、协议对象或代码概念时使用
+`Flow`；“流程图”只表示 graph。`Variable`、`Trigger`、`Connector`、`Subflow`、`Publication`、`Run`、`Webhook`、`Cron`、`JSON`、`URI`、`UTC`
+和 `Operator token` 保留为既有产品或技术 token。同一 feature 不得在相同语境下再并行引入另一套称呼；若要调整术语，必须一次同步所有对应 locale key，
+而不是在单个页面局部替换。
+
+部署宿主持有全局语言偏好，并通过 Workbench 的 `language` 与可选 `onLanguageChange` 传递语言状态，不能维护第二份偏好。宿主若要把语言入口移到
+Workbench 外部，必须先提供正式的 Host-facing 共享 Select composition；不能用原生 `select` 或复制 popup 样式替代现有 `WorkbenchSelect`。
+用户内容、Connector / Provider 数据、Run 日志和代码输出保持原文。Control API 与 Diagnostic 的 canonical message 也保持协议原文；客户端只有在拥有稳定 error code
+和结构化参数时才显示本地化版本，未知错误回退到原始 message 与 code，不能通过解析 English message 进行翻译。
+
 ## 共享 UI 主题合同
 
 共享 shadcn/Base UI primitive 只消费 `--ui-*` 语义 token。`src/ui/browser/theme.css` 是 Workbench 与部署宿主唯一的产品 palette owner；Designer Light 和

@@ -33,10 +33,12 @@
     "refresh": "새로 고침",
     "retry": "다시 시도",
     "save": "저장",
+    "saveFailed": "Variable을 저장할 수 없습니다.",
     "search": "Variable 검색",
     "title": "Variables",
     "updated": "업데이트 시간",
     "value": "값",
-    "valueTooLarge": "UTF-8로 인코딩한 값은 64 KiB 이하여야 합니다."
+    "valueTooLarge": "UTF-8로 인코딩한 값은 64 KiB 이하여야 합니다.",
+    "deleteFailed": "Variable을 삭제할 수 없습니다."
   }
 }

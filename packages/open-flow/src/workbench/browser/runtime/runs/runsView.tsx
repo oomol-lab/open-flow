@@ -132,7 +132,7 @@ export function RunsView({ onLocateEvent, store }: { readonly onLocateEvent: (se
                   </span>
                 </span>
                 <span className="run-list-time">
-                  <time>{new Date(candidate.createdAt).toLocaleString(language)}</time>
+                  <time dateTime={candidate.createdAt}>{new Date(candidate.createdAt).toLocaleString(language)}</time>
                   <span>{duration(candidate)}</span>
                 </span>
               </Button>
@@ -166,7 +166,7 @@ export function RunsView({ onLocateEvent, store }: { readonly onLocateEvent: (se
                   <span>
                     {t('run.duration')}: {duration(run)}
                   </span>
-                  <time>{new Date(run.createdAt).toLocaleString(language)}</time>
+                  <time dateTime={run.createdAt}>{new Date(run.createdAt).toLocaleString(language)}</time>
                   {triggerRun != null && (
                     <>
                       <span title={triggerRun.triggerNodeId}>

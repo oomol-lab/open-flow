@@ -158,7 +158,7 @@ export function RunResultView({ result }: { readonly result: RunResult }): React
     <section className="run-output-view">
       <header>
         <strong>{t('run.terminalResult')}</strong>
-        <time>{new Date(result.finishedAt).toLocaleString(language)}</time>
+        <time dateTime={result.finishedAt}>{new Date(result.finishedAt).toLocaleString(language)}</time>
       </header>
       {result.status == 'completed' ? (
         <JsonValueView label={t('run.terminalResult')} value={result.result} />
