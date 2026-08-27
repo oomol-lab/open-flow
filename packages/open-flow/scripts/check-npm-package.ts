@@ -278,6 +278,14 @@ const workbenchJavaScript = entries.filter(
   (entry) => entry.header.name.startsWith('package/dist/browser/') && entry.header.name.endsWith('.js') && entry.data != null,
 )
 assert.ok(workbenchJavaScript.some((entry) => /from ['"]react-dom['"]/.test(new TextDecoder().decode(entry.data!))))
+assert.equal(
+  entryNames.some((name) => /^package\/dist\/browser\/assets\/typeScriptWorker-.+\.js$/.test(name)),
+  false,
+)
+assert.equal(
+  workbenchJavaScript.some((entry) => /\/assets\/typeScriptWorker-.+\.js/.test(new TextDecoder().decode(entry.data!))),
+  false,
+)
 for (const entry of workbenchJavaScript) {
   assertNoReactRequire(new TextDecoder().decode(entry.data!), entry.header.name)
 }

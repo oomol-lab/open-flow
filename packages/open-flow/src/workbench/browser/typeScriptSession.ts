@@ -3,6 +3,8 @@ import type { Extension } from '@codemirror/state'
 
 import { javascript } from '@codemirror/lang-javascript'
 import { LSPClient, languageServerExtensions } from '@codemirror/lsp-client'
+// oxlint-disable-next-line import/default
+import TypeScriptWorker from './typeScriptWorker.ts?worker&inline'
 
 let sessionPromise: ReturnType<typeof createSession> | undefined
 const typeScriptLanguage = javascript({ typescript: true }).language
@@ -52,7 +54,7 @@ function createTransport(worker: Worker): Transport {
 }
 
 async function createSession() {
-  const worker = new Worker(new URL('./typeScriptWorker.ts', import.meta.url), { type: 'module' })
+  const worker = new TypeScriptWorker()
   const client = new LSPClient({ extensions: languageServerExtensions(), highlightLanguage, sanitizeHTML: openLinksInNewTab, timeout: 60_000 })
   await client.connect(createTransport(worker))
   return { client, worker }
