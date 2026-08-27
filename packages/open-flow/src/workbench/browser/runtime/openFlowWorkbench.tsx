@@ -49,14 +49,14 @@ export function OpenFlowSessionGate({
       {hasToken && (
         <FieldGroup>
           <Field data-invalid={error != null}>
-            <FieldLabel htmlFor="operator-token">{tokenLabel}</FieldLabel>
-            <Input autoComplete="username" name="username" type="hidden" value="operator" readOnly />
+            <FieldLabel htmlFor="session-token">{tokenLabel}</FieldLabel>
+            <Input autoComplete="username" name="username" type="hidden" value="open-flow" readOnly />
             <Input
               autoComplete="current-password"
               aria-invalid={error != null}
               autoFocus
-              id="operator-token"
-              name="operator-token"
+              id="session-token"
+              name="session-token"
               onChange={(event) => onTokenChange?.(event.target.value)}
               spellCheck={false}
               type="password"

@@ -115,10 +115,10 @@
       "tooLong": "名称不能超过 {{max}} 个字符。"
     },
     "newFlow": "新建工作流",
-    "noFlows": "还没有 Flow",
-    "noFlowsDescription": "创建第一个 Flow。",
+    "noFlows": "还没有工作流",
+    "noFlowsDescription": "创建第一个工作流。",
     "noMatchingDescription": "请尝试其他搜索词。",
-    "noMatchingFlows": "没有匹配的 Flow",
+    "noMatchingFlows": "没有匹配的工作流",
     "retiring": "停用中",
     "retryLoadMore": "重试加载更多",
     "searchFlows": "搜索工作流…",

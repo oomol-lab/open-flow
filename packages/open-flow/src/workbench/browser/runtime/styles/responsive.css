@@ -320,7 +320,7 @@
       flex-direction: column;
     }
 
-    .workspace-actions .action-help:last-child {
+    .workspace-actions .publish-action {
       display: none;
     }
 

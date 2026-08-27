@@ -148,7 +148,7 @@ ContextMenu 保留右键和长按触发，并遵循相同的持久关闭规则�
 `--ui-*` token。Workbench 与部署宿主必须在自己的根元素同时挂载 `.open-flow-theme` 和 `data-theme`；不得在各自 feature stylesheet 复制 light/dark palette。
 宿主若只需要产品主题，可单独导入公开的 `@oomol-lab/open-flow/theme.css`。
 
-部署宿主的登录、重试和认证错误页面使用 Workbench 公开的 session composition；宿主只传文案、token 状态与 submit 回调，不得复制 Button、Input、Field
+部署宿主的登录、重试和认证错误页面使用 Workbench 公开的 session composition；宿主只传文案、token、error、pending 状态与 submit 回调，不得复制 Button、Input、Field
 或重新维护 focus、invalid、disabled 和 pending 视觉。Session composition 在 `.open-flow-theme` 宿主内建立自己的 Workbench utility scope，不进入 Designer。
 
 `src/workbench/browser/runtime/styles.css` 是发布 Workbench CSS 的唯一 feature entry。它按 cascade 顺序导入产品主题、共享 UI、tokens、shell、resource browser、status、

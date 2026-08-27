@@ -144,7 +144,7 @@ bun add --dev @oomol-lab/open-flow
 Hosted products can use the controlled Workbench runtime:
 
 \`\`\`ts
-import { OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
+import { OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
 import '@oomol-lab/open-flow/workbench.css'
 \`\`\`
 

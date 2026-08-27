@@ -207,7 +207,7 @@ export function WorkspaceHeader({
             {t(busy == 'run' ? 'workspace.starting' : 'workspace.runDraft')}
           </Button>
         </span>
-        <span className="action-help" title={publishUnavailable}>
+        <span className="action-help publish-action" title={publishUnavailable}>
           <Button
             disabled={busy != null || invalid || subflow || live?.hasUnpublishedChanges == false}
             onClick={() => void store.publications.publish()}

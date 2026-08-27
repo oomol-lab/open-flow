@@ -203,11 +203,11 @@ export function App(): ReactElement {
                   }
                 : (event) => void signIn(event)
           }
-          onTokenChange={session.kind == 'signed-out' && session.configured !== false ? setToken : undefined}
+          onTokenChange={session.kind == 'signed-out' && session.configured === true ? setToken : undefined}
           pending={session.kind == 'checking' || submitting}
           title="Open Flow Server"
-          token={session.kind == 'signed-out' && session.configured !== false ? token : undefined}
-          tokenLabel={session.kind == 'signed-out' && session.configured !== false ? t.token : undefined}
+          token={session.kind == 'signed-out' && session.configured === true ? token : undefined}
+          tokenLabel={session.kind == 'signed-out' && session.configured === true ? t.token : undefined}
         />
       )}
       <Toaster
