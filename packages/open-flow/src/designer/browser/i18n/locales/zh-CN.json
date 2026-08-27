@@ -280,7 +280,6 @@
     "noData": "无数据",
     "nullable": "允许 null",
     "presetType": "预设类型",
-    "selectValueType": "选择数据类型",
     "reference": "已连线",
     "requiredFieldsUnset": "请设置必填项：{{fields}}。",
     "title": "输入接口",

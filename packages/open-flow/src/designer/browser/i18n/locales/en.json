@@ -280,7 +280,6 @@
     "noData": "no data",
     "nullable": "Nullable",
     "presetType": "Preset type",
-    "selectValueType": "Select data type",
     "reference": "connected",
     "requiredFieldsUnset": "Set the required fields: {{fields}}.",
     "title": "Input Handles",

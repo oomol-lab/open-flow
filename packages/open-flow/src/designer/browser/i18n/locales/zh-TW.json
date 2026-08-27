@@ -280,7 +280,6 @@
     "noData": "沒有資料",
     "nullable": "可為 null",
     "presetType": "預設類型",
-    "selectValueType": "選擇資料類型",
     "reference": "已連線",
     "requiredFieldsUnset": "請設定必填欄位：{{fields}}。",
     "title": "輸入 Handle",

@@ -280,7 +280,6 @@
     "noData": "데이터 없음",
     "nullable": "null 허용",
     "presetType": "사전 설정 타입",
-    "selectValueType": "데이터 타입 선택",
     "reference": "연결됨",
     "requiredFieldsUnset": "필수 항목을 설정하세요: {{fields}}.",
     "title": "입력 Handle",

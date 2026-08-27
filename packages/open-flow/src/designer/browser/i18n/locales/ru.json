@@ -280,7 +280,6 @@
     "noData": "нет данных",
     "nullable": "Допускает null",
     "presetType": "Готовый тип",
-    "selectValueType": "Выберите тип данных",
     "reference": "подключено",
     "requiredFieldsUnset": "Заполните обязательные поля: {{fields}}.",
     "title": "Входные Handle",

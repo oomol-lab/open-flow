@@ -280,7 +280,6 @@
     "noData": "データなし",
     "nullable": "null を許可",
     "presetType": "プリセット型",
-    "selectValueType": "データ型を選択",
     "reference": "接続済み",
     "requiredFieldsUnset": "必須項目を設定してください：{{fields}}。",
     "title": "入力 Handle",

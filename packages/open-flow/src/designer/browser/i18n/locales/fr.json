@@ -280,7 +280,6 @@
     "noData": "aucune donnée",
     "nullable": "Accepte null",
     "presetType": "Type prédéfini",
-    "selectValueType": "Sélectionner le type de donnée",
     "reference": "connecté",
     "requiredFieldsUnset": "Renseignez les champs obligatoires : {{fields}}.",
     "title": "Handles d'entrée",
