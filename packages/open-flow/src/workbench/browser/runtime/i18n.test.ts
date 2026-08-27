@@ -18,7 +18,7 @@ describe('Workbench i18n', () => {
   it('translates messages and interpolates values', () => {
     const i18n = createI18n('zh-CN')
 
-    expect(i18n.t('resource.flows')).toBe('Flow')
+    expect(i18n.t('resource.flows')).toBe('工作流')
     expect(i18n.t('notice.created', { name: '演示' })).toBe('已创建 演示。')
 
     i18n.dispose()

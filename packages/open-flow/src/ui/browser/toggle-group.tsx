@@ -41,7 +41,7 @@ function ToggleGroup<Value extends string>({
       style={{ '--gap': `${spacing}px` } as React.CSSProperties}
       orientation={orientation}
       className={cn(
-        'group/toggle-group flex w-fit flex-row items-center gap-[var(--gap)] rounded-lg data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch',
+        'group/toggle-group flex w-fit flex-row items-center gap-[var(--gap)] rounded-lg data-[size=sm]:rounded-md data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch',
         className,
       )}
       {...props}

@@ -321,13 +321,19 @@ function Editor({
 }
 
 export default function FlowWorkspace({
+  hostAction,
+  hostTitle,
   hrefFor,
   navigation,
+  onHostAction,
   store,
   theme,
 }: {
+  readonly hostAction?: string | undefined
+  readonly hostTitle?: string | undefined
   readonly hrefFor: (location: WorkbenchLocation) => string
   readonly navigation: NavigationStore
+  readonly onHostAction?: (() => void) | undefined
   readonly store: WorkbenchStore
   readonly theme: WorkbenchTheme
 }): ReactElement {
@@ -396,6 +402,8 @@ export default function FlowWorkspace({
           activeView={view}
           flowHref={hrefFor({ flowId: flowId!, view: 'design' })}
           flowsHref={hrefFor({ view: 'design' })}
+          hostAction={hostAction}
+          hostTitle={hostTitle}
           onOpenDesign={() => navigation.open('design')}
           onOpenFlow={() => navigation.openMainFlow()}
           onOpenFlows={() => void navigation.openFlows()}
@@ -407,6 +415,7 @@ export default function FlowWorkspace({
             store.runRequests.dismissInputs()
             navigation.open('runs')
           }}
+          onHostAction={onHostAction}
           onRunDraft={() => void runDraft()}
           onRunLive={() => void runLive()}
           store={store}

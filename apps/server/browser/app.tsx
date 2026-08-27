@@ -2,7 +2,7 @@ import type { WorkbenchLanguage, WorkbenchLocation, WorkbenchNavigationOptions, 
 import type { FormEvent, ReactElement } from 'react'
 
 import { OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Toaster, toast } from 'sonner'
 import { createBrowserHost } from './host.ts'
 import { parseRoute, routePath } from './route.ts'
@@ -17,7 +17,6 @@ const copy = {
     closeNotification: 'Close notification',
     configured: 'Sign in with the operator token configured for this deployment.',
     invalid: 'The operator token is invalid.',
-    moreActions: 'Server actions',
     notConfigured: 'Set OPEN_FLOW_TOKEN on the server before signing in.',
     notifications: 'Notifications',
     retry: 'Retry',
@@ -31,7 +30,6 @@ const copy = {
     closeNotification: '关闭通知',
     configured: '使用当前 deployment 配置的 operator token 登录。',
     invalid: 'Operator token 不正确。',
-    moreActions: '服务操作',
     notConfigured: '请先在服务端配置 OPEN_FLOW_TOKEN。',
     notifications: '通知',
     retry: '重试',
@@ -87,8 +85,6 @@ export function App(): ReactElement {
   const [session, setSession] = useState<Session>({ kind: 'checking' })
   const [token, setToken] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [operatorMenuOpen, setOperatorMenuOpen] = useState(false)
-  const operatorMenu = useRef<HTMLDivElement>(null)
   const t = copy[language]
   const host = useMemo(() => createBrowserHost(notify, () => setSession({ configured: true, kind: 'signed-out' })), [])
   const preferences = useMemo(
@@ -132,24 +128,6 @@ export function App(): ReactElement {
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
   }, [])
-  useEffect(() => {
-    if (!operatorMenuOpen) return
-    const close = (event: PointerEvent): void => {
-      if (event.target instanceof Node && !operatorMenu.current?.contains(event.target)) setOperatorMenuOpen(false)
-    }
-    const escape = (event: KeyboardEvent): void => {
-      if (event.key != 'Escape') return
-      setOperatorMenuOpen(false)
-      operatorMenu.current?.querySelector<HTMLButtonElement>('.operator-menu-trigger')?.focus()
-    }
-    globalThis.addEventListener('pointerdown', close)
-    globalThis.addEventListener('keydown', escape)
-    return () => {
-      globalThis.removeEventListener('pointerdown', close)
-      globalThis.removeEventListener('keydown', escape)
-    }
-  }, [operatorMenuOpen])
-
   function navigate(next: WorkbenchLocation, options: WorkbenchNavigationOptions): void {
     const path = routePath(next)
     if (path != window.location.pathname) window.history[options.replace ? 'replaceState' : 'pushState'](null, '', path)
@@ -181,7 +159,6 @@ export function App(): ReactElement {
   }
 
   async function signOut(): Promise<void> {
-    setOperatorMenuOpen(false)
     try {
       const response = await fetch('/auth/session', { credentials: 'same-origin', method: 'DELETE' })
       if (!response.ok) throw new Error('Session logout failed.')
@@ -195,46 +172,22 @@ export function App(): ReactElement {
   return (
     <div className="open-flow-theme server-host" data-theme={theme}>
       {session.kind == 'signed-in' ? (
-        <>
-          <div className="operator-menu" ref={operatorMenu}>
-            <button
-              aria-expanded={operatorMenuOpen}
-              aria-haspopup="dialog"
-              aria-label={t.moreActions}
-              className="operator-menu-trigger"
-              onClick={() => setOperatorMenuOpen(!operatorMenuOpen)}
-              title={t.moreActions}
-              type="button"
-            >
-              <svg aria-hidden="true" fill="currentColor" height="18" viewBox="0 0 24 24" width="18">
-                <circle cx="5" cy="12" r="1.5" />
-                <circle cx="12" cy="12" r="1.5" />
-                <circle cx="19" cy="12" r="1.5" />
-              </svg>
-            </button>
-            {operatorMenuOpen && (
-              <div aria-label={t.moreActions} className="operator-menu-popup" role="dialog">
-                <div className="operator-menu-label">Open Flow Server</div>
-                <button className="operator-menu-sign-out" onClick={() => void signOut()} type="button">
-                  {t.signOut}
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="workbench-frame">
-            <OpenFlowWorkbench
-              hrefFor={routePath}
-              host={host}
-              language={language}
-              location={route}
-              onLanguageChange={setLanguage}
-              onNavigate={navigate}
-              preferences={preferences}
-              sessionKey="server-operator"
-              theme={theme}
-            />
-          </div>
-        </>
+        <div className="workbench-frame">
+          <OpenFlowWorkbench
+            hrefFor={routePath}
+            host={host}
+            hostAction={t.signOut}
+            hostTitle="Open Flow Server"
+            language={language}
+            location={route}
+            onHostAction={() => void signOut()}
+            onLanguageChange={setLanguage}
+            onNavigate={navigate}
+            preferences={preferences}
+            sessionKey="server-operator"
+            theme={theme}
+          />
+        </div>
       ) : (
         <main className="session-gate">
           {session.kind == 'checking' ? (

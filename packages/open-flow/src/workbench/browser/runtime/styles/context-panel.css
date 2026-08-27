@@ -410,7 +410,7 @@
     height: 280px;
     overflow: hidden;
     border: 1px solid var(--ui-border);
-    border-radius: calc(var(--ui-radius) - 2px);
+    border-radius: var(--ui-radius);
     background: color-mix(in srgb, var(--ui-background) 88%, var(--ui-card));
     transition:
       border-color 140ms ease-out,
@@ -625,7 +625,7 @@
 
   .connection-state.required {
     border: 1px solid var(--warning-border);
-    border-radius: calc(var(--ui-radius) + 2px);
+    border-radius: var(--ui-radius);
     margin: 12px;
     background: var(--warning-surface);
     color: var(--warning-foreground);

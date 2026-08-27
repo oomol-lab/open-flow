@@ -16,6 +16,7 @@ import { Skeleton } from '../../../../ui/browser/skeleton.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
 import { followWorkbenchLink } from '../navigationLink.ts'
+import { HostMenu } from './hostMenu.tsx'
 import { WorkbenchSelect } from './workbenchSelect.tsx'
 
 const CreateResourceDialog = lazy(() => import('./createResourceDialog.tsx'))
@@ -94,12 +95,12 @@ function FlowItem({ busy, flow, href, onSelect, store }: FlowItemProps): ReactEl
           </span>
           <span>
             <strong>{flow.name}</strong>
-            <code>{flow.flowId}</code>
+            <code translate="no">{flow.flowId}</code>
           </span>
         </span>
         <time dateTime={flow.updatedAt}>{new Date(flow.updatedAt).toLocaleString(locale)}</time>
         <span className={`resource-status ${flow.status == 'active' ? 'active' : 'warning'}`}>
-          <span className={`status-dot ${flow.status == 'active' ? 'success' : 'running'}`} />
+          <span aria-hidden="true" className={`status-dot ${flow.status == 'active' ? 'success' : 'running'}`} />
           {t(flow.status == 'active' ? 'resource.active' : 'resource.retiring')}
         </span>
       </Button>
@@ -182,12 +183,25 @@ function FlowItem({ busy, flow, href, onSelect, store }: FlowItemProps): ReactEl
 
 interface FlowBrowserProps extends LanguageSelectProps {
   readonly hrefForFlow: (flow: Flow) => string
+  readonly hostAction?: string | undefined
+  readonly hostTitle?: string | undefined
   readonly onCreateFlow: (name: string) => Promise<boolean>
+  readonly onHostAction?: (() => void) | undefined
   readonly onSelectFlow: (flow: Flow) => void
   readonly store: WorkbenchStore
 }
 
-export function FlowBrowser({ hrefForFlow, language, onCreateFlow, onLanguageChange, onSelectFlow, store }: FlowBrowserProps): ReactElement {
+export function FlowBrowser({
+  hrefForFlow,
+  hostAction,
+  hostTitle,
+  language,
+  onCreateFlow,
+  onHostAction,
+  onLanguageChange,
+  onSelectFlow,
+  store,
+}: FlowBrowserProps): ReactElement {
   const t = useTranslate()
   const busy = useVal(store.workspace.$.busy)
   const loadFailed = useVal(store.workspace.$.flowLoadFailed)
@@ -216,11 +230,16 @@ export function FlowBrowser({ hrefForFlow, language, onCreateFlow, onLanguageCha
       <div className="resource-page">
         <header className="resource-page-header">
           <div className="resource-heading">
-            <span className="resource-eyebrow">{t('resource.workflows')}</span>
             <h1>{t('resource.flows')}</h1>
-            <p>{t('resource.flowsDescription')}</p>
           </div>
-          <LanguageSelect language={language} onLanguageChange={onLanguageChange} />
+          <div className="resource-page-actions">
+            <LanguageSelect language={language} onLanguageChange={onLanguageChange} />
+            <Button disabled={busy != null} onClick={() => setCreating(true)}>
+              <Icon data-icon="inline-start" name="plus" />
+              {t('resource.newFlow')}
+            </Button>
+            {hostAction != null && hostTitle != null && onHostAction != null && <HostMenu action={hostAction} onAction={onHostAction} title={hostTitle} />}
+          </div>
         </header>
         <section aria-labelledby="flow-list-title" className="resource-list-section">
           <div className="resource-list-title">
@@ -243,6 +262,7 @@ export function FlowBrowser({ hrefForFlow, language, onCreateFlow, onLanguageCha
                 />
               </InputGroup>
               <Button
+                aria-label={t('common.refresh')}
                 disabled={loading || busy != null}
                 onClick={() => void store.workspace.reloadFlows()}
                 size="icon"
@@ -250,10 +270,6 @@ export function FlowBrowser({ hrefForFlow, language, onCreateFlow, onLanguageCha
                 variant="outline"
               >
                 <Icon name="refresh" />
-              </Button>
-              <Button disabled={busy != null} onClick={() => setCreating(true)}>
-                <Icon data-icon="inline-start" name="plus" />
-                {t('resource.newFlow')}
               </Button>
             </div>
           </div>

@@ -109,6 +109,11 @@ UnoCSS 只负责现有 Iconify 图标，包括 `i-carbon:*`、`i-codicon:*`、`i
 Designer Dark 只在 Canvas Content compatibility scope 内实现相同的 token key。新增 primitive token 时，必须同时更新产品主题、两个 Designer compatibility
 theme 和发布 CSS 产物测试，不能遗漏、重命名或增加只由单个宿主理解的共享 token。
 
+共享 primitive 的圆角使用 `rounded-sm`、`rounded-md`、`rounded-lg` 等 Tailwind 语义 utility；不要在 arbitrary value 中直接读取运行时
+`--radius-sm`、`--radius-md` 或 `--radius-lg`。产品主题是部署宿主、Workbench 和 Canvas Chrome 的 radius owner，Designer 继续通过
+`--widget-radius` 与根级控件归一化独立拥有 Canvas Content 圆角。Workbench feature stylesheet 中的普通 surface 直接使用 `--ui-radius`，不要再以
+`calc(var(--ui-radius) +/- ...)` 创建局部圆角层级。
+
 Workbench 的 `styles/tokens.css` 只能消费共享 `--ui-*` token，并定义非 palette 的 Workbench 状态扩展；不得声明或覆盖 light/dark `--ui-*` 值，也不得重新引入
 `--canvas`、`--surface`、`--subtle`、`--border`、`--text`、`--muted`、`--primary`、`--focus` 或 `--danger` 作为平行主题事实源。Server-owned chrome
 不能 deep-import Workbench 源码，但必须消费同名 `--ui-*` 合同，避免通过逐组件 dark selector 维护第二套视觉。Designer 的 `--widget-*`、`--node-*`、
@@ -122,6 +127,9 @@ React Flow 画布外围通过固定的 `--xy-*` 映射消费共享 UI、node 和
 共享 Dialog、Select、DropdownMenu、Popover 和 Combobox 的 Popup 必须统一使用语义 popover surface、`tw-animate-css` 的 open/closed 动画，并同时提供
 `motion-reduce:animate-none` 与 `motion-reduce:transition-none`。不要在 feature stylesheet 重复声明同类淡入、缩放或关闭动画。Progress Indicator 只允许
 过渡实际变化的 `width`；不要使用会让颜色、布局和未来新增属性一起进入动画的 `transition-all`。
+
+共享 popup 保留 shadcn primitive 在 Positioner 与 Popup 上的 `z-50` stacking，不得因为使用局部 Portal `container` 而删除。局部 container 负责主题继承、
+outside-click 边界和 transformed Designer 定位，`z-50` 负责 popup 在该局部 stacking context 内覆盖后续页面内容；两者不是替代关系。
 
 Designer 的 `DesignerCombobox`、节点菜单、翻译面板和 Block Quick Pick 仍可通过 SCSS Modules 控制紧凑尺寸、最大高度、复杂网格和特定布局。这些属于已经精调
 的 Workflow 编辑体验，不应为了追平 registry 最新 DOM 结构而机械覆盖。共享 primitive 负责 surface、focus、disabled、item state 和 reduced-motion；Designer

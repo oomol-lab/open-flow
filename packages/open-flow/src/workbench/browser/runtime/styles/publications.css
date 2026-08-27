@@ -153,7 +153,7 @@
     justify-content: stretch;
     gap: 16px;
     padding: 14px 16px;
-    border-radius: calc(var(--ui-radius) + 1px);
+    border-radius: var(--ui-radius);
     background: var(--ui-card);
   }
 
@@ -478,7 +478,7 @@
     overflow: auto;
     padding: 8px 10px;
     border: 1px solid var(--ui-border);
-    border-radius: calc(var(--ui-radius) - 1px);
+    border-radius: var(--ui-radius);
     background: var(--ui-background);
     --text-color: var(--ui-muted-foreground);
   }
