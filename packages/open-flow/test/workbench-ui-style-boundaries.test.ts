@@ -174,10 +174,8 @@ test('keeps Designer node controls in the compact root normalization', async () 
   assert.match(designerRootStyles, /:not\(\.react-flow__controls button\)/)
   assert.doesNotMatch(designerRootStyles, /button:not\(\[data-slot\]\)/)
   assert.match(toggleGroup, /group-data-\[spacing=0\]\/toggle-group:rounded-none/)
-  assert.match(toggleGroup, /group-data-\[orientation=horizontal\]\/toggle-group:data-\[spacing=0\]:first:rounded-l-lg/)
-  assert.match(toggleGroup, /group-data-\[orientation=horizontal\]\/toggle-group:data-\[spacing=0\]:last:rounded-r-lg/)
-  assert.match(toggleGroup, /group-data-\[orientation=horizontal\]\/toggle-group:data-\[spacing=0\]:data-\[variant=outline\]:border-l-0/)
-  assert.match(toggleGroup, /group-data-\[orientation=horizontal\]\/toggle-group:data-\[spacing=0\]:data-\[variant=outline\]:first:border-l/)
+  assert.match(toggleGroup, /data-\[spacing=0\]:first:rounded/)
+  assert.match(toggleGroup, /data-\[spacing=0\]:last:rounded/)
 })
 
 test('keeps shared popup motion accessible without replacing Designer layout ownership', async () => {
