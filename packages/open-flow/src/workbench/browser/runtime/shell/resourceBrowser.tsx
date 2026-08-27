@@ -12,6 +12,7 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
+import { Label } from '../../../../ui/browser/label.tsx'
 import { Skeleton } from '../../../../ui/browser/skeleton.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
@@ -136,7 +137,7 @@ function FlowItem({ busy, flow, href, onSelect, store }: FlowItemProps): ReactEl
       )}
       {mode == 'rename' && (
         <form className="resource-row-form" onSubmit={(event) => void rename(event)}>
-          <label htmlFor={`rename-flow-${flow.flowId}`}>{t('sidebar.renameFlow', { name: flow.name })}</label>
+          <Label htmlFor={`rename-flow-${flow.flowId}`}>{t('sidebar.renameFlow', { name: flow.name })}</Label>
           <span className="resource-row-field">
             <Input
               autoComplete="off"

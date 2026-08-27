@@ -66,12 +66,6 @@
     flex: none;
   }
 
-  .resource-row-form label {
-    color: var(--ui-muted-foreground);
-    font-size: 12px;
-    font-weight: 500;
-  }
-
   .resource-row-form > div,
   .resource-row-actions,
   .resource-row-confirm > div {
