@@ -416,7 +416,6 @@
     "liveAndDraft": "线上 + 草稿",
     "liveOnly": "仅线上",
     "liveSuspended": "当前没有兼容的 Engine，线上版本已暂停运行。",
-    "liveOnly": "仅线上",
     "localClient": "本地测试客户端",
     "moreActions": "更多操作",
     "namePlaceholder": "名称",

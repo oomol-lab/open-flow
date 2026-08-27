@@ -416,7 +416,6 @@
     "liveAndDraft": "Live + Draft",
     "liveOnly": "Live only",
     "liveSuspended": "Live is suspended because no compatible Engine is currently available.",
-    "liveOnly": "Live only",
     "localClient": "Local test client",
     "moreActions": "More actions",
     "namePlaceholder": "Name",

@@ -391,7 +391,7 @@
     "customModel": "Своя модель…",
     "defaultModel": "Модель по умолчанию",
     "deleteMessage": "Удалить сообщение",
-    "maxTokens": "Максимум Token",
+    "maxTokens": "Максимум токенов",
     "messageCount": "Сообщений: {{count}}",
     "messageCountOne": "1 сообщение",
     "messagePlaceholder": "Текст сообщения",

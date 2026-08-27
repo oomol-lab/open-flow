@@ -8,7 +8,7 @@
     "signIn": "Sign in",
     "signOut": "Sign out",
     "token": "Operator token",
-    "unavailable": "The Server server could not be reached."
+    "unavailable": "The server could not be reached."
   },
   "shell": {
     "closeNotification": "Close notification",

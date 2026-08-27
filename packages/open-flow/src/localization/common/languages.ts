@@ -16,7 +16,7 @@ export const uiLanguageNames: Readonly<Record<UiLanguage, string>> = {
 }
 
 const uiLanguageTags: ReadonlyMap<string, UiLanguage> = new Map(uiLanguages.map((language) => [language.toLowerCase(), language]))
-const traditionalChineseSubtags: ReadonlySet<string> = new Set(['hant', 'hk', 'mo', 'tw'])
+const traditionalChineseRegions: ReadonlySet<string> = new Set(['hk', 'mo', 'tw'])
 const cjkLanguages: ReadonlySet<UiLanguage> = new Set<UiLanguage>(['zh-CN', 'zh-TW', 'ja', 'ko'])
 
 export function isUiLanguage(value: unknown): value is UiLanguage {
@@ -25,8 +25,9 @@ export function isUiLanguage(value: unknown): value is UiLanguage {
 
 /**
  * BCP 47 aware resolution over candidates such as `navigator.languages`: an exact tag match
- * (case-insensitive) wins; zh-TW, zh-HK, zh-MO and zh-Hant-* map to zh-TW; any other zh* maps to
- * zh-CN; en, ja, ko, ru and fr also match on their primary subtag (fr-CA to fr, ja-JP to ja).
+ * (case-insensitive) wins; for zh an explicit script subtag beats the region (zh-Hant-* to zh-TW,
+ * zh-Hans-* to zh-CN), then zh-TW, zh-HK and zh-MO map to zh-TW and any other zh* to zh-CN; en, ja,
+ * ko, ru and fr also match on their primary subtag (fr-CA to fr, ja-JP to ja).
  */
 export function resolveUiLanguage(candidates: Iterable<string | null | undefined>, fallback: UiLanguage = defaultUiLanguage): UiLanguage {
   for (const candidate of candidates) {
@@ -60,6 +61,10 @@ function matchUiLanguage(candidate: string): UiLanguage | undefined {
   const exact = uiLanguageTags.get(tag)
   if (exact != null) return exact
   const subtags = tag.split('-')
-  if (subtags[0] == 'zh') return subtags.some((subtag) => traditionalChineseSubtags.has(subtag)) ? 'zh-TW' : 'zh-CN'
+  if (subtags[0] == 'zh') {
+    if (subtags.includes('hant')) return 'zh-TW'
+    if (subtags.includes('hans')) return 'zh-CN'
+    return subtags.some((subtag) => traditionalChineseRegions.has(subtag)) ? 'zh-TW' : 'zh-CN'
+  }
   return uiLanguageTags.get(subtags[0]!)
 }

@@ -1,5 +1,6 @@
 import styles from './schemaEditor.module.scss'
 import type { useStoreApi } from '@xyflow/react'
+import type { ErrorObject } from 'ajv'
 import type { JSX } from 'react/jsx-runtime'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { HandleRowProps, IHandleAction } from '../components/handleRow.tsx'
@@ -120,26 +121,38 @@ function CodeEditor({ store }: CodeEditorProps) {
 
         const ajv = new Ajv({ allErrors: true, verbose: true })
         const queue = dispose.add(seq({ dropHead: true, window: 1 }))
+        // Kept so the reported message can be re-localized when the UI language changes.
+        let schemaErrors: ErrorObject[] | null = null
+        dispose.add(
+          i18n.lang$.reaction((lang) => {
+            if (!isMounted || schemaErrors == null) return
+            localizeAjvErrors(lang, schemaErrors)
+            setError(ajv.errorsText(schemaErrors))
+          }),
+        )
         schema$.reaction((json) =>
           queue.schedule(async () => {
             try {
               const result = tryParseJSON(json)
               if (result.isErr()) {
+                schemaErrors = null
                 if (isMounted) setError(result.unwrapErr())
                 return
               }
               schema = result.unwrap()
               await ajv.validateSchema(schema as any)
+              schemaErrors = ajv.errors != null && ajv.errors.length > 0 ? ajv.errors : null
               if (isMounted) {
-                if (ajv.errors && ajv.errors.length > 0) {
-                  localizeAjvErrors(i18n.lang, ajv.errors)
-                  setError(ajv.errorsText(ajv.errors))
+                if (schemaErrors != null) {
+                  localizeAjvErrors(i18n.lang, schemaErrors)
+                  setError(ajv.errorsText(schemaErrors))
                 } else {
                   setError(null)
                   store.schema$.set(schema)
                 }
               }
             } catch (err) {
+              schemaErrors = null
               if (isMounted) setError(err + '')
             }
           }),

@@ -13,7 +13,7 @@ function messages(value: Readonly<Record<string, unknown>>, prefix = ''): [strin
 }
 
 function placeholders(message: string): string[] {
-  return [...message.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].map((match) => match[1]!).toSorted()
+  return [...message.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].flatMap((match) => match[1] ?? []).toSorted()
 }
 
 const english = new Map(messages(en))
@@ -32,7 +32,13 @@ describe('Workbench i18n', () => {
       })
 
       it('keeps the placeholders of every message', () => {
-        for (const [key, message] of entries) expect([key, placeholders(message)]).toEqual([key, placeholders(english.get(key)!)])
+        const mismatched = entries.flatMap(([key, message]) => {
+          const source = english.get(key)
+          if (source == null) return [`${key}: not an English message`]
+          const [actual, expected] = [placeholders(message).join('|'), placeholders(source).join('|')]
+          return actual == expected ? [] : [`${key}: ${actual} instead of ${expected}`]
+        })
+        expect(mismatched).toEqual([])
       })
 
       it('never leaves a message empty', () => {

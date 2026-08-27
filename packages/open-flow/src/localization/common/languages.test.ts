@@ -33,6 +33,14 @@ describe('resolveUiLanguage', () => {
     expect(resolveUiLanguage(['zh-Hans-SG'])).toBe('zh-CN')
   })
 
+  it('prefers an explicit script subtag over the region', () => {
+    expect(resolveUiLanguage(['zh-Hans-TW'])).toBe('zh-CN')
+    expect(resolveUiLanguage(['zh-Hans-HK'])).toBe('zh-CN')
+    expect(resolveUiLanguage(['zh-Hans-MO'])).toBe('zh-CN')
+    expect(resolveUiLanguage(['zh-Hant-CN'])).toBe('zh-TW')
+    expect(resolveUiLanguage(['zh-Hant-SG'])).toBe('zh-TW')
+  })
+
   it('matches other languages on their primary subtag and prefers the first candidate', () => {
     expect(resolveUiLanguage(['fr-CA', 'en-US'])).toBe('fr')
     expect(resolveUiLanguage(['de', 'ru-RU'])).toBe('ru')

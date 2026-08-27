@@ -328,7 +328,7 @@
   },
   "jsonViewer": {
     "bin": "二進位",
-    "secret": "Secret",
+    "secret": "密鑰",
     "showLess": "收合",
     "showMore": "展開",
     "var": "變數"

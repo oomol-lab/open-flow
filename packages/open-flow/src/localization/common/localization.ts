@@ -26,7 +26,7 @@ export function localeChain<T>(locales: { readonly [language: string]: T | undef
   const chain: T[] = []
   for (const candidate of userLocaleFallbackChain(language)) {
     const locale = locales[candidate]
-    if (locale) chain.push(locale)
+    if (locale != null) chain.push(locale)
   }
   return chain
 }
