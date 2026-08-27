@@ -201,7 +201,7 @@ transition 与 reduced-motion。Workbench 的 coarse pointer 规则可以增加�
 Workbench root 始终建立 `open-flow-workbench` inline-size container；响应式业务布局只维护 1100、980、720、520 四个 container breakpoint。不要并行增加
 `max-width` viewport fallback，也不要在文件尾重复较宽 breakpoint 来争夺 cascade。与 viewport 本身相关的 pointer 和 reduced-motion media query 可以保留。
 
-共享 Alert 与 Card 消费 `--ui-card` / `--ui-card-foreground`，三个 theme owner 必须与其他 `--ui-*` token 同步实现。Workbench 的 error/warning feedback 使用
+共享 Alert 与 Workbench card surface 消费 `--ui-card` / `--ui-card-foreground`，三个 theme owner 必须与其他 `--ui-*` token 同步实现。Workbench 的 error/warning feedback 使用
 `--danger-*` / `--warning-*` surface、border、foreground token；除 JSON/code syntax highlighting 外，不要在 Runs、Context Panel、Status 或 responsive stylesheet
 直接维护浅色主题 red/amber hex。单条终止错误优先使用完整 Alert composition，而不是重新创建 feature error box。
 
