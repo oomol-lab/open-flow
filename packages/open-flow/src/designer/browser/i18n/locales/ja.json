@@ -211,9 +211,7 @@
     "default": "データ型に互換性がありません",
     "diffKind": "Handle の種別が一致しません",
     "errorNode": "破損したノードに接続されています",
-    "nullable": "接続元は null を許可しますが、接続先は許可していません",
-    "varDiffPkg": "変数が異なるプロジェクトに属しています",
-    "varDiffType": "変数の出力は変数の入力にのみ接続できます"
+    "nullable": "接続元は null を許可しますが、接続先は許可していません"
   },
   "errorNode": {
     "blockManifestUnrenderable": "ブロックマニフェスト {{path}} を描画できません",
@@ -248,8 +246,10 @@
       "empty": "Handle 名を空にはできません"
     },
     "schemaDescription": "JSON Schema の説明…",
-    "secretUnavailable": "シークレットカタログを利用できません",
-    "selectSecret": "シークレットを選択",
+    "selectVariable": "Variable を選択",
+    "variableMissing": "{{name}}（見つかりません）",
+    "variableMissingHelp": "Deployment Variable {{name}} は存在しません。",
+    "variablesLoading": "Variable を読み込み中…",
     "unknown": "不明"
   },
   "handleGroup": {
@@ -282,7 +282,6 @@
     "presetType": "プリセット型",
     "reference": "接続済み",
     "requiredFieldsUnset": "必須項目を設定してください：{{fields}}。",
-    "secretNotFound": "シークレットが見つかりません",
     "title": "入力 Handle",
     "typeError": "{{expected}} 型を指定してください",
     "unset": "<未設定>",
@@ -328,10 +327,8 @@
   },
   "jsonViewer": {
     "bin": "バイナリ",
-    "secret": "シークレット",
     "showLess": "折りたたむ",
-    "showMore": "展開",
-    "var": "変数"
+    "showMore": "展開"
   },
   "l10n": {
     "createKey": "翻訳を追加",
@@ -433,11 +430,10 @@
     "number": "Number",
     "object": "Object",
     "oneOf": "OneOf",
-    "secret": "Secret",
+    "deploymentVariable": "Variable",
     "select": "Single",
     "string": "String",
-    "text": "Textarea",
-    "variable": "Variable"
+    "text": "Textarea"
   },
   "preview": {
     "title": "プレビュー",
@@ -561,23 +557,6 @@
       "run": "実行",
       "showDetails": "実行詳細を表示",
       "trigger": "Trigger"
-    },
-    "secrets": {
-      "add": "シークレットを追加",
-      "addField": "フィールドを追加",
-      "close": "閉じる",
-      "confirmDelete": "現在のランタイムからこのシークレットを削除しますか？",
-      "delete": "削除",
-      "hideValue": "値を隠す",
-      "key": "キー",
-      "name": "名前",
-      "removeField": "フィールドを削除",
-      "save": "保存",
-      "saved": "シークレットを現在のランタイムに保存しました。",
-      "showValue": "値を表示",
-      "template": "テンプレート",
-      "title": "シークレット",
-      "value": "値"
     },
     "settings": {
       "categories": "設定カテゴリ",

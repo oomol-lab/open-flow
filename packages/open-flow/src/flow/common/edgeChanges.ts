@@ -1,5 +1,7 @@
 import type { ChangeOperation, GraphEdge, GraphTarget, RevisionContent } from './change.ts'
 
+import { cleanVariableBindings } from './nodeChanges.ts'
+
 export function connect(content: RevisionContent, target: GraphTarget, edge: GraphEdge): readonly ChangeOperation[] {
   const exact = { source: edge.source, sourceHandle: edge.sourceHandle, target: edge.target, targetHandle: edge.targetHandle }
   const node = graph(content, target)?.nodes[edge.target]
@@ -10,7 +12,7 @@ export function connect(content: RevisionContent, target: GraphTarget, edge: Gra
   ) {
     return []
   }
-  return [{ edge: exact, kind: 'graph.edge.connect', target }]
+  return cleanVariableBindings(content, [{ edge: exact, kind: 'graph.edge.connect', target }])
 }
 
 export function disconnect(content: RevisionContent, target: GraphTarget, edge: GraphEdge): readonly ChangeOperation[] {

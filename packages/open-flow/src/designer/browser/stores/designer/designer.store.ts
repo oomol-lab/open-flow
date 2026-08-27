@@ -6,13 +6,11 @@ import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { ReactiveMap, ReadonlyReactiveMap } from 'value-enhancer/collections'
 import type { LocaleTextStore } from '../../../../localization/common/localization.ts'
 import type { HandleName, NodeId } from '../../../../schema/index.ts'
-import type { SecretStore } from '../../../../secret/browser/store.ts'
 import type { FlowDisplayMode } from '../../../common/flowDisplay.ts'
 import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { PartialConnection, RFConnection, RFEdge, RFNode, RFNodeId } from '../../base/rfHelpers.ts'
 import type { ToReadonly$Group } from '../../base/val.ts'
 import type { TranslateKeyEvent, UserLocalesContext } from '../../components/userLocales.tsx'
-import type { HandleEditorContext } from '../../jsonSchema/handleEditorContext.ts'
 import type { EdgeStore } from '../edge/edge.store.ts'
 import type { RenderedRFEdge } from '../edge/overviewEdges.ts'
 import type { ManifestConnection } from '../edge/typings.ts'
@@ -187,6 +185,10 @@ export interface DesignerStore$ extends ToReadonly$Group<DesignerStore$$> {
   readonly runStatus: ReadonlyVal<FlowRunStatus>
 
   readonly nodeMiniMapPhase: ReadonlyVal<NodeMiniMapPhase>
+  readonly variableInputs: ReadonlyVal<ReadonlyMap<string, { readonly compatible: boolean; readonly name?: string }>>
+  readonly variableNames: ReadonlyVal<readonly string[]>
+  readonly variableNamesLoaded: ReadonlyVal<boolean>
+  readonly variableNamesLoading: ReadonlyVal<boolean>
 }
 
 export interface DesignerStoreProps {
@@ -201,12 +203,15 @@ export interface DesignerStoreProps {
   readonly displayMode?: Val<FlowDisplayMode>
   readonly viewport: Val<Viewport | undefined>
   readonly settingsPanelWidth: Val<number | undefined>
-  readonly secretStore?: SecretStore
   readonly connectorConnections?: ConnectorConnectionStore
   readonly nodes: ReactiveMap<NodeId, NodeStore>
   readonly runStatus: ReadonlyVal<FlowRunStatus>
   readonly designerUIStore: DesignerUIStore
   readonly focused$?: ReadonlyVal<boolean>
+  readonly variableInputs?: ReadonlyVal<ReadonlyMap<string, { readonly compatible: boolean; readonly name?: string }>>
+  readonly variableNames?: ReadonlyVal<readonly string[]>
+  readonly variableNamesLoaded?: ReadonlyVal<boolean>
+  readonly variableNamesLoading?: ReadonlyVal<boolean>
 
   readonly showConfirmDialog: (message: string) => Promise<boolean>
 
@@ -221,6 +226,8 @@ export interface DesignerStoreProps {
   ) => Promise<NodeId | undefined>
   readonly onDeleteNodes?: (toDeleteNodeStores: Iterable<NodeStore | CommentNodeStore>) => void
   readonly onConnect?: (connection: ManifestConnection) => void
+  readonly onChangeInputVariable?: (nodeId: string, handle: string, name: string | undefined) => void
+  readonly onOpenVariables?: () => void
   readonly onDisconnect?: (connections: Iterable<ManifestConnection>) => void
   readonly onDuplicate?: (nodeStores: NodeId[], offset?: XYPosition) => Promise<void>
   readonly onPaste?: (position: XYPosition) => void
@@ -289,6 +296,10 @@ export class DesignerStore {
   /** @internal */
   public readonly onConnect: DesignerStoreProps['onConnect']
   /** @internal */
+  public readonly onChangeInputVariable: DesignerStoreProps['onChangeInputVariable']
+  /** @internal */
+  public readonly onOpenVariables: DesignerStoreProps['onOpenVariables']
+  /** @internal */
   public readonly onDisconnect: DesignerStoreProps['onDisconnect']
   /** @internal */
   public readonly onDuplicate: DesignerStoreProps['onDuplicate']
@@ -306,9 +317,6 @@ export class DesignerStore {
   public readonly provideAddNodeMenuItems: DesignerStoreProps['provideAddNodeMenuItems']
   /** @internal */
   public readonly provideAsyncAddNodeMenuItems: DesignerStoreProps['provideAsyncAddNodeMenuItems']
-
-  /** @internal */
-  public readonly handleEditorContext: HandleEditorContext
 
   /** @internal */
   public readonly userLocalesContext: UserLocalesContext
@@ -331,6 +339,8 @@ export class DesignerStore {
     this.onAddNode = props.onAddNode
     this.onDeleteNodes = props.onDeleteNodes
     this.onConnect = props.onConnect
+    this.onChangeInputVariable = props.onChangeInputVariable
+    this.onOpenVariables = props.onOpenVariables
     this.onDisconnect = props.onDisconnect
     this.onDuplicate = props.onDuplicate
     this.onPaste = props.onPaste
@@ -431,11 +441,12 @@ export class DesignerStore {
           get(this.$$.displayMode) == 'overview' ? NodeMiniMapPhase.None : getNodeMinimap(get(this.$$.nodes.$).size, get(this.$$.viewport)?.zoom || 1),
         ),
       ),
+      variableInputs: this.dispose.add(props.variableInputs ?? val(new Map())),
+      variableNames: this.dispose.add(props.variableNames ?? val([])),
+      variableNamesLoaded: this.dispose.add(props.variableNamesLoaded ?? val(false)),
+      variableNamesLoading: this.dispose.add(props.variableNamesLoading ?? val(false)),
     }
 
-    this.handleEditorContext = {
-      secretStore: props.secretStore,
-    }
     this.onDidChangeTranslateKey = this.dispose.add(event())
     this.userLocalesContext = {
       userLocales: this.userLocales,

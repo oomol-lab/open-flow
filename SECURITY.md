@@ -58,7 +58,7 @@ A good report lets us reproduce and assess the issue quickly. Where possible, in
 ### Protect secrets in your report
 
 Because a deployment holds live secrets, **do not include real operator tokens, session cookies,
-Connector tokens, callback keys, Provider credentials, or workflow data** in your report. Redact
+Connector tokens, callback keys, Provider credentials, sensitive Variable values, or workflow data** in your report. Redact
 them and use placeholder values (for example, `OPEN_FLOW_TOKEN=REDACTED`). If a proof-of-concept
 requires a secret, describe how to generate a disposable test one instead of sharing a live value.
 
@@ -97,7 +97,10 @@ We follow a coordinated disclosure process:
   response into executable content or modified security headers on the Workbench or Control API
   origin.
 - **Secret leakage.** Operator tokens, Connector tokens, callback keys, or Provider callback
-  verifiers appearing in ProjectRevisions, RunEvents, the Workbench, API responses, or logs.
+  verifiers appearing in Flow Revisions, RunEvents, the Workbench, API responses, or logs.
+- **Variable boundary violations.** Variable values entering Flow Revisions, Publication records,
+  persisted Run requests, platform-generated `node.started` input projections, or server logs
+  without an operator-authored Flow explicitly propagating them.
 - **Resource limit bypasses.** Circumventing the concurrent Run, pending Run, or Run timeout limits
   from user code or through the API.
 - **Clients and distribution.** The Workbench (XSS, CSRF, and similar), the published
@@ -157,9 +160,13 @@ responsibility for securing their deployment. At minimum:
   `OPEN_FLOW_INTEGRATION_CALLBACK_KEY` (at least 32 bytes) through a secret. Callback verifiers
   derived from it live only in the Server's runtime state.
 - **Protect the data volume.** The SQLite database under `OPEN_FLOW_DATA_DIR` (`/data/open-flow`
-  in the image) contains Project source, Run history, Trigger state, and Provider callback
-  verifiers. Restrict access to the volume, let only one Server container write to it, and back it
-  up quiesced together with its WAL and SHM files.
+  in the image) contains Flow source, Run history, Variable values, Trigger state, and Provider
+  callback verifiers. Restrict access to the volume, let only one Server container write to it,
+  and back it up quiesced together with its WAL and SHM files.
+- **Treat Variables as readable deployment configuration.** Every authenticated Operator can list
+  and read all Variable values, and the open-source Server stores them as plaintext in SQLite.
+  Variables do not provide encryption at rest, per-value ACLs, automatic rotation, or an
+  unexportable Secret Manager boundary. A Flow may explicitly return, log, or send a bound value.
 - **Keep resource limits in place.** Tune `OPEN_FLOW_MAX_PENDING_RUNS`,
   `OPEN_FLOW_MAX_CONCURRENT_RUNS`, `OPEN_FLOW_RUN_TIMEOUT_MS`,
   `OPEN_FLOW_CALLBACK_REQUESTS_PER_MINUTE`, `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE`, and
@@ -181,7 +188,9 @@ For contributors and anyone working with this repository:
 - If a secret is committed by mistake, treat it as **compromised**: rotate it immediately, then
   report it privately through the channels above. Removing it from later commits or rewriting git
   history is not sufficient; assume it was captured.
-- Keep secrets out of ProjectRevisions, RunEvents, the Workbench, API responses, and logs. Do not
+- Keep platform credentials out of Flow Revisions, RunEvents, the Workbench, API responses, and logs.
+  Do not mistake the authenticated Variable API, which intentionally returns Variable values to an
+  Operator, for a Secret Manager. Do not
   add Capabilities to the user realm without validating the current Project, Run, Task, and
   invocation, and do not weaken the isolate, Executor, or callback authentication boundaries
   described in [docs/architecture.md](docs/architecture.md).

@@ -15,6 +15,7 @@ import type {
 } from './change.ts'
 
 import { generateTyping, mergeTypingIntoSourceFile } from '../../manifest/common/meta/block/generateTyping.ts'
+import { applyFlowChanges } from './change.ts'
 
 const codeTaskTemplate = `//#region generated meta
 /**
@@ -255,7 +256,7 @@ export function deleteNodes(content: RevisionContent, target: GraphTarget, nodeI
       ...(node.kind == 'task' && node.task != null ? [{ kind: 'module.delete' as const, moduleId: node.task.moduleId }] : []),
     ]
   })
-  if (target.kind == 'subflow') return operations
+  if (target.kind == 'subflow') return cleanVariableBindings(content, operations)
   const bindingIds = new Set(
     nodeIds.flatMap((nodeId) => {
       const node = nodes[nodeId]
@@ -268,7 +269,7 @@ export function deleteNodes(content: RevisionContent, target: GraphTarget, nodeI
     )
     if (!inUse) operations.push({ bindingId, kind: 'binding.delete' })
   }
-  return operations
+  return cleanVariableBindings(content, operations)
 }
 
 export function updateSettings(content: RevisionContent, target: GraphTarget, nodeId: string, settings: Settings): readonly ChangeOperation[] | undefined {
@@ -301,7 +302,63 @@ export function setInputValues(
     if (value === undefined) delete inputs[handle]
     else inputs[handle] = { kind: 'value', value }
   }
-  return replaceNode(target, nodeId, { ...node, inputs })
+  return cleanVariableBindings(content, replaceNode(target, nodeId, { ...node, inputs }))
+}
+
+export function setInputVariable(
+  content: RevisionContent,
+  target: GraphTarget,
+  nodeId: string,
+  handle: string,
+  name: string,
+  bindingId: string,
+): readonly ChangeOperation[] | undefined {
+  const node = graph(content, target)?.nodes[nodeId]
+  if (node == null || !('inputs' in node)) return
+  const mapping = node.inputs[handle]
+  const currentId =
+    mapping?.kind == 'sources' && mapping.sources.length == 1 && mapping.sources[0]?.kind == 'binding' ? mapping.sources[0].bindingId : undefined
+  const current = currentId == null ? undefined : content.document.bindings[currentId]
+  const references = bindingReferences(content.document)
+  if (currentId != null && current?.kind == 'variable' && (references.get(currentId) ?? 0) == 1) {
+    if (current.target == name) return []
+    return [{ binding: { kind: 'variable', target: name }, bindingId: currentId, kind: 'binding.replace' }]
+  }
+  const inputs = { ...node.inputs, [handle]: { kind: 'sources' as const, sources: [{ bindingId, kind: 'binding' as const }] } }
+  return [
+    { binding: { kind: 'variable', target: name }, bindingId, kind: 'binding.create' },
+    ...cleanVariableBindings(content, replaceNode(target, nodeId, { ...node, inputs })),
+  ]
+}
+
+export function cleanVariableBindings(content: RevisionContent, operations: readonly ChangeOperation[]): readonly ChangeOperation[] {
+  const before = bindingReferences(content.document)
+  const changed = applyFlowChanges(content, operations)
+  const after = bindingReferences(changed.document)
+  return [
+    ...operations,
+    ...[...before.keys()].flatMap((bindingId) =>
+      after.has(bindingId) || changed.document.bindings[bindingId]?.kind != 'variable' ? [] : [{ bindingId, kind: 'binding.delete' as const }],
+    ),
+  ]
+}
+
+function bindingReferences(document: RevisionContent['document']): Map<string, number> {
+  const references = new Map<string, number>()
+  const add = (bindingId: string): void => {
+    references.set(bindingId, (references.get(bindingId) ?? 0) + 1)
+  }
+  for (const currentGraph of [document.graph, ...Object.values(document.subflows).map((subflow) => subflow.graph)]) {
+    for (const node of Object.values(currentGraph.nodes)) {
+      if (node.kind == 'poll' || node.kind == 'integration') add(node.bindingId)
+      if (!('inputs' in node)) continue
+      for (const mapping of Object.values(node.inputs)) {
+        if (mapping.kind != 'sources') continue
+        for (const source of mapping.sources) if (source.kind == 'binding') add(source.bindingId)
+      }
+    }
+  }
+  return references
 }
 
 export function setConnectorConnection(content: RevisionContent, taskId: string, connectionId: string): readonly ChangeOperation[] | undefined {

@@ -217,8 +217,8 @@ export class HandleRowStore {
         return
       }
 
-      // Variable and binary handles require a connection.
-      if (((schemaType === 'variable' && value === undefined) || schemaType === 'binary') && !this.reference$.value) {
+      // Binary handles require a connection.
+      if (schemaType === 'binary' && !this.reference$.value) {
         this.error$.set({
           type: 'validationError',
           message: '$connectionRequired',

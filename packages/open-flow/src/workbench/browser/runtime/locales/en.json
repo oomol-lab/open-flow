@@ -214,7 +214,6 @@
   },
   "jsonViewer": {
     "bin": "Binary",
-    "secret": "Secret",
     "var": "Variable"
   },
   "notice": {

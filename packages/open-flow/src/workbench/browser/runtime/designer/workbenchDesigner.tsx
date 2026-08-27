@@ -42,6 +42,7 @@ interface Props {
   readonly onChangeNodeIcon: (nodeId: string, icon: string | undefined) => void
   readonly onChangeNodeTitle: (nodeId: string, title: string | undefined) => void
   readonly onChangeInput: (nodeId: string, handle: string, value: JsonValue | undefined) => void
+  readonly onChangeInputVariable: (nodeId: string, handle: string, name: string | undefined) => void
   readonly onChangeTaskPorts: (nodeId: string, inputs: readonly FlowDesignerViewInput[], outputs: readonly FlowDesignerViewOutput[]) => void
   readonly onChangeTriggerConfig: (triggerId: string, name: string, value: JsonValue | undefined) => void
   readonly onChangeTriggerSchedule: (triggerId: string, schedule: readonly FlowDesignerViewTriggerSchedule[]) => void
@@ -55,6 +56,7 @@ interface Props {
   readonly onMoveViewport: (viewport: DesignerViewport, displayMode: FlowDisplayMode) => void
   readonly onOpenBlocks: (opener?: HTMLButtonElement) => void
   readonly onOpenInspector: () => void
+  readonly onOpenVariables: () => void
   readonly onPaste: () => void
   readonly provideAddNodeOptions: (searchTerm: string, signal: AbortSignal) => Promise<readonly AddNodeOption[] | undefined>
   readonly onSelectNodes: (nodeIds: readonly string[]) => void
@@ -176,6 +178,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
     onChangeNodeIcon,
     onChangeNodeTitle,
     onChangeInput,
+    onChangeInputVariable,
     onChangeTaskPorts,
     onChangeTriggerConfig,
     onChangeTriggerSchedule,
@@ -189,6 +192,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
     onMoveViewport,
     onOpenBlocks,
     onOpenInspector,
+    onOpenVariables,
     onPaste,
     provideAddNodeOptions,
     onSelectNodes,
@@ -336,6 +340,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         onChangeNodeIcon={onChangeNodeIcon}
         onChangeNodeTitle={onChangeNodeTitle}
         onChangeInput={(nodeId, handle, value) => onChangeInput(nodeId, handle, value as JsonValue | undefined)}
+        onChangeInputVariable={onChangeInputVariable}
         onChangeTaskPorts={onChangeTaskPorts}
         onChangeTriggerConfig={(triggerId, name, value) => onChangeTriggerConfig(triggerId, name, value as JsonValue | undefined)}
         onChangeTriggerSchedule={onChangeTriggerSchedule}
@@ -360,6 +365,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
           dynamicOptions.current = new Map(indexAddNodeOptions(options))
           return addItems(options)
         }}
+        onOpenVariables={onOpenVariables}
         onSelectionChange={(nodeIds, edge: FlowDesignerViewEdge | undefined) => {
           onSelectNodes(nodeIds)
           if (nodeIds.some((nodeId) => model.nodes.some((node) => node.id == nodeId && node.kind != 'comment'))) onOpenInspector()

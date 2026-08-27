@@ -12,6 +12,32 @@
   },
   "shell": {
     "closeNotification": "Fermer la notification",
-    "notifications": "Notifications"
+    "flows": "Flow",
+    "moreActions": "Actions du serveur",
+    "notifications": "Notifications",
+    "variables": "Variables"
+  },
+  "variables": {
+    "all": "Toutes les Variables",
+    "cancel": "Annuler",
+    "count": "{{count}} sur 200",
+    "create": "Nouvelle Variable",
+    "delete": "Supprimer",
+    "deleteConfirm": "Supprimer {{name}} ?",
+    "description": "Configuration de deployment disponible pour les entrées Flow liées à une Variable.",
+    "edit": "Modifier",
+    "empty": "Aucune Variable n’a été créée.",
+    "invalidName": "Utilisez entre 1 et 256 lettres, chiffres ou traits de soulignement, commencez par une lettre ou un trait de soulignement et n’utilisez pas le préfixe réservé OO_.",
+    "loadFailed": "Impossible de charger les Variables.",
+    "name": "Nom",
+    "noMatch": "Aucune Variable ne correspond à cette recherche.",
+    "refresh": "Actualiser",
+    "retry": "Réessayer",
+    "save": "Enregistrer",
+    "search": "Rechercher des Variables",
+    "title": "Variables",
+    "updated": "Mise à jour",
+    "value": "Valeur",
+    "valueTooLarge": "La valeur encodée en UTF-8 ne doit pas dépasser 64 KiB."
   }
 }

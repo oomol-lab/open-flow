@@ -103,7 +103,6 @@ export class FlowDesignerService extends AbstractDesignerService {
         description: flowMeta.$.description.ref(),
       },
       settingsPanelWidth,
-      secretStore: this.secretStore,
       connectorConnections: this.connectorConnections,
       runStatus: runStatus$,
       miniMapExpanded,

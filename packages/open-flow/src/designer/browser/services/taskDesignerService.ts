@@ -74,7 +74,6 @@ export class TaskBlockDesignerService extends AbstractDesignerService {
       nodes,
       viewport,
       settingsPanelWidth: val(),
-      secretStore: this.secretStore,
       connectorConnections: this.connectorConnections,
       runStatus: runStatus$,
       miniMapExpanded: miniMapExpanded$,

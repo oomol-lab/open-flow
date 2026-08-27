@@ -12,6 +12,32 @@
   },
   "shell": {
     "closeNotification": "Close notification",
-    "notifications": "Notifications"
+    "flows": "Flows",
+    "moreActions": "Server actions",
+    "notifications": "Notifications",
+    "variables": "Variables"
+  },
+  "variables": {
+    "all": "All Variables",
+    "cancel": "Cancel",
+    "count": "{{count}} of 200",
+    "create": "New Variable",
+    "delete": "Delete",
+    "deleteConfirm": "Delete {{name}}?",
+    "description": "Deployment configuration available to Variable-bound Flow inputs.",
+    "edit": "Edit",
+    "empty": "No Variables have been created.",
+    "invalidName": "Use 1–256 letters, numbers, or underscores, start with a letter or underscore, and do not use the reserved OO_ prefix.",
+    "loadFailed": "Variables could not be loaded.",
+    "name": "Name",
+    "noMatch": "No Variables match this search.",
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "save": "Save",
+    "search": "Search Variables",
+    "title": "Variables",
+    "updated": "Updated",
+    "value": "Value",
+    "valueTooLarge": "Value must be no larger than 64 KiB when encoded as UTF-8."
   }
 }

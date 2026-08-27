@@ -25,10 +25,38 @@
 ```
 
 客户端只按稳定 `code` 分支。当前错误域包括 `authentication.*`、`authorization.*`、`flow.*`、`live.*`、`publication.*`、`run.*`、
-`trigger.*`、`trigger-key.*`、`connector.*`、`binding.*`、`engine.*`、`page.*` 和 `route.*`；精确 code 集合由
+`trigger.*`、`trigger-key.*`、`connector.*`、`variable.*`、`binding.*`、`engine.*`、`page.*` 和 `route.*`；精确 code 集合由
 `@oomol-lab/open-flow/control-api` 的 `controlErrorCode` 导出。
 
-## 2. Flow、Revision 与 Presentation
+## 2. Variable
+
+Variable 是 deployment scope 配置，不属于 Flow：
+
+```ts
+interface Variable {
+  name: string
+  updatedAt: string
+  value: string
+  version: 1
+}
+```
+
+| Method   | Path                  | Request             | Success                                     | Missing                  |
+| -------- | --------------------- | ------------------- | ------------------------------------------- | ------------------------ |
+| `GET`    | `/v1/variables`       | 无 body/query       | `200 { variables: Variable[], version: 1 }` | 不适用                   |
+| `GET`    | `/v1/variables/:name` | 无 body/query       | `200 Variable`                              | `404 variable.not-found` |
+| `PUT`    | `/v1/variables/:name` | `{ value: string }` | `200 Variable`                              | 不适用                   |
+| `DELETE` | `/v1/variables/:name` | 无 body/query       | `200 { version: 1 }`                        | `404 variable.not-found` |
+
+name 大小写敏感，只允许 1–256 个 ASCII 字符并匹配 `^[A-Za-z_][A-Za-z0-9_]*$`；不区分大小写的 `OO_` 前缀保留。
+列表按 name 的 ASCII/BINARY 升序返回。value 允许空字符串、NUL、换行和 Unicode，经 UTF-8 编码后最多 64 KiB；每个 deployment
+最多有 200 个不同 name，达到上限后仍可更新已有记录。相同 value 的 PUT 不改变 `updatedAt`。非法请求返回 `variable.invalid`，
+第 201 个 name 返回 `variable.limit-reached`。
+
+Control API Operator 可以枚举并读取所有 value。Variable 是可导出的 deployment configuration，不提供 Secret Manager 的不可导出值、
+per-variable ACL、KMS、轮换或独立审计语义。
+
+## 3. Flow、Revision 与 Presentation
 
 Flow 是顶层资源：
 
@@ -99,7 +127,7 @@ interface Presentation {
 
 更新 body 为 `{ expectedRevision, value, version: 1 }`，stale CAS 返回 `flow.presentation-conflict`。
 
-## 3. Validation、Publication 与 Live
+## 4. Validation、Publication 与 Live
 
 ```ts
 interface FlowCheck {
@@ -145,6 +173,8 @@ interface Live {
 
 Publish body 是 `{ engineContract, expectedLivePublicationId, version: 1 }`；Rollback body 是 `{ expectedLivePublicationId, version: 1 }`。
 两者使用 Live CAS。首次提交返回 `201`，幂等重放返回 `200`。Rollback 创建新 Publication 并设置 `sourcePublicationId`，不修改历史和 Draft head。
+首次 Publish 或 Rollback 必须在创建 Publication 的权威 transaction 中确认固定 closure 使用的 Variable 均存在；缺失时返回
+`binding.unresolved`。相同 operation identity 的幂等重放先返回原 Publication，不因 Variable 后续被删除而改变结果。
 
 Publication list 按 `createdAt`、`publicationId` 逆序稳定分页：
 
@@ -157,7 +187,7 @@ interface PublicationPage {
 }
 ```
 
-## 4. Run
+## 5. Run
 
 ```ts
 interface Run {
@@ -178,6 +208,10 @@ Run detail 增加固定的 `closureDigest`、`engineContract`、`engineDigest`�
 
 Draft Run body 是 `{ engineContract, inputs, version: 1 }`。Live Run body 是 `{ publicationId, inputs, version: 1 }`。首次接受返回 `202`，
 幂等重放返回 `200`。Run 接受后不受后续 Draft change、Publish 或 Rollback 影响。
+
+首次 Run admission 在创建 Run 的权威 transaction 中确认固定 closure 使用的 Variable 均存在；缺失返回 `binding.unresolved`。幂等重放先于
+该 eligibility 检查。Run 真正开始时再在一个读取 snapshot 中解析所有 Variable value，所以排队期间的更新会用于本次执行；开始后的更新不影响
+该 Run。Variable value 不进入持久化 Run request，也不由平台写入 `node.started` 的 inputs 投影。
 
 ```ts
 interface RunPage {
@@ -201,7 +235,7 @@ interface RunEvents {
 `after` 是已观察的最后 sequence，只返回更大的事件。terminal Run 最多有一个 terminal event。非 terminal Run 的 result 返回
 `run.not-terminal`；取消成功与重复取消分别返回 `cancelAccepted: true` 和 `false`。
 
-## 5. Trigger 与 Connector
+## 6. Trigger 与 Connector
 
 Trigger Key catalog 是 deployment scope 资源：
 

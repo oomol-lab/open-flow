@@ -1,5 +1,6 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
+import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { execFile } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -99,6 +100,33 @@ function hangingFlow(): RevisionContent {
   }
 }
 
+function variableFlow(): RevisionContent {
+  return {
+    document: {
+      bindings: { token: { kind: 'variable', target: 'TOKEN' } },
+      graph: {
+        nodes: {
+          task: {
+            concurrency: 1,
+            inputs: { token: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] } },
+            kind: 'task',
+            task: {
+              inputs: [{ handle: 'token', jsonSchema: { type: 'string' }, nullable: false }],
+              moduleId: 'main',
+              name: 'Variable',
+              outputs: [{ handle: 'token', jsonSchema: { type: 'string' }, nullable: false }],
+            },
+          },
+        },
+      },
+      subflows: {},
+      tasks: {},
+    },
+    modelVersion: 1,
+    modules: { main: { imports: [], name: 'Main', source: 'export default ({ token }) => ({ token })' } },
+  }
+}
+
 function llmFlow(): RevisionContent {
   return {
     document: {
@@ -137,6 +165,58 @@ async function waitForStatus(service: ServerService, runId: string, status: stri
 }
 
 describe('Server application service', () => {
+  it('checks Variable eligibility after idempotency and fails unresolved queued Runs before start', async () => {
+    const service = ServerService.open(await databaseFile())
+    await expect(
+      acceptRun(service, { flowId: 'main', idempotencyKey: 'variable-missing', revision: variableFlow(), revisionId: 'revision-variable' }),
+    ).rejects.toMatchObject({ code: controlErrorCode.bindingUnresolved })
+
+    service.control.putVariable('TOKEN', 'first')
+    const accepted = await acceptRun(service, {
+      flowId: 'main',
+      idempotencyKey: 'variable-run',
+      revision: variableFlow(),
+      revisionId: 'revision-variable',
+    })
+    if (accepted.kind != 'accepted') throw new Error('Variable Run was not accepted.')
+    service.control.deleteVariable('TOKEN')
+    await expect(
+      acceptRun(service, { flowId: 'main', idempotencyKey: 'variable-run', revision: variableFlow(), revisionId: 'revision-variable' }),
+    ).resolves.toMatchObject({ created: false, runId: accepted.runId })
+
+    service.start()
+    await service.waitForIdle()
+
+    expect(service.control.getRunResult(accepted.runId)).toMatchObject({ error: { code: controlErrorCode.bindingUnresolved }, status: 'failed' })
+    expect(service.run(accepted.runId)).toMatchObject({ status: 'failed' })
+    expect(service.events(accepted.runId).some(({ kind }) => kind == 'run.started')).toBe(false)
+    await service.close()
+  })
+
+  it('resolves one Variable snapshot at Run start without copying it into node.started', async () => {
+    const service = ServerService.open(await databaseFile())
+    service.control.putVariable('TOKEN', 'queued-value')
+    const accepted = await acceptRun(service, {
+      flowId: 'main',
+      idempotencyKey: 'variable-snapshot',
+      revision: variableFlow(),
+      revisionId: 'revision-variable-snapshot',
+    })
+    if (accepted.kind != 'accepted') throw new Error('Variable Run was not accepted.')
+    service.control.putVariable('TOKEN', 'start-value')
+
+    service.start()
+    await service.waitForIdle()
+
+    expect(service.control.getRunResult(accepted.runId)).toMatchObject({
+      result: { nodes: [{ jobs: [{ outputs: { token: 'start-value' } }], nodeId: 'task' }] },
+      status: 'completed',
+    })
+    const started = service.events(accepted.runId).filter(({ kind }) => kind == 'node.started')
+    expect(JSON.stringify(started)).not.toContain('start-value')
+    await service.close()
+  })
+
   it('executes a fixed full Flow through Scheduler and isolated-vm and persists public events', async () => {
     const service = ServerService.open(await databaseFile())
     service.start()

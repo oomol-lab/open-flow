@@ -211,9 +211,7 @@
     "default": "Les types de données ne sont pas compatibles",
     "diffKind": "Les types de Handle ne correspondent pas",
     "errorNode": "Connecté à un nœud défectueux",
-    "nullable": "La source accepte null, mais pas la cible",
-    "varDiffPkg": "Les variables appartiennent à des projets différents",
-    "varDiffType": "Une sortie de type variable ne peut se connecter qu'à une entrée de type variable"
+    "nullable": "La source accepte null, mais pas la cible"
   },
   "errorNode": {
     "blockManifestUnrenderable": "Impossible d'afficher le manifeste de bloc {{path}}",
@@ -248,8 +246,10 @@
       "empty": "Le nom de Handle ne peut pas être vide"
     },
     "schemaDescription": "Description JSON Schema...",
-    "secretUnavailable": "Catalogue de Secrets indisponible",
-    "selectSecret": "Choisir un Secret",
+    "selectVariable": "Choisir une Variable",
+    "variableMissing": "{{name}} (manquante)",
+    "variableMissingHelp": "La Variable de deployment {{name}} n’existe plus.",
+    "variablesLoading": "Chargement des Variables…",
     "unknown": "Inconnu"
   },
   "handleGroup": {
@@ -282,7 +282,6 @@
     "presetType": "Type prédéfini",
     "reference": "connecté",
     "requiredFieldsUnset": "Renseignez les champs obligatoires : {{fields}}.",
-    "secretNotFound": "Secret introuvable",
     "title": "Handles d'entrée",
     "typeError": "Type {{expected}} attendu",
     "unset": "<non défini>",
@@ -328,10 +327,8 @@
   },
   "jsonViewer": {
     "bin": "Binaire",
-    "secret": "Secret",
     "showLess": "Réduire",
-    "showMore": "Afficher plus",
-    "var": "Variable"
+    "showMore": "Afficher plus"
   },
   "l10n": {
     "createKey": "Activer la traduction",
@@ -433,11 +430,10 @@
     "number": "Number",
     "object": "Object",
     "oneOf": "OneOf",
-    "secret": "Secret",
+    "deploymentVariable": "Variable",
     "select": "Single",
     "string": "String",
-    "text": "Textarea",
-    "variable": "Variable"
+    "text": "Textarea"
   },
   "preview": {
     "title": "Aperçu",
@@ -561,23 +557,6 @@
       "run": "Exécuter",
       "showDetails": "Afficher les détails d'exécution",
       "trigger": "Trigger"
-    },
-    "secrets": {
-      "add": "Ajouter un Secret",
-      "addField": "Ajouter un champ",
-      "close": "Fermer",
-      "confirmDelete": "Supprimer ce Secret du runtime actuel ?",
-      "delete": "Supprimer",
-      "hideValue": "Masquer la valeur",
-      "key": "Clé",
-      "name": "Nom",
-      "removeField": "Retirer le champ",
-      "save": "Enregistrer",
-      "saved": "Secret enregistré pour ce runtime.",
-      "showValue": "Afficher la valeur",
-      "template": "Modèle",
-      "title": "Secrets",
-      "value": "Valeur"
     },
     "settings": {
       "categories": "Catégories de paramètres",

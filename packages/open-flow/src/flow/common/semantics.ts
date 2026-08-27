@@ -17,7 +17,7 @@ import type { RuntimeProgram } from '../../execution/common/runtime.ts'
 
 import { parse } from '@babel/parser'
 import { findEngineContract } from '../../execution/common/engineContract.ts'
-import { portsByHandle } from './change.ts'
+import { portsByHandle, validVariableName } from './change.ts'
 import { canonicalGraph, canonicalJsonBytes, canonicalModule, canonicalOutputs, canonicalPorts, canonicalTask, digestBytes } from './encoding.ts'
 
 export interface SemanticClosure {
@@ -127,6 +127,15 @@ export async function flowClosure(content: RevisionContent): Promise<SemanticClo
     version: 1,
   })
   return { dependencies: { bindings, inputBindings, modules, subflows, tasks }, digest: await digestBytes(bytes) }
+}
+
+export function variableBindings(revision: RevisionContent, bindingIds: Iterable<string>): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    [...bindingIds].flatMap((bindingId) => {
+      const binding = revision.document.bindings[bindingId]
+      return binding?.kind == 'variable' ? [[bindingId, binding.target]] : []
+    }),
+  )
 }
 
 export interface Diagnostic {
@@ -461,6 +470,16 @@ function schemaAssignable(sourceSchema: JsonValue, targetSchema: JsonValue): boo
   return source.additionalProperties === false || target.additionalProperties !== false
 }
 
+export function variableInputCompatible(jsonSchema: JsonValue): boolean {
+  return schemaAssignable({ type: 'string' }, jsonSchema)
+}
+
+function hasRetiredRef(value: unknown): boolean {
+  if (value == null || typeof value != 'object') return false
+  const source = value as Readonly<Record<string, unknown>>
+  return source.contentMediaType == 'oomol/ref' || Object.values(source).some(hasRetiredRef)
+}
+
 function validateTrigger(triggerId: string, trigger: TriggerNode, document: FlowDocument, path: string, diagnostics: Diagnostic[]): void {
   if (trigger.kind == 'webhook') {
     const handles = new Set<string>()
@@ -548,6 +567,10 @@ function checkSource(
     case 'binding':
       if (document.bindings[source.bindingId] == null) {
         diagnostics.push(graphDiagnostic('graph.binding-missing', `Binding "${source.bindingId}" does not exist.`, path))
+      } else if (document.bindings[source.bindingId].kind != 'variable') {
+        diagnostics.push(graphDiagnostic('graph.binding-invalid', `Binding "${source.bindingId}" must be a Variable.`, path))
+      } else if (targetInput != null && !variableInputCompatible(targetInput.jsonSchema)) {
+        diagnostics.push(graphDiagnostic('graph.variable-incompatible', `Variable binding "${source.bindingId}" is not compatible with this input.`, path))
       }
       return
     case 'flow':
@@ -619,6 +642,9 @@ function validateGraph(
   for (const [nodeId, node] of Object.entries(graph.nodes)) {
     const nodePath = `${path}/nodes/${nodeId}`
     if (!('inputs' in node)) {
+      if (hasRetiredRef(triggerPayloadSchema(node))) {
+        diagnostics.push(graphDiagnostic('graph.schema-unsupported', 'Runtime Ref schemas are not supported.', nodePath))
+      }
       if (!allowTriggers) {
         diagnostics.push(graphDiagnostic('graph.trigger-not-allowed', 'Trigger nodes are only allowed in Flows.', nodePath))
       } else {
@@ -632,6 +658,10 @@ function validateGraph(
       diagnostics.push(graphDiagnostic('graph.target-missing', `Subflow "${node.subflowId}" does not exist.`, `${nodePath}/subflowId`))
     }
     const inputPorts = nodeInputPorts(document, node)
+    const ports = [...Object.values(inputPorts), ...Object.values(nodeOutputPorts(document, node))]
+    if (ports.some((port) => hasRetiredRef(port.jsonSchema))) {
+      diagnostics.push(graphDiagnostic('graph.schema-unsupported', 'Runtime Ref schemas are not supported.', nodePath))
+    }
     const inputs = new Set(Object.keys(inputPorts))
     for (const [handle, mapping] of Object.entries(node.inputs)) {
       const mappingPath = `${nodePath}/inputs/${handle}`
@@ -639,6 +669,10 @@ function validateGraph(
         diagnostics.push(graphDiagnostic('graph.input-missing', `Node "${nodeId}" does not expose input "${handle}".`, mappingPath))
       }
       if (mapping.kind == 'sources') {
+        const variableSources = mapping.sources.filter((source) => source.kind == 'binding' && document.bindings[source.bindingId]?.kind == 'variable')
+        if (variableSources.length > 0 && (variableSources.length != 1 || mapping.sources.length != 1)) {
+          diagnostics.push(graphDiagnostic('graph.variable-source-mixed', 'A Variable must be the only source for an input.', mappingPath))
+        }
         for (const source of mapping.sources) checkSource(source, graph, document, flowInputs, inputPorts[handle], mappingPath, diagnostics)
       }
     }
@@ -701,6 +735,13 @@ function validateSubflowCycles(document: FlowDocument, diagnostics: Diagnostic[]
 
 function validateFlowGraph(revision: RevisionContent, closure: SemanticClosure): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = []
+  for (const [bindingId, binding] of Object.entries(revision.document.bindings)) {
+    if (binding.kind == 'variable' && !validVariableName(binding.target)) {
+      diagnostics.push(
+        graphDiagnostic('binding.variable-invalid', `Variable binding "${bindingId}" has an invalid target.`, `/document/bindings/${bindingId}/target`),
+      )
+    }
+  }
   validateGraph(revision.document.graph, revision.document, undefined, true, '/document/graph', diagnostics)
   for (const subflowId of [...closure.dependencies.subflows].toSorted()) {
     const subflow = revision.document.subflows[subflowId]
@@ -730,7 +771,7 @@ export function validateFlowInputs(revision: RevisionContent, value: unknown): F
     const inputs = nodeInputPorts(revision.document, node)
     for (const handle of Object.keys(candidate)) {
       const port = inputs[handle]
-      if (port == null || node.inputs[handle] != null || Object.hasOwn(port, 'value')) return 'invalid'
+      if (port == null || hasRetiredRef(port.jsonSchema) || node.inputs[handle] != null || Object.hasOwn(port, 'value')) return 'invalid'
     }
   }
   return 'valid'

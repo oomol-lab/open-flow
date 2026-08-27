@@ -71,6 +71,7 @@ export interface DesignerComboboxProps<
   options?: OptionsOrGroups<Option, Group>
   onChange?: (value: OnChangeValue<Option, IsMulti>) => void
   onClose?: () => void
+  onOpen?: () => void
   labelInMenu?: string
   maxMenuHeight?: number
   capitalize?: boolean
@@ -289,6 +290,7 @@ export const DesignerCombobox: <Option extends DesignerOption = DesignerOption, 
           keyboardNavigation$.set(false)
           props.onClose?.()
         }}
+        onMenuOpen={props.onOpen}
         isDisabled={props.disabled}
         isMulti={props.isMulti}
         defaultMenuIsOpen={props.defaultOpen}

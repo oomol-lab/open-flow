@@ -169,15 +169,11 @@
   display: inline-flex;
   font-size: 80%;
 
-  &:global(.secret) {
-    --color: rgb(226, 140, 95);
-  }
-
   &:global(.bin) {
     --color: var(--edge-bin, #00d6b9);
   }
 
-  &:global(.variable) {
+  &:global(.reference) {
     --color: var(--brand-highlight, #7d7fe9);
   }
 

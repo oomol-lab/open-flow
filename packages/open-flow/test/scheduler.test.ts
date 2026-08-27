@@ -73,6 +73,124 @@ function waitForever(_invocation: TaskInvocation): Effect.Effect<never> {
 }
 
 describe('revision graph scheduler', () => {
+  it('injects a Variable once without projecting it into node.started inputs', async () => {
+    const source = revision(
+      {
+        bindings: { token: { kind: 'variable', target: 'TOKEN' } },
+        graph: {
+          nodes: {
+            capture: {
+              concurrency: 1,
+              inputs: { token: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] } },
+              kind: 'task',
+              task: task('capture', ['token'], []),
+            },
+          },
+        },
+        subflows: {},
+        tasks: {},
+      },
+      ['capture'],
+    )
+    const prepared = await prepareFlow(source, 'main', engine)
+    const inputs: Readonly<Record<string, JsonValue>>[] = []
+    const events: SchedulerEvent[] = []
+
+    await runFlow(prepared, {
+      bindingValues: { token: 'secret-value' },
+      emit: (event) => Effect.sync(() => void events.push(event)),
+      invokeTask: (invocation) =>
+        Effect.sync(() => {
+          inputs.push(invocation.input)
+          return {}
+        }),
+      runId: 'run-variable',
+    })
+
+    expect(inputs).toEqual([{ token: 'secret-value' }])
+    expect(events.find((event) => event.type == 'node.started')).toMatchObject({ inputs: {}, type: 'node.started' })
+    await expect(runFlow(prepared, { invokeTask: () => Effect.succeed({}), runId: 'run-variable-missing' })).rejects.toThrow(
+      'Variable binding "token" is unresolved.',
+    )
+  })
+
+  it('injects the shared Run Variable snapshot into every Subflow invocation', async () => {
+    const source = revision(
+      {
+        bindings: { token: { kind: 'variable', target: 'TOKEN' } },
+        graph: {
+          nodes: {
+            first: {
+              concurrency: 1,
+              inputs: {},
+              kind: 'value',
+              values: [{ handle: 'call', jsonSchema: {}, nullable: false, value: 1 }],
+            },
+            second: {
+              concurrency: 1,
+              inputs: {},
+              kind: 'value',
+              values: [{ handle: 'call', jsonSchema: {}, nullable: false, value: 2 }],
+            },
+            worker: {
+              concurrency: 2,
+              inputs: {
+                call: {
+                  kind: 'sources',
+                  sources: [
+                    { kind: 'node', nodeId: 'first', output: 'call' },
+                    { kind: 'node', nodeId: 'second', output: 'call' },
+                  ],
+                },
+              },
+              kind: 'subflow',
+              subflowId: 'worker',
+            },
+          },
+        },
+        subflows: {
+          worker: {
+            graph: {
+              nodes: {
+                capture: {
+                  concurrency: 1,
+                  inputs: {
+                    call: { kind: 'sources', sources: [{ input: 'call', kind: 'flow' }] },
+                    token: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] },
+                  },
+                  kind: 'task',
+                  task: task('capture', ['call', 'token'], []),
+                },
+              },
+            },
+            inputs: [{ handle: 'call', jsonSchema: {}, nullable: false }],
+            name: 'Worker',
+            outputs: [],
+          },
+        },
+        tasks: {},
+      },
+      ['capture'],
+    )
+    const prepared = await prepareFlow(source, 'main', engine)
+    const inputs: Readonly<Record<string, JsonValue>>[] = []
+
+    await runFlow(prepared, {
+      bindingValues: { token: 'shared' },
+      invokeTask: (invocation) =>
+        Effect.sync(() => {
+          inputs.push(invocation.input)
+          return {}
+        }),
+      runId: 'run-subflow-variable',
+    })
+
+    expect(inputs.toSorted((left, right) => Number(left.call) - Number(right.call))).toEqual([
+      { call: 1, token: 'shared' },
+      { call: 2, token: 'shared' },
+    ])
+  })
+
   it.each(['missing', 'capture'])('rejects Trigger input for non-Trigger node %s', async (nodeId) => {
     const source = revision(
       {

@@ -94,12 +94,8 @@ export function typescriptOf(schema: any, nullable: boolean | undefined): string
   if (!schema) return 'any'
 
   switch (schema.contentMediaType) {
-    case 'oomol/secret':
-      return nullable ? 'string | null' : 'string'
     case 'oomol/bin':
       return nullable ? 'Uint8Array | null' : 'Uint8Array'
-    case 'oomol/var':
-      return 'any'
     case 'oomol/artifact':
       return nullable ? 'ArtifactRef | null' : 'ArtifactRef'
   }

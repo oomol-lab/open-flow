@@ -15,6 +15,10 @@ export function resourceNameIssue(value: string): ResourceNameIssue | undefined 
   if (!/^[\p{L}\p{N}](?:[\p{L}\p{N} _-]*[\p{L}\p{N}])?$/u.test(name)) return 'specialCharacter'
 }
 
+export function validVariableName(value: string): boolean {
+  return value.length <= 256 && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) && value.slice(0, 3).toUpperCase() != 'OO_'
+}
+
 export interface PortDefinition {
   readonly description?: string
   readonly jsonSchema: JsonValue
@@ -231,7 +235,7 @@ export type TriggerNode =
 export type GraphNode = ConditionNode | SubflowNode | TaskNode | TriggerNode | ValueNode
 
 export interface FlowDocument {
-  readonly bindings: Readonly<Record<string, { readonly kind: 'connection' | 'secret'; readonly target: string }>>
+  readonly bindings: Readonly<Record<string, { readonly kind: 'connection' | 'variable'; readonly target: string }>>
   readonly graph: Graph
   readonly subflows: Readonly<
     Record<
@@ -351,7 +355,10 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         if (node == null || !('inputs' in node)) invalid()
         const mapping = node.inputs[operation.edge.targetHandle]
         const source: NodeSource = { kind: 'node', nodeId: operation.edge.source, output: operation.edge.sourceHandle }
-        const sources = mapping?.kind == 'sources' ? mapping.sources : []
+        const sources =
+          mapping?.kind == 'sources'
+            ? mapping.sources.filter((candidate) => candidate.kind != 'binding' || document.bindings[candidate.bindingId]?.kind != 'variable')
+            : []
         if (sources.some((candidate) => candidate.kind == 'node' && candidate.nodeId == source.nodeId && candidate.output == source.output)) invalid()
         const updated = { ...node, inputs: { ...node.inputs, [operation.edge.targetHandle]: { kind: 'sources' as const, sources: [...sources, source] } } }
         Object.assign(document, replaceGraph(document, operation.target, { nodes: { ...graph.nodes, [operation.edge.target]: updated } }))

@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import type { DesignerOption } from '../../src/designer/browser/components/select.tsx'
 
 import { useState } from 'react'
-import { Cascade } from '../../src/designer/browser/components/cascade.tsx'
 import { DateTimePicker } from '../../src/designer/browser/components/dateTimePicker.tsx'
 import { DesignerCombobox } from '../../src/designer/browser/components/select.tsx'
 import { DesignerTooltip } from '../../src/designer/browser/components/tooltip.tsx'
@@ -93,49 +92,6 @@ function MultiSelectStory({ log }: { readonly log: LogAction }) {
             log('multi.change', next)
           }}
         />
-      </Field>
-    </StoryColumn>
-  )
-}
-
-function CascadeStory({ log }: { readonly log: LogAction }) {
-  const [value, setValue] = useState<string[]>(['source', 'text'])
-  const options = [
-    {
-      label: 'Source',
-      value: 'source',
-      children: [
-        { label: 'Text', value: 'text' },
-        { label: 'Image', value: 'image' },
-      ],
-    },
-    {
-      label: 'Target',
-      value: 'target',
-      children: [
-        { label: 'File', value: 'file' },
-        { disabled: true, label: 'Disabled', value: 'disabled' },
-      ],
-    },
-  ]
-  return (
-    <StoryColumn>
-      <Field label="Cascade">
-        <Cascade
-          options={options}
-          value={value}
-          title="Two levels"
-          onChange={(next) => {
-            setValue(next)
-            log('cascade.change', next)
-          }}
-        />
-      </Field>
-      <Field label="Loading">
-        <Cascade loading options={options} />
-      </Field>
-      <Field label="Warning">
-        <Cascade warning="A warning attached to the control" options={options} />
       </Field>
     </StoryColumn>
   )
@@ -234,7 +190,6 @@ function Field({ children, label }: { readonly children: ReactNode; readonly lab
 export const stories: readonly DesignerStory[] = [
   { group: 'Controls', id: 'select', render: (log) => <SelectStory log={log} />, title: 'Select' },
   { group: 'Controls', id: 'multi-select', render: (log) => <MultiSelectStory log={log} />, title: 'Multi Select' },
-  { group: 'Controls', id: 'cascade', render: (log) => <CascadeStory log={log} />, title: 'Cascade' },
   { group: 'Controls', id: 'date-time', render: (log) => <DateTimeStory log={log} />, title: 'Date & Time' },
   { group: 'Popup', id: 'popup', render: (log) => <PopupStory log={log} />, title: 'Dropdown, Popover & Tooltip' },
   { group: 'Popup', id: 'context-menu', render: (log) => <ContextMenuStory log={log} />, title: 'Context Menu' },

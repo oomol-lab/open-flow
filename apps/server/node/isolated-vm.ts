@@ -65,6 +65,7 @@ type InvokeRequest =
   | {
       readonly executionId: number
       readonly flow: {
+        readonly bindingValues?: FlowRunOptions['bindingValues']
         readonly flowId: string
         readonly inputs?: FlowRunOptions['inputs']
         readonly prepared: PreparedFlow
@@ -243,6 +244,7 @@ export class IsolatedVmHost {
         call: Parameters<RuntimeInvocation['capability']>[0],
       ) => Promise<RuntimeCapabilityResponse>
       readonly emit?: (event: SchedulerEvent) => void | Promise<void>
+      readonly bindingValues?: FlowRunOptions['bindingValues']
       readonly flowId: string
       readonly inputs?: FlowRunOptions['inputs']
       readonly invokeTask: (invocation: TaskInvocation & { readonly signal: AbortSignal }) => Promise<unknown>
@@ -280,6 +282,7 @@ export class IsolatedVmHost {
         this.#send(child, {
           executionId,
           flow: {
+            ...(options.bindingValues == null ? {} : { bindingValues: options.bindingValues }),
             flowId: options.flowId,
             ...(options.inputs == null ? {} : { inputs: options.inputs }),
             prepared,
@@ -720,7 +723,6 @@ export const capability = Object.freeze({
   }),
   connector: (input) => invoke('connector', input),
   egress: (url) => invoke('egress', { url }),
-  secret: (reference) => invoke('secret', reference),
 })`,
       { filename: 'open-flow:engine/capability.mjs' },
     )
@@ -856,6 +858,7 @@ function executeFlow(
   if (!('flow' in request)) return Effect.fail(new IsolatedVmError('invalid-program', 'Flow Runtime invocation is incomplete.'))
   const { flow } = request
   return runFlow(flow.prepared, {
+    ...(flow.bindingValues == null ? {} : { bindingValues: flow.bindingValues }),
     createId: randomUUID,
     emit: (event) => remote(call({ event, type: 'event' })).pipe(Effect.asVoid),
     flowId: flow.flowId,

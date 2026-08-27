@@ -5,7 +5,6 @@ import type { DesignerHost, UIFileSaveCandidate, UIFileSaveResult } from '../../
 import type { FlowPath, SearchPath } from '../../src/manifest/common/manifestTypes.ts'
 import type { CompareResult, CompareSchemaInfo } from '../../src/manifest/common/schemaCompare.ts'
 import type { NodeId } from '../../src/schema/index.ts'
-import type { SecretStore } from '../../src/secret/browser/store.ts'
 
 import { I18n } from 'val-i18n'
 import { val } from 'value-enhancer'
@@ -112,7 +111,6 @@ interface TestSetup {
   readonly host: TestDesignerHost
   readonly service: FlowDesignerService
   readonly store: FlowDesignerStore
-  readonly secretStore: SecretStore
   readonly theme: BrowserTheme
   readonly dirtyResources: BrowserDirtyResourceTracker
   readonly navigation: BrowserResourceNavigation
@@ -136,7 +134,6 @@ async function createTestSetup(uiFile: Promise<UIFileSource>): Promise<TestSetup
   const resourceService: DesignerResourceService = {
     resolveStaticResourceUri: (path) => path,
   }
-  const secretStore: SecretStore = { items$: reactiveMap(), loading$: val(false) }
   const service = new FlowDesignerService({
     i18n: new I18n('en', { en: {} }),
     service: host,
@@ -149,13 +146,12 @@ async function createTestSetup(uiFile: Promise<UIFileSource>): Promise<TestSetup
     resourceService,
     packageAuthoring: new ManifestPackageAuthoring({ packageMeta }),
     interactiveMode: val<InteractiveMode>('mouse'),
-    secretStore,
     theme,
     createSchemaEditor: () => () => {},
     createL10nMarkdownEditor: () => () => {},
   })
   const store = service.createFlowDesignerStore(flowMeta)
-  return { context, packageMeta, host, service, store, secretStore, theme, dirtyResources, navigation, notification }
+  return { context, packageMeta, host, service, store, theme, dirtyResources, navigation, notification }
 }
 
 function disposeTestSetup(setup: TestSetup): void {
@@ -204,7 +200,6 @@ describe('Flow Designer service readiness', () => {
     expect(setup.store.$.nodes.get('seed' as NodeId)?.$.position.value).toEqual({ x: 20, y: 40 })
     expect(setup.store.$.viewport.value).toEqual({ x: 12, y: 34, zoom: 0.75 })
     expect(setup.service.pendingSaveUIFiles.has(flowPath)).toBe(true)
-    expect(setup.store.handleEditorContext.secretStore).toBe(setup.secretStore)
   })
 
   it('serializes sidecar saves and rejects an external revision change', async () => {

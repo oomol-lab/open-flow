@@ -41,6 +41,10 @@ export const InputSection: React.FC<InputSectionProps> = /* @__PURE__ */ memo(({
   const isInBlock = designerStore.designerType === DESIGNER_TYPE.Block || subflowViewMode === SUBFLOW_VIEW_MODE.Block
   const handles = useVal(section.$.handles)
   const productHandles = useVal(section.$.productHandles)
+  const variableInputs = useVal(designerStore.$.variableInputs)
+  const variableNames = useVal(designerStore.$.variableNames)
+  const variableNamesLoaded = useVal(designerStore.$.variableNamesLoaded)
+  const variableNamesLoading = useVal(designerStore.$.variableNamesLoading)
   const allHandleNames = useVal(section.$.allHandleNames)
   const additionalInputs = useVal(section.$.additionalInputs)
   const canEditSchema = section.role === 'author' || (section.role === 'user' && additionalInputs && !!section.$$.additionalInputDefs)
@@ -91,22 +95,37 @@ export const InputSection: React.FC<InputSectionProps> = /* @__PURE__ */ memo(({
     return null
   }
 
-  const renderHandle = (handle: HandleRowStore) => (
-    <HandleEditor
-      key={handle.name}
-      store={handle}
-      panelWidth$={designerStore.$$.settingsPanelWidth}
-      reactFlowStore={reactFlowStore}
-      showSchemaSettings={showSchemaSettings}
-      validate={validateName}
-      onRename={(newName) => section.renameHandle(handle.name, newName as HandleName)}
-      onDelete={() => section.deleteHandle(handle.name)}
-      dragTarget={dnd.dragTarget}
-      dragPosition={dnd.dragPosition}
-      onDragStart={(ev) => dnd.onDragStart(ev, handle)}
-      onDragOver={(ev) => dnd.onDragOver(ev, handle)}
-    />
-  )
+  const renderHandle = (handle: HandleRowStore) => {
+    const variable = variableInputs.get(`${nodeStore.nodeId}\0${handle.name}`)
+    return (
+      <HandleEditor
+        key={handle.name}
+        store={handle}
+        panelWidth$={designerStore.$$.settingsPanelWidth}
+        reactFlowStore={reactFlowStore}
+        showSchemaSettings={showSchemaSettings}
+        validate={validateName}
+        onRename={(newName) => section.renameHandle(handle.name, newName as HandleName)}
+        onDelete={() => section.deleteHandle(handle.name)}
+        dragTarget={dnd.dragTarget}
+        dragPosition={dnd.dragPosition}
+        onDragStart={(ev) => dnd.onDragStart(ev, handle)}
+        onDragOver={(ev) => dnd.onDragOver(ev, handle)}
+        variable={
+          variable == null
+            ? undefined
+            : {
+                loaded: variableNamesLoaded,
+                loading: variableNamesLoading,
+                names: variableNames,
+                name: variable.name,
+                onChange: (name) => designerStore.onChangeInputVariable?.(nodeStore.nodeId, handle.name, name),
+                onOpen: () => designerStore.onOpenVariables?.(),
+              }
+        }
+      />
+    )
+  }
 
   const renderAdditionalHeader = () => {
     const action: ICardAction = {

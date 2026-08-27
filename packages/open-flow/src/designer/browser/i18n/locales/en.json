@@ -211,9 +211,7 @@
     "default": "Data types are not compatible",
     "diffKind": "Handle kinds do not match",
     "errorNode": "Connected to a broken node",
-    "nullable": "The source is nullable, but the target is not",
-    "varDiffPkg": "Variables belong to different projects",
-    "varDiffType": "A variable output can only connect to a variable input"
+    "nullable": "The source is nullable, but the target is not"
   },
   "errorNode": {
     "blockManifestUnrenderable": "Unable to render block manifest {{path}}",
@@ -248,8 +246,10 @@
       "empty": "Handle name cannot be empty"
     },
     "schemaDescription": "JSON Schema description...",
-    "secretUnavailable": "Secret catalog unavailable",
-    "selectSecret": "Choose secret",
+    "selectVariable": "Choose Variable",
+    "variableMissing": "{{name}} (missing)",
+    "variableMissingHelp": "Deployment Variable {{name}} no longer exists.",
+    "variablesLoading": "Loading Variables…",
     "unknown": "Unknown"
   },
   "handleGroup": {
@@ -282,7 +282,6 @@
     "presetType": "Preset type",
     "reference": "connected",
     "requiredFieldsUnset": "Set the required fields: {{fields}}.",
-    "secretNotFound": "Secret not found",
     "title": "Input Handles",
     "typeError": "Expect type {{expected}}",
     "unset": "<unset>",
@@ -328,10 +327,8 @@
   },
   "jsonViewer": {
     "bin": "Binary",
-    "secret": "Secret",
     "showLess": "Show less",
-    "showMore": "Show more",
-    "var": "Variable"
+    "showMore": "Show more"
   },
   "l10n": {
     "createKey": "Enable translation",
@@ -427,17 +424,16 @@
     "boolean": "Boolean",
     "color": "Color",
     "date": "Date",
+    "deploymentVariable": "Variable",
     "integer": "Integer",
     "multiSelect": "Multi",
     "null": "Null",
     "number": "Number",
     "object": "Object",
     "oneOf": "OneOf",
-    "secret": "Secret",
     "select": "Single",
     "string": "String",
-    "text": "Textarea",
-    "variable": "Variable"
+    "text": "Textarea"
   },
   "preview": {
     "title": "Preview",
@@ -561,23 +557,6 @@
       "run": "Run",
       "showDetails": "Show run details",
       "trigger": "Trigger"
-    },
-    "secrets": {
-      "add": "Add secret",
-      "addField": "Add field",
-      "close": "Close",
-      "confirmDelete": "Delete this secret from the current runtime?",
-      "delete": "Delete",
-      "hideValue": "Hide value",
-      "key": "Key",
-      "name": "Name",
-      "removeField": "Remove field",
-      "save": "Save",
-      "saved": "Secret saved for this runtime.",
-      "showValue": "Show value",
-      "template": "Template",
-      "title": "Secrets",
-      "value": "Value"
     },
     "settings": {
       "categories": "Settings categories",

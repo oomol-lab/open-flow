@@ -33,7 +33,7 @@ function revision(reverse = false): RevisionContent {
   }
   return {
     document: {
-      bindings: { secret: { kind: 'secret', target: 'secret-main' } },
+      bindings: { variable: { kind: 'variable', target: 'TOKEN' } },
       graph: { nodes: reverse ? { value: nodes.value, condition: nodes.condition } : nodes },
       subflows: {
         child: {
@@ -91,7 +91,7 @@ describe('Flow Revision encoding', () => {
     expect(second).toEqual(first)
     expect(JSON.parse(decoder.decode(first))).toMatchObject({
       document: {
-        bindings: { secret: { kind: 'secret', target: 'secret-main' } },
+        bindings: { variable: { kind: 'variable', target: 'TOKEN' } },
         graph: { nodes: { condition: {}, value: {} } },
         subflows: { child: { name: 'Child' } },
         tasks: { managed: { executor: { kind: 'llm', mode: 'json' }, name: 'LLM' } },
@@ -101,7 +101,7 @@ describe('Flow Revision encoding', () => {
       modules: { helper: { imports: [] }, main: { imports: ['helper'] } },
       version: 1,
     })
-    await expect(digestBytes(first)).resolves.toBe('sha256:95e4f26000c7efc9180f940f50cc5c2c9bcd8cd9bab9bbb2f40b67a6c64f3b06')
+    await expect(digestBytes(first)).resolves.toBe('sha256:fb5639eb4b28963502eb298e3ecfb9cc4c52a4be1e333896ac9fbee161fa1c09')
   })
 
   it('changes the encoded Revision when workflow semantics change', () => {

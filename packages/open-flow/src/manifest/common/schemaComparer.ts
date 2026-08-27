@@ -85,13 +85,6 @@ abstract class SpecialSchema<T = unknown> implements ExtendsSchema {
     if (other instanceof AnySchema) {
       return [ExpressionSingleResult.Equals]
     }
-
-    if (other instanceof VariableSchema) {
-      // A variable target can receive any source type.
-      if (!(this instanceof VariableSchema)) {
-        return [ExpressionSingleResult.ContainedBy]
-      }
-    }
   }
 }
 
@@ -289,10 +282,6 @@ class BinarySchema extends SpecialSchema<BinarySchemaValue> {
   }
 }
 
-interface VariableSchemaValue {
-  readonly contentMediaType: 'oomol/var'
-}
-
 interface ArtifactSchemaValue {
   readonly contentMediaType: 'oomol/artifact'
 }
@@ -318,67 +307,9 @@ class ArtifactSchema extends SpecialSchema<ArtifactSchemaValue> {
   }
 }
 
-class VariableSchema extends SpecialSchema<VariableSchemaValue> {
-  public static isMatch(value: unknown): value is VariableSchemaValue {
-    return toPlainObject(value)?.contentMediaType === 'oomol/var'
-  }
-
-  public constructor(id: number, value: unknown, context?: unknown) {
-    if (!VariableSchema.isMatch(value)) throw new TypeError('Invalid variable schema.')
-    super(id, value, context)
-  }
-
-  protected compareImpl(other: unknown): readonly ExpressionSingleResult[] {
-    if (other instanceof VariableSchema) {
-      // Variables must originate from the same package.
-      if (this.context.packageId !== other.context.packageId) {
-        SpecialSchema.setError(this, other, 'edgeError.varDiffPkg')
-        return [ExpressionSingleResult.Rejection]
-      }
-      return [ExpressionSingleResult.Equals]
-    } else {
-      SpecialSchema.setError(this, other, 'edgeError.varDiffType')
-      return [ExpressionSingleResult.Containing]
-    }
-  }
-
-  public equals(other: unknown): boolean {
-    return other instanceof VariableSchema && this.context.packageId === other.context.packageId
-  }
-}
-
-interface SecretSchemaValue {
-  readonly contentMediaType: 'oomol/secret'
-}
-
-class SecretSchema extends SpecialSchema<SecretSchemaValue> {
-  public static isMatch(value: unknown): value is SecretSchemaValue {
-    return toPlainObject(value)?.contentMediaType === 'oomol/secret'
-  }
-
-  public constructor(id: number, value: unknown, context?: unknown) {
-    if (!SecretSchema.isMatch(value)) throw new TypeError('Invalid secret schema.')
-    super(id, value, context)
-  }
-
-  protected compareImpl(other: unknown): readonly ExpressionSingleResult[] {
-    if (other instanceof SecretSchema) {
-      return [ExpressionSingleResult.Equals]
-    } else if (isStringLikeSchema(other)) {
-      return [ExpressionSingleResult.ContainedBy]
-    } else {
-      return [ExpressionSingleResult.Rejection]
-    }
-  }
-
-  public equals(other: unknown): boolean {
-    return other instanceof SecretSchema
-  }
-}
-
 export function createSchemaComparer(): SubsetCompare<unknown> {
   const comparer = makeSubsetCompare({
-    extendsSchemaClasses: [ArrayOfAny, AnySchema, SingleSelectSchema, MultiSelectSchema, SecretSchema, BinarySchema, ArtifactSchema, VariableSchema],
+    extendsSchemaClasses: [ArrayOfAny, AnySchema, SingleSelectSchema, MultiSelectSchema, BinarySchema, ArtifactSchema],
   })
 
   return comparer

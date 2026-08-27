@@ -126,6 +126,47 @@ function liveRunRequest(harness: ControlApiConformanceHarness, publicationId: st
 
 export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = [
   {
+    name: 'manages deployment Variables with stable limits and exact-case identity',
+    async verify(harness) {
+      equal(await json(await request(harness, '/v1/variables'), 200, 'List empty Variables'), { variables: [], version: 1 }, 'Empty Variables')
+      const put = (name: string, value: string, body: Readonly<Record<string, unknown>> = { value }) =>
+        request(harness, `/v1/variables/${encodeURIComponent(name)}`, { body: JSON.stringify(body), method: 'PUT' })
+      const created = await json(await put('Token', ''), 200, 'Create Variable')
+      equal(Object.keys(created).toSorted(), ['name', 'updatedAt', 'value', 'version'], 'Variable fields')
+      equal(created.name, 'Token', 'Variable name')
+      equal(created.value, '', 'Empty Variable value')
+      equal(created.version, 1, 'Variable version')
+      requiredString(created.updatedAt, 'Variable updatedAt')
+      equal(await json(await request(harness, '/v1/variables/Token'), 200, 'Read Variable'), created, 'Read Variable')
+      equal(await json(await put('Token', ''), 200, 'Put same Variable'), created, 'Same Variable update')
+
+      for (const name of ['A', 'Z', 'a', 'token']) await json(await put(name, name), 200, `Create ${name} Variable`)
+      const listed = await json(await request(harness, '/v1/variables'), 200, 'List Variables')
+      equal(
+        list(listed.variables, 'Variables').map((value) => record(value, 'Variable').name),
+        ['A', 'Token', 'Z', 'a', 'token'],
+        'Variable binary order',
+      )
+
+      const large = `${'值'.repeat(21_845)}x`
+      equal(new TextEncoder().encode(large).byteLength, 65_536, 'Variable UTF-8 boundary fixture')
+      await json(await put('BIG', large), 200, 'Create maximum Variable value')
+      await error(await put('BIG', `${large}x`), 400, 'variable.invalid', 'Reject oversized Variable value')
+      await error(await put('OO_TOKEN', 'value'), 400, 'variable.invalid', 'Reject reserved Variable name')
+      await error(await put('bad-name', 'value'), 400, 'variable.invalid', 'Reject invalid Variable name')
+      await error(await put('EXTRA', 'value', { extra: true, value: 'value' }), 400, 'variable.invalid', 'Reject extra Variable field')
+      await error(await request(harness, '/v1/variables/MISSING'), 404, 'variable.not-found', 'Read missing Variable')
+      await error(await request(harness, '/v1/variables/MISSING', { method: 'DELETE' }), 404, 'variable.not-found', 'Delete missing Variable')
+      equal(await json(await request(harness, '/v1/variables/Token', { method: 'DELETE' }), 200, 'Delete Variable'), { version: 1 }, 'Delete response')
+
+      for (let index = 0; index < 195; index += 1) {
+        await json(await put(`V${String(index).padStart(3, '0')}`, 'value'), 200, `Fill Variable ${index}`)
+      }
+      await error(await put('V195', 'value'), 409, 'variable.limit-reached', 'Reject Variable over limit')
+      equal((await json(await put('A', 'updated'), 200, 'Update full Variable catalog')).value, 'updated', 'Full catalog update')
+    },
+  },
+  {
     name: 'creates, replays, lists, reads, renames, and retires a Flow',
     async verify(harness) {
       const created = await createFlow(harness, 'Control flow', 'flow-lifecycle')

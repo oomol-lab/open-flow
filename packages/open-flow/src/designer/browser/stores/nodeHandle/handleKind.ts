@@ -8,7 +8,6 @@ export const DEFAULT_HANDLE_KIND: HandleKind = 'primitive'
 
 export function getHandleKind(schema: unknown): HandleKind {
   const t = filterString((schema as JsonSchema)?.contentMediaType)
-  if (t === ContentMediaType.secret) return 'secret'
   if (t === ContentMediaType.binary) return 'bin'
   // if ((schema as JsonSchema)?.type === "string") return "string";
   return DEFAULT_HANDLE_KIND

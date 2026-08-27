@@ -18,6 +18,7 @@ import type { RevisionView } from '../revisionView.ts'
 import { applyFlowChanges as reduceFlowChanges } from '../../../../flow/common/change.ts'
 import { replaceSource as replaceModuleSource } from '../../../../flow/common/moduleChanges.ts'
 import {
+  cleanVariableBindings,
   createCodeTask,
   createBuiltinTrigger,
   createCondition,
@@ -27,6 +28,7 @@ import {
   createValue,
   deleteNodes,
   setInputValue as setGraphInputValue,
+  setInputVariable as setGraphInputVariable,
   updateSettings,
 } from '../../../../flow/common/nodeChanges.ts'
 import { generateTyping, mergeTypingIntoSourceFile } from '../../../../manifest/common/meta/block/generateTyping.ts'
@@ -34,6 +36,7 @@ import { generateTyping, mergeTypingIntoSourceFile } from '../../../../manifest/
 export type DesignerTarget = { readonly kind: 'flow' } | { readonly id: string; readonly kind: 'subflow' }
 
 export interface NodeClipboard {
+  readonly bindings: Draft['content']['document']['bindings']
   readonly modules: Readonly<Record<string, CodeModule>>
   readonly nodes: Readonly<Record<string, GraphNode>>
 }
@@ -179,6 +182,20 @@ export function copyNodes(revision: RevisionView, target: DesignerTarget, nodeId
   const nodes = revision.graph(target)?.nodes ?? {}
   const copied = Object.fromEntries(nodeIds.flatMap((nodeId) => (nodes[nodeId] == null ? [] : [[nodeId, nodes[nodeId]]])))
   return {
+    bindings: Object.fromEntries(
+      Object.values(copied).flatMap((node) => {
+        if (!('inputs' in node)) return []
+        return Object.values(node.inputs).flatMap((mapping) =>
+          mapping.kind == 'sources'
+            ? mapping.sources.flatMap((source) => {
+                if (source.kind != 'binding') return []
+                const binding = revision.binding(source.bindingId)
+                return binding?.kind == 'variable' ? [[source.bindingId, binding]] : []
+              })
+            : [],
+        )
+      }),
+    ),
     modules: Object.fromEntries(
       Object.values(copied).flatMap((node) => {
         if (node.kind != 'task' || node.task == null) return []
@@ -198,6 +215,21 @@ export function pasteNodes(revision: RevisionView, target: DesignerTarget, clipb
   const sourceIds = entries.map(([sourceId]) => sourceId)
   const ids = new Map(sourceIds.map((sourceId) => [sourceId, identity()]))
   const operations: ChangeOperation[] = []
+  const bindingIds = new Map<string, string>()
+  for (const [, node] of entries) {
+    if (!('inputs' in node)) continue
+    for (const mapping of Object.values(node.inputs)) {
+      if (mapping.kind != 'sources') continue
+      for (const source of mapping.sources) {
+        if (source.kind != 'binding' || clipboard.bindings[source.bindingId]?.kind != 'variable' || bindingIds.has(source.bindingId)) continue
+        bindingIds.set(source.bindingId, identity())
+      }
+    }
+  }
+  for (const [sourceId, bindingId] of bindingIds) {
+    const binding = clipboard.bindings[sourceId]
+    if (binding != null) operations.push({ binding, bindingId, kind: 'binding.create' })
+  }
   for (const [sourceId, node] of entries) {
     const nodeId = ids.get(sourceId)!
     if (!('inputs' in node)) {
@@ -220,6 +252,11 @@ export function pasteNodes(revision: RevisionView, target: DesignerTarget, clipb
       }
       const sources: (typeof mapping.sources)[number][] = []
       for (const source of mapping.sources) {
+        if (source.kind == 'binding') {
+          const copiedBindingId = bindingIds.get(source.bindingId)
+          if (copiedBindingId != null) sources.push({ ...source, bindingId: copiedBindingId })
+          continue
+        }
         if (source.kind != 'node') {
           sources.push(source)
           continue
@@ -292,6 +329,17 @@ export function setInputValue(
   return setGraphInputValue(revision.revision.content, target, nodeId, handle, value)
 }
 
+export function setInputVariable(
+  revision: RevisionView,
+  target: DesignerTarget,
+  nodeId: string,
+  handle: string,
+  name: string,
+  bindingId: string,
+): FlowChanges | undefined {
+  return setGraphInputVariable(revision.revision.content, target, nodeId, handle, name, bindingId)
+}
+
 export function updateCondition(revision: RevisionView, target: DesignerTarget, nodeId: string, settings: ConditionSettings): FlowChanges | undefined {
   const graph = revision.graph(target)
   const current = graph?.nodes[nodeId]
@@ -348,7 +396,7 @@ export function updateCondition(revision: RevisionView, target: DesignerTarget, 
       changes.push({ kind: 'graph.node.replace', node: { ...node, inputs }, nodeId: currentNodeId, target })
     }
   }
-  return changes
+  return cleanVariableBindings(revision.revision.content, changes)
 }
 
 export function updateValue(revision: RevisionView, target: DesignerTarget, nodeId: string, settings: readonly ValueSettings[]): FlowChanges | undefined {
@@ -409,7 +457,8 @@ export function updateCodeTaskPorts(revision: RevisionView, target: DesignerTarg
       ports.outputs.map((port) => ({ handle: port.handle, json_schema: port.jsonSchema, nullable: port.nullable })),
     ),
   )
-  return source == selection.module.source ? changes : [...changes, ...replaceModuleSource(selection.node.task.moduleId, source, selection.module.imports)]
+  const cleaned = cleanVariableBindings(revision.revision.content, changes)
+  return source == selection.module.source ? cleaned : [...cleaned, ...replaceModuleSource(selection.node.task.moduleId, source, selection.module.imports)]
 }
 
 export function updateWebhook(

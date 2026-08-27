@@ -8,7 +8,6 @@ import { I18nProvider } from 'val-i18n-react'
 import { GetPopupContainerContext } from '../../designer/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { createI18n } from '../../designer/browser/i18n/i18n-loader.ts'
 import { HandleEditor } from '../../designer/browser/jsonSchema/handleEditor.tsx'
-import { HandleEditorProvider } from '../../designer/browser/jsonSchema/handleEditorContext.ts'
 import { HandleRowStore } from '../../designer/browser/stores/nodeHandle/handleRow.store.ts'
 import { ThemeProvider } from '../../designer/browser/theme/ThemeProvider.tsx'
 import { flowRunInputEditorState, FlowRunInputEditorStore } from './flowRunInputEditorStore.ts'
@@ -37,24 +36,22 @@ export function FlowRunInputEditor({ store, theme }: { readonly store: FlowRunIn
       <GetPopupContainerContext.Provider value={popupContainers}>
         <I18nProvider i18n={i18n}>
           <ThemeProvider dark={theme == 'dark'} getPopupContainer={popupContainers.static}>
-            <HandleEditorProvider value={{}}>
-              {handles.flatMap((handle) => {
-                if (!HandleRowStore.is(handle)) return []
-                const definition = state.definitions.find((candidate) => candidate.handle == handle.name)!
-                return [
-                  <fieldset className={styles.field} key={handle.name}>
-                    <legend className={styles.legend}>
-                      <span>{handle.name}</span>
-                      {definition.nullable && <span className={styles.optional}>null</span>}
-                    </legend>
-                    {definition.description != null && <p className={styles.description}>{definition.description}</p>}
-                    <div className={styles.value}>
-                      <HandleEditor panelWidth$={state.panelWidth$} presentation="form" showSchemaSettings={false} store={handle} />
-                    </div>
-                  </fieldset>,
-                ]
-              })}
-            </HandleEditorProvider>
+            {handles.flatMap((handle) => {
+              if (!HandleRowStore.is(handle)) return []
+              const definition = state.definitions.find((candidate) => candidate.handle == handle.name)!
+              return [
+                <fieldset className={styles.field} key={handle.name}>
+                  <legend className={styles.legend}>
+                    <span>{handle.name}</span>
+                    {definition.nullable && <span className={styles.optional}>null</span>}
+                  </legend>
+                  {definition.description != null && <p className={styles.description}>{definition.description}</p>}
+                  <div className={styles.value}>
+                    <HandleEditor panelWidth$={state.panelWidth$} presentation="form" showSchemaSettings={false} store={handle} />
+                  </div>
+                </fieldset>,
+              ]
+            })}
           </ThemeProvider>
         </I18nProvider>
       </GetPopupContainerContext.Provider>

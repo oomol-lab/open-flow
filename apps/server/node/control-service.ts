@@ -1,4 +1,4 @@
-import type { ConnectorAction, ConnectorConnection, ConnectorProvider, FlowChangeEvent } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAction, ConnectorConnection, ConnectorProvider, FlowChangeEvent, Variable } from '@oomol-lab/open-flow/control-api'
 import type { ChangeOperation, JsonValue, RevisionContent, TriggerKeySnapshot } from '@oomol-lab/open-flow/flow-change'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions } from '@oomol-lab/open-flow/scheduler'
@@ -9,7 +9,7 @@ import type { StoredTriggerActivity, StoredTriggerBinding } from './trigger-stor
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { applyFlowChanges } from '@oomol-lab/open-flow/flow-change'
 import { canonicalJsonBytes, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
-import { flowClosure, prepareFlow, validateFlow, validateFlowInputs } from '@oomol-lab/open-flow/flow-semantics'
+import { flowClosure, prepareFlow, validateFlow, validateFlowInputs, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { randomUUID } from 'node:crypto'
 import { ConnectorTaskError } from './connector.ts'
@@ -271,6 +271,28 @@ export class ControlService {
 
   listTriggerDefinitions(): readonly TriggerKeySnapshot[] {
     return this.triggerDefinitions
+  }
+
+  listVariables(): { readonly variables: readonly Variable[]; readonly version: 1 } {
+    return { variables: this.store.listVariables().map(variable), version: 1 }
+  }
+
+  getVariable(name: string): Variable {
+    const stored = this.store.variable(name)
+    if (stored == null) throw new ControlError(controlErrorCode.variableNotFound, 'The Variable was not found.')
+    return variable(stored)
+  }
+
+  putVariable(name: string, value: string): Variable {
+    const saved = this.store.putVariable(name, value)
+    if (saved.kind == 'limit-reached') {
+      throw new ControlError(controlErrorCode.variableLimitReached, 'The deployment has reached its Variable limit.')
+    }
+    return variable(saved.variable)
+  }
+
+  deleteVariable(name: string): void {
+    if (!this.store.deleteVariable(name)) throw new ControlError(controlErrorCode.variableNotFound, 'The Variable was not found.')
   }
 
   getTriggerKey(key: string): TriggerKeySnapshot {
@@ -645,8 +667,11 @@ export class ControlService {
       requestDigest,
       revisionDigest: stored.digest,
       revisionId,
+      variableNames: Object.values(variableBindings(content, fixed.validation.closure.dependencies.inputBindings)),
     })
     switch (accepted.kind) {
+      case 'binding-unresolved':
+        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required Variable is unresolved.')
       case 'busy':
         throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
       case 'conflict':
@@ -718,8 +743,11 @@ export class ControlService {
       requestDigest,
       revisionDigest: livePublication.revisionDigest,
       revisionId: livePublication.revisionId,
+      variableNames: Object.values(variableBindings(content, fixed.validation.closure.dependencies.inputBindings)),
     })
     switch (accepted.kind) {
+      case 'binding-unresolved':
+        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required Variable is unresolved.')
       case 'busy':
         throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
       case 'conflict':
@@ -839,6 +867,8 @@ export class ControlService {
       }
     }
     switch (accepted.kind) {
+      case 'binding-unresolved':
+        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required Variable is unresolved.')
       case 'busy':
         throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
       case 'conflict':
@@ -904,6 +934,10 @@ function flow(stored: StoredFlow): Flow {
     updatedAt: timestamp(stored.updatedAt),
     version: 1,
   }
+}
+
+function variable(stored: { readonly name: string; readonly updatedAt: number; readonly value: string }): Variable {
+  return { name: stored.name, updatedAt: timestamp(stored.updatedAt), value: stored.value, version: 1 }
 }
 
 function revisionContent(stored: { readonly content: string }): RevisionContent {

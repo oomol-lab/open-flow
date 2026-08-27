@@ -27,6 +27,9 @@ export const controlErrorCode = {
   triggerKeyInvalid: 'trigger-key.invalid',
   triggerKeyNotFound: 'trigger-key.not-found',
   triggerNotFound: 'trigger.not-found',
+  variableInvalid: 'variable.invalid',
+  variableLimitReached: 'variable.limit-reached',
+  variableNotFound: 'variable.not-found',
 } as const
 
 export type ControlErrorCode = (typeof controlErrorCode)[keyof typeof controlErrorCode]
@@ -60,4 +63,7 @@ export const controlErrorMetadata = {
   [controlErrorCode.triggerKeyInvalid]: { status: 409 },
   [controlErrorCode.triggerKeyNotFound]: { status: 404 },
   [controlErrorCode.triggerNotFound]: { status: 404 },
+  [controlErrorCode.variableInvalid]: { status: 400 },
+  [controlErrorCode.variableLimitReached]: { status: 409 },
+  [controlErrorCode.variableNotFound]: { status: 404 },
 } as const satisfies Record<ControlErrorCode, { readonly status: number }>

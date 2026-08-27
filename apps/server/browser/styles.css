@@ -26,6 +26,27 @@ body {
   font-size: 14px;
 }
 
+.operator-menu button,
+.variables-page button,
+.variables-page input,
+.variables-page textarea {
+  color: inherit;
+  font: inherit;
+}
+
+.operator-menu button:not(:disabled),
+.variables-page button:not(:disabled) {
+  cursor: pointer;
+}
+
+.operator-menu button:focus-visible,
+.variables-page button:focus-visible,
+.variables-page input:focus-visible,
+.variables-page textarea:focus-visible {
+  outline: 2px solid var(--ui-ring);
+  outline-offset: 2px;
+}
+
 .server-host {
   position: relative;
   display: flex;
@@ -39,4 +60,308 @@ body {
   min-width: 0;
   min-height: 0;
   flex: 1;
+}
+.operator-menu {
+  position: absolute;
+  z-index: 20;
+  right: 12px;
+  bottom: 12px;
+}
+
+.operator-menu .operator-menu-trigger {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: var(--ui-radius);
+  background: transparent;
+  color: var(--ui-muted-foreground);
+}
+
+.operator-menu .operator-menu-trigger:hover,
+.operator-menu .operator-menu-trigger[aria-expanded='true'] {
+  background: var(--ui-muted);
+  color: var(--ui-foreground);
+}
+
+.operator-menu-popup {
+  position: absolute;
+  right: 0;
+  bottom: 34px;
+  width: 168px;
+  padding: 4px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-popover);
+  color: var(--ui-popover-foreground);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 14%);
+}
+
+.operator-menu-label {
+  padding: 6px 8px;
+  color: var(--ui-muted-foreground);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.operator-menu-sign-out {
+  width: 100%;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--ui-destructive);
+  font-size: 12px;
+  text-align: left;
+}
+
+.operator-menu-page {
+  width: 100%;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+
+.operator-menu-page:hover {
+  background: var(--ui-muted);
+}
+
+.operator-menu-sign-out:hover {
+  background: color-mix(in srgb, var(--ui-destructive) 12%, transparent);
+}
+
+.variables-page {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.variables-content {
+  width: min(1080px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 40px 0 64px;
+}
+
+.variables-header span {
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.variables-header h1 {
+  margin: 8px 0 0;
+  font-size: 25px;
+  letter-spacing: -0.025em;
+}
+
+.variables-header p,
+.variables-state,
+.variable-row time {
+  color: var(--ui-muted-foreground);
+}
+
+.variables-header p {
+  margin: 7px 0 0;
+  font-size: 13px;
+}
+
+.variables-section {
+  margin-top: 32px;
+}
+
+.variables-toolbar,
+.variables-actions,
+.variables-heading,
+.variable-form-actions,
+.variable-row > div,
+.variable-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.variables-toolbar {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.variables-heading {
+  align-items: baseline;
+}
+
+.variables-heading h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.variables-heading span {
+  color: var(--ui-muted-foreground);
+  font-size: 11px;
+}
+
+.variables-page button,
+.variables-page input,
+.variables-page textarea {
+  border: 1px solid var(--ui-input);
+  border-radius: var(--ui-radius);
+  background: var(--ui-background);
+  color: inherit;
+  font: inherit;
+}
+
+.variables-page button,
+.variables-page input {
+  min-height: 32px;
+}
+
+.variables-page button {
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.variables-page button:hover:not(:disabled) {
+  background: var(--ui-muted);
+}
+
+.variables-page button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.variables-page input,
+.variables-page textarea {
+  padding: 7px 9px;
+}
+
+.variables-actions input {
+  width: 220px;
+}
+
+.variable-form {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 20px;
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-muted);
+}
+
+.variable-form label {
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.variable-form textarea {
+  resize: vertical;
+  font-family: ui-monospace, monospace;
+}
+
+.variable-form-actions {
+  justify-content: flex-end;
+}
+
+.variable-error {
+  color: var(--ui-destructive);
+  font-size: 11px;
+}
+
+.variable-columns,
+.variable-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.75fr) minmax(220px, 1.5fr) minmax(150px, 0.75fr) minmax(150px, auto);
+  align-items: center;
+  gap: 18px;
+  padding: 9px 12px;
+}
+
+.variable-columns {
+  color: var(--ui-muted-foreground);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.variable-list {
+  border-top: 1px solid var(--ui-border);
+}
+
+.variable-row {
+  min-height: 56px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.variable-row strong,
+.variable-row code,
+.variable-row time {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variable-row code {
+  font-size: 11px;
+}
+
+.variable-row time {
+  font-size: 11px;
+}
+
+.variable-row > div {
+  justify-content: flex-end;
+}
+
+.variable-confirm {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  font-size: 11px;
+}
+
+.variables-state {
+  min-height: 180px;
+  margin: 0;
+  padding: 48px 12px;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .variables-content {
+    width: min(100% - 24px, 1080px);
+    padding-top: 28px;
+  }
+
+  .variables-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .variables-actions input {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .variable-columns {
+    display: none;
+  }
+
+  .variable-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .variable-row code,
+  .variable-row time {
+    grid-column: 1;
+  }
+
+  .variable-row > div {
+    grid-column: 2;
+    grid-row: 1 / 4;
+  }
 }

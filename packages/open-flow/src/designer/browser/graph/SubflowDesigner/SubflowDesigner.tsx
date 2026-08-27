@@ -4,7 +4,6 @@ import { clsx } from 'clsx'
 import { memo, useEffect } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { NodeMiniMapProvider } from '../../components/minimap.tsx'
-import { HandleEditorProvider } from '../../jsonSchema/handleEditorContext.ts'
 import { SUBFLOW_VIEW_MODE } from '../../stores/designer/subflowDesigner.store.ts'
 import { fitViewOptions } from '../BlockDesigner/constants.ts'
 import { EDGE_TYPES, FLOW_EDGE_TYPES, NODE_TYPES } from '../constants.tsx'
@@ -30,15 +29,13 @@ export const SubflowDesigner: React.FC<SubflowDesignerProps> = (props) => {
   useEffect(props.subflowDesignerStore.setupForceDelete, [])
 
   return (
-    <HandleEditorProvider value={props.subflowDesignerStore.handleEditorContext}>
-      <DesignerStoreProvider value={props.subflowDesignerStore}>
-        <NodeMiniMapProvider value={nodeMiniMapPhase}>
-          <SubflowViewModeContext.Provider value={subflowViewMode}>
-            {showFlow ? <FlowMode {...props} /> : <BlockMode {...props} />}
-          </SubflowViewModeContext.Provider>
-        </NodeMiniMapProvider>
-      </DesignerStoreProvider>
-    </HandleEditorProvider>
+    <DesignerStoreProvider value={props.subflowDesignerStore}>
+      <NodeMiniMapProvider value={nodeMiniMapPhase}>
+        <SubflowViewModeContext.Provider value={subflowViewMode}>
+          {showFlow ? <FlowMode {...props} /> : <BlockMode {...props} />}
+        </SubflowViewModeContext.Provider>
+      </NodeMiniMapProvider>
+    </DesignerStoreProvider>
   )
 }
 

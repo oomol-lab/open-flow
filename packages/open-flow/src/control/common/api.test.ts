@@ -60,3 +60,52 @@ describe('ControlClient Flow API', () => {
     )
   })
 })
+
+describe('ControlClient Variable API', () => {
+  const variable = {
+    name: 'TOKEN',
+    updatedAt: '2026-08-27T00:00:00.000Z',
+    value: '',
+    version: 1,
+  } as const
+
+  it('lists, reads, writes, and deletes Variables with encoded names', async () => {
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path == '/v1/variables') return Response.json({ variables: [variable], version: 1 })
+      if (path == '/v1/variables/Token%2FName' && init?.method == null) return Response.json(variable)
+      if (path == '/v1/variables/Token%2FName' && init?.method == 'PUT') return Response.json({ ...variable, value: 'next' })
+      if (path == '/v1/variables/Token%2FName' && init?.method == 'DELETE') return Response.json({ version: 1 })
+      throw new Error(path)
+    })
+    const client = new ControlClient(request)
+
+    await expect(client.listVariables()).resolves.toEqual({ variables: [variable], version: 1 })
+    await expect(client.getVariable('Token/Name')).resolves.toEqual(variable)
+    await expect(client.putVariable('Token/Name', 'next')).resolves.toEqual({ ...variable, value: 'next' })
+    await expect(client.deleteVariable('Token/Name')).resolves.toBeUndefined()
+    expect(request).toHaveBeenNthCalledWith(
+      3,
+      '/v1/variables/Token%2FName',
+      expect.objectContaining({ body: JSON.stringify({ value: 'next' }), method: 'PUT' }),
+    )
+  })
+
+  it.each([
+    ['extra field', { ...variable, extra: true }],
+    ['missing field', { name: variable.name, updatedAt: variable.updatedAt, version: 1 }],
+    ['invalid timestamp', { ...variable, updatedAt: 'today' }],
+    ['invalid value', { ...variable, value: null }],
+    ['invalid version', { ...variable, version: 2 }],
+  ])('rejects a Variable response with an %s', async (_name, response) => {
+    const client = new ControlClient(async () => Response.json(response))
+    await expect(client.getVariable('TOKEN')).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
+  })
+
+  it('rejects malformed Variable list and delete responses', async () => {
+    const responses = [Response.json({ variables: {}, version: 1 }), Response.json({ version: 1, extra: true })]
+    const client = new ControlClient(async () => responses.shift()!)
+
+    await expect(client.listVariables()).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
+    await expect(client.deleteVariable('TOKEN')).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
+  })
+})

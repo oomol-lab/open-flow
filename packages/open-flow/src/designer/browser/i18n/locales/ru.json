@@ -211,9 +211,7 @@
     "default": "Типы данных несовместимы",
     "diffKind": "Виды Handle не совпадают",
     "errorNode": "Подключено к повреждённому узлу",
-    "nullable": "Источник допускает null, а получатель — нет",
-    "varDiffPkg": "Переменные принадлежат разным проектам",
-    "varDiffType": "Выход-переменная может подключаться только ко входу-переменной"
+    "nullable": "Источник допускает null, а получатель — нет"
   },
   "errorNode": {
     "blockManifestUnrenderable": "Не удалось отобразить манифест блока {{path}}",
@@ -248,8 +246,10 @@
       "empty": "Имя Handle не может быть пустым"
     },
     "schemaDescription": "Описание JSON Schema…",
-    "secretUnavailable": "Каталог секретов недоступен",
-    "selectSecret": "Выбрать секрет",
+    "selectVariable": "Выбрать Variable",
+    "variableMissing": "{{name}} (отсутствует)",
+    "variableMissingHelp": "Deployment Variable {{name}} больше не существует.",
+    "variablesLoading": "Загрузка Variables…",
     "unknown": "Неизвестно"
   },
   "handleGroup": {
@@ -282,7 +282,6 @@
     "presetType": "Готовый тип",
     "reference": "подключено",
     "requiredFieldsUnset": "Заполните обязательные поля: {{fields}}.",
-    "secretNotFound": "Секрет не найден",
     "title": "Входные Handle",
     "typeError": "Ожидается тип {{expected}}",
     "unset": "<не задано>",
@@ -328,10 +327,8 @@
   },
   "jsonViewer": {
     "bin": "Двоичные данные",
-    "secret": "Секрет",
     "showLess": "Свернуть",
-    "showMore": "Развернуть",
-    "var": "Переменная"
+    "showMore": "Развернуть"
   },
   "l10n": {
     "createKey": "Включить перевод",
@@ -433,11 +430,10 @@
     "number": "Number",
     "object": "Object",
     "oneOf": "OneOf",
-    "secret": "Secret",
+    "deploymentVariable": "Variable",
     "select": "Single",
     "string": "String",
-    "text": "Textarea",
-    "variable": "Variable"
+    "text": "Textarea"
   },
   "preview": {
     "title": "Предпросмотр",
@@ -561,23 +557,6 @@
       "run": "Запустить",
       "showDetails": "Показать детали запуска",
       "trigger": "Trigger"
-    },
-    "secrets": {
-      "add": "Добавить секрет",
-      "addField": "Добавить поле",
-      "close": "Закрыть",
-      "confirmDelete": "Удалить этот секрет из текущей среды выполнения?",
-      "delete": "Удалить",
-      "hideValue": "Скрыть значение",
-      "key": "Ключ",
-      "name": "Имя",
-      "removeField": "Удалить поле",
-      "save": "Сохранить",
-      "saved": "Секрет сохранён для этой среды выполнения.",
-      "showValue": "Показать значение",
-      "template": "Шаблон",
-      "title": "Секреты",
-      "value": "Значение"
     },
     "settings": {
       "categories": "Категории настроек",

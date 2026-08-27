@@ -16,7 +16,7 @@ import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId, validateTriggerSchedule } from '@oomol-lab/open-flow/cron-trigger'
 import { canonicalJsonBytes, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
-import { matchesSchema, prepareFlow, triggerPayloadSchema } from '@oomol-lab/open-flow/flow-semantics'
+import { matchesSchema, prepareFlow, triggerPayloadSchema, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import {
   maximumPollCheckpointBytes,
   maximumPollEventsPerPage,
@@ -474,6 +474,7 @@ export class ServerService {
       requestDigest,
       revisionDigest: fixed.revisionDigest,
       revisionId: input.revisionId,
+      variableNames: Object.values(fixed.variableBindings),
       webhooks,
     })
     this.#signal()
@@ -640,12 +641,14 @@ export class ServerService {
         if (prepared.kind != 'prepared') {
           return yield* Effect.fail(new Error(`Fixed Flow Revision can no longer be prepared: ${prepared.kind}.`))
         }
+        const bindingValues = this.#store.resolveVariables(variableBindings(revision, prepared.validation.closure.dependencies.inputBindings))
+        if (bindingValues == null) return { kind: 'binding-unresolved' as const }
         const projectEvent = createEventProjector(run.runId, nodeFailureCodes)
         const started = yield* Effect.tryPromise({
           try: () => projectEvent({ flowId: run.flowId, runId: run.runId, type: 'run.started' }),
           catch: (error) => error,
         })
-        return { flow: prepared.flow, projectEvent, started }
+        return { bindingValues, flow: prepared.flow, kind: 'prepared' as const, projectEvent, started }
       }).pipe(
         Effect.matchEffect({
           onFailure: (error) =>
@@ -661,6 +664,12 @@ export class ServerService {
           onSuccess: Effect.succeed,
         }),
       )
+      if (start?.kind == 'binding-unresolved') {
+        this.#store.failStarting(run.runId, {
+          error: { code: controlErrorCode.bindingUnresolved, message: 'A required Variable is unresolved.' },
+        })
+        return
+      }
       if (start == null || start.started == null || !this.#store.start(run.runId, start.started)) return
       const startedAt = performance.now()
       this.#logger.info({ category: 'run.started', flowId: run.flowId, runId: run.runId }, 'Run started.')
@@ -671,6 +680,7 @@ export class ServerService {
       this.#active.set(run.runId, cancellation)
       yield* Effect.raceFirst(
         this.#isolatedVm.run(start.flow, {
+          bindingValues: start.bindingValues,
           capability: (capabilities, call) => this.#invokeCapability(capabilities, call),
           emit: async (event) => {
             if (event.type == 'run.started' && event.runId == run.runId) return
@@ -1263,6 +1273,7 @@ async function validatedFlow(revision: RevisionContent): Promise<{
   readonly content: string
   readonly prepared: PreparedFlow
   readonly revisionDigest: string
+  readonly variableBindings: Readonly<Record<string, string>>
 }> {
   let prepared: Awaited<ReturnType<typeof prepareFlow>>
   try {
@@ -1281,6 +1292,7 @@ async function validatedFlow(revision: RevisionContent): Promise<{
         content: new TextDecoder().decode(bytes),
         prepared: prepared.flow,
         revisionDigest: await digestBytes(bytes),
+        variableBindings: variableBindings(revision, prepared.validation.closure.dependencies.inputBindings),
       }
     }
   }

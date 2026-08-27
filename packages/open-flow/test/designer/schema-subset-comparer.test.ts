@@ -20,67 +20,6 @@ function compare(info1: CompareSchemaInfo, info2: CompareSchemaInfo): { isSubset
 }
 
 describe('json-subset-comparer', () => {
-  it('rejects assigning a variable schema to a binary target', () => {
-    const result = compare({ schema: { contentMediaType: 'oomol/var' } }, { schema: { contentMediaType: 'oomol/bin' } })
-    expect(result.isSubset).toBe(false)
-  })
-
-  describe('var', () => {
-    it('should return true for the same package', () => {
-      expect(
-        compare(
-          {
-            packageId: 'test',
-            schema: { contentMediaType: 'oomol/var' },
-          },
-          {
-            packageId: 'test',
-            schema: { contentMediaType: 'oomol/var' },
-          },
-        ),
-      ).toEqual({ isSubset: true })
-    })
-    it('should return false for different packages', () => {
-      expect(
-        compare(
-          {
-            packageId: 'test1',
-            schema: { contentMediaType: 'oomol/var' },
-          },
-          {
-            packageId: 'test2',
-            schema: { contentMediaType: 'oomol/var' },
-          },
-        ),
-      ).toEqual({ isSubset: false, error: 'edgeError.varDiffPkg' })
-    })
-    it('should return true if to is var and from is not', () => {
-      expect(
-        compare(
-          {
-            schema: { type: 'string' },
-          },
-          {
-            packageId: 'test',
-            schema: { contentMediaType: 'oomol/var' },
-          },
-        ),
-      ).toEqual({ isSubset: true })
-      expect(
-        compare(
-          {
-            packageId: undefined,
-            schema: { contentMediaType: 'oomol/bin' },
-          },
-          {
-            packageId: 'test',
-            schema: { contentMediaType: 'oomol/var' },
-          },
-        ),
-      ).toEqual({ isSubset: true })
-    })
-  })
-
   describe('bin', () => {
     it('should return true if both are bin', () => {
       expect(
@@ -114,21 +53,6 @@ describe('json-subset-comparer', () => {
         isSubset: true,
       })
       expect(compare({ schema: { contentMediaType: 'oomol/artifact' } }, { schema: { contentMediaType: 'oomol/bin' } }).isSubset).toBe(false)
-    })
-  })
-
-  describe('secret', () => {
-    it('accepts another secret schema', () => {
-      expect(compare({ schema: { contentMediaType: 'oomol/secret' } }, { schema: { contentMediaType: 'oomol/secret' } })).toEqual({ isSubset: true })
-    })
-
-    it('rejects incompatible special values', () => {
-      expect(compare({ schema: { contentMediaType: 'oomol/secret' } }, { schema: { contentMediaType: 'oomol/bin' } })).toEqual({ isSubset: false })
-      expect(compare({ schema: { type: 'string' } }, { schema: { contentMediaType: 'oomol/secret' } })).toEqual({ isSubset: false })
-    })
-
-    it('allows a secret source where a string is accepted', () => {
-      expect(compare({ schema: { contentMediaType: 'oomol/secret' } }, { schema: { type: 'string' } })).toEqual({ isSubset: true })
     })
   })
 

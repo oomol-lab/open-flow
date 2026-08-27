@@ -15,6 +15,7 @@ import type { DesignerTarget } from './designer/flowChanges.ts'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionView.ts'
 
 import { FLOW_DISPLAY_MODES } from '../../../designer/common/flowDisplay.ts'
+import { variableInputCompatible } from '../../../flow/common/semantics.ts'
 import { revisionView } from './revisionView.ts'
 
 export interface Point {
@@ -75,6 +76,7 @@ interface NodeProjectionContext {
   readonly connectionCatalogs: Readonly<Record<string, ConnectionCatalog>>
   readonly connectorActions: Readonly<Record<string, ConnectorAction>>
   readonly diagnostics: readonly Diagnostic[]
+  readonly revision: RevisionView
   readonly runNodes: ReadonlyMap<string, FlowDesignerViewNodeRun>
   readonly t: TFunction | undefined
   readonly target: DesignerTarget
@@ -477,7 +479,7 @@ function layoutNodes(
   return { depth, ordered }
 }
 
-function designerInputs(nodeId: string, node: GraphNode, ports: NodePorts): readonly FlowDesignerViewInput[] {
+function designerInputs(nodeId: string, node: GraphNode, ports: NodePorts, revision: RevisionView): readonly FlowDesignerViewInput[] {
   if (!('inputs' in node)) return []
   const inputs: FlowDesignerViewInput[] = []
   for (const [handle, definition] of [...ports.inputs].toSorted(([a], [b]) => a.localeCompare(b))) {
@@ -495,11 +497,15 @@ function designerInputs(nodeId: string, node: GraphNode, ports: NodePorts): read
         sources.push({ nodeId: sourceId, output })
       }
     }
+    const bindingSource = mapping?.kind == 'sources' && mapping.sources.length == 1 ? mapping.sources[0] : undefined
+    const binding = bindingSource?.kind == 'binding' ? revision.binding(bindingSource.bindingId) : undefined
     inputs.push({
       ...definition,
       handle,
       ...(mapping?.kind == 'value' ? { value: mapping.value } : {}),
       ...(sources.length > 0 ? { sources } : {}),
+      ...(binding?.kind == 'variable' ? { variable: binding.target } : {}),
+      variableCompatible: variableInputCompatible(definition.jsonSchema as JsonValue),
     })
   }
   return inputs
@@ -620,7 +626,7 @@ function triggerDesignerNode(triggerId: string, trigger: TriggerNode, position: 
 
 function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: NodePorts, position: Point, context: NodeProjectionContext): DesignerNode {
   const node = resolved.node
-  const inputs = designerInputs(nodeId, node, ports)
+  const inputs = designerInputs(nodeId, node, ports, context.revision)
   const outputs = designerOutputs(ports)
   const task = resolved.kind == 'task' ? resolved.definition : undefined
   const connector = task != null && 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
@@ -688,6 +694,9 @@ export function designerGraph(
   t?: TFunction,
   run?: Run,
   runEvents: readonly RunEvent[] = [],
+  variableNames: readonly string[] = [],
+  variableNamesLoaded = false,
+  variableNamesLoading = false,
 ): DesignerGraph {
   const revision = draft == null ? undefined : revisionView(draft)
   const graph = revision == null || target == null ? undefined : revision.graph(target)
@@ -704,6 +713,7 @@ export function designerGraph(
     connectionCatalogs,
     connectorActions,
     diagnostics,
+    revision,
     runNodes: projectedRun.nodes,
     t,
     target,
@@ -731,6 +741,9 @@ export function designerGraph(
     nodes,
     ...(projectedRun.status == null ? {} : { runStatus: projectedRun.status }),
     viewport: savedViewport(presentation, target),
+    variableNames,
+    variableNamesLoaded,
+    variableNamesLoading,
   }
 }
 

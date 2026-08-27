@@ -1,8 +1,8 @@
-import type { RevisionContent as RevisionFixture } from '../src/flow/common/change.ts'
+import type { JsonValue, RevisionContent as RevisionFixture } from '../src/flow/common/change.ts'
 
 import { describe, expect, it } from 'vitest'
 import { currentEngineContract, findEngineContract } from '../src/execution/common/runtime.ts'
-import { createRuntimeProgram, prepareFlow, validateFlowInputs, validateModules } from '../src/flow/common/semantics.ts'
+import { createRuntimeProgram, prepareFlow, validateFlow, validateFlowInputs, validateModules } from '../src/flow/common/semantics.ts'
 
 const engine = findEngineContract(currentEngineContract)!
 
@@ -28,6 +28,28 @@ function revision(source: string, imports: readonly string[] = [], modules: Revi
 
 function validate(source: RevisionFixture, moduleIds: readonly string[]) {
   return validateModules(source, moduleIds, engine)
+}
+
+function variableRevision(jsonSchema: JsonValue): RevisionFixture {
+  const source = revision('export default ({ token }) => ({ token })')
+  const task = source.document.graph.nodes.task
+  if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+  return {
+    ...source,
+    document: {
+      ...source.document,
+      bindings: { token: { kind: 'variable', target: 'TOKEN' } },
+      graph: {
+        nodes: {
+          task: {
+            ...task,
+            inputs: { token: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] } },
+            task: { ...task.task, inputs: [{ handle: 'token', jsonSchema, nullable: false }] },
+          },
+        },
+      },
+    },
+  }
 }
 
 describe('Flow semantics', () => {
@@ -137,6 +159,67 @@ export default () => value`,
     expect(validateFlowInputs(revision('export default () => true'), { missing: {} })).toBe('invalid')
   })
 
+  it('rejects retired Runtime Ref schemas before execution', async () => {
+    const source = revision('export default ({ value }) => ({ value })')
+    const task = source.document.graph.nodes.task
+    if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+    const invalid: RevisionFixture = {
+      ...source,
+      document: {
+        ...source.document,
+        graph: {
+          nodes: {
+            task: {
+              ...task,
+              task: {
+                ...task.task,
+                inputs: [
+                  {
+                    handle: 'value',
+                    jsonSchema: { properties: { nested: { contentMediaType: 'oomol/ref' } }, type: 'object' },
+                    nullable: false,
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    }
+
+    await expect(validateFlow(invalid, engine)).resolves.toMatchObject({
+      diagnostics: [{ code: 'graph.schema-unsupported', path: '/document/graph/nodes/task' }],
+      valid: false,
+    })
+    expect(validateFlowInputs(invalid, { task: { value: {} } })).toBe('invalid')
+  })
+
+  it('allows ordinary data that resembles a retired Runtime Ref schema', async () => {
+    const source = revision('export default ({ value }) => ({ value })')
+    const task = source.document.graph.nodes.task
+    if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+    const value = { contentMediaType: 'oomol/ref' }
+    const valid: RevisionFixture = {
+      ...source,
+      document: {
+        ...source.document,
+        graph: {
+          nodes: {
+            task: {
+              ...task,
+              task: {
+                ...task.task,
+                inputs: [{ handle: 'value', jsonSchema: {}, nullable: false, value }],
+              },
+            },
+          },
+        },
+      },
+    }
+
+    await expect(validateFlow(valid, engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
+  })
+
   it('rejects incomplete Connector Capability declarations on inline Tasks', async () => {
     const source = revision('export default () => ({})')
     const task = source.document.graph.nodes.task
@@ -162,5 +245,57 @@ export default () => value`,
         diagnostics: [expect.objectContaining({ code: 'task.capability-incomplete', path: '/document/graph/nodes/task/task/capabilities/0' })],
       },
     })
+  })
+
+  it('validates Variable bindings as exclusive unconstrained string inputs', async () => {
+    await expect(validateFlow(variableRevision({ type: 'string' }), engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
+    await expect(validateFlow(variableRevision({}), engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
+
+    const restricted = await validateFlow(variableRevision({ enum: ['allowed'], type: 'string' }), engine)
+    expect(restricted.diagnostics).toEqual([expect.objectContaining({ code: 'graph.variable-incompatible' })])
+
+    const connection = variableRevision({ type: 'string' })
+    const connectionResult = await validateFlow(
+      { ...connection, document: { ...connection.document, bindings: { token: { kind: 'connection', target: 'connection-1' } } } },
+      engine,
+    )
+    expect(connectionResult.diagnostics).toEqual([expect.objectContaining({ code: 'graph.binding-invalid' })])
+
+    const mixed = variableRevision({ type: 'string' })
+    const task = mixed.document.graph.nodes.task
+    if (task?.kind != 'task') throw new Error('Fixture Task is missing.')
+    const mixedResult = await validateFlow(
+      {
+        ...mixed,
+        document: {
+          ...mixed.document,
+          graph: {
+            nodes: {
+              task: {
+                ...task,
+                inputs: {
+                  token: {
+                    kind: 'sources',
+                    sources: [
+                      { bindingId: 'token', kind: 'binding' },
+                      { input: 'token', kind: 'flow' },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      engine,
+    )
+    expect(mixedResult.diagnostics.map(({ code }) => code)).toContain('graph.variable-source-mixed')
+
+    const invalidName = variableRevision({ type: 'string' })
+    const invalidNameResult = await validateFlow(
+      { ...invalidName, document: { ...invalidName.document, bindings: { token: { kind: 'variable', target: 'OO_TOKEN' } } } },
+      engine,
+    )
+    expect(invalidNameResult.diagnostics).toEqual([expect.objectContaining({ code: 'binding.variable-invalid' })])
   })
 })

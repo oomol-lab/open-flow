@@ -134,7 +134,6 @@ export class SubflowBlockDesignerService extends AbstractDesignerService {
         forward_previews: subflowMeta.$.forwardPreviews.ref(),
       },
       settingsPanelWidth,
-      secretStore: this.secretStore,
       connectorConnections: this.connectorConnections,
       runStatus: runStatus$,
       miniMapExpanded,

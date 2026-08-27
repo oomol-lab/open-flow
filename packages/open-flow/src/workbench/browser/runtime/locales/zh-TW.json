@@ -214,7 +214,6 @@
   },
   "jsonViewer": {
     "bin": "二進位",
-    "secret": "密鑰",
     "var": "變數"
   },
   "notice": {

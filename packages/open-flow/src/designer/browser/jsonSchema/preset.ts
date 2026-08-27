@@ -10,9 +10,7 @@ type UnoIconLiteral = `i-${string}:${string}`
 
 export type WidgetType =
   | 'string'
-  | 'variable'
   | 'number'
-  | 'secret'
   | 'boolean'
   | 'integer'
   | 'color'
@@ -44,9 +42,7 @@ export interface WidgetTypeOptionGroup {
 
 const WIDGET_TYPE_OPTIONS: Readonly<Record<WidgetType, WidgetTypeOption>> = {
   string: { icon: 'i-carbon:quotes', value: 'string', label: 'String' },
-  variable: { icon: 'i-carbon:value-variable', value: 'variable', label: 'Variable' },
   number: { icon: 'i-carbon:number-0', value: 'number', label: 'Number' },
-  secret: { icon: 'i-codicon:key', value: 'secret', label: 'Secret' },
   boolean: { icon: 'i-carbon:boolean', value: 'boolean', label: 'Boolean' },
   integer: { icon: 'i-carbon:number-0', value: 'integer', label: 'Integer' },
   color: { icon: 'i-codicon:symbol-color', value: 'color', label: 'Color' },
@@ -107,9 +103,7 @@ export type WidgetSelectOption = WidgetTypeOption | WidgetTypeOptionGroup
 export const widgetSelectOptions = (t: (key: string) => string, predicate: (type: WidgetType) => boolean): WidgetSelectOption[] => {
   const options: WidgetSelectOption[] = [
     WIDGET_TYPE_OPTIONS.string,
-    WIDGET_TYPE_OPTIONS.variable,
     WIDGET_TYPE_OPTIONS.number,
-    WIDGET_TYPE_OPTIONS.secret,
     WIDGET_TYPE_OPTIONS.boolean,
     WIDGET_TYPE_OPTIONS.integer,
     WIDGET_TYPE_OPTIONS.color,
@@ -161,19 +155,13 @@ export const ui_widget = 'ui:widget'
 export const ui_options = 'ui:options'
 
 export const ContentMediaType = {
-  secret: 'oomol/secret',
   binary: 'oomol/bin',
-  variable: 'oomol/var',
 }
 
 // Use getBaseSchema to clone one of these default JSON Schemas.
 const BaseSchema: Record<WidgetType, JsonSchema> = {
-  // The stored value is `${{OO_SECRET:secretId,key}}`.
-  secret: { contentMediaType: ContentMediaType.secret, type: 'string' },
   // Binary values do not have a literal value editor.
   binary: { contentMediaType: ContentMediaType.binary },
-  // Variables may carry process-local values that ordinary serializable inputs cannot represent.
-  variable: { contentMediaType: ContentMediaType.variable },
   // Accept any JSON value.
   any: {},
   null: { type: 'null' },
@@ -267,9 +255,7 @@ const DefaultValue: Record<WidgetType, unknown> = {
   anyOf: void 0,
   allOf: void 0,
   oneOf: void 0,
-  secret: '',
   binary: void 0,
-  variable: void 0,
 }
 
 export function getDefaultValue(type: WidgetType, schema?: unknown): unknown {
@@ -283,12 +269,8 @@ export function typeOfSchema(source: unknown): WidgetType {
   if (!schema) return 'any'
 
   switch (schema.contentMediaType) {
-    case BaseSchema.secret.contentMediaType:
-      return 'secret'
     case BaseSchema.binary.contentMediaType:
       return 'binary'
-    case BaseSchema.variable.contentMediaType:
-      return 'variable'
   }
 
   if (schema[ui_widget]) {
@@ -317,14 +299,13 @@ export function typeOfSchema(source: unknown): WidgetType {
   }
 }
 
-// Variable values use the same override editor as unconstrained schemas.
 export function isAny(schemaType: WidgetType): boolean {
-  return schemaType === 'any' || schemaType === 'variable'
+  return schemaType === 'any'
 }
 
 // These schema kinds can be overridden at a node input.
 export function isUndecidable(schemaType: WidgetType): boolean {
-  return schemaType === 'any' || schemaType === 'variable' || schemaType === 'anyOf' || schemaType === 'oneOf' || schemaType === 'allOf'
+  return schemaType === 'any' || schemaType === 'anyOf' || schemaType === 'oneOf' || schemaType === 'allOf'
 }
 
 /**
@@ -348,7 +329,6 @@ export function asPrimitiveType(type: WidgetType): PrimitiveType | undefined {
     case 'text':
     case 'color':
     case 'date':
-    case 'secret':
       return 'string'
     case 'number':
     case 'integer':
@@ -401,8 +381,6 @@ export function sizeOfSchema(schema: unknown): number {
   }
 
   if (t === 'string') return 4 // format, regex, minLen, maxLen
-
-  if (t === 'variable') return 0
 
   if (t === 'array') return 3 // min, max, type
 

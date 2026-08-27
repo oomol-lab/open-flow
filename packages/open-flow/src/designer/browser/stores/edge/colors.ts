@@ -3,7 +3,6 @@ import type { HandleKind } from '../../components/handle.tsx'
 export const edgeColors: Record<HandleKind, string> = {
   /** default */
   primitive: 'var(--edge-primitive)',
-  secret: 'var(--edge-secret)',
   bin: 'var(--edge-bin)',
   string: 'var(--edge-string)',
   error: 'var(--edge-error)',

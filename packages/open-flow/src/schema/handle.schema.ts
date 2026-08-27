@@ -57,9 +57,7 @@ const BaseHandleDef = {
     .any()
     .optional()
     .describe('JSON Schema to validate value passed to the Handle, if not set, value will be treated as any type')
-    .describe("'contentMediaType' is 'oomol/secret' means the value is a secret key.")
     .describe("'contentMediaType' is 'oomol/bin' means the value is a binary data.")
-    .describe("'contentMediaType' is 'oomol/var' means the value is a program internal variable.")
     .describe("'contentMediaType' is 'oomol/artifact' means the value is a runtime-managed ArtifactRef.")
     .describe("If 'contentMediaType' is undefined, value will be treated as 'application/json' type"),
   kind: z.string().optional().describe('Custom kind name. If set the value will be treated as the specified kind.'),

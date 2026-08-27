@@ -211,9 +211,7 @@
     "default": "数据类型不兼容",
     "diffKind": "接口类型标记不匹配",
     "errorNode": "连接的节点已损坏",
-    "nullable": "来源允许 null，但目标不允许 null",
-    "varDiffPkg": "变量来自不同项目",
-    "varDiffType": "变量输出只能连接到变量输入"
+    "nullable": "来源允许 null，但目标不允许 null"
   },
   "errorNode": {
     "blockManifestUnrenderable": "无法渲染 Block 清单 {{path}}",
@@ -248,8 +246,10 @@
       "empty": "Handle 名不能为空"
     },
     "schemaDescription": "JSON Schema 说明...",
-    "secretUnavailable": "Secret 目录不可用",
-    "selectSecret": "选择密钥",
+    "selectVariable": "选择 Variable",
+    "variableMissing": "{{name}}（已缺失）",
+    "variableMissingHelp": "当前 deployment 中已不存在 Variable {{name}}。",
+    "variablesLoading": "正在加载 Variable…",
     "unknown": "未知"
   },
   "handleGroup": {
@@ -282,7 +282,6 @@
     "presetType": "预设类型",
     "reference": "已连线",
     "requiredFieldsUnset": "请设置必填项：{{fields}}。",
-    "secretNotFound": "未找到密钥",
     "title": "输入接口",
     "typeError": "期望 {{expected}} 类型",
     "unset": "<未设值>",
@@ -328,10 +327,8 @@
   },
   "jsonViewer": {
     "bin": "二进制",
-    "secret": "密钥",
     "showLess": "收起",
-    "showMore": "展开",
-    "var": "变量"
+    "showMore": "展开"
   },
   "l10n": {
     "createKey": "添加翻译",
@@ -427,17 +424,16 @@
     "boolean": "Boolean",
     "color": "Color",
     "date": "Date",
+    "deploymentVariable": "Variable",
     "integer": "Integer",
     "multiSelect": "Multi",
     "null": "Null",
     "number": "Number",
     "object": "Object",
     "oneOf": "OneOf",
-    "secret": "Secret",
     "select": "Single",
     "string": "String",
-    "text": "Textarea",
-    "variable": "Variable"
+    "text": "Textarea"
   },
   "preview": {
     "title": "预览",
@@ -561,23 +557,6 @@
       "run": "运行",
       "showDetails": "显示运行详情",
       "trigger": "触发器"
-    },
-    "secrets": {
-      "add": "添加 Secret",
-      "addField": "添加字段",
-      "close": "关闭",
-      "confirmDelete": "从当前 runtime 中删除这个 Secret？",
-      "delete": "删除",
-      "hideValue": "隐藏值",
-      "key": "字段名",
-      "name": "名称",
-      "removeField": "删除字段",
-      "save": "保存",
-      "saved": "Secret 已保存到当前 runtime。",
-      "showValue": "显示值",
-      "template": "模板",
-      "title": "Secrets",
-      "value": "值"
     },
     "settings": {
       "categories": "设置分类",

@@ -10,8 +10,8 @@ describe('JSON Schema capability profile', () => {
     const widgetTypes = options.flatMap((option) => ('options' in option ? option.options.map((nested) => nested.value) : [option.value]))
 
     expect(widgetTypes).toContain('binary')
-    expect(widgetTypes).toContain('variable')
-    expect(widgetTypes).toContain('secret')
+    expect(widgetTypes).not.toContain('reference')
+    expect(widgetTypes).not.toContain('secret')
     expect(widgetTypes).not.toContain('credential')
     expect(widgetTypes).not.toContain('file')
     expect(widgetTypes).not.toContain('dir')
@@ -30,7 +30,7 @@ describe('JSON Schema capability profile', () => {
 
     expect(englishOptions[0]?.label).toBe('en:preset.string')
     expect(chineseOptions[0]?.label).toBe('zh:preset.string')
-    expect(englishOptions[1]?.label).toBe('en:preset.variable')
-    expect(chineseOptions[1]?.label).toBe('zh:preset.variable')
+    expect(englishOptions[1]?.label).toBe('en:preset.number')
+    expect(chineseOptions[1]?.label).toBe('zh:preset.number')
   })
 })

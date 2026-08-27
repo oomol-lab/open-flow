@@ -31,6 +31,9 @@ export interface Workbench$ {
   readonly notice: ReadonlyVal<Notice | undefined>
   readonly runEventNodes: ReadonlyVal<ReadonlyMap<number, string>>
   readonly selectedDesignerNode: ReadonlyVal<DesignerNode | undefined>
+  readonly variableNames: ReadonlyVal<readonly string[]>
+  readonly variableNamesLoaded: ReadonlyVal<boolean>
+  readonly variableNamesLoading: ReadonlyVal<boolean>
 }
 
 function indexNodes(designer: DesignerGraph): ReadonlyMap<string, DesignerNode> {
@@ -66,9 +69,14 @@ const blockedExternalPages: Pick<WorkbenchHost, 'openExternalPage'> = {
 }
 
 export class WorkbenchStore {
+  readonly #client: WorkbenchClient
   readonly #externalRuns = new Latest()
   readonly #i18n: I18n
   readonly #notice: Val<Notice | undefined> = val()
+  readonly #variableNames = val<readonly string[]>([])
+  readonly #variableNamesLoaded = val(false)
+  readonly #variableNamesLoading = val(false)
+  readonly #variableRefresh = new Latest()
   #disposed = false
 
   public readonly $: Workbench$
@@ -86,6 +94,7 @@ export class WorkbenchStore {
     i18n: I18n = createI18n(),
     host: Pick<WorkbenchHost, 'openExternalPage'> = blockedExternalPages,
   ) {
+    this.#client = client
     this.#i18n = i18n
     const setNotice = (notice: Notice | undefined): void => {
       if (!this.#disposed) this.#notice.set(notice)
@@ -112,6 +121,9 @@ export class WorkbenchStore {
       const t = get(i18n.t$)
       const run = get(this.runs.$.run)
       const events = get(this.runs.$.events)
+      const variableNames = get(this.#variableNames)
+      const variableNamesLoaded = get(this.#variableNamesLoaded)
+      const variableNamesLoading = get(this.#variableNamesLoading)
       const key = target == null ? '' : target.kind == 'flow' ? 'flow' : `subflow:${target.id}`
       const inputs = [
         ...designerRevisionInputs(draft, target),
@@ -122,11 +134,27 @@ export class WorkbenchStore {
         t,
         run,
         events,
+        variableNames,
+        variableNamesLoaded,
+        variableNamesLoading,
         ...(run == null ? [] : [draft?.revisionId]),
       ]
       const cached = designerCache.get(key)
       if (cached != null && cached.inputs.length == inputs.length && cached.inputs.every((input, index) => input === inputs[index])) return cached.graph
-      const graph = designerGraph(draft, target, presentation, diagnostics, actions, catalogs, t, run, events)
+      const graph = designerGraph(
+        draft,
+        target,
+        presentation,
+        diagnostics,
+        actions,
+        catalogs,
+        t,
+        run,
+        events,
+        variableNames,
+        variableNamesLoaded,
+        variableNamesLoading,
+      )
       designerCache.set(key, { graph, inputs })
       return graph
     })
@@ -151,12 +179,16 @@ export class WorkbenchStore {
         const selected = get(this.workspace.$.selectedNodeIds)
         return selected.length == 1 ? get(designerNodeById).get(selected[0]!) : undefined
       }),
+      variableNames: this.#variableNames,
+      variableNamesLoaded: this.#variableNamesLoaded,
+      variableNamesLoading: this.#variableNamesLoading,
     }
   }
 
   public dispose(): void {
     this.#disposed = true
     this.#externalRuns.invalidate()
+    this.#variableRefresh.invalidate()
     for (const value of Object.values(this.$)) value.dispose()
     this.connectors.dispose()
     this.publications.dispose()
@@ -164,6 +196,9 @@ export class WorkbenchStore {
     this.runs.dispose()
     this.triggers.dispose()
     this.workspace.dispose()
+    this.#variableNames.dispose()
+    this.#variableNamesLoaded.dispose()
+    this.#variableNamesLoading.dispose()
   }
 
   public async start(flowId?: string): Promise<void> {
@@ -182,6 +217,22 @@ export class WorkbenchStore {
 
   public dismissNotice(): void {
     if (!this.#disposed) this.#notice.set(undefined)
+  }
+
+  public async refreshVariableNames(): Promise<void> {
+    if (this.#disposed) return
+    const current = this.#variableRefresh.begin()
+    this.#variableNamesLoading.set(true)
+    try {
+      const { variables } = await this.#client.listVariables()
+      if (!current() || this.#disposed) return
+      this.#variableNames.set(variables.map((variable) => variable.name))
+      this.#variableNamesLoaded.set(true)
+    } catch (error) {
+      if (current() && !this.#disposed) this.#notice.set(errorNotice(error, this.#i18n.t))
+    } finally {
+      if (current() && !this.#disposed) this.#variableNamesLoading.set(false)
+    }
   }
 
   public async selectFlow(flowId: string | undefined): Promise<boolean> {

@@ -12,6 +12,32 @@
   },
   "shell": {
     "closeNotification": "关闭通知",
-    "notifications": "通知"
+    "flows": "Flow",
+    "moreActions": "服务操作",
+    "notifications": "通知",
+    "variables": "Variables"
+  },
+  "variables": {
+    "all": "全部 Variable",
+    "cancel": "取消",
+    "count": "已使用 {{count}} / 200",
+    "create": "新建 Variable",
+    "delete": "删除",
+    "deleteConfirm": "删除 {{name}}？",
+    "description": "供 Flow 的 Variable 输入绑定使用的 deployment 配置。",
+    "edit": "编辑",
+    "empty": "尚未创建 Variable。",
+    "invalidName": "名称应为 1–256 个字母、数字或下划线，以字母或下划线开头，且不能使用保留的 OO_ 前缀。",
+    "loadFailed": "无法加载 Variable。",
+    "name": "名称",
+    "noMatch": "没有匹配的 Variable。",
+    "refresh": "刷新",
+    "retry": "重试",
+    "save": "保存",
+    "search": "搜索 Variable",
+    "title": "Variables",
+    "updated": "更新时间",
+    "value": "值",
+    "valueTooLarge": "值经 UTF-8 编码后不能超过 64 KiB。"
   }
 }

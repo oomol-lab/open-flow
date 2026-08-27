@@ -4,7 +4,7 @@ import type { JSX } from 'react/jsx-runtime'
 import { clsx } from 'clsx'
 import { createContext, useContext } from 'react'
 
-export type HandleKind = 'primitive' | 'bin' | 'secret' | 'string' | 'error'
+export type HandleKind = 'primitive' | 'bin' | 'string' | 'error'
 
 export interface HandleProps {
   id?: string

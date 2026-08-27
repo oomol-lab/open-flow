@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 
-const migrationFiles = ['0001_flow.sql'] as const
+const migrationFiles = ['0001_flow.sql', '0002_variables.sql'] as const
 const migrationsDirectory = new URL('../migrations/', import.meta.url)
 
 export function migrateDatabase(file: string): void {

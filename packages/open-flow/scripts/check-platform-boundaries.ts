@@ -27,7 +27,6 @@ const platformDomains: Set<string> = new Set([
   'manifest',
   'project',
   'runtime',
-  'secret',
   'workbench',
 ])
 const nodeModules: Set<string> = new Set(builtinModules.map((name) => name.replace(/^node:/, '')))

@@ -54,6 +54,33 @@ function revision(name = 'Incoming', webhook = true): RevisionContent {
   }
 }
 
+function variableRevision(): RevisionContent {
+  return {
+    document: {
+      bindings: { token: { kind: 'variable', target: 'TOKEN' } },
+      graph: {
+        nodes: {
+          task: {
+            concurrency: 1,
+            inputs: { token: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] } },
+            kind: 'task',
+            task: {
+              inputs: [{ handle: 'token', jsonSchema: { type: 'string' }, nullable: false }],
+              moduleId: 'main',
+              name: 'Variable',
+              outputs: [],
+            },
+          },
+        },
+      },
+      subflows: {},
+      tasks: {},
+    },
+    modelVersion: 1,
+    modules: { main: { imports: [], name: 'Main', source: 'export default () => ({})' } },
+  }
+}
+
 function publish(
   service: ServerService,
   input: {
@@ -70,6 +97,32 @@ function publish(
 }
 
 describe('Server Publication and Webhook target', () => {
+  it('checks Variable eligibility after Publish idempotency replay', async () => {
+    const service = ServerService.open(await databaseFile())
+    services.add(service)
+    const input = {
+      expectedLivePublicationId: null,
+      idempotencyKey: 'variable-publication',
+      revision: variableRevision(),
+      revisionId: 'revision-variable',
+    } as const
+
+    await expect(publish(service, input)).resolves.toEqual({ kind: 'binding-unresolved' })
+    service.control.putVariable('TOKEN', 'value')
+    const accepted = await publish(service, input)
+    if (accepted.kind != 'published') throw new Error('Variable Publication unexpectedly conflicted.')
+    service.control.deleteVariable('TOKEN')
+
+    await expect(publish(service, input)).resolves.toEqual({ created: false, kind: 'published', publicationId: accepted.publicationId })
+    await expect(
+      publish(service, {
+        ...input,
+        expectedLivePublicationId: accepted.publicationId,
+        idempotencyKey: 'variable-publication-next',
+      }),
+    ).resolves.toEqual({ kind: 'binding-unresolved' })
+  })
+
   it('publishes one immutable Live target without exposing deployment state', async () => {
     const service = ServerService.open(await databaseFile())
     services.add(service)

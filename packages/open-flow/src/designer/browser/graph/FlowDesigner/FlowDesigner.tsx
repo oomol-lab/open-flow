@@ -4,7 +4,6 @@ import type { FlowDesignerStore } from '../../stores/designer/flowDesigner.store
 import { useEffect } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { NodeMiniMapProvider } from '../../components/minimap.tsx'
-import { HandleEditorProvider } from '../../jsonSchema/handleEditorContext.ts'
 import { fitViewOptions } from '../BlockDesigner/constants.ts'
 import { FLOW_EDGE_TYPES, NODE_TYPES } from '../constants.tsx'
 import { DesignerStoreProvider } from '../DesignerStoreContext.tsx'
@@ -42,55 +41,53 @@ export const FlowDesigner: React.FC<FlowDesignerProps> = ({
   useEffect(flowDesignerStore.setupForceDelete, [])
 
   return (
-    <HandleEditorProvider value={flowDesignerStore.handleEditorContext}>
-      <DesignerStoreProvider value={flowDesignerStore}>
-        <NodeMiniMapProvider value={nodeMiniMapPhase}>
-          <ReactFlowContainer
-            showSettings$={flowDesignerStore.$$.showSettings}
-            focused$={flowDesignerStore.focused$}
-            editable={editable}
-            className={className}
-            i18n={flowDesignerStore.i18n}
-            dark={dark}
-            dottedBackground
-            fitView={fitView ?? !editable}
-            fitViewOptions={fitViewOptions}
-            nodeTypes={NODE_TYPES}
-            edgeTypes={FLOW_EDGE_TYPES}
-            miniMapExpanded$={flowDesignerStore.$$.miniMapExpanded}
-            displayMode$={flowDesignerStore.$$.displayMode}
-            interactiveMode$={flowDesignerStore.$$.interactiveMode}
-            graph$={flowDesignerStore.$.renderedRFGraph}
-            viewport$={flowDesignerStore.$$.viewport}
-            addNodeRequest={addNodeRequest}
-            onAddNode={flowDesignerStore.onAddNode}
-            onBeforeDelete={flowDesignerStore.onBeforeDelete}
-            onNodesChange={flowDesignerStore.handleNodesChange}
-            onEdgesChange={flowDesignerStore.handleEdgesChange}
-            onConnect={flowDesignerStore.onRFConnect}
-            onMoveEnd={onMoveEnd}
-            onNodeDragStop={onNodeDragStop}
-            onSelectionChange={onSelectionChange}
-            isValidConnection={isValidConnection}
-            onDropAddItem={onDropAddItem}
-            onRelayout={flowDesignerStore.onRelayout}
-            onDisplayModeMeasured={flowDesignerStore.completeDisplayModeLayout}
-            onInstance={flowDesignerStore.rfCommand.onRFInstance}
-            onInit={flowDesignerStore.onInit}
-            onFitView={flowDesignerStore.onFitView}
-            onPaste={flowDesignerStore.onPaste}
-            provideAddNodeMenuItems={flowDesignerStore.provideAddNodeMenuItems}
-            provideAsyncAddNodeMenuItems={flowDesignerStore.provideAsyncAddNodeMenuItems}
-            waitNode={flowDesignerStore.waitNode}
-            setupValueNode={flowDesignerStore.setupValueNode}
-            setupScriptletNode={flowDesignerStore.setupScriptletNode}
-            onAddHandle={flowDesignerStore.onAddHandle}
-            duplicateNodes={flowDesignerStore.duplicateNodes}
-          >
-            <FlowSettingsContainer />
-          </ReactFlowContainer>
-        </NodeMiniMapProvider>
-      </DesignerStoreProvider>
-    </HandleEditorProvider>
+    <DesignerStoreProvider value={flowDesignerStore}>
+      <NodeMiniMapProvider value={nodeMiniMapPhase}>
+        <ReactFlowContainer
+          showSettings$={flowDesignerStore.$$.showSettings}
+          focused$={flowDesignerStore.focused$}
+          editable={editable}
+          className={className}
+          i18n={flowDesignerStore.i18n}
+          dark={dark}
+          dottedBackground
+          fitView={fitView ?? !editable}
+          fitViewOptions={fitViewOptions}
+          nodeTypes={NODE_TYPES}
+          edgeTypes={FLOW_EDGE_TYPES}
+          miniMapExpanded$={flowDesignerStore.$$.miniMapExpanded}
+          displayMode$={flowDesignerStore.$$.displayMode}
+          interactiveMode$={flowDesignerStore.$$.interactiveMode}
+          graph$={flowDesignerStore.$.renderedRFGraph}
+          viewport$={flowDesignerStore.$$.viewport}
+          addNodeRequest={addNodeRequest}
+          onAddNode={flowDesignerStore.onAddNode}
+          onBeforeDelete={flowDesignerStore.onBeforeDelete}
+          onNodesChange={flowDesignerStore.handleNodesChange}
+          onEdgesChange={flowDesignerStore.handleEdgesChange}
+          onConnect={flowDesignerStore.onRFConnect}
+          onMoveEnd={onMoveEnd}
+          onNodeDragStop={onNodeDragStop}
+          onSelectionChange={onSelectionChange}
+          isValidConnection={isValidConnection}
+          onDropAddItem={onDropAddItem}
+          onRelayout={flowDesignerStore.onRelayout}
+          onDisplayModeMeasured={flowDesignerStore.completeDisplayModeLayout}
+          onInstance={flowDesignerStore.rfCommand.onRFInstance}
+          onInit={flowDesignerStore.onInit}
+          onFitView={flowDesignerStore.onFitView}
+          onPaste={flowDesignerStore.onPaste}
+          provideAddNodeMenuItems={flowDesignerStore.provideAddNodeMenuItems}
+          provideAsyncAddNodeMenuItems={flowDesignerStore.provideAsyncAddNodeMenuItems}
+          waitNode={flowDesignerStore.waitNode}
+          setupValueNode={flowDesignerStore.setupValueNode}
+          setupScriptletNode={flowDesignerStore.setupScriptletNode}
+          onAddHandle={flowDesignerStore.onAddHandle}
+          duplicateNodes={flowDesignerStore.duplicateNodes}
+        >
+          <FlowSettingsContainer />
+        </ReactFlowContainer>
+      </NodeMiniMapProvider>
+    </DesignerStoreProvider>
   )
 }

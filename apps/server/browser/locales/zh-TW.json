@@ -12,6 +12,32 @@
   },
   "shell": {
     "closeNotification": "關閉通知",
-    "notifications": "通知"
+    "flows": "Flow",
+    "moreActions": "伺服器操作",
+    "notifications": "通知",
+    "variables": "Variables"
+  },
+  "variables": {
+    "all": "全部 Variable",
+    "cancel": "取消",
+    "count": "已使用 {{count}} / 200",
+    "create": "新增 Variable",
+    "delete": "刪除",
+    "deleteConfirm": "刪除 {{name}}？",
+    "description": "供 Flow 的 Variable 輸入綁定使用的 deployment 設定。",
+    "edit": "編輯",
+    "empty": "尚未建立 Variable。",
+    "invalidName": "名稱須為 1–256 個字母、數字或底線，以字母或底線開頭，且不能使用保留的 OO_ 前綴。",
+    "loadFailed": "無法載入 Variable。",
+    "name": "名稱",
+    "noMatch": "沒有符合搜尋條件的 Variable。",
+    "refresh": "重新整理",
+    "retry": "重試",
+    "save": "儲存",
+    "search": "搜尋 Variable",
+    "title": "Variables",
+    "updated": "更新時間",
+    "value": "值",
+    "valueTooLarge": "值經 UTF-8 編碼後不能超過 64 KiB。"
   }
 }

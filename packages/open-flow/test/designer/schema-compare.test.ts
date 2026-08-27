@@ -35,15 +35,6 @@ describe('In-process schema compare', () => {
     ).toEqual({ kind: 'incompatible', error: undefined, errorPath: ['anyOf', 1, 'type'] })
   })
 
-  it('uses package lineage when comparing variable schemas', () => {
-    expect(
-      compareJSONSchema(
-        { schema: { contentMediaType: 'oomol/var' }, packageId: 'source-package' },
-        { schema: { contentMediaType: 'oomol/var' }, packageId: 'target-package' },
-      ),
-    ).toEqual({ kind: 'incompatible', error: 'edgeError.varDiffPkg', errorPath: undefined })
-  })
-
   it('fails closed when schema compilation throws', () => {
     const schema = Object.defineProperty({}, 'type', {
       enumerable: true,
@@ -64,20 +55,6 @@ describe('In-process schema compare', () => {
     expect(normalizeNullableSchemaPath(['anyOf', 0, 'minLength'], true)).toEqual(['minLength'])
     expect(normalizeNullableSchemaPath(['anyOf', 1, 'type'], true)).toBeUndefined()
     expect(normalizeNullableSchemaPath(['anyOf', 1, 'type'], false)).toEqual(['anyOf', 1, 'type'])
-  })
-
-  it('normalizes special schemas without modifying the live values', async () => {
-    const fromSchema = { contentMediaType: 'oomol/secret' }
-    const toSchema = { type: 'string' }
-    const compare = vi.fn(async (): Promise<CompareResult> => ({ kind: 'compatible' }))
-
-    await expect(validateConnectionData({ schema: fromSchema }, { schema: toSchema }, compare, translate)).resolves.toBeUndefined()
-    expect(fromSchema).toEqual({ contentMediaType: 'oomol/secret' })
-    expect(toSchema).toEqual({ type: 'string' })
-    expect(compare).toHaveBeenCalledWith(
-      { schema: { contentMediaType: 'oomol/secret', type: 'string' }, packageId: undefined },
-      { schema: { type: 'string' }, packageId: undefined },
-    )
   })
 
   it('turns compare errors into connection errors', async () => {

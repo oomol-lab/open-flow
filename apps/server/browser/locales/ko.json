@@ -12,6 +12,32 @@
   },
   "shell": {
     "closeNotification": "알림 닫기",
-    "notifications": "알림"
+    "flows": "Flow",
+    "moreActions": "서버 작업",
+    "notifications": "알림",
+    "variables": "Variables"
+  },
+  "variables": {
+    "all": "모든 Variable",
+    "cancel": "취소",
+    "count": "{{count}} / 200",
+    "create": "Variable 만들기",
+    "delete": "삭제",
+    "deleteConfirm": "{{name}}을(를) 삭제하시겠습니까?",
+    "description": "Variable에 바인딩된 Flow 입력에서 사용할 수 있는 deployment 설정입니다.",
+    "edit": "편집",
+    "empty": "생성된 Variable이 없습니다.",
+    "invalidName": "이름은 1~256자의 영문자, 숫자 또는 밑줄이어야 하며 영문자나 밑줄로 시작해야 합니다. 예약된 OO_ 접두사는 사용할 수 없습니다.",
+    "loadFailed": "Variable을 불러올 수 없습니다.",
+    "name": "이름",
+    "noMatch": "검색과 일치하는 Variable이 없습니다.",
+    "refresh": "새로 고침",
+    "retry": "다시 시도",
+    "save": "저장",
+    "search": "Variable 검색",
+    "title": "Variables",
+    "updated": "업데이트 시간",
+    "value": "값",
+    "valueTooLarge": "UTF-8로 인코딩한 값은 64 KiB 이하여야 합니다."
   }
 }

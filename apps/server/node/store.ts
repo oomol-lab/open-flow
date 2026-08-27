@@ -15,7 +15,7 @@ type RunInputs = NonNullable<FlowRunOptions['inputs']>
 
 export type PublicationAcceptance =
   | { readonly created: boolean; readonly kind: 'published'; readonly publicationId: string }
-  | { readonly kind: 'busy' | 'conflict' | 'live-conflict' | 'not-found' | 'revision-conflict' | 'source-not-found' }
+  | { readonly kind: 'binding-unresolved' | 'busy' | 'conflict' | 'live-conflict' | 'not-found' | 'revision-conflict' | 'source-not-found' }
 
 export interface RunEvent {
   readonly cursor: number
@@ -229,6 +229,69 @@ export class Store {
     if (!includeTotal) return { flows }
     const total = (this.#database.prepare('SELECT COUNT(*) AS total FROM flows').get() as { readonly total: number }).total
     return { flows, total }
+  }
+
+  listVariables(): readonly { readonly name: string; readonly updatedAt: number; readonly value: string }[] {
+    return this.#database.prepare('SELECT name, updated_at AS updatedAt, value FROM variables ORDER BY name COLLATE BINARY').all() as unknown as readonly {
+      readonly name: string
+      readonly updatedAt: number
+      readonly value: string
+    }[]
+  }
+
+  variable(name: string): { readonly name: string; readonly updatedAt: number; readonly value: string } | undefined {
+    return this.#database.prepare('SELECT name, updated_at AS updatedAt, value FROM variables WHERE name = ?').get(name) as
+      | { readonly name: string; readonly updatedAt: number; readonly value: string }
+      | undefined
+  }
+
+  putVariable(
+    name: string,
+    value: string,
+  ):
+    | { readonly kind: 'limit-reached' }
+    | { readonly kind: 'saved'; readonly variable: { readonly name: string; readonly updatedAt: number; readonly value: string } } {
+    return this.#transaction(() => {
+      const existing = this.variable(name)
+      if (existing != null) {
+        if (existing.value == value) return { kind: 'saved', variable: existing }
+        const updatedAt = this.#clock()
+        this.#database.prepare('UPDATE variables SET value = ?, updated_at = ? WHERE name = ?').run(value, updatedAt, name)
+        return { kind: 'saved', variable: { name, updatedAt, value } }
+      }
+      const count = (this.#database.prepare('SELECT COUNT(*) AS count FROM variables').get() as { readonly count: number }).count
+      if (count >= 200) return { kind: 'limit-reached' }
+      const updatedAt = this.#clock()
+      this.#database.prepare('INSERT INTO variables (name, value, updated_at) VALUES (?, ?, ?)').run(name, value, updatedAt)
+      return { kind: 'saved', variable: { name, updatedAt, value } }
+    })
+  }
+
+  deleteVariable(name: string): boolean {
+    return this.#transaction(() => this.#database.prepare('DELETE FROM variables WHERE name = ?').run(name).changes == 1)
+  }
+
+  resolveVariables(bindings: Readonly<Record<string, string>>): Readonly<Record<string, string>> | undefined {
+    const names = [...new Set(Object.values(bindings))]
+    if (names.length == 0) return {}
+    this.#database.exec('BEGIN')
+    try {
+      const rows = this.#database
+        .prepare(`SELECT name, value FROM variables WHERE name IN (${names.map(() => '?').join(', ')})`)
+        .all(...names) as unknown as readonly { readonly name: string; readonly value: string }[]
+      const values = new Map(rows.map(({ name, value }) => [name, value]))
+      const resolved = Object.fromEntries(
+        Object.entries(bindings).flatMap(([bindingId, name]) => {
+          const value = values.get(name)
+          return value == null ? [] : [[bindingId, value]]
+        }),
+      )
+      this.#database.exec('COMMIT')
+      return Object.keys(resolved).length == Object.keys(bindings).length ? resolved : undefined
+    } catch (error) {
+      this.#database.exec('ROLLBACK')
+      throw error
+    }
   }
 
   flow(flowId: string): StoredFlow | undefined {
@@ -471,7 +534,8 @@ export class Store {
     readonly requestDigest: string
     readonly revisionDigest: string
     readonly revisionId: string
-  }): RunAdmission | { readonly kind: 'busy' | 'not-found' } {
+    readonly variableNames: readonly string[]
+  }): RunAdmission | { readonly kind: 'binding-unresolved' | 'busy' | 'not-found' } {
     return this.#transaction(() => {
       const existing = this.#database
         .prepare('SELECT run_id AS runId, request_digest AS requestDigest, status FROM runs WHERE idempotency_key = ?')
@@ -491,6 +555,7 @@ export class Store {
         .get(input.flowId, input.revisionId) as { readonly digest: string; readonly status: StoredFlow['status'] } | undefined
       if (revision == null || revision.digest != input.revisionDigest) return { kind: 'not-found' }
       if (revision.status != 'active') return { kind: 'busy' }
+      if (!this.#variablesExist(input.variableNames)) return { kind: 'binding-unresolved' }
       if (!this.#hasRunCapacity()) return { kind: 'overloaded' }
 
       const runId = this.#insertRun({
@@ -511,7 +576,8 @@ export class Store {
     readonly requestDigest: string
     readonly revisionDigest: string
     readonly revisionId: string
-  }): RunAdmission | { readonly kind: 'busy' | 'live-conflict' | 'not-found' } {
+    readonly variableNames: readonly string[]
+  }): RunAdmission | { readonly kind: 'binding-unresolved' | 'busy' | 'live-conflict' | 'not-found' } {
     return this.#transaction(() => {
       const existing = this.#database
         .prepare('SELECT run_id AS runId, request_digest AS requestDigest, source, status FROM runs WHERE idempotency_key = ?')
@@ -536,6 +602,7 @@ export class Store {
       ) {
         return { kind: 'live-conflict' }
       }
+      if (!this.#variablesExist(input.variableNames)) return { kind: 'binding-unresolved' }
       if (!this.#hasRunCapacity()) return { kind: 'overloaded' }
 
       const runId = this.#insertRun({
@@ -655,6 +722,7 @@ export class Store {
     readonly requestDigest: string
     readonly revisionDigest: string
     readonly revisionId: string
+    readonly variableNames: readonly string[]
     readonly webhooks: readonly { readonly triggerJson: string; readonly triggerNodeId: string }[]
   }): PublicationAcceptance {
     return this.#transaction(() => {
@@ -687,6 +755,8 @@ export class Store {
           }
         }
       }
+
+      if (!this.#variablesExist(input.variableNames)) return { kind: 'binding-unresolved' }
 
       const live = this.#database.prepare('SELECT publication_id AS publicationId FROM flow_live WHERE flow_id = ?').get(input.flowId) as
         | { readonly publicationId: string }
@@ -1386,6 +1456,17 @@ export class Store {
          WHERE events_expires_at IS NULL AND status IN ('canceled', 'completed', 'failed', 'indeterminate')`,
       )
       .run(this.#clock() + this.#runEventRetentionMs)
+  }
+
+  #variablesExist(names: readonly string[]): boolean {
+    const unique = [...new Set(names)]
+    if (unique.length == 0) return true
+    const count = (
+      this.#database.prepare(`SELECT COUNT(*) AS count FROM variables WHERE name IN (${unique.map(() => '?').join(', ')})`).get(...unique) as {
+        readonly count: number
+      }
+    ).count
+    return count == unique.length
   }
 
   #transaction<Value>(operation: () => Value): Value {

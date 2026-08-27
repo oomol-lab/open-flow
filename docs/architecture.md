@@ -26,6 +26,16 @@ Presentation 独立保存布局、viewport 和 Comment 等展示状态；Flow �
 不进入 Revision digest，也不影响 validation、Run、Publication 或 Live。
 Revision 不保存 credential、Run、Engine IR、Provider 状态或部署缓存。
 
+### Deployment Variable
+
+Variable 是 deployment scope 配置，不属于任何 Flow。Flow Revision 只保存大小写敏感的 Variable name binding，digest 包含 binding 与 name，
+不包含 value。Variable 删除不修改 Revision；需要该 name 的首次 Publish、Rollback 或 Run admission 必须在资源创建的权威 operation boundary
+内 fail closed，幂等重放必须先返回已经接受的资源。
+
+Run 开始时从一个 deployment store snapshot 解析固定 closure 实际使用的 Variable，并把同一份值注入根图和每次 Subflow invocation。平台不能把
+解析值隐式写入 Revision、Publication、持久化 Run input 或 `node.started`；Flow 代码显式返回、记录、发送或抛出该值时，它仍可进入用户数据流、
+RunEvent、日志或外部系统。Variable 是 Operator 可读取的 deployment configuration，不是不可导出的 Secret Manager。
+
 旧 Project schema、Project API 和 Project 数据不属于当前产品合同。部署发现旧的未发布 schema 时直接重建当前 Flow schema，不迁移或保留旧
 Project、Flow、Publication、Run 或 authoring history。
 
@@ -66,6 +76,9 @@ RunEvent 明细可以按部署声明的 retention 到期，但唯一 terminal re
 显式桥接产品主题。宿主操作通过公开 Workbench props 进入 Workbench 持有的共享 UI composition，部署宿主不能通过绝对定位或内部 selector
 覆盖 Workbench Header。部署宿主的 pre-auth session 页面同样通过公开 Workbench composition 使用共享 shadcn primitive，宿主只持有认证请求和状态。
 
+产品中立 Workbench 拥有 Flow authoring 所需的 Variable name selector，只接收 name projection。deployment Variable 的 value 管理面属于正式
+Workbench 宿主：开源 Server 在自己的 Browser host 中提供，其他部署可以使用自己的既有管理面，不能为此复制或分叉公共 Workbench runtime。
+
 Common 代码不能依赖 Browser 或 Node，Browser 代码不能依赖 Node。部署应用通过公开 subpath 消费 package，不 deep-import 另一个 workspace 的源码。
 
 ## 3. Validation 与执行
@@ -75,6 +88,10 @@ credential value、Provider 当前状态、调用权限或部署资源。非确�
 
 Engine Contract、部署中立 Runtime invocation、Scheduler 图执行语义、RunEvent 投影和 conformance 属于 `packages/open-flow`。具体执行隔离、
 Engine digest、资源限制和恢复属于部署实现；`isolated-vm` RuntimeHost 只属于 Server。
+
+普通 Flow 数据通过声明的 input、output、edge 和 binding 传播，并在 Runtime invocation、Scheduler、Subflow、RunEvent 和 terminal result
+边界保持可序列化。脚本 `context` 只提供取消、日志、进度、Artifact、网络、Connector 等宿主能力和只读运行身份，不提供跨节点的动态
+Run store、Variable 查询或任意节点输出查询。部署可以为调度、调试和恢复私有保存 Run value，但不能把内部存储变成第二条用户数据通道。
 
 Server 将一次 Flow Run 作为一个逻辑 Runtime session 交给 Executor，Scheduler 和内联 Code Task 执行都在该 session 内；SQLite、RunEvent 投影、
 外部 Task 和 Capability mediation 仍由 Host 持有。Executor process 可以承载多个并发 session，但每次 Code Task invocation 使用新的 isolate；process

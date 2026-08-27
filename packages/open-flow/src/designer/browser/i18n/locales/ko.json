@@ -211,9 +211,7 @@
     "default": "데이터 타입이 호환되지 않습니다",
     "diffKind": "Handle 종류가 일치하지 않습니다",
     "errorNode": "손상된 노드에 연결되어 있습니다",
-    "nullable": "소스는 null을 허용하지만 대상은 허용하지 않습니다",
-    "varDiffPkg": "변수가 서로 다른 프로젝트에 속해 있습니다",
-    "varDiffType": "변수 출력은 변수 입력에만 연결할 수 있습니다"
+    "nullable": "소스는 null을 허용하지만 대상은 허용하지 않습니다"
   },
   "errorNode": {
     "blockManifestUnrenderable": "블록 매니페스트를 렌더링할 수 없습니다: {{path}}",
@@ -248,8 +246,10 @@
       "empty": "Handle 이름은 비워 둘 수 없습니다"
     },
     "schemaDescription": "JSON Schema 설명...",
-    "secretUnavailable": "시크릿 카탈로그를 사용할 수 없습니다",
-    "selectSecret": "시크릿 선택",
+    "selectVariable": "Variable 선택",
+    "variableMissing": "{{name}} (누락됨)",
+    "variableMissingHelp": "현재 deployment에 Variable {{name}}이(가) 더 이상 없습니다.",
+    "variablesLoading": "Variable 불러오는 중…",
     "unknown": "알 수 없음"
   },
   "handleGroup": {
@@ -282,7 +282,6 @@
     "presetType": "사전 설정 타입",
     "reference": "연결됨",
     "requiredFieldsUnset": "필수 항목을 설정하세요: {{fields}}.",
-    "secretNotFound": "시크릿을 찾을 수 없습니다",
     "title": "입력 Handle",
     "typeError": "{{expected}} 타입이 필요합니다",
     "unset": "<설정 안 됨>",
@@ -328,10 +327,8 @@
   },
   "jsonViewer": {
     "bin": "바이너리",
-    "secret": "시크릿",
     "showLess": "간략히 보기",
-    "showMore": "더 보기",
-    "var": "변수"
+    "showMore": "더 보기"
   },
   "l10n": {
     "createKey": "번역 사용",
@@ -433,11 +430,10 @@
     "number": "Number",
     "object": "Object",
     "oneOf": "OneOf",
-    "secret": "Secret",
+    "deploymentVariable": "Variable",
     "select": "Single",
     "string": "String",
-    "text": "Textarea",
-    "variable": "Variable"
+    "text": "Textarea"
   },
   "preview": {
     "title": "미리 보기",
@@ -561,23 +557,6 @@
       "run": "실행",
       "showDetails": "실행 세부 정보 표시",
       "trigger": "Trigger"
-    },
-    "secrets": {
-      "add": "시크릿 추가",
-      "addField": "필드 추가",
-      "close": "닫기",
-      "confirmDelete": "현재 런타임에서 이 시크릿을 삭제하시겠습니까?",
-      "delete": "삭제",
-      "hideValue": "값 숨기기",
-      "key": "키",
-      "name": "이름",
-      "removeField": "필드 삭제",
-      "save": "저장",
-      "saved": "이 런타임에 시크릿을 저장했습니다.",
-      "showValue": "값 표시",
-      "template": "템플릿",
-      "title": "시크릿",
-      "value": "값"
     },
     "settings": {
       "categories": "설정 분류",

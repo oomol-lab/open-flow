@@ -23,7 +23,7 @@ export const reconcileWidget$ = (
   const widgetType$ = combine([schema$, overrideSchema$], ([schema, overrideSchema]) => {
     const type = typeOfSchema(schema)
     const overrideType = typeOfSchema(overrideSchema?.schema)
-    return type === 'any' || type === 'variable' ? overrideType : type
+    return type === 'any' ? overrideType : type
   })
   const derived$ = derive(widgetType$, (widgetType) => {
     let widgetStore: WidgetStore

@@ -245,6 +245,7 @@ function Editor({
         onChangeNodeIcon={(nodeId, icon) => void store.workspace.saveNodeIcon(nodeId, icon)}
         onChangeNodeTitle={(nodeId, title) => void store.workspace.saveNodeTitle(nodeId, title)}
         onChangeInput={(nodeId, handle, value) => void store.workspace.setInputValue(nodeId, handle, value)}
+        onChangeInputVariable={(nodeId, handle, name) => void store.workspace.setInputVariable(nodeId, handle, name)}
         onChangeTaskPorts={(nodeId, inputs, outputs) => void store.workspace.saveCodeTaskPorts(nodeId, codeTaskPorts(inputs, outputs))}
         onChangeTriggerConfig={(triggerId, name, value) => void store.workspace.saveTriggerConfig(triggerId, name, value)}
         onChangeTriggerSchedule={(triggerId, schedule) => void store.workspace.saveTriggerSchedule(triggerId, schedule)}
@@ -258,6 +259,7 @@ function Editor({
         onMoveViewport={(viewport, displayMode) => void store.workspace.moveViewport(viewport, displayMode)}
         onOpenBlocks={openBlocks}
         onOpenInspector={openInspector}
+        onOpenVariables={() => void store.refreshVariableNames()}
         onPaste={() => void store.workspace.pasteNodes()}
         provideAddNodeOptions={store.provideAddNodeOptions}
         onSelectNodes={(nodeIds) => store.selectNodes(nodeIds)}

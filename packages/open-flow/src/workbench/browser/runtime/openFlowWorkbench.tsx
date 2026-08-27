@@ -220,6 +220,7 @@ function Session({
     const refreshConnections = (): void => {
       void store.connectors.refreshAfterAuthorization()
       void store.triggers.refreshAfterAuthorization()
+      void store.refreshVariableNames()
     }
     globalThis.addEventListener('focus', refreshConnections)
     return () => {

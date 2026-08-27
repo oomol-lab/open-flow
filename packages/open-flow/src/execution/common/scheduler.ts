@@ -109,6 +109,7 @@ export interface SchedulerFailure {
 }
 
 export interface FlowRunOptions {
+  readonly bindingValues?: Readonly<Record<string, string>>
   readonly createId: () => string
   readonly emit?: (event: SchedulerEvent) => Effect.Effect<void, Error>
   readonly flowId: string
@@ -148,6 +149,7 @@ function nodeFailure(error: unknown, project: FlowRunOptions['projectFailure']):
 }
 
 interface RunContext {
+  readonly bindingValues: Readonly<Record<string, string>>
   readonly createId: FlowRunOptions['createId']
   readonly emit: (event: SchedulerEvent) => Effect.Effect<void, Error>
   readonly invokeTask: FlowRunOptions['invokeTask']
@@ -429,13 +431,18 @@ function runGraph(
         Object.entries(target.graph.nodes).map(([nodeId, node]) => [nodeId, new InputBuffer(nodeId, node, nodePorts(context.prepared, node))]),
       )
       const flowInputTargets = new Map<string, InputTarget[]>()
+      const bindingInputTargets = new Map<string, InputTarget[]>()
       const nodeInputTargets = new Map<string, Map<string, InputTarget[]>>()
       const runOutputTargets = new Map<string, Map<string, string[]>>()
       for (const [nodeId, node] of Object.entries(target.graph.nodes)) {
         for (const [handle, mapping] of Object.entries(node.inputs)) {
           if (mapping.kind != 'sources') continue
           for (const source of mapping.sources) {
-            if (source.kind == 'flow') {
+            if (source.kind == 'binding') {
+              const targets = bindingInputTargets.get(source.bindingId) ?? []
+              targets.push({ handle, nodeId })
+              bindingInputTargets.set(source.bindingId, targets)
+            } else if (source.kind == 'flow') {
               const targets = flowInputTargets.get(source.input) ?? []
               targets.push({ handle, nodeId })
               flowInputTargets.set(source.input, targets)
@@ -485,8 +492,14 @@ function runGraph(
         const execution = Effect.gen(function* () {
           const kind = nodeKind(context.prepared, node)
           const title = nodeTitle(context.prepared, node)
+          const projectedInputs = Object.fromEntries(
+            Object.entries(nodeInputs).filter(([handle]) => {
+              const mapping = node.inputs[handle]
+              return mapping?.kind != 'sources' || mapping.sources.every((source) => source.kind != 'binding')
+            }),
+          )
           yield* context.emit({
-            inputs: nodeInputs,
+            inputs: projectedInputs,
             jobId,
             nodeId,
             nodeKind: kind,
@@ -622,6 +635,12 @@ function runGraph(
         if (buffer == null) continue
         for (const [handle, value] of Object.entries(values)) buffer.launch(handle, value)
       }
+      for (const [bindingId, targets] of bindingInputTargets) {
+        if (!Object.hasOwn(context.bindingValues, bindingId)) {
+          return yield* Effect.fail(new Error(`Variable binding "${bindingId}" is unresolved.`))
+        }
+        for (const targetInput of targets) deliverInput(targetInput, context.bindingValues[bindingId]!)
+      }
       for (const [handle, port] of Object.entries(target.inputs)) {
         const provided = Object.hasOwn(inputs, handle) ? inputs[handle] : port.value
         if (provided === undefined) continue
@@ -684,7 +703,14 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
       return yield* Effect.fail(new Error(`Node "${options.trigger.nodeId}" is not a TriggerNode in Flow "${options.flowId}".`))
     }
     return (yield* runGraph(
-      { createId: options.createId, emit, invokeTask: options.invokeTask, prepared, projectFailure: options.projectFailure },
+      {
+        bindingValues: options.bindingValues ?? {},
+        createId: options.createId,
+        emit,
+        invokeTask: options.invokeTask,
+        prepared,
+        projectFailure: options.projectFailure,
+      },
       { flowId: options.flowId, graph: executableGraph(prepared.graph), inputs: {}, kind: 'flow', outputs: {} },
       options.runId,
       {},

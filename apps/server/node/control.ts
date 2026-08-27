@@ -5,7 +5,7 @@ import type { Context, Next } from 'hono'
 import type { ControlService, FlowPosition, PublicationPosition, RunPosition, TriggerActivityPosition } from './control-service.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { resourceNameIssue } from '@oomol-lab/open-flow/flow-change'
+import { resourceNameIssue, validVariableName } from '@oomol-lab/open-flow/flow-change'
 import { runStatuses } from '@oomol-lab/open-flow/run-lifecycle'
 import { Hono } from 'hono'
 import { ControlError } from './error.ts'
@@ -13,7 +13,11 @@ import { ControlError } from './error.ts'
 export type ResolveControlActor = (request: Request) => Promise<string | undefined> | string | undefined
 
 type Environment = { Variables: { actorId: string } }
-type InvalidCode = typeof controlErrorCode.flowInvalid | typeof controlErrorCode.pageInvalidCursor | typeof controlErrorCode.runInvalid
+type InvalidCode =
+  | typeof controlErrorCode.flowInvalid
+  | typeof controlErrorCode.pageInvalidCursor
+  | typeof controlErrorCode.runInvalid
+  | typeof controlErrorCode.variableInvalid
 type RunInputs = NonNullable<FlowRunOptions['inputs']>
 
 const maxRequestBytes = 5 * 1024 * 1024
@@ -31,7 +35,29 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     context.set('actorId', actorId)
     await next()
   }
-  for (const route of ['/connector/*', '/flows', '/flows/*', '/runs', '/runs/*', '/trigger-keys', '/trigger-keys/*']) app.use(route, authenticate)
+  for (const route of ['/connector/*', '/flows', '/flows/*', '/runs', '/runs/*', '/trigger-keys', '/trigger-keys/*', '/variables', '/variables/*']) {
+    app.use(route, authenticate)
+  }
+
+  app.get('/variables', (context) => {
+    query(context.req.raw, [], controlErrorCode.variableInvalid)
+    return response(200, service.listVariables())
+  })
+  app.get('/variables/:name', (context) => {
+    query(context.req.raw, [], controlErrorCode.variableInvalid)
+    return response(200, service.getVariable(variableName(context.req.param('name'))))
+  })
+  app.put('/variables/:name', async (context) => {
+    query(context.req.raw, [], controlErrorCode.variableInvalid)
+    const body = await requestObject(context.req.raw, controlErrorCode.variableInvalid)
+    exact(body, ['value'], controlErrorCode.variableInvalid)
+    return response(200, service.putVariable(variableName(context.req.param('name')), variableValue(body.value)))
+  })
+  app.delete('/variables/:name', (context) => {
+    query(context.req.raw, [], controlErrorCode.variableInvalid)
+    service.deleteVariable(variableName(context.req.param('name')))
+    return response(200, { version: 1 })
+  })
 
   app.get('/trigger-keys', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
@@ -354,6 +380,19 @@ function resourceName(value: unknown): string {
   const name = text(value, controlErrorCode.flowInvalid)
   if (name != name.trim() || resourceNameIssue(name) != null) invalid(controlErrorCode.flowInvalid, 'Flow name is invalid.')
   return name
+}
+
+function variableName(value: unknown): string {
+  const name = text(value, controlErrorCode.variableInvalid)
+  if (!validVariableName(name)) invalid(controlErrorCode.variableInvalid, 'Variable name is invalid.')
+  return name
+}
+
+function variableValue(value: unknown): string {
+  if (typeof value != 'string' || encoder.encode(value).byteLength > 64 * 1024) {
+    invalid(controlErrorCode.variableInvalid, 'Variable value is invalid.')
+  }
+  return value
 }
 
 function connectorService(value: unknown): string {

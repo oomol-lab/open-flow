@@ -10,7 +10,6 @@ import type { SubflowBlockMeta } from '../../../manifest/common/meta/block/subfl
 import type { TaskBlockMeta } from '../../../manifest/common/meta/block/taskBlockMeta.ts'
 import type { CompareResult, CompareSchemaInfo } from '../../../manifest/common/schemaCompare.ts'
 import type { HandleName } from '../../../schema/index.ts'
-import type { SecretStore } from '../../../secret/browser/store.ts'
 import type { TriggerCatalogCompatibleItem, TriggerCatalogItem } from '../../../trigger/common/catalog.ts'
 import type { DesignerHost } from '../../common/designerHost.ts'
 import type { FlowDisplayMode } from '../../common/flowDisplay.ts'
@@ -78,7 +77,6 @@ export interface AbstractDesignerServiceProps {
   readonly packageAuthoring: PackageAuthoring
   readonly interactiveMode: Val<InteractiveMode>
   readonly theme: BrowserTheme
-  readonly secretStore?: SecretStore
   readonly createSchemaEditor: CreateSchemaEditorFn
   readonly createL10nMarkdownEditor: CreateL10nMarkdownEditorFn
   readonly createScriptletEditor?: CreateScriptletEditorFn
@@ -103,7 +101,6 @@ export abstract class AbstractDesignerService {
   protected readonly packageAuthoring: PackageAuthoring
   protected readonly interactiveMode: Val<InteractiveMode>
   protected readonly theme: BrowserTheme
-  protected readonly secretStore?: SecretStore
   protected readonly i18n: I18n
   protected readonly connectorCatalog: ConnectorCatalog | undefined
   protected readonly connectorConnections: ConnectorConnectionStore | undefined
@@ -120,7 +117,6 @@ export abstract class AbstractDesignerService {
   public constructor(props: AbstractDesignerServiceProps) {
     this.i18n = props.i18n
     this.theme = props.theme
-    this.secretStore = props.secretStore
     this.service = props.service
     this.designerStores = props.designerStores
     this.confirmation = props.confirmation

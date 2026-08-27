@@ -2,7 +2,6 @@ import styles from './handleEditor.module.scss'
 import type { useStoreApi } from '@xyflow/react'
 import type { JSX } from 'react/jsx-runtime'
 import type { Val } from 'value-enhancer'
-import type { BaseCascadeOption } from '../components/cascade.tsx'
 import type { ColorType } from '../components/constants.ts'
 import type { IHandleAction } from '../components/handleRow.tsx'
 import type { DesignerOption as IBasicOption } from '../components/select.tsx'
@@ -18,11 +17,10 @@ import type { JsonSchema } from './types.ts'
 
 import { isDefined, isString } from '@wopjs/cast'
 import { clsx } from 'clsx'
-import { memo, useCallback, useMemo, useState } from 'react'
-import { useDerived, useVal, useValues } from 'use-value-enhancer'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useDerived, useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { setValue, val } from 'value-enhancer'
-import { formatSecretReference, parseSecretReference } from '../../../secret/common/reference.ts'
 import { HANDLE_ROW_CLASSNAME, HANDLE_ROW_EXPANDED_CLASSNAME } from '../base/designer.ts'
 import { stopEvent } from '../base/dom.ts'
 import { toRFHandleName } from '../base/rfHelpers.ts'
@@ -44,7 +42,6 @@ import {
   trueFalse,
 } from '../base/trivial.ts'
 import { Button } from '../components/button.tsx'
-import { Cascade } from '../components/cascade.tsx'
 import { DesignerCheckbox } from '../components/checkbox.tsx'
 import { ColorPicker } from '../components/colorPicker.tsx'
 import { asColorType, asDate, asDateTimeFormat, formatDate } from '../components/constants.ts'
@@ -63,7 +60,6 @@ import { useSubflowViewMode } from '../graph/SubflowDesigner/SubflowViewModeCont
 import { SUBFLOW_VIEW_MODE } from '../stores/designer/subflowDesigner.store.ts'
 import { DESIGNER_TYPE } from '../stores/designer/typings.ts'
 import { NODE_TYPE } from '../stores/node/constants.ts'
-import { useHandleEditorContext } from './handleEditorContext.ts'
 import {
   asPrimitiveType,
   getBaseSchema,
@@ -94,6 +90,14 @@ export interface HandleEditorProps {
   readonly dragPosition?: number
   onDragStart?: (ev: React.DragEvent<HTMLElement>) => void
   onDragOver?: (ev: React.DragEvent<HTMLElement>) => void
+  readonly variable?: {
+    readonly loaded: boolean
+    readonly loading: boolean
+    readonly name?: string
+    readonly names: readonly string[]
+    readonly onChange: (name: string | undefined) => void
+    readonly onOpen: () => void
+  }
 }
 
 export function HandleEditor({
@@ -109,6 +113,7 @@ export function HandleEditor({
   dragPosition = 0,
   onDragStart,
   onDragOver,
+  variable,
 }: HandleEditorProps): JSX.Element {
   const { context } = store
 
@@ -218,7 +223,17 @@ export function HandleEditor({
             </div>
           </DesignerTooltip>
         }
-        value={<RootField reference={reference} nullable={nullable} type={schemaType} store={widget} descCollapsed={descCollapsed} error$={store.error$} />}
+        value={
+          <RootField
+            reference={reference}
+            nullable={nullable}
+            type={schemaType}
+            store={widget}
+            descCollapsed={descCollapsed}
+            error$={store.error$}
+            variable={variable}
+          />
+        }
         actions={[
           <DesignerCheckbox
             ariaLabel={t('inputHandleEditor.nullable')}
@@ -281,7 +296,10 @@ interface RootFieldProps {
   readonly descCollapsed?: boolean
   readonly store: WidgetStore
   readonly error$: Val<HandleError | undefined>
+  readonly variable?: HandleEditorProps['variable']
 }
+
+const deploymentVariableType = 'deployment-variable'
 
 function RootField(props: RootFieldProps) {
   const t = useTranslate()
@@ -292,6 +310,21 @@ function RootField(props: RootFieldProps) {
   const restricted = useVal(props.store.context.restrict$) != null
   const error = useVal(props.error$)
   const options = widgetSelectOptions(t, (type) => !isBannedType(props.store.context, type))
+  const [variableMode, setVariableMode] = useState(props.variable?.name != null)
+  const previousVariableName = useRef(props.variable?.name)
+  useEffect(() => {
+    const name = props.variable?.name
+    if (name != null) {
+      setVariableMode(true)
+    } else if (previousVariableName.current != null) {
+      setVariableMode(false)
+    }
+    previousVariableName.current = name
+  }, [props.variable?.name])
+  const variableOption: IBasicOption = { icon: 'i-carbon:value-variable', label: t('preset.deploymentVariable'), value: deploymentVariableType }
+  const literalOption = optionOf(t, props.type)
+  const typeOptions: readonly (WidgetSelectOption | IBasicOption)[] =
+    props.variable == null ? options : props.store.context.canEditSchema ? [...options, variableOption] : [literalOption, variableOption]
 
   const showError = toTrue(
     designerType !== DESIGNER_TYPE.Block &&
@@ -307,9 +340,14 @@ function RootField(props: RootFieldProps) {
     return message
   }
 
-  const onChange = (e: WidgetSelectOption | null) => {
+  const onChange = (e: WidgetSelectOption | IBasicOption | null) => {
     if (e) {
-      if (isWidgetType(e.value)) {
+      if (e.value == deploymentVariableType) {
+        setVariableMode(true)
+        props.variable?.onOpen()
+      } else if (isString(e.value) && isWidgetType(e.value)) {
+        if (variableMode) props.variable?.onChange(undefined)
+        setVariableMode(false)
         setValue(props.store.schema$, getBaseSchema(e.value, props.store.schema$.value))
       }
     }
@@ -319,7 +357,12 @@ function RootField(props: RootFieldProps) {
     !hasValue && props.type === 'array' ? (
       <ValueInlineArray type={props.type} nullable={props.nullable} store={props.store as ArrayWidgetStore} options={options} onChange={onChange} />
     ) : (
-      <Select value={optionOf(t, props.type)} options={options} disabled={restricted || !props.store.context.canEditSchema} onChange={onChange} />
+      <Select
+        value={variableMode ? variableOption : literalOption}
+        options={typeOptions}
+        disabled={restricted || (!props.store.context.canEditSchema && props.variable == null)}
+        onChange={onChange}
+      />
     )
 
   return (
@@ -340,18 +383,57 @@ function RootField(props: RootFieldProps) {
       ) : (
         body
       )}
-      {hasValue && (
-        <DesignerTooltip className={styles.errorOverlay} placement="top" title={showError && localize(error?.message)}>
-          <div className={clsx(styles.inlineValue, showError && error && styles.error)}>
-            {props.reference ? (
-              <ValueReference isSuffix type="binary" store={props.store} />
-            ) : (
-              <ValueReconciler isSuffix type={props.type} nullable={props.nullable} store={props.store} showError={showError} />
-            )}
-          </div>
-        </DesignerTooltip>
+      {props.variable != null && variableMode ? (
+        <VariableBinding {...props.variable} disabled={!props.store.context.canEditValue} />
+      ) : (
+        hasValue && (
+          <DesignerTooltip className={styles.errorOverlay} placement="top" title={showError && localize(error?.message)}>
+            <div className={clsx(styles.inlineValue, showError && error && styles.error)}>
+              {props.reference ? (
+                <ValueReference isSuffix type="binary" store={props.store} />
+              ) : (
+                <ValueReconciler isSuffix type={props.type} nullable={props.nullable} store={props.store} showError={showError} />
+              )}
+            </div>
+          </DesignerTooltip>
+        )
       )}
     </div>
+  )
+}
+
+function VariableBinding({
+  disabled,
+  loaded,
+  loading,
+  name,
+  names,
+  onChange,
+  onOpen,
+}: NonNullable<HandleEditorProps['variable']> & { readonly disabled: boolean }) {
+  const t = useTranslate()
+  const missing = loaded && name != null && !names.includes(name)
+  const options: IBasicOption[] = [
+    ...(missing ? [{ label: t('handleEditor.variableMissing', { name }), value: name }] : []),
+    ...names.map((value) => ({ label: value, value })),
+  ]
+  const value = name == null ? null : (options.find((option) => option.value == name) ?? null)
+  return (
+    <DesignerTooltip placement="top" title={missing ? t('handleEditor.variableMissingHelp', { name }) : undefined}>
+      <div className={styles.inlineValue}>
+        <Select<IBasicOption>
+          disabled={disabled}
+          isClearable
+          isSuffix
+          onChange={(option) => onChange(option?.value)}
+          onOpen={onOpen}
+          options={options}
+          placeholder={loading ? t('handleEditor.variablesLoading') : t('handleEditor.selectVariable')}
+          value={value}
+          variant={missing ? 'danger' : 'default'}
+        />
+      </div>
+    </DesignerTooltip>
   )
 }
 
@@ -563,8 +645,6 @@ const ValueReconciler = /*#__PURE__*/ memo(function ValueReconciler(props: Value
     case 'number':
     case 'integer':
       return <ValueNumber {...props} />
-    case 'secret':
-      return <ValueSecret {...props} />
     case 'boolean':
       return <ValueBoolean {...props} />
     case 'color':
@@ -596,7 +676,6 @@ const ValueReconciler = /*#__PURE__*/ memo(function ValueReconciler(props: Value
     case 'binary':
       return <ValueBinary {...props} />
     case 'any':
-    case 'variable':
       return <ValueAny {...props} />
     case 'null':
       return <ValueNull {...props} />
@@ -668,57 +747,6 @@ function ValueNumber(props: ValueProps) {
       isClearable={props.store.context.canEditValue}
       readOnly={!props.store.context.canEditValue}
       returnToCommit
-    />
-  )
-}
-
-function ValueSecret(props: ValueProps) {
-  const t = useTranslate()
-  const root = useHandleEditorContext()
-  const reference = useDerived(props.store.value$, parseSecretReference)
-  const value = reference ? [reference.secretId, reference.key] : undefined
-  const secrets = useValues(root.secretStore?.items$)
-  const loading = useVal(root.secretStore?.loading$)
-  const descriptors = useMemo(() => secrets ?? [], [secrets])
-  const options = useMemo<BaseCascadeOption[]>(
-    () =>
-      descriptors.map((secret) => ({
-        icon: 'i-carbon:api-key',
-        label: secret.name,
-        value: secret.secretId,
-        children: secret.fields.map((field) => ({ label: field.key, value: field.key })),
-      })),
-    [descriptors],
-  )
-
-  const missing =
-    root.secretStore != null &&
-    reference != null &&
-    !loading &&
-    !descriptors.some((secret) => secret.secretId === reference.secretId && secret.fields.some((field) => field.key === reference.key))
-  const warning = missing ? '$secretNotFound' : undefined
-
-  const localize = (message?: string): string | undefined => {
-    if (!message) return message
-    if (message[0] === '$') return t(`inputHandleEditor.${message.slice(1)}`)
-    return message
-  }
-
-  return (
-    <Cascade
-      isSuffix={props.isSuffix}
-      title={root.secretStore ? undefined : t('handleEditor.secretUnavailable')}
-      options={options}
-      value={value}
-      onChange={(raw) => {
-        const secret = descriptors.find((descriptor) => descriptor.secretId === raw?.[0])
-        const key = raw?.[1]
-        const next = secret && key ? formatSecretReference({ secretId: secret.secretId, key }) : null
-        props.store.value$?.set(next === null ? (props.nullable ? next : undefined) : next)
-      }}
-      disabled={!props.store.context.canEditValue}
-      loading={loading}
-      warning={localize(warning)}
     />
   )
 }

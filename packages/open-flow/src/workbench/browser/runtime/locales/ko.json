@@ -214,7 +214,6 @@
   },
   "jsonViewer": {
     "bin": "바이너리",
-    "secret": "시크릿",
     "var": "변수"
   },
   "notice": {

@@ -62,6 +62,8 @@ export interface FlowDesignerViewInput {
   readonly nullable?: boolean
   readonly sources?: readonly FlowDesignerViewSource[]
   readonly value?: unknown
+  readonly variable?: string
+  readonly variableCompatible?: boolean
 }
 
 export interface FlowDesignerViewOutput {
@@ -253,6 +255,9 @@ export interface FlowDesignerViewModel {
   readonly nodes: readonly FlowDesignerViewNode[]
   readonly runStatus?: 'idle' | 'running'
   readonly viewport: FlowDesignerViewViewport
+  readonly variableNames?: readonly string[]
+  readonly variableNamesLoaded?: boolean
+  readonly variableNamesLoading?: boolean
 }
 
 export interface FlowDesignerViewAddItem {
@@ -311,6 +316,7 @@ export interface FlowDesignerViewProps {
   readonly onChangeNodeIcon?: (nodeId: string, icon: string | undefined) => void
   readonly onChangeNodeTitle?: (nodeId: string, title: string | undefined) => void
   readonly onChangeInput?: (nodeId: string, handle: string, value: unknown) => void
+  readonly onChangeInputVariable?: (nodeId: string, handle: string, name: string | undefined) => void
   readonly onChangeTaskPorts?: (nodeId: string, inputs: readonly FlowDesignerViewInput[], outputs: readonly FlowDesignerViewOutput[]) => void
   readonly onChangeTriggerConfig?: (triggerId: string, name: string, value: unknown | undefined) => void
   readonly onChangeTriggerSchedule?: (triggerId: string, schedule: readonly FlowDesignerViewTriggerSchedule[]) => void
@@ -324,6 +330,7 @@ export interface FlowDesignerViewProps {
   readonly onPaste: (position: FlowDesignerViewPosition) => void
   readonly onSelectionChange: (nodeIds: readonly string[], edge: FlowDesignerViewEdge | undefined) => void
   readonly provideAddItems?: (searchTerm: string, signal: AbortSignal) => Promise<readonly FlowDesignerViewAddItem[] | undefined>
+  readonly onOpenVariables?: () => void
   readonly selectedNodeIds: readonly string[]
 }
 
@@ -382,6 +389,7 @@ interface ViewCallbacks {
   readonly onChangeNodeIcon: FlowDesignerViewProps['onChangeNodeIcon']
   readonly onChangeNodeTitle: FlowDesignerViewProps['onChangeNodeTitle']
   readonly onChangeInput: FlowDesignerViewProps['onChangeInput']
+  readonly onChangeInputVariable: FlowDesignerViewProps['onChangeInputVariable']
   readonly onChangeTaskPorts: FlowDesignerViewProps['onChangeTaskPorts']
   readonly onChangeTriggerConfig: FlowDesignerViewProps['onChangeTriggerConfig']
   readonly onChangeTriggerSchedule: FlowDesignerViewProps['onChangeTriggerSchedule']
@@ -392,6 +400,18 @@ interface ViewCallbacks {
   readonly onDuplicate: FlowDesignerViewProps['onDuplicate']
   readonly onPaste: FlowDesignerViewProps['onPaste']
   readonly provideAddItems: FlowDesignerViewProps['provideAddItems']
+  readonly onOpenVariables: FlowDesignerViewProps['onOpenVariables']
+}
+
+function variableInputs(nodes: readonly FlowDesignerViewNode[]): ReadonlyMap<string, { readonly compatible: boolean; readonly name?: string }> {
+  const inputs = new Map<string, { readonly compatible: boolean; readonly name?: string }>()
+  for (const node of nodes) {
+    if (node.kind == 'comment') continue
+    for (const input of node.inputs) {
+      if (input.variableCompatible) inputs.set(`${node.id}\0${input.handle}`, { compatible: true, ...(input.variable == null ? {} : { name: input.variable }) })
+    }
+  }
+  return inputs
 }
 
 class FlowDesignerViewAdapter {
@@ -407,6 +427,10 @@ class FlowDesignerViewAdapter {
   #pendingDisconnects = new Map<string, FlowDesignerViewEdge>()
   #runStatus: Val<FlowRunStatus>
   #selectedNodeIds = new Set<string>()
+  #variableInputs: Val<ReadonlyMap<string, { readonly compatible: boolean; readonly name?: string }>>
+  #variableNames: Val<readonly string[]>
+  #variableNamesLoaded: Val<boolean>
+  #variableNamesLoading: Val<boolean>
 
   constructor(model: FlowDesignerViewModel, editable: boolean, language: string, addItems: readonly FlowDesignerViewAddItem[], callbacks: ViewCallbacks) {
     this.#addItems = addItems
@@ -417,6 +441,10 @@ class FlowDesignerViewAdapter {
     const commentNodes = reactiveMap<NodeId, CommentNodeStore>(null, { onDeleted: dispose })
     const viewport = val<FlowDesignerViewViewport | undefined>(model.viewport)
     this.#runStatus = val<FlowRunStatus>(model.runStatus == 'running' ? FLOW_RUN_STATUS.Running : FLOW_RUN_STATUS.Idle)
+    this.#variableInputs = val(variableInputs(model.nodes))
+    this.#variableNames = val(model.variableNames ?? [])
+    this.#variableNamesLoaded = val(model.variableNamesLoaded ?? false)
+    this.#variableNamesLoading = val(model.variableNamesLoading ?? false)
     const designerUIStore = new DesignerUIStoreImpl({ commentNodeStores: commentNodes, viewport, nodeStores: nodes })
     this.store = new FlowDesignerStore({
       readonly: !editable,
@@ -431,6 +459,10 @@ class FlowDesignerViewAdapter {
       interactiveMode: val<InteractiveMode>('touchpad'),
       settingsPanelWidth: val<number | undefined>(),
       runStatus: this.#runStatus,
+      variableInputs: this.#variableInputs,
+      variableNames: this.#variableNames,
+      variableNamesLoaded: this.#variableNamesLoaded,
+      variableNamesLoading: this.#variableNamesLoading,
       display$: {
         description: val<string | undefined>(),
         icon: val<string | undefined>(),
@@ -462,6 +494,8 @@ class FlowDesignerViewAdapter {
           targetHandle: connection.to.target.input_handle,
         })
       },
+      onChangeInputVariable: (nodeId, handle, name) => this.#callbacks.onChangeInputVariable?.(nodeId, handle, name),
+      onOpenVariables: () => this.#callbacks.onOpenVariables?.(),
       onDeleteNodes: (stores) => {
         const nodeIds = [...stores].map((node) => node.nodeId)
         const deleted = new Set<string>(nodeIds)
@@ -594,6 +628,10 @@ class FlowDesignerViewAdapter {
   #syncModel(model: FlowDesignerViewModel): void {
     const runStatus = model.runStatus == 'running' ? FLOW_RUN_STATUS.Running : FLOW_RUN_STATUS.Idle
     if (this.#runStatus.value != runStatus) this.#runStatus.set(runStatus)
+    this.#variableInputs.set(variableInputs(model.nodes))
+    this.#variableNames.set(model.variableNames ?? [])
+    this.#variableNamesLoaded.set(model.variableNamesLoaded ?? false)
+    this.#variableNamesLoading.set(model.variableNamesLoading ?? false)
     if (
       this.#modelViewport == null ||
       this.#modelViewport.x != model.viewport.x ||
@@ -1200,6 +1238,7 @@ function callbacksFromProps(props: FlowDesignerViewProps): ViewCallbacks {
     onChangeNodeIcon: props.onChangeNodeIcon,
     onChangeNodeTitle: props.onChangeNodeTitle,
     onChangeInput: props.onChangeInput,
+    onChangeInputVariable: props.onChangeInputVariable,
     onChangeTaskPorts: props.onChangeTaskPorts,
     onChangeTriggerConfig: props.onChangeTriggerConfig,
     onChangeTriggerSchedule: props.onChangeTriggerSchedule,
@@ -1211,6 +1250,7 @@ function callbacksFromProps(props: FlowDesignerViewProps): ViewCallbacks {
     onDuplicate: props.onDuplicate,
     onPaste: props.onPaste,
     provideAddItems: props.provideAddItems,
+    onOpenVariables: props.onOpenVariables,
   }
 }
 

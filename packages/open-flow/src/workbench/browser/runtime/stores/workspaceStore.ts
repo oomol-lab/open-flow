@@ -43,6 +43,7 @@ import {
   createResource as createFlowResource,
   deleteSelection,
   pasteNodes,
+  setInputVariable as changeInputVariable,
   setInputValue as changeInputValue,
   updateCondition,
   updateCodeTaskPorts,
@@ -520,6 +521,17 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = changeInputValue(revision, target, nodeId, handle, value)
+    return changes != null && (await this.#changeDraft(changes)) != null
+  }
+
+  public async setInputVariable(nodeId: string, handle: string, name: string | undefined): Promise<boolean> {
+    const revision = this.$.revision.value
+    const target = this.#model.value.target
+    if (revision == null || target == null) return false
+    const changes =
+      name == null
+        ? changeInputValue(revision, target, nodeId, handle, undefined)
+        : changeInputVariable(revision, target, nodeId, handle, name, this.#identity())
     return changes != null && (await this.#changeDraft(changes)) != null
   }
 

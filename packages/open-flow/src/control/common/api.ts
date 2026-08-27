@@ -27,6 +27,13 @@ export interface FlowPage {
   readonly version: 1
 }
 
+export interface Variable {
+  readonly name: string
+  readonly updatedAt: string
+  readonly value: string
+  readonly version: 1
+}
+
 export interface TriggerKeySummary {
   readonly description: string
   readonly displayName: string
@@ -597,6 +604,19 @@ function flowPage(value: unknown): FlowPage {
   }
 }
 
+function variable(value: unknown): Variable {
+  const source = record(value)
+  exact(source, ['name', 'updatedAt', 'value', 'version'])
+  if (source.version != 1 || typeof source.value != 'string') return invalidResponse()
+  const updatedAt = string(source.updatedAt)
+  try {
+    if (new Date(updatedAt).toISOString() != updatedAt) return invalidResponse()
+  } catch {
+    return invalidResponse()
+  }
+  return { name: string(source.name), updatedAt, value: source.value, version: 1 }
+}
+
 function revisionMetadata(value: unknown): RevisionMetadata {
   const source = record(value)
   const parentRevisionId = source.parentRevisionId
@@ -904,6 +924,32 @@ export class ControlClient {
     if (options.includeTotal != null) parameters.set('includeTotal', String(options.includeTotal))
     const query = parameters.size == 0 ? '' : `?${parameters}`
     return flowPage(await this.request(`/v1/flows${query}`))
+  }
+
+  async listVariables(): Promise<{ readonly variables: readonly Variable[]; readonly version: 1 }> {
+    const source = record(await this.request('/v1/variables'))
+    exact(source, ['variables', 'version'])
+    if (source.version != 1 || !Array.isArray(source.variables)) return invalidResponse()
+    return { variables: source.variables.map(variable), version: 1 }
+  }
+
+  async getVariable(name: string): Promise<Variable> {
+    return variable(await this.request(`/v1/variables/${segment(name)}`))
+  }
+
+  async putVariable(name: string, value: string): Promise<Variable> {
+    return variable(
+      await this.request(`/v1/variables/${segment(name)}`, {
+        body: JSON.stringify({ value }),
+        method: 'PUT',
+      }),
+    )
+  }
+
+  async deleteVariable(name: string): Promise<void> {
+    const source = record(await this.request(`/v1/variables/${segment(name)}`, { method: 'DELETE' }))
+    exact(source, ['version'])
+    if (source.version != 1) return invalidResponse()
   }
 
   async createFlow(name: string, idempotencyKey = `flow-${crypto.randomUUID()}`): Promise<Flow> {

@@ -25,14 +25,6 @@ export interface ConnectionValidateData {
   nullable?: boolean | undefined
 }
 
-function normalizeSpecialValueSchema(schema: Record<string, unknown>): Record<string, unknown> {
-  if (schema.contentMediaType === 'oomol/secret' && !schema.type) {
-    return { ...schema, type: 'string' }
-  } else {
-    return { ...schema }
-  }
-}
-
 export function bindValidateConnection(
   flowLikeMeta: FlowLikeMeta,
   compareJSONSchema: (from: CompareSchemaInfo, to: CompareSchemaInfo) => Promise<CompareResult>,
@@ -77,7 +69,7 @@ export async function validateConnectionData(
   // Only object-shaped JSON Schemas participate in connection validation.
   if (!isUnknownRecord(fromSchemaSource)) return OK
   if (Object.keys(fromSchemaSource).length === 0) return OK
-  const fromSchema = normalizeSpecialValueSchema(fromSchemaSource)
+  const fromSchema = fromSchemaSource
 
   if (!to || isString(to)) return to
   if (to.isErrorNode) return t('edgeError.errorNode')
@@ -85,7 +77,7 @@ export async function validateConnectionData(
   // Only object-shaped JSON Schemas participate in connection validation.
   if (!isUnknownRecord(toSchemaSource)) return OK
   if (Object.keys(toSchemaSource).length === 0) return OK
-  const toSchema = normalizeSpecialValueSchema(toSchemaSource)
+  const toSchema = toSchemaSource
 
   if (from.kind && to.kind) {
     // Custom handle kinds must match on both ends.
@@ -106,22 +98,6 @@ export async function validateConnectionData(
         return t('edgeError.nullable')
       }
     }
-  }
-
-  if (toSchema.contentMediaType === 'oomol/var') {
-    if (fromSchema.contentMediaType === 'oomol/var') {
-      // Variable handles must belong to the same package lineage.
-      if (from.packageId !== to.packageId) {
-        return t('edgeError.varDiffPkg')
-      }
-    }
-    // A variable target can accept any source value.
-    return OK
-  }
-
-  if (fromSchema.contentMediaType === 'oomol/var') {
-    // A variable source can connect only to another variable handle.
-    return t('edgeError.varDiffType')
   }
 
   if (fromSchema.contentMediaType === 'oomol/bin' || toSchema.contentMediaType === 'oomol/bin') {

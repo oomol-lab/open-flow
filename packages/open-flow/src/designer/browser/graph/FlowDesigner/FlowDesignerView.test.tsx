@@ -202,6 +202,30 @@ describe('FlowDesignerView model synchronization', () => {
     view.props.flowDesignerStore.dispose()
   })
 
+  it('projects deployment Variable state and routes Handle selections to the host', () => {
+    const onChangeInputVariable = vi.fn()
+    const onOpenVariables = vi.fn()
+    const value: FlowDesignerViewModel = {
+      nodes: [task([{ handle: 'value', jsonSchema: { type: 'string' }, variable: 'API_TOKEN', variableCompatible: true }])],
+      variableNames: ['API_TOKEN', 'ENDPOINT'],
+      variableNamesLoaded: true,
+      variableNamesLoading: false,
+      viewport: { x: 0, y: 0, zoom: 1 },
+    }
+    const view = FlowDesignerView(props(value, { onChangeInputVariable, onOpenVariables })) as React.ReactElement<FlowDesignerProps>
+    const store = view.props.flowDesignerStore
+
+    expect(store.$.variableInputs.value.get('target\0value')).toEqual({ compatible: true, name: 'API_TOKEN' })
+    expect(store.$.variableNames.value).toEqual(['API_TOKEN', 'ENDPOINT'])
+    expect(store.$.variableNamesLoaded.value).toBe(true)
+    store.onOpenVariables?.()
+    store.onChangeInputVariable?.('target', 'value', 'ENDPOINT')
+
+    expect(onOpenVariables).toHaveBeenCalledOnce()
+    expect(onChangeInputVariable).toHaveBeenCalledWith('target', 'value', 'ENDPOINT')
+    store.dispose()
+  })
+
   it('restores editable handle controls for inline code Tasks only', async () => {
     const onChangeTaskPorts = vi.fn()
     const editable = { ...task([{ handle: 'value', jsonSchema: {} }]), editablePorts: true }

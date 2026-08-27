@@ -12,6 +12,32 @@
   },
   "shell": {
     "closeNotification": "通知を閉じる",
-    "notifications": "通知"
+    "flows": "Flow",
+    "moreActions": "サーバー操作",
+    "notifications": "通知",
+    "variables": "Variables"
+  },
+  "variables": {
+    "all": "すべての Variable",
+    "cancel": "キャンセル",
+    "count": "{{count}} / 200",
+    "create": "Variable を作成",
+    "delete": "削除",
+    "deleteConfirm": "{{name}} を削除しますか？",
+    "description": "Variable にバインドされた Flow 入力で使用できる deployment 設定です。",
+    "edit": "編集",
+    "empty": "Variable はまだ作成されていません。",
+    "invalidName": "名前は 1～256 文字の英字、数字、アンダースコアで指定し、英字またはアンダースコアで始めてください。予約済みの OO_ 接頭辞は使用できません。",
+    "loadFailed": "Variable を読み込めませんでした。",
+    "name": "名前",
+    "noMatch": "検索に一致する Variable はありません。",
+    "refresh": "更新",
+    "retry": "再試行",
+    "save": "保存",
+    "search": "Variable を検索",
+    "title": "Variables",
+    "updated": "更新日時",
+    "value": "値",
+    "valueTooLarge": "UTF-8 でエンコードした値は 64 KiB 以下にしてください。"
   }
 }

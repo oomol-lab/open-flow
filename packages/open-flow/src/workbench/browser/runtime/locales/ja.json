@@ -214,7 +214,6 @@
   },
   "jsonViewer": {
     "bin": "バイナリ",
-    "secret": "シークレット",
     "var": "変数"
   },
   "notice": {

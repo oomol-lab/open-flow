@@ -211,9 +211,7 @@
     "default": "資料類型不相容",
     "diffKind": "Handle 種類不相符",
     "errorNode": "連接到已損毀的節點",
-    "nullable": "來源允許 null，但目標不允許",
-    "varDiffPkg": "變數來自不同的專案",
-    "varDiffType": "變數輸出只能連接到變數輸入"
+    "nullable": "來源允許 null，但目標不允許"
   },
   "errorNode": {
     "blockManifestUnrenderable": "無法轉譯區塊資訊清單 {{path}}",
@@ -248,8 +246,10 @@
       "empty": "Handle 名稱不能為空"
     },
     "schemaDescription": "JSON Schema 說明...",
-    "secretUnavailable": "Secret 目錄無法使用",
-    "selectSecret": "選擇 Secret",
+    "selectVariable": "選擇 Variable",
+    "variableMissing": "{{name}}（已遺失）",
+    "variableMissingHelp": "目前 deployment 中已不存在 Variable {{name}}。",
+    "variablesLoading": "正在載入 Variable…",
     "unknown": "未知"
   },
   "handleGroup": {
@@ -282,7 +282,6 @@
     "presetType": "預設類型",
     "reference": "已連線",
     "requiredFieldsUnset": "請設定必填欄位：{{fields}}。",
-    "secretNotFound": "找不到 Secret",
     "title": "輸入 Handle",
     "typeError": "應為 {{expected}} 類型",
     "unset": "<未設定>",
@@ -328,10 +327,8 @@
   },
   "jsonViewer": {
     "bin": "二進位",
-    "secret": "密鑰",
     "showLess": "收合",
-    "showMore": "展開",
-    "var": "變數"
+    "showMore": "展開"
   },
   "l10n": {
     "createKey": "啟用翻譯",
@@ -433,11 +430,10 @@
     "number": "Number",
     "object": "Object",
     "oneOf": "OneOf",
-    "secret": "Secret",
+    "deploymentVariable": "Variable",
     "select": "Single",
     "string": "String",
-    "text": "Textarea",
-    "variable": "Variable"
+    "text": "Textarea"
   },
   "preview": {
     "title": "預覽",
@@ -561,23 +557,6 @@
       "run": "執行",
       "showDetails": "顯示執行詳情",
       "trigger": "Trigger"
-    },
-    "secrets": {
-      "add": "新增 Secret",
-      "addField": "新增欄位",
-      "close": "關閉",
-      "confirmDelete": "要從目前的執行環境刪除這個 Secret 嗎？",
-      "delete": "刪除",
-      "hideValue": "隱藏值",
-      "key": "鍵名",
-      "name": "名稱",
-      "removeField": "移除欄位",
-      "save": "儲存",
-      "saved": "Secret 已儲存至目前的執行環境。",
-      "showValue": "顯示值",
-      "template": "範本",
-      "title": "Secrets",
-      "value": "值"
     },
     "settings": {
       "categories": "設定分類",

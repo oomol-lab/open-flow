@@ -12,6 +12,32 @@
   },
   "shell": {
     "closeNotification": "Закрыть уведомление",
-    "notifications": "Уведомления"
+    "flows": "Flow",
+    "moreActions": "Действия сервера",
+    "notifications": "Уведомления",
+    "variables": "Variables"
+  },
+  "variables": {
+    "all": "Все Variables",
+    "cancel": "Отмена",
+    "count": "{{count}} из 200",
+    "create": "Создать Variable",
+    "delete": "Удалить",
+    "deleteConfirm": "Удалить {{name}}?",
+    "description": "Конфигурация deployment, доступная входам Flow, привязанным к Variable.",
+    "edit": "Изменить",
+    "empty": "Variables ещё не созданы.",
+    "invalidName": "Используйте от 1 до 256 букв, цифр или знаков подчёркивания; имя должно начинаться с буквы или знака подчёркивания и не может иметь зарезервированный префикс OO_.",
+    "loadFailed": "Не удалось загрузить Variables.",
+    "name": "Имя",
+    "noMatch": "Нет Variables, соответствующих поиску.",
+    "refresh": "Обновить",
+    "retry": "Повторить",
+    "save": "Сохранить",
+    "search": "Поиск Variables",
+    "title": "Variables",
+    "updated": "Обновлено",
+    "value": "Значение",
+    "valueTooLarge": "Значение в кодировке UTF-8 не должно превышать 64 KiB."
   }
 }

@@ -3,6 +3,7 @@ import type { ChangeOperation, GraphNode, RevisionContent } from './change.ts'
 import { describe, expect, it } from 'vitest'
 import { createAuthoringId } from './authoring.ts'
 import { applyFlowChanges, FlowChangeError } from './change.ts'
+import { connect } from './edgeChanges.ts'
 import { createCodeTask } from './nodeChanges.ts'
 
 const port = { jsonSchema: {}, nullable: false } as const
@@ -116,6 +117,35 @@ describe('Flow changes', () => {
     expect(connected.document.graph.nodes).toEqual({ target: expect.objectContaining({ inputs: {} }) })
   })
 
+  it('removes an orphaned Variable binding when a node connection replaces it', () => {
+    const base = revision()
+    const task = taskNode()
+    if (task.kind != 'task') throw new Error('Expected Task fixture.')
+    const content: RevisionContent = {
+      ...base,
+      document: {
+        ...base.document,
+        bindings: { token: { kind: 'variable', target: 'TOKEN' } },
+        graph: {
+          nodes: {
+            source: valueNode(1),
+            target: {
+              ...task,
+              inputs: { input: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] } },
+            },
+          },
+        },
+      },
+    }
+
+    const changed = applyFlowChanges(content, connect(content, target, { source: 'source', sourceHandle: 'value', target: 'target', targetHandle: 'input' }))
+
+    expect(changed.document.bindings).toEqual({})
+    expect(changed.document.graph.nodes.target).toMatchObject({
+      inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
+    })
+  })
+
   it('removes deleted Subflow node sources from its boundary outputs', () => {
     const source = revision()
     const withSubflow = applyFlowChanges(source, [
@@ -136,7 +166,7 @@ describe('Flow changes', () => {
   })
 
   it.each([
-    { binding: { kind: 'secret', target: 'secret' }, bindingId: 'missing', kind: 'binding.replace' },
+    { binding: { kind: 'variable', target: 'TOKEN' }, bindingId: 'missing', kind: 'binding.replace' },
     { kind: 'module.delete', moduleId: 'missing' },
     { kind: 'subflow.delete', subflowId: 'missing' },
     { kind: 'task.delete', taskId: 'missing' },
@@ -149,8 +179,8 @@ describe('Flow changes', () => {
     const source = revision()
     expect(() =>
       applyFlowChanges(source, [
-        { binding: { kind: 'secret', target: 'secret' }, bindingId: 'created', kind: 'binding.create' },
-        { binding: { kind: 'secret', target: 'duplicate' }, bindingId: 'created', kind: 'binding.create' },
+        { binding: { kind: 'variable', target: 'TOKEN' }, bindingId: 'created', kind: 'binding.create' },
+        { binding: { kind: 'variable', target: 'OTHER' }, bindingId: 'created', kind: 'binding.create' },
       ]),
     ).toThrow(FlowChangeError)
     expect(source).toEqual(revision())
