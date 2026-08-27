@@ -26,7 +26,7 @@ body {
   font-size: 14px;
 }
 
-.operator-menu button,
+.server-nav button,
 .variables-page button,
 .variables-page input,
 .variables-page textarea {
@@ -34,12 +34,12 @@ body {
   font: inherit;
 }
 
-.operator-menu button:not(:disabled),
+.server-nav button:not(:disabled),
 .variables-page button:not(:disabled) {
   cursor: pointer;
 }
 
-.operator-menu button:focus-visible,
+.server-nav button:focus-visible,
 .variables-page button:focus-visible,
 .variables-page input:focus-visible,
 .variables-page textarea:focus-visible {
@@ -61,77 +61,68 @@ body {
   min-height: 0;
   flex: 1;
 }
-.operator-menu {
-  position: absolute;
-  z-index: 20;
-  right: 12px;
-  bottom: 12px;
+.server-nav {
+  display: flex;
+  height: 44px;
+  flex: none;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-background);
 }
 
-.operator-menu .operator-menu-trigger {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  place-items: center;
+.server-nav-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.server-nav nav {
+  display: flex;
+  align-self: stretch;
+  gap: 4px;
+  align-items: center;
+}
+
+.server-nav nav button,
+.server-sign-out {
+  height: 30px;
+  padding: 0 10px;
   border: 0;
   border-radius: var(--ui-radius);
   background: transparent;
   color: var(--ui-muted-foreground);
+  font-size: 12px;
 }
 
-.operator-menu .operator-menu-trigger:hover,
-.operator-menu .operator-menu-trigger[aria-expanded='true'] {
+.server-nav nav button:hover,
+.server-nav nav button[aria-current='page'] {
   background: var(--ui-muted);
   color: var(--ui-foreground);
 }
 
-.operator-menu-popup {
-  position: absolute;
-  right: 0;
-  bottom: 34px;
-  width: 168px;
-  padding: 4px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
-  background: var(--ui-popover);
-  color: var(--ui-popover-foreground);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 14%);
-}
-
-.operator-menu-label {
-  padding: 6px 8px;
-  color: var(--ui-muted-foreground);
-  font-size: 11px;
+.server-nav nav button[aria-current='page'] {
   font-weight: 600;
 }
 
-.operator-menu-sign-out {
-  width: 100%;
-  padding: 0 8px;
-  border: 0;
-  background: transparent;
+.server-sign-out {
+  margin-left: auto;
   color: var(--ui-destructive);
-  font-size: 12px;
-  text-align: left;
 }
 
-.operator-menu-page {
-  width: 100%;
-  padding: 0 8px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 12px;
-  text-align: left;
-}
-
-.operator-menu-page:hover {
-  background: var(--ui-muted);
-}
-
-.operator-menu-sign-out:hover {
+.server-sign-out:hover {
   background: color-mix(in srgb, var(--ui-destructive) 12%, transparent);
+}
+
+@media (width < 560px) {
+  .server-nav {
+    gap: 4px;
+    padding: 0 8px;
+  }
+
+  .server-nav-title {
+    display: none;
+  }
 }
 
 .variables-page {

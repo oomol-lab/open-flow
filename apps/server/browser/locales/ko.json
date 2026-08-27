@@ -13,7 +13,6 @@
   "shell": {
     "closeNotification": "알림 닫기",
     "flows": "Flow",
-    "moreActions": "서버 작업",
     "notifications": "알림",
     "variables": "Variables"
   },

@@ -3,7 +3,7 @@ import type { FormEvent, ReactElement } from 'react'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Toaster, toast } from 'sonner'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { createBrowserHost } from './host.ts'
@@ -59,8 +59,6 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   const [session, setSession] = useState<Session>({ kind: 'checking' })
   const [token, setToken] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [operatorMenuOpen, setOperatorMenuOpen] = useState(false)
-  const operatorMenu = useRef<HTMLDivElement>(null)
   const t = useTranslate()
   const host = useMemo(() => createBrowserHost(notify, () => setSession({ configured: true, kind: 'signed-out' })), [])
   const client = useMemo(() => new ControlClient((input, init) => host.request(input, init)), [host])
@@ -98,24 +96,6 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
     window.addEventListener('popstate', restore)
     return () => window.removeEventListener('popstate', restore)
   }, [])
-  useEffect(() => {
-    if (!operatorMenuOpen) return
-    const close = (event: PointerEvent): void => {
-      if (event.target instanceof Node && !operatorMenu.current?.contains(event.target)) setOperatorMenuOpen(false)
-    }
-    const escape = (event: KeyboardEvent): void => {
-      if (event.key != 'Escape') return
-      setOperatorMenuOpen(false)
-      operatorMenu.current?.querySelector<HTMLButtonElement>('.operator-menu-trigger')?.focus()
-    }
-    globalThis.addEventListener('pointerdown', close)
-    globalThis.addEventListener('keydown', escape)
-    return () => {
-      globalThis.removeEventListener('pointerdown', close)
-      globalThis.removeEventListener('keydown', escape)
-    }
-  }, [operatorMenuOpen])
-
   function navigate(next: WorkbenchLocation, options: WorkbenchNavigationOptions): void {
     const path = routePath(next)
     if (path != window.location.pathname) window.history[options.replace ? 'replaceState' : 'pushState'](null, '', path)
@@ -124,7 +104,6 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   }
 
   function openPage(path: '/' | '/variables'): void {
-    setOperatorMenuOpen(false)
     if (path != window.location.pathname) window.history.pushState(null, '', path)
     setVariablesOpen(path == '/variables')
     if (path == '/') setRoute({ view: 'design' })
@@ -155,7 +134,6 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   }
 
   async function signOut(): Promise<void> {
-    setOperatorMenuOpen(false)
     try {
       const response = await fetch('/auth/session', { credentials: 'same-origin', method: 'DELETE' })
       if (!response.ok) throw new Error('Session logout failed.')
@@ -170,37 +148,20 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
     <div className="open-flow-theme server-host" data-theme={theme}>
       {session.kind == 'signed-in' ? (
         <>
-          <div className="operator-menu" ref={operatorMenu}>
-            <button
-              aria-expanded={operatorMenuOpen}
-              aria-haspopup="dialog"
-              aria-label={t('shell.moreActions')}
-              className="operator-menu-trigger"
-              onClick={() => setOperatorMenuOpen(!operatorMenuOpen)}
-              title={t('shell.moreActions')}
-              type="button"
-            >
-              <svg aria-hidden="true" fill="currentColor" height="18" viewBox="0 0 24 24" width="18">
-                <circle cx="5" cy="12" r="1.5" />
-                <circle cx="12" cy="12" r="1.5" />
-                <circle cx="19" cy="12" r="1.5" />
-              </svg>
+          <header className="server-nav">
+            <div className="server-nav-title">Open Flow Server</div>
+            <nav aria-label="Open Flow Server">
+              <button aria-current={variablesOpen ? undefined : 'page'} onClick={() => openPage('/')} type="button">
+                {t('shell.flows')}
+              </button>
+              <button aria-current={variablesOpen ? 'page' : undefined} onClick={() => openPage('/variables')} type="button">
+                {t('shell.variables')}
+              </button>
+            </nav>
+            <button className="server-sign-out" onClick={() => void signOut()} type="button">
+              {t('session.signOut')}
             </button>
-            {operatorMenuOpen && (
-              <div aria-label={t('shell.moreActions')} className="operator-menu-popup" role="dialog">
-                <div className="operator-menu-label">Open Flow Server</div>
-                <button className="operator-menu-page" onClick={() => openPage('/')} type="button">
-                  {t('shell.flows')}
-                </button>
-                <button className="operator-menu-page" onClick={() => openPage('/variables')} type="button">
-                  {t('shell.variables')}
-                </button>
-                <button className="operator-menu-sign-out" onClick={() => void signOut()} type="button">
-                  {t('session.signOut')}
-                </button>
-              </div>
-            )}
-          </div>
+          </header>
           <div className="workbench-frame">
             {variablesOpen ? (
               <VariablesPage client={client} language={language} />

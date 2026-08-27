@@ -890,11 +890,12 @@ function ValueAny(props: ValueProps) {
       <Select
         defaultOpen
         isSuffix={props.isSuffix}
-        value={optionOf(t, finalType)}
+        value={isUndecidable(finalType) ? null : optionOf(t, finalType)}
         options={widgetSelectOptions(
           t,
           (type) => !isBannedSubType(type) && type !== 'select' && type !== 'multiSelect' && (type !== 'any' || finalType !== 'any'),
         )}
+        placeholder={t('inputHandleEditor.selectValueType')}
         onChange={(e) => {
           if (e) {
             const overrideSchema = props.store.overrideSchema$.value

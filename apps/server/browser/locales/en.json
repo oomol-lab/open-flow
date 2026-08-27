@@ -13,7 +13,6 @@
   "shell": {
     "closeNotification": "Close notification",
     "flows": "Flows",
-    "moreActions": "Server actions",
     "notifications": "Notifications",
     "variables": "Variables"
   },

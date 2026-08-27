@@ -13,7 +13,6 @@
   "shell": {
     "closeNotification": "通知を閉じる",
     "flows": "Flow",
-    "moreActions": "サーバー操作",
     "notifications": "通知",
     "variables": "Variables"
   },
