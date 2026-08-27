@@ -1,8 +1,8 @@
 import type { WorkbenchLanguage, WorkbenchLocation, WorkbenchNavigationOptions, WorkbenchNotification, WorkbenchTheme } from '@oomol-lab/open-flow/workbench'
 import type { FormEvent, ReactElement } from 'react'
 
-import { OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
+import { useEffect, useMemo, useState } from 'react'
 import { Toaster, toast } from 'sonner'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { createBrowserHost } from './host.ts'
@@ -56,8 +56,6 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   const [session, setSession] = useState<Session>({ kind: 'checking' })
   const [token, setToken] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [operatorMenuOpen, setOperatorMenuOpen] = useState(false)
-  const operatorMenu = useRef<HTMLDivElement>(null)
   const t = useTranslate()
   const host = useMemo(() => createBrowserHost(notify, () => setSession({ configured: true, kind: 'signed-out' })), [])
   const preferences = useMemo(
@@ -91,23 +89,6 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
     window.addEventListener('popstate', restore)
     return () => window.removeEventListener('popstate', restore)
   }, [])
-  useEffect(() => {
-    if (!operatorMenuOpen) return
-    const close = (event: PointerEvent): void => {
-      if (event.target instanceof Node && !operatorMenu.current?.contains(event.target)) setOperatorMenuOpen(false)
-    }
-    const escape = (event: KeyboardEvent): void => {
-      if (event.key != 'Escape') return
-      setOperatorMenuOpen(false)
-      operatorMenu.current?.querySelector<HTMLButtonElement>('.operator-menu-trigger')?.focus()
-    }
-    globalThis.addEventListener('pointerdown', close)
-    globalThis.addEventListener('keydown', escape)
-    return () => {
-      globalThis.removeEventListener('pointerdown', close)
-      globalThis.removeEventListener('keydown', escape)
-    }
-  }, [operatorMenuOpen])
 
   function navigate(next: WorkbenchLocation, options: WorkbenchNavigationOptions): void {
     const path = routePath(next)
@@ -140,7 +121,6 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   }
 
   async function signOut(): Promise<void> {
-    setOperatorMenuOpen(false)
     try {
       const response = await fetch('/auth/session', { credentials: 'same-origin', method: 'DELETE' })
       if (!response.ok) throw new Error('Session logout failed.')
@@ -154,79 +134,45 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   return (
     <div className="open-flow-theme server-host" data-theme={theme}>
       {session.kind == 'signed-in' ? (
-        <>
-          <div className="operator-menu" ref={operatorMenu}>
-            <button
-              aria-expanded={operatorMenuOpen}
-              aria-haspopup="dialog"
-              aria-label={t('shell.moreActions')}
-              className="operator-menu-trigger"
-              onClick={() => setOperatorMenuOpen(!operatorMenuOpen)}
-              title={t('shell.moreActions')}
-              type="button"
-            >
-              <svg aria-hidden="true" fill="currentColor" height="18" viewBox="0 0 24 24" width="18">
-                <circle cx="5" cy="12" r="1.5" />
-                <circle cx="12" cy="12" r="1.5" />
-                <circle cx="19" cy="12" r="1.5" />
-              </svg>
-            </button>
-            {operatorMenuOpen && (
-              <div aria-label={t('shell.moreActions')} className="operator-menu-popup" role="dialog">
-                <div className="operator-menu-label">Open Flow Server</div>
-                <button className="operator-menu-sign-out" onClick={() => void signOut()} type="button">
-                  {t('session.signOut')}
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="workbench-frame">
-            <OpenFlowWorkbench
-              hrefFor={routePath}
-              host={host}
-              language={language}
-              location={route}
-              onLanguageChange={onLanguageChange}
-              onNavigate={navigate}
-              preferences={preferences}
-              sessionKey="server-operator"
-              theme={theme}
-            />
-          </div>
-        </>
+        <div className="workbench-frame">
+          <OpenFlowWorkbench
+            hrefFor={routePath}
+            host={host}
+            hostAction={t('session.signOut')}
+            hostTitle="Open Flow Server"
+            language={language}
+            location={route}
+            onHostAction={() => void signOut()}
+            onLanguageChange={onLanguageChange}
+            onNavigate={navigate}
+            preferences={preferences}
+            sessionKey="server-operator"
+            theme={theme}
+          />
+        </div>
       ) : (
-        <main className="session-gate">
-          {session.kind == 'checking' ? (
-            <p>{t('session.checking')}</p>
-          ) : (
-            <form className="session-form" onSubmit={(event) => void signIn(event)}>
-              <strong>Open Flow Server</strong>
-              <p>{sessionMessage}</p>
-              {session.configured === false || session.configured == null ? (
-                <button onClick={() => void checkSession()} type="button">
-                  {t('session.retry')}
-                </button>
-              ) : (
-                <>
-                  <input autoComplete="username" name="username" type="hidden" value="operator" />
-                  <label htmlFor="operator-token">{t('session.token')}</label>
-                  <input
-                    autoComplete="current-password"
-                    autoFocus
-                    id="operator-token"
-                    onChange={(event) => setToken(event.target.value)}
-                    type="password"
-                    value={token}
-                  />
-                  {session.error == 'invalid' ? <span className="session-error">{t('session.invalid')}</span> : null}
-                  <button disabled={token.length == 0 || submitting} type="submit">
-                    {t('session.signIn')}
-                  </button>
-                </>
-              )}
-            </form>
-          )}
-        </main>
+        <OpenFlowSessionGate
+          action={
+            session.kind == 'checking' ? undefined : session.configured === false || session.configured == null ? t('session.retry') : t('session.signIn')
+          }
+          description={session.kind == 'checking' ? t('session.checking') : sessionMessage}
+          error={session.kind == 'signed-out' && session.error == 'invalid' ? t('session.invalid') : undefined}
+          onSubmit={
+            session.kind == 'checking'
+              ? undefined
+              : session.configured === false || session.configured == null
+                ? (event) => {
+                    event.preventDefault()
+                    void checkSession()
+                  }
+                : (event) => void signIn(event)
+          }
+          onTokenChange={session.kind == 'signed-out' && session.configured === true ? setToken : undefined}
+          pending={session.kind == 'checking' || submitting}
+          title="Open Flow Server"
+          token={session.kind == 'signed-out' && session.configured === true ? token : undefined}
+          tokenLabel={session.kind == 'signed-out' && session.configured === true ? t('session.token') : undefined}
+        />
       )}
       <Toaster
         closeButton

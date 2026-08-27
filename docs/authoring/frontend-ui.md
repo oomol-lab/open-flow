@@ -109,6 +109,11 @@ UnoCSS 只负责现有 Iconify 图标，包括 `i-carbon:*`、`i-codicon:*`、`i
 Designer Dark 只在 Canvas Content compatibility scope 内实现相同的 token key。新增 primitive token 时，必须同时更新产品主题、两个 Designer compatibility
 theme 和发布 CSS 产物测试，不能遗漏、重命名或增加只由单个宿主理解的共享 token。
 
+共享 primitive 的圆角使用 `rounded-sm`、`rounded-md`、`rounded-lg` 等 Tailwind 语义 utility；不要在 arbitrary value 中直接读取运行时
+`--radius-sm`、`--radius-md` 或 `--radius-lg`。产品主题是部署宿主、Workbench 和 Canvas Chrome 的 radius owner，Designer 继续通过
+`--widget-radius` 与根级控件归一化独立拥有 Canvas Content 圆角。Workbench feature stylesheet 中的普通 surface 直接使用 `--ui-radius`，不要再以
+`calc(var(--ui-radius) +/- ...)` 创建局部圆角层级。
+
 Workbench 的 `styles/tokens.css` 只能消费共享 `--ui-*` token，并定义非 palette 的 Workbench 状态扩展；不得声明或覆盖 light/dark `--ui-*` 值，也不得重新引入
 `--canvas`、`--surface`、`--subtle`、`--border`、`--text`、`--muted`、`--primary`、`--focus` 或 `--danger` 作为平行主题事实源。Server-owned chrome
 不能 deep-import Workbench 源码，但必须消费同名 `--ui-*` 合同，避免通过逐组件 dark selector 维护第二套视觉。Designer 的 `--widget-*`、`--node-*`、
@@ -119,9 +124,12 @@ React Flow 画布外围通过固定的 `--xy-*` 映射消费共享 UI、node 和
 
 ## 共享 popup 动画与 Designer 例外
 
-共享 Dialog、Select、DropdownMenu、Popover 和 Combobox 的 Popup 必须统一使用语义 popover surface、`tw-animate-css` 的 open/closed 动画，并同时提供
+共享 Dialog、Select、DropdownMenu、Popover 和 Tooltip 的 Popup 必须统一使用语义 surface、`tw-animate-css` 的 open/closed 动画，并同时提供
 `motion-reduce:animate-none` 与 `motion-reduce:transition-none`。不要在 feature stylesheet 重复声明同类淡入、缩放或关闭动画。Progress Indicator 只允许
 过渡实际变化的 `width`；不要使用会让颜色、布局和未来新增属性一起进入动画的 `transition-all`。
+
+共享 popup 保留 shadcn primitive 在 Positioner 与 Popup 上的 `z-50` stacking，不得因为使用局部 Portal `container` 而删除。局部 container 负责主题继承、
+outside-click 边界和 transformed Designer 定位，`z-50` 负责 popup 在该局部 stacking context 内覆盖后续页面内容；两者不是替代关系。
 
 Designer 的 `DesignerCombobox`、节点菜单、翻译面板和 Block Quick Pick 仍可通过 SCSS Modules 控制紧凑尺寸、最大高度、复杂网格和特定布局。这些属于已经精调
 的 Workflow 编辑体验，不应为了追平 registry 最新 DOM 结构而机械覆盖。共享 primitive 负责 surface、focus、disabled、item state 和 reduced-motion；Designer
@@ -139,6 +147,9 @@ ContextMenu 保留右键和长按触发，并遵循相同的持久关闭规则�
 `src/ui/browser/theme.css` 是产品主题的唯一 palette 事实源，并以 `.open-flow-theme[data-theme]` 发布 `--open-flow-*` 语义 token，再映射到 shadcn 使用的
 `--ui-*` token。Workbench 与部署宿主必须在自己的根元素同时挂载 `.open-flow-theme` 和 `data-theme`；不得在各自 feature stylesheet 复制 light/dark palette。
 宿主若只需要产品主题，可单独导入公开的 `@oomol-lab/open-flow/theme.css`。
+
+部署宿主的登录、重试和认证错误页面使用 Workbench 公开的 session composition；宿主只传文案、token、error、pending 状态与 submit 回调，不得复制 Button、Input、Field
+或重新维护 focus、invalid、disabled 和 pending 视觉。Session composition 在 `.open-flow-theme` 宿主内建立自己的 Workbench utility scope，不进入 Designer。
 
 `src/workbench/browser/runtime/styles.css` 是发布 Workbench CSS 的唯一 feature entry。它按 cascade 顺序导入产品主题、共享 UI、tokens、shell、resource browser、status、
 workspace、canvas、context panel、runs、publications 和 responsive 样式。拆分样式时只移动连续的原始区段，并同步入口顺序测试；第一轮不得同时改
@@ -193,7 +204,7 @@ transition 与 reduced-motion。Workbench 的 coarse pointer 规则可以增加�
 Workbench root 始终建立 `open-flow-workbench` inline-size container；响应式业务布局只维护 1100、980、720、520 四个 container breakpoint。不要并行增加
 `max-width` viewport fallback，也不要在文件尾重复较宽 breakpoint 来争夺 cascade。与 viewport 本身相关的 pointer 和 reduced-motion media query 可以保留。
 
-共享 Alert 与 Card 消费 `--ui-card` / `--ui-card-foreground`，三个 theme owner 必须与其他 `--ui-*` token 同步实现。Workbench 的 error/warning feedback 使用
+共享 Alert 与 Workbench card surface 消费 `--ui-card` / `--ui-card-foreground`，三个 theme owner 必须与其他 `--ui-*` token 同步实现。Workbench 的 error/warning feedback 使用
 `--danger-*` / `--warning-*` surface、border、foreground token；除 JSON/code syntax highlighting 外，不要在 Runs、Context Panel、Status 或 responsive stylesheet
 直接维护浅色主题 red/amber hex。单条终止错误优先使用完整 Alert composition，而不是重新创建 feature error box。
 

@@ -311,16 +311,8 @@
     line-height: 17px;
   }
 
-  .inspector-form [data-slot='field-label'] {
-    color: var(--ui-muted-foreground);
-    font-size: 11px;
-    line-height: 16px;
-  }
-
   .inspector-form textarea {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 11px;
-    line-height: 17px;
   }
 
   .inspector-form [data-slot='field-group'] {
@@ -331,16 +323,6 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-  }
-
-  .checkbox-field {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center;
-  }
-
-  .checkbox-field input {
-    margin: 0;
   }
 
   .form-actions {
@@ -410,7 +392,7 @@
     height: 280px;
     overflow: hidden;
     border: 1px solid var(--ui-border);
-    border-radius: calc(var(--ui-radius) - 2px);
+    border-radius: var(--ui-radius);
     background: color-mix(in srgb, var(--ui-background) 88%, var(--ui-card));
     transition:
       border-color 140ms ease-out,
@@ -625,7 +607,7 @@
 
   .connection-state.required {
     border: 1px solid var(--warning-border);
-    border-radius: calc(var(--ui-radius) + 2px);
+    border-radius: var(--ui-radius);
     margin: 12px;
     background: var(--warning-surface);
     color: var(--warning-foreground);

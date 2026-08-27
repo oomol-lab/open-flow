@@ -122,9 +122,10 @@ test('keeps Workbench feature styles in their original cascade order', async () 
 })
 
 test('keeps Resource Browser primitives on shared visual ownership', async () => {
-  const [browser, createDialog, dialog, select, workbenchSelect, resourceStyles, workspaceStyles] = await Promise.all([
+  const [browser, createDialog, hostMenu, dialog, select, workbenchSelect, resourceStyles, workspaceStyles] = await Promise.all([
     readFile(new URL('src/workbench/browser/runtime/shell/resourceBrowser.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/shell/createResourceDialog.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/shell/hostMenu.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/dialog.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/select.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/shell/workbenchSelect.tsx', packageRoot), 'utf8'),
@@ -139,22 +140,20 @@ test('keeps Resource Browser primitives on shared visual ownership', async () =>
   assert.match(createDialog, /<FieldGroup>/)
   assert.match(createDialog, /<Field data-invalid=\{showIssue\}>/)
   assert.doesNotMatch(createDialog, /DialogOverlay|DialogPortal|resource-dialog-/)
+  assert.match(hostMenu, /from '\.\.\/\.\.\/\.\.\/\.\.\/ui\/browser\/button\.tsx'/)
+  assert.match(hostMenu, /from '\.\.\/\.\.\/\.\.\/\.\.\/ui\/browser\/dropdown-menu\.tsx'/)
+  assert.match(hostMenu, /container=\{root\}/)
+  assert.doesNotMatch(hostMenu, /pointerdown|keydown|role="dialog"|position:\s*absolute/)
   assert.match(dialog, /data-slot="dialog-overlay"/)
   assert.match(dialog, /data-slot="dialog-content"/)
   assert.match(dialog, /readonly container\?: HTMLElement \| null/)
   assert.match(dialog, /bg-popover/)
   assert.match(dialog, /motion-reduce:animate-none/)
-  assert.match(select, /data-slot="select-trigger"/)
-  assert.match(select, /data-slot="select-content"/)
-  assert.match(select, /data-slot="select-item"/)
   assert.match(select, /readonly container\?: HTMLElement \| null/)
-  assert.match(select, /<SelectPrimitive\.List>\{children\}<\/SelectPrimitive\.List>/)
   assert.match(select, /bg-popover/)
+  assert.match(select, /z-50/)
   assert.match(select, /motion-reduce:animate-none/)
   assert.match(workbenchSelect, /<SelectContent align="end" alignItemWithTrigger=\{false\} container=\{portalRoot\}>/)
-  assert.match(workbenchSelect, /<SelectGroup>/)
-  assert.match(workbenchSelect, /<SelectValue>\{options\.find\(\(option\) => option\.value == value\)\?\.label \?\? value\}<\/SelectValue>/)
-  assert.doesNotMatch(workbenchSelect, /items=\{options\}/)
   assert.doesNotMatch(workbenchSelect, /SelectPortal|SelectPositioner|SelectList|SelectItemIndicator|SelectItemText|workbench-select-/)
   assert.doesNotMatch(resourceStyles, /\.resource-row-form input|\.resource-dialog-field|\.resource-list-row:hover|\.resource-list-row:disabled/)
   assert.doesNotMatch(resourceStyles, /\.resource-dialog-|\.workbench-select-/)
@@ -163,6 +162,19 @@ test('keeps Resource Browser primitives on shared visual ownership', async () =>
   const rowRules = [...resourceStyles.matchAll(/\.resource-list-row \{([^}]*)\}/g)]
   assert.ok(rowRules.length >= 2)
   assert.doesNotMatch(rowRules.at(-1)![1]!, /background:|color:/)
+})
+
+test('keeps the public session gate on shared form primitives', async () => {
+  const source = await readFile(new URL('src/workbench/browser/runtime/openFlowWorkbench.tsx', packageRoot), 'utf8')
+
+  assert.match(source, /export function OpenFlowSessionGate/)
+  assert.match(source, /from '\.\.\/\.\.\/\.\.\/ui\/browser\/button\.tsx'/)
+  assert.match(source, /from '\.\.\/\.\.\/\.\.\/ui\/browser\/field\.tsx'/)
+  assert.match(source, /from '\.\.\/\.\.\/\.\.\/ui\/browser\/input\.tsx'/)
+  assert.match(source, /from '\.\.\/\.\.\/\.\.\/ui\/browser\/spinner\.tsx'/)
+  assert.match(source, /className="open-flow-workbench"/)
+  assert.doesNotMatch(source, /operator-token|value="operator"/)
+  assert.doesNotMatch(source, /session-(?:gate|form|error)/)
 })
 
 test('keeps Designer node controls in the compact root normalization', async () => {
@@ -175,18 +187,17 @@ test('keeps Designer node controls in the compact root normalization', async () 
   assert.match(designerRootStyles, /:not\(\.react-flow__controls button\)/)
   assert.doesNotMatch(designerRootStyles, /button:not\(\[data-slot\]\)/)
   assert.match(toggleGroup, /group-data-\[spacing=0\]\/toggle-group:rounded-none/)
-  assert.match(toggleGroup, /group-data-\[orientation=horizontal\]\/toggle-group:data-\[spacing=0\]:first:rounded-l-lg/)
-  assert.match(toggleGroup, /group-data-\[orientation=horizontal\]\/toggle-group:data-\[spacing=0\]:last:rounded-r-lg/)
-  assert.match(toggleGroup, /group-data-\[orientation=horizontal\]\/toggle-group:data-\[spacing=0\]:data-\[variant=outline\]:border-l-0/)
-  assert.match(toggleGroup, /group-data-\[orientation=horizontal\]\/toggle-group:data-\[spacing=0\]:data-\[variant=outline\]:first:border-l/)
+  assert.match(toggleGroup, /data-\[spacing=0\]:first:rounded/)
+  assert.match(toggleGroup, /data-\[spacing=0\]:last:rounded/)
 })
 
 test('keeps shared popup motion accessible without replacing Designer layout ownership', async () => {
   const [
     dropdownMenu,
+    select,
     contextMenu,
     popover,
-    combobox,
+    tooltip,
     progress,
     designerSelect,
     dateTimePicker,
@@ -197,9 +208,10 @@ test('keeps shared popup motion accessible without replacing Designer layout own
     blockQuickPick,
   ] = await Promise.all([
     readFile(new URL('src/ui/browser/dropdown-menu.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/ui/browser/select.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/context-menu.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/popover.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/ui/browser/combobox.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/ui/browser/tooltip.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/progress.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/designer/browser/components/select.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/designer/browser/components/dateTimePicker.tsx', packageRoot), 'utf8'),
@@ -210,9 +222,12 @@ test('keeps shared popup motion accessible without replacing Designer layout own
     readFile(new URL('src/designer/browser/graph/BlockQuickPickPanel.tsx', packageRoot), 'utf8'),
   ])
 
-  for (const source of [dropdownMenu, popover, combobox]) {
+  for (const source of [dropdownMenu, popover]) {
     assert.match(source, /motion-reduce:animate-none/)
     assert.match(source, /motion-reduce:transition-none/)
+  }
+  for (const source of [dropdownMenu, select, contextMenu, popover, tooltip]) {
+    assert.ok((source.match(/z-50/g) ?? []).length >= 2)
   }
   assert.match(progress, /transition-\[width\]/)
   assert.match(progress, /motion-reduce:transition-none/)
@@ -380,8 +395,11 @@ test('keeps responsive control density on component APIs', async () => {
   assert.match(workspaceHeader, /className="validation-state"[\s\S]*?size="default"/)
   assert.match(workspaceHeader, /onClick=\{onRunDraft\}[\s\S]*?size="default"/)
   assert.match(workspaceHeader, /store\.publications\.publish\(\)[\s\S]*?size="default"/)
+  assert.match(workspaceHeader, /className="action-help publish-action"/)
   assert.match(workspaceHeader, /className="workspace-tabs" variant="line"/)
   assert.doesNotMatch(responsiveStyles, /\.workspace-actions \[data-slot='button'\]/)
+  assert.match(responsiveStyles, /\.workspace-actions \.publish-action\s*\{[\s\S]*?display: none;/)
+  assert.doesNotMatch(responsiveStyles, /\.action-help:last-child/)
   assert.match(responsiveStyles, /@media \(pointer: coarse\)[\s\S]*?min-height: 40px;/)
   assert.match(responsiveStyles, /\[data-slot='button'\]\[data-size\^='icon'\][\s\S]*?min-width: 40px;/)
   assert.doesNotMatch(responsiveStyles, /\[data-slot='button'\] \{\s*height: 40px;/)
@@ -606,6 +624,9 @@ test('keeps the product theme contract separate from the Designer theme', async 
   assert.match(productTheme, /\.open-flow-theme\s*\{[\s\S]*?--open-flow-background: #ffffff;/)
   assert.match(productTheme, /\.open-flow-theme\[data-theme='dark'\]/)
   assert.match(productTheme, /--ui-background: var\(--open-flow-background\);/)
+  assert.match(productTheme, /--open-flow-radius: 8px;/)
+  assert.doesNotMatch(uiSources.join('\n'), /var\(--radius-(?:sm|md|lg)\)/)
+  for (const theme of [light, dark]) assert.match(theme, /--ui-radius: 6px;/)
   assert.doesNotMatch(workbench, /--ui-[\w-]+\s*:/)
   assert.doesNotMatch(workbench, /--(?:canvas|surface|subtle|border|input|text|muted|primary|primary-foreground|focus|danger):/)
   assert.match(workbenchRoot, /className="open-flow-theme open-flow-workbench"/)
@@ -624,6 +645,8 @@ test('keeps Workbench feature styles on the shared semantic theme', async () => 
     sources.join('\n'),
     /var\(--(?:canvas|surface|subtle|border|input|text|text-secondary|text-tertiary|muted|primary|primary-foreground|focus|danger)\)/,
   )
+  assert.doesNotMatch(sources.join('\n'), /calc\(var\(--ui-radius\)/)
+  assert.doesNotMatch(sources.join('\n'), /!important/)
 })
 
 test('keeps React Flow canvas chrome on one theme mapping', async () => {

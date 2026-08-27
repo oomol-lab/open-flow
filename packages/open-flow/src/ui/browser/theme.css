@@ -18,7 +18,7 @@
   --open-flow-border: #e4e4e7;
   --open-flow-input: #d4d4d8;
   --open-flow-ring: #a1a1aa;
-  --open-flow-radius: 6px;
+  --open-flow-radius: 8px;
   --ui-background: var(--open-flow-background);
   --ui-foreground: var(--open-flow-foreground);
   --ui-card: var(--open-flow-card);

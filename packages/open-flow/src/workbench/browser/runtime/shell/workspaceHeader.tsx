@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Icon } from '../icons.tsx'
 import { followWorkbenchLink } from '../navigationLink.ts'
 import { DiagnosticsPanel } from './diagnosticsPanel.tsx'
+import { HostMenu } from './hostMenu.tsx'
 
 const savingStatusDelayMs = 400
 const minimumSavingStatusMs = 400
@@ -20,6 +21,9 @@ interface Props {
   readonly activeView: 'design' | 'publications' | 'runs'
   readonly flowHref: string
   readonly flowsHref: string
+  readonly hostAction?: string | undefined
+  readonly hostTitle?: string | undefined
+  readonly onHostAction?: (() => void) | undefined
   readonly onOpenDesign: () => void
   readonly onOpenFlow: () => void
   readonly onOpenFlows: () => void
@@ -71,6 +75,9 @@ export function WorkspaceHeader({
   activeView,
   flowHref,
   flowsHref,
+  hostAction,
+  hostTitle,
+  onHostAction,
   onOpenDesign,
   onOpenFlow,
   onOpenFlows,
@@ -200,7 +207,7 @@ export function WorkspaceHeader({
             {t(busy == 'run' ? 'workspace.starting' : 'workspace.runDraft')}
           </Button>
         </span>
-        <span className="action-help" title={publishUnavailable}>
+        <span className="action-help publish-action" title={publishUnavailable}>
           <Button
             disabled={busy != null || invalid || subflow || live?.hasUnpublishedChanges == false}
             onClick={() => void store.publications.publish()}
@@ -232,6 +239,7 @@ export function WorkspaceHeader({
             </DropdownMenu>
           </div>
         )}
+        {hostAction != null && hostTitle != null && onHostAction != null && <HostMenu action={hostAction} onAction={onHostAction} title={hostTitle} />}
       </div>
       {diagnosticsOpen && (
         <DiagnosticsPanel

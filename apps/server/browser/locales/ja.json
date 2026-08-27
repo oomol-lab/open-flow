@@ -12,7 +12,6 @@
   },
   "shell": {
     "closeNotification": "通知を閉じる",
-    "moreActions": "サーバー操作",
     "notifications": "通知"
   }
 }

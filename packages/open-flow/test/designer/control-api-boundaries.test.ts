@@ -42,7 +42,7 @@ test('keeps Cloud Workbench form controls on the shared component layer', async 
   const paths: string[] = []
   for await (const path of glob('src/workbench/browser/runtime/**/*.{ts,tsx}')) paths.push(path)
   const sources = await Promise.all(paths.map(async (path) => ({ path, source: await readFile(path, 'utf8') })))
-  const rawControls = sources.filter(({ source }) => /<(?:input|select|textarea)\b/.test(source))
+  const rawControls = sources.filter(({ source }) => /<(?:button|input|label|select|textarea)\b/.test(source))
   expect(rawControls.map(({ path }) => path)).toEqual([])
 })
 

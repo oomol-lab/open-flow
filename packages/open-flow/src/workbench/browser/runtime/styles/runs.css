@@ -11,7 +11,7 @@
     grid-template-rows: 26px;
     overflow: hidden;
     border: 1px solid var(--ui-border);
-    border-radius: calc(var(--ui-radius) + 2px);
+    border-radius: var(--ui-radius);
     background: var(--ui-card);
   }
 
@@ -243,7 +243,7 @@
 
   .run-log-event .event-detail > div {
     padding: 5px 8px;
-    border-radius: calc(var(--ui-radius) - 2px);
+    border-radius: var(--ui-radius);
     background: var(--ui-muted);
   }
 
@@ -270,7 +270,7 @@
   .run-log-outputs {
     margin: 2px 0 6px;
     padding: 5px 8px;
-    border-radius: calc(var(--ui-radius) - 2px);
+    border-radius: var(--ui-radius);
     background: var(--ui-muted);
   }
 

@@ -26,25 +26,6 @@ body {
   font-size: 14px;
 }
 
-.operator-menu button,
-.session-form button,
-.session-form input {
-  color: inherit;
-  font: inherit;
-}
-
-.operator-menu button:not(:disabled),
-.session-form button:not(:disabled) {
-  cursor: pointer;
-}
-
-.operator-menu button:focus-visible,
-.session-form button:focus-visible,
-.session-form input:focus-visible {
-  outline: 2px solid var(--ui-ring);
-  outline-offset: 2px;
-}
-
 .server-host {
   position: relative;
   display: flex;
@@ -54,133 +35,8 @@ body {
   color: var(--ui-foreground);
 }
 
-.operator-menu button,
-.session-form button,
-.session-form input {
-  height: 32px;
-  border-radius: var(--ui-radius);
-}
-
 .workbench-frame {
   min-width: 0;
   min-height: 0;
   flex: 1;
-}
-
-.operator-menu {
-  position: absolute;
-  z-index: 20;
-  top: 12px;
-  right: 12px;
-}
-
-.operator-menu .operator-menu-trigger {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  place-items: center;
-  border: 0;
-  border-radius: var(--ui-radius);
-  background: transparent;
-  color: var(--ui-muted-foreground);
-}
-
-.operator-menu .operator-menu-trigger:hover,
-.operator-menu .operator-menu-trigger[aria-expanded='true'] {
-  background: var(--ui-muted);
-  color: var(--ui-foreground);
-}
-
-.operator-menu-popup {
-  position: absolute;
-  top: 34px;
-  right: 0;
-  width: 168px;
-  padding: 4px;
-  border: 1px solid var(--ui-border);
-  border-radius: calc(var(--ui-radius) + 2px);
-  background: var(--ui-popover);
-  color: var(--ui-popover-foreground);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 14%);
-}
-
-.operator-menu-label {
-  padding: 6px 8px;
-  color: var(--ui-muted-foreground);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.operator-menu-sign-out {
-  width: 100%;
-  padding: 0 8px;
-  border: 0;
-  background: transparent;
-  color: var(--ui-destructive);
-  font-size: 12px;
-  text-align: left;
-}
-
-.operator-menu-sign-out:hover {
-  background: color-mix(in srgb, var(--ui-destructive) 12%, transparent);
-}
-
-.server-host .workspace-actions,
-.server-host .resource-page-header {
-  padding-right: 36px;
-}
-
-.session-gate {
-  display: grid;
-  height: 100%;
-  place-items: center;
-}
-
-.session-form {
-  display: flex;
-  width: 340px;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.session-form strong {
-  font-size: 18px;
-}
-
-.session-form p {
-  min-height: 40px;
-  margin: 0 0 6px;
-  color: var(--ui-muted-foreground);
-  line-height: 20px;
-}
-
-.session-form label {
-  color: var(--ui-muted-foreground);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.session-form input {
-  padding: 0 9px;
-  border: 1px solid var(--ui-input);
-  background: var(--ui-background);
-}
-
-.session-form button {
-  padding: 0 12px;
-  border: 0;
-  background: var(--ui-primary);
-  color: var(--ui-primary-foreground);
-  font-weight: 600;
-}
-
-.session-form button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.session-error {
-  color: var(--ui-destructive);
-  font-size: 12px;
 }

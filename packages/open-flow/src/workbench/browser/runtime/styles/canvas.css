@@ -125,7 +125,7 @@
     place-items: center;
     margin-bottom: 4px;
     border: 1px solid var(--ui-border);
-    border-radius: calc(var(--ui-radius) + 2px);
+    border-radius: var(--ui-radius);
     background: var(--ui-card);
     color: var(--ui-muted-foreground);
   }

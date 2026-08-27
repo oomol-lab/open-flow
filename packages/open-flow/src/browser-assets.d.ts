@@ -23,3 +23,7 @@ declare module '*?raw' {
   const source: string
   export default source
 }
+declare module '*?worker&inline' {
+  const Worker: new () => Worker
+  export default Worker
+}

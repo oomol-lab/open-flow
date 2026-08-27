@@ -12,7 +12,6 @@
   },
   "shell": {
     "closeNotification": "Закрыть уведомление",
-    "moreActions": "Действия сервера",
     "notifications": "Уведомления"
   }
 }

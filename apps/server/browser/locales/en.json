@@ -12,7 +12,6 @@
   },
   "shell": {
     "closeNotification": "Close notification",
-    "moreActions": "Server actions",
     "notifications": "Notifications"
   }
 }

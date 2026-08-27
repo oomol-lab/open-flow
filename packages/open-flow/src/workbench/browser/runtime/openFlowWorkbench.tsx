@@ -1,10 +1,14 @@
 import './styles.css'
-import type { ReactElement } from 'react'
+import type { FormEvent, ReactElement } from 'react'
 import type { WorkbenchHost, WorkbenchLanguage, WorkbenchLocation, WorkbenchNavigationOptions, WorkbenchPreferences, WorkbenchTheme } from './contract.ts'
 
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
+import { Button } from '../../../ui/browser/button.tsx'
+import { Field, FieldError, FieldGroup, FieldLabel } from '../../../ui/browser/field.tsx'
+import { Input } from '../../../ui/browser/input.tsx'
+import { Spinner } from '../../../ui/browser/spinner.tsx'
 import { WorkbenchClient } from './api.ts'
 import { createI18n } from './i18n.ts'
 import { NavigationStore } from './navigation.ts'
@@ -12,6 +16,81 @@ import { FlowBrowser } from './shell/resourceBrowser.tsx'
 import { WorkbenchStore } from './stores/workbenchStore.ts'
 
 const FlowWorkspace = lazy(() => import('./flowWorkspace.tsx'))
+
+export function OpenFlowSessionGate({
+  action,
+  description,
+  error,
+  onSubmit,
+  onTokenChange,
+  pending = false,
+  title,
+  token,
+  tokenLabel,
+}: {
+  readonly action?: string | undefined
+  readonly description: string
+  readonly error?: string | undefined
+  readonly onSubmit?: ((event: FormEvent<HTMLFormElement>) => void) | undefined
+  readonly onTokenChange?: ((value: string) => void) | undefined
+  readonly pending?: boolean
+  readonly title: string
+  readonly token?: string | undefined
+  readonly tokenLabel?: string | undefined
+}): ReactElement {
+  const hasToken = token != null && tokenLabel != null && onTokenChange != null
+  const tokenValue = token ?? ''
+  const fields = (
+    <>
+      <header className="flex flex-col gap-1.5">
+        <h1 className="text-lg font-semibold">{title}</h1>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </header>
+      {hasToken && (
+        <FieldGroup>
+          <Field data-invalid={error != null}>
+            <FieldLabel htmlFor="session-token">{tokenLabel}</FieldLabel>
+            <Input autoComplete="username" name="username" type="hidden" value="open-flow" readOnly />
+            <Input
+              autoComplete="current-password"
+              aria-invalid={error != null}
+              autoFocus
+              id="session-token"
+              name="session-token"
+              onChange={(event) => onTokenChange?.(event.target.value)}
+              spellCheck={false}
+              type="password"
+              value={tokenValue}
+            />
+            {error != null && <FieldError>{error}</FieldError>}
+          </Field>
+        </FieldGroup>
+      )}
+      {action != null && onSubmit != null && (
+        <Button disabled={pending || (hasToken && tokenValue.length == 0)} type="submit">
+          {pending && <Spinner aria-label={action} data-icon="inline-start" />}
+          {action}
+        </Button>
+      )}
+      {pending && action == null && <Spinner aria-label={description} />}
+    </>
+  )
+  return (
+    <main className="open-flow-workbench">
+      <div className="grid h-full place-items-center p-6">
+        {onSubmit == null ? (
+          <section aria-busy={pending} className="flex w-full max-w-sm flex-col gap-4">
+            {fields}
+          </section>
+        ) : (
+          <form aria-busy={pending} className="flex w-full max-w-sm flex-col gap-4" onSubmit={onSubmit}>
+            {fields}
+          </form>
+        )}
+      </div>
+    </main>
+  )
+}
 
 function NotificationBridge({ host, store }: { readonly host: WorkbenchHost; readonly store: WorkbenchStore }): null {
   const notice = useVal(store.$.notice)
@@ -22,29 +101,43 @@ function NotificationBridge({ host, store }: { readonly host: WorkbenchHost; rea
 
 interface WorkbenchProps {
   readonly hrefFor: (location: WorkbenchLocation) => string
+  readonly hostAction?: string | undefined
+  readonly hostTitle?: string | undefined
   readonly language: WorkbenchLanguage
   readonly navigation: NavigationStore
+  readonly onHostAction?: (() => void) | undefined
   readonly onLanguageChange?: ((language: WorkbenchLanguage) => void) | undefined
   readonly store: WorkbenchStore
   readonly theme: WorkbenchTheme
 }
 
-function Workbench({ hrefFor, language, navigation, onLanguageChange, store, theme }: WorkbenchProps): ReactElement {
+function Workbench({ hrefFor, hostAction, hostTitle, language, navigation, onHostAction, onLanguageChange, store, theme }: WorkbenchProps): ReactElement {
   const flowId = useVal(store.workspace.$.flowId)
   return (
     <div className="app-shell">
       {flowId == null ? (
         <FlowBrowser
           hrefForFlow={(flow) => hrefFor({ flowId: flow.flowId, view: 'design' })}
+          hostAction={hostAction}
+          hostTitle={hostTitle}
           language={language}
           onCreateFlow={(name) => navigation.createFlow(name)}
+          onHostAction={onHostAction}
           onLanguageChange={onLanguageChange}
           onSelectFlow={(flow) => void navigation.selectFlow(flow)}
           store={store}
         />
       ) : (
         <Suspense fallback={<main aria-busy="true" className="workspace" />}>
-          <FlowWorkspace hrefFor={hrefFor} navigation={navigation} store={store} theme={theme} />
+          <FlowWorkspace
+            hostAction={hostAction}
+            hostTitle={hostTitle}
+            hrefFor={hrefFor}
+            navigation={navigation}
+            onHostAction={onHostAction}
+            store={store}
+            theme={theme}
+          />
         </Suspense>
       )}
     </div>
@@ -74,9 +167,12 @@ export {
 export interface OpenFlowWorkbenchProps {
   readonly host: WorkbenchHost
   readonly hrefFor: (location: WorkbenchLocation) => string
+  readonly hostAction?: string | undefined
+  readonly hostTitle?: string | undefined
   readonly language: WorkbenchLanguage
   readonly location: WorkbenchLocation
   readonly onLanguageChange?: ((language: WorkbenchLanguage) => void) | undefined
+  readonly onHostAction?: (() => void) | undefined
   readonly onNavigate: (location: WorkbenchLocation, options: WorkbenchNavigationOptions) => void
   readonly preferences: WorkbenchPreferences
   readonly sessionKey: string
@@ -85,7 +181,19 @@ export interface OpenFlowWorkbenchProps {
 
 type SessionProps = Omit<OpenFlowWorkbenchProps, 'sessionKey'>
 
-function Session({ host, hrefFor, language, location, onLanguageChange, onNavigate, preferences, theme }: SessionProps): ReactElement {
+function Session({
+  host,
+  hostAction,
+  hostTitle,
+  hrefFor,
+  language,
+  location,
+  onHostAction,
+  onLanguageChange,
+  onNavigate,
+  preferences,
+  theme,
+}: SessionProps): ReactElement {
   const navigate = useRef(onNavigate)
   navigate.current = onNavigate
   const [{ i18n, navigation, store }] = useState(() => {
@@ -129,7 +237,17 @@ function Session({ host, hrefFor, language, location, onLanguageChange, onNaviga
     <I18nProvider i18n={i18n}>
       <div className="open-flow-theme open-flow-workbench" data-theme={theme}>
         <NotificationBridge host={host} store={store} />
-        <Workbench hrefFor={hrefFor} language={language} navigation={navigation} onLanguageChange={onLanguageChange} store={store} theme={theme} />
+        <Workbench
+          hostAction={hostAction}
+          hostTitle={hostTitle}
+          hrefFor={hrefFor}
+          language={language}
+          navigation={navigation}
+          onHostAction={onHostAction}
+          onLanguageChange={onLanguageChange}
+          store={store}
+          theme={theme}
+        />
       </div>
     </I18nProvider>
   )

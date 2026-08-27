@@ -12,7 +12,6 @@
   },
   "shell": {
     "closeNotification": "Fermer la notification",
-    "moreActions": "Actions du serveur",
     "notifications": "Notifications"
   }
 }

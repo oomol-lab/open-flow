@@ -12,7 +12,6 @@
   },
   "shell": {
     "closeNotification": "關閉通知",
-    "moreActions": "伺服器操作",
     "notifications": "通知"
   }
 }
