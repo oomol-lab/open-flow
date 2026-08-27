@@ -77,9 +77,10 @@
 
   .resource-list-section {
     margin-top: 20px;
+    overflow: hidden;
     border: 1px solid var(--ui-border);
     border-radius: var(--ui-radius);
-    background: var(--ui-card);
+    background: var(--ui-background);
   }
 
   .resource-list-title {
@@ -89,7 +90,8 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 16px;
-    padding: 12px;
+    min-height: 56px;
+    padding: 8px 16px;
   }
 
   .resource-list-heading {
@@ -142,23 +144,22 @@
   }
 
   .flow-columns {
-    grid-template-columns: minmax(220px, 1fr) minmax(140px, 180px) 120px;
+    grid-template-columns: minmax(240px, 1fr) minmax(140px, 180px) 108px;
   }
 
   .resource-list-columns {
-    min-height: 30px;
-    padding: 0 12px;
+    min-height: 40px;
+    padding: 0 56px 0 16px;
     border-top: 1px solid var(--ui-border);
     color: var(--ui-muted-foreground);
-    background: color-mix(in srgb, var(--ui-muted) 55%, transparent);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
   }
 
   .resource-list-row {
     width: 100%;
-    min-height: 56px;
-    padding: 8px 12px;
+    min-height: 60px;
+    padding: 8px 16px;
     border-bottom: 1px solid var(--ui-border);
     text-align: left;
   }
@@ -191,19 +192,19 @@
 
   .resource-primary-cell strong {
     color: var(--ui-foreground);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
   }
 
   .resource-primary-cell code {
     color: var(--ui-muted-foreground);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .resource-icon {
     display: inline-grid;
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     place-items: center;
     flex: 0 0 auto;
     border: 1px solid var(--ui-border);
@@ -217,7 +218,7 @@
   .resource-status {
     min-width: 0;
     color: var(--ui-muted-foreground);
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .resource-list-row time {
@@ -258,6 +259,7 @@
     grid-column: 2;
     grid-row: 1;
     align-self: center;
+    justify-self: center;
     opacity: 0;
   }
 
@@ -307,5 +309,29 @@
   .resource-row-confirm small {
     color: var(--ui-muted-foreground);
     font-size: 11px;
+  }
+
+  .resource-skeleton-row {
+    padding-right: 56px;
+  }
+
+  .resource-skeleton-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .resource-skeleton-row:last-child {
+    border-bottom: 0;
+  }
+
+  .resource-list-footer {
+    display: flex;
+    min-height: 56px;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    border-top: 1px solid var(--ui-border);
   }
 }

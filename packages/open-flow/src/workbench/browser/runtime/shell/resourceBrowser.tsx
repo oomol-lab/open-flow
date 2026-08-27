@@ -182,6 +182,22 @@ function FlowItem({ busy, flow, href, onSelect, store }: FlowItemProps): ReactEl
   )
 }
 
+function FlowSkeleton(): ReactElement {
+  return (
+    <div aria-hidden="true" className="resource-list-row resource-skeleton-row flow-columns">
+      <span className="resource-primary-cell">
+        <Skeleton className="size-8 shrink-0" />
+        <span className="resource-skeleton-copy">
+          <Skeleton className="h-3.5 w-36" />
+          <Skeleton className="h-2.5 w-48 max-w-full" />
+        </span>
+      </span>
+      <Skeleton className="h-3 w-28" />
+      <Skeleton className="h-3 w-16" />
+    </div>
+  )
+}
+
 interface FlowBrowserProps extends LanguageSelectProps {
   readonly hrefForFlow: (flow: Flow) => string
   readonly hostAction?: string | undefined
@@ -281,7 +297,7 @@ export function FlowBrowser({
           </div>
           <div className="resource-list">
             {loading ? (
-              Array.from({ length: 5 }, (_, index) => <Skeleton className="h-14" key={index} />)
+              Array.from({ length: 5 }, (_, index) => <FlowSkeleton key={index} />)
             ) : loadFailed ? (
               <Empty className="min-h-64" role="alert">
                 <EmptyHeader>
@@ -320,9 +336,11 @@ export function FlowBrowser({
             )}
           </div>
           {nextCursor != null && (
-            <Button className="mt-3 w-full" disabled={loadingMore} onClick={() => void store.workspace.loadMoreFlows()} variant="outline">
-              {t(loadingMore ? 'resource.loadingMore' : loadMoreFailed ? 'resource.retryLoadMore' : 'resource.loadMore')}
-            </Button>
+            <div className="resource-list-footer">
+              <Button disabled={loadingMore} onClick={() => void store.workspace.loadMoreFlows()} variant="outline">
+                {t(loadingMore ? 'resource.loadingMore' : loadMoreFailed ? 'resource.retryLoadMore' : 'resource.loadMore')}
+              </Button>
+            </div>
           )}
         </section>
         {creating && (

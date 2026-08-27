@@ -20,7 +20,7 @@ export function HostMenu({ action, onAction, title }: { readonly action: string;
         <DropdownMenuTrigger
           aria-label={action}
           render={
-            <Button size="icon" title={action} variant="ghost">
+            <Button size="icon" title={action} variant="outline">
               <Icon name="more" />
             </Button>
           }
