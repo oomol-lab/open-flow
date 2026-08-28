@@ -79,6 +79,7 @@ Les deux options prises en charge utilisent le même produit Open Flow et le mê
 ## Pourquoi Open Flow
 
 - **Créez avec un Agent IA.** Utilisez `oo flow` depuis Codex, Claude Code ou un autre Agent de terminal pour créer, vérifier, exécuter et publier le même Flow que celui affiché dans le Workbench.
+- **Rendez les dépendances de données explicites.** Chaque Task et Subflow déclare des entrées et des sorties nommées et typées. Chaque arête lie une valeur de sortie précise à une entrée précise : le graphe est donc le modèle de dépendances utilisé par le runtime.
 - **Concevez visuellement, étendez avec du code.** Composez des nœuds typés et des Subflows sur le
   canevas, puis utilisez des nœuds Script et CodeModule pour la logique qui doit rester explicite. Le
   code reste du code, avec du vrai TypeScript plutôt que des expressions cachées dans des champs de
@@ -99,6 +100,12 @@ Les deux options prises en charge utilisent le même produit Open Flow et le mê
 
 Open Flow est conçu pour les workflows qui dépassent le stade du prototype no-code mais ne doivent
 pas devenir un ensemble opaque de scripts et d'infrastructure.
+
+## Le graphe est le contrat du runtime
+
+Chaque Task et Subflow déclare des entrées et des sorties nommées et typées. Une arête transporte une valeur d'une sortie précise vers une entrée précise, et le runtime démarre un nœud lorsque ses entrées sont prêtes.
+
+Le graphe montre les dépendances de données réellement utilisées par le runtime : les données ordinaires d'un Flow ne peuvent pas être récupérées depuis un nœud arbitraire au moyen d'un stockage runtime caché. Les branches indépendantes peuvent s'exécuter en parallèle, et la position d'un nœud sur le canevas ne modifie jamais le comportement d'exécution.
 
 ### Création visuelle typée
 

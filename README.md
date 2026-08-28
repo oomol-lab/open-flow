@@ -82,6 +82,9 @@ Use the same Open Flow product and Workbench through either supported path.
 
 - **Build with an AI Agent.** Use `oo flow` from Codex, Claude Code, or another terminal Agent to
   create, check, run, and publish the same Flow you see in the Workbench.
+- **Make data dependencies explicit.** Every Task and Subflow declares named, typed inputs and
+  outputs. Each edge binds a specific output value to a specific input, so the graph is the data
+  dependency model used by the runtime.
 - **Design visually, extend with code.** Compose typed nodes and Subflows on the canvas, then use
   Script and CodeModule nodes for logic that should stay explicit. The code remains code, with real
   TypeScript instead of expressions hidden in form fields.
@@ -99,6 +102,15 @@ Use the same Open Flow product and Workbench through either supported path.
 
 Open Flow is built for workflows that outgrow a no-code prototype but should not become an opaque
 collection of scripts and infrastructure.
+
+## The Graph Is the Runtime Contract
+
+Every Task and Subflow declares named, typed inputs and outputs. An edge carries a value from a
+specific output to a specific input, and the runtime starts a node when its inputs are ready.
+
+The graph shows the data dependencies the runtime actually uses: ordinary Flow data cannot be
+pulled from arbitrary nodes through a hidden runtime store. Independent branches can run
+concurrently, and canvas position never changes execution behavior.
 
 ### Typed visual authoring
 
