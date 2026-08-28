@@ -176,8 +176,12 @@ consistent backup, stop the machine before creating a snapshot:
 ```bash
 fly machine stop <machine-id> --app my-open-flow
 fly volumes snapshots create <volume-id> --app my-open-flow
+fly volumes snapshots list <volume-id> --app my-open-flow
 fly machine start <machine-id> --app my-open-flow
 ```
+
+The snapshot is created asynchronously. Keep the machine stopped until
+`fly volumes snapshots list` shows the new snapshot as `created`, then start the machine again.
 
 Find the ids with `fly machine list` and `fly volumes list`.
 

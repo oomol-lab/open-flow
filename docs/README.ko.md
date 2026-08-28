@@ -165,7 +165,7 @@ Server는 외부 서비스 없이도 유용하게 사용할 수 있습니다. Co
 
 같은 이미지를 Fly.io에서도 실행할 수 있습니다. 저장소에 포함된 `fly.toml`은 `apps/server/Dockerfile`로 이미지를 빌드하고, Cron과 Poll
 Trigger를 위해 machine 한 대를 항상 실행 상태로 유지하며, SQLite를 Fly volume에 영속화합니다. Fly app 생성, volume, secret, 배포,
-custom domain, 스케일링 제한은 [fly-io.md](server/fly-io/README.ko.md)를 참고하세요.
+custom domain, 스케일링 제한은 [Fly.io 배포](server/fly-io/README.ko.md)를 참고하세요.
 
 ## Connector 연결
 

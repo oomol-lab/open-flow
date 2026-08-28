@@ -151,8 +151,11 @@ Fly 会自动创建 volume snapshot，但 Server 只承诺 quiesced backup。需
 ```bash
 fly machine stop <machine-id> --app my-open-flow
 fly volumes snapshots create <volume-id> --app my-open-flow
+fly volumes snapshots list <volume-id> --app my-open-flow
 fly machine start <machine-id> --app my-open-flow
 ```
+
+snapshot 异步创建。保持 machine 停止，直到 `fly volumes snapshots list` 显示新 snapshot 的状态为 `created`，再启动 machine。
 
 machine id 和 volume id 分别来自 `fly machine list` 和 `fly volumes list`。
 

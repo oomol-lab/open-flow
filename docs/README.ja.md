@@ -158,7 +158,7 @@ Server は外部サービスなしでも利用できます。Connector を利用
 
 同じイメージは Fly.io でも動作します。リポジトリに含まれる `fly.toml` は `apps/server/Dockerfile` でイメージをビルドし、Cron と Poll Trigger
 を動かすために 1 台の machine を常時起動し、SQLite を Fly volume に永続化します。Fly app の作成、volume、secret、デプロイ、custom
-domain、スケーリングの制限については [fly-io.md](server/fly-io/README.ja.md) を参照してください。
+domain、スケーリングの制限については [Fly.io へのデプロイ](server/fly-io/README.ja.md) を参照してください。
 
 ## Connector を接続する
 

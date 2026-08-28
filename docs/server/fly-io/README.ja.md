@@ -169,8 +169,12 @@ Fly は volume のスナップショットを自動的に取得しますが、Se
 ```bash
 fly machine stop <machine-id> --app my-open-flow
 fly volumes snapshots create <volume-id> --app my-open-flow
+fly volumes snapshots list <volume-id> --app my-open-flow
 fly machine start <machine-id> --app my-open-flow
 ```
+
+snapshot は非同期に作成されます。`fly volumes snapshots list` で新しい snapshot が `created` と表示されるまで machine を停止したままにし、
+その後で machine を起動してください。
 
 各 id は `fly machine list` と `fly volumes list` で確認できます。
 

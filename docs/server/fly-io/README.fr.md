@@ -179,8 +179,12 @@ repos. Pour une sauvegarde cohérente, arrêtez la machine avant de créer un sn
 ```bash
 fly machine stop <machine-id> --app my-open-flow
 fly volumes snapshots create <volume-id> --app my-open-flow
+fly volumes snapshots list <volume-id> --app my-open-flow
 fly machine start <machine-id> --app my-open-flow
 ```
+
+Le snapshot est créé de manière asynchrone. Laissez la machine arrêtée jusqu'à ce que
+`fly volumes snapshots list` affiche le nouveau snapshot avec l'état `created`, puis redémarrez la machine.
 
 Retrouvez les identifiants avec `fly machine list` et `fly volumes list`.
 

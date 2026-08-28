@@ -176,8 +176,12 @@ Fly автоматически создаёт снимки volume, но Server �
 ```bash
 fly machine stop <machine-id> --app my-open-flow
 fly volumes snapshots create <volume-id> --app my-open-flow
+fly volumes snapshots list <volume-id> --app my-open-flow
 fly machine start <machine-id> --app my-open-flow
 ```
+
+Snapshot создаётся асинхронно. Держите machine остановленной, пока `fly volumes snapshots list` не
+покажет новый snapshot в состоянии `created`, затем запустите machine.
 
 Идентификаторы можно найти с помощью `fly machine list` и `fly volumes list`.
 

@@ -179,7 +179,7 @@ la liste de durcissement dans [SECURITY.md](../SECURITY.md#hardening-your-deploy
 
 La même image fonctionne sur Fly.io. Le dépôt fournit un `fly.toml` qui construit
 `apps/server/Dockerfile`, garde une machine en marche pour les Triggers Cron et Poll, et persiste
-SQLite sur un volume Fly. Consultez [fly-io.md](server/fly-io/README.fr.md) pour la création de l'app, le
+SQLite sur un volume Fly. Consultez [Déploiement sur Fly.io](server/fly-io/README.fr.md) pour la création de l'app, le
 volume, les secrets, le déploiement, les domaines personnalisés et les limites de mise à
 l'échelle.
 

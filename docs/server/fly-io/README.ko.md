@@ -173,8 +173,12 @@ Fly는 volume 스냅샷을 자동으로 생성하지만, Server는 정지 상태
 ```bash
 fly machine stop <machine-id> --app my-open-flow
 fly volumes snapshots create <volume-id> --app my-open-flow
+fly volumes snapshots list <volume-id> --app my-open-flow
 fly machine start <machine-id> --app my-open-flow
 ```
+
+snapshot은 비동기로 생성됩니다. `fly volumes snapshots list`에서 새 snapshot이 `created`로 표시될 때까지 machine을 중지 상태로
+유지한 뒤 machine을 시작하세요.
 
 id는 `fly machine list`와 `fly volumes list`로 찾을 수 있습니다.
 

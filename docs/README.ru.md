@@ -179,7 +179,7 @@ Server полезен и без внешних сервисов. Action на б�
 Тот же образ работает на Fly.io. В репозитории есть `fly.toml`, который собирает
 `apps/server/Dockerfile`, держит одну machine запущенной для Cron и Poll Trigger и сохраняет SQLite
 на Fly volume. Создание Fly app, volume, secrets, развёртывание, custom domain и
-ограничения масштабирования описаны в [fly-io.md](server/fly-io/README.ru.md).
+ограничения масштабирования описаны в [Развёртывание на Fly.io](server/fly-io/README.ru.md).
 
 ## Подключение Connector
 

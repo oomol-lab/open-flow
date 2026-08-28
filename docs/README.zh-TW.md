@@ -154,7 +154,7 @@ docker run --rm \
 ## 部署到 Fly.io
 
 同一個映像也可以部署到 Fly.io。儲存庫內建的 `fly.toml` 使用 `apps/server/Dockerfile` 建置映像，保持一台 machine 常駐以執行 Cron 和 Poll
-Trigger，並把 SQLite 持久化到 Fly volume。Fly app 建立、volume、secret、部署、自訂網域和擴縮容限制請參閱 [fly-io.md](server/fly-io/README.zh-TW.md)。
+Trigger，並把 SQLite 持久化到 Fly volume。Fly app 建立、volume、secret、部署、自訂網域和擴縮容限制請參閱 [Fly.io 部署](server/fly-io/README.zh-TW.md)。
 
 ## 接入 Connector
 
