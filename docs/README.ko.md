@@ -55,11 +55,11 @@ Open Flow는 노코드 프로토타입 수준을 넘어섰지만 불투명한 �
 flowchart LR
   Workbench["Workbench"] -->|"Control API"| Server["Open Flow Server"]
   CLI["oo flow CLI"] -->|"Control API"| Server
+  Server -. "선택 사항" .-> Connector["Connector 런타임"]
+  Connector --> Providers["서드파티 Provider"]
   Server --> Store["SQLite: Project, Revision, Publication, Run"]
   Server --> Triggers["Trigger 스케줄러: Cron, Webhook, Poll, Integration"]
   Server --> Runtime["격리된 JavaScript 런타임"]
-  Server -. "선택 사항" .-> Connector["Connector 런타임"]
-  Connector --> Providers["서드파티 Provider"]
 ```
 
 Workbench와 CLI는 버전 관리되는 Control API를 통해 선택된 하나의 배포와만 통신합니다. 배포는 검증, 실행, 영속화,

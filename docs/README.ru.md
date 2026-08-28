@@ -60,11 +60,11 @@ deployment остаётся под вашим контролем.
 flowchart LR
   Workbench["Workbench"] -->|"Control API"| Server["Open Flow Server"]
   CLI["oo flow CLI"] -->|"Control API"| Server
+  Server -. "опционально" .-> Connector["Среда выполнения Connector"]
+  Connector --> Providers["Сторонние Provider"]
   Server --> Store["SQLite: Project, Revision, Publication, Run"]
   Server --> Triggers["Планировщик Trigger: Cron, Webhook, Poll, Integration"]
   Server --> Runtime["Изолированная среда выполнения JavaScript"]
-  Server -. "опционально" .-> Connector["Среда выполнения Connector"]
-  Connector --> Providers["Сторонние Provider"]
 ```
 
 Workbench и CLI общаются только с одним выбранным deployment через версионированный Control API.

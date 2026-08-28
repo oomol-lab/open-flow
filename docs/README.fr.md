@@ -61,11 +61,11 @@ code reste du code, et le déploiement reste sous votre contrôle.
 flowchart LR
   Workbench["Workbench"] -->|"Control API"| Server["Open Flow Server"]
   CLI["oo flow CLI"] -->|"Control API"| Server
+  Server -. "optionnel" .-> Connector["Runtime Connector"]
+  Connector --> Providers["Providers tiers"]
   Server --> Store["SQLite : Projects, Revisions, Publications, Runs"]
   Server --> Triggers["Ordonnanceur de Triggers : Cron, Webhook, Poll, Integration"]
   Server --> Runtime["Runtime JavaScript isolé"]
-  Server -. "optionnel" .-> Connector["Runtime Connector"]
-  Connector --> Providers["Providers tiers"]
 ```
 
 Le Workbench et la CLI ne communiquent qu'avec un seul déploiement sélectionné, via la Control API

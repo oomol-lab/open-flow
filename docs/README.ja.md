@@ -50,11 +50,11 @@ Open Flow は、ノーコードのプロトタイプでは収まらなくなっ�
 flowchart LR
   Workbench["Workbench"] -->|"Control API"| Server["Open Flow Server"]
   CLI["oo flow CLI"] -->|"Control API"| Server
+  Server -. "任意" .-> Connector["Connector ランタイム"]
+  Connector --> Providers["サードパーティ Provider"]
   Server --> Store["SQLite：Project、Revision、Publication、Run"]
   Server --> Triggers["Trigger スケジューラ：Cron、Webhook、Poll、Integration"]
   Server --> Runtime["分離された JavaScript ランタイム"]
-  Server -. "任意" .-> Connector["Connector ランタイム"]
-  Connector --> Providers["サードパーティ Provider"]
 ```
 
 Workbench と CLI は、バージョン管理された Control API を通じて、選択された一つのデプロイメントとだけ通信します。デプロイメント側が検証、実行、永続化、

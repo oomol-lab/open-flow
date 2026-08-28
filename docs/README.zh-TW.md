@@ -46,11 +46,11 @@ Open Flow 適合已經超出簡單無程式碼原型，但又不想變成一堆�
 flowchart LR
   Workbench["Workbench"] -->|"Control API"| Server["Open Flow Server"]
   CLI["oo flow CLI"] -->|"Control API"| Server
+  Server -. "選用" .-> Connector["Connector 執行環境"]
+  Connector --> Providers["第三方 Provider"]
   Server --> Store["SQLite：Project、Revision、Publication、Run"]
   Server --> Triggers["Trigger 排程：Cron、Webhook、Poll、Integration"]
   Server --> Runtime["隔離的 JavaScript 執行環境"]
-  Server -. "選用" .-> Connector["Connector 執行環境"]
-  Connector --> Providers["第三方 Provider"]
 ```
 
 Workbench 和 CLI 只透過有版本的 Control API 與目前選定的一個部署通訊。部署端負責 validation、執行、持久化和 Trigger 准入。Provider
