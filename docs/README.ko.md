@@ -25,6 +25,25 @@ Open Flow는 코드를 포기하지 않고 시각적 캔버스 위에서 워크�
 > [!IMPORTANT]
 > Open Flow는 현재 알파 단계입니다. 공개 계약은 버전 관리되지만, 제품은 아직 첫 안정 버전에 도달하지 않았습니다.
 
+## Open Flow 실행 방식 선택
+
+지원되는 두 방식 모두 동일한 Open Flow 제품과 Workbench를 사용합니다.
+
+<table>
+  <tr>
+    <td width="50%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
+    <td width="50%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">서버를 준비하거나 패치하고 모니터링할 필요 없이 바로 사용할 수 있습니다. OOMOL이 배포를 운영하고 지원되는 연동에 관리형 OAuth App을 제공하므로 고정 서버 비용과 별도의 OAuth App 설정을 줄일 수 있습니다.</td>
+    <td width="50%" valign="top">포함된 Docker 이미지로 자체 인프라에서 실행합니다. 배포, 스토리지, 백업, 업그레이드, 네트워크와 Connector 또는 OAuth App 설정을 직접 관리합니다.</td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">🚀 <a href="https://oomol.com"><strong>OOMOL Hosted 사용</strong></a></td>
+    <td width="50%" align="center"><a href="#빠른-시작"><strong>Docker로 셀프 호스팅</strong></a></td>
+  </tr>
+</table>
+
 ## 왜 Open Flow인가
 
 - **시각적으로 설계하고, 코드로 확장합니다.** 캔버스에서 타입이 지정된 노드와 Subflow를 조합하고, 명시적으로
@@ -38,8 +57,8 @@ Open Flow는 코드를 포기하지 않고 시각적 캔버스 위에서 워크�
   숨겨진 서비스에 흩어지지 않고 선택된 하나의 배포에 속합니다.
 - **신뢰할 수 없는 코드를 안전하게 실행합니다.** Server는 오래 유지되는 Executor 프로세스 안에서 코드 Task마다 새
   V8 isolate를 만들고, 해당 Task가 선언한 Capability만 제공합니다.
-- **실행 위치를 직접 선택합니다.** 포함된 자체 호스팅 Server를 사용하거나, 같은 Workbench와 CLI를 버전 관리되는
-  Control API의 다른 구현에 연결할 수 있습니다.
+- **실행 위치를 직접 선택합니다.** OOMOL Hosted를 사용하거나, 포함된 Server를 Docker로 자체 인프라에서 실행할 수
+  있습니다.
 
 Open Flow는 노코드 프로토타입 수준을 넘어섰지만 불투명한 스크립트와 인프라 더미가 되어서는 안 되는 워크플로를
 위해 만들어졌습니다. 그래프는 계속 이해할 수 있는 상태로, 코드는 계속 코드로, 배포는 계속 여러분의 통제 아래

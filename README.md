@@ -24,6 +24,25 @@ interactively, and publish them for continuous execution on a deployment you con
 > Open Flow is in alpha. Its contracts are versioned, but the product has not reached its first
 > stable release.
 
+## Choose How to Run Open Flow
+
+Use the same Open Flow product and Workbench through either supported path.
+
+<table>
+  <tr>
+    <td width="50%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
+    <td width="50%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">Ready to use without provisioning, patching, or monitoring a server. OOMOL operates the deployment and provides managed OAuth apps for supported integrations, so you avoid fixed server costs and separate OAuth app setup.</td>
+    <td width="50%" valign="top">Run on your own infrastructure with the included Docker image. You manage deployment, storage, backups, upgrades, networking, and any Connector or OAuth app setup.</td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">🚀 <a href="https://oomol.com"><strong>Use OOMOL Hosted</strong></a></td>
+    <td width="50%" align="center"><a href="#quick-start"><strong>Self-host with Docker</strong></a></td>
+  </tr>
+</table>
+
 ## Why Open Flow
 
 - **Design visually, extend with code.** Compose typed nodes and Subflows on the canvas, then use
@@ -38,8 +57,8 @@ interactively, and publish them for continuous execution on a deployment you con
   files and hidden services.
 - **Run untrusted code safely.** The Server executes every code Task in a fresh V8 isolate inside a
   long-lived Executor process, with only the Capabilities that Task declared.
-- **Choose where it runs.** Use the included self-hosted Server, or connect the same Workbench and
-  CLI to another implementation of the versioned Control API.
+- **Choose where it runs.** Use OOMOL Hosted, or run the included Server with Docker on your own
+  infrastructure.
 
 Open Flow is built for workflows that outgrow a no-code prototype but should not become an opaque
 collection of scripts and infrastructure. The graph remains understandable, the code remains

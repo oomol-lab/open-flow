@@ -27,6 +27,25 @@ exécution continue sur un déploiement que vous contrôlez.
 > Open Flow est en phase alpha. Ses contrats sont versionnés, mais le produit n'a pas encore atteint
 > sa première version stable.
 
+## Choisir comment exécuter Open Flow
+
+Les deux options prises en charge utilisent le même produit Open Flow et le même Workbench.
+
+<table>
+  <tr>
+    <td width="50%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
+    <td width="50%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">Prêt à l'emploi sans préparer, mettre à jour ou superviser un serveur. OOMOL exploite le déploiement et fournit des OAuth Apps gérées pour les intégrations compatibles, ce qui évite les coûts fixes d'un serveur et la configuration séparée des OAuth Apps.</td>
+    <td width="50%" valign="top">Exécutez Open Flow sur votre propre infrastructure avec l'image Docker incluse. Vous gérez le déploiement, le stockage, les sauvegardes, les mises à niveau, le réseau et la configuration du Connector ou des OAuth Apps.</td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">🚀 <a href="https://oomol.com"><strong>Utiliser OOMOL Hosted</strong></a></td>
+    <td width="50%" align="center"><a href="#démarrage-rapide"><strong>S'auto-héberger avec Docker</strong></a></td>
+  </tr>
+</table>
+
 ## Pourquoi Open Flow
 
 - **Concevez visuellement, étendez avec du code.** Composez des nœuds typés et des Subflows sur le
@@ -44,8 +63,8 @@ exécution continue sur un déploiement que vous contrôlez.
 - **Exécutez du code non fiable en toute sécurité.** Le Server exécute chaque Task de code dans un
   isolate V8 neuf, au sein d'un processus Executor de longue durée, avec uniquement les Capabilities
   déclarées par cette Task.
-- **Choisissez où cela s'exécute.** Utilisez le Server auto-hébergé inclus, ou connectez le même
-  Workbench et la même CLI à une autre implémentation de la Control API versionnée.
+- **Choisissez où cela s'exécute.** Utilisez OOMOL Hosted ou exécutez le Server inclus avec Docker
+  sur votre propre infrastructure.
 
 Open Flow est conçu pour les workflows qui dépassent le stade du prototype no-code mais ne doivent
 pas devenir un ensemble opaque de scripts et d'infrastructure. Le graphe reste compréhensible, le

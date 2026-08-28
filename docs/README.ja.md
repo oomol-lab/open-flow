@@ -25,6 +25,25 @@ Open Flow は、コードを手放すことなくビジュアルキャンバス�
 > [!IMPORTANT]
 > Open Flow は現在 Alpha 段階です。公開されている契約（contract）はバージョン管理されていますが、プロダクトとしての最初の安定版はまだリリースされていません。
 
+## Open Flow の実行方法を選ぶ
+
+どちらの対応パスでも、同じ Open Flow プロダクトと Workbench を利用できます。
+
+<table>
+  <tr>
+    <td width="50%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
+    <td width="50%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">サーバーの準備、更新、監視なしですぐに利用できます。OOMOL がデプロイメントを運用し、対応する連携にはマネージド OAuth App を提供するため、固定のサーバー費用や個別の OAuth App 設定が不要です。</td>
+    <td width="50%" valign="top">同梱の Docker イメージを使って自分のインフラストラクチャで実行します。デプロイ、ストレージ、バックアップ、アップグレード、ネットワーク、Connector または OAuth App の設定を自分で管理します。</td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">🚀 <a href="https://oomol.com"><strong>OOMOL Hosted を使う</strong></a></td>
+    <td width="50%" align="center"><a href="#クイックスタート"><strong>Docker でセルフホストする</strong></a></td>
+  </tr>
+</table>
+
 ## Open Flow を選ぶ理由
 
 - **ビジュアルで設計し、コードで拡張する。** キャンバス上で型付けされたノードと Subflow を組み合わせ、明示的に残すべきロジックには Script ノードや
@@ -35,7 +54,7 @@ Open Flow は、コードを手放すことなくビジュアルキャンバス�
   分散することなく、選択された一つのデプロイメントに属します。
 - **信頼できないコードを安全に実行する。** Server は、長時間稼働する Executor プロセス内で、コードの Task ごとに新しい V8 isolate を作成し、
   その Task が宣言した Capability だけを公開します。
-- **実行場所を選べる。** 同梱のセルフホスト Server を使うことも、同じ Workbench と CLI をバージョン管理された Control API の別の実装に接続することもできます。
+- **実行場所を選べる。** OOMOL Hosted を利用するか、同梱の Server を Docker で自分のインフラストラクチャ上に実行できます。
 
 Open Flow は、ノーコードのプロトタイプでは収まらなくなったものの、不透明なスクリプトとインフラの寄せ集めにはしたくないワークフローのために作られています。
 グラフは理解しやすいまま、コードはコードのまま、そしてデプロイメントは自分の管理下に残ります。

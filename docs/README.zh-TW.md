@@ -24,6 +24,25 @@ TypeScript，直接執行和偵錯 Flow，再把它發布成持續運作的自�
 > [!IMPORTANT]
 > Open Flow 目前處於 Alpha 階段。公開協定有版本管理，但產品尚未發布第一個穩定版本。
 
+## 選擇 Open Flow 的執行方式
+
+兩種支援的方式使用同一套 Open Flow 產品和 Workbench。
+
+<table>
+  <tr>
+    <td width="50%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
+    <td width="50%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">無需準備、更新或監控伺服器，開啟即可使用。OOMOL 負責執行部署，並為支援的整合提供託管 OAuth App，省去固定伺服器成本和另外設定 OAuth App 的工作。</td>
+    <td width="50%" valign="top">使用內建 Docker 映像檔在自己的基礎設施中執行。部署、儲存、備份、升級、網路以及 Connector 或 OAuth App 設定均由你管理。</td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">🚀 <a href="https://oomol.com"><strong>使用 OOMOL Hosted</strong></a></td>
+    <td width="50%" align="center"><a href="#快速開始"><strong>使用 Docker 自行部署</strong></a></td>
+  </tr>
+</table>
+
 ## 為什麼選擇 Open Flow
 
 - **視覺化設計，用程式碼擴充。** 在畫布上組合具型別約束的節點和 Subflow；遇到更適合用程式碼處理的邏輯，直接使用 Script 或 CodeModule
@@ -32,7 +51,7 @@ TypeScript，直接執行和偵錯 Flow，再把它發布成持續運作的自�
 - **發布為長期執行的自動化。** Flow 可以手動啟動，也可以由 Cron、Webhook、輪詢資料來源或 Provider Event 觸發。
 - **執行狀態集中管理。** Project、不可變的 Revision、Publication、Live 版本、Run 和 Trigger 狀態都由目前的部署管理，不會散落在本機檔案和隱藏服務中。
 - **安全地執行使用者程式碼。** Server 在常駐的 Executor 程序中為每次程式碼 Task 呼叫建立全新的 V8 isolate，只開放該 Task 明確宣告的 Capability。
-- **自由選擇執行環境。** 可以使用儲存庫內建的 Server 自行部署，也可以讓同一套 Workbench 和 CLI 連接其他相容 Control API 的實作。
+- **自由選擇執行環境。** 可以直接使用 OOMOL Hosted，也可以透過 Docker 在自己的基礎設施上執行儲存庫內建的 Server。
 
 Open Flow 適合已經超出簡單無程式碼原型，但又不想變成一堆腳本和基礎設施的工作流程。流程圖仍然容易理解，需要撰寫的程式碼也保留為正常的程式碼，執行環境由你決定。
 

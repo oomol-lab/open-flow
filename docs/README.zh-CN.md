@@ -24,6 +24,25 @@ TypeScript，直接运行和调试 Flow，再把它发布成持续工作的自�
 > [!IMPORTANT]
 > Open Flow 目前处于 Alpha 阶段。公开协议有版本管理，但产品还没有发布第一个稳定版本。
 
+## 选择 Open Flow 的运行方式
+
+两种支持的方式使用同一套 Open Flow 产品和 Workbench。
+
+<table>
+  <tr>
+    <td width="50%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
+    <td width="50%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">无需准备、更新或监控服务器，打开即可使用。OOMOL 负责运行部署，并为支持的集成提供托管 OAuth App，免去固定服务器成本和单独配置 OAuth App 的工作。</td>
+    <td width="50%" valign="top">使用内置 Docker 镜像运行在自己的基础设施中。部署、存储、备份、升级、网络以及 Connector 或 OAuth App 配置均由你管理。</td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">🚀 <a href="https://oomol.com"><strong>使用 OOMOL Hosted</strong></a></td>
+    <td width="50%" align="center"><a href="#快速开始"><strong>使用 Docker 自部署</strong></a></td>
+  </tr>
+</table>
+
 ## 为什么选择 Open Flow
 
 - **可视化设计，用代码扩展。** 在画布上组合有类型约束的节点和 Subflow；遇到更适合代码的逻辑，直接使用 Script 或 CodeModule
@@ -32,7 +51,7 @@ TypeScript，直接运行和调试 Flow，再把它发布成持续工作的自�
 - **发布为长期运行的自动化。** Flow 可以手动启动，也可以由 Cron、Webhook、轮询数据源或 Provider Event 触发。
 - **运行状态集中管理。** Project、不可变 Revision、Publication、Live 版本、Run 和 Trigger 状态都由当前部署管理，不会散落在本地文件和隐藏服务中。
 - **安全地执行用户代码。** Server 在长驻的 Executor 进程中为每次代码 Task 调用创建全新的 V8 isolate，只暴露该 Task 明确声明的 Capability。
-- **自由选择运行环境。** 可以使用仓库自带的 Server 自行部署，也可以让同一套 Workbench 和 CLI 连接其他兼容 Control API 的实现。
+- **自由选择运行环境。** 可以直接使用 OOMOL Hosted，也可以通过 Docker 在自己的基础设施上运行仓库内置的 Server。
 
 Open Flow 适合已经超过简单无代码原型，但又不想变成一堆脚本和基础设施的工作流。流程图仍然容易理解，需要写的代码也保留为正常代码，运行环境由你选择。
 
