@@ -17,7 +17,7 @@
 Open Flow 是一个开源工作流自动化平台，AI Agent 和人可以在其中共同构建同一个 Flow。让 Codex、Claude Code 或其他终端
 Agent 通过 [`oo flow`](https://github.com/oomol-lab/oo-cli) 创建、检查、运行和发布类型化工作流，然后在 Workbench 中直观查看并继续编辑同一个 Flow。
 
-使用类型化节点定义结构，将自定义逻辑保留为真正的 JavaScript 或 TypeScript，并在 OOMOL Hosted 或自己控制的基础设施上运行最终的自动化流程。流程图始终容易理解，代码始终是代码，部署也始终由你掌控。
+使用类型化节点定义结构，将自定义逻辑保留为 JavaScript，并在 OOMOL Hosted 或自己控制的基础设施上运行最终的自动化流程。流程图始终容易理解，代码始终是代码，部署也始终由你掌控。
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
@@ -73,9 +73,8 @@ Agent 创建的是所选 Open Flow 部署中的真实 Draft，而不是用完即
 ## 为什么选择 Open Flow
 
 - **使用 AI Agent 构建。** 在 Codex、Claude Code 或其他终端 Agent 中使用 `oo flow`，创建、检查、运行和发布 Workbench 中的同一个 Flow。
-- **显式呈现数据依赖。** 每个 Task 和 Subflow 都声明具名、类型化的输入和输出。每条边将一个特定输出值绑定到一个特定输入，因此流程图就是运行时使用的数据依赖模型。
-- **可视化设计，用代码扩展。** 在画布上组合有类型约束的节点和 Subflow；遇到更适合代码的逻辑，直接使用 Script 或 CodeModule
-  节点，写的是真正的 TypeScript，而不是藏在表单里的表达式。
+- **显式呈现数据依赖。** 每个 Task 都声明具名、类型化的输入和输出。每条边将一个特定输出值绑定到一个特定输入，因此流程图就是运行时使用的数据依赖模型。
+- **可视化设计，需要时加入代码。** 在画布上组合类型化节点，并使用 Code Task 编写自定义 JavaScript。代码始终清晰可见，不会隐藏在表单字段中。
 - **运行和调试在同一处。** 运行前检查输入和 Flow 结构，运行时查看每个节点的进度、输出和完整事件记录。
 - **发布为长期运行的自动化。** Flow 可以手动启动，也可以由 Cron、Webhook、轮询数据源或 Provider Event 触发。
 - **运行状态集中管理。** Project、不可变 Revision、Publication、Live 版本、Run 和 Trigger 状态都由当前部署管理，不会散落在本地文件和隐藏服务中。
@@ -86,7 +85,7 @@ Open Flow 适合已经超过简单无代码原型，但又不想变成一堆脚�
 
 ## 流程图即运行时契约
 
-每个 Task 和 Subflow 都声明具名、类型化的输入和输出。每条边将一个特定输出值传递给一个特定输入；当节点的输入就绪时，运行时才会启动该节点。
+每个 Task 都声明具名、类型化的输入和输出。每条边将一个特定输出值传递给一个特定输入；当节点的输入就绪时，运行时才会启动该节点。
 
 流程图呈现的正是运行时实际使用的数据依赖：普通 Flow 数据不能通过隐藏的运行时存储从任意节点读取。彼此独立的分支可以并发运行，节点在画布上的位置永远不会改变执行行为。
 
@@ -100,7 +99,7 @@ Open Flow 适合已经超过简单无代码原型，但又不想变成一堆脚�
 
 ### 在合适的位置写代码
 
-Code Task 会把自定义 JavaScript 或 TypeScript 与它连接的节点放在一起，并保留类型化的输入和输出。
+Code Task 将自定义 JavaScript 直接放在流程图中，并保留类型化的输入和输出。
 
 <p align="center">
   <img src="assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">

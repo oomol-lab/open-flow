@@ -23,6 +23,7 @@ const hooks = vi.hoisted(() => ({
   memo: undefined as unknown,
   refIndex: 0,
   refs: [] as { current: unknown }[],
+  setups: [] as (() => void | (() => void))[],
 }))
 
 vi.mock('virtual:uno.css', () => ({}))
@@ -33,6 +34,7 @@ vi.mock('react', async (importOriginal) => {
     const index = hooks.effectIndex++
     const previous = hooks.effects[index]
     hooks.effects[index] = dependencies
+    hooks.setups[index] = callback
     if (
       dependencies == null ||
       previous == null ||
@@ -161,6 +163,14 @@ function captureIdleValidation(): () => void {
   }
 }
 
+function replayEffects(): void {
+  for (const cleanup of hooks.cleanups) cleanup?.()
+  for (const [index, setup] of hooks.setups.entries()) {
+    const cleanup = setup()
+    hooks.cleanups[index] = typeof cleanup == 'function' ? cleanup : undefined
+  }
+}
+
 function firstInput(store: FlowDesignerProps['flowDesignerStore']) {
   const node = [...store.$.nodes.values()][0]
   if (node == null) throw new Error('Expected a node.')
@@ -171,7 +181,10 @@ function firstInput(store: FlowDesignerProps['flowDesignerStore']) {
   return { node, row, section }
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
 
 describe('FlowDesignerView model synchronization', () => {
   beforeEach(() => {
@@ -181,15 +194,18 @@ describe('FlowDesignerView model synchronization', () => {
     hooks.memo = undefined
     hooks.refIndex = 0
     hooks.refs = []
+    hooks.setups = []
   })
 
   it('continues reconciling after React replays effect cleanup', () => {
+    vi.useFakeTimers()
     const initial = props(model([task([])]), { editable: false })
     const view = FlowDesignerView(initial) as React.ReactElement<FlowDesignerProps>
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     try {
-      for (const cleanup of hooks.cleanups) cleanup?.()
+      replayEffects()
+      vi.runOnlyPendingTimers()
       FlowDesignerView(props(model([task([])]), { editable: true }))
 
       expect(error).not.toHaveBeenCalled()
@@ -198,6 +214,20 @@ describe('FlowDesignerView model synchronization', () => {
       error.mockRestore()
       view.props.flowDesignerStore.dispose()
     }
+  })
+
+  it('disposes the Designer store after a real effect cleanup', async () => {
+    vi.useFakeTimers()
+    const view = FlowDesignerView(props(model([task([])]))) as React.ReactElement<FlowDesignerProps>
+    const store = view.props.flowDesignerStore
+
+    expect(store.dispose.size()).toBeGreaterThan(0)
+    for (const cleanup of hooks.cleanups) cleanup?.()
+    await Promise.resolve()
+    expect(store.dispose.size()).toBeGreaterThan(0)
+    vi.runOnlyPendingTimers()
+
+    expect(store.dispose.size()).toBe(0)
   })
 
   it('does not publish unchanged Variable projections while mounting', () => {
@@ -591,11 +621,12 @@ describe('FlowDesignerView model synchronization', () => {
     const previous = vi.fn()
     const current = vi.fn()
     const value = model([conditionNode()])
-    const view = FlowDesignerView(props(value, { onChangeCondition: previous })) as React.ReactElement<FlowDesignerProps>
+    const initial = props(value, { onChangeCondition: previous })
+    const view = FlowDesignerView(initial) as React.ReactElement<FlowDesignerProps>
     const node = [...view.props.flowDesignerStore.$.nodes.values()][0]!
     const section = node.findSection<ConditionsSectionStore>(ConditionsSectionStore.TYPE)!
 
-    FlowDesignerView(props({ ...value }, { onChangeCondition: current }))
+    FlowDesignerView({ ...initial, onChangeCondition: current })
     section.renameHandle('matched' as HandleName, 'accepted' as HandleName)
 
     expect(previous).not.toHaveBeenCalled()

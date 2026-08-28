@@ -307,8 +307,15 @@ interface BlockQuickPickPanelData {
 const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
   const rf = useReactFlow()
   const updateNodeInternals = useUpdateNodeInternals()
+  const mounted = useRef(true)
 
   useLayoutEffect(() => props.onInstance?.(rf), [rf, props.onInstance])
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
   // https://github.com/xyflow/xyflow/issues/4263
   const [rfFocused, setRfFocused] = useState(true)
 
@@ -469,6 +476,21 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
   const viewport = useVal(props.viewport$)
   const nonEmptyViewport = useRef(viewport)
   nonEmptyViewport.current = viewport || nonEmptyViewport.current
+  const onViewportChange = useCallback(
+    (nextViewport: Viewport) => {
+      const current = props.viewport$.value
+      if (current == null || current.x != nextViewport.x || current.y != nextViewport.y || current.zoom != nextViewport.zoom) {
+        props.viewport$.set(nextViewport)
+      }
+    },
+    [props.viewport$],
+  )
+  const onInit = useCallback<OnInit<RFNode<any>, RFEdge<any>>>(
+    (instance) => {
+      if (mounted.current) props.onInit?.(instance)
+    },
+    [props.onInit],
+  )
 
   const paneSize = useStore(GET_SIZE, isSizeEqual)
   const paneRect$ = useMemo(
@@ -599,6 +621,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           fitView={props.fitView || !viewport}
           fitViewOptions={props.fitViewOptions}
           viewport={viewport}
+          onViewportChange={onViewportChange}
           maxZoom={3}
           minZoom={0.1}
           nodesConnectable={!overview && editable && props.onConnect != null}
@@ -610,7 +633,6 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           onConnect={!overview && editable ? props.onConnect : undefined}
           onDragOver={editable && (props.onAddNode != null || props.onDropAddItem != null) ? handleDragOver : undefined}
           onDrop={editable && (props.onAddNode != null || props.onDropAddItem != null) ? onDrop : undefined}
-          onMove={(_, nextViewport) => props.viewport$.set(nextViewport)}
           onMoveEnd={props.onMoveEnd}
           onNodeDragStop={props.onNodeDragStop}
           onSelectionChange={props.onSelectionChange}
@@ -627,7 +649,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           selectionKeyCode={toTrue(isMouse) && 'Shift'}
           selectionOnDrag={!isMouse}
           connectOnClick={false}
-          onInit={props.onInit}
+          onInit={onInit}
           connectionLineComponent={ConnectionLine}
           aria-readonly={!editable}
         >

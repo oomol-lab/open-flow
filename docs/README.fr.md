@@ -20,9 +20,9 @@ créer, vérifier, exécuter et publier un workflow typé avec [`oo flow`](https
 puis consultez et modifiez visuellement ce Flow précis dans le Workbench.
 
 Utilisez des nœuds typés pour structurer le workflow, conservez la logique personnalisée sous forme de
-véritable JavaScript ou TypeScript, et exécutez l'automatisation sur OOMOL Hosted ou sur une
-infrastructure que vous contrôlez. Le graphe reste compréhensible, le code reste du code, et le
-déploiement reste sous votre contrôle.
+JavaScript et exécutez l'automatisation sur OOMOL Hosted ou sur une infrastructure que vous
+contrôlez. Le graphe reste compréhensible, le code reste du code, et le déploiement reste sous votre
+contrôle.
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
@@ -79,11 +79,8 @@ Les deux options prises en charge utilisent le même produit Open Flow et le mê
 ## Pourquoi Open Flow
 
 - **Créez avec un Agent IA.** Utilisez `oo flow` depuis Codex, Claude Code ou un autre Agent de terminal pour créer, vérifier, exécuter et publier le même Flow que celui affiché dans le Workbench.
-- **Rendez les dépendances de données explicites.** Chaque Task et Subflow déclare des entrées et des sorties nommées et typées. Chaque arête lie une valeur de sortie précise à une entrée précise : le graphe est donc le modèle de dépendances utilisé par le runtime.
-- **Concevez visuellement, étendez avec du code.** Composez des nœuds typés et des Subflows sur le
-  canevas, puis utilisez des nœuds Script et CodeModule pour la logique qui doit rester explicite. Le
-  code reste du code, avec du vrai TypeScript plutôt que des expressions cachées dans des champs de
-  formulaire.
+- **Rendez les dépendances de données explicites.** Chaque Task déclare des entrées et des sorties nommées et typées. Chaque arête lie une valeur de sortie précise à une entrée précise : le graphe est donc le modèle de dépendances utilisé par le runtime.
+- **Concevez visuellement, ajoutez du code lorsque c'est nécessaire.** Composez des nœuds typés sur le canevas et utilisez une Code Task pour le JavaScript personnalisé. Le code reste visible au lieu d'être caché dans des champs de formulaire.
 - **Exécutez et déboguez au même endroit.** Validez les entrées et la structure du Flow avant
   l'exécution, inspectez la progression et les sorties de chaque nœud, et suivez l'historique complet
   des événements de chaque Run.
@@ -103,7 +100,7 @@ pas devenir un ensemble opaque de scripts et d'infrastructure.
 
 ## Le graphe est le contrat du runtime
 
-Chaque Task et Subflow déclare des entrées et des sorties nommées et typées. Une arête transporte une valeur d'une sortie précise vers une entrée précise, et le runtime démarre un nœud lorsque ses entrées sont prêtes.
+Chaque Task déclare des entrées et des sorties nommées et typées. Une arête transporte une valeur d'une sortie précise vers une entrée précise, et le runtime démarre un nœud lorsque ses entrées sont prêtes.
 
 Le graphe montre les dépendances de données réellement utilisées par le runtime : les données ordinaires d'un Flow ne peuvent pas être récupérées depuis un nœud arbitraire au moyen d'un stockage runtime caché. Les branches indépendantes peuvent s'exécuter en parallèle, et la position d'un nœud sur le canevas ne modifie jamais le comportement d'exécution.
 
@@ -118,8 +115,8 @@ connexion.
 
 ### Du code là où il est nécessaire
 
-Les Code Tasks gardent le JavaScript ou TypeScript personnalisé visible à côté des nœuds connectés,
-avec des entrées et sorties typées.
+Les Code Tasks placent le JavaScript personnalisé directement dans le graphe, avec des entrées et
+sorties typées.
 
 <p align="center">
   <img src="assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">

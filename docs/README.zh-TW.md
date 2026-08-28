@@ -17,7 +17,7 @@
 Open Flow 是一個開源工作流程自動化平台，AI Agent 和人可以在其中共同建立同一個 Flow。讓 Codex、Claude Code 或其他終端
 Agent 透過 [`oo flow`](https://github.com/oomol-lab/oo-cli) 建立、檢查、執行和發布類型化工作流程，然後在 Workbench 中以視覺化方式檢視並繼續編輯同一個 Flow。
 
-使用類型化節點定義結構，將自訂邏輯保留為真正的 JavaScript 或 TypeScript，並在 OOMOL Hosted 或自己掌控的基礎設施上執行最終的自動化流程。流程圖始終容易理解，程式碼始終是程式碼，部署也始終由你掌控。
+使用類型化節點定義結構，將自訂邏輯保留為 JavaScript，並在 OOMOL Hosted 或自己掌控的基礎設施上執行最終的自動化流程。流程圖始終容易理解，程式碼始終是程式碼，部署也始終由你掌控。
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
@@ -73,9 +73,8 @@ Agent 建立的是所選 Open Flow 部署中的真實 Draft，而不是用完即
 ## 為什麼選擇 Open Flow
 
 - **使用 AI Agent 建立。** 在 Codex、Claude Code 或其他終端 Agent 中使用 `oo flow`，建立、檢查、執行和發布 Workbench 中的同一個 Flow。
-- **明確呈現資料相依關係。** 每個 Task 和 Subflow 都宣告具名、類型化的輸入和輸出。每條邊將一個特定輸出值綁定到一個特定輸入，因此流程圖就是執行階段使用的資料相依模型。
-- **視覺化設計，用程式碼擴充。** 在畫布上組合具型別約束的節點和 Subflow；遇到更適合用程式碼處理的邏輯，直接使用 Script 或 CodeModule
-  節點，寫的是真正的 TypeScript，而不是藏在表單裡的運算式。
+- **明確呈現資料相依關係。** 每個 Task 都宣告具名、類型化的輸入和輸出。每條邊將一個特定輸出值綁定到一個特定輸入，因此流程圖就是執行階段使用的資料相依模型。
+- **視覺化設計，需要時加入程式碼。** 在畫布上組合類型化節點，並使用 Code Task 撰寫自訂 JavaScript。程式碼始終清晰可見，不會隱藏在表單欄位中。
 - **執行和偵錯在同一處。** 執行前檢查輸入和 Flow 結構，執行時查看每個節點的進度、輸出和完整事件記錄。
 - **發布為長期執行的自動化。** Flow 可以手動啟動，也可以由 Cron、Webhook、輪詢資料來源或 Provider Event 觸發。
 - **執行狀態集中管理。** Project、不可變的 Revision、Publication、Live 版本、Run 和 Trigger 狀態都由目前的部署管理，不會散落在本機檔案和隱藏服務中。
@@ -86,7 +85,7 @@ Open Flow 適合已經超出簡單無程式碼原型，但又不想變成一堆�
 
 ## 流程圖就是執行階段契約
 
-每個 Task 和 Subflow 都宣告具名、類型化的輸入和輸出。每條邊將一個特定輸出值傳遞給一個特定輸入；當節點的輸入就緒時，執行階段才會啟動該節點。
+每個 Task 都宣告具名、類型化的輸入和輸出。每條邊將一個特定輸出值傳遞給一個特定輸入；當節點的輸入就緒時，執行階段才會啟動該節點。
 
 流程圖呈現的正是執行階段實際使用的資料相依關係：一般 Flow 資料不能透過隱藏的執行階段儲存空間從任意節點讀取。彼此獨立的分支可以並行執行，節點在畫布上的位置永遠不會改變執行行為。
 
@@ -100,7 +99,7 @@ Open Flow 適合已經超出簡單無程式碼原型，但又不想變成一堆�
 
 ### 在合適的位置撰寫程式碼
 
-Code Task 會把自訂 JavaScript 或 TypeScript 與它連接的節點放在一起，並保留類型化的輸入和輸出。
+Code Task 將自訂 JavaScript 直接放在流程圖中，並保留類型化的輸入和輸出。
 
 <p align="center">
   <img src="assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">

@@ -435,6 +435,7 @@ class FlowDesignerViewAdapter {
   #addItems: readonly FlowDesignerViewAddItem[]
   readonly #callbacks: ViewCallbacks
   #disconnectTimer: ReturnType<typeof setTimeout> | undefined
+  #disposeTimer: ReturnType<typeof setTimeout> | undefined
   #entries = new Map<string, NodeEntry>()
   #language: Val<string>
   #modelPositions = new Map<string, FlowDesignerViewPosition>()
@@ -559,10 +560,26 @@ class FlowDesignerViewAdapter {
     this.store.switchDisplayMode('overview')
   }
 
-  cancelPendingDisconnects(): void {
+  #cancelPendingDisconnects(): void {
     if (this.#disconnectTimer != null) clearTimeout(this.#disconnectTimer)
     this.#disconnectTimer = undefined
     this.#pendingDisconnects.clear()
+  }
+
+  mount(): () => void {
+    if (this.#disposeTimer != null) clearTimeout(this.#disposeTimer)
+    this.#disposeTimer = undefined
+    return () => {
+      this.#cancelPendingDisconnects()
+      this.#disposeTimer = setTimeout(() => {
+        this.#disposeTimer = undefined
+        this.store.dispose()
+      }, 0)
+    }
+  }
+
+  setCallbacks(callbacks: ViewCallbacks): void {
+    Object.assign(this.#callbacks, callbacks)
   }
 
   focusNode(nodeId: string, duration: number): void {
@@ -576,23 +593,18 @@ class FlowDesignerViewAdapter {
     for (const edge of edges) this.#callbacks.onDisconnect(edge)
   }
 
-  reconcile(
-    model: FlowDesignerViewModel,
-    editable: boolean,
-    language: string,
-    addItems: readonly FlowDesignerViewAddItem[],
-    selectedNodeIds: readonly string[],
-    callbacks: ViewCallbacks,
-  ): void {
+  reconcile(model: FlowDesignerViewModel, editable: boolean, language: string, addItems: readonly FlowDesignerViewAddItem[]): void {
     this.#addItems = addItems
-    Object.assign(this.#callbacks, callbacks)
     const editableChanged = this.store.$.editable.value != editable
     if (editableChanged) this.store.$$.editable.set(editable)
     if (this.#language.value != language) this.#language.set(language)
+    this.#syncModel(model)
+  }
+
+  setSelection(selectedNodeIds: readonly string[]): void {
     const selected = new Set(selectedNodeIds)
     const selectionChanged = selected.size != this.#selectedNodeIds.size || [...selected].some((nodeId) => !this.#selectedNodeIds.has(nodeId))
     this.#selectedNodeIds = selected
-    this.#syncModel(model)
     if (selectionChanged) {
       for (const [nodeId, entry] of this.#entries) {
         const value = selected.has(nodeId)
@@ -1367,10 +1379,12 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
     void propsRef.current.onAddNode(itemId, position)
   }, [])
 
-  useEffect(() => () => adapter.cancelPendingDisconnects(), [adapter])
+  useEffect(() => adapter.mount(), [adapter])
+  useLayoutEffect(() => adapter.setCallbacks(callbacksFromProps(props)))
   useLayoutEffect(() => {
-    adapter.reconcile(props.model, props.editable, props.language ?? 'en', props.addItems, props.selectedNodeIds, callbacksFromProps(props))
-  }, [adapter, props])
+    adapter.reconcile(props.model, props.editable, props.language ?? 'en', props.addItems)
+  }, [adapter, props.addItems, props.editable, props.language, props.model])
+  useLayoutEffect(() => adapter.setSelection(props.selectedNodeIds), [adapter, props.selectedNodeIds])
   useEffect(() => {
     if (props.focusNodeRequest != null) {
       const reducedMotion =
@@ -1387,6 +1401,7 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
       fitView={false}
       flowDesignerStore={adapter.store}
       isValidConnection={isValidConnection}
+      key={props.identity}
       onMoveEnd={onMoveEnd}
       onNodeDragStop={onNodeDragStop}
       onDropAddItem={onDropAddItem}

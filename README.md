@@ -17,9 +17,9 @@ Flow. Ask Codex, Claude Code, or another terminal Agent to create, check, run, a
 workflow through [`oo flow`](https://github.com/oomol-lab/oo-cli), then inspect and edit that exact
 Flow visually in the Workbench.
 
-Use typed nodes for structure, keep custom logic as real JavaScript or TypeScript, and run the
-resulting automation on OOMOL Hosted or infrastructure you control. The graph remains
-understandable, the code remains code, and the deployment remains under your control.
+Use typed nodes for structure, keep custom logic as JavaScript, and run the resulting automation on
+OOMOL Hosted or infrastructure you control. The graph remains understandable, the code remains
+code, and the deployment remains under your control.
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
@@ -82,12 +82,11 @@ Use the same Open Flow product and Workbench through either supported path.
 
 - **Build with an AI Agent.** Use `oo flow` from Codex, Claude Code, or another terminal Agent to
   create, check, run, and publish the same Flow you see in the Workbench.
-- **Make data dependencies explicit.** Every Task and Subflow declares named, typed inputs and
-  outputs. Each edge binds a specific output value to a specific input, so the graph is the data
-  dependency model used by the runtime.
-- **Design visually, extend with code.** Compose typed nodes and Subflows on the canvas, then use
-  Script and CodeModule nodes for logic that should stay explicit. The code remains code, with real
-  TypeScript instead of expressions hidden in form fields.
+- **Make data dependencies explicit.** Every Task declares named, typed inputs and outputs. Each
+  edge binds a specific output value to a specific input, so the graph is the data dependency model
+  used by the runtime.
+- **Design visually, add code when needed.** Compose typed nodes on the canvas, and use Code Tasks
+  for custom JavaScript. Code stays visible instead of being hidden in form fields.
 - **Run and debug in one place.** Validate inputs and the Flow structure before execution, inspect
   node progress and outputs, and follow the complete event history of every Run.
 - **Publish long-running automation.** Start Flows manually or from Cron schedules, Webhooks,
@@ -105,8 +104,8 @@ collection of scripts and infrastructure.
 
 ## The Graph Is the Runtime Contract
 
-Every Task and Subflow declares named, typed inputs and outputs. An edge carries a value from a
-specific output to a specific input, and the runtime starts a node when its inputs are ready.
+Every Task declares named, typed inputs and outputs. An edge carries a value from a specific output
+to a specific input, and the runtime starts a node when its inputs are ready.
 
 The graph shows the data dependencies the runtime actually uses: ordinary Flow data cannot be
 pulled from arbitrary nodes through a hidden runtime store. Independent branches can run
@@ -123,8 +122,7 @@ canvas.
 
 ### Code where it belongs
 
-Code Tasks keep custom JavaScript or TypeScript visible beside the nodes they connect, with typed
-inputs and outputs.
+Code Tasks place custom JavaScript directly in the graph, with typed inputs and outputs.
 
 <p align="center">
   <img src="./docs/assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">
