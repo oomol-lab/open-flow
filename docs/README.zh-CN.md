@@ -14,8 +14,11 @@
 
 </div>
 
-Open Flow 是一个开源的工作流自动化平台。你可以在画布上连接有类型约束的节点，在合适的位置编写 JavaScript 或
-TypeScript，直接运行和调试 Flow，再把它发布成持续工作的自动化流程，并部署在自己控制的环境中。
+Open Flow 是一个开源、面向 Agent 的工作流自动化平台。告诉 Codex、Claude Code 或其他终端 Agent 你想自动化什么；它可以通过
+[`oo flow`](https://github.com/oomol-lab/oo-cli) 发现 Action 和 Trigger、生成类型化工作流、编写代码、检查、运行并发布工作流。
+
+同一个 Flow 会始终显示在 Workbench 中并可继续编辑。你也可以在可视化画布上连接类型化步骤，在合适的位置保留 JavaScript 或
+TypeScript，并在自己控制的部署中运行最终的自动化流程。
 
 <p align="center">
   <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="assets/workbench-overview.png">
@@ -23,6 +26,21 @@ TypeScript，直接运行和调试 Flow，再把它发布成持续工作的自�
 
 > [!IMPORTANT]
 > Open Flow 目前处于 Alpha 阶段。公开协议有版本管理，但产品还没有发布第一个稳定版本。
+
+## 使用 AI Agent 构建工作流
+
+`oo flow` 将完整的创作生命周期开放为有版本、机器可读的命令。能够使用终端的 Agent 可以：
+
+- 发现准确的 Connector Action 和 Provider Trigger；
+- 创建和编辑类型化 Node、Edge、Code Task 和 Trigger binding；
+- 检查 Draft、运行它并读取结果；
+- 在你明确要求时发布到 Live，或者在 Workbench 中打开同一个 Flow。
+
+> **示例请求：**“构建一个工作流，读取未读 Gmail 邮件，整理格式后发送到飞书。”
+
+Agent 创建的是所选 Open Flow 部署中的真实 Draft，而不是用完即弃的本地配置。CLI 和 Workbench 使用同一个 Control API，因此 AI 创建的改动会立即出现在同一个可视化流程图中，并且人和 Agent 都可以继续编辑。
+
+[安装 `oo` CLI](https://github.com/oomol-lab/oo-cli)，即可通过 Codex、Claude Code 或其他终端 Agent 创作 Open Flow。
 
 ## 选择 Open Flow 的运行方式
 
@@ -45,6 +63,7 @@ TypeScript，直接运行和调试 Flow，再把它发布成持续工作的自�
 
 ## 为什么选择 Open Flow
 
+- **使用 AI Agent 构建。** 在 Codex、Claude Code 或其他终端 Agent 中使用 `oo flow`，创建、检查、运行和发布 Workbench 中的同一个 Flow。
 - **可视化设计，用代码扩展。** 在画布上组合有类型约束的节点和 Subflow；遇到更适合代码的逻辑，直接使用 Script 或 CodeModule
   节点，写的是真正的 TypeScript，而不是藏在表单里的表达式。
 - **运行和调试在同一处。** 运行前检查输入和 Flow 结构，运行时查看每个节点的进度、输出和完整事件记录。

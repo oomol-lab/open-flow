@@ -14,9 +14,12 @@
 
 </div>
 
-Open Flow は、コードを手放すことなくビジュアルキャンバス上で構築できるオープンソースのワークフロー自動化プラットフォームです。
-型付けされたステップを接続し、必要な場所で JavaScript または TypeScript を記述し、Flow を対話的に実行し、自分で管理するデプロイメント上で
-継続的に実行されるように公開できます。
+Open Flow は、オープンソースで Agent ネイティブなワークフロー自動化プラットフォームです。Codex、Claude Code、または他のターミナル Agent に
+自動化したい内容を伝えると、[`oo flow`](https://github.com/oomol-lab/oo-cli) を通じて Action と Trigger を探索し、型付きワークフローを生成し、
+コードを記述し、検査、実行、公開できます。
+
+同じ Flow は Workbench 上で表示および編集できます。ビジュアルキャンバスで型付きステップを接続し、必要な場所に JavaScript または TypeScript を残し、
+自分で管理するデプロイメント上で自動化を実行できます。
 
 <p align="center">
   <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="assets/workbench-overview.png">
@@ -24,6 +27,21 @@ Open Flow は、コードを手放すことなくビジュアルキャンバス�
 
 > [!IMPORTANT]
 > Open Flow は現在 Alpha 段階です。公開されている契約（contract）はバージョン管理されていますが、プロダクトとしての最初の安定版はまだリリースされていません。
+
+## AI Agent でワークフローを構築する
+
+`oo flow` は、作成ライフサイクルをバージョン管理された機械可読コマンドとして公開します。ターミナルを使用できる Agent は次の操作ができます。
+
+- 正確な Connector Action と Provider Trigger を探索する。
+- 型付き Node、Edge、Code Task、Trigger binding を作成および編集する。
+- Draft を検査して実行し、結果を確認する。
+- 明示的に依頼された場合に Live へ公開するか、同じ Flow を Workbench で開く。
+
+> **依頼の例：**「未読の Gmail メッセージを読み、整形して Feishu に送信するワークフローを構築して。」
+
+Agent が作成するのは、使い捨てのローカル設定ではなく、選択した Open Flow デプロイメント内の実際の Draft です。CLI と Workbench は同じ Control API を使用するため、AI が作成した変更は同じビジュアルグラフに表示され、人と Agent のどちらも編集を続けられます。
+
+[Codex、Claude Code、または他のターミナル Agent から Open Flow を作成するために `oo` CLI をインストールします。](https://github.com/oomol-lab/oo-cli)
 
 ## Open Flow の実行方法を選ぶ
 
@@ -46,6 +64,7 @@ Open Flow は、コードを手放すことなくビジュアルキャンバス�
 
 ## Open Flow を選ぶ理由
 
+- **AI Agent で構築する。** Codex、Claude Code、または他のターミナル Agent から `oo flow` を使用して、Workbench に表示される同じ Flow を作成、検査、実行、公開できます。
 - **ビジュアルで設計し、コードで拡張する。** キャンバス上で型付けされたノードと Subflow を組み合わせ、明示的に残すべきロジックには Script ノードや
   CodeModule ノードを使います。コードはあくまでコードのままで、フォーム項目に隠された式ではなく、本物の TypeScript を書けます。
 - **実行とデバッグを一か所で。** 実行前に入力と Flow の構造を検証し、各ノードの進行状況と出力を確認し、すべての Run の完全なイベント履歴を追跡できます。

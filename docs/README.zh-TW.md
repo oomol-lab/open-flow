@@ -14,8 +14,11 @@
 
 </div>
 
-Open Flow 是一個開源的工作流程自動化平台。你可以在畫布上連接具型別約束的節點，在合適的位置撰寫 JavaScript 或
-TypeScript，直接執行和偵錯 Flow，再把它發布成持續運作的自動化流程，並部署在自己掌控的環境中。
+Open Flow 是一個開源、面向 Agent 的工作流程自動化平台。告訴 Codex、Claude Code 或其他終端 Agent 你想自動化什麼；它可以透過
+[`oo flow`](https://github.com/oomol-lab/oo-cli) 探索 Action 和 Trigger、產生類型化工作流程、撰寫程式碼、檢查、執行並發布工作流程。
+
+同一個 Flow 會持續顯示在 Workbench 中並可繼續編輯。你也可以在視覺化畫布上連接類型化步驟，在合適的位置保留 JavaScript 或
+TypeScript，並在自己掌控的部署中執行最終的自動化流程。
 
 <p align="center">
   <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="assets/workbench-overview.png">
@@ -23,6 +26,21 @@ TypeScript，直接執行和偵錯 Flow，再把它發布成持續運作的自�
 
 > [!IMPORTANT]
 > Open Flow 目前處於 Alpha 階段。公開協定有版本管理，但產品尚未發布第一個穩定版本。
+
+## 使用 AI Agent 建立工作流程
+
+`oo flow` 將完整的創作生命週期開放為有版本、機器可讀的命令。能夠使用終端的 Agent 可以：
+
+- 探索準確的 Connector Action 和 Provider Trigger；
+- 建立和編輯類型化 Node、Edge、Code Task 和 Trigger binding；
+- 檢查 Draft、執行它並讀取結果；
+- 在你明確要求時發布到 Live，或在 Workbench 中開啟同一個 Flow。
+
+> **範例請求：**「建立一個工作流程，讀取未讀 Gmail 郵件，整理格式後傳送到飛書。」
+
+Agent 建立的是所選 Open Flow 部署中的真實 Draft，而不是用完即棄的本機設定。CLI 和 Workbench 使用同一個 Control API，因此 AI 建立的變更會立即出現在同一個視覺化流程圖中，並且人和 Agent 都可以繼續編輯。
+
+[安裝 `oo` CLI](https://github.com/oomol-lab/oo-cli)，即可透過 Codex、Claude Code 或其他終端 Agent 創作 Open Flow。
 
 ## 選擇 Open Flow 的執行方式
 
@@ -45,6 +63,7 @@ TypeScript，直接執行和偵錯 Flow，再把它發布成持續運作的自�
 
 ## 為什麼選擇 Open Flow
 
+- **使用 AI Agent 建立。** 在 Codex、Claude Code 或其他終端 Agent 中使用 `oo flow`，建立、檢查、執行和發布 Workbench 中的同一個 Flow。
 - **視覺化設計，用程式碼擴充。** 在畫布上組合具型別約束的節點和 Subflow；遇到更適合用程式碼處理的邏輯，直接使用 Script 或 CodeModule
   節點，寫的是真正的 TypeScript，而不是藏在表單裡的運算式。
 - **執行和偵錯在同一處。** 執行前檢查輸入和 Flow 結構，執行時查看每個節點的進度、輸出和完整事件記錄。

@@ -12,9 +12,14 @@
 
 </div>
 
-Open Flow is an open-source workflow automation platform for building on a visual canvas without
-giving up code. Connect typed steps, write JavaScript or TypeScript where it belongs, run flows
-interactively, and publish them for continuous execution on a deployment you control.
+Open Flow is an open-source, agent-native workflow automation platform. Tell Codex, Claude Code, or
+another terminal Agent what you want to automate; through
+[`oo flow`](https://github.com/oomol-lab/oo-cli), it can discover Actions and Triggers, generate a
+typed workflow, write code, check it, run it, and publish it.
+
+The same Flow stays visible and editable in the Workbench. Connect typed steps on a visual canvas,
+keep JavaScript or TypeScript where it belongs, and run the resulting automation on a deployment
+you control.
 
 <p align="center">
   <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="./docs/assets/workbench-overview.png">
@@ -23,6 +28,26 @@ interactively, and publish them for continuous execution on a deployment you con
 > [!IMPORTANT]
 > Open Flow is in alpha. Its contracts are versioned, but the product has not reached its first
 > stable release.
+
+## Build Workflows with an AI Agent
+
+`oo flow` exposes the authoring lifecycle as versioned, machine-readable commands. An Agent that can
+use a terminal can:
+
+- discover exact Connector Actions and Provider Triggers;
+- create and edit typed Nodes, Edges, Code Tasks, and Trigger bindings;
+- check a Draft, run it, and inspect the result;
+- publish it to Live or open the same Flow in the Workbench when you ask.
+
+> **Example request:** “Build a workflow that reads unread Gmail messages, formats them, and sends
+> them to Feishu.”
+
+The Agent creates a real Draft in the selected Open Flow deployment, not a disposable local config.
+The CLI and Workbench use the same Control API, so an AI-authored change appears in the same visual
+graph and remains editable by both people and Agents.
+
+[Install the `oo` CLI](https://github.com/oomol-lab/oo-cli) to author Open Flow from Codex, Claude
+Code, or another terminal Agent.
 
 ## Choose How to Run Open Flow
 
@@ -45,6 +70,8 @@ Use the same Open Flow product and Workbench through either supported path.
 
 ## Why Open Flow
 
+- **Build with an AI Agent.** Use `oo flow` from Codex, Claude Code, or another terminal Agent to
+  create, check, run, and publish the same Flow you see in the Workbench.
 - **Design visually, extend with code.** Compose typed nodes and Subflows on the canvas, then use
   Script and CodeModule nodes for logic that should stay explicit. The code remains code, with real
   TypeScript instead of expressions hidden in form fields.
