@@ -18,11 +18,7 @@ Open Flow 是一个开源的工作流自动化平台。你可以在画布上连�
 TypeScript，直接运行和调试 Flow，再把它发布成持续工作的自动化流程，并部署在自己控制的环境中。
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="assets/light.png">
-    <img alt="Open Flow Workbench 中正在运行的 Hacker News 工作流" src="assets/light.png">
-  </picture>
+  <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="assets/workbench-overview.png">
 </p>
 
 > [!IMPORTANT]
@@ -39,6 +35,22 @@ TypeScript，直接运行和调试 Flow，再把它发布成持续工作的自�
 - **自由选择运行环境。** 可以使用仓库自带的 Server 自行部署，也可以让同一套 Workbench 和 CLI 连接其他兼容 Control API 的实现。
 
 Open Flow 适合已经超过简单无代码原型，但又不想变成一堆脚本和基础设施的工作流。流程图仍然容易理解，需要写的代码也保留为正常代码，运行环境由你选择。
+
+### 类型化可视编排
+
+详细视图会在画布上明确展示每个输入、输出、类型、可空约束和连接关系。
+
+<p align="center">
+  <img src="assets/typed-node-details.jpg" alt="Typed input and output handles in the Open Flow Workbench detailed view">
+</p>
+
+### 在合适的位置写代码
+
+Code Task 会把自定义 JavaScript 或 TypeScript 与它连接的节点放在一起，并保留类型化的输入和输出。
+
+<p align="center">
+  <img src="assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">
+</p>
 
 ## 工作原理
 
@@ -87,6 +99,10 @@ docker run --rm \
 
 要对 GitHub、Gmail、Slack、Notion 等服务执行 Action 和 Provider Trigger，需要把 Server 指向一个 Connector 运行时。自行部署的
 [OpenConnector](https://github.com/oomol-lab/open-connector) 和 OOMOL 托管的 Connector 都提供所需的运行时 API。
+
+<p align="center">
+  <img src="assets/connector-actions.jpg" alt="Browsing Gmail Provider Triggers and Actions in the Open Flow Workbench">
+</p>
 
 ```dotenv
 OPEN_FLOW_CONNECTOR_ORIGIN=http://open-connector:3000
@@ -185,5 +201,5 @@ Issue。[SECURITY.md](../SECURITY.md) 说明了受支持的版本、披露流程
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../assets/star-history/star-history-dark.svg">
-  <img alt="Star 历史" src="../assets/star-history/star-history-light.svg">
+  <img alt="Star history" src="../assets/star-history/star-history-light.svg">
 </picture>

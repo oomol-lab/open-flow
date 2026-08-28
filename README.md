@@ -17,11 +17,7 @@ giving up code. Connect typed steps, write JavaScript or TypeScript where it bel
 interactively, and publish them for continuous execution on a deployment you control.
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="./docs/assets/light.png">
-    <img alt="A Hacker News workflow running in the Open Flow Workbench" src="./docs/assets/light.png">
-  </picture>
+  <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="./docs/assets/workbench-overview.png">
 </p>
 
 > [!IMPORTANT]
@@ -48,6 +44,24 @@ interactively, and publish them for continuous execution on a deployment you con
 Open Flow is built for workflows that outgrow a no-code prototype but should not become an opaque
 collection of scripts and infrastructure. The graph remains understandable, the code remains
 code, and the deployment remains under your control.
+
+### Typed visual authoring
+
+Detailed view keeps each input, output, type, nullable constraint, and connection explicit on the
+canvas.
+
+<p align="center">
+  <img src="./docs/assets/typed-node-details.jpg" alt="Typed input and output handles in the Open Flow Workbench detailed view">
+</p>
+
+### Code where it belongs
+
+Code Tasks keep custom JavaScript or TypeScript visible beside the nodes they connect, with typed
+inputs and outputs.
+
+<p align="center">
+  <img src="./docs/assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">
+</p>
 
 ## How It Works
 
@@ -104,6 +118,10 @@ To run Actions and Provider Triggers against services such as GitHub, Gmail, Sla
 point the Server at a Connector runtime. Both a self-hosted
 [OpenConnector](https://github.com/oomol-lab/open-connector) and the OOMOL-hosted Connector expose
 the required runtime API.
+
+<p align="center">
+  <img src="./docs/assets/connector-actions.jpg" alt="Browsing Gmail Provider Triggers and Actions in the Open Flow Workbench">
+</p>
 
 ```dotenv
 OPEN_FLOW_CONNECTOR_ORIGIN=http://open-connector:3000

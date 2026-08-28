@@ -20,11 +20,7 @@ TypeScript там, где это уместно, запускаете Flow в и
 непрерывного выполнения на deployment, который контролируете вы.
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="assets/light.png">
-    <img alt="Workflow для Hacker News, выполняющийся в Open Flow Workbench" src="assets/light.png">
-  </picture>
+  <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="assets/workbench-overview.png">
 </p>
 
 > [!IMPORTANT]
@@ -53,6 +49,24 @@ TypeScript там, где это уместно, запускаете Flow в и
 Open Flow создан для workflow, которые переросли no-code прототип, но не должны превращаться в
 непрозрачный набор скриптов и инфраструктуры. Граф остаётся понятным, код остаётся кодом, а
 deployment остаётся под вашим контролем.
+
+### Визуальное создание с типами
+
+В подробном представлении каждый вход, выход, тип, nullable-ограничение и соединение явно показаны
+на холсте.
+
+<p align="center">
+  <img src="assets/typed-node-details.jpg" alt="Typed input and output handles in the Open Flow Workbench detailed view">
+</p>
+
+### Код там, где он нужен
+
+Code Task показывает пользовательский JavaScript или TypeScript рядом с соединёнными узлами,
+сохраняя типизированные входы и выходы.
+
+<p align="center">
+  <img src="assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">
+</p>
 
 ## Как это работает
 
@@ -109,6 +123,10 @@ Server полезен и без внешних сервисов. Action на б�
 Чтобы выполнять Action и Trigger от Provider для таких сервисов, как GitHub, Gmail, Slack или Notion,
 укажите Server среду выполнения Connector. Необходимый runtime API предоставляют как self-hosted
 [OpenConnector](https://github.com/oomol-lab/open-connector), так и Connector, размещённый OOMOL.
+
+<p align="center">
+  <img src="assets/connector-actions.jpg" alt="Browsing Gmail Provider Triggers and Actions in the Open Flow Workbench">
+</p>
 
 ```dotenv
 OPEN_FLOW_CONNECTOR_ORIGIN=http://open-connector:3000
@@ -221,5 +239,5 @@ Issue и pull request приветствуются. Настройка окру�
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../assets/star-history/star-history-dark.svg">
-  <img alt="История звёзд" src="../assets/star-history/star-history-light.svg">
+  <img alt="Star history" src="../assets/star-history/star-history-light.svg">
 </picture>

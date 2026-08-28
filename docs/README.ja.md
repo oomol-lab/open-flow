@@ -19,11 +19,7 @@ Open Flow は、コードを手放すことなくビジュアルキャンバス�
 継続的に実行されるように公開できます。
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="assets/light.png">
-    <img alt="Open Flow Workbench で実行中の Hacker News ワークフロー" src="assets/light.png">
-  </picture>
+  <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="assets/workbench-overview.png">
 </p>
 
 > [!IMPORTANT]
@@ -43,6 +39,22 @@ Open Flow は、コードを手放すことなくビジュアルキャンバス�
 
 Open Flow は、ノーコードのプロトタイプでは収まらなくなったものの、不透明なスクリプトとインフラの寄せ集めにはしたくないワークフローのために作られています。
 グラフは理解しやすいまま、コードはコードのまま、そしてデプロイメントは自分の管理下に残ります。
+
+### 型付きビジュアルオーサリング
+
+詳細ビューでは、各入力、出力、型、nullable 制約、接続がキャンバス上に明示されます。
+
+<p align="center">
+  <img src="assets/typed-node-details.jpg" alt="Typed input and output handles in the Open Flow Workbench detailed view">
+</p>
+
+### 必要な場所にコードを書く
+
+Code Task では、カスタム JavaScript や TypeScript を接続先のノードと並べて表示し、型付きの入力と出力を維持できます。
+
+<p align="center">
+  <img src="assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">
+</p>
 
 ## 仕組み
 
@@ -91,6 +103,10 @@ Server は外部サービスなしでも利用できます。Connector を利用
 
 GitHub、Gmail、Slack、Notion などのサービスに対して Action や Provider Trigger を実行するには、Server を Connector ランタイムに向けます。
 セルフホストの [OpenConnector](https://github.com/oomol-lab/open-connector) と OOMOL がホストする Connector のどちらも、必要なランタイム API を提供しています。
+
+<p align="center">
+  <img src="assets/connector-actions.jpg" alt="Browsing Gmail Provider Triggers and Actions in the Open Flow Workbench">
+</p>
 
 ```dotenv
 OPEN_FLOW_CONNECTOR_ORIGIN=http://open-connector:3000
@@ -188,5 +204,5 @@ Open Flow の開発にご協力いただいたすべての皆さまに感謝し�
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../assets/star-history/star-history-dark.svg">
-  <img alt="Star 履歴" src="../assets/star-history/star-history-light.svg">
+  <img alt="Star history" src="../assets/star-history/star-history-light.svg">
 </picture>

@@ -20,11 +20,7 @@ TypeScript là où c'est pertinent, exécutez vos Flows de manière interactive 
 exécution continue sur un déploiement que vous contrôlez.
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="assets/light.png">
-    <img alt="Un workflow Hacker News en cours d'exécution dans le Workbench Open Flow" src="assets/light.png">
-  </picture>
+  <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="assets/workbench-overview.png">
 </p>
 
 > [!IMPORTANT]
@@ -54,6 +50,24 @@ exécution continue sur un déploiement que vous contrôlez.
 Open Flow est conçu pour les workflows qui dépassent le stade du prototype no-code mais ne doivent
 pas devenir un ensemble opaque de scripts et d'infrastructure. Le graphe reste compréhensible, le
 code reste du code, et le déploiement reste sous votre contrôle.
+
+### Création visuelle typée
+
+La vue détaillée rend explicites sur le canevas chaque entrée, sortie, type, contrainte nullable et
+connexion.
+
+<p align="center">
+  <img src="assets/typed-node-details.jpg" alt="Typed input and output handles in the Open Flow Workbench detailed view">
+</p>
+
+### Du code là où il est nécessaire
+
+Les Code Tasks gardent le JavaScript ou TypeScript personnalisé visible à côté des nœuds connectés,
+avec des entrées et sorties typées.
+
+<p align="center">
+  <img src="assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">
+</p>
 
 ## Fonctionnement
 
@@ -111,6 +125,10 @@ Pour exécuter des Actions et des Triggers de Provider auprès de services tels 
 ou Notion, pointez le Server vers un runtime Connector. Un
 [OpenConnector](https://github.com/oomol-lab/open-connector) auto-hébergé comme le Connector hébergé
 par OOMOL exposent tous deux l'API runtime requise.
+
+<p align="center">
+  <img src="assets/connector-actions.jpg" alt="Browsing Gmail Provider Triggers and Actions in the Open Flow Workbench">
+</p>
 
 ```dotenv
 OPEN_FLOW_CONNECTOR_ORIGIN=http://open-connector:3000
@@ -229,5 +247,5 @@ Consultez le [guide de contribution](../CONTRIBUTING.md).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../assets/star-history/star-history-dark.svg">
-  <img alt="Historique des Stars" src="../assets/star-history/star-history-light.svg">
+  <img alt="Star history" src="../assets/star-history/star-history-light.svg">
 </picture>

@@ -19,11 +19,7 @@ Open Flow는 코드를 포기하지 않고 시각적 캔버스 위에서 워크�
 대화식으로 실행한 뒤, 직접 관리하는 배포 환경에 게시해 지속적으로 실행할 수 있습니다.
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="assets/light.png">
-    <img alt="Open Flow Workbench에서 실행 중인 Hacker News 워크플로" src="assets/light.png">
-  </picture>
+  <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="assets/workbench-overview.png">
 </p>
 
 > [!IMPORTANT]
@@ -48,6 +44,22 @@ Open Flow는 코드를 포기하지 않고 시각적 캔버스 위에서 워크�
 Open Flow는 노코드 프로토타입 수준을 넘어섰지만 불투명한 스크립트와 인프라 더미가 되어서는 안 되는 워크플로를
 위해 만들어졌습니다. 그래프는 계속 이해할 수 있는 상태로, 코드는 계속 코드로, 배포는 계속 여러분의 통제 아래
 남습니다.
+
+### 타입이 명확한 시각적 작성
+
+상세 보기에서는 각 입력, 출력, 타입, nullable 제약 조건과 연결 관계를 캔버스에 명확하게 표시합니다.
+
+<p align="center">
+  <img src="assets/typed-node-details.jpg" alt="Typed input and output handles in the Open Flow Workbench detailed view">
+</p>
+
+### 필요한 곳에 작성하는 코드
+
+Code Task는 사용자 정의 JavaScript 또는 TypeScript를 연결된 노드와 함께 표시하고 타입이 지정된 입력과 출력을 유지합니다.
+
+<p align="center">
+  <img src="assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">
+</p>
 
 ## 동작 방식
 
@@ -100,6 +112,10 @@ Server는 외부 서비스 없이도 유용하게 사용할 수 있습니다. Co
 GitHub, Gmail, Slack, Notion 같은 서비스에 대해 Action과 Provider Trigger를 실행하려면 Server가 Connector 런타임을
 가리키도록 설정합니다. 자체 호스팅한 [OpenConnector](https://github.com/oomol-lab/open-connector)와 OOMOL이 호스팅하는
 Connector 모두 필요한 런타임 API를 제공합니다.
+
+<p align="center">
+  <img src="assets/connector-actions.jpg" alt="Browsing Gmail Provider Triggers and Actions in the Open Flow Workbench">
+</p>
 
 ```dotenv
 OPEN_FLOW_CONNECTOR_ORIGIN=http://open-connector:3000
@@ -206,5 +222,5 @@ Open Flow를 함께 만들어 주신 모든 기여자께 감사드립니다.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../assets/star-history/star-history-dark.svg">
-  <img alt="Star 히스토리" src="../assets/star-history/star-history-light.svg">
+  <img alt="Star history" src="../assets/star-history/star-history-light.svg">
 </picture>
