@@ -1,8 +1,6 @@
 <div align="center">
 
-# Open Flow
-
-**Build workflows you can see, code, run, and own.**
+<img src="docs/assets/open-flow-readme-banner.png" alt="Open Flow - Connect Actions. Compose Anything." width="100%" />
 
 [English](README.md) | [简体中文](docs/README.zh-CN.md) | [繁體中文](docs/README.zh-TW.md) | [日本語](docs/README.ja.md) | [한국어](docs/README.ko.md) | [Русский](docs/README.ru.md) | [Français](docs/README.fr.md)
 
