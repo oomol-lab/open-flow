@@ -1,0 +1,42 @@
+# Change this to the globally unique Fly app name you create with `fly apps create`.
+app = "my-open-flow"
+primary_region = "iad"
+
+# The Server drains Runs, SSE connections, and SQLite for up to 30 seconds after SIGTERM.
+kill_signal = "SIGTERM"
+kill_timeout = "45s"
+
+[build]
+dockerfile = "apps/server/Dockerfile"
+
+[env]
+NODE_ENV = "production"
+OPEN_FLOW_HOST = "0.0.0.0"
+OPEN_FLOW_PORT = "3000"
+OPEN_FLOW_DATA_DIR = "/data/open-flow"
+OPEN_FLOW_SESSION_COOKIE_SECURE = "true"
+OPEN_FLOW_LOG_LEVEL = "info"
+
+[mounts]
+source = "open_flow_data"
+destination = "/data/open-flow"
+
+[http_service]
+internal_port = 3000
+force_https = true
+# Cron and Poll Triggers only fire while the machine is running, so keep one machine up.
+auto_stop_machines = "off"
+auto_start_machines = true
+min_machines_running = 1
+
+[[http_service.checks]]
+interval = "30s"
+timeout = "5s"
+grace_period = "15s"
+method = "GET"
+path = "/readyz"
+protocol = "http"
+
+[[vm]]
+size = "shared-cpu-1x"
+memory = "1gb"

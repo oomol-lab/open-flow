@@ -54,20 +54,23 @@ Agent는 일회용 로컬 설정이 아니라 선택한 Open Flow 배포 안에 
 
 ## Open Flow 실행 방식 선택
 
-지원되는 두 방식 모두 동일한 Open Flow 제품과 Workbench를 사용합니다.
+지원되는 세 방식 모두 동일한 Open Flow 제품과 Workbench를 사용합니다.
 
 <table>
   <tr>
-    <td width="50%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
-    <td width="50%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+    <td width="33%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
+    <td width="33%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+    <td width="33%" align="center"><strong>Fly.io Self-hosted</strong></td>
   </tr>
   <tr>
-    <td width="50%" valign="top">서버를 준비하거나 패치하고 모니터링할 필요 없이 바로 사용할 수 있습니다. OOMOL이 배포를 운영하고 지원되는 연동에 관리형 OAuth App을 제공하므로 고정 서버 비용과 별도의 OAuth App 설정을 줄일 수 있습니다.</td>
-    <td width="50%" valign="top">포함된 Docker 이미지로 자체 인프라에서 실행합니다. 배포, 스토리지, 백업, 업그레이드, 네트워크와 Connector 또는 OAuth App 설정을 직접 관리합니다.</td>
+    <td width="33%" valign="top">서버를 준비하거나 패치하고 모니터링할 필요 없이 바로 사용할 수 있습니다. OOMOL이 배포를 운영하고 지원되는 연동에 관리형 OAuth App을 제공하므로 고정 서버 비용과 별도의 OAuth App 설정을 줄일 수 있습니다.</td>
+    <td width="33%" valign="top">포함된 Docker 이미지로 자체 인프라에서 실행합니다. 배포, 스토리지, 백업, 업그레이드, 네트워크와 Connector 또는 OAuth App 설정을 직접 관리합니다.</td>
+    <td width="33%" valign="top">같은 Docker 이미지를 Fly.io에서 실행하며 서버를 직접 운영할 필요가 없습니다. Fly가 이미지 빌드, TLS 종료, 영구 volume의 SQLite를 담당하고, secret, 백업, 업그레이드와 Connector 또는 OAuth App 설정은 직접 관리합니다.</td>
   </tr>
   <tr>
-    <td width="50%" align="center">🚀 <a href="https://oomol.com"><strong>OOMOL Hosted 사용</strong></a></td>
-    <td width="50%" align="center"><a href="#빠른-시작"><strong>Docker로 셀프 호스팅</strong></a></td>
+    <td width="33%" align="center">🚀 <a href="https://oomol.com"><strong>OOMOL Hosted 사용</strong></a></td>
+    <td width="33%" align="center"><a href="#빠른-시작"><strong>Docker로 셀프 호스팅</strong></a></td>
+    <td width="33%" align="center"><a href="server/fly-io/README.ko.md"><strong>Fly.io에 배포</strong></a></td>
   </tr>
 </table>
 
@@ -158,6 +161,12 @@ Server는 외부 서비스 없이도 유용하게 사용할 수 있습니다. Co
 프로덕션 구성, TLS, 헬스 체크, 영속화, 백업, 리소스 제한은 [Server 배포 가이드](server/container-delivery.md)와
 [SECURITY.md](../SECURITY.md#hardening-your-deployment)의 강화 체크리스트를 참고하세요.
 
+## Fly.io에 배포
+
+같은 이미지를 Fly.io에서도 실행할 수 있습니다. 저장소에 포함된 `fly.toml`은 `apps/server/Dockerfile`로 이미지를 빌드하고, Cron과 Poll
+Trigger를 위해 machine 한 대를 항상 실행 상태로 유지하며, SQLite를 Fly volume에 영속화합니다. Fly app 생성, volume, secret, 배포,
+custom domain, 스케일링 제한은 [fly-io.md](server/fly-io/README.ko.md)를 참고하세요.
+
 ## Connector 연결
 
 GitHub, Gmail, Slack, Notion 같은 서비스에 대해 Action과 Provider Trigger를 실행하려면 Server가 Connector 런타임을
@@ -235,6 +244,7 @@ bun run build
 - [Command Artifact 배포 계약](distribution/command-artifact.md)
 - [Workbench 및 Designer 프런트엔드 참고 사항](authoring/frontend-ui.md)
 - [Server 배포](server/container-delivery.md)
+- [Fly.io 배포](server/fly-io/README.ko.md)
 - [기여 안내](../CONTRIBUTING.md)
 - [행동 강령](../CODE_OF_CONDUCT.md)
 - [보안 정책](../SECURITY.md)

@@ -58,20 +58,23 @@ Agent создаёт настоящий Draft в выбранном deployment O
 
 ## Выберите способ запуска Open Flow
 
-Оба поддерживаемых варианта используют один и тот же продукт Open Flow и Workbench.
+Все поддерживаемые варианты используют один и тот же продукт Open Flow и Workbench.
 
 <table>
   <tr>
-    <td width="50%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
-    <td width="50%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+    <td width="33%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
+    <td width="33%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+    <td width="33%" align="center"><strong>Fly.io Self-hosted</strong></td>
   </tr>
   <tr>
-    <td width="50%" valign="top">Готово к работе без подготовки, обновления и мониторинга сервера. OOMOL управляет deployment и предоставляет управляемые OAuth App для поддерживаемых интеграций, поэтому вам не нужны постоянные расходы на сервер и отдельная настройка OAuth App.</td>
-    <td width="50%" valign="top">Запускайте на своей инфраструктуре с помощью включённого Docker image. Вы управляете deployment, хранилищем, резервным копированием, обновлениями, сетью и настройкой Connector или OAuth App.</td>
+    <td width="33%" valign="top">Готово к работе без подготовки, обновления и мониторинга сервера. OOMOL управляет deployment и предоставляет управляемые OAuth App для поддерживаемых интеграций, поэтому вам не нужны постоянные расходы на сервер и отдельная настройка OAuth App.</td>
+    <td width="33%" valign="top">Запускайте на своей инфраструктуре с помощью включённого Docker image. Вы управляете deployment, хранилищем, резервным копированием, обновлениями, сетью и настройкой Connector или OAuth App.</td>
+    <td width="33%" valign="top">Запускайте тот же Docker image на Fly.io, не обслуживая сервер самостоятельно. Fly собирает image, терминирует TLS и хранит SQLite на постоянном volume; вы управляете secrets, резервным копированием, обновлениями и настройкой Connector или OAuth App.</td>
   </tr>
   <tr>
-    <td width="50%" align="center">🚀 <a href="https://oomol.com"><strong>Использовать OOMOL Hosted</strong></a></td>
-    <td width="50%" align="center"><a href="#быстрый-старт"><strong>Развернуть самостоятельно с Docker</strong></a></td>
+    <td width="33%" align="center">🚀 <a href="https://oomol.com"><strong>Использовать OOMOL Hosted</strong></a></td>
+    <td width="33%" align="center"><a href="#быстрый-старт"><strong>Развернуть самостоятельно с Docker</strong></a></td>
+    <td width="33%" align="center"><a href="server/fly-io/README.ru.md"><strong>Развернуть на Fly.io</strong></a></td>
   </tr>
 </table>
 
@@ -171,6 +174,13 @@ Server полезен и без внешних сервисов. Action на б�
 ресурсов описаны в [руководстве по развёртыванию Server](server/container-delivery.md) и в чеклисте
 по усилению защиты в [SECURITY.md](../SECURITY.md#hardening-your-deployment).
 
+## Развёртывание на Fly.io
+
+Тот же образ работает на Fly.io. В репозитории есть `fly.toml`, который собирает
+`apps/server/Dockerfile`, держит одну machine запущенной для Cron и Poll Trigger и сохраняет SQLite
+на Fly volume. Создание Fly app, volume, secrets, развёртывание, custom domain и
+ограничения масштабирования описаны в [fly-io.md](server/fly-io/README.ru.md).
+
 ## Подключение Connector
 
 Чтобы выполнять Action и Trigger от Provider для таких сервисов, как GitHub, Gmail, Slack или Notion,
@@ -251,6 +261,7 @@ bun run build
 - [Дистрибуция Command Artifact](distribution/command-artifact.md)
 - [Заметки по frontend Workbench и Designer](authoring/frontend-ui.md)
 - [Развёртывание Server](server/container-delivery.md)
+- [Развёртывание на Fly.io](server/fly-io/README.ru.md)
 - [Участие в разработке](../CONTRIBUTING.md)
 - [Кодекс поведения](../CODE_OF_CONDUCT.md)
 - [Безопасность](../SECURITY.md)

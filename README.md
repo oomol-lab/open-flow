@@ -61,20 +61,23 @@ Code, or another terminal Agent.
 
 ## Choose How to Run Open Flow
 
-Use the same Open Flow product and Workbench through either supported path.
+Use the same Open Flow product and Workbench through any supported path.
 
 <table>
   <tr>
-    <td width="50%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
-    <td width="50%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+    <td width="33%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
+    <td width="33%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+    <td width="33%" align="center"><strong>Fly.io Self-hosted</strong></td>
   </tr>
   <tr>
-    <td width="50%" valign="top">Ready to use without provisioning, patching, or monitoring a server. OOMOL operates the deployment and provides managed OAuth apps for supported integrations, so you avoid fixed server costs and separate OAuth app setup.</td>
-    <td width="50%" valign="top">Run on your own infrastructure with the included Docker image. You manage deployment, storage, backups, upgrades, networking, and any Connector or OAuth app setup.</td>
+    <td width="33%" valign="top">Ready to use without provisioning, patching, or monitoring a server. OOMOL operates the deployment and provides managed OAuth apps for supported integrations, so you avoid fixed server costs and separate OAuth app setup.</td>
+    <td width="33%" valign="top">Run on your own infrastructure with the included Docker image. You manage deployment, storage, backups, upgrades, networking, and any Connector or OAuth app setup.</td>
+    <td width="33%" valign="top">Run the same Docker image on Fly.io without operating a server yourself. Fly builds the image, terminates TLS, and keeps SQLite on a persistent volume; you manage secrets, backups, upgrades, and any Connector or OAuth app setup.</td>
   </tr>
   <tr>
-    <td width="50%" align="center">🚀 <a href="https://oomol.com"><strong>Use OOMOL Hosted</strong></a></td>
-    <td width="50%" align="center"><a href="#quick-start"><strong>Self-host with Docker</strong></a></td>
+    <td width="33%" align="center">🚀 <a href="https://oomol.com"><strong>Use OOMOL Hosted</strong></a></td>
+    <td width="33%" align="center"><a href="#quick-start"><strong>Self-host with Docker</strong></a></td>
+    <td width="33%" align="center"><a href="docs/server/fly-io/README.md"><strong>Deploy to Fly.io</strong></a></td>
   </tr>
 </table>
 
@@ -177,6 +180,13 @@ For production configuration, TLS, health checks, persistence, backup, and resou
 [Server deployment guide](docs/server/container-delivery.md) and the hardening checklist in
 [SECURITY.md](SECURITY.md#hardening-your-deployment).
 
+## Deploy to Fly.io
+
+The same image runs on Fly.io. The repository ships a `fly.toml` that builds
+`apps/server/Dockerfile`, keeps one machine running for Cron and Poll Triggers, and persists SQLite
+on a Fly volume. See [docs/server/fly-io/README.md](docs/server/fly-io/README.md) for app creation, volumes,
+secrets, deployment, custom domains, and scaling limits.
+
 ## Connect a Connector
 
 To run Actions and Provider Triggers against services such as GitHub, Gmail, Slack, or Notion,
@@ -261,6 +271,7 @@ Start with the [documentation index](docs/README.md). The most useful references
 - [Command Artifact distribution](docs/distribution/command-artifact.md)
 - [Workbench and Designer frontend notes](docs/authoring/frontend-ui.md)
 - [Server deployment](docs/server/container-delivery.md)
+- [Fly.io deployment](docs/server/fly-io/README.md)
 - [Contributing](CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Security](SECURITY.md)

@@ -23,7 +23,6 @@ try {
   process.stdout.write('Building the Server Docker image.\n')
   await docker(['build', '--file', 'apps/server/Dockerfile', '--tag', imageName, '.'])
   imageBuilt = true
-  assert.equal((await docker(['image', 'inspect', '--format', '{{.Config.User}}', imageName])).trim(), 'node')
 
   await docker(['volume', 'create', volumeName])
   volumeCreated = true

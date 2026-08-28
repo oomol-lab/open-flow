@@ -54,20 +54,23 @@ Agent が作成するのは、使い捨てのローカル設定ではなく、�
 
 ## Open Flow の実行方法を選ぶ
 
-どちらの対応パスでも、同じ Open Flow プロダクトと Workbench を利用できます。
+どの対応パスでも、同じ Open Flow プロダクトと Workbench を利用できます。
 
 <table>
   <tr>
-    <td width="50%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
-    <td width="50%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+    <td width="33%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
+    <td width="33%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+    <td width="33%" align="center"><strong>Fly.io Self-hosted</strong></td>
   </tr>
   <tr>
-    <td width="50%" valign="top">サーバーの準備、更新、監視なしですぐに利用できます。OOMOL がデプロイメントを運用し、対応する連携にはマネージド OAuth App を提供するため、固定のサーバー費用や個別の OAuth App 設定が不要です。</td>
-    <td width="50%" valign="top">同梱の Docker イメージを使って自分のインフラストラクチャで実行します。デプロイ、ストレージ、バックアップ、アップグレード、ネットワーク、Connector または OAuth App の設定を自分で管理します。</td>
+    <td width="33%" valign="top">サーバーの準備、更新、監視なしですぐに利用できます。OOMOL がデプロイメントを運用し、対応する連携にはマネージド OAuth App を提供するため、固定のサーバー費用や個別の OAuth App 設定が不要です。</td>
+    <td width="33%" valign="top">同梱の Docker イメージを使って自分のインフラストラクチャで実行します。デプロイ、ストレージ、バックアップ、アップグレード、ネットワーク、Connector または OAuth App の設定を自分で管理します。</td>
+    <td width="33%" valign="top">同じ Docker イメージを Fly.io で実行でき、サーバーを自分で運用する必要はありません。Fly がイメージのビルド、TLS 終端、永続 volume 上の SQLite を担当し、secret、バックアップ、アップグレード、Connector または OAuth App の設定は自分で管理します。</td>
   </tr>
   <tr>
-    <td width="50%" align="center">🚀 <a href="https://oomol.com"><strong>OOMOL Hosted を使う</strong></a></td>
-    <td width="50%" align="center"><a href="#クイックスタート"><strong>Docker でセルフホストする</strong></a></td>
+    <td width="33%" align="center">🚀 <a href="https://oomol.com"><strong>OOMOL Hosted を使う</strong></a></td>
+    <td width="33%" align="center"><a href="#クイックスタート"><strong>Docker でセルフホストする</strong></a></td>
+    <td width="33%" align="center"><a href="server/fly-io/README.ja.md"><strong>Fly.io にデプロイする</strong></a></td>
   </tr>
 </table>
 
@@ -151,6 +154,12 @@ Server は外部サービスなしでも利用できます。Connector を利用
 本番環境の設定、TLS、ヘルスチェック、永続化、バックアップ、リソース制限については、[Server デプロイガイド](server/container-delivery.md) と
 [SECURITY.md](../SECURITY.md#hardening-your-deployment) の強化チェックリストを参照してください。
 
+## Fly.io にデプロイする
+
+同じイメージは Fly.io でも動作します。リポジトリに含まれる `fly.toml` は `apps/server/Dockerfile` でイメージをビルドし、Cron と Poll Trigger
+を動かすために 1 台の machine を常時起動し、SQLite を Fly volume に永続化します。Fly app の作成、volume、secret、デプロイ、custom
+domain、スケーリングの制限については [fly-io.md](server/fly-io/README.ja.md) を参照してください。
+
 ## Connector を接続する
 
 GitHub、Gmail、Slack、Notion などのサービスに対して Action や Provider Trigger を実行するには、Server を Connector ランタイムに向けます。
@@ -221,6 +230,7 @@ bun run build
 - [Command Artifact の配布契約](distribution/command-artifact.md)
 - [Workbench と Designer のフロントエンドに関する注意](authoring/frontend-ui.md)
 - [Server のデプロイ](server/container-delivery.md)
+- [Fly.io へのデプロイ](server/fly-io/README.ja.md)
 - [コントリビューション](../CONTRIBUTING.md)
 - [行動規範](../CODE_OF_CONDUCT.md)
 - [セキュリティ](../SECURITY.md)

@@ -60,7 +60,7 @@ docker run --detach \
 ```
 
 Workbench 和 API 位于 `http://127.0.0.1:3000`；登录后 `/variables` 提供该 deployment 的 Variable 管理面。最终镜像默认监听
-`0.0.0.0:3000`，以非 root `node` 用户运行，并把 SQLite 保存为 `/data/open-flow/open-flow.sqlite`。
+`0.0.0.0:3000`，以 root 用户运行，并把 SQLite 保存为 `/data/open-flow/open-flow.sqlite`。
 
 ## 4. 配置
 

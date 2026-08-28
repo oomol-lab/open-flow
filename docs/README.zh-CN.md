@@ -53,20 +53,23 @@ Agent 创建的是所选 Open Flow 部署中的真实 Draft，而不是用完即
 
 ## 选择 Open Flow 的运行方式
 
-两种支持的方式使用同一套 Open Flow 产品和 Workbench。
+三种支持的方式使用同一套 Open Flow 产品和 Workbench。
 
 <table>
   <tr>
-    <td width="50%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
-    <td width="50%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+    <td width="33%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
+    <td width="33%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+    <td width="33%" align="center"><strong>Fly.io Self-hosted</strong></td>
   </tr>
   <tr>
-    <td width="50%" valign="top">无需准备、更新或监控服务器，打开即可使用。OOMOL 负责运行部署，并为支持的集成提供托管 OAuth App，免去固定服务器成本和单独配置 OAuth App 的工作。</td>
-    <td width="50%" valign="top">使用内置 Docker 镜像运行在自己的基础设施中。部署、存储、备份、升级、网络以及 Connector 或 OAuth App 配置均由你管理。</td>
+    <td width="33%" valign="top">无需准备、更新或监控服务器，打开即可使用。OOMOL 负责运行部署，并为支持的集成提供托管 OAuth App，免去固定服务器成本和单独配置 OAuth App 的工作。</td>
+    <td width="33%" valign="top">使用内置 Docker 镜像运行在自己的基础设施中。部署、存储、备份、升级、网络以及 Connector 或 OAuth App 配置均由你管理。</td>
+    <td width="33%" valign="top">在 Fly.io 上运行同一个 Docker 镜像，无需自己维护服务器。Fly 负责构建镜像、终止 TLS 并把 SQLite 保存在持久化 volume 上；secret、备份、升级以及 Connector 或 OAuth App 配置由你管理。</td>
   </tr>
   <tr>
-    <td width="50%" align="center">🚀 <a href="https://oomol.com"><strong>使用 OOMOL Hosted</strong></a></td>
-    <td width="50%" align="center"><a href="#快速开始"><strong>使用 Docker 自部署</strong></a></td>
+    <td width="33%" align="center">🚀 <a href="https://oomol.com"><strong>使用 OOMOL Hosted</strong></a></td>
+    <td width="33%" align="center"><a href="#快速开始"><strong>使用 Docker 自部署</strong></a></td>
+    <td width="33%" align="center"><a href="server/fly-io/README.zh-CN.md"><strong>部署到 Fly.io</strong></a></td>
   </tr>
 </table>
 
@@ -148,6 +151,11 @@ docker run --rm \
 生产环境所需的配置、TLS、健康检查、数据持久化、备份和资源限制，参见
 [Server 部署文档](server/container-delivery.md) 和 [SECURITY.md](../SECURITY.md#hardening-your-deployment) 中的加固清单。
 
+## 部署到 Fly.io
+
+同一个镜像也可以部署到 Fly.io。仓库自带的 `fly.toml` 使用 `apps/server/Dockerfile` 构建镜像，保持一台 machine 常驻以运行 Cron 和 Poll
+Trigger，并把 SQLite 持久化到 Fly volume。Fly app 创建、volume、secret、部署、自定义域名和扩缩容限制见 [fly-io.zh-CN.md](server/fly-io/README.zh-CN.md)。
+
 ## 接入 Connector
 
 要对 GitHub、Gmail、Slack、Notion 等服务执行 Action 和 Provider Trigger，需要把 Server 指向一个 Connector 运行时。自行部署的
@@ -220,6 +228,7 @@ SQLite volume 恢复。不要在仓库根目录直接运行 `bun test`，它会�
 - [Command Artifact 分发合同](distribution/command-artifact.md)
 - [Workbench 与 Designer 前端注意事项](authoring/frontend-ui.md)
 - [Server 部署](server/container-delivery.md)
+- [Fly.io 部署](server/fly-io/README.zh-CN.md)
 - [参与贡献](../CONTRIBUTING.md)
 - [行为准则](../CODE_OF_CONDUCT.md)
 - [安全政策](../SECURITY.md)

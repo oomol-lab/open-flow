@@ -59,20 +59,23 @@ L'Agent crée un véritable Draft dans le déploiement Open Flow sélectionné, 
 
 ## Choisir comment exécuter Open Flow
 
-Les deux options prises en charge utilisent le même produit Open Flow et le même Workbench.
+Les trois options prises en charge utilisent le même produit Open Flow et le même Workbench.
 
 <table>
   <tr>
-    <td width="50%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
-    <td width="50%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+    <td width="33%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
+    <td width="33%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
+    <td width="33%" align="center"><strong>Fly.io Self-hosted</strong></td>
   </tr>
   <tr>
-    <td width="50%" valign="top">Prêt à l'emploi sans préparer, mettre à jour ou superviser un serveur. OOMOL exploite le déploiement et fournit des OAuth Apps gérées pour les intégrations compatibles, ce qui évite les coûts fixes d'un serveur et la configuration séparée des OAuth Apps.</td>
-    <td width="50%" valign="top">Exécutez Open Flow sur votre propre infrastructure avec l'image Docker incluse. Vous gérez le déploiement, le stockage, les sauvegardes, les mises à niveau, le réseau et la configuration du Connector ou des OAuth Apps.</td>
+    <td width="33%" valign="top">Prêt à l'emploi sans préparer, mettre à jour ou superviser un serveur. OOMOL exploite le déploiement et fournit des OAuth Apps gérées pour les intégrations compatibles, ce qui évite les coûts fixes d'un serveur et la configuration séparée des OAuth Apps.</td>
+    <td width="33%" valign="top">Exécutez Open Flow sur votre propre infrastructure avec l'image Docker incluse. Vous gérez le déploiement, le stockage, les sauvegardes, les mises à niveau, le réseau et la configuration du Connector ou des OAuth Apps.</td>
+    <td width="33%" valign="top">Exécutez la même image Docker sur Fly.io sans exploiter vous-même un serveur. Fly construit l'image, termine le TLS et conserve SQLite sur un volume persistant ; vous gérez les secrets, les sauvegardes, les mises à niveau et la configuration du Connector ou des OAuth Apps.</td>
   </tr>
   <tr>
-    <td width="50%" align="center">🚀 <a href="https://oomol.com"><strong>Utiliser OOMOL Hosted</strong></a></td>
-    <td width="50%" align="center"><a href="#démarrage-rapide"><strong>S'auto-héberger avec Docker</strong></a></td>
+    <td width="33%" align="center">🚀 <a href="https://oomol.com"><strong>Utiliser OOMOL Hosted</strong></a></td>
+    <td width="33%" align="center"><a href="#démarrage-rapide"><strong>S'auto-héberger avec Docker</strong></a></td>
+    <td width="33%" align="center"><a href="server/fly-io/README.fr.md"><strong>Déployer sur Fly.io</strong></a></td>
   </tr>
 </table>
 
@@ -172,6 +175,14 @@ Pour la configuration de production, TLS, les health checks, la persistance, les
 limites de ressources, consultez le [guide de déploiement du Server](server/container-delivery.md) et
 la liste de durcissement dans [SECURITY.md](../SECURITY.md#hardening-your-deployment).
 
+## Déployer sur Fly.io
+
+La même image fonctionne sur Fly.io. Le dépôt fournit un `fly.toml` qui construit
+`apps/server/Dockerfile`, garde une machine en marche pour les Triggers Cron et Poll, et persiste
+SQLite sur un volume Fly. Consultez [fly-io.md](server/fly-io/README.fr.md) pour la création de l'app, le
+volume, les secrets, le déploiement, les domaines personnalisés et les limites de mise à
+l'échelle.
+
 ## Connecter un Connector
 
 Pour exécuter des Actions et des Triggers de Provider auprès de services tels que GitHub, Gmail, Slack
@@ -257,6 +268,7 @@ Commencez par l'[index de la documentation](README.md). Les références les plu
 - [Distribution du Command Artifact](distribution/command-artifact.md)
 - [Notes sur le frontend du Workbench et du Designer](authoring/frontend-ui.md)
 - [Déploiement du Server](server/container-delivery.md)
+- [Déploiement sur Fly.io](server/fly-io/README.fr.md)
 - [Contribuer](../CONTRIBUTING.md)
 - [Code de conduite](../CODE_OF_CONDUCT.md)
 - [Sécurité](../SECURITY.md)

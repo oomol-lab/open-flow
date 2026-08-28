@@ -22,10 +22,9 @@ ENV NODE_ENV=production \
   OPEN_FLOW_PORT=3000
 
 WORKDIR /app
-COPY --from=build --chown=node:node /workspace/apps/server/dist/ ./
-RUN mkdir -p /data/open-flow && chown node:node /data/open-flow
+COPY --from=build /workspace/apps/server/dist/ ./
+RUN mkdir -p /data/open-flow
 
-USER node
 VOLUME ["/data/open-flow"]
 EXPOSE 3000
 STOPSIGNAL SIGTERM

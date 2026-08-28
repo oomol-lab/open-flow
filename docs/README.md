@@ -14,3 +14,4 @@ Open Flow 提供公共产品合同、Workbench runtime、CLI runtime 与完整 S
 ## Server 实施参考
 
 - [Server 容器交付参考](server/container-delivery.md)
+- [Fly.io 部署](server/fly-io/README.zh-CN.md) ([English](server/fly-io/README.md))
