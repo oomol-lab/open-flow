@@ -14,11 +14,10 @@
 
 </div>
 
-Open Flow 是一个开源、面向 Agent 的工作流自动化平台。告诉 Codex、Claude Code 或其他终端 Agent 你想自动化什么；它可以通过
-[`oo flow`](https://github.com/oomol-lab/oo-cli) 发现 Action 和 Trigger、生成类型化工作流、编写代码、检查、运行并发布工作流。
+Open Flow 是一个开源工作流自动化平台，AI Agent 和人可以在其中共同构建同一个 Flow。让 Codex、Claude Code 或其他终端
+Agent 通过 [`oo flow`](https://github.com/oomol-lab/oo-cli) 创建、检查、运行和发布类型化工作流，然后在 Workbench 中直观查看并继续编辑同一个 Flow。
 
-同一个 Flow 会始终显示在 Workbench 中并可继续编辑。你也可以在可视化画布上连接类型化步骤，在合适的位置保留 JavaScript 或
-TypeScript，并在自己控制的部署中运行最终的自动化流程。
+使用类型化节点定义结构，将自定义逻辑保留为真正的 JavaScript 或 TypeScript，并在 OOMOL Hosted 或自己控制的基础设施上运行最终的自动化流程。流程图始终容易理解，代码始终是代码，部署也始终由你掌控。
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
@@ -82,7 +81,7 @@ Agent 创建的是所选 Open Flow 部署中的真实 Draft，而不是用完即
 - **安全地执行用户代码。** Server 在长驻的 Executor 进程中为每次代码 Task 调用创建全新的 V8 isolate，只暴露该 Task 明确声明的 Capability。
 - **自由选择运行环境。** 可以直接使用 OOMOL Hosted，也可以通过 Docker 在自己的基础设施上运行仓库内置的 Server。
 
-Open Flow 适合已经超过简单无代码原型，但又不想变成一堆脚本和基础设施的工作流。流程图仍然容易理解，需要写的代码也保留为正常代码，运行环境由你选择。
+Open Flow 适合已经超过简单无代码原型，但又不想变成一堆脚本和基础设施的工作流。
 
 ### 类型化可视编排
 

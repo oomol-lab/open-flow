@@ -14,12 +14,11 @@
 
 </div>
 
-Open Flow は、オープンソースで Agent ネイティブなワークフロー自動化プラットフォームです。Codex、Claude Code、または他のターミナル Agent に
-自動化したい内容を伝えると、[`oo flow`](https://github.com/oomol-lab/oo-cli) を通じて Action と Trigger を探索し、型付きワークフローを生成し、
-コードを記述し、検査、実行、公開できます。
+Open Flow は、AI Agent と人が同じ Flow を共同で構築できる、オープンソースのワークフロー自動化プラットフォームです。Codex、Claude Code、または他のターミナル Agent に
+[`oo flow`](https://github.com/oomol-lab/oo-cli) を通じて型付きワークフローを作成、検査、実行、公開させ、その同じ Flow を Workbench で視覚的に確認し、編集できます。
 
-同じ Flow は Workbench 上で表示および編集できます。ビジュアルキャンバスで型付きステップを接続し、必要な場所に JavaScript または TypeScript を残し、
-自分で管理するデプロイメント上で自動化を実行できます。
+型付きノードで構造を定義し、カスタムロジックは本物の JavaScript または TypeScript として保ち、OOMOL Hosted または自分で管理するインフラストラクチャ上で自動化を実行できます。
+グラフは理解しやすいまま、コードはコードのまま、そしてデプロイメントは自分の管理下に残ります。
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
@@ -86,7 +85,6 @@ Agent が作成するのは、使い捨てのローカル設定ではなく、�
 - **実行場所を選べる。** OOMOL Hosted を利用するか、同梱の Server を Docker で自分のインフラストラクチャ上に実行できます。
 
 Open Flow は、ノーコードのプロトタイプでは収まらなくなったものの、不透明なスクリプトとインフラの寄せ集めにはしたくないワークフローのために作られています。
-グラフは理解しやすいまま、コードはコードのまま、そしてデプロイメントは自分の管理下に残ります。
 
 ### 型付きビジュアルオーサリング
 

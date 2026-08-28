@@ -14,12 +14,11 @@
 
 </div>
 
-Open Flow는 오픈소스 Agent 네이티브 워크플로 자동화 플랫폼입니다. Codex, Claude Code 또는 다른 터미널 Agent에게
-자동화하려는 작업을 설명하면 [`oo flow`](https://github.com/oomol-lab/oo-cli)를 통해 Action과 Trigger를 탐색하고,
-타입이 지정된 워크플로를 생성하고, 코드를 작성하고, 검사하고, 실행하고, 게시할 수 있습니다.
+Open Flow는 AI Agent와 사람이 동일한 Flow를 함께 구축하는 오픈소스 워크플로 자동화 플랫폼입니다. Codex, Claude Code 또는 다른 터미널
+Agent에게 [`oo flow`](https://github.com/oomol-lab/oo-cli)를 통해 타입이 지정된 워크플로를 생성, 검사, 실행, 게시하도록 요청한 다음, 바로 그 Flow를 Workbench에서 시각적으로 확인하고 계속 편집할 수 있습니다.
 
-동일한 Flow는 Workbench에서 계속 표시되고 편집할 수 있습니다. 시각적 캔버스에서 타입이 지정된 단계를 연결하고,
-필요한 곳에 JavaScript 또는 TypeScript를 유지하며, 직접 관리하는 배포 환경에서 자동화를 실행할 수 있습니다.
+타입이 지정된 노드로 구조를 정의하고, 사용자 정의 로직은 실제 JavaScript 또는 TypeScript로 유지하며, OOMOL Hosted 또는 직접 관리하는 인프라에서 자동화를 실행할 수 있습니다.
+그래프는 계속 이해할 수 있는 상태로, 코드는 계속 코드로, 배포는 계속 여러분의 통제 아래 남습니다.
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
@@ -90,8 +89,7 @@ Agent는 일회용 로컬 설정이 아니라 선택한 Open Flow 배포 안에 
   있습니다.
 
 Open Flow는 노코드 프로토타입 수준을 넘어섰지만 불투명한 스크립트와 인프라 더미가 되어서는 안 되는 워크플로를
-위해 만들어졌습니다. 그래프는 계속 이해할 수 있는 상태로, 코드는 계속 코드로, 배포는 계속 여러분의 통제 아래
-남습니다.
+위해 만들어졌습니다.
 
 ### 타입이 명확한 시각적 작성
 

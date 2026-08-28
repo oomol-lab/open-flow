@@ -14,14 +14,15 @@
 
 </div>
 
-Open Flow est une plateforme open source d'automatisation de workflows conçue nativement pour les
-Agents. Décrivez à Codex, Claude Code ou un autre Agent de terminal ce que vous souhaitez automatiser ;
-avec [`oo flow`](https://github.com/oomol-lab/oo-cli), il peut découvrir des Actions et des Triggers,
-générer un workflow typé, écrire du code, le vérifier, l'exécuter et le publier.
+Open Flow est une plateforme open source d'automatisation de workflows où les Agents IA et les
+personnes construisent le même Flow. Demandez à Codex, Claude Code ou à un autre Agent de terminal de
+créer, vérifier, exécuter et publier un workflow typé avec [`oo flow`](https://github.com/oomol-lab/oo-cli),
+puis consultez et modifiez visuellement ce Flow précis dans le Workbench.
 
-Le même Flow reste visible et modifiable dans le Workbench. Connectez des étapes typées sur un canevas
-visuel, conservez le JavaScript ou le TypeScript là où il est pertinent et exécutez l'automatisation
-sur un déploiement que vous contrôlez.
+Utilisez des nœuds typés pour structurer le workflow, conservez la logique personnalisée sous forme de
+véritable JavaScript ou TypeScript, et exécutez l'automatisation sur OOMOL Hosted ou sur une
+infrastructure que vous contrôlez. Le graphe reste compréhensible, le code reste du code, et le
+déploiement reste sous votre contrôle.
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
@@ -97,8 +98,7 @@ Les deux options prises en charge utilisent le même produit Open Flow et le mê
   sur votre propre infrastructure.
 
 Open Flow est conçu pour les workflows qui dépassent le stade du prototype no-code mais ne doivent
-pas devenir un ensemble opaque de scripts et d'infrastructure. Le graphe reste compréhensible, le
-code reste du code, et le déploiement reste sous votre contrôle.
+pas devenir un ensemble opaque de scripts et d'infrastructure.
 
 ### Création visuelle typée
 
