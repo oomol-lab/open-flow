@@ -24,7 +24,13 @@ visuel, conservez le JavaScript ou le TypeScript là où il est pertinent et ex�
 sur un déploiement que vous contrôlez.
 
 <p align="center">
-  <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="assets/workbench-overview.png">
+  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
+    <img alt="Regarder Codex créer et exécuter un workflow Gmail vers Feishu avec Open Flow" src="assets/open-flow-demo-video.jpg" width="100%">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM"><strong>▶ Regarder la démo Open Flow d’une minute</strong></a>
 </p>
 
 > [!IMPORTANT]
@@ -43,6 +49,10 @@ sur un déploiement que vous contrôlez.
 > **Exemple de demande :** « Crée un workflow qui lit les messages Gmail non lus, les met en forme et les envoie dans Feishu. »
 
 L'Agent crée un véritable Draft dans le déploiement Open Flow sélectionné, et non une configuration locale jetable. La CLI et le Workbench utilisent la même Control API : une modification créée par l'IA apparaît donc dans le même graphe visuel et reste modifiable par les personnes comme par les Agents.
+
+<p align="center">
+  <img alt="Un workflow Gmail vers Feishu exécuté avec succès dans Open Flow Workbench" src="assets/workbench-overview.png">
+</p>
 
 [Installez la CLI `oo`](https://github.com/oomol-lab/oo-cli) pour créer des Open Flow depuis Codex, Claude Code ou un autre Agent de terminal.
 

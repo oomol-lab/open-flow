@@ -24,7 +24,13 @@ Open Flow — это open-source платформа автоматизации w
 deployment под вашим контролем.
 
 <p align="center">
-  <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="assets/workbench-overview.png">
+  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
+    <img alt="Посмотрите, как Codex создаёт и запускает workflow из Gmail в Feishu с помощью Open Flow" src="assets/open-flow-demo-video.jpg" width="100%">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM"><strong>▶ Посмотреть минутную демонстрацию Open Flow</strong></a>
 </p>
 
 > [!IMPORTANT]
@@ -43,6 +49,10 @@ deployment под вашим контролем.
 > **Пример запроса:** «Создай workflow, который читает непрочитанные сообщения Gmail, форматирует их и отправляет в Feishu».
 
 Agent создаёт настоящий Draft в выбранном deployment Open Flow, а не одноразовую локальную конфигурацию. CLI и Workbench используют один Control API, поэтому изменения, созданные AI, появляются в том же визуальном графе и остаются доступными для редактирования как людям, так и Agent.
+
+<p align="center">
+  <img alt="Workflow из Gmail в Feishu, успешно выполненный в Open Flow Workbench" src="assets/workbench-overview.png">
+</p>
 
 [Установите `oo` CLI](https://github.com/oomol-lab/oo-cli), чтобы создавать Open Flow из Codex, Claude Code или другого терминального Agent.
 

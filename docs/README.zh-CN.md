@@ -21,7 +21,13 @@ Open Flow 是一个开源、面向 Agent 的工作流自动化平台。告诉 Co
 TypeScript，并在自己控制的部署中运行最终的自动化流程。
 
 <p align="center">
-  <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="assets/workbench-overview.png">
+  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
+    <img alt="观看 Codex 使用 Open Flow 创建并运行 Gmail 到飞书工作流的演示" src="assets/open-flow-demo-video.jpg" width="100%">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM"><strong>▶ 观看 1 分钟 Open Flow 演示</strong></a>
 </p>
 
 > [!IMPORTANT]
@@ -39,6 +45,10 @@ TypeScript，并在自己控制的部署中运行最终的自动化流程。
 > **示例请求：**“构建一个工作流，读取未读 Gmail 邮件，整理格式后发送到飞书。”
 
 Agent 创建的是所选 Open Flow 部署中的真实 Draft，而不是用完即弃的本地配置。CLI 和 Workbench 使用同一个 Control API，因此 AI 创建的改动会立即出现在同一个可视化流程图中，并且人和 Agent 都可以继续编辑。
+
+<p align="center">
+  <img alt="在 Open Flow Workbench 中成功运行的 Gmail 到飞书工作流" src="assets/workbench-overview.png">
+</p>
 
 [安装 `oo` CLI](https://github.com/oomol-lab/oo-cli)，即可通过 Codex、Claude Code 或其他终端 Agent 创作 Open Flow。
 

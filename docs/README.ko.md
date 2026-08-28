@@ -22,7 +22,13 @@ Open Flow는 오픈소스 Agent 네이티브 워크플로 자동화 플랫폼입
 필요한 곳에 JavaScript 또는 TypeScript를 유지하며, 직접 관리하는 배포 환경에서 자동화를 실행할 수 있습니다.
 
 <p align="center">
-  <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="assets/workbench-overview.png">
+  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
+    <img alt="Codex가 Open Flow에서 Gmail-Feishu 워크플로를 만들고 실행하는 데모 보기" src="assets/open-flow-demo-video.jpg" width="100%">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM"><strong>▶ 1분 Open Flow 데모 보기</strong></a>
 </p>
 
 > [!IMPORTANT]
@@ -40,6 +46,10 @@ Open Flow는 오픈소스 Agent 네이티브 워크플로 자동화 플랫폼입
 > **요청 예시:** “읽지 않은 Gmail 메시지를 읽고, 형식을 정리한 다음 Feishu로 보내는 워크플로를 만들어 줘.”
 
 Agent는 일회용 로컬 설정이 아니라 선택한 Open Flow 배포 안에 실제 Draft를 만듭니다. CLI와 Workbench는 동일한 Control API를 사용하므로 AI가 만든 변경 사항은 동일한 시각적 그래프에 표시되며 사람과 Agent 모두 계속 편집할 수 있습니다.
+
+<p align="center">
+  <img alt="Open Flow Workbench에서 성공적으로 실행된 Gmail-Feishu 워크플로" src="assets/workbench-overview.png">
+</p>
 
 [Codex, Claude Code 또는 다른 터미널 Agent에서 Open Flow를 작성하려면 `oo` CLI를 설치하세요.](https://github.com/oomol-lab/oo-cli)
 

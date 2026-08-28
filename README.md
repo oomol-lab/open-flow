@@ -22,7 +22,13 @@ keep JavaScript or TypeScript where it belongs, and run the resulting automation
 you control.
 
 <p align="center">
-  <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="./docs/assets/workbench-overview.png">
+  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
+    <img alt="Watch Codex build and run a Gmail-to-Feishu workflow with Open Flow" src="./docs/assets/open-flow-demo-video.jpg" width="100%">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM"><strong>▶ Watch the 1-minute Open Flow demo</strong></a>
 </p>
 
 > [!IMPORTANT]
@@ -45,6 +51,10 @@ use a terminal can:
 The Agent creates a real Draft in the selected Open Flow deployment, not a disposable local config.
 The CLI and Workbench use the same Control API, so an AI-authored change appears in the same visual
 graph and remains editable by both people and Agents.
+
+<p align="center">
+  <img alt="A Gmail-to-Feishu workflow running successfully in the Open Flow Workbench" src="./docs/assets/workbench-overview.png">
+</p>
 
 [Install the `oo` CLI](https://github.com/oomol-lab/oo-cli) to author Open Flow from Codex, Claude
 Code, or another terminal Agent.
