@@ -616,8 +616,10 @@ describe('FlowDesignerView model synchronization', () => {
     const initial = props(model([source, task([])]), { selectedNodeIds: ['source'] })
     const view = FlowDesignerView(initial) as React.ReactElement<FlowDesignerProps>
     const stores = [...view.props.flowDesignerStore.$.nodes.values()]
-    const sourceStore = stores.find((node) => node.nodeId == 'source')!
-    const targetStore = stores.find((node) => node.nodeId == 'target')!
+    const sourceStore = stores.find((node) => node.nodeId == 'source')
+    const targetStore = stores.find((node) => node.nodeId == 'target')
+    if (sourceStore == null) throw new Error('Expected source node store.')
+    if (targetStore == null) throw new Error('Expected target node store.')
     const batchDepths: number[] = []
     const disposeSource = sourceStore.$.selected.reaction(() => batchDepths.push(reactDom.batchDepth), true)
     const disposeTarget = targetStore.$.selected.reaction(() => batchDepths.push(reactDom.batchDepth), true)
