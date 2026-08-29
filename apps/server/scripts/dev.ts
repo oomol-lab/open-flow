@@ -2,12 +2,16 @@ import type { ChildProcess } from 'node:child_process'
 
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
 import path from 'node:path'
+import { loadEnvFile } from 'node:process'
 
 const appRoot = path.resolve(import.meta.dirname, '..')
+const workspaceEnvPath = path.resolve(appRoot, '../..', '.env')
+if (existsSync(workspaceEnvPath)) loadEnvFile(workspaceEnvPath)
 const developmentStateDirectory = path.join(appRoot, '.open-flow-dev')
 const operatorTokenPath = path.join(developmentStateDirectory, 'operator-token')
 const require = createRequire(import.meta.url)
@@ -48,7 +52,6 @@ function completed(child: ChildProcess, name: string): Promise<void> {
 
 const backend = start('node', ['--watch', '--no-node-snapshot', 'node/main.ts', '--api-only'], {
   ...process.env,
-  OPEN_FLOW_CONNECTOR_ORIGIN: process.env.OPEN_FLOW_CONNECTOR_ORIGIN ?? 'http://localhost:3000',
   OPEN_FLOW_HOST: '127.0.0.1',
   OPEN_FLOW_TOKEN: operatorToken,
   OPEN_FLOW_PORT: String(backendPort),

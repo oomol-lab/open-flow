@@ -13,3 +13,6 @@ coverage/
 # README only embeds the SVGs. PNG doesn't delta-compress, so committing it
 # would grow the repo by ~50 KB per refresh for nothing.
 assets/star-history/star-history.png
+
+.env
+.env.local
