@@ -23,7 +23,7 @@ flowchart LR
   Connector --> Providers["GitHub, Gmail, Slack, ..."]
 ```
 
-這四組值必須一致：
+需要設定這四組值：
 
 | 用途                            | 寫在哪裡                                                    | 填什麼                                                                  |
 | ------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -91,6 +91,8 @@ curl -s -X POST http://localhost:3001/api/runtime-tokens \
   -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":["*"]}'
 ```
 
+`*` 只用於這次本機走通。正式環境請只列出你實際要用的 Provider。
+
 回應中的 `token` 欄位只會回傳這一次。把它儲存為 `OPEN_FLOW_CONNECTOR_TOKEN`：
 
 ```bash
@@ -130,14 +132,17 @@ docker run -d \
   --env OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN="http://localhost:3001" \
   open-flow-server:dev
 
-curl http://localhost:3000/readyz
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  curl -sf http://localhost:3000/readyz && break
+  sleep 1
+done
 ```
 
 - `OPEN_FLOW_CONNECTOR_ORIGIN` 是 Open Flow 程序使用的位址。在 `oomol` 網路內，它是容器名稱加容器連接埠，而不是發布到主機的連接埠。
 - `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN` 是使用者瀏覽器開啟的位址。當 Connector Node 或 Provider Trigger 需要帳號時，Workbench
   會連結到 `<console origin>/providers/<service>`。只有 loopback 主機可以使用明文 HTTP，其餘情況必須是不帶 path 的 HTTPS origin。
-- 只有當 Open Flow 正在執行且設定的 Connector 通過健康檢查時，`/readyz` 才會回傳 `{"status":"ready"}`。設定了 Connector 卻回傳 503，
-  通常是 runtime origin 寫錯，或容器不在同一個網路。
+- 只有當 Open Flow 正在執行且設定的 Connector 通過健康檢查時，`/readyz` 才會回傳 `{"status":"ready"}`。`docker run -d` 之後幾秒內出現
+  503 是正常的。如果一直 503，通常是 runtime origin 寫錯，或容器不在同一個網路。
 
 開啟 `http://localhost:3000`，用 `OPEN_FLOW_TOKEN` 登入。Workbench 的目錄現在會列出 OpenConnector 的 Provider 和 Action。
 
@@ -145,13 +150,18 @@ curl http://localhost:3000/readyz
 
 Connection 保存在 OpenConnector 中，而不是 Open Flow 中。Open Flow 只保存 Connection 的 ID，永遠接觸不到 Provider 憑證。
 
-對於 GitHub，可以在 Console 的 GitHub 頁面 `http://localhost:3001/providers/github` 儲存 personal access token，也可以透過管理 API：
+對於 GitHub，可以在 Console 的 GitHub 頁面 `http://localhost:3001/providers/github` 儲存 personal access token，也可以透過管理 API。
+`read -s` 後貼上 token 再按 Enter，螢幕上不會顯示：
 
 ```bash
+read -s GITHUB_PAT
 curl -s -X PUT http://localhost:3001/api/connections/github \
   -H "authorization: Bearer $OOMOL_CONNECT_ADMIN_TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"authType":"api_key","values":{"apiKey":"github_pat_..."}}'
+  --data-binary @- <<EOF
+{"authType":"api_key","values":{"apiKey":"${GITHUB_PAT}"}}
+EOF
+unset GITHUB_PAT
 ```
 
 對於 OAuth Provider，先在 Console 中設定 OAuth client，再從 Provider 頁面授權帳號。OAuth client、具名 Connection 和 token
@@ -212,8 +222,7 @@ oo flow open "GitHub digest"
 
 ## 7. 選用：在 oo connector 中重複使用同一套 OpenConnector
 
-同一個 OpenConnector 也可以在 Open Flow 之外給 `oo connector` 命令用。這需要另一個 runtime token。Open Flow 的 token
-應只給 Open Flow 用：
+同一個 OpenConnector 也可以在 Open Flow 之外給 `oo connector` 命令用。這需要另一個 runtime token。不要重複使用 Open Flow 的 token：
 
 ```bash
 oo connector login http://localhost:3001 --token <另一個 runtime token>

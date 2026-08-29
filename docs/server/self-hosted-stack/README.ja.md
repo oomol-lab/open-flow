@@ -24,7 +24,7 @@ flowchart LR
   Connector --> Providers["GitHub, Gmail, Slack, ..."]
 ```
 
-次の 4 つの値を一致させてください。
+次の 4 つの値を設定してください。
 
 | 用途                                  | 設定場所                                                    | 値                                                                      |
 | ------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -98,6 +98,8 @@ curl -s -X POST http://localhost:3001/api/runtime-tokens \
   -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":["*"]}'
 ```
 
+`*` の proxy 許可はこのローカル手順用です。本番では実際に使う Provider だけを列挙してください。
+
 レスポンスには token が `token` として 1 回だけ含まれます。これを `OPEN_FLOW_CONNECTOR_TOKEN` として保存します。
 
 ```bash
@@ -139,7 +141,10 @@ docker run -d \
   --env OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN="http://localhost:3001" \
   open-flow-server:dev
 
-curl http://localhost:3000/readyz
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  curl -sf http://localhost:3000/readyz && break
+  sleep 1
+done
 ```
 
 - `OPEN_FLOW_CONNECTOR_ORIGIN` は Open Flow プロセスが使うアドレスです。`oomol` ネットワーク内では、公開されたホストの
@@ -148,8 +153,8 @@ curl http://localhost:3000/readyz
   アカウントを必要とするとき、Workbench は `<console origin>/providers/<service>` にリンクします。平文の HTTP を使えるのは
   loopback ホストだけで、それ以外はパスを含まない HTTPS origin でなければなりません。
 - `/readyz` が `{"status":"ready"}` を返すのは、Open Flow が動作しており、設定された Connector がヘルスチェックに応答する
-  場合だけです。Connector を設定した状態で 503 が返る場合、通常は runtime origin が誤っているか、コンテナが同じ
-  ネットワークにありません。
+  場合だけです。`docker run -d` の直後に数秒 503 が返るのは普通です。それが続く場合、通常は runtime origin が誤っているか、
+  コンテナが同じネットワークにありません。
 
 `http://localhost:3000` を開き、`OPEN_FLOW_TOKEN` でサインインします。Workbench のカタログに OpenConnector の Provider と
 Action が表示されるようになります。
@@ -160,13 +165,17 @@ Connection は Open Flow ではなく OpenConnector にあります。Open Flow 
 Provider の認証情報を見ることはありません。
 
 GitHub の場合は、Console の GitHub ページ `http://localhost:3001/providers/github`、または admin API から personal access
-token を保存します。
+token を保存します。`read -s` のあと token を貼り付けて Enter を押してください。画面には表示されません。
 
 ```bash
+read -s GITHUB_PAT
 curl -s -X PUT http://localhost:3001/api/connections/github \
   -H "authorization: Bearer $OOMOL_CONNECT_ADMIN_TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"authType":"api_key","values":{"apiKey":"github_pat_..."}}'
+  --data-binary @- <<EOF
+{"authType":"api_key","values":{"apiKey":"${GITHUB_PAT}"}}
+EOF
+unset GITHUB_PAT
 ```
 
 OAuth Provider の場合は、まず Console で OAuth クライアントを設定し、その後 Provider ページからアカウントを認可します。
@@ -238,7 +247,7 @@ oo flow open "GitHub digest"
 ## 7. 任意: oo connector から同じ OpenConnector を使う
 
 同じ OpenConnector は、Open Flow の外でも `oo connector` コマンドに利用できます。別の runtime token が必要です。
-その token は Open Flow 専用にしてください。
+Open Flow の token は再利用しないでください。
 
 ```bash
 oo connector login http://localhost:3001 --token <別の runtime token>

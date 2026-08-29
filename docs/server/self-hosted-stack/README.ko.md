@@ -24,7 +24,7 @@ flowchart LR
   Connector --> Providers["GitHub, Gmail, Slack, ..."]
 ```
 
-다음 네 값이 일치해야 합니다.
+다음 네 값을 설정하세요.
 
 | 용도                               | 설정 위치                                                  | 값                                                                      |
 | ---------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -98,6 +98,8 @@ curl -s -X POST http://localhost:3001/api/runtime-tokens \
   -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":["*"]}'
 ```
 
+`*` proxy 권한은 이 로컬 절차용입니다. 운영 환경에서는 실제로 쓰는 Provider만 나열하세요.
+
 응답의 `token` 필드는 이번에만 반환됩니다. 이 값을 `OPEN_FLOW_CONNECTOR_TOKEN`으로 저장하세요.
 
 ```bash
@@ -139,7 +141,10 @@ docker run -d \
   --env OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN="http://localhost:3001" \
   open-flow-server:dev
 
-curl http://localhost:3000/readyz
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  curl -sf http://localhost:3000/readyz && break
+  sleep 1
+done
 ```
 
 - `OPEN_FLOW_CONNECTOR_ORIGIN`은 Open Flow 프로세스가 사용하는 주소입니다. `oomol` 네트워크 안에서는 호스트에 공개한
@@ -148,7 +153,8 @@ curl http://localhost:3000/readyz
   계정을 필요로 할 때 Workbench는 `<console origin>/providers/<service>`로 연결합니다. 평문 HTTP는 loopback
   호스트만 사용할 수 있으며, 그 외에는 path가 없는 HTTPS origin이어야 합니다.
 - `/readyz`는 Open Flow가 실행 중이고 설정한 Connector가 헬스 체크에 응답할 때만 `{"status":"ready"}`를 반환합니다.
-  Connector를 설정했는데 503이 나오면 보통 runtime origin이 잘못되었거나 컨테이너가 같은 네트워크에 없는 경우입니다.
+  `docker run -d` 직후 몇 초 동안 503이 나오는 것은 정상입니다. 계속되면 보통 runtime origin이 잘못되었거나 컨테이너가
+  같은 네트워크에 없는 경우입니다.
 
 `http://localhost:3000`을 열고 `OPEN_FLOW_TOKEN`으로 로그인하세요. Workbench 목록에 OpenConnector의 Provider와
 Action이 나타납니다.
@@ -159,13 +165,17 @@ Connection은 Open Flow가 아니라 OpenConnector에 저장됩니다. Open Flow
 증명을 보지 않습니다.
 
 GitHub의 경우 Console의 GitHub 페이지 `http://localhost:3001/providers/github` 또는 admin API로 personal access
-token을 저장합니다.
+token을 저장합니다. `read -s` 다음에 token을 붙여넣고 Enter를 누르세요. 화면에 표시되지 않습니다.
 
 ```bash
+read -s GITHUB_PAT
 curl -s -X PUT http://localhost:3001/api/connections/github \
   -H "authorization: Bearer $OOMOL_CONNECT_ADMIN_TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"authType":"api_key","values":{"apiKey":"github_pat_..."}}'
+  --data-binary @- <<EOF
+{"authType":"api_key","values":{"apiKey":"${GITHUB_PAT}"}}
+EOF
+unset GITHUB_PAT
 ```
 
 OAuth Provider는 먼저 Console에서 OAuth 클라이언트를 설정한 뒤 Provider 페이지에서 계정을 연결하세요. OAuth
@@ -238,7 +248,7 @@ oo flow open "GitHub digest"
 ## 7. 선택: oo connector에서 같은 OpenConnector 사용하기
 
 같은 OpenConnector는 Open Flow 밖에서도 `oo connector` 명령에 쓸 수 있습니다. 별도의 runtime token이 필요합니다.
-그 token은 Open Flow 전용으로 두세요.
+Open Flow token을 재사용하지 마세요.
 
 ```bash
 oo connector login http://localhost:3001 --token <다른 runtime token>
@@ -278,5 +288,5 @@ oo connector search "send an email"
 | 수동 Action은 되는데 Poll 또는 Integration Trigger 실패 | runtime token에 해당 Provider의 `allowedProxies` 권한이 없거나 `OOMOL_CONNECT_BLOCKED_PROXIES`가 막고 있습니다.             |
 | `oo flow`가 OOMOL 로그인을 요구함                       | `OO_OPEN_FLOW_URL` 또는 `OO_OPEN_FLOW_TOKEN`이 없습니다. 둘 다 같은 셸에서 설정해야 합니다.                                 |
 | `oo flow`가 401을 반환함                                | `OO_OPEN_FLOW_TOKEN`이 그 Open Flow의 `OPEN_FLOW_TOKEN`과 다릅니다.                                                         |
-| Workbench의 Console 링크가 잘못된 호스트를 염           | `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN`이 브라우저가 접근할 수 있는 origin이 아니라 컨테이너 주소를 가리킵니다.                |
+| Workbench의 Console 링크가 잘못된 호스트를 엽니다       | `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN`이 브라우저가 접근할 수 있는 origin이 아니라 컨테이너 주소를 가리킵니다.                |
 | OAuth 인증이 잘못된 URL로 돌아옴                        | `OOMOL_CONNECT_ORIGIN`이 브라우저가 Console을 열 때 사용한 origin과 다릅니다.                                               |

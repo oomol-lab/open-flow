@@ -28,7 +28,7 @@ flowchart LR
   Connector --> Providers["GitHub, Gmail, Slack, ..."]
 ```
 
-Ces quatre valeurs doivent correspondre :
+Définissez ces quatre valeurs :
 
 | Usage                                   | Où la définir                                               | Valeur                                                                    |
 | --------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -105,6 +105,9 @@ curl -s -X POST http://localhost:3001/api/runtime-tokens \
   -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":["*"]}'
 ```
 
+L'autorisation proxy `*` est pour ce parcours local. En production, listez seulement les Providers
+dont vous avez besoin.
+
 La réponse contient le token une seule fois, dans `token`. Enregistrez-le comme
 `OPEN_FLOW_CONNECTOR_TOKEN` :
 
@@ -150,7 +153,10 @@ docker run -d \
   --env OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN="http://localhost:3001" \
   open-flow-server:dev
 
-curl http://localhost:3000/readyz
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  curl -sf http://localhost:3000/readyz && break
+  sleep 1
+done
 ```
 
 - `OPEN_FLOW_CONNECTOR_ORIGIN` est l'adresse utilisée par le processus Open Flow. Dans le réseau
@@ -160,8 +166,9 @@ curl http://localhost:3000/readyz
   Provider Trigger a besoin d'un compte. Seuls les hôtes loopback peuvent utiliser HTTP en clair ;
   tout le reste doit être une origine HTTPS sans chemin.
 - `/readyz` renvoie `{"status":"ready"}` seulement lorsque Open Flow tourne et que le Connector
-  configuré répond à son health check. Un 503 avec un Connector configuré signifie en général que
-  l'origine runtime est fausse ou que le conteneur n'est pas sur le même réseau.
+  configuré répond à son health check. Un 503 pendant quelques secondes après `docker run -d` est
+  normal. S'il persiste, l'origine runtime est en général fausse ou le conteneur n'est pas sur le
+  même réseau.
 
 Ouvrez `http://localhost:3000` et connectez-vous avec `OPEN_FLOW_TOKEN`. Le catalogue du Workbench
 liste alors les Providers et Actions d'OpenConnector.
@@ -172,13 +179,18 @@ Les Connections vivent dans OpenConnector, pas dans Open Flow. Open Flow ne stoc
 Connection et ne voit jamais les identifiants des Providers.
 
 Pour GitHub, enregistrez un personal access token via la page GitHub de la Console à
-`http://localhost:3001/providers/github`, ou via l'API admin :
+`http://localhost:3001/providers/github`, ou via l'API admin. Après `read -s`, collez le token et
+appuyez sur Entrée. Il ne s'affiche pas :
 
 ```bash
+read -s GITHUB_PAT
 curl -s -X PUT http://localhost:3001/api/connections/github \
   -H "authorization: Bearer $OOMOL_CONNECT_ADMIN_TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"authType":"api_key","values":{"apiKey":"github_pat_..."}}'
+  --data-binary @- <<EOF
+{"authType":"api_key","values":{"apiKey":"${GITHUB_PAT}"}}
+EOF
+unset GITHUB_PAT
 ```
 
 Pour les Providers OAuth, configurez d'abord le client OAuth dans la Console, puis autorisez le
@@ -253,7 +265,7 @@ Triggers, et l'écriture d'un Flow depuis un fichier. Voir `oo flow --help`.
 ## 7. Optionnel : réutiliser le même OpenConnector depuis oo connector
 
 Le même OpenConnector peut aussi servir les commandes `oo connector` hors d'Open Flow. Il faut un
-runtime token distinct. Réservez ce token à Open Flow :
+runtime token distinct. Ne réutilisez pas le token Open Flow :
 
 ```bash
 oo connector login http://localhost:3001 --token <un-autre-runtime-token>
