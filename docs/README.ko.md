@@ -52,6 +52,9 @@ Agent는 일회용 로컬 설정이 아니라 선택한 Open Flow 배포 안에 
 
 [Codex, Claude Code 또는 다른 터미널 Agent에서 Open Flow를 작성하려면 `oo` CLI를 설치하세요.](https://github.com/oomol-lab/oo-cli)
 
+직접 실행 중인 Open Flow를 사용한다면 Agent를 실행하는 셸에 `OO_OPEN_FLOW_URL`과 `OO_OPEN_FLOW_TOKEN`을 설정하세요.
+[OpenConnector와 oo CLI로 Open Flow 사용하기](server/self-hosted-stack/README.ko.md)를 참고하세요.
+
 ## Open Flow 실행 방식 선택
 
 지원되는 세 방식 모두 동일한 Open Flow 제품과 Workbench를 사용합니다.
@@ -119,7 +122,7 @@ Code Task는 사용자 정의 JavaScript를 그래프에 직접 배치하고 타
 
 ```mermaid
 flowchart LR
-  Workbench["Workbench"] -->|"Control API"| Server["Open Flow Server"]
+  Workbench["Workbench"] -->|"Control API"| Server["Open Flow"]
   CLI["oo flow CLI"] -->|"Control API"| Server
   Server -. "선택 사항" .-> Connector["Connector 런타임"]
   Connector --> Providers["서드파티 Provider"]
@@ -187,6 +190,9 @@ runtime origin은 Server가 Connector에 접근하는 주소이고, console orig
 Connector Console을 여는 주소입니다. Provider Trigger 정의는 Open Flow에 내장되어 있으므로 별도 등록이 필요 없습니다.
 Integration 콜백 설정과 각 origin의 제약은 [구성 참조](server/container-delivery.md#4-配置)를 참고하세요.
 
+OpenConnector와 Open Flow를 함께 시작하고, runtime token을 만들고, 계정을 연결한 뒤, `oo flow`로 첫 Flow를
+만드는 방법은 [OpenConnector와 oo CLI로 Open Flow 사용하기](server/self-hosted-stack/README.ko.md)를 참고하세요.
+
 ## 하나의 제품, 이식 가능한 배포
 
 Workbench와 CLI는 특정 데이터베이스나 클라우드 런타임에 의존하지 않고 버전 관리되는 Control API로 통신합니다.
@@ -245,6 +251,7 @@ bun run build
 - [Workbench 및 Designer 프런트엔드 참고 사항](authoring/frontend-ui.md)
 - [Server 배포](server/container-delivery.md)
 - [Fly.io 배포](server/fly-io/README.ko.md)
+- [OpenConnector와 oo CLI로 Open Flow 사용하기](server/self-hosted-stack/README.ko.md)
 - [기여 안내](../CONTRIBUTING.md)
 - [행동 강령](../CODE_OF_CONDUCT.md)
 - [보안 정책](../SECURITY.md)

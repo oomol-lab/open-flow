@@ -57,6 +57,10 @@ L'Agent crée un véritable Draft dans le déploiement Open Flow sélectionné, 
 
 [Installez la CLI `oo`](https://github.com/oomol-lab/oo-cli) pour créer des Open Flow depuis Codex, Claude Code ou un autre Agent de terminal.
 
+Pour utiliser votre propre Open Flow, définissez `OO_OPEN_FLOW_URL` et `OO_OPEN_FLOW_TOKEN` dans le
+shell qui exécute l'Agent ; consultez
+[Utiliser Open Flow avec OpenConnector et oo CLI](server/self-hosted-stack/README.fr.md).
+
 ## Choisir comment exécuter Open Flow
 
 Les trois options prises en charge utilisent le même produit Open Flow et le même Workbench.
@@ -129,7 +133,7 @@ sorties typées.
 
 ```mermaid
 flowchart LR
-  Workbench["Workbench"] -->|"Control API"| Server["Open Flow Server"]
+  Workbench["Workbench"] -->|"Control API"| Server["Open Flow"]
   CLI["oo flow CLI"] -->|"Control API"| Server
   Server -. "optionnel" .-> Connector["Runtime Connector"]
   Connector --> Providers["Providers tiers"]
@@ -206,6 +210,10 @@ définitions de Triggers de Provider sont livrées avec Open Flow et ne nécessi
 enregistrement. Consultez la [référence de configuration](server/container-delivery.md#4-配置) pour
 les paramètres de callback d'Integration et les contraintes applicables à chaque origine.
 
+Pour démarrer OpenConnector et Open Flow ensemble, créer un runtime token, autoriser un compte et
+construire un premier Flow avec `oo flow`, consultez
+[Utiliser Open Flow avec OpenConnector et oo CLI](server/self-hosted-stack/README.fr.md).
+
 ## Un seul produit, des déploiements portables
 
 Le Workbench et la CLI parlent une Control API versionnée plutôt que de dépendre d'une base de données
@@ -269,6 +277,7 @@ Commencez par l'[index de la documentation](README.md). Les références les plu
 - [Notes sur le frontend du Workbench et du Designer](authoring/frontend-ui.md)
 - [Déploiement du Server](server/container-delivery.md)
 - [Déploiement sur Fly.io](server/fly-io/README.fr.md)
+- [Utiliser Open Flow avec OpenConnector et oo CLI](server/self-hosted-stack/README.fr.md)
 - [Contribuer](../CONTRIBUTING.md)
 - [Code de conduite](../CODE_OF_CONDUCT.md)
 - [Sécurité](../SECURITY.md)

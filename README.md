@@ -59,6 +59,9 @@ graph and remains editable by both people and Agents.
 [Install the `oo` CLI](https://github.com/oomol-lab/oo-cli) to author Open Flow from Codex, Claude
 Code, or another terminal Agent.
 
+To use your own Open Flow, set `OO_OPEN_FLOW_URL` and `OO_OPEN_FLOW_TOKEN` in the shell that runs the
+Agent; see [Use Open Flow with OpenConnector and oo CLI](docs/server/self-hosted-stack/README.md).
+
 ## Choose How to Run Open Flow
 
 Use the same Open Flow product and Workbench through any supported path.
@@ -135,7 +138,7 @@ Code Tasks place custom JavaScript directly in the graph, with typed inputs and 
 
 ```mermaid
 flowchart LR
-  Workbench["Workbench"] -->|"Control API"| Server["Open Flow Server"]
+  Workbench["Workbench"] -->|"Control API"| Server["Open Flow"]
   CLI["oo flow CLI"] -->|"Control API"| Server
   Server -. "optional" .-> Connector["Connector runtime"]
   Connector --> Providers["Third-party Providers"]
@@ -211,6 +214,10 @@ Open Flow and need no registration. See the
 [configuration reference](docs/server/container-delivery.md#4-配置) for Integration callback
 settings and the constraints on each origin.
 
+To start OpenConnector and Open Flow together, create a runtime token, authorize an account, and
+build a first Flow with `oo flow`, see
+[Use Open Flow with OpenConnector and oo CLI](docs/server/self-hosted-stack/README.md).
+
 ## One Product, Portable Deployments
 
 The Workbench and CLI speak a versioned Control API rather than depending on a particular database
@@ -272,6 +279,7 @@ Start with the [documentation index](docs/README.md). The most useful references
 - [Workbench and Designer frontend notes](docs/authoring/frontend-ui.md)
 - [Server deployment](docs/server/container-delivery.md)
 - [Fly.io deployment](docs/server/fly-io/README.md)
+- [Use Open Flow with OpenConnector and oo CLI](docs/server/self-hosted-stack/README.md)
 - [Contributing](CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Security](SECURITY.md)

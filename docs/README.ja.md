@@ -52,6 +52,9 @@ Agent が作成するのは、使い捨てのローカル設定ではなく、�
 
 [Codex、Claude Code、または他のターミナル Agent から Open Flow を作成するために `oo` CLI をインストールします。](https://github.com/oomol-lab/oo-cli)
 
+自分で動かしている Open Flow を使う場合は、Agent を実行するシェルで `OO_OPEN_FLOW_URL` と `OO_OPEN_FLOW_TOKEN` を設定してください。
+詳細は [OpenConnector と oo CLI で Open Flow を使う](server/self-hosted-stack/README.ja.md) を参照してください。
+
 ## Open Flow の実行方法を選ぶ
 
 どの対応パスでも、同じ Open Flow プロダクトと Workbench を利用できます。
@@ -115,7 +118,7 @@ Code Task では、カスタム JavaScript をグラフ内に直接配置し、�
 
 ```mermaid
 flowchart LR
-  Workbench["Workbench"] -->|"Control API"| Server["Open Flow Server"]
+  Workbench["Workbench"] -->|"Control API"| Server["Open Flow"]
   CLI["oo flow CLI"] -->|"Control API"| Server
   Server -. "任意" .-> Connector["Connector ランタイム"]
   Connector --> Providers["サードパーティ Provider"]
@@ -179,6 +182,9 @@ runtime origin は Server が Connector に到達するためのアドレスで�
 アドレスです。Provider Trigger の定義は Open Flow に同梱されており、登録は不要です。Integration callback の設定と各 origin の制約については
 [設定リファレンス](server/container-delivery.md#4-配置) を参照してください。
 
+OpenConnector と Open Flow を一緒に起動し、runtime token を作成し、アカウントを認可して、`oo flow` で最初の Flow を作る手順は
+[OpenConnector と oo CLI で Open Flow を使う](server/self-hosted-stack/README.ja.md) を参照してください。
+
 ## 一つのプロダクト、ポータブルなデプロイメント
 
 Workbench と CLI は、特定のデータベースやクラウドランタイムに依存するのではなく、バージョン管理された Control API で通信します。デプロイメントが実行と
@@ -231,6 +237,7 @@ bun run build
 - [Workbench と Designer のフロントエンドに関する注意](authoring/frontend-ui.md)
 - [Server のデプロイ](server/container-delivery.md)
 - [Fly.io へのデプロイ](server/fly-io/README.ja.md)
+- [OpenConnector と oo CLI で Open Flow を使う](server/self-hosted-stack/README.ja.md)
 - [コントリビューション](../CONTRIBUTING.md)
 - [行動規範](../CODE_OF_CONDUCT.md)
 - [セキュリティ](../SECURITY.md)

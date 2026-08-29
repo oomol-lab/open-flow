@@ -51,6 +51,9 @@ Agent 建立的是所選 Open Flow 部署中的真實 Draft，而不是用完即
 
 [安裝 `oo` CLI](https://github.com/oomol-lab/oo-cli)，即可透過 Codex、Claude Code 或其他終端 Agent 創作 Open Flow。
 
+使用自己部署的 Open Flow 時，請在執行 Agent 的 shell 中設定 `OO_OPEN_FLOW_URL` 和 `OO_OPEN_FLOW_TOKEN`，見
+[用 OpenConnector 和 oo CLI 執行 Open Flow](server/self-hosted-stack/README.zh-TW.md)。
+
 ## 選擇 Open Flow 的執行方式
 
 三種支援的方式使用同一套 Open Flow 產品和 Workbench。
@@ -112,7 +115,7 @@ Code Task 將自訂 JavaScript 直接放在流程圖中，並保留類型化的�
 
 ```mermaid
 flowchart LR
-  Workbench["Workbench"] -->|"Control API"| Server["Open Flow Server"]
+  Workbench["Workbench"] -->|"Control API"| Server["Open Flow"]
   CLI["oo flow CLI"] -->|"Control API"| Server
   Server -. "選用" .-> Connector["Connector 執行環境"]
   Connector --> Providers["第三方 Provider"]
@@ -175,6 +178,9 @@ runtime origin 是 Server 存取 Connector 的位址，console origin 是使用�
 定義隨 Open Flow 內建，不需要額外註冊。Integration callback 的設定和各 origin 的限制請參閱
 [設定說明](server/container-delivery.md#4-配置)。
 
+要同時啟動 OpenConnector 和 Open Flow、建立 runtime token、授權帳號並用 `oo flow` 建立第一個 Flow，見
+[用 OpenConnector 和 oo CLI 執行 Open Flow](server/self-hosted-stack/README.zh-TW.md)。
+
 ## 一套產品，多種部署
 
 Workbench 和 CLI 透過有版本的 Control API 運作，不依賴特定資料庫或雲端執行環境。部署端負責執行和持久化；用戶端不會建立第二套本機
@@ -227,6 +233,7 @@ SQLite volume 復原。不要在儲存庫根目錄直接執行 `bun test`，它�
 - [Workbench 與 Designer 前端注意事項](authoring/frontend-ui.md)
 - [Server 部署](server/container-delivery.md)
 - [Fly.io 部署](server/fly-io/README.zh-TW.md)
+- [用 OpenConnector 和 oo CLI 執行 Open Flow](server/self-hosted-stack/README.zh-TW.md)
 - [參與貢獻](../CONTRIBUTING.md)
 - [行為準則](../CODE_OF_CONDUCT.md)
 - [安全政策](../SECURITY.md)

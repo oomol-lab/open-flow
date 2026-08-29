@@ -56,6 +56,10 @@ Agent создаёт настоящий Draft в выбранном deployment O
 
 [Установите `oo` CLI](https://github.com/oomol-lab/oo-cli), чтобы создавать Open Flow из Codex, Claude Code или другого терминального Agent.
 
+Чтобы пользоваться своим Open Flow, задайте `OO_OPEN_FLOW_URL` и `OO_OPEN_FLOW_TOKEN` в shell, где
+запускается Agent; см.
+[Использование Open Flow с OpenConnector и oo CLI](server/self-hosted-stack/README.ru.md).
+
 ## Выберите способ запуска Open Flow
 
 Все поддерживаемые варианты используют один и тот же продукт Open Flow и Workbench.
@@ -128,7 +132,7 @@ Code Task размещает пользовательский JavaScript пря�
 
 ```mermaid
 flowchart LR
-  Workbench["Workbench"] -->|"Control API"| Server["Open Flow Server"]
+  Workbench["Workbench"] -->|"Control API"| Server["Open Flow"]
   CLI["oo flow CLI"] -->|"Control API"| Server
   Server -. "опционально" .-> Connector["Среда выполнения Connector"]
   Connector --> Providers["Сторонние Provider"]
@@ -202,6 +206,10 @@ Runtime origin определяет, где Server обращается к Conne
 поставляются вместе с Open Flow и не требуют регистрации. Настройки Integration callback и
 ограничения для каждого origin см. в [справочнике по конфигурации](server/container-delivery.md#4-配置).
 
+Как вместе запустить OpenConnector и Open Flow, создать runtime token, подключить аккаунт и
+собрать первый Flow через `oo flow`, см. в
+[Использование Open Flow с OpenConnector и oo CLI](server/self-hosted-stack/README.ru.md).
+
 ## Один продукт, переносимые deployment
 
 Workbench и CLI используют версионированный Control API и не зависят от конкретной базы данных или
@@ -262,6 +270,7 @@ bun run build
 - [Заметки по frontend Workbench и Designer](authoring/frontend-ui.md)
 - [Развёртывание Server](server/container-delivery.md)
 - [Развёртывание на Fly.io](server/fly-io/README.ru.md)
+- [Использование Open Flow с OpenConnector и oo CLI](server/self-hosted-stack/README.ru.md)
 - [Участие в разработке](../CONTRIBUTING.md)
 - [Кодекс поведения](../CODE_OF_CONDUCT.md)
 - [Безопасность](../SECURITY.md)
