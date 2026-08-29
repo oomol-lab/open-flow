@@ -132,10 +132,15 @@ docker run -d \
   --env OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN="http://localhost:3001" \
   open-flow-server:dev
 
+ready=0
 for i in 1 2 3 4 5 6 7 8 9 10; do
-  curl -sf http://localhost:3000/readyz && break
+  if curl -sf --max-time 2 http://localhost:3000/readyz; then
+    ready=1
+    break
+  fi
   sleep 1
 done
+[ "$ready" -eq 1 ]
 ```
 
 - `OPEN_FLOW_CONNECTOR_ORIGIN` 是 Open Flow 进程使用的地址。在 `oomol` 网络内它是容器名加容器端口，而不是发布到宿主机的端口。
