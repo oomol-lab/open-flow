@@ -120,6 +120,10 @@ Connector service 拥有 Provider 授权、credential、Connection lifecycle 和
 不能把 credential、token 或 Connector 数据库复制进 Revision、Browser 或 RunEvent。Connector catalog 和 Connection 是 deployment scope 资源，
 不从属于单个 Flow。
 
+Server 可以显式配置独立的 LLM origin 和 token；未显式配置时，OOMOL-hosted Connector runtime 和对应 token 可以推导同一环境与授权的 OOMOL
+LLM host。自建或自定义 Connector origin 不隐含模型能力，未配置的 Connector 或 LLM capability 必须分别 fail closed；Workbench 不能把外部服务
+暂时不可用误报为部署尚未配置。
+
 Trigger 是 Flow graph 中的 source node。Webhook、Cron、Poll 和 Integration 的确定性协议、Provider definitions、Registry 与 conformance 属于公共
 package；subscription、checkpoint、调度持久化、endpoint routing 和 admission 事务属于部署实现。
 

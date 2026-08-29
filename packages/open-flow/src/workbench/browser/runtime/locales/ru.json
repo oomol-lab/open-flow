@@ -217,6 +217,7 @@
     "var": "Переменная"
   },
   "notice": {
+    "connectorUnconfigured": "Для этого развертывания Connector не настроен.",
     "connectionPopupBlocked": "Окно подключения заблокировано. Разрешите всплывающие окна и повторите попытку.",
     "created": "Создано: {{name}}.",
     "createdInDraft": "Создано в черновике: {{name}}.",

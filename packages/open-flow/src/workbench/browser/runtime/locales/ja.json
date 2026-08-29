@@ -217,6 +217,7 @@
     "var": "変数"
   },
   "notice": {
+    "connectorUnconfigured": "このデプロイには Connector が設定されていません。",
     "connectionPopupBlocked": "接続ウィンドウがブロックされました。ポップアップを許可して再試行してください。",
     "created": "{{name}} を作成しました。",
     "createdInDraft": "ドラフトに {{name}} を作成しました。",

@@ -217,6 +217,7 @@
     "var": "변수"
   },
   "notice": {
+    "connectorUnconfigured": "이 배포에는 Connector가 구성되어 있지 않습니다.",
     "connectionPopupBlocked": "연결 창이 차단되었습니다. 팝업을 허용한 뒤 다시 시도하세요.",
     "created": "{{name}} 생성을 완료했습니다.",
     "createdInDraft": "초안에 {{name}} 생성을 완료했습니다.",

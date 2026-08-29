@@ -217,6 +217,7 @@
     "var": "Variable"
   },
   "notice": {
+    "connectorUnconfigured": "Connector n’est pas configuré pour ce déploiement.",
     "connectionPopupBlocked": "La fenêtre de connexion a été bloquée. Autorisez les fenêtres contextuelles, puis réessayez.",
     "created": "{{name}} créé.",
     "createdInDraft": "{{name}} créé dans le Brouillon.",

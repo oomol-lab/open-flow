@@ -7,6 +7,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ConnectorClient } from './connector.ts'
 import { createServerApp } from './http.ts'
+import { createLlm, oomolLlm } from './llm.ts'
 import { createLogger } from './logger.ts'
 import { OperatorSession } from './operator.ts'
 import { ServerService } from './service.ts'
@@ -59,6 +60,12 @@ function main(): Effect.Effect<void> {
         throw new Error('OPEN_FLOW_CONNECTOR_TOKEN requires OPEN_FLOW_CONNECTOR_ORIGIN.')
       }
       const connector = connectorOrigin == null ? undefined : new ConnectorClient(connectorOrigin, connectorToken ?? '', 30_000, logger)
+      const llmOrigin = process.env.OPEN_FLOW_LLM_ORIGIN
+      const llmToken = process.env.OPEN_FLOW_LLM_TOKEN
+      if ((llmOrigin == null) != (llmToken == null)) {
+        throw new Error('OPEN_FLOW_LLM_ORIGIN and OPEN_FLOW_LLM_TOKEN must be configured together.')
+      }
+      const llm = llmOrigin != null && llmToken != null ? createLlm(llmOrigin, llmToken) : oomolLlm(connectorOrigin, connectorToken)
 
       const integrationPublicOrigin = process.env.OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN
       const integrationCallbackKey = process.env.OPEN_FLOW_INTEGRATION_CALLBACK_KEY
@@ -93,7 +100,14 @@ function main(): Effect.Effect<void> {
         path.join(dataDirectory, 'open-flow.sqlite'),
         connector,
         undefined,
-        { ...(integration == null ? {} : { integration }), maxConcurrentRuns, maxPendingRuns, runEventRetentionMs, runTimeoutMs },
+        {
+          ...(integration == null ? {} : { integration }),
+          ...(llm == null ? {} : { llm }),
+          maxConcurrentRuns,
+          maxPendingRuns,
+          runEventRetentionMs,
+          runTimeoutMs,
+        },
         connectorConsoleOrigin,
         logger,
       )

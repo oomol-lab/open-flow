@@ -64,30 +64,38 @@ Workbench 和 API 位于 `http://127.0.0.1:3000`；登录后 `/variables` 提供
 
 ## 4. 配置
 
-| 环境变量                                       | 用途                                                                           |
-| ---------------------------------------------- | ------------------------------------------------------------------------------ |
-| `OPEN_FLOW_HOST`                               | HTTP 监听地址；镜像默认 `0.0.0.0`。                                            |
-| `OPEN_FLOW_PORT`                               | HTTP 监听端口；镜像默认 `3000`。                                               |
-| `OPEN_FLOW_DATA_DIR`                           | SQLite 持久目录；镜像默认 `/data/open-flow`。                                  |
-| `OPEN_FLOW_TOKEN`                              | 浏览器 session 与 machine client 共用的 operator secret；至少 32 UTF-8 bytes。 |
-| `OPEN_FLOW_SESSION_COOKIE_SECURE`              | TLS ingress 后应设为 `true`；只接受 `true` 或 `false`。                        |
-| `OPEN_FLOW_LOG_LEVEL`                          | Pino 日志级别；默认 `info`。                                                   |
-| `OPEN_FLOW_CONNECTOR_ORIGIN`                   | Server 可访问的 Connector runtime origin。                                     |
-| `OPEN_FLOW_CONNECTOR_TOKEN`                    | Server 调用 Connector runtime API 的受限 token；本地未启用认证时可以为空。     |
-| `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN`           | 用户浏览器可访问的 Connector Console 公网 origin。                             |
-| `OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN`          | Provider 可访问的 Integration callback 公网 origin。                           |
-| `OPEN_FLOW_INTEGRATION_CALLBACK_KEY`           | 派生 Integration callback secret 的至少 32 UTF-8 bytes 密钥。                  |
-| `OPEN_FLOW_RUN_EVENT_RETENTION_DAYS`           | terminal Run 详细事件的保留天数；默认 `30`。                                   |
-| `OPEN_FLOW_MAX_PENDING_RUNS`                   | 全部署尚未 terminal 的 Run 上限；默认 `1000`。                                 |
-| `OPEN_FLOW_MAX_CONCURRENT_RUNS`                | 全部署同时执行的 Run 上限；同一 Flow 最多执行一个；默认 `4`。                  |
-| `OPEN_FLOW_RUN_TIMEOUT_MS`                     | 单个 Run 从开始执行到 terminal 的最长毫秒数；默认 `1800000`。                  |
-| `OPEN_FLOW_CALLBACK_REQUESTS_PER_MINUTE`       | 每个 Webhook 或 Integration endpoint 的每分钟请求上限；默认 `120`。            |
-| `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE` | 全部署每分钟允许的 operator 登录尝试数；默认 `10`。                            |
+| 环境变量                                       | 用途                                                                                                        |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `OPEN_FLOW_HOST`                               | HTTP 监听地址；镜像默认 `0.0.0.0`。                                                                         |
+| `OPEN_FLOW_PORT`                               | HTTP 监听端口；镜像默认 `3000`。                                                                            |
+| `OPEN_FLOW_DATA_DIR`                           | SQLite 持久目录；镜像默认 `/data/open-flow`。                                                               |
+| `OPEN_FLOW_TOKEN`                              | 浏览器 session 与 machine client 共用的 operator secret；至少 32 UTF-8 bytes。                              |
+| `OPEN_FLOW_SESSION_COOKIE_SECURE`              | TLS ingress 后应设为 `true`；只接受 `true` 或 `false`。                                                     |
+| `OPEN_FLOW_LOG_LEVEL`                          | Pino 日志级别；默认 `info`。                                                                                |
+| `OPEN_FLOW_CONNECTOR_ORIGIN`                   | Server 可访问的 Connector runtime origin。                                                                  |
+| `OPEN_FLOW_CONNECTOR_TOKEN`                    | Server 调用 Connector runtime API 的受限 token；本地未启用认证时可以为空。OOMOL-hosted token 同时用于 LLM。 |
+| `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN`           | 用户浏览器可访问的 Connector Console 公网 origin。                                                          |
+| `OPEN_FLOW_LLM_ORIGIN`                         | OpenAI-compatible LLM 服务的 root origin；Server 会请求其 `/v1/chat/completions`。                          |
+| `OPEN_FLOW_LLM_TOKEN`                          | Server 调用显式配置 LLM 服务的 bearer token。                                                               |
+| `OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN`          | Provider 可访问的 Integration callback 公网 origin。                                                        |
+| `OPEN_FLOW_INTEGRATION_CALLBACK_KEY`           | 派生 Integration callback secret 的至少 32 UTF-8 bytes 密钥。                                               |
+| `OPEN_FLOW_RUN_EVENT_RETENTION_DAYS`           | terminal Run 详细事件的保留天数；默认 `30`。                                                                |
+| `OPEN_FLOW_MAX_PENDING_RUNS`                   | 全部署尚未 terminal 的 Run 上限；默认 `1000`。                                                              |
+| `OPEN_FLOW_MAX_CONCURRENT_RUNS`                | 全部署同时执行的 Run 上限；同一 Flow 最多执行一个；默认 `4`。                                               |
+| `OPEN_FLOW_RUN_TIMEOUT_MS`                     | 单个 Run 从开始执行到 terminal 的最长毫秒数；默认 `1800000`。                                               |
+| `OPEN_FLOW_CALLBACK_REQUESTS_PER_MINUTE`       | 每个 Webhook 或 Integration endpoint 的每分钟请求上限；默认 `120`。                                         |
+| `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE` | 全部署每分钟允许的 operator 登录尝试数；默认 `10`。                                                         |
 
 `OPEN_FLOW_CONNECTOR_ORIGIN` 用于启用 Connector。`OPEN_FLOW_CONNECTOR_TOKEN` 可选；Connector 本地未启用 runtime 认证时可以省略或设为空字符串，此时
 Server 不发送 `Authorization` header。不能只配置 token 而不配置 origin。内部 runtime origin 与 Browser 使用的 Console origin 相互独立；
 后者不能使用只在容器网络中可访问的地址，也不能包含 credential、path、query 或 fragment；除 loopback 本地开发外必须使用 HTTPS。Connector runtime
 origin 可以在受信任的容器私网使用 HTTP；跨不受信任网络部署时必须由 TLS 保护 bearer token。
+
+`OPEN_FLOW_LLM_ORIGIN` 和 `OPEN_FLOW_LLM_TOKEN` 必须同时提供或同时省略。显式配置优先，origin 必须是不带 credential、path、query 或 fragment 的
+HTTPS origin；只有 loopback 本地开发可以使用 HTTP。Server 在该 origin 下调用 `/v1/chat/completions`。未显式配置时，如果 Connector runtime
+origin 的 hostname 精确为 `connector.oomol.com` 或 `connector.oomol.dev` 且 token 非空，Server 会分别使用
+`https://llm.oomol.com/v1` 或 `https://llm.oomol.dev/v1`，并复用 Connector token。Console origin 不参与推导；自建 OpenConnector、自定义域名和
+空 token 都不会隐式启用 LLM。
 
 Provider Trigger definitions 由公共 Open Flow package 内置，不需要用户或部署者注册。Poll 与 Integration 通过 Connector 的
 `POST /v1/proxy/:service` 运行面执行；OpenConnector 与 OOMOL Connector 都支持该接口。具体可用的 Provider、Connection 和授权范围以当前配置的

@@ -217,6 +217,7 @@
     "var": "Variable"
   },
   "notice": {
+    "connectorUnconfigured": "Connector is not configured for this deployment.",
     "connectionPopupBlocked": "The connection window was blocked. Allow pop-ups and try again.",
     "created": "Created {{name}}.",
     "createdInDraft": "Created {{name}} in the Draft.",

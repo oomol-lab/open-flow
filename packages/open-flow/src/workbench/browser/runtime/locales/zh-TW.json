@@ -217,6 +217,7 @@
     "var": "變數"
   },
   "notice": {
+    "connectorUnconfigured": "目前部署尚未設定 Connector。",
     "connectionPopupBlocked": "連線視窗被瀏覽器封鎖，請允許彈出式視窗後再試一次。",
     "created": "已建立 {{name}}。",
     "createdInDraft": "已在草稿中建立 {{name}}。",

@@ -327,7 +327,7 @@ export class ControlService {
   }
 
   async #connectorRequest<Value>(request: (connector: ConnectorHost) => Promise<Value>): Promise<Value> {
-    if (this.connector == null) throw new ControlError(controlErrorCode.connectorUnavailable, 'The Connector request could not be completed.')
+    if (this.connector == null) throw new ControlError(controlErrorCode.connectorUnconfigured, 'Connector is not configured for this deployment.')
     try {
       return await request(this.connector)
     } catch (error) {

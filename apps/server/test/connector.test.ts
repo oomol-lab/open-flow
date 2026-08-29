@@ -114,6 +114,16 @@ async function run(service: ServerService, revision: RevisionContent): Promise<s
 }
 
 describe('Server Connector host', () => {
+  it('distinguishes an unconfigured Connector from an unavailable Connector', async () => {
+    const service = await open()
+
+    await expect(service.control.listConnectorProviders()).rejects.toMatchObject({
+      code: 'connector.unconfigured',
+      message: 'Connector is not configured for this deployment.',
+      status: 503,
+    })
+  })
+
   it('projects discovery and the explicit external Connection page from the injected host', async () => {
     const providers: readonly ConnectorProvider[] = [{ serviceId: 'example', serviceName: 'Example' }]
     const actions: readonly ConnectorAction[] = [

@@ -290,29 +290,94 @@ describe('Server Connector client', () => {
     )
   })
 
-  it('rejects private fields in runtime discovery responses', async () => {
-    const origin = await startConnector((_request, response) => {
-      send(response, 200, {
+  it('projects Hosted Connector discovery responses without requiring exact keys', async () => {
+    const provider = {
+      credential: 'must-not-cross-boundary',
+      displayName: 'Example',
+      iconUrl: null,
+      searchAliases: ['sample'],
+      service: 'example',
+    }
+    const action = {
+      description: 'Echo one message.',
+      id: 'example.echo',
+      inputSchema: { properties: {}, type: 'object' },
+      name: 'echo',
+      operationType: 'action',
+      outputSchema: { properties: {}, type: 'object' },
+      service: 'example',
+    }
+    const connectedApp = {
+      alias: 'work',
+      createdAt: '2026-08-29T00:00:00.000Z',
+      credentialFields: { apiKey: 'must-not-cross-boundary' },
+      displayName: 'Work account',
+      id: 'connection-work',
+      isDefault: true,
+      service: 'example',
+      status: 'active',
+      userId: 'user-private',
+    }
+    const origin = await startConnector((request, response) => {
+      if (request.url == '/v1/providers') return send(response, 200, { data: [provider], requestId: 'request-1', success: true })
+      if (request.url == '/v1/actions?service=example') return send(response, 200, { data: [action], success: true })
+      return send(response, 200, { data: [connectedApp], success: true })
+    })
+    const connector = new ConnectorClient(origin, 'runtime-token')
+
+    await expect(connector.listProviders()).resolves.toEqual([{ serviceId: 'example', serviceName: 'Example' }])
+    await expect(connector.listActions('example')).resolves.toEqual([
+      {
+        actionId: 'example.echo',
+        defaultConnection: {
+          connectionId: 'connection-work',
+          displayName: 'Work account',
+          isDefault: true,
+          serviceId: 'example',
+          status: 'active',
+        },
+        description: 'Echo one message.',
+        inputs: {},
+        name: 'echo',
+        outputs: {},
+        serviceId: 'example',
+        serviceName: 'Example',
+      },
+    ])
+    await expect(connector.listConnections('example')).resolves.toEqual([
+      {
+        connectionId: 'connection-work',
+        displayName: 'Work account',
+        isDefault: true,
+        serviceId: 'example',
+        status: 'active',
+      },
+    ])
+  })
+
+  it('rejects a Connector Action without a stable id', async () => {
+    const origin = await startConnector((request, response) => {
+      if (request.url == '/v1/providers') {
+        return send(response, 200, { data: [{ displayName: 'Example', service: 'example' }], success: true })
+      }
+      if (request.url == '/v1/apps') return send(response, 200, { data: [], success: true })
+      return send(response, 200, {
         data: [
           {
-            authTypes: ['api_key'],
-            categories: [],
-            credential: 'must-not-cross-boundary',
-            displayName: 'Example',
-            homepageUrl: null,
-            iconUrl: null,
-            scenario: 'developer',
+            authenticated: false,
+            description: 'Echo one message.',
+            inputSchema: { properties: {}, type: 'object' },
+            name: 'echo',
+            outputSchema: { properties: {}, type: 'object' },
             service: 'example',
           },
         ],
-        message: 'OK',
-        meta: {},
         success: true,
       })
     })
     const connector = new ConnectorClient(origin, 'runtime-token')
 
-    await expect(connector.listProviders()).rejects.toMatchObject({ code: 'connector.unavailable' })
+    await expect(connector.searchActions('echo')).rejects.toMatchObject({ code: 'connector.unavailable' })
   })
 
   it('maps malformed Connector Action schemas to the stable unavailable error', async () => {

@@ -268,6 +268,8 @@ interface TriggerBinding {
 occurrence 无法通过最终 admission guard。Poll test 不推进 checkpoint、不写 dedupe、不创建 Run。
 
 Connector Provider、Action、Connection 和授权页面都是 deployment scope 资源，不接收 Flow identity。Connector credential 不进入响应、Revision 或 RunEvent。
+部署没有配置 Connector 时，catalog 和 Connection 请求返回 `connector.unconfigured`；已经配置但上游不可用或响应无效时返回
+`connector.unavailable`，客户端不能把两者合并为同一配置提示。
 
 ## 6. 实时通知
 

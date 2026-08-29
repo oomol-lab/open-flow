@@ -217,6 +217,7 @@
     "var": "变量"
   },
   "notice": {
+    "connectorUnconfigured": "当前部署尚未配置 Connector。",
     "connectionPopupBlocked": "连接窗口被浏览器拦截了，请允许弹出窗口后重试。",
     "created": "已创建 {{name}}。",
     "createdInDraft": "已在草稿中创建 {{name}}。",

@@ -122,7 +122,7 @@ export class ConnectorClient implements ConnectorHost {
       if (failure?.success === false && failure.errorCode === 'unknown_action') throw actionNotFound()
       throw unavailable()
     }
-    return mapAction(runtimeAction(runtimeData(response.value), false), providers, connections)
+    return mapAction(runtimeAction(runtimeData(response.value)), providers, connections)
   }
 
   async listConnections(serviceId: string, signal?: AbortSignal): Promise<readonly ConnectorConnection[]> {
@@ -202,7 +202,7 @@ export class ConnectorClient implements ConnectorHost {
       search ? maxResponseBytes : maxActionCatalogBytes,
     )
     if (!response.ok) throw unavailable()
-    return runtimeList(runtimeData(response.value), (value) => runtimeAction(value, search))
+    return runtimeList(runtimeData(response.value), runtimeAction)
   }
 
   async #connections(serviceId?: string, signal?: AbortSignal): Promise<readonly ConnectorConnection[]> {
@@ -345,26 +345,14 @@ async function readJson(response: Response, limit: number): Promise<unknown> {
   }
 }
 
-function exact(value: Record<string, unknown>, keys: readonly string[]): void {
-  const actual = Object.keys(value)
-  if (actual.length != keys.length || actual.some((key) => !keys.includes(key))) throw unavailable()
-}
-
 function string(value: unknown): string {
   if (typeof value != 'string' || value.length == 0) throw unavailable()
   return value
 }
 
-function strings(value: unknown): readonly string[] {
-  if (!Array.isArray(value)) throw unavailable()
-  return value.map(string)
-}
-
 function runtimeData(value: unknown): unknown {
   const source = record(value) ? value : undefined
-  if (source == null) throw unavailable()
-  exact(source, ['data', 'message', 'meta', 'success'])
-  if (source.success !== true || source.message !== 'OK' || !record(source.meta)) throw unavailable()
+  if (source == null || source.success !== true || !Object.hasOwn(source, 'data')) throw unavailable()
   return source.data
 }
 
@@ -376,18 +364,7 @@ function runtimeList<Value>(value: unknown, decode: (value: unknown) => Value): 
 function runtimeProvider(value: unknown): ConnectorProvider {
   const source = record(value) ? value : undefined
   if (source == null) throw unavailable()
-  exact(source, ['authTypes', 'categories', 'displayName', 'homepageUrl', 'iconUrl', 'scenario', 'service'])
-  strings(source.authTypes)
-  string(source.scenario)
-  if (!Array.isArray(source.categories)) throw unavailable()
-  for (const category of source.categories) {
-    if (!record(category)) throw unavailable()
-    exact(category, ['displayName', 'id'])
-    string(category.displayName)
-    string(category.id)
-  }
-  if (source.homepageUrl !== null && typeof source.homepageUrl != 'string') throw unavailable()
-  if (source.iconUrl !== null && typeof source.iconUrl != 'string') throw unavailable()
+  if (source.iconUrl != null && typeof source.iconUrl != 'string') throw unavailable()
   return {
     ...(source.iconUrl == null || source.iconUrl.length == 0 ? {} : { icon: source.iconUrl }),
     serviceId: string(source.service),
@@ -395,48 +372,9 @@ function runtimeProvider(value: unknown): ConnectorProvider {
   }
 }
 
-function runtimeAction(value: unknown, search: boolean): RuntimeAction {
+function runtimeAction(value: unknown): RuntimeAction {
   const source = record(value) ? value : undefined
   if (source == null) throw unavailable()
-  if (search) {
-    exact(source, ['authenticated', 'description', 'id', 'inputSchema', 'name', 'outputSchema', 'service'])
-    if (typeof source.authenticated != 'boolean') throw unavailable()
-  } else {
-    exact(source, [
-      'asyncLifecycle',
-      'description',
-      'execution',
-      'followUpActions',
-      'id',
-      'inputSchema',
-      'name',
-      'outputSchema',
-      'providerPermissions',
-      'requiredScopes',
-      'service',
-    ])
-    strings(source.providerPermissions)
-    strings(source.requiredScopes)
-    if (!Array.isArray(source.followUpActions)) throw unavailable()
-    for (const followUp of source.followUpActions) {
-      if (!record(followUp)) throw unavailable()
-      exact(followUp, ['actionId'])
-      string(followUp.actionId)
-    }
-    if (source.asyncLifecycle !== null && !record(source.asyncLifecycle)) throw unavailable()
-    const execution = record(source.execution) ? source.execution : undefined
-    if (execution == null) throw unavailable()
-    exact(execution, ['catalogOnly', 'locallyExecutable', 'needsCredential', 'noAuthRunnable', 'requiredAuthTypes'])
-    if (
-      typeof execution.catalogOnly != 'boolean' ||
-      typeof execution.locallyExecutable != 'boolean' ||
-      typeof execution.needsCredential != 'boolean' ||
-      typeof execution.noAuthRunnable != 'boolean'
-    ) {
-      throw unavailable()
-    }
-    strings(execution.requiredAuthTypes)
-  }
   if (typeof source.description != 'string') throw unavailable()
   return {
     description: source.description,
@@ -451,13 +389,8 @@ function runtimeAction(value: unknown, search: boolean): RuntimeAction {
 function runtimeConnection(value: unknown): ConnectorConnection {
   const source = record(value) ? value : undefined
   if (source == null) throw unavailable()
-  exact(source, ['accountLabel', 'alias', 'authType', 'displayName', 'id', 'isDefault', 'scopes', 'service', 'status'])
   const status = connectionStatus(source.status)
   if (typeof source.isDefault != 'boolean') throw unavailable()
-  string(source.accountLabel)
-  string(source.alias)
-  string(source.authType)
-  strings(source.scopes)
   return {
     connectionId: string(source.id),
     displayName: string(source.displayName),
