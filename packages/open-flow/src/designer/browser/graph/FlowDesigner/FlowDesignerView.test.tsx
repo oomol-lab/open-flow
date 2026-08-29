@@ -26,7 +26,20 @@ const hooks = vi.hoisted(() => ({
   setups: [] as (() => void | (() => void))[],
 }))
 
+const reactDom = vi.hoisted(() => ({ batchDepth: 0 }))
+
 vi.mock('virtual:uno.css', () => ({}))
+
+vi.mock('react-dom', () => ({
+  unstable_batchedUpdates: <T,>(callback: () => T): T => {
+    reactDom.batchDepth++
+    try {
+      return callback()
+    } finally {
+      reactDom.batchDepth--
+    }
+  },
+}))
 
 vi.mock('react', async (importOriginal) => {
   const original = await importOriginal<typeof import('react')>()
@@ -596,6 +609,26 @@ describe('FlowDesignerView model synchronization', () => {
     view.props.onSelectionChange?.({ edges: [], nodes: nodes.toReversed().map((node) => ({ data: { store: node } }) as never) })
 
     expect(onSelectionChange).not.toHaveBeenCalled()
+    view.props.flowDesignerStore.dispose()
+  })
+
+  it('batches a controlled selection replacement', () => {
+    const initial = props(model([source, task([])]), { selectedNodeIds: ['source'] })
+    const view = FlowDesignerView(initial) as React.ReactElement<FlowDesignerProps>
+    const stores = [...view.props.flowDesignerStore.$.nodes.values()]
+    const sourceStore = stores.find((node) => node.nodeId == 'source')!
+    const targetStore = stores.find((node) => node.nodeId == 'target')!
+    const batchDepths: number[] = []
+    const disposeSource = sourceStore.$.selected.reaction(() => batchDepths.push(reactDom.batchDepth), true)
+    const disposeTarget = targetStore.$.selected.reaction(() => batchDepths.push(reactDom.batchDepth), true)
+
+    FlowDesignerView(props(model([source, task([])]), { selectedNodeIds: ['target'] }))
+
+    expect(batchDepths).toEqual([1, 1])
+    expect(sourceStore.$.selected.value).toBe(false)
+    expect(targetStore.$.selected.value).toBe(true)
+    disposeSource()
+    disposeTarget()
     view.props.flowDesignerStore.dispose()
   })
 

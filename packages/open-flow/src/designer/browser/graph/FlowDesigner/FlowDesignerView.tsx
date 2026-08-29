@@ -29,6 +29,7 @@ import type { InlineTask } from '../../stores/node/taskNode.store.ts'
 
 import { dispose } from '@wopjs/disposable'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { unstable_batchedUpdates } from 'react-dom'
 import { derive, val } from 'value-enhancer'
 import { reactiveMap } from 'value-enhancer/collections'
 import { toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
@@ -606,10 +607,13 @@ class FlowDesignerViewAdapter {
     const selectionChanged = selected.size != this.#selectedNodeIds.size || [...selected].some((nodeId) => !this.#selectedNodeIds.has(nodeId))
     this.#selectedNodeIds = selected
     if (selectionChanged) {
-      for (const [nodeId, entry] of this.#entries) {
-        const value = selected.has(nodeId)
-        if (entry.store.$.selected.value != value) entry.store.$$.selected.set(value)
-      }
+      // Keep React Flow from observing and echoing an intermediate selection while nodes are updated.
+      unstable_batchedUpdates(() => {
+        for (const [nodeId, entry] of this.#entries) {
+          const value = selected.has(nodeId)
+          if (entry.store.$.selected.value != value) entry.store.$$.selected.set(value)
+        }
+      })
     }
   }
 
