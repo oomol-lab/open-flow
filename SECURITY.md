@@ -13,7 +13,7 @@ deployments safe.
 
 ## Supported Versions
 
-Open Flow is in alpha and has not reached its first stable release. Security fixes are delivered on
+Open Flow is in beta and has not reached its first stable release. Security fixes are delivered on
 the **latest released version** and the **`main`** branch. We recommend always running the latest
 release and rebuilding the Server image from it.
 

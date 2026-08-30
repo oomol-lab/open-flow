@@ -35,7 +35,7 @@ contrôle.
 </p>
 
 > [!IMPORTANT]
-> Open Flow est en phase alpha. Ses contrats sont versionnés, mais le produit n'a pas encore atteint
+> Open Flow est en phase bêta. Ses contrats sont versionnés, mais le produit n'a pas encore atteint
 > sa première version stable.
 
 ## Créer des workflows avec un Agent IA

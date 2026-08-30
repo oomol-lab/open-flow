@@ -30,7 +30,7 @@ Agent 透過 [`oo flow`](https://github.com/oomol-lab/oo-cli) 建立、檢查、
 </p>
 
 > [!IMPORTANT]
-> Open Flow 目前處於 Alpha 階段。公開協定有版本管理，但產品尚未發布第一個穩定版本。
+> Open Flow 目前處於 Beta 階段。公開協定有版本管理，但產品尚未發布第一個穩定版本。
 
 ## 使用 AI Agent 建立工作流程
 

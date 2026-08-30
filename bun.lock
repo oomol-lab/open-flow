@@ -10,7 +10,7 @@
     },
     "apps/server": {
       "name": "@oomol-lab/open-flow-server",
-      "version": "0.1.0-alpha.0",
+      "version": "0.1.0-beta.1",
       "dependencies": {
         "@hono/node-server": "2.1.1",
         "@oomol-lab/open-flow": "workspace:*",
@@ -44,7 +44,7 @@
     },
     "packages/command": {
       "name": "@oomol-lab/open-flow-command",
-      "version": "0.1.0-alpha.17",
+      "version": "0.1.0-beta.1",
       "dependencies": {
         "@oomol-lab/open-flow": "workspace:*",
         "@wopjs/cast": "^0.1.16",
@@ -63,7 +63,7 @@
     },
     "packages/open-flow": {
       "name": "@oomol-lab/open-flow",
-      "version": "0.1.0-alpha.17",
+      "version": "0.1.0-beta.1",
       "devDependencies": {
         "@babel/parser": "8.0.4",
         "@babel/traverse": "8.0.4",

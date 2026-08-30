@@ -32,7 +32,7 @@ code, and the deployment remains under your control.
 </p>
 
 > [!IMPORTANT]
-> Open Flow is in alpha. Its contracts are versioned, but the product has not reached its first
+> Open Flow is in beta. Its contracts are versioned, but the product has not reached its first
 > stable release.
 
 ## Build Workflows with an AI Agent
