@@ -264,3 +264,36 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
   expect(database.prepare('SELECT COUNT(*) AS count FROM integration_candidates').get()).toEqual({ count: 0 })
   database.close()
 })
+
+it('removes a cleanup candidate whose fixed Integration definition is unavailable', async () => {
+  const file = await databaseFile()
+  const service = await openService(
+    file,
+    connector(async () => {
+      throw new Error('Cleanup should fail before a Connector request.')
+    }),
+    () => Date.parse('2026-08-31T13:00:00.000Z'),
+    runtime,
+    undefined,
+    undefined,
+    [stripe],
+  )
+  services.add(service)
+  const created = await service.control.createFlow('operator', 'Stripe cleanup', 'stripe-cleanup-flow')
+  const revisionId = await addStripe(service, created.flow.flowId, created.flow.draftRevisionId, ['charge.succeeded'])
+  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v1', null, 'stripe-cleanup')
+  const unavailable = { ...stripeNode(['charge.succeeded']), definition: { ...stripe.snapshot, key: 'stripe.unavailable' } }
+  const database = new DatabaseSync(file)
+  database
+    .prepare(
+      `UPDATE integration_candidates
+       SET checkpoint_json = 'null', subscription_json = '{}', status = 'cleanup', next_at = ?, trigger_json = ?
+       WHERE operation_id = ?`,
+    )
+    .run(Date.parse('2026-08-31T13:00:00.000Z'), JSON.stringify(unavailable), operation.operationId)
+
+  await service.tickIntegration('2026-08-31T13:00:00.000Z')
+
+  expect(database.prepare('SELECT COUNT(*) AS count FROM integration_candidates WHERE operation_id = ?').get(operation.operationId)).toEqual({ count: 0 })
+  database.close()
+})

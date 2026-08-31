@@ -22,6 +22,7 @@ const publicationColumns = `
 
 const publishDeadlineMs = 30 * 60 * 1_000
 const publishRetentionMs = 24 * 60 * 60 * 1_000
+export const publishPending = new Error('Publish candidate activation is pending.')
 
 export class PublicationStore {
   readonly #clock: () => number
@@ -657,7 +658,7 @@ export class PublicationStore {
               .run(publicationId, poll.scheduleJson, poll.nextAt, input.publishedAt, binding.bindingId)
           } else if (input.operationId != null) {
             if (!this.#polls.activateCandidate(input.operationId, input.flowId, publicationId, poll, input.publishedAt)) {
-              throw new Error('Ready Poll candidate changed before activation.')
+              throw publishPending
             }
           } else {
             this.#database
@@ -701,7 +702,7 @@ export class PublicationStore {
       for (const [triggerNodeId, poll] of desiredPolls) {
         if (input.operationId != null) {
           if (!this.#polls.activateCandidate(input.operationId, input.flowId, publicationId, poll, input.publishedAt)) {
-            throw new Error('Ready Poll candidate changed before activation.')
+            throw publishPending
           }
         } else {
           this.#database
@@ -783,7 +784,7 @@ export class PublicationStore {
       for (const [triggerNodeId, integration] of desiredIntegrations) {
         if (input.operationId != null) {
           if (!this.#integrations.activateCandidate(input.operationId, input.flowId, publicationId, integration, input.publishedAt)) {
-            throw new Error('Ready Integration candidate changed before activation.')
+            throw publishPending
           }
           continue
         }

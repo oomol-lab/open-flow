@@ -141,9 +141,9 @@ function serializedBytes(value: unknown): number {
   return encoder.encode(JSON.stringify(value)).byteLength
 }
 
-function writeMessage(message: ExecutorMessage): void {
-  if (process.send == null) return
-  process.send(message, () => {})
+function writeMessage(message: ExecutorMessage, sent: () => void = () => {}): void {
+  if (process.send == null) return sent()
+  process.send(message, sent)
 }
 
 function normalizedError(error: unknown): Error {
@@ -967,7 +967,10 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
       }
       yield* Effect.sync(() => {
         const retiring = retire()
-        writeMessage({ executionId: request.executionId, ok: true, ...(retiring ? { retire: true } : {}), type: 'result', value })
+        writeMessage(
+          { executionId: request.executionId, ok: true, ...(retiring ? { retire: true } : {}), type: 'result', value },
+          retiring ? () => process.disconnect?.() : undefined,
+        )
       })
     }).pipe(
       Effect.catch((error) =>
@@ -977,14 +980,17 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
               ? error
               : new IsolatedVmError('flow' in request ? 'task-failed' : 'executor-crashed', normalizedError(error).message)
           const retiring = retire()
-          writeMessage({
-            code: failure.code,
-            executionId: request.executionId,
-            message: failure.message,
-            ok: false,
-            ...(retiring ? { retire: true } : {}),
-            type: 'result',
-          })
+          writeMessage(
+            {
+              code: failure.code,
+              executionId: request.executionId,
+              message: failure.message,
+              ok: false,
+              ...(retiring ? { retire: true } : {}),
+              type: 'result',
+            },
+            retiring ? () => process.disconnect?.() : undefined,
+          )
         }),
       ),
       Effect.ensuring(Effect.sync(() => pending.clear())),
@@ -1031,7 +1037,6 @@ function runExecutor(): Effect.Effect<void> {
           const fiber = run(
             executeWithCapabilities(message, pending, () => {
               if (completedIsolates < executorIsolateBudget || executions.size != 1) return false
-              queueMicrotask(() => process.disconnect?.())
               return true
             }).pipe(
               Effect.ensuring(

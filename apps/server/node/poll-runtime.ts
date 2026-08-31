@@ -171,9 +171,11 @@ export class PollRuntime {
           if (candidates.length == 0) break
           for (const candidate of candidates) yield* this.#baseline(candidate, now)
         }
-        while (true) {
-          const targets = this.#store.polls.duePoll(now, batchSize)
+        let pages = 0
+        while (pages < batchSize) {
+          const targets = this.#store.polls.duePoll(now, batchSize - pages)
           if (targets.length == 0) break
+          pages += targets.length
           for (const target of targets) {
             const scheduledAt = new Date(target.nextAt).toISOString()
             const occurrenceId = yield* Effect.tryPromise({
@@ -377,7 +379,7 @@ export class PollRuntime {
         }
         const checkpointJson = JSON.stringify(result.checkpoint)
         if (checkpointJson == null || encoder.encode(checkpointJson).byteLength > maximumPollCheckpointBytes) {
-          return yield* Effect.fail(new RangeError('Poll checkpoint exceeds 64 KiB.'))
+          return yield* Effect.fail(new PermanentPollError('Poll checkpoint exceeds 64 KiB.'))
         }
         const baseline = target.health == 'initializing'
         const identified = yield* Effect.forEach(

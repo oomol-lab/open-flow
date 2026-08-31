@@ -40,6 +40,7 @@ import { isolatedVmEngineDigest, IsolatedVmHost } from './isolated-vm.ts'
 import { errorKind, silentLogger } from './logger.ts'
 import { migrateDatabase } from './migrate.ts'
 import { PollRuntime } from './poll-runtime.ts'
+import { publishPending } from './publication-store.ts'
 import { Store } from './store.ts'
 
 interface PublishFlowInput {
@@ -1065,7 +1066,13 @@ export class ServerService {
         continue
       }
       const input = JSON.parse(target.input) as Parameters<PublicationStore['publish']>[0]
-      const accepted = this.#store.publications.publish({ ...input, operationId: target.operationId, publishedAt: now })
+      let accepted: PublicationAcceptance
+      try {
+        accepted = this.#store.publications.publish({ ...input, operationId: target.operationId, publishedAt: now })
+      } catch (error) {
+        if (error === publishPending) return maintenanceRetryMs
+        throw error
+      }
       switch (accepted.kind) {
         case 'published':
           this.#logger.info(
@@ -1107,7 +1114,7 @@ export class ServerService {
           })
           break
         case 'operation-pending':
-          return 0
+          return maintenanceRetryMs
       }
     }
     let nextDelay = publishCount == maintenanceBatchSize || this.#store.pruneExpiredEvents(now, maintenanceBatchSize) > 0 ? 0 : maintenanceIntervalMs

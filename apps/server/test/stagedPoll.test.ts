@@ -252,3 +252,28 @@ it('fails a permanent Poll baseline before activation and preserves the old Live
   expect(database.prepare('SELECT COUNT(*) AS count FROM poll_bindings').get()).toEqual({ count: 0 })
   database.close()
 })
+
+it('rolls back a changed Poll candidate during activation and succeeds after recovery', async () => {
+  const file = await databaseFile()
+  const definition: PollDefinition = { snapshot, poll: async () => ({ checkpoint: { ready: true }, events: [] }) }
+  const service = await openService(file, connector, () => Date.parse('2026-08-31T12:00:00.000Z'), {}, undefined, undefined, [definition])
+  services.add(service)
+  const created = await service.control.createFlow('operator', 'Poll activation', 'poll-activation-flow')
+  const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'activation')
+  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v1', null, 'poll-activation')
+  await service.tickPoll('2026-08-31T12:00:00.000Z')
+
+  const database = new DatabaseSync(file)
+  const scheduleJson = JSON.stringify(pollNode('activation').pollTimes)
+  database.prepare("UPDATE poll_candidates SET schedule_json = '[]' WHERE operation_id = ?").run(operation.operationId)
+  await service.tickMaintenance('2026-08-31T12:00:00.000Z')
+  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('pending')
+  await expect(service.control.getLive(created.flow.flowId)).resolves.toMatchObject({ publication: null })
+  expect(database.prepare('SELECT COUNT(*) AS count FROM publications').get()).toEqual({ count: 0 })
+
+  database.prepare('UPDATE poll_candidates SET schedule_json = ? WHERE operation_id = ?').run(scheduleJson, operation.operationId)
+  await service.tickMaintenance('2026-08-31T12:00:01.000Z')
+  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('succeeded')
+  expect(database.prepare('SELECT COUNT(*) AS count FROM publications').get()).toEqual({ count: 1 })
+  database.close()
+})

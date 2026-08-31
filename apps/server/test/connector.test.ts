@@ -207,7 +207,8 @@ describe('Server Connector host', () => {
       }),
     )
     const source = connectorFlow()
-    const task = source.document.tasks.connector!
+    const task = source.document.tasks.connector
+    if (task == null) throw new Error('Connector Task fixture is missing.')
     const revision: RevisionContent = {
       ...source,
       document: {
@@ -243,7 +244,8 @@ describe('Server Connector host', () => {
       }),
     )
     const source = connectorFlow()
-    const task = source.document.tasks.connector!
+    const task = source.document.tasks.connector
+    if (task == null) throw new Error('Connector Task fixture is missing.')
     const revision: RevisionContent = {
       ...source,
       document: {

@@ -2,7 +2,7 @@ import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { PollDefinition, PollResult } from '@oomol-lab/open-flow/poll-trigger'
 import type { DestinationStream, Logger } from 'pino'
 
-import { PollConnectionError, TransientPollError } from '@oomol-lab/open-flow/poll-trigger'
+import { maximumPollCheckpointBytes, PollConnectionError, TransientPollError } from '@oomol-lab/open-flow/poll-trigger'
 import * as Effect from 'effect/Effect'
 import { TestClock } from 'effect/testing'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -295,6 +295,25 @@ describe('Server Poll Trigger', () => {
     await closeService(service)
   })
 
+  it('bounds continuation pages processed by one Poll tick', async () => {
+    let calls = 0
+    const definition: PollDefinition = {
+      snapshot,
+      async poll() {
+        calls += 1
+        return { checkpoint: { page: calls }, events: [], hasMore: true }
+      },
+    }
+    const service = await openService(await databaseFile(), connector, () => publishedAt, {}, undefined, undefined, [definition])
+    await publish(service)
+
+    await service.tickPoll('2026-08-21T00:01:00.000Z')
+
+    expect(calls).toBe(100)
+    expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: { page: 100 }, health: 'initializing' })
+    await closeService(service)
+  })
+
   it('stops scheduling a Poll binding that needs Connection reauthorization', async () => {
     const file = await databaseFile()
     const captured = captureLogger()
@@ -318,6 +337,35 @@ describe('Server Poll Trigger', () => {
     expect(captured.output()).toContain('"category":"trigger.poll.health_changed"')
     expect(captured.output()).toContain('"health":"needs_reauth"')
     expect(captured.output()).not.toContain('Connection requires reauthorization.')
+    database.close()
+    await closeService(service)
+  })
+
+  it('fails a Poll binding whose Provider returns an oversized checkpoint', async () => {
+    const file = await databaseFile()
+    let calls = 0
+    const definition: PollDefinition = {
+      snapshot,
+      async poll() {
+        calls += 1
+        return { checkpoint: calls == 1 ? null : 'x'.repeat(maximumPollCheckpointBytes), events: [] }
+      },
+    }
+    const service = await openService(file, connector, () => publishedAt, {}, undefined, undefined, [definition])
+    await publish(service)
+
+    await service.tickPoll('2026-08-21T00:01:00.000Z')
+    expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: null, health: 'healthy' })
+    await service.tickPoll('2026-08-21T00:02:00.000Z')
+    expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: null, health: 'failed' })
+    await service.tickPoll('2026-08-21T00:03:00.000Z')
+    expect(calls).toBe(2)
+
+    const database = new DatabaseSync(file, { readOnly: true })
+    expect(database.prepare('SELECT next_at AS nextAt FROM poll_bindings').get()).toEqual({ nextAt: null })
+    expect(database.prepare('SELECT error_code AS errorCode, kind FROM trigger_activities').all()).toEqual([
+      { errorCode: 'trigger-key.invalid', kind: 'health.failed' },
+    ])
     database.close()
     await closeService(service)
   })

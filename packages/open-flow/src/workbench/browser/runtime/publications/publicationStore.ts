@@ -198,11 +198,15 @@ export class PublicationStore {
   public async load(flowId: string): Promise<void> {
     const target = { flowId }
     const current = this.#loads.begin()
-    if (!sameTarget(this.#state.value.target, target)) this.#attempt = undefined
+    if (!sameTarget(this.#state.value.target, target)) {
+      this.#operation.invalidate()
+      this.#attempt = undefined
+    }
     this.#setNotice(undefined)
     this.#state.set({ ...initialState, loading: true, target })
     try {
-      const [[live, page, bindings], operation] = await Promise.all([this.#read(target), this.#storedOperation(target)])
+      const operation = await this.#storedOperation(target)
+      const [live, page, bindings] = await this.#read(target)
       if (!current()) return
       this.#set({
         bindings,

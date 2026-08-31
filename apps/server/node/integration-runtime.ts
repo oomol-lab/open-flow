@@ -326,7 +326,7 @@ export class IntegrationRuntime {
     return Effect.gen({ self: this }, function* () {
       const options = this.#resolveOptions()
       if (options == null) return yield* Effect.fail(new TransientIntegrationError('Integration runtime is not configured.'))
-      const resolved = this.#trigger(candidate.triggerJson)
+      const resolved = yield* Effect.try({ try: () => this.#trigger(candidate.triggerJson), catch: (error) => error })
       let current = this.#store.integrations.candidate(candidate.operationId, candidate.nodeId)
       if (current == null) return
       if (current.status == 'preparing' && current.subscriptionJson == null) {
@@ -397,6 +397,19 @@ export class IntegrationRuntime {
                   ...errorKind(error),
                 },
                 'Integration candidate preparation failed.',
+              )
+              return
+            }
+            if (candidate.status == 'cleanup' && health == 'failed') {
+              this.#store.integrations.deleteCandidate(candidate)
+              this.#logger.warn(
+                {
+                  category: 'publication.integration_cleanup_failed',
+                  nodeId: candidate.nodeId,
+                  operationId: candidate.operationId,
+                  ...errorKind(error),
+                },
+                'Integration candidate cleanup failed permanently.',
               )
               return
             }

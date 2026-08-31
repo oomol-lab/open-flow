@@ -42,6 +42,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
     expect(tables.map(({ name }) => name)).toContain('integration_candidates')
     expect(tables.map(({ name }) => name)).toContain('poll_candidates')
     expect(tables.map(({ name }) => name)).not.toContain('projects')
+    expect(database.prepare("SELECT name FROM pragma_index_info('publish_work_operation') WHERE seqno = 0").get()).toEqual({ name: 'operation_id' })
     for (const { name } of tables) expect(database.prepare(`PRAGMA foreign_key_list(${name})`).all(), name).toEqual([])
   } finally {
     database.close()

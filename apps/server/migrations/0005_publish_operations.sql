@@ -48,3 +48,4 @@ CREATE TABLE publish_work (
 ) STRICT;
 
 CREATE INDEX publish_work_due ON publish_work (status, next_at, work_id);
+CREATE INDEX publish_work_operation ON publish_work (operation_id, status);
