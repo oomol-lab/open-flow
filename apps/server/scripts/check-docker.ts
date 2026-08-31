@@ -1,3 +1,4 @@
+import type { PublishOperation } from '@oomol-lab/open-flow/control-api'
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
 import assert from 'node:assert/strict'
@@ -67,7 +68,7 @@ try {
     },
     200,
   )
-  const publication = await requestJson<{ readonly publicationId: string }>(
+  let operation = await requestJson<PublishOperation>(
     firstOrigin,
     `/v1/flows/${flow.flowId}/revisions/${changed.revision.revisionId}/publications`,
     {
@@ -75,13 +76,24 @@ try {
       headers: { 'content-type': 'application/json', 'cookie': firstCookie, 'idempotency-key': `publication-${suffix}` },
       method: 'POST',
     },
-    201,
+    202,
   )
+  for (let attempt = 0; attempt < 200 && operation.status == 'pending'; attempt += 1) {
+    await delay(25)
+    operation = await requestJson<PublishOperation>(
+      firstOrigin,
+      `/v1/flows/${flow.flowId}/publish-operations/${operation.operationId}`,
+      { headers: { cookie: firstCookie } },
+      200,
+    )
+  }
+  if (operation.status == 'failed') assert.fail(`Publish operation ${operation.operationId} failed: ${JSON.stringify(operation.issue)}`)
+  if (operation.status == 'pending') assert.fail(`Publish operation ${operation.operationId} did not reach a terminal status.`)
   const accepted = await requestJson<{ readonly runId: string }>(
     firstOrigin,
     '/v1/runs',
     {
-      body: JSON.stringify({ inputs: {}, publicationId: publication.publicationId, version: 1 }),
+      body: JSON.stringify({ inputs: {}, publicationId: operation.publicationId, version: 1 }),
       headers: { 'content-type': 'application/json', 'cookie': firstCookie, 'idempotency-key': `run-${suffix}` },
       method: 'POST',
     },
