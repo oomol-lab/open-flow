@@ -1,6 +1,6 @@
 import type { Node, NodeChange, NodePositionChange, XYPosition } from '@xyflow/react'
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 
 export type HelperLinesData = [
   horizontal: number | undefined,
@@ -12,7 +12,7 @@ export const useHelperLines = (): HelperLinesData => {
   const [horizontal, setHorizontal] = useState<number | undefined>()
   const [vertical, setVertical] = useState<number | undefined>()
 
-  const onBeforeApplyNodesChanges = (changes: NodeChange[], nodes: Node[]) => {
+  const onBeforeApplyNodesChanges = useCallback((changes: NodeChange[], nodes: Node[]) => {
     // Clear any existing helper lines.
     setHorizontal(undefined)
     setVertical(undefined)
@@ -29,7 +29,7 @@ export const useHelperLines = (): HelperLinesData => {
       setHorizontal(helperLines.horizontal)
       setVertical(helperLines.vertical)
     }
-  }
+  }, [])
 
   return [horizontal, vertical, onBeforeApplyNodesChanges] as const
 }
