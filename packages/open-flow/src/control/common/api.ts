@@ -163,6 +163,37 @@ export interface Publication {
   readonly version: 1
 }
 
+export type PublishOperation =
+  | {
+      readonly createdAt: string
+      readonly flowId: string
+      readonly operationId: string
+      readonly revisionId: string
+      readonly status: 'pending'
+      readonly updatedAt: string
+      readonly version: 1
+    }
+  | {
+      readonly createdAt: string
+      readonly flowId: string
+      readonly operationId: string
+      readonly publicationId: string
+      readonly revisionId: string
+      readonly status: 'succeeded'
+      readonly updatedAt: string
+      readonly version: 1
+    }
+  | {
+      readonly createdAt: string
+      readonly flowId: string
+      readonly issue: { readonly code: string; readonly message: string; readonly nodeId?: string }
+      readonly operationId: string
+      readonly revisionId: string
+      readonly status: 'failed'
+      readonly updatedAt: string
+      readonly version: 1
+    }
+
 export interface Diagnostic {
   readonly code: string
   readonly column: number
@@ -694,6 +725,41 @@ function publication(value: unknown): Publication {
   }
 }
 
+function publishOperation(value: unknown): PublishOperation {
+  const source = record(value)
+  const status = source.status
+  const common = {
+    createdAt: string(source.createdAt),
+    flowId: string(source.flowId),
+    operationId: string(source.operationId),
+    revisionId: string(source.revisionId),
+    updatedAt: string(source.updatedAt),
+    version: 1 as const,
+  }
+  if (source.version != 1) return invalidResponse()
+  switch (status) {
+    case 'pending':
+      exact(source, ['createdAt', 'flowId', 'operationId', 'revisionId', 'status', 'updatedAt', 'version'])
+      return { ...common, status }
+    case 'succeeded':
+      exact(source, ['createdAt', 'flowId', 'operationId', 'publicationId', 'revisionId', 'status', 'updatedAt', 'version'])
+      return { ...common, publicationId: string(source.publicationId), status }
+    case 'failed': {
+      exact(source, ['createdAt', 'flowId', 'issue', 'operationId', 'revisionId', 'status', 'updatedAt', 'version'])
+      const issue = record(source.issue)
+      const nodeId = issue.nodeId
+      exact(issue, ['code', 'message', ...(nodeId == null ? [] : ['nodeId'])])
+      return {
+        ...common,
+        issue: { code: string(issue.code), message: string(issue.message), ...(nodeId == null ? {} : { nodeId: string(nodeId) }) },
+        status,
+      }
+    }
+    default:
+      return invalidResponse()
+  }
+}
+
 function diagnostic(value: unknown): Diagnostic {
   const source = record(value)
   const values = source.values == null ? undefined : record(source.values)
@@ -1183,14 +1249,18 @@ export class ControlClient {
     return created.source == 'live' ? created : invalidResponse()
   }
 
-  async publishFlow(flowId: string, revisionId: string, expectedLivePublicationId: string | null, options: PublicationOptions = {}): Promise<Publication> {
-    return publication(
+  async publishFlow(flowId: string, revisionId: string, expectedLivePublicationId: string | null, options: PublicationOptions = {}): Promise<PublishOperation> {
+    return publishOperation(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/publications`, {
         body: JSON.stringify({ engineContract: 'open-flow-engine/v1', expectedLivePublicationId, version: 1 }),
         headers: { 'idempotency-key': options.idempotencyKey ?? operationKey('publication') },
         method: 'POST',
       }),
     )
+  }
+
+  async getPublishOperation(flowId: string, operationId: string): Promise<PublishOperation> {
+    return publishOperation(await this.request(`/v1/flows/${segment(flowId)}/publish-operations/${segment(operationId)}`))
   }
 
   async rollbackFlow(flowId: string, publicationId: string, expectedLivePublicationId: string, options: PublicationOptions = {}): Promise<Publication> {

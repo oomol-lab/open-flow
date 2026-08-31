@@ -45,13 +45,7 @@ export const FlowSchema = /* @__PURE__ */ z
           })
           continue
         }
-        if (definition.connector != null && node.trigger.connection == null) {
-          context.addIssue({
-            code: 'custom',
-            message: `Trigger "${node.node_id}" requires a connection for service "${definition.connector.service_id}".`,
-            path: ['nodes', index, 'trigger', 'connection'],
-          })
-        } else if (definition.connector == null && node.trigger.connection != null) {
+        if (definition.connector == null && node.trigger.connection != null) {
           context.addIssue({
             code: 'custom',
             message: `Trigger "${node.node_id}" does not use a Connector connection.`,

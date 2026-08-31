@@ -93,7 +93,7 @@ export type AddNodeIntent =
   | { readonly kind: 'condition'; readonly name: string }
   | { readonly kind: 'cron'; readonly name: string }
   | { readonly kind: 'llm'; readonly mode: 'chat' | 'json'; readonly name: string; readonly outputDescription: string }
-  | { readonly kind: 'provider-trigger'; readonly connectionId: string; readonly definition: TriggerKeySnapshot }
+  | { readonly kind: 'provider-trigger'; readonly connectionId?: string; readonly definition: TriggerKeySnapshot }
   | { readonly kind: 'subflow'; readonly subflowId: string }
   | { readonly kind: 'value'; readonly name: string }
   | { readonly kind: 'webhook'; readonly name: string }
@@ -176,7 +176,7 @@ export function addNode(
       if (target.kind != 'flow') return
       return createProviderTrigger(target, { bindingId: identity(), nodeId }, intent.definition, {
         config: {},
-        connectionId: intent.connectionId,
+        ...(intent.connectionId == null ? {} : { connectionId: intent.connectionId }),
       })
     }
   }
@@ -243,9 +243,8 @@ export function pasteNodes(revision: RevisionView, target: DesignerTarget, clipb
     if (!('inputs' in node)) {
       if (node.kind == 'poll' || node.kind == 'integration') {
         const binding = revision.binding(node.bindingId)
-        if (binding == null) continue
         const bindingId = identity()
-        operations.push({ binding, bindingId, kind: 'binding.create' })
+        if (binding != null) operations.push({ binding, bindingId, kind: 'binding.create' })
         operations.push({ kind: 'graph.node.create', node: { ...node, bindingId, name: `${node.name} copy` }, nodeId, target })
       } else {
         operations.push({ kind: 'graph.node.create', node: { ...node, name: `${node.name} copy` }, nodeId, target })

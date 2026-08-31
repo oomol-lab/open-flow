@@ -11,10 +11,14 @@ describe('JavaScript executor manifest model', () => {
     expect(parseTaskBlockExecutor({ name: 'nodejs', options: { entry: 'task.ts' } }).unwrapOr()).toBeUndefined()
   })
 
-  it('requires non-empty string Connector action and connection options', () => {
+  it('requires a non-empty Connector action while preserving an optional Connection', () => {
     expect(parseTaskBlockExecutor({ name: 'connector', options: { action: 'gmail.send_email', connection: 'gmail-work' } }).unwrapOr()).toEqual({
       name: 'connector',
       options: { action: 'gmail.send_email', connection: 'gmail-work' },
+    })
+    expect(parseTaskBlockExecutor({ name: 'connector', options: { action: 'gmail.send_email' } }).unwrapOr()).toEqual({
+      name: 'connector',
+      options: { action: 'gmail.send_email' },
     })
     expect(parseTaskBlockExecutor({ name: 'connector', options: { action: 'gmail.send_email', connection: 42 } }).unwrapOr()).toBeUndefined()
     expect(parseTaskBlockExecutor({ name: 'connector', options: { action: 'gmail.send_email', connection: '' } }).unwrapOr()).toBeUndefined()

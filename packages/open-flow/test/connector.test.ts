@@ -70,4 +70,10 @@ test('creates a Connector Designer node with stable title and icon behavior', ()
     inputs_def: [],
     outputs_def: [],
   })
+  const unconnected = connectorActionNode(action, undefined, connectorNodeId('gmail_send_email')).task
+  if (typeof unconnected == 'string') throw new Error('Expected an inline Connector Task.')
+  assert.deepEqual(unconnected.executor, {
+    name: 'connector',
+    options: { action: 'gmail.send_email' },
+  })
 })

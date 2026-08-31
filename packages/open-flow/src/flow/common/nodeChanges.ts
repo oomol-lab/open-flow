@@ -194,7 +194,7 @@ export function createProviderTrigger(
   definition: TriggerKeySnapshot,
   options: {
     readonly config: Readonly<Record<string, JsonValue>>
-    readonly connectionId: string
+    readonly connectionId?: string
     readonly name?: string
     readonly schedule?: readonly TriggerSchedule[]
   },
@@ -218,7 +218,9 @@ export function createProviderTrigger(
           name,
         }
   return [
-    { binding: { kind: 'connection', target: options.connectionId }, bindingId: identity.bindingId, kind: 'binding.create' },
+    ...(options.connectionId == null
+      ? []
+      : [{ binding: { kind: 'connection' as const, target: options.connectionId }, bindingId: identity.bindingId, kind: 'binding.create' as const }]),
     { kind: 'graph.node.create', node, nodeId: identity.nodeId, target },
   ]
 }
@@ -246,7 +248,7 @@ export function deleteNodes(content: RevisionContent, target: GraphTarget, nodeI
     const inUse = Object.entries(content.document.graph.nodes).some(
       ([nodeId, node]) => !removed.has(nodeId) && (node.kind == 'poll' || node.kind == 'integration') && node.bindingId == bindingId,
     )
-    if (!inUse) operations.push({ bindingId, kind: 'binding.delete' })
+    if (!inUse && content.document.bindings[bindingId] != null) operations.push({ bindingId, kind: 'binding.delete' })
   }
   return cleanVariableBindings(content, operations)
 }
@@ -425,7 +427,9 @@ export function setTriggerConnection(
   const trigger = content.document.graph.nodes[nodeId]
   if (trigger == null || (trigger.kind != 'poll' && trigger.kind != 'integration')) return
   const binding = content.document.bindings[trigger.bindingId]
-  if (binding?.kind != 'connection') return
+  if (binding == null) return [{ binding: { kind: 'connection', target: connectionId }, bindingId: trigger.bindingId, kind: 'binding.create' }]
+  if (binding.kind != 'connection') return
+  if (binding.target == connectionId) return []
   return [{ binding: { kind: 'connection', target: connectionId }, bindingId: trigger.bindingId, kind: 'binding.replace' }]
 }
 

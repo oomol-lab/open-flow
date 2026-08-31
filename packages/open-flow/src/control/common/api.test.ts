@@ -61,7 +61,7 @@ describe('ControlClient Flow API', () => {
   })
 
   it('scopes Connector resources to an encoded Flow identity', async () => {
-    const request = vi.fn(async (path: string) => {
+    const request = vi.fn(async (path: string, _init?: RequestInit) => {
       if (path == '/v1/connector/providers?flowId=flow%2F1') {
         return Response.json({ providers: [{ serviceId: 'mail', serviceName: 'Mail' }], version: 1 })
       }
@@ -103,6 +103,50 @@ describe('ControlClient Flow API', () => {
       Response.json({ ...checked, diagnostics: [{ ...checked.diagnostics[0], values: { taskId: true, variant: 'task' } }] }),
     )
     await expect(invalid.checkFlow(flow.flowId, flow.draftRevisionId)).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
+  })
+})
+
+describe('ControlClient Publish API', () => {
+  const pending = {
+    createdAt: '2026-08-31T00:00:00.000Z',
+    flowId: flow.flowId,
+    operationId: 'publish-1',
+    revisionId: flow.draftRevisionId,
+    status: 'pending',
+    updatedAt: '2026-08-31T00:00:00.000Z',
+    version: 1,
+  } as const
+
+  it('starts and reads one Publish operation', async () => {
+    const succeeded = { ...pending, publicationId: 'publication-1', status: 'succeeded', updatedAt: '2026-08-31T00:00:01.000Z' } as const
+    const request = vi.fn(async (path: string, _init?: RequestInit) => {
+      if (path.endsWith('/publications')) return Response.json(pending, { status: 202 })
+      if (path.endsWith('/publish-operations/publish-1')) return Response.json(succeeded)
+      throw new Error(path)
+    })
+    const client = new ControlClient(request)
+
+    await expect(client.publishFlow(flow.flowId, flow.draftRevisionId, null, { idempotencyKey: 'publish-key' })).resolves.toEqual(pending)
+    await expect(client.getPublishOperation(flow.flowId, pending.operationId)).resolves.toEqual(succeeded)
+    expect(request).toHaveBeenNthCalledWith(
+      1,
+      '/v1/flows/flow%2F1/revisions/revision-1/publications',
+      expect.objectContaining({
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v1', expectedLivePublicationId: null, version: 1 }),
+        method: 'POST',
+      }),
+    )
+    expect(new Headers(request.mock.calls[0]![1]?.headers).get('idempotency-key')).toBe('publish-key')
+    expect(request).toHaveBeenNthCalledWith(2, '/v1/flows/flow%2F1/publish-operations/publish-1', expect.anything())
+  })
+
+  it.each([
+    ['an extra pending field', { ...pending, extra: true }],
+    ['a succeeded result without a Publication', { ...pending, status: 'succeeded' }],
+    ['a failed result with an unsafe issue shape', { ...pending, issue: { code: 'provider.failed', message: 'Failed.', response: {} }, status: 'failed' }],
+  ])('rejects %s', async (_name, response) => {
+    const client = new ControlClient(async () => Response.json(response))
+    await expect(client.getPublishOperation(flow.flowId, pending.operationId)).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
   })
 })
 

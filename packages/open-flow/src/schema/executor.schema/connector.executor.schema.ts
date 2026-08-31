@@ -7,7 +7,7 @@ export const ConnectorExecutorSchema = /* @__PURE__ */ z
     name: ConnectorExecutorNameSchema,
     options: /* @__PURE__ */ z.strictObject({
       action: /* @__PURE__ */ z.string().min(1).describe('Connector action id in service.action form'),
-      connection: /* @__PURE__ */ z.string().min(1).describe('Team-owned Connector connection id'),
+      connection: /* @__PURE__ */ z.string().min(1).optional().describe('Team-owned Connector connection id'),
     }),
   })
   .describe('Connector Executor calls a versioned remote action')

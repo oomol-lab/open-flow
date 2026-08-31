@@ -1,6 +1,7 @@
 import type { Draft } from '../api.ts'
 
 import { describe, expect, it } from 'vitest'
+import { setTriggerConnection } from '../../../../flow/common/nodeChanges.ts'
 import { revisionView } from '../revisionView.ts'
 import { addNode, applyFlowChanges, copyNodes, pasteNodes, setInputValue, setInputVariable, updateCodeTaskPorts } from './flowChanges.ts'
 
@@ -167,6 +168,49 @@ describe('Variable input changes', () => {
     })
     expect(changed.content.document.graph.nodes['task-copy']).toMatchObject({
       inputs: { value: { sources: [{ bindingId: 'binding-copy', kind: 'binding' }] } },
+    })
+  })
+})
+
+describe('Provider Trigger changes', () => {
+  it('creates an unconnected Trigger and adds its binding when a Connection is selected', () => {
+    const current = draft('export default () => {}\n')
+    const ids = ['binding']
+    const changes = addNode(
+      revisionView(current),
+      { kind: 'flow' },
+      'trigger',
+      {
+        definition: {
+          configSchema: { additionalProperties: false, type: 'object' },
+          definitionVersion: 1,
+          description: 'Runs when a repository changes.',
+          displayName: 'Repository event',
+          endpoint: {
+            body: { allowArray: false, allowEmpty: false, formats: ['json'] },
+            methods: ['POST'],
+            successStatus: 200,
+          },
+          key: 'github.on_repo_event',
+          name: 'on_repo_event',
+          payloadSchema: { additionalProperties: true, type: 'object' },
+          provider: 'github',
+          type: 'integration',
+        },
+        kind: 'provider-trigger',
+      },
+      () => ids.shift()!,
+    )
+
+    if (changes == null) throw new Error('Expected provider Trigger changes.')
+    const added = applyFlowChanges(current, changes)
+    expect(added.content.document.bindings).toEqual({})
+    expect(added.content.document.graph.nodes.trigger).toMatchObject({ bindingId: 'binding', kind: 'integration' })
+
+    const connected = setTriggerConnection(added.content, { kind: 'flow' }, 'trigger', 'github-work')
+    if (connected == null) throw new Error('Expected Trigger Connection changes.')
+    expect(applyFlowChanges(added, connected).content.document.bindings).toEqual({
+      binding: { kind: 'connection', target: 'github-work' },
     })
   })
 })

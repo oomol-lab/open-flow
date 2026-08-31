@@ -85,6 +85,7 @@ function reconcileContext(target: ConnectorProxy, runtime: IntegrationStateConte
     config,
     connector: target,
     endpointUrl: 'https://flow.example/v1/integrations/endpoint_11111111111111111111111111111111',
+    idempotencyKey: 'integration-test',
     now: new Date('2026-08-20T12:34:20.000Z'),
     state: runtime,
   }

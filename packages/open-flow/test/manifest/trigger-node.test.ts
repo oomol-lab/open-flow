@@ -97,13 +97,9 @@ describe('Trigger node authoring', () => {
     ).toThrow(/Unrecognized key/)
   })
 
-  it('rejects invalid Trigger identities and schemas while preserving incomplete config', () => {
-    expect(() =>
-      FlowSchema.parse({
-        trigger_definitions: [triggerDefinition],
-        nodes: [{ ...triggerNode, trigger: { ...triggerNode.trigger, connection: undefined } }],
-      }),
-    ).toThrow(/requires a connection/)
+  it('rejects invalid Trigger identities and schemas while preserving incomplete authoring state', () => {
+    const unconnected = { ...triggerNode, trigger: { ...triggerNode.trigger, connection: undefined } }
+    expect(FlowSchema.parse({ trigger_definitions: [triggerDefinition], nodes: [unconnected] }).nodes[0]).toEqual(unconnected)
     expect(() =>
       FlowSchema.parse({ trigger_definitions: [triggerDefinition], nodes: [{ ...triggerNode, trigger: { ...triggerNode.trigger, type: '' } }] }),
     ).toThrow()

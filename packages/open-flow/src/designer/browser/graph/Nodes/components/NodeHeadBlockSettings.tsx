@@ -811,7 +811,7 @@ function ExecutorConfigs(props: InlineTaskConfigsProps) {
 
 function ConnectorConnectionConfig(props: {
   readonly action: string
-  readonly connection: string
+  readonly connection: string | undefined
   readonly editable: boolean
   readonly executor$: InlineTask['executor']
 }) {
@@ -829,7 +829,7 @@ function ConnectorConnectionConfig(props: {
         }
         value={
           <Label className={styles.executorName} title={props.connection}>
-            {props.connection}
+            {props.connection ?? t('addNode.connectorNoActiveConnection')}
           </Label>
         }
       />
@@ -837,13 +837,13 @@ function ConnectorConnectionConfig(props: {
   }
 
   const active = connections.filter((connection) => connection.status == 'active')
-  const selected = connections.find((connection) => connection.id == props.connection)
+  const selected = props.connection == null ? undefined : connections.find((connection) => connection.id == props.connection)
   const resolved = selected?.status == 'active'
   const options: IBasicOption[] = active.map((connection) => ({
     label: `${connection.displayName} (${connection.id})`,
     value: connection.id,
   }))
-  if (!resolved) {
+  if (props.connection != null && !resolved) {
     options.unshift({
       isDisabled: true,
       label: `${props.connection} (${t('blockEditor.executor.connectionUnresolved')})`,

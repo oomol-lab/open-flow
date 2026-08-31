@@ -8,6 +8,7 @@ import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { describe, it } from 'vitest'
 import { createServerApp } from '../node/http.ts'
+import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService } from './serviceFixture.ts'
 
 let sequence = 0
@@ -95,8 +96,19 @@ async function createHarness(fixture: IntegrationConformanceFixture): Promise<In
     },
     snapshot,
   }
+  const connector = createConnectorHost({
+    listConnections: async () => [
+      {
+        connectionId: fixture.connectionId,
+        displayName: 'Conformance',
+        isDefault: true,
+        serviceId: snapshot.provider,
+        status: 'active',
+      },
+    ],
+  })
   let now = Date.parse(fixture.publishedAt)
-  const open = () => openService(file, undefined, () => now, { integration: { callbackKey, publicOrigin } }, undefined, undefined, [definition])
+  const open = () => openService(file, connector, () => now, { integration: { callbackKey, publicOrigin } }, undefined, undefined, [definition])
   let service = await open()
   let revisionId = next('revision')
   const published = await service.publishFlow({

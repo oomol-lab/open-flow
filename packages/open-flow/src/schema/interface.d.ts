@@ -255,7 +255,7 @@ export type ConnectorExecutor = {
     /** Connector action id in service.action form. */
     action: string
     /** Team-owned Connector connection id. */
-    connection: string
+    connection?: string | undefined
   }
 }
 

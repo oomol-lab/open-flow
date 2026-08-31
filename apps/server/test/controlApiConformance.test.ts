@@ -93,6 +93,7 @@ async function createHarness(): Promise<ControlApiConformanceHarness> {
     async request(request) {
       const headers = new Headers(request.headers)
       headers.set('authorization', 'Bearer control-api-conformance')
+      if (request.method == 'GET' && new URL(request.url).pathname.includes('/publish-operations/')) await service.tickMaintenance()
       const response = await app.request(new Request(request, { headers }))
       if (request.method == 'POST' && new URL(request.url).pathname.endsWith('/pause') && response.ok) {
         await closeService(service)

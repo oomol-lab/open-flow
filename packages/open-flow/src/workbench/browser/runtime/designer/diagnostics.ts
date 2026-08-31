@@ -56,6 +56,7 @@ function scope(path: string): DiagnosticScope {
 function nodeSection(node: GraphNode, suffix: string): InspectorSection {
   if (suffix.startsWith('/inputs/')) return 'inputs'
   if (node.kind == 'task' && suffix.startsWith('/task')) return 'task'
+  if ((node.kind == 'poll' || node.kind == 'integration') && suffix.startsWith('/bindingId')) return 'account'
   if (node.kind == 'condition' && (suffix.startsWith('/cases/') || suffix.startsWith('/input') || suffix.startsWith('/defaultOutput'))) {
     return 'condition'
   }

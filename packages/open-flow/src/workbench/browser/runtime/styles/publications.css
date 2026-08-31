@@ -75,6 +75,52 @@
     border-top: 1px solid var(--ui-border);
   }
 
+  .publication-progress {
+    display: grid;
+    min-width: 0;
+    grid-column: 1 / -1;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    padding: 12px 14px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius);
+    background: var(--ui-card);
+  }
+
+  .publication-progress.failed {
+    border-color: color-mix(in srgb, var(--ui-destructive) 28%, var(--ui-border));
+    background: color-mix(in srgb, var(--ui-destructive) 7%, var(--ui-background));
+  }
+
+  .publication-progress > .status-dot {
+    margin-top: 4px;
+  }
+
+  .publication-progress > div {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .publication-progress strong {
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .publication-progress span {
+    color: var(--ui-muted-foreground);
+    font-size: 11px;
+    line-height: 16px;
+  }
+
+  .publication-progress-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
   .publication-revision-overview {
     display: grid;
     min-width: 0;

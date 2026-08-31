@@ -102,7 +102,7 @@ export const stripeEvent: IntegrationDefinition = {
       const created = await request(context, 'endpoint create', {
         body: createForm(context.endpointUrl, config),
         endpoint: endpoints,
-        headers: formHeaders,
+        headers: { ...formHeaders, 'Idempotency-Key': context.idempotencyKey },
         method: 'POST',
       })
       success(created, 'endpoint create')

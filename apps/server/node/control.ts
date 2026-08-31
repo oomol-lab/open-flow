@@ -231,6 +231,9 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     )
     return response(200, { ...page, ...(next == null ? {} : { nextCursor: encodePublicationCursor(flowId, next) }) })
   })
+  app.get('/flows/:flowId/publish-operations/:operationId', (context) =>
+    response(200, service.getPublishOperation(context.req.param('flowId'), context.req.param('operationId'))),
+  )
   app.get('/flows/:flowId/presentation', (context) => response(200, service.getPresentation(context.req.param('flowId'))))
   app.put('/flows/:flowId/presentation', async (context) => {
     const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)
@@ -261,7 +264,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     if (body.expectedLivePublicationId !== null && (typeof body.expectedLivePublicationId != 'string' || body.expectedLivePublicationId.length == 0)) {
       invalid(controlErrorCode.flowInvalid, 'Expected Live Publication is invalid.')
     }
-    const committed = await service.publishFlow(
+    const operation = await service.publishFlow(
       context.get('actorId'),
       context.req.param('flowId'),
       context.req.param('revisionId'),
@@ -269,7 +272,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       body.expectedLivePublicationId as string | null,
       idempotencyKey(context.req.raw, controlErrorCode.flowInvalid),
     )
-    return response(committed.created ? 201 : 200, committed.publication)
+    return response(202, operation)
   })
   app.post('/flows/:flowId/publications/:publicationId/rollback', async (context) => {
     const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)

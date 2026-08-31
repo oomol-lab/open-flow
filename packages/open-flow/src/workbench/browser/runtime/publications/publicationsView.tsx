@@ -126,6 +126,7 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
   const loadMoreFailed = useVal(store.publications.$.loadMoreFailed)
   const loadingMore = useVal(store.publications.$.loadingMore)
   const nextCursor = useVal(store.publications.$.nextCursor)
+  const operation = useVal(store.publications.$.operation)
   const publications = useVal(store.publications.$.publications)
   const flowId = useVal(store.workspace.$.flowId)
   const publishing = useVal(store.publications.$.publishing)
@@ -137,6 +138,41 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
   const total = useVal(store.publications.$.total)
   const [copiedEndpoint, setCopiedEndpoint] = useState<string>()
   const [confirming, setConfirming] = useState<string>()
+
+  let operationClass = 'neutral'
+  let operationDetail: ReactElement | undefined
+  let operationLabel = ''
+  switch (operation?.status) {
+    case 'pending':
+      operationClass = 'running'
+      operationDetail = <span>{t('publication.publishingDescription')}</span>
+      operationLabel = t('workspace.publishing')
+      break
+    case 'succeeded':
+      operationClass = 'success'
+      operationDetail = (
+        <span>
+          {t('publication.livePublication')}: <CompactId value={operation.publicationId} />
+        </span>
+      )
+      operationLabel = t('publication.published')
+      break
+    case 'failed':
+      operationClass = 'danger'
+      operationDetail = (
+        <>
+          <span>{operation.issue.message}</span>
+          <span className="publication-progress-meta">
+            <code>{operation.issue.code}</code>
+            {operation.issue.nodeId != null && <code>{t('publication.failureNode', { id: operation.issue.nodeId })}</code>}
+          </span>
+        </>
+      )
+      operationLabel = t('publication.failed')
+      break
+    case undefined:
+      break
+  }
 
   useEffect(() => setConfirming(undefined), [flow?.flowId, live?.publication?.publicationId])
   useEffect(() => setCopiedEndpoint(undefined), [detail?.binding.endpointUrl])
@@ -177,6 +213,15 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
           </div>
         ) : (
           <div className="publication-precondition">
+            {operation != null && (
+              <div className={`publication-progress ${operation.status}`}>
+                <span className={`status-dot ${operationClass}`} />
+                <div>
+                  <strong>{operationLabel}</strong>
+                  {operationDetail}
+                </div>
+              </div>
+            )}
             {draft != null && (
               <div className="publication-publish-action">
                 <div>

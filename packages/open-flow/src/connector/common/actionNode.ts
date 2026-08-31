@@ -8,14 +8,19 @@ export function connectorActionTitle(name: string): string {
   return capitalCase(name)
 }
 
-export function connectorActionNode(action: ConnectorAction, connection: string, nodeId: NodeId, title: string = connectorActionTitle(action.name)): TaskNode {
+export function connectorActionNode(
+  action: ConnectorAction,
+  connection: string | undefined,
+  nodeId: NodeId,
+  title: string = connectorActionTitle(action.name),
+): TaskNode {
   const ports = connectorActionPorts(action.inputSchema, action.outputSchema)
   return {
     icon: connectorActionIcon(action),
     inputs_from: ports.initialInputs.length > 0 ? ([...ports.initialInputs] as HandleInputFrom[]) : undefined,
     node_id: nodeId,
     task: {
-      executor: { name: 'connector', options: { action: action.actionId, connection } },
+      executor: { name: 'connector', options: { action: action.actionId, ...(connection == null ? {} : { connection }) } },
       inputs_def: [...ports.inputs] as InputHandleDef[],
       outputs_def: [...ports.outputs] as OutputHandleDef[],
     },

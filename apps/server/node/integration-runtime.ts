@@ -10,6 +10,7 @@ import type {
 } from '@oomol-lab/open-flow/integration-trigger'
 import type { Logger } from 'pino'
 import type { ConnectorHost } from './connector.ts'
+import type { IntegrationCandidate } from './integration-store.ts'
 import type { IntegrationHealth, StoredIntegrationBinding, StoredIntegrationState, StoredIntegrationTarget } from './trigger-store.ts'
 
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
@@ -125,13 +126,13 @@ export class IntegrationRuntime {
   }
 
   endpoint(flowId: string, triggerNodeId: string): string | undefined {
-    return this.#store.triggers.integrationBinding(flowId, triggerNodeId)?.endpointId
+    return this.#store.integrations.integrationBinding(flowId, triggerNodeId)?.endpointId
   }
 
   state(flowId: string, triggerNodeId: string): IntegrationRuntimeState | undefined {
-    const binding = this.#store.triggers.integrationBinding(flowId, triggerNodeId)
+    const binding = this.#store.integrations.integrationBinding(flowId, triggerNodeId)
     if (binding == null) return
-    const state = this.#store.triggers.integrationState(binding.bindingId)
+    const state = this.#store.integrations.integrationState(binding.bindingId)
     return {
       bindingId: binding.bindingId,
       checkpoint: state == null ? null : (JSON.parse(state.checkpointJson) as JsonValue),
@@ -143,15 +144,15 @@ export class IntegrationRuntime {
   }
 
   target(endpointId: string): IntegrationTarget | undefined {
-    let stored = this.#store.triggers.integrationTarget(endpointId)
+    let stored = this.#store.integrations.integrationTarget(endpointId)
     if (stored == null) return
     let state = stored.state
     let current = state == null || state.runtimeVersion == stored.runtimeVersion
     let resolved = this.#trigger(state == null || current ? stored.triggerJson : state.triggerJson)
     if (state == null) {
       const initial = resolved.definition.initialState ?? { checkpoint: null, subscription: {} }
-      this.#store.triggers.createIntegrationState(stored, initial.checkpoint, initial.subscription, this.#clock())
-      stored = this.#store.triggers.integrationTarget(endpointId)
+      this.#store.integrations.createIntegrationState(stored, initial.checkpoint, initial.subscription, this.#clock())
+      stored = this.#store.integrations.integrationTarget(endpointId)
       state = stored?.state
       if (stored == null || state == null) throw new TransientIntegrationError('Integration runtime state changed.')
       current = state.runtimeVersion == stored.runtimeVersion
@@ -248,7 +249,7 @@ export class IntegrationRuntime {
             runtimeVersion: target.stored.runtimeVersion,
           }),
         )
-        const accepted = this.#store.triggers.acceptIntegrationTarget({
+        const accepted = this.#store.integrations.acceptIntegrationTarget({
           ...target.stored,
           occurrenceId,
           payload: received.payload,
@@ -291,6 +292,131 @@ export class IntegrationRuntime {
     )
   }
 
+  #candidateStateContext(candidate: IntegrationCandidate, now: number): IntegrationStateContext {
+    if (candidate.checkpointJson == null || candidate.subscriptionJson == null) {
+      throw new TransientIntegrationError('Integration candidate state is not initialized.')
+    }
+    let checkpointJson: string = candidate.checkpointJson
+    let subscriptionJson: string = candidate.subscriptionJson
+    return {
+      get checkpoint() {
+        return JSON.parse(checkpointJson) as JsonValue
+      },
+      get subscription() {
+        return JSON.parse(subscriptionJson) as Readonly<Record<string, JsonValue>>
+      },
+      saveCheckpoint: async (checkpoint) => {
+        const next = JSON.stringify(checkpoint)
+        if (!this.#store.integrations.updateCandidateCheckpoint(candidate, checkpointJson, next, now)) {
+          throw new TransientIntegrationError('Integration candidate checkpoint changed concurrently.')
+        }
+        checkpointJson = next
+      },
+      saveSubscription: async (subscription, reconcileAt) => {
+        const next = JSON.stringify(subscription)
+        if (!this.#store.integrations.updateCandidateSubscription(candidate, subscriptionJson, next, reconcileAt.getTime(), now)) {
+          throw new TransientIntegrationError('Integration candidate subscription changed concurrently.')
+        }
+        subscriptionJson = next
+      },
+    }
+  }
+
+  #reconcileCandidate(candidate: IntegrationCandidate, now: number): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const options = this.#resolveOptions()
+      if (options == null) return yield* Effect.fail(new TransientIntegrationError('Integration runtime is not configured.'))
+      const resolved = this.#trigger(candidate.triggerJson)
+      let current = this.#store.integrations.candidate(candidate.operationId, candidate.nodeId)
+      if (current == null) return
+      if (current.status == 'preparing' && current.subscriptionJson == null) {
+        const initial = resolved.definition.initialState ?? { checkpoint: null, subscription: {} }
+        this.#store.integrations.initializeCandidate(current, initial.checkpoint, initial.subscription, now)
+        current = this.#store.integrations.candidate(candidate.operationId, candidate.nodeId)
+        if (current == null) return
+      }
+      if (current.status == 'cleanup' && current.subscriptionJson == null) {
+        this.#store.integrations.deleteCandidate(current)
+        this.#logger.info(
+          { category: 'publication.integration_cleanup_succeeded', nodeId: current.nodeId, operationId: current.operationId },
+          'Unused Integration candidate was removed.',
+        )
+        return
+      }
+      const callbackSecret = yield* Effect.tryPromise({
+        try: () => integrationCallbackSecret(options.callbackKey, current.endpointId),
+        catch: (error) => error,
+      })
+      const active = current.status == 'preparing'
+      const outcome = yield* this.#invokeReconcile(resolved.definition, current.bindingId, current.connectionId, current.flowId, {
+        active,
+        callbackSecret,
+        config: resolved.trigger.config,
+        endpointUrl: options.publicOrigin + '/v1/integrations/' + current.endpointId,
+        idempotencyKey: ['open-flow', current.operationId, current.nodeId, 'prepare'].join(':'),
+        now: new Date(now),
+        state: this.#candidateStateContext(current, now),
+      })
+      if (outcome.outcome == 'pending') {
+        return yield* Effect.fail(new TransientIntegrationError('Integration candidate is still converging.'))
+      }
+      if (active) {
+        if (!this.#store.integrations.markCandidateReady(current, now)) {
+          return yield* Effect.fail(new TransientIntegrationError('Integration candidate changed before it became ready.'))
+        }
+        this.#logger.info(
+          { category: 'publication.integration_ready', nodeId: current.nodeId, operationId: current.operationId },
+          'Integration candidate is ready.',
+        )
+      } else {
+        if (!this.#store.integrations.deleteCandidate(current)) {
+          return yield* Effect.fail(new TransientIntegrationError('Integration candidate changed before cleanup completed.'))
+        }
+        this.#logger.info(
+          { category: 'publication.integration_cleanup_succeeded', nodeId: current.nodeId, operationId: current.operationId },
+          'Integration candidate cleanup completed.',
+        )
+      }
+    }).pipe(
+      Effect.matchEffect({
+        onFailure: (error) =>
+          Effect.sync(() => {
+            const health = failure(error)
+            if (candidate.status == 'preparing' && health != null) {
+              this.#store.integrations.failCandidate(
+                candidate,
+                health == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid',
+                health == 'needs_reauth' ? 'The Integration Connection requires reauthorization.' : 'The Integration subscription could not be prepared.',
+                now,
+              )
+              this.#logger.warn(
+                {
+                  category: 'publication.integration_failed',
+                  nodeId: candidate.nodeId,
+                  operationId: candidate.operationId,
+                  ...errorKind(error),
+                },
+                'Integration candidate preparation failed.',
+              )
+              return
+            }
+            this.#store.integrations.retryCandidate(candidate, now + retryMs, now)
+            this.#logger.warn(
+              {
+                category: candidate.status == 'cleanup' ? 'publication.integration_cleanup_retrying' : 'publication.integration_retrying',
+                nodeId: candidate.nodeId,
+                operationId: candidate.operationId,
+                retryAt: now + retryMs,
+                ...errorKind(error),
+              },
+              'Integration candidate will be retried.',
+            )
+          }),
+        onSuccess: () => Effect.void,
+      }),
+    )
+  }
+
   #reconcile(binding: StoredIntegrationBinding, now: number): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
       const options = this.#resolveOptions()
@@ -300,7 +426,7 @@ export class IntegrationRuntime {
         catch: (error) => error,
       })
       const endpointUrl = `${options.publicOrigin}/v1/integrations/${binding.endpointId}`
-      let state = this.#store.triggers.integrationState(binding.bindingId)
+      let state = this.#store.integrations.integrationState(binding.bindingId)
       let retiredPrevious = false
       if (state != null && state.runtimeVersion != binding.runtimeVersion) {
         const previousState = state
@@ -310,14 +436,15 @@ export class IntegrationRuntime {
           callbackSecret,
           config: previous.trigger.config,
           endpointUrl,
+          idempotencyKey: ['integration', binding.bindingId, previousState.runtimeVersion, 'retire'].join(':'),
           now: new Date(now),
           state: this.#stateContext(previousState, now),
         })
         if (outcome.outcome == 'pending') {
           return yield* Effect.fail(new TransientIntegrationError('Previous Integration subscription is still retiring.'))
         }
-        this.#store.triggers.deleteIntegrationState(binding.bindingId, previousState.runtimeVersion)
-        state = this.#store.triggers.integrationState(binding.bindingId)
+        this.#store.integrations.deleteIntegrationState(binding.bindingId, previousState.runtimeVersion)
+        state = this.#store.integrations.integrationState(binding.bindingId)
         if (state != null) return yield* Effect.fail(new TransientIntegrationError('Previous Integration subscription is still retiring.'))
         retiredPrevious = true
       }
@@ -331,23 +458,24 @@ export class IntegrationRuntime {
             callbackSecret,
             config: resolved.trigger.config,
             endpointUrl,
+            idempotencyKey: ['integration', binding.bindingId, binding.runtimeVersion, 'retire'].join(':'),
             now: new Date(now),
             ...(state == null ? {} : { state: this.#stateContext(state, now) }),
           })
           if (outcome.outcome == 'pending') {
             return yield* Effect.fail(new TransientIntegrationError('Integration subscription is still retiring.'))
           }
-          if (state != null) this.#store.triggers.deleteIntegrationState(binding.bindingId, state.runtimeVersion)
+          if (state != null) this.#store.integrations.deleteIntegrationState(binding.bindingId, state.runtimeVersion)
         }
-        this.#store.triggers.markIntegrationSynced(binding.bindingId, binding.runtimeVersion, false, now)
+        this.#store.integrations.markIntegrationSynced(binding.bindingId, binding.runtimeVersion, false, now)
         this.#retrying.delete(binding.bindingId)
         return
       }
 
       if (state == null) {
         const initial = resolved.definition.initialState ?? { checkpoint: null, subscription: {} }
-        this.#store.triggers.createIntegrationState(binding, initial.checkpoint, initial.subscription, now)
-        state = this.#store.triggers.integrationState(binding.bindingId)
+        this.#store.integrations.createIntegrationState(binding, initial.checkpoint, initial.subscription, now)
+        state = this.#store.integrations.integrationState(binding.bindingId)
         if (state == null || state.runtimeVersion != binding.runtimeVersion) {
           return yield* Effect.fail(new TransientIntegrationError('Integration runtime state changed.'))
         }
@@ -357,13 +485,14 @@ export class IntegrationRuntime {
         callbackSecret,
         config: resolved.trigger.config,
         endpointUrl,
+        idempotencyKey: ['integration', binding.bindingId, binding.runtimeVersion, 'activate'].join(':'),
         now: new Date(now),
         state: this.#stateContext(state, now),
       })
       if (outcome.outcome == 'pending') {
         return yield* Effect.fail(new TransientIntegrationError('Integration subscription is still converging.'))
       }
-      const synced = this.#store.triggers.markIntegrationSynced(binding.bindingId, binding.runtimeVersion, true, now)
+      const synced = this.#store.integrations.markIntegrationSynced(binding.bindingId, binding.runtimeVersion, true, now)
       const retried = this.#retrying.delete(binding.bindingId)
       if (synced && (binding.health != 'healthy' || retried)) {
         this.#logger.info(
@@ -382,7 +511,7 @@ export class IntegrationRuntime {
         onFailure: (error) =>
           Effect.sync(() => {
             const health = failure(error)
-            this.#store.triggers.failIntegration(
+            this.#store.integrations.failIntegration(
               binding.bindingId,
               binding.runtimeVersion,
               health == null
@@ -443,14 +572,16 @@ export class IntegrationRuntime {
       },
       saveCheckpoint: async (checkpoint) => {
         const next = JSON.stringify(checkpoint)
-        if (!this.#store.triggers.updateIntegrationCheckpoint(record.bindingId, record.runtimeVersion, checkpointJson, next, now)) {
+        if (!this.#store.integrations.updateIntegrationCheckpoint(record.bindingId, record.runtimeVersion, checkpointJson, next, now)) {
           throw new TransientIntegrationError('Integration checkpoint changed concurrently.')
         }
         checkpointJson = next
       },
       saveSubscription: async (subscription, reconcileAt) => {
         const next = JSON.stringify(subscription)
-        if (!this.#store.triggers.updateIntegrationSubscription(record.bindingId, record.runtimeVersion, subscriptionJson, next, reconcileAt.getTime(), now)) {
+        if (
+          !this.#store.integrations.updateIntegrationSubscription(record.bindingId, record.runtimeVersion, subscriptionJson, next, reconcileAt.getTime(), now)
+        ) {
           throw new TransientIntegrationError('Integration subscription changed concurrently.')
         }
         subscriptionJson = next
@@ -461,7 +592,12 @@ export class IntegrationRuntime {
   #tick(now: number): Effect.Effect<void, unknown> {
     return Effect.gen({ self: this }, function* () {
       while (true) {
-        const bindings = this.#store.triggers.dueIntegrations(now, batchSize)
+        const candidates = this.#store.integrations.dueCandidates(now, batchSize)
+        if (candidates.length == 0) break
+        for (const candidate of candidates) yield* this.#reconcileCandidate(candidate, now)
+      }
+      while (true) {
+        const bindings = this.#store.integrations.dueIntegrations(now, batchSize)
         if (bindings.length == 0) return
         for (const binding of bindings) {
           yield* this.#reconcile(binding, now)

@@ -3,7 +3,6 @@ import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { ReactiveMap } from 'value-enhancer/collections'
 import type { ConnectorCatalog } from '../../../connector/common/catalog.ts'
-import type { ConnectorConnection } from '../../../connector/common/model.ts'
 import type { LocaleTextStore } from '../../../localization/common/localization.ts'
 import type { FlowLikePath } from '../../../manifest/common/manifestTypes.ts'
 import type { SubflowBlockMeta } from '../../../manifest/common/meta/block/subflowBlockMeta.ts'
@@ -27,7 +26,6 @@ import { val } from 'value-enhancer'
 import { jsonTryParse, jsonTryStringify } from '../../../base/common/parse.ts'
 import { connectorActionIcon, connectorActionTitle } from '../../../connector/common/actionNode.ts'
 import { connectorActionPorts } from '../../../connector/common/actionSchema.ts'
-import { defaultConnection } from '../../../connector/common/model.ts'
 import { WEBHOOK_TYPE } from '../../../trigger/common/builtins.ts'
 import { encodeTriggerCatalogIdentity } from '../../../trigger/common/catalog.ts'
 import { provideAddNodeMenuItems } from '../actions/addNodeMenuItems.ts'
@@ -204,39 +202,21 @@ export abstract class AbstractDesignerService {
     const catalog = this.connectorCatalog
     const actions = await catalog.searchActions(searchTerm, signal)
     const items: IAddNodeMenuItem[] = [{ type: 'divider', label: this.i18n.t('addNode.connectorActions') }]
-    const connectionsByService = new Map(
-      [...new Set(actions.map((action) => action.service))].map((service) => [service, catalog.listConnections(service, signal)]),
-    )
     for (const action of actions) {
       const ports = connectorActionPorts(action.inputSchema, action.outputSchema)
       const handles = fromSource == null ? undefined : fromSource.side == 'left' ? ports.outputs : ports.inputs
-      const connections = (await connectionsByService.get(action.service)!).filter((connection) => connection.status == 'active')
-      const connection = defaultConnection(connections)
       items.push({
         type: 'connector',
-        data: connection == null ? undefined : JSON.stringify({ actionId: action.actionId, connection: connection.id }),
+        data: JSON.stringify({ actionId: action.actionId }),
         label: connectorActionTitle(action.name),
-        detail: [action.service, action.actionId, ...connections.flatMap((item) => [item.displayName, item.id])].join(' '),
-        description: connection == null ? this.i18n.t('addNode.connectorNoActiveConnection') : connection.displayName,
+        detail: `${action.service} ${action.actionId}`,
+        description: action.authenticated ? this.i18n.t('addNode.connectorNoActiveConnection') : action.service,
         icon: connectorActionIcon(action),
-        choices:
-          connection == null
-            ? [
-                {
-                  data: JSON.stringify({ actionId: action.actionId, manageConnection: action.service }),
-                  description: connectorActionTitle(action.service),
-                  label: this.i18n.t('addNode.connectorNewConnection'),
-                },
-              ]
-            : undefined,
-        handles:
-          connection == null
-            ? undefined
-            : handles?.map((handle) => ({
-                description: handle.description,
-                json_schema: handle.json_schema,
-                name: handle.handle as HandleName,
-              })),
+        handles: handles?.map((handle) => ({
+          description: handle.description,
+          json_schema: handle.json_schema,
+          name: handle.handle as HandleName,
+        })),
       })
     }
     return actions.length == 0 ? [] : items
@@ -271,18 +251,6 @@ export abstract class AbstractDesignerService {
     }
 
     const items: IAddNodeMenuItem[] = []
-    const connectionsByService =
-      this.connectorCatalog == null
-        ? new Map<string, Promise<readonly ConnectorConnection[]>>()
-        : new Map(
-            [
-              ...new Set(
-                catalogItems.flatMap((item) =>
-                  item.compatible && item.trigger.definition.connector != null ? [item.trigger.definition.connector.service_id] : [],
-                ),
-              ),
-            ].map((service) => [service, this.connectorCatalog!.listConnections(service, signal)]),
-          )
     for (const item of catalogItems) {
       if (!item.compatible) {
         items.push({
@@ -295,9 +263,7 @@ export abstract class AbstractDesignerService {
         })
         continue
       }
-      const service = item.trigger.definition.connector?.service_id
-      const connection = service == null ? undefined : defaultConnection((await connectionsByService.get(service)) ?? [])
-      items.push(this.triggerAddNodeMenuItem(item, fromSource, connection))
+      items.push(this.triggerAddNodeMenuItem(item, fromSource))
     }
     if (catalogItems.length == 0) {
       items.push({
@@ -311,34 +277,23 @@ export abstract class AbstractDesignerService {
     return items
   }
 
-  protected triggerAddNodeMenuItem(item: TriggerCatalogCompatibleItem, fromSource?: IFromSource, connection?: ConnectorConnection): IAddNodeMenuItem {
+  protected triggerAddNodeMenuItem(item: TriggerCatalogCompatibleItem, fromSource?: IFromSource): IAddNodeMenuItem {
     const service = item.trigger.definition.connector?.service_id
-    const requiresConnection = service != null
     const identity = encodeTriggerCatalogIdentity(item)
     return {
       type: 'trigger',
-      data: requiresConnection && connection == null ? undefined : JSON.stringify({ identity, ...(connection == null ? {} : { connection: connection.id }) }),
+      data: JSON.stringify({ identity }),
       label: item.trigger.definition.name,
-      detail: `${item.trigger.definition.service_name} ${item.type} ${item.revision}${connection == null ? '' : ` ${connection.displayName} ${connection.id}`}`,
+      detail: `${item.trigger.definition.service_name} ${item.type} ${item.revision}`,
       description:
-        requiresConnection && connection == null
+        service != null
           ? this.i18n.t('addNode.connectorNoActiveConnection')
           : item.type == WEBHOOK_TYPE
             ? this.i18n.t('trigger.webhookDescription')
-            : (connection?.displayName ?? item.description ?? item.trigger.definition.service_name),
+            : (item.description ?? item.trigger.definition.service_name),
       icon: item.icon,
-      choices:
-        service == null || connection != null
-          ? undefined
-          : [
-              {
-                data: JSON.stringify({ identity, manageConnection: service }),
-                description: item.trigger.definition.service_name,
-                label: this.i18n.t('addNode.connectorNewConnection'),
-              },
-            ],
       handles:
-        fromSource == null || (requiresConnection && connection == null)
+        fromSource == null
           ? undefined
           : [
               {

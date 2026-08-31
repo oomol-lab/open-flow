@@ -95,8 +95,19 @@ export async function publishCommand(client: ControlClient, operands: readonly s
   requireCount(operands, 1, 'oo flow publish <flow> [--json]')
   const flow = await referencedFlow(client, operands[0]!)
   const live = await client.getLive(flow.flowId)
-  const published = await client.publishFlow(flow.flowId, flow.draftRevisionId, live.publication?.publicationId ?? null)
-  write(runtime, args.json, { kind: 'publication.publish', publication: published, version: 1 }, publicationText(published))
+  let operation = await client.publishFlow(flow.flowId, flow.draftRevisionId, live.publication?.publicationId ?? null)
+  while (operation.status == 'pending') {
+    await runtime.wait(1_000)
+    operation = await client.getPublishOperation(flow.flowId, operation.operationId)
+  }
+  if (operation.status == 'failed') {
+    throw new CliError(operation.issue.code, operation.issue.message, {
+      ...(operation.issue.nodeId == null ? {} : { nodeId: operation.issue.nodeId }),
+      operationId: operation.operationId,
+    })
+  }
+  const publication = await publicationById(client, flow.flowId, operation.publicationId)
+  write(runtime, args.json, { kind: 'publication.publish', publication, version: 1 }, publicationText(publication))
 }
 
 export async function publicationsCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<void> {

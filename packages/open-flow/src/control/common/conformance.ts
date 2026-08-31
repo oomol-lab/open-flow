@@ -108,6 +108,30 @@ function publishRequest(
   })
 }
 
+async function completePublish(
+  harness: ControlApiConformanceHarness,
+  response: Response,
+  status: 202,
+  message: string,
+): Promise<{ readonly operation: RecordValue; readonly publication: RecordValue }> {
+  let operation = await json(response, status, message)
+  const operationId = requiredString(operation.operationId, `${message} operationId`)
+  for (let attempt = 0; operation.status == 'pending' && attempt < 100; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    operation = await json(
+      await request(harness, `/v1/flows/${requiredString(operation.flowId, `${message} flowId`)}/publish-operations/${operationId}`),
+      200,
+      `${message} operation`,
+    )
+  }
+  equal(operation.status, 'succeeded', `${message} terminal status`)
+  const publicationId = requiredString(operation.publicationId, `${message} publicationId`)
+  const live = await json(await request(harness, `/v1/flows/${requiredString(operation.flowId, `${message} flowId`)}/live`), 200, `${message} Live`)
+  const publication = record(live.publication, `${message} Publication`)
+  equal(publication.publicationId, publicationId, `${message} Live Publication`)
+  return { operation, publication }
+}
+
 function rollbackRequest(harness: ControlApiConformanceHarness, flowId: string, source: string, expected: string, key: string): Promise<Response> {
   return request(harness, `/v1/flows/${encodeURIComponent(flowId)}/publications/${encodeURIComponent(source)}/rollback`, {
     body: JSON.stringify({ expectedLivePublicationId: expected, version: 1 }),
@@ -411,9 +435,10 @@ export const publicationControlApiConformanceCases: readonly ControlApiConforman
       const draftRevisionId = requiredString(flow.draftRevisionId, 'Publication Flow revisionId')
       equal((await json(await request(harness, `/v1/flows/${flowId}/live`), 200, 'Read Live')).status, 'not-published', 'Initial Live status')
       const publish = () => publishRequest(harness, flowId, draftRevisionId, null, 'publication-first')
-      const publication = await json(await publish(), 201, 'Publish Flow')
+      const completed = await completePublish(harness, await publish(), 202, 'Publish Flow')
+      const publication = completed.publication
       const publicationId = requiredString(publication.publicationId, 'Publication id')
-      equal(await json(await publish(), 200, 'Replay Publish'), publication, 'Replayed Publication')
+      equal(await json(await publish(), 202, 'Replay Publish'), completed.operation, 'Replayed Publish operation')
       await error(await publishRequest(harness, flowId, draftRevisionId, publicationId, 'publication-first'), 409, 'publication.conflict', 'Conflicting replay')
       const live = await json(await request(harness, `/v1/flows/${flowId}/live`), 200, 'Read published Live')
       equal(live.publication, publication, 'Live Publication')
@@ -456,11 +481,20 @@ export const publicationControlApiConformanceCases: readonly ControlApiConforman
       const flow = await createFlow(harness, 'Rollback flow', 'rollback-flow')
       const flowId = requiredString(flow.flowId, 'Rollback Flow flowId')
       const firstRevisionId = requiredString(flow.draftRevisionId, 'Rollback Flow revisionId')
-      const first = await json(await publishRequest(harness, flowId, firstRevisionId, null, 'publish-first'), 201, 'Publish first Revision')
+      const first = (
+        await completePublish(harness, await publishRequest(harness, flowId, firstRevisionId, null, 'publish-first'), 202, 'Publish first Revision')
+      ).publication
       const firstPublicationId = requiredString(first.publicationId, 'First Publication')
       const changed = await json(await addValueNode(harness, flowId, firstRevisionId), 200, 'Change Draft')
       const secondRevisionId = changedRevisionId(changed, 'Second Revision')
-      const second = await json(await publishRequest(harness, flowId, secondRevisionId, firstPublicationId, 'publish-second'), 201, 'Publish second Revision')
+      const second = (
+        await completePublish(
+          harness,
+          await publishRequest(harness, flowId, secondRevisionId, firstPublicationId, 'publish-second'),
+          202,
+          'Publish second Revision',
+        )
+      ).publication
       const secondPublicationId = requiredString(second.publicationId, 'Second Publication')
       await error(await liveRunRequest(harness, firstPublicationId, 'stale-live-run'), 412, 'live.conflict', 'Run stale Publication')
       const rollback = () => rollbackRequest(harness, flowId, firstPublicationId, secondPublicationId, 'rollback-first')
@@ -522,7 +556,9 @@ export const triggerControlApiConformanceCases: readonly ControlApiConformanceCa
         'Create Trigger nodes',
       )
       const triggerRevisionId = changedRevisionId(changed, 'Trigger Revision')
-      const publication = await json(await publishRequest(harness, flowId, triggerRevisionId, null, 'trigger-publication'), 201, 'Publish Trigger Flow')
+      const publication = (
+        await completePublish(harness, await publishRequest(harness, flowId, triggerRevisionId, null, 'trigger-publication'), 202, 'Publish Trigger Flow')
+      ).publication
       const publicationId = requiredString(publication.publicationId, 'Trigger Publication')
       const base = `/v1/flows/${flowId}/triggers`
       const bindings = list((await json(await request(harness, base), 200, 'List Trigger bindings')).bindings, 'Trigger bindings').map((value) =>
@@ -549,9 +585,10 @@ export const triggerControlApiConformanceCases: readonly ControlApiConformanceCa
         200,
         'Delete Webhook',
       )
-      await json(
+      await completePublish(
+        harness,
         await publishRequest(harness, flowId, changedRevisionId(removed, 'Retired Trigger Revision'), publicationId, 'retire-trigger'),
-        201,
+        202,
         'Publish retired Trigger',
       )
       equal(

@@ -46,7 +46,6 @@ export interface Trigger$ {
 }
 
 const initialState: TriggerState = { catalogs: {} }
-const connectionBatchSize = 4
 const optionPrefix = 'trigger:'
 
 function target(selection: ResolvedSelection | undefined, workspace: WorkspaceStore): TriggerTarget | undefined {
@@ -61,67 +60,16 @@ function target(selection: ResolvedSelection | undefined, workspace: WorkspaceSt
   }
 }
 
-function concreteOption(definition: TriggerKeySnapshot, connectionId: string, description: string, group: string): AddNodeOption {
-  return {
-    description,
-    group,
-    id: `trigger:${definition.key}:${connectionId}`,
-    inputs: [],
-    kind: 'trigger',
-    label: definition.displayName,
-    outputs: [{ handle: 'payload', jsonSchema: definition.payloadSchema }],
-    trigger: { connectionId, definition, kind: 'catalog' },
-  }
-}
-
 function option(definition: TriggerKeySnapshot, i18n: I18n): AddNodeOption {
   return {
-    choices: [],
-    description: i18n.t('addNode.triggerChooseConnection'),
+    description: i18n.t('addNode.triggerNeedsConnection', { provider: definition.provider }),
     group: i18n.t('addNode.triggers'),
     id: `${optionPrefix}${definition.key}`,
     inputs: [],
     kind: 'trigger',
     label: definition.displayName,
-    outputs: [],
-  }
-}
-
-function choices(definition: TriggerKeySnapshot, catalog: ConnectionCatalog, i18n: I18n): readonly AddNodeOption[] {
-  const group = i18n.t('addNode.triggers')
-  const preferred = catalog.preferred
-  if (preferred != null) return [concreteOption(definition, preferred.connectionId, preferred.displayName, group)]
-  if (catalog.active.length > 0) {
-    return catalog.active.map((connection) => concreteOption(definition, connection.connectionId, connection.displayName, group))
-  }
-  return [
-    {
-      description: i18n.t('addNode.triggerNeedsConnection', { provider: definition.provider }),
-      group,
-      id: `${optionPrefix}${definition.key}:connect`,
-      inputs: [],
-      kind: 'trigger',
-      label: i18n.t('addNode.triggerAddConnection'),
-      outputs: [],
-      trigger: { kind: 'connect', provider: definition.provider },
-    },
-  ]
-}
-
-function resolvedOption(definition: TriggerKeySnapshot, catalog: ConnectionCatalog, i18n: I18n): AddNodeOption {
-  const preferred = catalog.preferred
-  if (preferred != null) return concreteOption(definition, preferred.connectionId, preferred.displayName, i18n.t('addNode.triggers'))
-  const base = option(definition, i18n)
-  const options = choices(definition, catalog, i18n)
-  return {
-    ...base,
-    description: catalog.active.length == 0 ? i18n.t('addNode.triggerNeedsConnection', { provider: definition.provider }) : base.description,
-    outputs: catalog.active.length == 0 ? [] : [{ handle: 'payload', jsonSchema: definition.payloadSchema }],
-    choices: options.map((child) => ({
-      description: catalog.active.length == 0 ? definition.provider : undefined,
-      label: child.label,
-      option: child,
-    })),
+    outputs: [{ handle: 'payload', jsonSchema: definition.payloadSchema }],
+    trigger: { definition, kind: 'catalog' },
   }
 }
 
@@ -215,32 +163,7 @@ export class TriggerStore {
     const definitions = [...catalog.values()].filter((item) =>
       [item.description, item.displayName, item.key, item.name, item.provider, item.type].some((value) => value.toLowerCase().includes(query)),
     )
-    const providers = [...new Set(definitions.map((definition) => definition.provider))].filter((provider) => this.#state.value.catalogs[provider] == null)
-    for (let index = 0; index < providers.length; index += connectionBatchSize) {
-      const loaded = await Promise.all(
-        providers
-          .slice(index, index + connectionBatchSize)
-          .map(async (provider) => [provider, connectionCatalog(await this.#client.listConnectorConnections(provider, signal, flowId))] as const),
-      )
-      if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
-      this.#set({ catalogs: { ...this.#state.value.catalogs, ...Object.fromEntries(loaded) } })
-    }
-    return definitions.map((definition) => resolvedOption(definition, this.#state.value.catalogs[definition.provider]!, this.#i18n))
-  }
-
-  public readonly provideAddNodeOptionChoices = async (optionId: string, signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
-    const flowId = this.#workspace.$.flowId.value
-    const key = optionId.startsWith(optionPrefix) ? optionId.slice(optionPrefix.length) : undefined
-    if (signal.aborted || this.#disposed || flowId == null || key == null || this.#workspace.$.target.value?.kind != 'flow') return
-    const definition = (await this.#loadCatalog()).get(key)
-    if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value || definition == null) return
-    let catalog = this.#state.value.catalogs[definition.provider]
-    if (catalog == null) {
-      catalog = connectionCatalog(await this.#client.listConnectorConnections(definition.provider, signal, flowId))
-      if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
-      this.#set({ catalogs: { ...this.#state.value.catalogs, [definition.provider]: catalog } })
-    }
-    return choices(definition, catalog, this.#i18n)
+    return definitions.map((definition) => option(definition, this.#i18n))
   }
 
   public async refresh(force = false): Promise<void> {

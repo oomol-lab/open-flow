@@ -1,4 +1,4 @@
-import type { FlowCatalogEvent, FlowChangeEvent } from '@oomol-lab/open-flow/control-api'
+import type { FlowCatalogEvent, FlowChangeEvent, PublishOperation } from '@oomol-lab/open-flow/control-api'
 import type { ConnectorCapability, JsonValue, RevisionContent, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { IntegrationDefinition } from '@oomol-lab/open-flow/integration-trigger'
@@ -10,23 +10,15 @@ import type { FlowRunResult, TaskInvocation } from '@oomol-lab/open-flow/schedul
 import type { Logger } from 'pino'
 import type { ConnectorHost } from './connector.ts'
 import type { IntegrationOptions, IntegrationResponse, IntegrationRuntimeState, IntegrationTarget } from './integration-runtime.ts'
+import type { PublicationStore } from './publication-store.ts'
 import type { PublicationAcceptance, RunEvent, RunRecord, StoredRun } from './store.ts'
-import type { PollState, RunAdmission, StoredCronTarget, StoredPollTarget } from './trigger-store.ts'
+import type { PollState, RunAdmission, StoredCronTarget } from './trigger-store.ts'
 
 import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-action'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId, validateTriggerSchedule } from '@oomol-lab/open-flow/cron-trigger'
 import { canonicalJsonBytes, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { matchesSchema, prepareFlow, triggerPayloadSchema, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
-import {
-  maximumPollCheckpointBytes,
-  maximumPollEventsPerPage,
-  PermanentPollError,
-  pollPageClaimId,
-  providerEventId,
-  PollConnectionError,
-  TransientPollError,
-} from '@oomol-lab/open-flow/poll-trigger'
 import { triggerDefinitions as providerTriggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { createEventProjector } from '@oomol-lab/open-flow/run-events'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
@@ -42,11 +34,12 @@ import * as Scope from 'effect/Scope'
 import * as Semaphore from 'effect/Semaphore'
 import { ConnectorClient, ConnectorTaskError } from './connector.ts'
 import { ControlService } from './control-service.ts'
-import { AcceptanceError, ControlError, serverErrorCode } from './error.ts'
+import { AcceptanceError, ControlError } from './error.ts'
 import { IntegrationRuntime } from './integration-runtime.ts'
 import { isolatedVmEngineDigest, IsolatedVmHost } from './isolated-vm.ts'
 import { errorKind, silentLogger } from './logger.ts'
 import { migrateDatabase } from './migrate.ts'
+import { PollRuntime } from './poll-runtime.ts'
 import { Store } from './store.ts'
 
 interface PublishFlowInput {
@@ -58,6 +51,7 @@ interface PublishFlowInput {
   readonly flowId: string
   readonly idempotencyKey: string
   readonly revision: RevisionContent
+  readonly revisionDigest?: string
   readonly revisionId: string
 }
 
@@ -111,11 +105,6 @@ const nodeFailureCodes: ReadonlySet<string> = new Set([
   'node.failed',
 ])
 const cronBatchSize = 100
-const pollBatchSize = 100
-const pollClaimRetentionMs = 30 * 24 * 60 * 60 * 1000
-const pollLeaseMs = 60_000
-const pollRetryMs = 1_000
-const pollTimeoutMs = 30_000
 const maxTimerDelayMs = 2_147_483_647
 const maintenanceBatchSize = 100
 const maintenanceIntervalMs = 60_000
@@ -192,8 +181,7 @@ export class ServerService {
   readonly #logger: Logger
   readonly #maxConcurrentRuns: number
   readonly #maintenanceLock: Semaphore.Semaphore
-  readonly #pollDefinitions: ReadonlyMap<string, PollDefinition>
-  readonly #pollLock: Semaphore.Semaphore
+  readonly #poll: PollRuntime
   readonly #resolveConnector: () => ConnectorHost | undefined
   readonly #resolveConnectorConsoleOrigin: () => URL | undefined
   readonly #flowCatalogSubscribers = new Set<(event: FlowCatalogEvent) => void>()
@@ -237,7 +225,6 @@ export class ServerService {
     this.#logger = logger.child({ component: 'runtime' })
     this.#maintenanceLock = maintenanceLock
     this.#maxConcurrentRuns = runtime.maxConcurrentRuns ?? defaultMaxConcurrentRuns
-    this.#pollLock = pollLock
     this.#resolveConnector = runtime.resolveConnector ?? (() => connector)
     this.#resolveConnectorConsoleOrigin = runtime.resolveConnectorConsoleOrigin ?? (() => connectorConsoleOrigin)
     this.#runTimeoutMs = runtime.runTimeoutMs ?? defaultRunTimeoutMs
@@ -248,7 +235,6 @@ export class ServerService {
     this.#workers = workers
     const pollDefinitions = triggerDefinitions.filter((definition): definition is PollDefinition => definition.snapshot.type == 'poll')
     const integrationDefinitions = triggerDefinitions.filter((definition): definition is IntegrationDefinition => definition.snapshot.type == 'integration')
-    this.#pollDefinitions = new Map(pollDefinitions.map((definition) => [definition.snapshot.key, definition]))
     const snapshots = triggerDefinitions.map((definition) => definition.snapshot).toSorted((left, right) => left.key.localeCompare(right.key))
     this.control = new ControlService(
       store,
@@ -256,12 +242,13 @@ export class ServerService {
       (runId) => this.#interrupt(runId),
       () => this.#signal(),
       (input) => this.publishFlow(input),
+      (input) => this.acceptPublishOperation(input),
       () => {
         this.#maintenanceAt = this.#clock()
         this.#signal()
       },
       snapshots,
-      (flowId, triggerNodeId) => this.#testPollTrigger(flowId, triggerNodeId),
+      (flowId, triggerNodeId) => this.#poll.test(flowId, triggerNodeId),
       () => this.#notifyFlowCatalog(),
       (event) => this.#notifyFlow(event),
       () => this.#resolveLlm() != null,
@@ -275,6 +262,18 @@ export class ServerService {
       this.#clock,
       runtime.resolveIntegration ?? (() => runtime.integration),
       integrationDefinitions,
+      validatedFlow,
+      () => this.#signal(),
+      (flowId, runId) => this.#runCreated(flowId, runId),
+      logger,
+    )
+    this.#poll = new PollRuntime(
+      store,
+      () => this.#resolveConnector(),
+      this.#clock,
+      this.#clockService,
+      pollLock,
+      pollDefinitions,
       validatedFlow,
       () => this.#signal(),
       (flowId, runId) => this.#runCreated(flowId, runId),
@@ -361,87 +360,6 @@ export class ServerService {
     return selected.id
   }
 
-  async #testPollTrigger(
-    flowId: string,
-    triggerNodeId: string,
-  ): Promise<{
-    readonly events: readonly Readonly<Record<string, JsonValue>>[]
-    readonly filtered: number
-    readonly hasMore: boolean
-    readonly version: 1
-  }> {
-    const target = this.#store.triggers.pollTestTarget(flowId, triggerNodeId)
-    if (target == null) throw new ControlError(controlErrorCode.triggerNotFound, 'The Trigger binding was not found.')
-    try {
-      const revision = JSON.parse(target.content) as RevisionContent
-      const fixed = await validatedFlow(revision)
-      const trigger = fixed.prepared.graph.nodes[target.triggerNodeId]
-      if (
-        fixed.revisionDigest != target.revisionDigest ||
-        fixed.prepared.closureDigest != target.closureDigest ||
-        trigger?.kind != 'poll' ||
-        JSON.stringify(trigger) != target.triggerJson
-      ) {
-        throw new PermanentPollError('Fixed Poll Trigger target does not match its Publication.')
-      }
-      const definition = this.#pollDefinitions.get(trigger.definition.key)
-      if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion) {
-        throw new PermanentPollError('Fixed Poll Trigger definition is not available.')
-      }
-      const connection = revision.document.bindings[trigger.bindingId]
-      if (connection?.kind != 'connection' || connection.target != target.connectionId) {
-        throw new ControlError(controlErrorCode.bindingUnresolved, 'The fixed Poll Trigger Connection is unresolved.')
-      }
-      const connector = this.#resolveConnector()
-      if (connector == null) throw new ControlError(controlErrorCode.connectorUnavailable, 'The Connector request could not be completed.')
-      const result = await Effect.runPromise(
-        Effect.tryPromise({
-          try: (signal) =>
-            definition.poll({
-              checkpoint: target.checkpoint,
-              config: trigger.config,
-              connector: {
-                execute: (request, requestSignal) =>
-                  connector.proxy(
-                    definition.snapshot.provider,
-                    target.connectionId,
-                    target.bindingId,
-                    request,
-                    requestSignal == null ? signal : AbortSignal.any([signal, requestSignal]),
-                    this.#store.connectorTeam(flowId),
-                  ),
-              },
-              now: new Date(this.#clock()),
-              signal,
-            }),
-          catch: (error) => error,
-        }).pipe(
-          Effect.timeoutOrElse({
-            duration: pollTimeoutMs,
-            orElse: () => Effect.fail(new TransientPollError('Poll Provider exceeded its execution deadline.')),
-          }),
-          Effect.provideService(Clock.Clock, this.#clockService),
-        ),
-      )
-      if (result.events.length > maximumPollEventsPerPage) {
-        throw new PermanentPollError(`Poll page exceeds ${maximumPollEventsPerPage} events.`)
-      }
-      return {
-        events: result.events.map((event) => event.payload),
-        filtered: result.filtered ?? 0,
-        hasMore: result.hasMore == true,
-        version: 1,
-      }
-    } catch (error) {
-      if (error instanceof ControlError) throw error
-      if (error instanceof PollConnectionError || (error instanceof ConnectorTaskError && error.code == 'connector.connection-required')) {
-        throw new ControlError(serverErrorCode.connectorConnectionRequired, 'The Poll Trigger Connection requires reauthorization.')
-      }
-      if (error instanceof PermanentPollError) throw new ControlError(controlErrorCode.triggerKeyInvalid, error.message)
-      throw new ControlError(controlErrorCode.connectorUnavailable, 'The Connector request could not be completed.')
-    }
-  }
-
   async acceptWebhookTarget(target: WebhookTarget, occurrenceId: string, payload: JsonValue): Promise<RunAdmission | undefined> {
     const fixed = await validatedFlow(target.revision)
     const trigger = fixed.prepared.graph.nodes[target.triggerNodeId]
@@ -492,23 +410,110 @@ export class ServerService {
   }
 
   async publishFlow(input: PublishFlowInput): Promise<PublicationAcceptance> {
+    const planned = await this.#publication(input)
+    const accepted = this.#store.publications.publish(planned)
+    this.#signal()
+    return accepted
+  }
+
+  async acceptPublishOperation(input: PublishFlowInput): Promise<PublishOperation> {
+    if (input.revisionDigest != null) {
+      const replay = this.#store.publications.replayPublishOperation(
+        input.flowId,
+        input.idempotencyKey,
+        await this.#publicationRequestDigest(input, input.revisionDigest),
+      )
+      if (replay?.kind == 'accepted') return replay.operation
+      if (replay?.kind == 'conflict') {
+        throw new ControlError(controlErrorCode.publicationConflict, 'The idempotency key refers to another Publish request.')
+      }
+    }
+    const accepted = this.#store.publications.acceptPublishOperation(await this.#publication(input))
+    switch (accepted.kind) {
+      case 'accepted':
+        this.#maintenanceAt = this.#clock()
+        this.#signal()
+        return accepted.operation
+      case 'binding-unresolved':
+        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required Variable is unresolved.')
+      case 'busy':
+        throw new ControlError(controlErrorCode.flowBusy, 'Another Publish operation is already pending for this Flow.')
+      case 'conflict':
+        throw new ControlError(controlErrorCode.publicationConflict, 'The idempotency key refers to another Publish request.')
+      case 'live-conflict':
+        throw new ControlError(controlErrorCode.liveConflict, 'The Flow Live pointer no longer matches the expected Publication.')
+      case 'not-found':
+        throw new ControlError(controlErrorCode.flowNotFound, 'The Flow was not found.')
+      case 'revision-conflict':
+        throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
+      case 'unsupported':
+        throw new ControlError(controlErrorCode.publicationUnsupported, 'The existing Integration subscription cannot be changed safely during Publish.')
+    }
+  }
+
+  async #publication(input: PublishFlowInput): Promise<Parameters<PublicationStore['publish']>[0]> {
     const fixed = await validatedFlow(input.revision)
     const engineContract = input.engineContract ?? currentEngineContract
-    const requestDigest = await digestBytes(
-      canonicalJsonBytes({
-        engineContract,
-        expectedLivePublicationId: input.expectedLivePublicationId,
-        flowId: input.flowId,
-        operation: input.control?.operation ?? 'publish',
-        revisionDigest: fixed.revisionDigest,
-        ...(input.control?.operation == 'rollback' ? { sourcePublicationId: input.control.sourcePublicationId } : {}),
-      }),
+    if (input.revisionDigest != null && input.revisionDigest != fixed.revisionDigest) {
+      throw new AcceptanceError('revision-conflict', 'The fixed Revision digest does not match its content.')
+    }
+    const requestDigest = await this.#publicationRequestDigest(input, fixed.revisionDigest)
+    const publishedAt = this.#clock()
+    const integrations = this.#integration.bindings(input.revision, fixed.prepared, publishedAt)
+    const connectorTasks = Object.values(fixed.prepared.tasks).flatMap((task) =>
+      'executor' in task && task.executor.kind == 'connector' ? [task.executor] : [],
     )
+    const providerTriggers = Object.values(fixed.prepared.graph.nodes).filter(
+      (trigger): trigger is Extract<TriggerNode, { readonly kind: 'integration' | 'poll' }> => trigger.kind == 'integration' || trigger.kind == 'poll',
+    )
+    if (connectorTasks.length > 0 || providerTriggers.length > 0) {
+      const connector = this.#resolveConnector()
+      if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
+      const teamId = this.#store.connectorTeam(input.flowId)
+      const actionRequests = new Map<string, ReturnType<ConnectorHost['getAction']>>()
+      const connectionRequests = new Map<string, ReturnType<ConnectorHost['listConnections']>>()
+      const action = (actionId: string): ReturnType<ConnectorHost['getAction']> => {
+        const existing = actionRequests.get(actionId)
+        if (existing != null) return existing
+        const request = connector.getAction(actionId, undefined, teamId)
+        actionRequests.set(actionId, request)
+        return request
+      }
+      const connections = (serviceId: string): ReturnType<ConnectorHost['listConnections']> => {
+        const existing = connectionRequests.get(serviceId)
+        if (existing != null) return existing
+        const request = connector.listConnections(serviceId, undefined, teamId)
+        connectionRequests.set(serviceId, request)
+        return request
+      }
+      await Promise.all([
+        ...connectorTasks.map(async (executor) => {
+          const definition = await action(executor.action)
+          if (!definition.authenticated && executor.connectionId == null) return
+          if (executor.connectionId == null) {
+            throw new ConnectorTaskError('connector.connection-required', 'The Connector Task requires a Connection before it can be published.')
+          }
+          const available = await connections(definition.serviceId)
+          if (!available.some((candidate) => candidate.connectionId == executor.connectionId && candidate.status == 'active')) {
+            throw new ConnectorTaskError('connector.connection-required', 'The selected Connector Connection must be reconnected or replaced.')
+          }
+        }),
+        ...providerTriggers.map(async (trigger) => {
+          const binding = input.revision.document.bindings[trigger.bindingId]
+          if (binding?.kind != 'connection') {
+            throw new ConnectorTaskError('connector.connection-required', 'The Trigger requires a Connection before it can be published.')
+          }
+          const available = await connections(trigger.definition.provider)
+          if (!available.some((candidate) => candidate.connectionId == binding.target && candidate.status == 'active')) {
+            throw new ConnectorTaskError('connector.connection-required', 'The selected Connector Connection must be reconnected or replaced.')
+          }
+        }),
+      ])
+    }
     const webhooks = Object.entries(fixed.prepared.graph.nodes)
       .filter((entry): entry is [string, Extract<TriggerNode, { readonly kind: 'webhook' }>] => entry[1].kind == 'webhook')
       .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
       .map(([triggerNodeId, trigger]) => ({ triggerJson: JSON.stringify(trigger), triggerNodeId }))
-    const publishedAt = this.#clock()
     const crons = Object.entries(fixed.prepared.graph.nodes)
       .filter((entry): entry is [string, Extract<TriggerNode, { readonly kind: 'cron' }>] => entry[1].kind == 'cron')
       .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
@@ -534,8 +539,7 @@ export class ServerService {
         } catch (error) {
           throw new AcceptanceError('trigger-invalid', error instanceof Error ? error.message : 'Poll Trigger schedule is invalid.')
         }
-        const definition = this.#pollDefinitions.get(trigger.definition.key)
-        if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion) {
+        if (!this.#poll.supports(trigger.definition.key, trigger.definition.definitionVersion)) {
           throw new AcceptanceError('trigger-invalid', 'Poll Trigger definition is not available.')
         }
         const binding = input.revision.document.bindings[trigger.bindingId]
@@ -550,7 +554,6 @@ export class ServerService {
           triggerNodeId,
         }
       })
-    const integrations = this.#integration.bindings(input.revision, fixed.prepared, publishedAt)
     let metadata: PublicationMetadata | undefined
     if (input.control?.operation == 'publish') {
       metadata = { actorId: input.control.actorId, modelVersion: input.revision.modelVersion, operation: 'publish' }
@@ -562,7 +565,7 @@ export class ServerService {
         sourcePublicationId: input.control.sourcePublicationId,
       }
     }
-    const accepted = this.#store.publish({
+    return {
       closureDigest: fixed.prepared.closureDigest,
       content: fixed.content,
       crons,
@@ -579,9 +582,20 @@ export class ServerService {
       revisionId: input.revisionId,
       variableNames: Object.values(fixed.variableBindings),
       webhooks,
-    })
-    this.#signal()
-    return accepted
+    }
+  }
+
+  async #publicationRequestDigest(input: PublishFlowInput, revisionDigest: string): Promise<string> {
+    return await digestBytes(
+      canonicalJsonBytes({
+        engineContract: input.engineContract ?? currentEngineContract,
+        expectedLivePublicationId: input.expectedLivePublicationId,
+        flowId: input.flowId,
+        operation: input.control?.operation ?? 'publish',
+        revisionDigest,
+        ...(input.control?.operation == 'rollback' ? { sourcePublicationId: input.control.sourcePublicationId } : {}),
+      }),
+    )
   }
 
   cancel(runId: string): boolean {
@@ -653,7 +667,7 @@ export class ServerService {
   }
 
   tickPoll(at = new Date(this.#clock()).toISOString()): Promise<void> {
-    return Effect.runPromise(this.#pollDue(at).pipe(Effect.provideService(Clock.Clock, this.#clockService)))
+    return Effect.runPromise(this.#poll.tick(at).pipe(Effect.provideService(Clock.Clock, this.#clockService)))
   }
 
   tickIntegration(at = new Date(this.#clock()).toISOString()): Promise<void> {
@@ -665,23 +679,11 @@ export class ServerService {
   }
 
   pollState(flowId: string, triggerNodeId: string): PollState | undefined {
-    return this.#store.triggers.pollState(flowId, triggerNodeId)
+    return this.#poll.state(flowId, triggerNodeId)
   }
 
   processPollOccurrence(input: PollOccurrenceInput): Promise<void> {
-    return Effect.runPromise(
-      this.#pollLock
-        .withPermit(
-          Effect.gen({ self: this }, function* () {
-            const now = Date.parse(input.occurredAt)
-            if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Poll occurrence time must be an ISO timestamp.'))
-            const target = this.#store.triggers.pollTarget(input.bindingId, input.runtimeVersion)
-            if (target != null) yield* this.#poll(target, input.occurrenceId, now)
-            this.#signal()
-          }),
-        )
-        .pipe(Effect.provideService(Clock.Clock, this.#clockService)),
-    )
+    return this.#poll.process(input)
   }
 
   integrationEndpoint(flowId: string, triggerNodeId: string): string | undefined {
@@ -947,195 +949,6 @@ export class ServerService {
     })
   }
 
-  #poll(target: StoredPollTarget, occurrenceId: string, now: number): Effect.Effect<void, unknown> {
-    return Effect.gen({ self: this }, function* () {
-      const rootOccurrenceId = target.continuationRootId ?? occurrenceId
-      const page = target.continuationRootId == null ? 0 : target.continuationPage
-      const claimId =
-        page == 0
-          ? rootOccurrenceId
-          : yield* Effect.tryPromise({
-              try: () => pollPageClaimId(target.bindingId, target.runtimeVersion, rootOccurrenceId, page),
-              catch: (error) => error,
-            })
-      const claim = this.#store.triggers.claimPoll(target, claimId, now, now + pollLeaseMs)
-      if (claim.kind != 'acquired') {
-        if (claim.kind == 'completed') this.#signal()
-        return
-      }
-
-      yield* Effect.gen({ self: this }, function* () {
-        const revision = JSON.parse(target.content) as RevisionContent
-        const fixed = yield* Effect.tryPromise({ try: () => validatedFlow(revision), catch: (error) => error })
-        const trigger = fixed.prepared.graph.nodes[target.triggerNodeId]
-        if (
-          fixed.revisionDigest != target.revisionDigest ||
-          fixed.prepared.closureDigest != target.closureDigest ||
-          trigger?.kind != 'poll' ||
-          JSON.stringify(trigger) != target.triggerJson ||
-          JSON.stringify(trigger.pollTimes) != target.scheduleJson
-        ) {
-          return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger target does not match its Publication.'))
-        }
-        const definition = this.#pollDefinitions.get(trigger.definition.key)
-        if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion) {
-          return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger definition is not available.'))
-        }
-        const connection = revision.document.bindings[trigger.bindingId]
-        if (connection?.kind != 'connection' || connection.target != target.connectionId) {
-          return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger Connection does not match its Publication.'))
-        }
-        const connector = this.#resolveConnector()
-        if (connector == null) {
-          return yield* Effect.fail(new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.'))
-        }
-        const result = yield* Effect.tryPromise({
-          try: (signal) =>
-            definition.poll({
-              checkpoint: target.checkpoint,
-              config: trigger.config,
-              connector: {
-                execute: (request, requestSignal) => {
-                  const connectorSignal = requestSignal == null ? signal : AbortSignal.any([signal, requestSignal])
-                  return connector.proxy(
-                    definition.snapshot.provider,
-                    target.connectionId,
-                    target.bindingId,
-                    request,
-                    connectorSignal,
-                    this.#store.connectorTeam(target.flowId),
-                  )
-                },
-              },
-              now: new Date(now),
-              signal,
-            }),
-          catch: (error) => error,
-        }).pipe(
-          Effect.timeoutOrElse({
-            duration: pollTimeoutMs,
-            orElse: () => Effect.fail(new TransientPollError('Poll Provider exceeded its execution deadline.')),
-          }),
-        )
-        if (result.events.length > maximumPollEventsPerPage) {
-          return yield* Effect.fail(new PermanentPollError(`Poll page exceeds ${maximumPollEventsPerPage} events.`))
-        }
-        const checkpointJson = JSON.stringify(result.checkpoint)
-        if (checkpointJson == null || encoder.encode(checkpointJson).byteLength > maximumPollCheckpointBytes) {
-          return yield* Effect.fail(new RangeError('Poll checkpoint exceeds 64 KiB.'))
-        }
-        const baseline = target.health == 'initializing'
-        const identified = yield* Effect.forEach(
-          result.events,
-          (event) =>
-            Effect.tryPromise({
-              try: () => providerEventId(target.bindingId, definition.snapshot.key, event.dedupeKey),
-              catch: (error) => error,
-            }).pipe(Effect.map((id) => ({ event, id }))),
-          { concurrency: 'unbounded' },
-        )
-        const known = baseline
-          ? new Set<string>()
-          : this.#store.triggers.knownPollEvents(
-              target.bindingId,
-              identified.map((item) => item.id),
-            )
-        const pageIds = new Set<string>()
-        const fresh = baseline
-          ? []
-          : identified.filter((item) => {
-              if (known.has(item.id) || pageIds.has(item.id)) return false
-              pageIds.add(item.id)
-              return true
-            })
-        const payload = fresh.length == 0 ? null : ({ events: fresh.map((item) => item.event.payload) } satisfies JsonValue)
-        const requestDigest =
-          payload == null
-            ? null
-            : yield* Effect.tryPromise({
-                try: () =>
-                  digestBytes(
-                    canonicalJsonBytes({
-                      bindingId: target.bindingId,
-                      claimId,
-                      payload,
-                      revisionDigest: target.revisionDigest,
-                      runtimeVersion: target.runtimeVersion,
-                    }),
-                  ),
-                catch: (error) => error,
-              })
-        const hasMore = result.hasMore == true
-        const completed = this.#store.triggers.completePollPage({
-          activate: baseline && !hasMore,
-          checkpointJson,
-          claimExpiresAt: now + pollClaimRetentionMs,
-          claimId,
-          completedAt: now,
-          leaseToken: claim.leaseToken,
-          nextAt: hasMore ? target.nextAt : nextTriggerScheduledAt(trigger.pollTimes, now),
-          nextContinuationPage: hasMore ? page + 1 : 0,
-          nextContinuationRootId: hasMore ? rootOccurrenceId : null,
-          page,
-          payload,
-          providerEventIds: fresh.map((item) => item.id),
-          requestDigest,
-          rootOccurrenceId,
-          target,
-        })
-        if (completed.kind == 'overloaded') {
-          this.#store.triggers.failPollClaim(target.bindingId, target.runtimeVersion, claim.leaseToken, { retryAt: now + admissionRetryMs })
-          return
-        }
-        if (completed.kind == 'completed' && completed.accepted?.kind == 'accepted') {
-          if (completed.accepted.created) this.#runCreated(target.flowId, completed.accepted.runId)
-          this.#signal()
-        }
-        if (completed.kind == 'completed' && baseline && !hasMore) {
-          this.#logger.info(
-            {
-              bindingId: target.bindingId,
-              category: 'trigger.poll.ready',
-              flowId: target.flowId,
-              runtimeVersion: target.runtimeVersion,
-              triggerNodeId: target.triggerNodeId,
-            },
-            'Poll Trigger is ready.',
-          )
-        }
-        this.#store.triggers.prunePoll(now, pollBatchSize)
-      }).pipe(
-        Effect.matchEffect({
-          onFailure: (error) =>
-            Effect.sync(() => {
-              const failure = pollFailure(error)
-              const fields = {
-                bindingId: target.bindingId,
-                flowId: target.flowId,
-                runtimeVersion: target.runtimeVersion,
-                triggerNodeId: target.triggerNodeId,
-                ...errorKind(error),
-              }
-              this.#store.triggers.failPollClaim(
-                target.bindingId,
-                target.runtimeVersion,
-                claim.leaseToken,
-                failure == null
-                  ? { retryAt: now + pollRetryMs }
-                  : { errorCode: failure == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid', health: failure, now },
-              )
-              if (failure == null) {
-                this.#logger.warn({ category: 'trigger.poll.retrying', retryAt: now + pollRetryMs, ...fields }, 'Poll Trigger will be retried.')
-              } else {
-                this.#logger.warn({ category: 'trigger.poll.health_changed', health: failure, ...fields }, 'Poll Trigger health changed.')
-              }
-            }),
-          onSuccess: () => Effect.void,
-        }),
-      )
-    })
-  }
-
   #cron(at: string): Effect.Effect<void, unknown> {
     return this.#cronLock.withPermit(
       Effect.gen({ self: this }, function* () {
@@ -1153,28 +966,6 @@ export class ServerService {
             }
           }
           if (overloaded) break
-        }
-        this.#signal()
-      }),
-    )
-  }
-
-  #pollDue(at: string): Effect.Effect<void, unknown> {
-    return this.#pollLock.withPermit(
-      Effect.gen({ self: this }, function* () {
-        const now = Date.parse(at)
-        if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Poll tick time must be an ISO timestamp.'))
-        while (true) {
-          const targets = this.#store.triggers.duePoll(now, pollBatchSize)
-          if (targets.length == 0) break
-          for (const target of targets) {
-            const scheduledAt = new Date(target.nextAt).toISOString()
-            const occurrenceId = yield* Effect.tryPromise({
-              try: () => scheduledTriggerOccurrenceId(target.bindingId, target.runtimeVersion, scheduledAt),
-              catch: (error) => error,
-            })
-            yield* this.#poll(target, occurrenceId, now)
-          }
         }
         this.#signal()
       }),
@@ -1263,7 +1054,64 @@ export class ServerService {
   }
 
   #maintain(now: number): number {
-    let nextDelay = this.#store.pruneExpiredEvents(now, maintenanceBatchSize) == 0 ? maintenanceIntervalMs : 0
+    let publishCount = 0
+    for (; publishCount < maintenanceBatchSize; publishCount += 1) {
+      const target = this.#store.publications.nextPublishOperation(now)
+      if (target == null) break
+      if (target.kind == 'failed') {
+        const { operationId, ...issue } = target
+        this.#store.publications.failPublishOperation(operationId, issue)
+        this.#logger.warn({ category: 'publication.failed', operationId, ...issue }, 'Publish operation failed.')
+        continue
+      }
+      const input = JSON.parse(target.input) as Parameters<PublicationStore['publish']>[0]
+      const accepted = this.#store.publications.publish({ ...input, operationId: target.operationId, publishedAt: now })
+      switch (accepted.kind) {
+        case 'published':
+          this.#logger.info(
+            { category: 'publication.succeeded', operationId: target.operationId, publicationId: accepted.publicationId },
+            'Publish operation succeeded.',
+          )
+          break
+        case 'binding-unresolved':
+          this.#store.publications.failPublishOperation(target.operationId, {
+            code: controlErrorCode.bindingUnresolved,
+            message: 'A required Variable is unresolved.',
+          })
+          break
+        case 'busy':
+          this.#store.publications.failPublishOperation(target.operationId, { code: controlErrorCode.flowBusy, message: 'The Flow is retiring.' })
+          break
+        case 'conflict':
+          this.#store.publications.failPublishOperation(target.operationId, {
+            code: controlErrorCode.publicationConflict,
+            message: 'The idempotency key refers to another Publication request.',
+          })
+          break
+        case 'live-conflict':
+          this.#store.publications.failPublishOperation(target.operationId, {
+            code: controlErrorCode.liveConflict,
+            message: 'The Flow Live pointer no longer matches the expected Publication.',
+          })
+          break
+        case 'not-found':
+          this.#store.publications.failPublishOperation(target.operationId, { code: controlErrorCode.flowNotFound, message: 'The Flow was not found.' })
+          break
+        case 'revision-conflict':
+          this.#store.publications.failPublishOperation(target.operationId, { code: controlErrorCode.flowRevisionConflict, message: 'The Draft changed.' })
+          break
+        case 'source-not-found':
+          this.#store.publications.failPublishOperation(target.operationId, {
+            code: controlErrorCode.publicationNotFound,
+            message: 'The source Publication was not found.',
+          })
+          break
+        case 'operation-pending':
+          return 0
+      }
+    }
+    let nextDelay = publishCount == maintenanceBatchSize || this.#store.pruneExpiredEvents(now, maintenanceBatchSize) > 0 ? 0 : maintenanceIntervalMs
+    if (this.#store.publications.prunePublishOperations(now, maintenanceBatchSize) > 0) nextDelay = 0
     const flowId = this.#store.claimRetiringFlow(now)
     if (flowId == null) {
       if (this.#store.collectOrphanRevisions(maintenanceBatchSize) > 0) nextDelay = 0
@@ -1331,13 +1179,13 @@ export class ServerService {
       if (!FiberMap.hasUnsafe(this.#tasks, 'cron') && cronAt != null && Math.max(cronAt, this.#cronRetryAt ?? cronAt) <= now) {
         yield* this.#startTask('cron', 'trigger.cron.loop.failed', this.#cron(new Date(now).toISOString()))
       }
-      const integrationAt = this.#store.triggers.nextIntegrationAt()
+      const integrationAt = this.#store.integrations.nextIntegrationAt()
       if (!FiberMap.hasUnsafe(this.#tasks, 'integration') && integrationAt != null && integrationAt <= now) {
         yield* this.#startTask('integration', 'trigger.integration.loop.failed', this.#integration.tick(new Date(now).toISOString()))
       }
-      const pollAt = this.#store.triggers.nextPollAt()
+      const pollAt = this.#store.polls.nextPollAt()
       if (!FiberMap.hasUnsafe(this.#tasks, 'poll') && pollAt != null && pollAt <= now) {
-        yield* this.#startTask('poll', 'trigger.poll.loop.failed', this.#pollDue(new Date(now).toISOString()))
+        yield* this.#startTask('poll', 'trigger.poll.loop.failed', this.#poll.tick(new Date(now).toISOString()))
       }
       if (!FiberMap.hasUnsafe(this.#tasks, 'maintenance') && this.#maintenanceAt <= now) {
         yield* this.#startTask('maintenance', 'maintenance.loop.failed', this.#maintenance(new Date(now).toISOString()))
@@ -1387,11 +1235,11 @@ export class ServerService {
       if (nextAt != null) deadlines.push(Math.max(nextAt, this.#cronRetryAt ?? nextAt))
     }
     if (!FiberMap.hasUnsafe(this.#tasks, 'integration')) {
-      const nextAt = this.#store.triggers.nextIntegrationAt()
+      const nextAt = this.#store.integrations.nextIntegrationAt()
       if (nextAt != null) deadlines.push(nextAt)
     }
     if (!FiberMap.hasUnsafe(this.#tasks, 'poll')) {
-      const nextAt = this.#store.triggers.nextPollAt()
+      const nextAt = this.#store.polls.nextPollAt()
       if (nextAt != null) deadlines.push(nextAt)
     }
     return deadlines.length == 0 ? maxTimerDelayMs : Math.max(0, Math.min(Math.min(...deadlines) - now, maxTimerDelayMs))
@@ -1431,14 +1279,6 @@ function connectorCapabilityPayload(value: JsonValue): {
     throw new TaskHostError('capability.invalid', 'The Runtime Capability request is invalid.')
   }
   return { action: source.action, connectionId: source.connectionId, input: source.input as Readonly<Record<string, JsonValue>> }
-}
-
-function pollFailure(error: unknown): Extract<PollState['health'], 'failed' | 'needs_reauth'> | undefined {
-  for (let current: unknown = error; current instanceof Error; current = current.cause) {
-    if (current instanceof PollConnectionError) return 'needs_reauth'
-    if (current instanceof PermanentPollError) return 'failed'
-    if (current instanceof ConnectorTaskError && current.code == 'connector.connection-required') return 'needs_reauth'
-  }
 }
 
 async function validatedFlow(revision: RevisionContent): Promise<{

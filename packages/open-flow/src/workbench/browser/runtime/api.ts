@@ -17,6 +17,7 @@ export type {
   LiveRun,
   Publication,
   PublicationPage,
+  PublishOperation,
   Flow,
   FlowCheck,
   FlowPage,

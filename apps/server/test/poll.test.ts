@@ -95,7 +95,14 @@ function revision(source = 'primary'): RevisionContent {
   }
 }
 
-const connector = createConnectorHost()
+const activeConnection = {
+  connectionId: 'connection-main',
+  displayName: 'Main',
+  isDefault: true,
+  serviceId: snapshot.provider,
+  status: 'active',
+} as const
+const connector = createConnectorHost({ listConnections: async () => [activeConnection] })
 const publishedAt = Date.parse('2026-08-21T00:00:30.000Z')
 
 async function publish(service: ServerService, content = revision(), expectedLivePublicationId: string | null = null) {
@@ -117,6 +124,7 @@ describe('Server Poll Trigger', () => {
     let providerSignal: AbortSignal | undefined
     const requestSignal = new AbortController().signal
     const waitingConnector = createConnectorHost({
+      listConnections: async () => [activeConnection],
       async proxy(_provider, _connectionId, _rateLimitId, _request, signal) {
         entered.resolve()
         return await new Promise((_resolve, reject) => {
@@ -131,7 +139,7 @@ describe('Server Poll Trigger', () => {
     })
     const definition: PollDefinition = {
       snapshot,
-      async poll(context) {
+      async poll(context): Promise<PollResult> {
         providerSignal = context.signal
         await context.connector.execute({ endpoint: '/events', method: 'GET' }, requestSignal)
         return { checkpoint: null, events: [] }
@@ -199,9 +207,15 @@ describe('Server Poll Trigger', () => {
     let checkpoint: unknown
     const definition: PollDefinition = {
       snapshot,
-      async poll(context) {
+      async poll(context): Promise<PollResult> {
         calls += 1
         checkpoint = context.checkpoint
+        if (calls == 1) {
+          return {
+            checkpoint: { baseline: true },
+            events: [{ dedupeKey: 'old-event', payload: { value: 'old' } }],
+          }
+        }
         return {
           checkpoint: { ignored: true },
           events: [{ dedupeKey: 'event-1', payload: { value: 'first' } }],
@@ -219,6 +233,8 @@ describe('Server Poll Trigger', () => {
         { kind: 'graph.node.create', node: content.document.graph.nodes.poll!, nodeId: 'poll', target: { kind: 'flow' } },
       ])
       await service.control.publishFlow('operator', created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v1', null, 'poll-control-publication')
+      await service.tickPoll()
+      await service.tickMaintenance()
       const before = service.pollState(created.flow.flowId, 'poll')
 
       expect(service.control.listTriggerKeys()).toEqual([
@@ -237,8 +253,8 @@ describe('Server Poll Trigger', () => {
         hasMore: true,
         version: 1,
       })
-      expect(calls).toBe(1)
-      expect(checkpoint).toBeNull()
+      expect(calls).toBe(2)
+      expect(checkpoint).toEqual({ baseline: true })
       expect(service.pollState(created.flow.flowId, 'poll')).toEqual(before)
       const database = new DatabaseSync(file, { readOnly: true })
       expect(database.prepare('SELECT COUNT(*) AS count FROM poll_claims').get()).toEqual({ count: 0 })
@@ -344,11 +360,11 @@ describe('Server Poll Trigger', () => {
     await closeService(service)
 
     const store = new Store(file)
-    const target = store.triggers.duePoll(Date.parse('2026-08-21T00:01:00.000Z'), 1)[0]
+    const target = store.polls.duePoll(Date.parse('2026-08-21T00:01:00.000Z'), 1)[0]
     if (target == null) throw new Error('Poll claim target was not due.')
-    const first = store.triggers.claimPoll(target, 'claim-main', 1_000, 2_000)
-    const busy = store.triggers.claimPoll(target, 'claim-main', 1_500, 2_500)
-    const reacquired = store.triggers.claimPoll(target, 'claim-main', 2_000, 3_000)
+    const first = store.polls.claimPoll(target, 'claim-main', 1_000, 2_000)
+    const busy = store.polls.claimPoll(target, 'claim-main', 1_500, 2_500)
+    const reacquired = store.polls.claimPoll(target, 'claim-main', 2_000, 3_000)
 
     expect(first).toMatchObject({ kind: 'acquired' })
     expect(busy).toEqual({ kind: 'busy' })

@@ -129,8 +129,17 @@ Flow、Run、Task、invocation、binding 和 Run 状态；Task 或 Run 结束后
 
 ## 4. Publication、Connector 与 Trigger
 
-Publication 是 Flow 在固定 Revision 上的不可变发布记录。每个 Flow 独立拥有 Publication 历史和最多一个 Live pointer。Publish 必须在一个权威
-operation boundary 内完成 validation、binding、eligibility 和 Live 更新；Rollback 创建新 Publication，不修改历史记录。
+Publication 是 Flow 在固定 Revision 上的不可变成功记录。每个 Flow 独立拥有 Publication 历史和最多一个 Live pointer。Publish 在同步接受前固定
+Revision、closure、Engine、预期 Live 和必要 binding，并完成 validation 与非确定性 eligibility；之后由持久化 publish operation 表达
+`pending | succeeded | failed`。同一个 Flow 最多有一个 pending publish operation，幂等重放返回同一个 operation。
+
+只有需要外部或异步准备的 Trigger 才建立持久化 work。外部请求不进入本地事务；所有必需 work Ready 后，一个权威 transaction 才能创建
+Publication、比较并移动 Live、安装 current Trigger binding 并把 operation 标为 succeeded。pending 或 failed operation 不创建 Publication、不移动
+Live，旧 Live 继续作为 Run 和 Trigger admission 的事实来源。Rollback 创建新 Publication，不修改历史记录。
+
+current Trigger binding 与 Live pointer 共同构成 Trigger admission authority。候选 Integration callback、Poll baseline event 和旧 runtime claim 在激活前后
+都不能绕过该 authority 创建 Run；Poll baseline checkpoint 只在激活 transaction 中安装。不能使用独立候选 endpoint 安全替换的 Integration 变更必须
+fail closed，不能先修改 current provider resource 再依赖补偿恢复。
 
 Connector service 拥有 Provider 授权、credential、Connection lifecycle 和 proxy transport。Open Flow 只保存稳定的 opaque Connection identity，
 不能把 credential、token 或 Connector 数据库复制进 Revision、Browser 或 RunEvent。Connector catalog 和 Connection 是 deployment scope 资源，

@@ -179,6 +179,55 @@ export default () => value`,
     await expect(validateFlow(source, engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
   })
 
+  it('reports an unconnected provider Trigger without rejecting its Draft shape', async () => {
+    const source: RevisionFixture = {
+      document: {
+        bindings: {},
+        graph: {
+          nodes: {
+            trigger: {
+              bindingId: 'binding',
+              config: {},
+              definition: {
+                configSchema: { additionalProperties: false, type: 'object' },
+                definitionVersion: 1,
+                description: 'Runs when a repository changes.',
+                displayName: 'Repository event',
+                endpoint: {
+                  body: { allowArray: false, allowEmpty: false, formats: ['json'] },
+                  methods: ['POST'],
+                  successStatus: 200,
+                },
+                key: 'github.on_repo_event',
+                name: 'on_repo_event',
+                payloadSchema: { additionalProperties: true, type: 'object' },
+                provider: 'github',
+                type: 'integration',
+              },
+              kind: 'integration',
+              name: 'Repository event',
+            },
+          },
+        },
+        subflows: {},
+        tasks: {},
+      },
+      modelVersion: 1,
+      modules: {},
+    }
+
+    await expect(validateFlow(source, engine)).resolves.toMatchObject({
+      diagnostics: [
+        expect.objectContaining({
+          code: 'trigger.connection-missing',
+          path: '/document/graph/nodes/trigger/bindingId',
+          values: { bindingId: 'binding' },
+        }),
+      ],
+      valid: false,
+    })
+  })
+
   it('reports unsupported Engine, invalid Flow, and invalid invocation inputs without platform errors', async () => {
     await expect(prepareFlow(revision('export default () => true'), 'unsupported')).resolves.toEqual({ kind: 'engine-unsupported' })
     await expect(prepareFlow(revision('export const value = true'), currentEngineContract)).resolves.toMatchObject({

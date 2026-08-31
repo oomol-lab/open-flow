@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createServerApp } from '../node/http.ts'
 import { createLogger } from '../node/logger.ts'
 import { ServerService } from '../node/service.ts'
+import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
 
 const directories: string[] = []
@@ -65,6 +66,18 @@ const snapshot = {
   provider: 'test',
   type: 'integration',
 } as const
+
+const connector = createConnectorHost({
+  listConnections: async () => [
+    {
+      connectionId: 'connection-main',
+      displayName: 'Main',
+      isDefault: true,
+      serviceId: snapshot.provider,
+      status: 'active',
+    },
+  ],
+})
 
 function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient'): RevisionContent {
   return {
@@ -166,7 +179,7 @@ describe('Server Integration reconciliation', () => {
       snapshot,
     }
     const at = Date.parse('2026-08-21T00:00:00.000Z')
-    const service = await openService(await databaseFile(), undefined, () => at, runtime(), undefined, undefined, [definition])
+    const service = await openService(await databaseFile(), connector, () => at, runtime(), undefined, undefined, [definition])
     await publish(service, 'ready', null)
     await startService(service)
     await entered.promise
@@ -207,7 +220,7 @@ describe('Server Integration reconciliation', () => {
             },
             snapshot,
           }
-          const service = yield* ServerService.open(file, undefined, clock, runtime(), undefined, undefined, [definition])
+          const service = yield* ServerService.open(file, connector, clock, runtime(), undefined, undefined, [definition])
           yield* Effect.tryPromise({ try: () => publish(service, 'ready', null), catch: (error) => error })
           const ticking = service.tickIntegration(new Date(at).toISOString())
           yield* Effect.promise(() => entered.promise)
@@ -247,7 +260,7 @@ describe('Server Integration reconciliation', () => {
       snapshot,
     }
     const at = Date.parse('2026-08-21T00:00:00.000Z')
-    const service = await openService(await databaseFile(), undefined, () => at, runtime(), undefined, undefined, [definition])
+    const service = await openService(await databaseFile(), connector, () => at, runtime(), undefined, undefined, [definition])
     try {
       await publish(service, 'transient', null)
       const first = service.tickIntegration(new Date(at).toISOString())
@@ -286,7 +299,7 @@ describe('Server Integration reconciliation', () => {
           }
           yield* Effect.scoped(
             Effect.gen(function* () {
-              const service = yield* ServerService.open(file, undefined, clock, runtime(), undefined, undefined, [definition])
+              const service = yield* ServerService.open(file, connector, clock, runtime(), undefined, undefined, [definition])
               yield* Effect.tryPromise({
                 try: async () => {
                   await publish(service, 'ready', null)
@@ -317,7 +330,7 @@ describe('Server Integration reconciliation', () => {
       snapshot,
     }
     const at = Date.parse('2026-08-21T00:00:00.000Z')
-    const service = await openService(await databaseFile(), undefined, () => at, runtime(), undefined, captured.logger, [definition])
+    const service = await openService(await databaseFile(), connector, () => at, runtime(), undefined, captured.logger, [definition])
     try {
       await publish(service, 'transient', null)
       await service.tickIntegration(new Date(at).toISOString())
@@ -347,7 +360,7 @@ describe('Server Integration reconciliation', () => {
     }
     let now = Date.parse('2026-08-21T00:00:00.000Z')
     const file = await databaseFile()
-    const service = await openService(file, undefined, () => now, runtime(), undefined, undefined, [definition])
+    const service = await openService(file, connector, () => now, runtime(), undefined, undefined, [definition])
     try {
       let publicationId = await publish(service, 'connection', null)
       await service.tickIntegration(new Date(now).toISOString())
@@ -412,7 +425,7 @@ describe('Server Integration callback fencing', () => {
     }
     let now = Date.parse('2026-08-21T00:00:00.000Z')
     const file = await databaseFile()
-    const service = await openService(file, undefined, () => now, runtime(), undefined, undefined, [definition])
+    const service = await openService(file, connector, () => now, runtime(), undefined, undefined, [definition])
     try {
       let publicationId = await publish(service, 'ready', null)
       await service.tickIntegration(new Date(now).toISOString())

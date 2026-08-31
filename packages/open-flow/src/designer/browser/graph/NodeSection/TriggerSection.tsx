@@ -140,19 +140,29 @@ function PollScheduleEditor({ editable, pollTime, section }: { editable: boolean
   )
 }
 
-function Connection({ connection, editable, section, service }: { connection: string; editable: boolean; section: TriggerSectionStore; service: string }) {
+function Connection({
+  connection,
+  editable,
+  section,
+  service,
+}: {
+  connection: string | undefined
+  editable: boolean
+  section: TriggerSectionStore
+  service: string
+}) {
   const t = useTranslate()
   const label = <span className={styles.connectionLabel}>{t('trigger.connection')}</span>
   const connections = useConnectorServiceConnections(service)
   if (connections == null) {
-    return <HandleRow level=" " name={label} value={<span title={connection}>{connection}</span>} />
+    return <HandleRow level=" " name={label} value={<span title={connection}>{connection ?? t('addNode.connectorNoActiveConnection')}</span>} />
   }
 
   const active = connections.filter((item) => item.status == 'active')
-  const selected = connections.find((item) => item.id == connection)
+  const selected = connection == null ? undefined : connections.find((item) => item.id == connection)
   const resolved = selected?.status == 'active'
   const options: IBasicOption[] = active.map((item) => ({ label: `${item.displayName} (${item.id})`, value: item.id }))
-  if (!resolved) {
+  if (connection != null && !resolved) {
     options.unshift({
       isDisabled: true,
       label: `${connection} (${t('blockEditor.executor.connectionUnresolved')})`,
@@ -191,7 +201,7 @@ export const TriggerSection: React.FC<TriggerSectionProps> = /* @__PURE__ */ mem
 
   return (
     <Card name={TRIGGER_SECTION_TYPE} icon="i-carbon:settings-adjust" title={t('trigger.configuration')} contentClassName={styles.configuration}>
-      {connector != null && trigger?.connection != null && (
+      {connector != null && trigger != null && (
         <Connection connection={trigger.connection} editable={editable} section={section} service={connector.service_id} />
       )}
       {config != null && (

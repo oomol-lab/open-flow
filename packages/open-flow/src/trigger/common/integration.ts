@@ -56,6 +56,7 @@ export interface IntegrationReconcileContext {
   readonly config: Readonly<Record<string, JsonValue>>
   readonly connector: ConnectorProxy
   readonly endpointUrl: string
+  readonly idempotencyKey: string
   readonly now: Date
   readonly signal?: AbortSignal
   readonly state?: IntegrationStateContext

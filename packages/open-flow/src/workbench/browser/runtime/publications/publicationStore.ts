@@ -1,6 +1,16 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { WorkbenchClient, Live, PollTriggerTestResult, Publication, TriggerActivity, TriggerBinding, TriggerBindingDetail } from '../api.ts'
+import type {
+  WorkbenchClient,
+  Live,
+  PollTriggerTestResult,
+  Publication,
+  PublishOperation,
+  TriggerActivity,
+  TriggerBinding,
+  TriggerBindingDetail,
+} from '../api.ts'
+import type { WorkbenchPreferences } from '../contract.ts'
 import type { SetNotice } from '../stores/workbenchNotice.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 
@@ -35,6 +45,7 @@ interface PublicationState {
   readonly loadMoreFailed: boolean
   readonly loadingMore: boolean
   readonly nextCursor?: string
+  readonly operation?: PublishOperation
   readonly publications: readonly Publication[]
   readonly publishing: boolean
   readonly rollingBackPublicationId?: string
@@ -49,6 +60,7 @@ type Client = Pick<
   WorkbenchClient,
   | 'getFlowTriggerBinding'
   | 'getLive'
+  | 'getPublishOperation'
   | 'listFlowTriggerActivities'
   | 'listFlowTriggerBindings'
   | 'listPublications'
@@ -75,6 +87,7 @@ export interface Publication$ {
   readonly loadMoreFailed: ReadonlyVal<boolean>
   readonly loadingMore: ReadonlyVal<boolean>
   readonly nextCursor: ReadonlyVal<string | undefined>
+  readonly operation: ReadonlyVal<PublishOperation | undefined>
   readonly publications: ReadonlyVal<readonly Publication[]>
   readonly publishing: ReadonlyVal<boolean>
   readonly rollingBackPublicationId: ReadonlyVal<string | undefined>
@@ -101,6 +114,7 @@ const initialState: PublicationState = {
 
 const activityPageLimit = 20
 const pageLimit = 50
+const publishPollMs = 750
 
 function sameTarget(left: Target | undefined, right: Target): boolean {
   return left?.flowId == right.flowId
@@ -112,6 +126,7 @@ export class PublicationStore {
   readonly #i18n: I18n
   readonly #loads = new Latest()
   readonly #operation = new Latest()
+  readonly #preferences: WorkbenchPreferences
   readonly #triggerDetails = new Latest()
   readonly #triggerTest = new Latest()
   readonly #setNotice: SetNotice
@@ -125,12 +140,14 @@ export class PublicationStore {
     client: Client,
     workspace: WorkspaceStore,
     setNotice: SetNotice,
+    preferences: WorkbenchPreferences,
     identity: () => string = () => crypto.randomUUID(),
     i18n: I18n = createI18n(),
   ) {
     this.#client = client
     this.#identity = identity
     this.#i18n = i18n
+    this.#preferences = preferences
     this.#setNotice = setNotice
     this.#workspace = workspace
     this.$ = {
@@ -149,6 +166,7 @@ export class PublicationStore {
       loadMoreFailed: derive(this.#state, (state) => state.loadMoreFailed),
       loadingMore: derive(this.#state, (state) => state.loadingMore),
       nextCursor: derive(this.#state, (state) => state.nextCursor),
+      operation: derive(this.#state, (state) => state.operation),
       publications: derive(this.#state, (state) => state.publications),
       publishing: derive(this.#state, (state) => state.publishing),
       rollingBackPublicationId: derive(this.#state, (state) => state.rollingBackPublicationId),
@@ -184,9 +202,22 @@ export class PublicationStore {
     this.#setNotice(undefined)
     this.#state.set({ ...initialState, loading: true, target })
     try {
-      const [live, page, bindings] = await this.#read(target)
+      const [[live, page, bindings], operation] = await Promise.all([this.#read(target), this.#storedOperation(target)])
       if (!current()) return
-      this.#set({ bindings, live, loading: false, nextCursor: page.nextCursor, publications: page.publications, total: page.total })
+      this.#set({
+        bindings,
+        live,
+        loading: false,
+        nextCursor: page.nextCursor,
+        operation,
+        publications: page.publications,
+        publishing: operation?.status == 'pending',
+        total: page.total,
+      })
+      if (operation?.status == 'pending') {
+        const flow = this.#workspace.$.targetFlow.value
+        void this.#observe(target, operation, this.#operation.begin(), flow?.flowId == target.flowId ? flow.name : target.flowId)
+      }
     } catch (error) {
       if (!current()) return
       this.#set({ loadFailed: true, loading: false })
@@ -237,13 +268,11 @@ export class PublicationStore {
     this.#setNotice(undefined)
     this.#setTarget(target, { publishing: true })
     try {
-      await this.#client.publishFlow(flow.flowId, draft.revisionId, expectedLivePublicationId, { idempotencyKey: attempt.key })
+      const operation = await this.#client.publishFlow(flow.flowId, draft.revisionId, expectedLivePublicationId, { idempotencyKey: attempt.key })
       if (!current()) return false
-      await this.#refresh(target)
-      if (!current()) return false
-      this.#attempt = undefined
-      this.#setNotice({ kind: 'success', message: this.#i18n.t('notice.published', { name: flow.name }) })
-      return true
+      this.#preferences.setItem(this.#operationKey(target.flowId), operation.operationId)
+      this.#set({ operation, publishing: operation.status == 'pending' })
+      return await this.#observe(target, operation, current, flow.name)
     } catch (error) {
       if (!current()) return false
       if (error instanceof ApiError && error.code == 'live.conflict') await this.#recover(target)
@@ -457,6 +486,62 @@ export class PublicationStore {
       this.#client.listPublications(target.flowId, { includeTotal: true, limit: pageLimit }),
       this.#client.listFlowTriggerBindings(target.flowId),
     ])
+  }
+
+  async #storedOperation(target: Target): Promise<PublishOperation | undefined> {
+    const operationId = this.#preferences.getItem(this.#operationKey(target.flowId))
+    if (operationId == null || operationId == '') return
+    try {
+      return await this.#client.getPublishOperation(target.flowId, operationId)
+    } catch (error) {
+      if (error instanceof ApiError && error.code == 'publication.operation-not-found') {
+        this.#preferences.setItem(this.#operationKey(target.flowId), '')
+        return
+      }
+      throw error
+    }
+  }
+
+  async #observe(target: Target, initial: PublishOperation, current: () => boolean, name: string): Promise<boolean> {
+    let operation = initial
+    while (operation.status == 'pending') {
+      await new Promise((resolve) => setTimeout(resolve, publishPollMs))
+      if (!current()) return false
+      try {
+        operation = await this.#client.getPublishOperation(target.flowId, operation.operationId)
+      } catch (error) {
+        if (!current()) return false
+        if (error instanceof ApiError && error.code == 'publication.operation-not-found') {
+          this.#preferences.setItem(this.#operationKey(target.flowId), '')
+          this.#setTarget(target, { operation: undefined, publishing: false })
+          this.#setNotice(errorNotice(error, this.#i18n.t))
+          return false
+        }
+        this.#setNotice(errorNotice(error, this.#i18n.t))
+        continue
+      }
+      if (!current()) return false
+      this.#setTarget(target, { operation })
+    }
+    this.#attempt = undefined
+    this.#setTarget(target, { operation, publishing: false })
+    if (operation.status == 'failed') {
+      this.#setNotice({ kind: 'error', message: operation.issue.message })
+      return false
+    }
+    try {
+      await this.#refresh(target)
+    } catch (error) {
+      if (current()) this.#setNotice(errorNotice(error, this.#i18n.t))
+      return true
+    }
+    if (!current()) return false
+    this.#setNotice({ kind: 'success', message: this.#i18n.t('notice.published', { name }) })
+    return true
+  }
+
+  #operationKey(flowId: string): string {
+    return `publish-operation:${flowId}`
   }
 
   #setTarget(target: Target, patch: Partial<PublicationState>): void {

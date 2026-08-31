@@ -10,6 +10,7 @@ import type {
   Live,
   PollTriggerTestResult,
   Publication,
+  PublishOperation,
   Run,
   RunCancellation,
   RunDetails,
@@ -47,6 +48,7 @@ type PublishInput = {
   readonly flowId: string
   readonly idempotencyKey: string
   readonly revision: RevisionContent
+  readonly revisionDigest: string
   readonly revisionId: string
 }
 
@@ -78,6 +80,7 @@ export interface PublicationPosition {
 }
 
 export class ControlService {
+  private readonly acceptPublish: (input: PublishInput) => Promise<PublishOperation>
   private readonly abortRun: (runId: string) => void
   private readonly clock: () => number
   private readonly flowCatalogChanged: () => void
@@ -99,6 +102,7 @@ export class ControlService {
     abortRun: (runId: string) => void,
     wake: () => void,
     publish: (input: PublishInput) => Promise<PublicationAcceptance>,
+    acceptPublish: (input: PublishInput) => Promise<PublishOperation>,
     triggersChanged: () => void,
     triggerDefinitions: readonly TriggerKeySnapshot[],
     testPollTrigger: (flowId: string, triggerNodeId: string) => Promise<PollTriggerTestResult>,
@@ -114,6 +118,7 @@ export class ControlService {
     this.abortRun = abortRun
     this.wake = wake
     this.publish = publish
+    this.acceptPublish = acceptPublish
     this.triggersChanged = triggersChanged
     this.triggerDefinitions = triggerDefinitions
     this.testPollTrigger = testPollTrigger
@@ -332,7 +337,7 @@ export class ControlService {
     const currentFlow = this.getFlow(flowId)
     const current = this.requireDraft(flowId)
     const draftClosure = await flowClosure(revisionContent(current))
-    const stored = this.store.live(flowId)
+    const stored = this.store.publications.live(flowId)
     if (stored == null) {
       return {
         flowId,
@@ -408,7 +413,7 @@ export class ControlService {
     readonly page: { readonly publications: readonly Publication[]; readonly total?: number; readonly version: 1 }
   } {
     this.getFlow(flowId)
-    const stored = this.store.listPublications(flowId, limit + 1, after, includeTotal)
+    const stored = this.store.publications.listPublications(flowId, limit + 1, after, includeTotal)
     const rows = stored.publications.slice(0, limit)
     const last = rows.at(-1)
     return {
@@ -428,19 +433,29 @@ export class ControlService {
     engineContract: string,
     expectedLivePublicationId: string | null,
     idempotencyKey: string,
-  ): Promise<{ readonly created: boolean; readonly publication: Publication }> {
+  ): Promise<PublishOperation> {
     if (engineContract != currentEngineContract) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
     const revision = this.store.revision(flowId, revisionId)
     if (revision == null) notFound()
-    return await this.commitPublication({
+    return await this.commitPublishOperation({
       control: { actorId, operation: 'publish' },
       engineContract,
       expectedLivePublicationId,
       flowId,
       idempotencyKey,
       revision: revisionContent(revision),
+      revisionDigest: revision.digest,
       revisionId,
     })
+  }
+
+  getPublishOperation(flowId: string, operationId: string): PublishOperation {
+    this.getFlow(flowId)
+    const operation = this.store.publications.publishOperation(flowId, operationId)
+    if (operation == null) {
+      throw new ControlError(controlErrorCode.publishOperationNotFound, 'The Publish operation was not found.')
+    }
+    return operation
   }
 
   async rollbackFlow(
@@ -450,11 +465,18 @@ export class ControlService {
     expectedLivePublicationId: string,
     idempotencyKey: string,
   ): Promise<{ readonly created: boolean; readonly publication: Publication }> {
-    const source = this.store.publication(flowId, sourcePublicationId)
+    const source = this.store.publications.publication(flowId, sourcePublicationId)
     if (source == null) throw new ControlError(controlErrorCode.publicationNotFound, 'The Publication was not found.')
     const revision = this.store.revision(flowId, source.revisionId)
     if (revision == null || revision.digest != source.revisionDigest) {
       throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Revision does not match the Publication.')
+    }
+    const content = revisionContent(revision)
+    if (Object.values(content.document.graph.nodes).some((node) => node.kind == 'integration' || node.kind == 'poll')) {
+      throw new ControlError(
+        controlErrorCode.publicationConflict,
+        'Rollback for Provider Triggers is not supported until their resources can be prepared safely.',
+      )
     }
     return await this.commitPublication({
       control: { actorId, operation: 'rollback', sourcePublicationId },
@@ -462,7 +484,8 @@ export class ControlService {
       expectedLivePublicationId,
       flowId,
       idempotencyKey,
-      revision: revisionContent(revision),
+      revision: content,
+      revisionDigest: revision.digest,
       revisionId: source.revisionId,
     })
   }
@@ -597,13 +620,13 @@ export class ControlService {
       return { created: false, run: runDetails(this.requireRun(existing.runId)) }
     }
 
-    const livePublication = this.store.publicationById(publicationId)
+    const livePublication = this.store.publications.publicationById(publicationId)
     if (livePublication == null) throw new ControlError(controlErrorCode.publicationNotFound, 'The Publication was not found.')
     const { flowId } = livePublication
     const currentFlow = this.store.flow(flowId)
     if (currentFlow == null) notFound()
     if (currentFlow.status != 'active') throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
-    const live = this.store.live(flowId)
+    const live = this.store.publications.live(flowId)
     if (live?.publication.publicationId != publicationId) {
       throw new ControlError(controlErrorCode.liveConflict, 'The Publication is no longer the current Live target.')
     }
@@ -744,23 +767,7 @@ export class ControlService {
     try {
       accepted = await this.publish(input)
     } catch (error) {
-      if (!(error instanceof AcceptanceError)) throw error
-      switch (error.code) {
-        case 'engine-unsupported':
-          throw new ControlError(controlErrorCode.engineUnsupported, error.message)
-        case 'flow-not-found':
-          throw new ControlError(controlErrorCode.flowNotFound, error.message)
-        case 'publication-live-conflict':
-          throw new ControlError(controlErrorCode.liveConflict, error.message)
-        case 'revision-conflict':
-          throw new ControlError(serverErrorCode.flowRevisionStorageConflict, error.message)
-        case 'flow-inputs-invalid':
-        case 'flow-invalid':
-        case 'revision-invalid':
-        case 'trigger-invalid':
-        case 'trigger-payload-invalid':
-          throw new ControlError(controlErrorCode.flowInvalid, error.message)
-      }
+      this.publicationError(error)
     }
     switch (accepted.kind) {
       case 'binding-unresolved':
@@ -773,15 +780,46 @@ export class ControlService {
         throw new ControlError(controlErrorCode.liveConflict, 'The Flow Live pointer no longer matches the expected Publication.')
       case 'not-found':
         return notFound()
+      case 'operation-pending':
+        throw new Error('A synchronous Publication cannot have pending work.')
       case 'revision-conflict':
         throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
       case 'source-not-found':
         throw new ControlError(controlErrorCode.publicationNotFound, 'The Publication was not found.')
       case 'published': {
-        const stored = this.store.publication(input.flowId, accepted.publicationId)
+        const stored = this.store.publications.publication(input.flowId, accepted.publicationId)
         if (stored == null) throw new Error('Committed Publication is missing.')
         return { created: accepted.created, publication: publication(stored) }
       }
+    }
+  }
+
+  private async commitPublishOperation(input: PublishInput): Promise<PublishOperation> {
+    try {
+      return await this.acceptPublish(input)
+    } catch (error) {
+      this.publicationError(error)
+    }
+  }
+
+  private publicationError(error: unknown): never {
+    if (error instanceof ConnectorTaskError) throw new ControlError(error.code, error.message)
+    if (!(error instanceof AcceptanceError)) throw error
+    switch (error.code) {
+      case 'engine-unsupported':
+        throw new ControlError(controlErrorCode.engineUnsupported, error.message)
+      case 'flow-not-found':
+        throw new ControlError(controlErrorCode.flowNotFound, error.message)
+      case 'publication-live-conflict':
+        throw new ControlError(controlErrorCode.liveConflict, error.message)
+      case 'revision-conflict':
+        throw new ControlError(serverErrorCode.flowRevisionStorageConflict, error.message)
+      case 'flow-inputs-invalid':
+      case 'flow-invalid':
+      case 'revision-invalid':
+      case 'trigger-invalid':
+      case 'trigger-payload-invalid':
+        throw new ControlError(controlErrorCode.flowInvalid, error.message)
     }
   }
 

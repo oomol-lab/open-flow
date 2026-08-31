@@ -44,12 +44,13 @@ function parseLlmExecutorOptions(options: unknown): Option<LlmExecutor['options'
 
 function parseConnectorExecutorOptions(options: unknown): Option<ConnectorExecutor['options']> {
   return Option.from(options, isUnknownRecord).andThen((record) =>
-    Option.from(record.action, (action): action is string => isString(action) && action.length > 0).andThen((action) =>
-      Option.from(record.connection, (connection): connection is string => isString(connection) && connection.length > 0).map((connection) => ({
+    Option.from(record.action, (action): action is string => isString(action) && action.length > 0).andThen((action) => {
+      if (record.connection == null) return Option.from({ action })
+      return Option.from(record.connection, (connection): connection is string => isString(connection) && connection.length > 0).map((connection) => ({
         action,
         connection,
-      })),
-    ),
+      }))
+    }),
   )
 }
 

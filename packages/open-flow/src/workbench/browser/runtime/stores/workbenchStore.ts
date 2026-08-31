@@ -90,7 +90,7 @@ export class WorkbenchStore {
 
   public constructor(
     client: WorkbenchClient,
-    _preferences: WorkbenchPreferences,
+    preferences: WorkbenchPreferences,
     identity: () => string = () => crypto.randomUUID(),
     i18n: I18n = createI18n(),
     host: Pick<WorkbenchHost, 'openExternalPage'> = blockedExternalPages,
@@ -106,7 +106,7 @@ export class WorkbenchStore {
     this.workspace = new WorkspaceStore(client, setNotice, createAuthoringId, i18n, (event) => void this.#followExternalRun(client, event))
     this.connectors = new ConnectorStore(client, this.workspace, setNotice, host, i18n)
     this.triggers = new TriggerStore(client, this.workspace, setNotice, host, i18n)
-    this.publications = new PublicationStore(client, this.workspace, setNotice, identity, i18n)
+    this.publications = new PublicationStore(client, this.workspace, setNotice, preferences, identity, i18n)
     this.runRequests = new RunRequestStore(client, this.runs, setNotice, i18n, identity)
     const designerCache = new Map<string, { readonly graph: DesignerGraph; readonly inputs: readonly unknown[] }>()
     let designerFlowId: string | undefined
@@ -309,9 +309,8 @@ export class WorkbenchStore {
   }
 
   public readonly provideAddNodeOptionChoices = async (optionId: string, signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
-    return await (optionId.startsWith('trigger:')
-      ? this.triggers.provideAddNodeOptionChoices(optionId, signal)
-      : this.connectors.provideAddNodeOptionChoices(optionId, signal))
+    if (optionId.startsWith('trigger:')) return
+    return await this.connectors.provideAddNodeOptionChoices(optionId, signal)
   }
 
   public async refreshSelectedConnector(force = false): Promise<void> {

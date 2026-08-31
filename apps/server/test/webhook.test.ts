@@ -71,6 +71,7 @@ function webhookFlow(): RevisionContent {
 async function publishedWebhook(service: ServerService) {
   const stored = await storeRevision(service, webhookFlow(), 'revision-webhook')
   await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v1', null, 'publication-webhook')
+  await service.tickMaintenance()
   const binding = service.control.getFlowTriggerBinding(stored.flowId, 'incoming', 'http://server.local')
   const endpointId = binding.endpointUrl == null ? undefined : webhookEndpointId(new URL(binding.endpointUrl))
   const target = endpointId == null ? undefined : service.webhookTarget(endpointId)

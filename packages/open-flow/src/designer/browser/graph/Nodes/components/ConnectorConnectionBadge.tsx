@@ -9,15 +9,15 @@ import { useConnectorConnections } from '../../../connectorConnection.ts'
 export interface ConnectorConnectionBadgeProps {
   readonly action: string
   readonly className?: string
-  readonly connection: string
+  readonly connection: string | undefined
 }
 
 export function ConnectorConnectionBadge(props: ConnectorConnectionBadgeProps) {
   const t = useTranslate()
   const connections = useConnectorConnections(props.action)
-  const selected = connections?.find((connection) => connection.id == props.connection)
+  const selected = props.connection == null ? undefined : connections?.find((connection) => connection.id == props.connection)
   const unresolved = connections === null || (connections !== undefined && selected?.status != 'active')
-  const label = selected?.displayName ?? compactConnectionId(props.connection)
+  const label = selected?.displayName ?? (props.connection == null ? t('blockEditor.executor.connectionUnresolved') : compactConnectionId(props.connection))
   const connectionLabel = t('blockEditor.executor.connection')
   const status = selected?.status ?? (connections === undefined ? undefined : 'unresolved')
 
@@ -33,7 +33,7 @@ export function ConnectorConnectionBadge(props: ConnectorConnectionBadgeProps) {
             <dd>{selected?.displayName ?? '—'}</dd>
             <dt>{t('blockEditor.executor.connectionId')}</dt>
             <dd>
-              <code>{props.connection}</code>
+              <code>{props.connection ?? '—'}</code>
             </dd>
             {status != null && (
               <>

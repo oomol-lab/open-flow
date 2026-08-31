@@ -170,6 +170,37 @@ interface Publication {
   version: 1
 }
 
+type PublishOperation =
+  | {
+      createdAt: string
+      flowId: string
+      operationId: string
+      revisionId: string
+      status: 'pending'
+      updatedAt: string
+      version: 1
+    }
+  | {
+      createdAt: string
+      flowId: string
+      operationId: string
+      publicationId: string
+      revisionId: string
+      status: 'succeeded'
+      updatedAt: string
+      version: 1
+    }
+  | {
+      createdAt: string
+      flowId: string
+      issue: { code: string; message: string; nodeId?: string }
+      operationId: string
+      revisionId: string
+      status: 'failed'
+      updatedAt: string
+      version: 1
+    }
+
 interface Live {
   flowId: string
   hasUnpublishedChanges: boolean
@@ -180,8 +211,16 @@ interface Live {
 }
 ```
 
-Publish body 是 `{ engineContract, expectedLivePublicationId, version: 1 }`；Rollback body 是 `{ expectedLivePublicationId, version: 1 }`。
-两者使用 Live CAS。首次提交返回 `201`，幂等重放返回 `200`。Rollback 创建新 Publication 并设置 `sourcePublicationId`，不修改历史和 Draft head。
+Publish body 是 `{ engineContract, expectedLivePublicationId, version: 1 }`。接受与幂等重放都返回 `202` 和同一 `PublishOperation`。客户端通过
+`GET /v1/flows/{flowId}/publish-operations/{operationId}` 读取其状态。pending 时不创建
+Publication、不移动 Live；succeeded 后可以用 `publicationId` 读取 Publication 与 Live；failed 只返回安全 issue。
+
+新的 Integration subscription 与新建或变更 Poll 的 baseline 都在 pending operation 内准备。Poll baseline 返回的事件不会创建 Run，最终 checkpoint
+只在 operation 激活时安装。完全未变化且健康的 Integration/Poll 运行状态可以复用；已有 Integration 不能安全 staged replacement 时，Publish 在建立
+operation 前返回 `publication.unsupported`，旧 Live 与现有 subscription 保持不变。
+
+Rollback body 是 `{ expectedLivePublicationId, version: 1 }`，使用 Live CAS。首次提交返回 `201`，幂等重放返回 `200`。Rollback 创建新
+Publication 并设置 `sourcePublicationId`，不修改历史和 Draft head。
 首次 Publish 或 Rollback 必须在创建 Publication 的权威 transaction 中确认固定 closure 使用的 Variable 均存在；缺失时返回
 `binding.unresolved`。相同 operation identity 的幂等重放先返回原 Publication，不因 Variable 后续被删除而改变结果。
 
@@ -327,7 +366,8 @@ type FlowChangeEvent =
 | `POST`    | `/v1/flows/:flowId/revisions/:revisionId/check`          |      200 | 固定 Revision validation                         |
 | `GET`     | `/v1/flows/:flowId/live`                                 |      200 | Live projection                                  |
 | `GET`     | `/v1/flows/:flowId/publications`                         |      200 | Publication page                                 |
-| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/publications`   |  201/200 | Publish                                          |
+| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/publications`   |      202 | Publish operation                                |
+| `GET`     | `/v1/flows/:flowId/publish-operations/:operationId`      |      200 | Publish operation                                |
 | `POST`    | `/v1/flows/:flowId/publications/:publicationId/rollback` |  201/200 | Rollback                                         |
 | `POST`    | `/v1/flows/:flowId/revisions/:revisionId/runs`           |  202/200 | Draft Run                                        |
 | `POST`    | `/v1/runs`                                               |  202/200 | Live Run                                         |

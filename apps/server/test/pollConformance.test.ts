@@ -97,11 +97,21 @@ async function createHarness(fixture: PollConformanceFixture): Promise<PollConfo
       return page
     },
   }
-  const connector = createConnectorHost()
+  let connectionId = fixture.connectionId
+  const connector = createConnectorHost({
+    listConnections: async () => [
+      {
+        connectionId,
+        displayName: 'Conformance',
+        isDefault: true,
+        serviceId: snapshot.provider,
+        status: 'active',
+      },
+    ],
+  })
   let now = Date.parse(fixture.publishedAt)
   let service = await openService(file, connector, () => now, {}, undefined, undefined, [definition])
   let config = fixture.config
-  let connectionId = fixture.connectionId
   let active = true
   let nextAt = nextTriggerScheduledAt(fixture.rules, now)
   let lastOccurrence: { readonly bindingId: string; readonly occurredAt: string; readonly occurrenceId: string; readonly runtimeVersion: number } | undefined

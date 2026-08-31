@@ -189,6 +189,80 @@ describe('Server Connector host', () => {
     expect(service.run(runId)?.status).toBe('completed')
   })
 
+  it('allows an unconnected Connector Task in Draft but rejects Publish when its action requires authorization', async () => {
+    const action: ConnectorAction = {
+      actionId: 'example.echo',
+      authenticated: true,
+      description: 'Echo.',
+      inputs: {},
+      name: 'Echo',
+      outputs: {},
+      serviceId: 'example',
+      serviceName: 'Example',
+    }
+    const service = await open(
+      createConnectorHost({
+        getAction: async () => action,
+        listConnections: async () => [],
+      }),
+    )
+    const source = connectorFlow()
+    const task = source.document.tasks.connector!
+    const revision: RevisionContent = {
+      ...source,
+      document: {
+        ...source.document,
+        tasks: { ...source.document.tasks, connector: { ...task, executor: { action: 'example.echo', kind: 'connector' } } },
+      },
+    }
+
+    await expect(
+      service.publishFlow({
+        expectedLivePublicationId: null,
+        flowId: 'main',
+        idempotencyKey: 'unconnected-connector',
+        revision,
+        revisionId: 'revision-unconnected-connector',
+      }),
+    ).rejects.toMatchObject({ code: 'connector.connection-required' })
+  })
+
+  it('publishes a public Connector Task without a Connection', async () => {
+    const service = await open(
+      createConnectorHost({
+        getAction: async () => ({
+          actionId: 'example.echo',
+          authenticated: false,
+          description: 'Echo.',
+          inputs: {},
+          name: 'Echo',
+          outputs: {},
+          serviceId: 'example',
+          serviceName: 'Example',
+        }),
+      }),
+    )
+    const source = connectorFlow()
+    const task = source.document.tasks.connector!
+    const revision: RevisionContent = {
+      ...source,
+      document: {
+        ...source.document,
+        tasks: { ...source.document.tasks, connector: { ...task, executor: { action: 'example.echo', kind: 'connector' } } },
+      },
+    }
+
+    await expect(
+      service.publishFlow({
+        expectedLivePublicationId: null,
+        flowId: 'main',
+        idempotencyKey: 'public-connector',
+        revision,
+        revisionId: 'revision-public-connector',
+      }),
+    ).resolves.toMatchObject({ kind: 'published' })
+  })
+
   it('uses the Flow Team fixed when a Run is admitted', async () => {
     const requests: { readonly teamId: string | null; readonly url: string }[] = []
     vi.stubGlobal(

@@ -4,8 +4,8 @@ import type { RuntimeCapabilityResponse, RuntimeInvocation, RuntimeProgram } fro
 import type { FlowRunOptions, FlowRunResult, SchedulerEvent, SchedulerFailure, TaskInvocation, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
 import type * as Scope from 'effect/Scope'
 import type IsolatedVM from 'isolated-vm'
-import type { ChildProcessWithoutNullStreams } from 'node:child_process'
-import type { Interface } from 'node:readline'
+import type { ChildProcess, ChildProcessByStdio } from 'node:child_process'
+import type { Readable } from 'node:stream'
 
 import { createRuntimeProgram } from '@oomol-lab/open-flow/flow-semantics'
 import { findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
@@ -16,7 +16,6 @@ import * as Fiber from 'effect/Fiber'
 import * as FiberSet from 'effect/FiberSet'
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 
 export interface IsolatedVmLimits {
@@ -143,7 +142,8 @@ function serializedBytes(value: unknown): number {
 }
 
 function writeMessage(message: ExecutorMessage): void {
-  process.stdout.write(`${JSON.stringify(message)}\n`)
+  if (process.send == null) return
+  process.send(message, () => {})
 }
 
 function normalizedError(error: unknown): Error {
@@ -169,10 +169,9 @@ function programError(program: RuntimeProgram): IsolatedVmError | undefined {
 }
 
 export class IsolatedVmHost {
-  #child?: ChildProcessWithoutNullStreams
+  #child?: ChildProcess
   #closed = false
   #executionId = 0
-  #output?: Interface
   readonly #pending = new Map<number, PendingInvocation>()
   #stderr = ''
 
@@ -304,30 +303,29 @@ export class IsolatedVmHost {
     for (const [executionId, pending] of this.#pending) this.#finish(executionId, () => pending.reject(reason))
     if (child == null) return
     this.#child = undefined
-    this.#output?.close()
-    this.#output = undefined
     if (child.exitCode != null || child.signalCode != null) return
     const closed = new Promise<void>((resolve) => child.once('close', () => resolve()))
     child.kill()
     await closed
   }
 
-  #start(): ChildProcessWithoutNullStreams {
+  #start(): ChildProcess {
     const modulePath = fileURLToPath(import.meta.url)
     const executorPath = modulePath.endsWith('.ts') ? modulePath : fileURLToPath(new URL('./isolated-vm.js', import.meta.url))
     const child = spawn(process.execPath, ['--no-node-snapshot', executorPath, '--executor'], {
       env: { NODE_ENV: 'production' },
-      stdio: ['pipe', 'pipe', 'pipe'],
-    })
-    const output = createInterface({ input: child.stdout })
+      stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
+    }) as ChildProcessByStdio<null, null, Readable>
     this.#child = child
-    this.#output = output
     this.#stderr = ''
     child.stderr.setEncoding('utf8')
     child.stderr.on('data', (chunk: string) => {
       if (this.#child == child && this.#stderr.length < 4_096) this.#stderr += chunk
     })
     child.once('error', (error) => this.#fail(child, normalizedError(error)))
+    child.once('disconnect', () =>
+      this.#fail(child, new IsolatedVmError('executor-crashed', 'Runtime Executor IPC channel disconnected before completing its work.')),
+    )
     child.once('close', (code, signal) => {
       const detail = this.#stderr.trim()
       this.#fail(
@@ -338,26 +336,16 @@ export class IsolatedVmHost {
         ),
       )
     })
-    output.on('line', (line) => this.#receive(child, line))
+    child.on('message', (message) => this.#receive(child, message as ExecutorMessage))
     return child
   }
 
-  #receive(child: ChildProcessWithoutNullStreams, line: string): void {
-    let message: ExecutorMessage
-    try {
-      message = JSON.parse(line) as ExecutorMessage
-    } catch {
-      this.#fail(child, new IsolatedVmError('executor-crashed', 'Runtime Executor returned an invalid protocol message.'))
-      child.kill()
-      return
-    }
+  #receive(child: ChildProcess, message: ExecutorMessage): void {
     const pending = this.#pending.get(message.executionId)
     if (pending == null) return
     if (message.type == 'result') {
       if (message.retire && this.#child == child) {
         this.#child = undefined
-        this.#output?.close()
-        this.#output = undefined
       }
       this.#finish(message.executionId, () => {
         if (message.ok) pending.resolve(message.value)
@@ -421,7 +409,7 @@ export class IsolatedVmHost {
   }
 
   #call(
-    child: ChildProcessWithoutNullStreams,
+    child: ChildProcess,
     executionId: number,
     id: number,
     pending: PendingInvocation,
@@ -471,8 +459,11 @@ export class IsolatedVmHost {
     fiber.addObserver(() => pending.activeCalls.delete(id))
   }
 
-  #send(child: ChildProcessWithoutNullStreams, message: ParentMessage): void {
-    if (this.#child == child && !child.stdin.destroyed) child.stdin.write(`${JSON.stringify(message)}\n`)
+  #send(child: ChildProcess, message: ParentMessage): void {
+    if (this.#child != child || !child.connected) return
+    child.send(message, (error) => {
+      if (error != null) this.#fail(child, normalizedError(error))
+    })
   }
 
   #finish(executionId: number, operation: () => void): void {
@@ -485,11 +476,9 @@ export class IsolatedVmHost {
     operation()
   }
 
-  #fail(child: ChildProcessWithoutNullStreams, error: Error): void {
+  #fail(child: ChildProcess, error: Error): void {
     if (this.#child != child) return
     this.#child = undefined
-    this.#output?.close()
-    this.#output = undefined
     for (const [executionId, pending] of this.#pending) this.#finish(executionId, () => pending.reject(error))
   }
 }
@@ -1006,26 +995,14 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
 function runExecutor(): Effect.Effect<void> {
   return Effect.scoped(
     Effect.gen(function* () {
-      const input = yield* Effect.acquireRelease(
-        Effect.sync(() => createInterface({ input: process.stdin })),
-        (interface_) => Effect.sync(() => interface_.close()),
-      )
       const fibers = yield* FiberSet.make<void, never>()
       const run = yield* FiberSet.runtime(fibers)()
       const executions = new Map<number, { readonly fiber: Fiber.Fiber<void, never>; readonly pending: Map<number, PendingCapability> }>()
 
       yield* Effect.callback<void>((resume) => {
         const close = (): void => resume(Effect.void)
-        const line = (source: string): void => {
-          let message: ParentMessage
-          try {
-            message = JSON.parse(source) as ParentMessage
-          } catch {
-            process.stderr.write('Executor received an invalid protocol message.\n')
-            process.exitCode = 1
-            input.close()
-            return
-          }
+        const receive = (source: unknown): void => {
+          const message = source as ParentMessage
           const execution = executions.get(message.executionId)
           if (message.type == 'cancel') {
             if (execution != null) run(Fiber.interrupt(execution.fiber))
@@ -1054,7 +1031,7 @@ function runExecutor(): Effect.Effect<void> {
           const fiber = run(
             executeWithCapabilities(message, pending, () => {
               if (completedIsolates < executorIsolateBudget || executions.size != 1) return false
-              queueMicrotask(() => input.close())
+              queueMicrotask(() => process.disconnect?.())
               return true
             }).pipe(
               Effect.ensuring(
@@ -1066,11 +1043,11 @@ function runExecutor(): Effect.Effect<void> {
           )
           executions.set(message.executionId, { fiber, pending })
         }
-        input.once('close', close)
-        input.on('line', line)
+        process.once('disconnect', close)
+        process.on('message', receive)
         return Effect.sync(() => {
-          input.off('close', close)
-          input.off('line', line)
+          process.off('disconnect', close)
+          process.off('message', receive)
         })
       })
     }),

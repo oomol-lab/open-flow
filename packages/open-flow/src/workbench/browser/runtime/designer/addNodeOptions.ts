@@ -27,7 +27,7 @@ interface AddNodeOptionBase {
 type AddTrigger =
   | {
       readonly kind: 'catalog'
-      readonly connectionId: string
+      readonly connectionId?: string
       readonly definition: TriggerKeySnapshot
     }
   | { readonly kind: 'connect'; readonly provider: string }
