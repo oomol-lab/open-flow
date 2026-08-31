@@ -159,7 +159,7 @@ export class Store {
     this.#clock = clock
     this.#maxPendingRuns = maxPendingRuns
     this.#runEventRetentionMs = runEventRetentionMs
-    this.#database = new DatabaseSync(file)
+    this.#database = new DatabaseSync(file, { timeout: 5_000 })
     this.#database.exec(`
       PRAGMA journal_mode = WAL;
       PRAGMA synchronous = NORMAL;

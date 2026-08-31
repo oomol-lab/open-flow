@@ -46,7 +46,7 @@ export class OperatorSession {
 
   async actor(request: Request): Promise<string | undefined> {
     const authorization = request.headers.get('authorization')
-    if (authorization?.startsWith('Bearer ') && this.matches(authorization.slice(7))) return actorId
+    if (authorization?.startsWith('Bearer ') && (await this.matches(authorization.slice(7)))) return actorId
 
     const fingerprint = this.#fingerprint()
     if (fingerprint == null) return
@@ -60,8 +60,8 @@ export class OperatorSession {
     return Number.isSafeInteger(expiration) && expiration > this.#now() ? actorId : undefined
   }
 
-  matches(token: string): boolean {
-    if (this.#envToken == null) return this.#store.matches(token)
+  async matches(token: string): Promise<boolean> {
+    if (this.#envToken == null) return await this.#store.matches(token)
     const candidate = encoder.encode(token)
     return candidate.byteLength == this.#envToken.byteLength && timingSafeEqual(candidate, this.#envToken)
   }
@@ -173,7 +173,7 @@ export function createOperatorApp(session?: OperatorSession, attemptsPerMinute =
     if (!admitted()) return limited()
     const body = await tokenRequest(context.req.raw, 'token')
     if (body == null) return json(400, { error: { code: serverErrorCode.operatorInvalid, message: 'Session request is invalid.' }, version: 1 })
-    if (!session.matches(body)) {
+    if (!(await session.matches(body))) {
       return json(401, { error: { code: serverErrorCode.authenticationInvalid, message: 'Operator token is invalid.' }, version: 1 })
     }
     await session.setCookie(context)

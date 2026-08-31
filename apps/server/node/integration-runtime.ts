@@ -81,8 +81,7 @@ export class IntegrationRuntime {
     store: Store,
     resolveConnector: () => ConnectorHost | undefined,
     clock: () => number,
-    options: IntegrationOptions | undefined,
-    resolveOptions: (() => IntegrationOptions | undefined) | undefined,
+    resolveOptions: () => IntegrationOptions | undefined,
     definitions: readonly IntegrationDefinition[],
     validateFlow: ValidateFlow,
     wake: () => void,
@@ -93,7 +92,7 @@ export class IntegrationRuntime {
     this.#definitions = new Map(definitions.map((definition) => [definition.snapshot.key, definition]))
     this.#logger = logger.child({ component: 'integration' })
     this.#resolveConnector = resolveConnector
-    this.#resolveOptions = resolveOptions ?? (() => options)
+    this.#resolveOptions = resolveOptions
     this.#store = store
     this.#validateFlow = validateFlow
     this.#wake = wake

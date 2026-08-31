@@ -213,7 +213,13 @@ function SettingItem({
   )
 }
 
-export function SettingsPage({ onUnauthorized }: { readonly onUnauthorized: () => void }): ReactElement {
+export function SettingsPage({
+  onConnectorChange,
+  onUnauthorized,
+}: {
+  readonly onConnectorChange: () => void
+  readonly onUnauthorized: () => void
+}): ReactElement {
   const [current, setCurrent] = useState<NonNullable<ReturnType<typeof config>>>()
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -279,7 +285,10 @@ export function SettingsPage({ onUnauthorized }: { readonly onUnauthorized: () =
                 heading="h3"
                 name={t('settings.runtime')}
                 onConflict={load}
-                onSaved={setCurrent}
+                onSaved={(value) => {
+                  setCurrent(value)
+                  onConnectorChange()
+                }}
                 onUnauthorized={onUnauthorized}
                 originLabel={t('settings.origin')}
                 placeholder="https://connector.example.com"

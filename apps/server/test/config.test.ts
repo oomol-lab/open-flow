@@ -45,9 +45,12 @@ it('keeps LLM invocations on the configuration snapshot taken when they start', 
     version: 1,
   })
   expect(configured.putLlm(1, 'https://models.example.com', 'first-token')).toBe('saved')
-  const first = configured.llm()!
+  const first = configured.llm()
+  expect(first).toBeDefined()
   expect(configured.putLlm(2, 'https://models.example.com', 'second-token')).toBe('saved')
-  const second = configured.llm()!
+  const second = configured.llm()
+  expect(second).toBeDefined()
+  if (first == null || second == null) throw new Error('Expected both LLM snapshots to be configured.')
   const authorizations: string[] = []
   vi.stubGlobal(
     'fetch',

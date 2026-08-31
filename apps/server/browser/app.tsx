@@ -402,7 +402,7 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
           </header>
           <div className="workbench-frame">
             {settingsOpen ? (
-              <SettingsPage onUnauthorized={sessionExpired} />
+              <SettingsPage onConnectorChange={() => void loadTeams()} onUnauthorized={sessionExpired} />
             ) : variablesOpen ? (
               <VariablesPage client={client} language={language} />
             ) : (

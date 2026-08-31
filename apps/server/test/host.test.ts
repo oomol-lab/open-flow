@@ -151,6 +151,30 @@ it('rate limits operator login attempts', async () => {
   }
 })
 
+it('throttles failed stored token verification and caches a verified token', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-operator-verify-'))
+  const file = path.join(directory, 'open-flow.sqlite')
+  const service = await openService(file)
+  let now = Date.UTC(2026, 7, 22)
+  const claimed = new OperatorStore(file, () => now)
+  const restored = new OperatorStore(file, () => now)
+  operatorStores.push(claimed, restored)
+  try {
+    expect(claimed.claim(token)).toBe(true)
+    expect(await restored.matches('wrong')).toBe(false)
+    expect(await restored.matches(token)).toBe(false)
+
+    now += 1_000
+    await expect(Promise.all([restored.matches(token), restored.matches(token)])).resolves.toEqual([true, true])
+
+    expect(await restored.matches('another-wrong-token')).toBe(false)
+    expect(await restored.matches(token)).toBe(true)
+  } finally {
+    await closeService(service)
+    await rm(directory, { force: true, recursive: true })
+  }
+})
+
 it('reports missing operator configuration without disabling callbacks or health', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-operator-missing-'))
   const file = path.join(directory, 'open-flow.sqlite')

@@ -6,7 +6,7 @@ export class SettingsStore {
 
   constructor(file: string, clock: () => number = Date.now) {
     this.#clock = clock
-    this.#database = new DatabaseSync(file)
+    this.#database = new DatabaseSync(file, { timeout: 5_000 })
     this.#database.exec(`
       PRAGMA journal_mode = WAL;
       PRAGMA synchronous = NORMAL;
