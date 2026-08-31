@@ -239,8 +239,7 @@ Workbench container 为准，不维护并行的 viewport fallback。`ResizeObser
 
 ## Designer 键盘与图标控件
 
-可聚焦的 React Flow Canvas 根必须在 `:focus-visible` 下显示不影响节点测量的 inset ring；不要只使用 `outline: none !important`。视口外 NodeIndicator 是导航动作，必须
-使用原生 button，并让键盘 click 以按钮中心计算目标坐标。其淡出 transition 必须支持 reduced-motion。
+可聚焦的 React Flow Canvas 根必须在 `:focus-visible` 下显示不影响节点测量的 inset ring；不要只使用 `outline: none !important`。
 
 Icon Picker 的 icon、tab、关闭、随机、颜色面板和具体颜色都使用原生 `type="button"`；icon-only action 必须有 `aria-label`，选中的 tab/color 使用 `aria-pressed`，颜色
 面板 trigger 使用 `aria-expanded`。搜索框必须有可访问名称与 `autocomplete="off"`。这些语义改动不得改变 Icon Picker 的网格、颜色或 Designer 节点图标系统。

@@ -6,11 +6,8 @@
     "connectorConnections": "{{count}} 個 Connection",
     "connectorNewConnection": "新增 Connection",
     "connectorNoActiveConnection": "沒有可用的 Connection",
-    "connectorPopupBlocked": "連線視窗被瀏覽器封鎖，請允許彈出式視窗後再試一次。",
-    "connectorUnavailable": "此專案環境不支援 Connector 操作。",
     "llmChat": "LLM 對話",
     "llmStructured": "LLM 結構化輸出",
-    "scriptletUnsupported": "此專案環境不支援編寫小腳本。",
     "sharedBlocks": "任務與 Subflow",
     "triggers": "Trigger",
     "value": "值"
@@ -68,19 +65,12 @@
       "timeout": "逾時時間",
       "title": "執行設定"
     },
-    "sourceNotFound": "找不到區塊原始檔",
     "task": "區塊名稱",
     "taskHeader": "來自共享區塊",
     "title": "標題"
   },
   "cancel": "取消",
-  "clipboard": {
-    "copySuccess": "已複製 {{@}} 個節點",
-    "copySuccess@1": "已複製 1 個節點",
-    "pasteScriptletUnsupported": "此專案環境不支援貼上小腳本。"
-  },
   "comment": {
-    "editWithMarkdown": "使用 Markdown 編輯",
     "preview": "預覽",
     "source": "檢視原始文字"
   },
@@ -207,16 +197,7 @@
   "edit": "編輯",
   "edgeError": {
     "aggregateSummary": "{{connectionCount}} 條連線中有 {{errorCount}} 條發生錯誤",
-    "binDiffType": "二進位資料不相容",
-    "default": "資料類型不相容",
-    "diffKind": "Handle 種類不相符",
-    "errorNode": "連接到已損毀的節點",
-    "nullable": "來源允許 null，但目標不允許"
-  },
-  "errorNode": {
-    "blockManifestUnrenderable": "無法轉譯區塊資訊清單 {{path}}",
-    "blockNotFound": "找不到任務或 Subflow 的 YAML 檔案",
-    "unsupportedNode": "不支援的節點中繼資料"
+    "binDiffType": "二進位資料不相容"
   },
   "fitView": "適應檢視",
   "flowEditor": {
@@ -439,18 +420,8 @@
   },
   "preview": {
     "title": "預覽",
-    "textAriaLabel": "文字預覽",
     "videoBilibili": "Bilibili 影片播放器",
     "videoYouTube": "YouTube 影片播放器",
-    "audio": {
-      "mute": "靜音",
-      "pause": "暫停音訊",
-      "play": "播放音訊",
-      "seek": "調整音訊播放進度",
-      "title": "音訊預覽",
-      "unmute": "取消靜音",
-      "volume": "音量"
-    },
     "table": {
       "footer": "共 {{columns}} 欄、{{rows}} 列"
     }
@@ -469,21 +440,9 @@
     "value": "值"
   },
   "scriptlet": "小腳本",
-  "subflowEditor": {
-    "blockMode": "區塊檢視",
-    "flowMode": "Flow 檢視"
-  },
   "subflowSettings": {
     "forwardPreview": "轉發預覽",
     "title": "Subflow 設定"
-  },
-  "validation": {
-    "nodeIdBanned": "Node ID 不能為 {{name}}",
-    "nodeIdExists": "Node ID 已存在",
-    "nodeIdInvalid": "Node ID 只能包含英文字母、數字、底線和連字號",
-    "sharedBlockNameBanned": "任務或 Subflow 的名稱不能為 {{name}}",
-    "sharedBlockNameExists": "已有同名的任務或 Subflow",
-    "sharedBlockNameInvalid": "任務和 Subflow 的名稱只能包含英文字母、數字、底線和連字號"
   },
   "workbench": {
     "conflict": {

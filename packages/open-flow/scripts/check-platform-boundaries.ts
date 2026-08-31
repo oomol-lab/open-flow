@@ -30,7 +30,7 @@ const platformDomains: Set<string> = new Set([
   'workbench',
 ])
 const nodeModules: Set<string> = new Set(builtinModules.map((name) => name.replace(/^node:/, '')))
-const browserPackagePrefixes: readonly string[] = ['antd', 'react', 'react-dom', '@wopjs/dom']
+const browserPackagePrefixes: readonly string[] = ['antd', 'react', 'react-dom']
 const nonPortablePackagePrefixes: readonly string[] = ['@cloudflare/', '@oomol/', 'cloudflare:']
 const domGlobals: Set<string> = new Set([
   'document',

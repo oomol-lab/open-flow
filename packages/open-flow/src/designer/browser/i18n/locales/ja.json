@@ -6,11 +6,8 @@
     "connectorConnections": "Connection {{count}} 件",
     "connectorNewConnection": "新しい Connection",
     "connectorNoActiveConnection": "利用可能な Connection がありません",
-    "connectorPopupBlocked": "接続ウィンドウがブロックされました。ポップアップを許可して再試行してください。",
-    "connectorUnavailable": "このプロジェクトホストでは Connector アクションを利用できません。",
     "llmChat": "LLM チャット",
     "llmStructured": "LLM 構造化出力",
-    "scriptletUnsupported": "このプロジェクトホストではスクリプトレットの作成に対応していません。",
     "sharedBlocks": "タスクと Subflow",
     "triggers": "Trigger",
     "value": "値"
@@ -68,19 +65,12 @@
       "timeout": "タイムアウト",
       "title": "実行設定"
     },
-    "sourceNotFound": "ブロックのソースファイルが見つかりません",
     "task": "ブロック名",
     "taskHeader": "共有ブロックから",
     "title": "タイトル"
   },
   "cancel": "キャンセル",
-  "clipboard": {
-    "copySuccess": "{{@}} 個のノードをコピーしました",
-    "copySuccess@1": "1 個のノードをコピーしました",
-    "pasteScriptletUnsupported": "このプロジェクトホストではスクリプトレットの貼り付けに対応していません。"
-  },
   "comment": {
-    "editWithMarkdown": "Markdown で編集",
     "preview": "プレビュー",
     "source": "ソースを表示"
   },
@@ -207,16 +197,7 @@
   "edit": "編集",
   "edgeError": {
     "aggregateSummary": "{{connectionCount}} 本の接続のうち {{errorCount}} 本にエラーがあります",
-    "binDiffType": "バイナリデータに互換性がありません",
-    "default": "データ型に互換性がありません",
-    "diffKind": "Handle の種別が一致しません",
-    "errorNode": "破損したノードに接続されています",
-    "nullable": "接続元は null を許可しますが、接続先は許可していません"
-  },
-  "errorNode": {
-    "blockManifestUnrenderable": "ブロックマニフェスト {{path}} を描画できません",
-    "blockNotFound": "タスクまたは Subflow の YAML ファイルが見つかりません",
-    "unsupportedNode": "サポートされていないノードのメタデータです"
+    "binDiffType": "バイナリデータに互換性がありません"
   },
   "fitView": "ビューに合わせる",
   "flowEditor": {
@@ -439,18 +420,8 @@
   },
   "preview": {
     "title": "プレビュー",
-    "textAriaLabel": "テキストプレビュー",
     "videoBilibili": "Bilibili 動画プレーヤー",
     "videoYouTube": "YouTube 動画プレーヤー",
-    "audio": {
-      "mute": "ミュート",
-      "pause": "音声を一時停止",
-      "play": "音声を再生",
-      "seek": "再生位置を調整",
-      "title": "音声プレビュー",
-      "unmute": "ミュートを解除",
-      "volume": "音量"
-    },
     "table": {
       "footer": "全 {{columns}} 列、{{rows}} 行"
     }
@@ -469,21 +440,9 @@
     "value": "値"
   },
   "scriptlet": "スクリプトレット",
-  "subflowEditor": {
-    "blockMode": "ブロックビュー",
-    "flowMode": "Flow ビュー"
-  },
   "subflowSettings": {
     "forwardPreview": "プレビューを転送",
     "title": "Subflow 設定"
-  },
-  "validation": {
-    "nodeIdBanned": "Node ID に {{name}} は使用できません",
-    "nodeIdExists": "Node ID は既に存在します",
-    "nodeIdInvalid": "Node ID には半角英字、数字、アンダースコア、ハイフンのみ使用できます",
-    "sharedBlockNameBanned": "タスクまたは Subflow の名前に {{name}} は使用できません",
-    "sharedBlockNameExists": "同じ名前のタスクまたは Subflow が既に存在します",
-    "sharedBlockNameInvalid": "タスクと Subflow の名前には半角英字、数字、アンダースコア、ハイフンのみ使用できます"
   },
   "workbench": {
     "conflict": {

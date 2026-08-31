@@ -1,4 +1,25 @@
-import type { ConnectorAction, ConnectorConnection, ConnectorProvider, FlowChangeEvent, Variable } from '@oomol-lab/open-flow/control-api'
+import type {
+  ConnectorAction,
+  ConnectorConnection,
+  ConnectorProvider,
+  Draft,
+  DraftChange,
+  Flow,
+  FlowChangeEvent,
+  FlowCheck,
+  Live,
+  PollTriggerTestResult,
+  Publication,
+  Run,
+  RunCancellation,
+  RunDetails,
+  RunEvents,
+  RunResult,
+  TriggerActivity,
+  TriggerBinding,
+  TriggerKeySummary,
+  Variable,
+} from '@oomol-lab/open-flow/control-api'
 import type { ChangeOperation, JsonValue, RevisionContent, TriggerKeySnapshot } from '@oomol-lab/open-flow/flow-change'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions } from '@oomol-lab/open-flow/scheduler'
@@ -29,141 +50,6 @@ type PublishInput = {
   readonly revisionId: string
 }
 
-interface Flow {
-  readonly createdAt: string
-  readonly draftRevisionId: string
-  readonly name: string
-  readonly flowId: string
-  readonly status: 'active' | 'retiring'
-  readonly updatedAt: string
-  readonly version: 1
-}
-
-interface RevisionMetadata {
-  readonly actorId: string
-  readonly createdAt: string
-  readonly digest: string
-  readonly modelVersion: number
-  readonly parentRevisionId: string | null
-  readonly flowId: string
-  readonly revisionId: string
-  readonly version: 1
-}
-
-interface Draft extends RevisionMetadata {
-  readonly content: RevisionContent
-}
-
-interface DraftChange {
-  readonly revision: RevisionMetadata
-  readonly version: 1
-}
-
-interface Publication {
-  readonly actorId: string
-  readonly closureDigest: string
-  readonly createdAt: string
-  readonly engineContract: string
-  readonly flowId: string
-  readonly modelVersion: number
-  readonly operation: 'publish' | 'rollback'
-  readonly publicationId: string
-  readonly revisionDigest: string
-  readonly revisionId: string
-  readonly sourcePublicationId?: string
-  readonly version: 1
-}
-
-interface Live {
-  readonly flowId: string
-  readonly hasUnpublishedChanges: boolean
-  readonly publication: Publication | null
-  readonly revision: number
-  readonly status: 'not-published' | 'runnable' | 'suspended'
-  readonly version: 1
-}
-
-interface FlowCheck {
-  readonly closureDigest: string
-  readonly diagnostics: readonly {
-    readonly code: string
-    readonly column: number
-    readonly line: number
-    readonly message: string
-    readonly path: string
-    readonly values?: Readonly<Record<string, string | number>>
-  }[]
-  readonly engineContract: string
-  readonly flowId: string
-  readonly modelVersion: number
-  readonly revisionDigest: string
-  readonly revisionId: string
-  readonly valid: boolean
-  readonly version: 1
-}
-
-interface Run {
-  readonly createdAt: string
-  readonly finishedAt?: string
-  readonly flowId: string
-  readonly revisionId: string
-  readonly runId: string
-  readonly source: 'draft' | 'live' | 'trigger'
-  readonly startedAt?: string
-  readonly status: RunStatus
-  readonly version: 1
-}
-
-interface RunDetailsBase extends Run {
-  readonly closureDigest: string
-  readonly engineContract: string
-  readonly engineDigest: string
-  readonly modelVersion: number
-  readonly revisionDigest: string
-}
-
-type RunDetails =
-  | (RunDetailsBase & { readonly source: 'draft' })
-  | (RunDetailsBase & { readonly publicationId: string; readonly source: 'live' })
-  | (RunDetailsBase & {
-      readonly occurrenceId: string
-      readonly publicationId: string
-      readonly source: 'trigger'
-      readonly triggerNodeId: string
-    })
-
-interface RunEvents {
-  readonly done: boolean
-  readonly events: readonly {
-    readonly createdAt: string
-    readonly kind: string
-    readonly payload: Readonly<Record<string, JsonValue>>
-    readonly sequence: number
-  }[]
-  readonly historyComplete: boolean
-  readonly nextAfter: number
-  readonly runId: string
-  readonly version: 1
-}
-
-interface RunCancellation {
-  readonly cancelAccepted: boolean
-  readonly runId: string
-  readonly status: Extract<RunStatus, 'canceled' | 'completed' | 'failed' | 'indeterminate'>
-  readonly version: 1
-}
-
-type RunResult =
-  | { readonly finishedAt: string; readonly result: JsonValue; readonly runId: string; readonly status: 'completed'; readonly version: 1 }
-  | {
-      readonly error: { readonly code: string; readonly message: string }
-      readonly finishedAt: string
-      readonly runId: string
-      readonly status: 'failed' | 'indeterminate'
-      readonly version: 1
-    }
-  | { readonly finishedAt: string; readonly runId: string; readonly status: 'canceled'; readonly version: 1 }
-
 interface Presentation {
   readonly revision: number
   readonly updatedAt: string
@@ -171,48 +57,9 @@ interface Presentation {
   readonly version: 1
 }
 
-interface TriggerKeySummary {
-  readonly description: string
-  readonly displayName: string
-  readonly key: string
-  readonly name: string
-  readonly provider: string
-  readonly type: TriggerKeySnapshot['type']
-}
-
-interface TriggerBinding {
-  readonly currentPublicationId?: string
-  readonly currentRevisionId?: string
-  readonly endpointUrl?: string
-  readonly flowId: string
-  readonly health: StoredTriggerBinding['health']
-  readonly kind: StoredTriggerBinding['kind']
-  readonly lastErrorCode?: string
-  readonly operatorState: StoredTriggerBinding['operatorState']
-  readonly runtimeVersion: number
-  readonly triggerNodeId: string
-  readonly updatedAt: string
-  readonly version: 1
-}
-
-interface TriggerActivity {
-  readonly activityId: string
-  readonly createdAt: string
-  readonly errorCode?: string
-  readonly errorMessage?: string
-  readonly kind: StoredTriggerActivity['kind']
-}
-
 export interface TriggerActivityPosition {
   readonly activityId: string
   readonly createdAt: number
-}
-
-type PollTriggerTestResult = {
-  readonly events: readonly Readonly<Record<string, JsonValue>>[]
-  readonly filtered: number
-  readonly hasMore: boolean
-  readonly version: 1
 }
 
 export interface FlowPosition {
@@ -1046,7 +893,6 @@ function triggerActivity(stored: StoredTriggerActivity): TriggerActivity {
 function run(stored: StoredControlRun): Run {
   return {
     createdAt: timestamp(stored.createdAt),
-    ...(stored.eventsExpiresAt == null ? {} : { eventsExpiresAt: timestamp(stored.eventsExpiresAt) }),
     ...(stored.finishedAt == null ? {} : { finishedAt: timestamp(stored.finishedAt) }),
     flowId: stored.flowId,
     revisionId: stored.revisionId,
@@ -1064,6 +910,7 @@ function runDetails(stored: StoredControlRun): RunDetails {
     closureDigest: stored.closureDigest,
     engineContract: stored.engineContract,
     engineDigest: stored.engineDigest,
+    ...(stored.eventsExpiresAt == null ? {} : { eventsExpiresAt: timestamp(stored.eventsExpiresAt) }),
     modelVersion: stored.modelVersion,
     revisionDigest: stored.revisionDigest,
   }

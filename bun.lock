@@ -103,7 +103,6 @@
         "@wopjs/async-seq": "^0.1.2",
         "@wopjs/cast": "^0.1.16",
         "@wopjs/disposable": "^0.1.24",
-        "@wopjs/dom": "^0.1.3",
         "@wopjs/event": "^0.1.5",
         "@wopjs/tsur": "^0.1.7",
         "@wopjs/weak-cache": "^0.1.5",
@@ -159,7 +158,6 @@
         "val-i18n": "^0.1.14",
         "val-i18n-react": "^0.1.7",
         "value-enhancer": "^5.7.2",
-        "viewerjs": "^1.11.8",
         "virtua": "^0.49.3",
         "vite": "8.2.1",
         "vitest": "^4.1.10",
@@ -647,8 +645,6 @@
     "@wopjs/cast": ["@wopjs/cast@0.1.16", "", {}, "sha512-HoQfg6R6/swD2N/RYd+1qiccUnM0aBPgRIkr48emqkq3heF7VZAOriAJGWx24o1xm3i6hdRGQ4oOEl5OfC0PKQ=="],
 
     "@wopjs/disposable": ["@wopjs/disposable@0.1.24", "", {}, "sha512-hovp9Tq5yExx4ekbd10UNLVluy8Kl9/RH7GT6RIKpwJJOr0AUeLE4jWU2rX+uuKfPrd1lKkLXtarrqgNXh4XAQ=="],
-
-    "@wopjs/dom": ["@wopjs/dom@0.1.3", "", {}, "sha512-3ywhZXVKT3taJmjqo0I0/MBpumO8a93lKbiBYV7cVcCBegiDxkApa/UuHDGKFITqso1LT8MWmWSzOwupB4S5RQ=="],
 
     "@wopjs/event": ["@wopjs/event@0.1.5", "", {}, "sha512-x5U0NQgTpZyTmyQ8AaI5I/xNSHYlMUE/0y0/34jpgKZY4gYgKybgFOGUrTvc7zDX1/0MhFxVjl/6wZNHEqIW9w=="],
 
@@ -1309,8 +1305,6 @@
     "vfile-location": ["vfile-location@5.0.3", "", { "dependencies": { "@types/unist": "^3.0.0", "vfile": "^6.0.0" } }, "sha512-5yXvWDEgqeiYiBe1lbxYF7UMAIm/IcopxMHrMQDq3nvKcjPKIhZklUKL+AE7J7uApI4kwe2snsK+eI6UTj9EHg=="],
 
     "vfile-message": ["vfile-message@4.0.3", "", { "dependencies": { "@types/unist": "^3.0.0", "unist-util-stringify-position": "^4.0.0" } }, "sha512-QTHzsGd1EhbZs4AsQ20JX1rC3cOlt/IWJruk893DfLRr57lcnOeMaWG4K0JrRta4mIJZKth2Au3mM3u03/JWKw=="],
-
-    "viewerjs": ["viewerjs@1.12.0", "", {}, "sha512-eQrV7FvqXj2Ysavd9LINI6bFAvXtw5YbdlMtdIo6Bmrv25hEOBeXoOX9E7cJwYuFAOPFzmppFvDn02QNHB120w=="],
 
     "virtua": ["virtua@0.49.3", "", { "peerDependencies": { "react": ">=16.14.0", "react-dom": ">=16.14.0", "solid-js": ">=1.0", "svelte": ">=5.0", "vue": ">=3.2" }, "optionalPeers": ["react", "react-dom", "solid-js", "svelte", "vue"] }, "sha512-k1Yn988Vz/L40uDtEWPjfdVo15Suumh4tU4/z5Srs0elNcU9DgBskqdh3llpHyAlXrCeHWTfcclYvY1uU4MmIg=="],
 

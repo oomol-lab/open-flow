@@ -6,11 +6,8 @@
     "connectorConnections": "{{count}} Connections",
     "connectorNewConnection": "Nouvelle Connection",
     "connectorNoActiveConnection": "Aucune Connection active",
-    "connectorPopupBlocked": "La fenêtre de connexion a été bloquée. Autorisez les fenêtres contextuelles, puis réessayez.",
-    "connectorUnavailable": "Les actions Connector ne sont pas disponibles dans cet hôte de projet.",
     "llmChat": "Conversation LLM",
     "llmStructured": "Sortie structurée LLM",
-    "scriptletUnsupported": "Cet hôte de projet ne prend pas en charge l'écriture de mini-scripts.",
     "sharedBlocks": "Tâches et Subflows",
     "triggers": "Triggers",
     "value": "Valeur"
@@ -68,19 +65,12 @@
       "timeout": "Délai d'expiration",
       "title": "Configuration d'exécution"
     },
-    "sourceNotFound": "Fichier source du bloc introuvable",
     "task": "Nom du bloc",
     "taskHeader": "Depuis un bloc partagé",
     "title": "Titre"
   },
   "cancel": "Annuler",
-  "clipboard": {
-    "copySuccess": "{{@}} nœuds copiés",
-    "copySuccess@1": "1 nœud copié",
-    "pasteScriptletUnsupported": "Cet hôte de projet ne prend pas en charge le collage de mini-scripts."
-  },
   "comment": {
-    "editWithMarkdown": "Modifier en Markdown",
     "preview": "Aperçu",
     "source": "Afficher la source"
   },
@@ -207,16 +197,7 @@
   "edit": "Modifier",
   "edgeError": {
     "aggregateSummary": "{{errorCount}} connexions sur {{connectionCount}} présentent des erreurs",
-    "binDiffType": "Les données binaires ne sont pas compatibles",
-    "default": "Les types de données ne sont pas compatibles",
-    "diffKind": "Les types de Handle ne correspondent pas",
-    "errorNode": "Connecté à un nœud défectueux",
-    "nullable": "La source accepte null, mais pas la cible"
-  },
-  "errorNode": {
-    "blockManifestUnrenderable": "Impossible d'afficher le manifeste de bloc {{path}}",
-    "blockNotFound": "Fichier YAML de tâche ou de Subflow introuvable",
-    "unsupportedNode": "Métadonnées de nœud non prises en charge"
+    "binDiffType": "Les données binaires ne sont pas compatibles"
   },
   "fitView": "ajuster la vue",
   "flowEditor": {
@@ -439,18 +420,8 @@
   },
   "preview": {
     "title": "Aperçu",
-    "textAriaLabel": "Aperçu du texte",
     "videoBilibili": "Lecteur vidéo Bilibili",
     "videoYouTube": "Lecteur vidéo YouTube",
-    "audio": {
-      "mute": "Couper le son",
-      "pause": "Mettre l'audio en pause",
-      "play": "Lire l'audio",
-      "seek": "Naviguer dans l'audio",
-      "title": "Aperçu audio",
-      "unmute": "Rétablir le son",
-      "volume": "Volume audio"
-    },
     "table": {
       "footer": "{{columns}} colonnes, {{rows}} lignes au total"
     }
@@ -469,21 +440,9 @@
     "value": "Valeur"
   },
   "scriptlet": "Mini-script",
-  "subflowEditor": {
-    "blockMode": "Vue bloc",
-    "flowMode": "Vue Flow"
-  },
   "subflowSettings": {
     "forwardPreview": "Transférer l'aperçu",
     "title": "Configuration du Subflow"
-  },
-  "validation": {
-    "nodeIdBanned": "Le Node ID ne peut pas être {{name}}",
-    "nodeIdExists": "Ce Node ID existe déjà",
-    "nodeIdInvalid": "Le Node ID ne peut contenir que des lettres, des chiffres, des tirets bas et des traits d'union",
-    "sharedBlockNameBanned": "Le nom de tâche ou de Subflow ne peut pas être {{name}}",
-    "sharedBlockNameExists": "Une tâche ou un Subflow portant ce nom existe déjà",
-    "sharedBlockNameInvalid": "Les noms de tâche et de Subflow ne peuvent contenir que des lettres, des chiffres, des tirets bas et des traits d'union"
   },
   "workbench": {
     "conflict": {

@@ -6,11 +6,8 @@
     "connectorConnections": "{{count}} 个连接",
     "connectorNewConnection": "新建 Connection",
     "connectorNoActiveConnection": "没有可用连接",
-    "connectorPopupBlocked": "连接窗口被浏览器拦截，请允许弹出窗口后重试。",
-    "connectorUnavailable": "当前项目宿主不支持 Connector 操作。",
     "llmChat": "LLM 对话",
     "llmStructured": "LLM 结构化输出",
-    "scriptletUnsupported": "当前项目宿主不支持编写脚本。",
     "sharedBlocks": "任务与子流程",
     "triggers": "触发器",
     "value": "值"
@@ -68,19 +65,12 @@
       "timeout": "超时时间",
       "title": "运行配置"
     },
-    "sourceNotFound": "未找到区块源文件",
     "task": "区块名称",
     "taskHeader": "来自共享区块",
     "title": "标题"
   },
   "cancel": "取消",
-  "clipboard": {
-    "copySuccess": "已复制 {{@}} 个节点",
-    "copySuccess@1": "已复制 1 个节点",
-    "pasteScriptletUnsupported": "当前项目宿主不支持粘贴脚本。"
-  },
   "comment": {
-    "editWithMarkdown": "使用 Markdown 编辑",
     "preview": "预览",
     "source": "显示源文本"
   },
@@ -207,16 +197,7 @@
   "edit": "编辑",
   "edgeError": {
     "aggregateSummary": "{{connectionCount}} 条连接中有 {{errorCount}} 条错误",
-    "binDiffType": "二进制数据不兼容",
-    "default": "数据类型不兼容",
-    "diffKind": "接口类型标记不匹配",
-    "errorNode": "连接的节点已损坏",
-    "nullable": "来源允许 null，但目标不允许 null"
-  },
-  "errorNode": {
-    "blockManifestUnrenderable": "无法渲染 Block 清单 {{path}}",
-    "blockNotFound": "未找到任务或子流程 YAML 文件",
-    "unsupportedNode": "不支持的节点元数据"
+    "binDiffType": "二进制数据不兼容"
   },
   "fitView": "适应视图",
   "flowEditor": {
@@ -439,18 +420,8 @@
   },
   "preview": {
     "title": "预览",
-    "textAriaLabel": "文本预览",
     "videoBilibili": "Bilibili 视频播放器",
     "videoYouTube": "YouTube 视频播放器",
-    "audio": {
-      "mute": "静音",
-      "pause": "暂停音频",
-      "play": "播放音频",
-      "seek": "调整音频进度",
-      "title": "音频预览",
-      "unmute": "取消静音",
-      "volume": "音量"
-    },
     "table": {
       "footer": "共 {{columns}} 列，{{rows}} 条记录"
     }
@@ -469,21 +440,9 @@
     "value": "值"
   },
   "scriptlet": "小脚本",
-  "subflowEditor": {
-    "blockMode": "区块视图",
-    "flowMode": "工作流视图"
-  },
   "subflowSettings": {
     "forwardPreview": "转发预览",
     "title": "子流配置"
-  },
-  "validation": {
-    "nodeIdBanned": "Node ID 不能为 {{name}}",
-    "nodeIdExists": "Node ID 已存在",
-    "nodeIdInvalid": "Node ID 只能包含英文字母、数字、下划线和短横线",
-    "sharedBlockNameBanned": "任务或子流程名称不能为 {{name}}",
-    "sharedBlockNameExists": "同名任务或子流程已存在",
-    "sharedBlockNameInvalid": "任务和子流程名称只能包含英文字母、数字、下划线和短横线"
   },
   "workbench": {
     "conflict": {

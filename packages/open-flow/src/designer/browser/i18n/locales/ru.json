@@ -6,11 +6,8 @@
     "connectorConnections": "Connection: {{count}}",
     "connectorNewConnection": "Новый Connection",
     "connectorNoActiveConnection": "Нет активного Connection",
-    "connectorPopupBlocked": "Окно подключения заблокировано. Разрешите всплывающие окна и повторите попытку.",
-    "connectorUnavailable": "Текущий хост проекта не поддерживает действия Connector.",
     "llmChat": "Чат LLM",
     "llmStructured": "Структурированный вывод LLM",
-    "scriptletUnsupported": "Текущий хост проекта не поддерживает написание скриптлетов.",
     "sharedBlocks": "Задачи и Subflow",
     "triggers": "Triggers",
     "value": "Значение"
@@ -68,19 +65,12 @@
       "timeout": "Время ожидания",
       "title": "Параметры выполнения"
     },
-    "sourceNotFound": "Исходный файл блока не найден",
     "task": "Имя блока",
     "taskHeader": "Из общего блока",
     "title": "Заголовок"
   },
   "cancel": "Отмена",
-  "clipboard": {
-    "copySuccess": "Скопировано узлов: {{@}}",
-    "copySuccess@1": "Скопирован 1 узел",
-    "pasteScriptletUnsupported": "Текущий хост проекта не поддерживает вставку скриптлетов."
-  },
   "comment": {
-    "editWithMarkdown": "Редактировать в Markdown",
     "preview": "Предпросмотр",
     "source": "Показать исходный текст"
   },
@@ -207,16 +197,7 @@
   "edit": "Изменить",
   "edgeError": {
     "aggregateSummary": "Ошибки в {{errorCount}} из {{connectionCount}} соединений",
-    "binDiffType": "Двоичные данные несовместимы",
-    "default": "Типы данных несовместимы",
-    "diffKind": "Виды Handle не совпадают",
-    "errorNode": "Подключено к повреждённому узлу",
-    "nullable": "Источник допускает null, а получатель — нет"
-  },
-  "errorNode": {
-    "blockManifestUnrenderable": "Не удалось отобразить манифест блока {{path}}",
-    "blockNotFound": "YAML-файл задачи или Subflow не найден",
-    "unsupportedNode": "Неподдерживаемые метаданные узла"
+    "binDiffType": "Двоичные данные несовместимы"
   },
   "fitView": "вписать в экран",
   "flowEditor": {
@@ -439,18 +420,8 @@
   },
   "preview": {
     "title": "Предпросмотр",
-    "textAriaLabel": "Предпросмотр текста",
     "videoBilibili": "Видеоплеер Bilibili",
     "videoYouTube": "Видеоплеер YouTube",
-    "audio": {
-      "mute": "Выключить звук",
-      "pause": "Приостановить аудио",
-      "play": "Воспроизвести аудио",
-      "seek": "Перемотать аудио",
-      "title": "Предпросмотр аудио",
-      "unmute": "Включить звук",
-      "volume": "Громкость"
-    },
     "table": {
       "footer": "Всего столбцов: {{columns}}, строк: {{rows}}"
     }
@@ -469,21 +440,9 @@
     "value": "Значение"
   },
   "scriptlet": "Скриптлет",
-  "subflowEditor": {
-    "blockMode": "Вид блока",
-    "flowMode": "Вид Flow"
-  },
   "subflowSettings": {
     "forwardPreview": "Пересылать предпросмотр",
     "title": "Настройки Subflow"
-  },
-  "validation": {
-    "nodeIdBanned": "Node ID не может быть {{name}}",
-    "nodeIdExists": "Такой Node ID уже существует",
-    "nodeIdInvalid": "Node ID может содержать только буквы, цифры, подчёркивания и дефисы",
-    "sharedBlockNameBanned": "Имя задачи или Subflow не может быть {{name}}",
-    "sharedBlockNameExists": "Задача или Subflow с таким именем уже существует",
-    "sharedBlockNameInvalid": "Имена задач и Subflow могут содержать только буквы, цифры, подчёркивания и дефисы"
   },
   "workbench": {
     "conflict": {

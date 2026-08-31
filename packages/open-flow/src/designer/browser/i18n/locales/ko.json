@@ -6,11 +6,8 @@
     "connectorConnections": "Connection {{count}}개",
     "connectorNewConnection": "새 Connection",
     "connectorNoActiveConnection": "사용 가능한 Connection이 없습니다",
-    "connectorPopupBlocked": "연결 창이 차단되었습니다. 팝업을 허용한 뒤 다시 시도하세요.",
-    "connectorUnavailable": "이 프로젝트 호스트에서는 Connector 액션을 사용할 수 없습니다.",
     "llmChat": "LLM 대화",
     "llmStructured": "LLM 구조화 출력",
-    "scriptletUnsupported": "이 프로젝트 호스트에서는 스크립틀릿 작성을 지원하지 않습니다.",
     "sharedBlocks": "태스크와 Subflow",
     "triggers": "Trigger",
     "value": "값"
@@ -68,19 +65,12 @@
       "timeout": "제한 시간",
       "title": "실행 설정"
     },
-    "sourceNotFound": "블록 소스 파일을 찾을 수 없습니다",
     "task": "블록 이름",
     "taskHeader": "공유 블록에서 가져옴",
     "title": "제목"
   },
   "cancel": "취소",
-  "clipboard": {
-    "copySuccess": "노드 {{@}}개를 복사했습니다",
-    "copySuccess@1": "노드 1개를 복사했습니다",
-    "pasteScriptletUnsupported": "이 프로젝트 호스트에서는 스크립틀릿 붙여넣기를 지원하지 않습니다."
-  },
   "comment": {
-    "editWithMarkdown": "Markdown으로 편집",
     "preview": "미리 보기",
     "source": "원본 보기"
   },
@@ -207,16 +197,7 @@
   "edit": "편집",
   "edgeError": {
     "aggregateSummary": "연결 {{connectionCount}}개 중 {{errorCount}}개에 오류가 있습니다",
-    "binDiffType": "바이너리 데이터가 호환되지 않습니다",
-    "default": "데이터 타입이 호환되지 않습니다",
-    "diffKind": "Handle 종류가 일치하지 않습니다",
-    "errorNode": "손상된 노드에 연결되어 있습니다",
-    "nullable": "소스는 null을 허용하지만 대상은 허용하지 않습니다"
-  },
-  "errorNode": {
-    "blockManifestUnrenderable": "블록 매니페스트를 렌더링할 수 없습니다: {{path}}",
-    "blockNotFound": "태스크 또는 Subflow YAML 파일을 찾을 수 없습니다",
-    "unsupportedNode": "지원하지 않는 노드 메타데이터입니다"
+    "binDiffType": "바이너리 데이터가 호환되지 않습니다"
   },
   "fitView": "화면 맞춤",
   "flowEditor": {
@@ -439,18 +420,8 @@
   },
   "preview": {
     "title": "미리 보기",
-    "textAriaLabel": "텍스트 미리 보기",
     "videoBilibili": "Bilibili 동영상 플레이어",
     "videoYouTube": "YouTube 동영상 플레이어",
-    "audio": {
-      "mute": "음소거",
-      "pause": "오디오 일시 정지",
-      "play": "오디오 재생",
-      "seek": "오디오 탐색",
-      "title": "오디오 미리 보기",
-      "unmute": "음소거 해제",
-      "volume": "오디오 볼륨"
-    },
     "table": {
       "footer": "전체 {{columns}}열, {{rows}}행"
     }
@@ -469,21 +440,9 @@
     "value": "값"
   },
   "scriptlet": "스크립틀릿",
-  "subflowEditor": {
-    "blockMode": "블록 보기",
-    "flowMode": "Flow 보기"
-  },
   "subflowSettings": {
     "forwardPreview": "미리 보기 전달",
     "title": "Subflow 설정"
-  },
-  "validation": {
-    "nodeIdBanned": "Node ID를 {{name}}(으)로 지정할 수 없습니다",
-    "nodeIdExists": "이미 존재하는 Node ID입니다",
-    "nodeIdInvalid": "Node ID에는 영문자, 숫자, 밑줄, 하이픈만 사용할 수 있습니다",
-    "sharedBlockNameBanned": "태스크 또는 Subflow 이름을 {{name}}(으)로 지정할 수 없습니다",
-    "sharedBlockNameExists": "같은 이름의 태스크 또는 Subflow가 이미 있습니다",
-    "sharedBlockNameInvalid": "태스크와 Subflow 이름에는 영문자, 숫자, 밑줄, 하이픈만 사용할 수 있습니다"
   },
   "workbench": {
     "conflict": {

@@ -1,3 +1,4 @@
+import type { RunEventKind } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { RunStatus, RunTerminalStatus } from '@oomol-lab/open-flow/run-lifecycle'
@@ -19,7 +20,7 @@ export type PublicationAcceptance =
 
 export interface RunEvent {
   readonly cursor: number
-  readonly kind: string
+  readonly kind: RunEventKind
   readonly payload: Readonly<Record<string, unknown>>
   readonly value?: unknown
 }
@@ -102,7 +103,7 @@ export interface StoredControlRun {
 
 export interface StoredControlEvent {
   readonly createdAt: number
-  readonly kind: string
+  readonly kind: RunEventKind
   readonly payload: Readonly<Record<string, JsonValue>>
   readonly sequence: number
   readonly value?: JsonValue
@@ -1161,7 +1162,7 @@ export class Store {
     return (
       this.#database.prepare('SELECT cursor, kind, payload, value FROM events WHERE run_id = ? ORDER BY cursor').all(runId) as {
         readonly cursor: number
-        readonly kind: string
+        readonly kind: RunEventKind
         readonly payload: string
         readonly value: string | null
       }[]
@@ -1237,7 +1238,7 @@ export class Store {
         )
         .all(runId, after, limit) as {
         readonly createdAt: number
-        readonly kind: string
+        readonly kind: RunEventKind
         readonly payload: string
         readonly sequence: number
         readonly value: string | null
@@ -1361,7 +1362,7 @@ export class Store {
     return runs
   }
 
-  #insertEvent(runId: string, kind: string, payload: Readonly<Record<string, unknown>>, value?: unknown): void {
+  #insertEvent(runId: string, kind: RunEventKind, payload: Readonly<Record<string, unknown>>, value?: unknown): void {
     const cursor = Number(
       (this.#database.prepare('SELECT COALESCE(MAX(cursor), 0) + 1 AS cursor FROM events WHERE run_id = ?').get(runId) as { cursor: number }).cursor,
     )

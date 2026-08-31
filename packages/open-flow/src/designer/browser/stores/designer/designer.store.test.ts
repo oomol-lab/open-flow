@@ -6,7 +6,6 @@ import type { InteractiveMode } from './designer.store.ts'
 import { val } from 'value-enhancer'
 import { reactiveMap } from 'value-enhancer/collections'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { selectAndFocusNodeLater } from '../../actions/focusNodeLater.ts'
 import { NODE_STATUS, NODE_TYPE } from '../node/constants.ts'
 import { NodeStore } from '../node/node.store.ts'
 import { DesignerStore } from './designer.store.ts'
@@ -313,28 +312,6 @@ describe('DesignerStore display mode', () => {
     expect(first.$.position.value).toEqual({ x: 100, y: 200 })
     expect(added.$.position.value).toEqual({ x: 300, y: 40 })
     expect(setup.store.completeDisplayModeLayout()).toBe(true)
-    setup.dispose()
-  })
-})
-
-describe('selectAndFocusNodeLater', () => {
-  it('replaces the selection and sends the existing Designer focus command', async () => {
-    vi.useFakeTimers()
-    const setup = createTestSetup()
-    const previous = setup.createNode('previous' as NodeId)
-    const target = setup.createNode('target' as NodeId)
-    setup.nodes.set(previous.nodeId, previous)
-    setup.nodes.set(target.nodeId, target)
-    previous.$$.selected.set(true)
-    const focus = vi.spyOn(setup.store.rfCommand, 'send')
-
-    expect(selectAndFocusNodeLater(setup.store, target.nodeId)).toBe(true)
-    expect(previous.$.selected.value).toBe(false)
-    expect(target.$.selected.value).toBe(true)
-    await vi.advanceTimersByTimeAsync(100)
-    expect(focus).toHaveBeenCalledWith('focusNode', target.nodeId)
-
-    expect(selectAndFocusNodeLater(setup.store, 'missing' as NodeId)).toBe(false)
     setup.dispose()
   })
 })

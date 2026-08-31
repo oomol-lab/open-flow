@@ -6,11 +6,8 @@
     "connectorConnections": "{{count}} connections",
     "connectorNewConnection": "New Connection",
     "connectorNoActiveConnection": "No active connection",
-    "connectorPopupBlocked": "The connection window was blocked. Allow pop-ups and try again.",
-    "connectorUnavailable": "Connector actions are not available in this project host.",
     "llmChat": "LLM Chat",
     "llmStructured": "LLM Structured Output",
-    "scriptletUnsupported": "Writing scriptlets is not supported by this project host.",
     "sharedBlocks": "Tasks and subflows",
     "triggers": "Triggers",
     "value": "Value"
@@ -68,19 +65,12 @@
       "timeout": "Timeout",
       "title": "Running config"
     },
-    "sourceNotFound": "Block source file not found",
     "task": "Block name",
     "taskHeader": "From Shared Block",
     "title": "Title"
   },
   "cancel": "Cancel",
-  "clipboard": {
-    "copySuccess": "Copied {{@}} nodes",
-    "copySuccess@1": "Copied 1 node",
-    "pasteScriptletUnsupported": "Pasting scriptlets is not supported by this project host."
-  },
   "comment": {
-    "editWithMarkdown": "Edit with Markdown",
     "preview": "Preview",
     "source": "View source"
   },
@@ -207,16 +197,7 @@
   "edit": "Edit",
   "edgeError": {
     "aggregateSummary": "{{errorCount}} of {{connectionCount}} connections have errors",
-    "binDiffType": "Binary data is not compatible",
-    "default": "Data types are not compatible",
-    "diffKind": "Handle kinds do not match",
-    "errorNode": "Connected to a broken node",
-    "nullable": "The source is nullable, but the target is not"
-  },
-  "errorNode": {
-    "blockManifestUnrenderable": "Unable to render block manifest {{path}}",
-    "blockNotFound": "Task or Subflow YAML file not found",
-    "unsupportedNode": "Unsupported node metadata"
+    "binDiffType": "Binary data is not compatible"
   },
   "fitView": "fit view",
   "flowEditor": {
@@ -439,18 +420,8 @@
   },
   "preview": {
     "title": "Preview",
-    "textAriaLabel": "Text preview",
     "videoBilibili": "Bilibili video player",
     "videoYouTube": "YouTube video player",
-    "audio": {
-      "mute": "Mute audio",
-      "pause": "Pause audio",
-      "play": "Play audio",
-      "seek": "Seek audio",
-      "title": "Audio preview",
-      "unmute": "Unmute audio",
-      "volume": "Audio volume"
-    },
     "table": {
       "footer": "Total {{columns}} columns, {{rows}} rows"
     }
@@ -469,21 +440,9 @@
     "value": "Value"
   },
   "scriptlet": "Scriptlet",
-  "subflowEditor": {
-    "blockMode": "Block View",
-    "flowMode": "Flow View"
-  },
   "subflowSettings": {
     "forwardPreview": "Forward Preview",
     "title": "Subflow Configs"
-  },
-  "validation": {
-    "nodeIdBanned": "Node ID cannot be {{name}}",
-    "nodeIdExists": "Node ID already exists",
-    "nodeIdInvalid": "Node ID can contain only letters, numbers, underscores, and hyphens",
-    "sharedBlockNameBanned": "Task or Subflow name cannot be {{name}}",
-    "sharedBlockNameExists": "A Task or Subflow with this name already exists",
-    "sharedBlockNameInvalid": "Task and Subflow names can contain only letters, numbers, underscores, and hyphens"
   },
   "workbench": {
     "conflict": {

@@ -5,19 +5,10 @@ import { expect, test } from 'vitest'
 
 const traverse = ((traverseModule as unknown as { readonly default?: typeof traverseModule }).default ?? traverseModule) as typeof traverseModule
 
-test('keeps the canvas and off-screen node navigation keyboard visible', async () => {
-  const [containerStyles, indicator, indicatorStyles] = await Promise.all([
-    readFile('src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.module.scss', 'utf8'),
-    readFile('src/designer/browser/graph/ReactFlowContainer/NodeIndicator.tsx', 'utf8'),
-    readFile('src/designer/browser/graph/ReactFlowContainer/NodeIndicator.module.scss', 'utf8'),
-  ])
+test('keeps the canvas keyboard focus visible', async () => {
+  const containerStyles = await readFile('src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.module.scss', 'utf8')
 
   expect(containerStyles).toMatch(/\.flow:focus-visible \{[\s\S]*?box-shadow: inset 0 0 0 2px var\(--ui-ring\)/)
-  expect(indicator).toMatch(/aria-label=\{title \|\| nodeId\}/)
-  expect(indicator).toMatch(/ev\.detail === 0/)
-  expect(indicator).not.toMatch(/tabIndex=\{-1\}/)
-  expect(indicatorStyles).toMatch(/\.indicator:focus-visible/)
-  expect(indicatorStyles).toMatch(/@media \(prefers-reduced-motion: reduce\)/)
 })
 
 test('keeps Icon Picker controls named and stateful', async () => {
@@ -50,21 +41,14 @@ test('keeps expandable Handle rows on one labelled keyboard trigger', async () =
   expect((nodeSettings.match(/valueExpands/g) ?? []).length).toBe(5)
 })
 
-test('keeps labels, iframe previews, and JSON expansion on semantic controls', async () => {
-  const [label, iframePreview, jsonViewer, jsonViewerStyles] = await Promise.all([
+test('keeps labels and JSON expansion on semantic controls', async () => {
+  const [label, jsonViewer, jsonViewerStyles] = await Promise.all([
     readFile('src/designer/browser/components/label.tsx', 'utf8'),
-    readFile('src/designer/browser/preview/iframePreview.tsx', 'utf8'),
     readFile('src/designer/browser/jsonViewer/DataRender.tsx', 'utf8'),
     readFile('src/designer/browser/jsonViewer/JSONViewer.module.scss', 'utf8'),
   ])
 
   expect(label).not.toMatch(/onClick/)
-  expect(iframePreview).not.toMatch(/<div onClick=/)
-  expect(iframePreview).toMatch(/listen\(window, 'pointerup', \(\) => setFocus\(false\), true\)/)
-  expect(iframePreview).toMatch(/onBlur=\{\(\) => setFocus\(false\)\}/)
-  expect(iframePreview).toMatch(/onFocus=\{\(\) => setFocus\(true\)\}/)
-  // The iframe always carries an accessible name, falling back to the localized default title.
-  expect(iframePreview).toMatch(/title=\{title \?\? t\('preview\.title'\)\}/)
   expect(jsonViewer).not.toMatch(/<(?:span|div)[^>]*onClick=/)
   expect(jsonViewer).toMatch(/<button[\s\S]*?aria-label=\{ariaLabel\}/)
   expect(jsonViewer).not.toMatch(/role="button"/)
