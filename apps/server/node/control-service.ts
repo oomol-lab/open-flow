@@ -233,13 +233,13 @@ export interface PublicationPosition {
 export class ControlService {
   private readonly abortRun: (runId: string) => void
   private readonly clock: () => number
-  private readonly connector?: ConnectorHost
-  private readonly connectorConsoleOrigin?: URL
   private readonly flowCatalogChanged: () => void
   private readonly flowChanged: (event: FlowChangeEvent) => void
-  private readonly llmAvailable: boolean
+  private readonly llmAvailable: () => boolean
   private readonly publish: (input: PublishInput) => Promise<PublicationAcceptance>
-  private readonly resolveConnectorTeam?: (teamId?: string) => Promise<string>
+  private readonly resolveConnector: () => ConnectorHost | undefined
+  private readonly resolveConnectorConsoleOrigin: () => URL | undefined
+  private readonly resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>
   private readonly store: Store
   private readonly testPollTrigger: (flowId: string, triggerNodeId: string) => Promise<PollTriggerTestResult>
   private readonly triggerDefinitions: readonly TriggerKeySnapshot[]
@@ -257,10 +257,10 @@ export class ControlService {
     testPollTrigger: (flowId: string, triggerNodeId: string) => Promise<PollTriggerTestResult>,
     flowCatalogChanged: () => void,
     flowChanged: (event: FlowChangeEvent) => void,
-    llmAvailable: boolean,
-    connector?: ConnectorHost,
-    connectorConsoleOrigin?: URL,
-    resolveConnectorTeam?: (teamId?: string) => Promise<string>,
+    llmAvailable: () => boolean,
+    resolveConnector: () => ConnectorHost | undefined,
+    resolveConnectorConsoleOrigin: () => URL | undefined,
+    resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>,
   ) {
     this.store = store
     this.clock = clock
@@ -273,8 +273,8 @@ export class ControlService {
     this.flowCatalogChanged = flowCatalogChanged
     this.flowChanged = flowChanged
     this.llmAvailable = llmAvailable
-    this.connector = connector
-    this.connectorConsoleOrigin = connectorConsoleOrigin
+    this.resolveConnector = resolveConnector
+    this.resolveConnectorConsoleOrigin = resolveConnectorConsoleOrigin
     this.resolveConnectorTeam = resolveConnectorTeam
   }
 
@@ -336,19 +336,22 @@ export class ControlService {
 
   connectorConnectionPage(serviceId: string, flowId?: string): string {
     if (flowId != null) this.getFlow(flowId)
-    if (this.connectorConsoleOrigin == null) throw new ControlError(controlErrorCode.connectorUnavailable, 'The Connector request could not be completed.')
-    return new URL(`providers/${encodeURIComponent(serviceId)}`, this.connectorConsoleOrigin).href
+    const origin = this.resolveConnectorConsoleOrigin()
+    if (origin == null) throw new ControlError(controlErrorCode.connectorUnavailable, 'The Connector request could not be completed.')
+    return new URL(`providers/${encodeURIComponent(serviceId)}`, origin).href
   }
 
   async #connectorRequest<Value>(flowId: string | undefined, request: (connector: ConnectorHost, teamId?: string) => Promise<Value>): Promise<Value> {
-    if (this.connector == null) throw new ControlError(controlErrorCode.connectorUnconfigured, 'Connector is not configured for this deployment.')
+    const connector = this.resolveConnector()
+    if (connector == null) throw new ControlError(controlErrorCode.connectorUnconfigured, 'Connector is not configured for this deployment.')
     if (flowId != null) this.getFlow(flowId)
     let teamId = flowId == null ? undefined : this.store.connectorTeam(flowId)
-    if (flowId != null && teamId == null && this.resolveConnectorTeam != null) {
-      teamId = this.store.bindConnectorTeam(flowId, await this.resolveConnectorTeam())
+    if (flowId != null && teamId == null) {
+      const resolved = await this.resolveConnectorTeam()
+      if (resolved != null) teamId = this.store.bindConnectorTeam(flowId, resolved)
     }
     try {
-      return await request(this.connector, teamId)
+      return await request(connector, teamId)
     } catch (error) {
       if (!(error instanceof ConnectorTaskError)) throw error
       throw new ControlError(error.code, error.message)
@@ -361,10 +364,10 @@ export class ControlService {
     idempotencyKey: string,
     connectorTeamId?: string,
   ): Promise<{ readonly created: boolean; readonly flow: Flow }> {
-    if (connectorTeamId != null && this.resolveConnectorTeam == null) {
+    const selectedConnectorTeamId = await this.resolveConnectorTeam(connectorTeamId)
+    if (connectorTeamId != null && selectedConnectorTeamId == null) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Connector Team is not available for this deployment.')
     }
-    const selectedConnectorTeamId = this.resolveConnectorTeam == null ? undefined : await this.resolveConnectorTeam(connectorTeamId)
     const content = emptyRevision()
     const bytes = encodeRevision(content)
     const createdAt = this.clock()
@@ -644,7 +647,7 @@ export class ControlService {
     if (stored == null) notFound()
     const content = revisionContent(stored)
     const checked = await validateFlow(content, engine)
-    const llmDiagnostics = this.llmAvailable
+    const llmDiagnostics = this.llmAvailable()
       ? []
       : [...checked.closure.dependencies.tasks].toSorted().flatMap((taskId) => {
           const task = content.document.tasks[taskId]

@@ -42,6 +42,7 @@ body {
 }
 
 .server-button,
+.settings-page input,
 .variables-page input,
 .variables-page textarea {
   color: inherit;
@@ -81,6 +82,7 @@ body {
 
 .server-button:focus-visible,
 .server-nav a:focus-visible,
+.settings-page input:focus-visible,
 .variables-page input:focus-visible,
 .variables-page textarea:focus-visible {
   border-color: var(--ui-ring);
@@ -495,6 +497,172 @@ body {
 
 .variables-state .server-button {
   margin-top: 4px;
+}
+
+.settings-page {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.settings-content {
+  width: min(720px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 32px 0 64px;
+}
+
+.settings-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 32px;
+}
+
+.settings-header p,
+.settings-summary p {
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.settings-section {
+  margin-top: 20px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-background);
+}
+
+.settings-heading,
+.settings-actions,
+.settings-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-heading {
+  min-height: 64px;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.settings-heading-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-heading h2,
+.settings-heading h3,
+.settings-group-heading h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-heading h3 {
+  font-size: 13px;
+}
+
+.settings-heading-copy p {
+  max-width: 65ch;
+  margin: 0;
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.settings-group-heading {
+  padding: 16px;
+}
+
+.settings-group-heading p {
+  max-width: 70ch;
+  margin: 4px 0 0;
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.settings-group > .settings-item {
+  border-top: 1px solid var(--ui-border);
+}
+
+.settings-group .settings-heading {
+  min-height: 56px;
+}
+
+.settings-group .settings-summary {
+  min-height: 72px;
+}
+
+.settings-heading span,
+.settings-actions > span,
+.settings-hint {
+  color: var(--ui-muted-foreground);
+  font-size: 11px;
+}
+
+.settings-form {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-card);
+}
+
+.settings-form label {
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-page input {
+  height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--ui-input);
+  border-radius: var(--ui-radius);
+  background: transparent;
+  color: inherit;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.settings-form-actions {
+  justify-content: flex-end;
+}
+
+.settings-summary,
+.settings-state {
+  display: flex;
+  min-height: 112px;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.settings-summary code {
+  overflow: hidden;
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-summary p {
+  margin: 0;
+}
+
+.settings-state {
+  align-items: center;
+  color: var(--ui-muted-foreground);
+  text-align: center;
 }
 
 .variable-skeleton-row > span {

@@ -14,8 +14,10 @@ const imageName = `open-flow-server:smoke-${suffix}`
 const volumeName = `open-flow-server-smoke-${suffix}`
 const firstContainer = `open-flow-server-smoke-first-${suffix}`
 const secondContainer = `open-flow-server-smoke-second-${suffix}`
+const setupContainer = `open-flow-server-smoke-setup-${suffix}`
+const restoredContainer = `open-flow-server-smoke-restored-${suffix}`
 const operatorToken = 'open-flow-server-docker-smoke-token'
-const containers = [firstContainer, secondContainer]
+const containers = [firstContainer, secondContainer, setupContainer, restoredContainer]
 let imageBuilt = false
 let volumeCreated = false
 
@@ -119,7 +121,87 @@ try {
   assert.equal(restoredRun.status, 'completed')
   await stopContainer(secondContainer)
 
-  process.stdout.write('Verified the Server image, Workbench, Isolated VM, graceful shutdown, and SQLite volume persistence.\n')
+  process.stdout.write('Claiming the same deployment without an operator environment variable.\n')
+  await startContainer(setupContainer, false)
+  await waitForHealthy(setupContainer)
+  const setupOrigin = await containerOrigin(setupContainer)
+  const setupCookie = await authorizeSetup(setupOrigin, await setupCode(setupContainer))
+  const claimedCookie = await claim(setupOrigin, setupCookie)
+  const claimedFlows = await requestJson<{ readonly flows: readonly { readonly flowId: string }[] }>(
+    setupOrigin,
+    '/v1/flows',
+    { headers: { cookie: claimedCookie } },
+    200,
+  )
+  assert.ok(claimedFlows.flows.some((candidate) => candidate.flowId == flow.flowId))
+  await requestJson(
+    setupOrigin,
+    '/config/connector-console',
+    {
+      body: JSON.stringify({ expectedRevision: 1, origin: 'https://console.example.com', version: 1 }),
+      headers: { 'content-type': 'application/json', 'cookie': claimedCookie },
+      method: 'PUT',
+    },
+    200,
+  )
+  await requestJson(
+    setupOrigin,
+    '/config/integration',
+    {
+      body: JSON.stringify({
+        callbackKey: 'docker-smoke-integration-key-32-bytes',
+        expectedRevision: 2,
+        publicOrigin: 'https://flows.example.com',
+        version: 1,
+      }),
+      headers: { 'content-type': 'application/json', 'cookie': claimedCookie },
+      method: 'PUT',
+    },
+    200,
+  )
+  await requestJson(
+    setupOrigin,
+    '/config/llm',
+    {
+      body: JSON.stringify({ expectedRevision: 3, origin: 'https://models.example.com', token: 'docker-smoke-model-token', version: 1 }),
+      headers: { 'content-type': 'application/json', 'cookie': claimedCookie },
+      method: 'PUT',
+    },
+    200,
+  )
+  await stopContainer(setupContainer)
+
+  process.stdout.write('Restarting the claimed deployment without an operator environment variable.\n')
+  await startContainer(restoredContainer, false)
+  await waitForHealthy(restoredContainer)
+  const claimedOrigin = await containerOrigin(restoredContainer)
+  const restoredCookie = await login(claimedOrigin)
+  const persistedFlows = await requestJson<{ readonly flows: readonly { readonly flowId: string }[] }>(
+    claimedOrigin,
+    '/v1/flows',
+    { headers: { cookie: restoredCookie } },
+    200,
+  )
+  assert.ok(persistedFlows.flows.some((candidate) => candidate.flowId == flow.flowId))
+  const configuration = await requestJson<{
+    readonly connector: unknown
+    readonly integration: unknown
+    readonly llm: { readonly origin: string; readonly source: string; readonly tokenConfigured: boolean }
+    readonly revision: number
+  }>(claimedOrigin, '/config', { headers: { cookie: restoredCookie } }, 200)
+  assert.deepEqual(configuration, {
+    connector: {
+      console: { configured: true, origin: 'https://console.example.com', source: 'settings' },
+      runtime: { configured: false, source: 'none', tokenConfigured: false },
+    },
+    integration: { configured: true, publicOrigin: 'https://flows.example.com', source: 'settings' },
+    llm: { configured: true, origin: 'https://models.example.com', source: 'settings', tokenConfigured: true },
+    revision: 4,
+    version: 1,
+  })
+  await stopContainer(restoredContainer)
+
+  process.stdout.write('Verified the Server image, operator setup, Workbench, Isolated VM, graceful shutdown, and SQLite volume persistence.\n')
 } catch (error) {
   for (const container of containers) {
     const logs = await docker(['logs', container]).catch(() => '')
@@ -160,12 +242,11 @@ async function docker(args: readonly string[]): Promise<string> {
   return result.stdout
 }
 
-async function startContainer(name: string): Promise<void> {
+async function startContainer(name: string, configured = true): Promise<void> {
   await docker([
     'run',
     '--detach',
-    '--env',
-    `OPEN_FLOW_TOKEN=${operatorToken}`,
+    ...(configured ? ['--env', `OPEN_FLOW_TOKEN=${operatorToken}`] : []),
     '--name',
     name,
     '--publish',
@@ -174,6 +255,37 @@ async function startContainer(name: string): Promise<void> {
     `${volumeName}:/data/open-flow`,
     imageName,
   ])
+}
+
+async function setupCode(name: string): Promise<string> {
+  const logs = await docker(['logs', name])
+  const code = logs.match(/"setupCode":"([^"]+)"/)?.[1]
+  assert.ok(code != null)
+  return code
+}
+
+async function authorizeSetup(baseUrl: string, code: string): Promise<string> {
+  const response = await fetch(`${baseUrl}/auth/setup/session`, {
+    body: JSON.stringify({ code, version: 1 }),
+    headers: { 'content-type': 'application/json' },
+    method: 'POST',
+  })
+  assert.equal(response.status, 200)
+  const cookie = response.headers.get('set-cookie')
+  assert.ok(cookie != null)
+  return cookie.split(';', 1)[0]!
+}
+
+async function claim(baseUrl: string, setupCookie: string): Promise<string> {
+  const response = await fetch(`${baseUrl}/auth/setup`, {
+    body: JSON.stringify({ token: operatorToken, version: 1 }),
+    headers: { 'content-type': 'application/json', 'cookie': setupCookie },
+    method: 'POST',
+  })
+  assert.equal(response.status, 201)
+  const cookie = response.headers.get('set-cookie')?.match(/open_flow_operator_session=[^;]+/)?.[0]
+  assert.ok(cookie != null)
+  return cookie
 }
 
 async function waitForHealthy(name: string): Promise<void> {

@@ -1,4 +1,5 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
+import type { InvokeLlmTask } from '@oomol-lab/open-flow/runtime-contract'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import * as Effect from 'effect/Effect'
@@ -11,6 +12,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { promisify } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ServerService } from '../node/service.ts'
+import { createConnectorHost } from './connectorHost.ts'
 import { acceptRun, storeRevision } from './runFixture.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
 
@@ -610,6 +612,39 @@ describe('Server application service', () => {
       diagnostics: [],
       valid: true,
     })
+  })
+
+  it('resolves the current LLM host for each check and invocation', async () => {
+    let llm: InvokeLlmTask | undefined
+    const service = await openService(await databaseFile(), undefined, Date.now, { resolveLlm: () => llm })
+    const stored = await storeRevision(service, llmFlow(), 'llm-current')
+
+    expect(await service.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v1')).toMatchObject({ valid: false })
+    llm = async () => ({ kind: 'completed', value: { answer: 'current' }, version: 1 })
+    expect(await service.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v1')).toMatchObject({ diagnostics: [], valid: true })
+
+    await startService(service)
+    const accepted = await acceptRun(service, { flowId: 'main', idempotencyKey: 'llm-current', revision: llmFlow(), revisionId: 'llm-current' })
+    if (accepted.kind != 'accepted') throw new Error('LLM Run acceptance conflicted.')
+    await service.waitForIdle()
+    expect(service.run(accepted.runId)).toMatchObject({ status: 'completed' })
+  })
+
+  it('resolves the current Connector host and Console origin for each request', async () => {
+    let connector = createConnectorHost({ listProviders: async () => [{ serviceId: 'first', serviceName: 'First' }] })
+    let consoleOrigin = new URL('https://first.example.com')
+    const service = await openService(await databaseFile(), undefined, Date.now, {
+      resolveConnector: () => connector,
+      resolveConnectorConsoleOrigin: () => consoleOrigin,
+    })
+
+    expect(await service.control.listConnectorProviders()).toEqual([{ serviceId: 'first', serviceName: 'First' }])
+    expect(service.control.connectorConnectionPage('mail')).toBe('https://first.example.com/providers/mail')
+
+    connector = createConnectorHost({ listProviders: async () => [{ serviceId: 'second', serviceName: 'Second' }] })
+    consoleOrigin = new URL('https://second.example.com')
+    expect(await service.control.listConnectorProviders()).toEqual([{ serviceId: 'second', serviceName: 'Second' }])
+    expect(service.control.connectorConnectionPage('mail')).toBe('https://second.example.com/providers/mail')
   })
 
   it('ignores unreferenced LLM Tasks when the deployment has no LLM host', async () => {

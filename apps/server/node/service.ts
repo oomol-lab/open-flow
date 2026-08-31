@@ -79,6 +79,10 @@ export interface ServerRuntime {
   readonly maxPendingRuns?: number
   readonly runEventRetentionMs?: number
   readonly runTimeoutMs?: number
+  readonly resolveConnector?: () => ConnectorHost | undefined
+  readonly resolveConnectorConsoleOrigin?: () => URL | undefined
+  readonly resolveIntegration?: () => IntegrationOptions | undefined
+  readonly resolveLlm?: () => InvokeLlmTask | undefined
 }
 
 interface WebhookTarget {
@@ -181,21 +185,21 @@ export class ServerService {
   readonly control: ControlService
   readonly #clock: () => number
   readonly #clockService: Clock.Clock
-  readonly #connector?: ConnectorHost
   readonly #cronLock: Semaphore.Semaphore
   readonly #integration: IntegrationRuntime
   readonly #isolatedVm: IsolatedVmHost
   readonly #logger: Logger
-  readonly #llm?: InvokeLlmTask
   readonly #maxConcurrentRuns: number
   readonly #maintenanceLock: Semaphore.Semaphore
   readonly #pollDefinitions: ReadonlyMap<string, PollDefinition>
   readonly #pollLock: Semaphore.Semaphore
-  readonly #resolveConnectorTeam?: (teamId?: string) => Promise<string>
+  readonly #resolveConnector: () => ConnectorHost | undefined
+  readonly #resolveConnectorConsoleOrigin: () => URL | undefined
   readonly #flowCatalogSubscribers = new Set<(event: FlowCatalogEvent) => void>()
   readonly #flowSubscribers = new Map<string, Set<(event: FlowChangeEvent) => void>>()
   readonly #runningFlows = new Set<string>()
   readonly #runTimeoutMs: number
+  readonly #resolveLlm: () => InvokeLlmTask | undefined
   readonly #signals: Queue.Queue<Deferred.Deferred<void> | undefined>
   readonly #store: Store
   readonly #tasks: FiberMap.FiberMap<string, void, never>
@@ -227,24 +231,16 @@ export class ServerService {
     const { clockService, cronLock, isolatedVm, maintenanceLock, pollLock, signals, store, tasks, workers } = resources
     this.#clock = typeof clock == 'function' ? clock : () => clock.currentTimeMillisUnsafe()
     this.#clockService = clockService
-    this.#connector = connector
     this.#cronLock = cronLock
     this.#isolatedVm = isolatedVm
     this.#logger = logger.child({ component: 'runtime' })
-    this.#llm = runtime.llm
     this.#maintenanceLock = maintenanceLock
     this.#maxConcurrentRuns = runtime.maxConcurrentRuns ?? defaultMaxConcurrentRuns
     this.#pollLock = pollLock
-    this.#resolveConnectorTeam =
-      connector instanceof ConnectorClient && connector.teamSupported()
-        ? async (teamId) => {
-            const teams = await loadTeams(connector)
-            const selected = teamId == null ? teams.find((team) => team.systemCreated) : teams.find((team) => team.id == teamId)
-            if (selected == null) throw new ControlError(controlErrorCode.flowInvalid, 'The selected OOMOL Team is not available.')
-            return selected.id
-          }
-        : undefined
+    this.#resolveConnector = runtime.resolveConnector ?? (() => connector)
+    this.#resolveConnectorConsoleOrigin = runtime.resolveConnectorConsoleOrigin ?? (() => connectorConsoleOrigin)
     this.#runTimeoutMs = runtime.runTimeoutMs ?? defaultRunTimeoutMs
+    this.#resolveLlm = runtime.resolveLlm ?? (() => runtime.llm)
     this.#signals = signals
     this.#store = store
     this.#tasks = tasks
@@ -267,16 +263,17 @@ export class ServerService {
       (flowId, triggerNodeId) => this.#testPollTrigger(flowId, triggerNodeId),
       () => this.#notifyFlowCatalog(),
       (event) => this.#notifyFlow(event),
-      this.#llm != null,
-      connector,
-      connectorConsoleOrigin,
-      this.#resolveConnectorTeam,
+      () => this.#resolveLlm() != null,
+      () => this.#resolveConnector(),
+      () => this.#resolveConnectorConsoleOrigin(),
+      (teamId) => this.#connectorTeam(teamId),
     )
     this.#integration = new IntegrationRuntime(
       store,
-      connector,
+      () => this.#resolveConnector(),
       this.#clock,
       runtime.integration,
+      runtime.resolveIntegration,
       integrationDefinitions,
       validatedFlow,
       () => this.#signal(),
@@ -344,12 +341,24 @@ export class ServerService {
     readonly teams: readonly { readonly id: string; readonly name: string; readonly systemCreated: boolean }[]
     readonly version: 1
   }> {
-    const connector = this.#connector
+    const connector = this.#resolveConnector()
     if (!(connector instanceof ConnectorClient) || !connector.teamSupported()) return { bindings: [], enabled: false, teams: [], version: 1 }
     const teams = await loadTeams(connector, signal)
     const defaultTeam = teams.find((team) => team.systemCreated)
     if (defaultTeam != null) this.#store.bindUnassignedConnectorTeams(defaultTeam.id)
     return { bindings: this.#store.connectorTeamBindings(), enabled: true, teams, version: 1 }
+  }
+
+  async #connectorTeam(teamId?: string): Promise<string | undefined> {
+    const connector = this.#resolveConnector()
+    if (!(connector instanceof ConnectorClient) || !connector.teamSupported()) {
+      if (teamId != null) throw new ControlError(controlErrorCode.flowInvalid, 'Connector Team is not available for this deployment.')
+      return
+    }
+    const teams = await loadTeams(connector)
+    const selected = teamId == null ? teams.find((team) => team.systemCreated) : teams.find((team) => team.id == teamId)
+    if (selected == null) throw new ControlError(controlErrorCode.flowInvalid, 'The selected OOMOL Team is not available.')
+    return selected.id
   }
 
   async #testPollTrigger(
@@ -383,7 +392,7 @@ export class ServerService {
       if (connection?.kind != 'connection' || connection.target != target.connectionId) {
         throw new ControlError(controlErrorCode.bindingUnresolved, 'The fixed Poll Trigger Connection is unresolved.')
       }
-      const connector = this.#connector
+      const connector = this.#resolveConnector()
       if (connector == null) throw new ControlError(controlErrorCode.connectorUnavailable, 'The Connector request could not be completed.')
       const result = await Effect.runPromise(
         Effect.tryPromise({
@@ -608,7 +617,13 @@ export class ServerService {
   }
 
   async ready(): Promise<boolean> {
-    return this.#started && this.#failure == null && (this.#connector == null || (await this.#connector.ready()))
+    const connector = this.#resolveConnector()
+    return this.#started && this.#failure == null && (connector == null || (await connector.ready()))
+  }
+
+  configurationChanged(): void {
+    this.#maintenanceAt = this.#clock()
+    this.#signal()
   }
 
   run(runId: string): RunRecord | undefined {
@@ -617,16 +632,14 @@ export class ServerService {
 
   start(): Effect.Effect<void, never, Scope.Scope> {
     return Effect.gen({ self: this }, function* () {
-      if (this.#resolveConnectorTeam != null) {
-        const resolveConnectorTeam = this.#resolveConnectorTeam
-        yield* Effect.promise(async () => {
-          try {
-            this.#store.bindUnassignedConnectorTeams(await resolveConnectorTeam())
-          } catch (error) {
-            this.#logger.warn({ category: 'connector.team.resolve-failed', err: error }, 'Default OOMOL Team could not be resolved.')
-          }
-        })
-      }
+      yield* Effect.promise(async () => {
+        try {
+          const teamId = await this.#connectorTeam()
+          if (teamId != null) this.#store.bindUnassignedConnectorTeams(teamId)
+        } catch (error) {
+          this.#logger.warn({ category: 'connector.team.resolve-failed', err: error }, 'Default OOMOL Team could not be resolved.')
+        }
+      })
       this.#started = true
       yield* Effect.addFinalizer(() => Effect.sync(() => (this.#started = false)))
       this.#maintenanceAt = this.#clock()
@@ -972,7 +985,7 @@ export class ServerService {
         if (connection?.kind != 'connection' || connection.target != target.connectionId) {
           return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger Connection does not match its Publication.'))
         }
-        const connector = this.#connector
+        const connector = this.#resolveConnector()
         if (connector == null) {
           return yield* Effect.fail(new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.'))
         }
@@ -1188,8 +1201,9 @@ export class ServerService {
     const executor = task.executor
     switch (executor.kind) {
       case 'connector':
-        if (this.#connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
-        return await this.#connector.execute(
+        const connector = this.#resolveConnector()
+        if (connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
+        return await connector.execute(
           executor.action,
           executor.connectionId,
           normalizeConnectorRuntimeInputs(
@@ -1201,10 +1215,11 @@ export class ServerService {
           teamId,
         )
       case 'llm':
-        if (this.#llm == null) throw new TaskHostError('llm.unavailable', 'The LLM request could not be completed.')
+        const llm = this.#resolveLlm()
+        if (llm == null) throw new TaskHostError('llm.unavailable', 'The LLM request could not be completed.')
         let result
         try {
-          result = await this.#llm({
+          result = await llm({
             input: invocation.input,
             invocationId: invocation.invocationId,
             mode: executor.mode,
@@ -1226,9 +1241,10 @@ export class ServerService {
     if (!capabilities.some((capability) => capability.action == payload.action && capability.connectionId == payload.connectionId)) {
       throw new TaskHostError('capability.denied', 'The Runtime Capability is not declared for this Task.')
     }
-    if (this.#connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
+    const connector = this.#resolveConnector()
+    if (connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
     return {
-      body: await this.#connector.execute(payload.action, payload.connectionId, payload.input, call.invocationId, call.signal, teamId),
+      body: await connector.execute(payload.action, payload.connectionId, payload.input, call.invocationId, call.signal, teamId),
       status: 200,
     }
   }

@@ -1,1 +1,1 @@
-export const serverPaths = ['/auth', '/connector', '/healthz', '/oauth', '/readyz', '/v1'] as const
+export const serverPaths = ['/auth', '/config', '/connector', '/healthz', '/oauth', '/readyz', '/v1'] as const

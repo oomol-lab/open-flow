@@ -2,15 +2,18 @@ import { serve } from '@hono/node-server'
 import * as Cause from 'effect/Cause'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
+import { randomBytes } from 'node:crypto'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ConnectorClient } from './connector.ts'
 import { createServerApp } from './http.ts'
-import { createLlm, oomolLlm } from './llm.ts'
 import { createLogger } from './logger.ts'
+import { migrateDatabase } from './migrate.ts'
+import { OperatorStore } from './operator-store.ts'
 import { OperatorSession } from './operator.ts'
 import { ServerService } from './service.ts'
+import { SettingsStore } from './settings-store.ts'
+import { Settings } from './settings.ts'
 
 const logger = createLogger()
 const shutdownTimeoutMs = 30_000
@@ -26,6 +29,8 @@ function main(): Effect.Effect<void> {
       if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new Error('OPEN_FLOW_PORT must be an integer between 0 and 65535.')
       const dataDirectory = path.resolve(process.env.OPEN_FLOW_DATA_DIR ?? '.open-flow-dev/server')
       yield* Effect.promise(() => mkdir(dataDirectory, { recursive: true }))
+      const databaseFile = path.join(dataDirectory, 'open-flow.sqlite')
+      yield* Effect.sync(() => migrateDatabase(databaseFile))
 
       const retentionDays = Number(process.env.OPEN_FLOW_RUN_EVENT_RETENTION_DAYS ?? '30')
       const runEventRetentionMs = retentionDays * 24 * 60 * 60 * 1000
@@ -59,14 +64,15 @@ function main(): Effect.Effect<void> {
       if (connectorOrigin == null && connectorToken != null) {
         throw new Error('OPEN_FLOW_CONNECTOR_TOKEN requires OPEN_FLOW_CONNECTOR_ORIGIN.')
       }
-      const connector = connectorOrigin == null ? undefined : new ConnectorClient(connectorOrigin, connectorToken ?? '', 30_000, logger)
       const llmOrigin = process.env.OPEN_FLOW_LLM_ORIGIN
       const llmToken = process.env.OPEN_FLOW_LLM_TOKEN
       if ((llmOrigin == null) != (llmToken == null)) {
         throw new Error('OPEN_FLOW_LLM_ORIGIN and OPEN_FLOW_LLM_TOKEN must be configured together.')
       }
-      const llm = llmOrigin != null && llmToken != null ? createLlm(llmOrigin, llmToken) : oomolLlm(connectorOrigin, connectorToken)
-
+      const settingsStore = yield* Effect.acquireRelease(
+        Effect.sync(() => new SettingsStore(databaseFile)),
+        (opened) => Effect.sync(() => opened.close()),
+      )
       const integrationPublicOrigin = process.env.OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN
       const integrationCallbackKey = process.env.OPEN_FLOW_INTEGRATION_CALLBACK_KEY
       if ((integrationPublicOrigin == null) != (integrationCallbackKey == null)) {
@@ -90,28 +96,48 @@ function main(): Effect.Effect<void> {
         }
         integration = { callbackKey: integrationCallbackKey, publicOrigin: publicOrigin.origin }
       }
+      const settings = new Settings(settingsStore, {
+        connectorConsoleOrigin,
+        connectorOrigin,
+        connectorToken,
+        integrationCallbackKey: integration?.callbackKey,
+        integrationPublicOrigin: integration?.publicOrigin,
+        llmOrigin,
+        llmToken,
+        logger,
+      })
       const operatorToken = process.env.OPEN_FLOW_TOKEN
       const secureCookie = process.env.OPEN_FLOW_SESSION_COOKIE_SECURE
       if (secureCookie != null && secureCookie != 'true' && secureCookie != 'false') {
         throw new Error('OPEN_FLOW_SESSION_COOKIE_SECURE must be true or false.')
       }
-      const operator = operatorToken == null ? undefined : new OperatorSession(operatorToken, secureCookie == 'true')
       const service = yield* ServerService.open(
-        path.join(dataDirectory, 'open-flow.sqlite'),
-        connector,
+        databaseFile,
+        undefined,
         undefined,
         {
-          ...(integration == null ? {} : { integration }),
-          ...(llm == null ? {} : { llm }),
           maxConcurrentRuns,
           maxPendingRuns,
+          resolveConnector: () => settings.connector(),
+          resolveConnectorConsoleOrigin: () => settings.connectorConsoleOrigin(),
+          resolveIntegration: () => settings.integration(),
+          resolveLlm: () => settings.llm(),
           runEventRetentionMs,
           runTimeoutMs,
         },
-        connectorConsoleOrigin,
+        undefined,
         logger,
       )
       yield* service.start()
+      const operatorStore = yield* Effect.acquireRelease(
+        Effect.sync(() => new OperatorStore(databaseFile)),
+        (opened) => Effect.sync(() => opened.close()),
+      )
+      const setupCode = operatorToken == null && !operatorStore.state().claimed ? randomBytes(32).toString('base64url') : undefined
+      const operator = new OperatorSession(operatorStore, operatorToken, secureCookie == 'true', setupCode)
+      if (setupCode != null) {
+        logger.warn({ category: 'operator.setup.required', setupCode }, 'Open Flow Server requires operator setup. Use the setup code from this log entry.')
+      }
       const workbenchHost = process.argv.includes('--api-only')
         ? {}
         : { publicDirectory: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public') }
@@ -125,6 +151,7 @@ function main(): Effect.Effect<void> {
                 logger,
                 operator,
                 operatorLoginAttemptsPerMinute,
+                settings,
                 shutdownSignal: shutdownController.signal,
                 ...workbenchHost,
               }).fetch,

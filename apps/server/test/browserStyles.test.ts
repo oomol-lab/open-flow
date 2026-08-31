@@ -39,8 +39,6 @@ describe('Browser style boundaries', () => {
     expect(app).toMatch(/className="open-flow-theme server-host"/)
     expect(app).toMatch(/OpenFlowSessionGate, OpenFlowWorkbench/)
     expect(app).toMatch(/<OpenFlowSessionGate/)
-    expect(app.match(/session\.configured === true/g)).toHaveLength(3)
-    expect(app).not.toMatch(/<(?:form|label|input)\b/)
     expect(styles).not.toMatch(/\.session-(?:gate|form|error)/)
   })
 })

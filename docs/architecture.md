@@ -40,10 +40,24 @@ RunEvent、日志或外部系统。Variable 是 Operator 可读取的 deployment
 旧 Project schema、Project API 和 Project 数据不属于当前产品合同。部署发现旧的未发布 schema 时直接重建当前 Flow schema，不迁移或保留旧
 Project、Flow、Publication、Run 或 authoring history。
 
+### Deployment capability settings
+
+Connector runtime、Connector Console、显式 LLM 和 Integration callback 等部署能力配置不属于 Flow 或 Revision。Server 可以从启动环境或自己的 deployment store 解析每个完整配置块；启动环境
+存在时锁定该配置块，不能与 store 按字段混合，也不能在外部服务不可用时静默 fallback。配置来源必须能由 Operator 区分为 environment、settings、derived
+或 unconfigured。
+
+Store-managed 配置原子提交并在保存后用于新的 capability operation；已经开始的 operation 继续使用开始时取得的固定配置快照。Secret value 不通过读取 API、
+Workbench 或日志返回，但可恢复的外部 service credential 会进入 Server 数据卷、WAL 和备份的信任边界，不是不可导出的 Secret Manager。
+
 ### Scope、身份与通知
 
 部署必须从认证 principal 确定稳定 scope。客户端选择的 scope、operator identity、workload authority 和 callback endpoint identity 不能互相替代。
 切换 deployment scope 必须销毁旧 session、请求和实时订阅。
+
+Server operator credential 可以由启动环境锁定，也可以在 deployment store 中持久化；启动环境存在时必须成为唯一 active auth source，不能与持久化
+credential 混合验证。全新 Server 在两种来源都不存在时进入未认领状态，只能通过部署者从进程启动日志取得的一次性 setup authorization 建立首个持久化
+credential。认领必须原子且最多成功一次，不能把第一个访问管理面的匿名请求直接提升为 Operator。Operator credential verification、Browser session
+signing 和 callback endpoint identity 使用彼此独立的秘密与生命周期。
 
 Workbench 使用两个彼此独立的实时通知通道：
 

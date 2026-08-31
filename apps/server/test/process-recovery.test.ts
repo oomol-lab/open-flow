@@ -207,7 +207,14 @@ it('serves the compiled Workbench and authenticates the Control API in the real 
   expect(asset.status).toBe(200)
   expect(asset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
 
-  await expect(json(await fetch(`${app.origin}/auth/session`))).resolves.toEqual({ authenticated: false, configured: true, version: 1 })
+  await expect(json(await fetch(`${app.origin}/auth/session`))).resolves.toEqual({
+    authenticated: false,
+    configured: true,
+    setupAuthorized: false,
+    setupRequired: false,
+    source: 'environment',
+    version: 1,
+  })
   const cookie = await operatorCookie(app.origin)
   const flows = await fetch(`${app.origin}/v1/flows`, { headers: { cookie } })
   expect(flows.status).toBe(200)

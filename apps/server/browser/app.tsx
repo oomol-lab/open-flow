@@ -17,6 +17,7 @@ import { createBrowserHost } from './host.ts'
 import { createI18n } from './i18n.ts'
 import { initialLanguage, languagePreference } from './language.ts'
 import { parseRoute, routePath } from './route.ts'
+import { SettingsPage } from './settings.tsx'
 import { VariablesPage } from './variables.tsx'
 
 const notificationId = 'open-flow-workbench'
@@ -29,12 +30,21 @@ interface Props {
 
 type Session =
   | { readonly kind: 'checking' }
-  | { readonly configured?: boolean; readonly error?: 'invalid' | 'unavailable'; readonly kind: 'signed-out' }
+  | {
+      readonly configured?: boolean
+      readonly error?: 'invalid' | 'setup-code' | 'setup-token' | 'unavailable'
+      readonly kind: 'signed-out'
+      readonly setupAuthorized?: boolean
+      readonly setupRequired?: boolean
+    }
   | { readonly kind: 'signed-in' }
 
 interface SessionStatus {
   readonly authenticated: boolean
   readonly configured: boolean
+  readonly setupAuthorized: boolean
+  readonly setupRequired: boolean
+  readonly source: 'environment' | 'none' | 'settings'
   readonly version: 1
 }
 
@@ -45,8 +55,24 @@ function initialTheme(): WorkbenchTheme {
 function sessionStatus(value: unknown): SessionStatus | undefined {
   if (value == null || typeof value != 'object' || Array.isArray(value)) return
   const status = value as Record<string, unknown>
-  if (status.version !== 1 || typeof status.authenticated != 'boolean' || typeof status.configured != 'boolean') return
-  return { authenticated: status.authenticated, configured: status.configured, version: 1 }
+  if (
+    status.version !== 1 ||
+    typeof status.authenticated != 'boolean' ||
+    typeof status.configured != 'boolean' ||
+    typeof status.setupAuthorized != 'boolean' ||
+    typeof status.setupRequired != 'boolean' ||
+    !['environment', 'none', 'settings'].includes(String(status.source))
+  ) {
+    return
+  }
+  return {
+    authenticated: status.authenticated,
+    configured: status.configured,
+    setupAuthorized: status.setupAuthorized,
+    setupRequired: status.setupRequired,
+    source: status.source as 'environment' | 'none' | 'settings',
+    version: 1,
+  }
 }
 
 function connectorTeams(value: unknown):
@@ -93,6 +119,7 @@ function notify(notification: WorkbenchNotification | undefined): void {
 
 function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   const [route, setRoute] = useState(() => parseRoute(window.location.pathname))
+  const [settingsOpen, setSettingsOpen] = useState(window.location.pathname == '/settings')
   const [variablesOpen, setVariablesOpen] = useState(window.location.pathname == '/variables')
   const [session, setSession] = useState<Session>({ kind: 'checking' })
   const [token, setToken] = useState('')
@@ -137,9 +164,12 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
       if (!signal?.aborted) setTeam({ kind: 'error' })
     }
   }, [])
+  const sessionExpired = useCallback(() => setSession({ configured: true, kind: 'signed-out' }), [])
   let sessionMessage = t('session.configured')
   if (session.kind == 'signed-out') {
-    if (session.configured === false) sessionMessage = t('session.notConfigured')
+    if (session.setupRequired === true) {
+      sessionMessage = t(session.setupAuthorized === true ? 'session.setupTokenDescription' : 'session.setupCodeDescription')
+    } else if (session.configured === false) sessionMessage = t('session.notConfigured')
     else if (session.error == 'unavailable') sessionMessage = t('session.unavailable')
   }
 
@@ -149,7 +179,16 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
       const response = await fetch('/auth/session', { credentials: 'same-origin' })
       const status = sessionStatus(await response.json())
       if (!response.ok || status == null) throw new Error('Invalid session response.')
-      setSession(status.authenticated ? { kind: 'signed-in' } : { configured: status.configured, kind: 'signed-out' })
+      setSession(
+        status.authenticated
+          ? { kind: 'signed-in' }
+          : {
+              configured: status.configured,
+              kind: 'signed-out',
+              setupAuthorized: status.setupAuthorized,
+              setupRequired: status.setupRequired,
+            },
+      )
     } catch {
       setSession({ error: 'unavailable', kind: 'signed-out' })
     }
@@ -167,6 +206,7 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   }, [loadTeams, session.kind])
   useEffect(() => {
     const restore = (): void => {
+      setSettingsOpen(window.location.pathname == '/settings')
       setVariablesOpen(window.location.pathname == '/variables')
       setRoute(parseRoute(window.location.pathname))
     }
@@ -177,16 +217,18 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
     const path = routePath(next)
     if (path != window.location.pathname) window.history[options.replace ? 'replaceState' : 'pushState'](null, '', path)
     setRoute(next)
+    setSettingsOpen(false)
     setVariablesOpen(false)
   }
 
-  function openPage(path: '/' | '/variables'): void {
+  function openPage(path: '/' | '/settings' | '/variables'): void {
     if (path != window.location.pathname) window.history.pushState(null, '', path)
+    setSettingsOpen(path == '/settings')
     setVariablesOpen(path == '/variables')
     if (path == '/') setRoute({ view: 'design' })
   }
 
-  function followPage(event: MouseEvent<HTMLAnchorElement>, path: '/' | '/variables'): void {
+  function followPage(event: MouseEvent<HTMLAnchorElement>, path: '/' | '/settings' | '/variables'): void {
     if (event.defaultPrevented || event.button != 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
     openPage(path)
@@ -211,6 +253,42 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
       setSession({ kind: 'signed-in' })
     } catch {
       setSession({ configured: true, error: 'unavailable', kind: 'signed-out' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function setup(event: FormEvent): Promise<void> {
+    event.preventDefault()
+    if (token.length == 0 || submitting || session.kind != 'signed-out' || session.setupRequired !== true) return
+    setSubmitting(true)
+    const authorized = session.setupAuthorized === true
+    try {
+      const response = await fetch(authorized ? '/auth/setup' : '/auth/setup/session', {
+        body: JSON.stringify({ [authorized ? 'token' : 'code']: token, version: 1 }),
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      })
+      if (response.status == 409) {
+        setToken('')
+        await checkSession()
+        return
+      }
+      if (!response.ok) {
+        setSession({
+          configured: false,
+          error: authorized ? 'setup-token' : 'setup-code',
+          kind: 'signed-out',
+          setupAuthorized: authorized,
+          setupRequired: true,
+        })
+        return
+      }
+      setToken('')
+      setSession(authorized ? { kind: 'signed-in' } : { configured: false, kind: 'signed-out', setupAuthorized: true, setupRequired: true })
+    } catch {
+      setSession({ configured: false, error: 'unavailable', kind: 'signed-out', setupAuthorized: authorized, setupRequired: true })
     } finally {
       setSubmitting(false)
     }
@@ -306,11 +384,14 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
           <header className="server-nav">
             <div className="server-nav-title">Open Flow Server</div>
             <nav aria-label="Open Flow Server">
-              <a aria-current={variablesOpen ? undefined : 'page'} href="/" onClick={(event) => followPage(event, '/')}>
+              <a aria-current={variablesOpen || settingsOpen ? undefined : 'page'} href="/" onClick={(event) => followPage(event, '/')}>
                 {t('shell.flows')}
               </a>
               <a aria-current={variablesOpen ? 'page' : undefined} href="/variables" onClick={(event) => followPage(event, '/variables')}>
                 {t('shell.variables')}
+              </a>
+              <a aria-current={settingsOpen ? 'page' : undefined} href="/settings" onClick={(event) => followPage(event, '/settings')}>
+                {t('shell.settings')}
               </a>
             </nav>
             <div className="server-nav-actions">
@@ -320,7 +401,9 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
             </div>
           </header>
           <div className="workbench-frame">
-            {variablesOpen ? (
+            {settingsOpen ? (
+              <SettingsPage onUnauthorized={sessionExpired} />
+            ) : variablesOpen ? (
               <VariablesPage client={client} language={language} />
             ) : (
               <OpenFlowWorkbench
@@ -344,25 +427,43 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
       ) : (
         <OpenFlowSessionGate
           action={
-            session.kind == 'checking' ? undefined : session.configured === false || session.configured == null ? t('session.retry') : t('session.signIn')
+            session.kind == 'checking'
+              ? undefined
+              : session.setupRequired === true
+                ? t(session.setupAuthorized === true ? 'session.setupFinish' : 'session.setupContinue')
+                : session.configured === false || session.configured == null
+                  ? t('session.retry')
+                  : t('session.signIn')
           }
           description={session.kind == 'checking' ? t('session.checking') : sessionMessage}
-          error={session.kind == 'signed-out' && session.error == 'invalid' ? t('session.invalid') : undefined}
+          error={
+            session.kind != 'signed-out' || session.error == null || session.error == 'unavailable'
+              ? undefined
+              : t(session.error == 'invalid' ? 'session.invalid' : session.error == 'setup-code' ? 'session.setupInvalidCode' : 'session.setupInvalidToken')
+          }
           onSubmit={
             session.kind == 'checking'
               ? undefined
-              : session.configured === false || session.configured == null
-                ? (event) => {
-                    event.preventDefault()
-                    void checkSession()
-                  }
-                : (event) => void signIn(event)
+              : session.setupRequired === true
+                ? (event) => void setup(event)
+                : session.configured === false || session.configured == null
+                  ? (event) => {
+                      event.preventDefault()
+                      void checkSession()
+                    }
+                  : (event) => void signIn(event)
           }
-          onTokenChange={session.kind == 'signed-out' && session.configured === true ? setToken : undefined}
+          onTokenChange={session.kind == 'signed-out' && (session.configured === true || session.setupRequired === true) ? setToken : undefined}
           pending={session.kind == 'checking' || submitting}
           title="Open Flow Server"
-          token={session.kind == 'signed-out' && session.configured === true ? token : undefined}
-          tokenLabel={session.kind == 'signed-out' && session.configured === true ? t('session.token') : undefined}
+          token={session.kind == 'signed-out' && (session.configured === true || session.setupRequired === true) ? token : undefined}
+          tokenLabel={
+            session.kind == 'signed-out' && session.setupRequired === true
+              ? t(session.setupAuthorized === true ? 'session.token' : 'session.setupCode')
+              : session.kind == 'signed-out' && session.configured === true
+                ? t('session.token')
+                : undefined
+          }
         />
       )}
       <Toaster

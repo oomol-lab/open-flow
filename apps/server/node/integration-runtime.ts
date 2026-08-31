@@ -65,13 +65,12 @@ const reconcileTimeoutMs = 30_000
 const retryMs = 1_000
 
 export class IntegrationRuntime {
-  readonly #callbackKey?: string
   readonly #clock: () => number
-  readonly #connector?: ConnectorHost
   readonly #definitions: ReadonlyMap<string, IntegrationDefinition>
   readonly #logger: Logger
   readonly #lock = Semaphore.makeUnsafe(1)
-  readonly #publicOrigin?: string
+  readonly #resolveConnector: () => ConnectorHost | undefined
+  readonly #resolveOptions: () => IntegrationOptions | undefined
   readonly #retrying = new Set<string>()
   readonly #store: Store
   readonly #validateFlow: ValidateFlow
@@ -80,21 +79,21 @@ export class IntegrationRuntime {
 
   constructor(
     store: Store,
-    connector: ConnectorHost | undefined,
+    resolveConnector: () => ConnectorHost | undefined,
     clock: () => number,
     options: IntegrationOptions | undefined,
+    resolveOptions: (() => IntegrationOptions | undefined) | undefined,
     definitions: readonly IntegrationDefinition[],
     validateFlow: ValidateFlow,
     wake: () => void,
     runCreated: (flowId: string, runId: string) => void,
     logger: Logger,
   ) {
-    this.#callbackKey = options?.callbackKey
     this.#clock = clock
-    this.#connector = connector
     this.#definitions = new Map(definitions.map((definition) => [definition.snapshot.key, definition]))
     this.#logger = logger.child({ component: 'integration' })
-    this.#publicOrigin = options == null ? undefined : new URL(options.publicOrigin).origin
+    this.#resolveConnector = resolveConnector
+    this.#resolveOptions = resolveOptions ?? (() => options)
     this.#store = store
     this.#validateFlow = validateFlow
     this.#wake = wake
@@ -105,7 +104,7 @@ export class IntegrationRuntime {
     const nodes = Object.entries(prepared.graph.nodes)
       .filter((entry): entry is [string, Extract<TriggerNode, { readonly kind: 'integration' }>] => entry[1].kind == 'integration')
       .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-    if (nodes.length > 0 && (this.#callbackKey == null || this.#publicOrigin == null)) {
+    if (nodes.length > 0 && this.#resolveOptions() == null) {
       throw new AcceptanceError('trigger-invalid', 'Integration runtime is not configured.')
     }
     return nodes.map(([triggerNodeId, trigger]) => {
@@ -200,7 +199,9 @@ export class IntegrationRuntime {
     ) {
       return { status: 404 }
     }
-    const callbackSecret = await integrationCallbackSecret(this.#callbackKey, target.stored.endpointId)
+    const options = this.#resolveOptions()
+    if (options == null) return { status: 404 }
+    const callbackSecret = await integrationCallbackSecret(options.callbackKey, target.stored.endpointId)
     const now = new Date(this.#clock())
     const admit = target.current && target.stored.health == 'healthy'
     const connector = this.#connectorProxy(target.definition, target.stored.bindingId, target.connectionId, target.stored.flowId)
@@ -293,11 +294,13 @@ export class IntegrationRuntime {
 
   #reconcile(binding: StoredIntegrationBinding, now: number): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
+      const options = this.#resolveOptions()
+      if (options == null) return yield* Effect.fail(new TransientIntegrationError('Integration runtime is not configured.'))
       const callbackSecret = yield* Effect.tryPromise({
-        try: () => integrationCallbackSecret(this.#callbackKey, binding.endpointId),
+        try: () => integrationCallbackSecret(options.callbackKey, binding.endpointId),
         catch: (error) => error,
       })
-      const endpointUrl = `${this.#publicOrigin}/v1/integrations/${binding.endpointId}`
+      const endpointUrl = `${options.publicOrigin}/v1/integrations/${binding.endpointId}`
       let state = this.#store.triggers.integrationState(binding.bindingId)
       let retiredPrevious = false
       if (state != null && state.runtimeVersion != binding.runtimeVersion) {
@@ -413,11 +416,12 @@ export class IntegrationRuntime {
     return {
       execute: async (request, signal) => {
         try {
-          if (this.#connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
+          const connector = this.#resolveConnector()
+          if (connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
           let connectorSignal = signal ?? parentSignal
           if (signal != null && parentSignal != null) connectorSignal = AbortSignal.any([parentSignal, signal])
           connectorSignal ??= AbortSignal.timeout(30_000)
-          return await this.#connector.proxy(definition.snapshot.provider, connectionId, bindingId, request, connectorSignal, this.#store.connectorTeam(flowId))
+          return await connector.proxy(definition.snapshot.provider, connectionId, bindingId, request, connectorSignal, this.#store.connectorTeam(flowId))
         } catch (cause) {
           if (cause instanceof ConnectorTaskError && cause.code == 'connector.connection-required') {
             throw new IntegrationConnectionError('Integration Connection requires reauthorization.', { cause })

@@ -39,8 +39,12 @@ bun run --filter @oomol-lab/open-flow-server test:docker
 
 ## 3. 启动
 
-operator token 至少包含 32 UTF-8 bytes。它既用于浏览器建立签名 operator session，也可由 machine client 作为 Control API Bearer token 使用。
-生产部署应通过 secret 或只供部署者读取的 env file 注入，不要把 token 写入 Dockerfile、镜像层或仓库文件。例如 `.env.server` 可以包含：
+Server 可以在启动环境中读取 operator token，也可以在第一次启动后由部署者通过 Workbench 认领。Operator token 至少包含 32 UTF-8 bytes，既用于浏览器
+建立 operator session，也可由 machine client 作为 Control API Bearer token 使用。Browser session 使用 Server 独立生成并保存在数据卷中的签名 secret，
+不会直接使用 operator token 签名。
+
+需要由外部 Secret 管理固定 credential 时，通过只供部署者读取的 env file 注入，不要把 token 写入 Dockerfile、镜像层或仓库文件。例如
+`.env.server` 可以包含：
 
 ```dotenv
 OPEN_FLOW_TOKEN=replace-with-at-least-32-random-bytes
@@ -59,8 +63,25 @@ docker run --detach \
   open-flow-server:dev
 ```
 
-Workbench 和 API 位于 `http://127.0.0.1:3000`；登录后 `/variables` 提供该 deployment 的 Variable 管理面。最终镜像默认监听
+Workbench 和 API 位于 `http://127.0.0.1:3000`；登录后 `/variables` 提供该 deployment 的 Variable 管理面，`/settings` 提供外部 capability 管理面。最终镜像默认监听
 `0.0.0.0:3000`，以 root 用户运行，并把 SQLite 保存为 `/data/open-flow/open-flow.sqlite`。
+
+也可以不提供 `OPEN_FLOW_TOKEN` 直接启动：
+
+```bash
+docker run --detach \
+  --name open-flow-server \
+  --publish 3000:3000 \
+  --volume open-flow-data:/data/open-flow \
+  open-flow-server:dev
+```
+
+全新数据卷会在启动日志的 `operator.setup.required` 记录中输出一次性 setup code。打开 Workbench 后先输入该 code，再设置至少 32 UTF-8 bytes 的
+Operator token。Setup code 只对当前未认领进程有效；第一步授权有效期为 10 分钟，认领成功或 Server 重启后旧 code 失效。认领 operation 在 SQLite 中
+原子执行，并发请求最多一个成功。不要把未认领的 Server 暴露给无法读取部署日志的用户，也不要把包含 setup code 的启动日志公开。
+
+认领后，Operator token 的不可逆摘要和独立 Browser session signing secret 保存在数据卷中；原 token 不落盘。容器使用同一数据卷重启后继续使用该
+credential。设置 `OPEN_FLOW_TOKEN` 时环境配置锁定当前认证来源并跳过 setup；如果数据卷从未被认领，随后移除该环境变量会让 Server 重新进入未认领状态。
 
 ## 4. 配置
 
@@ -69,7 +90,7 @@ Workbench 和 API 位于 `http://127.0.0.1:3000`；登录后 `/variables` 提供
 | `OPEN_FLOW_HOST`                               | HTTP 监听地址；镜像默认 `0.0.0.0`。                                                                         |
 | `OPEN_FLOW_PORT`                               | HTTP 监听端口；镜像默认 `3000`。                                                                            |
 | `OPEN_FLOW_DATA_DIR`                           | SQLite 持久目录；镜像默认 `/data/open-flow`。                                                               |
-| `OPEN_FLOW_TOKEN`                              | 浏览器 session 与 machine client 共用的 operator secret；至少 32 UTF-8 bytes。                              |
+| `OPEN_FLOW_TOKEN`                              | 可选的 env-managed Operator credential；至少 32 UTF-8 bytes，存在时跳过并锁定 deployment setup。            |
 | `OPEN_FLOW_SESSION_COOKIE_SECURE`              | TLS ingress 后应设为 `true`；只接受 `true` 或 `false`。                                                     |
 | `OPEN_FLOW_LOG_LEVEL`                          | Pino 日志级别；默认 `info`。                                                                                |
 | `OPEN_FLOW_CONNECTOR_ORIGIN`                   | Server 可访问的 Connector runtime origin。                                                                  |
@@ -97,16 +118,25 @@ origin 的 hostname 精确为 `connector.oomol.com` 或 `connector.oomol.dev` �
 `https://llm.oomol.com/v1` 或 `https://llm.oomol.dev/v1`，并复用 Connector token。Console origin 不参与推导；自建 OpenConnector、自定义域名和
 空 token 都不会隐式启用 LLM。
 
+Connector runtime、Connector Console、LLM 和 Integration callback 也可以在登录后的 `/settings` 中配置。每个配置块独立使用 env-managed 或
+SQLite-managed 来源：对应的完整 env 配置存在时锁定该块，不能修改、清除或与 SQLite 按字段混合；外部服务暂时不可用也不会 fallback 到 SQLite。Connector
+runtime 的 origin/token、Integration 的 public origin/callback key，以及显式 LLM 的 origin/token 都作为完整配置块保存。Connector Console 只有公开 origin，
+与 Connector runtime 独立。
+
+Settings-managed 配置保存后立即用于新的 request、Run、Poll 或 Integration operation，已经开始的 operation 继续使用开始时取得的配置快照，不要求重启。
+读取配置只返回公开 origin、来源和 credential 是否已配置，token 与 callback key 不会返回 Browser。Settings update 使用全局预期 revision，stale update
+返回冲突。LLM 的生效顺序为显式 LLM env、SQLite LLM settings、从当前生效的 OOMOL Connector 推导、未配置；其他配置块的顺序为对应 env、SQLite、未配置。
+
 Provider Trigger definitions 由公共 Open Flow package 内置，不需要用户或部署者注册。Poll 与 Integration 通过 Connector 的
 `POST /v1/proxy/:service` 运行面执行；OpenConnector 与 OOMOL Connector 都支持该接口。具体可用的 Provider、Connection 和授权范围以当前配置的
 Connector 为准。
 
 `OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN` 与 `OPEN_FLOW_INTEGRATION_CALLBACK_KEY` 必须同时提供或同时省略。前者必须是 Provider 可访问且不带
-credential、path、query 或 fragment 的 HTTPS origin；只有 loopback 本地开发可以使用 HTTP。后者只能通过 secret 注入。未配置时 Integration
-definition 仍可用于 authoring，但 Publish 会 fail closed。
+credential、path、query 或 fragment 的 HTTPS origin；只有 loopback 本地开发可以使用 HTTP。callback key 至少包含 32 UTF-8 bytes。两者也可作为一个
+完整配置块在 Settings 中保存；未配置时 Integration definition 仍可用于 authoring，但 Publish 会 fail closed。
 
-不配置 operator token 时，health、callback 和已持久化的 runtime 工作仍可运行，但 Control API fail closed，Workbench 显示管理面尚未配置。
-Operator 登录按部署实例限速，超过 `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE` 后返回 429 和 `Retry-After`。
+没有 env-managed 或持久化 operator credential 时，health、callback 和已持久化的 runtime 工作仍可运行，但 Control API fail closed，Workbench 进入
+setup。Operator 登录与 setup authorization 共享部署实例级限速，超过 `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE` 后返回 429 和 `Retry-After`。
 
 达到 `OPEN_FLOW_MAX_PENDING_RUNS` 后，新 Run admission 返回 429；已接受请求的幂等重放仍返回原 Run。Cron 与 Poll 保留当前调度位置并短暂重试。
 Callback 请求限流只为已存在的 endpoint 建立内存窗口，超过限制时返回 429 和 `Retry-After`。
@@ -136,11 +166,13 @@ docker stop --time 30 open-flow-server
 
 ## 6. 持久化与恢复
 
-Flow、Revision、Publication、Run、RunEvent、Variable、Trigger binding、Provider callback verifier 和 migration version 都位于数据卷中的 SQLite 文件。callback
-verifier 只属于 Trigger runtime state，不进入 Flow Revision、Workbench 或 RunEvent。当前只承诺 quiesced backup：先停止入口流量并让容器正常退出，
-再备份 volume；恢复时把完整数据目录挂载到相同路径后启动一个 Server 容器。
+Flow、Revision、Publication、Run、RunEvent、Variable、Trigger binding、Provider callback verifier、deployment capability settings、持久化 Operator credential
+摘要、Browser session signing secret 和 migration version 都位于数据卷中的 SQLite 文件。callback verifier 只属于 Trigger runtime state，不进入 Flow Revision、
+Workbench 或 RunEvent。
+当前只承诺 quiesced backup：先停止入口流量并让容器正常退出，再备份 volume；恢复时把完整数据目录挂载到相同路径后启动一个 Server 容器。
 
-Variable value 以明文存在于 SQLite 主文件、WAL 和备份中，并可由已认证 Operator 通过 Control API 和管理面读取。它不是加密存储或
-不可导出的 Secret Manager；如果其中保存敏感配置，部署者必须把数据卷、备份、Operator token 和管理网络视为同一信任边界。
+Variable value 和 Settings-managed 外部 service credential 以明文存在于 SQLite 主文件、WAL 和备份中。Variable 可由已认证 Operator 通过 Control API 和管理面
+读取；外部 service credential 不通过读取 API 返回。两者都不是加密存储或不可导出的 Secret Manager；部署者必须把数据卷、备份、Operator token 和管理网络
+视为同一信任边界。
 
 不能只复制主 `.sqlite` 文件而遗漏同目录中的 WAL/SHM 状态，也不能在一个仍写入的容器和一个恢复容器之间共享数据卷。Connector 持久化是外部服务自己的备份边界，不属于 `/data/open-flow`。

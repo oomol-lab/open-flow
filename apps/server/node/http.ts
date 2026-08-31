@@ -2,6 +2,7 @@ import type { JsonValue, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { Logger } from 'pino'
 import type { ResolveControlActor } from './control.ts'
 import type { OperatorSession } from './operator.ts'
+import type { Settings } from './settings.ts'
 
 import { serveStatic } from '@hono/node-server/serve-static'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
@@ -10,6 +11,7 @@ import { integrationEndpointId } from '@oomol-lab/open-flow/integration-trigger'
 import { maximumWebhookBodyBytes, webhookEndpointId, webhookOccurrenceId } from '@oomol-lab/open-flow/webhook-trigger'
 import { Hono } from 'hono'
 import { randomUUID } from 'node:crypto'
+import { createConfigApp } from './config.ts'
 import { createControlApp } from './control.ts'
 import { AcceptanceError, ControlError, serverErrorCode } from './error.ts'
 import { handleIntegration } from './integration.ts'
@@ -51,6 +53,7 @@ interface ServerAppOptions {
   readonly operatorLoginAttemptsPerMinute?: number
   readonly publicDirectory?: string
   readonly resolveControlActor?: ResolveControlActor
+  readonly settings?: Settings
   readonly shutdownSignal?: AbortSignal
 }
 
@@ -116,6 +119,11 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     )
   })
   app.route('/v1', createControlApp(service.control, resolveActor))
+  if (options.settings != null)
+    app.route(
+      '/config',
+      createConfigApp(options.settings, authenticate, () => service.configurationChanged()),
+    )
   app.get('/connector/teams', async (context) => {
     await authenticate(context.req.raw)
     return json(200, await service.connectorTeams(context.req.raw.signal))

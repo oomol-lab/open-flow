@@ -4,8 +4,11 @@ import { controlErrorMetadata } from '@oomol-lab/open-flow/control-api'
 
 export const serverErrorCode = {
   authenticationInvalid: 'authentication.invalid',
+  configurationConflict: 'configuration.conflict',
+  configurationEnvironmentManaged: 'configuration.environment-managed',
   connectorConnectionRequired: 'connector.connection-required',
   internal: 'internal',
+  operatorAlreadyConfigured: 'operator.already-configured',
   operatorInvalid: 'operator.invalid',
   operatorNotConfigured: 'operator.not-configured',
   flowRevisionStorageConflict: 'flow.revision-storage-conflict',
@@ -18,8 +21,11 @@ type ErrorCode = ControlErrorCode | ServerErrorCode
 const errorMetadata = {
   ...controlErrorMetadata,
   [serverErrorCode.authenticationInvalid]: { status: 401 },
+  [serverErrorCode.configurationConflict]: { status: 409 },
+  [serverErrorCode.configurationEnvironmentManaged]: { status: 409 },
   [serverErrorCode.connectorConnectionRequired]: { status: 409 },
   [serverErrorCode.internal]: { status: 500 },
+  [serverErrorCode.operatorAlreadyConfigured]: { status: 409 },
   [serverErrorCode.operatorInvalid]: { status: 400 },
   [serverErrorCode.operatorNotConfigured]: { status: 503 },
   [serverErrorCode.flowRevisionStorageConflict]: { status: 409 },

@@ -5,19 +5,31 @@ import path from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { ConnectorClient } from '../node/connector.ts'
 import { createServerApp } from '../node/http.ts'
+import { OperatorStore } from '../node/operator-store.ts'
 import { OperatorSession } from '../node/operator.ts'
 import { closeService, openService } from './serviceFixture.ts'
 
 const token = 'open-flow-server-operator-token-00000001'
+const operatorStores: OperatorStore[] = []
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  for (const store of operatorStores.splice(0)) store.close()
+})
+
+function operator(file: string, envToken: string | undefined, secure = false, setupCode?: string, now?: () => number): OperatorSession {
+  const store = new OperatorStore(file, now)
+  operatorStores.push(store)
+  return new OperatorSession(store, envToken, secure, setupCode, now)
+}
 
 it('uses a signed operator session, expires it on time or token rotation, and clears its cookie on logout', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-operator-'))
-  const service = await openService(path.join(directory, 'open-flow.sqlite'))
+  const file = path.join(directory, 'open-flow.sqlite')
+  const service = await openService(file)
   let now = Date.UTC(2026, 7, 22)
-  const operator = new OperatorSession(token, false, () => now)
-  const app = createServerApp(service, { operator })
+  const session = operator(file, token, false, undefined, () => now)
+  const app = createServerApp(service, { operator: session })
   try {
     const anonymous = await app.request('/auth/session')
     expect(anonymous.headers.get('cache-control')).toBe('no-store')
@@ -26,7 +38,14 @@ it('uses a signed operator session, expires it on time or token rotation, and cl
     expect(anonymous.headers.get('referrer-policy')).toBe('no-referrer')
     expect(anonymous.headers.get('x-content-type-options')).toBe('nosniff')
     expect(anonymous.headers.get('x-frame-options')).toBe('DENY')
-    expect(await anonymous.json()).toEqual({ authenticated: false, configured: true, version: 1 })
+    expect(await anonymous.json()).toEqual({
+      authenticated: false,
+      configured: true,
+      setupAuthorized: false,
+      setupRequired: false,
+      source: 'environment',
+      version: 1,
+    })
 
     const invalid = await app.request('/auth/session', {
       body: JSON.stringify({ token: 'wrong', version: 1 }),
@@ -51,7 +70,14 @@ it('uses a signed operator session, expires it on time or token rotation, and cl
     const cookie = setCookie.split(';', 1)[0]!
 
     const authenticated = await app.request('/auth/session', { headers: { cookie } })
-    expect(await authenticated.json()).toEqual({ authenticated: true, configured: true, version: 1 })
+    expect(await authenticated.json()).toEqual({
+      authenticated: true,
+      configured: true,
+      setupAuthorized: false,
+      setupRequired: false,
+      source: 'environment',
+      version: 1,
+    })
     const flow = await app.request('/v1/flows', {
       body: JSON.stringify({ name: 'Operator flow', version: 1 }),
       headers: { 'content-type': 'application/json', cookie, 'idempotency-key': 'operator-flow' },
@@ -67,11 +93,14 @@ it('uses a signed operator session, expires it on time or token rotation, and cl
     expect((await app.request('/v1/flows', { headers: { authorization: `Basic ${token}` } })).status).toBe(401)
 
     const rotated = createServerApp(service, {
-      operator: new OperatorSession('open-flow-server-rotated-token-00000001', false, () => now),
+      operator: operator(file, 'open-flow-server-rotated-token-00000001', false, undefined, () => now),
     })
     expect(await (await rotated.request('/auth/session', { headers: { cookie } })).json()).toEqual({
       authenticated: false,
       configured: true,
+      setupAuthorized: false,
+      setupRequired: false,
+      source: 'environment',
       version: 1,
     })
 
@@ -95,9 +124,10 @@ it('uses a signed operator session, expires it on time or token rotation, and cl
 
 it('rate limits operator login attempts', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-operator-limit-'))
-  const service = await openService(path.join(directory, 'open-flow.sqlite'))
+  const file = path.join(directory, 'open-flow.sqlite')
+  const service = await openService(file)
   const app = createServerApp(service, {
-    operator: new OperatorSession(token, false),
+    operator: operator(file, token),
     operatorLoginAttemptsPerMinute: 1,
   })
   try {
@@ -123,16 +153,103 @@ it('rate limits operator login attempts', async () => {
 
 it('reports missing operator configuration without disabling callbacks or health', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-operator-missing-'))
-  const service = await openService(path.join(directory, 'open-flow.sqlite'))
-  const app = createServerApp(service)
+  const file = path.join(directory, 'open-flow.sqlite')
+  const service = await openService(file)
+  const app = createServerApp(service, { operator: operator(file, undefined, false, 'setup-code-000000000000000000000000') })
   try {
-    expect(await (await app.request('/auth/session')).json()).toEqual({ authenticated: false, configured: false, version: 1 })
+    expect(await (await app.request('/auth/session')).json()).toEqual({
+      authenticated: false,
+      configured: false,
+      setupAuthorized: false,
+      setupRequired: true,
+      source: 'none',
+      version: 1,
+    })
     expect((await app.request('/auth/session', { body: JSON.stringify({ token, version: 1 }), method: 'POST' })).status).toBe(503)
     expect((await app.request('/v1/flows')).status).toBe(401)
     expect((await app.request('/v1/flows', { headers: { authorization: `Bearer ${token}` } })).status).toBe(401)
     expect((await app.request('/v1/runs/missing')).status).toBe(401)
     expect((await app.request('/healthz')).status).toBe(200)
     expect((await app.request('/v1/webhooks/not-an-endpoint')).status).toBe(404)
+  } finally {
+    await closeService(service)
+    await rm(directory, { force: true, recursive: true })
+  }
+})
+
+it('claims an unconfigured deployment with a one-time setup session and restores the operator credential', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-operator-setup-'))
+  const file = path.join(directory, 'open-flow.sqlite')
+  const service = await openService(file)
+  const setupCode = 'open-flow-server-setup-code-000000000001'
+  const session = operator(file, undefined, false, setupCode)
+  const app = createServerApp(service, { operator: session })
+  try {
+    const invalid = await app.request('/auth/setup/session', {
+      body: JSON.stringify({ code: 'wrong', version: 1 }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    })
+    expect(invalid.status).toBe(401)
+
+    const authorized = await app.request('/auth/setup/session', {
+      body: JSON.stringify({ code: setupCode, version: 1 }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    })
+    expect(authorized.status).toBe(200)
+    const setupCookie = authorized.headers.get('set-cookie')!.split(';', 1)[0]!
+    expect(setupCookie).toContain('open_flow_operator_setup=')
+    expect(await (await app.request('/auth/session', { headers: { cookie: setupCookie } })).json()).toEqual({
+      authenticated: false,
+      configured: false,
+      setupAuthorized: true,
+      setupRequired: true,
+      source: 'none',
+      version: 1,
+    })
+
+    const short = await app.request('/auth/setup', {
+      body: JSON.stringify({ token: 'short', version: 1 }),
+      headers: { 'content-type': 'application/json', 'cookie': setupCookie },
+      method: 'POST',
+    })
+    expect(short.status).toBe(401)
+
+    const claimed = await app.request('/auth/setup', {
+      body: JSON.stringify({ token, version: 1 }),
+      headers: { 'content-type': 'application/json', 'cookie': setupCookie },
+      method: 'POST',
+    })
+    expect(claimed.status).toBe(201)
+    const cookie = claimed.headers.get('set-cookie')!.match(/open_flow_operator_session=[^;]+/)?.[0]
+    expect(cookie).toBeDefined()
+    expect(await (await app.request('/auth/session', { headers: { cookie: cookie! } })).json()).toEqual({
+      authenticated: true,
+      configured: true,
+      setupAuthorized: false,
+      setupRequired: false,
+      source: 'settings',
+      version: 1,
+    })
+    expect((await app.request('/v1/flows', { headers: { authorization: `Bearer ${token}` } })).status).toBe(200)
+    expect(
+      (
+        await app.request('/auth/setup/session', {
+          body: JSON.stringify({ code: setupCode, version: 1 }),
+          headers: { 'content-type': 'application/json' },
+          method: 'POST',
+        })
+      ).status,
+    ).toBe(409)
+
+    const restored = createServerApp(service, { operator: operator(file, undefined) })
+    const login = await restored.request('/auth/session', {
+      body: JSON.stringify({ token, version: 1 }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    })
+    expect(login.status).toBe(200)
   } finally {
     await closeService(service)
     await rm(directory, { force: true, recursive: true })
