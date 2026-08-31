@@ -10,6 +10,7 @@ import { BlockLibrary, ContextPanel } from './contextPanel.tsx'
 const connector: AddNodeOption = {
   connector: {
     actionId: 'create-issue',
+    authenticated: true,
     description: 'Create an issue.',
     inputs: {},
     name: 'Create issue',

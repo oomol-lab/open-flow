@@ -75,6 +75,7 @@ describe('ConnectorStore', () => {
           actions: [
             {
               actionId: 'mail.send',
+              authenticated: false,
               description: `Send for ${flowId}.`,
               inputs: {},
               name: 'Send',
@@ -96,9 +97,10 @@ describe('ConnectorStore', () => {
     try {
       await workspace.start(flows[0]!.flowId)
       const firstProviders = await connectors.browseAddNodeOptions(signal)
-      await connectors.provideAddNodeOptionChoices('connector-provider:mail', signal)
+      const firstActions = await connectors.provideAddNodeOptionChoices('connector-provider:mail', signal)
 
       expect(firstProviders?.[0]?.label).toBe('Mail flow-a')
+      expect(firstActions?.[0]?.description).toBe('Send for flow-a.')
       expect(connectors.$.actions.value['mail.send']?.description).toBe('Send for flow-a.')
 
       await workspace.selectFlow(flows[1]!.flowId)

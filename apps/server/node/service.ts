@@ -1191,7 +1191,7 @@ export class ServerService {
         if (this.#connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
         return await this.#connector.execute(
           executor.action,
-          executor.connectionId!,
+          executor.connectionId,
           normalizeConnectorRuntimeInputs(
             task.inputs.filter((input) => 'handle' in input),
             invocation.input,

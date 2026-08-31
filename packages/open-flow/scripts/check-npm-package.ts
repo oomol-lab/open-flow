@@ -366,7 +366,7 @@ async function verifyConsumer(versions: { readonly react: string; readonly react
         "import '@oomol-lab/open-flow/workbench.css'",
         "import '@oomol-lab/open-flow/theme.css'",
         'const connector: ConnectorProxy = { execute: async () => ({ data: {}, status: 200 }) }',
-        "const connectorAction: ConnectorAction = { actionId: 'mail.send', description: '', inputs: {}, name: 'send', outputs: {}, serviceId: 'mail', serviceName: 'Mail' }",
+        "const connectorAction: ConnectorAction = { actionId: 'mail.send', authenticated: true, description: '', inputs: {}, name: 'send', outputs: {}, serviceId: 'mail', serviceName: 'Mail' }",
         "const controlError: ControlErrorCode = 'flow.not-found'",
         "const uiLanguage: UiLanguage = resolveUiLanguage(['fr-CA'])",
         "const transition = transitionRun('queued', { kind: 'claim' })",

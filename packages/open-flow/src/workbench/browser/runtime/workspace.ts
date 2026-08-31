@@ -678,7 +678,8 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
   const connectionId = connector?.connectionId
   let selectedConnection = connectionId == null ? undefined : connections?.byId.get(connectionId)
   if (selectedConnection == null && defaultConnection != null && defaultConnection.connectionId == connectionId) selectedConnection = defaultConnection
-  const connectionRequired = connector != null && (connector.connectionId == null || (connections != null && selectedConnection?.status != 'active'))
+  const connectionRequired =
+    connectorAction?.authenticated == true && (connector?.connectionId == null || (connections != null && selectedConnection?.status != 'active'))
   const nodeRun = context.runNodes.get(nodeId)
   const common = {
     concurrency: node.concurrency,

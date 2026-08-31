@@ -11,6 +11,7 @@ const maxActionCatalogBytes = 8 * 1024 * 1024
 const readinessTimeoutMs = 1_000
 
 interface RuntimeAction {
+  readonly authenticated: boolean
   readonly description: string
   readonly id: string
   readonly inputSchema: JsonValue
@@ -22,7 +23,7 @@ interface RuntimeAction {
 export interface ConnectorHost {
   execute(
     action: string,
-    connectionId: string,
+    connectionId: string | undefined,
     input: Readonly<Record<string, JsonValue>>,
     invocationId: string,
     signal: AbortSignal,
@@ -160,7 +161,7 @@ export class ConnectorClient implements ConnectorHost {
 
   async execute(
     action: string,
-    connectionId: string,
+    connectionId: string | undefined,
     input: Readonly<Record<string, JsonValue>>,
     invocationId: string,
     signal: AbortSignal,
@@ -168,7 +169,7 @@ export class ConnectorClient implements ConnectorHost {
   ): Promise<JsonValue> {
     const separator = action.indexOf('.')
     if (separator <= 0) throw connectionRequired()
-    const alias = await this.#resolveConnection(connectionId, action.slice(0, separator), signal, teamId)
+    const alias = connectionId == null ? undefined : await this.#resolveConnection(connectionId, action.slice(0, separator), signal, teamId)
 
     const actionResponse = await this.#request(
       'action.execute',
@@ -178,12 +179,12 @@ export class ConnectorClient implements ConnectorHost {
         headers: {
           'content-type': 'application/json',
           'idempotency-key': invocationId,
-          'x-oo-connector-alias': alias,
+          ...(alias == null ? {} : { 'x-oo-connector-alias': alias }),
         },
         method: 'POST',
       },
       signal,
-      { fields: { actionId: action, connectionId, invocationId }, teamId },
+      { fields: { actionId: action, ...(connectionId == null ? {} : { connectionId }), invocationId }, teamId },
     )
     const response = actionResponse.value
     if (!record(response)) throw unavailable()
@@ -421,7 +422,13 @@ function runtimeAction(value: unknown): RuntimeAction {
   const source = record(value) ? value : undefined
   if (source == null) throw unavailable()
   if (typeof source.description != 'string') throw unavailable()
+  const execution = record(source.execution) ? source.execution : undefined
+  let authenticated: boolean
+  if (typeof source.authenticated == 'boolean') authenticated = source.authenticated
+  else if (typeof execution?.noAuthRunnable == 'boolean') authenticated = !execution.noAuthRunnable
+  else throw unavailable()
   return {
+    authenticated,
     description: source.description,
     id: string(source.id),
     inputSchema: source.inputSchema as JsonValue,
@@ -477,7 +484,9 @@ function mapAction(action: RuntimeAction, providers: readonly ConnectorProvider[
   const provider = providers.find((candidate) => candidate.serviceId == action.service)
   if (provider == null) throw unavailable()
   const active = connections.filter((connection) => connection.serviceId == action.service && connection.status == 'active')
-  const defaultConnection = active.find((connection) => connection.isDefault) ?? (active.length == 1 ? active[0] : undefined)
+  const defaultConnection = action.authenticated
+    ? (active.find((connection) => connection.isDefault) ?? (active.length == 1 ? active[0] : undefined))
+    : undefined
   let ports: ReturnType<typeof connectorActionPorts>
   try {
     ports = connectorActionPorts(action.inputSchema, action.outputSchema)
@@ -486,6 +495,7 @@ function mapAction(action: RuntimeAction, providers: readonly ConnectorProvider[
   }
   return {
     actionId: action.id,
+    authenticated: action.authenticated,
     ...(defaultConnection == null ? {} : { defaultConnection }),
     description: action.description,
     ...(provider.icon == null ? {} : { icon: provider.icon }),

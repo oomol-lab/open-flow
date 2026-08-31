@@ -244,7 +244,8 @@ function TaskDefinition({
   const connector = 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
   const activeConnections = activeConnectorConnections ?? []
   const connectionRequired =
-    connector != null && (connector.connectionId == null || (activeConnectorConnections != null && connectorConnection?.status != 'active'))
+    connectorAction?.authenticated == true &&
+    (connector?.connectionId == null || (activeConnectorConnections != null && connectorConnection?.status != 'active'))
   const codeEditor =
     module != null && 'moduleId' in task && moduleEditor?.moduleId == task.moduleId ? (
       <form
@@ -363,7 +364,7 @@ function TaskDefinition({
   )
   return (
     <>
-      {connector != null && (
+      {connector != null && connectorAction?.authenticated !== false && (
         <section className={`inspector-section connection-state ${connectionRequired ? 'required' : ''}`} data-inspector-section="account">
           <h3>
             <Icon name="connection" size={15} /> {t('inspector.account.title')}

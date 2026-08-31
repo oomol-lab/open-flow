@@ -128,7 +128,16 @@ describe('Server Connector host', () => {
   it('projects discovery and the explicit external Connection page from the injected host', async () => {
     const providers: readonly ConnectorProvider[] = [{ serviceId: 'example', serviceName: 'Example' }]
     const actions: readonly ConnectorAction[] = [
-      { actionId: 'example.echo', description: 'Echo.', inputs: {}, name: 'Echo', outputs: {}, serviceId: 'example', serviceName: 'Example' },
+      {
+        actionId: 'example.echo',
+        authenticated: true,
+        description: 'Echo.',
+        inputs: {},
+        name: 'Echo',
+        outputs: {},
+        serviceId: 'example',
+        serviceName: 'Example',
+      },
     ]
     const connections: readonly ConnectorConnection[] = [
       { connectionId: 'connection-work', displayName: 'Work', isDefault: true, serviceId: 'example', status: 'active' },
@@ -151,7 +160,7 @@ describe('Server Connector host', () => {
   })
 
   it('executes managed Connector Tasks through the injected host', async () => {
-    const execute = vi.fn(async (_action: string, _connectionId: string, input: Readonly<Record<string, JsonValue>>) => input)
+    const execute = vi.fn(async (_action: string, _connectionId: string | undefined, input: Readonly<Record<string, JsonValue>>) => input)
     const service = await open(createConnectorHost({ execute }))
     const runId = await run(service, connectorFlow())
 
@@ -160,6 +169,24 @@ describe('Server Connector host', () => {
       result: { kind: 'node-results', nodes: [{ jobs: [{ outputs: { message: 'hello' } }], nodeId: 'connector' }] },
       status: 'completed',
     })
+  })
+
+  it('executes public Connector Tasks without a Connection', async () => {
+    const execute = vi.fn(async (_action: string, _connectionId: string | undefined, input: Readonly<Record<string, JsonValue>>) => input)
+    const service = await open(createConnectorHost({ execute }))
+    const source = connectorFlow()
+    const task = source.document.tasks.connector!
+    const revision: RevisionContent = {
+      ...source,
+      document: {
+        ...source.document,
+        tasks: { ...source.document.tasks, connector: { ...task, executor: { action: 'example.echo', kind: 'connector' } } },
+      },
+    }
+    const runId = await run(service, revision)
+
+    expect(execute).toHaveBeenCalledWith('example.echo', undefined, { message: 'hello' }, expect.any(String), expect.any(AbortSignal), undefined)
+    expect(service.run(runId)?.status).toBe('completed')
   })
 
   it('uses the Flow Team fixed when a Run is admitted', async () => {

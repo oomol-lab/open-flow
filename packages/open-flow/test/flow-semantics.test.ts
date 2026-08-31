@@ -157,6 +157,28 @@ export default () => value`,
     expect(createRuntimeProgram(result.flow, 'outside-closure', 'sha256:implementation')).toBeUndefined()
   })
 
+  it('allows Connector Tasks without a Connection during deterministic validation', async () => {
+    const source: RevisionFixture = {
+      document: {
+        bindings: {},
+        graph: { nodes: { news: { concurrency: 1, inputs: {}, kind: 'task', taskId: 'news' } } },
+        subflows: {},
+        tasks: {
+          news: {
+            executor: { action: 'hacker-news.get-ask-stories', kind: 'connector' },
+            inputs: [],
+            name: 'Get Ask Stories',
+            outputs: [],
+          },
+        },
+      },
+      modelVersion: 1,
+      modules: {},
+    }
+
+    await expect(validateFlow(source, engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
+  })
+
   it('reports unsupported Engine, invalid Flow, and invalid invocation inputs without platform errors', async () => {
     await expect(prepareFlow(revision('export default () => true'), 'unsupported')).resolves.toEqual({ kind: 'engine-unsupported' })
     await expect(prepareFlow(revision('export const value = true'), currentEngineContract)).resolves.toMatchObject({

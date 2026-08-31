@@ -103,6 +103,7 @@ export interface ConnectorConnection {
 
 export interface ConnectorAction {
   readonly actionId: string
+  readonly authenticated: boolean
   readonly defaultConnection?: ConnectorConnection
   readonly description: string
   readonly icon?: string
@@ -385,6 +386,7 @@ function connectorAction(value: unknown): ConnectorAction {
   const hasConnection = source.defaultConnection != null
   exact(source, [
     'actionId',
+    'authenticated',
     ...(hasConnection ? ['defaultConnection'] : []),
     'description',
     ...(icon == null ? [] : ['icon']),
@@ -397,6 +399,7 @@ function connectorAction(value: unknown): ConnectorAction {
   if (icon != null && typeof icon != 'string') return invalidResponse()
   const result: ConnectorAction = {
     actionId: string(source.actionId),
+    authenticated: typeof source.authenticated == 'boolean' ? source.authenticated : invalidResponse(),
     ...(hasConnection ? { defaultConnection: connection(source.defaultConnection) } : {}),
     description: typeof source.description == 'string' ? source.description : invalidResponse(),
     ...(icon == null ? {} : { icon }),

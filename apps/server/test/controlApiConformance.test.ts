@@ -32,6 +32,7 @@ const connectorConnection: ConnectorConnection = {
 
 const connectorAction: ConnectorAction = {
   actionId: 'mail.send',
+  authenticated: true,
   defaultConnection: connectorConnection,
   description: 'Send one message.',
   inputs: {

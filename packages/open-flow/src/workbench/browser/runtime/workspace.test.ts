@@ -60,6 +60,54 @@ describe('Designer port projection', () => {
       expect.objectContaining({ handle: 'first', variableEnabled: false }),
     ])
   })
+
+  it('only requires a Connection for authenticated Connector Actions', () => {
+    const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+      actorId: 'actor',
+      content: {
+        document: {
+          bindings: {},
+          graph: { nodes: { news: { concurrency: 1, inputs: {}, kind: 'task', taskId: 'news' } } },
+          subflows: {},
+          tasks: {
+            news: {
+              executor: { action: 'hacker-news.get-ask-stories', kind: 'connector' },
+              inputs: [],
+              name: 'Get Ask Stories',
+              outputs: [],
+            },
+          },
+        },
+        modelVersion: 1,
+        modules: {},
+      },
+      createdAt: '2026-08-31T00:00:00.000Z',
+      digest: 'digest',
+      flowId: 'flow',
+      modelVersion: 1,
+      parentRevisionId: null,
+      revisionId: 'revision',
+      version: 1,
+    }
+    const action = {
+      actionId: 'hacker-news.get-ask-stories',
+      authenticated: false,
+      description: 'Get Ask HN stories.',
+      inputs: {},
+      name: 'Get Ask Stories',
+      outputs: {},
+      serviceId: 'hacker-news',
+      serviceName: 'Hacker News',
+    }
+
+    const publicNode = designerGraph(draft, { kind: 'flow' }, {}, [], { [action.actionId]: action }).nodes[0]
+    const authenticatedNode = designerGraph(draft, { kind: 'flow' }, {}, [], {
+      [action.actionId]: { ...action, authenticated: true },
+    }).nodes[0]
+
+    expect(publicNode).toMatchObject({ diagnostics: 0, executorName: 'connector' })
+    expect(authenticatedNode).toMatchObject({ diagnostics: 1, executorName: 'connection required' })
+  })
 })
 
 describe('Designer presentation layouts', () => {

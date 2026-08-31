@@ -992,16 +992,6 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
         values: { taskId },
       })
     }
-    if (task.executor.kind == 'connector' && task.executor.connectionId == null) {
-      checked.diagnostics.push({
-        code: 'task.connector-connection-required',
-        column: 0,
-        line: 1,
-        message: `Connector Task "${taskId}" requires a Connection.`,
-        path: `/document/tasks/${taskId}/executor/connectionId`,
-        values: { taskId },
-      })
-    }
   }
   const diagnostics = checked.diagnostics.toSorted(compareDiagnostics)
   return { closure, diagnostics, valid: diagnostics.length == 0 }

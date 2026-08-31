@@ -67,7 +67,7 @@ function option(action: ConnectorAction, t: TFunction): AddNodeOption {
   return {
     connector: action,
     description:
-      action.defaultConnection == null
+      action.authenticated && action.defaultConnection == null
         ? t('addNode.connectorNeedsConnection', { description: action.description, service: action.serviceName })
         : action.description,
     group: t('addNode.connectorActions'),
@@ -284,7 +284,7 @@ export class ConnectorStore {
       const action = await this.#loadAction(target.actionId, force)
       if (!this.#isCurrent(current, flowId)) return
       this.#set({ actions: { ...this.#state.value.actions, [action.actionId]: action } })
-      await this.#refreshConnections(flowId, target, action.serviceId, force, current)
+      if (action.authenticated) await this.#refreshConnections(flowId, target, action.serviceId, force, current)
     } catch (error) {
       if (this.#isCurrent(current, flowId)) {
         this.#set({ actionError: { actionId: target.actionId, message: errorNotice(error, this.#i18n.t).message } })

@@ -293,6 +293,7 @@ describe('Server Connector client', () => {
     await expect(connector.listActions('example')).resolves.toEqual([
       expect.objectContaining({
         actionId: 'example.echo',
+        authenticated: true,
         defaultConnection: expect.objectContaining({ connectionId: 'connection-work' }),
         inputs: {
           message: { description: 'Message.', jsonSchema: { default: 'hello', description: 'Message.', type: 'string' }, nullable: true, value: 'hello' },
@@ -336,6 +337,7 @@ describe('Server Connector client', () => {
     }
     const action = {
       description: 'Echo one message.',
+      execution: { noAuthRunnable: false },
       id: 'example.echo',
       inputSchema: { properties: {}, type: 'object' },
       name: 'echo',
@@ -365,6 +367,7 @@ describe('Server Connector client', () => {
     await expect(connector.listActions('example')).resolves.toEqual([
       {
         actionId: 'example.echo',
+        authenticated: true,
         defaultConnection: {
           connectionId: 'connection-work',
           displayName: 'Work account',
@@ -387,6 +390,58 @@ describe('Server Connector client', () => {
         isDefault: true,
         serviceId: 'example',
         status: 'active',
+      },
+    ])
+  })
+
+  it('projects public Connector Actions without a Connection', async () => {
+    const origin = await startConnector((request, response) => {
+      if (request.url == '/v1/providers') {
+        return send(response, 200, success([{ displayName: 'Hacker News', service: 'hacker-news' }]))
+      }
+      if (request.url == '/v1/apps/services/hacker-news') {
+        return send(
+          response,
+          200,
+          success([
+            {
+              displayName: 'Reader',
+              id: 'hacker-news-reader',
+              isDefault: true,
+              service: 'hacker-news',
+              status: 'active',
+            },
+          ]),
+        )
+      }
+      return send(
+        response,
+        200,
+        success([
+          {
+            description: 'Get Ask HN stories.',
+            execution: { noAuthRunnable: true },
+            id: 'hacker-news.get-ask-stories',
+            inputSchema: { properties: {}, type: 'object' },
+            name: 'Get Ask Stories',
+            outputSchema: { properties: {}, type: 'object' },
+            service: 'hacker-news',
+          },
+        ]),
+      )
+    })
+    const connector = new ConnectorClient(origin, 'runtime-token')
+
+    await expect(connector.listActions('hacker-news')).resolves.toEqual([
+      {
+        actionId: 'hacker-news.get-ask-stories',
+        authenticated: false,
+        description: 'Get Ask HN stories.',
+        inputs: {},
+        name: 'Get Ask Stories',
+        outputs: {},
+        serviceId: 'hacker-news',
+        serviceName: 'Hacker News',
       },
     ])
   })
@@ -518,6 +573,20 @@ describe('Server Connector client', () => {
         path: '/v1/actions/example.echo',
       },
     ])
+  })
+
+  it('executes a public action without resolving a Connection', async () => {
+    const calls: { readonly alias?: string; readonly path: string }[] = []
+    const origin = await startConnector((request, response) => {
+      calls.push({ alias: request.headers['x-oo-connector-alias'] as string | undefined, path: request.url! })
+      send(response, 200, { data: { stories: [] }, success: true })
+    })
+    const connector = new ConnectorClient(origin, 'runtime-token')
+
+    await expect(connector.execute('hacker-news.get-ask-stories', undefined, {}, 'public-action', AbortSignal.timeout(30_000))).resolves.toEqual({
+      stories: [],
+    })
+    expect(calls).toEqual([{ alias: undefined, path: '/v1/actions/hacker-news.get-ask-stories' }])
   })
 
   it('preserves safe Connector input diagnostics in the Run event', async () => {
