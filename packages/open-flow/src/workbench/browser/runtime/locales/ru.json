@@ -366,6 +366,8 @@
     "loading": "Загрузка запусков…",
     "loadingMore": "Загрузка…",
     "observationFailed": "Не удалось загрузить обновления запуска.",
+    "configureConnector": "Настроить Connector",
+    "connectorUnconfigured": "Connector не настроен для этого развертывания. Завершите настройку и снова запустите Flow.",
     "connectorUnavailable": "Не удалось выполнить запрос к Connector. Запустите Flow снова; если ошибка повторится, проверьте выбранный Connection.",
     "locateNode": "Найти {{name}} на холсте",
     "nodeError": "Ошибка узла",

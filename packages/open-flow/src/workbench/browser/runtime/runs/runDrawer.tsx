@@ -79,6 +79,7 @@ interface Props {
   readonly historyComplete: boolean
   readonly onCancel: () => void
   readonly onClose: () => void
+  readonly onConfigureConnector?: (() => void) | undefined
   readonly onEventFilterChange: (filter: RunEventFilter) => void
   readonly onLocateEvent: (sequence: number) => void
   readonly onRetryObservation: () => void
@@ -322,6 +323,7 @@ export function RunLog({
   filters,
   historyComplete,
   observationFailed,
+  onConfigureConnector,
   onLocateEvent,
   onRetryObservation,
   result,
@@ -334,6 +336,7 @@ export function RunLog({
   | 'eventNodes'
   | 'historyComplete'
   | 'observationFailed'
+  | 'onConfigureConnector'
   | 'onLocateEvent'
   | 'onRetryObservation'
   | 'result'
@@ -433,7 +436,7 @@ export function RunLog({
                       </Button>
                     )}
                   </div>
-                  <RunEventDetails events={groupedEvents} />
+                  <RunEventDetails events={groupedEvents} onConfigureConnector={onConfigureConnector} />
                 </div>
               </li>
             )
@@ -496,6 +499,7 @@ export function RunDrawer({
   historyComplete,
   onCancel,
   onClose,
+  onConfigureConnector,
   onEventFilterChange,
   onLocateEvent,
   onRetryObservation,
@@ -633,6 +637,7 @@ export function RunDrawer({
             filters={filters}
             historyComplete={historyComplete}
             observationFailed={observationFailed}
+            onConfigureConnector={onConfigureConnector}
             onLocateEvent={onLocateEvent}
             onRetryObservation={onRetryObservation}
             result={result}

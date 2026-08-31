@@ -366,6 +366,8 @@
     "loading": "Loading runs…",
     "loadingMore": "Loading…",
     "observationFailed": "Run updates could not be loaded.",
+    "configureConnector": "Configure Connector",
+    "connectorUnconfigured": "Connector is not configured for this deployment. Complete the configuration, then run the Flow again.",
     "connectorUnavailable": "The Connector request could not be completed. Run the Flow again; if it still fails, check the selected Connection.",
     "locateNode": "Locate {{name}} on the canvas",
     "nodeError": "Node error",

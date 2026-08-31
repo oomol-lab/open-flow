@@ -366,6 +366,8 @@
     "loading": "실행 기록 불러오는 중…",
     "loadingMore": "불러오는 중…",
     "observationFailed": "실행 업데이트를 불러오지 못했습니다.",
+    "configureConnector": "Connector 구성",
+    "connectorUnconfigured": "이 배포에는 Connector가 구성되어 있지 않습니다. 구성을 완료한 후 Flow를 다시 실행하세요.",
     "connectorUnavailable": "Connector 요청을 완료하지 못했습니다. Flow를 다시 실행하고, 계속 실패하면 선택한 Connection을 확인하세요.",
     "locateNode": "캔버스에서 {{name}} 위치 보기",
     "nodeError": "노드 오류",

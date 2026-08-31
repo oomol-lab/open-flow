@@ -31,7 +31,15 @@ function shortRunId(runId: string): string {
   return runId.slice(-8)
 }
 
-export function RunsView({ onLocateEvent, store }: { readonly onLocateEvent: (sequence: number) => void; readonly store: WorkbenchStore }): ReactElement {
+export function RunsView({
+  onConfigureConnector,
+  onLocateEvent,
+  store,
+}: {
+  readonly onConfigureConnector?: (() => void) | undefined
+  readonly onLocateEvent: (sequence: number) => void
+  readonly store: WorkbenchStore
+}): ReactElement {
   const language = useLang()
   const t = useTranslate()
   const eventFilter = useVal(store.runs.$.eventFilter)
@@ -228,6 +236,7 @@ export function RunsView({ onLocateEvent, store }: { readonly onLocateEvent: (se
                     filters={filters}
                     historyComplete={historyComplete}
                     observationFailed={observationFailed}
+                    onConfigureConnector={onConfigureConnector}
                     onLocateEvent={onLocateEvent}
                     onRetryObservation={() => store.runs.retryObservation()}
                     result={result}

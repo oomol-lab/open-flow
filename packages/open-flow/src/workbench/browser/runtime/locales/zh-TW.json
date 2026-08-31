@@ -366,6 +366,8 @@
     "loading": "正在載入執行紀錄…",
     "loadingMore": "載入中…",
     "observationFailed": "無法載入執行狀態更新。",
+    "configureConnector": "設定 Connector",
+    "connectorUnconfigured": "目前部署尚未設定 Connector。請先完成設定，再重新執行 Flow。",
     "connectorUnavailable": "Connector 請求無法完成。請再次執行 Flow；若仍然失敗，請檢查所選的 Connection。",
     "locateNode": "在畫布上定位 {{name}}",
     "nodeError": "節點錯誤",

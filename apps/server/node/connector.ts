@@ -45,7 +45,7 @@ export interface ConnectorHost {
   searchActions(query: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorAction[]>
 }
 
-export type ConnectorErrorCode = 'connector.action-not-found' | 'connector.connection-required' | 'connector.unavailable'
+export type ConnectorErrorCode = 'connector.action-not-found' | 'connector.connection-required' | 'connector.unavailable' | 'connector.unconfigured'
 
 export class ConnectorTaskError extends Error {
   readonly code: ConnectorErrorCode

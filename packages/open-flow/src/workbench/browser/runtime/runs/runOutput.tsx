@@ -2,8 +2,10 @@ import type { ReactElement, ReactNode } from 'react'
 import type { JsonValue, RunEvent, RunResult } from '../api.ts'
 
 import { useLang, useTranslate } from 'val-i18n-react'
+import { controlErrorCode } from '../../../../control/common/errors.ts'
 import { collapseAllNested, JSONViewer } from '../../../../designer/browser/jsonViewer/index.ts'
 import { Alert, AlertDescription, AlertTitle } from '../../../../ui/browser/alert.tsx'
+import { Button } from '../../../../ui/browser/button.tsx'
 
 function record(value: JsonValue | undefined): Readonly<Record<string, JsonValue>> | undefined {
   if (value == null || typeof value != 'object' || Array.isArray(value)) return undefined
@@ -33,7 +35,13 @@ export function eventHasDetails(event: RunEvent): boolean {
   return event.kind == 'node.artifact' || event.kind == 'node.failed' || event.kind == 'node.log' || event.kind == 'node.output'
 }
 
-export function RunEventDetail({ event }: { readonly event: RunEvent }): ReactElement | null {
+export function RunEventDetail({
+  event,
+  onConfigureConnector,
+}: {
+  readonly event: RunEvent
+  readonly onConfigureConnector?: (() => void) | undefined
+}): ReactElement | null {
   const language = useLang()
   const t = useTranslate()
   switch (event.kind) {
@@ -99,18 +107,27 @@ export function RunEventDetail({ event }: { readonly event: RunEvent }): ReactEl
       const message =
         code == 'connector.connection-required'
           ? t('run.connectionRequired')
-          : code == 'connector.unavailable' && rawMessage == 'The Connector request could not be completed.'
-            ? t('run.connectorUnavailable')
-            : rawMessage != null
-              ? rawMessage
-              : t('run.nodeFailed')
+          : code == controlErrorCode.connectorUnconfigured
+            ? t('run.connectorUnconfigured')
+            : code == 'connector.unavailable' && rawMessage == 'The Connector request could not be completed.'
+              ? t('run.connectorUnavailable')
+              : rawMessage != null
+                ? rawMessage
+                : t('run.nodeFailed')
       return (
         <EventDetail label={t('run.nodeError')}>
           <Alert className="mt-2.5" variant="destructive">
             <AlertTitle>
               <code>{code}</code>
             </AlertTitle>
-            <AlertDescription>{message}</AlertDescription>
+            <AlertDescription className="flex flex-col items-start gap-2">
+              <span>{message}</span>
+              {code == controlErrorCode.connectorUnconfigured && onConfigureConnector != null && (
+                <Button onClick={onConfigureConnector} size="sm" type="button" variant="outline">
+                  {t('run.configureConnector')}
+                </Button>
+              )}
+            </AlertDescription>
           </Alert>
         </EventDetail>
       )
@@ -120,9 +137,15 @@ export function RunEventDetail({ event }: { readonly event: RunEvent }): ReactEl
   }
 }
 
-export function RunEventDetails({ events }: { readonly events: readonly RunEvent[] }): ReactElement | null {
+export function RunEventDetails({
+  events,
+  onConfigureConnector,
+}: {
+  readonly events: readonly RunEvent[]
+  readonly onConfigureConnector?: (() => void) | undefined
+}): ReactElement | null {
   const t = useTranslate()
-  if (events.length == 1) return <RunEventDetail event={events[0]!} />
+  if (events.length == 1) return <RunEventDetail event={events[0]!} onConfigureConnector={onConfigureConnector} />
   const outputs: Record<string, JsonValue> = {}
   for (const event of events) {
     const handle = event.payload.handle
@@ -137,7 +160,7 @@ export function RunEventDetails({ events }: { readonly events: readonly RunEvent
       return (
         <>
           {events.map((candidate) => (
-            <RunEventDetail event={candidate} key={candidate.sequence} />
+            <RunEventDetail event={candidate} key={candidate.sequence} onConfigureConnector={onConfigureConnector} />
           ))}
         </>
       )

@@ -366,6 +366,8 @@
     "loading": "正在加载运行记录…",
     "loadingMore": "正在加载…",
     "observationFailed": "无法加载最新运行状态。",
+    "configureConnector": "配置 Connector",
+    "connectorUnconfigured": "当前部署尚未配置 Connector。请先完成配置，然后重新运行 Flow。",
     "connectorUnavailable": "Connector 请求未能完成。请再次运行 Flow；如果仍然失败，请检查所选连接。",
     "locateNode": "在画布中定位{{name}}",
     "nodeError": "节点错误",

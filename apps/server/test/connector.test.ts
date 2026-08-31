@@ -282,7 +282,7 @@ describe('Server Connector host', () => {
 
     expect(service.run(runId)?.status).toBe('failed')
     expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({
-      payload: { error: { code: 'connector.unavailable', message: 'The Connector request could not be completed.' } },
+      payload: { error: { code: 'connector.unconfigured', message: 'Connector is not configured for this deployment.' } },
     })
   })
 

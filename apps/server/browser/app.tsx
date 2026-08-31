@@ -415,6 +415,7 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
                 host={host}
                 language={language}
                 location={route}
+                onConfigureConnector={() => openPage('/settings')}
                 onLanguageChange={onLanguageChange}
                 onNavigate={navigate}
                 preferences={preferences}

@@ -281,7 +281,7 @@ occurrence 无法通过最终 admission guard。Poll test 不推进 checkpoint�
 Connector credential 不进入响应、Revision 或 RunEvent。
 `ConnectorAction.authenticated` 是必需的 boolean；`false` 表示 Action 可以不绑定 Connection 直接执行，客户端不得显示账号连接要求，
 执行请求也不得为了该 Action 合成 Connection identity。`true` 表示执行需要有效 Connection。
-部署没有配置 Connector 时，catalog 和 Connection 请求返回 `connector.unconfigured`；已经配置但上游不可用或响应无效时返回
+部署没有配置 Connector 时，catalog、Connection 请求和 Connector Task 运行失败返回 `connector.unconfigured`；已经配置但上游不可用或响应无效时返回
 `connector.unavailable`，客户端不能把两者合并为同一配置提示。
 
 ## 6. 实时通知

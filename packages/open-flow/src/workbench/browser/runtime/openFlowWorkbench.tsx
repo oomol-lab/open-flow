@@ -117,6 +117,7 @@ interface WorkbenchProps {
   readonly hostTitle?: string | undefined
   readonly language: WorkbenchLanguage
   readonly navigation: NavigationStore
+  readonly onConfigureConnector?: (() => void) | undefined
   readonly onHostAction?: (() => void) | undefined
   readonly onLanguageChange?: ((language: WorkbenchLanguage) => void) | undefined
   readonly store: WorkbenchStore
@@ -133,6 +134,7 @@ function Workbench({
   hostTitle,
   language,
   navigation,
+  onConfigureConnector,
   onHostAction,
   onLanguageChange,
   store,
@@ -163,6 +165,7 @@ function Workbench({
             hostTitle={hostTitle}
             hrefFor={hrefFor}
             navigation={navigation}
+            onConfigureConnector={onConfigureConnector}
             onHostAction={onHostAction}
             store={store}
             theme={theme}
@@ -228,8 +231,9 @@ export interface OpenFlowWorkbenchProps {
   readonly hostTitle?: string | undefined
   readonly language: WorkbenchLanguage
   readonly location: WorkbenchLocation
-  readonly onLanguageChange?: ((language: WorkbenchLanguage) => void) | undefined
+  readonly onConfigureConnector?: (() => void) | undefined
   readonly onHostAction?: (() => void) | undefined
+  readonly onLanguageChange?: ((language: WorkbenchLanguage) => void) | undefined
   readonly onNavigate: (location: WorkbenchLocation, options: WorkbenchNavigationOptions) => void
   readonly preferences: WorkbenchPreferences
   readonly sessionKey: string
@@ -250,6 +254,7 @@ function Session({
   hrefFor,
   language,
   location,
+  onConfigureConnector,
   onHostAction,
   onLanguageChange,
   onNavigate,
@@ -312,6 +317,7 @@ function Session({
           hrefFor={hrefFor}
           language={language}
           navigation={navigation}
+          onConfigureConnector={onConfigureConnector}
           onHostAction={onHostAction}
           onLanguageChange={onLanguageChange}
           store={store}

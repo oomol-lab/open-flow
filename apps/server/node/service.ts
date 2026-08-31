@@ -105,6 +105,7 @@ const nodeFailureCodes: ReadonlySet<string> = new Set([
   'capability.invalid',
   'connector.connection-required',
   'connector.unavailable',
+  'connector.unconfigured',
   'llm.output-invalid',
   'llm.unavailable',
   'node.failed',
@@ -1202,7 +1203,7 @@ export class ServerService {
     switch (executor.kind) {
       case 'connector':
         const connector = this.#resolveConnector()
-        if (connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
+        if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
         return await connector.execute(
           executor.action,
           executor.connectionId,

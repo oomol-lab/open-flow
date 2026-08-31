@@ -366,6 +366,8 @@
     "loading": "Chargement des exécutions…",
     "loadingMore": "Chargement…",
     "observationFailed": "Impossible de charger les mises à jour de l'exécution.",
+    "configureConnector": "Configurer Connector",
+    "connectorUnconfigured": "Connector n’est pas configuré pour ce déploiement. Terminez la configuration, puis relancez le Flow.",
     "connectorUnavailable": "La requête Connector n'a pas pu aboutir. Exécutez à nouveau le Flow ; si l'échec persiste, vérifiez la Connection sélectionnée.",
     "locateNode": "Localiser {{name}} sur le canevas",
     "nodeError": "Erreur du nœud",
