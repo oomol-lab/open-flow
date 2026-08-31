@@ -1,6 +1,6 @@
-import type { PublishOperation } from '@oomol-lab/open-flow/control-api'
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
+import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -68,24 +68,21 @@ try {
     },
     200,
   )
-  let operation = await requestJson<PublishOperation>(
-    firstOrigin,
-    `/v1/flows/${flow.flowId}/revisions/${changed.revision.revisionId}/publications`,
-    {
-      body: JSON.stringify({ engineContract: 'open-flow-engine/v1', expectedLivePublicationId: null, version: 1 }),
-      headers: { 'content-type': 'application/json', 'cookie': firstCookie, 'idempotency-key': `publication-${suffix}` },
-      method: 'POST',
-    },
-    202,
-  )
+  const control = new ControlClient(async (pathname, init = {}) => {
+    const headers = new Headers(init.headers)
+    headers.set('cookie', firstCookie)
+    const response = await fetch(`${firstOrigin}${pathname}`, { ...init, headers })
+    const source = await response.clone().text()
+    const status = init.method == 'POST' ? 202 : 200
+    assert.equal(response.status, status, `${pathname} returned HTTP ${response.status}: ${source}`)
+    return response
+  })
+  let operation = await control.publishFlow(flow.flowId, changed.revision.revisionId, null, {
+    idempotencyKey: `publication-${suffix}`,
+  })
   for (let attempt = 0; attempt < 200 && operation.status == 'pending'; attempt += 1) {
     await delay(25)
-    operation = await requestJson<PublishOperation>(
-      firstOrigin,
-      `/v1/flows/${flow.flowId}/publish-operations/${operation.operationId}`,
-      { headers: { cookie: firstCookie } },
-      200,
-    )
+    operation = await control.getPublishOperation(flow.flowId, operation.operationId)
   }
   if (operation.status == 'failed') assert.fail(`Publish operation ${operation.operationId} failed: ${JSON.stringify(operation.issue)}`)
   if (operation.status == 'pending') assert.fail(`Publish operation ${operation.operationId} did not reach a terminal status.`)
