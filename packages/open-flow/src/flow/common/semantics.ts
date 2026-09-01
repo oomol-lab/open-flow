@@ -715,7 +715,12 @@ function validateGraph(
       for (const port of ports) {
         if (!('handle' in port)) continue
         if (handles.has(port.handle)) {
-          diagnostics.push(graphDiagnostic('graph.input-duplicate', `Node "${nodeId}" declares input "${port.handle}" more than once.`, nodePath, { handle: port.handle, nodeId }))
+          diagnostics.push(
+            graphDiagnostic('graph.input-duplicate', `Node "${nodeId}" declares input "${port.handle}" more than once.`, nodePath, {
+              handle: port.handle,
+              nodeId,
+            }),
+          )
         }
         handles.add(port.handle)
       }
