@@ -26,6 +26,7 @@
     "./control-api-conformance": "./src/control/common/conformance.ts",
     "./cron-trigger": "./src/trigger/common/cron.ts",
     "./designer-css-modules": "./src/build/node/cssModules.ts",
+    "./provider-icons-plugin": "./src/build/node/providerIcons.ts",
     "./designer-twemoji-plugin": "./src/build/node/twemojiCollection.ts",
     "./designer-vite-config": "./src/build/node/designerUnoConfig.ts",
     "./integration-trigger": "./src/trigger/common/integration.ts",

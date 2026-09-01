@@ -16,6 +16,7 @@ import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionVi
 
 import { FLOW_DISPLAY_MODES } from '../../../designer/common/flowDisplay.ts'
 import { variableInputCompatible } from '../../../flow/common/semantics.ts'
+import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
 
 export interface Point {
@@ -662,7 +663,11 @@ function triggerDesignerNode(triggerId: string, trigger: TriggerNode, position: 
   return {
     description: trigger.description,
     diagnostics: triggerDiagnosticCount(triggerId, diagnostics),
-    icon: trigger.icon ?? triggerIcon(trigger),
+    icon:
+      trigger.icon ??
+      (trigger.kind == 'integration' || trigger.kind == 'poll'
+        ? providerIcon({ serviceId: trigger.definition.provider, serviceName: trigger.definition.provider })
+        : triggerIcon(trigger)),
     id: triggerId,
     inputs: [],
     kind: 'trigger',
@@ -694,7 +699,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
     concurrency: node.concurrency,
     description: node.description,
     diagnostics: nodeDiagnosticCount(context.target, resolved, context.diagnostics),
-    icon: node.icon ?? connectorAction?.icon ?? nodeIcon(resolved),
+    icon: node.icon ?? (connectorAction == null ? nodeIcon(resolved) : providerIcon(connectorAction)),
     id: nodeId,
     inputs,
     outputs,

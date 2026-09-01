@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { providerIcon } from './providerIcon.ts'
 import { designerGraph, setFlowViewport, setNodePositions } from './workspace.ts'
 
 describe('Designer port projection', () => {
@@ -184,6 +185,7 @@ describe('Designer port projection', () => {
     ]).nodes[0]
 
     expect(node).toMatchObject({
+      icon: providerIcon({ serviceId: 'github', serviceName: 'github' }),
       kind: 'trigger',
       presentation: {
         config: [expect.objectContaining({ invalid: true, name: 'owner' }), expect.objectContaining({ invalid: false, name: 'repo' })],

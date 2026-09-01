@@ -106,6 +106,7 @@ export interface ConnectorAction {
   readonly authenticated: boolean
   readonly defaultConnection?: ConnectorConnection
   readonly description: string
+  readonly homepageUrl?: string
   readonly icon?: string
   readonly inputs: Readonly<Record<string, InputPortDefinition>>
   readonly name: string
@@ -115,6 +116,7 @@ export interface ConnectorAction {
 }
 
 export interface ConnectorProvider {
+  readonly homepageUrl?: string
   readonly icon?: string
   readonly serviceId: string
   readonly serviceName: string
@@ -413,6 +415,7 @@ function ports<Value>(value: unknown, decode: (value: unknown) => Value): Readon
 
 function connectorAction(value: unknown): ConnectorAction {
   const source = record(value)
+  const homepageUrl = source.homepageUrl
   const icon = source.icon
   const hasConnection = source.defaultConnection != null
   exact(source, [
@@ -420,6 +423,7 @@ function connectorAction(value: unknown): ConnectorAction {
     'authenticated',
     ...(hasConnection ? ['defaultConnection'] : []),
     'description',
+    ...(homepageUrl == null ? [] : ['homepageUrl']),
     ...(icon == null ? [] : ['icon']),
     'inputs',
     'name',
@@ -427,12 +431,13 @@ function connectorAction(value: unknown): ConnectorAction {
     'serviceId',
     'serviceName',
   ])
-  if (icon != null && typeof icon != 'string') return invalidResponse()
+  if ((homepageUrl != null && typeof homepageUrl != 'string') || (icon != null && typeof icon != 'string')) return invalidResponse()
   const result: ConnectorAction = {
     actionId: string(source.actionId),
     authenticated: typeof source.authenticated == 'boolean' ? source.authenticated : invalidResponse(),
     ...(hasConnection ? { defaultConnection: connection(source.defaultConnection) } : {}),
     description: typeof source.description == 'string' ? source.description : invalidResponse(),
+    ...(homepageUrl == null ? {} : { homepageUrl }),
     ...(icon == null ? {} : { icon }),
     inputs: ports(source.inputs, inputPort),
     name: string(source.name),
@@ -448,10 +453,12 @@ function connectorAction(value: unknown): ConnectorAction {
 
 function connectorProvider(value: unknown): ConnectorProvider {
   const source = record(value)
+  const homepageUrl = source.homepageUrl
   const icon = source.icon
-  exact(source, ['serviceId', 'serviceName', ...(icon == null ? [] : ['icon'])])
-  if (icon != null && typeof icon != 'string') return invalidResponse()
+  exact(source, ['serviceId', 'serviceName', ...(homepageUrl == null ? [] : ['homepageUrl']), ...(icon == null ? [] : ['icon'])])
+  if ((homepageUrl != null && typeof homepageUrl != 'string') || (icon != null && typeof icon != 'string')) return invalidResponse()
   return {
+    ...(homepageUrl == null ? {} : { homepageUrl }),
     ...(icon == null ? {} : { icon }),
     serviceId: string(source.serviceId),
     serviceName: string(source.serviceName),

@@ -63,14 +63,16 @@ describe('ControlClient Flow API', () => {
   it('scopes Connector resources to an encoded Flow identity', async () => {
     const request = vi.fn(async (path: string, _init?: RequestInit) => {
       if (path == '/v1/connector/providers?flowId=flow%2F1') {
-        return Response.json({ providers: [{ serviceId: 'mail', serviceName: 'Mail' }], version: 1 })
+        return Response.json({ providers: [{ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail' }], version: 1 })
       }
       if (path == '/v1/connector/connections/mail/page?flowId=flow%2F1') return Response.json({ url: 'https://connector.example/providers/mail', version: 1 })
       throw new Error(path)
     })
     const client = new ControlClient(request)
 
-    await expect(client.listConnectorProviders(undefined, flow.flowId)).resolves.toEqual([{ serviceId: 'mail', serviceName: 'Mail' }])
+    await expect(client.listConnectorProviders(undefined, flow.flowId)).resolves.toEqual([
+      { homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail' },
+    ])
     await expect(client.createConnectorConnectionPage('mail', flow.flowId)).resolves.toBe('https://connector.example/providers/mail')
   })
 

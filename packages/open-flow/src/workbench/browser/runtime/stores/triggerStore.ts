@@ -11,6 +11,7 @@ import type { WorkspaceStore } from './workspaceStore.ts'
 
 import { compute, derive, val } from 'value-enhancer'
 import { createI18n } from '../i18n.ts'
+import { providerIcon } from '../providerIcon.ts'
 import { connectionCatalog } from '../workspace.ts'
 import { Latest } from './latest.ts'
 import { errorNotice } from './workbenchNotice.ts'
@@ -64,6 +65,7 @@ function option(definition: TriggerKeySnapshot, i18n: I18n): AddNodeOption {
   return {
     description: i18n.t('addNode.triggerNeedsConnection', { provider: definition.provider }),
     group: i18n.t('addNode.triggers'),
+    icon: providerIcon({ serviceId: definition.provider, serviceName: definition.provider }),
     id: `${optionPrefix}${definition.key}`,
     inputs: [],
     kind: 'trigger',

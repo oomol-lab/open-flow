@@ -206,6 +206,7 @@ it('serves the compiled Workbench and authenticates the Control API in the real 
   const asset = await fetch(`${app.origin}${assetPath}`)
   expect(asset.status).toBe(200)
   expect(asset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+  await asset.body?.cancel()
 
   await expect(json(await fetch(`${app.origin}/auth/session`))).resolves.toEqual({
     authenticated: false,

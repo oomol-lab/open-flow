@@ -1,6 +1,8 @@
+import { providerIconsPlugin } from '@oomol-lab/open-flow/provider-icons-plugin'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  plugins: [providerIconsPlugin({ iconUrls: {} })],
   test: {
     coverage: {
       include: [

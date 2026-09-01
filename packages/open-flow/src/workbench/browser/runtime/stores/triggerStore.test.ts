@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
+import { providerIcon } from '../providerIcon.ts'
 import { TriggerStore } from './triggerStore.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
 
@@ -93,6 +94,7 @@ describe('TriggerStore', () => {
 
       expect(options).toHaveLength(1)
       expect(options?.[0]).toMatchObject({
+        icon: providerIcon({ serviceId: 'github', serviceName: 'github' }),
         id: 'trigger:github.on_repo_event',
         outputs: [{ handle: 'payload' }],
         trigger: { kind: 'catalog' },

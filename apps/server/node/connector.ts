@@ -110,9 +110,11 @@ export class ConnectorClient implements ConnectorHost {
 
   async listProviders(signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorProvider[]> {
     return (await this.#providers(signal, teamId)).map((provider) =>
-      provider.icon == null
-        ? { serviceId: provider.serviceId, serviceName: provider.serviceName }
-        : { icon: provider.icon, serviceId: provider.serviceId, serviceName: provider.serviceName },
+      Object.assign(
+        { serviceId: provider.serviceId, serviceName: provider.serviceName },
+        provider.homepageUrl == null ? {} : { homepageUrl: provider.homepageUrl },
+        provider.icon == null ? {} : { icon: provider.icon },
+      ),
     )
   }
 
@@ -501,9 +503,11 @@ function runtimeProvider(value: unknown) {
   const source = record(value) ? value : undefined
   if (source == null) throw unavailable()
   if (!Array.isArray(source.authTypes) || source.authTypes.some((authType) => typeof authType != 'string')) throw unavailable()
+  if (source.homepageUrl != null && typeof source.homepageUrl != 'string') throw unavailable()
   if (source.iconUrl != null && typeof source.iconUrl != 'string') throw unavailable()
   return {
     authenticated: !source.authTypes.includes('no_auth'),
+    ...(source.homepageUrl == null || source.homepageUrl.length == 0 ? {} : { homepageUrl: source.homepageUrl }),
     ...(source.iconUrl == null || source.iconUrl.length == 0 ? {} : { icon: source.iconUrl }),
     serviceId: string(source.service),
     serviceName: string(source.displayName),
@@ -588,6 +592,7 @@ function mapAction(
     authenticated: provider.authenticated,
     ...(defaultConnection == null ? {} : { defaultConnection }),
     description: action.description,
+    ...(provider.homepageUrl == null ? {} : { homepageUrl: provider.homepageUrl }),
     ...(provider.icon == null ? {} : { icon: provider.icon }),
     inputs: Object.fromEntries(
       ports.inputs.map((port) => {

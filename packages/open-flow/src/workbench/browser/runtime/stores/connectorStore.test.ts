@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
+import { providerIcon } from '../providerIcon.ts'
 import { ConnectorStore } from './connectorStore.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
 
@@ -67,7 +68,7 @@ describe('ConnectorStore', () => {
       const flowId = new URL(path, 'https://open-flow.example').searchParams.get('flowId')
       if (path.startsWith('/v1/connector/providers?')) {
         connectorRequests.push(path)
-        return Response.json({ providers: [{ serviceId: 'mail', serviceName: `Mail ${flowId}` }], version: 1 })
+        return Response.json({ providers: [{ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: `Mail ${flowId}` }], version: 1 })
       }
       if (path.startsWith('/v1/connector/actions?')) {
         connectorRequests.push(path)
@@ -77,6 +78,7 @@ describe('ConnectorStore', () => {
               actionId: 'mail.send',
               authenticated: false,
               description: `Send for ${flowId}.`,
+              homepageUrl: 'https://mail.example',
               inputs: {},
               name: 'Send',
               outputs: {},
@@ -100,7 +102,9 @@ describe('ConnectorStore', () => {
       const firstActions = await connectors.provideAddNodeOptionChoices('connector-provider:mail', signal)
 
       expect(firstProviders?.[0]?.label).toBe('Mail flow-a')
+      expect(firstProviders?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail flow-a' }))
       expect(firstActions?.[0]?.description).toBe('Send for flow-a.')
+      expect(firstActions?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail flow-a' }))
       expect(connectors.$.actions.value['mail.send']?.description).toBe('Send for flow-a.')
 
       await workspace.selectFlow(flows[1]!.flowId)

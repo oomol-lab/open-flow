@@ -13,6 +13,10 @@ declare module '*.svg' {
   export default source
 }
 declare module 'virtual:uno.css'
+declare module 'virtual:oomol-provider-icons' {
+  const iconUrls: Readonly<Record<string, string>>
+  export default iconUrls
+}
 declare module 'virtual:open-flow-twemoji' {
   import type { IconifyJSONPackageExports } from '@iconify/types'
 

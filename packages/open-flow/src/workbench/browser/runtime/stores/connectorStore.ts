@@ -12,6 +12,7 @@ import type { WorkspaceStore } from './workspaceStore.ts'
 import { compute, derive, val } from 'value-enhancer'
 import { flowDependencies } from '../../../../flow/common/semantics.ts'
 import { createI18n } from '../i18n.ts'
+import { providerIcon } from '../providerIcon.ts'
 import { connectionCatalog } from '../workspace.ts'
 import { Latest } from './latest.ts'
 import { errorNotice } from './workbenchNotice.ts'
@@ -73,7 +74,7 @@ function option(action: ConnectorAction, t: TFunction): AddNodeOption {
         ? t('addNode.connectorNeedsConnection', { description: action.description, service: action.serviceName })
         : action.description,
     group: t('addNode.connectorActions'),
-    icon: action.icon ?? ':carbon:connection-signal:',
+    icon: providerIcon(action),
     id: `connector:${action.actionId}`,
     inputs: ports(action.inputs),
     kind: 'connector',
@@ -101,7 +102,7 @@ function providerOptions(actions: readonly ConnectorAction[], t: TFunction): rea
         choices,
         description: t(choices.length == 1 ? 'addNode.connectorActionCountOne' : 'addNode.connectorActionCount', { count: choices.length }),
         group: t('addNode.connectorActions'),
-        icon: first.icon ?? ':carbon:connection-signal:',
+        icon: providerIcon(first),
         id: `connector-provider:${first.serviceId}`,
         inputs: [],
         kind: 'connector-group',
@@ -117,7 +118,7 @@ function providerOption(provider: ConnectorProvider, t: TFunction): AddNodeOptio
     choices: [],
     description: t('addNode.connectorBrowseActions'),
     group: t('addNode.connectorActions'),
-    icon: provider.icon ?? ':carbon:connection-signal:',
+    icon: providerIcon(provider),
     id: `connector-provider:${provider.serviceId}`,
     inputs: [],
     kind: 'connector-group',

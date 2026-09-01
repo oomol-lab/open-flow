@@ -1,8 +1,9 @@
 import { defineConfig } from 'vitest/config'
+import { providerIconsPlugin } from './src/build/node/providerIcons.ts'
 import { twemojiCollectionPlugin } from './src/build/node/twemojiCollection.ts'
 
 export default defineConfig({
-  plugins: [twemojiCollectionPlugin()],
+  plugins: [providerIconsPlugin({ iconUrls: { github: 'https://static.oomol.com/logo/third-party/github.svg' } }), twemojiCollectionPlugin()],
   test: {
     coverage: {
       include: [

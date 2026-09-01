@@ -281,12 +281,20 @@ describe('Server Connector client', () => {
     })
     const connector = new ConnectorClient(origin, 'runtime-token')
 
-    await expect(connector.listProviders()).resolves.toEqual([{ icon: 'https://example.test/icon.svg', serviceId: 'example', serviceName: 'Example' }])
+    await expect(connector.listProviders()).resolves.toEqual([
+      {
+        homepageUrl: 'https://example.test',
+        icon: 'https://example.test/icon.svg',
+        serviceId: 'example',
+        serviceName: 'Example',
+      },
+    ])
     await expect(connector.listActions('example')).resolves.toEqual([
       expect.objectContaining({
         actionId: 'example.echo',
         authenticated: true,
         defaultConnection: expect.objectContaining({ connectionId: 'connection-work' }),
+        homepageUrl: 'https://example.test',
         inputs: {
           message: { description: 'Message.', jsonSchema: { default: 'hello', description: 'Message.', type: 'string' }, nullable: true, value: 'hello' },
         },
