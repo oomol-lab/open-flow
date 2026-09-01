@@ -208,6 +208,7 @@ function FlowSkeleton(): ReactElement {
 }
 
 interface FlowBrowserProps extends LanguageSelectProps {
+  readonly catalogWidth?: 'default' | 'full' | undefined
   readonly createFlowDisabled?: boolean | undefined
   readonly createFlowField?: ComponentProps<typeof CreateResourceDialog>['field']
   readonly flowBadges?: Readonly<Record<string, string>> | undefined
@@ -221,6 +222,7 @@ interface FlowBrowserProps extends LanguageSelectProps {
 }
 
 export function FlowBrowser({
+  catalogWidth,
   createFlowDisabled,
   createFlowField,
   flowBadges,
@@ -259,20 +261,8 @@ export function FlowBrowser({
 
   return (
     <main className="resource-browser">
-      <div className="resource-page">
-        <header className="resource-page-header">
-          <div className="resource-heading">
-            <h1>{t('resource.flows')}</h1>
-          </div>
-          <div className="resource-page-actions">
-            <LanguageSelect language={language} onLanguageChange={onLanguageChange} />
-            <Button disabled={busy != null} onClick={() => setCreating(true)}>
-              <Icon data-icon="inline-start" name="plus" />
-              {t('resource.newFlow')}
-            </Button>
-            {hostAction != null && hostTitle != null && onHostAction != null && <HostMenu action={hostAction} onAction={onHostAction} title={hostTitle} />}
-          </div>
-        </header>
+      <div className={cn('resource-page', catalogWidth != 'default' && 'resource-page-full')}>
+        <h1 className="sr-only">{t('resource.flows')}</h1>
         <section aria-labelledby="flow-list-title" className="resource-list-section">
           <div className="resource-list-title">
             <div className="resource-list-heading">
@@ -280,6 +270,7 @@ export function FlowBrowser({
               {!loading && <span>{t('resource.flowCount', { count: total ?? flows.length })}</span>}
             </div>
             <div className="resource-list-actions">
+              <LanguageSelect language={language} onLanguageChange={onLanguageChange} />
               <InputGroup className="w-full sm:w-56">
                 <InputGroupAddon>
                   <Icon name="search" size={17} />
@@ -303,6 +294,11 @@ export function FlowBrowser({
               >
                 <Icon name="refresh" />
               </Button>
+              <Button className="resource-page-primary-action" disabled={busy != null} onClick={() => setCreating(true)}>
+                <Icon data-icon="inline-start" name="plus" />
+                {t('resource.newFlow')}
+              </Button>
+              {hostAction != null && hostTitle != null && onHostAction != null && <HostMenu action={hostAction} onAction={onHostAction} title={hostTitle} />}
             </div>
           </div>
           <div aria-hidden="true" className="resource-list-columns flow-columns">

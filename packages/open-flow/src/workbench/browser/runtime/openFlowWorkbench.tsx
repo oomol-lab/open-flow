@@ -108,6 +108,7 @@ function NotificationBridge({ host, store }: { readonly host: WorkbenchHost; rea
 }
 
 interface WorkbenchProps {
+  readonly catalogWidth?: 'default' | 'full' | undefined
   readonly createFlow?: ((name: string) => Promise<string>) | undefined
   readonly createFlowDisabled?: boolean | undefined
   readonly createFlowField?: OpenFlowWorkbenchProps['createFlowField']
@@ -125,6 +126,7 @@ interface WorkbenchProps {
 }
 
 function Workbench({
+  catalogWidth,
   createFlow,
   createFlowDisabled,
   createFlowField,
@@ -145,6 +147,7 @@ function Workbench({
     <div className="app-shell">
       {flowId == null ? (
         <FlowBrowser
+          catalogWidth={catalogWidth}
           createFlowDisabled={createFlowDisabled}
           createFlowField={createFlowField}
           flowBadges={flowBadges}
@@ -197,6 +200,7 @@ export {
 } from '../../../localization/common/languages.ts'
 
 export interface OpenFlowWorkbenchProps {
+  readonly catalogWidth?: 'default' | 'full' | undefined
   readonly createFlow?: ((name: string) => Promise<string>) | undefined
   readonly createFlowDisabled?: boolean | undefined
   readonly createFlowField?:
@@ -244,6 +248,7 @@ export interface OpenFlowWorkbenchProps {
 type SessionProps = Omit<OpenFlowWorkbenchProps, 'sessionKey'>
 
 function Session({
+  catalogWidth,
   createFlow,
   createFlowDisabled,
   createFlowField,
@@ -308,6 +313,7 @@ function Session({
       <div className="open-flow-theme open-flow-workbench" data-theme={theme}>
         <NotificationBridge host={host} store={store} />
         <Workbench
+          catalogWidth={catalogWidth}
           createFlow={createFlow}
           createFlowDisabled={createFlowDisabled}
           createFlowField={createFlowField}

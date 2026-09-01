@@ -7,12 +7,7 @@
   color: var(--ui-foreground);
   background: var(--ui-background);
   font-size: 14px;
-  font-family:
-    ui-sans-serif,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  font-family: inherit;
   font-synthesis: none;
   font-kerning: normal;
   text-rendering: optimizeLegibility;

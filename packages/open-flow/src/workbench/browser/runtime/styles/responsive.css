@@ -106,22 +106,6 @@
       padding: 24px 0 40px;
     }
 
-    .resource-page-header {
-      align-items: flex-start;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .resource-page-actions {
-      width: 100%;
-      justify-content: flex-end;
-    }
-
-    .resource-heading h1 {
-      font-size: 22px;
-      line-height: 28px;
-    }
-
     .resource-list-title {
       align-items: stretch;
       flex-direction: column;
