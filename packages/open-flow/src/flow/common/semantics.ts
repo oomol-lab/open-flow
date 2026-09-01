@@ -454,7 +454,8 @@ export function matchesSchema(value: JsonValue, schema: JsonValue): boolean {
 }
 
 function schemaAssignable(sourceSchema: JsonValue, targetSchema: JsonValue, sourceNullable = false, targetNullable = false): boolean {
-  if (sourceSchema === true || targetSchema === true || jsonEqual(sourceSchema, {}) || jsonEqual(targetSchema, {})) return true
+  if (targetSchema === true || jsonEqual(targetSchema, {})) return true
+  if (sourceSchema === true || jsonEqual(sourceSchema, {})) return false
   if (sourceSchema === false || targetSchema === false) return false
   const source = schemaObject(sourceSchema)
   const target = schemaObject(targetSchema)

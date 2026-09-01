@@ -56,10 +56,12 @@ export function compareJSONSchema(fromSchema: CompareSchemaInfo, toSchema: Compa
 
 function resolveLocalRefs(schema: object): object {
   function target(reference: string): unknown {
-    if (reference == '#') return schema
-    if (!reference.startsWith('#/')) return
+    if (!reference.startsWith('#')) return
+    const pointer = decodeURIComponent(reference.slice(1))
+    if (pointer == '') return schema
+    if (!pointer.startsWith('/')) return
     let value: unknown = schema
-    for (const encoded of reference.slice(2).split('/')) {
+    for (const encoded of pointer.slice(1).split('/')) {
       if (value == null || typeof value != 'object' || Array.isArray(value)) return
       const token = encoded.replaceAll('~1', '/').replaceAll('~0', '~')
       if (!Object.hasOwn(value, token)) return
@@ -79,18 +81,47 @@ function resolveLocalRefs(schema: object): object {
       if (resolved === undefined) throw new TypeError(`Local JSON Schema reference "${reference}" does not exist.`)
       const nextReferences = new Set(references)
       nextReferences.add(reference)
-      const siblings = Object.fromEntries(
-        Object.entries(source)
-          .filter(([key]) => key != '$ref' && key != '$defs' && key != 'definitions')
-          .map(([key, item]) => [key, visit(item, nextReferences)]),
-      )
+      const siblings = Object.fromEntries(Object.entries(source).filter(([key]) => key != '$ref' && key != '$defs' && key != 'definitions'))
       const result = visit(resolved, nextReferences)
-      return Object.keys(siblings).length == 0 ? result : { allOf: [result, siblings] }
+      return Object.keys(siblings).length == 0 ? result : { allOf: [result, visit(siblings, references)] }
     }
     return Object.fromEntries(
       Object.entries(source)
         .filter(([key]) => key != '$defs' && key != 'definitions')
-        .map(([key, item]) => [key, visit(item, references)]),
+        .map(([key, item]) => {
+          switch (key) {
+            case 'additionalItems':
+            case 'additionalProperties':
+            case 'contains':
+            case 'else':
+            case 'if':
+            case 'not':
+            case 'propertyNames':
+            case 'then': {
+              return [key, visit(item, references)]
+            }
+            case 'items': {
+              return [key, Array.isArray(item) ? item.map((entry) => visit(entry, references)) : visit(item, references)]
+            }
+            case 'allOf':
+            case 'anyOf':
+            case 'oneOf': {
+              return [key, Array.isArray(item) ? item.map((entry) => visit(entry, references)) : item]
+            }
+            case 'patternProperties':
+            case 'properties': {
+              if (item == null || typeof item != 'object' || Array.isArray(item)) return [key, item]
+              return [key, Object.fromEntries(Object.entries(item).map(([name, entry]) => [name, visit(entry, references)]))]
+            }
+            case 'dependencies': {
+              if (item == null || typeof item != 'object' || Array.isArray(item)) return [key, item]
+              return [key, Object.fromEntries(Object.entries(item).map(([name, entry]) => [name, Array.isArray(entry) ? entry : visit(entry, references)]))]
+            }
+            default: {
+              return [key, item]
+            }
+          }
+        }),
     )
   }
 

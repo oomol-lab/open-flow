@@ -460,6 +460,52 @@ export default () => value`,
     await expect(validateFlow(valid, engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
   })
 
+  it.each([
+    {
+      codes: ['graph.node-output-incompatible'],
+      name: 'rejects a true output for a constrained input',
+      sourceSchema: true as JsonValue,
+      targetSchema: { type: 'string' } as JsonValue,
+    },
+    {
+      codes: ['graph.node-output-incompatible'],
+      name: 'rejects an empty output schema for a constrained input',
+      sourceSchema: {} as JsonValue,
+      targetSchema: { type: 'string' } as JsonValue,
+    },
+    { codes: [], name: 'accepts two unconstrained schemas', sourceSchema: true as JsonValue, targetSchema: {} as JsonValue },
+  ])('$name', async ({ codes, sourceSchema, targetSchema }) => {
+    const source = revision('export default ({ input }) => ({ input })')
+    const task = source.document.graph.nodes.task
+    if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+    const invalid: RevisionFixture = {
+      ...source,
+      document: {
+        ...source.document,
+        graph: {
+          nodes: {
+            source: {
+              concurrency: 1,
+              inputs: {},
+              kind: 'value',
+              name: 'Source',
+              values: [{ handle: 'value', jsonSchema: sourceSchema, nullable: false, value: 'text' }],
+            },
+            task: {
+              ...task,
+              inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
+              task: { ...task.task, inputs: [{ handle: 'input', jsonSchema: targetSchema, nullable: false }] },
+            },
+          },
+        },
+      },
+    }
+
+    const result = await validateFlow(invalid, engine)
+    expect(result.diagnostics.map(({ code }) => code)).toEqual(codes)
+    expect(result.valid).toBe(codes.length == 0)
+  })
+
   it('accepts a schema-nullable output for a nullable input', async () => {
     const source = revision('export default ({ input }) => ({ input })')
     const task = source.document.graph.nodes.task

@@ -223,6 +223,54 @@ describe('In-process schema compare', () => {
     ).toEqual({ kind: 'compatible' })
   })
 
+  it('decodes URI fragments before evaluating JSON Pointers', () => {
+    expect(
+      compareJSONSchema(
+        {
+          packageId: undefined,
+          schema: {
+            $defs: { group: { text: { type: 'string' } } },
+            $ref: '#/$defs/group%2Ftext',
+          },
+        },
+        { packageId: undefined, schema: { type: 'string' } },
+      ),
+    ).toEqual({ kind: 'compatible' })
+  })
+
+  it('preserves literal objects containing $ref keys', () => {
+    const literal = { $ref: '#/$defs/text' }
+
+    expect(
+      compareJSONSchema(
+        { packageId: undefined, schema: { $defs: { text: { type: 'string' } }, const: literal } },
+        { packageId: undefined, schema: { const: literal } },
+      ),
+    ).toEqual({ kind: 'compatible' })
+    expect(
+      compareJSONSchema(
+        { packageId: undefined, schema: { $defs: { text: { type: 'string' } }, enum: [literal] } },
+        { packageId: undefined, schema: { enum: [literal] } },
+      ),
+    ).toEqual({ kind: 'compatible' })
+  })
+
+  it('allows a $ref sibling to repeat a reference', () => {
+    expect(
+      compareJSONSchema(
+        {
+          packageId: undefined,
+          schema: {
+            $defs: { text: { type: 'string' } },
+            $ref: '#/$defs/text',
+            allOf: [{ $ref: '#/$defs/text' }],
+          },
+        },
+        { packageId: undefined, schema: { type: 'string' } },
+      ),
+    ).toEqual({ kind: 'compatible' })
+  })
+
   it('fails closed for cyclic local references', () => {
     expect(
       compareJSONSchema(
