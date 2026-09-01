@@ -1,6 +1,8 @@
 import type { Plugin } from 'vite'
 
 const catalogUrl = 'https://oomol.com/en/apps/catalog.json'
+const catalogTimeoutMs = 5_000
+const emptyModule = 'export default {};'
 const publicModuleId = 'virtual:oomol-provider-icons'
 const resolvedModuleId = `\0${publicModuleId}`
 
@@ -21,20 +23,24 @@ export function providerIconsPlugin(options: { readonly iconUrls?: Readonly<Reco
 }
 
 async function loadProviderIconsModule(): Promise<string> {
-  const response = await fetch(catalogUrl)
-  if (!response.ok) throw new Error(`Could not load OOMOL provider icons: ${response.status} ${response.statusText}`)
+  try {
+    const response = await fetch(catalogUrl, { signal: AbortSignal.timeout(catalogTimeoutMs) })
+    if (!response.ok) return emptyModule
 
-  const payload = (await response.json()) as { readonly items?: unknown }
-  if (!Array.isArray(payload.items)) throw new Error('Could not load OOMOL provider icons: catalog.items is not an array')
+    const payload = (await response.json()) as { readonly items?: unknown }
+    if (!Array.isArray(payload.items)) return emptyModule
 
-  const iconUrls: Record<string, string> = {}
-  for (const item of payload.items) {
-    const candidate = item as { readonly iconUrl?: unknown; readonly service?: unknown }
-    if (typeof candidate.service == 'string' && typeof candidate.iconUrl == 'string' && candidate.iconUrl.trim()) {
-      iconUrls[candidate.service] = candidate.iconUrl
+    const iconUrls: Record<string, string> = {}
+    for (const item of payload.items) {
+      const candidate = item as { readonly iconUrl?: unknown; readonly service?: unknown }
+      if (typeof candidate.service == 'string' && typeof candidate.iconUrl == 'string' && candidate.iconUrl.trim()) {
+        iconUrls[candidate.service] = candidate.iconUrl
+      }
     }
+    return serializeProviderIcons(iconUrls)
+  } catch {
+    return emptyModule
   }
-  return serializeProviderIcons(iconUrls)
 }
 
 function serializeProviderIcons(iconUrls: Readonly<Record<string, string>>): string {
