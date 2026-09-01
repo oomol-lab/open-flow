@@ -89,6 +89,8 @@ export interface SubflowRunResult {
 
 interface TaskInvocationBase {
   readonly additionalInputs?: Readonly<Record<string, JsonValue>>
+  readonly blockId: string
+  readonly flowId: string
   readonly input: Readonly<Record<string, JsonValue>>
   readonly invocationId: string
   readonly jobId: string
@@ -550,6 +552,8 @@ function runGraph(
               const additional = new Set((node.additionalInputs ?? []).map((port) => port.handle))
               const result = yield* context.invokeTask({
                 additionalInputs: Object.fromEntries(Object.entries(nodeInputs).filter(([handle]) => additional.has(handle))),
+                blockId: node.task != null ? node.task.moduleId : node.taskId,
+                flowId: target.flowId,
                 input: Object.fromEntries(Object.entries(nodeInputs).filter(([handle]) => !additional.has(handle))),
                 invocationId: context.createId(),
                 jobId,

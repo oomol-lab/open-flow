@@ -727,7 +727,15 @@ export async function invoke(source) {
     const wrapped = value != null && typeof value == 'object' && Object.hasOwn(value, 'additionalInputs') && Object.hasOwn(value, 'input')
     const inputs = wrapped ? value.input : value
     const additionalInputs = wrapped ? value.additionalInputs : {}
-    const context = Object.freeze({ ...capability, additionalInputs, inputs })
+    const context = Object.freeze({
+      ...capability,
+      additionalInputs,
+      blockId: wrapped ? value.blockId : undefined,
+      flowId: wrapped ? value.flowId : undefined,
+      inputs,
+      runId: wrapped ? value.runId : undefined,
+      signal: new AbortController().signal,
+    })
     const result = await task(inputs, context)
     return JSON.stringify({ engineDigest: ${JSON.stringify(program.engineDigest)}, ok: true, value: result })
   } catch (error) {
@@ -895,7 +903,13 @@ function executeFlow(
             executeEffect(
               {
                 executionId: request.executionId,
-                input: { additionalInputs: invocation.additionalInputs ?? {}, input: invocation.input },
+                input: {
+                  additionalInputs: invocation.additionalInputs ?? {},
+                  blockId: invocation.blockId,
+                  flowId: invocation.flowId,
+                  input: invocation.input,
+                  runId: invocation.runId,
+                },
                 invocationId: invocation.invocationId,
                 limits: request.limits,
                 program,
