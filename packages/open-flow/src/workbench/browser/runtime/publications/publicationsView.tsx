@@ -117,7 +117,7 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
   const changingTriggerId = useVal(store.publications.$.changingTriggerId)
   const detail = useVal(store.publications.$.detail)
   const detailLoading = useVal(store.publications.$.detailLoading)
-  const diagnostics = useVal(store.workspace.$.diagnostics)
+  const diagnostics = useVal(store.$.diagnostics)
   const draft = useVal(store.workspace.$.draft)
   const flow = useVal(store.workspace.$.targetFlow)
   const live = useVal(store.publications.$.live)

@@ -38,7 +38,7 @@ function entries<T>(value: Readonly<Record<string, T>>): readonly (readonly [str
     .map((key) => [key, value[key]!] as const)
 }
 
-export async function flowClosure(content: RevisionContent): Promise<SemanticClosure> {
+export function flowDependencies(content: RevisionContent): SemanticClosure['dependencies'] {
   const bindings = new Set<string>()
   const inputBindings = new Set<string>()
   const modules = new Set<string>()
@@ -103,6 +103,13 @@ export async function flowClosure(content: RevisionContent): Promise<SemanticClo
 
   visitGraph(content.document.graph)
 
+  return { bindings, inputBindings, modules, subflows, tasks }
+}
+
+export async function flowClosure(content: RevisionContent): Promise<SemanticClosure> {
+  const dependencies = flowDependencies(content)
+  const { bindings, modules, subflows, tasks } = dependencies
+
   const bytes = canonicalJsonBytes({
     bindings: Object.fromEntries([...bindings].toSorted().map((id) => [id, content.document.bindings[id] ?? null])),
     graph: canonicalGraph(content.document.graph),
@@ -127,7 +134,7 @@ export async function flowClosure(content: RevisionContent): Promise<SemanticClo
     ),
     version: 1,
   })
-  return { dependencies: { bindings, inputBindings, modules, subflows, tasks }, digest: await digestBytes(bytes) }
+  return { dependencies, digest: await digestBytes(bytes) }
 }
 
 export function variableBindings(revision: RevisionContent, bindingIds: Iterable<string>): Readonly<Record<string, string>> {

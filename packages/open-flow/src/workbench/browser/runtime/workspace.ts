@@ -693,7 +693,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
   const common = {
     concurrency: node.concurrency,
     description: node.description,
-    diagnostics: nodeDiagnosticCount(context.target, resolved, context.diagnostics) + (connectionRequired ? 1 : 0),
+    diagnostics: nodeDiagnosticCount(context.target, resolved, context.diagnostics),
     icon: node.icon ?? connectorAction?.icon ?? nodeIcon(resolved),
     id: nodeId,
     inputs,

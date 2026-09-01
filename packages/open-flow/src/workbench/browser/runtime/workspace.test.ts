@@ -101,9 +101,22 @@ describe('Designer port projection', () => {
     }
 
     const publicNode = designerGraph(draft, { kind: 'flow' }, {}, [], { [action.actionId]: action }).nodes[0]
-    const authenticatedNode = designerGraph(draft, { kind: 'flow' }, {}, [], {
-      [action.actionId]: { ...action, authenticated: true },
-    }).nodes[0]
+    const authenticatedNode = designerGraph(
+      draft,
+      { kind: 'flow' },
+      {},
+      [
+        {
+          code: 'task.connector-connection-required',
+          column: 0,
+          line: 1,
+          message: 'Connector Task "news" requires an active Connection.',
+          path: '/document/tasks/news/executor/connectionId',
+          values: { taskId: 'news' },
+        },
+      ],
+      { [action.actionId]: { ...action, authenticated: true } },
+    ).nodes[0]
 
     expect(publicNode).toMatchObject({ diagnostics: 0, executorName: 'connector' })
     expect(authenticatedNode).toMatchObject({ diagnostics: 1, executorName: 'connection required' })

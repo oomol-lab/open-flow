@@ -1,15 +1,16 @@
 import type { I18n, TFunction } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { WorkbenchClient, ConnectorAction, ConnectorConnection, ConnectorProvider, JsonValue } from '../api.ts'
+import type { WorkbenchClient, ConnectorAction, ConnectorConnection, ConnectorProvider, Diagnostic, JsonValue } from '../api.ts'
 import type { WorkbenchHost } from '../contract.ts'
 import type { AddNodeOption } from '../designer/addNodeOptions.ts'
-import type { ResolvedSelection } from '../revisionView.ts'
+import type { ResolvedSelection, RevisionView } from '../revisionView.ts'
 import type { ConnectionCatalog } from '../workspace.ts'
 import type { Current } from './latest.ts'
 import type { SetNotice } from './workbenchNotice.ts'
 import type { WorkspaceStore } from './workspaceStore.ts'
 
 import { compute, derive, val } from 'value-enhancer'
+import { flowDependencies } from '../../../../flow/common/semantics.ts'
 import { createI18n } from '../i18n.ts'
 import { connectionCatalog } from '../workspace.ts'
 import { Latest } from './latest.ts'
@@ -46,6 +47,7 @@ export interface Connector$ {
   readonly actions: ReadonlyVal<Readonly<Record<string, ConnectorAction>>>
   readonly catalogs: ReadonlyVal<Readonly<Record<string, ConnectionCatalog>>>
   readonly connectionLoading: ReadonlyVal<string | undefined>
+  readonly diagnostics: ReadonlyVal<readonly Diagnostic[]>
   readonly selectedAction: ReadonlyVal<ConnectorAction | undefined>
   readonly selectedActionError: ReadonlyVal<string | undefined>
   readonly selectedActiveConnections: ReadonlyVal<readonly ConnectorConnection[] | undefined>
@@ -137,12 +139,40 @@ function connectorTarget(selection: ResolvedSelection | undefined): ConnectorTar
   }
 }
 
+function connectionDiagnostics(
+  revision: RevisionView | undefined,
+  actions: Readonly<Record<string, ConnectorAction>>,
+  catalogs: Readonly<Record<string, ConnectionCatalog>>,
+): readonly Diagnostic[] {
+  if (revision == null) return []
+  const diagnostics: Diagnostic[] = []
+  for (const taskId of [...flowDependencies(revision.revision.content).tasks].toSorted()) {
+    const task = revision.task(taskId)
+    if (task?.executor.kind != 'connector') continue
+    const action = actions[task.executor.action]
+    if (action?.authenticated != true) continue
+    let connection = task.executor.connectionId == null ? undefined : catalogs[action.serviceId]?.byId.get(task.executor.connectionId)
+    if (connection == null && action.defaultConnection?.connectionId == task.executor.connectionId) connection = action.defaultConnection
+    if (task.executor.connectionId != null && (catalogs[action.serviceId] == null || connection?.status == 'active')) continue
+    diagnostics.push({
+      code: 'task.connector-connection-required',
+      column: 0,
+      line: 1,
+      message: `Connector Task "${taskId}" requires an active Connection.`,
+      path: `/document/tasks/${taskId}/executor/connectionId`,
+      values: { taskId },
+    })
+  }
+  return diagnostics
+}
+
 export class ConnectorStore {
   readonly #client: WorkbenchClient
   readonly #i18n: I18n
   readonly #host: Pick<WorkbenchHost, 'openExternalPage'>
   readonly #providerActions = new Map<string, readonly ConnectorAction[]>()
   readonly #loadingActions = new Set<string>()
+  readonly #draftRefresh = new Latest()
   readonly #refresh = new Latest()
   readonly #flowReaction: () => void
   readonly #revisionReaction: () => void
@@ -192,6 +222,7 @@ export class ConnectorStore {
       actions,
       catalogs,
       connectionLoading: derive(this.#state, (state) => state.connectionLoading),
+      diagnostics: compute((get) => connectionDiagnostics(get(workspace.$.revision), get(actions), get(catalogs))),
       selectedAction: derive(this.#selected, (value) => value.action),
       selectedActionError: derive(this.#selected, (value) => value.actionError),
       selectedActiveConnections: derive(this.#selected, (value) => value.activeConnections),
@@ -205,6 +236,7 @@ export class ConnectorStore {
 
   public dispose(): void {
     this.#disposed = true
+    this.#draftRefresh.invalidate()
     this.#refresh.invalidate()
     this.#flowReaction()
     this.#revisionReaction()
@@ -215,6 +247,7 @@ export class ConnectorStore {
 
   public reset(): void {
     if (this.#disposed) return
+    this.#draftRefresh.invalidate()
     this.#refresh.invalidate()
     this.#authorization = undefined
     this.#providerActions.clear()
@@ -387,23 +420,33 @@ export class ConnectorStore {
 
   async #loadDraftActions(): Promise<void> {
     if (this.#disposed) return
-    const current = this.#refresh.capture()
+    const current = this.#draftRefresh.begin()
     const flowId = this.#workspace.$.flowId.value
     const revision = this.#workspace.$.revision.value
     if (flowId == null || revision == null) return
     const missing = [...revision.connectorActionIds].filter((actionId) => this.#state.value.actions[actionId] == null && !this.#loadingActions.has(actionId))
-    if (missing.length == 0) return
-    for (const actionId of missing) this.#loadingActions.add(actionId)
-    try {
-      const actions = await Promise.all(missing.map((actionId) => this.#client.getConnectorAction(actionId, undefined, flowId)))
-      if (!this.#isCurrent(current, flowId)) return
-      const next = { ...this.#state.value.actions }
-      for (const action of actions) next[action.actionId] = action
-      this.#set({ actions: next })
-    } catch {
-      return
-    } finally {
-      for (const actionId of missing) this.#loadingActions.delete(actionId)
+    if (missing.length > 0) {
+      for (const actionId of missing) this.#loadingActions.add(actionId)
+      try {
+        const actions = await Promise.all(missing.map((actionId) => this.#client.getConnectorAction(actionId, undefined, flowId)))
+        if (!this.#isCurrent(current, flowId)) return
+        const next = { ...this.#state.value.actions }
+        for (const action of actions) next[action.actionId] = action
+        this.#set({ actions: next })
+      } catch {
+        return
+      } finally {
+        for (const actionId of missing) this.#loadingActions.delete(actionId)
+      }
     }
+    if (!this.#isCurrent(current, flowId)) return
+    const services = new Set<string>()
+    for (const taskId of flowDependencies(revision.revision.content).tasks) {
+      const task = revision.task(taskId)
+      if (task?.executor.kind != 'connector') continue
+      const action = this.#state.value.actions[task.executor.action]
+      if (action?.authenticated == true) services.add(action.serviceId)
+    }
+    await Promise.all([...services].map((serviceId) => this.#loadCatalog(flowId, serviceId, false, current)))
   }
 }

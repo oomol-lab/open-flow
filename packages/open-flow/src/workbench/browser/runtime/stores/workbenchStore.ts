@@ -1,8 +1,9 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { WorkbenchClient, Draft, Run, RunEvent } from '../api.ts'
+import type { WorkbenchClient, Draft, FlowCheck, Run, RunEvent } from '../api.ts'
 import type { FlowChangeEvent, WorkbenchHost, WorkbenchPreferences } from '../contract.ts'
 import type { AddNodeOption } from '../designer/addNodeOptions.ts'
+import type { DiagnosticItem } from '../designer/diagnostics.ts'
 import type { DesignerTarget } from '../designer/flowChanges.ts'
 import type { DesignerEdge, DesignerNode, DesignerGraph, Point } from '../workspace.ts'
 import type { Notice } from './workbenchNotice.ts'
@@ -10,6 +11,7 @@ import type { WorkspaceBusy } from './workspaceModel.ts'
 
 import { compute, derive, val } from 'value-enhancer'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
+import { diagnosticItems } from '../designer/diagnostics.ts'
 import { createI18n } from '../i18n.ts'
 import { PublicationStore } from '../publications/publicationStore.ts'
 import { revisionView } from '../revisionView.ts'
@@ -26,6 +28,8 @@ export type Busy = WorkspaceBusy | 'cancel' | 'publish' | 'rollback' | 'run' | '
 
 export interface Workbench$ {
   readonly busy: ReadonlyVal<Busy | undefined>
+  readonly diagnosticItems: ReadonlyVal<readonly DiagnosticItem[]>
+  readonly diagnostics: ReadonlyVal<FlowCheck | undefined>
   readonly designer: ReadonlyVal<DesignerGraph>
   readonly designerNodeById: ReadonlyVal<ReadonlyMap<string, DesignerNode>>
   readonly notice: ReadonlyVal<Notice | undefined>
@@ -108,6 +112,13 @@ export class WorkbenchStore {
     this.triggers = new TriggerStore(client, this.workspace, setNotice, host, i18n)
     this.publications = new PublicationStore(client, this.workspace, setNotice, preferences, identity, i18n)
     this.runRequests = new RunRequestStore(client, this.runs, setNotice, i18n, identity)
+    const diagnostics = compute<FlowCheck | undefined>((get) => {
+      const check = get(this.workspace.$.diagnostics)
+      if (check == null) return
+      const connectorDiagnostics = get(this.connectors.$.diagnostics)
+      if (connectorDiagnostics.length == 0) return check
+      return { ...check, diagnostics: [...check.diagnostics, ...connectorDiagnostics], valid: false }
+    })
     const designerCache = new Map<string, { readonly graph: DesignerGraph; readonly inputs: readonly unknown[] }>()
     let designerFlowId: string | undefined
     const designer = compute((get) => {
@@ -118,7 +129,7 @@ export class WorkbenchStore {
       }
       const target = get(this.workspace.$.target)
       const presentation = get(this.workspace.$.presentation)?.value
-      const diagnostics = get(this.workspace.$.diagnostics)?.diagnostics
+      const designerDiagnostics = get(diagnostics)?.diagnostics ?? get(this.connectors.$.diagnostics)
       const actions = get(this.connectors.$.actions)
       const catalogs = get(this.connectors.$.catalogs)
       const t = get(i18n.t$)
@@ -131,7 +142,7 @@ export class WorkbenchStore {
       const inputs = [
         ...designerRevisionInputs(draft, target),
         presentation == null || target == null ? undefined : targetPresentation(presentation, target),
-        diagnostics,
+        designerDiagnostics,
         actions,
         catalogs,
         t,
@@ -148,7 +159,7 @@ export class WorkbenchStore {
         draft,
         target,
         presentation,
-        diagnostics,
+        designerDiagnostics,
         actions,
         catalogs,
         t,
@@ -173,6 +184,8 @@ export class WorkbenchStore {
         if (get(this.publications.$.rollingBackPublicationId) != null) return 'rollback'
         if (get(this.publications.$.changingTriggerId) != null) return 'trigger'
       }),
+      diagnosticItems: compute((get) => diagnosticItems(get(this.workspace.$.revision), get(this.workspace.$.target), get(diagnostics))),
+      diagnostics,
       designer,
       designerNodeById,
       notice: this.#notice,
