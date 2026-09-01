@@ -40,11 +40,11 @@ const codeEditorTyping = `/**
  */
 `
 
-const codeEditorSource = `export default async function (input, context) {
+const codeEditorSource = `export default async function (inputs, context) {
   await context.reportProgress(20)
   const response = await context.fetch("https://example.com")
   const text = await response.text()
-  return { result: input.value + text }
+  return { result: inputs.value + text }
 }
 `
 

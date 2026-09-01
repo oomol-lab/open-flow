@@ -723,7 +723,9 @@ async function compileProgram(
 import { capability } from './capability.mjs'
 export async function invoke(source) {
   try {
-    const value = await task(JSON.parse(source), capability)
+    const { additionalInputs = {}, input } = JSON.parse(source)
+    const context = Object.freeze({ ...capability, additionalInputs, inputs: input })
+    const value = await task(input, context)
     return JSON.stringify({ engineDigest: ${JSON.stringify(program.engineDigest)}, ok: true, value })
   } catch (error) {
     return JSON.stringify({ error: error instanceof Error ? error.message : String(error), ok: false })
@@ -890,7 +892,7 @@ function executeFlow(
             executeEffect(
               {
                 executionId: request.executionId,
-                input: invocation.input,
+                input: { additionalInputs: invocation.additionalInputs ?? {}, input: invocation.input },
                 invocationId: invocation.invocationId,
                 limits: request.limits,
                 program,

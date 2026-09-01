@@ -107,8 +107,7 @@ Engine Contract、部署中立 Runtime invocation、Scheduler 图执行语义、
 Engine digest、资源限制和恢复属于部署实现；`isolated-vm` RuntimeHost 只属于 Server。
 
 普通 Flow 数据通过声明的 input、output、edge 和 binding 传播，并在 Runtime invocation、Scheduler、Subflow、RunEvent 和 terminal result
-边界保持可序列化。脚本 `context` 只提供取消、日志、进度、Artifact、网络、Connector 等宿主能力和只读运行身份，不提供跨节点的动态
-Run store、Variable 查询或任意节点输出查询。部署可以为调度、调试和恢复私有保存 Run value，但不能把内部存储变成第二条用户数据通道。
+边界保持可序列化。脚本 `context` 提供取消、日志、进度、Artifact、网络、Connector 等宿主能力、只读运行身份，以及与第一个参数相同的 `inputs` 和始终为对象的 `additionalInputs`；不提供跨节点的动态 Run store、Variable 查询或任意节点输出查询。部署可以为调度、调试和恢复私有保存 Run value，但不能把内部存储变成第二条用户数据通道。
 
 Server 将一次 Flow Run 作为一个逻辑 Runtime session 交给 Executor，Scheduler 和内联 Code Task 执行都在该 session 内；SQLite、RunEvent 投影、
 外部 Task 和 Capability mediation 仍由 Host 持有。Executor process 可以承载多个并发 session，但每次 Code Task invocation 使用新的 isolate；process

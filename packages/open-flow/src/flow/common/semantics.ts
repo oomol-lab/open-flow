@@ -541,7 +541,7 @@ function nodeInputPorts(document: FlowDocument, node: GraphNode): Readonly<Recor
     case 'subflow':
       return portsByHandle(document.subflows[node.subflowId]?.inputs ?? [])
     case 'task':
-      return portsByHandle(node.task != null ? node.task.inputs : (document.tasks[node.taskId]?.inputs ?? []))
+      return portsByHandle([...(node.task != null ? node.task.inputs : (document.tasks[node.taskId]?.inputs ?? [])), ...(node.additionalInputs ?? [])])
     case 'cron':
     case 'integration':
     case 'poll':

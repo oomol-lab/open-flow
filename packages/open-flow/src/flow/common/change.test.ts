@@ -44,7 +44,7 @@ describe('Flow changes', () => {
     const changed = applyFlowChanges(revision(), createCodeTask(target, { moduleId: 'module', nodeId: 'task' }, 'Code'))
     const source = changed.modules.module?.source
 
-    expect(source).toBe('export default async function (input, context) {\n  return { result: input.value }\n}\n')
+    expect(source).toBe('export default async function (inputs, context) {\n  return { result: inputs.value }\n}\n')
   })
 
   it('applies every resource lifecycle operation in order', () => {

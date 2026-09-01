@@ -16,8 +16,8 @@ import type {
 
 import { applyFlowChanges } from './change.ts'
 
-const codeTaskTemplate = `export default async function (input, context) {
-  return { result: input.value }
+const codeTaskTemplate = `export default async function (inputs, context) {
+  return { result: inputs.value }
 }
 `
 

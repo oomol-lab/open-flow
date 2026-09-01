@@ -118,7 +118,19 @@ function canonicalNode(value: GraphNode): JsonValue {
     case 'subflow':
       return { ...common, kind: value.kind, subflowId: value.subflowId }
     case 'task':
-      return value.task != null ? { ...common, kind: value.kind, task: canonicalInlineTask(value.task) } : { ...common, kind: value.kind, taskId: value.taskId }
+      return value.task != null
+        ? {
+            ...common,
+            ...(value.additionalInputs == null ? {} : { additionalInputs: canonicalPorts(value.additionalInputs) }),
+            kind: value.kind,
+            task: canonicalInlineTask(value.task),
+          }
+        : {
+            ...common,
+            ...(value.additionalInputs == null ? {} : { additionalInputs: canonicalPorts(value.additionalInputs) }),
+            kind: value.kind,
+            taskId: value.taskId,
+          }
     case 'value':
       return { ...common, kind: value.kind, values: canonicalPorts(value.values) }
   }

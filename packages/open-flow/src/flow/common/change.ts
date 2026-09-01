@@ -158,8 +158,8 @@ export interface ManagedTaskDefinition extends TaskDefinitionBase {
 export type TaskDefinition = InlineTaskDefinition | ManagedTaskDefinition
 
 export type TaskNode = GraphNodeBase & { readonly kind: 'task' } & (
-    | { readonly task: InlineTaskDefinition; readonly taskId?: never }
-    | { readonly task?: never; readonly taskId: string }
+    | { readonly additionalInputs?: readonly InputPort[]; readonly task: InlineTaskDefinition; readonly taskId?: never }
+    | { readonly additionalInputs?: readonly InputPort[]; readonly task?: never; readonly taskId: string }
   )
 
 export interface Graph {
