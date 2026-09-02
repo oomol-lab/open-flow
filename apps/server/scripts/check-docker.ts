@@ -63,7 +63,7 @@ try {
         ],
         version: 1,
       }),
-      headers: { 'content-type': 'application/json', 'cookie': firstCookie },
+      headers: { 'content-type': 'application/json', 'cookie': firstCookie, 'idempotency-key': `change-${suffix}` },
       method: 'POST',
     },
     200,
