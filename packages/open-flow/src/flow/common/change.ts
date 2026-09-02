@@ -523,6 +523,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const graph = selectedGraph(document, operation.target)
         const node = graph.nodes[operation.nodeId]
         if (node == null || !dequal(Reflect.get(node, operation.field), operation.before)) invalid()
+        if (operation.field == 'concurrency' && operation.value == null) invalid()
         const updated = { ...node }
         if (operation.value == null) Reflect.deleteProperty(updated, operation.field)
         else Object.assign(updated, { [operation.field]: operation.value })

@@ -181,6 +181,54 @@ describe('DraftChanges', () => {
     )
   })
 
+  it('uses a new change identity after an uncertain request rebases', async () => {
+    const remote = draft('revision-2', undefined, 'Remote')
+    const request = vi.fn(async (_path: string, _init?: RequestInit) => {
+      if (request.mock.calls.length == 1) throw new Error('Request failed')
+      return Response.json({
+        revision: {
+          actorId: 'actor',
+          createdAt: '2026-09-02T00:00:02.000Z',
+          digest: 'digest-revision-3',
+          flowId: 'flow',
+          modelVersion: 1,
+          parentRevisionId: 'revision-2',
+          revisionId: 'revision-3',
+          version: 1,
+        },
+        version: 1,
+      })
+    })
+    let applied = draft('revision-1')
+    let changes: DraftChanges
+    changes = new DraftChanges(new WorkbenchClient(request), vi.fn(), createI18n('en'), {
+      apply: (value) => {
+        applied = value
+      },
+      beforeChange: () => {},
+      check: () => {},
+      current: () => true,
+      diagnostics: () => undefined,
+      finishChanges: () => {},
+      headChanged: () => {},
+      recover: async () => {
+        applied = changes.replaceCommitted(remote)
+        return true
+      },
+    })
+    changes.reset(applied)
+
+    await changes.change({ current: () => true, flowId: 'flow' }, applied, [
+      { before: undefined, field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Local' },
+    ])
+
+    expect(applied.content.document.graph.nodes.task).toMatchObject({ description: 'Remote', name: 'Local' })
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(new Headers(request.mock.calls[0]?.[1]?.headers).get('idempotency-key')).not.toBe(
+      new Headers(request.mock.calls[1]?.[1]?.headers).get('idempotency-key'),
+    )
+  })
+
   it('silently drops a pending field changed by the latest snapshot', async () => {
     const remote = draft('revision-2', 'Remote')
     const request = vi.fn(async () => conflict())

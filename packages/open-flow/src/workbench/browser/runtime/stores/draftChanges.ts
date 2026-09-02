@@ -161,9 +161,13 @@ export class DraftChanges {
           if (recovered) await this.#hooks.recover(pending)
           this.#reject(pending)
         } else {
-          if (!(error instanceof ApiError) && !recovered && (await this.#hooks.recover(pending))) {
-            recovered = true
-            continue
+          if (!(error instanceof ApiError) && !recovered) {
+            const revisionId = this.#committed?.revisionId
+            if (await this.#hooks.recover(pending)) {
+              recovered = true
+              if (pending.active && this.#committed?.revisionId != revisionId) pending.changeId = crypto.randomUUID()
+              continue
+            }
           }
           this.#reject(pending)
           if (this.#hooks.current(pending)) this.#setNotice(errorNotice(error, this.#i18n.t))

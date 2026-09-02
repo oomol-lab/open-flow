@@ -192,6 +192,12 @@ describe('Flow changes', () => {
     expect(() => applyFlowChanges(revision(), [operation])).toThrow(FlowChangeError)
   })
 
+  it('rejects removing node concurrency', () => {
+    expect(() => applyFlowChanges(revision(), [{ before: 1, field: 'concurrency', kind: 'graph.node.field.set', nodeId: 'value', target }])).toThrow(
+      FlowChangeError,
+    )
+  })
+
   it('does not mutate the input when a later operation fails', () => {
     const source = revision()
     expect(() =>
