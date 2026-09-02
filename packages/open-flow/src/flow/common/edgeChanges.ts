@@ -12,7 +12,7 @@ export function connect(content: RevisionContent, target: GraphTarget, edge: Gra
   ) {
     return []
   }
-  return cleanVariableBindings(content, [{ edge: exact, kind: 'graph.edge.connect', target }])
+  return cleanVariableBindings(content, [{ before: mapping, edge: exact, kind: 'graph.edge.connect', target }])
 }
 
 export function disconnect(content: RevisionContent, target: GraphTarget, edge: GraphEdge): readonly ChangeOperation[] {
@@ -25,7 +25,7 @@ export function disconnect(content: RevisionContent, target: GraphTarget, edge: 
   ) {
     return []
   }
-  return [{ edge: exact, kind: 'graph.edge.disconnect', target }]
+  return [{ before: mapping, edge: exact, kind: 'graph.edge.disconnect', target }]
 }
 
 function graph(content: RevisionContent, target: GraphTarget) {

@@ -16,10 +16,16 @@ export async function imports(source: string): Promise<readonly string[]> {
   }
 }
 
-export function replaceSource(moduleId: string, source: string, moduleImports: readonly string[]): readonly ChangeOperation[] {
-  return [{ imports: moduleImports, kind: 'module.source.replace', moduleId, source }]
+export function replaceSource(
+  moduleId: string,
+  beforeSource: string,
+  beforeImports: readonly string[],
+  source: string,
+  moduleImports: readonly string[],
+): readonly ChangeOperation[] {
+  return [{ beforeImports, beforeSource, imports: moduleImports, kind: 'module.source.replace', moduleId, source }]
 }
 
-export function rename(moduleId: string, name: string): readonly ChangeOperation[] {
-  return [{ kind: 'module.rename', moduleId, name }]
+export function rename(moduleId: string, before: string, name: string): readonly ChangeOperation[] {
+  return [{ before, kind: 'module.rename', moduleId, name }]
 }

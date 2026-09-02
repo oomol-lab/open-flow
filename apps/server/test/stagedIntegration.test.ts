@@ -50,7 +50,7 @@ async function addStripe(service: ServerService, flowId: string, revisionId: str
 
 async function replaceStripe(service: ServerService, flowId: string, revisionId: string, events: readonly string[]): Promise<string> {
   const changed = await service.control.changeDraft('operator', flowId, revisionId, [
-    { kind: 'graph.node.replace', node: stripeNode(events), nodeId: 'stripe', target: { kind: 'flow' } },
+    { before: ['charge.succeeded'], kind: 'graph.trigger.config.set', name: 'events', nodeId: 'stripe', value: events },
   ])
   return changed.revision.revisionId
 }

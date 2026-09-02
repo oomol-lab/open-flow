@@ -86,6 +86,13 @@
   }
 }
 
+.sourceEditor {
+  overflow: hidden;
+  border-radius: var(--widget-radius);
+  --vscode-editor-background: transparent;
+  --vscode-editorGutter-background: transparent;
+}
+
 .deleteBtn {
   margin-left: 4px;
   font-size: 14px;

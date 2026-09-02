@@ -17,12 +17,14 @@ import type { JsonSchema } from './types.ts'
 
 import { isDefined, isString } from '@wopjs/cast'
 import { clsx } from 'clsx'
+import { dequal } from 'dequal/lite'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDerived, useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { setValue, val } from 'value-enhancer'
 import { HANDLE_ROW_CLASSNAME, HANDLE_ROW_EXPANDED_CLASSNAME } from '../base/designer.ts'
 import { stopEvent } from '../base/dom.ts'
+import { useDelayedTrue } from '../base/react.ts'
 import { toRFHandleName } from '../base/rfHelpers.ts'
 import {
   asArray,
@@ -432,6 +434,7 @@ function VariableBinding({
   onOpen,
 }: NonNullable<HandleEditorProps['variable']> & { readonly disabled: boolean }) {
   const t = useTranslate()
+  const displayedLoading = useDelayedTrue(loading, 200)
   const unavailable = !enabled
   const missing = !unavailable && loaded && name != null && !names.includes(name)
   const options: IBasicOption[] = [
@@ -453,7 +456,7 @@ function VariableBinding({
           onChange={(option) => onChange(option?.value)}
           onOpen={onOpen}
           options={options}
-          placeholder={loading ? t('handleEditor.variablesLoading') : t('handleEditor.selectVariable')}
+          placeholder={displayedLoading ? t('handleEditor.variablesLoading') : t('handleEditor.selectVariable')}
           value={value}
           variant={missing || unavailable ? 'danger' : 'default'}
         />
@@ -628,7 +631,9 @@ const ValueReconciler = /*#__PURE__*/ memo(function ValueReconciler(props: Value
   const expected = asPrimitiveType(props.type)
   const valueType = inferPrimitiveType(value)
 
-  const schema = useVal(props.type == 'select' || props.type == 'multiSelect' || props.type == 'anyOf' ? props.store.schema$ : undefined)
+  const schema = useVal(
+    props.type == 'select' || props.type == 'multiSelect' || props.type == 'anyOf' || props.type == 'literal' ? props.store.schema$ : undefined,
+  )
 
   // Open the schema editor when enum or anyOf options are empty.
   if (props.store.context.canEditSchema) {
@@ -662,6 +667,14 @@ const ValueReconciler = /*#__PURE__*/ memo(function ValueReconciler(props: Value
     }
 
     return <ValueError {...props} error={t('inputHandleEditor.enumError')} />
+  }
+
+  if (props.type === 'literal' && !dequal(value, toPlainObject(schema)?.const)) {
+    if (value === null && props.nullable) {
+      return <ValueNullable {...props} />
+    }
+
+    return <ValueError {...props} error={t('inputHandleEditor.literalError')} />
   }
 
   // Show a repair action when the value has the wrong type.
@@ -709,6 +722,8 @@ const ValueReconciler = /*#__PURE__*/ memo(function ValueReconciler(props: Value
       return <ValueAnyOf {...props} store={props.store as AnyOfWidgetStore} />
     case 'binary':
       return <ValueBinary {...props} />
+    case 'literal':
+      return <ValueLiteral {...props} />
     case 'any':
       return <ValueAny {...props} />
     case 'null':
@@ -859,6 +874,22 @@ function ValueSelect(props: ValueProps) {
         const v = e === null ? (props.nullable ? e : undefined) : (options.find((o) => o.value === e)?.realValue ?? e)
         props.store.value$?.set(v)
       }}
+      disabled={!props.store.context.canEditValue}
+    />
+  )
+}
+
+function ValueLiteral(props: ValueProps) {
+  const literal = useDerived(props.store.schema$, (schema) => toPlainObject(schema)?.const, equalConfig)
+  const option = { label: inspect(literal), value: 'literal' }
+
+  return (
+    <Select
+      isSuffix={props.isSuffix}
+      options={[option]}
+      value={option}
+      isClearable={props.nullable && props.store.context.canEditValue}
+      onChange={(selected) => props.store.value$?.set(selected == null && props.nullable ? null : literal)}
       disabled={!props.store.context.canEditValue}
     />
   )

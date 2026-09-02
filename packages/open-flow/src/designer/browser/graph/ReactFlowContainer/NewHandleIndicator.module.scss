@@ -8,3 +8,16 @@
   border-bottom: 1px solid var(--widget-font-color);
   z-index: 1001;
 }
+
+.label {
+  position: absolute;
+  right: 0;
+  bottom: 4px;
+  padding: 2px 5px;
+  color: var(--widget-font-color);
+  background: var(--node-background-color);
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}

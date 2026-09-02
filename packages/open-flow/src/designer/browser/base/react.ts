@@ -115,6 +115,21 @@ export function useDebouncedValue<T>(value: T, delay: number): T {
   return debouncedValue
 }
 
+export function useDelayedTrue(value: boolean, delay: number): boolean {
+  const [displayed, setDisplayed] = useState(false)
+
+  useEffect(() => {
+    if (!value) {
+      setDisplayed(false)
+      return
+    }
+    const timer = setTimeout(() => setDisplayed(true), delay)
+    return () => clearTimeout(timer)
+  }, [delay, value])
+
+  return displayed
+}
+
 export function isEmptyReactNode(node: React.ReactNode): boolean {
   if (node == null) return true
   if (typeof node === 'string' || typeof node === 'number') return false

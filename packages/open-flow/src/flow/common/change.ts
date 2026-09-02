@@ -1,3 +1,5 @@
+import { dequal } from 'dequal/lite'
+
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
 export const resourceNameMaxLength = 80
@@ -292,27 +294,114 @@ export interface GraphEdge {
 
 export type ChangeOperation =
   | { readonly binding: FlowDocument['bindings'][string]; readonly bindingId: string; readonly kind: 'binding.create' }
-  | { readonly binding: FlowDocument['bindings'][string]; readonly bindingId: string; readonly kind: 'binding.replace' }
   | { readonly bindingId: string; readonly kind: 'binding.delete' }
-  | { readonly kind: 'graph.edge.connect'; readonly edge: GraphEdge; readonly target: GraphTarget }
-  | { readonly kind: 'graph.edge.disconnect'; readonly edge: GraphEdge; readonly target: GraphTarget }
+  | { readonly before: string; readonly bindingId: string; readonly kind: 'binding.target.set'; readonly value: string }
+  | { readonly before?: InputMapping; readonly kind: 'graph.edge.connect'; readonly edge: GraphEdge; readonly target: GraphTarget }
+  | { readonly before?: InputMapping; readonly kind: 'graph.edge.disconnect'; readonly edge: GraphEdge; readonly target: GraphTarget }
+  | {
+      readonly before?: readonly InputPort[]
+      readonly kind: 'graph.node.additional-inputs.set'
+      readonly nodeId: string
+      readonly target: GraphTarget
+      readonly value?: readonly InputPort[]
+    }
+  | {
+      readonly before: Pick<ConditionNode, 'cases' | 'defaultOutput' | 'input'>
+      readonly kind: 'graph.node.condition.set'
+      readonly nodeId: string
+      readonly target: GraphTarget
+      readonly value: Pick<ConditionNode, 'cases' | 'defaultOutput' | 'input'>
+    }
   | { readonly kind: 'graph.node.create'; readonly node: GraphNode; readonly nodeId: string; readonly target: GraphTarget }
   | { readonly kind: 'graph.node.delete'; readonly nodeId: string; readonly target: GraphTarget }
-  | { readonly kind: 'graph.node.replace'; readonly node: GraphNode; readonly nodeId: string; readonly target: GraphTarget }
+  | {
+      readonly before?: number | string
+      readonly field: 'concurrency' | 'description' | 'icon' | 'name' | 'timeoutMs'
+      readonly kind: 'graph.node.field.set'
+      readonly nodeId: string
+      readonly target: GraphTarget
+      readonly value?: number | string
+    }
+  | {
+      readonly before?: InputMapping
+      readonly handle: string
+      readonly kind: 'graph.node.input.set'
+      readonly nodeId: string
+      readonly target: GraphTarget
+      readonly value?: InputMapping
+    }
+  | {
+      readonly before: Pick<InlineTaskDefinition, 'inputs' | 'outputs'>
+      readonly kind: 'graph.node.task.ports.set'
+      readonly nodeId: string
+      readonly target: GraphTarget
+      readonly value: Pick<InlineTaskDefinition, 'inputs' | 'outputs'>
+    }
+  | {
+      readonly before: string
+      readonly kind: 'graph.node.task.name.set'
+      readonly nodeId: string
+      readonly target: GraphTarget
+      readonly value: string
+    }
+  | {
+      readonly before: readonly InputPort[]
+      readonly kind: 'graph.node.values.set'
+      readonly nodeId: string
+      readonly target: GraphTarget
+      readonly value: readonly InputPort[]
+    }
+  | {
+      readonly before: Pick<WaitNode, 'actions' | 'notification' | 'prompt'>
+      readonly kind: 'graph.node.wait.set'
+      readonly nodeId: string
+      readonly target: Extract<GraphTarget, { readonly kind: 'flow' }>
+      readonly value: Pick<WaitNode, 'actions' | 'notification' | 'prompt'>
+    }
+  | {
+      readonly before: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'inputsDef' | 'options'>
+      readonly kind: 'graph.node.webhook.set'
+      readonly nodeId: string
+      readonly target: Extract<GraphTarget, { readonly kind: 'flow' }>
+      readonly value: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'inputsDef' | 'options'>
+    }
+  | {
+      readonly before?: JsonValue
+      readonly kind: 'graph.trigger.config.set'
+      readonly name: string
+      readonly nodeId: string
+      readonly value?: JsonValue
+    }
+  | {
+      readonly before: readonly TriggerSchedule[]
+      readonly kind: 'graph.trigger.schedule.set'
+      readonly nodeId: string
+      readonly value: readonly TriggerSchedule[]
+    }
   | { readonly kind: 'module.create'; readonly module: CodeModule; readonly moduleId: string }
   | { readonly kind: 'module.delete'; readonly moduleId: string }
-  | { readonly kind: 'module.rename'; readonly moduleId: string; readonly name: string }
-  | { readonly imports: readonly string[]; readonly kind: 'module.source.replace'; readonly moduleId: string; readonly source: string }
+  | { readonly before: string; readonly kind: 'module.rename'; readonly moduleId: string; readonly name: string }
+  | {
+      readonly beforeImports: readonly string[]
+      readonly beforeSource: string
+      readonly imports: readonly string[]
+      readonly kind: 'module.source.replace'
+      readonly moduleId: string
+      readonly source: string
+    }
   | { readonly kind: 'subflow.create'; readonly subflow: FlowDocument['subflows'][string]; readonly subflowId: string }
   | {
+      readonly before: Omit<FlowDocument['subflows'][string], 'graph'>
       readonly definition: Omit<FlowDocument['subflows'][string], 'graph'>
-      readonly kind: 'subflow.definition.replace'
+      readonly kind: 'subflow.definition.set'
       readonly subflowId: string
     }
   | { readonly kind: 'subflow.delete'; readonly subflowId: string }
   | { readonly kind: 'task.create'; readonly task: FlowDocument['tasks'][string]; readonly taskId: string }
+  | { readonly before?: string; readonly kind: 'task.connector.connection.set'; readonly taskId: string; readonly value?: string }
   | { readonly kind: 'task.delete'; readonly taskId: string }
-  | { readonly kind: 'task.replace'; readonly task: FlowDocument['tasks'][string]; readonly taskId: string }
+  | { readonly before: 'chat' | 'json'; readonly kind: 'task.llm.mode.set'; readonly taskId: string; readonly value: 'chat' | 'json' }
+  | { readonly before: string; readonly kind: 'task.name.set'; readonly taskId: string; readonly value: string }
 
 export class FlowChangeError extends Error {}
 
@@ -355,15 +444,17 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         if (document.bindings[operation.bindingId] != null) invalid()
         document.bindings = { ...document.bindings, [operation.bindingId]: operation.binding }
         break
-      case 'binding.replace':
-        if (document.bindings[operation.bindingId] == null) invalid()
-        document.bindings = { ...document.bindings, [operation.bindingId]: operation.binding }
-        break
       case 'binding.delete': {
         if (document.bindings[operation.bindingId] == null) invalid()
         const bindings = { ...document.bindings }
         delete bindings[operation.bindingId]
         document.bindings = bindings
+        break
+      }
+      case 'binding.target.set': {
+        const binding = document.bindings[operation.bindingId]
+        if (binding == null || binding.target != operation.before) invalid()
+        document.bindings = { ...document.bindings, [operation.bindingId]: { ...binding, target: operation.value } }
         break
       }
       case 'graph.edge.connect': {
@@ -372,6 +463,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const node = graph.nodes[operation.edge.target]
         if (node == null || !('inputs' in node)) invalid()
         const mapping = node.inputs[operation.edge.targetHandle]
+        if (!dequal(mapping, operation.before)) invalid()
         const source: NodeSource = { kind: 'node', nodeId: operation.edge.source, output: operation.edge.sourceHandle }
         const sources =
           mapping?.kind == 'sources'
@@ -387,7 +479,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const node = graph.nodes[operation.edge.target]
         if (node == null || !('inputs' in node)) invalid()
         const mapping = node.inputs[operation.edge.targetHandle]
-        if (mapping?.kind != 'sources') invalid()
+        if (mapping?.kind != 'sources' || !dequal(mapping, operation.before)) invalid()
         const sources = mapping.sources.filter(
           (source) => source.kind != 'node' || source.nodeId != operation.edge.source || source.output != operation.edge.sourceHandle,
         )
@@ -396,6 +488,31 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         if (sources.length == 0) delete inputs[operation.edge.targetHandle]
         else inputs[operation.edge.targetHandle] = { kind: 'sources', sources }
         Object.assign(document, replaceGraph(document, operation.target, { nodes: { ...graph.nodes, [operation.edge.target]: { ...node, inputs } } }))
+        break
+      }
+      case 'graph.node.additional-inputs.set': {
+        const graph = selectedGraph(document, operation.target)
+        const node = graph.nodes[operation.nodeId]
+        if (node?.kind != 'task' || !dequal(node.additionalInputs, operation.before)) invalid()
+        const { additionalInputs: _, ...rest } = node
+        const updated: TaskNode = operation.value == null ? rest : { ...rest, additionalInputs: operation.value }
+        Object.assign(document, replaceGraph(document, operation.target, { nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
+        break
+      }
+      case 'graph.node.condition.set': {
+        const graph = selectedGraph(document, operation.target)
+        const node = graph.nodes[operation.nodeId]
+        if (node?.kind != 'condition') invalid()
+        if (
+          !dequal(node.cases, operation.before.cases) ||
+          node.defaultOutput != operation.before.defaultOutput ||
+          !dequal(node.input, operation.before.input)
+        ) {
+          invalid()
+        }
+        const { defaultOutput: _, ...rest } = node
+        const updated: ConditionNode = operation.value.defaultOutput == null ? { ...rest, ...operation.value } : { ...node, ...operation.value }
+        Object.assign(document, replaceGraph(document, operation.target, { nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
         break
       }
       case 'graph.node.create': {
@@ -422,10 +539,101 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         }
         break
       }
-      case 'graph.node.replace': {
+      case 'graph.node.field.set': {
         const graph = selectedGraph(document, operation.target)
-        if (graph.nodes[operation.nodeId] == null || (operation.target.kind == 'subflow' && !('inputs' in operation.node))) invalid()
-        Object.assign(document, replaceGraph(document, operation.target, { nodes: { ...graph.nodes, [operation.nodeId]: operation.node } }))
+        const node = graph.nodes[operation.nodeId]
+        if (node == null || !dequal(Reflect.get(node, operation.field), operation.before)) invalid()
+        if (operation.field == 'concurrency' && operation.value == null) invalid()
+        const updated = { ...node }
+        if (operation.value == null) Reflect.deleteProperty(updated, operation.field)
+        else Object.assign(updated, { [operation.field]: operation.value })
+        Object.assign(document, replaceGraph(document, operation.target, { nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
+        break
+      }
+      case 'graph.node.input.set': {
+        const graph = selectedGraph(document, operation.target)
+        const node = graph.nodes[operation.nodeId]
+        if (node == null || !('inputs' in node) || !dequal(node.inputs[operation.handle], operation.before)) invalid()
+        const inputs = { ...node.inputs }
+        if (operation.value == null) delete inputs[operation.handle]
+        else inputs[operation.handle] = operation.value
+        Object.assign(document, replaceGraph(document, operation.target, { nodes: { ...graph.nodes, [operation.nodeId]: { ...node, inputs } } }))
+        break
+      }
+      case 'graph.node.task.name.set': {
+        const graph = selectedGraph(document, operation.target)
+        const node = graph.nodes[operation.nodeId]
+        if (node?.kind != 'task' || node.task == null || node.task.name != operation.before) invalid()
+        const updated = { ...node, task: { ...node.task, name: operation.value } }
+        Object.assign(document, replaceGraph(document, operation.target, { nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
+        break
+      }
+      case 'graph.node.task.ports.set': {
+        const graph = selectedGraph(document, operation.target)
+        const node = graph.nodes[operation.nodeId]
+        if (node?.kind != 'task' || node.task == null || !dequal({ inputs: node.task.inputs, outputs: node.task.outputs }, operation.before)) invalid()
+        const updated = { ...node, task: { ...node.task, ...operation.value } }
+        Object.assign(document, replaceGraph(document, operation.target, { nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
+        break
+      }
+      case 'graph.node.values.set': {
+        const graph = selectedGraph(document, operation.target)
+        const node = graph.nodes[operation.nodeId]
+        if (node?.kind != 'value' || !dequal(node.values, operation.before)) invalid()
+        Object.assign(
+          document,
+          replaceGraph(document, operation.target, { nodes: { ...graph.nodes, [operation.nodeId]: { ...node, values: operation.value } } }),
+        )
+        break
+      }
+      case 'graph.node.wait.set': {
+        const graph = document.graph
+        const node = graph.nodes[operation.nodeId]
+        if (
+          node?.kind != 'wait' ||
+          !dequal(
+            {
+              actions: node.actions,
+              ...(node.notification == null ? {} : { notification: node.notification }),
+              prompt: node.prompt,
+            },
+            operation.before,
+          )
+        ) {
+          invalid()
+        }
+        const { notification: _, ...rest } = node
+        const updated: WaitNode = operation.value.notification == null ? { ...rest, ...operation.value } : { ...node, ...operation.value }
+        document.graph = { nodes: { ...graph.nodes, [operation.nodeId]: updated } }
+        break
+      }
+      case 'graph.node.webhook.set': {
+        const graph = selectedGraph(document, operation.target)
+        const node = graph.nodes[operation.nodeId]
+        if (node?.kind != 'webhook' || !dequal(node.inputsDef, operation.before.inputsDef) || !dequal(node.options, operation.before.options)) invalid()
+        const { options: _, ...rest } = node
+        const updated: TriggerNode = operation.value.options == null ? { ...rest, inputsDef: operation.value.inputsDef } : { ...node, ...operation.value }
+        Object.assign(document, replaceGraph(document, operation.target, { nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
+        break
+      }
+      case 'graph.trigger.config.set': {
+        const graph = document.graph
+        const node = graph.nodes[operation.nodeId]
+        if (node == null || (node.kind != 'integration' && node.kind != 'poll') || !dequal(node.config[operation.name], operation.before)) invalid()
+        const config = { ...node.config }
+        if (operation.value === undefined) delete config[operation.name]
+        else config[operation.name] = operation.value
+        document.graph = { nodes: { ...graph.nodes, [operation.nodeId]: { ...node, config } } }
+        break
+      }
+      case 'graph.trigger.schedule.set': {
+        const graph = document.graph
+        const node = graph.nodes[operation.nodeId]
+        if (node == null || (node.kind != 'cron' && node.kind != 'poll')) invalid()
+        const before = node.kind == 'cron' ? node.cronTimes : node.pollTimes
+        if (!dequal(before, operation.before)) invalid()
+        const updated: TriggerNode = node.kind == 'cron' ? { ...node, cronTimes: operation.value } : { ...node, pollTimes: operation.value }
+        document.graph = { nodes: { ...graph.nodes, [operation.nodeId]: updated } }
         break
       }
       case 'module.create':
@@ -438,13 +646,13 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         break
       case 'module.rename': {
         const module = modules[operation.moduleId]
-        if (module == null) invalid()
+        if (module == null || module.name != operation.before) invalid()
         modules[operation.moduleId] = { ...module, name: operation.name }
         break
       }
       case 'module.source.replace': {
         const module = modules[operation.moduleId]
-        if (module == null) invalid()
+        if (module == null || module.source != operation.beforeSource || !dequal(module.imports, operation.beforeImports)) invalid()
         modules[operation.moduleId] = { ...module, imports: operation.imports, source: operation.source }
         break
       }
@@ -452,9 +660,9 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         if (document.subflows[operation.subflowId] != null) invalid()
         document.subflows = { ...document.subflows, [operation.subflowId]: operation.subflow }
         break
-      case 'subflow.definition.replace': {
+      case 'subflow.definition.set': {
         const subflow = document.subflows[operation.subflowId]
-        if (subflow == null) invalid()
+        if (subflow == null || !dequal({ inputs: subflow.inputs, name: subflow.name, outputs: subflow.outputs }, operation.before)) invalid()
         document.subflows = { ...document.subflows, [operation.subflowId]: { ...operation.definition, graph: subflow.graph } }
         break
       }
@@ -469,6 +677,14 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         if (document.tasks[operation.taskId] != null) invalid()
         document.tasks = { ...document.tasks, [operation.taskId]: operation.task }
         break
+      case 'task.connector.connection.set': {
+        const task = document.tasks[operation.taskId]
+        if (task == null || !('executor' in task) || task.executor.kind != 'connector' || task.executor.connectionId != operation.before) invalid()
+        const { connectionId: _, ...executor } = task.executor
+        const next = operation.value == null ? executor : { ...executor, connectionId: operation.value }
+        document.tasks = { ...document.tasks, [operation.taskId]: { ...task, executor: next } }
+        break
+      }
       case 'task.delete': {
         if (document.tasks[operation.taskId] == null) invalid()
         const tasks = { ...document.tasks }
@@ -476,10 +692,18 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         document.tasks = tasks
         break
       }
-      case 'task.replace':
-        if (document.tasks[operation.taskId] == null) invalid()
-        document.tasks = { ...document.tasks, [operation.taskId]: operation.task }
+      case 'task.llm.mode.set': {
+        const task = document.tasks[operation.taskId]
+        if (task == null || !('executor' in task) || task.executor.kind != 'llm' || task.executor.mode != operation.before) invalid()
+        document.tasks = { ...document.tasks, [operation.taskId]: { ...task, executor: { ...task.executor, mode: operation.value } } }
         break
+      }
+      case 'task.name.set': {
+        const task = document.tasks[operation.taskId]
+        if (task == null || task.name != operation.before) invalid()
+        document.tasks = { ...document.tasks, [operation.taskId]: { ...task, name: operation.value } }
+        break
+      }
     }
   }
   return { document, modelVersion: content.modelVersion, modules }

@@ -73,7 +73,7 @@ describe('Designer port projection', () => {
               news: {
                 additionalInputs: [{ handle: 'start', jsonSchema: {}, nullable: false }],
                 concurrency: 1,
-                inputs: { start: { kind: 'value', value: 'manual' } },
+                inputs: {},
                 kind: 'task',
                 taskId: 'news',
               },
@@ -130,7 +130,7 @@ describe('Designer port projection', () => {
     ).nodes[0]
 
     expect(publicNode).toMatchObject({
-      additionalInputs: [{ handle: 'start', value: 'manual' }],
+      additionalInputs: [{ handle: 'start', jsonSchema: {}, nullable: false }],
       diagnostics: 0,
       editableAdditionalInputs: true,
       executorName: 'connector',

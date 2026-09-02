@@ -17,21 +17,19 @@ interface CodeMirrorModules {
   readonly Compartment: typeof import('@codemirror/state').Compartment
   readonly EditorState: typeof import('@codemirror/state').EditorState
   readonly EditorView: typeof import('@codemirror/view').EditorView
-  readonly HighlightStyle: typeof import('@codemirror/language').HighlightStyle
   readonly basicSetup: typeof import('codemirror').basicSetup
+  readonly githubDark: typeof import('@uiw/codemirror-theme-github').githubDark
+  readonly githubLight: typeof import('@uiw/codemirror-theme-github').githubLight
   readonly javascript: typeof import('@codemirror/lang-javascript').javascript
   readonly json: typeof import('@codemirror/lang-json').json
   readonly markdown: typeof import('@codemirror/lang-markdown').markdown
   readonly StateEffect: typeof import('@codemirror/state').StateEffect
-  readonly syntaxHighlighting: typeof import('@codemirror/language').syntaxHighlighting
-  readonly tags: typeof import('@lezer/highlight').tags
   readonly yaml: typeof import('@codemirror/lang-yaml').yaml
 }
 
 interface CodeMirrorStringEditorFactoryOptions {
   readonly darkMode$?: ReadonlyVal<boolean>
   readonly extension?: Promise<Extension | undefined>
-  readonly theme?: Extension
 }
 
 type Listener<T> = (event: T) => void
@@ -78,24 +76,22 @@ async function loadCodeMirrorModules(): Promise<CodeMirrorModules> {
       import('codemirror'),
       import('@codemirror/state'),
       import('@codemirror/view'),
-      import('@codemirror/language'),
+      import('@uiw/codemirror-theme-github'),
       import('@codemirror/lang-javascript'),
       import('@codemirror/lang-json'),
       import('@codemirror/lang-markdown'),
       import('@codemirror/lang-yaml'),
-      import('@lezer/highlight'),
-    ]).then(([codeMirror, state, view, language, javascript, json, markdown, yaml, highlight]) => ({
+    ]).then(([codeMirror, state, view, github, javascript, json, markdown, yaml]) => ({
       basicSetup: codeMirror.basicSetup,
       Compartment: state.Compartment,
       EditorState: state.EditorState,
       EditorView: view.EditorView,
-      HighlightStyle: language.HighlightStyle,
+      githubDark: github.githubDark,
+      githubLight: github.githubLight,
       javascript: javascript.javascript,
       json: json.json,
       markdown: markdown.markdown,
       StateEffect: state.StateEffect,
-      syntaxHighlighting: language.syntaxHighlighting,
-      tags: highlight.tags,
       yaml: yaml.yaml,
     }))
   }
@@ -120,77 +116,7 @@ function createLanguageExtension(modules: CodeMirrorModules, language: CodeMirro
 }
 
 function createEditorTheme(modules: CodeMirrorModules, dark: boolean): Extension {
-  const tags = modules.tags
-  const highlightStyle = modules.HighlightStyle.define([
-    { tag: tags.comment, color: 'var(--open-flow-editor-comment, #6a9955)' },
-    { tag: [tags.keyword, tags.modifier, tags.operatorKeyword], color: 'var(--vscode-debugTokenExpression-name, #9b46b0)' },
-    { tag: [tags.typeName, tags.className, tags.namespace], color: 'var(--open-flow-editor-type, #4ec9b0)' },
-    { tag: [tags.string, tags.character, tags.attributeValue, tags.regexp], color: 'var(--vscode-debugTokenExpression-string, #a31515)' },
-    { tag: tags.bool, color: 'var(--vscode-debugTokenExpression-boolean, #0000ff)' },
-    { tag: tags.number, color: 'var(--vscode-debugTokenExpression-number, #098658)' },
-    { tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], color: 'var(--open-flow-editor-function, #dcdcaa)' },
-    { tag: [tags.variableName, tags.propertyName, tags.attributeName], color: 'var(--open-flow-editor-variable, #9cdcfe)' },
-    { tag: tags.punctuation, color: 'var(--vscode-editor-foreground, currentColor)' },
-    { tag: [tags.heading, tags.strong], fontWeight: 'bold' },
-    { tag: tags.emphasis, fontStyle: 'italic' },
-    { tag: [tags.link, tags.url], color: 'var(--vscode-textLink-foreground, LinkText)', textDecoration: 'underline' },
-    { tag: tags.invalid, color: 'var(--vscode-debugTokenExpression-error, #e51400)' },
-  ])
-  return [
-    modules.EditorView.theme(
-      {
-        '&': {
-          width: '100%',
-          height: '100%',
-          color: 'var(--vscode-editor-foreground, CanvasText)',
-          backgroundColor: 'var(--vscode-editor-background, Canvas)',
-        },
-        '&.cm-focused': {
-          outline: 'none',
-        },
-        '.cm-scroller': {
-          overflow: 'auto',
-          fontFamily: 'var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Consolas, monospace)',
-        },
-        '.cm-content': {
-          caretColor: 'var(--vscode-editorCursor-foreground, currentColor)',
-        },
-        '.cm-line': {
-          padding: '0 8px',
-        },
-        '.cm-gutters': {
-          color: 'var(--vscode-editorLineNumber-foreground, GrayText)',
-          backgroundColor: 'var(--vscode-editorGutter-background, var(--vscode-editor-background, Canvas))',
-          border: 'none',
-        },
-        '.cm-activeLineGutter': {
-          color: 'var(--vscode-editorLineNumber-activeForeground, currentColor)',
-          backgroundColor: 'transparent',
-        },
-        '.cm-activeLine': {
-          backgroundColor: 'var(--vscode-editor-lineHighlightBackground, transparent)',
-          outline: '1px solid var(--vscode-editor-lineHighlightBorder, transparent)',
-          outlineOffset: '-1px',
-        },
-        '&.cm-focused .cm-cursor': {
-          borderLeftColor: 'var(--vscode-editorCursor-foreground, currentColor)',
-        },
-        '.cm-selectionBackground': {
-          backgroundColor: 'var(--vscode-editor-inactiveSelectionBackground, Highlight)',
-        },
-        '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-content ::selection': {
-          backgroundColor: 'var(--vscode-editor-selectionBackground, Highlight)',
-        },
-        '.cm-tooltip': {
-          color: 'var(--vscode-editorWidget-foreground, CanvasText)',
-          backgroundColor: 'var(--vscode-editorWidget-background, Canvas)',
-          borderColor: 'var(--vscode-editorWidget-border, GrayText)',
-        },
-      },
-      { dark },
-    ),
-    modules.syntaxHighlighting(highlightStyle),
-  ]
+  return dark ? modules.githubDark : modules.githubLight
 }
 
 function isWordWrapEnabled(wordWrap: string): boolean {
@@ -248,7 +174,6 @@ class CodeMirrorStringEditorControl implements StringEditorControl {
     private readonly modules: CodeMirrorModules,
     darkMode$: ReadonlyVal<boolean> | undefined,
     extension: Promise<Extension | undefined> | undefined,
-    theme: Extension | undefined,
   ) {
     this.automaticLayout = options.automaticLayout === true
     this.domReadOnly = options.domReadOnly === true
@@ -266,7 +191,7 @@ class CodeMirrorStringEditorControl implements StringEditorControl {
       parent: layoutRoot,
       extensions: [
         modules.basicSetup,
-        this.themeCompartment.of(theme ?? createEditorTheme(modules, dark)),
+        this.themeCompartment.of(createEditorTheme(modules, dark)),
         this.languageCompartment.of(createLanguageExtension(modules, this.language)),
         this.readOnlyCompartment.of(modules.EditorState.readOnly.of(this.readOnly)),
         this.editableCompartment.of(modules.EditorView.editable.of(!this.readOnly && !this.domReadOnly)),
@@ -287,10 +212,10 @@ class CodeMirrorStringEditorControl implements StringEditorControl {
     this.lastContentHeight = this.getContentHeight()
     this.view.dom.addEventListener('focusin', this.onFocusIn)
     this.view.dom.addEventListener('focusout', this.onFocusOut)
-    this.themeReactionDisposer =
-      theme == null
-        ? darkMode$?.reaction((nextDark) => this.view.dispatch({ effects: this.themeCompartment.reconfigure(createEditorTheme(this.modules, nextDark)) }), true)
-        : undefined
+    this.themeReactionDisposer = darkMode$?.reaction(
+      (nextDark) => this.view.dispatch({ effects: this.themeCompartment.reconfigure(createEditorTheme(this.modules, nextDark)) }),
+      true,
+    )
     void extension?.then((value) => {
       if (!this.disposed && value != null) this.view.dispatch({ effects: this.modules.StateEffect.appendConfig.of(value) })
     })
@@ -479,18 +404,16 @@ class CodeMirrorStringEditor implements StringEditor {
 export class CodeMirrorStringEditorFactory implements StringEditorFactory {
   private readonly darkMode$: ReadonlyVal<boolean> | undefined
   private readonly extension: Promise<Extension | undefined> | undefined
-  private readonly theme: Extension | undefined
 
   public constructor(options: CodeMirrorStringEditorFactoryOptions = {}) {
     this.darkMode$ = options.darkMode$
     this.extension = options.extension
-    this.theme = options.theme
   }
 
   public async create(dom: HTMLElement, uri: string, options: StringEditorOptions = {}): Promise<StringEditor> {
     if (typeof document == 'undefined') throw new Error('The CodeMirror string editor requires a DOM environment.')
 
     const modules = await loadCodeMirrorModules()
-    return new CodeMirrorStringEditor(new CodeMirrorStringEditorControl(dom, uri, options, modules, this.darkMode$, this.extension, this.theme))
+    return new CodeMirrorStringEditor(new CodeMirrorStringEditorControl(dom, uri, options, modules, this.darkMode$, this.extension))
   }
 }

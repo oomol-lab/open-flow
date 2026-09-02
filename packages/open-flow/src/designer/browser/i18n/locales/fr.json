@@ -226,6 +226,7 @@
       "duplicate": "Doublon avec un autre Handle",
       "empty": "Le nom de Handle ne peut pas être vide"
     },
+    "releaseToConnect": "Relâchez pour créer et connecter",
     "schemaDescription": "Description JSON Schema...",
     "selectVariable": "Choisir une Variable",
     "variableMissing": "{{name}} (manquante)",
@@ -256,6 +257,7 @@
     "defineSchema": "définir le schéma",
     "deleteField": "Supprimer le champ",
     "enumError": "Valeur enum attendue",
+    "literalError": "La valeur fixe est attendue",
     "handleKeyTitle": "Clé",
     "handleName": "Handle",
     "handleTypeTitle": "Type",
@@ -415,6 +417,7 @@
     "oneOf": "OneOf",
     "deploymentVariable": "Variable",
     "select": "Single",
+    "literal": "Littéral",
     "string": "String",
     "text": "Textarea"
   },

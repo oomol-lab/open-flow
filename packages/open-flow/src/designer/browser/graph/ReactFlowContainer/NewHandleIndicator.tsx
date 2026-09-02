@@ -5,6 +5,7 @@ import type { JSX } from 'react/jsx-runtime'
 import { isDefined } from '@wopjs/cast'
 import { useStore } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslate } from 'val-i18n-react'
 import { shallow } from 'zustand/shallow'
 import { HANDLE_ROW_CLASSNAME } from '../../base/designer.ts'
 import { getInsertBefore, getNewHandleIndicator } from './useNewHandleIndicator.ts'
@@ -25,6 +26,7 @@ const selector = (state: ReactFlowState) => ({
 })
 
 export function NewHandleIndicator(props: NewHandleIndicatorProps): JSX.Element {
+  const t = useTranslate()
   const ref = useRef<HTMLDivElement>(null)
   const state = useStore(selector, shallow)
   const enable = props.editable && !!(state.inProgress && state.fromNode && state.fromHandle && !state.toNode)
@@ -68,7 +70,9 @@ export function NewHandleIndicator(props: NewHandleIndicatorProps): JSX.Element 
             left: rect.left - bounds.left + ($handleRow ? 0 : 6 * zoom),
             width: rect.width - ($handleRow ? 0 : 12 * zoom),
           }}
-        />
+        >
+          <span className={styles.label}>{t('handleEditor.releaseToConnect')}</span>
+        </div>
       )}
     </div>
   )

@@ -20,10 +20,11 @@ Flow 是部署生成的顶层产品资源和稳定 opaque identity，不从属�
 Presentation、Publication、Live、Run 和 Trigger binding。
 
 Flow 有一个可变 Draft head 和不可变的 Revision 历史。Revision 是该 Flow 的 graph、Subflow、Task、binding 和 CodeModule source 的完整事实来源；
-语义修改必须以预期 Revision 为前提原子提交，不能静默覆盖 stale head。内部索引、缓存、增量记录和存储布局不能成为第二个事实来源。
+语义修改必须以预期 Revision 为前提并使用稳定 change identity 原子提交，不能静默覆盖 stale head；幂等重放必须先于 Draft head 比较返回已经接受的
+Revision。Draft 同步只返回当前完整 Revision snapshot，不提供持久化 authoring operation history。内部索引、缓存、增量记录和存储布局不能成为第二个事实来源。
 
-Presentation 独立保存布局、viewport 和 Comment 等展示状态；Flow 的 overview 和 detail 模式分别序列化布局和 viewport，但切换模式时目标模式继承
-当前空间状态，不恢复另一份可能已经失配的坐标或 viewport。Presentation 不进入 Revision digest，也不影响 validation、Run、Publication 或 Live。
+Presentation 独立保存布局、viewport 和 Comment 等展示状态；Flow 的 overview 和 detail 模式分别拥有自己的布局和 viewport。Presentation
+不进入 Revision digest，也不影响 validation、Run、Publication 或 Live。
 Task 的端口分组随有序端口定义保存在 Revision 并参与 digest；分组不创建语义端口，也不参与连接、validation 或 Run。
 Revision 不保存 credential、Run、Engine IR、Provider 状态或部署缓存。
 

@@ -101,7 +101,13 @@ export async function codeCommand(client: ControlClient, flow: Flow, operands: r
         return
       }
       const target = { kind: 'module', moduleId: resolved.moduleId }
-      const changed = await changeDraft(client, flow.flowId, draft.revisionId, target, replaceModuleSource(resolved.moduleId, source, imports))
+      const changed = await changeDraft(
+        client,
+        flow.flowId,
+        draft.revisionId,
+        target,
+        replaceModuleSource(resolved.moduleId, resolved.module.source, resolved.module.imports, source, imports),
+      )
       write(
         runtime,
         args.json,
@@ -127,7 +133,7 @@ export async function codeCommand(client: ControlClient, flow: Flow, operands: r
         return
       }
       const target = { kind: 'module', moduleId: resolved.moduleId }
-      const changed = await changeDraft(client, flow.flowId, draft.revisionId, target, renameModule(resolved.moduleId, name))
+      const changed = await changeDraft(client, flow.flowId, draft.revisionId, target, renameModule(resolved.moduleId, resolved.module.name, name))
       write(
         runtime,
         args.json,

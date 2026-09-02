@@ -226,6 +226,7 @@
       "duplicate": "Совпадает с именем другого Handle",
       "empty": "Имя Handle не может быть пустым"
     },
+    "releaseToConnect": "Отпустите, чтобы создать и подключить",
     "schemaDescription": "Описание JSON Schema…",
     "selectVariable": "Выбрать Variable",
     "variableMissing": "{{name}} (отсутствует)",
@@ -256,6 +257,7 @@
     "defineSchema": "задать схему",
     "deleteField": "Удалить поле",
     "enumError": "Ожидается значение enum",
+    "literalError": "Ожидается фиксированное значение",
     "handleKeyTitle": "Ключ",
     "handleName": "Handle",
     "handleTypeTitle": "Тип",
@@ -415,6 +417,7 @@
     "oneOf": "OneOf",
     "deploymentVariable": "Variable",
     "select": "Single",
+    "literal": "Литерал",
     "string": "String",
     "text": "Textarea"
   },

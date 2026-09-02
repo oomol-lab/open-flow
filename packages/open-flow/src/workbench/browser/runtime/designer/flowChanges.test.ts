@@ -185,10 +185,12 @@ describe('Wait changes', () => {
     if (task?.kind != 'task') throw new Error('Expected Task fixture.')
     changed = applyFlowChanges(changed, [
       {
-        kind: 'graph.node.replace',
-        node: { ...task, inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'continue' }] } } },
+        before: task.inputs.value,
+        handle: 'value',
+        kind: 'graph.node.input.set',
         nodeId: 'task',
         target: { kind: 'flow' },
+        value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'continue' }] },
       },
     ])
 

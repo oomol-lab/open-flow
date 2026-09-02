@@ -6,6 +6,7 @@ import type { WorkspaceStatus } from '../stores/workspaceModel.ts'
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
+import { useDelayedTrue } from '../../../../designer/browser/base/react.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Tabs, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
@@ -14,8 +15,7 @@ import { followWorkbenchLink } from '../navigationLink.ts'
 import { DiagnosticsPanel } from './diagnosticsPanel.tsx'
 import { HostMenu } from './hostMenu.tsx'
 
-const savingStatusDelayMs = 400
-const minimumSavingStatusMs = 400
+const savingStatusDelayMs = 200
 
 interface Props {
   readonly activeView: 'design' | 'publications' | 'runs'
@@ -43,30 +43,13 @@ function validationLabel(valid: boolean | undefined, issueCount: number, loading
 
 function useDisplayedStatus(status: WorkspaceStatus): WorkspaceStatus {
   const [displayed, setDisplayed] = useState(status)
-  const savingStarted = useRef<number>()
   useEffect(() => {
     if (status == 'saving') {
       if (displayed == 'saving') return
-      const timer = setTimeout(() => {
-        savingStarted.current = Date.now()
-        setDisplayed('saving')
-      }, savingStatusDelayMs)
+      const timer = setTimeout(() => setDisplayed('saving'), savingStatusDelayMs)
       return () => clearTimeout(timer)
     }
-    if (displayed != 'saving' || status != 'saved' || savingStarted.current == null) {
-      savingStarted.current = undefined
-      setDisplayed(status)
-      return
-    }
-    const remaining = minimumSavingStatusMs - (Date.now() - savingStarted.current)
-    const timer = setTimeout(
-      () => {
-        savingStarted.current = undefined
-        setDisplayed('saved')
-      },
-      Math.max(0, remaining),
-    )
-    return () => clearTimeout(timer)
+    setDisplayed(status)
   }, [displayed, status])
   return displayed
 }
@@ -98,6 +81,7 @@ export function WorkspaceHeader({
   const live = useVal(store.workspace.$.live)
   const status = useVal(store.workspace.$.status)
   const displayedStatus = useDisplayedStatus(status)
+  const displayedCheckLoading = useDelayedTrue(checkLoading, 200)
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   const target = useVal(store.workspace.$.target)
   const targetName = useVal(store.workspace.$.targetName)
@@ -189,7 +173,7 @@ export function WorkspaceHeader({
           variant={invalid ? 'destructive' : 'ghost'}
         >
           <Icon data-icon="inline-start" name={invalid ? 'alert' : 'check'} />
-          {validationLabel(diagnostics?.valid, diagnostics?.diagnostics.length ?? 0, checkLoading, t)}
+          {validationLabel(diagnostics?.valid, diagnostics?.diagnostics.length ?? 0, displayedCheckLoading, t)}
         </Button>
         <span aria-atomic="true" aria-live="polite" className="saved-state">
           {workspaceLoading || draft == null ? null : <Icon name="check" size={16} />}

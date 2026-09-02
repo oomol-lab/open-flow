@@ -19,6 +19,7 @@ import type {
 } from '../../../../schema/index.ts'
 import type { FlowDisplayMode } from '../../../common/flowDisplay.ts'
 import type { RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
+import type { CreateSchemaEditorFn } from '../../services/designerService.ts'
 import type { IAddNodeMenuItem, IFromSource } from '../../stores/designer/designer.store.ts'
 import type { InteractiveMode } from '../../stores/designer/designer.store.ts'
 import type { DesignerUILayout, DesignerUIStore } from '../../stores/designer/designerUI.store.ts'
@@ -337,6 +338,7 @@ export interface FlowDesignerViewProps {
   }
   readonly addItems: readonly FlowDesignerViewAddItem[]
   readonly className?: string
+  readonly createSchemaEditor: CreateSchemaEditorFn
   readonly dark?: boolean
   readonly editable: boolean
   readonly focusNodeRequest?: {
@@ -404,6 +406,7 @@ interface NodeValues {
   readonly successCount: Val<number | undefined>
   readonly timeout: Val<number | undefined>
   readonly title: Val<string>
+  applyingModel?: boolean
   triggerPresentation?: Val<FlowDesignerViewTriggerPresentation | undefined>
   valueDefs?: Val<ValueHandleDef[] | undefined>
 }
@@ -490,6 +493,7 @@ class FlowDesignerViewAdapter {
 
   #addItems: readonly FlowDesignerViewAddItem[]
   readonly #callbacks: ViewCallbacks
+  readonly #createSchemaEditor: CreateSchemaEditorFn
   #disconnectTimer: ReturnType<typeof setTimeout> | undefined
   #disposeTimer: ReturnType<typeof setTimeout> | undefined
   #entries = new Map<string, NodeEntry>()
@@ -513,9 +517,17 @@ class FlowDesignerViewAdapter {
   #variableNamesLoaded: Val<boolean>
   #variableNamesLoading: Val<boolean>
 
-  constructor(model: FlowDesignerViewModel, editable: boolean, language: string, addItems: readonly FlowDesignerViewAddItem[], callbacks: ViewCallbacks) {
+  constructor(
+    model: FlowDesignerViewModel,
+    editable: boolean,
+    language: string,
+    addItems: readonly FlowDesignerViewAddItem[],
+    callbacks: ViewCallbacks,
+    createSchemaEditor: CreateSchemaEditorFn,
+  ) {
     this.#addItems = addItems
     this.#callbacks = callbacks
+    this.#createSchemaEditor = createSchemaEditor
     this.#language = val(language)
     const initialDisplayMode = model.layouts?.overview == null ? 'detail' : 'overview'
 
@@ -667,12 +679,10 @@ class FlowDesignerViewAdapter {
 
   reconcile(model: FlowDesignerViewModel, editable: boolean, language: string, addItems: readonly FlowDesignerViewAddItem[]): void {
     this.#addItems = addItems
-    unstable_batchedUpdates(() => {
-      const editableChanged = this.store.$.editable.value != editable
-      if (editableChanged) this.store.$$.editable.set(editable)
-      if (this.#language.value != language) this.#language.set(language)
-      this.#syncModel(model)
-    })
+    const editableChanged = this.store.$.editable.value != editable
+    if (editableChanged) this.store.$$.editable.set(editable)
+    if (this.#language.value != language) this.#language.set(language)
+    this.#syncModel(model)
   }
 
   setSelection(selectedNodeIds: readonly string[]): void {
@@ -780,7 +790,7 @@ class FlowDesignerViewAdapter {
         this.store.designerUIStore.setNodeUIData(node.id as NodeId, {
           rfNode: { position: createdPosition },
         })
-        entry = createNodeEntry(node, outputHandles, contentKey, this.store.designerUIStore, this.store, this.#callbacks)
+        entry = createNodeEntry(node, outputHandles, contentKey, this.store.designerUIStore, this.store, this.#callbacks, this.#createSchemaEditor)
         created = true
       } else {
         if (entry.kind == 'comment') throw new Error('Unexpected Comment node entry.')
@@ -1087,6 +1097,7 @@ function createNodeEntry(
   designerUIStore: DesignerUIStore,
   designerStore: FlowDesignerStore,
   callbacks: ViewCallbacks,
+  createSchemaEditor: CreateSchemaEditorFn,
 ): SemanticNodeEntry {
   const nodeInputsFrom = inputsFrom(node)
   const variablePrefix = `${node.id}\0`
@@ -1117,51 +1128,45 @@ function createNodeEntry(
     timeout: val(node.timeoutSeconds),
     title: val(node.title),
   }
-  const edit = <T,>(source: Val<T>, onChange: (value: T, previous: T) => void): Val<T> =>
+  const showSettings = val()
+  let inputRole: 'author' | 'guest' | 'user' = 'guest'
+  if (designerStore.$.editable.value) inputRole = node.kind == 'task' && node.editablePorts ? 'author' : 'user'
+  const inputSection = new InputSectionStore({
+    role: inputRole,
+    lang: designerStore.lang$,
+    boundHandles,
+    handleInputsFrom: values.inputsFrom,
+    inputHandleDefs: values.inputDefs,
+    additionalInputs: node.kind == 'task' && node.editableAdditionalInputs ? val(true) : undefined,
+    additionalInputDefs: node.kind == 'task' && node.editableAdditionalInputs ? values.additionalInputDefs : undefined,
+    showSettings,
+    createSchemaEditor,
+  })
+  inputSection.dispose.add(boundHandles)
+  let previousInputValues = new Map(nodeInputsFrom.flatMap((input) => (Object.hasOwn(input, 'value') ? [[input.handle, input.value] as const] : [])))
+  inputSection.dispose.add(
+    values.inputsFrom.reaction((inputs) => {
+      const inputValues = new Map((inputs ?? []).flatMap((input) => (Object.hasOwn(input, 'value') ? [[input.handle, input.value] as const] : [])))
+      if (!values.applyingModel && designerStore.$.editable.value) {
+        for (const handle of new Set([...previousInputValues.keys(), ...inputValues.keys()])) {
+          if (previousInputValues.has(handle) == inputValues.has(handle) && Object.is(previousInputValues.get(handle), inputValues.get(handle))) continue
+          callbacks.onChangeInput?.(node.id, handle, inputValues.get(handle))
+        }
+      }
+      previousInputValues = inputValues
+    }, true),
+  )
+  const diagnosticSection = createDiagnosticSection(values.diagnostics)
+  const duplicateNode = (offset?: FlowDesignerViewPosition) => designerStore.onDuplicate?.([node.id as NodeId], offset)
+  const edit = <T,>(source: Val<T>, onChange: (value: T) => void): Val<T> =>
     attachSetter(
       derive(source, (value) => value),
       (value) => {
         const previous = source.value
         source.set(value)
-        if (source.value !== previous && designerStore.$.editable.value) onChange(value, previous)
+        if (source.value !== previous && designerStore.$.editable.value) onChange(value)
       },
     )
-  const showSettings = val()
-  let inputRole: 'author' | 'guest' | 'user' = 'guest'
-  if (designerStore.$.editable.value) inputRole = node.kind == 'task' && node.editablePorts ? 'author' : 'user'
-  const editableInputsFrom = edit(values.inputsFrom, (inputs, previous) => {
-    const previousInputValues = new Map((previous ?? []).flatMap((input) => (Object.hasOwn(input, 'value') ? [[input.handle, input.value] as const] : [])))
-    const inputValues = new Map((inputs ?? []).flatMap((input) => (Object.hasOwn(input, 'value') ? [[input.handle, input.value] as const] : [])))
-    for (const handle of new Set([...previousInputValues.keys(), ...inputValues.keys()])) {
-      if (previousInputValues.has(handle) == inputValues.has(handle) && Object.is(previousInputValues.get(handle), inputValues.get(handle))) continue
-      callbacks.onChangeInput?.(node.id, handle, inputValues.get(handle))
-    }
-  })
-  const editableInputDefs =
-    node.kind == 'task' && node.editablePorts
-      ? edit(values.inputDefs, (defs) => callbacks.onChangeTaskPorts?.(node.id, taskInputs(defs), taskOutputs(values.outputDefs.value)))
-      : values.inputDefs
-  const editableAdditionalInputDefs =
-    node.kind == 'task' && node.editableAdditionalInputs
-      ? edit(values.additionalInputDefs, (defs) => callbacks.onChangeTaskAdditionalInputs?.(node.id, taskAdditionalInputs(defs ?? [])))
-      : values.additionalInputDefs
-  const inputSection = new InputSectionStore({
-    role: inputRole,
-    lang: designerStore.lang$,
-    boundHandles,
-    handleInputsFrom: editableInputsFrom,
-    inputHandleDefs: editableInputDefs,
-    additionalInputs: node.kind == 'task' && node.editableAdditionalInputs ? val(true) : undefined,
-    additionalInputDefs: node.kind == 'task' && node.editableAdditionalInputs ? editableAdditionalInputDefs : undefined,
-    showSettings,
-    createSchemaEditor: () => undefined,
-  })
-  inputSection.dispose.add(editableInputsFrom)
-  if (editableInputDefs !== values.inputDefs) inputSection.dispose.add(editableInputDefs)
-  if (editableAdditionalInputDefs !== values.additionalInputDefs) inputSection.dispose.add(editableAdditionalInputDefs)
-  inputSection.dispose.add(boundHandles)
-  const diagnosticSection = createDiagnosticSection(values.diagnostics)
-  const duplicateNode = (offset?: FlowDesignerViewPosition) => designerStore.onDuplicate?.([node.id as NodeId], offset)
   const manifest$ = {
     description: edit(values.description, (description) => callbacks.onChangeNodeDescription?.(node.id, description)),
     icon: edit(values.rawIcon, (icon) => callbacks.onChangeNodeIcon?.(node.id, icon)),
@@ -1193,17 +1198,19 @@ function createNodeEntry(
       values.conditionCases = val(conditionCases(node), equalConfig)
       values.defaultCondition = val(node.defaultOutput == null ? undefined : { handle: node.defaultOutput as HandleName }, equalConfig)
       const conditionInputs = derive(values.inputDefs, (defs) => defs.filter(isHandleDef))
-      const editableConditionCases = edit(values.conditionCases, () => callbacks.onChangeCondition?.(node.id, conditionChange(values)))
-      const editableDefaultCondition = edit(values.defaultCondition, () => callbacks.onChangeCondition?.(node.id, conditionChange(values)))
       const conditionsSection = new ConditionsSectionStore({
         role: designerStore.$.editable.value ? 'author' : 'guest',
         lang: designerStore.lang$,
         handleOutputsTo: values.outputsTo,
         inputHandleDefs: conditionInputs,
-        conditionHandleDefs: editableConditionCases,
-        defaultConditionHandleDef: editableDefaultCondition,
+        conditionHandleDefs: values.conditionCases,
+        defaultConditionHandleDef: values.defaultCondition,
         showSettings,
       })
+      const notifyChange = () => {
+        if (values.applyingModel || !designerStore.$.editable.value) return
+        callbacks.onChangeCondition?.(node.id, conditionChange(values))
+      }
       store = new ConditionNodeStore(node.id as NodeId, {
         changeDescription,
         display$: {
@@ -1214,7 +1221,9 @@ function createNodeEntry(
         duplicateNode,
         manifest$,
       })
-      store.dispose.add([values.conditionCases, values.defaultCondition, editableConditionCases, editableDefaultCondition, conditionInputs])
+      store.dispose.add(values.conditionCases.reaction(notifyChange, true))
+      store.dispose.add(values.defaultCondition.reaction(notifyChange, true))
+      store.dispose.add([values.conditionCases, values.defaultCondition, conditionInputs])
       break
     }
     case 'subflow': {
@@ -1224,7 +1233,7 @@ function createNodeEntry(
         handleOutputsTo: values.outputsTo,
         outputHandleDefs: values.outputDefs,
         showSettings,
-        createSchemaEditor: () => undefined,
+        createSchemaEditor,
       })
       store = new SubflowNodeStore(node.id as NodeId, {
         changeDescription,
@@ -1240,18 +1249,14 @@ function createNodeEntry(
       break
     }
     case 'task': {
-      const editableOutputDefs = node.editablePorts
-        ? edit(values.outputDefs, (defs) => callbacks.onChangeTaskPorts?.(node.id, taskInputs(values.inputDefs.value), taskOutputs(defs)))
-        : values.outputDefs
       const outputSection = new OutputSectionStore({
         role: designerStore.$.editable.value && node.editablePorts ? 'author' : 'guest',
         lang: designerStore.lang$,
         handleOutputsTo: values.outputsTo,
-        outputHandleDefs: editableOutputDefs,
+        outputHandleDefs: values.outputDefs,
         showSettings,
-        createSchemaEditor: () => undefined,
+        createSchemaEditor,
       })
-      if (editableOutputDefs !== values.outputDefs) outputSection.dispose.add(editableOutputDefs)
       store = new TaskNodeStore(node.id as NodeId, {
         changeDescription,
         display$: {
@@ -1267,6 +1272,22 @@ function createNodeEntry(
           task: val<string | InlineTask | undefined>(node.reference),
         },
       })
+      if (node.editablePorts) {
+        const changePorts = () => {
+          if (values.applyingModel || !designerStore.$.editable.value) return
+          callbacks.onChangeTaskPorts?.(node.id, taskInputs(values.inputDefs.value), taskOutputs(values.outputDefs.value))
+        }
+        store.dispose.add(values.inputDefs.reaction(changePorts, true))
+        store.dispose.add(values.outputDefs.reaction(changePorts, true))
+      }
+      if (node.editableAdditionalInputs) {
+        store.dispose.add(
+          values.additionalInputDefs.reaction((inputs) => {
+            if (values.applyingModel || !designerStore.$.editable.value) return
+            callbacks.onChangeTaskAdditionalInputs?.(node.id, taskAdditionalInputs(inputs ?? []))
+          }, true),
+        )
+      }
       break
     }
     case 'trigger': {
@@ -1278,7 +1299,7 @@ function createNodeEntry(
         handleOutputsTo: values.outputsTo,
         outputHandleDefs: values.outputDefs,
         showSettings,
-        createSchemaEditor: () => undefined,
+        createSchemaEditor,
       })
       store = new TriggerNodeStore(node.id as NodeId, {
         changeDescription,
@@ -1286,19 +1307,19 @@ function createNodeEntry(
           callbacks.onChangeTriggerConfig == null
             ? undefined
             : (name, value) => {
-                if (designerStore.$.editable.value) callbacks.onChangeTriggerConfig?.(node.id, name, value)
+                if (!values.applyingModel && designerStore.$.editable.value) callbacks.onChangeTriggerConfig?.(node.id, name, value)
               },
         changeSchedule:
           callbacks.onChangeTriggerSchedule == null
             ? undefined
             : (schedule) => {
-                if (designerStore.$.editable.value) callbacks.onChangeTriggerSchedule?.(node.id, schedule)
+                if (!values.applyingModel && designerStore.$.editable.value) callbacks.onChangeTriggerSchedule?.(node.id, schedule)
               },
         changeWebhook:
           callbacks.onChangeWebhook == null
             ? undefined
             : (webhook) => {
-                if (designerStore.$.editable.value) callbacks.onChangeWebhook?.(node.id, webhook)
+                if (!values.applyingModel && designerStore.$.editable.value) callbacks.onChangeWebhook?.(node.id, webhook)
               },
         display$: {
           ...commonDisplay,
@@ -1317,29 +1338,13 @@ function createNodeEntry(
     }
     case 'value': {
       const defs = (values.valueDefs = val<ValueHandleDef[] | undefined>(valueDefs(node), equalConfig))
-      const editableDefs = edit(defs, (nextDefs) =>
-        callbacks.onChangeValue?.(
-          node.id,
-          (nextDefs ?? []).map((def) =>
-            Object.assign(
-              {
-                handle: def.handle,
-                description: def.description,
-                jsonSchema: def.json_schema,
-                nullable: def.nullable,
-              },
-              Object.hasOwn(def, 'value') ? { value: def.value } : {},
-            ),
-          ),
-        ),
-      )
       const valueSection = new ValueSectionStore({
         role: designerStore.$.editable.value ? 'author' : 'guest',
         lang: designerStore.lang$,
         handleOutputsTo: values.outputsTo,
-        valueHandleDefs: editableDefs,
+        valueHandleDefs: defs,
         showSettings,
-        createSchemaEditor: () => undefined,
+        createSchemaEditor,
       })
       store = new ValueNodeStore(node.id as NodeId, {
         changeDescription,
@@ -1353,7 +1358,26 @@ function createNodeEntry(
         duplicateNode,
         manifest$,
       })
-      store.dispose.add([defs, editableDefs])
+      store.dispose.add(
+        valueSection.$.valueHandleDefs.reaction((nextDefs) => {
+          if (values.applyingModel || !designerStore.$.editable.value) return
+          callbacks.onChangeValue?.(
+            node.id,
+            (nextDefs ?? []).map((def) =>
+              Object.assign(
+                {
+                  handle: def.handle,
+                  description: def.description,
+                  jsonSchema: def.json_schema,
+                  nullable: def.nullable,
+                },
+                Object.hasOwn(def, 'value') ? { value: def.value } : {},
+              ),
+            ),
+          )
+        }, true),
+      )
+      store.dispose.add(defs)
       break
     }
     case 'wait': {
@@ -1364,7 +1388,7 @@ function createNodeEntry(
         handleOutputsTo: values.outputsTo,
         outputHandleDefs: values.outputDefs,
         showSettings,
-        createSchemaEditor: () => undefined,
+        createSchemaEditor,
       })
       store = new TaskNodeStore(node.id as NodeId, {
         changeDescription,
@@ -1382,7 +1406,7 @@ function createNodeEntry(
       break
     }
   }
-  store.dispose.add([values.outputsTo, values.rawIcon, values.rawTitle])
+  store.dispose.add([manifest$.description, manifest$.icon, manifest$.title, values.outputsTo])
   return {
     contentKey,
     editable: designerStore.$.editable.value,
@@ -1398,6 +1422,7 @@ function updateNodeEntry(
   connected: readonly HandleName[],
   contentKey: string,
 ): SemanticNodeEntry {
+  entry.values.applyingModel = true
   entry.values.description.set(node.description)
   entry.values.diagnostics.set((node.diagnostics ?? 0) > 0)
   entry.values.concurrency.set(node.concurrency)
@@ -1406,10 +1431,15 @@ function updateNodeEntry(
   entry.values.notice?.set(node.kind == 'wait' ? node.notice : undefined)
   entry.values.rawIcon.set(node.rawIcon)
   entry.values.rawTitle.set(node.rawTitle)
-  entry.values.inputDefs.set(inputDefs(node))
-  entry.values.additionalInputDefs.set(additionalInputDefs(node))
+  const nextInputDefs = inputDefs(node)
+  const nextAdditionalInputDefs = additionalInputDefs(node)
+  const nextOutputDefs = outputDefs(node)
+  if (JSON.stringify(entry.values.inputDefs.value) != JSON.stringify(nextInputDefs)) entry.values.inputDefs.set(nextInputDefs)
+  if (JSON.stringify(entry.values.additionalInputDefs.value) != JSON.stringify(nextAdditionalInputDefs)) {
+    entry.values.additionalInputDefs.set(nextAdditionalInputDefs)
+  }
   entry.values.inputsFrom.set(inputsFrom(node))
-  entry.values.outputDefs.set(outputDefs(node))
+  if (JSON.stringify(entry.values.outputDefs.value) != JSON.stringify(nextOutputDefs)) entry.values.outputDefs.set(nextOutputDefs)
   entry.values.outputsTo.set([...connected])
   entry.values.progress.set(node.run?.progress)
   entry.values.reference.set(node.kind == 'task' || node.kind == 'subflow' ? node.reference : undefined)
@@ -1421,8 +1451,11 @@ function updateNodeEntry(
     entry.values.conditionCases!.set(conditionCases(node))
     entry.values.defaultCondition!.set(node.defaultOutput == null ? undefined : { handle: node.defaultOutput as HandleName })
   }
-  if (node.kind == 'value') entry.values.valueDefs!.set(valueDefs(node))
+  if (node.kind == 'value') {
+    entry.values.valueDefs!.set(valueDefs(node))
+  }
   if (node.kind == 'trigger') entry.values.triggerPresentation!.set(node.presentation)
+  entry.values.applyingModel = false
   return { ...entry, contentKey }
 }
 
@@ -1464,7 +1497,7 @@ function callbacksFromProps(props: FlowDesignerViewProps): ViewCallbacks {
 
 export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
   const adapter = useMemo(
-    () => new FlowDesignerViewAdapter(props.model, props.editable, props.language ?? 'en', props.addItems, callbacksFromProps(props)),
+    () => new FlowDesignerViewAdapter(props.model, props.editable, props.language ?? 'en', props.addItems, callbacksFromProps(props), props.createSchemaEditor),
     [props.identity],
   )
   const propsRef = useRef(props)

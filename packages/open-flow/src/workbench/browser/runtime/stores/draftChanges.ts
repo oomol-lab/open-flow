@@ -4,6 +4,7 @@ import type { FlowChanges } from '../designer/flowChanges.ts'
 import type { Current } from './latest.ts'
 import type { SetNotice } from './workbenchNotice.ts'
 
+import { FlowChangeError } from '../../../../flow/common/change.ts'
 import { ApiError } from '../api.ts'
 import { applyFlowChanges } from '../designer/flowChanges.ts'
 import { errorNotice } from './workbenchNotice.ts'
@@ -14,6 +15,8 @@ export interface DraftChangeContext {
 }
 
 interface PendingChange extends DraftChangeContext {
+  active: boolean
+  changeId: string
   changes: FlowChanges
   result?: Promise<Draft | undefined>
   started: boolean
@@ -30,23 +33,19 @@ type Hooks = {
   readonly recover: (context: DraftChangeContext) => Promise<boolean>
 }
 
-function replacementKey(changes: FlowChanges): string | undefined {
-  if (changes.length != 1) return
-  const change = changes[0]!
-  switch (change.kind) {
-    case 'binding.replace':
-      return `${change.kind}:${change.bindingId}`
-    case 'graph.node.replace':
-      return `${change.kind}:${change.target.kind}:${change.target.kind == 'subflow' ? change.target.id : ''}:${change.nodeId}`
-    case 'module.rename':
-    case 'module.source.replace':
-      return `${change.kind}:${change.moduleId}`
-    case 'subflow.definition.replace':
-      return `${change.kind}:${change.subflowId}`
-    case 'task.replace':
-      return `${change.kind}:${change.taskId}`
-    default:
-      return
+function mergeChanges(before: FlowChanges, after: FlowChanges): FlowChanges | undefined {
+  if (before.length != 1 || after.length != 1) return
+  const first = before[0]
+  const last = after[0]
+  if (first?.kind == 'graph.node.field.set' && last?.kind == 'graph.node.field.set') {
+    if (first.nodeId != last.nodeId || first.field != last.field || first.target.kind != last.target.kind) return
+    if (first.target.kind == 'subflow' && (last.target.kind != 'subflow' || first.target.id != last.target.id)) return
+    return [{ before: first.before, field: last.field, kind: last.kind, nodeId: last.nodeId, target: last.target, value: last.value }]
+  }
+  if (first?.kind == 'graph.node.input.set' && last?.kind == 'graph.node.input.set') {
+    if (first.nodeId != last.nodeId || first.handle != last.handle || first.target.kind != last.target.kind) return
+    if (first.target.kind == 'subflow' && (last.target.kind != 'subflow' || first.target.id != last.target.id)) return
+    return [{ before: first.before, handle: last.handle, kind: last.kind, nodeId: last.nodeId, target: last.target, value: last.value }]
   }
 }
 
@@ -85,8 +84,21 @@ export class DraftChanges {
     this.#queue = Promise.resolve()
   }
 
-  public replaceCommitted(draft: Draft): void {
+  public replaceCommitted(draft: Draft): Draft {
     this.#committed = draft
+    let projected = draft
+    const pending: PendingChange[] = []
+    for (const change of this.#pending) {
+      try {
+        projected = applyFlowChanges(projected, change.changes)
+        pending.push(change)
+      } catch (error) {
+        if (!(error instanceof FlowChangeError)) throw error
+        change.active = false
+      }
+    }
+    this.#pending = pending
+    return projected
   }
 
   public project(draft: Draft): Draft {
@@ -100,18 +112,18 @@ export class DraftChanges {
   }
 
   public async change(context: DraftChangeContext, draft: Draft, changes: FlowChanges, manageBusy = true): Promise<Draft | undefined> {
-    this.#hooks.beforeChange(manageBusy)
-    this.#hooks.apply(applyFlowChanges(draft, changes))
-    const key = replacementKey(changes)
     const tail = this.#pending.at(-1)
-    const queued = key != null && tail != null && !tail.started && replacementKey(tail.changes) == key ? tail : undefined
-    if (queued != null) {
-      queued.changes = changes
-      return await queued.result!
+    const merged = tail == null || tail.started || !tail.active ? undefined : mergeChanges(tail.changes, changes)
+    if (tail != null && merged != null) {
+      tail.changes = merged
+      if (this.#committed != null) this.#hooks.apply(this.project(this.#committed))
+      return tail.result
     }
-    const pending: PendingChange = { ...context, changes, started: false }
+    this.#hooks.beforeChange(manageBusy)
+    const pending: PendingChange = { ...context, active: true, changeId: crypto.randomUUID(), changes, started: false }
     this.#committed ??= draft
     this.#pending.push(pending)
+    this.#hooks.apply(this.project(this.#committed))
     this.#changes += 1
     const change = this.#queue.then(() => {
       pending.started = true
@@ -129,11 +141,11 @@ export class DraftChanges {
 
   async #commit(pending: PendingChange): Promise<Draft | undefined> {
     let recovered = false
-    while (this.#hooks.current(pending)) {
+    while (pending.active && this.#hooks.current(pending)) {
       const base = this.#committed
       if (base == null) return
       try {
-        const changed = await this.#client.changeDraft(pending.flowId, base.revisionId, pending.changes)
+        const changed = await this.#client.changeDraft(pending.flowId, base.revisionId, pending.changes, pending.changeId)
         if (!this.#hooks.current(pending)) return
         if (changed.revision.parentRevisionId != base.revisionId) throw new Error('Invalid Draft change response.')
         const committed = this.#applyCommitted(pending, base, changed)
@@ -143,17 +155,20 @@ export class DraftChanges {
         if (error instanceof ApiError && error.code == 'flow.revision-conflict') {
           if (!recovered && (await this.#hooks.recover(pending))) {
             recovered = true
+            pending.changeId = crypto.randomUUID()
             continue
           }
           if (recovered) await this.#hooks.recover(pending)
           this.#reject(pending)
-          if (this.#hooks.current(pending)) {
-            this.#setNotice({
-              kind: 'error',
-              message: this.#i18n.t('notice.draftConflict'),
-            })
-          }
         } else {
+          if (!(error instanceof ApiError) && !recovered) {
+            const revisionId = this.#committed?.revisionId
+            if (await this.#hooks.recover(pending)) {
+              recovered = true
+              if (pending.active && this.#committed?.revisionId != revisionId) pending.changeId = crypto.randomUUID()
+              continue
+            }
+          }
           this.#reject(pending)
           if (this.#hooks.current(pending)) this.#setNotice(errorNotice(error, this.#i18n.t))
         }
@@ -174,6 +189,7 @@ export class DraftChanges {
   }
 
   #reject(pending: PendingChange): void {
+    pending.active = false
     this.#pending = this.#pending.filter((candidate) => candidate !== pending)
     if (!this.#hooks.current(pending) || this.#committed == null) return
     this.#hooks.apply(this.project(this.#committed))

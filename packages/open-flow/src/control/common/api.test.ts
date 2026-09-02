@@ -27,7 +27,7 @@ describe('ControlClient Flow API', () => {
   })
 
   it('changes the top-level Flow Draft graph', async () => {
-    const request = vi.fn(async () =>
+    const request = vi.fn(async (_path: string, _init?: RequestInit) =>
       Response.json({
         revision: {
           actorId: 'actor-1',
@@ -52,12 +52,13 @@ describe('ControlClient Flow API', () => {
       },
     ]
 
-    await client.changeDraft(flow.flowId, flow.draftRevisionId, operations)
+    await client.changeDraft(flow.flowId, flow.draftRevisionId, operations, 'change-1')
 
     expect(request).toHaveBeenCalledWith(
       '/v1/flows/flow%2F1/draft/changes',
       expect.objectContaining({ body: JSON.stringify({ expectedRevisionId: 'revision-1', operations, version: 1 }), method: 'POST' }),
     )
+    expect(new Headers(request.mock.calls[0]![1]?.headers).get('idempotency-key')).toBe('change-1')
   })
 
   it('scopes Connector resources to an encoded Flow identity', async () => {

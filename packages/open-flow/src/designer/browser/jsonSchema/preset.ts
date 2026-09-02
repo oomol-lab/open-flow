@@ -25,6 +25,7 @@ export type WidgetType =
   | 'allOf'
   | 'oneOf'
   | 'binary'
+  | 'literal'
   | 'null'
 
 export interface WidgetTypeOption {
@@ -57,6 +58,7 @@ const WIDGET_TYPE_OPTIONS: Readonly<Record<WidgetType, WidgetTypeOption>> = {
   allOf: { icon: 'i-carbon:json', value: 'allOf', label: 'AllOf' },
   oneOf: { icon: 'i-carbon:json', value: 'oneOf', label: 'OneOf' },
   binary: { icon: 'i-carbon:transform-binary', value: 'binary', label: 'Binary' },
+  literal: { icon: 'i-carbon:code', value: 'literal', label: 'Literal' },
   null: { icon: 'i-carbon:null-sign', value: 'null', label: 'Null' },
 }
 
@@ -162,6 +164,7 @@ export const ContentMediaType = {
 const BaseSchema: Record<WidgetType, JsonSchema> = {
   // Binary values do not have a literal value editor.
   binary: { contentMediaType: ContentMediaType.binary },
+  literal: {},
   // Accept any JSON value.
   any: {},
   null: { type: 'null' },
@@ -256,6 +259,7 @@ const DefaultValue: Record<WidgetType, unknown> = {
   allOf: void 0,
   oneOf: void 0,
   binary: void 0,
+  literal: (schema: unknown) => (schema as JsonSchema | null)?.const,
 }
 
 export function getDefaultValue(type: WidgetType, schema?: unknown): unknown {
@@ -281,6 +285,7 @@ export function typeOfSchema(source: unknown): WidgetType {
   if (schema.oneOf) return 'oneOf'
   if (schema.allOf) return 'any'
 
+  if (Object.hasOwn(schema, 'const')) return 'literal'
   if (schema.enum) return 'select'
 
   switch (schema.type) {

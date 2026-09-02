@@ -149,7 +149,7 @@ it('recovers a process crash after the start barrier as one indeterminate termin
         ],
         version: 1,
       }),
-      headers: { 'content-type': 'application/json', cookie },
+      headers: { 'content-type': 'application/json', cookie, 'idempotency-key': 'crash-change' },
       method: 'POST',
     }),
   )
