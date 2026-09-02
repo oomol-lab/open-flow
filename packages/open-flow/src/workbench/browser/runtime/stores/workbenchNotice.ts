@@ -38,6 +38,7 @@ const errorKeys = {
   [controlErrorCode.runNotFound]: 'notice.error.notFound',
   [controlErrorCode.runNotTerminal]: 'notice.error.runNotTerminal',
   [controlErrorCode.runOverloaded]: 'notice.error.runOverloaded',
+  [controlErrorCode.runWaitNotFound]: 'notice.error.notFound',
   [controlErrorCode.triggerKeyInvalid]: 'notice.error.invalidRequest',
   [controlErrorCode.triggerKeyNotFound]: 'notice.error.notFound',
   [controlErrorCode.triggerNotFound]: 'notice.error.notFound',

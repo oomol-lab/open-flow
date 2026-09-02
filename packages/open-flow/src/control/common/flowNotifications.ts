@@ -16,3 +16,9 @@ export type FlowChangeEvent =
       readonly runId: string
       readonly version: 1
     }
+  | {
+      readonly flowId: string
+      readonly kind: 'run.changed'
+      readonly runId: string
+      readonly version: 1
+    }

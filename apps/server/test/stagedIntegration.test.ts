@@ -87,7 +87,16 @@ function connector(proxy: ConnectorHost['proxy']) {
   })
 }
 
-const runtime = { integration: { callbackKey: 'callback-key', publicOrigin: 'https://flow.example' } } as const
+function options(host: ConnectorHost, clock: () => number) {
+  return {
+    capabilities: {
+      connector: () => host,
+      integration: () => ({ callbackKey: 'callback-key', publicOrigin: 'https://flow.example' }),
+    },
+    clock,
+    triggerDefinitions: [stripe],
+  }
+}
 
 it('recovers Stripe candidate creation with one fixed idempotency key, fences callbacks, and reuses the active subscription', async () => {
   const file = await databaseFile()
@@ -95,25 +104,23 @@ it('recovers Stripe candidate creation with one fixed idempotency key, fences ca
   let createCalls = 0
   const service = await openService(
     file,
-    connector(async (_provider, _connectionId, _rateLimitId, request) => {
-      if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'GET') {
-        return { data: { data: [], has_more: false }, status: 200 }
-      }
-      if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'POST') {
-        createCalls += 1
-        createKeys.push(request.headers?.['Idempotency-Key'] ?? '')
-        return { data: { id: 'we_candidate', secret: 'whsec_candidate' }, status: 200 }
-      }
-      if (request.endpoint == '/v1/webhook_endpoints/we_candidate' && request.method == 'POST') {
-        return { data: { id: 'we_candidate' }, status: 200 }
-      }
-      throw new Error('Unexpected Stripe request: ' + request.method + ' ' + request.endpoint)
-    }),
-    () => Date.parse('2026-08-31T08:00:00.000Z'),
-    runtime,
-    undefined,
-    undefined,
-    [stripe],
+    options(
+      connector(async (_provider, _connectionId, _rateLimitId, request) => {
+        if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'GET') {
+          return { data: { data: [], has_more: false }, status: 200 }
+        }
+        if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'POST') {
+          createCalls += 1
+          createKeys.push(request.headers?.['Idempotency-Key'] ?? '')
+          return { data: { id: 'we_candidate', secret: 'whsec_candidate' }, status: 200 }
+        }
+        if (request.endpoint == '/v1/webhook_endpoints/we_candidate' && request.method == 'POST') {
+          return { data: { id: 'we_candidate' }, status: 200 }
+        }
+        throw new Error('Unexpected Stripe request: ' + request.method + ' ' + request.endpoint)
+      }),
+      () => Date.parse('2026-08-31T08:00:00.000Z'),
+    ),
   )
   services.add(service)
   const created = await service.control.createFlow('operator', 'Stripe', 'stripe-flow')
@@ -197,32 +204,30 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
   let deletes = 0
   const service = await openService(
     file,
-    connector(async (_provider, _connectionId, _rateLimitId, request) => {
-      if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'GET') {
-        return {
-          data: { data: createdUrl == '' ? [] : [{ id: 'we_failed', url: createdUrl }], has_more: false },
-          status: 200,
+    options(
+      connector(async (_provider, _connectionId, _rateLimitId, request) => {
+        if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'GET') {
+          return {
+            data: { data: createdUrl == '' ? [] : [{ id: 'we_failed', url: createdUrl }], has_more: false },
+            status: 200,
+          }
         }
-      }
-      if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'POST') {
-        if (typeof request.body != 'string') throw new Error('Stripe create body is missing.')
-        createdUrl = new URLSearchParams(request.body).get('url') ?? ''
-        return { data: { id: 'we_failed', secret: 'whsec_failed' }, status: 200 }
-      }
-      if (request.endpoint == '/v1/webhook_endpoints/we_failed' && request.method == 'POST') {
-        return { data: { error: { message: 'Rejected.' } }, status: 400 }
-      }
-      if (request.endpoint == '/v1/webhook_endpoints/we_failed' && request.method == 'DELETE') {
-        deletes += 1
-        return { data: { deleted: true, id: 'we_failed' }, status: 200 }
-      }
-      throw new Error('Unexpected Stripe request: ' + request.method + ' ' + request.endpoint)
-    }),
-    () => Date.parse('2026-08-31T09:00:00.000Z'),
-    runtime,
-    undefined,
-    undefined,
-    [stripe],
+        if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'POST') {
+          if (typeof request.body != 'string') throw new Error('Stripe create body is missing.')
+          createdUrl = new URLSearchParams(request.body).get('url') ?? ''
+          return { data: { id: 'we_failed', secret: 'whsec_failed' }, status: 200 }
+        }
+        if (request.endpoint == '/v1/webhook_endpoints/we_failed' && request.method == 'POST') {
+          return { data: { error: { message: 'Rejected.' } }, status: 400 }
+        }
+        if (request.endpoint == '/v1/webhook_endpoints/we_failed' && request.method == 'DELETE') {
+          deletes += 1
+          return { data: { deleted: true, id: 'we_failed' }, status: 200 }
+        }
+        throw new Error('Unexpected Stripe request: ' + request.method + ' ' + request.endpoint)
+      }),
+      () => Date.parse('2026-08-31T09:00:00.000Z'),
+    ),
   )
   services.add(service)
   const created = await service.control.createFlow('operator', 'Stripe failure', 'stripe-failure-flow')
@@ -269,14 +274,12 @@ it('removes a cleanup candidate whose fixed Integration definition is unavailabl
   const file = await databaseFile()
   const service = await openService(
     file,
-    connector(async () => {
-      throw new Error('Cleanup should fail before a Connector request.')
-    }),
-    () => Date.parse('2026-08-31T13:00:00.000Z'),
-    runtime,
-    undefined,
-    undefined,
-    [stripe],
+    options(
+      connector(async () => {
+        throw new Error('Cleanup should fail before a Connector request.')
+      }),
+      () => Date.parse('2026-08-31T13:00:00.000Z'),
+    ),
   )
   services.add(service)
   const created = await service.control.createFlow('operator', 'Stripe cleanup', 'stripe-cleanup-flow')

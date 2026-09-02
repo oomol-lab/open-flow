@@ -31,6 +31,7 @@ export interface TaskNodeStoreManifest$ extends NodeStoreManifest$ {
 export interface TaskNodeStoreDisplay$ extends NodeStoreDisplay$ {
   readonly task: ReadonlyVal<string | undefined>
   readonly executorName: ReadonlyVal<string | undefined>
+  readonly notice?: ReadonlyVal<{ readonly icon?: string; readonly text: string } | undefined>
 }
 
 export interface TaskNodeStoreProps extends NodeStoreProps<TaskNodeStoreManifest$, TaskNodeStoreDisplay$> {

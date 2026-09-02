@@ -32,6 +32,8 @@
     "triggers": "触发器",
     "value": "值",
     "valueDescription": "为下游节点提供可复用的字面量。",
+    "wait": "等待",
+    "waitDescription": "暂停 Run，直到 Operator 继续或审批。",
     "webhook": "Webhook",
     "webhookDescription": "通过专属 HTTP 入口接收外部事件。"
   },
@@ -202,6 +204,24 @@
       "source": "源代码",
       "structuredJson": "结构化 JSON"
     },
+    "wait": {
+      "approval": "通过或拒绝",
+      "changeNotification": "更换",
+      "chooseNotification": "添加通知",
+      "chooseNotificationTitle": "选择通知方式",
+      "continue": "继续",
+      "inputs": "参数",
+      "inputsInvalid": "请填写所有必需的通知参数。",
+      "inputsLoading": "正在加载通知参数…",
+      "messageHandle": "消息内容写入",
+      "mode": "处理方式",
+      "notificationTask": "通知",
+      "notificationUnavailable": "通知配置不可用，请重新选择。",
+      "prompt": "提示",
+      "promptError": "提示必须包含 1 到 1,000 个字符。",
+      "removeNotification": "移除通知",
+      "save": "保存"
+    },
     "trigger": {
       "description": "描述",
       "save": "保存 Trigger",
@@ -340,6 +360,9 @@
     "upToDate": "当前草稿与线上版本一致。"
   },
   "run": {
+    "actionApprove": "通过",
+    "actionContinue": "继续",
+    "actionReject": "拒绝",
     "artifactMetadata": "产物元数据",
     "artifactUnavailable": "当前 Workbench 尚不支持预览或下载此产物。",
     "cancel": "取消运行",
@@ -364,6 +387,7 @@
     "eventRecorded": "已记录",
     "eventStarted": "已开始",
     "eventTruncated": "记录已截断",
+    "eventWaitResolved": "等待已处理",
     "eventsTruncatedNotice": "本次运行达到观察上限后，部分事件已被省略。",
     "eventsTruncatedUntil": "本次运行达到观察上限后，部分事件已被省略；其余详情保留至 {{date}}。",
     "filter": {
@@ -392,6 +416,7 @@
     "connectorUnconfigured": "当前部署尚未配置 Connector。请先完成配置，然后重新运行 Flow。",
     "connectorUnavailable": "Connector 请求未能完成。请再次运行 Flow；如果仍然失败，请检查所选连接。",
     "locateNode": "在画布中定位{{name}}",
+    "locateWait": "定位 Wait 节点",
     "nodeError": "节点错误",
     "nodeFailed": "节点未能完成执行。",
     "nodeLog": "{{level}} 日志",
@@ -401,6 +426,7 @@
     "outputId": "输出 ID",
     "outputPending": "运行结束后会在这里显示最终输出。",
     "resize": "拖动调整运行详情高度",
+    "resolving": "正在提交…",
     "runId": "运行 ID：{{id}}",
     "selectRun": "选择一条运行记录以查看时间线和输出。",
     "sourceDraft": "草稿",
@@ -412,6 +438,7 @@
     "statusNone": "暂无运行记录",
     "statusQueued": "排队中",
     "statusRunning": "运行中",
+    "statusWaiting": "等待中",
     "statusStarting": "启动中",
     "statusSubmitting": "正在提交",
     "statusSucceeded": "成功",
@@ -426,7 +453,8 @@
     "timeline": "时间线",
     "timelineEmpty": "运行当前选中的草稿后，可查看时间线和输出。",
     "submitting": "正在提交当前固定修订并创建运行记录…",
-    "waiting": "正在等待第一个事件…"
+    "waiting": "正在等待第一个事件…",
+    "waitExpires": "到期时间：{{date}}"
   },
   "sidebar": {
     "createFirstFlow": "创建 Flow",

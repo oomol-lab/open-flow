@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
 import type { TriggerSettings } from '../../../../flow/common/nodeChanges.ts'
-import type { ConnectorAction, ConnectorConnection, Diagnostic } from '../api.ts'
+import type { ConnectorAction, ConnectorConnection, Diagnostic, JsonValue } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from '../revisionView.ts'
@@ -12,25 +12,32 @@ import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 import type { DiagnosticFocus } from './diagnostics.ts'
 import type { DesignerTarget, SubflowSettings, TaskSettings } from './flowChanges.ts'
 
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
-import { useTranslate } from 'val-i18n-react'
+import { useLang, useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
+import { ToggleGroup, ToggleGroupItem } from '../../../../ui/browser/toggle-group.tsx'
 import { Icon } from '../icons.tsx'
 import { CodeEditor } from './codeEditor.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
 import { codeTyping } from './flowChanges.ts'
 import { taskDiagnosticReady, taskInspectorSection } from './nodeInspectorBehavior.ts'
 
+const WaitNotificationInputs = lazy(async () => {
+  const module = await import('./waitNotificationInputs.tsx')
+  return { default: module.WaitNotificationInputs }
+})
+
 export function inspectorIcon(node: ResolvedSelection | undefined, target: DesignerTarget): IconName {
   if (node?.kind == 'trigger') return 'trigger'
   if (node?.kind == 'condition') return 'condition'
   if (node?.kind == 'value') return 'value'
+  if (node?.kind == 'wait') return 'wait'
   if (node?.kind == 'subflow' || (node == null && target.kind == 'subflow')) return 'subflow'
   if (node?.kind == 'task' && node.definition != null && 'executor' in node.definition) {
     return node.definition.executor.kind == 'llm' ? 'llm' : 'connection'
@@ -188,6 +195,415 @@ function GeneralSettings({
   )
 }
 
+function ConnectorAccount({
+  action,
+  actionError,
+  actionId,
+  activeConnections,
+  authorizationPending,
+  connection,
+  connectionError,
+  connectionId,
+  connectors,
+  disabled,
+  fieldIdPrefix,
+  loading,
+  taskId,
+}: {
+  readonly action: ConnectorAction | undefined
+  readonly actionError: string | undefined
+  readonly actionId: string
+  readonly activeConnections: readonly ConnectorConnection[] | undefined
+  readonly authorizationPending: boolean
+  readonly connection: ConnectorConnection | undefined
+  readonly connectionError: string | undefined
+  readonly connectionId: string | undefined
+  readonly connectors: ConnectorStore
+  readonly disabled: boolean
+  readonly fieldIdPrefix: string
+  readonly loading: boolean
+  readonly taskId: string
+}): ReactElement {
+  const t = useTranslate()
+  const available = activeConnections ?? []
+  const required = action?.authenticated == true && (connectionId == null || (activeConnections != null && connection?.status != 'active'))
+  return (
+    <section className={`inspector-section connection-state ${required ? 'required' : ''}`} data-inspector-section="account">
+      <h3>
+        <Icon name="connection" size={15} /> {t('inspector.account.title')}
+      </h3>
+      {loading ? (
+        <p>{t('inspector.account.loading')}</p>
+      ) : actionError != null || action == null ? (
+        <>
+          <p>{actionError ?? t('inspector.account.statusUnavailable', { action: actionId })}</p>
+          <Button disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
+            {t('inspector.account.retry')}
+          </Button>
+        </>
+      ) : connectionError != null ? (
+        <>
+          <p>{t('inspector.account.refreshFailed')}</p>
+          <p className="connection-detail">{connectionError}</p>
+          <Button disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
+            {t('inspector.account.retry')}
+          </Button>
+        </>
+      ) : connectionId == null ? (
+        available.length > 0 ? (
+          <>
+            {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
+            <Field className="connection-field">
+              <FieldLabel htmlFor={`${fieldIdPrefix}-connection`}>{t('inspector.account.connection')}</FieldLabel>
+              <NativeSelect
+                disabled={disabled}
+                id={`${fieldIdPrefix}-connection`}
+                onChange={(event) => void connectors.setConnection(taskId, event.target.value)}
+                value=""
+              >
+                <NativeSelectOption disabled value="">
+                  {t('inspector.account.chooseAccount')}
+                </NativeSelectOption>
+                {available.map((candidate) => (
+                  <NativeSelectOption key={candidate.connectionId} value={candidate.connectionId}>
+                    {candidate.displayName}
+                    {candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+            <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="sm" type="button" variant="secondary">
+              <Icon data-icon="inline-start" name="plus" /> {t('inspector.account.addConnection')}
+            </Button>
+          </>
+        ) : (
+          <>
+            {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
+            <p>{t('inspector.account.connectBeforeRun', { service: action.serviceName })}</p>
+            <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="sm" type="button">
+              {t('inspector.account.connectService', { service: action.serviceName })}
+            </Button>
+          </>
+        )
+      ) : (
+        <>
+          {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
+          <Field className="connection-field">
+            <FieldLabel htmlFor={`${fieldIdPrefix}-connection`}>{t('inspector.account.connection')}</FieldLabel>
+            <NativeSelect
+              disabled={disabled || available.length == 0}
+              id={`${fieldIdPrefix}-connection`}
+              onChange={(event) => void connectors.setConnection(taskId, event.target.value)}
+              value={connectionId}
+            >
+              {connection?.status != 'active' && (
+                <NativeSelectOption disabled value={connectionId}>
+                  {connection?.displayName ?? connectionId} ({t('inspector.account.unavailable')})
+                </NativeSelectOption>
+              )}
+              {available.map((candidate) => (
+                <NativeSelectOption key={candidate.connectionId} value={candidate.connectionId}>
+                  {candidate.displayName}
+                  {candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+          {connection == null ? (
+            <p>{t('inspector.account.missing')}</p>
+          ) : connection.status == 'active' ? (
+            <p>{t('inspector.account.pinned')}</p>
+          ) : (
+            <p>{t(`inspector.account.status.${connection.status}`)}</p>
+          )}
+          <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="sm" type="button" variant="secondary">
+            <Icon data-icon="inline-start" name="plus" /> {t('inspector.account.addConnection')}
+          </Button>
+        </>
+      )}
+    </section>
+  )
+}
+
+function WaitDefinition({
+  activeConnectorConnections,
+  connectorAction,
+  connectorActionError,
+  connectorAuthorizationPending,
+  connectorConnection,
+  connectorConnectionError,
+  connectorLoading,
+  connectors,
+  disabled,
+  onChooseNotification,
+  revision,
+  selection,
+  store,
+  theme,
+}: {
+  readonly activeConnectorConnections: readonly ConnectorConnection[] | undefined
+  readonly connectorAction: ConnectorAction | undefined
+  readonly connectorActionError: string | undefined
+  readonly connectorAuthorizationPending: boolean
+  readonly connectorConnection: ConnectorConnection | undefined
+  readonly connectorConnectionError: string | undefined
+  readonly connectorLoading: boolean
+  readonly connectors: ConnectorStore
+  readonly disabled: boolean
+  readonly onChooseNotification: (button: HTMLButtonElement) => void
+  readonly revision: RevisionView
+  readonly selection: Extract<ResolvedNode, { readonly kind: 'wait' }>
+  readonly store: WorkspaceStore
+  readonly theme: WorkbenchTheme
+}): ReactElement {
+  const language = useLang()
+  const t = useTranslate()
+  const node = selection.node
+  const [name, setName] = useState(node.name ?? '')
+  const [mode, setMode] = useState<'approval' | 'continue'>(node.actions.length == 1 ? 'continue' : 'approval')
+  const [notificationTaskId, setNotificationTaskId] = useState(node.notification?.taskId ?? '')
+  const [messageHandle, setMessageHandle] = useState(node.notification?.messageHandle ?? '')
+  const [prompt, setPrompt] = useState(node.prompt)
+  const [error, setError] = useState<string>()
+  const [inputAttempted, setInputAttempted] = useState(false)
+  const fieldIdPrefix = `wait-${selection.id}`
+  const savedMode = node.actions.length == 1 ? 'continue' : 'approval'
+  const notificationTask = notificationTaskId == '' ? undefined : revision.task(notificationTaskId)
+  const notificationName = (connectorAction?.name ?? notificationTask?.name ?? '').replaceAll('_', ' ')
+  const ports = useMemo(() => notificationTask?.inputs.flatMap((port) => ('handle' in port ? [port] : [])) ?? [], [notificationTask])
+  const messageHandles = ports.map((port) => port.handle)
+  const currentInputs = useMemo(
+    () => (node.notification?.taskId == notificationTaskId ? node.notification.inputs : {}),
+    [node.notification, notificationTaskId],
+  )
+  const mappedHandles = useMemo(
+    () => Object.entries(currentInputs).flatMap(([handle, mapping]) => (mapping.kind == 'sources' ? [handle] : [])),
+    [currentInputs],
+  )
+  const inputDefinitions = useMemo(
+    () =>
+      ports.flatMap((port) =>
+        port.handle == messageHandle || Object.hasOwn(port, 'value') || mappedHandles.includes(port.handle)
+          ? []
+          : [
+              {
+                ...(port.description == null ? {} : { description: port.description }),
+                handle: port.handle,
+                jsonSchema: port.jsonSchema,
+                nullable: port.nullable ?? false,
+              },
+            ],
+      ),
+    [mappedHandles, messageHandle, ports],
+  )
+  const savedValues = Object.fromEntries(
+    Object.entries(currentInputs).flatMap(([handle, mapping]) => (mapping.kind == 'value' ? [[handle, mapping.value] as const] : [])),
+  )
+  const [notificationValues, setNotificationValues] = useState<Readonly<Record<string, JsonValue>>>(savedValues)
+  const [inputsValid, setInputsValid] = useState(inputDefinitions.length == 0)
+
+  useEffect(() => {
+    setName(node.name ?? '')
+    setMode(node.actions.length == 1 ? 'continue' : 'approval')
+    setNotificationTaskId(node.notification?.taskId ?? '')
+    setMessageHandle(node.notification?.messageHandle ?? '')
+    setNotificationValues(
+      Object.fromEntries(
+        Object.entries(node.notification?.inputs ?? {}).flatMap(([handle, mapping]) => (mapping.kind == 'value' ? [[handle, mapping.value] as const] : [])),
+      ),
+    )
+    setPrompt(node.prompt)
+    setError(undefined)
+    setInputAttempted(false)
+  }, [node])
+
+  useEffect(() => setInputsValid(inputDefinitions.length == 0), [inputDefinitions])
+
+  const save = async (validateInputs = true, nextMode = mode, nextNotificationTaskId = notificationTaskId): Promise<boolean> => {
+    const value = prompt.trim()
+    if (value.length == 0 || [...value].length > 1_000) {
+      setError(t('inspector.wait.promptError'))
+      return false
+    }
+    let notification: typeof node.notification
+    if (nextNotificationTaskId != '') {
+      if (notificationTask?.executor.kind != 'connector' || !messageHandles.includes(messageHandle)) {
+        setError(t('inspector.wait.notificationUnavailable'))
+        return false
+      }
+      if (validateInputs && !inputsValid) {
+        setInputAttempted(true)
+        setError(t('inspector.wait.inputsInvalid'))
+        return false
+      }
+      const mappedInputs = Object.fromEntries(Object.entries(currentInputs).filter(([, mapping]) => mapping.kind == 'sources'))
+      notification = {
+        inputs: {
+          ...mappedInputs,
+          ...Object.fromEntries(Object.entries(notificationValues).map(([handle, input]) => [handle, { kind: 'value' as const, value: input }])),
+        },
+        messageHandle,
+        taskId: nextNotificationTaskId,
+      }
+    }
+    setError(undefined)
+    return await store.saveWait(selection.id, {
+      actions: nextMode == 'continue' ? ['continue'] : ['approve', 'reject'],
+      ...(name.trim() == '' ? {} : { name: name.trim() }),
+      notification,
+      prompt: value,
+    })
+  }
+
+  const chooseNotification = async (button: HTMLButtonElement): Promise<void> => {
+    if (name.trim() == (node.name ?? '') && prompt.trim() == node.prompt && mode == savedMode) {
+      onChooseNotification(button)
+      return
+    }
+    if (await save(false)) onChooseNotification(button)
+  }
+
+  return (
+    <>
+      <form
+        className="inspector-section inspector-form wait-form"
+        data-inspector-section="wait"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void save()
+        }}
+      >
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor={`${fieldIdPrefix}-name`}>{t('common.name')}</FieldLabel>
+            <Input disabled={disabled} id={`${fieldIdPrefix}-name`} onChange={(event) => setName(event.target.value)} value={name} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={`${fieldIdPrefix}-prompt`}>{t('inspector.wait.prompt')}</FieldLabel>
+            <Textarea disabled={disabled} id={`${fieldIdPrefix}-prompt`} onChange={(event) => setPrompt(event.target.value)} rows={3} value={prompt} />
+          </Field>
+          <Field>
+            <FieldLabel>{t('inspector.wait.mode')}</FieldLabel>
+            <ToggleGroup<'approval' | 'continue'>
+              aria-label={t('inspector.wait.mode')}
+              className="wait-mode-switcher"
+              disabled={disabled}
+              onValueChange={(values) => {
+                const value = values.at(-1)
+                if (value == null || value == mode) return
+                setMode(value)
+                void save(false, value).then((saved) => {
+                  if (!saved) setMode(savedMode)
+                })
+              }}
+              spacing={0}
+              size="sm"
+              value={[mode]}
+              variant="default"
+            >
+              <ToggleGroupItem value="continue">{t('inspector.wait.continue')}</ToggleGroupItem>
+              <ToggleGroupItem value="approval">{t('inspector.wait.approval')}</ToggleGroupItem>
+            </ToggleGroup>
+          </Field>
+          <Field>
+            <FieldLabel>{t('inspector.wait.notificationTask')}</FieldLabel>
+            {notificationTask == null ? (
+              <Button disabled={disabled} onClick={(event) => void chooseNotification(event.currentTarget)} size="sm" type="button" variant="secondary">
+                <Icon data-icon="inline-start" name="plus" /> {t('inspector.wait.chooseNotification')}
+              </Button>
+            ) : (
+              <div className="wait-notification-summary">
+                <Icon name="connection" size={16} />
+                <span>{connectorAction == null ? notificationName : `${connectorAction.serviceName} · ${notificationName}`}</span>
+                <Button disabled={disabled} onClick={(event) => void chooseNotification(event.currentTarget)} size="sm" type="button" variant="ghost">
+                  {t('inspector.wait.changeNotification')}
+                </Button>
+                <Button
+                  aria-label={t('inspector.wait.removeNotification')}
+                  disabled={disabled}
+                  onClick={() => {
+                    void save(false, mode, '').then((saved) => {
+                      if (!saved) return
+                      setNotificationTaskId('')
+                      setMessageHandle('')
+                      setNotificationValues({})
+                    })
+                  }}
+                  size="icon-sm"
+                  title={t('inspector.wait.removeNotification')}
+                  type="button"
+                  variant="ghost"
+                >
+                  <Icon name="close" />
+                </Button>
+              </div>
+            )}
+          </Field>
+          {notificationTask != null && messageHandles.length > 1 && (
+            <Field>
+              <FieldLabel htmlFor={`${fieldIdPrefix}-message-handle`}>{t('inspector.wait.messageHandle')}</FieldLabel>
+              <NativeSelect
+                disabled={disabled}
+                id={`${fieldIdPrefix}-message-handle`}
+                onChange={(event) => setMessageHandle(event.target.value)}
+                value={messageHandle}
+              >
+                {messageHandles.map((handle) => (
+                  <NativeSelectOption key={handle} value={handle}>
+                    {handle}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+          )}
+          {notificationTask != null && inputDefinitions.length > 0 && (
+            <Field>
+              <FieldLabel>{t('inspector.wait.inputs')}</FieldLabel>
+              <fieldset className="wait-notification-inputs" disabled={disabled}>
+                <Suspense fallback={<FieldDescription>{t('inspector.wait.inputsLoading')}</FieldDescription>}>
+                  <WaitNotificationInputs
+                    definitions={inputDefinitions}
+                    key={`${notificationTaskId}:${messageHandle}`}
+                    language={language}
+                    onChange={setNotificationValues}
+                    onValidChange={setInputsValid}
+                    showErrors={inputAttempted}
+                    theme={theme}
+                    values={notificationValues}
+                  />
+                </Suspense>
+              </fieldset>
+            </Field>
+          )}
+          {error != null && <FieldError>{error}</FieldError>}
+        </FieldGroup>
+        <div className="form-actions">
+          <Button disabled={disabled} size="sm" type="submit" variant="secondary">
+            {t('inspector.wait.save')}
+          </Button>
+        </div>
+      </form>
+      {notificationTask?.executor.kind == 'connector' && connectorAction?.authenticated !== false && (
+        <ConnectorAccount
+          action={connectorAction}
+          actionError={connectorActionError}
+          actionId={notificationTask.executor.action}
+          activeConnections={activeConnectorConnections}
+          authorizationPending={connectorAuthorizationPending}
+          connection={connectorConnection}
+          connectionError={connectorConnectionError}
+          connectionId={notificationTask.executor.connectionId}
+          connectors={connectors}
+          disabled={disabled}
+          fieldIdPrefix={fieldIdPrefix}
+          loading={connectorLoading}
+          taskId={notificationTaskId}
+        />
+      )}
+    </>
+  )
+}
+
 function TaskDefinition({
   children,
   connectorAction,
@@ -242,10 +658,6 @@ function TaskDefinition({
 
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
   const connector = 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
-  const activeConnections = activeConnectorConnections ?? []
-  const connectionRequired =
-    connectorAction?.authenticated == true &&
-    (connector?.connectionId == null || (activeConnectorConnections != null && connectorConnection?.status != 'active'))
   const codeEditor =
     module != null && 'moduleId' in task && moduleEditor?.moduleId == task.moduleId ? (
       <form
@@ -364,101 +776,22 @@ function TaskDefinition({
   )
   return (
     <>
-      {connector != null && connectorAction?.authenticated !== false && (
-        <section className={`inspector-section connection-state ${connectionRequired ? 'required' : ''}`} data-inspector-section="account">
-          <h3>
-            <Icon name="connection" size={15} /> {t('inspector.account.title')}
-          </h3>
-          {connectorLoading ? (
-            <p>{t('inspector.account.loading')}</p>
-          ) : connectorActionError != null || connectorAction == null ? (
-            <>
-              <p>{connectorActionError ?? t('inspector.account.statusUnavailable', { action: connector.action })}</p>
-              <Button disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
-                {t('inspector.account.retry')}
-              </Button>
-            </>
-          ) : connectorConnectionError != null ? (
-            <>
-              <p>{t('inspector.account.refreshFailed')}</p>
-              <p className="connection-detail">{connectorConnectionError}</p>
-              <Button disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
-                {t('inspector.account.retry')}
-              </Button>
-            </>
-          ) : connector.connectionId == null ? (
-            activeConnections.length > 0 ? (
-              <>
-                {connectorAuthorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
-                <Field className="connection-field">
-                  <FieldLabel htmlFor={`${fieldIdPrefix}-connection`}>{t('inspector.account.connection')}</FieldLabel>
-                  <NativeSelect
-                    disabled={disabled}
-                    id={`${fieldIdPrefix}-connection`}
-                    onChange={(event) => void connectors.setConnection(taskId!, event.target.value)}
-                    value=""
-                  >
-                    <NativeSelectOption disabled value="">
-                      {t('inspector.account.chooseAccount')}
-                    </NativeSelectOption>
-                    {activeConnections.map((connection) => (
-                      <NativeSelectOption key={connection.connectionId} value={connection.connectionId}>
-                        {connection.displayName}
-                        {connection.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </Field>
-                <Button disabled={disabled} onClick={() => void connectors.connect(connectorAction.serviceId)} size="sm" type="button" variant="secondary">
-                  <Icon data-icon="inline-start" name="plus" /> {t('inspector.account.addConnection')}
-                </Button>
-              </>
-            ) : (
-              <>
-                {connectorAuthorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
-                <p>{t('inspector.account.connectBeforeRun', { service: connectorAction.serviceName })}</p>
-                <Button disabled={disabled} onClick={() => void connectors.connect(connectorAction.serviceId)} size="sm" type="button">
-                  {t('inspector.account.connectService', { service: connectorAction.serviceName })}
-                </Button>
-              </>
-            )
-          ) : (
-            <>
-              {connectorAuthorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
-              <Field className="connection-field">
-                <FieldLabel htmlFor={`${fieldIdPrefix}-connection`}>{t('inspector.account.connection')}</FieldLabel>
-                <NativeSelect
-                  disabled={disabled || activeConnections.length == 0}
-                  id={`${fieldIdPrefix}-connection`}
-                  onChange={(event) => void connectors.setConnection(taskId!, event.target.value)}
-                  value={connector.connectionId}
-                >
-                  {connectorConnection?.status != 'active' && (
-                    <NativeSelectOption disabled value={connector.connectionId}>
-                      {connectorConnection?.displayName ?? connector.connectionId} ({t('inspector.account.unavailable')})
-                    </NativeSelectOption>
-                  )}
-                  {activeConnections.map((connection) => (
-                    <NativeSelectOption key={connection.connectionId} value={connection.connectionId}>
-                      {connection.displayName}
-                      {connection.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </Field>
-              {connectorConnection == null ? (
-                <p>{t('inspector.account.missing')}</p>
-              ) : connectorConnection.status == 'active' ? (
-                <p>{t('inspector.account.pinned')}</p>
-              ) : (
-                <p>{t(`inspector.account.status.${connectorConnection.status}`)}</p>
-              )}
-              <Button disabled={disabled} onClick={() => void connectors.connect(connectorAction.serviceId)} size="sm" type="button" variant="secondary">
-                <Icon data-icon="inline-start" name="plus" /> {t('inspector.account.addConnection')}
-              </Button>
-            </>
-          )}
-        </section>
+      {connector != null && taskId != null && connectorAction?.authenticated !== false && (
+        <ConnectorAccount
+          action={connectorAction}
+          actionError={connectorActionError}
+          actionId={connector.action}
+          activeConnections={activeConnectorConnections}
+          authorizationPending={connectorAuthorizationPending}
+          connection={connectorConnection}
+          connectionError={connectorConnectionError}
+          connectionId={connector.connectionId}
+          connectors={connectors}
+          disabled={disabled}
+          fieldIdPrefix={fieldIdPrefix}
+          loading={connectorLoading}
+          taskId={taskId}
+        />
       )}
       {codeEditor == null ? (
         settingsPanel
@@ -715,6 +1048,7 @@ interface Props {
   readonly diagnostics: readonly Diagnostic[]
   readonly disabled: boolean
   readonly focus?: DiagnosticFocus
+  readonly onChooseWaitNotification: (button: HTMLButtonElement) => void
   readonly revision: RevisionView
   readonly selection: ResolvedSelection | undefined
   readonly store: WorkspaceStore
@@ -740,6 +1074,7 @@ export function NodeInspector({
   diagnostics,
   disabled,
   focus,
+  onChooseWaitNotification,
   revision,
   selection,
   store,
@@ -819,6 +1154,23 @@ export function NodeInspector({
             >
               <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
             </TaskDefinition>
+          ) : selection.kind == 'wait' ? (
+            <WaitDefinition
+              activeConnectorConnections={activeConnectorConnections}
+              connectorAction={connectorAction}
+              connectorActionError={connectorActionError}
+              connectorAuthorizationPending={connectorAuthorizationPending}
+              connectorConnection={connectorConnection}
+              connectorConnectionError={connectorConnectionError}
+              connectorLoading={connectorLoading}
+              connectors={connectors}
+              disabled={disabled}
+              onChooseNotification={onChooseWaitNotification}
+              revision={revision}
+              selection={selection}
+              store={store}
+              theme={theme}
+            />
           ) : (
             <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
           )}

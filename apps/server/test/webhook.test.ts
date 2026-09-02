@@ -128,7 +128,7 @@ describe('Server Webhook Trigger admission', () => {
   })
 
   it('bounds pending Runs without blocking idempotent replay', async () => {
-    const service = await openService(await databaseFile(), undefined, Date.now, { maxPendingRuns: 1 })
+    const service = await openService(await databaseFile(), { clock: Date.now, runtime: { maxPendingRuns: 1 } })
     services.push(service)
     const target = await publishedWebhook(service)
 

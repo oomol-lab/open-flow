@@ -10,7 +10,7 @@ import type { ID } from './typing.ts'
 
 import { isBoolean } from '@wopjs/cast'
 import { INPUT_NODE_ID, NODE_TYPE, OUTPUT_NODE_ID } from '../stores/node/constants.ts'
-import { isSize } from './compare.ts'
+import { isSameXYPosition, isSize } from './compare.ts'
 import { DEFAULT_POSITION } from './designer.ts'
 
 export type RFNode = _Node<{ store: NodeStore | CommentNodeStore }>
@@ -173,11 +173,11 @@ export function applyNodeChanges<TRFNode extends RFNode = RFNode>(
         break
       }
       case 'position': {
-        nodeStore.$$.rfNode.set({
-          ...nodeStore.$.rfNode.value,
-          position: change.position ?? nodeStore.$.rfNode.value.position ?? DEFAULT_POSITION,
-          dragging: change.dragging,
-        })
+        const current = nodeStore.$.rfNode.value
+        const position = change.position ?? current.position ?? DEFAULT_POSITION
+        if (!isSameXYPosition(current.position, position) || current.dragging !== change.dragging) {
+          nodeStore.$$.rfNode.set({ ...current, position, dragging: change.dragging })
+        }
         break
       }
       case 'dimensions': {

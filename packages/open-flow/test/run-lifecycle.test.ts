@@ -23,7 +23,7 @@ class SqliteRunLifecycle implements RunLifecycleHarness {
         run_id TEXT PRIMARY KEY,
         idempotency_key TEXT NOT NULL UNIQUE,
         request_digest TEXT NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('queued', 'starting', 'running', 'completed', 'failed', 'canceled', 'indeterminate')),
+        status TEXT NOT NULL CHECK (status IN ('queued', 'starting', 'running', 'waiting', 'completed', 'failed', 'canceled', 'indeterminate')),
         terminal_status TEXT CHECK (terminal_status IN ('completed', 'failed', 'canceled', 'indeterminate'))
       ) STRICT;
       CREATE TABLE run_terminal_events (
@@ -56,6 +56,8 @@ class SqliteRunLifecycle implements RunLifecycleHarness {
         return { kind: 'ready', status }
       case 'running':
         return { kind: 'running', status }
+      case 'waiting':
+        return { kind: 'waiting', status }
       case 'canceled':
       case 'completed':
       case 'failed':
@@ -71,8 +73,10 @@ class SqliteRunLifecycle implements RunLifecycleHarness {
     try {
       const statement =
         status == 'canceled'
-          ? "UPDATE runs SET status = ?, terminal_status = ? WHERE run_id = ? AND status IN ('queued', 'starting', 'running') AND terminal_status IS NULL"
-          : "UPDATE runs SET status = ?, terminal_status = ? WHERE run_id = ? AND status = 'running' AND terminal_status IS NULL"
+          ? "UPDATE runs SET status = ?, terminal_status = ? WHERE run_id = ? AND status IN ('queued', 'starting', 'running', 'waiting') AND terminal_status IS NULL"
+          : status == 'failed'
+            ? "UPDATE runs SET status = ?, terminal_status = ? WHERE run_id = ? AND status IN ('running', 'waiting') AND terminal_status IS NULL"
+            : "UPDATE runs SET status = ?, terminal_status = ? WHERE run_id = ? AND status = 'running' AND terminal_status IS NULL"
       const result = this.#database.prepare(statement).run(status, status, runId)
       if (result.changes == 1) {
         this.#database.prepare('INSERT INTO run_terminal_events (run_id, sequence, status) VALUES (?, 1, ?)').run(runId, status)
@@ -106,6 +110,14 @@ class SqliteRunLifecycle implements RunLifecycleHarness {
     return status == 'running' ? { kind: 'already-started', status } : { kind: 'stale', status }
   }
 
+  async wait(runId: string): Promise<boolean> {
+    return this.#database.prepare("UPDATE runs SET status = 'waiting' WHERE run_id = ? AND status = 'running'").run(runId).changes == 1
+  }
+
+  async resolve(runId: string): Promise<boolean> {
+    return this.#database.prepare("UPDATE runs SET status = 'queued' WHERE run_id = ? AND status = 'waiting'").run(runId).changes == 1
+  }
+
   #status(runId: string): RunStatus {
     return (this.#database.prepare('SELECT status FROM runs WHERE run_id = ?').get(runId) as { readonly status: RunStatus }).status
   }
@@ -115,9 +127,14 @@ test('models the Run start barrier and terminal commit rules', () => {
   assert.deepEqual(transitionRun('queued', { kind: 'claim' }), { kind: 'ready', status: 'starting' })
   assert.deepEqual(transitionRun('starting', { kind: 'claim' }), { kind: 'ready', status: 'starting' })
   assert.deepEqual(transitionRun('running', { kind: 'claim' }), { kind: 'running', status: 'running' })
+  assert.deepEqual(transitionRun('running', { kind: 'wait' }), { kind: 'waited', status: 'waiting' })
+  assert.deepEqual(transitionRun('waiting', { kind: 'claim' }), { kind: 'waiting', status: 'waiting' })
+  assert.deepEqual(transitionRun('waiting', { kind: 'resolve' }), { kind: 'resolved', status: 'queued' })
   assert.deepEqual(transitionRun('starting', { kind: 'commit', status: 'completed' }), { kind: 'stale', status: 'starting' })
   assert.deepEqual(transitionRun('starting', { kind: 'commit', status: 'canceled' }), { kind: 'committed', status: 'canceled' })
   assert.deepEqual(transitionRun('running', { kind: 'commit', status: 'indeterminate' }), { kind: 'committed', status: 'indeterminate' })
+  assert.deepEqual(transitionRun('waiting', { kind: 'commit', status: 'failed' }), { kind: 'committed', status: 'failed' })
+  assert.deepEqual(transitionRun('waiting', { kind: 'commit', status: 'completed' }), { kind: 'stale', status: 'waiting' })
 })
 
 for (const conformance of runLifecycleConformanceCases) {

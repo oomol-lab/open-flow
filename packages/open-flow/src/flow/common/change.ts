@@ -89,6 +89,19 @@ export interface ValueNode extends GraphNodeBase {
   readonly values: readonly InputPort[]
 }
 
+export type WaitAction = 'approve' | 'continue' | 'reject'
+
+export interface WaitNode extends GraphNodeBase {
+  readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
+  readonly kind: 'wait'
+  readonly notification?: {
+    readonly inputs: Readonly<Record<string, InputMapping>>
+    readonly messageHandle: string
+    readonly taskId: string
+  }
+  readonly prompt: string
+}
+
 export type ConditionOperator =
   | '!='
   | '<'
@@ -237,7 +250,7 @@ export type TriggerNode =
       readonly kind: 'integration'
     })
 
-export type GraphNode = ConditionNode | SubflowNode | TaskNode | TriggerNode | ValueNode
+export type GraphNode = ConditionNode | SubflowNode | TaskNode | TriggerNode | ValueNode | WaitNode
 
 export interface FlowDocument {
   readonly bindings: Readonly<Record<string, { readonly kind: 'connection' | 'variable'; readonly target: string }>>

@@ -2,7 +2,7 @@ import type { EventListeners } from 'overlayscrollbars'
 import type { KeyboardEvent, PointerEvent, ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
 import type { OverlayScrollbarRef } from '../../../../designer/browser/components/overlayScrollbar.tsx'
-import type { JsonValue, Run, RunEvent, RunResult } from '../api.ts'
+import type { JsonValue, Run, RunDetails, RunEvent, RunResult, WaitAction } from '../api.ts'
 import type { IconName } from '../icons.tsx'
 import type { RunEventFilter } from './runStore.ts'
 
@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { OverlayScrollbar } from '../../../../designer/browser/components/overlayScrollbar.tsx'
 import { collapseAllNested, CompactValue, JSONViewer } from '../../../../designer/browser/jsonViewer/index.ts'
+import { Alert, AlertDescription, AlertTitle } from '../../../../ui/browser/alert.tsx'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
@@ -28,6 +29,8 @@ export function runLabel(run: Run | undefined, t: TFunction): string {
       return t('run.statusStarting')
     case 'running':
       return t('run.statusRunning')
+    case 'waiting':
+      return t('run.statusWaiting')
     case 'completed':
       return t('run.statusSucceeded')
     case 'failed':
@@ -82,12 +85,15 @@ interface Props {
   readonly onConfigureConnector?: (() => void) | undefined
   readonly onEventFilterChange: (filter: RunEventFilter) => void
   readonly onLocateEvent: (sequence: number) => void
+  readonly onLocateWait: () => void
+  readonly onResolve: (action: WaitAction) => void
   readonly onRetryObservation: () => void
   readonly onToggle: () => void
   readonly open: boolean
   readonly observationFailed: boolean
   readonly result: RunResult | undefined
-  readonly run: Run | undefined
+  readonly resolvingAction: WaitAction | undefined
+  readonly run: Run | RunDetails | undefined
   readonly submitting: boolean
   readonly visible: boolean
 }
@@ -96,6 +102,60 @@ type EventObservation = 'expired' | 'truncated'
 type EventCategory = Exclude<RunEventFilter, 'all'>
 
 const eventCategories: readonly EventCategory[] = ['lifecycle', 'progress', 'log', 'output', 'artifact']
+
+function waitActionLabel(action: WaitAction, t: TFunction): string {
+  switch (action) {
+    case 'approve':
+      return t('run.actionApprove')
+    case 'continue':
+      return t('run.actionContinue')
+    case 'reject':
+      return t('run.actionReject')
+  }
+}
+
+function ActiveWait({
+  onLocate,
+  onResolve,
+  resolvingAction,
+  run,
+}: {
+  readonly onLocate: () => void
+  readonly onResolve: (action: WaitAction) => void
+  readonly resolvingAction: WaitAction | undefined
+  readonly run: Run | RunDetails
+}): ReactElement | null {
+  const language = useLang()
+  const t = useTranslate()
+  const waiting = run.status == 'waiting' && 'waiting' in run ? run.waiting : undefined
+  if (waiting == null) return null
+  return (
+    <Alert className="mx-2 mt-2 shrink-0">
+      <Icon name="wait" />
+      <AlertTitle>{waiting.prompt}</AlertTitle>
+      <AlertDescription>
+        <div>{t('run.waitExpires', { date: new Date(waiting.expiresAt).toLocaleString(language) })}</div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {waiting.actions.map((action) => (
+            <Button
+              disabled={resolvingAction != null}
+              key={action}
+              onClick={() => onResolve(action)}
+              size="sm"
+              type="button"
+              variant={action == 'reject' ? 'destructive' : 'default'}
+            >
+              {resolvingAction == action ? t('run.resolving') : waitActionLabel(action, t)}
+            </Button>
+          ))}
+          <Button onClick={onLocate} size="sm" type="button" variant="secondary">
+            <Icon name="fit" /> {t('run.locateWait')}
+          </Button>
+        </div>
+      </AlertDescription>
+    </Alert>
+  )
+}
 
 function eventObservation(events: readonly RunEvent[], historyComplete: boolean): EventObservation | undefined {
   if (!historyComplete) return 'expired'
@@ -122,7 +182,9 @@ function eventCategory(event: RunEvent): EventCategory {
     case 'run.failed':
     case 'run.indeterminate':
     case 'run.queued':
+    case 'run.resolved':
     case 'run.started':
+    case 'run.waiting':
       return 'lifecycle'
   }
 }
@@ -274,6 +336,10 @@ function eventSummary(event: RunEvent, t: TFunction): string {
   switch (event.kind) {
     case 'run.queued':
       return t('run.eventEnqueued')
+    case 'run.resolved':
+      return t('run.eventWaitResolved')
+    case 'run.waiting':
+      return t('run.statusWaiting')
     case 'run.started':
     case 'node.started':
       return t('run.eventStarted')
@@ -502,11 +568,14 @@ export function RunDrawer({
   onConfigureConnector,
   onEventFilterChange,
   onLocateEvent,
+  onLocateWait,
+  onResolve,
   onRetryObservation,
   onToggle,
   observationFailed,
   open,
   result,
+  resolvingAction,
   run,
   submitting,
   visible,
@@ -630,6 +699,7 @@ export function RunDrawer({
       )}
       {open && (
         <div className="run-content">
+          {run != null && <ActiveWait onLocate={onLocateWait} onResolve={onResolve} resolvingAction={resolvingAction} run={run} />}
           <RunLog
             events={events}
             eventsExpiresAt={eventsExpiresAt}

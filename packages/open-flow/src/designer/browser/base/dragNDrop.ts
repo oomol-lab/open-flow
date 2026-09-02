@@ -5,7 +5,7 @@ const TRANSFER_CONDITION_KEY = 'application/oomol-designer/condition'
 const TRANSFER_COMMENT_KEY = 'application/oomol-designer/comment'
 const TRANSFER_TRIGGER_KEY = 'application/oomol-designer/trigger'
 
-export type AddNodeType = 'scriptlet' | 'block' | 'value' | 'condition' | 'comment' | 'connector' | 'llm' | 'trigger'
+export type AddNodeType = 'scriptlet' | 'block' | 'value' | 'condition' | 'comment' | 'connector' | 'llm' | 'trigger' | 'wait'
 
 export const setSharedBlockPath = (dataTransfer: DataTransfer, blockPath: string): void => {
   dataTransfer.setData(TRANSFER_SHARED_BLOCK_KEY, blockPath)

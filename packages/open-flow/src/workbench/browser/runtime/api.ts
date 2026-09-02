@@ -64,6 +64,8 @@ export type {
   TriggerNode,
   TriggerSchedule,
   ValueNode,
+  WaitAction,
+  WaitNode,
   WebhookOptions,
 } from '../../../flow/common/change.ts'
 
@@ -77,8 +79,6 @@ export interface Presentation {
 type Fetcher = WorkbenchHost['request']
 type FlowSubscriber = WorkbenchHost['subscribeFlow']
 type FlowCatalogSubscriber = WorkbenchHost['subscribeFlowCatalog']
-type RunCreatedEvent = Extract<FlowChangeEvent, { readonly kind: 'run.created' }>
-
 const segment = encodeURIComponent
 
 export class WorkbenchClient extends ControlClient {
@@ -94,11 +94,15 @@ export class WorkbenchClient extends ControlClient {
     return this.subscribeFlowCatalog(changed)
   }
 
-  watchFlow(flowId: string, changed: (revisionId?: string) => void, runCreated: (event: RunCreatedEvent) => void = () => {}): () => void {
+  watchFlow(
+    flowId: string,
+    changed: (revisionId?: string) => void,
+    runChanged: (event: Extract<FlowChangeEvent, { readonly kind: 'run.changed' | 'run.created' }>) => void = () => {},
+  ): () => void {
     return this.subscribeFlow(flowId, (event?: FlowChangeEvent) => {
       if (event == null) changed()
       else if (event.kind == 'draft.changed') changed(event.revisionId)
-      else runCreated(event)
+      else runChanged(event)
     })
   }
 

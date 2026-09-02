@@ -1,12 +1,12 @@
 import type { FlowCatalogEvent, FlowChangeEvent, PublishOperation } from '@oomol-lab/open-flow/control-api'
-import type { ConnectorCapability, JsonValue, RevisionContent, TriggerNode } from '@oomol-lab/open-flow/flow-change'
+import type { ConnectorCapability, JsonValue, RevisionContent, TriggerNode, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { IntegrationDefinition } from '@oomol-lab/open-flow/integration-trigger'
 import type { PollDefinition } from '@oomol-lab/open-flow/poll-trigger'
 import type { ProviderTriggerDefinition } from '@oomol-lab/open-flow/provider-triggers'
 import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { InvokeLlmTask, RuntimeCapabilityCall, RuntimeCapabilityResponse } from '@oomol-lab/open-flow/runtime-contract'
-import type { FlowRunResult, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
+import type { FlowRunOutcome, FlowRunResult, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
 import type { Logger } from 'pino'
 import type { ConnectorHost } from './connector.ts'
 import type { IntegrationOptions, IntegrationResponse, IntegrationRuntimeState, IntegrationTarget } from './integration-runtime.ts'
@@ -32,6 +32,7 @@ import * as Option from 'effect/Option'
 import * as Queue from 'effect/Queue'
 import * as Scope from 'effect/Scope'
 import * as Semaphore from 'effect/Semaphore'
+import { createHash } from 'node:crypto'
 import { ConnectorClient, ConnectorTaskError } from './connector.ts'
 import { ControlService } from './control-service.ts'
 import { AcceptanceError, ControlError } from './error.ts'
@@ -68,16 +69,26 @@ interface PollOccurrenceInput {
 }
 
 export interface ServerRuntime {
-  readonly integration?: IntegrationOptions
-  readonly llm?: InvokeLlmTask
   readonly maxConcurrentRuns?: number
   readonly maxPendingRuns?: number
   readonly runEventRetentionMs?: number
   readonly runTimeoutMs?: number
-  readonly resolveConnector?: () => ConnectorHost | undefined
-  readonly resolveConnectorConsoleOrigin?: () => URL | undefined
-  readonly resolveIntegration?: () => IntegrationOptions | undefined
-  readonly resolveLlm?: () => InvokeLlmTask | undefined
+}
+
+export interface ServerCapabilities {
+  readonly connector?: () => ConnectorHost | undefined
+  readonly connectorConsoleOrigin?: () => URL | undefined
+  readonly integration?: () => IntegrationOptions | undefined
+  readonly llm?: () => InvokeLlmTask | undefined
+  readonly waitPublicOrigin?: () => URL | undefined
+}
+
+export interface ServerServiceOptions {
+  readonly capabilities?: ServerCapabilities
+  readonly clock?: Clock.Clock | (() => number)
+  readonly logger?: Logger
+  readonly runtime?: ServerRuntime
+  readonly triggerDefinitions?: readonly ProviderTriggerDefinition[]
 }
 
 interface WebhookTarget {
@@ -110,6 +121,7 @@ const maxTimerDelayMs = 2_147_483_647
 const maintenanceBatchSize = 100
 const maintenanceIntervalMs = 60_000
 const maintenanceRetryMs = 1_000
+const waitNotificationLeaseMs = 60_000
 const admissionRetryMs = 1_000
 const defaultMaxConcurrentRuns = 4
 const defaultRunTimeoutMs = 30 * 60 * 1_000
@@ -138,7 +150,15 @@ function validateRuntime(runtime: ServerRuntime): void {
   validatePositiveInteger(runtime.maxPendingRuns, 'Maximum pending Runs must be a positive safe integer.')
   validatePositiveInteger(runtime.maxConcurrentRuns, 'Maximum concurrent Runs must be a positive safe integer.')
   validatePositiveInteger(runtime.runTimeoutMs, 'Run timeout must be a positive safe integer number of milliseconds.')
-  if (runtime.integration != null) parseOrigin(runtime.integration.publicOrigin, 'Integration public origin')
+}
+
+function validateCapabilities(capabilities: ServerCapabilities): void {
+  const consoleOrigin = capabilities.connectorConsoleOrigin?.()
+  if (consoleOrigin != null) parseOrigin(consoleOrigin.href, 'Connector Console origin')
+  const integration = capabilities.integration?.()
+  if (integration != null) parseOrigin(integration.publicOrigin, 'Integration public origin')
+  const waitPublicOrigin = capabilities.waitPublicOrigin?.()
+  if (waitPublicOrigin != null) parseOrigin(waitPublicOrigin.href, 'Wait public origin')
 }
 
 function finishWaiters(waiters: readonly Deferred.Deferred<void>[]): Effect.Effect<void> {
@@ -188,8 +208,10 @@ export class ServerService {
   readonly #flowCatalogSubscribers = new Set<(event: FlowCatalogEvent) => void>()
   readonly #flowSubscribers = new Map<string, Set<(event: FlowChangeEvent) => void>>()
   readonly #runningFlows = new Set<string>()
+  readonly #resolveIntegration: () => IntegrationOptions | undefined
   readonly #runTimeoutMs: number
   readonly #resolveLlm: () => InvokeLlmTask | undefined
+  readonly #resolveWaitPublicOrigin: () => URL | undefined
   readonly #signals: Queue.Queue<Deferred.Deferred<void> | undefined>
   readonly #store: Store
   readonly #tasks: FiberMap.FiberMap<string, void, never>
@@ -211,25 +233,26 @@ export class ServerService {
       readonly tasks: FiberMap.FiberMap<string, void, never>
       readonly workers: FiberMap.FiberMap<string, void, never>
     },
-    connector: ConnectorHost | undefined,
-    clock: Clock.Clock | (() => number),
+    capabilities: ServerCapabilities,
+    clock: () => number,
     runtime: ServerRuntime,
-    connectorConsoleOrigin: URL | undefined,
     logger: Logger,
     triggerDefinitions: readonly ProviderTriggerDefinition[],
   ) {
     const { clockService, cronLock, isolatedVm, maintenanceLock, pollLock, signals, store, tasks, workers } = resources
-    this.#clock = typeof clock == 'function' ? clock : () => clock.currentTimeMillisUnsafe()
+    this.#clock = clock
     this.#clockService = clockService
     this.#cronLock = cronLock
     this.#isolatedVm = isolatedVm
     this.#logger = logger.child({ component: 'runtime' })
     this.#maintenanceLock = maintenanceLock
     this.#maxConcurrentRuns = runtime.maxConcurrentRuns ?? defaultMaxConcurrentRuns
-    this.#resolveConnector = runtime.resolveConnector ?? (() => connector)
-    this.#resolveConnectorConsoleOrigin = runtime.resolveConnectorConsoleOrigin ?? (() => connectorConsoleOrigin)
+    this.#resolveConnector = capabilities.connector ?? (() => undefined)
+    this.#resolveConnectorConsoleOrigin = capabilities.connectorConsoleOrigin ?? (() => undefined)
+    this.#resolveIntegration = capabilities.integration ?? (() => undefined)
     this.#runTimeoutMs = runtime.runTimeoutMs ?? defaultRunTimeoutMs
-    this.#resolveLlm = runtime.resolveLlm ?? (() => runtime.llm)
+    this.#resolveLlm = capabilities.llm ?? (() => undefined)
+    this.#resolveWaitPublicOrigin = capabilities.waitPublicOrigin ?? (() => undefined)
     this.#signals = signals
     this.#store = store
     this.#tasks = tasks
@@ -253,15 +276,16 @@ export class ServerService {
       () => this.#notifyFlowCatalog(),
       (event) => this.#notifyFlow(event),
       () => this.#resolveLlm() != null,
-      () => this.#resolveConnector(),
-      () => this.#resolveConnectorConsoleOrigin(),
+      this.#resolveConnector,
+      this.#resolveConnectorConsoleOrigin,
+      this.#resolveWaitPublicOrigin,
       (teamId) => this.#connectorTeam(teamId),
     )
     this.#integration = new IntegrationRuntime(
       store,
-      () => this.#resolveConnector(),
+      this.#resolveConnector,
       this.#clock,
-      runtime.resolveIntegration ?? (() => runtime.integration),
+      this.#resolveIntegration,
       integrationDefinitions,
       validatedFlow,
       () => this.#signal(),
@@ -270,7 +294,7 @@ export class ServerService {
     )
     this.#poll = new PollRuntime(
       store,
-      () => this.#resolveConnector(),
+      this.#resolveConnector,
       this.#clock,
       this.#clockService,
       pollLock,
@@ -282,23 +306,15 @@ export class ServerService {
     )
   }
 
-  static open(
-    databaseFile: string,
-    connector?: ConnectorHost,
-    clock?: Clock.Clock | (() => number),
-    runtime: ServerRuntime = {},
-    connectorConsoleOrigin?: string,
-    logger: Logger = silentLogger,
-    triggerDefinitions: readonly ProviderTriggerDefinition[] = providerTriggerDefinitions,
-  ): Effect.Effect<ServerService, Error, Scope.Scope> {
+  static open(databaseFile: string, options: ServerServiceOptions = {}): Effect.Effect<ServerService, Error, Scope.Scope> {
+    const { capabilities = {}, clock, logger = silentLogger, runtime = {}, triggerDefinitions = providerTriggerDefinitions } = options
     return Effect.gen(function* () {
       const clockService = typeof clock == 'object' ? clock : yield* Clock.Clock
-      const serviceClock = clock ?? clockService
-      const now = typeof serviceClock == 'function' ? serviceClock : () => serviceClock.currentTimeMillisUnsafe()
-      const consoleOrigin = yield* Effect.try({
+      const now = typeof clock == 'function' ? clock : () => clockService.currentTimeMillisUnsafe()
+      yield* Effect.try({
         try: () => {
           validateRuntime(runtime)
-          return connectorConsoleOrigin == null ? undefined : parseOrigin(connectorConsoleOrigin, 'Connector Console origin')
+          validateCapabilities(capabilities)
         },
         catch: (error) => (error instanceof Error ? error : new Error(String(error))),
       })
@@ -324,10 +340,9 @@ export class ServerService {
       const workers = yield* FiberMap.make<string, void, never>()
       const service = new ServerService(
         { clockService, cronLock, isolatedVm, maintenanceLock, pollLock, signals, store, tasks, workers },
-        connector,
-        serviceClock,
+        capabilities,
+        now,
         runtime,
-        consoleOrigin,
         logger,
         triggerDefinitions,
       )
@@ -457,6 +472,9 @@ export class ServerService {
     const engineContract = input.engineContract ?? currentEngineContract
     if (input.revisionDigest != null && input.revisionDigest != fixed.revisionDigest) {
       throw new AcceptanceError('revision-conflict', 'The fixed Revision digest does not match its content.')
+    }
+    if (Object.values(fixed.prepared.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) && this.#resolveWaitPublicOrigin() == null) {
+      throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
     }
     const requestDigest = await this.#publicationRequestDigest(input, fixed.revisionDigest)
     const publishedAt = this.#clock()
@@ -658,25 +676,29 @@ export class ServerService {
       this.#started = true
       yield* Effect.addFinalizer(() => Effect.sync(() => (this.#started = false)))
       this.#maintenanceAt = this.#clock()
-      yield* this.#supervise().pipe(Effect.provideService(Clock.Clock, this.#clockService), Effect.forkScoped)
+      yield* this.#supervise().pipe(Effect.forkScoped)
       this.#signal()
-    })
+    }).pipe(Effect.provideService(Clock.Clock, this.#clockService))
+  }
+
+  #run(effect: Effect.Effect<void, unknown>): Promise<void> {
+    return Effect.runPromise(effect.pipe(Effect.provideService(Clock.Clock, this.#clockService)))
   }
 
   tickCron(at = new Date(this.#clock()).toISOString()): Promise<void> {
-    return Effect.runPromise(this.#cron(at).pipe(Effect.provideService(Clock.Clock, this.#clockService)))
+    return this.#run(this.#cron(at))
   }
 
   tickPoll(at = new Date(this.#clock()).toISOString()): Promise<void> {
-    return Effect.runPromise(this.#poll.tick(at).pipe(Effect.provideService(Clock.Clock, this.#clockService)))
+    return this.#run(this.#poll.tick(at))
   }
 
   tickIntegration(at = new Date(this.#clock()).toISOString()): Promise<void> {
-    return Effect.runPromise(this.#integration.tick(at).pipe(Effect.provideService(Clock.Clock, this.#clockService)))
+    return this.#run(this.#integration.tick(at))
   }
 
   tickMaintenance(at = new Date(this.#clock()).toISOString()): Promise<void> {
-    return Effect.runPromise(this.#maintenance(at).pipe(Effect.provideService(Clock.Clock, this.#clockService)))
+    return this.#run(this.#maintenance(at))
   }
 
   pollState(flowId: string, triggerNodeId: string): PollState | undefined {
@@ -773,13 +795,27 @@ export class ServerService {
       if (prepared.kind != 'prepared') {
         return yield* Effect.fail(new Error(`Fixed Flow Revision can no longer be prepared: ${prepared.kind}.`))
       }
-      const bindingValues = this.#store.resolveVariables(variableBindings(revision, prepared.validation.closure.dependencies.inputBindings))
-      if (bindingValues == null) return { kind: 'binding-unresolved' as const }
       const projectEvent = createEventProjector(run.runId, nodeFailureCodes)
       const started = yield* Effect.tryPromise({
         try: () => projectEvent({ flowId: run.flowId, runId: run.runId, type: 'run.started' }),
         catch: (error) => error,
       })
+      if (run.resume != null) {
+        const saved = run.resume.checkpoint.wait
+        const wait = prepared.flow.graph.nodes[saved.nodeId]
+        if (wait?.kind != 'wait' || !wait.actions.some((action) => action == run.resume!.action)) {
+          return yield* Effect.fail(new Error('Stored Wait resolution does not match the fixed Flow Revision.'))
+        }
+        return {
+          bindingValues: run.resume.checkpoint.bindingValues,
+          flow: prepared.flow,
+          kind: 'prepared' as const,
+          projectEvent,
+          started,
+        }
+      }
+      const bindingValues = this.#store.resolveVariables(variableBindings(revision, prepared.validation.closure.dependencies.inputBindings))
+      if (bindingValues == null) return { kind: 'binding-unresolved' as const }
       return { bindingValues, flow: prepared.flow, kind: 'prepared' as const, projectEvent, started }
     })
   }
@@ -793,15 +829,30 @@ export class ServerService {
     | undefined
   > {
     return Effect.gen({ self: this }, function* () {
+      if (run.resumeUnavailable) {
+        if (
+          this.#store.failResume(run.runId, {
+            error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint is unavailable.' },
+          })
+        ) {
+          this.#runChanged(run.flowId, run.runId)
+        }
+        return
+      }
       const start = yield* this.#loadRun(run).pipe(
         Effect.matchEffect({
           onFailure: (error) =>
             Effect.sync(() => {
-              if (
-                this.#store.failStarting(run.runId, {
-                  error: { code: 'execution.unavailable', message: 'The fixed Run could not be started by this deployment.' },
-                })
-              ) {
+              const committed =
+                run.resume == null
+                  ? this.#store.failStarting(run.runId, {
+                      error: { code: 'execution.unavailable', message: 'The fixed Run could not be started by this deployment.' },
+                    })
+                  : this.#store.failResume(run.runId, {
+                      error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint cannot resume against the fixed Flow.' },
+                    })
+              if (committed) {
+                this.#runChanged(run.flowId, run.runId)
                 this.#logger.error({ category: 'run.start_failed', flowId: run.flowId, runId: run.runId, ...errorKind(error) }, 'Run could not be started.')
               }
             }).pipe(Effect.as(undefined)),
@@ -814,7 +865,9 @@ export class ServerService {
         })
         return
       }
-      if (start == null || start.started == null || !this.#store.start(run.runId, start.started)) return
+      if (start == null || start.started == null) return
+      const started = run.resume == null ? this.#store.start(run.runId, start.started) : this.#store.resume(run.runId, run.resume.checkpoint.wait.waitId)
+      if (!started) return
       return { bindingValues: start.bindingValues, flow: start.flow, projectEvent: start.projectEvent }
     })
   }
@@ -827,13 +880,13 @@ export class ServerService {
   ): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
       const startedAt = performance.now()
+      const budgetMs = run.remainingMs ?? this.#runTimeoutMs
       this.#logger.info({ category: 'run.started', flowId: run.flowId, runId: run.runId }, 'Run started.')
 
       const timeoutReason = new Error('Run exceeded its execution deadline.')
       let timedOut = false
       yield* this.#isolatedVm
         .run(flow, {
-          bindingValues,
           capability: (capabilities, call) => this.#invokeCapability(capabilities, call, run.connectorTeamId),
           emit: async (event) => {
             if (event.type == 'run.started' && event.runId == run.runId) return
@@ -841,7 +894,7 @@ export class ServerService {
             if (projected != null) this.#store.append(run.runId, projected)
           },
           flowId: run.flowId,
-          inputs: run.inputs,
+          ...(run.resume == null ? { bindingValues, inputs: run.inputs } : { resume: run.resume }),
           invokeTask: (invocation) => {
             if (!('taskId' in invocation)) throw new Error('Runtime Executor returned a Code Task to the Host.')
             return this.#invokeTask(flow, invocation, run.connectorTeamId)
@@ -852,11 +905,11 @@ export class ServerService {
             return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
           },
           runId: run.runId,
-          ...(run.trigger == null ? {} : { trigger: run.trigger }),
+          ...(run.resume != null || run.trigger == null ? {} : { trigger: run.trigger }),
         })
         .pipe(
           Effect.timeoutOrElse({
-            duration: this.#runTimeoutMs,
+            duration: budgetMs,
             orElse: () =>
               Effect.sync(() => {
                 timedOut = true
@@ -864,10 +917,58 @@ export class ServerService {
           }),
           Effect.matchEffect({
             onFailure: (error) => Effect.sync(() => this.#failRun(run, startedAt, timedOut, error)),
-            onSuccess: (output) => Effect.sync(() => this.#completeRun(run, startedAt, output)),
+            onSuccess: (output) => Effect.sync(() => this.#commitOutcome(run, flow, startedAt, budgetMs, output)),
           }),
         )
     })
+  }
+
+  #commitOutcome(run: StoredRun, flow: PreparedFlow, startedAt: number, budgetMs: number, output: FlowRunOutcome): void {
+    if (output.kind == 'waiting') {
+      const remainingMs = Math.max(0, budgetMs - Math.round(performance.now() - startedAt))
+      let notification:
+        | {
+            readonly action: string
+            readonly connectionId?: string
+            readonly input: Readonly<Record<string, JsonValue>>
+            readonly messageHandle: string
+            readonly prompt: string
+            readonly publicOrigin: string
+            readonly taskId: string
+          }
+        | undefined
+      if (output.notification != null) {
+        const wait = flow.graph.nodes[output.wait.nodeId]
+        const task = flow.tasks[output.notification.taskId]
+        const publicOrigin = this.#resolveWaitPublicOrigin()
+        if (wait?.kind != 'wait' || task == null || task.executor.kind != 'connector' || publicOrigin == null) {
+          this.#failRun(run, startedAt, false, new Error('Wait notification is unavailable.'))
+          return
+        }
+        notification = {
+          action: task.executor.action,
+          connectionId: task.executor.connectionId,
+          input: normalizeConnectorRuntimeInputs(
+            task.inputs.filter((input) => 'handle' in input),
+            output.notification.input,
+          ),
+          messageHandle: output.notification.messageHandle,
+          prompt: wait.prompt,
+          publicOrigin: publicOrigin.href,
+          taskId: output.notification.taskId,
+        }
+      }
+      if (this.#store.wait(run.runId, output, remainingMs, notification) == null) return
+      this.#runChanged(run.flowId, run.runId)
+      this.#maintenanceAt = this.#clock()
+      this.#signal()
+      this.#logger.info(
+        { category: 'run.waiting', durationMs: Math.round(performance.now() - startedAt), flowId: run.flowId, runId: run.runId, waitId: output.wait.waitId },
+        'Run is waiting.',
+      )
+      return
+    }
+    this.#completeRun(run, startedAt, output)
   }
 
   #failRun(run: StoredRun, startedAt: number, timedOut: boolean, error: unknown): void {
@@ -875,6 +976,7 @@ export class ServerService {
       ? { error: { code: 'run.timeout', message: 'The Run exceeded its execution deadline.' } }
       : { error: { code: 'run.failed', message: 'The Flow could not be completed.' } }
     if (!this.#store.commit(run.runId, 'failed', result)) return
+    this.#runChanged(run.flowId, run.runId)
     this.#logger.error(
       {
         category: timedOut ? 'run.timed_out' : 'run.failed',
@@ -889,6 +991,7 @@ export class ServerService {
 
   #completeRun(run: StoredRun, startedAt: number, output: FlowRunResult): void {
     if (!this.#store.commit(run.runId, 'completed', output)) return
+    this.#runChanged(run.flowId, run.runId)
     this.#logger.info(
       { category: 'run.completed', durationMs: Math.round(performance.now() - startedAt), flowId: run.flowId, runId: run.runId },
       'Run completed.',
@@ -978,7 +1081,36 @@ export class ServerService {
       Effect.gen({ self: this }, function* () {
         const now = Date.parse(at)
         if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Maintenance tick time must be an ISO timestamp.'))
-        this.#maintenanceAt = this.#clock() + this.#maintain(now)
+        const notification = this.#store.claimWaitNotification(now, waitNotificationLeaseMs)
+        if (notification != null) {
+          const connector = this.#resolveConnector()
+          if (connector == null) {
+            this.#store.finishWaitNotification(notification.runId, notification.waitId, notification.claimId, false)
+          } else {
+            yield* Effect.tryPromise({
+              try: (signal) =>
+                connector.execute(notification.action, notification.connectionId, notification.input, notification.invocationId, signal, notification.teamId),
+              catch: (error) => error,
+            }).pipe(
+              Effect.matchEffect({
+                onFailure: (error) =>
+                  Effect.sync(() => {
+                    this.#store.finishWaitNotification(notification.runId, notification.waitId, notification.claimId, false)
+                    this.#logger.warn({ category: 'wait.notification.failed', runId: notification.runId, ...errorKind(error) }, 'Wait notification failed.')
+                  }),
+                onSuccess: () =>
+                  Effect.sync(() => {
+                    this.#store.finishWaitNotification(notification.runId, notification.waitId, notification.claimId, true)
+                    this.#logger.info({ category: 'wait.notification.delivered', runId: notification.runId }, 'Wait notification was delivered.')
+                  }),
+              }),
+            )
+          }
+        }
+        let nextDelay = this.#maintain(now)
+        const nextNotificationAt = this.#store.nextWaitNotificationAt()
+        if (nextNotificationAt != null) nextDelay = Math.min(nextDelay, Math.max(0, nextNotificationAt - now))
+        this.#maintenanceAt = this.#clock() + nextDelay
         this.#signal()
       }),
     )
@@ -1054,6 +1186,10 @@ export class ServerService {
     this.#notifyFlow({ flowId, kind: 'run.created', runId, version: 1 })
   }
 
+  #runChanged(flowId: string, runId: string): void {
+    this.#notifyFlow({ flowId, kind: 'run.changed', runId, version: 1 })
+  }
+
   #maintain(now: number): number {
     let publishCount = 0
     for (; publishCount < maintenanceBatchSize; publishCount += 1) {
@@ -1119,6 +1255,9 @@ export class ServerService {
     }
     let nextDelay = publishCount == maintenanceBatchSize || this.#store.pruneExpiredEvents(now, maintenanceBatchSize) > 0 ? 0 : maintenanceIntervalMs
     if (this.#store.publications.prunePublishOperations(now, maintenanceBatchSize) > 0) nextDelay = 0
+    const expiredWaits = this.#store.expireWaits(now, maintenanceBatchSize)
+    for (const { flowId, runId } of expiredWaits) this.#runChanged(flowId, runId)
+    if (expiredWaits.length == maintenanceBatchSize) nextDelay = 0
     const flowId = this.#store.claimRetiringFlow(now)
     if (flowId == null) {
       if (this.#store.collectOrphanRevisions(maintenanceBatchSize) > 0) nextDelay = 0
@@ -1237,6 +1376,10 @@ export class ServerService {
   #nextDelay(now: number): number {
     const deadlines: number[] = []
     if (!FiberMap.hasUnsafe(this.#tasks, 'maintenance')) deadlines.push(this.#maintenanceAt)
+    const waitExpiry = this.#store.nextWaitExpiry()
+    if (waitExpiry != null) deadlines.push(waitExpiry)
+    const waitNotificationAt = this.#store.nextWaitNotificationAt()
+    if (waitNotificationAt != null) deadlines.push(waitNotificationAt)
     if (!FiberMap.hasUnsafe(this.#tasks, 'cron')) {
       const nextAt = this.#store.triggers.nextCronAt()
       if (nextAt != null) deadlines.push(Math.max(nextAt, this.#cronRetryAt ?? nextAt))
@@ -1257,6 +1400,54 @@ export class ServerService {
     this.#failure = error
     this.#logger.error({ category, err: error }, 'Server background processing stopped.')
     this.#signal()
+  }
+
+  inspectWaitAction(
+    capability: string,
+    requested: WaitAction,
+  ): { readonly action: WaitAction; readonly expiresAt: string; readonly prompt: string; readonly state: 'resolved' | 'waiting' } | undefined {
+    const receipt = this.#store.waitByCapability(createHash('sha256').update(capability).digest('hex'))
+    if (receipt == null) return
+    const revision = this.#store.revision(receipt.flowId, receipt.revisionId)
+    if (revision == null) return
+    const node = (JSON.parse(revision.content) as RevisionContent).document.graph.nodes[receipt.nodeId]
+    if (node?.kind != 'wait' || !node.actions.some((action) => action == requested)) return
+    if (receipt.action != null) {
+      return { action: requested, expiresAt: new Date(receipt.expiresAt).toISOString(), prompt: node.prompt, state: 'resolved' }
+    }
+    if (receipt.status != 'waiting' || receipt.expiresAt <= this.#clock()) return
+    return { action: requested, expiresAt: new Date(receipt.expiresAt).toISOString(), prompt: node.prompt, state: 'waiting' }
+  }
+
+  resolveWaitAction(
+    capability: string,
+    requested: WaitAction,
+  ):
+    | {
+        readonly action: WaitAction | null
+        readonly resolutionAccepted: boolean
+        readonly resolvedAt: string | null
+        readonly state: 'resolved' | 'unavailable' | 'waiting'
+      }
+    | undefined {
+    const receipt = this.#store.waitByCapability(createHash('sha256').update(capability).digest('hex'))
+    if (receipt == null) return
+    const revision = this.#store.revision(receipt.flowId, receipt.revisionId)
+    if (revision == null) return
+    const node = (JSON.parse(revision.content) as RevisionContent).document.graph.nodes[receipt.nodeId]
+    if (node?.kind != 'wait' || !node.actions.some((action) => action == requested)) return
+    const result = this.#store.resolveWait(receipt.runId, receipt.waitId, requested, node.actions)
+    if (result.kind != 'resolved') return
+    if (result.changed) {
+      this.#runChanged(receipt.flowId, receipt.runId)
+      if (result.status == 'queued') this.#signal()
+    }
+    return {
+      action: result.action,
+      resolutionAccepted: result.resolutionAccepted,
+      resolvedAt: result.resolvedAt == null ? null : new Date(result.resolvedAt).toISOString(),
+      state: result.action != null ? 'resolved' : result.status == 'waiting' ? 'waiting' : 'unavailable',
+    }
   }
 }
 

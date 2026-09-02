@@ -14,6 +14,7 @@ export {
   createManagedTask,
   createProviderTrigger,
   createValue,
+  createWait,
   deleteNodes,
   cleanVariableBindings,
   setConnectorConnection,

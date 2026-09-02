@@ -7,7 +7,7 @@ import * as Effect from 'effect/Effect'
 import * as Fiber from 'effect/Fiber'
 import { describe, expect, it } from 'vitest'
 import { currentEngineContract } from '../src/execution/common/runtime.ts'
-import { runFlow as scheduleFlow } from '../src/execution/common/scheduler.ts'
+import { decodeFlowRunCheckpoint, runFlow as scheduleFlow } from '../src/execution/common/scheduler.ts'
 import { prepareFlow as prepareRevision } from '../src/flow/common/semantics.ts'
 
 const port = { jsonSchema: {}, nullable: false } as const
@@ -16,8 +16,8 @@ const connectorConnectionRequired = 'connector.connection-required'
 const connectorUnavailable = 'connector.unavailable'
 let nextId = 0
 
-function runFlow(prepared: PreparedFlow, options: Omit<FlowRunOptions, 'createId' | 'flowId'>) {
-  return Effect.runPromise(
+async function runOutcome(prepared: PreparedFlow, options: Omit<FlowRunOptions, 'createId' | 'flowId'>) {
+  return await Effect.runPromise(
     scheduleFlow(prepared, {
       createId: () => `scheduler-${++nextId}`,
       flowId: 'main',
@@ -28,6 +28,12 @@ function runFlow(prepared: PreparedFlow, options: Omit<FlowRunOptions, 'createId
       ...options,
     }),
   )
+}
+
+async function runFlow(prepared: PreparedFlow, options: Omit<FlowRunOptions, 'createId' | 'flowId'>) {
+  const outcome = await runOutcome(prepared, options)
+  if (outcome.kind != 'node-results') throw new Error('Expected the Flow Run to complete.')
+  return outcome
 }
 
 async function prepareFlow(source: RevisionContent, _flowId: string, contract: string): Promise<PreparedFlow> {
@@ -320,6 +326,198 @@ describe('revision graph scheduler', () => {
       nodes: [{ jobs: [{ jobId: expect.any(String), outputs: { count: 2, label: 'ready' } }], nodeId: 'value' }],
     })
     expect(events).toContainEqual(expect.objectContaining({ nodeId: 'value', nodeKind: 'value', type: 'node.started' }))
+  })
+
+  it('pauses and resumes the same Run without replaying completed work', async () => {
+    const source = revision(
+      {
+        bindings: { token: { kind: 'variable', target: 'TOKEN' } },
+        graph: {
+          nodes: {
+            source: {
+              concurrency: 1,
+              inputs: {},
+              kind: 'value',
+              values: [{ handle: 'value', jsonSchema: {}, nullable: true, value: { id: 42 } }],
+            },
+            wait: {
+              actions: ['continue'],
+              concurrency: 1,
+              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
+              kind: 'wait',
+              prompt: 'Continue processing?',
+            },
+            after: {
+              concurrency: 1,
+              inputs: {
+                token: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] },
+                value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'continue' }] },
+              },
+              kind: 'task',
+              task: task('after', ['token', 'value'], ['result']),
+            },
+          },
+        },
+        subflows: {},
+        tasks: {},
+      },
+      ['after'],
+    )
+    const prepared = await prepareFlow(source, 'main', engine)
+    const events: SchedulerEvent[] = []
+    const invocations: TaskInvocation[] = []
+    const first = await runOutcome(prepared, {
+      bindingValues: { token: '' },
+      emit: (event) => Effect.sync(() => void events.push(event)),
+      invokeTask: (invocation) =>
+        Effect.sync(() => {
+          invocations.push(invocation)
+          return { result: invocation.input }
+        }),
+      runId: 'run-wait',
+    })
+
+    expect(first.kind).toBe('waiting')
+    if (first.kind != 'waiting') throw new Error('Expected the Flow Run to wait.')
+    expect(first.wait).toMatchObject({ actions: ['continue'], nodeId: 'wait' })
+    expect(first.wait.waitId).toMatch(/^[A-Za-z0-9_-]{21}$/)
+    expect(invocations).toEqual([])
+    expect(decodeFlowRunCheckpoint(JSON.parse(JSON.stringify(first.checkpoint)))).toEqual(first.checkpoint)
+
+    const completed = await runOutcome(prepared, {
+      bindingValues: { token: 'changed' },
+      emit: (event) => Effect.sync(() => void events.push(event)),
+      invokeTask: (invocation) =>
+        Effect.sync(() => {
+          invocations.push(invocation)
+          return { result: invocation.input }
+        }),
+      resume: { action: 'continue', checkpoint: JSON.parse(JSON.stringify(first.checkpoint)) },
+      runId: 'run-wait',
+    })
+
+    expect(completed).toEqual({
+      kind: 'node-results',
+      nodes: [{ jobs: [{ jobId: expect.any(String), outputs: { result: { token: '', value: { id: 42 } } } }], nodeId: 'after' }],
+    })
+    expect(invocations).toHaveLength(1)
+    expect(events.filter((event) => event.type == 'run.started')).toHaveLength(1)
+    expect(events.filter((event) => event.type == 'node.started' && event.nodeId == 'source')).toHaveLength(1)
+    expect(events.filter((event) => event.type == 'node.started' && event.nodeId == 'wait')).toHaveLength(1)
+    expect(events.filter((event) => event.type == 'node.output' && event.nodeId == 'wait' && event.handle == 'continue')).toHaveLength(1)
+    expect(events.filter((event) => event.type == 'node.completed' && event.nodeId == 'wait')).toHaveLength(1)
+  })
+
+  it.each(['approve', 'reject'] as const)('routes only the selected Approval action: %s', async (action) => {
+    const source = revision(
+      {
+        bindings: {},
+        graph: {
+          nodes: {
+            wait: {
+              actions: ['approve', 'reject'],
+              concurrency: 1,
+              inputs: { value: { kind: 'value', value: 'request-1' } },
+              kind: 'wait',
+              prompt: 'Approve this request?',
+            },
+            approved: {
+              concurrency: 1,
+              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'approve' }] } },
+              kind: 'task',
+              task: task('approved', ['value'], []),
+            },
+            rejected: {
+              concurrency: 1,
+              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'reject' }] } },
+              kind: 'task',
+              task: task('rejected', ['value'], []),
+            },
+          },
+        },
+        subflows: {},
+        tasks: {},
+      },
+      ['approved', 'rejected'],
+    )
+    const prepared = await prepareFlow(source, 'main', engine)
+    const invoked: string[] = []
+    const events: SchedulerEvent[] = []
+    const first = await runOutcome(prepared, {
+      emit: (event) => Effect.sync(() => void events.push(event)),
+      invokeTask: () => Effect.fail(new Error('Approval branches must not run before resolution.')),
+      runId: `run-${action}`,
+    })
+    if (first.kind != 'waiting') throw new Error('Expected the Flow Run to wait.')
+
+    const completed = await runOutcome(prepared, {
+      emit: (event) => Effect.sync(() => void events.push(event)),
+      invokeTask: (invocation) =>
+        Effect.sync(() => {
+          invoked.push(invocation.nodeId)
+          return {}
+        }),
+      resume: { action, checkpoint: first.checkpoint },
+      runId: `run-${action}`,
+    })
+
+    expect(completed.kind).toBe('node-results')
+    expect(invoked).toEqual([action == 'approve' ? 'approved' : 'rejected'])
+    expect(events.filter((event) => event.type == 'node.output' && event.nodeId == 'wait')).toEqual([
+      expect.objectContaining({ handle: action, value: 'request-1' }),
+    ])
+  })
+
+  it('creates a new identity for each sequential Wait in one Run', async () => {
+    const source = revision(
+      {
+        bindings: {},
+        graph: {
+          nodes: {
+            first: {
+              actions: ['continue'],
+              concurrency: 1,
+              inputs: { value: { kind: 'value', value: 1 } },
+              kind: 'wait',
+              prompt: 'First wait',
+            },
+            second: {
+              actions: ['continue'],
+              concurrency: 1,
+              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'first', output: 'continue' }] } },
+              kind: 'wait',
+              prompt: 'Second wait',
+            },
+          },
+        },
+        subflows: {},
+        tasks: {},
+      },
+      [],
+    )
+    const prepared = await prepareFlow(source, 'main', engine)
+    const events: SchedulerEvent[] = []
+    const emit = (event: SchedulerEvent) => Effect.sync(() => void events.push(event))
+    const first = await runOutcome(prepared, { emit, invokeTask: () => Effect.succeed({}), runId: 'run-two-waits' })
+    if (first.kind != 'waiting') throw new Error('Expected the first Wait.')
+    const second = await runOutcome(prepared, {
+      emit,
+      invokeTask: () => Effect.succeed({}),
+      resume: { action: 'continue', checkpoint: first.checkpoint },
+      runId: 'run-two-waits',
+    })
+    if (second.kind != 'waiting') throw new Error('Expected the second Wait.')
+    const completed = await runOutcome(prepared, {
+      emit,
+      invokeTask: () => Effect.succeed({}),
+      resume: { action: 'continue', checkpoint: second.checkpoint },
+      runId: 'run-two-waits',
+    })
+
+    expect(second.wait.nodeId).toBe('second')
+    expect(second.wait.waitId).not.toBe(first.wait.waitId)
+    expect(completed).toEqual({ kind: 'node-results', nodes: [{ jobs: [{ jobId: expect.any(String), outputs: { continue: 1 } }], nodeId: 'second' }] })
+    expect(events.filter((event) => event.type == 'run.started')).toHaveLength(1)
   })
 
   it('routes first-match Conditions through nested Subflows and preserves empty branches', async () => {

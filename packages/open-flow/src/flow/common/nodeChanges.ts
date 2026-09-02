@@ -180,6 +180,24 @@ export function createValue(target: GraphTarget, nodeId: string, name: string): 
   ]
 }
 
+export function createWait(target: Extract<GraphTarget, { readonly kind: 'flow' }>, nodeId: string, name: string): readonly ChangeOperation[] {
+  return [
+    {
+      kind: 'graph.node.create',
+      node: {
+        actions: ['continue'],
+        concurrency: 1,
+        inputs: { value: { kind: 'value', value: null } },
+        kind: 'wait',
+        name,
+        prompt: name,
+      },
+      nodeId,
+      target,
+    },
+  ]
+}
+
 export function createBuiltinTrigger(
   target: Extract<GraphTarget, { readonly kind: 'flow' }>,
   nodeId: string,
@@ -333,7 +351,8 @@ function bindingReferences(document: RevisionContent['document']): Map<string, n
     for (const node of Object.values(currentGraph.nodes)) {
       if (node.kind == 'poll' || node.kind == 'integration') add(node.bindingId)
       if (!('inputs' in node)) continue
-      for (const mapping of Object.values(node.inputs)) {
+      const inputs = [...Object.values(node.inputs), ...(node.kind == 'wait' && node.notification != null ? Object.values(node.notification.inputs) : [])]
+      for (const mapping of inputs) {
         if (mapping.kind != 'sources') continue
         for (const source of mapping.sources) if (source.kind == 'binding') add(source.bindingId)
       }

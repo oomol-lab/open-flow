@@ -352,6 +352,75 @@
     gap: 6px;
   }
 
+  .wait-notification-inputs {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .wait-form textarea {
+    font-family: inherit;
+  }
+
+  .wait-mode-switcher {
+    width: 100%;
+    padding: 2px;
+    border-radius: var(--ui-radius);
+    background: var(--ui-muted);
+  }
+
+  .wait-mode-switcher [data-slot='toggle-group-item'] {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    border-radius: var(--ui-radius);
+    color: var(--ui-muted-foreground);
+    box-shadow: none;
+  }
+
+  .wait-mode-switcher [data-slot='toggle-group-item']:hover {
+    color: var(--ui-foreground);
+  }
+
+  .wait-mode-switcher [data-slot='toggle-group-item'][data-state='on'],
+  .wait-mode-switcher [data-slot='toggle-group-item'][aria-pressed='true'] {
+    color: var(--ui-foreground);
+    background: var(--ui-background);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--ui-foreground) 14%, transparent);
+  }
+
+  .wait-notification-summary {
+    display: grid;
+    min-height: 36px;
+    align-items: center;
+    grid-template-columns: 16px minmax(0, 1fr) auto auto;
+    gap: 4px;
+    padding: 3px 3px 3px 8px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius);
+  }
+
+  .wait-notification-summary > svg {
+    color: var(--ui-muted-foreground);
+  }
+
+  .wait-notification-summary > span {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wait-mode-switcher [data-slot='toggle-group-item'] {
+      transition: none;
+    }
+  }
+
   .form-error,
   .section-empty,
   .reference-value {

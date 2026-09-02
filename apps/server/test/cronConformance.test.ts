@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { describe, it } from 'vitest'
-import { closeService, openService } from './serviceFixture.ts'
+import { closeService, openService, startService } from './serviceFixture.ts'
 
 let sequence = 0
 
@@ -44,7 +44,7 @@ async function createHarness(fixture: CronConformanceFixture): Promise<CronConfo
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-cron-conformance-'))
   const file = path.join(directory, 'open-flow.sqlite')
   let now = Date.parse(fixture.publishedAt)
-  const service = await openService(file, undefined, () => now)
+  const service = await openService(file, { clock: () => now })
   let revisionId = next('revision')
   const published = await service.publishFlow({
     expectedLivePublicationId: null,
@@ -55,6 +55,7 @@ async function createHarness(fixture: CronConformanceFixture): Promise<CronConfo
   })
   if (published.kind != 'published') throw new Error('Initial Cron conformance Publication unexpectedly conflicted.')
   let publicationId = published.publicationId
+  await startService(service)
 
   return {
     async dispose() {
@@ -107,6 +108,7 @@ async function createHarness(fixture: CronConformanceFixture): Promise<CronConfo
     async tick(at) {
       now = Date.parse(at)
       await service.tickCron(at)
+      await service.waitForIdle()
     },
   }
 }

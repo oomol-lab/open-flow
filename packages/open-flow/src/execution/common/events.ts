@@ -10,7 +10,7 @@ export type ProjectedRunEvent =
     }
 
 const encoder = new TextEncoder()
-const nodeKinds = new Set(['condition', 'connector', 'javascript', 'llm', 'subflow', 'value'])
+const nodeKinds = new Set(['condition', 'connector', 'javascript', 'llm', 'subflow', 'value', 'wait'])
 
 function object(value: unknown, description: string): Record<string, unknown> {
   if (value == null || typeof value != 'object' || Array.isArray(value)) throw new TypeError(`${description} must be an object.`)
@@ -26,12 +26,12 @@ function optionalString(value: unknown, description: string): string | undefined
   return value === undefined ? undefined : string(value, description)
 }
 
-function nodeKind(value: unknown): 'condition' | 'connector' | 'javascript' | 'llm' | 'subflow' | 'value' | undefined {
+function nodeKind(value: unknown): 'condition' | 'connector' | 'javascript' | 'llm' | 'subflow' | 'value' | 'wait' | undefined {
   if (value === undefined) return
   if (!nodeKinds.has(value as string)) {
     throw new TypeError('Runtime node.started nodeKind is invalid.')
   }
-  return value as 'condition' | 'connector' | 'javascript' | 'llm' | 'subflow' | 'value'
+  return value as 'condition' | 'connector' | 'javascript' | 'llm' | 'subflow' | 'value' | 'wait'
 }
 
 function runId(event: Record<string, unknown>): string {

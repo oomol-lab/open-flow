@@ -1,4 +1,4 @@
-import type { HandleName } from '../../../../schema/index.ts'
+import type { HandleName, NodeId } from '../../../../schema/index.ts'
 import type { FlowDesignerProps } from './FlowDesigner.tsx'
 import type {
   FlowDesignerViewCommentNode,
@@ -13,6 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConditionsSectionStore } from '../../stores/node/nodeSection/conditionsSection.store.ts'
 import { InputSectionStore } from '../../stores/node/nodeSection/inputSection.store.ts'
 import { OutputSectionStore } from '../../stores/node/nodeSection/outputSection.store.ts'
+import { ValueSectionStore } from '../../stores/node/nodeSection/valueSection.store.ts'
+import { TaskNodeStore } from '../../stores/node/taskNode.store.ts'
 import { HandleRowStore } from '../../stores/nodeHandle/handleRow.store.ts'
 import { FlowDesignerView } from './FlowDesignerView.tsx'
 
@@ -281,6 +283,20 @@ describe('FlowDesignerView model synchronization', () => {
 
     expect(onChangeInput).not.toHaveBeenCalled()
     store.dispose()
+  })
+
+  it('routes input value edits to the host', () => {
+    const onChangeInput = vi.fn()
+    const view = FlowDesignerView(
+      props(model([task([{ handle: 'value', jsonSchema: {}, nullable: true, value: 'before' }])]), { onChangeInput }),
+    ) as React.ReactElement<FlowDesignerProps>
+    const { row } = firstInput(view.props.flowDesignerStore)
+    if (row.value$ == null) throw new Error('Expected an input value.')
+
+    row.value$.set('after')
+
+    expect(onChangeInput).toHaveBeenCalledWith('target', 'value', 'after')
+    view.props.flowDesignerStore.dispose()
   })
 
   it('does not replace a connection when nullable initializes its input value', async () => {
@@ -741,19 +757,43 @@ describe('FlowDesignerView model synchronization', () => {
     view.props.flowDesignerStore.dispose()
   })
 
-  it('forwards inline node title and icon changes', async () => {
+  it('forwards inline node metadata changes', async () => {
+    const onChangeNodeDescription = vi.fn()
     const onChangeNodeIcon = vi.fn()
     const onChangeNodeTitle = vi.fn()
-    const view = FlowDesignerView(props(model([task([])]), { onChangeNodeIcon, onChangeNodeTitle })) as React.ReactElement<FlowDesignerProps>
+    const view = FlowDesignerView(
+      props(model([task([])]), { onChangeNodeDescription, onChangeNodeIcon, onChangeNodeTitle }),
+    ) as React.ReactElement<FlowDesignerProps>
     const node = [...view.props.flowDesignerStore.$.nodes.values()][0]!
 
+    node.changeDescription?.('Updated description')
     node.manifest$!.title.set('Renamed task')
     node.manifest$!.icon.set(':carbon:star:')
     await Promise.resolve()
 
+    expect(onChangeNodeDescription).toHaveBeenCalledWith('target', 'Updated description')
     expect(onChangeNodeTitle).toHaveBeenCalledWith('target', 'Renamed task')
     expect(onChangeNodeIcon).toHaveBeenCalledWith('target', ':carbon:star:')
     view.props.flowDesignerStore.dispose()
+  })
+
+  it('does not echo model-owned metadata updates to the host', async () => {
+    const onChangeNodeDescription = vi.fn()
+    const onChangeNodeIcon = vi.fn()
+    const onChangeNodeTitle = vi.fn()
+    const initial = { ...task([]), description: 'Before', rawIcon: ':carbon:circle:', rawTitle: 'Before' }
+    const changed = { ...initial, description: 'After', rawIcon: ':carbon:star:', rawTitle: 'After' }
+    const store = update(
+      props(model([initial]), { onChangeNodeDescription, onChangeNodeIcon, onChangeNodeTitle }),
+      props(model([changed]), { onChangeNodeDescription, onChangeNodeIcon, onChangeNodeTitle }),
+    )
+
+    await Promise.resolve()
+
+    expect(onChangeNodeDescription).not.toHaveBeenCalled()
+    expect(onChangeNodeIcon).not.toHaveBeenCalled()
+    expect(onChangeNodeTitle).not.toHaveBeenCalled()
+    store.dispose()
   })
 
   it('restores editable handle controls when a read-only view becomes editable', () => {
@@ -785,6 +825,74 @@ describe('FlowDesignerView model synchronization', () => {
     const moved = { ...task([]), position: { x: 500, y: 400 } }
     FlowDesignerView(props(model([moved]), { editable: false }))
     expect([...view.props.flowDesignerStore.$.nodes.values()][0]?.$.position.value).toEqual(moved.position)
+    view.props.flowDesignerStore.dispose()
+  })
+
+  it('updates the Wait notice without recreating the node', () => {
+    const wait = {
+      id: 'wait',
+      inputs: [{ handle: 'value', jsonSchema: {}, nullable: true }],
+      kind: 'wait' as const,
+      notice: { icon: ':service:feishu:', text: 'Notification · Feishu Custom Bot · Send text message' },
+      outputs: [
+        { handle: 'approve', jsonSchema: {}, nullable: true },
+        { handle: 'reject', jsonSchema: {}, nullable: true },
+      ],
+      position: { x: 0, y: 0 },
+      title: 'Wait',
+    }
+    const store = update(props(model([{ ...wait, notice: undefined }])), props(model([wait])))
+    const node = [...store.$.nodes.values()][0]
+
+    expect(TaskNodeStore.is(node)).toBe(true)
+    if (!TaskNodeStore.is(node)) throw new Error('Expected a Wait node.')
+    expect(node.display$.notice?.value).toBe(wait.notice)
+
+    const notice = node.display$.notice?.value
+    FlowDesignerView(props(model([{ ...wait, notice: { ...wait.notice } }])))
+    expect(node.display$.notice?.value).toBe(notice)
+    store.dispose()
+  })
+
+  it('publishes only changed structured node values during reconciliation', () => {
+    const wait = {
+      id: 'wait',
+      inputs: [{ handle: 'value', jsonSchema: {}, nullable: true }],
+      kind: 'wait' as const,
+      outputs: [
+        { handle: 'approve', jsonSchema: {}, nullable: true },
+        { handle: 'reject', jsonSchema: {}, nullable: true },
+      ],
+      position: { x: 0, y: 0 },
+      title: 'Wait',
+    }
+    const target = task([{ handle: 'value', jsonSchema: {}, sources: [{ nodeId: 'wait', output: 'approve' }] }])
+    const view = FlowDesignerView(props(model([wait, target]))) as React.ReactElement<FlowDesignerProps>
+    const node = [...view.props.flowDesignerStore.$.nodes.values()].find((item) => item.nodeId == 'wait')
+    if (!TaskNodeStore.is(node)) throw new Error('Expected a Wait node.')
+    const output = node.findSection<OutputSectionStore>(OutputSectionStore.TYPE)
+    if (output == null) throw new Error('Expected a Wait output section.')
+    const changes: string[] = []
+    const batchDepths: number[] = []
+    const track = (name: string) => {
+      changes.push(name)
+      batchDepths.push(reactDom.batchDepth)
+    }
+    const disposers = [
+      node.display$.inputs_def.reaction(() => track('inputs'), true),
+      node.display$.inputs_from!.reaction(() => track('input values'), true),
+      node.display$.outputs_def.reaction(() => track('outputs'), true),
+      output.$.connectedHandles.reaction(() => track('connections'), true),
+      node.display$.notice!.reaction(() => track('notice'), true),
+    ]
+
+    FlowDesignerView(
+      props(model([{ ...wait, notice: { icon: ':service:feishu:', text: 'Notification · Feishu Custom Bot · Send text message' } }, { ...target }])),
+    )
+
+    expect(changes).toEqual(['notice'])
+    expect(batchDepths).toEqual([1])
+    disposers.forEach((dispose) => dispose())
     view.props.flowDesignerStore.dispose()
   })
 
@@ -843,6 +951,32 @@ describe('FlowDesignerView model synchronization', () => {
     expect(onChangeComment).not.toHaveBeenCalled()
     expect(onChangeValue).not.toHaveBeenCalled()
     store.dispose()
+  })
+
+  it('routes Value edits to the host', () => {
+    const onChangeValue = vi.fn()
+    const view = FlowDesignerView(props(model([valueNode('before')]), { onChangeValue })) as React.ReactElement<FlowDesignerProps>
+    const node = [...view.props.flowDesignerStore.$.nodes.values()][0]
+    const section = node?.findSection<ValueSectionStore>(ValueSectionStore.TYPE)
+    const row = section?.$.handles.value[0]
+    if (row?.value$ == null) throw new Error('Expected a Value handle.')
+
+    row.value$.set('after')
+
+    expect(onChangeValue).toHaveBeenCalledWith('value', [expect.objectContaining({ handle: 'value', value: 'after' })])
+    view.props.flowDesignerStore.dispose()
+  })
+
+  it('routes Comment title edits to the host', () => {
+    const onChangeComment = vi.fn()
+    const view = FlowDesignerView(props(model([commentNode('Before')]), { onChangeComment })) as React.ReactElement<FlowDesignerProps>
+    const comment = [...view.props.flowDesignerStore.$.commentNodes!.values()][0]
+    if (comment == null) throw new Error('Expected a Comment node.')
+
+    comment.$$.title.set('After')
+
+    expect(onChangeComment).toHaveBeenCalledWith('comment', { content: '', title: 'After' })
+    view.props.flowDesignerStore.dispose()
   })
 
   it('does not rewrite an unchanged controlled selection when the host recreates the model', () => {
@@ -925,6 +1059,49 @@ describe('FlowDesignerView model synchronization', () => {
     expect(setPosition).not.toHaveBeenCalled()
     expect(setViewport).not.toHaveBeenCalled()
     view.props.flowDesignerStore.dispose()
+  })
+
+  it('converges when the host acknowledges React Flow movement and selection', async () => {
+    const onMoveNodes = vi.fn()
+    const onMoveViewport = vi.fn()
+    const onSelectionChange = vi.fn()
+    const initial = task([])
+    const initialProps = props(model([initial]), { onMoveNodes, onMoveViewport, onSelectionChange })
+    const view = FlowDesignerView(initialProps) as React.ReactElement<FlowDesignerProps>
+    const store = view.props.flowDesignerStore
+    const node = [...store.$.nodes.values()][0]!
+    const position = { x: 320, y: 180 }
+    const viewport = { x: 40, y: 60, zoom: 1.2 }
+
+    await store.handleNodesChange([
+      { id: node.rfNodeId, position, type: 'position' },
+      { id: node.rfNodeId, selected: true, type: 'select' },
+    ])
+    store.$$.viewport.set(viewport)
+    view.props.onNodeDragStop?.({} as never, node.$.rfNode.value, [])
+    view.props.onMoveEnd?.(null, viewport)
+    view.props.onSelectionChange?.({ edges: [], nodes: [node.$.rfNode.value] })
+    const graph = store.$.renderedRFGraph.value
+    const currentViewport = store.$.viewport.value
+
+    FlowDesignerView(
+      props(
+        { nodes: [{ ...initial, position: { ...position } }], viewport: { ...viewport } },
+        {
+          onMoveNodes,
+          onMoveViewport,
+          onSelectionChange,
+          selectedNodeIds: ['target'],
+        },
+      ),
+    )
+
+    expect(store.$.renderedRFGraph.value).toBe(graph)
+    expect(store.$.viewport.value).toBe(currentViewport)
+    expect(onMoveNodes).toHaveBeenCalledOnce()
+    expect(onMoveViewport).toHaveBeenCalledOnce()
+    expect(onSelectionChange).toHaveBeenCalledOnce()
+    store.dispose()
   })
 
   it('routes user edits through the latest host callbacks', () => {
@@ -1032,6 +1209,31 @@ describe('FlowDesignerView model synchronization', () => {
 
     expect(view.props.flowDesignerStore.$.displayMode.value).toBe('overview')
     view.props.flowDesignerStore.dispose()
+  })
+
+  it('restores the saved overview layout when the Flow view opens', () => {
+    const value: FlowDesignerViewModel = {
+      layouts: {
+        detail: {
+          nodes: { ['comment' as NodeId]: { x: 700, y: 500 }, ['target' as NodeId]: { x: 900, y: 700 } },
+          viewport: { x: -800, y: -600, zoom: 0.6 },
+        },
+        overview: {
+          nodes: { ['comment' as NodeId]: { x: 60, y: 80 }, ['target' as NodeId]: { x: 200, y: 120 } },
+          viewport: { x: 30, y: 40, zoom: 1.2 },
+        },
+      },
+      nodes: [task([]), commentNode('Comment')],
+      viewport: { x: -800, y: -600, zoom: 0.6 },
+    }
+
+    const view = FlowDesignerView(props(value)) as React.ReactElement<FlowDesignerProps>
+    const store = view.props.flowDesignerStore
+
+    expect([...store.$.nodes.values()][0]?.$.position.value).toEqual({ x: 200, y: 120 })
+    expect([...store.$.commentNodes!.values()][0]?.$.position.value).toEqual({ x: 60, y: 80 })
+    expect(store.$.viewport.value).toEqual({ x: 30, y: 40, zoom: 1.2 })
+    store.dispose()
   })
 
   it('keeps overview mode when an external update adds a node', () => {

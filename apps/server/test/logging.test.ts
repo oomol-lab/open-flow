@@ -192,7 +192,7 @@ it('does not log callback endpoint identities', async () => {
 
 it('logs Run lifecycle metadata without copying user errors or Run payloads', async () => {
   const captured = capture()
-  const service = await openService(await databaseFile(), undefined, Date.now, {}, undefined, captured.logger)
+  const service = await openService(await databaseFile(), { clock: Date.now, logger: captured.logger })
   services.push(service)
   await startService(service)
 

@@ -25,7 +25,7 @@ import { RunsView } from './runs/runsView.tsx'
 import { WorkspaceHeader } from './shell/workspaceHeader.tsx'
 import { WorkbenchStore } from './stores/workbenchStore.ts'
 
-type ContextPanelMode = 'blocks' | 'inspector' | undefined
+type ContextPanelMode = 'blocks' | 'inspector' | 'notification' | undefined
 
 function codeTaskPorts(
   inputs: readonly (FlowDesignerViewInput | GroupDividerDef)[],
@@ -93,6 +93,7 @@ function RunDrawerContainer({
   const historyComplete = useVal(store.runs.$.historyComplete)
   const observationFailed = useVal(store.runs.$.observationFailed)
   const result = useVal(store.runs.$.result)
+  const resolvingAction = useVal(store.runs.$.resolvingAction)
   const run = useVal(store.runs.$.run)
   const submitting = useVal(store.runRequests.$.submitting)
   return (
@@ -109,11 +110,16 @@ function RunDrawerContainer({
       onConfigureConnector={onConfigureConnector}
       onEventFilterChange={(filter) => store.runs.setEventFilter(filter)}
       onLocateEvent={(sequence) => store.locateRunEvent(sequence)}
+      onLocateWait={() => {
+        if (store.locateRunWait()) onClose()
+      }}
+      onResolve={(action) => void store.runs.resolve(action)}
       onRetryObservation={() => store.runs.retryObservation()}
       onToggle={onToggle}
       observationFailed={observationFailed}
       open={open}
       result={result}
+      resolvingAction={resolvingAction}
       run={run}
       submitting={submitting != null}
       visible={visible}
@@ -214,6 +220,12 @@ function Editor({
     focusInspectorOnOpen.current = false
     setContextPanelMode('inspector')
   }
+  const openNotification = (button: HTMLButtonElement): void => {
+    opener.current = button
+    focusInspectorOnOpen.current = false
+    setContextPanelMode('notification')
+    setBlocksFocusRequest((request) => request + 1)
+  }
   const toggleInspector = (button: HTMLButtonElement): void => {
     if (contextPanelMode == 'inspector') {
       closeContextPanel(button)
@@ -239,6 +251,13 @@ function Editor({
     } finally {
       if (!waitForSelection) addingFromBlocks.current = false
     }
+  }
+  const setNotification = async (option: AddNodeOption): Promise<string | undefined> => {
+    if (selection?.kind != 'wait' || option.kind != 'connector') return
+    if (!(await store.workspace.setWaitNotification(selection.id, option.connector))) return
+    await store.refreshSelectedConnector()
+    setContextPanelMode('inspector')
+    return selection.id
   }
 
   const contextPanelVisible = contextPanelMode != null && target != null && (contextPanelMode == 'blocks' || revision != null)
@@ -297,10 +316,16 @@ function Editor({
       {contextPanelVisible && (
         <ContextPanel
           focusOnOpen={contextPanelMode == 'inspector' && focusInspectorOnOpen.current}
-          icon={contextPanelMode == 'blocks' ? 'plus' : inspectorIcon(selection, target)}
-          onClose={() => closeContextPanel()}
+          icon={contextPanelMode == 'blocks' ? 'plus' : contextPanelMode == 'notification' ? 'connection' : inspectorIcon(selection, target)}
+          onClose={() => (contextPanelMode == 'notification' ? setContextPanelMode('inspector') : closeContextPanel())}
           theme={theme}
-          title={contextPanelMode == 'blocks' ? t('contextPanel.blocks') : (selectedDesignerNode?.title ?? targetName ?? t('inspector.title'))}
+          title={
+            contextPanelMode == 'blocks'
+              ? t('contextPanel.blocks')
+              : contextPanelMode == 'notification'
+                ? t('inspector.wait.chooseNotificationTitle')
+                : (selectedDesignerNode?.title ?? targetName ?? t('inspector.title'))
+          }
         >
           {contextPanelMode == 'blocks' ? (
             <BlockLibrary
@@ -311,6 +336,21 @@ function Editor({
               onRegisterDragOption={(option) => designerRef.current?.registerAddNodeOption(option)}
               options={addNodeOptions}
               provideChoices={store.provideAddNodeOptionChoices}
+            />
+          ) : contextPanelMode == 'notification' ? (
+            <BlockLibrary
+              browseOptions={store.connectors.browseAddNodeOptions}
+              disabled={authoringDisabled}
+              draggable={false}
+              focusRequest={blocksFocusRequest}
+              onAdd={setNotification}
+              onRegisterDragOption={() => {}}
+              options={[]}
+              provideChoices={async (optionId, signal) =>
+                (await store.connectors.provideAddNodeOptionChoices(optionId, signal))?.filter(
+                  (option) => option.kind == 'connector' && option.inputs.length > 0,
+                )
+              }
             />
           ) : (
             revision != null && (
@@ -326,6 +366,7 @@ function Editor({
                 diagnostics={inspectorDiagnostics}
                 focus={diagnosticFocus}
                 disabled={authoringDisabled}
+                onChooseWaitNotification={openNotification}
                 revision={revision}
                 selection={selection}
                 store={store.workspace}

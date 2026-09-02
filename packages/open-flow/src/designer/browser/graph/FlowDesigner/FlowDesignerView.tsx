@@ -28,11 +28,14 @@ import type { NodeStore } from '../../stores/node/node.store.ts'
 import type { InlineTask } from '../../stores/node/taskNode.store.ts'
 
 import { dispose } from '@wopjs/disposable'
+import { isEqual } from 'radash'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { unstable_batchedUpdates } from 'react-dom'
-import { combine, derive, val } from 'value-enhancer'
+import { arrayShallowEqual, attachSetter, combine, derive, val } from 'value-enhancer'
 import { reactiveMap } from 'value-enhancer/collections'
+import { isSameViewport } from '../../base/compare.ts'
 import { toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
+import { equalConfig } from '../../base/trivial.ts'
 import { MarkdownPreview } from '../../preview/markdownPreview.tsx'
 import { DesignerUIStore as DesignerUIStoreImpl } from '../../stores/designer/designerUI.store.ts'
 import { FlowDesignerStore } from '../../stores/designer/flowDesigner.store.ts'
@@ -271,6 +274,10 @@ export type FlowDesignerViewNode =
   | FlowDesignerViewTaskNode
   | FlowDesignerViewTriggerNode
   | FlowDesignerViewValueNode
+  | (FlowDesignerViewNodeBase & {
+      readonly kind: 'wait'
+      readonly notice?: { readonly icon?: string; readonly text: string }
+    })
 
 type FlowDesignerViewSemanticNode = Exclude<FlowDesignerViewNode, FlowDesignerViewCommentNode>
 
@@ -300,7 +307,7 @@ export interface FlowDesignerViewAddItem {
   readonly inputs: readonly FlowDesignerViewAddPort[]
   readonly label: string
   readonly outputs: readonly FlowDesignerViewAddPort[]
-  readonly type: 'block' | 'comment' | 'condition' | 'connector' | 'llm' | 'scriptlet' | 'trigger' | 'value'
+  readonly type: 'block' | 'comment' | 'condition' | 'connector' | 'llm' | 'scriptlet' | 'trigger' | 'value' | 'wait'
 }
 
 export interface FlowDesignerViewAddPort {
@@ -386,6 +393,7 @@ interface NodeValues {
   readonly inputDefs: Val<(InputHandleDef | GroupDividerDef)[]>
   readonly additionalInputDefs: Val<InputHandleDef[] | undefined>
   readonly inputsFrom: Val<readonly HandleInputFrom[] | undefined>
+  notice?: Val<Extract<FlowDesignerViewNode, { readonly kind: 'wait' }>['notice']>
   readonly outputDefs: Val<(OutputHandleDef | GroupDividerDef)[]>
   readonly outputsTo: Val<HandleName[]>
   readonly progress: Val<number | undefined>
@@ -396,12 +404,7 @@ interface NodeValues {
   readonly successCount: Val<number | undefined>
   readonly timeout: Val<number | undefined>
   readonly title: Val<string>
-  syncingCondition?: boolean
-  syncingPorts?: boolean
   triggerPresentation?: Val<FlowDesignerViewTriggerPresentation | undefined>
-  syncingInput?: boolean
-  syncingMetadata?: boolean
-  syncingValue?: boolean
   valueDefs?: Val<ValueHandleDef[] | undefined>
 }
 
@@ -416,8 +419,8 @@ interface SemanticNodeEntry {
 interface CommentNodeEntry {
   readonly contentKey: string
   readonly kind: 'comment'
+  readonly setTitle: (title: string | undefined) => void
   readonly store: CommentNodeStore
-  syncing: boolean
 }
 
 type NodeEntry = CommentNodeEntry | SemanticNodeEntry
@@ -478,6 +481,10 @@ function variableInputs(nodes: readonly FlowDesignerViewNode[]): ReadonlyMap<
   return inputs
 }
 
+function equalVariableInputs(left: ReturnType<typeof variableInputs>, right: ReturnType<typeof variableInputs>): boolean {
+  return left.size == right.size && [...left].every(([key, input]) => isEqual(input, right.get(key)))
+}
+
 class FlowDesignerViewAdapter {
   readonly store: FlowDesignerStore
 
@@ -510,15 +517,16 @@ class FlowDesignerViewAdapter {
     this.#addItems = addItems
     this.#callbacks = callbacks
     this.#language = val(language)
+    const initialDisplayMode = model.layouts?.overview == null ? 'detail' : 'overview'
 
     const nodes = reactiveMap<NodeId, NodeStore>(null, { onDeleted: dispose })
     const commentNodes = reactiveMap<NodeId, CommentNodeStore>(null, {
       onDeleted: dispose,
     })
-    const viewport = val<FlowDesignerViewViewport | undefined>(model.viewport)
+    const viewport = val<FlowDesignerViewViewport | undefined>(model.viewport, { equal: isSameViewport })
     this.#runStatus = val<FlowRunStatus>(model.runStatus == 'running' ? FLOW_RUN_STATUS.Running : FLOW_RUN_STATUS.Idle)
-    this.#variableInputs = val(variableInputs(model.nodes))
-    this.#variableNames = val(model.variableNames ?? [])
+    this.#variableInputs = val(variableInputs(model.nodes), { equal: equalVariableInputs })
+    this.#variableNames = val(model.variableNames ?? [], { equal: arrayShallowEqual })
     this.#variableNamesLoaded = val(model.variableNamesLoaded ?? false)
     this.#variableNamesLoading = val(model.variableNamesLoading ?? false)
     const designerUIStore = new DesignerUIStoreImpl({
@@ -528,7 +536,7 @@ class FlowDesignerViewAdapter {
     })
     this.store = new FlowDesignerStore({
       readonly: !editable,
-      displayMode: val<FlowDisplayMode>('detail'),
+      displayMode: val<FlowDisplayMode>(initialDisplayMode),
       lang$: this.#language,
       rfCommand: createRFCommand(nodes),
       designerUIStore,
@@ -620,8 +628,8 @@ class FlowDesignerViewAdapter {
     this.store.dispose.add(commentNodes)
     this.store.dispose.add(this.#language)
     this.#syncModel(model)
-    designerUIStore.loadDesignerUIData({ layouts: model.layouts }, 'detail')
-    this.store.switchDisplayMode('overview')
+    designerUIStore.loadDesignerUIData({ layouts: model.layouts }, initialDisplayMode)
+    if (initialDisplayMode == 'detail') this.store.switchDisplayMode('overview')
   }
 
   #cancelPendingDisconnects(): void {
@@ -659,10 +667,12 @@ class FlowDesignerViewAdapter {
 
   reconcile(model: FlowDesignerViewModel, editable: boolean, language: string, addItems: readonly FlowDesignerViewAddItem[]): void {
     this.#addItems = addItems
-    const editableChanged = this.store.$.editable.value != editable
-    if (editableChanged) this.store.$$.editable.set(editable)
-    if (this.#language.value != language) this.#language.set(language)
-    this.#syncModel(model)
+    unstable_batchedUpdates(() => {
+      const editableChanged = this.store.$.editable.value != editable
+      if (editableChanged) this.store.$$.editable.set(editable)
+      if (this.#language.value != language) this.#language.set(language)
+      this.#syncModel(model)
+    })
   }
 
   setSelection(selectedNodeIds: readonly string[]): void {
@@ -722,20 +732,8 @@ class FlowDesignerViewAdapter {
   #syncModel(model: FlowDesignerViewModel): void {
     const runStatus = model.runStatus == 'running' ? FLOW_RUN_STATUS.Running : FLOW_RUN_STATUS.Idle
     if (this.#runStatus.value != runStatus) this.#runStatus.set(runStatus)
-    const inputs = variableInputs(model.nodes)
-    const currentInputs = this.#variableInputs.value
-    if (
-      inputs.size != currentInputs.size ||
-      [...inputs].some(([key, input]) => {
-        const current = currentInputs.get(key)
-        return current == null || current.compatible != input.compatible || current.enabled != input.enabled || current.name != input.name
-      })
-    ) {
-      this.#variableInputs.set(inputs)
-    }
-    const names = model.variableNames ?? []
-    const currentNames = this.#variableNames.value
-    if (names.length != currentNames.length || names.some((name, index) => name != currentNames[index])) this.#variableNames.set(names)
+    this.#variableInputs.set(variableInputs(model.nodes))
+    this.#variableNames.set(model.variableNames ?? [])
     const namesLoaded = model.variableNamesLoaded ?? false
     if (this.#variableNamesLoaded.value != namesLoaded) this.#variableNamesLoaded.set(namesLoaded)
     const namesLoading = model.variableNamesLoading ?? false
@@ -1053,33 +1051,32 @@ function createCommentNodeEntry(
     },
     preview,
   })
+  const setTitle = store.$$.title.set
+  attachSetter(store.$$.title, (title) => {
+    const previous = store.$$.title.value
+    setTitle(title)
+    if (store.$$.title.value === previous) return
+    callbacks.onChangeComment?.(node.id, {
+      content: store.$$.content.value ?? '',
+      title: title ?? 'Comment',
+    })
+  })
   const entry: CommentNodeEntry = {
     contentKey,
     kind: 'comment',
+    setTitle,
     store,
-    syncing: false,
   }
   const renderPreview = (content = '') => preview.set(<MarkdownPreview content={content} dark$={dark} draggable onDoubleClick={store.togglePreview} />)
   renderPreview(node.content)
   store.dispose.add(store.$.content.reaction(renderPreview))
-  store.dispose.add(
-    store.$$.title.reaction((title) => {
-      if (!entry.syncing)
-        callbacks.onChangeComment?.(node.id, {
-          content: store.$$.content.value ?? '',
-          title: title ?? 'Comment',
-        })
-    }, true),
-  )
   store.dispose.add([dark, preview])
   return entry
 }
 
 function updateCommentNodeEntry(entry: CommentNodeEntry, node: FlowDesignerViewCommentNode, contentKey: string): CommentNodeEntry {
-  entry.syncing = true
   entry.store.$$.content.set(node.content)
-  entry.store.$$.title.set(node.title)
-  entry.syncing = false
+  entry.setTitle(node.title)
   return { ...entry, contentKey }
 }
 
@@ -1101,16 +1098,16 @@ function createNodeEntry(
     return handles
   })
   const values: NodeValues = {
-    additionalInputDefs: val<InputHandleDef[] | undefined>(additionalInputDefs(node)),
+    additionalInputDefs: val<InputHandleDef[] | undefined>(additionalInputDefs(node), equalConfig),
     concurrency: val(node.concurrency),
     description: val(node.description),
     diagnostics: val((node.diagnostics ?? 0) > 0),
     executorName: val(node.kind == 'task' ? node.executorName : undefined),
     icon: val(node.icon),
-    inputDefs: val(inputDefs(node)),
-    inputsFrom: val<readonly HandleInputFrom[] | undefined>(nodeInputsFrom),
-    outputDefs: val(outputDefs(node)),
-    outputsTo: val([...connected]),
+    inputDefs: val(inputDefs(node), equalConfig),
+    inputsFrom: val<readonly HandleInputFrom[] | undefined>(nodeInputsFrom, equalConfig),
+    outputDefs: val(outputDefs(node), equalConfig),
+    outputsTo: val([...connected], equalConfig),
     progress: val(node.run?.progress),
     rawIcon: val(node.rawIcon),
     rawTitle: val(node.rawTitle),
@@ -1120,58 +1117,57 @@ function createNodeEntry(
     timeout: val(node.timeoutSeconds),
     title: val(node.title),
   }
+  const edit = <T,>(source: Val<T>, onChange: (value: T, previous: T) => void): Val<T> =>
+    attachSetter(
+      derive(source, (value) => value),
+      (value) => {
+        const previous = source.value
+        source.set(value)
+        if (source.value !== previous && designerStore.$.editable.value) onChange(value, previous)
+      },
+    )
   const showSettings = val()
   let inputRole: 'author' | 'guest' | 'user' = 'guest'
   if (designerStore.$.editable.value) inputRole = node.kind == 'task' && node.editablePorts ? 'author' : 'user'
+  const editableInputsFrom = edit(values.inputsFrom, (inputs, previous) => {
+    const previousInputValues = new Map((previous ?? []).flatMap((input) => (Object.hasOwn(input, 'value') ? [[input.handle, input.value] as const] : [])))
+    const inputValues = new Map((inputs ?? []).flatMap((input) => (Object.hasOwn(input, 'value') ? [[input.handle, input.value] as const] : [])))
+    for (const handle of new Set([...previousInputValues.keys(), ...inputValues.keys()])) {
+      if (previousInputValues.has(handle) == inputValues.has(handle) && Object.is(previousInputValues.get(handle), inputValues.get(handle))) continue
+      callbacks.onChangeInput?.(node.id, handle, inputValues.get(handle))
+    }
+  })
+  const editableInputDefs =
+    node.kind == 'task' && node.editablePorts
+      ? edit(values.inputDefs, (defs) => callbacks.onChangeTaskPorts?.(node.id, taskInputs(defs), taskOutputs(values.outputDefs.value)))
+      : values.inputDefs
+  const editableAdditionalInputDefs =
+    node.kind == 'task' && node.editableAdditionalInputs
+      ? edit(values.additionalInputDefs, (defs) => callbacks.onChangeTaskAdditionalInputs?.(node.id, taskAdditionalInputs(defs ?? [])))
+      : values.additionalInputDefs
   const inputSection = new InputSectionStore({
     role: inputRole,
     lang: designerStore.lang$,
     boundHandles,
-    handleInputsFrom: values.inputsFrom,
-    inputHandleDefs: values.inputDefs,
+    handleInputsFrom: editableInputsFrom,
+    inputHandleDefs: editableInputDefs,
     additionalInputs: node.kind == 'task' && node.editableAdditionalInputs ? val(true) : undefined,
-    additionalInputDefs: node.kind == 'task' && node.editableAdditionalInputs ? values.additionalInputDefs : undefined,
+    additionalInputDefs: node.kind == 'task' && node.editableAdditionalInputs ? editableAdditionalInputDefs : undefined,
     showSettings,
     createSchemaEditor: () => undefined,
   })
+  inputSection.dispose.add(editableInputsFrom)
+  if (editableInputDefs !== values.inputDefs) inputSection.dispose.add(editableInputDefs)
+  if (editableAdditionalInputDefs !== values.additionalInputDefs) inputSection.dispose.add(editableAdditionalInputDefs)
   inputSection.dispose.add(boundHandles)
-  let previousInputValues = new Map(nodeInputsFrom.flatMap((input) => (Object.hasOwn(input, 'value') ? [[input.handle, input.value] as const] : [])))
-  inputSection.dispose.add(
-    values.inputsFrom.reaction((inputs) => {
-      const inputValues = new Map((inputs ?? []).flatMap((input) => (Object.hasOwn(input, 'value') ? [[input.handle, input.value] as const] : [])))
-      if (!values.syncingInput && designerStore.$.editable.value) {
-        for (const handle of new Set([...previousInputValues.keys(), ...inputValues.keys()])) {
-          if (previousInputValues.has(handle) == inputValues.has(handle) && Object.is(previousInputValues.get(handle), inputValues.get(handle))) continue
-          callbacks.onChangeInput?.(node.id, handle, inputValues.get(handle))
-        }
-      }
-      previousInputValues = inputValues
-    }, true),
-  )
   const diagnosticSection = createDiagnosticSection(values.diagnostics)
   const duplicateNode = (offset?: FlowDesignerViewPosition) => designerStore.onDuplicate?.([node.id as NodeId], offset)
   const manifest$ = {
-    description: values.description,
-    icon: values.rawIcon,
-    title: values.rawTitle,
+    description: edit(values.description, (description) => callbacks.onChangeNodeDescription?.(node.id, description)),
+    icon: edit(values.rawIcon, (icon) => callbacks.onChangeNodeIcon?.(node.id, icon)),
+    title: edit(values.rawTitle, (title) => callbacks.onChangeNodeTitle?.(node.id, title)),
   }
-  const metadataDisposables = [
-    values.description.reaction((description) => {
-      if (!values.syncingMetadata && designerStore.$.editable.value) callbacks.onChangeNodeDescription?.(node.id, description)
-    }),
-    values.rawIcon.reaction((icon) => {
-      if (!values.syncingMetadata && designerStore.$.editable.value) callbacks.onChangeNodeIcon?.(node.id, icon)
-    }),
-    values.rawTitle.reaction((title) => {
-      if (!values.syncingMetadata && designerStore.$.editable.value) callbacks.onChangeNodeTitle?.(node.id, title)
-    }),
-  ]
-  const changeDescription =
-    callbacks.onChangeNodeDescription == null
-      ? undefined
-      : (description: string | undefined) => {
-          if (designerStore.$.editable.value) values.description.set(description)
-        }
+  const changeDescription = callbacks.onChangeNodeDescription == null ? undefined : manifest$.description.set
   const commonDisplay = {
     icon: values.icon,
     title: values.title,
@@ -1194,22 +1190,20 @@ function createNodeEntry(
   let store: NodeStore
   switch (node.kind) {
     case 'condition': {
-      values.conditionCases = val(conditionCases(node))
-      values.defaultCondition = val(node.defaultOutput == null ? undefined : { handle: node.defaultOutput as HandleName })
+      values.conditionCases = val(conditionCases(node), equalConfig)
+      values.defaultCondition = val(node.defaultOutput == null ? undefined : { handle: node.defaultOutput as HandleName }, equalConfig)
       const conditionInputs = derive(values.inputDefs, (defs) => defs.filter(isHandleDef))
+      const editableConditionCases = edit(values.conditionCases, () => callbacks.onChangeCondition?.(node.id, conditionChange(values)))
+      const editableDefaultCondition = edit(values.defaultCondition, () => callbacks.onChangeCondition?.(node.id, conditionChange(values)))
       const conditionsSection = new ConditionsSectionStore({
         role: designerStore.$.editable.value ? 'author' : 'guest',
         lang: designerStore.lang$,
         handleOutputsTo: values.outputsTo,
         inputHandleDefs: conditionInputs,
-        conditionHandleDefs: values.conditionCases,
-        defaultConditionHandleDef: values.defaultCondition,
+        conditionHandleDefs: editableConditionCases,
+        defaultConditionHandleDef: editableDefaultCondition,
         showSettings,
       })
-      const notifyChange = () => {
-        if (values.syncingCondition || !designerStore.$.editable.value) return
-        callbacks.onChangeCondition?.(node.id, conditionChange(values))
-      }
       store = new ConditionNodeStore(node.id as NodeId, {
         changeDescription,
         display$: {
@@ -1220,9 +1214,7 @@ function createNodeEntry(
         duplicateNode,
         manifest$,
       })
-      store.dispose.add(values.conditionCases.reaction(notifyChange, true))
-      store.dispose.add(values.defaultCondition.reaction(notifyChange, true))
-      store.dispose.add([values.conditionCases, values.defaultCondition, conditionInputs])
+      store.dispose.add([values.conditionCases, values.defaultCondition, editableConditionCases, editableDefaultCondition, conditionInputs])
       break
     }
     case 'subflow': {
@@ -1248,14 +1240,18 @@ function createNodeEntry(
       break
     }
     case 'task': {
+      const editableOutputDefs = node.editablePorts
+        ? edit(values.outputDefs, (defs) => callbacks.onChangeTaskPorts?.(node.id, taskInputs(values.inputDefs.value), taskOutputs(defs)))
+        : values.outputDefs
       const outputSection = new OutputSectionStore({
         role: designerStore.$.editable.value && node.editablePorts ? 'author' : 'guest',
         lang: designerStore.lang$,
         handleOutputsTo: values.outputsTo,
-        outputHandleDefs: values.outputDefs,
+        outputHandleDefs: editableOutputDefs,
         showSettings,
         createSchemaEditor: () => undefined,
       })
+      if (editableOutputDefs !== values.outputDefs) outputSection.dispose.add(editableOutputDefs)
       store = new TaskNodeStore(node.id as NodeId, {
         changeDescription,
         display$: {
@@ -1271,27 +1267,11 @@ function createNodeEntry(
           task: val<string | InlineTask | undefined>(node.reference),
         },
       })
-      if (node.editablePorts) {
-        const changePorts = () => {
-          if (values.syncingPorts || !designerStore.$.editable.value) return
-          callbacks.onChangeTaskPorts?.(node.id, taskInputs(values.inputDefs.value), taskOutputs(values.outputDefs.value))
-        }
-        store.dispose.add(values.inputDefs.reaction(changePorts, true))
-        store.dispose.add(values.outputDefs.reaction(changePorts, true))
-      }
-      if (node.editableAdditionalInputs) {
-        store.dispose.add(
-          values.additionalInputDefs.reaction((inputs) => {
-            if (values.syncingPorts || !designerStore.$.editable.value) return
-            callbacks.onChangeTaskAdditionalInputs?.(node.id, taskAdditionalInputs(inputs ?? []))
-          }, true),
-        )
-      }
       break
     }
     case 'trigger': {
       inputSection.dispose()
-      values.triggerPresentation = val(node.presentation)
+      values.triggerPresentation = val(node.presentation, equalConfig)
       const outputSection = new OutputSectionStore({
         role: 'guest',
         lang: designerStore.lang$,
@@ -1336,12 +1316,28 @@ function createNodeEntry(
       break
     }
     case 'value': {
-      const defs = (values.valueDefs = val<ValueHandleDef[] | undefined>(valueDefs(node)))
+      const defs = (values.valueDefs = val<ValueHandleDef[] | undefined>(valueDefs(node), equalConfig))
+      const editableDefs = edit(defs, (nextDefs) =>
+        callbacks.onChangeValue?.(
+          node.id,
+          (nextDefs ?? []).map((def) =>
+            Object.assign(
+              {
+                handle: def.handle,
+                description: def.description,
+                jsonSchema: def.json_schema,
+                nullable: def.nullable,
+              },
+              Object.hasOwn(def, 'value') ? { value: def.value } : {},
+            ),
+          ),
+        ),
+      )
       const valueSection = new ValueSectionStore({
         role: designerStore.$.editable.value ? 'author' : 'guest',
         lang: designerStore.lang$,
         handleOutputsTo: values.outputsTo,
-        valueHandleDefs: defs,
+        valueHandleDefs: editableDefs,
         showSettings,
         createSchemaEditor: () => undefined,
       })
@@ -1357,31 +1353,36 @@ function createNodeEntry(
         duplicateNode,
         manifest$,
       })
-      store.dispose.add(
-        valueSection.$.valueHandleDefs.reaction((nextDefs) => {
-          if (values.syncingValue || !designerStore.$.editable.value) return
-          callbacks.onChangeValue?.(
-            node.id,
-            (nextDefs ?? []).map((def) =>
-              Object.assign(
-                {
-                  handle: def.handle,
-                  description: def.description,
-                  jsonSchema: def.json_schema,
-                  nullable: def.nullable,
-                },
-                Object.hasOwn(def, 'value') ? { value: def.value } : {},
-              ),
-            ),
-          )
-        }, true),
-      )
-      store.dispose.add(defs)
+      store.dispose.add([defs, editableDefs])
+      break
+    }
+    case 'wait': {
+      values.notice = val(node.notice, equalConfig)
+      const outputSection = new OutputSectionStore({
+        role: 'guest',
+        lang: designerStore.lang$,
+        handleOutputsTo: values.outputsTo,
+        outputHandleDefs: values.outputDefs,
+        showSettings,
+        createSchemaEditor: () => undefined,
+      })
+      store = new TaskNodeStore(node.id as NodeId, {
+        changeDescription,
+        display$: {
+          ...commonDisplay,
+          sections: val([inputSection, outputSection, diagnosticSection]),
+          task: val('wait'),
+          executorName: val('Wait'),
+          notice: values.notice,
+        },
+        designerUIStore,
+        duplicateNode,
+        manifest$: { ...manifest$, task: val<string | InlineTask | undefined>() },
+      })
       break
     }
   }
-  store.dispose.add(metadataDisposables)
-  store.dispose.add(values.outputsTo)
+  store.dispose.add([values.outputsTo, values.rawIcon, values.rawTitle])
   return {
     contentKey,
     editable: designerStore.$.editable.value,
@@ -1397,28 +1398,18 @@ function updateNodeEntry(
   connected: readonly HandleName[],
   contentKey: string,
 ): SemanticNodeEntry {
-  if (node.kind == 'condition') entry.values.syncingCondition = true
-  entry.values.syncingMetadata = true
   entry.values.description.set(node.description)
   entry.values.diagnostics.set((node.diagnostics ?? 0) > 0)
   entry.values.concurrency.set(node.concurrency)
   entry.values.executorName.set(node.kind == 'task' ? node.executorName : undefined)
   entry.values.icon.set(node.icon)
+  entry.values.notice?.set(node.kind == 'wait' ? node.notice : undefined)
   entry.values.rawIcon.set(node.rawIcon)
   entry.values.rawTitle.set(node.rawTitle)
-  const nextInputDefs = inputDefs(node)
-  const nextAdditionalInputDefs = additionalInputDefs(node)
-  const nextOutputDefs = outputDefs(node)
-  entry.values.syncingPorts = true
-  if (JSON.stringify(entry.values.inputDefs.value) != JSON.stringify(nextInputDefs)) entry.values.inputDefs.set(nextInputDefs)
-  if (JSON.stringify(entry.values.additionalInputDefs.value) != JSON.stringify(nextAdditionalInputDefs)) {
-    entry.values.additionalInputDefs.set(nextAdditionalInputDefs)
-  }
-  entry.values.syncingInput = true
+  entry.values.inputDefs.set(inputDefs(node))
+  entry.values.additionalInputDefs.set(additionalInputDefs(node))
   entry.values.inputsFrom.set(inputsFrom(node))
-  entry.values.syncingInput = false
-  if (JSON.stringify(entry.values.outputDefs.value) != JSON.stringify(nextOutputDefs)) entry.values.outputDefs.set(nextOutputDefs)
-  entry.values.syncingPorts = false
+  entry.values.outputDefs.set(outputDefs(node))
   entry.values.outputsTo.set([...connected])
   entry.values.progress.set(node.run?.progress)
   entry.values.reference.set(node.kind == 'task' || node.kind == 'subflow' ? node.reference : undefined)
@@ -1426,17 +1417,11 @@ function updateNodeEntry(
   entry.values.successCount.set(node.run?.successCount)
   entry.values.timeout.set(node.timeoutSeconds)
   entry.values.title.set(node.title)
-  entry.values.syncingMetadata = false
   if (node.kind == 'condition') {
     entry.values.conditionCases!.set(conditionCases(node))
     entry.values.defaultCondition!.set(node.defaultOutput == null ? undefined : { handle: node.defaultOutput as HandleName })
-    entry.values.syncingCondition = false
   }
-  if (node.kind == 'value') {
-    entry.values.syncingValue = true
-    entry.values.valueDefs!.set(valueDefs(node))
-    entry.values.syncingValue = false
-  }
+  if (node.kind == 'value') entry.values.valueDefs!.set(valueDefs(node))
   if (node.kind == 'trigger') entry.values.triggerPresentation!.set(node.presentation)
   return { ...entry, contentKey }
 }

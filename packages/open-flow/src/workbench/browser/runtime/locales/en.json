@@ -32,6 +32,8 @@
     "triggers": "Triggers",
     "value": "Value",
     "valueDescription": "Provide reusable literal values to downstream nodes.",
+    "wait": "Wait",
+    "waitDescription": "Pause the Run until an operator continues or approves it.",
     "webhook": "Webhook",
     "webhookDescription": "Receive external events through a dedicated HTTP endpoint."
   },
@@ -202,6 +204,24 @@
       "source": "Source",
       "structuredJson": "Structured JSON"
     },
+    "wait": {
+      "approval": "Approve or reject",
+      "changeNotification": "Change",
+      "chooseNotification": "Add notification",
+      "chooseNotificationTitle": "Choose notification",
+      "continue": "Continue",
+      "inputs": "Parameters",
+      "inputsInvalid": "Fill in all required notification parameters.",
+      "inputsLoading": "Loading notification parameters…",
+      "messageHandle": "Write message to",
+      "mode": "Resolution",
+      "notificationTask": "Notification",
+      "notificationUnavailable": "The notification is unavailable. Choose it again.",
+      "prompt": "Prompt",
+      "promptError": "Prompt must contain 1 to 1,000 characters.",
+      "removeNotification": "Remove notification",
+      "save": "Save"
+    },
     "trigger": {
       "description": "Description",
       "save": "Save Trigger",
@@ -340,6 +360,9 @@
     "upToDate": "The current Draft matches Live."
   },
   "run": {
+    "actionApprove": "Approve",
+    "actionContinue": "Continue",
+    "actionReject": "Reject",
     "artifactMetadata": "Artifact metadata",
     "artifactUnavailable": "Preview and download are not available in this Workbench yet.",
     "cancel": "Cancel run",
@@ -364,6 +387,7 @@
     "eventRecorded": "Recorded",
     "eventStarted": "Started",
     "eventTruncated": "Truncated",
+    "eventWaitResolved": "Wait resolved",
     "eventsTruncatedNotice": "Some events were omitted after this run reached its observation limit.",
     "eventsTruncatedUntil": "Some events were omitted after this run reached its observation limit. The remaining details are retained until {{date}}.",
     "filter": {
@@ -392,6 +416,7 @@
     "connectorUnconfigured": "Connector is not configured for this deployment. Complete the configuration, then run the Flow again.",
     "connectorUnavailable": "The Connector request could not be completed. Run the Flow again; if it still fails, check the selected Connection.",
     "locateNode": "Locate {{name}} on the canvas",
+    "locateWait": "Locate Wait node",
     "nodeError": "Node error",
     "nodeFailed": "The node could not be completed.",
     "nodeLog": "{{level}} log",
@@ -401,6 +426,7 @@
     "outputId": "Output ID",
     "outputPending": "The terminal output will appear when this run finishes.",
     "resize": "Drag to resize run details",
+    "resolving": "Applying…",
     "runId": "Run ID: {{id}}",
     "selectRun": "Select a run to inspect its timeline and output.",
     "sourceDraft": "Draft",
@@ -412,6 +438,7 @@
     "statusNone": "No run yet",
     "statusQueued": "Queued",
     "statusRunning": "Running",
+    "statusWaiting": "Waiting",
     "statusStarting": "Starting",
     "statusSubmitting": "Submitting",
     "statusSucceeded": "Succeeded",
@@ -426,7 +453,8 @@
     "timeline": "Timeline",
     "timelineEmpty": "Run the selected Draft to inspect its timeline and output.",
     "submitting": "Submitting this fixed revision and creating its run record…",
-    "waiting": "Waiting for the first event…"
+    "waiting": "Waiting for the first event…",
+    "waitExpires": "Expires {{date}}"
   },
   "sidebar": {
     "createFirstFlow": "Create Flow",

@@ -1,7 +1,7 @@
 import type { ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RuntimeCapabilityResponse, RuntimeInvocation, RuntimeProgram } from '@oomol-lab/open-flow/runtime-contract'
-import type { FlowRunOptions, FlowRunResult, SchedulerEvent, SchedulerFailure, TaskInvocation, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
+import type { FlowRunOptions, FlowRunOutcome, SchedulerEvent, SchedulerFailure, TaskInvocation, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
 import type * as Scope from 'effect/Scope'
 import type IsolatedVM from 'isolated-vm'
 import type { ChildProcess, ChildProcessByStdio } from 'node:child_process'
@@ -40,7 +40,7 @@ export const isolatedVmLimits: IsolatedVmLimits = {
   wallMs: 30_000,
 }
 
-export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/2 isolated-vm/7.0.1 node/26 web-globals/1').digest('hex')}`
+export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/2 isolated-vm/7.0.1 node/26 web-globals/2').digest('hex')}`
 
 export class IsolatedVmError extends Error {
   readonly code: 'canceled' | 'executor-crashed' | 'invalid-program' | 'limit-exceeded' | 'task-failed'
@@ -75,6 +75,7 @@ type InvokeRequest =
         readonly flowId: string
         readonly inputs?: FlowRunOptions['inputs']
         readonly prepared: PreparedFlow
+        readonly resume?: FlowRunOptions['resume']
         readonly runId: string
         readonly trigger?: TriggerSeed
       }
@@ -117,7 +118,7 @@ type ExecutorMessage =
       readonly retire?: true
       readonly type: 'result'
     }
-  | { readonly executionId: number; readonly ok: true; readonly retire?: true; readonly type: 'result'; readonly value: FlowRunResult | JsonValue }
+  | { readonly executionId: number; readonly ok: true; readonly retire?: true; readonly type: 'result'; readonly value: FlowRunOutcome | JsonValue }
 
 interface PendingCapability {
   readonly deferred: Deferred.Deferred<CapabilityResult, Error>
@@ -136,7 +137,7 @@ interface PendingInvocation {
   readonly limits: IsolatedVmLimits
   readonly projectFailure: (error: unknown) => SchedulerFailure
   readonly reject: (error: unknown) => void
-  readonly resolve: (value: FlowRunResult | JsonValue) => void
+  readonly resolve: (value: FlowRunOutcome | JsonValue) => void
   readonly signal?: AbortSignal
 }
 
@@ -254,17 +255,18 @@ export class IsolatedVmHost {
       readonly inputs?: FlowRunOptions['inputs']
       readonly invokeTask: (invocation: TaskInvocation & { readonly signal: AbortSignal }) => Promise<unknown>
       readonly projectFailure: (error: unknown) => SchedulerFailure
+      readonly resume?: FlowRunOptions['resume']
       readonly runId: string
       readonly trigger?: TriggerSeed
     },
     limits: IsolatedVmLimits = isolatedVmLimits,
-  ): Effect.Effect<FlowRunResult, Error> {
+  ): Effect.Effect<FlowRunOutcome, Error> {
     return Effect.suspend(() => {
       if (this.#closed) return Effect.fail(new IsolatedVmError('executor-crashed', 'Runtime Host is closed.'))
       if (serializedBytes(prepared) > limits.maxProgramBytes) {
         return Effect.fail(new IsolatedVmError('limit-exceeded', 'Fixed Flow exceeds the configured byte limit.'))
       }
-      return Effect.callback<FlowRunResult, Error>((resume, signal) => {
+      return Effect.callback<FlowRunOutcome, Error>((resume, signal) => {
         const child = this.#child ?? this.#start()
         const executionId = ++this.#executionId
         const interrupt = (): void => {
@@ -281,7 +283,7 @@ export class IsolatedVmHost {
           limits,
           projectFailure: options.projectFailure,
           reject: (error) => resume(Effect.fail(normalizedError(error))),
-          resolve: (value) => resume(Effect.succeed(value as FlowRunResult)),
+          resolve: (value) => resume(Effect.succeed(value as FlowRunOutcome)),
         })
         signal.addEventListener('abort', interrupt, { once: true })
         this.#send(child, {
@@ -291,6 +293,7 @@ export class IsolatedVmHost {
             flowId: options.flowId,
             ...(options.inputs == null ? {} : { inputs: options.inputs }),
             prepared,
+            ...(options.resume == null ? {} : { resume: options.resume }),
             runId: options.runId,
             ...(options.trigger == null ? {} : { trigger: options.trigger }),
           },
@@ -499,6 +502,7 @@ const decodeBase64 = globalThis.__openFlowDecodeBase64
 const decodeText = globalThis.__openFlowDecodeText
 const encodeBase64 = globalThis.__openFlowEncodeBase64
 const encodeText = globalThis.__openFlowEncodeText
+const writeLog = globalThis.__openFlowLog
 const now = globalThis.__openFlowNow
 const scheduleTimer = globalThis.__openFlowSetTimeout
 const timeOrigin = globalThis.__openFlowTimeOrigin
@@ -509,6 +513,7 @@ delete globalThis.__openFlowDecodeBase64
 delete globalThis.__openFlowDecodeText
 delete globalThis.__openFlowEncodeBase64
 delete globalThis.__openFlowEncodeText
+delete globalThis.__openFlowLog
 delete globalThis.__openFlowNow
 delete globalThis.__openFlowSetTimeout
 delete globalThis.__openFlowTimeOrigin
@@ -616,6 +621,27 @@ globalThis.TextEncoder = class TextEncoder {
     return encodeText.applySync(undefined, [String(input)], { arguments: { copy: true }, result: { copy: true } })
   }
 }
+const formatLogValue = (value) => {
+  if (typeof value === 'string') return value
+  if (value instanceof Error) return value.stack ?? value.message
+  try {
+    const source = JSON.stringify(value)
+    return source === undefined ? String(value) : source
+  } catch {
+    return String(value)
+  }
+}
+const emitLog = (level, values) => {
+  const message = values.map(formatLogValue).join(' ')
+  if (message.length > 0) writeLog.applySync(undefined, [level, message], { arguments: { copy: true } })
+}
+globalThis.console = Object.freeze({
+  debug: (...values) => emitLog('debug', values),
+  error: (...values) => emitLog('error', values),
+  info: (...values) => emitLog('info', values),
+  log: (...values) => emitLog('info', values),
+  warn: (...values) => emitLog('warn', values),
+})
 async function invoke(kind, payload) {
   const source = await new Promise((resolve) => {
     call.applyIgnored(undefined, [JSON.stringify({ kind, payload }), resolve], { arguments: { reference: true } })
@@ -639,11 +665,13 @@ function installGlobals(
   request: { readonly invocationId: string; readonly limits: IsolatedVmLimits },
   call: (invocationId: string, capabilities: readonly ConnectorCapability[], kind: string, payload: JsonValue) => Promise<RuntimeCapabilityResponse>,
   capabilities: readonly ConnectorCapability[],
-): { readonly close: () => boolean; readonly failure: () => unknown } {
+  log?: (level: 'debug' | 'error' | 'info' | 'warn', message: string) => Promise<void>,
+): { readonly close: () => boolean; readonly failure: () => unknown; readonly flush: () => Promise<void> } {
   const timers = new Map<number, { readonly fire: IsolatedVM.Reference<() => void>; readonly timer: ReturnType<typeof setTimeout> }>()
   const canceledTimers = new Set<number>()
   let active = true
   let capabilityFailure: unknown
+  let logQueue = Promise.resolve()
 
   const close = (): boolean => {
     const wasActive = active
@@ -695,6 +723,10 @@ function installGlobals(
   const encodeBase64 = new ivm.Reference((value: string): string => btoa(value))
   const encodeText = new ivm.Reference((value: string): Uint8Array => new TextEncoder().encode(value))
   const now = new ivm.Reference((): number => performance.now())
+  const writeLog = new ivm.Reference((level: 'debug' | 'error' | 'info' | 'warn', message: string): void => {
+    if (!active || log == null) return
+    logQueue = logQueue.then(() => log(level, message))
+  })
   const capability = new ivm.Reference((sourceReference: IsolatedVM.Reference<string>, settle: IsolatedVM.Reference<(source: string) => void>): void => {
     const settleResult = (result: CapabilityOutcome): void => {
       if (!active) return
@@ -736,10 +768,11 @@ function installGlobals(
   context.global.setSync('__openFlowDecodeText', decodeText)
   context.global.setSync('__openFlowEncodeBase64', encodeBase64)
   context.global.setSync('__openFlowEncodeText', encodeText)
+  context.global.setSync('__openFlowLog', writeLog)
   context.global.setSync('__openFlowNow', now)
   context.global.setSync('__openFlowSetTimeout', scheduleTimer)
   context.global.setSync('__openFlowTimeOrigin', performance.timeOrigin)
-  return { close, failure: () => capabilityFailure }
+  return { close, failure: () => capabilityFailure, flush: () => logQueue }
 }
 
 async function compileProgram(
@@ -847,6 +880,7 @@ async function execute(
   call: (invocationId: string, capabilities: readonly ConnectorCapability[], kind: string, payload: JsonValue) => Promise<RuntimeCapabilityResponse>,
   capabilities: readonly ConnectorCapability[] = [],
   preserveCapabilityFailure = false,
+  log?: (level: 'debug' | 'error' | 'info' | 'warn', message: string) => Promise<void>,
 ): Promise<JsonValue> {
   if (!('program' in request)) throw new IsolatedVmError('invalid-program', 'Runtime module invocation is incomplete.')
   const { program } = request
@@ -869,7 +903,7 @@ async function execute(
       },
     })
     const context = await isolate.createContext()
-    globals = installGlobals(ivm, context, request, call, capabilities)
+    globals = installGlobals(ivm, context, request, call, capabilities, log)
     abort = (): void => {
       if (!globals?.close()) return
       if (isolate != null && !isolate.isDisposed) isolate.dispose()
@@ -890,6 +924,7 @@ async function execute(
     canceled.addEventListener('abort', abort, { once: true })
     if (canceled.aborted) abort()
     const source = await invokeProgram(mainModule, request.input, request.limits.cpuMs)
+    await globals.flush()
     const result = readResult(source, program, request.limits.maxResultBytes, preserveCapabilityFailure, globals.failure())
     globals.close()
     return result
@@ -919,9 +954,11 @@ function executeEffect(
   ) => Effect.Effect<RuntimeCapabilityResponse, Error>,
   capabilities: readonly ConnectorCapability[] = [],
   preserveCapabilityFailure = false,
+  log?: (level: 'debug' | 'error' | 'info' | 'warn', message: string) => Effect.Effect<void, Error>,
 ): Effect.Effect<JsonValue, Error, Scope.Scope> {
   return Effect.gen(function* () {
     const run = yield* FiberSet.makeRuntimePromise<never, RuntimeCapabilityResponse, Error>()
+    const emit = yield* FiberSet.makeRuntimePromise<never, void, Error>()
     return yield* Effect.tryPromise({
       try: (signal) =>
         execute(
@@ -930,6 +967,7 @@ function executeEffect(
           (invocationId, allowed, kind, payload) => run(call(invocationId, allowed, kind, payload)),
           capabilities,
           preserveCapabilityFailure,
+          log == null ? undefined : (level, message) => emit(log(level, message)),
         ),
       catch: normalizedError,
     })
@@ -950,7 +988,7 @@ function executeFlow(
       | { readonly event: SchedulerEvent; readonly type: 'event' }
       | { readonly invocation: TaskInvocation; readonly type: 'task' },
   ) => Effect.Effect<CapabilityResult, Error>,
-): Effect.Effect<FlowRunResult, Error> {
+): Effect.Effect<FlowRunOutcome, Error> {
   if (!('flow' in request)) return Effect.fail(new IsolatedVmError('invalid-program', 'Flow Runtime invocation is incomplete.'))
   const { flow } = request
   return runFlow(flow.prepared, {
@@ -982,6 +1020,20 @@ function executeFlow(
                 ),
               invocation.capabilities,
               true,
+              (level, message) =>
+                remote(
+                  call({
+                    event: {
+                      jobId: invocation.jobId,
+                      level,
+                      message,
+                      nodeId: invocation.nodeId,
+                      runId: invocation.runId,
+                      type: 'node.log',
+                    },
+                    type: 'event',
+                  }),
+                ).pipe(Effect.asVoid),
             ).pipe(
               Effect.timeoutOrElse({
                 duration: request.limits.wallMs,
@@ -996,6 +1048,7 @@ function executeFlow(
       code: typeof Reflect.get(Object(error), 'schedulerCode') == 'string' ? (Reflect.get(Object(error), 'schedulerCode') as string) : 'node.failed',
       message: normalizedError(error).message,
     }),
+    ...(flow.resume == null ? {} : { resume: flow.resume }),
     runId: flow.runId,
     ...(flow.trigger == null ? {} : { trigger: flow.trigger }),
   })
@@ -1034,7 +1087,7 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
 
   return Effect.scoped(
     Effect.gen(function* () {
-      let value: FlowRunResult | JsonValue
+      let value: FlowRunOutcome | JsonValue
       if ('flow' in request) value = yield* executeFlow(request, call)
       else {
         value = yield* executeEffect(request, (invocationId, capabilities, kind, payload) =>

@@ -61,6 +61,7 @@ function main(): Effect.Effect<void> {
       const connectorOrigin = process.env.OPEN_FLOW_CONNECTOR_ORIGIN
       const connectorToken = process.env.OPEN_FLOW_CONNECTOR_TOKEN
       const connectorConsoleOrigin = process.env.OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN
+      const waitPublicOrigin = process.env.OPEN_FLOW_PUBLIC_ORIGIN
       if (connectorOrigin == null && connectorToken != null) {
         throw new Error('OPEN_FLOW_CONNECTOR_TOKEN requires OPEN_FLOW_CONNECTOR_ORIGIN.')
       }
@@ -111,23 +112,22 @@ function main(): Effect.Effect<void> {
       if (secureCookie != null && secureCookie != 'true' && secureCookie != 'false') {
         throw new Error('OPEN_FLOW_SESSION_COOKIE_SECURE must be true or false.')
       }
-      const service = yield* ServerService.open(
-        databaseFile,
-        undefined,
-        undefined,
-        {
+      const service = yield* ServerService.open(databaseFile, {
+        capabilities: {
+          connector: () => settings.connector(),
+          connectorConsoleOrigin: () => settings.connectorConsoleOrigin(),
+          integration: () => settings.integration(),
+          llm: () => settings.llm(),
+          waitPublicOrigin: () => (waitPublicOrigin == null ? undefined : new URL(waitPublicOrigin)),
+        },
+        logger,
+        runtime: {
           maxConcurrentRuns,
           maxPendingRuns,
-          resolveConnector: () => settings.connector(),
-          resolveConnectorConsoleOrigin: () => settings.connectorConsoleOrigin(),
-          resolveIntegration: () => settings.integration(),
-          resolveLlm: () => settings.llm(),
           runEventRetentionMs,
           runTimeoutMs,
         },
-        undefined,
-        logger,
-      )
+      })
       yield* service.start()
       const operatorStore = yield* Effect.acquireRelease(
         Effect.sync(() => new OperatorStore(databaseFile)),

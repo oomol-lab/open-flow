@@ -128,15 +128,18 @@ function providerOption(provider: ConnectorProvider, t: TFunction): AddNodeOptio
   }
 }
 
-function connectorTarget(selection: ResolvedSelection | undefined): ConnectorTarget | undefined {
-  if (selection?.kind != 'task' || selection.node.task != null) return
-  const task = selection.definition
+function connectorTarget(selection: ResolvedSelection | undefined, revision: RevisionView | undefined): ConnectorTarget | undefined {
+  if (selection == null) return
+  const taskId =
+    selection.kind == 'wait' ? selection.node.notification?.taskId : selection.kind == 'task' && selection.node.task == null ? selection.node.taskId : undefined
+  if (taskId == null) return
+  const task = selection.kind == 'task' ? selection.definition : revision?.task(taskId)
   if (task == null || !('executor' in task) || task.executor.kind != 'connector') return
   return {
     actionId: task.executor.action,
     connectionId: task.executor.connectionId,
     nodeId: selection.id,
-    taskId: selection.node.taskId,
+    taskId,
   }
 }
 
@@ -202,7 +205,7 @@ export class ConnectorStore {
     const actions = derive(this.#state, (state) => state.actions)
     const catalogs = derive(this.#state, (state) => state.catalogs)
     this.#selected = compute<Selection>((get) => {
-      const target = connectorTarget(get(workspace.$.selection))
+      const target = connectorTarget(get(workspace.$.selection), get(workspace.$.revision))
       const state = get(this.#state)
       if (target == null) return { authorizationPending: false }
       const action = state.actions[target.actionId]
@@ -306,7 +309,7 @@ export class ConnectorStore {
     if (this.#disposed) return
     const current = this.#refresh.begin()
     const flowId = this.#workspace.$.flowId.value
-    const target = connectorTarget(this.#workspace.$.selection.value)
+    const target = connectorTarget(this.#workspace.$.selection.value, this.#workspace.$.revision.value)
     if (flowId == null || target == null) {
       if (this.#state.value.actionLoading != null || this.#state.value.connectionLoading != null) {
         this.#set({ actionLoading: undefined, connectionLoading: undefined })

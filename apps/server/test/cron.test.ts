@@ -59,7 +59,7 @@ afterEach(async () => {
 describe('Server Cron Trigger', () => {
   it('rejects invalid schedules without moving Live or creating bindings', async () => {
     const file = await databaseFile()
-    const service = await openService(file, undefined, () => Date.parse('2026-08-21T00:00:30.000Z'))
+    const service = await openService(file, { clock: () => Date.parse('2026-08-21T00:00:30.000Z') })
     await expect(
       service.publishFlow({
         expectedLivePublicationId: null,
@@ -83,7 +83,7 @@ describe('Server Cron Trigger', () => {
 
   it('recovers the earliest due grid from SQLite and advances past the actual tick', async () => {
     const file = await databaseFile()
-    let service = await openService(file, undefined, () => Date.parse('2026-08-21T00:00:30.000Z'))
+    let service = await openService(file, { clock: () => Date.parse('2026-08-21T00:00:30.000Z') })
     const published = await service.publishFlow({
       expectedLivePublicationId: null,
       flowId: 'main',
@@ -94,7 +94,7 @@ describe('Server Cron Trigger', () => {
     expect(published.kind).toBe('published')
     await closeService(service)
 
-    service = await openService(file, undefined, () => Date.parse('2026-08-21T00:03:30.000Z'))
+    service = await openService(file, { clock: () => Date.parse('2026-08-21T00:03:30.000Z') })
     await service.tickCron()
     await closeService(service)
 
@@ -124,7 +124,7 @@ describe('Server Cron Trigger', () => {
   it('uses the process timer to wake and execute a due ordinary Run', async () => {
     const file = await databaseFile()
     await withClock(Date.parse('2026-08-21T00:00:30.000Z'), async (clock) => {
-      const service = await openService(file, undefined, clock)
+      const service = await openService(file, { clock })
       try {
         await service.publishFlow({
           expectedLivePublicationId: null,
@@ -153,10 +153,76 @@ describe('Server Cron Trigger', () => {
     }
   })
 
+  it('keeps one scheduled Run while the same Flow waits', async () => {
+    const file = await databaseFile()
+    let now = Date.parse('2026-08-21T00:00:30.000Z')
+    const service = await openService(file, { clock: () => now })
+    const scheduled = revision([{ type: 'every', unit: 'minute', value: 1 }])
+    const flow: RevisionContent = {
+      ...scheduled,
+      document: {
+        ...scheduled.document,
+        graph: {
+          ...scheduled.document.graph,
+          nodes: {
+            ...scheduled.document.graph.nodes,
+            approval: {
+              actions: ['continue'],
+              concurrency: 1,
+              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'scheduled', output: 'payload' }] } },
+              kind: 'wait',
+              prompt: 'Continue?',
+            },
+          },
+        },
+      },
+    }
+    await service.publishFlow({
+      expectedLivePublicationId: null,
+      flowId: 'main',
+      idempotencyKey: 'publish-waiting-cron',
+      revision: flow,
+      revisionId: 'revision-waiting-cron',
+    })
+
+    now = Date.parse('2026-08-21T00:01:00.000Z')
+    await service.tickCron(new Date(now).toISOString())
+    await startService(service)
+    await service.waitForIdle()
+
+    const database = new DatabaseSync(file)
+    try {
+      const first = database.prepare('SELECT run_id AS runId, status FROM runs').get() as { readonly runId: string; readonly status: string }
+      expect(first.status).toBe('waiting')
+
+      now = Date.parse('2026-08-21T00:03:00.000Z')
+      await service.tickCron(new Date(now).toISOString())
+      expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 1 })
+      expect(database.prepare('SELECT next_at AS nextAt FROM cron_bindings').get()).toEqual({ nextAt: Date.parse('2026-08-21T00:02:00.000Z') })
+
+      expect(service.control.cancelRun(first.runId)).toMatchObject({ cancelAccepted: true, status: 'canceled' })
+
+      now = Date.parse('2026-08-21T00:05:00.000Z')
+      await service.tickCron(new Date(now).toISOString())
+      await service.waitForIdle()
+      expect(database.prepare('SELECT next_at AS nextAt FROM cron_bindings').get()).toEqual({ nextAt: Date.parse('2026-08-21T00:06:00.000Z') })
+      const payloads = database.prepare('SELECT payload FROM trigger_occurrences ORDER BY rowid').all() as unknown as readonly {
+        readonly payload: string
+      }[]
+      expect(payloads.map(({ payload }) => JSON.parse(payload))).toEqual([
+        { scheduledAt: '2026-08-21T00:01:00.000Z' },
+        { scheduledAt: '2026-08-21T00:02:00.000Z' },
+      ])
+    } finally {
+      database.close()
+      await closeService(service)
+    }
+  })
+
   it('cancels an armed process timer when the service closes', async () => {
     const file = await databaseFile()
     await withClock(Date.parse('2026-08-21T00:00:59.990Z'), async (clock) => {
-      const service = await openService(file, undefined, clock)
+      const service = await openService(file, { clock })
       await service.publishFlow({
         expectedLivePublicationId: null,
         flowId: 'main',
@@ -181,7 +247,7 @@ describe('Server Cron Trigger', () => {
   it('fences a due target when Publish advances during admission', async () => {
     const file = await databaseFile()
     let now = Date.parse('2026-08-21T00:00:30.000Z')
-    const service = await openService(file, undefined, () => now)
+    const service = await openService(file, { clock: () => now })
     const published = await service.publishFlow({
       expectedLivePublicationId: null,
       flowId: 'main',

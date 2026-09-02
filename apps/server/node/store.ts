@@ -1,12 +1,13 @@
 import type { RunEventKind } from '@oomol-lab/open-flow/control-api'
-import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { RunStatus, RunTerminalStatus } from '@oomol-lab/open-flow/run-lifecycle'
-import type { FlowRunOptions, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
+import type { FlowRunCheckpoint, FlowRunOptions, FlowRunOutcome, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
 import type { RunAdmission, TriggerOccurrenceInput } from './trigger-store.ts'
 
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
-import { randomUUID } from 'node:crypto'
+import { decodeFlowRunCheckpoint } from '@oomol-lab/open-flow/scheduler'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { AcceptanceError } from './error.ts'
 import { IntegrationStore } from './integration-store.ts'
@@ -129,6 +130,9 @@ export interface StoredRun {
   readonly flowId: string
   readonly inputs: RunInputs
   readonly revisionDigest: string
+  readonly remainingMs?: number
+  readonly resume?: { readonly action: WaitAction; readonly checkpoint: FlowRunCheckpoint }
+  readonly resumeUnavailable?: true
   readonly runId: string
   readonly trigger?: TriggerSeed
 }
@@ -139,6 +143,7 @@ const maxEventCount = 1_000
 const maxEventTotalBytes = 16 * 1024 * 1024
 const defaultRunEventRetentionMs = 30 * 24 * 60 * 60 * 1000
 const defaultMaxPendingRuns = 1_000
+const waitDurationMs = 7 * 24 * 60 * 60 * 1_000
 
 export class Store {
   readonly integrations: IntegrationStore
@@ -353,14 +358,14 @@ export class Store {
       const runs = this.#database
         .prepare(
           `SELECT run_id AS runId FROM runs
-           WHERE flow_id = ? AND status IN ('queued', 'starting', 'running')
+           WHERE flow_id = ? AND status IN ('queued', 'starting', 'running', 'waiting')
            ORDER BY created_at, run_id LIMIT ?`,
         )
         .all(flowId, limit) as { readonly runId: string }[]
       const result = { error: { code: 'run.canceled', message: 'Run canceled.' } }
       const finishedAt = this.#clock()
       for (const { runId } of runs) {
-        this.#finishRun(runId, 'canceled', result, "status IN ('queued', 'starting', 'running')", finishedAt)
+        this.#finishRun(runId, 'canceled', result, "status IN ('queued', 'starting', 'running', 'waiting')", finishedAt)
       }
       return runs.map(({ runId }) => runId)
     })
@@ -392,6 +397,8 @@ export class Store {
         this.#database.prepare('DELETE FROM poll_event_dedupe WHERE run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM trigger_occurrences WHERE run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM events WHERE run_id = ?').run(runId)
+        this.#database.prepare('DELETE FROM wait_notifications WHERE run_id = ?').run(runId)
+        this.#database.prepare('DELETE FROM run_waits WHERE run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM work WHERE run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM runs WHERE run_id = ?').run(runId)
       }
@@ -655,6 +662,10 @@ export class Store {
           `SELECT runs.run_id AS runId
            FROM work JOIN runs USING (run_id)
            WHERE runs.status IN ('queued', 'starting')
+             AND NOT EXISTS (
+               SELECT 1 FROM work AS earlier_work JOIN runs AS earlier ON earlier.run_id = earlier_work.run_id
+               WHERE earlier.flow_id = runs.flow_id AND earlier.status = 'waiting' AND earlier_work.sequence < work.sequence
+             )
              ${flowFilter}
            ORDER BY work.sequence
            LIMIT 1`,
@@ -667,8 +678,12 @@ export class Store {
           `SELECT revisions.content, runs.engine_contract AS engineContract, runs.engine_digest AS engineDigest,
                   runs.connector_team_id AS connectorTeamId, runs.flow_id AS flowId, runs.inputs,
                   runs.revision_digest AS revisionDigest, runs.run_id AS runId,
+                  run_waits.action AS waitAction, run_waits.checkpoint_json AS checkpointJson,
+                  run_waits.remaining_ms AS remainingMs, run_waits.wait_id AS waitId,
                   trigger_occurrences.payload AS triggerPayload, trigger_occurrences.trigger_node_id AS triggerNodeId
-           FROM runs JOIN revisions USING (revision_id) LEFT JOIN trigger_occurrences USING (run_id)
+           FROM runs JOIN revisions USING (revision_id)
+           LEFT JOIN trigger_occurrences USING (run_id)
+           LEFT JOIN run_waits USING (run_id)
            WHERE runs.run_id = ? AND runs.status = 'starting'`,
         )
         .get(claimed.runId) as {
@@ -679,14 +694,39 @@ export class Store {
         readonly inputs: string
         readonly flowId: string
         readonly revisionDigest: string
+        readonly checkpointJson: string | null
+        readonly remainingMs: number | null
         readonly runId: string
         readonly triggerNodeId: string | null
         readonly triggerPayload: string | null
+        readonly waitAction: WaitAction | null
+        readonly waitId: string | null
+      }
+      let resumeUnavailable = row.waitId != null && (row.waitAction == null || row.checkpointJson == null || row.remainingMs == null)
+      let resume: StoredRun['resume']
+      if (!resumeUnavailable && row.waitId != null && row.waitAction != null && row.checkpointJson != null) {
+        try {
+          const checkpoint = decodeFlowRunCheckpoint(JSON.parse(row.checkpointJson))
+          if (checkpoint.wait.waitId != row.waitId) resumeUnavailable = true
+          else resume = { action: row.waitAction, checkpoint }
+        } catch {
+          resumeUnavailable = true
+        }
       }
       return {
-        ...row,
+        content: row.content,
         connectorTeamId: row.connectorTeamId ?? undefined,
+        engineContract: row.engineContract,
+        engineDigest: row.engineDigest,
+        flowId: row.flowId,
         inputs: JSON.parse(row.inputs) as RunInputs,
+        ...(resumeUnavailable
+          ? { resumeUnavailable: true as const }
+          : resume == null || row.remainingMs == null
+            ? {}
+            : { remainingMs: row.remainingMs, resume }),
+        revisionDigest: row.revisionDigest,
+        runId: row.runId,
         ...(row.triggerNodeId == null || row.triggerPayload == null
           ? {}
           : { trigger: { nodeId: row.triggerNodeId, payload: JSON.parse(row.triggerPayload) as JsonValue } }),
@@ -722,13 +762,390 @@ export class Store {
 
   commit(runId: string, status: RunTerminalStatus, result: unknown): boolean {
     return this.#transaction(() => {
-      const condition = status == 'canceled' ? "status IN ('queued', 'starting', 'running')" : "status = 'running'"
+      const condition = status == 'canceled' ? "status IN ('queued', 'starting', 'running', 'waiting')" : "status = 'running'"
       return this.#finishRun(runId, status, result, condition, this.#clock())
     })
   }
 
   failStarting(runId: string, result: unknown): boolean {
     return this.#transaction(() => this.#finishRun(runId, 'failed', result, "status = 'starting'", this.#clock()))
+  }
+
+  failResume(runId: string, result: unknown): boolean {
+    return this.#transaction(() => this.#finishRun(runId, 'indeterminate', result, "status = 'starting'", this.#clock()))
+  }
+
+  wait(
+    runId: string,
+    outcome: Extract<FlowRunOutcome, { readonly kind: 'waiting' }>,
+    remainingMs: number,
+    notification?: {
+      readonly action: string
+      readonly connectionId?: string
+      readonly input: Readonly<Record<string, JsonValue>>
+      readonly messageHandle: string
+      readonly prompt: string
+      readonly publicOrigin: string
+      readonly taskId: string
+    },
+  ): { readonly expiresAt: number; readonly waitingSince: number } | undefined {
+    const checkpointJson = JSON.stringify(outcome.checkpoint)
+    const checkpointBytes = encoder.encode(checkpointJson).byteLength
+    const checkpointDigest = `sha256:${createHash('sha256').update(checkpointJson).digest('hex')}`
+    return this.#transaction(() => {
+      const waitingSince = this.#clock()
+      const expiresAt = waitingSince + waitDurationMs
+      const capability = notification == null ? undefined : randomBytes(32).toString('base64url')
+      const capabilityDigest = capability == null ? null : createHash('sha256').update(capability).digest('hex')
+      const changed = this.#database.prepare("UPDATE runs SET status = 'waiting' WHERE run_id = ? AND status = 'running'").run(runId)
+      if (changed.changes != 1) return
+      this.#database
+        .prepare(
+          `INSERT INTO run_waits (
+             run_id, wait_id, node_id, job_id, job_order, waiting_since, expires_at,
+             checkpoint_json, checkpoint_version, checkpoint_digest, checkpoint_bytes,
+             remaining_ms, action, resolved_at, capability_digest
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, NULL, NULL, ?)
+           ON CONFLICT(run_id) DO UPDATE SET
+             wait_id = excluded.wait_id, node_id = excluded.node_id, job_id = excluded.job_id,
+             job_order = excluded.job_order, waiting_since = excluded.waiting_since,
+             expires_at = excluded.expires_at, checkpoint_json = excluded.checkpoint_json,
+             checkpoint_version = 1, checkpoint_digest = excluded.checkpoint_digest,
+             checkpoint_bytes = excluded.checkpoint_bytes, remaining_ms = excluded.remaining_ms,
+             action = NULL, resolved_at = NULL, capability_digest = excluded.capability_digest`,
+        )
+        .run(
+          runId,
+          outcome.wait.waitId,
+          outcome.wait.nodeId,
+          outcome.wait.jobId,
+          outcome.wait.order,
+          waitingSince,
+          expiresAt,
+          checkpointJson,
+          checkpointDigest,
+          checkpointBytes,
+          remainingMs,
+          capabilityDigest,
+        )
+      this.#database.prepare('DELETE FROM wait_notifications WHERE run_id = ?').run(runId)
+      if (notification != null && capability != null) {
+        const expiresAtText = new Date(expiresAt).toISOString()
+        const links = outcome.wait.actions.map((action) => ({
+          action,
+          url: new URL(`/v1/wait-actions/${capability}/${action}`, notification.publicOrigin).href,
+        }))
+        const labels = { approve: 'Approve', continue: 'Continue', reject: 'Reject' } as const
+        const message = [notification.prompt, `Expires at: ${expiresAtText}`, ...links.map(({ action, url }) => `${labels[action]}: ${url}`)].join('\n')
+        const input = { ...notification.input, [notification.messageHandle]: message }
+        this.#database
+          .prepare(
+            `INSERT INTO wait_notifications (
+               run_id, wait_id, invocation_id, action, connection_id, task_id,
+               input_json, status, claim_id, claim_expires_at, created_at, updated_at
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NULL, NULL, ?, ?)`,
+          )
+          .run(
+            runId,
+            outcome.wait.waitId,
+            `wait:${runId}:${outcome.wait.waitId}`,
+            notification.action,
+            notification.connectionId ?? null,
+            notification.taskId,
+            JSON.stringify(input),
+            waitingSince,
+            waitingSince,
+          )
+      }
+      const payload = {
+        expiresAt: new Date(expiresAt).toISOString(),
+        nodeId: outcome.wait.nodeId,
+        waitId: outcome.wait.waitId,
+        waitingSince: new Date(waitingSince).toISOString(),
+      }
+      this.#insertEvent(runId, 'run.waiting', payload)
+      const bytes = encoder.encode(JSON.stringify({ kind: 'run.waiting', payload })).byteLength
+      this.#database.prepare('UPDATE runs SET event_count = event_count + 1, event_bytes = event_bytes + ? WHERE run_id = ?').run(bytes, runId)
+      return { expiresAt, waitingSince }
+    })
+  }
+
+  activeWait(runId: string):
+    | {
+        readonly expiresAt: number
+        readonly nodeId: string
+        readonly waitId: string
+        readonly waitingSince: number
+      }
+    | undefined {
+    return this.#database
+      .prepare(
+        `SELECT run_waits.expires_at AS expiresAt, run_waits.node_id AS nodeId,
+                run_waits.wait_id AS waitId, run_waits.waiting_since AS waitingSince
+         FROM run_waits JOIN runs USING (run_id)
+         WHERE run_waits.run_id = ? AND runs.status = 'waiting'`,
+      )
+      .get(runId) as { readonly expiresAt: number; readonly nodeId: string; readonly waitId: string; readonly waitingSince: number } | undefined
+  }
+
+  waitReceipt(
+    runId: string,
+    waitId: string,
+  ):
+    | {
+        readonly expiresAt: number
+        readonly nodeId: string
+        readonly waitId: string
+        readonly waitingSince: number
+      }
+    | undefined {
+    return this.#database
+      .prepare(
+        `SELECT expires_at AS expiresAt, node_id AS nodeId, wait_id AS waitId, waiting_since AS waitingSince
+         FROM run_waits WHERE run_id = ? AND wait_id = ?`,
+      )
+      .get(runId, waitId) as { readonly expiresAt: number; readonly nodeId: string; readonly waitId: string; readonly waitingSince: number } | undefined
+  }
+
+  resolveWait(
+    runId: string,
+    waitId: string,
+    requested: WaitAction,
+    allowed: readonly WaitAction[],
+  ):
+    | { readonly kind: 'invalid-action' | 'not-found' }
+    | {
+        readonly action: WaitAction | null
+        readonly changed: boolean
+        readonly kind: 'resolved'
+        readonly resolutionAccepted: boolean
+        readonly resolvedAt: number | null
+        readonly status: RunStatus
+      } {
+    return this.#transaction(() => {
+      const row = this.#database
+        .prepare(
+          `SELECT run_waits.action, run_waits.expires_at AS expiresAt,
+                  run_waits.resolved_at AS resolvedAt, runs.status
+           FROM run_waits JOIN runs USING (run_id)
+           WHERE run_waits.run_id = ? AND run_waits.wait_id = ?`,
+        )
+        .get(runId, waitId) as
+        | { readonly action: WaitAction | null; readonly expiresAt: number; readonly resolvedAt: number | null; readonly status: RunStatus }
+        | undefined
+      if (row == null) return { kind: 'not-found' as const }
+      if (!allowed.includes(requested)) return { kind: 'invalid-action' as const }
+      if (row.action != null && row.resolvedAt != null) {
+        return {
+          action: row.action,
+          changed: false,
+          kind: 'resolved' as const,
+          resolutionAccepted: row.action == requested,
+          resolvedAt: row.resolvedAt,
+          status: row.status,
+        }
+      }
+      if (row.status != 'waiting') {
+        return { action: null, changed: false, kind: 'resolved' as const, resolutionAccepted: false, resolvedAt: null, status: row.status }
+      }
+      const resolvedAt = this.#clock()
+      if (resolvedAt >= row.expiresAt) {
+        this.#finishRun(
+          runId,
+          'failed',
+          { error: { code: 'run.wait-expired', message: 'The Wait expired before it was resolved.' } },
+          "status = 'waiting'",
+          resolvedAt,
+        )
+        return { action: null, changed: true, kind: 'resolved' as const, resolutionAccepted: false, resolvedAt: null, status: 'failed' as const }
+      }
+      this.#database.prepare("UPDATE runs SET status = 'queued' WHERE run_id = ? AND status = 'waiting'").run(runId)
+      this.#database.prepare('UPDATE run_waits SET action = ?, resolved_at = ? WHERE run_id = ? AND action IS NULL').run(requested, resolvedAt, runId)
+      this.#database.prepare('DELETE FROM wait_notifications WHERE run_id = ?').run(runId)
+      const payload = { action: requested, resolvedAt: new Date(resolvedAt).toISOString(), waitId }
+      this.#insertEvent(runId, 'run.resolved', payload)
+      const bytes = encoder.encode(JSON.stringify({ kind: 'run.resolved', payload })).byteLength
+      this.#database.prepare('UPDATE runs SET event_count = event_count + 1, event_bytes = event_bytes + ? WHERE run_id = ?').run(bytes, runId)
+      return { action: requested, changed: true, kind: 'resolved' as const, resolutionAccepted: true, resolvedAt, status: 'queued' as const }
+    })
+  }
+
+  expireWaits(now: number, limit: number): readonly { readonly flowId: string; readonly runId: string }[] {
+    return this.#transaction(() => {
+      const due = this.#database
+        .prepare(
+          `SELECT runs.flow_id AS flowId, runs.run_id AS runId
+           FROM runs JOIN run_waits USING (run_id)
+           WHERE runs.status = 'waiting' AND run_waits.expires_at <= ?
+           ORDER BY run_waits.expires_at, runs.run_id LIMIT ?`,
+        )
+        .all(now, limit) as unknown as readonly { readonly flowId: string; readonly runId: string }[]
+      for (const { runId } of due) {
+        this.#finishRun(
+          runId,
+          'failed',
+          { error: { code: 'run.wait-expired', message: 'The Wait expired before it was resolved.' } },
+          "status = 'waiting'",
+          now,
+        )
+      }
+      return due
+    })
+  }
+
+  nextWaitExpiry(): number | undefined {
+    return (
+      (
+        this.#database
+          .prepare(
+            `SELECT MIN(run_waits.expires_at) AS expiresAt
+           FROM run_waits JOIN runs USING (run_id)
+           WHERE runs.status = 'waiting'`,
+          )
+          .get() as { readonly expiresAt: number | null }
+      ).expiresAt ?? undefined
+    )
+  }
+
+  claimWaitNotification(
+    now: number,
+    leaseMs: number,
+  ):
+    | {
+        readonly action: string
+        readonly claimId: string
+        readonly connectionId?: string
+        readonly input: Readonly<Record<string, JsonValue>>
+        readonly invocationId: string
+        readonly runId: string
+        readonly teamId?: string
+        readonly waitId: string
+      }
+    | undefined {
+    return this.#transaction(() => {
+      this.#database
+        .prepare(
+          `DELETE FROM wait_notifications
+           WHERE status = 'pending' AND NOT EXISTS (
+             SELECT 1 FROM runs JOIN run_waits USING (run_id)
+             WHERE runs.run_id = wait_notifications.run_id
+               AND runs.status = 'waiting'
+               AND run_waits.wait_id = wait_notifications.wait_id
+               AND run_waits.expires_at > ?
+           )`,
+        )
+        .run(now)
+      const row = this.#database
+        .prepare(
+          `SELECT wait_notifications.action, wait_notifications.connection_id AS connectionId,
+                  wait_notifications.input_json AS inputJson, wait_notifications.invocation_id AS invocationId,
+                  wait_notifications.run_id AS runId, runs.connector_team_id AS teamId,
+                  wait_notifications.wait_id AS waitId
+           FROM wait_notifications JOIN runs USING (run_id) JOIN run_waits USING (run_id)
+           WHERE wait_notifications.status = 'pending'
+             AND (wait_notifications.claim_id IS NULL OR wait_notifications.claim_expires_at <= ?)
+             AND runs.status = 'waiting'
+             AND run_waits.wait_id = wait_notifications.wait_id
+             AND run_waits.expires_at > ?
+           ORDER BY wait_notifications.created_at, wait_notifications.run_id LIMIT 1`,
+        )
+        .get(now, now) as
+        | {
+            readonly action: string
+            readonly connectionId: string | null
+            readonly inputJson: string
+            readonly invocationId: string
+            readonly runId: string
+            readonly teamId: string | null
+            readonly waitId: string
+          }
+        | undefined
+      if (row == null) return
+      const claimId = randomUUID()
+      const changed = this.#database
+        .prepare(
+          `UPDATE wait_notifications SET claim_id = ?, claim_expires_at = ?, updated_at = ?
+           WHERE run_id = ? AND wait_id = ? AND status = 'pending'
+             AND (claim_id IS NULL OR claim_expires_at <= ?)`,
+        )
+        .run(claimId, now + leaseMs, now, row.runId, row.waitId, now)
+      if (changed.changes != 1) return
+      return {
+        action: row.action,
+        claimId,
+        connectionId: row.connectionId ?? undefined,
+        input: JSON.parse(row.inputJson) as Readonly<Record<string, JsonValue>>,
+        invocationId: row.invocationId,
+        runId: row.runId,
+        teamId: row.teamId ?? undefined,
+        waitId: row.waitId,
+      }
+    })
+  }
+
+  finishWaitNotification(runId: string, waitId: string, claimId: string, delivered: boolean): boolean {
+    return (
+      this.#database
+        .prepare(
+          `UPDATE wait_notifications
+           SET status = ?, claim_id = NULL, claim_expires_at = NULL, updated_at = ?
+           WHERE run_id = ? AND wait_id = ? AND status = 'pending' AND claim_id = ?`,
+        )
+        .run(delivered ? 'delivered' : 'failed', this.#clock(), runId, waitId, claimId).changes == 1
+    )
+  }
+
+  nextWaitNotificationAt(): number | undefined {
+    return (
+      (
+        this.#database
+          .prepare(
+            `SELECT MIN(COALESCE(wait_notifications.claim_expires_at, wait_notifications.created_at)) AS dueAt
+           FROM wait_notifications JOIN runs USING (run_id) JOIN run_waits USING (run_id)
+           WHERE wait_notifications.status = 'pending'
+             AND runs.status = 'waiting'
+             AND run_waits.wait_id = wait_notifications.wait_id`,
+          )
+          .get() as { readonly dueAt: number | null }
+      ).dueAt ?? undefined
+    )
+  }
+
+  waitByCapability(digest: string):
+    | {
+        readonly action: WaitAction | null
+        readonly expiresAt: number
+        readonly flowId: string
+        readonly nodeId: string
+        readonly resolvedAt: number | null
+        readonly revisionId: string
+        readonly runId: string
+        readonly status: RunStatus
+        readonly waitId: string
+      }
+    | undefined {
+    return this.#database
+      .prepare(
+        `SELECT run_waits.action, run_waits.expires_at AS expiresAt, runs.flow_id AS flowId,
+                run_waits.node_id AS nodeId, run_waits.resolved_at AS resolvedAt,
+                runs.revision_id AS revisionId, runs.run_id AS runId, runs.status,
+                run_waits.wait_id AS waitId
+         FROM run_waits JOIN runs USING (run_id)
+         WHERE run_waits.capability_digest = ?`,
+      )
+      .get(digest) as
+      | {
+          readonly action: WaitAction | null
+          readonly expiresAt: number
+          readonly flowId: string
+          readonly nodeId: string
+          readonly resolvedAt: number | null
+          readonly revisionId: string
+          readonly runId: string
+          readonly status: RunStatus
+          readonly waitId: string
+        }
+      | undefined
   }
 
   events(runId: string): readonly RunEvent[] {
@@ -839,7 +1256,7 @@ export class Store {
         runId,
         'canceled',
         { error: { code: 'run.canceled', message: 'Run canceled.' } },
-        "status IN ('queued', 'starting', 'running')",
+        "status IN ('queued', 'starting', 'running', 'waiting')",
         this.#clock(),
       )
       return { accepted: true, run: this.controlRun(runId)! }
@@ -849,12 +1266,35 @@ export class Store {
   start(runId: string, event: ProjectedRunEvent): boolean {
     return this.#transaction(() => {
       const changed = this.#database
-        .prepare("UPDATE runs SET status = 'running', started_at = ? WHERE run_id = ? AND status = 'starting'")
+        .prepare(
+          `UPDATE runs SET status = 'running', started_at = ?
+           WHERE run_id = ? AND status = 'starting'
+             AND NOT EXISTS (SELECT 1 FROM run_waits WHERE run_waits.run_id = runs.run_id AND resolved_at IS NOT NULL)`,
+        )
         .run(this.#clock(), runId)
       if (changed.changes != 1) return false
       const bytes = encoder.encode(JSON.stringify(event)).byteLength
       this.#insertEvent(runId, event.kind, event.payload, 'value' in event ? event.value : undefined)
       this.#database.prepare('UPDATE runs SET event_count = event_count + 1, event_bytes = event_bytes + ? WHERE run_id = ?').run(bytes, runId)
+      return true
+    })
+  }
+
+  resume(runId: string, waitId: string): boolean {
+    return this.#transaction(() => {
+      const changed = this.#database
+        .prepare(
+          `UPDATE runs SET status = 'running'
+           WHERE run_id = ? AND status = 'starting'
+             AND EXISTS (
+               SELECT 1 FROM run_waits
+               WHERE run_waits.run_id = runs.run_id AND wait_id = ?
+                 AND action IS NOT NULL AND checkpoint_json IS NOT NULL
+             )`,
+        )
+        .run(runId, waitId)
+      if (changed.changes != 1) return false
+      this.#database.prepare('UPDATE run_waits SET checkpoint_json = NULL WHERE run_id = ? AND wait_id = ?').run(runId, waitId)
       return true
     })
   }
@@ -949,6 +1389,8 @@ export class Store {
       .prepare(`UPDATE runs SET status = ?, result = ?, finished_at = ?, events_expires_at = ? WHERE run_id = ? AND ${condition}`)
       .run(status, JSON.stringify(result), finishedAt, finishedAt + this.#runEventRetentionMs, runId)
     if (changed.changes != 1) return false
+    this.#database.prepare('UPDATE run_waits SET checkpoint_json = NULL WHERE run_id = ?').run(runId)
+    this.#database.prepare('DELETE FROM wait_notifications WHERE run_id = ?').run(runId)
     this.#insertEvent(runId, `run.${status}`, { result })
     this.#database.prepare('UPDATE runs SET event_count = event_count + 1 WHERE run_id = ?').run(runId)
     this.#database.prepare('DELETE FROM work WHERE run_id = ?').run(runId)
@@ -1050,6 +1492,83 @@ export class Store {
       this.commit(runId, 'indeterminate', {
         error: { code: 'execution.terminal-unknown', message: 'The previous process stopped after user execution began.' },
       })
+    }
+    const waiting = this.#database
+      .prepare(
+        `SELECT runs.run_id AS runId, run_waits.checkpoint_bytes AS checkpointBytes,
+                run_waits.checkpoint_digest AS checkpointDigest, run_waits.checkpoint_json AS checkpointJson,
+                run_waits.expires_at AS expiresAt, run_waits.wait_id AS waitId
+         FROM runs LEFT JOIN run_waits USING (run_id)
+         WHERE runs.status = 'waiting'`,
+      )
+      .all() as unknown as readonly {
+      readonly checkpointBytes: number | null
+      readonly checkpointDigest: string | null
+      readonly checkpointJson: string | null
+      readonly expiresAt: number | null
+      readonly runId: string
+      readonly waitId: string | null
+    }[]
+    for (const row of waiting) {
+      if (row.expiresAt != null && row.expiresAt <= this.#clock()) {
+        this.#transaction(() =>
+          this.#finishRun(
+            row.runId,
+            'failed',
+            { error: { code: 'run.wait-expired', message: 'The Wait expired before it was resolved.' } },
+            "status = 'waiting'",
+            this.#clock(),
+          ),
+        )
+      } else if (!this.#checkpointValid(row.checkpointJson, row.checkpointDigest, row.checkpointBytes, row.waitId)) {
+        this.#transaction(() =>
+          this.#finishRun(
+            row.runId,
+            'indeterminate',
+            { error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint is unavailable.' } },
+            "status = 'waiting'",
+            this.#clock(),
+          ),
+        )
+      }
+    }
+    const resumes = this.#database
+      .prepare(
+        `SELECT runs.run_id AS runId, runs.status, run_waits.checkpoint_bytes AS checkpointBytes,
+                run_waits.checkpoint_digest AS checkpointDigest, run_waits.checkpoint_json AS checkpointJson,
+                run_waits.wait_id AS waitId
+         FROM runs JOIN run_waits USING (run_id)
+         WHERE runs.status IN ('queued', 'starting') AND run_waits.resolved_at IS NOT NULL`,
+      )
+      .all() as unknown as readonly {
+      readonly checkpointBytes: number
+      readonly checkpointDigest: string
+      readonly checkpointJson: string | null
+      readonly runId: string
+      readonly status: 'queued' | 'starting'
+      readonly waitId: string
+    }[]
+    for (const row of resumes) {
+      if (this.#checkpointValid(row.checkpointJson, row.checkpointDigest, row.checkpointBytes, row.waitId)) continue
+      this.#transaction(() =>
+        this.#finishRun(
+          row.runId,
+          'indeterminate',
+          { error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint is unavailable.' } },
+          `status = '${row.status}'`,
+          this.#clock(),
+        ),
+      )
+    }
+  }
+
+  #checkpointValid(source: string | null, digest: string | null, bytes: number | null, waitId: string | null): boolean {
+    if (source == null || digest == null || bytes == null || encoder.encode(source).byteLength != bytes) return false
+    if (`sha256:${createHash('sha256').update(source).digest('hex')}` != digest) return false
+    try {
+      return decodeFlowRunCheckpoint(JSON.parse(source)).wait.waitId == waitId
+    } catch {
+      return false
     }
   }
 

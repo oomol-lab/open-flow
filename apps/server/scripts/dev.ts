@@ -21,6 +21,7 @@ const frontendPort = 5174
 if (!Number.isInteger(backendPort) || backendPort < 1 || backendPort > 65_535) {
   throw new Error('OPEN_FLOW_PORT must be an integer between 1 and 65535 in development.')
 }
+const waitPublicOrigin = process.env.OPEN_FLOW_PUBLIC_ORIGIN ?? `http://127.0.0.1:${backendPort}`
 const configuredOperatorToken = process.env.OPEN_FLOW_TOKEN
 if (configuredOperatorToken != null && Buffer.byteLength(configuredOperatorToken) < 32) {
   throw new Error('OPEN_FLOW_TOKEN must contain at least 32 UTF-8 bytes. Remove it to use a generated development token.')
@@ -34,7 +35,9 @@ if (!(await portAvailable(backendPort))) {
 const developmentToken = configuredOperatorToken == null ? await loadDevelopmentToken() : { created: false, token: configuredOperatorToken }
 const operatorToken = developmentToken.token
 
-process.stdout.write(`Development endpoints:\n  Workbench: http://localhost:${frontendPort}\n  Server API: http://127.0.0.1:${backendPort}\n`)
+process.stdout.write(
+  `Development endpoints:\n  Workbench: http://localhost:${frontendPort}\n  Server API: http://127.0.0.1:${backendPort}\n  Wait actions: ${waitPublicOrigin}\n`,
+)
 
 function start(command: string, args: readonly string[], environment = process.env): ChildProcess {
   return spawn(command, [...args], { cwd: appRoot, env: environment, stdio: 'inherit' })
@@ -54,6 +57,7 @@ const backend = start('node', ['--watch', '--no-node-snapshot', 'node/main.ts', 
   ...process.env,
   OPEN_FLOW_HOST: '127.0.0.1',
   OPEN_FLOW_LOG_LEVEL: process.env.OPEN_FLOW_LOG_LEVEL ?? 'debug',
+  OPEN_FLOW_PUBLIC_ORIGIN: waitPublicOrigin,
   OPEN_FLOW_TOKEN: operatorToken,
   OPEN_FLOW_PORT: String(backendPort),
 })

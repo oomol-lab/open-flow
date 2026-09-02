@@ -55,6 +55,14 @@
     gap: 4px;
   }
 
+  .designer-actions [data-slot='button'][data-variant='destructive'] {
+    background: var(--danger-surface);
+  }
+
+  .designer-actions [data-slot='button'][data-variant='destructive']:hover {
+    background: color-mix(in srgb, var(--ui-destructive) 20%, var(--ui-background));
+  }
+
   .node-icon {
     display: inline-grid;
     width: 30px;

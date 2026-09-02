@@ -5,3 +5,49 @@
     overflow: visible;
   }
 }
+
+.notice {
+  min-width: 0;
+  margin: 0 8px 8px;
+  padding: 7px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  border-radius: var(--widget-radius);
+  background-color: var(--block-editor-item-background-color);
+  color: var(--text-2);
+  font-size: var(--base-font-size);
+  line-height: 20px;
+}
+
+.noticeIcon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 4px;
+  color: var(--text-3);
+
+  > :where(img, svg) {
+    width: 16px;
+    height: 16px;
+  }
+
+  > i {
+    flex: none;
+  }
+}
+
+.notice > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:global(.oo-designer-node-minimap1) .notice {
+  visibility: hidden;
+}

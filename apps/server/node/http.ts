@@ -1,4 +1,4 @@
-import type { JsonValue, TriggerNode } from '@oomol-lab/open-flow/flow-change'
+import type { JsonValue, TriggerNode, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { Logger } from 'pino'
 import type { ResolveControlActor } from './control.ts'
 import type { OperatorSession } from './operator.ts'
@@ -120,6 +120,30 @@ export function createServerApp(service: ServerService, options: ServerAppOption
       notifications((listener) => service.subscribeFlow(context.req.param('flowId'), listener), [context.req.raw.signal, options.shutdownSignal]),
     )
   })
+  app.all('/v1/wait-actions/:capability/:action', (context) => {
+    const method = context.req.method
+    if (method != 'GET' && method != 'HEAD' && method != 'POST') {
+      const response = json(405, { error: { code: 'wait-action.method-not-allowed', message: 'Method is not allowed.' }, version: 1 })
+      response.headers.set('allow', 'GET, HEAD, POST')
+      response.headers.set('cache-control', 'no-store')
+      return response
+    }
+    const capability = context.req.param('capability')
+    const action = context.req.param('action')
+    const requested = action == 'approve' || action == 'continue' || action == 'reject' ? (action satisfies WaitAction) : undefined
+    const result =
+      requested == null || !/^[A-Za-z0-9_-]{43}$/.test(capability)
+        ? undefined
+        : method == 'POST'
+          ? service.resolveWaitAction(capability, requested)
+          : service.inspectWaitAction(capability, requested)
+    const response =
+      result == null
+        ? json(404, { error: { code: 'wait-action.not-found', message: 'Wait action was not found.' }, version: 1 })
+        : json(200, { ...result, version: 1 })
+    response.headers.set('cache-control', 'no-store')
+    return method == 'HEAD' ? new Response(null, { headers: response.headers, status: response.status }) : response
+  })
   app.route('/v1', createControlApp(service.control, resolveActor))
   if (options.settings != null)
     app.route(
@@ -237,6 +261,7 @@ function safeRequestId(value: string | undefined): string | undefined {
 }
 
 function logPath(path: string): string {
+  if (path.startsWith('/v1/wait-actions/')) return '/v1/wait-actions/:capability/:action'
   if (path.startsWith('/v1/webhooks/')) return '/v1/webhooks/:endpointId'
   if (path.startsWith('/v1/integrations/')) return '/v1/integrations/:endpointId'
   return path

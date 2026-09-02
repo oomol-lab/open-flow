@@ -53,6 +53,7 @@ export type AddNodeOption = AddNodeOptionBase &
       }
     | { readonly kind: 'trigger'; readonly trigger: AddTrigger }
     | { readonly kind: 'value' }
+    | { readonly kind: 'wait' }
   )
 
 export function indexAddNodeOptions(options: readonly AddNodeOption[]): ReadonlyMap<string, AddNodeOption> {
@@ -177,6 +178,16 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: DesignerT
       ],
       trigger: { kind: 'cron' },
     },
+    {
+      description: t('addNode.waitDescription'),
+      group: t('addNode.blocks'),
+      id: 'wait',
+      icon: ':carbon:time:',
+      inputs: [{ handle: 'value', jsonSchema: {} }],
+      kind: 'wait',
+      label: t('addNode.wait'),
+      outputs: [{ handle: 'continue', jsonSchema: {} }],
+    },
     ...options,
   ]
 }
@@ -223,6 +234,8 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, tar
       return { kind: 'condition', name: t('addNode.condition') }
     case 'value':
       return { kind: 'value', name: t('addNode.value') }
+    case 'wait':
+      return target.kind == 'flow' ? { kind: 'wait', name: t('addNode.wait') } : undefined
     case 'subflow':
       return { kind: 'subflow', subflowId: option.referenceId }
   }

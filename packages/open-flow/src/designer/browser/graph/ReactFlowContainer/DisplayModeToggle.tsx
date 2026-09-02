@@ -23,7 +23,7 @@ export const DisplayModeToggle: React.FC<DisplayModeToggleProps> = /*#__PURE__*/
     <Panel className={styles.container} data-canvas-control-scope position="bottom-center">
       <ToggleGroup<FlowDisplayMode>
         aria-label={t('flowDisplayMode.overviewDescription')}
-        className={clsx(styles.group, isCjkLanguage(lang) && styles.compact)}
+        className={clsx('bg-background', styles.group, isCjkLanguage(lang) && styles.compact)}
         onValueChange={(values) => {
           const value = values.at(-1)
           if (value != null) displayMode$.set(value)

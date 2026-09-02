@@ -113,7 +113,7 @@ export class PollRuntime {
       }
       const connector = this.#resolveConnector()
       if (connector == null) throw new ControlError(controlErrorCode.connectorUnavailable, 'The Connector request could not be completed.')
-      const result = await Effect.runPromise(
+      const result = await this.#run(
         Effect.tryPromise({
           try: (signal) =>
             definition.poll({
@@ -139,7 +139,6 @@ export class PollRuntime {
             duration: timeoutMs,
             orElse: () => Effect.fail(new TransientPollError('Poll Provider exceeded its execution deadline.')),
           }),
-          Effect.provideService(Clock.Clock, this.#clockService),
         ),
       )
       if (result.events.length > maximumPollEventsPerPage) {
@@ -191,18 +190,16 @@ export class PollRuntime {
   }
 
   process(input: { readonly bindingId: string; readonly occurredAt: string; readonly occurrenceId: string; readonly runtimeVersion: number }): Promise<void> {
-    return Effect.runPromise(
-      this.#lock
-        .withPermit(
-          Effect.gen({ self: this }, function* () {
-            const now = Date.parse(input.occurredAt)
-            if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Poll occurrence time must be an ISO timestamp.'))
-            const target = this.#store.polls.pollTarget(input.bindingId, input.runtimeVersion)
-            if (target != null) yield* this.#poll(target, input.occurrenceId, now)
-            this.#signal()
-          }),
-        )
-        .pipe(Effect.provideService(Clock.Clock, this.#clockService)),
+    return this.#run(
+      this.#lock.withPermit(
+        Effect.gen({ self: this }, function* () {
+          const now = Date.parse(input.occurredAt)
+          if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Poll occurrence time must be an ISO timestamp.'))
+          const target = this.#store.polls.pollTarget(input.bindingId, input.runtimeVersion)
+          if (target != null) yield* this.#poll(target, input.occurrenceId, now)
+          this.#signal()
+        }),
+      ),
     )
   }
 
@@ -212,6 +209,10 @@ export class PollRuntime {
 
   supports(key: string, definitionVersion: number): boolean {
     return this.#definitions.get(key)?.snapshot.definitionVersion == definitionVersion
+  }
+
+  #run<Value>(effect: Effect.Effect<Value, unknown>): Promise<Value> {
+    return Effect.runPromise(effect.pipe(Effect.provideService(Clock.Clock, this.#clockService)))
   }
 
   #baseline(candidate: PollCandidate, now: number): Effect.Effect<void> {

@@ -1,6 +1,7 @@
 import type { JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { IntegrationDefinition } from '@oomol-lab/open-flow/integration-trigger'
 import type { DestinationStream, Logger } from 'pino'
+import type { ServerServiceOptions } from '../node/service.ts'
 
 import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '@oomol-lab/open-flow/integration-trigger'
 import * as Effect from 'effect/Effect'
@@ -129,14 +130,26 @@ async function publish(
   return result.publicationId
 }
 
-function runtime() {
-  return { integration: { callbackKey: 'callback-key', publicOrigin: 'https://flow.example' } } as const
+function options(clock: ServerServiceOptions['clock'], triggerDefinitions: readonly IntegrationDefinition[], logger?: Logger): ServerServiceOptions {
+  return {
+    capabilities: {
+      connector: () => connector,
+      integration: () => ({ callbackKey: 'callback-key', publicOrigin: 'https://flow.example' }),
+    },
+    clock,
+    ...(logger == null ? {} : { logger }),
+    triggerDefinitions,
+  }
 }
 
 it('requires HTTPS for non-loopback Integration callback origins', async () => {
   const file = await databaseFile()
   await expect(
-    openService(file, undefined, Date.now, { integration: { callbackKey: 'callback-key', publicOrigin: 'http://flow.example' } }, undefined, undefined, []),
+    openService(file, {
+      capabilities: { integration: () => ({ callbackKey: 'callback-key', publicOrigin: 'http://flow.example' }) },
+      clock: Date.now,
+      triggerDefinitions: [],
+    }),
   ).rejects.toThrow('Integration public origin must be an HTTPS origin without credentials, a path, query, or fragment, except on loopback.')
 })
 
@@ -146,7 +159,7 @@ it('rejects Integration publication when the callback runtime is not configured'
     reconcile: () => Promise.resolve({ outcome: 'ready' }),
     snapshot,
   }
-  const service = await openService(await databaseFile(), undefined, Date.now, {}, undefined, undefined, [definition])
+  const service = await openService(await databaseFile(), { clock: Date.now, triggerDefinitions: [definition] })
   try {
     await expect(publish(service, 'ready', null)).rejects.toMatchObject({ code: 'trigger-invalid', message: 'Integration runtime is not configured.' })
   } finally {
@@ -179,7 +192,10 @@ describe('Server Integration reconciliation', () => {
       snapshot,
     }
     const at = Date.parse('2026-08-21T00:00:00.000Z')
-    const service = await openService(await databaseFile(), connector, () => at, runtime(), undefined, undefined, [definition])
+    const service = await openService(
+      await databaseFile(),
+      options(() => at, [definition]),
+    )
     await publish(service, 'ready', null)
     await startService(service)
     await entered.promise
@@ -220,7 +236,7 @@ describe('Server Integration reconciliation', () => {
             },
             snapshot,
           }
-          const service = yield* ServerService.open(file, connector, clock, runtime(), undefined, undefined, [definition])
+          const service = yield* ServerService.open(file, options(clock, [definition]))
           yield* Effect.tryPromise({ try: () => publish(service, 'ready', null), catch: (error) => error })
           const ticking = service.tickIntegration(new Date(at).toISOString())
           yield* Effect.promise(() => entered.promise)
@@ -260,7 +276,10 @@ describe('Server Integration reconciliation', () => {
       snapshot,
     }
     const at = Date.parse('2026-08-21T00:00:00.000Z')
-    const service = await openService(await databaseFile(), connector, () => at, runtime(), undefined, undefined, [definition])
+    const service = await openService(
+      await databaseFile(),
+      options(() => at, [definition]),
+    )
     try {
       await publish(service, 'transient', null)
       const first = service.tickIntegration(new Date(at).toISOString())
@@ -299,7 +318,7 @@ describe('Server Integration reconciliation', () => {
           }
           yield* Effect.scoped(
             Effect.gen(function* () {
-              const service = yield* ServerService.open(file, connector, clock, runtime(), undefined, undefined, [definition])
+              const service = yield* ServerService.open(file, options(clock, [definition]))
               yield* Effect.tryPromise({
                 try: async () => {
                   await publish(service, 'ready', null)
@@ -330,7 +349,10 @@ describe('Server Integration reconciliation', () => {
       snapshot,
     }
     const at = Date.parse('2026-08-21T00:00:00.000Z')
-    const service = await openService(await databaseFile(), connector, () => at, runtime(), undefined, captured.logger, [definition])
+    const service = await openService(
+      await databaseFile(),
+      options(() => at, [definition], captured.logger),
+    )
     try {
       await publish(service, 'transient', null)
       await service.tickIntegration(new Date(at).toISOString())
@@ -360,7 +382,10 @@ describe('Server Integration reconciliation', () => {
     }
     let now = Date.parse('2026-08-21T00:00:00.000Z')
     const file = await databaseFile()
-    const service = await openService(file, connector, () => now, runtime(), undefined, undefined, [definition])
+    const service = await openService(
+      file,
+      options(() => now, [definition]),
+    )
     try {
       let publicationId = await publish(service, 'connection', null)
       await service.tickIntegration(new Date(now).toISOString())
@@ -425,7 +450,10 @@ describe('Server Integration callback fencing', () => {
     }
     let now = Date.parse('2026-08-21T00:00:00.000Z')
     const file = await databaseFile()
-    const service = await openService(file, connector, () => now, runtime(), undefined, undefined, [definition])
+    const service = await openService(
+      file,
+      options(() => now, [definition]),
+    )
     try {
       let publicationId = await publish(service, 'ready', null)
       await service.tickIntegration(new Date(now).toISOString())

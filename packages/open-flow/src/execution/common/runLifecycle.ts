@@ -1,23 +1,31 @@
 import { dequal } from 'dequal/lite'
 
 export const runTerminalStatuses = ['canceled', 'completed', 'failed', 'indeterminate'] as const
-export const runStatuses = [...runTerminalStatuses, 'queued', 'running', 'starting'] as const
+export const runStatuses = [...runTerminalStatuses, 'queued', 'running', 'starting', 'waiting'] as const
 
 export type RunStatus = (typeof runStatuses)[number]
 export type RunTerminalStatus = (typeof runTerminalStatuses)[number]
 
-export type RunOperation = { readonly kind: 'claim' } | { readonly kind: 'start' } | { readonly kind: 'commit'; readonly status: RunTerminalStatus }
+export type RunOperation =
+  | { readonly kind: 'claim' }
+  | { readonly kind: 'start' }
+  | { readonly kind: 'wait' }
+  | { readonly kind: 'resolve' }
+  | { readonly kind: 'commit'; readonly status: RunTerminalStatus }
 
 export type RunTransition =
   | { readonly kind: 'ready'; readonly status: 'starting' }
   | { readonly kind: 'running'; readonly status: 'running' }
+  | { readonly kind: 'waiting'; readonly status: 'waiting' }
   | { readonly kind: 'terminal'; readonly status: RunTerminalStatus }
   | { readonly kind: 'started'; readonly status: 'running' }
   | { readonly kind: 'already-started'; readonly status: 'running' }
   | { readonly kind: 'committed'; readonly status: RunTerminalStatus }
+  | { readonly kind: 'waited'; readonly status: 'waiting' }
+  | { readonly kind: 'resolved'; readonly status: 'queued' }
   | { readonly kind: 'stale'; readonly status: RunStatus }
 
-export type RunClaim = Extract<RunTransition, { readonly kind: 'ready' | 'running' | 'terminal' }>
+export type RunClaim = Extract<RunTransition, { readonly kind: 'ready' | 'running' | 'terminal' | 'waiting' }>
 export type RunStart = Extract<RunTransition, { readonly kind: 'already-started' | 'started' | 'stale' }>
 
 export function isRunTerminal(status: RunStatus): status is RunTerminalStatus {
@@ -33,6 +41,8 @@ export function transitionRun(status: RunStatus, operation: RunOperation): RunTr
           return { kind: 'ready', status: 'starting' }
         case 'running':
           return { kind: 'running', status }
+        case 'waiting':
+          return { kind: 'waiting', status }
         case 'canceled':
         case 'completed':
         case 'failed':
@@ -46,15 +56,22 @@ export function transitionRun(status: RunStatus, operation: RunOperation): RunTr
         case 'running':
           return { kind: 'already-started', status }
         case 'queued':
+        case 'waiting':
         case 'canceled':
         case 'completed':
         case 'failed':
         case 'indeterminate':
           return { kind: 'stale', status }
       }
+    case 'wait':
+      return status == 'running' ? { kind: 'waited', status: 'waiting' } : { kind: 'stale', status }
+    case 'resolve':
+      return status == 'waiting' ? { kind: 'resolved', status: 'queued' } : { kind: 'stale', status }
     case 'commit':
       if (isRunTerminal(status)) return { kind: 'stale', status }
-      if (operation.status == 'canceled' || status == 'running') return { kind: 'committed', status: operation.status }
+      if (operation.status == 'canceled' || status == 'running' || (operation.status == 'failed' && status == 'waiting')) {
+        return { kind: 'committed', status: operation.status }
+      }
       return { kind: 'stale', status }
   }
 }
@@ -73,7 +90,9 @@ export interface RunLifecycleHarness {
   claim(runId: string): Promise<RunClaim>
   commit(runId: string, status: RunTerminalStatus): Promise<boolean>
   observe(runId: string): Promise<RunObservation>
+  resolve(runId: string): Promise<boolean>
   start(runId: string): Promise<RunStart>
+  wait(runId: string): Promise<boolean>
 }
 
 export interface RunLifecycleConformanceCase {
@@ -94,6 +113,45 @@ async function accepted(harness: RunLifecycleHarness, idempotencyKey: string = '
 }
 
 export const runLifecycleConformanceCases: readonly RunLifecycleConformanceCase[] = [
+  {
+    name: 'pauses and resumes the same Run through the ordinary start barrier',
+    async verify(harness) {
+      const runId = await accepted(harness)
+      const claimed = await harness.claim(runId)
+      if (claimed.kind != 'ready') throw new Error('Initial Run claim was not ready.')
+      equal(await harness.start(runId), transitionRun(claimed.status, { kind: 'start' }), 'Initial start')
+      equal(await harness.wait(runId), true, 'Wait commit')
+      equal(await harness.observe(runId), { status: 'waiting', terminalEvents: [] }, 'Waiting Run observation')
+      equal(await harness.claim(runId), transitionRun('waiting', { kind: 'claim' }), 'Claim while waiting')
+      equal(await harness.resolve(runId), true, 'Wait resolution')
+      equal(await harness.resolve(runId), false, 'Repeated Wait resolution')
+      const resumeClaim = await harness.claim(runId)
+      if (resumeClaim.kind != 'ready') throw new Error('Resolved Run claim was not ready.')
+      equal(await harness.start(runId), transitionRun(resumeClaim.status, { kind: 'start' }), 'Resume start')
+      equal(await harness.commit(runId, 'completed'), true, 'Completion after resume')
+      equal(await harness.observe(runId), { status: 'completed', terminalEvents: ['completed'] }, 'Resumed Run observation')
+    },
+  },
+  {
+    name: 'allows cancellation and expiry failure while waiting',
+    async verify(harness) {
+      const canceledRunId = await accepted(harness, 'cancel-wait')
+      const canceledClaim = await harness.claim(canceledRunId)
+      if (canceledClaim.kind != 'ready') throw new Error('Canceled Run claim was not ready.')
+      await harness.start(canceledRunId)
+      equal(await harness.wait(canceledRunId), true, 'Canceled Run Wait commit')
+      equal(await harness.commit(canceledRunId, 'canceled'), true, 'Waiting cancellation')
+      equal(await harness.resolve(canceledRunId), false, 'Resolution after cancellation')
+
+      const expiredRunId = await accepted(harness, 'expire-wait')
+      const expiredClaim = await harness.claim(expiredRunId)
+      if (expiredClaim.kind != 'ready') throw new Error('Expired Run claim was not ready.')
+      await harness.start(expiredRunId)
+      equal(await harness.wait(expiredRunId), true, 'Expired Run Wait commit')
+      equal(await harness.commit(expiredRunId, 'failed'), true, 'Waiting expiry failure')
+      equal(await harness.observe(expiredRunId), { status: 'failed', terminalEvents: ['failed'] }, 'Expired Run observation')
+    },
+  },
   {
     name: 'replays idempotent acceptance and rejects a conflicting request',
     async verify(harness) {

@@ -83,6 +83,12 @@ export function flowDependencies(content: RevisionContent): SemanticClosure['dep
           break
         case 'value':
           break
+        case 'wait':
+          if (node.notification != null) {
+            tasks.add(node.notification.taskId)
+            visitInputMappings(node.notification.inputs)
+          }
+          break
         case 'poll':
         case 'integration':
           visitBinding(node.bindingId)
@@ -549,6 +555,8 @@ function nodeInputPorts(document: FlowDocument, node: GraphNode): Readonly<Recor
       return portsByHandle(document.subflows[node.subflowId]?.inputs ?? [])
     case 'task':
       return portsByHandle([...(node.task != null ? node.task.inputs : (document.tasks[node.taskId]?.inputs ?? [])), ...(node.additionalInputs ?? [])])
+    case 'wait':
+      return { value: { jsonSchema: {}, nullable: true, value: null } }
     case 'cron':
     case 'integration':
     case 'poll':
@@ -569,6 +577,8 @@ function nodeOutputPorts(document: FlowDocument, node: GraphNode): Readonly<Reco
       return portsByHandle(document.subflows[node.subflowId]?.outputs ?? [])
     case 'task':
       return portsByHandle(node.task != null ? node.task.outputs : (document.tasks[node.taskId]?.outputs ?? []))
+    case 'wait':
+      return Object.fromEntries(node.actions.map((action) => [action, { jsonSchema: {}, nullable: true }]))
     case 'cron':
     case 'integration':
     case 'poll':
@@ -656,13 +666,119 @@ function checkSource(
 function nodeDependencies(graph: Graph, node: GraphNode): Set<string> {
   const dependencies = new Set<string>()
   if (!('inputs' in node)) return dependencies
-  for (const mapping of Object.values(node.inputs)) {
+  const inputs = [...Object.values(node.inputs), ...(node.kind == 'wait' && node.notification != null ? Object.values(node.notification.inputs) : [])]
+  for (const mapping of inputs) {
     if (mapping.kind != 'sources') continue
     for (const source of mapping.sources) {
       if (source.kind == 'node' && graph.nodes[source.nodeId] != null) dependencies.add(source.nodeId)
     }
   }
   return dependencies
+}
+
+function validateWait(
+  nodeId: string,
+  node: Extract<GraphNode, { readonly kind: 'wait' }>,
+  graph: Graph,
+  document: FlowDocument,
+  flowInputs: Readonly<Record<string, InputPortDefinition>> | undefined,
+  allowed: boolean,
+  path: string,
+  diagnostics: Diagnostic[],
+): void {
+  const fields = new Set(['actions', 'concurrency', 'description', 'icon', 'inputs', 'kind', 'name', 'notification', 'prompt'])
+  const unsupported = Object.keys(node).filter((field) => !fields.has(field))
+  if (unsupported.length > 0) {
+    diagnostics.push(
+      graphDiagnostic('wait.field-unsupported', `Wait node "${nodeId}" contains unsupported fields: ${unsupported.join(', ')}.`, path, {
+        fields: unsupported.join(', '),
+        nodeId,
+      }),
+    )
+  }
+  if (!allowed) diagnostics.push(graphDiagnostic('wait.not-allowed', 'Wait nodes are only allowed in Flows.', path))
+  if (node.concurrency != 1) diagnostics.push(graphDiagnostic('wait.concurrency-invalid', 'Wait concurrency must be 1.', `${path}/concurrency`))
+  if (typeof node.prompt != 'string' || node.prompt.trim().length == 0 || [...node.prompt].length > 1_000) {
+    diagnostics.push(graphDiagnostic('wait.prompt-invalid', 'Wait prompt must contain between 1 and 1,000 Unicode code points.', `${path}/prompt`))
+  }
+  if (
+    !Array.isArray(node.actions) ||
+    !((node.actions.length == 1 && node.actions[0] == 'continue') || (node.actions.length == 2 && node.actions[0] == 'approve' && node.actions[1] == 'reject'))
+  ) {
+    diagnostics.push(graphDiagnostic('wait.actions-invalid', 'Wait actions must be ["continue"] or ["approve", "reject"].', `${path}/actions`))
+  }
+  if (node.notification == null) return
+  const notification = node.notification as unknown
+  if (typeof notification != 'object' || Array.isArray(notification)) {
+    diagnostics.push(graphDiagnostic('wait.notification-invalid', 'Wait notification must be an object.', `${path}/notification`))
+    return
+  }
+  const source = notification as Readonly<Record<string, unknown>>
+  if (
+    Object.keys(source).length != 3 ||
+    !Object.hasOwn(source, 'inputs') ||
+    !Object.hasOwn(source, 'messageHandle') ||
+    !Object.hasOwn(source, 'taskId') ||
+    typeof source.taskId != 'string' ||
+    typeof source.messageHandle != 'string' ||
+    source.inputs == null ||
+    typeof source.inputs != 'object' ||
+    Array.isArray(source.inputs)
+  ) {
+    diagnostics.push(graphDiagnostic('wait.notification-invalid', 'Wait notification has an invalid shape.', `${path}/notification`))
+    return
+  }
+  const task = document.tasks[source.taskId]
+  if (task == null) {
+    diagnostics.push(
+      graphDiagnostic('graph.target-missing', `Task "${source.taskId}" does not exist.`, `${path}/notification/taskId`, {
+        taskId: source.taskId,
+        variant: 'task',
+      }),
+    )
+    return
+  }
+  if (task.executor.kind != 'connector') {
+    diagnostics.push(graphDiagnostic('wait.notification-task-invalid', 'Wait notification must use a Connector Task.', `${path}/notification/taskId`))
+  }
+  const ports = portsByHandle(task.inputs)
+  if (ports[source.messageHandle] == null) {
+    diagnostics.push(
+      graphDiagnostic(
+        'wait.notification-message-missing',
+        `Notification Task "${source.taskId}" does not expose input "${source.messageHandle}".`,
+        `${path}/notification/messageHandle`,
+      ),
+    )
+  }
+  const inputs = source.inputs as Readonly<Record<string, InputMapping>>
+  if (Object.hasOwn(inputs, source.messageHandle)) {
+    diagnostics.push(
+      graphDiagnostic('wait.notification-message-mapped', 'The notification message input is populated by the system.', `${path}/notification/inputs`),
+    )
+  }
+  for (const [handle, mapping] of Object.entries(inputs)) {
+    const inputPath = `${path}/notification/inputs/${handle}`
+    const port = ports[handle]
+    if (port == null) {
+      diagnostics.push(
+        graphDiagnostic('graph.input-missing', `Notification Task "${source.taskId}" does not expose input "${handle}".`, inputPath, {
+          handle,
+          nodeId,
+        }),
+      )
+      continue
+    }
+    if (mapping.kind == 'sources') for (const candidate of mapping.sources) checkSource(candidate, graph, document, flowInputs, port, inputPath, diagnostics)
+  }
+  for (const [handle, port] of Object.entries(ports)) {
+    if (handle == source.messageHandle || Object.hasOwn(inputs, handle) || Object.hasOwn(port, 'value')) continue
+    diagnostics.push(
+      graphDiagnostic('wait.notification-input-missing', `Notification input "${handle}" requires a mapping or default value.`, `${path}/notification/inputs`, {
+        handle,
+      }),
+    )
+  }
 }
 
 function checkCycles(graph: Graph, path: string, diagnostics: Diagnostic[]): void {
@@ -750,6 +866,7 @@ function validateGraph(
         for (const source of mapping.sources) checkSource(source, graph, document, flowInputs, inputPorts[handle], mappingPath, diagnostics)
       }
     }
+    if (node.kind == 'wait') validateWait(nodeId, node, graph, document, flowInputs, allowTriggers, nodePath, diagnostics)
     if (node.kind != 'condition') continue
     const outputs = new Set<string>()
     for (const [index, condition] of node.cases.entries()) {
