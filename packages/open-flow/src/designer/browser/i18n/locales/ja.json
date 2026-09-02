@@ -226,6 +226,7 @@
       "duplicate": "他の Handle と名前が重複しています",
       "empty": "Handle 名を空にはできません"
     },
+    "releaseToConnect": "離して作成・接続",
     "schemaDescription": "JSON Schema の説明…",
     "selectVariable": "Variable を選択",
     "variableMissing": "{{name}}（見つかりません）",
@@ -256,6 +257,7 @@
     "defineSchema": "型を定義",
     "deleteField": "フィールドを削除",
     "enumError": "enum の値を指定してください",
+    "literalError": "固定値を指定してください",
     "handleKeyTitle": "キー",
     "handleName": "Handle 名",
     "handleTypeTitle": "型",
@@ -415,6 +417,7 @@
     "oneOf": "OneOf",
     "deploymentVariable": "Variable",
     "select": "Single",
+    "literal": "固定値",
     "string": "String",
     "text": "Textarea"
   },

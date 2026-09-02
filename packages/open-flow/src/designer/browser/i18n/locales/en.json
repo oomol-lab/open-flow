@@ -226,6 +226,7 @@
       "duplicate": "Duplicate with other handle",
       "empty": "Handle name cannot be empty"
     },
+    "releaseToConnect": "Release to create and connect",
     "schemaDescription": "JSON Schema description...",
     "selectVariable": "Choose Variable",
     "variableMissing": "{{name}} (missing)",
@@ -256,6 +257,7 @@
     "defineSchema": "define schema",
     "deleteField": "Delete field",
     "enumError": "Expect enum value",
+    "literalError": "Expected the fixed value",
     "handleKeyTitle": "Key",
     "handleName": "Handle",
     "handleTypeTitle": "Type",
@@ -415,6 +417,7 @@
     "object": "Object",
     "oneOf": "OneOf",
     "select": "Single",
+    "literal": "Literal",
     "string": "String",
     "text": "Textarea"
   },

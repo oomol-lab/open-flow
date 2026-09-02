@@ -107,9 +107,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
 
   app.get('/flows/:flowId/draft', (context) => response(200, service.getDraft(context.req.param('flowId'))))
   app.get('/flows/:flowId/draft/sync', (context) => {
-    const parameters = query(context.req.raw, ['fromRevisionId'], controlErrorCode.flowInvalid)
-    const fromRevisionId = parameters.get('fromRevisionId')
-    if (fromRevisionId != null) text(fromRevisionId, controlErrorCode.flowInvalid)
+    query(context.req.raw, [], controlErrorCode.flowInvalid)
     return response(200, service.syncDraft(context.req.param('flowId')))
   })
   app.post('/flows/:flowId/draft/changes', async (context) => {
@@ -128,6 +126,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
         context.req.param('flowId'),
         text(body.expectedRevisionId, controlErrorCode.flowInvalid),
         body.operations as readonly ChangeOperation[],
+        idempotencyKey(context.req.raw, controlErrorCode.flowInvalid),
       ),
     )
   })

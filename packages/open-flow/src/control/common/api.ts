@@ -142,13 +142,11 @@ export interface DraftChange {
   readonly version: 1
 }
 
-export type DraftSync =
-  | {
-      readonly kind: 'changes'
-      readonly revisions: readonly { readonly operations: readonly ChangeOperation[]; readonly revision: RevisionMetadata }[]
-      readonly version: 1
-    }
-  | { readonly draft: Draft; readonly kind: 'snapshot'; readonly version: 1 }
+export interface DraftSync {
+  readonly draft: Draft
+  readonly kind: 'snapshot'
+  readonly version: 1
+}
 
 export interface Publication {
   readonly actorId: string
@@ -692,21 +690,8 @@ function draftChange(value: unknown): DraftChange {
 
 function draftSync(value: unknown): DraftSync {
   const source = record(value)
-  if (source.version != 1) return invalidResponse()
-  if (source.kind == 'snapshot') return { draft: draft(source.draft), kind: 'snapshot', version: 1 }
-  if (source.kind != 'changes' || !Array.isArray(source.revisions)) return invalidResponse()
-  return {
-    kind: 'changes',
-    revisions: source.revisions.map((candidate) => {
-      const change = record(candidate)
-      if (!Array.isArray(change.operations) || change.operations.length == 0) return invalidResponse()
-      for (const operation of change.operations) {
-        if (typeof record(operation).kind != 'string') return invalidResponse()
-      }
-      return { operations: change.operations as unknown as readonly ChangeOperation[], revision: revisionMetadata(change.revision) }
-    }),
-    version: 1,
-  }
+  if (source.version != 1 || source.kind != 'snapshot') return invalidResponse()
+  return { draft: draft(source.draft), kind: 'snapshot', version: 1 }
 }
 
 function publication(value: unknown): Publication {
@@ -1140,9 +1125,8 @@ export class ControlClient {
     return draft(await this.request(`/v1/flows/${segment(flowId)}/draft`))
   }
 
-  async syncDraft(flowId: string, fromRevisionId?: string): Promise<DraftSync> {
-    const query = fromRevisionId == null ? '' : `?fromRevisionId=${segment(fromRevisionId)}`
-    return draftSync(await this.request(`/v1/flows/${segment(flowId)}/draft/sync${query}`))
+  async syncDraft(flowId: string): Promise<DraftSync> {
+    return draftSync(await this.request(`/v1/flows/${segment(flowId)}/draft/sync`))
   }
 
   async getRevision(flowId: string, revisionId: string): Promise<Draft> {
@@ -1200,10 +1184,16 @@ export class ControlClient {
     }
   }
 
-  async changeDraft(flowId: string, expectedRevisionId: string, operations: readonly ChangeOperation[]): Promise<DraftChange> {
+  async changeDraft(
+    flowId: string,
+    expectedRevisionId: string,
+    operations: readonly ChangeOperation[],
+    changeId = operationKey('change'),
+  ): Promise<DraftChange> {
     return draftChange(
       await this.request(`/v1/flows/${segment(flowId)}/draft/changes`, {
         body: JSON.stringify({ expectedRevisionId, operations, version: 1 }),
+        headers: { 'idempotency-key': changeId },
         method: 'POST',
       }),
     )

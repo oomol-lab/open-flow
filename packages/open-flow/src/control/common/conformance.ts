@@ -67,27 +67,40 @@ async function createFlow(harness: ControlApiConformanceHarness, name: string, k
   return json(await createFlowRequest(harness, name, key), 201, 'Create Flow')
 }
 
-function changeRequest(harness: ControlApiConformanceHarness, flowId: string, revisionId: string, operations: readonly unknown[]): Promise<Response> {
+function changeRequest(
+  harness: ControlApiConformanceHarness,
+  flowId: string,
+  revisionId: string,
+  operations: readonly unknown[],
+  changeId = `change-${crypto.randomUUID()}`,
+): Promise<Response> {
   return request(harness, `/v1/flows/${encodeURIComponent(flowId)}/draft/changes`, {
     body: JSON.stringify({ expectedRevisionId: revisionId, operations, version: 1 }),
+    headers: { 'idempotency-key': changeId },
     method: 'POST',
   })
 }
 
-function addValueNode(harness: ControlApiConformanceHarness, flowId: string, revisionId: string, nodeId = 'marker'): Promise<Response> {
-  return changeRequest(harness, flowId, revisionId, [
-    {
-      kind: 'graph.node.create',
-      node: {
-        concurrency: 1,
-        inputs: {},
-        kind: 'value',
-        values: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
+function addValueNode(harness: ControlApiConformanceHarness, flowId: string, revisionId: string, nodeId = 'marker', changeId?: string): Promise<Response> {
+  return changeRequest(
+    harness,
+    flowId,
+    revisionId,
+    [
+      {
+        kind: 'graph.node.create',
+        node: {
+          concurrency: 1,
+          inputs: {},
+          kind: 'value',
+          values: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
+        },
+        nodeId,
+        target: { kind: 'flow' },
       },
-      nodeId,
-      target: { kind: 'flow' },
-    },
-  ])
+    ],
+    changeId,
+  )
 }
 
 function changedRevisionId(change: RecordValue, message: string): string {
@@ -230,21 +243,28 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       const flow = await createFlow(harness, 'Draft flow', 'draft-flow')
       const flowId = requiredString(flow.flowId, 'Draft Flow flowId')
       const initialRevisionId = requiredString(flow.draftRevisionId, 'Draft Flow revisionId')
-      const changed = await json(await addValueNode(harness, flowId, initialRevisionId), 200, 'Change Draft')
+      const changed = await json(await addValueNode(harness, flowId, initialRevisionId, 'marker', 'draft-change'), 200, 'Change Draft')
       const currentRevisionId = changedRevisionId(changed, 'Changed Draft')
       equal(record(changed.revision, 'Changed Draft revision').parentRevisionId, initialRevisionId, 'Changed Draft parent')
+      equal(
+        await json(await addValueNode(harness, flowId, initialRevisionId, 'marker', 'draft-change'), 200, 'Replay Draft change'),
+        changed,
+        'Replayed Draft change',
+      )
+      await error(
+        await addValueNode(harness, flowId, initialRevisionId, 'another-marker', 'draft-change'),
+        409,
+        'flow.conflict',
+        'Conflicting Draft change replay',
+      )
       await error(
         await changeRequest(harness, flowId, currentRevisionId, [
           {
-            kind: 'graph.node.replace',
-            node: {
-              concurrency: 1,
-              inputs: {},
-              kind: 'value',
-              values: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
-            },
+            before: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
+            kind: 'graph.node.values.set',
             nodeId: 'marker',
             target: { kind: 'flow' },
+            value: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
           },
         ]),
         400,
@@ -257,7 +277,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       equal(oldNodes, {}, 'Old Revision nodes')
       const draft = await json(await request(harness, `/v1/flows/${flowId}/draft`), 200, 'Read Draft')
       equal(draft.revisionId, currentRevisionId, 'Draft revisionId')
-      const sync = await json(await request(harness, `/v1/flows/${flowId}/draft/sync?fromRevisionId=${initialRevisionId}`), 200, 'Sync Draft')
+      const sync = await json(await request(harness, `/v1/flows/${flowId}/draft/sync`), 200, 'Sync Draft')
       equal(sync.kind, 'snapshot', 'Draft sync kind')
       equal(record(sync.draft, 'Draft snapshot').revisionId, currentRevisionId, 'Draft snapshot revisionId')
     },

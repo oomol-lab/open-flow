@@ -79,7 +79,7 @@ async function addPoll(service: ServerService, flowId: string, revisionId: strin
 
 async function replacePoll(service: ServerService, flowId: string, revisionId: string, source: string): Promise<string> {
   const changed = await service.control.changeDraft('operator', flowId, revisionId, [
-    { kind: 'graph.node.replace', node: pollNode(source), nodeId: 'poll', target: { kind: 'flow' } },
+    { before: 'initial', kind: 'graph.trigger.config.set', name: 'source', nodeId: 'poll', value: source },
   ])
   return changed.revision.revisionId
 }

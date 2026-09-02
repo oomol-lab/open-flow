@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { widgetSelectOptions } from './preset.ts'
+import { getDefaultValue, typeOfSchema, widgetSelectOptions } from './preset.ts'
 
 describe('JSON Schema capability profile', () => {
   it('offers portable values without host-path or retired credential widgets', () => {
@@ -16,6 +16,14 @@ describe('JSON Schema capability profile', () => {
     expect(widgetTypes).not.toContain('file')
     expect(widgetTypes).not.toContain('dir')
     expect(widgetTypes).not.toContain('save')
+    expect(widgetTypes).not.toContain('literal')
+  })
+
+  it('projects const schemas as fixed literals without offering them to schema authors', () => {
+    const schema = { const: 'pretty', description: 'Pretty-print the response.' }
+
+    expect(typeOfSchema(schema)).toBe('literal')
+    expect(getDefaultValue('literal', schema)).toBe('pretty')
   })
 
   it('returns independently translated options for each call', () => {

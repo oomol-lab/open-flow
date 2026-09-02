@@ -356,10 +356,7 @@ export async function triggerCommand(
             break
           }
         }
-        const replacement = changedTrigger?.[0]
-        if (replacement?.kind == 'graph.node.replace' && JSON.stringify(replacement.node) != JSON.stringify(resolved.trigger)) {
-          operations.push(replacement)
-        }
+        if (changedTrigger != null) operations.push(...changedTrigger)
       }
       if (args.connection != null && (resolved.trigger.kind == 'poll' || resolved.trigger.kind == 'integration')) {
         const connection = await preferredConnection(client, resolved.trigger.definition.provider, args.connection, undefined, true)

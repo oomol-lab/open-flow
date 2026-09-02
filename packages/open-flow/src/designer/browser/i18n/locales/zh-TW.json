@@ -226,6 +226,7 @@
       "duplicate": "與其他 Handle 重複",
       "empty": "Handle 名稱不能為空"
     },
+    "releaseToConnect": "放開以建立並連接",
     "schemaDescription": "JSON Schema 說明...",
     "selectVariable": "選擇 Variable",
     "variableMissing": "{{name}}（已遺失）",
@@ -256,6 +257,7 @@
     "defineSchema": "定義類型",
     "deleteField": "刪除欄位",
     "enumError": "應為 enum 值",
+    "literalError": "需要使用固定值",
     "handleKeyTitle": "鍵名",
     "handleName": "Handle 名稱",
     "handleTypeTitle": "類型",
@@ -415,6 +417,7 @@
     "oneOf": "OneOf",
     "deploymentVariable": "Variable",
     "select": "Single",
+    "literal": "固定值",
     "string": "String",
     "text": "Textarea"
   },

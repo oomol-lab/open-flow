@@ -52,14 +52,27 @@ describe('Flow changes', () => {
     const task = { executor: { kind: 'llm' as const, mode: 'chat' as const }, inputs: [], name: 'Managed', outputs: [] }
     const operations: readonly ChangeOperation[] = [
       { binding: { kind: 'connection', target: 'connection-a' }, bindingId: 'binding', kind: 'binding.create' },
-      { binding: { kind: 'connection', target: 'connection-b' }, bindingId: 'binding', kind: 'binding.replace' },
+      { before: 'connection-a', bindingId: 'binding', kind: 'binding.target.set', value: 'connection-b' },
       { kind: 'module.create', module: { imports: [], name: 'Module', source: 'export default () => 1' }, moduleId: 'module' },
-      { imports: ['helper'], kind: 'module.source.replace', moduleId: 'module', source: 'export default () => 2' },
-      { kind: 'module.rename', moduleId: 'module', name: 'Renamed module' },
+      {
+        beforeImports: [],
+        beforeSource: 'export default () => 1',
+        imports: ['helper'],
+        kind: 'module.source.replace',
+        moduleId: 'module',
+        source: 'export default () => 2',
+      },
+      { before: 'Module', kind: 'module.rename', moduleId: 'module', name: 'Renamed module' },
       { kind: 'subflow.create', subflow, subflowId: 'child' },
-      { definition: { ...subflow, inputs: [], name: 'Renamed child', outputs: [] }, kind: 'subflow.definition.replace', subflowId: 'child' },
+      {
+        before: { inputs: subflow.inputs, name: subflow.name, outputs: subflow.outputs },
+        definition: { inputs: [], name: 'Renamed child', outputs: [] },
+        kind: 'subflow.definition.set',
+        subflowId: 'child',
+      },
       { kind: 'task.create', task, taskId: 'managed' },
-      { kind: 'task.replace', task: { ...task, executor: { kind: 'llm', mode: 'json' }, name: 'Replaced' }, taskId: 'managed' },
+      { before: 'Managed', kind: 'task.name.set', taskId: 'managed', value: 'Replaced' },
+      { before: 'chat', kind: 'task.llm.mode.set', taskId: 'managed', value: 'json' },
     ]
 
     const changed = applyFlowChanges(revision(), operations)
@@ -87,7 +100,13 @@ describe('Flow changes', () => {
         kind: 'graph.edge.connect',
         target,
       },
-      { kind: 'graph.node.replace', node: valueNode(2), nodeId: 'source', target },
+      {
+        before: [{ ...port, handle: 'value', value: 1 }],
+        kind: 'graph.node.values.set',
+        nodeId: 'source',
+        target,
+        value: [{ ...port, handle: 'value', value: 2 }],
+      },
     ])
     expect(created.document.graph.nodes.source).toEqual(valueNode(2))
     expect(created.document.graph.nodes.target).toMatchObject({
@@ -96,6 +115,7 @@ describe('Flow changes', () => {
 
     const disconnected = applyFlowChanges(created, [
       {
+        before: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] },
         edge: { source: 'source', sourceHandle: 'value', target: 'target', targetHandle: 'input' },
         kind: 'graph.edge.disconnect',
         target,
@@ -163,7 +183,7 @@ describe('Flow changes', () => {
   })
 
   it.each([
-    { binding: { kind: 'variable', target: 'TOKEN' }, bindingId: 'missing', kind: 'binding.replace' },
+    { before: 'OLD', bindingId: 'missing', kind: 'binding.target.set', value: 'TOKEN' },
     { kind: 'module.delete', moduleId: 'missing' },
     { kind: 'subflow.delete', subflowId: 'missing' },
     { kind: 'task.delete', taskId: 'missing' },
@@ -181,5 +201,62 @@ describe('Flow changes', () => {
       ]),
     ).toThrow(FlowChangeError)
     expect(source).toEqual(revision())
+  })
+
+  it('applies independent node fields without replacing the node', () => {
+    const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: taskNode(), nodeId: 'task', target }])
+    const changed = applyFlowChanges(source, [
+      { before: undefined, field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Renamed' },
+      {
+        before: undefined,
+        handle: 'input',
+        kind: 'graph.node.input.set',
+        nodeId: 'task',
+        target,
+        value: { kind: 'value', value: 'hello' },
+      },
+    ])
+
+    expect(changed.document.graph.nodes.task).toMatchObject({
+      inputs: { input: { kind: 'value', value: 'hello' } },
+      name: 'Renamed',
+    })
+  })
+
+  it('rejects a stale field change atomically', () => {
+    const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: taskNode(), nodeId: 'task', target }])
+    expect(() =>
+      applyFlowChanges(source, [
+        { before: undefined, field: 'description', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Description' },
+        { before: 'Old', field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Renamed' },
+      ]),
+    ).toThrow(FlowChangeError)
+    expect(source.document.graph.nodes.task).toEqual(taskNode())
+  })
+
+  it('sets additional inputs without replacing input mappings', () => {
+    const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: taskNode(), nodeId: 'task', target }])
+    const changed = applyFlowChanges(source, [
+      {
+        before: undefined,
+        kind: 'graph.node.additional-inputs.set',
+        nodeId: 'task',
+        target,
+        value: [{ handle: 'payload', jsonSchema: {}, nullable: true }],
+      },
+      {
+        before: undefined,
+        handle: 'payload',
+        kind: 'graph.node.input.set',
+        nodeId: 'task',
+        target,
+        value: { kind: 'value', value: null },
+      },
+    ])
+
+    expect(changed.document.graph.nodes.task).toMatchObject({
+      additionalInputs: [{ handle: 'payload' }],
+      inputs: { payload: { kind: 'value', value: null } },
+    })
   })
 })

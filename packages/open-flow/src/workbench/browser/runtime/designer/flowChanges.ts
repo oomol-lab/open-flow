@@ -308,23 +308,23 @@ export function updateNodeDescription(
 ): FlowChanges | undefined {
   const node = revision.node(target, nodeId)?.node
   if (node == null) return
-  const { description: _, ...rest } = node
-  return replaceNode(target, nodeId, description == null ? rest : { ...rest, description })
+  if (node.description == description) return []
+  return [{ before: node.description, field: 'description', kind: 'graph.node.field.set', nodeId, target, value: description }]
 }
 
 export function updateNodeIcon(revision: RevisionView, target: DesignerTarget, nodeId: string, icon: string | undefined): FlowChanges | undefined {
   const node = revision.node(target, nodeId)?.node
   if (node == null) return
-  const { icon: _, ...rest } = node
-  return replaceNode(target, nodeId, icon == null ? rest : { ...rest, icon })
+  if (node.icon == icon) return []
+  return [{ before: node.icon, field: 'icon', kind: 'graph.node.field.set', nodeId, target, value: icon }]
 }
 
 export function updateNodeName(revision: RevisionView, target: DesignerTarget, nodeId: string, name: string | undefined): FlowChanges | undefined {
   const node = revision.node(target, nodeId)?.node
   if (node == null) return
-  if (!('inputs' in node)) return replaceNode(target, nodeId, { ...node, name: name ?? node.name })
-  const { name: _, ...rest } = node
-  return replaceNode(target, nodeId, name == null ? rest : { ...rest, name })
+  const value = !('inputs' in node) ? (name ?? node.name) : name
+  if (node.name == value) return []
+  return [{ before: node.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value }]
 }
 
 export function setInputValue(
@@ -372,7 +372,6 @@ export function updateCondition(revision: RevisionView, target: DesignerTarget, 
 
   for (const [currentNodeId, node] of Object.entries(graph.nodes)) {
     if (!('inputs' in node)) continue
-    let changed = currentNodeId == nodeId
     const inputs: Record<string, InputMapping> = { ...node.inputs }
 
     if (currentNodeId == nodeId) {
@@ -393,18 +392,15 @@ export function updateCondition(revision: RevisionView, target: DesignerTarget, 
         return outputNames.has(source.output) ? [source] : []
       })
       if (sources.length == mapping.sources.length && sources.every((source, index) => source === mapping.sources[index])) continue
-      changed = true
       if (sources.length == 0) delete inputs[name]
       else inputs[name] = { kind: 'sources', sources }
     }
 
-    if (!changed) continue
     if (currentNodeId == nodeId) {
-      const { defaultOutput: _defaultOutput, ...rest } = current
-      changes.push({ kind: 'graph.node.replace', node: { ...rest, ...settings, inputs }, nodeId: currentNodeId, target })
-    } else {
-      changes.push({ kind: 'graph.node.replace', node: { ...node, inputs }, nodeId: currentNodeId, target })
+      const before = { cases: current.cases, defaultOutput: current.defaultOutput, input: current.input }
+      if (!dequal(before, settings)) changes.push({ before, kind: 'graph.node.condition.set', nodeId, target, value: settings })
     }
+    changes.push(...changedInputs(node.inputs, inputs, target, currentNodeId))
   }
   return cleanVariableBindings(revision.revision.content, changes)
 }
@@ -412,16 +408,15 @@ export function updateCondition(revision: RevisionView, target: DesignerTarget, 
 export function updateValue(revision: RevisionView, target: DesignerTarget, nodeId: string, settings: readonly ValueSettings[]): FlowChanges | undefined {
   const node = revision.node(target, nodeId)?.node
   if (node?.kind != 'value') return
-  return replaceNode(target, nodeId, {
-    ...node,
-    values: settings.map((item) => ({
-      handle: item.handle,
-      ...(item.description == null ? {} : { description: item.description }),
-      jsonSchema: (item.jsonSchema ?? {}) as JsonValue,
-      nullable: item.nullable ?? false,
-      ...(Object.hasOwn(item, 'value') ? { value: item.value as JsonValue } : {}),
-    })),
-  })
+  const values = settings.map((item) => ({
+    handle: item.handle,
+    ...(item.description == null ? {} : { description: item.description }),
+    jsonSchema: (item.jsonSchema ?? {}) as JsonValue,
+    nullable: item.nullable ?? false,
+    ...(Object.hasOwn(item, 'value') ? { value: item.value as JsonValue } : {}),
+  }))
+  if (dequal(node.values, values)) return []
+  return [{ before: node.values, kind: 'graph.node.values.set', nodeId, target, value: values }]
 }
 
 export function updateTask(revision: RevisionView, target: DesignerTarget, nodeId: string, settings: TaskSettings): FlowChanges | undefined {
@@ -436,20 +431,18 @@ export function updateTask(revision: RevisionView, target: DesignerTarget, nodeI
       if (node.task != null) return
       const task = revision.task(node.taskId)
       if (task?.executor.kind != 'llm') return
-      const next: typeof task = {
-        executor: { kind: 'llm', mode: settings.mode },
-        inputs: task.inputs,
-        name: settings.name,
-        outputs: task.outputs,
+      const changes: ChangeOperation[] = []
+      if (task.name != settings.name) changes.push({ before: task.name, kind: 'task.name.set', taskId: node.taskId, value: settings.name })
+      if (task.executor.mode != settings.mode) {
+        changes.push({ before: task.executor.mode, kind: 'task.llm.mode.set', taskId: node.taskId, value: settings.mode })
       }
-      return [{ kind: 'task.replace', task: next, taskId: node.taskId }]
+      return changes
     }
     case 'connector': {
       if (node.task != null) return
       const task = revision.task(node.taskId)
       if (task?.executor.kind != 'connector') return
-      const next: typeof task = { ...task, name: settings.name }
-      return [{ kind: 'task.replace', task: next, taskId: node.taskId }]
+      return task.name == settings.name ? [] : [{ before: task.name, kind: 'task.name.set', taskId: node.taskId, value: settings.name }]
     }
   }
 }
@@ -485,9 +478,11 @@ export function updateTaskAdditionalInputs(
   for (const handle of Object.keys(inputs)) {
     if (!handles.has(handle)) delete inputs[handle]
   }
-  const { additionalInputs: _, ...node } = current
-  const replacement: GraphNode = additionalInputs.length == 0 ? { ...node, inputs } : { ...node, additionalInputs, inputs }
-  return cleanVariableBindings(revision.revision.content, replaceNode(target, nodeId, replacement))
+  const value = additionalInputs.length == 0 ? undefined : additionalInputs
+  return cleanVariableBindings(revision.revision.content, [
+    { before: current.additionalInputs, kind: 'graph.node.additional-inputs.set', nodeId, target, value },
+    ...changedInputs(current.inputs, inputs, target, nodeId),
+  ])
 }
 
 export function updateWebhook(
@@ -498,17 +493,18 @@ export function updateWebhook(
 ): FlowChanges | undefined {
   const trigger = revision.trigger(triggerId)
   if (trigger == null || trigger.kind != 'webhook') return
-  const { options: _, ...withoutOptions } = trigger
-  const next: Extract<TriggerNode, { readonly kind: 'webhook' }> =
-    Object.keys(settings.options).length == 0
-      ? { ...withoutOptions, inputsDef: settings.inputs }
-      : { ...trigger, inputsDef: settings.inputs, options: settings.options }
-  return replaceNode(target, triggerId, next)
+  const before = { inputsDef: trigger.inputsDef, options: trigger.options }
+  const value = { inputsDef: settings.inputs, options: Object.keys(settings.options).length == 0 ? undefined : settings.options }
+  if (dequal(before.inputsDef, value.inputsDef) && dequal(before.options, value.options)) return []
+  return [{ before, kind: 'graph.node.webhook.set', nodeId: triggerId, target, value }]
 }
 
 export function updateSubflow(revision: RevisionView, subflowId: string, settings: SubflowSettings): FlowChanges | undefined {
-  if (revision.subflow(subflowId) == null) return
-  return [{ definition: settings, kind: 'subflow.definition.replace', subflowId }]
+  const subflow = revision.subflow(subflowId)
+  if (subflow == null) return
+  const before = { inputs: subflow.inputs, name: subflow.name, outputs: subflow.outputs }
+  if (dequal(before, settings)) return []
+  return [{ before, definition: settings, kind: 'subflow.definition.set', subflowId }]
 }
 
 function createSubflowNode(target: DesignerTarget, nodeId: string, subflowId: string, inputs: TaskDefinition['inputs']): FlowChanges {
@@ -541,6 +537,22 @@ function renamedPort(
   return removed.length == 1 && added.length == 1 ? [removed[0]!, added[0]!] : undefined
 }
 
+function changedInputs(
+  before: Readonly<Record<string, InputMapping>>,
+  value: Readonly<Record<string, InputMapping>>,
+  target: DesignerTarget,
+  nodeId: string,
+): ChangeOperation[] {
+  const handles = new Set([...Object.keys(before), ...Object.keys(value)])
+  const changes: ChangeOperation[] = []
+  for (const handle of handles) {
+    if (!dequal(before[handle], value[handle])) {
+      changes.push({ before: before[handle], handle, kind: 'graph.node.input.set', nodeId, target, value: value[handle] })
+    }
+  }
+  return changes
+}
+
 function replaceCodeTaskPorts(
   revision: RevisionView,
   target: DesignerTarget,
@@ -558,7 +570,6 @@ function replaceCodeTaskPorts(
 
   for (const [currentNodeId, node] of Object.entries(graph.nodes)) {
     if (!('inputs' in node)) continue
-    let changed = currentNodeId == nodeId
     const inputs: Record<string, InputMapping> = { ...node.inputs }
 
     if (currentNodeId == nodeId) {
@@ -579,23 +590,19 @@ function replaceCodeTaskPorts(
         return outputNames.has(source.output) ? [source] : []
       })
       if (sources.length == mapping.sources.length && sources.every((source, index) => source === mapping.sources[index])) continue
-      changed = true
       if (sources.length == 0) delete inputs[name]
       else inputs[name] = { kind: 'sources', sources }
     }
 
-    if (!changed) continue
-    const replacement: GraphNode = currentNodeId == nodeId ? { ...current, inputs, task } : { ...node, inputs }
-    changes.push({
-      kind: 'graph.node.replace',
-      node: replacement,
-      nodeId: currentNodeId,
-      target,
-    })
+    if (currentNodeId == nodeId) {
+      if (current.task.name != task.name) {
+        changes.push({ before: current.task.name, kind: 'graph.node.task.name.set', nodeId, target, value: task.name })
+      }
+      const before = { inputs: current.task.inputs, outputs: current.task.outputs }
+      const value = { inputs: task.inputs, outputs: task.outputs }
+      if (!dequal(before, value)) changes.push({ before, kind: 'graph.node.task.ports.set', nodeId, target, value })
+    }
+    changes.push(...changedInputs(node.inputs, inputs, target, currentNodeId))
   }
   return changes
-}
-
-function replaceNode(target: DesignerTarget, nodeId: string, node: GraphNode): FlowChanges {
-  return [{ kind: 'graph.node.replace', node, nodeId, target }]
 }

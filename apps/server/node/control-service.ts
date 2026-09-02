@@ -297,9 +297,16 @@ export class ControlService {
     return { draft: draft(current), kind: 'snapshot', version: 1 }
   }
 
-  async changeDraft(actorId: string, flowId: string, expectedRevisionId: string, operations: readonly ChangeOperation[]): Promise<DraftChange> {
-    const base = this.requireDraft(flowId)
-    if (base.revisionId != expectedRevisionId) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
+  async changeDraft(
+    actorId: string,
+    flowId: string,
+    expectedRevisionId: string,
+    operations: readonly ChangeOperation[],
+    changeId: string = randomUUID(),
+  ): Promise<DraftChange> {
+    this.requireDraft(flowId)
+    const base = this.store.revision(flowId, expectedRevisionId)
+    if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
     let content: RevisionContent
     let bytes: Uint8Array
     try {
@@ -310,13 +317,16 @@ export class ControlService {
     }
     const digest = await digestBytes(bytes)
     if (digest == base.digest) invalidFlow('The Draft change does not modify the Flow.')
+    const requestDigest = await digestBytes(canonicalJsonBytes({ expectedRevisionId, operations: operations as unknown as JsonValue }))
     const stored = this.store.commitRevision({
       actorId,
+      changeId,
       content: new TextDecoder().decode(bytes),
       createdAt: this.clock(),
       digest,
       expectedRevisionId,
       flowId,
+      requestDigest,
       revisionId: identity('revision'),
     })
     switch (stored.kind) {
@@ -324,6 +334,8 @@ export class ControlService {
         throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
       case 'conflict':
         throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
+      case 'request-conflict':
+        throw new ControlError(controlErrorCode.flowConflict, 'The change identity refers to another Draft change.')
       case 'not-found':
         return notFound()
       case 'committed':

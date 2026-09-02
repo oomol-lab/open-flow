@@ -226,6 +226,7 @@
       "duplicate": "与其他 Handle 重名",
       "empty": "Handle 名不能为空"
     },
+    "releaseToConnect": "松开以创建并连接",
     "schemaDescription": "JSON Schema 说明...",
     "selectVariable": "选择 Variable",
     "variableMissing": "{{name}}（已缺失）",
@@ -256,6 +257,7 @@
     "defineSchema": "定义类型",
     "deleteField": "删除字段",
     "enumError": "期望 enum 参数",
+    "literalError": "需要使用固定值",
     "handleKeyTitle": "接口名",
     "handleName": "接口名称",
     "handleTypeTitle": "类型",
@@ -415,6 +417,7 @@
     "object": "Object",
     "oneOf": "OneOf",
     "select": "Single",
+    "literal": "固定值",
     "string": "String",
     "text": "Textarea"
   },

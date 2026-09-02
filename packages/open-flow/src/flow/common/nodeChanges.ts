@@ -1,7 +1,6 @@
 import type {
   ChangeOperation,
   CodeModule,
-  GraphNode,
   GraphTarget,
   InputMapping,
   JsonValue,
@@ -14,6 +13,7 @@ import type {
   WebhookOptions,
 } from './change.ts'
 
+import { dequal } from 'dequal/lite'
 import { applyFlowChanges } from './change.ts'
 
 const codeTaskTemplate = `export default async function (inputs, context) {
@@ -256,8 +256,15 @@ export function deleteNodes(content: RevisionContent, target: GraphTarget, nodeI
 export function updateSettings(content: RevisionContent, target: GraphTarget, nodeId: string, settings: Settings): readonly ChangeOperation[] | undefined {
   const node = graph(content, target)?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return
-  const { concurrency: _concurrency, name: _name, timeoutMs: _timeoutMs, ...rest } = node
-  return replaceNode(target, nodeId, { ...rest, ...settings })
+  const operations: ChangeOperation[] = []
+  if (node.concurrency != settings.concurrency) {
+    operations.push({ before: node.concurrency, field: 'concurrency', kind: 'graph.node.field.set', nodeId, target, value: settings.concurrency })
+  }
+  if (node.name != settings.name) operations.push({ before: node.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value: settings.name })
+  if (node.timeoutMs != settings.timeoutMs) {
+    operations.push({ before: node.timeoutMs, field: 'timeoutMs', kind: 'graph.node.field.set', nodeId, target, value: settings.timeoutMs })
+  }
+  return operations
 }
 
 export function setInputValue(
@@ -278,12 +285,14 @@ export function setInputValues(
 ): readonly ChangeOperation[] | undefined {
   const node = graph(content, target)?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return
-  const inputs = { ...node.inputs }
+  const operations: ChangeOperation[] = []
   for (const [handle, value] of Object.entries(values)) {
-    if (value === undefined) delete inputs[handle]
-    else inputs[handle] = { kind: 'value', value }
+    const before = node.inputs[handle]
+    const next: InputMapping | undefined = value === undefined ? undefined : { kind: 'value', value }
+    if (dequal(before, next)) continue
+    operations.push({ before, handle, kind: 'graph.node.input.set', nodeId, target, value: next })
   }
-  return cleanVariableBindings(content, replaceNode(target, nodeId, { ...node, inputs }))
+  return cleanVariableBindings(content, operations)
 }
 
 export function setInputVariable(
@@ -303,12 +312,12 @@ export function setInputVariable(
   const references = bindingReferences(content.document)
   if (currentId != null && current?.kind == 'variable' && (references.get(currentId) ?? 0) == 1) {
     if (current.target == name) return []
-    return [{ binding: { kind: 'variable', target: name }, bindingId: currentId, kind: 'binding.replace' }]
+    return [{ before: current.target, bindingId: currentId, kind: 'binding.target.set', value: name }]
   }
-  const inputs = { ...node.inputs, [handle]: { kind: 'sources' as const, sources: [{ bindingId, kind: 'binding' as const }] } }
+  const next: InputMapping = { kind: 'sources', sources: [{ bindingId, kind: 'binding' }] }
   return [
     { binding: { kind: 'variable', target: name }, bindingId, kind: 'binding.create' },
-    ...cleanVariableBindings(content, replaceNode(target, nodeId, { ...node, inputs })),
+    ...cleanVariableBindings(content, [{ before: mapping, handle, kind: 'graph.node.input.set', nodeId, target, value: next }]),
   ]
 }
 
@@ -345,7 +354,8 @@ function bindingReferences(document: RevisionContent['document']): Map<string, n
 export function setConnectorConnection(content: RevisionContent, taskId: string, connectionId: string): readonly ChangeOperation[] | undefined {
   const task = content.document.tasks[taskId]
   if (task == null || !('executor' in task) || task.executor.kind != 'connector') return
-  return [{ kind: 'task.replace', task: { ...task, executor: { ...task.executor, connectionId } }, taskId }]
+  if (task.executor.connectionId == connectionId) return []
+  return [{ before: task.executor.connectionId, kind: 'task.connector.connection.set', taskId, value: connectionId }]
 }
 
 export function updateTrigger(
@@ -356,50 +366,66 @@ export function updateTrigger(
 ): readonly ChangeOperation[] | undefined {
   const trigger = content.document.graph.nodes[nodeId]
   if (trigger == null) return
-  const common = { ...(settings.description == null ? {} : { description: settings.description }), icon: trigger.icon, name: settings.name }
-  let next: TriggerNode
+  const operations: ChangeOperation[] = []
+  if (trigger.name != settings.name) {
+    operations.push({ before: trigger.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value: settings.name })
+  }
+  if (trigger.description != settings.description) {
+    operations.push({ before: trigger.description, field: 'description', kind: 'graph.node.field.set', nodeId, target, value: settings.description })
+  }
   switch (settings.kind) {
-    case 'webhook':
+    case 'webhook': {
       if (trigger.kind != 'webhook') return
-      next =
-        Object.keys(settings.options).length == 0
-          ? { ...common, inputsDef: settings.inputs, kind: 'webhook' }
-          : { ...common, inputsDef: settings.inputs, kind: 'webhook', options: settings.options }
+      const value = { inputsDef: settings.inputs, options: Object.keys(settings.options).length == 0 ? undefined : settings.options }
+      const before = { inputsDef: trigger.inputsDef, options: trigger.options }
+      if (!dequal(before, value)) operations.push({ before, kind: 'graph.node.webhook.set', nodeId, target, value })
       break
+    }
     case 'cron':
       if (trigger.kind != 'cron') return
-      next = { ...common, cronTimes: settings.schedule, kind: 'cron' }
+      if (!dequal(trigger.cronTimes, settings.schedule)) {
+        operations.push({ before: trigger.cronTimes, kind: 'graph.trigger.schedule.set', nodeId, value: settings.schedule })
+      }
       break
     case 'poll':
       if (trigger.kind != 'poll') return
-      next = { ...trigger, ...common, config: settings.config, pollTimes: settings.schedule }
+      for (const name of new Set([...Object.keys(trigger.config), ...Object.keys(settings.config)])) {
+        if (!dequal(trigger.config[name], settings.config[name])) {
+          operations.push({ before: trigger.config[name], kind: 'graph.trigger.config.set', name, nodeId, value: settings.config[name] })
+        }
+      }
+      if (!dequal(trigger.pollTimes, settings.schedule)) {
+        operations.push({ before: trigger.pollTimes, kind: 'graph.trigger.schedule.set', nodeId, value: settings.schedule })
+      }
       break
     case 'integration':
       if (trigger.kind != 'integration') return
-      next = { ...trigger, ...common, config: settings.config }
+      for (const name of new Set([...Object.keys(trigger.config), ...Object.keys(settings.config)])) {
+        if (!dequal(trigger.config[name], settings.config[name])) {
+          operations.push({ before: trigger.config[name], kind: 'graph.trigger.config.set', name, nodeId, value: settings.config[name] })
+        }
+      }
       break
   }
-  return replaceNode(target, nodeId, next)
+  return operations
 }
 
 export function updateTriggerConfig(
   content: RevisionContent,
-  target: { readonly kind: 'flow' },
+  _target: { readonly kind: 'flow' },
   nodeId: string,
   name: string,
   value: JsonValue | undefined,
 ): readonly ChangeOperation[] | undefined {
   const trigger = content.document.graph.nodes[nodeId]
   if (trigger == null || (trigger.kind != 'integration' && trigger.kind != 'poll')) return
-  const config: Record<string, JsonValue> = { ...trigger.config }
-  if (value === undefined) delete config[name]
-  else config[name] = value
-  return replaceNode(target, nodeId, { ...trigger, config })
+  if (dequal(trigger.config[name], value)) return []
+  return [{ before: trigger.config[name], kind: 'graph.trigger.config.set', name, nodeId, value }]
 }
 
 export function updateTriggerSchedule(
   content: RevisionContent,
-  target: { readonly kind: 'flow' },
+  _target: { readonly kind: 'flow' },
   nodeId: string,
   schedule: readonly TriggerSchedule[],
 ): readonly ChangeOperation[] | undefined {
@@ -407,9 +433,9 @@ export function updateTriggerSchedule(
   if (trigger == null) return
   switch (trigger.kind) {
     case 'cron':
-      return replaceNode(target, nodeId, { ...trigger, cronTimes: schedule })
+      return dequal(trigger.cronTimes, schedule) ? [] : [{ before: trigger.cronTimes, kind: 'graph.trigger.schedule.set', nodeId, value: schedule }]
     case 'poll':
-      return replaceNode(target, nodeId, { ...trigger, pollTimes: schedule })
+      return dequal(trigger.pollTimes, schedule) ? [] : [{ before: trigger.pollTimes, kind: 'graph.trigger.schedule.set', nodeId, value: schedule }]
     case 'integration':
     case 'webhook':
       return
@@ -430,7 +456,7 @@ export function setTriggerConnection(
   if (binding == null) return [{ binding: { kind: 'connection', target: connectionId }, bindingId: trigger.bindingId, kind: 'binding.create' }]
   if (binding.kind != 'connection') return
   if (binding.target == connectionId) return []
-  return [{ binding: { kind: 'connection', target: connectionId }, bindingId: trigger.bindingId, kind: 'binding.replace' }]
+  return [{ before: binding.target, bindingId: trigger.bindingId, kind: 'binding.target.set', value: connectionId }]
 }
 
 function graph(content: RevisionContent, target: GraphTarget) {
@@ -447,8 +473,4 @@ function defaultInputs(ports: TaskDefinition['inputs']): Readonly<Record<string,
 
 function llmInputValue(values: LlmTaskOptions['inputs'], handle: LlmInputHandle, fallback: JsonValue): JsonValue {
   return values != null && Object.hasOwn(values, handle) ? values[handle]! : fallback
-}
-
-function replaceNode(target: GraphTarget, nodeId: string, node: GraphNode): readonly ChangeOperation[] {
-  return [{ kind: 'graph.node.replace', node, nodeId, target }]
 }

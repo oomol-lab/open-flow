@@ -14,8 +14,7 @@ import { followWorkbenchLink } from '../navigationLink.ts'
 import { DiagnosticsPanel } from './diagnosticsPanel.tsx'
 import { HostMenu } from './hostMenu.tsx'
 
-const savingStatusDelayMs = 400
-const minimumSavingStatusMs = 400
+const savingStatusDelayMs = 200
 
 interface Props {
   readonly activeView: 'design' | 'publications' | 'runs'
@@ -43,30 +42,13 @@ function validationLabel(valid: boolean | undefined, issueCount: number, loading
 
 function useDisplayedStatus(status: WorkspaceStatus): WorkspaceStatus {
   const [displayed, setDisplayed] = useState(status)
-  const savingStarted = useRef<number>()
   useEffect(() => {
     if (status == 'saving') {
       if (displayed == 'saving') return
-      const timer = setTimeout(() => {
-        savingStarted.current = Date.now()
-        setDisplayed('saving')
-      }, savingStatusDelayMs)
+      const timer = setTimeout(() => setDisplayed('saving'), savingStatusDelayMs)
       return () => clearTimeout(timer)
     }
-    if (displayed != 'saving' || status != 'saved' || savingStarted.current == null) {
-      savingStarted.current = undefined
-      setDisplayed(status)
-      return
-    }
-    const remaining = minimumSavingStatusMs - (Date.now() - savingStarted.current)
-    const timer = setTimeout(
-      () => {
-        savingStarted.current = undefined
-        setDisplayed('saved')
-      },
-      Math.max(0, remaining),
-    )
-    return () => clearTimeout(timer)
+    setDisplayed(status)
   }, [displayed, status])
   return displayed
 }

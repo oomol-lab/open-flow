@@ -226,6 +226,7 @@
       "duplicate": "다른 Handle과 이름이 중복됩니다",
       "empty": "Handle 이름은 비워 둘 수 없습니다"
     },
+    "releaseToConnect": "놓아서 만들고 연결",
     "schemaDescription": "JSON Schema 설명...",
     "selectVariable": "Variable 선택",
     "variableMissing": "{{name}} (누락됨)",
@@ -256,6 +257,7 @@
     "defineSchema": "스키마 정의",
     "deleteField": "필드 삭제",
     "enumError": "enum 값이 필요합니다",
+    "literalError": "고정 값이 필요합니다",
     "handleKeyTitle": "키",
     "handleName": "Handle",
     "handleTypeTitle": "타입",
@@ -415,6 +417,7 @@
     "oneOf": "OneOf",
     "deploymentVariable": "Variable",
     "select": "Single",
+    "literal": "고정 값",
     "string": "String",
     "text": "Textarea"
   },
