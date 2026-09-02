@@ -108,7 +108,12 @@ async function createHarness(fixture: IntegrationConformanceFixture): Promise<In
     ],
   })
   let now = Date.parse(fixture.publishedAt)
-  const open = () => openService(file, connector, () => now, { integration: { callbackKey, publicOrigin } }, undefined, undefined, [definition])
+  const open = () =>
+    openService(file, {
+      capabilities: { connector: () => connector, integration: () => ({ callbackKey, publicOrigin }) },
+      clock: () => now,
+      triggerDefinitions: [definition],
+    })
   let service = await open()
   let revisionId = next('revision')
   const published = await service.publishFlow({

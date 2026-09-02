@@ -32,6 +32,8 @@
     "triggers": "Trigger",
     "value": "값",
     "valueDescription": "다운스트림 노드에 재사용 가능한 리터럴 값을 제공합니다.",
+    "wait": "대기",
+    "waitDescription": "운영자가 계속하거나 승인할 때까지 Run을 일시 중지합니다.",
     "webhook": "Webhook",
     "webhookDescription": "전용 HTTP 엔드포인트로 외부 이벤트를 수신합니다."
   },
@@ -202,6 +204,24 @@
       "source": "소스",
       "structuredJson": "구조화된 JSON"
     },
+    "wait": {
+      "approval": "승인 또는 거부",
+      "changeNotification": "변경",
+      "chooseNotification": "알림 추가",
+      "chooseNotificationTitle": "알림 선택",
+      "continue": "계속",
+      "inputs": "매개변수",
+      "inputsInvalid": "필수 알림 매개변수를 모두 입력하세요.",
+      "inputsLoading": "알림 매개변수를 불러오는 중…",
+      "messageHandle": "메시지를 기록할 입력",
+      "mode": "처리 방식",
+      "notificationTask": "알림",
+      "notificationUnavailable": "알림 구성을 사용할 수 없습니다. 다시 선택하세요.",
+      "prompt": "프롬프트",
+      "promptError": "프롬프트는 1~1,000자여야 합니다.",
+      "removeNotification": "알림 제거",
+      "save": "저장"
+    },
     "trigger": {
       "description": "설명",
       "save": "Trigger 저장",
@@ -340,6 +360,9 @@
     "upToDate": "현재 초안이 라이브와 일치합니다."
   },
   "run": {
+    "actionApprove": "승인",
+    "actionContinue": "계속",
+    "actionReject": "거부",
     "artifactMetadata": "아티팩트 메타데이터",
     "artifactUnavailable": "이 워크벤치에서는 아직 미리 보기와 다운로드를 사용할 수 없습니다.",
     "cancel": "실행 취소",
@@ -364,6 +387,7 @@
     "eventRecorded": "기록됨",
     "eventStarted": "시작됨",
     "eventTruncated": "잘림",
+    "eventWaitResolved": "대기 해결됨",
     "eventsTruncatedNotice": "이 실행이 관찰 한도에 도달한 뒤 일부 이벤트가 생략되었습니다.",
     "eventsTruncatedUntil": "이 실행이 관찰 한도에 도달한 뒤 일부 이벤트가 생략되었습니다. 나머지 세부 정보는 {{date}}까지 보관됩니다.",
     "filter": {
@@ -392,6 +416,7 @@
     "connectorUnconfigured": "이 배포에는 Connector가 구성되어 있지 않습니다. 구성을 완료한 후 Flow를 다시 실행하세요.",
     "connectorUnavailable": "Connector 요청을 완료하지 못했습니다. Flow를 다시 실행하고, 계속 실패하면 선택한 Connection을 확인하세요.",
     "locateNode": "캔버스에서 {{name}} 위치 보기",
+    "locateWait": "대기 노드 찾기",
     "nodeError": "노드 오류",
     "nodeFailed": "노드를 완료하지 못했습니다.",
     "nodeLog": "{{level}} 로그",
@@ -401,6 +426,7 @@
     "outputId": "출력 ID",
     "outputPending": "이 실행이 끝나면 최종 출력이 표시됩니다.",
     "resize": "드래그하여 실행 세부 정보 크기 조절",
+    "resolving": "적용 중…",
     "runId": "실행 ID: {{id}}",
     "selectRun": "타임라인과 출력을 확인할 실행 기록을 선택하세요.",
     "sourceDraft": "초안",
@@ -412,6 +438,7 @@
     "statusNone": "실행 기록 없음",
     "statusQueued": "대기 중",
     "statusRunning": "실행 중",
+    "statusWaiting": "대기 중",
     "statusStarting": "시작하는 중",
     "statusSubmitting": "제출하는 중",
     "statusSucceeded": "성공",
@@ -426,7 +453,8 @@
     "timeline": "타임라인",
     "timelineEmpty": "선택한 초안을 실행하면 타임라인과 출력을 확인할 수 있습니다.",
     "submitting": "고정된 리비전을 제출하고 실행 기록을 만드는 중…",
-    "waiting": "첫 이벤트를 기다리는 중…"
+    "waiting": "첫 이벤트를 기다리는 중…",
+    "waitExpires": "만료: {{date}}"
   },
   "sidebar": {
     "createFirstFlow": "Flow 만들기",

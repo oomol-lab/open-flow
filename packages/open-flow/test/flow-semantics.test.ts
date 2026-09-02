@@ -2,7 +2,15 @@ import type { JsonValue, RevisionContent as RevisionFixture } from '../src/flow/
 
 import { describe, expect, it } from 'vitest'
 import { currentEngineContract, findEngineContract } from '../src/execution/common/runtime.ts'
-import { createRuntimeProgram, matchesSchema, prepareFlow, validateFlow, validateFlowInputs, validateModules } from '../src/flow/common/semantics.ts'
+import {
+  createRuntimeProgram,
+  flowDependencies,
+  matchesSchema,
+  prepareFlow,
+  validateFlow,
+  validateFlowInputs,
+  validateModules,
+} from '../src/flow/common/semantics.ts'
 
 const engine = findEngineContract(currentEngineContract)!
 
@@ -778,5 +786,144 @@ export default () => value`,
       engine,
     )
     expect(invalidNameResult.diagnostics).toEqual([expect.objectContaining({ code: 'binding.variable-invalid' })])
+  })
+
+  it('validates a root Wait notification and includes its dependencies', async () => {
+    const source: RevisionFixture = {
+      document: {
+        bindings: { recipient: { kind: 'variable', target: 'RECIPIENT' } },
+        graph: {
+          nodes: {
+            wait: {
+              actions: ['approve', 'reject'],
+              concurrency: 1,
+              inputs: { value: { kind: 'value', value: null } },
+              kind: 'wait',
+              notification: {
+                inputs: { recipient: { kind: 'sources', sources: [{ bindingId: 'recipient', kind: 'binding' }] } },
+                messageHandle: 'message',
+                taskId: 'notify',
+              },
+              prompt: 'Approve this request?',
+            },
+          },
+        },
+        subflows: {},
+        tasks: {
+          notify: {
+            executor: { action: 'mail.send', connectionId: 'connection-1', kind: 'connector' },
+            inputs: [
+              { handle: 'recipient', jsonSchema: { type: 'string' }, nullable: false },
+              { handle: 'message', jsonSchema: { type: 'string' }, nullable: false },
+            ],
+            name: 'Notify',
+            outputs: [],
+          },
+        },
+      },
+      modelVersion: 1,
+      modules: {},
+    }
+
+    await expect(validateFlow(source, engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
+    const dependencies = flowDependencies(source)
+    expect([...dependencies.tasks]).toEqual(['notify'])
+    expect([...dependencies.bindings]).toEqual(['recipient'])
+    expect([...dependencies.inputBindings]).toEqual(['recipient'])
+  })
+
+  it.each([
+    [{ actions: ['approve'] }, 'wait.actions-invalid'],
+    [{ concurrency: 2 }, 'wait.concurrency-invalid'],
+    [{ prompt: '' }, 'wait.prompt-invalid'],
+    [{ timeoutMs: 1_000 }, 'wait.field-unsupported'],
+  ] as const)('rejects an invalid Wait shape: %s', async (fields, code) => {
+    const source: RevisionFixture = {
+      document: {
+        bindings: {},
+        graph: {
+          nodes: {
+            wait: {
+              actions: ['continue'],
+              concurrency: 1,
+              inputs: { value: { kind: 'value', value: null } },
+              kind: 'wait',
+              prompt: 'Continue?',
+              ...fields,
+            } as RevisionFixture['document']['graph']['nodes'][string],
+          },
+        },
+        subflows: {},
+        tasks: {},
+      },
+      modelVersion: 1,
+      modules: {},
+    }
+
+    const result = await validateFlow(source, engine)
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ code }))
+  })
+
+  it('rejects Wait in a Subflow and invalid notification targets', async () => {
+    const source: RevisionFixture = {
+      document: {
+        bindings: {},
+        graph: {
+          nodes: {
+            call: {
+              concurrency: 1,
+              inputs: {},
+              kind: 'subflow',
+              subflowId: 'child',
+            },
+            wait: {
+              actions: ['continue'],
+              concurrency: 1,
+              inputs: { value: { kind: 'value', value: null } },
+              kind: 'wait',
+              notification: { inputs: {}, messageHandle: 'missing', taskId: 'notify' },
+              prompt: 'Continue?',
+            },
+          },
+        },
+        subflows: {
+          child: {
+            graph: {
+              nodes: {
+                wait: {
+                  actions: ['continue'],
+                  concurrency: 1,
+                  inputs: { value: { kind: 'value', value: null } },
+                  kind: 'wait',
+                  prompt: 'Not allowed here',
+                },
+              },
+            },
+            inputs: [],
+            name: 'Child',
+            outputs: [],
+          },
+        },
+        tasks: {
+          notify: {
+            executor: { kind: 'llm', mode: 'chat' },
+            inputs: [{ handle: 'message', jsonSchema: { type: 'string' }, nullable: false }],
+            name: 'Not a Connector',
+            outputs: [],
+          },
+        },
+      },
+      modelVersion: 1,
+      modules: {},
+    }
+
+    const result = await validateFlow(source, engine)
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'wait.notification-message-missing' }),
+        expect.objectContaining({ code: 'wait.notification-task-invalid' }),
+        expect.objectContaining({ code: 'wait.not-allowed', path: '/document/subflows/child/graph/nodes/wait' }),
+      ]),
+    )
   })
 })

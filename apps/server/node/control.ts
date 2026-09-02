@@ -1,4 +1,4 @@
-import type { ChangeOperation, JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { ChangeOperation, JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions } from '@oomol-lab/open-flow/scheduler'
 import type { Context, Next } from 'hono'
@@ -339,6 +339,14 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   app.post('/runs/:runId/cancel', async (context) => {
     await versionOnly(context.req.raw, controlErrorCode.runInvalid)
     return response(200, service.cancelRun(context.req.param('runId')))
+  })
+  app.post('/runs/:runId/waits/:waitId/resolve', async (context) => {
+    const body = await requestObject(context.req.raw, controlErrorCode.runInvalid)
+    exact(body, ['action', 'version'], controlErrorCode.runInvalid)
+    version(body.version, controlErrorCode.runInvalid)
+    const action = body.action
+    if (action != 'approve' && action != 'continue' && action != 'reject') invalid(controlErrorCode.runInvalid, 'Wait action is invalid.')
+    return response(200, service.resolveRunWait(context.req.param('runId'), context.req.param('waitId'), action as WaitAction))
   })
   return app
 }

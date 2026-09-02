@@ -1,5 +1,6 @@
 import type { ConnectorAction, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
+import type { ConnectorHost } from '../node/connector.ts'
 
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -100,8 +101,14 @@ function capabilityFlow(
   }
 }
 
-async function open(connector?: Parameters<typeof ServerService.open>[1], connectorConsoleOrigin?: string): Promise<ServerService> {
-  const service = await openService(await databaseFile(), connector, Date.now, {}, connectorConsoleOrigin)
+async function open(connector?: ConnectorHost, connectorConsoleOrigin?: string): Promise<ServerService> {
+  const service = await openService(await databaseFile(), {
+    capabilities: {
+      connector: connector == null ? undefined : () => connector,
+      connectorConsoleOrigin: connectorConsoleOrigin == null ? undefined : () => new URL(connectorConsoleOrigin),
+    },
+    clock: Date.now,
+  })
   services.push(service)
   await startService(service)
   return service

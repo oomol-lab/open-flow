@@ -100,6 +100,7 @@ credential。设置 `OPEN_FLOW_TOKEN` 时环境配置锁定当前认证来源并
 | `OPEN_FLOW_LLM_TOKEN`                          | Server 调用显式配置 LLM 服务的 bearer token。                                                               |
 | `OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN`          | Provider 可访问的 Integration callback 公网 origin。                                                        |
 | `OPEN_FLOW_INTEGRATION_CALLBACK_KEY`           | 派生 Integration callback secret 的至少 32 UTF-8 bytes 密钥。                                               |
+| `OPEN_FLOW_PUBLIC_ORIGIN`                      | Wait 通知消费端可访问的 Server 公网 origin。                                                                |
 | `OPEN_FLOW_RUN_EVENT_RETENTION_DAYS`           | terminal Run 详细事件的保留天数；默认 `30`。                                                                |
 | `OPEN_FLOW_MAX_PENDING_RUNS`                   | 全部署尚未 terminal 的 Run 上限；默认 `1000`。                                                              |
 | `OPEN_FLOW_MAX_CONCURRENT_RUNS`                | 全部署同时执行的 Run 上限；同一 Flow 最多执行一个；默认 `4`。                                               |
@@ -135,10 +136,16 @@ Connector 为准。
 credential、path、query 或 fragment 的 HTTPS origin；只有 loopback 本地开发可以使用 HTTP。callback key 至少包含 32 UTF-8 bytes。两者也可作为一个
 完整配置块在 Settings 中保存；未配置时 Integration definition 仍可用于 authoring，但 Publish 会 fail closed。
 
+`OPEN_FLOW_PUBLIC_ORIGIN` 为 Wait Connector 通知生成 action URL。它必须是不带 credential、path、query 或 fragment 的 HTTPS origin；只有
+loopback 本地开发可以使用 HTTP。普通 Wait 不需要该配置；固定 Revision 中只要有 Wait 配置了通知，Draft Run admission、Live Run admission 和
+Publish 就会在缺少该 origin 时 fail closed。公开 action 路由不使用 Operator session，URL 中的 opaque capability 是只绑定当前 Wait 的 bearer
+credential；不要让 reverse proxy access log、消息预览或分析工具采集完整 path。
+
 没有 env-managed 或持久化 operator credential 时，health、callback 和已持久化的 runtime 工作仍可运行，但 Control API fail closed，Workbench 进入
 setup。Operator 登录与 setup authorization 共享部署实例级限速，超过 `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE` 后返回 429 和 `Retry-After`。
 
 达到 `OPEN_FLOW_MAX_PENDING_RUNS` 后，新 Run admission 返回 429；已接受请求的幂等重放仍返回原 Run。Cron 与 Poll 保留当前调度位置并短暂重试。
+Cron 所属 Flow 已有未终结 Run 时同样保留当前调度位置；前一个 Run 结束后只补入最早未处理 occurrence，并把下一次计划推进到当前时间之后。
 Callback 请求限流只为已存在的 endpoint 建立内存窗口，超过限制时返回 429 和 `Retry-After`。
 
 ## 5. 健康检查与停止
@@ -166,9 +173,14 @@ docker stop --time 30 open-flow-server
 
 ## 6. 持久化与恢复
 
-Flow、Revision、Publication、Run、RunEvent、Variable、Trigger binding、Provider callback verifier、deployment capability settings、持久化 Operator credential
-摘要、Browser session signing secret 和 migration version 都位于数据卷中的 SQLite 文件。callback verifier 只属于 Trigger runtime state，不进入 Flow Revision、
-Workbench 或 RunEvent。
+Flow、Revision、Publication、Run、RunEvent、Wait checkpoint、Wait notification outbox、Variable、Trigger binding、Provider callback verifier、deployment
+capability settings、持久化 Operator credential 摘要、Browser session signing secret 和 migration version 都位于数据卷中的 SQLite 文件。callback
+verifier 只属于 Trigger runtime state，不进入 Flow Revision、Workbench 或 RunEvent。
+
+Server 在提交 `waiting` 后通过持久化 outbox 发送 Connector 通知。崩溃恢复会重新 claim 未完成或 lease 已过期的 work，因此 Connector action 可能收到
+相同 invocation identity 的重复请求；Run 状态和决议仍由 SQLite 中唯一的 Wait 记录约束。通知失败只记录 delivery failure，Run 保持等待，直到被决议、
+取消或在进入等待 7 天后到期。SQLite 只保存 capability 的 SHA-256 摘要，通知发送时生成的完整 capability URL 会离开 Server 数据卷并进入所选 Connector 和消息系统的
+信任边界。
 当前只承诺 quiesced backup：先停止入口流量并让容器正常退出，再备份 volume；恢复时把完整数据目录挂载到相同路径后启动一个 Server 容器。
 
 Variable value 和 Settings-managed 外部 service credential 以明文存在于 SQLite 主文件、WAL 和备份中。Variable 可由已认证 Operator 通过 Control API 和管理面

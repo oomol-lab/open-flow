@@ -146,7 +146,11 @@ describe('Server Poll Trigger', () => {
       },
     }
     let now = publishedAt
-    const service = await openService(await databaseFile(), waitingConnector, () => now, {}, undefined, undefined, [definition])
+    const service = await openService(await databaseFile(), {
+      capabilities: { connector: () => waitingConnector },
+      clock: () => now,
+      triggerDefinitions: [definition],
+    })
     await publish(service)
     now = Date.parse('2026-08-21T00:01:00.000Z')
     await startService(service)
@@ -186,7 +190,11 @@ describe('Server Poll Trigger', () => {
               })
             },
           }
-          const service = yield* ServerService.open(file, connector, clock, {}, undefined, undefined, [definition])
+          const service = yield* ServerService.open(file, {
+            capabilities: { connector: () => connector },
+            clock,
+            triggerDefinitions: [definition],
+          })
           yield* Effect.tryPromise({ try: () => publish(service), catch: (error) => error })
           const ticking = service.tickPoll('2026-08-21T00:01:00.000Z')
           yield* Effect.promise(() => entered.promise)
@@ -224,7 +232,7 @@ describe('Server Poll Trigger', () => {
         }
       },
     }
-    const service = await openService(file, connector, () => publishedAt, {}, undefined, undefined, [definition])
+    const service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
     try {
       const created = await service.control.createFlow('operator', 'Poll control', 'poll-control-flow')
       const content = revision()
@@ -278,7 +286,7 @@ describe('Server Poll Trigger', () => {
         return { checkpoint: { page: 2 }, events: [] }
       },
     }
-    let service = await openService(file, connector, () => publishedAt, {}, undefined, undefined, [definition])
+    let service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
     await publish(service)
 
     await service.tickPoll('2026-08-21T00:01:00.000Z')
@@ -286,7 +294,7 @@ describe('Server Poll Trigger', () => {
     expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: { page: 1 }, health: 'initializing' })
     await closeService(service)
 
-    service = await openService(file, connector, () => publishedAt, {}, undefined, undefined, [definition])
+    service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
     await service.tickPoll('2026-08-21T00:01:00.000Z')
     expect(calls).toBe(2)
     await service.tickPoll('2026-08-21T00:01:01.000Z')
@@ -304,7 +312,11 @@ describe('Server Poll Trigger', () => {
         return { checkpoint: { page: calls }, events: [], hasMore: true }
       },
     }
-    const service = await openService(await databaseFile(), connector, () => publishedAt, {}, undefined, undefined, [definition])
+    const service = await openService(await databaseFile(), {
+      capabilities: { connector: () => connector },
+      clock: () => publishedAt,
+      triggerDefinitions: [definition],
+    })
     await publish(service)
 
     await service.tickPoll('2026-08-21T00:01:00.000Z')
@@ -323,7 +335,12 @@ describe('Server Poll Trigger', () => {
         throw new PollConnectionError('Connection requires reauthorization.')
       },
     }
-    const service = await openService(file, connector, () => publishedAt, {}, undefined, captured.logger, [definition])
+    const service = await openService(file, {
+      capabilities: { connector: () => connector },
+      clock: () => publishedAt,
+      logger: captured.logger,
+      triggerDefinitions: [definition],
+    })
     await publish(service)
 
     await service.tickPoll('2026-08-21T00:01:00.000Z')
@@ -351,7 +368,7 @@ describe('Server Poll Trigger', () => {
         return { checkpoint: calls == 1 ? null : 'x'.repeat(maximumPollCheckpointBytes), events: [] }
       },
     }
-    const service = await openService(file, connector, () => publishedAt, {}, undefined, undefined, [definition])
+    const service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
     await publish(service)
 
     await service.tickPoll('2026-08-21T00:01:00.000Z')
@@ -382,7 +399,7 @@ describe('Server Poll Trigger', () => {
       },
     }
     let now = Date.parse('2026-08-21T00:00:30.000Z')
-    const service = await openService(file, connector, () => now, {}, undefined, undefined, [definition])
+    const service = await openService(file, { capabilities: { connector: () => connector }, clock: () => now, triggerDefinitions: [definition] })
     const publicationId = await publish(service)
     const ticking = service.tickPoll('2026-08-21T00:01:00.000Z')
     await entered.promise
@@ -403,7 +420,7 @@ describe('Server Poll Trigger', () => {
   it('allows an expired durable claim lease to be reacquired', async () => {
     const file = await databaseFile()
     const definition: PollDefinition = { snapshot, poll: () => Promise.resolve({ checkpoint: null, events: [] }) }
-    const service = await openService(file, connector, () => publishedAt, {}, undefined, undefined, [definition])
+    const service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
     await publish(service)
     await closeService(service)
 

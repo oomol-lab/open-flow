@@ -21,7 +21,7 @@ import type {
   TriggerKeySummary,
   Variable,
 } from '@oomol-lab/open-flow/control-api'
-import type { ChangeOperation, JsonValue, RevisionContent, TriggerKeySnapshot } from '@oomol-lab/open-flow/flow-change'
+import type { ChangeOperation, JsonValue, RevisionContent, TriggerKeySnapshot, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions } from '@oomol-lab/open-flow/scheduler'
 import type { ConnectorHost } from './connector.ts'
@@ -90,6 +90,7 @@ export class ControlService {
   private readonly resolveConnector: () => ConnectorHost | undefined
   private readonly resolveConnectorConsoleOrigin: () => URL | undefined
   private readonly resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>
+  private readonly resolveWaitPublicOrigin: () => URL | undefined
   private readonly store: Store
   private readonly testPollTrigger: (flowId: string, triggerNodeId: string) => Promise<PollTriggerTestResult>
   private readonly triggerDefinitions: readonly TriggerKeySnapshot[]
@@ -111,6 +112,7 @@ export class ControlService {
     llmAvailable: () => boolean,
     resolveConnector: () => ConnectorHost | undefined,
     resolveConnectorConsoleOrigin: () => URL | undefined,
+    resolveWaitPublicOrigin: () => URL | undefined,
     resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>,
   ) {
     this.store = store
@@ -127,6 +129,7 @@ export class ControlService {
     this.llmAvailable = llmAvailable
     this.resolveConnector = resolveConnector
     this.resolveConnectorConsoleOrigin = resolveConnectorConsoleOrigin
+    this.resolveWaitPublicOrigin = resolveWaitPublicOrigin
     this.resolveConnectorTeam = resolveConnectorTeam
   }
 
@@ -573,7 +576,7 @@ export class ControlService {
         throw new ControlError(controlErrorCode.runConflict, 'The idempotency key refers to another Run request.')
       }
       if (existing.status == 'queued' || existing.status == 'starting') this.wake()
-      return { created: false, run: runDetails(this.requireRun(existing.runId)) }
+      return { created: false, run: this.runDetails(this.requireRun(existing.runId)) }
     }
     if (engineContract != currentEngineContract) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
     const stored = this.store.revision(flowId, revisionId)
@@ -587,6 +590,9 @@ export class ControlService {
         throw new ControlError(controlErrorCode.flowInvalid, 'The Flow is invalid.')
       case 'prepared':
         break
+    }
+    if (Object.values(fixed.flow.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) && this.resolveWaitPublicOrigin() == null) {
+      throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
     }
     if (validateFlowInputs(content, inputs) != 'valid') throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
     const accepted = this.store.acceptControlRun({
@@ -616,7 +622,7 @@ export class ControlService {
           this.flowChanged({ flowId, kind: 'run.created', runId: accepted.runId, version: 1 })
           this.wake()
         }
-        return { created: accepted.created, run: runDetails(this.requireRun(accepted.runId)) }
+        return { created: accepted.created, run: this.runDetails(this.requireRun(accepted.runId)) }
       }
     }
   }
@@ -629,7 +635,7 @@ export class ControlService {
         throw new ControlError(controlErrorCode.runConflict, 'The idempotency key refers to another Run request.')
       }
       if (existing.status == 'queued' || existing.status == 'starting') this.wake()
-      return { created: false, run: runDetails(this.requireRun(existing.runId)) }
+      return { created: false, run: this.runDetails(this.requireRun(existing.runId)) }
     }
 
     const livePublication = this.store.publications.publicationById(publicationId)
@@ -658,6 +664,9 @@ export class ControlService {
         throw new ControlError(controlErrorCode.flowInvalid, 'The Flow is invalid.')
       case 'prepared':
         break
+    }
+    if (Object.values(fixed.flow.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) && this.resolveWaitPublicOrigin() == null) {
+      throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
     }
     const inputsValid = validateFlowInputs(content, inputs) == 'valid'
     if (!inputsValid) throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
@@ -694,13 +703,56 @@ export class ControlService {
           this.flowChanged({ flowId, kind: 'run.created', runId: accepted.runId, version: 1 })
           this.wake()
         }
-        return { created: accepted.created, run: runDetails(this.requireRun(accepted.runId)) }
+        return { created: accepted.created, run: this.runDetails(this.requireRun(accepted.runId)) }
       }
     }
   }
 
   getRun(runId: string): RunDetails {
-    return runDetails(this.requireRun(runId))
+    return this.runDetails(this.requireRun(runId))
+  }
+
+  resolveRunWait(
+    runId: string,
+    waitId: string,
+    action: WaitAction,
+  ): {
+    readonly action: WaitAction | null
+    readonly resolutionAccepted: boolean
+    readonly resolvedAt: string | null
+    readonly runId: string
+    readonly status: RunStatus
+    readonly version: 1
+    readonly waitId: string
+  } {
+    const stored = this.requireRun(runId)
+    const receipt = this.store.waitReceipt(runId, waitId)
+    if (receipt == null) throw new ControlError(controlErrorCode.runWaitNotFound, 'The active Wait was not found.')
+    const revision = this.store.revision(stored.flowId, stored.revisionId)
+    if (revision == null) throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Revision is unavailable.')
+    const node = revisionContent(revision).document.graph.nodes[receipt.nodeId]
+    if (node?.kind != 'wait') throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Wait node is unavailable.')
+    const result = this.store.resolveWait(runId, waitId, action, node.actions)
+    switch (result.kind) {
+      case 'invalid-action':
+        throw new ControlError(controlErrorCode.runInvalid, 'The Wait action is invalid.')
+      case 'not-found':
+        throw new ControlError(controlErrorCode.runWaitNotFound, 'The active Wait was not found.')
+      case 'resolved':
+        if (result.changed) {
+          this.flowChanged({ flowId: stored.flowId, kind: 'run.changed', runId, version: 1 })
+          if (result.status == 'queued') this.wake()
+        }
+        return {
+          action: result.action,
+          resolutionAccepted: result.resolutionAccepted,
+          resolvedAt: result.resolvedAt == null ? null : timestamp(result.resolvedAt),
+          runId,
+          status: result.status,
+          version: 1,
+          waitId,
+        }
+    }
   }
 
   listRuns(
@@ -763,6 +815,7 @@ export class ControlService {
       case 'queued':
       case 'running':
       case 'starting':
+      case 'waiting':
         throw new Error('Non-terminal Run passed the terminal guard.')
     }
   }
@@ -770,7 +823,10 @@ export class ControlService {
   cancelRun(runId: string): RunCancellation {
     const canceled = this.store.cancelControlRun(runId)
     if (canceled == null) runNotFound()
-    if (canceled.accepted) this.abortRun(runId)
+    if (canceled.accepted) {
+      this.abortRun(runId)
+      this.flowChanged({ flowId: canceled.run.flowId, kind: 'run.changed', runId, version: 1 })
+    }
     return { cancelAccepted: canceled.accepted, runId, status: terminalStatus(canceled.run.status), version: 1 }
   }
 
@@ -845,6 +901,28 @@ export class ControlService {
     const stored = this.store.controlRun(runId)
     if (stored == null) runNotFound()
     return stored
+  }
+
+  private runDetails(stored: StoredControlRun): RunDetails {
+    const details = runDetails(stored)
+    if (stored.status != 'waiting') return details
+    const receipt = this.store.activeWait(stored.runId)
+    if (receipt == null) throw new Error('Waiting Run is missing its active Wait receipt.')
+    const revision = this.store.revision(stored.flowId, stored.revisionId)
+    if (revision == null) throw new Error('Waiting Run is missing its fixed Revision.')
+    const node = revisionContent(revision).document.graph.nodes[receipt.nodeId]
+    if (node?.kind != 'wait') throw new Error('Waiting Run does not point to a fixed Wait node.')
+    return {
+      ...details,
+      waiting: {
+        actions: node.actions,
+        expiresAt: timestamp(receipt.expiresAt),
+        nodeId: receipt.nodeId,
+        prompt: node.prompt,
+        waitId: receipt.waitId,
+        waitingSince: timestamp(receipt.waitingSince),
+      },
+    }
   }
 
   private requireTriggerBinding(flowId: string, triggerNodeId: string): StoredTriggerBinding {

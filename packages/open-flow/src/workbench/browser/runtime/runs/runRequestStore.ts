@@ -61,6 +61,8 @@ function inputPorts(node: ResolvedNode): Readonly<Record<string, InputPortDefini
       return portsByHandle(node.definition?.inputs ?? [])
     case 'value':
       return {}
+    case 'wait':
+      return { value: { jsonSchema: {}, nullable: true, value: null } }
   }
 }
 

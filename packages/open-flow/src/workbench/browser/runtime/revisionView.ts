@@ -11,6 +11,7 @@ import type {
   TaskNode,
   TriggerNode,
   ValueNode,
+  WaitNode,
 } from './api.ts'
 
 type SubflowDefinition = FlowDocument['subflows'][string]
@@ -26,6 +27,7 @@ export type ResolvedNode =
       readonly node: TaskNode
     }
   | { readonly id: string; readonly kind: 'value'; readonly node: ValueNode }
+  | { readonly id: string; readonly kind: 'wait'; readonly node: WaitNode }
 
 export interface ResolvedTrigger {
   readonly id: string
@@ -113,6 +115,9 @@ export class RevisionView {
       case 'value':
         resolved = { id: nodeId, kind: node.kind, node }
         break
+      case 'wait':
+        resolved = { id: nodeId, kind: node.kind, node }
+        break
       case 'cron':
       case 'integration':
       case 'poll':
@@ -137,6 +142,10 @@ export class RevisionView {
 
   public task(taskId: string): FlowDocument['tasks'][string] | undefined {
     return this.#document.tasks[taskId]
+  }
+
+  public tasks(): [string, TaskDefinition][] {
+    return Object.entries(this.#document.tasks)
   }
 
   public binding(bindingId: string): FlowDocument['bindings'][string] | undefined {

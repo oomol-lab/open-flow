@@ -110,7 +110,7 @@ async function createHarness(fixture: PollConformanceFixture): Promise<PollConfo
     ],
   })
   let now = Date.parse(fixture.publishedAt)
-  let service = await openService(file, connector, () => now, {}, undefined, undefined, [definition])
+  let service = await openService(file, { capabilities: { connector: () => connector }, clock: () => now, triggerDefinitions: [definition] })
   let config = fixture.config
   let active = true
   let nextAt = nextTriggerScheduledAt(fixture.rules, now)
@@ -149,7 +149,7 @@ async function createHarness(fixture: PollConformanceFixture): Promise<PollConfo
     },
     async restart() {
       await closeService(service)
-      service = await openService(file, connector, () => now, {}, undefined, undefined, [definition])
+      service = await openService(file, { capabilities: { connector: () => connector }, clock: () => now, triggerDefinitions: [definition] })
     },
     async retire(at) {
       now = Date.parse(at)

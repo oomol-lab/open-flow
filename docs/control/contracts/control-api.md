@@ -257,6 +257,23 @@ interface Run {
 Run detail 增加固定的 `closureDigest`、`engineContract`、`engineDigest`、`modelVersion` 和 `revisionDigest`。Live Run 增加
 `publicationId`；Trigger Run 增加 `publicationId`、`occurrenceId` 和 `triggerNodeId`。
 
+`RunStatus` 包含 `queued | starting | running | waiting | canceled | completed | failed | indeterminate`。处于 `waiting` 的 Run detail
+还包含当前暂停点：
+
+```ts
+waiting: {
+  actions: readonly['continue'] | readonly[('approve', 'reject')]
+  expiresAt: string
+  nodeId: string
+  prompt: string
+  waitId: string
+  waitingSince: string
+}
+```
+
+这是当前 active Wait 的投影，不是历史列表。客户端用 `nodeId` 定位 Flow 中的 Wait node，用 `waitId` 提交一次固定暂停的决议。
+Run 离开 `waiting` 后不再返回该投影；历史由 RunEvent 表达。
+
 Draft Run body 是 `{ engineContract, inputs, version: 1 }`。Live Run body 是 `{ publicationId, inputs, version: 1 }`。首次接受返回 `202`，
 幂等重放返回 `200`。Run 接受后不受后续 Draft change、Publish 或 Rollback 影响。
 
@@ -283,10 +300,34 @@ interface RunEvents {
 }
 ```
 
-Run list 按 `createdAt`、`runId` 逆序稳定分页。
+Run list 按 `createdAt`、`runId` 逆序稳定分页，`status=waiting` 可以只查询当前暂停的 Run。
 
 `after` 是已观察的最后 sequence，只返回更大的事件。terminal Run 最多有一个 terminal event。非 terminal Run 的 result 返回
 `run.not-terminal`；取消成功与重复取消分别返回 `cancelAccepted: true` 和 `false`。
+
+Wait 进入和离开暂停状态分别追加事件：
+
+- `run.waiting` payload 为 `{ expiresAt, nodeId, waitId, waitingSince }`；
+- `run.resolved` payload 为 `{ action, resolvedAt, waitId }`。
+
+已认证客户端通过 `POST /v1/runs/:runId/waits/:waitId/resolve` 决议当前 Wait，body 固定为
+`{ action: 'continue' | 'approve' | 'reject', version: 1 }`。Action 必须属于固定 Revision 中该 Wait 的 `actions`。响应为：
+
+```ts
+{
+  action: 'continue' | 'approve' | 'reject' | null
+  resolutionAccepted: boolean
+  resolvedAt: string | null
+  runId: string
+  status: RunStatus
+  version: 1
+  waitId: string
+}
+```
+
+同一 `waitId` 只有第一个合法、未过期的决议能把 Run 从 `waiting` 推进到 `queued`。同一 action 重放返回
+`resolutionAccepted: true`，竞争的另一 action 返回 `false`，两者都返回已经提交的 `action` 和 `resolvedAt`。不存在的 Wait 返回
+`run.wait-not-found`，不属于该 Wait 的 action 返回 `run.invalid`。Wait 到期后 Run 以 `run.wait-expired` 失败，不产生新的 Run。
 
 ## 6. Trigger 与 Connector
 
@@ -342,6 +383,7 @@ interface FlowCatalogEvent {
 type FlowChangeEvent =
   | { flowId: string; kind: 'draft.changed'; revisionId: string; version: 1 }
   | { flowId: string; kind: 'run.created'; runId: string; version: 1 }
+  | { flowId: string; kind: 'run.changed'; runId: string; version: 1 }
 ```
 
 `undefined` 表示连接或重连已经建立，客户端必须 refetch。事件只做 invalidation。Server 同源宿主使用两个独立 SSE 请求：
@@ -379,6 +421,7 @@ type FlowChangeEvent =
 | `GET`     | `/v1/runs/:runId/events`                                 |      200 | `after`、`limit`                  |
 | `GET`     | `/v1/runs/:runId/result`                                 |      200 | terminal result                   |
 | `POST`    | `/v1/runs/:runId/cancel`                                 |      200 | `{ version: 1 }`                  |
+| `POST`    | `/v1/runs/:runId/waits/:waitId/resolve`                  |      200 | `{ action, version: 1 }`          |
 | `GET`     | `/v1/trigger-keys`                                       |      200 | Trigger summaries                 |
 | `GET`     | `/v1/trigger-keys/catalog`                               |      200 | definitions                       |
 | `GET`     | `/v1/trigger-keys/:key`                                  |      200 | definition detail                 |
@@ -398,3 +441,23 @@ Connector route 的 `flowId` 是 opaque Flow identity。提供时部署必须先
 Connection；客户端不能改用 Team ID、Connection owner 或其他外部 identity 代替 Flow scope。省略时使用部署的未限定 Connector catalog。
 
 分页 cursor 是 opaque、scope-bound token。跨 Flow、Trigger 或资源类型使用 cursor 返回 `page.invalid-cursor`。
+
+## 8. 公开 Wait action hook
+
+配置了公开 origin 的部署可以把一次 Wait 的 opaque capability URL 放进 Connector 通知。该路由不使用 Operator session 或 bearer token：
+
+```text
+/v1/wait-actions/:capability/:action
+```
+
+`action` 固定为 `continue | approve | reject`，并且必须属于 capability 绑定的 Wait。响应始终是 JSON，不返回 HTML、不跳转、不设置 cookie，
+并带 `Cache-Control: no-store`：
+
+- `GET` 只检查 action，成功时返回 `{ action, expiresAt, prompt, state: 'waiting' | 'resolved', version: 1 }`；
+- `HEAD` 与 `GET` 使用相同检查和状态码，但没有 response body；
+- `POST` 才提交 action，成功时返回
+  `{ action, resolutionAccepted, resolvedAt, state: 'waiting' | 'resolved' | 'unavailable', version: 1 }`。
+
+`POST` 服从与认证 resolve route 相同的 first-writer-wins 和幂等重放语义。capability、action、固定 Revision 或 active Wait 不匹配时返回
+`404 wait-action.not-found`；其他方法返回 `405 wait-action.method-not-allowed` 并携带 `Allow: GET, HEAD, POST`。服务端只持久化
+capability 摘要；完整 capability 是 bearer credential，消费端不得把它作为普通可公开 URL 记录或转发。

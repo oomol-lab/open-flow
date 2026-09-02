@@ -265,4 +265,49 @@ describe('Flow changes', () => {
       inputs: { payload: { kind: 'value', value: null } },
     })
   })
+
+  it('updates Wait settings and rejects a stale change', () => {
+    const source = applyFlowChanges(revision(), [
+      {
+        kind: 'graph.node.create',
+        node: {
+          actions: ['continue'],
+          concurrency: 1,
+          inputs: {},
+          kind: 'wait',
+          notification: { inputs: {}, messageHandle: 'text', taskId: 'notify' },
+          prompt: 'Continue?',
+        },
+        nodeId: 'wait',
+        target,
+      },
+    ])
+    const changed = applyFlowChanges(source, [
+      {
+        before: {
+          actions: ['continue'],
+          notification: { inputs: {}, messageHandle: 'text', taskId: 'notify' },
+          prompt: 'Continue?',
+        },
+        kind: 'graph.node.wait.set',
+        nodeId: 'wait',
+        target,
+        value: { actions: ['approve', 'reject'], prompt: 'Approve?' },
+      },
+    ])
+
+    expect(changed.document.graph.nodes.wait).toMatchObject({ actions: ['approve', 'reject'], prompt: 'Approve?' })
+    expect(changed.document.graph.nodes.wait).not.toHaveProperty('notification')
+    expect(() =>
+      applyFlowChanges(changed, [
+        {
+          before: { actions: ['continue'], prompt: 'Continue?' },
+          kind: 'graph.node.wait.set',
+          nodeId: 'wait',
+          target,
+          value: { actions: ['continue'], prompt: 'Continue again?' },
+        },
+      ]),
+    ).toThrow(FlowChangeError)
+  })
 })

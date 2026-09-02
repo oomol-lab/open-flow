@@ -8,6 +8,7 @@ export interface ControlApiConformanceHarness {
 
 export interface ControlApiConformanceCase {
   readonly name: string
+  readonly runtime?: true
   verify(harness: ControlApiConformanceHarness): Promise<void>
 }
 
@@ -384,6 +385,122 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
         ).status,
         'canceled',
         'Second canceled Run status',
+      )
+    },
+  },
+  {
+    name: 'pauses, resolves, resumes, and cancels waiting Draft Runs',
+    runtime: true,
+    async verify(harness) {
+      const flow = await createFlow(harness, 'Wait flow', 'wait-flow')
+      const flowId = requiredString(flow.flowId, 'Wait Flow flowId')
+      const initialRevisionId = requiredString(flow.draftRevisionId, 'Wait Flow revisionId')
+      const changed = await json(
+        await changeRequest(harness, flowId, initialRevisionId, [
+          {
+            kind: 'graph.node.create',
+            node: {
+              actions: ['approve', 'reject'],
+              concurrency: 1,
+              inputs: { value: { kind: 'value', value: { request: 1 } } },
+              kind: 'wait',
+              prompt: 'Approve request 1?',
+            },
+            nodeId: 'approval',
+            target: { kind: 'flow' },
+          },
+        ]),
+        200,
+        'Create Wait',
+      )
+      const revisionId = changedRevisionId(changed, 'Wait Revision')
+      const runPath = `/v1/flows/${flowId}/revisions/${revisionId}/runs`
+      const create = async (key: string, message: string) =>
+        json(
+          await request(harness, runPath, {
+            body: JSON.stringify({ engineContract, inputs: {}, version: 1 }),
+            headers: { 'idempotency-key': key },
+            method: 'POST',
+          }),
+          202,
+          message,
+        )
+      const run = await create('wait-run', 'Create Wait Run')
+      const runId = requiredString(run.runId, 'Wait Run runId')
+      let detail = run
+      for (let attempt = 0; detail.status != 'waiting' && attempt < 200; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        detail = await json(await request(harness, `/v1/runs/${runId}`), 200, 'Read Wait Run')
+      }
+      equal(detail.status, 'waiting', 'Wait Run status')
+      const waiting = record(detail.waiting, 'Active Wait')
+      equal(waiting.actions, ['approve', 'reject'], 'Wait actions')
+      equal(waiting.nodeId, 'approval', 'Wait node')
+      equal(waiting.prompt, 'Approve request 1?', 'Wait prompt')
+      requiredString(waiting.expiresAt, 'Wait expiry')
+      requiredString(waiting.waitingSince, 'Wait start')
+      const waitId = requiredString(waiting.waitId, 'Wait id')
+
+      const waitingPage = await json(await request(harness, `/v1/flows/${flowId}/runs?status=waiting`), 200, 'List waiting Runs')
+      equal(
+        list(waitingPage.runs, 'Waiting Runs').map((value) => record(value, 'Waiting Run').runId),
+        [runId],
+        'Waiting Run list',
+      )
+      const waitingEvents = await json(await request(harness, `/v1/runs/${runId}/events`), 200, 'Read waiting Run events')
+      equal(waitingEvents.done, false, 'Waiting events done')
+      if (!list(waitingEvents.events, 'Waiting events').some((value) => record(value, 'Waiting event').kind == 'run.waiting')) {
+        fail('Waiting Run must contain run.waiting.')
+      }
+      await error(await request(harness, `/v1/runs/${runId}/result`), 409, 'run.not-terminal', 'Read waiting Run result')
+
+      const resolvePath = `/v1/runs/${runId}/waits/${waitId}/resolve`
+      const resolveWait = (action: 'approve' | 'continue' | 'reject') =>
+        request(harness, resolvePath, { body: JSON.stringify({ action, version: 1 }), method: 'POST' })
+      await error(await resolveWait('continue'), 400, 'run.invalid', 'Reject unsupported Wait action')
+      const approved = await json(await resolveWait('approve'), 200, 'Approve Wait')
+      equal(approved.action, 'approve', 'Approved action')
+      equal(approved.resolutionAccepted, true, 'Approved resolution')
+      equal(approved.status, 'queued', 'Resolved Run status')
+      requiredString(approved.resolvedAt, 'Wait resolution time')
+      const rejected = await json(await resolveWait('reject'), 200, 'Reject resolved Wait')
+      equal(rejected.action, 'approve', 'Winning action')
+      equal(rejected.resolutionAccepted, false, 'Competing resolution')
+
+      for (let attempt = 0; detail.status != 'completed' && attempt < 200; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        detail = await json(await request(harness, `/v1/runs/${runId}`), 200, 'Read resumed Run')
+      }
+      equal(detail.status, 'completed', 'Resumed Run status')
+      equal(detail.waiting, undefined, 'Completed Wait projection')
+      const replay = await json(await resolveWait('approve'), 200, 'Replay approved Wait')
+      equal(replay.resolutionAccepted, true, 'Replayed resolution')
+      equal(replay.status, 'completed', 'Replayed terminal status')
+      const completedEvents = await json(await request(harness, `/v1/runs/${runId}/events`), 200, 'Read resumed Run events')
+      equal(
+        list(completedEvents.events, 'Completed events').filter((value) => record(value, 'Completed event').kind == 'run.resolved').length,
+        1,
+        'Resolved event count',
+      )
+
+      const canceled = await create('wait-run-cancel', 'Create cancelable Wait Run')
+      const canceledRunId = requiredString(canceled.runId, 'Cancelable Wait Run id')
+      let canceledDetail = canceled
+      for (let attempt = 0; canceledDetail.status != 'waiting' && attempt < 200; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        canceledDetail = await json(await request(harness, `/v1/runs/${canceledRunId}`), 200, 'Read cancelable Wait Run')
+      }
+      equal(canceledDetail.status, 'waiting', 'Cancelable Wait status')
+      equal(
+        (
+          await json(
+            await request(harness, `/v1/runs/${canceledRunId}/cancel`, { body: JSON.stringify({ version: 1 }), method: 'POST' }),
+            200,
+            'Cancel waiting Run',
+          )
+        ).status,
+        'canceled',
+        'Canceled waiting Run status',
       )
     },
   },

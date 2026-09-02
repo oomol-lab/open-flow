@@ -1,6 +1,6 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { WorkbenchClient, Run, RunEvent, RunResult } from '../api.ts'
+import type { WorkbenchClient, Run, RunDetails, RunEvent, RunResult, WaitAction } from '../api.ts'
 import type { Current } from '../stores/latest.ts'
 import type { SetNotice } from '../stores/workbenchNotice.ts'
 
@@ -26,12 +26,13 @@ interface RunState {
   readonly nextCursor?: string
   readonly observationFailed: boolean
   readonly result?: RunResult
-  readonly run?: Run
+  readonly resolvingAction?: WaitAction
+  readonly run?: Run | RunDetails
   readonly runs: readonly Run[]
   readonly target?: { readonly flowId: string }
 }
 
-type Client = Pick<WorkbenchClient, 'cancelRun' | 'getRun' | 'getRunEvents' | 'getRunResult' | 'listRuns'>
+type Client = Pick<WorkbenchClient, 'cancelRun' | 'getRun' | 'getRunEvents' | 'getRunResult' | 'listRuns' | 'resolveRunWait'>
 
 export interface Run$ {
   readonly cancelingRunId: ReadonlyVal<string | undefined>
@@ -47,7 +48,8 @@ export interface Run$ {
   readonly nextCursor: ReadonlyVal<string | undefined>
   readonly observationFailed: ReadonlyVal<boolean>
   readonly result: ReadonlyVal<RunResult | undefined>
-  readonly run: ReadonlyVal<Run | undefined>
+  readonly resolvingAction: ReadonlyVal<WaitAction | undefined>
+  readonly run: ReadonlyVal<Run | RunDetails | undefined>
   readonly runs: ReadonlyVal<readonly Run[]>
 }
 
@@ -69,9 +71,10 @@ const initialState: RunState = {
 const eventPageLimit = 100
 const startingPollDelay = 500
 const runningPollDelay = 1200
+const waitingPollDelay = 60_000
 
-export function canCancelRun(run: Run | undefined): run is Run & { readonly status: 'queued' | 'running' | 'starting' } {
-  return run?.status == 'queued' || run?.status == 'starting' || run?.status == 'running'
+export function canCancelRun(run: Run | undefined): run is Run & { readonly status: 'queued' | 'running' | 'starting' | 'waiting' } {
+  return run?.status == 'queued' || run?.status == 'starting' || run?.status == 'running' || run?.status == 'waiting'
 }
 
 export class RunStore {
@@ -104,6 +107,7 @@ export class RunStore {
       nextCursor: derive(this.#state, (state) => state.nextCursor),
       observationFailed: derive(this.#state, (state) => state.observationFailed),
       result: derive(this.#state, (state) => state.result),
+      resolvingAction: derive(this.#state, (state) => state.resolvingAction),
       run: derive(this.#state, (state) => state.run),
       runs: derive(this.#state, (state) => state.runs),
     }
@@ -179,6 +183,13 @@ export class RunStore {
     }
   }
 
+  public changed(runId: string): void {
+    const state = this.#state.value
+    if (state.target == null) return
+    if (state.run?.runId == runId) this.retryObservation()
+    void this.#refreshList(state.target.flowId)
+  }
+
   public select(runId: string): void {
     const run = this.#state.value.runs.find((candidate) => candidate.runId == runId)
     if (run != null && run.runId != this.#state.value.run?.runId) this.#observe(run)
@@ -229,6 +240,32 @@ export class RunStore {
     }
   }
 
+  public async resolve(action: WaitAction): Promise<void> {
+    const run = this.#state.value.run
+    const waiting = run?.status == 'waiting' && 'waiting' in run ? run.waiting : undefined
+    if (run == null || waiting == null || this.#state.value.resolvingAction != null || !waiting.actions.some((candidate) => candidate == action)) return
+    this.#setNotice(undefined)
+    this.#set({ resolvingAction: action })
+    try {
+      const resolution = await this.#client.resolveRunWait(run.runId, waiting.waitId, action)
+      const selected = this.#state.value.run
+      if (selected?.runId != run.runId || !('waiting' in selected) || selected.waiting?.waitId != waiting.waitId) return
+      const { waiting: _, ...rest } = selected
+      const next = { ...rest, status: resolution.status }
+      this.#set({
+        run: next,
+        runs: this.#state.value.runs.map((candidate) => (candidate.runId == run.runId ? { ...candidate, status: resolution.status } : candidate)),
+      })
+      this.retryObservation()
+      const target = this.#state.value.target
+      if (target != null) void this.#refreshList(target.flowId)
+    } catch (error) {
+      if (this.#state.value.run?.runId == run.runId) this.#setNotice(errorNotice(error, this.#i18n.t))
+    } finally {
+      if (this.#state.value.resolvingAction == action) this.#set({ resolvingAction: undefined })
+    }
+  }
+
   public prepareStart(): Current {
     const current = this.#selection.begin()
     this.#lists.invalidate()
@@ -262,7 +299,16 @@ export class RunStore {
   #observe(run: Run): void {
     const current = this.#selection.begin()
     this.#clearTimer()
-    this.#set({ eventCursor: 0, events: [], eventsExpiresAt: undefined, historyComplete: true, observationFailed: false, result: undefined, run })
+    this.#set({
+      eventCursor: 0,
+      events: [],
+      eventsExpiresAt: undefined,
+      historyComplete: true,
+      observationFailed: false,
+      resolvingAction: undefined,
+      result: undefined,
+      run,
+    })
     void this.#poll(run, current)
   }
 
@@ -304,15 +350,28 @@ export class RunStore {
       const delay =
         isRunTerminal(nextRun.status) || page.events.length == eventPageLimit
           ? 0
-          : starting
-            ? Math.min(runningPollDelay, startingPollDelay * 2 ** Math.max(0, nextUnchangedStartingPolls - 1))
-            : runningPollDelay
+          : nextRun.status == 'waiting'
+            ? waitingPollDelay
+            : starting
+              ? Math.min(runningPollDelay, startingPollDelay * 2 ** Math.max(0, nextUnchangedStartingPolls - 1))
+              : runningPollDelay
       this.#timer = globalThis.setTimeout(() => void this.#poll(nextRun, current, nextUnchangedStartingPolls), delay)
     } catch (error) {
       if (current() && this.#state.value.run?.runId == run.runId) {
         this.#set({ observationFailed: true })
         this.#setNotice(errorNotice(error, this.#i18n.t))
       }
+    }
+  }
+
+  async #refreshList(flowId: string): Promise<void> {
+    const current = this.#lists.begin()
+    try {
+      const page = await this.#client.listRuns(flowId, { limit: 50 })
+      if (!current() || this.#state.value.target?.flowId != flowId) return
+      this.#set({ nextCursor: page.nextCursor, runs: page.runs })
+    } catch {
+      return
     }
   }
 

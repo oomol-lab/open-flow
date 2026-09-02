@@ -152,6 +152,7 @@ export class DesignerUIStore {
       if (!activeLayout && hasPersistedPositions(uiData.nodes, uiData.pseudoNodes)) {
         this.initializedLayouts.add(displayMode)
       }
+      if (activeLayout) this.applyLayout(activeLayout)
       const viewport = activeLayout?.viewport ?? uiData.viewport
       if (isViewport(viewport)) {
         this.observedViewport = viewport
@@ -272,6 +273,12 @@ export class DesignerUIStore {
 
   private applyLayout(layout: DesignerUILayout): void {
     applyPositions(this.nodeStores, layout.nodes)
+    if (this.commentNodeStores && layout.nodes) {
+      for (const [nodeId, store] of this.commentNodeStores) {
+        const position = layout.nodes[nodeId]
+        if (position) store.$$.position.set({ ...position })
+      }
+    }
     if (this.pseudoNodeStores) applyPositions(this.pseudoNodeStores, layout.pseudoNodes)
     if (layout.viewport) {
       this.observedViewport = layout.viewport

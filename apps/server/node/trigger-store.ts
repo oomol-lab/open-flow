@@ -434,6 +434,23 @@ export class TriggerStore {
         )
       if (current == null) return
 
+      const flowBusy =
+        this.#database
+          .prepare(
+            `SELECT 1
+             FROM work
+             JOIN runs USING (run_id)
+             WHERE runs.flow_id = ?
+               AND NOT EXISTS (
+                 SELECT 1
+                 FROM trigger_occurrences
+                 WHERE trigger_occurrences.occurrence_id = ?
+               )
+             LIMIT 1`,
+          )
+          .get(input.flowId, input.occurrenceId) != null
+      if (flowBusy) return { kind: 'overloaded' }
+
       const scheduledAt = new Date(input.nextAt).toISOString()
       const accepted = this.#acceptTriggerOccurrence({
         content: input.content,

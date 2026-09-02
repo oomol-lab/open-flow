@@ -164,6 +164,18 @@ describe('DesignerStore graph projection', () => {
     expect(setup.store.$.renderedRFGraph.value).toBe(measured)
     setup.dispose()
   })
+
+  it('does not republish nodes for an unchanged position', async () => {
+    const setup = createTestSetup()
+    const node = setup.createNode('node' as NodeId)
+    setup.nodes.set(node.nodeId, node)
+    const graph = setup.store.$.renderedRFGraph.value
+
+    await setup.store.handleNodesChange([{ id: node.rfNodeId, position: { ...node.$.position.value }, type: 'position' }])
+
+    expect(setup.store.$.renderedRFGraph.value).toBe(graph)
+    setup.dispose()
+  })
 })
 
 describe('DesignerStore display mode', () => {

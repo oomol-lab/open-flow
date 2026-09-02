@@ -107,7 +107,10 @@ export class WorkbenchStore {
       if (!this.#disposed) this.#notice.set(notice)
     }
     this.runs = new RunStore(client, setNotice, i18n)
-    this.workspace = new WorkspaceStore(client, setNotice, createAuthoringId, i18n, (event) => void this.#followExternalRun(client, event))
+    this.workspace = new WorkspaceStore(client, setNotice, createAuthoringId, i18n, (event) => {
+      if (event.kind == 'run.created') void this.#followExternalRun(client, event)
+      else this.runs.changed(event.runId)
+    })
     this.connectors = new ConnectorStore(client, this.workspace, setNotice, host, i18n)
     this.triggers = new TriggerStore(client, this.workspace, setNotice, host, i18n)
     this.publications = new PublicationStore(client, this.workspace, setNotice, preferences, identity, i18n)
@@ -285,6 +288,11 @@ export class WorkbenchStore {
   public locateRunEvent(sequence: number): boolean {
     const nodeId = this.$.runEventNodes.value.get(sequence)
     return nodeId != null && this.workspace.locateNode(nodeId)
+  }
+
+  public locateRunWait(): boolean {
+    const run = this.runs.$.run.value
+    return run?.status == 'waiting' && 'waiting' in run && run.waiting != null && this.workspace.locateNode(run.waiting.nodeId)
   }
 
   public async addNode(option: AddNodeOption, position: Point, connection?: (nodeId: string) => Omit<DesignerEdge, 'id'>): Promise<string | undefined> {

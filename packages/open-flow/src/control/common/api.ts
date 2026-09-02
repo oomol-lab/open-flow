@@ -1,7 +1,15 @@
 import type { RunStatus } from '../../execution/common/runLifecycle.ts'
-import type { ChangeOperation, InputPortDefinition, JsonValue, PortDefinition, RevisionContent, TriggerKeySnapshot } from '../../flow/common/change.ts'
+import type {
+  ChangeOperation,
+  InputPortDefinition,
+  JsonValue,
+  PortDefinition,
+  RevisionContent,
+  TriggerKeySnapshot,
+  WaitAction,
+} from '../../flow/common/change.ts'
 
-export type { JsonValue, TriggerKeySnapshot } from '../../flow/common/change.ts'
+export type { JsonValue, TriggerKeySnapshot, WaitAction } from '../../flow/common/change.ts'
 export type { RunStatus } from '../../execution/common/runLifecycle.ts'
 export { controlErrorCode, controlErrorMetadata, type ControlErrorCode } from './errors.ts'
 export type { FlowCatalogEvent, FlowChangeEvent } from './flowNotifications.ts'
@@ -250,6 +258,14 @@ interface RunDetailsBase extends Run {
   readonly eventsExpiresAt?: string
   readonly modelVersion: number
   readonly revisionDigest: string
+  readonly waiting?: {
+    readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
+    readonly expiresAt: string
+    readonly nodeId: string
+    readonly prompt: string
+    readonly waitId: string
+    readonly waitingSince: string
+  }
 }
 
 export type DraftRun = RunDetailsBase & { readonly source: 'draft' }
@@ -284,7 +300,9 @@ export type RunEventKind =
   | 'run.indeterminate'
   | 'run.progress'
   | 'run.queued'
+  | 'run.resolved'
   | 'run.started'
+  | 'run.waiting'
 
 export interface RunEvent {
   readonly createdAt: string
@@ -850,11 +868,33 @@ function run(value: unknown): Run {
   }
 }
 
+function runWaiting(value: unknown) {
+  const source = record(value)
+  exact(source, ['actions', 'expiresAt', 'nodeId', 'prompt', 'waitId', 'waitingSince'])
+  const actions = source.actions
+  if (
+    !Array.isArray(actions) ||
+    !((actions.length == 1 && actions[0] == 'continue') || (actions.length == 2 && actions[0] == 'approve' && actions[1] == 'reject'))
+  ) {
+    return invalidResponse()
+  }
+  return {
+    actions: actions as unknown as readonly ['continue'] | readonly ['approve', 'reject'],
+    expiresAt: string(source.expiresAt),
+    nodeId: string(source.nodeId),
+    prompt: string(source.prompt),
+    waitId: string(source.waitId),
+    waitingSince: string(source.waitingSince),
+  }
+}
+
 function runDetails(value: unknown): RunDetails {
   const source = record(value)
   const summary = run(source)
   const eventsExpiresAt = source.eventsExpiresAt
   if (eventsExpiresAt != null && typeof eventsExpiresAt != 'string') return invalidResponse()
+  if (summary.status != 'waiting' && source.waiting !== undefined) return invalidResponse()
+  const waiting = summary.status == 'waiting' ? runWaiting(source.waiting) : undefined
   const details = {
     ...summary,
     closureDigest: string(source.closureDigest),
@@ -863,6 +903,7 @@ function runDetails(value: unknown): RunDetails {
     ...(eventsExpiresAt == null ? {} : { eventsExpiresAt }),
     modelVersion: integer(source.modelVersion),
     revisionDigest: string(source.revisionDigest),
+    ...(waiting == null ? {} : { waiting }),
   }
   switch (summary.source) {
     case 'draft':
@@ -908,7 +949,9 @@ const runEventKinds = new Set<RunEventKind>([
   'run.indeterminate',
   'run.progress',
   'run.queued',
+  'run.resolved',
   'run.started',
+  'run.waiting',
 ])
 
 function runEvent(value: unknown): RunEvent {
@@ -950,10 +993,43 @@ function runEvents(value: unknown): RunEvents {
 function runCancellation(value: unknown): RunCancellation {
   const source = record(value)
   const status = runStatus(source.status)
-  if (source.version != 1 || typeof source.cancelAccepted != 'boolean' || status == 'queued' || status == 'starting' || status == 'running') {
+  if (
+    source.version != 1 ||
+    typeof source.cancelAccepted != 'boolean' ||
+    status == 'queued' ||
+    status == 'starting' ||
+    status == 'running' ||
+    status == 'waiting'
+  ) {
     return invalidResponse()
   }
   return { cancelAccepted: source.cancelAccepted, runId: string(source.runId), status, version: 1 }
+}
+
+function waitResolution(value: unknown) {
+  const source = record(value)
+  exact(source, ['action', 'resolutionAccepted', 'resolvedAt', 'runId', 'status', 'version', 'waitId'])
+  const action = source.action
+  const resolvedAt = source.resolvedAt
+  if (
+    source.version != 1 ||
+    typeof source.resolutionAccepted != 'boolean' ||
+    (action !== null && action != 'approve' && action != 'continue' && action != 'reject') ||
+    (resolvedAt !== null && typeof resolvedAt != 'string') ||
+    (action === null) != (resolvedAt === null) ||
+    (source.resolutionAccepted && action === null)
+  ) {
+    return invalidResponse()
+  }
+  return {
+    action: action as WaitAction | null,
+    resolutionAccepted: source.resolutionAccepted,
+    resolvedAt: resolvedAt as string | null,
+    runId: string(source.runId),
+    status: runStatus(source.status),
+    version: 1 as const,
+    waitId: string(source.waitId),
+  }
 }
 
 function runResult(value: unknown): RunResult {
@@ -1299,6 +1375,27 @@ export class ControlClient {
     return runCancellation(
       await this.request(`/v1/runs/${segment(runId)}/cancel`, {
         body: JSON.stringify({ version: 1 }),
+        method: 'POST',
+      }),
+    )
+  }
+
+  async resolveRunWait(
+    runId: string,
+    waitId: string,
+    action: WaitAction,
+  ): Promise<{
+    readonly action: WaitAction | null
+    readonly resolutionAccepted: boolean
+    readonly resolvedAt: string | null
+    readonly runId: string
+    readonly status: RunStatus
+    readonly version: 1
+    readonly waitId: string
+  }> {
+    return waitResolution(
+      await this.request(`/v1/runs/${segment(runId)}/waits/${segment(waitId)}/resolve`, {
+        body: JSON.stringify({ action, version: 1 }),
         method: 'POST',
       }),
     )

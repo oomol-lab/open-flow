@@ -27,11 +27,13 @@ import {
   createManagedTask,
   createProviderTrigger,
   createValue,
+  createWait,
   deleteNodes,
   setInputValue as setGraphInputValue,
   setInputVariable as setGraphInputVariable,
   updateSettings,
 } from '../../../../flow/common/nodeChanges.ts'
+import { flowDependencies } from '../../../../flow/common/semantics.ts'
 import { generateTyping } from '../../../../manifest/common/meta/block/generateTyping.ts'
 
 export type DesignerTarget = { readonly kind: 'flow' } | { readonly id: string; readonly kind: 'subflow' }
@@ -97,12 +99,42 @@ export type AddNodeIntent =
   | { readonly kind: 'provider-trigger'; readonly connectionId?: string; readonly definition: TriggerKeySnapshot }
   | { readonly kind: 'subflow'; readonly subflowId: string }
   | { readonly kind: 'value'; readonly name: string }
+  | { readonly kind: 'wait'; readonly name: string }
   | { readonly kind: 'webhook'; readonly name: string }
 
 export interface PastedNodes {
   readonly changes: FlowChanges
   readonly nodeIds: readonly string[]
   readonly sourceIds: readonly string[]
+}
+
+function connectorTask(action: ConnectorAction): Extract<TaskDefinition, { readonly executor: unknown }> {
+  return {
+    executor: {
+      action: action.actionId,
+      ...(action.defaultConnection == null ? {} : { connectionId: action.defaultConnection.connectionId }),
+      kind: 'connector',
+    },
+    inputs: Object.entries(action.inputs).map(([handle, port]) => Object.assign({ handle }, port)),
+    name: action.name,
+    outputs: Object.entries(action.outputs).map(([handle, port]) => Object.assign({ handle }, port)),
+  }
+}
+
+function messageHandle(action: ConnectorAction): string | undefined {
+  const inputs = Object.entries(action.inputs)
+  return (
+    inputs.find(([, port]) => {
+      const schema = port.jsonSchema
+      return schema != null && typeof schema == 'object' && !Array.isArray(schema) && 'type' in schema && schema.type == 'string'
+    })?.[0] ?? inputs[0]?.[0]
+  )
+}
+
+function cleanTask(revision: RevisionView, changes: FlowChanges, taskId: string | undefined): FlowChanges {
+  if (taskId == null) return changes
+  const changed = reduceFlowChanges(revision.revision.content, changes)
+  return flowDependencies(changed).tasks.has(taskId) ? changes : [...changes, { kind: 'task.delete', taskId }]
 }
 
 export function createResource(id: string, name: string): FlowChanges {
@@ -140,24 +172,13 @@ export function addNode(
     case 'llm':
       return createLlmTask(target, { nodeId, taskId: identity() }, intent.name, intent.mode, intent.outputDescription)
     case 'connector':
-      return createManagedTask(
-        target,
-        { nodeId, taskId: identity() },
-        {
-          executor: {
-            action: intent.action.actionId,
-            ...(intent.action.defaultConnection == null ? {} : { connectionId: intent.action.defaultConnection.connectionId }),
-            kind: 'connector',
-          },
-          inputs: Object.entries(intent.action.inputs).map(([handle, port]) => Object.assign({ handle }, port)),
-          name: intent.action.name,
-          outputs: Object.entries(intent.action.outputs).map(([handle, port]) => Object.assign({ handle }, port)),
-        },
-      )
+      return createManagedTask(target, { nodeId, taskId: identity() }, connectorTask(intent.action))
     case 'condition':
       return createCondition(target, nodeId, intent.name)
     case 'value':
       return createValue(target, nodeId, intent.name)
+    case 'wait':
+      return target.kind == 'flow' ? createWait(target, nodeId, intent.name) : undefined
     case 'subflow': {
       const subflow = revision.subflow(intent.subflowId)
       if (subflow == null) return
@@ -194,7 +215,8 @@ export function copyNodes(revision: RevisionView, target: DesignerTarget, nodeId
     bindings: Object.fromEntries(
       Object.values(copied).flatMap((node) => {
         if (!('inputs' in node)) return []
-        return Object.values(node.inputs).flatMap((mapping) =>
+        const inputs = [...Object.values(node.inputs), ...(node.kind == 'wait' && node.notification != null ? Object.values(node.notification.inputs) : [])]
+        return inputs.flatMap((mapping) =>
           mapping.kind == 'sources'
             ? mapping.sources.flatMap((source) => {
                 if (source.kind != 'binding') return []
@@ -227,7 +249,8 @@ export function pasteNodes(revision: RevisionView, target: DesignerTarget, clipb
   const bindingIds = new Map<string, string>()
   for (const [, node] of entries) {
     if (!('inputs' in node)) continue
-    for (const mapping of Object.values(node.inputs)) {
+    const inputs = [...Object.values(node.inputs), ...(node.kind == 'wait' && node.notification != null ? Object.values(node.notification.inputs) : [])]
+    for (const mapping of inputs) {
       if (mapping.kind != 'sources') continue
       for (const source of mapping.sources) {
         if (source.kind != 'binding' || clipboard.bindings[source.bindingId]?.kind != 'variable' || bindingIds.has(source.bindingId)) continue
@@ -252,29 +275,38 @@ export function pasteNodes(revision: RevisionView, target: DesignerTarget, clipb
       }
       continue
     }
-    const inputs: Record<string, InputMapping> = {}
-    for (const [handle, mapping] of Object.entries(node.inputs)) {
-      if (mapping.kind == 'value') {
-        inputs[handle] = mapping
-        continue
-      }
-      const sources: (typeof mapping.sources)[number][] = []
-      for (const source of mapping.sources) {
-        if (source.kind == 'binding') {
-          const copiedBindingId = bindingIds.get(source.bindingId)
-          if (copiedBindingId != null) sources.push({ ...source, bindingId: copiedBindingId })
+    const remapInputs = (sourceInputs: Readonly<Record<string, InputMapping>>): Readonly<Record<string, InputMapping>> => {
+      const inputs: Record<string, InputMapping> = {}
+      for (const [handle, mapping] of Object.entries(sourceInputs)) {
+        if (mapping.kind == 'value') {
+          inputs[handle] = mapping
           continue
         }
-        if (source.kind != 'node') {
-          sources.push(source)
-          continue
+        const sources: (typeof mapping.sources)[number][] = []
+        for (const source of mapping.sources) {
+          if (source.kind == 'binding') {
+            const copiedBindingId = bindingIds.get(source.bindingId)
+            if (copiedBindingId != null) sources.push({ ...source, bindingId: copiedBindingId })
+            continue
+          }
+          if (source.kind != 'node') {
+            sources.push(source)
+            continue
+          }
+          const copiedNodeId = ids.get(source.nodeId)
+          if (copiedNodeId != null) sources.push({ ...source, nodeId: copiedNodeId })
         }
-        const copiedNodeId = ids.get(source.nodeId)
-        if (copiedNodeId != null) sources.push({ ...source, nodeId: copiedNodeId })
+        if (sources.length > 0) inputs[handle] = { kind: 'sources', sources }
       }
-      if (sources.length > 0) inputs[handle] = { kind: 'sources', sources }
+      return inputs
     }
-    let copy: GraphNode = { ...node, inputs, ...(node.name == null ? {} : { name: `${node.name} copy` }) }
+    const inputs = remapInputs(node.inputs)
+    let copy: GraphNode = {
+      ...node,
+      inputs,
+      ...(node.kind == 'wait' && node.notification != null ? { notification: { ...node.notification, inputs: remapInputs(node.notification.inputs) } } : {}),
+      ...(node.name == null ? {} : { name: `${node.name} copy` }),
+    }
     if (node.kind == 'task' && node.task != null) {
       const moduleId = nodeId
       const module = clipboard.modules[node.task.moduleId]
@@ -417,6 +449,79 @@ export function updateValue(revision: RevisionView, target: DesignerTarget, node
   }))
   if (dequal(node.values, values)) return []
   return [{ before: node.values, kind: 'graph.node.values.set', nodeId, target, value: values }]
+}
+
+export function updateWait(
+  revision: RevisionView,
+  target: DesignerTarget,
+  nodeId: string,
+  settings: Pick<Extract<GraphNode, { readonly kind: 'wait' }>, 'actions' | 'prompt'> & {
+    readonly name?: string
+    readonly notification: Extract<GraphNode, { readonly kind: 'wait' }>['notification']
+  },
+): FlowChanges | undefined {
+  if (target.kind != 'flow') return
+  const graph = revision.graph(target)
+  const current = graph?.nodes[nodeId]
+  if (graph == null || current?.kind != 'wait') return
+  const before = {
+    actions: current.actions,
+    ...(current.notification == null ? {} : { notification: current.notification }),
+    prompt: current.prompt,
+  }
+  const value = {
+    actions: settings.actions,
+    ...(settings.notification == null ? {} : { notification: settings.notification }),
+    prompt: settings.prompt,
+  }
+  const outputs = new Set<string>(settings.actions)
+  const changes: ChangeOperation[] = []
+  if (current.name != settings.name) {
+    changes.push({ before: current.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value: settings.name })
+  }
+  if (!dequal(before, value)) changes.push({ before, kind: 'graph.node.wait.set', nodeId, target, value })
+  for (const [currentNodeId, node] of Object.entries(graph.nodes)) {
+    if (currentNodeId == nodeId) continue
+    if (!('inputs' in node)) continue
+    for (const [handle, mapping] of Object.entries(node.inputs)) {
+      if (mapping.kind != 'sources') continue
+      const sources = mapping.sources.filter((source) => source.kind != 'node' || source.nodeId != nodeId || outputs.has(source.output))
+      if (sources.length == mapping.sources.length) continue
+      changes.push({
+        before: mapping,
+        handle,
+        kind: 'graph.node.input.set',
+        nodeId: currentNodeId,
+        target,
+        value: sources.length == 0 ? undefined : { kind: 'sources', sources },
+      })
+    }
+  }
+  if (changes.length == 0) return
+  const cleaned = cleanVariableBindings(revision.revision.content, changes)
+  return cleanTask(revision, cleaned, current.notification?.taskId == settings.notification?.taskId ? undefined : current.notification?.taskId)
+}
+
+export function setWaitNotification(revision: RevisionView, nodeId: string, action: ConnectorAction, taskId: string): FlowChanges | undefined {
+  const graph = revision.graph({ kind: 'flow' })
+  const current = graph?.nodes[nodeId]
+  const handle = messageHandle(action)
+  if (current?.kind != 'wait' || handle == null) return
+  const changes: ChangeOperation[] = [
+    { kind: 'task.create', task: connectorTask(action), taskId },
+    {
+      before: {
+        actions: current.actions,
+        ...(current.notification == null ? {} : { notification: current.notification }),
+        prompt: current.prompt,
+      },
+      kind: 'graph.node.wait.set',
+      nodeId,
+      target: { kind: 'flow' },
+      value: { actions: current.actions, notification: { inputs: {}, messageHandle: handle, taskId }, prompt: current.prompt },
+    },
+  ]
+  return cleanTask(revision, changes, current.notification?.taskId)
 }
 
 export function updateTask(revision: RevisionView, target: DesignerTarget, nodeId: string, settings: TaskSettings): FlowChanges | undefined {

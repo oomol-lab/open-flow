@@ -300,7 +300,7 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
     }),
   )
   const connector = new ConnectorClient('https://connector.oomol.com', 'runtime-token')
-  const service = await openService(file, connector)
+  const service = await openService(file, { capabilities: { connector: () => connector } })
   let flowId = ''
   try {
     expect((await createServerApp(service).request('/connector/teams')).status).toBe(401)
@@ -351,7 +351,7 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
     await closeService(service)
   }
 
-  const reopened = await openService(file, new ConnectorClient('https://connector.oomol.com', 'runtime-token'))
+  const reopened = await openService(file, { capabilities: { connector: () => new ConnectorClient('https://connector.oomol.com', 'runtime-token') } })
   try {
     await reopened.control.listConnectorProviders(flowId)
     expect(requests.at(-1)).toEqual({ teamId: 'team-2', url: 'https://connector.oomol.com/v1/providers' })
@@ -363,7 +363,9 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
 
 it('hides OOMOL Team selection for a custom Connector', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-custom-team-'))
-  const service = await openService(path.join(directory, 'open-flow.sqlite'), new ConnectorClient('https://connector.example.com', 'runtime-token'))
+  const service = await openService(path.join(directory, 'open-flow.sqlite'), {
+    capabilities: { connector: () => new ConnectorClient('https://connector.example.com', 'runtime-token') },
+  })
   try {
     const app = createServerApp(service, { resolveControlActor: () => 'operator' })
     expect(await (await app.request('/connector/teams')).json()).toEqual({ bindings: [], enabled: false, teams: [], version: 1 })

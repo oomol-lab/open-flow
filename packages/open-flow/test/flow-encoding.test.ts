@@ -186,4 +186,67 @@ describe('Flow Revision encoding', () => {
       document: { graph: { nodes: { value: { values: [{ handle: 'value' }, { handle: 'detail' }] } } } },
     })
   })
+
+  it('canonically encodes Wait actions and notification mappings', () => {
+    const source = revision()
+    const wait = {
+      actions: ['approve', 'reject'],
+      concurrency: 1,
+      inputs: { value: { kind: 'value', value: { request: 1 } } },
+      kind: 'wait',
+      notification: {
+        inputs: {
+          recipient: { kind: 'value', value: 'ops@example.com' },
+          subject: { kind: 'value', value: 'Approval required' },
+        },
+        messageHandle: 'message',
+        taskId: 'notify',
+      },
+      prompt: 'Approve request 1?',
+    } as const
+    const first: RevisionContent = {
+      ...source,
+      document: {
+        ...source.document,
+        graph: { nodes: { wait } },
+      },
+    }
+    const second: RevisionContent = {
+      ...first,
+      document: {
+        ...first.document,
+        graph: {
+          nodes: {
+            wait: {
+              ...wait,
+              notification: {
+                ...wait.notification,
+                inputs: {
+                  subject: wait.notification.inputs.subject,
+                  recipient: wait.notification.inputs.recipient,
+                },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    expect(encodeRevision(second)).toEqual(encodeRevision(first))
+    expect(JSON.parse(decoder.decode(encodeRevision(first))).document.graph.nodes.wait).toEqual({
+      actions: ['approve', 'reject'],
+      concurrency: 1,
+      inputs: { value: { kind: 'value', value: { request: 1 } } },
+      kind: 'wait',
+      notification: {
+        inputs: {
+          recipient: { kind: 'value', value: 'ops@example.com' },
+          subject: { kind: 'value', value: 'Approval required' },
+        },
+        messageHandle: 'message',
+        taskId: 'notify',
+      },
+      prompt: 'Approve request 1?',
+    })
+  })
 })

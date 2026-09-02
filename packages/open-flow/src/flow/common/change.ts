@@ -91,6 +91,19 @@ export interface ValueNode extends GraphNodeBase {
   readonly values: readonly InputPort[]
 }
 
+export type WaitAction = 'approve' | 'continue' | 'reject'
+
+export interface WaitNode extends GraphNodeBase {
+  readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
+  readonly kind: 'wait'
+  readonly notification?: {
+    readonly inputs: Readonly<Record<string, InputMapping>>
+    readonly messageHandle: string
+    readonly taskId: string
+  }
+  readonly prompt: string
+}
+
 export type ConditionOperator =
   | '!='
   | '<'
@@ -239,7 +252,7 @@ export type TriggerNode =
       readonly kind: 'integration'
     })
 
-export type GraphNode = ConditionNode | SubflowNode | TaskNode | TriggerNode | ValueNode
+export type GraphNode = ConditionNode | SubflowNode | TaskNode | TriggerNode | ValueNode | WaitNode
 
 export interface FlowDocument {
   readonly bindings: Readonly<Record<string, { readonly kind: 'connection' | 'variable'; readonly target: string }>>
@@ -337,6 +350,13 @@ export type ChangeOperation =
       readonly nodeId: string
       readonly target: GraphTarget
       readonly value: readonly InputPort[]
+    }
+  | {
+      readonly before: Pick<WaitNode, 'actions' | 'notification' | 'prompt'>
+      readonly kind: 'graph.node.wait.set'
+      readonly nodeId: string
+      readonly target: Extract<GraphTarget, { readonly kind: 'flow' }>
+      readonly value: Pick<WaitNode, 'actions' | 'notification' | 'prompt'>
     }
   | {
       readonly before: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'inputsDef' | 'options'>
@@ -564,6 +584,27 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
           document,
           replaceGraph(document, operation.target, { nodes: { ...graph.nodes, [operation.nodeId]: { ...node, values: operation.value } } }),
         )
+        break
+      }
+      case 'graph.node.wait.set': {
+        const graph = document.graph
+        const node = graph.nodes[operation.nodeId]
+        if (
+          node?.kind != 'wait' ||
+          !dequal(
+            {
+              actions: node.actions,
+              ...(node.notification == null ? {} : { notification: node.notification }),
+              prompt: node.prompt,
+            },
+            operation.before,
+          )
+        ) {
+          invalid()
+        }
+        const { notification: _, ...rest } = node
+        const updated: WaitNode = operation.value.notification == null ? { ...rest, ...operation.value } : { ...node, ...operation.value }
+        document.graph = { nodes: { ...graph.nodes, [operation.nodeId]: updated } }
         break
       }
       case 'graph.node.webhook.set': {

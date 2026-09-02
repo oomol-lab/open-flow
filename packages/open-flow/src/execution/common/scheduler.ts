@@ -1,10 +1,21 @@
 import type * as Cause from 'effect/Cause'
-import type { ConnectorCapability, Graph, GraphNode, InputPortDefinition, JsonValue, OutputMapping, TriggerNode } from '../../flow/common/change.ts'
+import type {
+  ConnectorCapability,
+  Graph,
+  GraphNode,
+  InputMapping,
+  InputPortDefinition,
+  JsonValue,
+  OutputMapping,
+  TriggerNode,
+  WaitAction,
+} from '../../flow/common/change.ts'
 import type { PreparedFlow } from '../../flow/common/semantics.ts'
 
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import * as FiberSet from 'effect/FiberSet'
+import { nanoid } from 'nanoid'
 import { portsByHandle } from '../../flow/common/change.ts'
 
 type ExecutableNode = Exclude<GraphNode, TriggerNode>
@@ -32,7 +43,7 @@ export type SchedulerEvent =
       readonly inputs: Readonly<Record<string, JsonValue>>
       readonly jobId: string
       readonly nodeId: string
-      readonly nodeKind: 'condition' | 'connector' | 'javascript' | 'llm' | 'subflow' | 'value'
+      readonly nodeKind: 'condition' | 'connector' | 'javascript' | 'llm' | 'subflow' | 'value' | 'wait'
       readonly nodeTitle?: string
       readonly runId: string
       readonly type: 'node.started'
@@ -60,6 +71,14 @@ export type SchedulerEvent =
       readonly type: 'node.failed'
     }
   | {
+      readonly jobId: string
+      readonly level: 'debug' | 'error' | 'info' | 'warn'
+      readonly message: string
+      readonly nodeId: string
+      readonly runId: string
+      readonly type: 'node.log'
+    }
+  | {
       readonly result: FlowRunResult | SubflowRunResult
       readonly runId: string
       readonly type: 'run.completed'
@@ -80,6 +99,66 @@ export interface FlowRunResult {
     readonly nodeId: string
   }[]
 }
+
+export interface FlowRunCheckpoint {
+  readonly bindingValues: Readonly<Record<string, string>>
+  readonly buffers: Readonly<
+    Record<
+      string,
+      {
+        readonly slots: Readonly<
+          Record<
+            string,
+            {
+              readonly provided: boolean
+              readonly queue: readonly JsonValue[]
+              readonly value: JsonValue
+            }
+          >
+        >
+        readonly staticTaken: boolean
+      }
+    >
+  >
+  readonly completedNodes: readonly string[]
+  readonly nextJobs: Readonly<Record<string, number>>
+  readonly outputs: Readonly<Record<string, JsonValue>>
+  readonly results: readonly {
+    readonly jobs: readonly {
+      readonly jobId: string
+      readonly order: number
+      readonly outputs: Readonly<Record<string, JsonValue>>
+    }[]
+    readonly nodeId: string
+  }[]
+  readonly version: 1
+  readonly wait: {
+    readonly jobId: string
+    readonly nodeId: string
+    readonly order: number
+    readonly value: JsonValue
+    readonly waitId: string
+  }
+}
+
+export type FlowRunOutcome =
+  | FlowRunResult
+  | {
+      readonly checkpoint: FlowRunCheckpoint
+      readonly kind: 'waiting'
+      readonly notification?: {
+        readonly input: Readonly<Record<string, JsonValue>>
+        readonly messageHandle: string
+        readonly taskId: string
+      }
+      readonly wait: {
+        readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
+        readonly jobId: string
+        readonly nodeId: string
+        readonly order: number
+        readonly waitId: string
+      }
+    }
 
 export interface SubflowRunResult {
   readonly kind: 'function-outputs'
@@ -119,14 +198,9 @@ export interface FlowRunOptions {
   readonly inputs?: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>
   readonly invokeTask: (invocation: TaskInvocation, outputs: (value: unknown) => Effect.Effect<void, Error>) => Effect.Effect<unknown, Error>
   readonly projectFailure?: (error: unknown) => SchedulerFailure
+  readonly resume?: { readonly action: WaitAction; readonly checkpoint: unknown }
   readonly runId: string
   readonly trigger?: TriggerSeed
-}
-
-interface NodeJob {
-  readonly jobId: string
-  readonly order: number
-  readonly outputs: Readonly<Record<string, JsonValue>>
 }
 
 interface ParentRun {
@@ -181,6 +255,14 @@ class ValueQueue {
     }
     return value
   }
+
+  restore(values: readonly JsonValue[]): void {
+    this.#values.push(...values)
+  }
+
+  snapshot(): readonly JsonValue[] {
+    return this.#values.slice(this.#head)
+  }
 }
 
 class InputSlot {
@@ -189,8 +271,7 @@ class InputSlot {
   #provided: boolean
   #value: JsonValue
 
-  constructor(node: ExecutableNode, handle: string, port: InputPortDefinition) {
-    const mapping = node.inputs[handle]
+  constructor(mapping: InputMapping | undefined, port: InputPortDefinition) {
     this.#dynamic = mapping?.kind == 'sources'
     this.#provided = !this.#dynamic && (mapping?.kind == 'value' || Object.hasOwn(port, 'value'))
     this.#value = mapping?.kind == 'value' ? mapping.value : (port.value ?? null)
@@ -217,6 +298,16 @@ class InputSlot {
   take(): JsonValue {
     return this.#queue.length > 0 ? this.#queue.shift() : this.#value
   }
+
+  restore(state: { readonly provided: boolean; readonly queue: readonly JsonValue[]; readonly value: JsonValue }): void {
+    this.#provided = state.provided
+    this.#value = state.value
+    this.#queue.restore(state.queue)
+  }
+
+  snapshot(): { readonly provided: boolean; readonly queue: readonly JsonValue[]; readonly value: JsonValue } {
+    return { provided: this.#provided, queue: this.#queue.snapshot(), value: this.#value }
+  }
 }
 
 class InputBuffer {
@@ -225,10 +316,23 @@ class InputBuffer {
   readonly #slots: ReadonlyMap<string, InputSlot>
   #staticTaken = false
 
-  constructor(nodeId: string, node: ExecutableNode, ports: Readonly<Record<string, InputPortDefinition>>) {
+  constructor(
+    nodeId: string,
+    mappings: Readonly<Record<string, InputMapping>>,
+    ports: Readonly<Record<string, InputPortDefinition>>,
+    state?: FlowRunCheckpoint['buffers'][string],
+  ) {
     this.#nodeId = nodeId
-    this.#slots = new Map(Object.entries(ports).map(([handle, port]) => [handle, new InputSlot(node, handle, port)]))
+    this.#slots = new Map(
+      Object.entries(ports).map(([handle, port]) => {
+        const slot = new InputSlot(mappings[handle], port)
+        const saved = state?.slots[handle]
+        if (saved != null) slot.restore(saved)
+        return [handle, slot]
+      }),
+    )
     this.#dynamic = [...this.#slots.values()].some((slot) => slot.dynamic)
+    this.#staticTaken = state?.staticTaken ?? false
   }
 
   get ready(): boolean {
@@ -252,6 +356,24 @@ class InputBuffer {
     if (!this.#dynamic) this.#staticTaken = true
     return Object.fromEntries([...this.#slots].map(([handle, slot]) => [handle, slot.take()]))
   }
+
+  snapshot(): FlowRunCheckpoint['buffers'][string] {
+    return { slots: Object.fromEntries([...this.#slots].map(([handle, slot]) => [handle, slot.snapshot()])), staticTaken: this.#staticTaken }
+  }
+}
+
+const notificationPrefix = 'notification:'
+
+function notificationInput(handle: string): string {
+  return `${notificationPrefix}${handle}`
+}
+
+function nodeMappings(node: ExecutableNode): Readonly<Record<string, InputMapping>> {
+  if (node.kind != 'wait' || node.notification == null) return node.inputs
+  return {
+    ...node.inputs,
+    ...Object.fromEntries(Object.entries(node.notification.inputs).map(([handle, mapping]) => [notificationInput(handle), mapping])),
+  }
 }
 
 function nodePorts(prepared: PreparedFlow, node: ExecutableNode): Readonly<Record<string, InputPortDefinition>> {
@@ -264,6 +386,19 @@ function nodePorts(prepared: PreparedFlow, node: ExecutableNode): Readonly<Recor
       return portsByHandle(prepared.subflows[node.subflowId]!.inputs)
     case 'task':
       return portsByHandle([...(node.task != null ? node.task.inputs : prepared.tasks[node.taskId]!.inputs), ...(node.additionalInputs ?? [])])
+    case 'wait': {
+      const task = node.notification == null ? undefined : prepared.tasks[node.notification.taskId]
+      return {
+        value: { jsonSchema: {}, nullable: true, value: null },
+        ...(node.notification == null || task == null
+          ? {}
+          : Object.fromEntries(
+              task.inputs.flatMap((port) =>
+                'handle' in port && port.handle != node.notification!.messageHandle ? [[notificationInput(port.handle), port]] : [],
+              ),
+            )),
+      }
+    }
   }
 }
 
@@ -278,10 +413,12 @@ function nodeTitle(prepared: PreparedFlow, node: ExecutableNode): string | undef
       return prepared.subflows[node.subflowId]!.name
     case 'task':
       return node.task != null ? node.task.name : prepared.tasks[node.taskId]!.name
+    case 'wait':
+      return 'Wait'
   }
 }
 
-function nodeKind(prepared: PreparedFlow, node: ExecutableNode): 'condition' | 'connector' | 'javascript' | 'llm' | 'subflow' | 'value' {
+function nodeKind(prepared: PreparedFlow, node: ExecutableNode): 'condition' | 'connector' | 'javascript' | 'llm' | 'subflow' | 'value' | 'wait' {
   if (node.kind != 'task') return node.kind
   return node.task != null ? 'javascript' : prepared.tasks[node.taskId]!.executor.kind
 }
@@ -303,7 +440,7 @@ function graphOrder(graph: ExecutableGraph): readonly string[] {
     Object.entries(graph.nodes).map(([nodeId, node]) => [
       nodeId,
       new Set(
-        Object.values(node.inputs).flatMap((mapping) =>
+        Object.values(nodeMappings(node)).flatMap((mapping) =>
           mapping.kind == 'sources'
             ? mapping.sources.flatMap((source) => (source.kind == 'node' && graph.nodes[source.nodeId] != null ? [source.nodeId] : []))
             : [],
@@ -325,6 +462,141 @@ function graphOrder(graph: ExecutableGraph): readonly string[] {
     for (const sources of dependencies.values()) for (const nodeId of ready) sources.delete(nodeId)
   }
   return order
+}
+
+function resultNodeIds(graph: ExecutableGraph, order: readonly string[]): readonly string[] {
+  const dependencies = new Set(
+    Object.values(graph.nodes).flatMap((node) =>
+      Object.values(nodeMappings(node)).flatMap((mapping) =>
+        mapping.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node').map((source) => source.nodeId) : [],
+      ),
+    ),
+  )
+  return order.filter((nodeId) => !dependencies.has(nodeId))
+}
+
+function checkpointRecord(value: unknown, description: string): Readonly<Record<string, unknown>> {
+  if (value == null || typeof value != 'object' || Array.isArray(value)) throw new Error(`${description} must be an object.`)
+  return value as Readonly<Record<string, unknown>>
+}
+
+function checkpointExact(value: Readonly<Record<string, unknown>>, fields: readonly string[], description: string): void {
+  const keys = Object.keys(value)
+  if (keys.length != fields.length || keys.some((key) => !fields.includes(key))) throw new Error(`${description} contains unsupported fields.`)
+}
+
+function checkpointString(value: unknown, description: string): string {
+  if (typeof value != 'string' || value.length == 0) throw new Error(`${description} must be a non-empty string.`)
+  return value
+}
+
+function checkpointInteger(value: unknown, description: string): number {
+  if (!Number.isSafeInteger(value) || Number(value) < 0) throw new Error(`${description} must be a non-negative integer.`)
+  return Number(value)
+}
+
+function checkpointJson(value: unknown, description: string, depth = 0): JsonValue {
+  if (depth > 64) throw new Error(`${description} exceeds the maximum JSON depth.`)
+  if (value === null || typeof value == 'boolean' || typeof value == 'string') return value
+  if (typeof value == 'number' && Number.isFinite(value)) return value
+  if (Array.isArray(value)) return value.map((item) => checkpointJson(item, description, depth + 1))
+  const source = checkpointRecord(value, description)
+  return Object.fromEntries(Object.entries(source).map(([key, item]) => [key, checkpointJson(item, description, depth + 1)]))
+}
+
+export function decodeFlowRunCheckpoint(value: unknown): FlowRunCheckpoint {
+  const source = checkpointRecord(value, 'Flow Run checkpoint')
+  checkpointExact(source, ['bindingValues', 'buffers', 'completedNodes', 'nextJobs', 'outputs', 'results', 'version', 'wait'], 'Flow Run checkpoint')
+  if (source.version != 1) throw new Error('Flow Run checkpoint version is unsupported.')
+
+  const bindingSource = checkpointRecord(source.bindingValues, 'Flow Run checkpoint bindings')
+  const bindingValues = Object.fromEntries(
+    Object.entries(bindingSource).map(([bindingId, item]) => {
+      if (typeof item != 'string') throw new Error(`Flow Run checkpoint binding "${bindingId}" must be a string.`)
+      return [bindingId, item]
+    }),
+  )
+  const bufferSource = checkpointRecord(source.buffers, 'Flow Run checkpoint buffers')
+  const buffers = Object.fromEntries(
+    Object.entries(bufferSource).map(([nodeId, item]) => {
+      const buffer = checkpointRecord(item, `Flow Run checkpoint buffer "${nodeId}"`)
+      checkpointExact(buffer, ['slots', 'staticTaken'], `Flow Run checkpoint buffer "${nodeId}"`)
+      if (typeof buffer.staticTaken != 'boolean') throw new Error(`Flow Run checkpoint buffer "${nodeId}" staticTaken must be boolean.`)
+      const slotSource = checkpointRecord(buffer.slots, `Flow Run checkpoint buffer "${nodeId}" slots`)
+      const slots = Object.fromEntries(
+        Object.entries(slotSource).map(([handle, slotItem]) => {
+          const slot = checkpointRecord(slotItem, `Flow Run checkpoint slot "${nodeId}/${handle}"`)
+          checkpointExact(slot, ['provided', 'queue', 'value'], `Flow Run checkpoint slot "${nodeId}/${handle}"`)
+          if (typeof slot.provided != 'boolean' || !Array.isArray(slot.queue)) {
+            throw new Error(`Flow Run checkpoint slot "${nodeId}/${handle}" is invalid.`)
+          }
+          return [
+            handle,
+            {
+              provided: slot.provided,
+              queue: slot.queue.map((queued) => checkpointJson(queued, `Flow Run checkpoint slot "${nodeId}/${handle}" queue`)),
+              value: checkpointJson(slot.value, `Flow Run checkpoint slot "${nodeId}/${handle}" value`),
+            },
+          ]
+        }),
+      )
+      return [nodeId, { slots, staticTaken: buffer.staticTaken }]
+    }),
+  )
+  if (!Array.isArray(source.completedNodes) || !Array.isArray(source.results)) throw new Error('Flow Run checkpoint result state is invalid.')
+  const completedNodes = source.completedNodes.map((nodeId) => checkpointString(nodeId, 'Flow Run checkpoint completed node'))
+  const nextJobs = Object.fromEntries(
+    Object.entries(checkpointRecord(source.nextJobs, 'Flow Run checkpoint next jobs')).map(([nodeId, item]) => [
+      nodeId,
+      checkpointInteger(item, `Flow Run checkpoint next job "${nodeId}"`),
+    ]),
+  )
+  const outputs = Object.fromEntries(
+    Object.entries(checkpointRecord(source.outputs, 'Flow Run checkpoint outputs')).map(([handle, item]) => [
+      handle,
+      checkpointJson(item, `Flow Run checkpoint output "${handle}"`),
+    ]),
+  )
+  const results = source.results.map((item, index) => {
+    const result = checkpointRecord(item, `Flow Run checkpoint result ${index}`)
+    checkpointExact(result, ['jobs', 'nodeId'], `Flow Run checkpoint result ${index}`)
+    if (!Array.isArray(result.jobs)) throw new Error(`Flow Run checkpoint result ${index} jobs must be an array.`)
+    return {
+      jobs: result.jobs.map((jobItem, jobIndex) => {
+        const job = checkpointRecord(jobItem, `Flow Run checkpoint result ${index} job ${jobIndex}`)
+        checkpointExact(job, ['jobId', 'order', 'outputs'], `Flow Run checkpoint result ${index} job ${jobIndex}`)
+        return {
+          jobId: checkpointString(job.jobId, `Flow Run checkpoint result ${index} job ${jobIndex} ID`),
+          order: checkpointInteger(job.order, `Flow Run checkpoint result ${index} job ${jobIndex} order`),
+          outputs: Object.fromEntries(
+            Object.entries(checkpointRecord(job.outputs, `Flow Run checkpoint result ${index} job ${jobIndex} outputs`)).map(([handle, output]) => [
+              handle,
+              checkpointJson(output, `Flow Run checkpoint result ${index} job ${jobIndex} output "${handle}"`),
+            ]),
+          ),
+        }
+      }),
+      nodeId: checkpointString(result.nodeId, `Flow Run checkpoint result ${index} node ID`),
+    }
+  })
+  const wait = checkpointRecord(source.wait, 'Flow Run checkpoint wait')
+  checkpointExact(wait, ['jobId', 'nodeId', 'order', 'value', 'waitId'], 'Flow Run checkpoint wait')
+  return {
+    bindingValues,
+    buffers,
+    completedNodes,
+    nextJobs,
+    outputs,
+    results,
+    version: 1,
+    wait: {
+      jobId: checkpointString(wait.jobId, 'Flow Run checkpoint wait job ID'),
+      nodeId: checkpointString(wait.nodeId, 'Flow Run checkpoint wait node ID'),
+      order: checkpointInteger(wait.order, 'Flow Run checkpoint wait order'),
+      value: checkpointJson(wait.value, 'Flow Run checkpoint wait value'),
+      waitId: checkpointString(wait.waitId, 'Flow Run checkpoint wait ID'),
+    },
+  }
 }
 
 function jsonEqual(left: JsonValue, right: JsonValue): boolean {
@@ -420,26 +692,46 @@ function runGraph(
   launchInputs: Readonly<Record<string, Readonly<Record<string, JsonValue>>>> = {},
   onOutput?: (handle: string, value: JsonValue) => Effect.Effect<void, Error>,
   trigger?: TriggerSeed,
-): Effect.Effect<FlowRunResult | Readonly<Record<string, JsonValue>>, Error> {
+  resume?: { readonly action: WaitAction; readonly checkpoint: FlowRunCheckpoint },
+): Effect.Effect<FlowRunOutcome | Readonly<Record<string, JsonValue>>, Error> {
   return Effect.scoped(
     Effect.gen(function* () {
-      yield* context.emit({
-        flowId: target.flowId,
-        ...(parent == null ? {} : { parentJobId: parent.jobId, parentRunId: parent.runId }),
-        runId,
-        type: 'run.started',
-      })
+      if (resume == null) {
+        yield* context.emit({
+          flowId: target.flowId,
+          ...(parent == null ? {} : { parentJobId: parent.jobId, parentRunId: parent.runId }),
+          runId,
+          type: 'run.started',
+        })
+      }
       const order = graphOrder(target.graph)
+      const resultNodes = resultNodeIds(target.graph, order)
       const nodeCount = order.length
       const inputBuffers = new Map(
-        Object.entries(target.graph.nodes).map(([nodeId, node]) => [nodeId, new InputBuffer(nodeId, node, nodePorts(context.prepared, node))]),
+        Object.entries(target.graph.nodes).map(([nodeId, node]) => [
+          nodeId,
+          new InputBuffer(nodeId, nodeMappings(node), nodePorts(context.prepared, node), resume?.checkpoint.buffers[nodeId]),
+        ]),
       )
+      if (resume != null) {
+        const bufferIds = Object.keys(resume.checkpoint.buffers).toSorted()
+        if (bufferIds.length != order.length || bufferIds.some((nodeId, index) => nodeId != [...order].toSorted()[index])) {
+          return yield* Effect.fail(new Error('Flow Run checkpoint buffers do not match the prepared graph.'))
+        }
+        for (const [nodeId, node] of Object.entries(target.graph.nodes)) {
+          const expected = Object.keys(nodePorts(context.prepared, node)).toSorted()
+          const actual = Object.keys(resume.checkpoint.buffers[nodeId]!.slots).toSorted()
+          if (expected.length != actual.length || expected.some((handle, index) => handle != actual[index])) {
+            return yield* Effect.fail(new Error(`Flow Run checkpoint inputs do not match node "${nodeId}".`))
+          }
+        }
+      }
       const flowInputTargets = new Map<string, InputTarget[]>()
       const bindingInputTargets = new Map<string, InputTarget[]>()
       const nodeInputTargets = new Map<string, Map<string, InputTarget[]>>()
       const runOutputTargets = new Map<string, Map<string, string[]>>()
       for (const [nodeId, node] of Object.entries(target.graph.nodes)) {
-        for (const [handle, mapping] of Object.entries(node.inputs)) {
+        for (const [handle, mapping] of Object.entries(nodeMappings(node))) {
           if (mapping.kind != 'sources') continue
           for (const source of mapping.sources) {
             if (source.kind == 'binding') {
@@ -463,12 +755,24 @@ function runGraph(
       const activeCounts = new Map<string, number>()
       const active = yield* FiberSet.make<void, Error>()
       const runNode = yield* FiberSet.runtime(active)()
-      const completed = new Map<string, NodeJob[]>()
-      const scheduled = new Map<string, number>()
-      const runOutputs = new Map<string, JsonValue>()
-      const completedNodes = new Set<string>()
+      const completed = new Map(resume?.checkpoint.results.map((result) => [result.nodeId, [...result.jobs]]) ?? [])
+      const scheduled = new Map(Object.entries(resume?.checkpoint.nextJobs ?? {}))
+      const runOutputs = new Map(Object.entries(resume?.checkpoint.outputs ?? {}))
+      const completedNodes = new Set(resume?.checkpoint.completedNodes ?? [])
       let firstCause: Cause.Cause<Error> | undefined
       let firstFailure: Error | undefined
+      let suspending = resume != null
+      let pendingWait:
+        | {
+            readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
+            readonly jobId: string
+            readonly nodeId: string
+            readonly notification?: { readonly input: Readonly<Record<string, JsonValue>>; readonly messageHandle: string; readonly taskId: string }
+            readonly order: number
+            readonly value: JsonValue
+            readonly waitId: string
+          }
+        | undefined
 
       let scheduleReady: (nodeId: string) => void
       const deliverInput = (targetInput: InputTarget, value: JsonValue): void => {
@@ -498,6 +802,7 @@ function runGraph(
           const title = nodeTitle(context.prepared, node)
           const projectedInputs = Object.fromEntries(
             Object.entries(nodeInputs).filter(([handle]) => {
+              if (node.kind == 'wait') return handle == 'value'
               const mapping = node.inputs[handle]
               return mapping?.kind != 'sources' || mapping.sources.every((source) => source.kind != 'binding')
             }),
@@ -581,6 +886,8 @@ function runGraph(
               outputs = Object.fromEntries(emitted)
               break
             }
+            case 'wait':
+              return yield* Effect.fail(new Error('Wait jobs are handled by the Scheduler suspension boundary.'))
           }
           yield* context.emit({ jobId, nodeId, runId, type: 'node.completed' })
           return outputs
@@ -602,6 +909,45 @@ function runGraph(
         const jobId = context.createId()
         const jobOrder = scheduled.get(nodeId) ?? 0
         scheduled.set(nodeId, jobOrder + 1)
+        if (node.kind == 'wait') {
+          suspending = true
+          pendingWait = {
+            actions: node.actions,
+            jobId,
+            nodeId,
+            ...(node.notification == null
+              ? {}
+              : {
+                  notification: {
+                    input: Object.fromEntries(
+                      Object.entries(nodeInputs).flatMap(([handle, value]) =>
+                        handle.startsWith(notificationPrefix) ? [[handle.slice(notificationPrefix.length), value]] : [],
+                      ),
+                    ),
+                    messageHandle: node.notification.messageHandle,
+                    taskId: node.notification.taskId,
+                  },
+                }),
+            order: jobOrder,
+            value: nodeInputs.value ?? null,
+            waitId: nanoid(),
+          }
+          const mapping = node.inputs.value
+          const projectedInputs: Readonly<Record<string, JsonValue>> =
+            mapping?.kind == 'sources' && mapping.sources.some((source) => source.kind == 'binding') ? {} : { value: nodeInputs.value ?? null }
+          runNode(
+            context.emit({
+              inputs: projectedInputs,
+              jobId,
+              nodeId,
+              nodeKind: 'wait',
+              ...(node.name == null ? {} : { nodeTitle: node.name }),
+              runId,
+              type: 'node.started',
+            }),
+          )
+          return
+        }
         activeCounts.set(nodeId, (activeCounts.get(nodeId) ?? 0) + 1)
         runNode(
           executeNode(nodeId, node, jobId, nodeInputs).pipe(
@@ -644,36 +990,58 @@ function runGraph(
       }
 
       scheduleReady = (nodeId) => {
-        if (firstCause != null) return
+        if (firstCause != null || suspending) return
         const node = target.graph.nodes[nodeId]!
         const buffer = inputBuffers.get(nodeId)!
         while (buffer.ready && (activeCounts.get(nodeId) ?? 0) < node.concurrency) startNode(nodeId)
       }
 
-      for (const [nodeId, values] of Object.entries(launchInputs)) {
-        const buffer = inputBuffers.get(nodeId)
-        if (buffer == null) continue
-        for (const [handle, value] of Object.entries(values)) buffer.launch(handle, value)
-      }
-      for (const [bindingId, targets] of bindingInputTargets) {
-        if (!Object.hasOwn(context.bindingValues, bindingId)) {
-          return yield* Effect.fail(new Error(`Variable binding "${bindingId}" is unresolved.`))
+      if (resume == null) {
+        for (const [nodeId, values] of Object.entries(launchInputs)) {
+          const buffer = inputBuffers.get(nodeId)
+          if (buffer == null) continue
+          for (const [handle, value] of Object.entries(values)) buffer.launch(handle, value)
         }
-        for (const targetInput of targets) deliverInput(targetInput, context.bindingValues[bindingId]!)
-      }
-      for (const [handle, port] of Object.entries(target.inputs)) {
-        const provided = Object.hasOwn(inputs, handle) ? inputs[handle] : port.value
-        if (provided === undefined) continue
-        for (const output of Object.entries(target.outputs)) {
-          if (output[1].sources.some((source) => source.kind == 'flow' && source.input == handle)) {
-            runOutputs.set(output[0], provided)
-            if (onOutput != null) yield* onOutput(output[0], provided)
+        for (const [bindingId, targets] of bindingInputTargets) {
+          if (!Object.hasOwn(context.bindingValues, bindingId)) {
+            return yield* Effect.fail(new Error(`Variable binding "${bindingId}" is unresolved.`))
           }
+          for (const targetInput of targets) deliverInput(targetInput, context.bindingValues[bindingId]!)
         }
-        for (const targetInput of flowInputTargets.get(handle) ?? []) deliverInput(targetInput, provided)
-      }
-      if (trigger != null) {
-        for (const targetInput of targetsFor(nodeInputTargets, trigger.nodeId, 'payload')) deliverInput(targetInput, trigger.payload)
+        for (const [handle, port] of Object.entries(target.inputs)) {
+          const provided = Object.hasOwn(inputs, handle) ? inputs[handle] : port.value
+          if (provided === undefined) continue
+          for (const output of Object.entries(target.outputs)) {
+            if (output[1].sources.some((source) => source.kind == 'flow' && source.input == handle)) {
+              runOutputs.set(output[0], provided)
+              if (onOutput != null) yield* onOutput(output[0], provided)
+            }
+          }
+          for (const targetInput of flowInputTargets.get(handle) ?? []) deliverInput(targetInput, provided)
+        }
+        if (trigger != null) {
+          for (const targetInput of targetsFor(nodeInputTargets, trigger.nodeId, 'payload')) deliverInput(targetInput, trigger.payload)
+        }
+      } else {
+        const saved = resume.checkpoint.wait
+        const node = target.graph.nodes[saved.nodeId]
+        if (node?.kind != 'wait' || !node.actions.some((action) => action == resume.action)) {
+          return yield* Effect.fail(new Error('Flow Run checkpoint resolution does not match the prepared Wait node.'))
+        }
+        if (Object.keys(resume.checkpoint.nextJobs).some((nodeId) => target.graph.nodes[nodeId] == null)) {
+          return yield* Effect.fail(new Error('Flow Run checkpoint job state does not match the prepared graph.'))
+        }
+        const outputs = { [resume.action]: saved.value }
+        yield* emitNodeOutput(saved.nodeId, saved.jobId, resume.action, saved.value)
+        const jobs = completed.get(saved.nodeId) ?? []
+        jobs.push({ jobId: saved.jobId, order: saved.order, outputs })
+        completed.set(saved.nodeId, jobs)
+        if (!completedNodes.has(saved.nodeId)) {
+          completedNodes.add(saved.nodeId)
+          yield* context.emit({ progress: (completedNodes.size / nodeCount) * 100, runId, type: 'run.progress' })
+        }
+        yield* context.emit({ jobId: saved.jobId, nodeId: saved.nodeId, runId, type: 'node.completed' })
+        suspending = false
       }
       for (const nodeId of order) scheduleReady(nodeId)
 
@@ -688,26 +1056,59 @@ function runGraph(
         return yield* Effect.failCause(firstCause)
       }
       if (Exit.isFailure(activeExit)) return yield* Effect.failCause(activeExit.cause)
+      if (pendingWait != null) {
+        if (target.kind != 'flow') return yield* Effect.fail(new Error('Subflow Wait is not supported.'))
+        const checkpointSource: FlowRunCheckpoint = {
+          bindingValues: context.bindingValues,
+          buffers: Object.fromEntries([...inputBuffers].map(([nodeId, buffer]) => [nodeId, buffer.snapshot()])),
+          completedNodes: [...completedNodes].toSorted(),
+          nextJobs: Object.fromEntries(scheduled),
+          outputs: Object.fromEntries(runOutputs),
+          results: resultNodes.map((nodeId) => ({
+            jobs: (completed.get(nodeId) ?? []).toSorted((left, right) => left.order - right.order),
+            nodeId,
+          })),
+          version: 1,
+          wait: {
+            jobId: pendingWait.jobId,
+            nodeId: pendingWait.nodeId,
+            order: pendingWait.order,
+            value: pendingWait.value,
+            waitId: pendingWait.waitId,
+          },
+        }
+        const encoded = JSON.stringify(checkpointSource)
+        if (new TextEncoder().encode(encoded).byteLength > 16 * 1024 * 1024) {
+          const message = 'Flow Run checkpoint exceeds 16 MiB.'
+          yield* context.emit({ code: 'run.checkpoint-too-large', jobId: pendingWait.jobId, message, nodeId: pendingWait.nodeId, runId, type: 'node.failed' })
+          yield* context.emit({ message, runId, type: 'run.failed' })
+          return yield* Effect.fail(new Error(`run.checkpoint-too-large: ${message}`))
+        }
+        const checkpoint = decodeFlowRunCheckpoint(JSON.parse(encoded))
+        return {
+          checkpoint,
+          kind: 'waiting',
+          ...(pendingWait.notification == null ? {} : { notification: pendingWait.notification }),
+          wait: {
+            actions: pendingWait.actions,
+            jobId: pendingWait.jobId,
+            nodeId: pendingWait.nodeId,
+            order: pendingWait.order,
+            waitId: pendingWait.waitId,
+          },
+        }
+      }
       if (target.kind == 'subflow') {
         const outputs = Object.fromEntries(runOutputs)
         yield* context.emit({ result: { kind: 'function-outputs', outputs, target: 'subflow' }, runId, type: 'run.completed' })
         return outputs
       }
-      const dependencies = new Set(
-        Object.values(target.graph.nodes).flatMap((node) =>
-          Object.values(node.inputs).flatMap((mapping) =>
-            mapping.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node').map((source) => source.nodeId) : [],
-          ),
-        ),
-      )
       const result: FlowRunResult = {
         kind: 'node-results',
-        nodes: order
-          .filter((nodeId) => !dependencies.has(nodeId))
-          .map((nodeId) => ({
-            jobs: (completed.get(nodeId) ?? []).toSorted((left, right) => left.order - right.order).map(({ jobId, outputs }) => ({ jobId, outputs })),
-            nodeId,
-          })),
+        nodes: resultNodes.map((nodeId) => ({
+          jobs: (completed.get(nodeId) ?? []).toSorted((left, right) => left.order - right.order).map(({ jobId, outputs }) => ({ jobId, outputs })),
+          nodeId,
+        })),
       }
       yield* context.emit({ result, runId, type: 'run.completed' })
       return result
@@ -715,16 +1116,23 @@ function runGraph(
   )
 }
 
-export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect.Effect<FlowRunResult, Error> {
+export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect.Effect<FlowRunOutcome, Error> {
   const emit = options.emit ?? (() => Effect.void)
   const program = Effect.gen(function* () {
+    if (options.resume != null && (options.inputs != null || options.trigger != null)) {
+      return yield* Effect.fail(new Error('A resumed Flow Run cannot accept launch inputs or a Trigger seed.'))
+    }
+    const checkpoint = options.resume == null ? undefined : decodeFlowRunCheckpoint(options.resume.checkpoint)
+    if (checkpoint != null && new TextEncoder().encode(JSON.stringify(checkpoint)).byteLength > 16 * 1024 * 1024) {
+      return yield* Effect.fail(new Error('Flow Run checkpoint exceeds 16 MiB.'))
+    }
     const triggerNode = options.trigger == null ? undefined : prepared.graph.nodes[options.trigger.nodeId]
     if (options.trigger != null && (triggerNode == null || 'inputs' in triggerNode)) {
       return yield* Effect.fail(new Error(`Node "${options.trigger.nodeId}" is not a TriggerNode in Flow "${options.flowId}".`))
     }
     return (yield* runGraph(
       {
-        bindingValues: options.bindingValues ?? {},
+        bindingValues: checkpoint?.bindingValues ?? options.bindingValues ?? {},
         createId: options.createId,
         emit,
         invokeTask: options.invokeTask,
@@ -738,7 +1146,8 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
       options.inputs,
       undefined,
       options.trigger,
-    )) as FlowRunResult
+      checkpoint == null ? undefined : { action: options.resume!.action, checkpoint },
+    )) as FlowRunOutcome
   })
   return program
 }

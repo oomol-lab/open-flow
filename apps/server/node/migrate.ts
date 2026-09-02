@@ -10,6 +10,7 @@ const migrationFiles = [
   '0006_integration_candidates.sql',
   '0007_poll_candidates.sql',
   '0008_draft_changes.sql',
+  '0009_wait_runs.sql',
 ] as const
 const migrationsDirectory = new URL('../migrations/', import.meta.url)
 

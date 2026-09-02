@@ -1,7 +1,7 @@
 import type { I18n } from 'val-i18n'
 import type { FlowDisplayMode } from '../../../../designer/common/flowDisplay.ts'
 import type { Settings as NodeSettings, TriggerSettings } from '../../../../flow/common/nodeChanges.ts'
-import type { WorkbenchClient, Draft, Flow, InputPort, JsonValue, Live, TriggerSchedule } from '../api.ts'
+import type { WorkbenchClient, ConnectorAction, Draft, Flow, GraphNode, InputPort, JsonValue, Live, TriggerSchedule } from '../api.ts'
 import type { FlowChangeEvent } from '../contract.ts'
 import type { AddNodeOption } from '../designer/addNodeOptions.ts'
 import type { DiagnosticItem } from '../designer/diagnostics.ts'
@@ -43,6 +43,7 @@ import {
   pasteNodes,
   setInputVariable as changeInputVariable,
   setInputValue as changeInputValue,
+  setWaitNotification,
   updateCondition,
   updateCodeTaskPorts,
   updateTaskAdditionalInputs,
@@ -53,6 +54,7 @@ import {
   updateSubflow,
   updateTask,
   updateValue,
+  updateWait,
   updateWebhook,
 } from '../designer/flowChanges.ts'
 import { createI18n } from '../i18n.ts'
@@ -133,7 +135,7 @@ export class WorkspaceStore {
   readonly #identity: () => string
   readonly #presentationChanges: PresentationChanges
   readonly #flows: FlowCatalog
-  readonly #runCreated: (event: Extract<FlowChangeEvent, { readonly kind: 'run.created' }>) => void
+  readonly #runChanged: (event: Extract<FlowChangeEvent, { readonly kind: 'run.changed' | 'run.created' }>) => void
   readonly #setNotice: SetNotice
   readonly #model: WorkspaceModel
   #clipboard?: Clipboard
@@ -152,13 +154,13 @@ export class WorkspaceStore {
     setNotice: SetNotice,
     identity: () => string = createAuthoringId,
     i18n: I18n = createI18n(),
-    runCreated: (event: Extract<FlowChangeEvent, { readonly kind: 'run.created' }>) => void = () => {},
+    runChanged: (event: Extract<FlowChangeEvent, { readonly kind: 'run.changed' | 'run.created' }>) => void = () => {},
   ) {
     this.#client = client
     this.#setNotice = setNotice
     this.#identity = identity
     this.#i18n = i18n
-    this.#runCreated = runCreated
+    this.#runChanged = runChanged
     this.#flows = new FlowCatalog(client, setNotice, i18n)
     this.#model = new WorkspaceModel(i18n, this.#flows)
     this.#draftChanges = new DraftChanges(client, setNotice, i18n, {
@@ -258,7 +260,7 @@ export class WorkspaceStore {
         (revisionId) => {
           if (!this.#disposed && revisionId != this.#draftChanges.committed?.revisionId) void this.#refreshDraft(revisionId)
         },
-        this.#runCreated,
+        this.#runChanged,
       )
     } catch (error) {
       if (!current()) return false
@@ -568,6 +570,26 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateValue(revision, target, nodeId, values)
+    return changes != null && (await this.#changeDraft(changes)) != null
+  }
+
+  public async saveWait(
+    nodeId: string,
+    settings: Pick<Extract<GraphNode, { readonly kind: 'wait' }>, 'actions' | 'prompt'> & {
+      readonly name?: string
+      readonly notification: Extract<GraphNode, { readonly kind: 'wait' }>['notification']
+    },
+  ): Promise<boolean> {
+    const revision = this.$.revision.value
+    const target = this.#model.value.target
+    if (revision == null || target?.kind != 'flow') return false
+    const changes = updateWait(revision, target, nodeId, settings)
+    return changes != null && (await this.#changeDraft(changes)) != null
+  }
+
+  public async setWaitNotification(nodeId: string, action: ConnectorAction): Promise<boolean> {
+    const revision = this.$.revision.value
+    const changes = revision == null ? undefined : setWaitNotification(revision, nodeId, action, this.#identity())
     return changes != null && (await this.#changeDraft(changes)) != null
   }
 

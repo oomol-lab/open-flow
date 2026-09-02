@@ -32,6 +32,8 @@
     "triggers": "Triggers",
     "value": "Значение",
     "valueDescription": "Передавать нижестоящим узлам переиспользуемые литеральные значения.",
+    "wait": "Ожидание",
+    "waitDescription": "Приостановить Run, пока оператор не продолжит или не одобрит его.",
     "webhook": "Webhook",
     "webhookDescription": "Получать внешние события через выделенный HTTP-адрес."
   },
@@ -202,6 +204,24 @@
       "source": "Исходный код",
       "structuredJson": "Структурированный JSON"
     },
+    "wait": {
+      "approval": "Одобрить или отклонить",
+      "changeNotification": "Изменить",
+      "chooseNotification": "Добавить уведомление",
+      "chooseNotificationTitle": "Выбрать уведомление",
+      "continue": "Продолжить",
+      "inputs": "Параметры",
+      "inputsInvalid": "Заполните все обязательные параметры уведомления.",
+      "inputsLoading": "Загрузка параметров уведомления…",
+      "messageHandle": "Записать сообщение во вход",
+      "mode": "Обработка",
+      "notificationTask": "Уведомление",
+      "notificationUnavailable": "Уведомление недоступно. Выберите его снова.",
+      "prompt": "Запрос",
+      "promptError": "Запрос должен содержать от 1 до 1 000 символов.",
+      "removeNotification": "Удалить уведомление",
+      "save": "Сохранить"
+    },
     "trigger": {
       "description": "Описание",
       "save": "Сохранить Trigger",
@@ -340,6 +360,9 @@
     "upToDate": "Текущий черновик совпадает с рабочей версией."
   },
   "run": {
+    "actionApprove": "Одобрить",
+    "actionContinue": "Продолжить",
+    "actionReject": "Отклонить",
     "artifactMetadata": "Метаданные артефакта",
     "artifactUnavailable": "Предпросмотр и скачивание пока недоступны в этой рабочей среде.",
     "cancel": "Отменить запуск",
@@ -364,6 +387,7 @@
     "eventRecorded": "Записано",
     "eventStarted": "Начато",
     "eventTruncated": "Усечено",
+    "eventWaitResolved": "Ожидание разрешено",
     "eventsTruncatedNotice": "Часть событий пропущена после того, как запуск достиг предела наблюдения.",
     "eventsTruncatedUntil": "Часть событий пропущена после того, как запуск достиг предела наблюдения. Остальные детали сохраняются до {{date}}.",
     "filter": {
@@ -392,6 +416,7 @@
     "connectorUnconfigured": "Connector не настроен для этого развертывания. Завершите настройку и снова запустите Flow.",
     "connectorUnavailable": "Не удалось выполнить запрос к Connector. Запустите Flow снова; если ошибка повторится, проверьте выбранный Connection.",
     "locateNode": "Найти {{name}} на холсте",
+    "locateWait": "Найти узел ожидания",
     "nodeError": "Ошибка узла",
     "nodeFailed": "Не удалось выполнить узел.",
     "nodeLog": "Лог {{level}}",
@@ -401,6 +426,7 @@
     "outputId": "ID выходных данных",
     "outputPending": "Итоговый результат появится после завершения запуска.",
     "resize": "Потяните, чтобы изменить размер деталей запуска",
+    "resolving": "Применение…",
     "runId": "ID запуска: {{id}}",
     "selectRun": "Выберите запуск, чтобы посмотреть его хронологию и выходные данные.",
     "sourceDraft": "Черновик",
@@ -412,6 +438,7 @@
     "statusNone": "Запусков ещё нет",
     "statusQueued": "В очереди",
     "statusRunning": "Выполняется",
+    "statusWaiting": "Ожидание",
     "statusStarting": "Запускается",
     "statusSubmitting": "Отправляется",
     "statusSucceeded": "Успешно",
@@ -426,7 +453,8 @@
     "timeline": "Хронология",
     "timelineEmpty": "Запустите выбранный черновик, чтобы посмотреть его хронологию и выходные данные.",
     "submitting": "Отправка зафиксированной ревизии и создание записи о запуске…",
-    "waiting": "Ожидание первого события…"
+    "waiting": "Ожидание первого события…",
+    "waitExpires": "Истекает {{date}}"
   },
   "sidebar": {
     "createFirstFlow": "Создать Flow",

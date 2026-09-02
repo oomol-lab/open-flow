@@ -32,6 +32,7 @@ export type IconName =
   | 'trash'
   | 'trigger'
   | 'value'
+  | 'wait'
 
 function glyph(name: IconName): ReactNode {
   switch (name) {
@@ -198,6 +199,13 @@ function glyph(name: IconName): ReactNode {
       )
     case 'value':
       return <path d="m12 3 8 9-8 9-8-9z" />
+    case 'wait':
+      return (
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </>
+      )
     case 'task':
       return (
         <>

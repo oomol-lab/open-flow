@@ -14,7 +14,7 @@ import { describe, it } from 'vitest'
 import { ConnectorTaskError } from '../node/connector.ts'
 import { createServerApp } from '../node/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
-import { closeService, openService } from './serviceFixture.ts'
+import { closeService, openService, startService } from './serviceFixture.ts'
 
 const connectorProvider: ConnectorProvider = {
   icon: 'https://connector.example/icons/mail.svg',
@@ -53,7 +53,7 @@ const connectorAction: ConnectorAction = {
   serviceName: 'Mail',
 }
 
-async function createHarness(): Promise<ControlApiConformanceHarness> {
+async function createHarness(start = false): Promise<ControlApiConformanceHarness> {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-control-conformance-'))
   const file = path.join(directory, 'open-flow.sqlite')
   const connector = createConnectorHost({
@@ -68,17 +68,20 @@ async function createHarness(): Promise<ControlApiConformanceHarness> {
     searchActions: async () => [connectorAction],
   })
   let now = Date.UTC(2026, 7, 22)
-  const open = () =>
-    openService(
-      file,
-      connector,
-      () => {
+  const open = async () => {
+    const service = await openService(file, {
+      capabilities: {
+        connector: connector == null ? undefined : () => connector,
+        connectorConsoleOrigin: () => new URL('https://connector.example'),
+      },
+      clock: () => {
         now += 1_000
         return now
       },
-      {},
-      'https://connector.example',
-    )
+    })
+    if (start) await startService(service)
+    return service
+  }
   const options = {
     resolveControlActor: (request: Request) => (request.headers.get('authorization') == 'Bearer control-api-conformance' ? 'server-operator' : undefined),
   }
@@ -108,7 +111,7 @@ async function createHarness(): Promise<ControlApiConformanceHarness> {
 describe('Server P0 Control API conformance', () => {
   for (const conformance of controlApiConformanceCases) {
     it(conformance.name, async () => {
-      const harness = await createHarness()
+      const harness = await createHarness(conformance.runtime)
       try {
         await conformance.verify(harness)
       } finally {

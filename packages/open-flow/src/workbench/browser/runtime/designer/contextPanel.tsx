@@ -31,6 +31,7 @@ interface ContextPanelProps {
 
 interface LibraryItemProps {
   readonly disabled: boolean
+  readonly draggable: boolean
   readonly item: Exclude<IAddNodeMenuItem, { type: 'divider' }>
   readonly onAdd: (itemId: string) => void
   readonly onDrag: (event: ReactDragEvent, itemId: string) => void
@@ -42,6 +43,7 @@ type LibraryChoice = NonNullable<Exclude<IAddNodeMenuItem, { type: 'divider' }>[
 interface BlockLibraryProps {
   readonly browseOptions: (signal: AbortSignal) => Promise<readonly AddNodeOption[] | undefined>
   readonly disabled: boolean
+  readonly draggable?: boolean
   readonly focusRequest: number
   readonly onAdd: (option: AddNodeOption) => Promise<string | undefined>
   readonly onRegisterDragOption: (option: AddNodeOption) => void
@@ -142,6 +144,7 @@ function optionType(option: AddNodeOption): Exclude<IAddNodeMenuItem, { type: 'd
     case 'llm':
     case 'trigger':
     case 'value':
+    case 'wait':
       return option.kind
   }
 }
@@ -183,6 +186,8 @@ function fallbackIcon(item: Exclude<IAddNodeMenuItem, { type: 'divider' }>): Ico
       return 'trigger'
     case 'value':
       return 'value'
+    case 'wait':
+      return 'wait'
     case 'block':
     case 'comment':
     case 'scriptlet':
@@ -213,7 +218,7 @@ function LibraryGroup({ label }: { readonly label: string }): ReactElement {
   )
 }
 
-function LibraryItem({ disabled, item, onAdd, onDrag, onLoadChoices }: LibraryItemProps): ReactElement {
+function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices }: LibraryItemProps): ReactElement {
   const t = useTranslate()
   const connectionChoices = item.type == 'trigger'
   const controller = useRef<AbortController>()
@@ -277,7 +282,7 @@ function LibraryItem({ disabled, item, onAdd, onDrag, onLoadChoices }: LibraryIt
               <Button
                 className="block-library-item h-auto min-h-12 justify-start whitespace-normal px-2 py-2"
                 disabled={disabled}
-                draggable={!disabled}
+                draggable={draggable && !disabled}
                 key={choice.data}
                 onClick={() => onAdd(choice.data)}
                 onDragStart={(event) => onDrag(event, choice.data)}
@@ -310,7 +315,7 @@ function LibraryItem({ disabled, item, onAdd, onDrag, onLoadChoices }: LibraryIt
     <Button
       className="block-library-item h-auto min-h-12 justify-start whitespace-normal px-2 py-2"
       disabled={disabled}
-      draggable={!disabled}
+      draggable={draggable && !disabled}
       onClick={() => item.data != null && onAdd(item.data)}
       onDragStart={(event) => item.data != null && onDrag(event, item.data)}
       type="button"
@@ -321,7 +326,16 @@ function LibraryItem({ disabled, item, onAdd, onDrag, onLoadChoices }: LibraryIt
   )
 }
 
-export function BlockLibrary({ browseOptions, disabled, focusRequest, onAdd, onRegisterDragOption, options, provideChoices }: BlockLibraryProps): ReactElement {
+export function BlockLibrary({
+  browseOptions,
+  disabled,
+  draggable = true,
+  focusRequest,
+  onAdd,
+  onRegisterDragOption,
+  options,
+  provideChoices,
+}: BlockLibraryProps): ReactElement {
   const t = useTranslate()
   const search = useRef<HTMLInputElement>(null)
   const active = useRef(true)
@@ -406,6 +420,7 @@ export function BlockLibrary({ browseOptions, disabled, focusRequest, onAdd, onR
             ) : (
               <LibraryItem
                 disabled={busy || item.disabled == true}
+                draggable={draggable}
                 item={item}
                 key={item.data ?? item.label}
                 onAdd={(id) => void add(id)}

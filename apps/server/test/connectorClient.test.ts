@@ -114,7 +114,7 @@ async function startConnector(handler: (request: IncomingMessage, response: Serv
 
 async function startService(origin: string, token = 'runtime-token', timeoutMs = 30_000, logger?: Logger): Promise<{ file: string; service: ServerService }> {
   const file = await databaseFile()
-  const service = await openService(file, new ConnectorClient(origin, token, timeoutMs, logger))
+  const service = await openService(file, { capabilities: { connector: () => new ConnectorClient(origin, token, timeoutMs, logger) } })
   services.push(service)
   await startRuntime(service)
   return { file, service }
@@ -662,7 +662,10 @@ describe('Server Connector client', () => {
   })
 
   it('uses only the explicit public Console origin for Connection pages', async () => {
-    const configured = await openService(await databaseFile(), undefined, Date.now, {}, 'https://connector.example')
+    const configured = await openService(await databaseFile(), {
+      capabilities: { connectorConsoleOrigin: () => new URL('https://connector.example') },
+      clock: Date.now,
+    })
     services.push(configured)
     expect(configured.control.connectorConnectionPage('mail/work')).toBe('https://connector.example/providers/mail%2Fwork')
 
@@ -671,9 +674,12 @@ describe('Server Connector client', () => {
     expect(() => unconfigured.control.connectorConnectionPage('mail')).toThrow(expect.objectContaining({ code: 'connector.unavailable', status: 503 }))
 
     const insecureFile = await databaseFile()
-    await expect(openService(insecureFile, undefined, Date.now, {}, 'http://connector.example')).rejects.toThrow(
-      'Connector Console origin must be an HTTPS origin without credentials, a path, query, or fragment, except on loopback.',
-    )
+    await expect(
+      openService(insecureFile, {
+        capabilities: { connectorConsoleOrigin: () => new URL('http://connector.example') },
+        clock: Date.now,
+      }),
+    ).rejects.toThrow('Connector Console origin must be an HTTPS origin without credentials, a path, query, or fragment, except on loopback.')
   })
 
   it('resolves the stable Connection id and executes an action with the runtime grant', async () => {

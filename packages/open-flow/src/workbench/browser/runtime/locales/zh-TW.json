@@ -32,6 +32,8 @@
     "triggers": "Trigger",
     "value": "值",
     "valueDescription": "為下游節點提供可重複使用的字面值。",
+    "wait": "等待",
+    "waitDescription": "暫停 Run，直到 Operator 繼續或審批。",
     "webhook": "Webhook",
     "webhookDescription": "透過專屬的 HTTP 端點接收外部事件。"
   },
@@ -202,6 +204,24 @@
       "source": "原始碼",
       "structuredJson": "結構化 JSON"
     },
+    "wait": {
+      "approval": "通過或拒絕",
+      "changeNotification": "更換",
+      "chooseNotification": "新增通知",
+      "chooseNotificationTitle": "選擇通知方式",
+      "continue": "繼續",
+      "inputs": "參數",
+      "inputsInvalid": "請填寫所有必需的通知參數。",
+      "inputsLoading": "正在載入通知參數…",
+      "messageHandle": "訊息內容寫入",
+      "mode": "處理方式",
+      "notificationTask": "通知",
+      "notificationUnavailable": "通知設定不可用，請重新選擇。",
+      "prompt": "提示",
+      "promptError": "提示必須包含 1 到 1,000 個字元。",
+      "removeNotification": "移除通知",
+      "save": "儲存"
+    },
     "trigger": {
       "description": "描述",
       "save": "儲存 Trigger",
@@ -340,6 +360,9 @@
     "upToDate": "目前的草稿與線上版本一致。"
   },
   "run": {
+    "actionApprove": "通過",
+    "actionContinue": "繼續",
+    "actionReject": "拒絕",
     "artifactMetadata": "產物中繼資料",
     "artifactUnavailable": "這個工作台尚不支援預覽和下載。",
     "cancel": "取消執行",
@@ -364,6 +387,7 @@
     "eventRecorded": "已記錄",
     "eventStarted": "已開始",
     "eventTruncated": "已截斷",
+    "eventWaitResolved": "等待已處理",
     "eventsTruncatedNotice": "這次執行達到觀測上限後，部分事件已被省略。",
     "eventsTruncatedUntil": "這次執行達到觀測上限後，部分事件已被省略；其餘詳情會保留到 {{date}}。",
     "filter": {
@@ -392,6 +416,7 @@
     "connectorUnconfigured": "目前部署尚未設定 Connector。請先完成設定，再重新執行 Flow。",
     "connectorUnavailable": "Connector 請求無法完成。請再次執行 Flow；若仍然失敗，請檢查所選的 Connection。",
     "locateNode": "在畫布上定位 {{name}}",
+    "locateWait": "定位 Wait 節點",
     "nodeError": "節點錯誤",
     "nodeFailed": "這個節點未能完成。",
     "nodeLog": "{{level}} 日誌",
@@ -401,6 +426,7 @@
     "outputId": "輸出 ID",
     "outputPending": "這次執行結束後就會顯示最終輸出。",
     "resize": "拖曳以調整執行詳情大小",
+    "resolving": "正在提交…",
     "runId": "執行 ID：{{id}}",
     "selectRun": "選擇一筆執行紀錄以檢視它的時間軸與輸出。",
     "sourceDraft": "草稿",
@@ -412,6 +438,7 @@
     "statusNone": "尚未執行",
     "statusQueued": "佇列中",
     "statusRunning": "執行中",
+    "statusWaiting": "等待中",
     "statusStarting": "啟動中",
     "statusSubmitting": "提交中",
     "statusSucceeded": "成功",
@@ -426,7 +453,8 @@
     "timeline": "時間軸",
     "timelineEmpty": "執行選取的草稿後，就可以檢視它的時間軸與輸出。",
     "submitting": "正在提交這個固定修訂並建立執行紀錄…",
-    "waiting": "正在等待第一個事件…"
+    "waiting": "正在等待第一個事件…",
+    "waitExpires": "到期時間：{{date}}"
   },
   "sidebar": {
     "createFirstFlow": "建立 Flow",

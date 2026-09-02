@@ -63,7 +63,7 @@ signing 和 callback endpoint identity 使用彼此独立的秘密与生命周�
 Workbench 使用两个彼此独立的实时通知通道：
 
 - Flow catalog 通道只发送 `flows.changed`，用于重新读取顶层 Flow 列表；
-- 当前 Flow 通道发送该 Flow 的 `draft.changed` 和 `run.created`。
+- 当前 Flow 通道发送该 Flow 的 `draft.changed`、`run.created` 和 `run.changed`。
 
 CLI、Workbench 或其他客户端通过 Control API 创建、改名或删除 Flow 时，部署必须使 catalog 通道可观察到变化。两个通道必须能独立连接、
 断线和重连；重连后客户端通过普通 Control API 恢复权威状态。通知只是 invalidation，不是 Revision、RunEvent、协作日志或消息队列。
@@ -124,6 +124,19 @@ scope 内唯一资源 identity。用户代码开始执行后不能通过重试�
 部署必须限制并行 Run 数量和单个 Run 的总执行时间。同一 Flow 的 Run 串行 claim，不同 Flow 在全局并发上限内按最早可执行顺序推进，避免一个
 Flow 的长 Run 阻塞其他 Flow。
 
+Wait 是同一个 Run 内的持久化暂停点，不是新的 Run、子流程或长驻 Runtime session。Run 到达 Wait 时，部署必须原子保存 Scheduler checkpoint、
+固定 Revision 身份、当前 Wait 和剩余执行预算，再把 Run 置为 `waiting`；暂停期间不持有 Executor session 或同 Flow 的执行槽。合法 action 只把
+该 Run 重新排队，恢复时从 checkpoint 继续，并保持 Wait 之前已经完成的节点结果和同一 `runId`。进程恢复不能重跑已完成 segment，也不能重置
+Run 的总执行预算。checkpoint 缺失、损坏或与固定 Wait 不一致时必须 fail closed，不能从 Flow 起点猜测性重放。
+
+Approval 是 Wait 对 action 集合 `approve/reject` 的一种产品语义，不是独立执行节点或部署认证机制。部署内部的 Control API resolve 使用 Operator
+认证；外部通知可以携带只绑定一个 Wait 的 opaque capability。公开 hook 只提供 JSON inspection 和显式 POST action，不拥有 HTML 页面或特定消费端
+界面。一次 Wait 的所有 resolve 入口共享同一个 first-writer-wins 决议事实。
+
+Wait 通知复用固定 Revision 中显式选择的 Connector action。部署必须先持久化 `waiting` 和通知 work，再在事务外调用 Connector；外部调用至少一次，
+稳定 invocation identity 由 Connector 幂等处理。通知发送失败不能自动批准、拒绝或结束 Run。通知正文中的 capability 只以不可逆摘要进入持久化存储，
+完整 URL 属于 bearer credential；公开 origin 是部署 capability 配置，不进入 Flow Revision。
+
 用户代码只在隔离 realm 中获得目标 closure、固定 platform module 和当前 Task invocation 明确声明的窄 Capability。Capability host 必须校验当前
 Flow、Run、Task、invocation、binding 和 Run 状态；Task 或 Run 结束后旧 Capability 必须 fail closed。
 
@@ -160,6 +173,9 @@ package；subscription、checkpoint、调度持久化、endpoint routing 和 adm
 
 一次有效 Trigger occurrence 只能准入普通 Flow Run，之后复用相同的 Run、执行、事件、取消和 terminal 语义。重投 occurrence 必须通过稳定 identity
 和权威 store 约束为最多一个 Run。
+
+Cron 不为同一 Flow 创建重叠的未终结 Run。已有未终结 Run 时保留当前到期位置并重试；前一个 Run terminal 后最多补入一个最早未处理
+occurrence，再把计划推进到当前时间之后。手动 Run 和其他 Trigger 保留各自的 admission 与 backpressure 语义。
 
 Callback response 不能在承载 Workbench 或 Control API 的 origin 上成为 Flow 控制的可执行内容，也不能修改 cookie、跳转、CORS 或其他部署级
 安全响应头。需要完整自定义 HTTP responder 时必须使用与管理面隔离的 origin。

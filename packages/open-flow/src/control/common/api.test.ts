@@ -201,3 +201,63 @@ describe('ControlClient Variable API', () => {
     await expect(client.deleteVariable('TOKEN')).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
   })
 })
+
+describe('ControlClient Wait API', () => {
+  const waiting = {
+    closureDigest: 'closure-1',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    engineContract: 'open-flow-engine/v1',
+    engineDigest: 'engine-1',
+    flowId: flow.flowId,
+    modelVersion: 1,
+    revisionDigest: 'revision-digest-1',
+    revisionId: flow.draftRevisionId,
+    runId: 'run-waiting',
+    source: 'draft',
+    startedAt: '2026-09-01T00:00:01.000Z',
+    status: 'waiting',
+    version: 1,
+    waiting: {
+      actions: ['approve', 'reject'],
+      expiresAt: '2026-09-08T00:00:02.000Z',
+      nodeId: 'approval',
+      prompt: 'Approve deployment?',
+      waitId: 'abcdefghijklmnopqrstu',
+      waitingSince: '2026-09-01T00:00:02.000Z',
+    },
+  } as const
+
+  it('decodes the active waiting projection and resolves a fixed action', async () => {
+    const response = {
+      action: 'approve',
+      resolutionAccepted: true,
+      resolvedAt: '2026-09-01T00:00:03.000Z',
+      runId: waiting.runId,
+      status: 'queued',
+      version: 1,
+      waitId: waiting.waiting.waitId,
+    } as const
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path == `/v1/runs/${waiting.runId}`) return Response.json(waiting)
+      if (path == `/v1/runs/${waiting.runId}/waits/${waiting.waiting.waitId}/resolve` && init?.method == 'POST') return Response.json(response)
+      throw new Error(path)
+    })
+    const client = new ControlClient(request)
+
+    await expect(client.getRun(waiting.runId)).resolves.toEqual(waiting)
+    await expect(client.resolveRunWait(waiting.runId, waiting.waiting.waitId, 'approve')).resolves.toEqual(response)
+    expect(request).toHaveBeenLastCalledWith(
+      `/v1/runs/${waiting.runId}/waits/${waiting.waiting.waitId}/resolve`,
+      expect.objectContaining({ body: JSON.stringify({ action: 'approve', version: 1 }), method: 'POST' }),
+    )
+  })
+
+  it.each([
+    ['a waiting Run without active wait data', { ...waiting, waiting: undefined }],
+    ['a non-waiting Run with stale wait data', { ...waiting, status: 'running' }],
+    ['an unknown action combination', { ...waiting, waiting: { ...waiting.waiting, actions: ['approve'] } }],
+  ])('rejects %s', async (_name, response) => {
+    const client = new ControlClient(async () => Response.json(response))
+    await expect(client.getRun(waiting.runId)).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
+  })
+})

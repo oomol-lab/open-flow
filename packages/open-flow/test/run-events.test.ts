@@ -89,6 +89,24 @@ describe('Runtime event projector', () => {
     })
   })
 
+  it('projects Wait node metadata without exposing its input', async () => {
+    const project = createEventProjector(runId)
+    await project({ flowId: 'flows/wait/flow.oo.yaml', runId: 'runtime-run', type: 'run.started' })
+
+    const event = await project({
+      inputs: { value: 'private' },
+      jobId: 'wait-job',
+      nodeId: 'approval',
+      nodeKind: 'wait',
+      nodeTitle: 'Approval',
+      runId: 'runtime-run',
+      type: 'node.started',
+    })
+
+    expect(event).toMatchObject({ kind: 'node.started', payload: { nodeId: 'approval', nodeKind: 'wait', nodeTitle: 'Approval' } })
+    expect(JSON.stringify(event)).not.toContain('private')
+  })
+
   it('samples node and run progress once per integer percentage bucket', async () => {
     const project = createEventProjector(runId)
     await project({ flowId: 'flows/progress/flow.oo.yaml', runId: 'runtime-run', type: 'run.started' })

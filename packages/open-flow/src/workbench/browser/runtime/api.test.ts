@@ -8,7 +8,7 @@ describe('WorkbenchClient notifications', () => {
       | ((
           event?:
             | { readonly flowId: string; readonly kind: 'draft.changed'; readonly revisionId: string; readonly version: 1 }
-            | { readonly flowId: string; readonly kind: 'run.created'; readonly runId: string; readonly version: 1 },
+            | { readonly flowId: string; readonly kind: 'run.created' | 'run.changed'; readonly runId: string; readonly version: 1 },
         ) => void)
       | undefined
     const subscribeCatalog = vi.fn((listener: typeof catalogListener) => {
@@ -29,12 +29,14 @@ describe('WorkbenchClient notifications', () => {
     catalogListener?.({ kind: 'flows.changed', version: 1 })
     flowListener?.({ flowId: 'flow-1', kind: 'draft.changed', revisionId: 'revision-2', version: 1 })
     flowListener?.({ flowId: 'flow-1', kind: 'run.created', runId: 'run-1', version: 1 })
+    flowListener?.({ flowId: 'flow-1', kind: 'run.changed', runId: 'run-1', version: 1 })
 
     expect(subscribeCatalog).toHaveBeenCalledOnce()
     expect(subscribeFlow).toHaveBeenCalledWith('flow-1', expect.any(Function))
     expect(catalogChanged).toHaveBeenCalledWith({ kind: 'flows.changed', version: 1 })
     expect(draftChanged).toHaveBeenCalledWith('revision-2')
-    expect(runCreated).toHaveBeenCalledWith({ flowId: 'flow-1', kind: 'run.created', runId: 'run-1', version: 1 })
+    expect(runCreated).toHaveBeenNthCalledWith(1, { flowId: 'flow-1', kind: 'run.created', runId: 'run-1', version: 1 })
+    expect(runCreated).toHaveBeenNthCalledWith(2, { flowId: 'flow-1', kind: 'run.changed', runId: 'run-1', version: 1 })
   })
 
   it('uses the Flow-scoped Presentation route', async () => {

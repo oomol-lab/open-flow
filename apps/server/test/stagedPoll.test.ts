@@ -136,7 +136,11 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
       }
     },
   }
-  let service = await openService(file, connector, () => Date.parse('2026-08-31T10:00:30.000Z'), {}, undefined, undefined, [definition])
+  let service = await openService(file, {
+    capabilities: { connector: () => connector },
+    clock: () => Date.parse('2026-08-31T10:00:30.000Z'),
+    triggerDefinitions: [definition],
+  })
   services.add(service)
   const created = await service.control.createFlow('operator', 'Poll staging', 'poll-staging-flow')
   const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'initial')
@@ -157,7 +161,11 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
 
   await closeService(service)
   services.delete(service)
-  service = await openService(file, connector, () => Date.parse('2026-08-31T10:00:31.000Z'), {}, undefined, undefined, [definition])
+  service = await openService(file, {
+    capabilities: { connector: () => connector },
+    clock: () => Date.parse('2026-08-31T10:00:31.000Z'),
+    triggerDefinitions: [definition],
+  })
   services.add(service)
   await service.tickPoll('2026-08-31T10:00:31.000Z')
   expect(checkpoints).toEqual([null, { cursor: 'page-1' }, { cursor: 'page-1' }])
@@ -219,7 +227,11 @@ it('fails a permanent Poll baseline before activation and preserves the old Live
       throw new PermanentPollError('The fixed Poll configuration is invalid.')
     },
   }
-  const service = await openService(file, connector, () => Date.parse('2026-08-31T11:00:00.000Z'), {}, undefined, undefined, [definition])
+  const service = await openService(file, {
+    capabilities: { connector: () => connector },
+    clock: () => Date.parse('2026-08-31T11:00:00.000Z'),
+    triggerDefinitions: [definition],
+  })
   services.add(service)
   const created = await service.control.createFlow('operator', 'Poll failure', 'poll-failure-flow')
   const initial = await service.control.publishFlow('operator', created.flow.flowId, created.flow.draftRevisionId, 'open-flow-engine/v1', null, 'poll-initial')
@@ -256,7 +268,11 @@ it('fails a permanent Poll baseline before activation and preserves the old Live
 it('rolls back a changed Poll candidate during activation and succeeds after recovery', async () => {
   const file = await databaseFile()
   const definition: PollDefinition = { snapshot, poll: async () => ({ checkpoint: { ready: true }, events: [] }) }
-  const service = await openService(file, connector, () => Date.parse('2026-08-31T12:00:00.000Z'), {}, undefined, undefined, [definition])
+  const service = await openService(file, {
+    capabilities: { connector: () => connector },
+    clock: () => Date.parse('2026-08-31T12:00:00.000Z'),
+    triggerDefinitions: [definition],
+  })
   services.add(service)
   const created = await service.control.createFlow('operator', 'Poll activation', 'poll-activation-flow')
   const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'activation')

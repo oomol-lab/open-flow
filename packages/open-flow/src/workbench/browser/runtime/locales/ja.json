@@ -32,6 +32,8 @@
     "triggers": "Trigger",
     "value": "値",
     "valueDescription": "下流のノードに再利用できるリテラル値を提供します。",
+    "wait": "待機",
+    "waitDescription": "オペレーターが続行または承認するまで Run を一時停止します。",
     "webhook": "Webhook",
     "webhookDescription": "専用の HTTP エンドポイントで外部イベントを受信します。"
   },
@@ -202,6 +204,24 @@
       "source": "ソースコード",
       "structuredJson": "構造化 JSON"
     },
+    "wait": {
+      "approval": "承認または拒否",
+      "changeNotification": "変更",
+      "chooseNotification": "通知を追加",
+      "chooseNotificationTitle": "通知を選択",
+      "continue": "続行",
+      "inputs": "パラメーター",
+      "inputsInvalid": "必須の通知パラメーターをすべて入力してください。",
+      "inputsLoading": "通知パラメーターを読み込んでいます…",
+      "messageHandle": "メッセージの書き込み先",
+      "mode": "処理方法",
+      "notificationTask": "通知",
+      "notificationUnavailable": "通知設定を利用できません。選択し直してください。",
+      "prompt": "プロンプト",
+      "promptError": "プロンプトは1〜1,000文字で入力してください。",
+      "removeNotification": "通知を削除",
+      "save": "保存"
+    },
     "trigger": {
       "description": "説明",
       "save": "Trigger を保存",
@@ -340,6 +360,9 @@
     "upToDate": "現在のドラフトは本番と同じ内容です。"
   },
   "run": {
+    "actionApprove": "承認",
+    "actionContinue": "続行",
+    "actionReject": "拒否",
     "artifactMetadata": "アーティファクトのメタデータ",
     "artifactUnavailable": "このワークベンチでは、まだプレビューとダウンロードを利用できません。",
     "cancel": "実行をキャンセル",
@@ -364,6 +387,7 @@
     "eventRecorded": "記録",
     "eventStarted": "開始",
     "eventTruncated": "記録を省略",
+    "eventWaitResolved": "待機を解決しました",
     "eventsTruncatedNotice": "この実行が観測上限に達したため、一部のイベントは省略されました。",
     "eventsTruncatedUntil": "この実行が観測上限に達したため、一部のイベントは省略されました。残りの詳細は {{date}} まで保持されます。",
     "filter": {
@@ -392,6 +416,7 @@
     "connectorUnconfigured": "このデプロイには Connector が設定されていません。設定を完了してから、Flow を再実行してください。",
     "connectorUnavailable": "Connector へのリクエストを完了できませんでした。もう一度 Flow を実行し、それでも失敗する場合は選択中の Connection を確認してください。",
     "locateNode": "キャンバス上で {{name}} を表示",
+    "locateWait": "待機ノードを表示",
     "nodeError": "ノードのエラー",
     "nodeFailed": "ノードの実行を完了できませんでした。",
     "nodeLog": "{{level}} ログ",
@@ -401,6 +426,7 @@
     "outputId": "出力 ID",
     "outputPending": "実行が完了すると、ここに最終出力が表示されます。",
     "resize": "ドラッグして実行詳細の高さを調整",
+    "resolving": "適用中…",
     "runId": "実行 ID：{{id}}",
     "selectRun": "実行記録を選択すると、タイムラインと出力を確認できます。",
     "sourceDraft": "ドラフト",
@@ -412,6 +438,7 @@
     "statusNone": "実行記録なし",
     "statusQueued": "キュー待ち",
     "statusRunning": "実行中",
+    "statusWaiting": "待機中",
     "statusStarting": "開始中",
     "statusSubmitting": "送信中",
     "statusSucceeded": "成功",
@@ -426,7 +453,8 @@
     "timeline": "タイムライン",
     "timelineEmpty": "選択中のドラフトを実行すると、タイムラインと出力を確認できます。",
     "submitting": "この固定リビジョンを送信し、実行記録を作成しています…",
-    "waiting": "最初のイベントを待っています…"
+    "waiting": "最初のイベントを待っています…",
+    "waitExpires": "期限: {{date}}"
   },
   "sidebar": {
     "createFirstFlow": "Flow を作成",

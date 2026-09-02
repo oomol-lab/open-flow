@@ -32,6 +32,8 @@
     "triggers": "Triggers",
     "value": "Valeur",
     "valueDescription": "Fournir des valeurs littérales réutilisables aux nœuds en aval.",
+    "wait": "Attente",
+    "waitDescription": "Mettre le Run en pause jusqu’à ce qu’un opérateur le poursuive ou l’approuve.",
     "webhook": "Webhook",
     "webhookDescription": "Recevoir des événements externes via un point de terminaison HTTP dédié."
   },
@@ -202,6 +204,24 @@
       "source": "Source",
       "structuredJson": "JSON structuré"
     },
+    "wait": {
+      "approval": "Approuver ou refuser",
+      "changeNotification": "Changer",
+      "chooseNotification": "Ajouter une notification",
+      "chooseNotificationTitle": "Choisir une notification",
+      "continue": "Continuer",
+      "inputs": "Paramètres",
+      "inputsInvalid": "Renseignez tous les paramètres de notification requis.",
+      "inputsLoading": "Chargement des paramètres de notification…",
+      "messageHandle": "Écrire le message dans",
+      "mode": "Traitement",
+      "notificationTask": "Notification",
+      "notificationUnavailable": "La notification est indisponible. Choisissez-la à nouveau.",
+      "prompt": "Invite",
+      "promptError": "L’invite doit contenir entre 1 et 1 000 caractères.",
+      "removeNotification": "Supprimer la notification",
+      "save": "Enregistrer"
+    },
     "trigger": {
       "description": "Description",
       "save": "Enregistrer le Trigger",
@@ -340,6 +360,9 @@
     "upToDate": "Le Brouillon actuel correspond à la version en ligne."
   },
   "run": {
+    "actionApprove": "Approuver",
+    "actionContinue": "Continuer",
+    "actionReject": "Refuser",
     "artifactMetadata": "Métadonnées de l'artefact",
     "artifactUnavailable": "L'aperçu et le téléchargement ne sont pas encore disponibles dans cet atelier.",
     "cancel": "Annuler l'exécution",
@@ -364,6 +387,7 @@
     "eventRecorded": "Enregistré",
     "eventStarted": "Démarré",
     "eventTruncated": "Tronqué",
+    "eventWaitResolved": "Attente résolue",
     "eventsTruncatedNotice": "Certains événements ont été omis après que cette exécution a atteint sa limite d'observation.",
     "eventsTruncatedUntil": "Certains événements ont été omis après que cette exécution a atteint sa limite d'observation. Les détails restants sont conservés jusqu'au {{date}}.",
     "filter": {
@@ -392,6 +416,7 @@
     "connectorUnconfigured": "Le Connector n’est pas configuré pour ce déploiement. Terminez la configuration, puis relancez le Flow.",
     "connectorUnavailable": "La requête Connector n'a pas pu aboutir. Exécutez à nouveau le Flow ; si l'échec persiste, vérifiez la Connection sélectionnée.",
     "locateNode": "Localiser {{name}} sur le canevas",
+    "locateWait": "Localiser le nœud d’attente",
     "nodeError": "Erreur du nœud",
     "nodeFailed": "Le nœud n'a pas pu être terminé.",
     "nodeLog": "Journal {{level}}",
@@ -401,6 +426,7 @@
     "outputId": "ID de sortie",
     "outputPending": "La sortie finale s'affichera à la fin de cette exécution.",
     "resize": "Faites glisser pour redimensionner les détails d'exécution",
+    "resolving": "Application…",
     "runId": "ID d'exécution : {{id}}",
     "selectRun": "Sélectionnez une exécution pour inspecter sa chronologie et sa sortie.",
     "sourceDraft": "Brouillon",
@@ -412,6 +438,7 @@
     "statusNone": "Aucune exécution",
     "statusQueued": "En file d'attente",
     "statusRunning": "En cours",
+    "statusWaiting": "En attente",
     "statusStarting": "Démarrage",
     "statusSubmitting": "Envoi en cours",
     "statusSucceeded": "Réussie",
@@ -426,7 +453,8 @@
     "timeline": "Chronologie",
     "timelineEmpty": "Exécutez le Brouillon sélectionné pour inspecter sa chronologie et sa sortie.",
     "submitting": "Envoi de cette révision figée et création de son enregistrement d'exécution…",
-    "waiting": "En attente du premier événement…"
+    "waiting": "En attente du premier événement…",
+    "waitExpires": "Expire le {{date}}"
   },
   "sidebar": {
     "createFirstFlow": "Créer un Flow",
