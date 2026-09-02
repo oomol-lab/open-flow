@@ -6,6 +6,7 @@ import type { WorkspaceStatus } from '../stores/workspaceModel.ts'
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
+import { useDelayedTrue } from '../../../../designer/browser/base/react.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Tabs, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
@@ -80,6 +81,7 @@ export function WorkspaceHeader({
   const live = useVal(store.workspace.$.live)
   const status = useVal(store.workspace.$.status)
   const displayedStatus = useDisplayedStatus(status)
+  const displayedCheckLoading = useDelayedTrue(checkLoading, 200)
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   const target = useVal(store.workspace.$.target)
   const targetName = useVal(store.workspace.$.targetName)
@@ -171,7 +173,7 @@ export function WorkspaceHeader({
           variant={invalid ? 'destructive' : 'ghost'}
         >
           <Icon data-icon="inline-start" name={invalid ? 'alert' : 'check'} />
-          {validationLabel(diagnostics?.valid, diagnostics?.diagnostics.length ?? 0, checkLoading, t)}
+          {validationLabel(diagnostics?.valid, diagnostics?.diagnostics.length ?? 0, displayedCheckLoading, t)}
         </Button>
         <span aria-atomic="true" aria-live="polite" className="saved-state">
           {workspaceLoading || draft == null ? null : <Icon name="check" size={16} />}

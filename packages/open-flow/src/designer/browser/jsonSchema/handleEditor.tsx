@@ -24,6 +24,7 @@ import { useTranslate } from 'val-i18n-react'
 import { setValue, val } from 'value-enhancer'
 import { HANDLE_ROW_CLASSNAME, HANDLE_ROW_EXPANDED_CLASSNAME } from '../base/designer.ts'
 import { stopEvent } from '../base/dom.ts'
+import { useDelayedTrue } from '../base/react.ts'
 import { toRFHandleName } from '../base/rfHelpers.ts'
 import {
   asArray,
@@ -433,6 +434,7 @@ function VariableBinding({
   onOpen,
 }: NonNullable<HandleEditorProps['variable']> & { readonly disabled: boolean }) {
   const t = useTranslate()
+  const displayedLoading = useDelayedTrue(loading, 200)
   const unavailable = !enabled
   const missing = !unavailable && loaded && name != null && !names.includes(name)
   const options: IBasicOption[] = [
@@ -454,7 +456,7 @@ function VariableBinding({
           onChange={(option) => onChange(option?.value)}
           onOpen={onOpen}
           options={options}
-          placeholder={loading ? t('handleEditor.variablesLoading') : t('handleEditor.selectVariable')}
+          placeholder={displayedLoading ? t('handleEditor.variablesLoading') : t('handleEditor.selectVariable')}
           value={value}
           variant={missing || unavailable ? 'danger' : 'default'}
         />
