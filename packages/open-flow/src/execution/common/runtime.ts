@@ -161,14 +161,18 @@ export default () => fs.readFileSync('/etc/passwd', 'utf8')`,
         program: program(
           harness,
           `export default async (_input, context) => {
-  await context.outputs({ first: 1, second: 2 })
+  await context.outputs({ first: 1 })
+  await context.outputs({ second: 2 })
 }`,
         ),
       })
       equal(value, undefined, 'Void Task result')
       equal(
         calls.map(({ invocationId, kind, payload }) => ({ invocationId, kind, payload })),
-        [{ invocationId: 'task-outputs', kind: 'outputs', payload: { first: 1, second: 2 } }],
+        [
+          { invocationId: 'task-outputs', kind: 'outputs', payload: { first: 1 } },
+          { invocationId: 'task-outputs', kind: 'outputs', payload: { second: 2 } },
+        ],
         'Task outputs request',
       )
     },

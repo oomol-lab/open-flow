@@ -126,6 +126,30 @@ function hangingFlow(): RevisionContent {
   }
 }
 
+function oversizedOutputsFlow(): RevisionContent {
+  return {
+    document: {
+      bindings: {},
+      graph: {
+        nodes: {
+          task: {
+            concurrency: 1,
+            inputs: {},
+            kind: 'task',
+            task: { inputs: [], moduleId: 'main', name: 'Main', outputs: [{ ...port, handle: 'value' }] },
+          },
+        },
+      },
+      subflows: {},
+      tasks: {},
+    },
+    modelVersion: 1,
+    modules: {
+      main: { imports: [], name: 'Main', source: "export default async (_inputs, context) => context.outputs({ value: 'x'.repeat(2_000_000) })" },
+    },
+  }
+}
+
 function variableFlow(): RevisionContent {
   return {
     document: {
@@ -336,6 +360,26 @@ describe('Server application service', () => {
     })
     await expect(acceptRun(service, { flowId: 'main', idempotencyKey: 'full-flow', revision: fullFlow(4), revisionId: 'revision-b' })).resolves.toEqual({
       kind: 'conflict',
+    })
+    await closeService(service)
+  })
+
+  it('rejects context outputs larger than the Runtime result limit before delivery', async () => {
+    const service = await openService(await databaseFile())
+    await startService(service)
+    const accepted = await acceptRun(service, {
+      flowId: 'main',
+      idempotencyKey: 'oversized-outputs',
+      revision: oversizedOutputsFlow(),
+      revisionId: 'revision-oversized-outputs',
+    })
+    if (accepted.kind != 'accepted') throw new Error('Oversized outputs Run acceptance conflicted.')
+    await service.waitForIdle()
+
+    expect(service.run(accepted.runId)?.status).toBe('failed')
+    expect(service.events(accepted.runId).filter((event) => event.kind == 'node.output')).toHaveLength(0)
+    expect(service.events(accepted.runId).find((event) => event.kind == 'node.failed')).toMatchObject({
+      payload: { error: { code: 'node.failed', message: 'Runtime result exceeds the configured byte limit.' } },
     })
     await closeService(service)
   })

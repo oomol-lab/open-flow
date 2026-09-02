@@ -40,7 +40,7 @@ export const isolatedVmLimits: IsolatedVmLimits = {
   wallMs: 30_000,
 }
 
-export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/3 isolated-vm/7.0.1 node/26 web-globals/1').digest('hex')}`
+export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/1').digest('hex')}`
 
 export class IsolatedVmError extends Error {
   readonly code: 'canceled' | 'executor-crashed' | 'invalid-program' | 'limit-exceeded' | 'task-failed'
@@ -1000,7 +1000,12 @@ function executeFlow(
                 type: 'invoke',
               },
               (invocationId, capabilities, kind, payload) => {
-                if (kind == 'outputs') return outputs(payload).pipe(Effect.as({ body: null, status: 200 }))
+                if (kind == 'outputs') {
+                  if (serializedBytes(payload) > request.limits.maxResultBytes) {
+                    return Effect.fail(new IsolatedVmError('limit-exceeded', 'Runtime result exceeds the configured byte limit.'))
+                  }
+                  return outputs(payload).pipe(Effect.as({ body: null, status: 200 }))
+                }
                 return remote(call({ capabilities, invocationId, kind, payload, type: 'capability' })).pipe(
                   Effect.map((response) => response as RuntimeCapabilityResponse),
                 )
