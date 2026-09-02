@@ -173,7 +173,7 @@ function CodeEditor({ store }: CodeEditorProps) {
 
   return (
     <>
-      <div ref={setDiv} />
+      <div ref={setDiv} className={styles.sourceEditor} />
       <div className={styles.schemaError}>{error}</div>
     </>
   )

@@ -19,6 +19,7 @@ import type {
 } from '../../../../schema/index.ts'
 import type { FlowDisplayMode } from '../../../common/flowDisplay.ts'
 import type { RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
+import type { CreateSchemaEditorFn } from '../../services/designerService.ts'
 import type { IAddNodeMenuItem, IFromSource } from '../../stores/designer/designer.store.ts'
 import type { InteractiveMode } from '../../stores/designer/designer.store.ts'
 import type { DesignerUILayout, DesignerUIStore } from '../../stores/designer/designerUI.store.ts'
@@ -330,6 +331,7 @@ export interface FlowDesignerViewProps {
   }
   readonly addItems: readonly FlowDesignerViewAddItem[]
   readonly className?: string
+  readonly createSchemaEditor: CreateSchemaEditorFn
   readonly dark?: boolean
   readonly editable: boolean
   readonly focusNodeRequest?: {
@@ -479,6 +481,7 @@ class FlowDesignerViewAdapter {
 
   #addItems: readonly FlowDesignerViewAddItem[]
   readonly #callbacks: ViewCallbacks
+  readonly #createSchemaEditor: CreateSchemaEditorFn
   #disconnectTimer: ReturnType<typeof setTimeout> | undefined
   #disposeTimer: ReturnType<typeof setTimeout> | undefined
   #entries = new Map<string, NodeEntry>()
@@ -502,9 +505,17 @@ class FlowDesignerViewAdapter {
   #variableNamesLoaded: Val<boolean>
   #variableNamesLoading: Val<boolean>
 
-  constructor(model: FlowDesignerViewModel, editable: boolean, language: string, addItems: readonly FlowDesignerViewAddItem[], callbacks: ViewCallbacks) {
+  constructor(
+    model: FlowDesignerViewModel,
+    editable: boolean,
+    language: string,
+    addItems: readonly FlowDesignerViewAddItem[],
+    callbacks: ViewCallbacks,
+    createSchemaEditor: CreateSchemaEditorFn,
+  ) {
     this.#addItems = addItems
     this.#callbacks = callbacks
+    this.#createSchemaEditor = createSchemaEditor
     this.#language = val(language)
 
     const nodes = reactiveMap<NodeId, NodeStore>(null, { onDeleted: dispose })
@@ -778,7 +789,7 @@ class FlowDesignerViewAdapter {
         this.store.designerUIStore.setNodeUIData(node.id as NodeId, {
           rfNode: { position: createdPosition },
         })
-        entry = createNodeEntry(node, outputHandles, contentKey, this.store.designerUIStore, this.store, this.#callbacks)
+        entry = createNodeEntry(node, outputHandles, contentKey, this.store.designerUIStore, this.store, this.#callbacks, this.#createSchemaEditor)
         created = true
       } else {
         if (entry.kind == 'comment') throw new Error('Unexpected Comment node entry.')
@@ -1086,6 +1097,7 @@ function createNodeEntry(
   designerUIStore: DesignerUIStore,
   designerStore: FlowDesignerStore,
   callbacks: ViewCallbacks,
+  createSchemaEditor: CreateSchemaEditorFn,
 ): SemanticNodeEntry {
   const nodeInputsFrom = inputsFrom(node)
   const variablePrefix = `${node.id}\0`
@@ -1128,7 +1140,7 @@ function createNodeEntry(
     additionalInputs: node.kind == 'task' && node.editableAdditionalInputs ? val(true) : undefined,
     additionalInputDefs: node.kind == 'task' && node.editableAdditionalInputs ? values.additionalInputDefs : undefined,
     showSettings,
-    createSchemaEditor: () => undefined,
+    createSchemaEditor,
   })
   inputSection.dispose.add(boundHandles)
   let previousInputValues = new Map(nodeInputsFrom.flatMap((input) => (Object.hasOwn(input, 'value') ? [[input.handle, input.value] as const] : [])))
@@ -1228,7 +1240,7 @@ function createNodeEntry(
         handleOutputsTo: values.outputsTo,
         outputHandleDefs: values.outputDefs,
         showSettings,
-        createSchemaEditor: () => undefined,
+        createSchemaEditor,
       })
       store = new SubflowNodeStore(node.id as NodeId, {
         changeDescription,
@@ -1250,7 +1262,7 @@ function createNodeEntry(
         handleOutputsTo: values.outputsTo,
         outputHandleDefs: values.outputDefs,
         showSettings,
-        createSchemaEditor: () => undefined,
+        createSchemaEditor,
       })
       store = new TaskNodeStore(node.id as NodeId, {
         changeDescription,
@@ -1294,7 +1306,7 @@ function createNodeEntry(
         handleOutputsTo: values.outputsTo,
         outputHandleDefs: values.outputDefs,
         showSettings,
-        createSchemaEditor: () => undefined,
+        createSchemaEditor,
       })
       store = new TriggerNodeStore(node.id as NodeId, {
         changeDescription,
@@ -1339,7 +1351,7 @@ function createNodeEntry(
         handleOutputsTo: values.outputsTo,
         valueHandleDefs: defs,
         showSettings,
-        createSchemaEditor: () => undefined,
+        createSchemaEditor,
       })
       store = new ValueNodeStore(node.id as NodeId, {
         changeDescription,
@@ -1467,7 +1479,7 @@ function callbacksFromProps(props: FlowDesignerViewProps): ViewCallbacks {
 
 export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
   const adapter = useMemo(
-    () => new FlowDesignerViewAdapter(props.model, props.editable, props.language ?? 'en', props.addItems, callbacksFromProps(props)),
+    () => new FlowDesignerViewAdapter(props.model, props.editable, props.language ?? 'en', props.addItems, callbacksFromProps(props), props.createSchemaEditor),
     [props.identity],
   )
   const propsRef = useRef(props)

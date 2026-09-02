@@ -20,6 +20,10 @@ implementation history in Git. Do not reference unavailable repositories.
 - Use neutral domain names for product-owned code. The npm scope and serialized format tokens are
   exceptions, not internal naming patterns.
 - Remove obsolete unpublished behavior instead of adding compatibility adapters.
+- For changes involving a contract or `packages/command`, work bottom-up in waterfall order: make
+  the lower-level model and its specification tests correct first, then implement adapters and
+  upper clients. Do not compensate for an incomplete lower layer in a command, Workbench, or other
+  client; a complete lower contract should leave upper layers with fewer states and bugs to handle.
 - Keep comments in plain English sentence style with terminal punctuation.
 - Before changing frontend interaction involving Select, popup, portal, focus, or outside-click
   handling, read [`docs/authoring/frontend-ui.md`](docs/authoring/frontend-ui.md).

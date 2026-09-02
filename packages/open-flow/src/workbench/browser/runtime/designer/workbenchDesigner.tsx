@@ -1,4 +1,6 @@
 import type { KeyboardEvent, PointerEvent, ReactElement } from 'react'
+import type { ReadonlyVal } from 'value-enhancer'
+import type { EditorDisposable } from '../../../../base/browser/stringEditor.ts'
 import type {
   FlowDesignerViewConditionChange,
   FlowDesignerViewInput,
@@ -9,6 +11,7 @@ import type {
   FlowDesignerViewValue,
   FlowDesignerViewWebhook,
 } from '../../../../designer/browser/graph/FlowDesigner/FlowDesignerView.tsx'
+import type { CreateSchemaEditorFn } from '../../../../designer/browser/services/designerService.ts'
 import type { FlowDisplayMode } from '../../../../designer/common/flowDisplay.ts'
 import type { GroupDividerDef } from '../../../../schema/index.ts'
 import type { ConditionOperator, JsonValue } from '../api.ts'
@@ -20,10 +23,12 @@ import type { WebhookSettings } from './flowChanges.ts'
 
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
+import { isWritable, val } from 'value-enhancer'
 import { FlowDesignerView } from '../../../../designer/browser/graph/FlowDesigner/FlowDesignerView.tsx'
 import { compareJSONSchema } from '../../../../manifest/common/schemaCompare.ts'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { CodeMirrorStringEditorFactory } from '../../codeMirrorStringEditor.ts'
 import { Icon } from '../icons.tsx'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
 
@@ -176,6 +181,51 @@ function focusPanel(event: PointerEvent<HTMLElement>): void {
   event.currentTarget.focus({ preventScroll: true })
 }
 
+let schemaEditorId = 0
+
+function schemaEditor(darkMode$: ReadonlyVal<boolean>): CreateSchemaEditorFn {
+  const factory = new CodeMirrorStringEditorFactory({ darkMode$ })
+  return (container, schema$) => {
+    let disposed = false
+    let editor: Awaited<ReturnType<CodeMirrorStringEditorFactory['create']>> | undefined
+    let changeListener: EditorDisposable | undefined
+    let syncing = false
+    const stopValue = schema$.reaction((value) => {
+      if (editor == null || editor.monacoEditor.getValue() == value) return
+      syncing = true
+      editor.monacoEditor.setValue(value)
+      syncing = false
+    })
+    void factory
+      .create(container, `open-flow-schema:${schemaEditorId++}`, {
+        automaticLayout: true,
+        language: 'json',
+        readOnly: !isWritable(schema$),
+        value: schema$.value,
+        wordWrap: 'on',
+      })
+      .then((created) => {
+        if (disposed) {
+          created.dispose()
+          return
+        }
+        editor = created
+        if (isWritable(schema$)) {
+          changeListener = created.monacoEditor.onDidChangeModelContent(() => {
+            if (!syncing) schema$.set(created.monacoEditor.getValue())
+          })
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      disposed = true
+      stopValue()
+      changeListener?.dispose()
+      editor?.dispose()
+    }
+  }
+}
+
 export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(function WorkbenchDesigner(
   {
     addNodeOptions,
@@ -220,6 +270,10 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
 ): ReactElement {
   const language = useLang()
   const t = useTranslate()
+  const schemaDark$ = useMemo(() => val(theme == 'dark'), [])
+  const createSchemaEditor = useMemo(() => schemaEditor(schemaDark$), [schemaDark$])
+  schemaDark$.set(theme == 'dark')
+  useEffect(() => () => schemaDark$.dispose(), [schemaDark$])
   const [addNodeRequest, setAddNodeRequest] = useState<{
     readonly position: Point
     readonly screenPosition?: Point
@@ -410,6 +464,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         addNodeRequest={addNodeRequest}
         addItems={designerAddItems}
         className="workbench-designer-canvas"
+        createSchemaEditor={createSchemaEditor}
         dark={theme == 'dark'}
         editable={!disabled}
         focusNodeRequest={readyFocusNodeRequest}

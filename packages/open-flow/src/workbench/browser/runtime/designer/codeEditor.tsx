@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import type { WorkbenchTheme } from '../contract.ts'
 
 import { useEffect, useRef, useState } from 'react'
+import { val } from 'value-enhancer'
 import { CodeMirrorStringEditorFactory } from '../../codeMirrorStringEditor.ts'
 
 type Editor = Awaited<ReturnType<CodeMirrorStringEditorFactory['create']>>
@@ -61,20 +62,21 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
     let changeListener: { dispose(): void } | undefined
     let release: (() => void) | undefined
     let disposed = false
+    const darkMode$ = val(theme == 'dark')
     setFailed(false)
     setLoading(true)
     const extension = import('../../typeScriptSession.ts')
       .then(({ loadTypeScriptExtension }) => loadTypeScriptExtension(uri, typingRef.current))
       .catch(() => undefined)
-    void Promise.all([import('@uiw/codemirror-theme-github'), claimEditor(uri)])
-      .then(([{ githubDark, githubLight }, nextRelease]) => {
+    void claimEditor(uri)
+      .then((nextRelease) => {
         release = nextRelease
         if (disposed) {
           release()
           release = undefined
           return
         }
-        return new CodeMirrorStringEditorFactory({ extension, theme: theme == 'dark' ? githubDark : githubLight }).create(container, uri, {
+        return new CodeMirrorStringEditorFactory({ darkMode$, extension }).create(container, uri, {
           ariaLabel,
           automaticLayout: true,
           language: 'javascript',
@@ -113,6 +115,7 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
       disposed = true
       changeListener?.dispose()
       current?.dispose()
+      darkMode$.dispose()
       release?.()
       release = undefined
       if (editor.current === current) editor.current = undefined

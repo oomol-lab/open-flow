@@ -177,25 +177,30 @@ export class DesignerUIStore {
   }
 
   /**
-   * Carries the current layout into the next display mode so switching modes
-   * keeps the same spatial context. Returns false when the outgoing layout has
-   * not been initialized and the next mode still needs its first layout.
+   * Saves the outgoing layout and restores the target layout when one exists.
+   * Returns false when the target layout was seeded from the outgoing mode and
+   * still needs its measured node sizes to resolve overlaps.
    */
   public switchDisplayMode(previousMode: FlowDisplayMode, nextMode: FlowDisplayMode): boolean {
     this.captureLayout(previousMode)
     this.activeDisplayMode = nextMode
     const source = this.layouts.get(previousMode)
-    const target = cloneLayout(source)
-    const targetChanged = JSON.stringify(this.layouts.get(nextMode)) != JSON.stringify(target)
-    if (hasLayoutData(target)) {
+    const existingTarget = this.layouts.get(nextMode)
+    const target = existingTarget && mergeMissingPositions(existingTarget, source)
+    if (target) {
+      const targetChanged = !sameLayoutMembership(existingTarget, target)
       this.layouts.set(nextMode, target)
       this.applyLayout(target)
       if (targetChanged) send(this.onChanged, this)
+      return this.initializedLayouts.has(nextMode)
     }
-    const initialized = this.initializedLayouts.has(previousMode)
-    if (initialized) this.initializedLayouts.add(nextMode)
-    else this.initializedLayouts.delete(nextMode)
-    return initialized
+
+    const seeded = cloneLayout(source)
+    if (hasLayoutData(seeded)) this.layouts.set(nextMode, seeded)
+    this.initializedLayouts.delete(nextMode)
+    this.applyLayout(seeded)
+    if (hasLayoutData(seeded)) send(this.onChanged, this)
+    return false
   }
 
   public captureActiveLayout(): void {
@@ -339,6 +344,32 @@ function cloneLayout(layout: DesignerUILayout | undefined): DesignerUILayout {
 function clonePositions(positions: DesignerUILayout['nodes']): DesignerUILayout['nodes'] {
   if (!positions) return
   return Object.fromEntries(Object.entries(positions).map(([nodeId, position]) => [nodeId, position && { ...position }])) as DesignerUILayout['nodes']
+}
+
+function mergeMissingPositions(target: DesignerUILayout, source: DesignerUILayout | undefined): DesignerUILayout {
+  const nodes = { ...target.nodes }
+  const pseudoNodes = { ...target.pseudoNodes }
+  for (const [nodeId, position] of Object.entries(source?.nodes ?? {})) {
+    if (nodes[nodeId as NodeId] == null && position) nodes[nodeId as NodeId] = { ...position }
+  }
+  for (const [nodeId, position] of Object.entries(source?.pseudoNodes ?? {})) {
+    if (pseudoNodes[nodeId as NodeId] == null && position) pseudoNodes[nodeId as NodeId] = { ...position }
+  }
+  return {
+    nodes: Object.keys(nodes).length > 0 ? nodes : undefined,
+    pseudoNodes: Object.keys(pseudoNodes).length > 0 ? pseudoNodes : undefined,
+    viewport: target.viewport && { ...target.viewport },
+  }
+}
+
+function sameLayoutMembership(a: DesignerUILayout, b: DesignerUILayout): boolean {
+  return samePositionKeys(a.nodes, b.nodes) && samePositionKeys(a.pseudoNodes, b.pseudoNodes)
+}
+
+function samePositionKeys(a: DesignerUILayout['nodes'], b: DesignerUILayout['nodes']): boolean {
+  const aKeys = Object.keys(a ?? {})
+  const bKeys = Object.keys(b ?? {})
+  return aKeys.length == bKeys.length && aKeys.every((key) => b?.[key as NodeId] != null)
 }
 
 function hasLayoutData(layout: DesignerUILayout): boolean {
