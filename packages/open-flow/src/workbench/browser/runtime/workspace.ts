@@ -280,6 +280,9 @@ function nodePorts(node: ResolvedSelection): NodePorts {
         if (!('handle' in port)) continue
         inputs.set(port.handle, { defaultValue: port.value, description: port.description, jsonSchema: port.jsonSchema, nullable: port.nullable })
       }
+      for (const port of node.node.additionalInputs ?? []) {
+        inputs.set(port.handle, { defaultValue: port.value, description: port.description, jsonSchema: port.jsonSchema, nullable: port.nullable })
+      }
       for (const [handle, port] of mappedInputs) {
         if (!inputs.has(handle)) inputs.set(handle, port)
       }
