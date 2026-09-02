@@ -660,6 +660,55 @@ describe('revision graph scheduler', () => {
     ])
   })
 
+  it('propagates repeated Task outputs and treats an undefined result as empty', async () => {
+    const source = revision(
+      {
+        bindings: {},
+        graph: {
+          nodes: {
+            source: { concurrency: 1, inputs: {}, kind: 'task', task: task('source', [], ['item']) },
+            collect: {
+              concurrency: 1,
+              inputs: { item: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'item' }] } },
+              kind: 'task',
+              task: task('collect', ['item'], ['seen']),
+            },
+          },
+        },
+        subflows: {},
+        tasks: {},
+      },
+      ['source', 'collect'],
+    )
+    const prepared = await prepareFlow(source, 'main', engine)
+    const events: SchedulerEvent[] = []
+    const result = await runFlow(prepared, {
+      emit: (event) => Effect.sync(() => void events.push(event)),
+      invokeTask(invocation, outputs) {
+        if (invocation.nodeId == 'collect') return Effect.succeed({ seen: invocation.input.item })
+        return Effect.gen(function* () {
+          yield* outputs({ item: 'first' })
+          yield* outputs({ item: 'second' })
+          return undefined
+        })
+      },
+      runId: 'run-task-outputs',
+    })
+
+    expect(
+      events.filter((event) => event.type == 'node.output' && event.nodeId == 'source').map((event) => (event.type == 'node.output' ? event.value : undefined)),
+    ).toEqual(['first', 'second'])
+    expect(result.nodes).toEqual([
+      {
+        jobs: [
+          { jobId: expect.any(String), outputs: { seen: 'first' } },
+          { jobId: expect.any(String), outputs: { seen: 'second' } },
+        ],
+        nodeId: 'collect',
+      },
+    ])
+  })
+
   it('enforces timeout and Fiber interruption for each Task invocation', async () => {
     const source = revision(
       {

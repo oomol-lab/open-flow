@@ -85,12 +85,12 @@ function fullFlow(value = 2): RevisionContent {
       increment: {
         imports: [],
         name: 'Increment',
-        source: `export default (inputs, context) => {
+        source: `export default async (inputs, context) => {
   if (context.inputs !== inputs) throw new Error('Task context inputs must be the first argument.')
   if (context.blockId != 'increment' || typeof context.flowId != 'string' || typeof context.runId != 'string') throw new Error('Task identity is incomplete.')
   if (inputs.start != 'manual') throw new Error('Additional input was not passed to the Task.')
   context.signal.throwIfAborted()
-  return { value: inputs.value + 1 }
+  await context.outputs({ value: inputs.value + 1 })
 }`,
       },
     },

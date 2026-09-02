@@ -69,7 +69,7 @@ export interface TaskContext<Outputs extends object = Record<string, unknown>> {
   readonly artifact: ArtifactCapability
   readonly fetch: typeof fetch
   readonly logger: TaskLogger
-  output<Handle extends keyof Outputs & string>(handle: Handle, value: Outputs[Handle]): Promise<void>
+  outputs(value: Partial<Outputs>): Promise<void>
   preview(payload: PreviewPayload, id?: string): Promise<void>
   reportProgress(progress: number): Promise<void>
 }

@@ -117,7 +117,7 @@ export interface FlowRunOptions {
   readonly emit?: (event: SchedulerEvent) => Effect.Effect<void, Error>
   readonly flowId: string
   readonly inputs?: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>
-  readonly invokeTask: (invocation: TaskInvocation) => Effect.Effect<unknown, Error>
+  readonly invokeTask: (invocation: TaskInvocation, outputs: (value: unknown) => Effect.Effect<void, Error>) => Effect.Effect<unknown, Error>
   readonly projectFailure?: (error: unknown) => SchedulerFailure
   readonly runId: string
   readonly trigger?: TriggerSeed
@@ -406,6 +406,7 @@ function conditionMatches(
 }
 
 function outputRecord(value: unknown, nodeId: string): Readonly<Record<string, JsonValue>> {
+  if (value === undefined) return {}
   if (value == null || typeof value != 'object' || Array.isArray(value)) throw new Error(`Node "${nodeId}" must return an object.`)
   return value as Readonly<Record<string, JsonValue>>
 }
@@ -550,22 +551,34 @@ function runGraph(
             }
             case 'task': {
               const additional = new Set((node.additionalInputs ?? []).map((port) => port.handle))
-              const result = yield* context.invokeTask({
-                additionalInputs: Object.fromEntries(Object.entries(nodeInputs).filter(([handle]) => additional.has(handle))),
-                blockId: node.task != null ? node.task.moduleId : node.taskId,
-                flowId: target.flowId,
-                input: Object.fromEntries(Object.entries(nodeInputs).filter(([handle]) => !additional.has(handle))),
-                invocationId: context.createId(),
-                jobId,
-                nodeId,
-                runId,
-                ...(node.task != null ? { capabilities: node.task.capabilities ?? [], moduleId: node.task.moduleId } : { taskId: node.taskId }),
-              })
-              outputs = yield* Effect.try({
-                try: () => outputRecord(result, nodeId),
-                catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-              })
-              for (const [handle, value] of Object.entries(outputs)) yield* emitNodeOutput(nodeId, jobId, handle, value)
+              const emitted = new Map<string, JsonValue>()
+              const emitOutputs = (value: unknown): Effect.Effect<void, Error> =>
+                Effect.gen(function* () {
+                  const record = yield* Effect.try({
+                    try: () => outputRecord(value, nodeId),
+                    catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+                  })
+                  for (const [handle, output] of Object.entries(record)) {
+                    yield* emitNodeOutput(nodeId, jobId, handle, output)
+                    emitted.set(handle, output)
+                  }
+                })
+              const result = yield* context.invokeTask(
+                {
+                  additionalInputs: Object.fromEntries(Object.entries(nodeInputs).filter(([handle]) => additional.has(handle))),
+                  blockId: node.task != null ? node.task.moduleId : node.taskId,
+                  flowId: target.flowId,
+                  input: Object.fromEntries(Object.entries(nodeInputs).filter(([handle]) => !additional.has(handle))),
+                  invocationId: context.createId(),
+                  jobId,
+                  nodeId,
+                  runId,
+                  ...(node.task != null ? { capabilities: node.task.capabilities ?? [], moduleId: node.task.moduleId } : { taskId: node.taskId }),
+                },
+                emitOutputs,
+              )
+              yield* emitOutputs(result)
+              outputs = Object.fromEntries(emitted)
               break
             }
           }

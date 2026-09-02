@@ -40,7 +40,7 @@ export const isolatedVmLimits: IsolatedVmLimits = {
   wallMs: 30_000,
 }
 
-export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/2 isolated-vm/7.0.1 node/26 web-globals/1').digest('hex')}`
+export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/3 isolated-vm/7.0.1 node/26 web-globals/1').digest('hex')}`
 
 export class IsolatedVmError extends Error {
   readonly code: 'canceled' | 'executor-crashed' | 'invalid-program' | 'limit-exceeded' | 'task-failed'
@@ -117,7 +117,13 @@ type ExecutorMessage =
       readonly retire?: true
       readonly type: 'result'
     }
-  | { readonly executionId: number; readonly ok: true; readonly retire?: true; readonly type: 'result'; readonly value: FlowRunResult | JsonValue }
+  | {
+      readonly executionId: number
+      readonly ok: true
+      readonly retire?: true
+      readonly type: 'result'
+      readonly value: FlowRunResult | JsonValue | undefined
+    }
 
 interface PendingCapability {
   readonly deferred: Deferred.Deferred<CapabilityResult, Error>
@@ -136,7 +142,7 @@ interface PendingInvocation {
   readonly limits: IsolatedVmLimits
   readonly projectFailure: (error: unknown) => SchedulerFailure
   readonly reject: (error: unknown) => void
-  readonly resolve: (value: FlowRunResult | JsonValue) => void
+  readonly resolve: (value: FlowRunResult | JsonValue | undefined) => void
   readonly signal?: AbortSignal
 }
 
@@ -182,7 +188,7 @@ export class IsolatedVmHost {
   readonly #pending = new Map<number, PendingInvocation>()
   #stderr = ''
 
-  async invoke(invocation: RuntimeInvocation, limits: IsolatedVmLimits = isolatedVmLimits): Promise<JsonValue> {
+  async invoke(invocation: RuntimeInvocation, limits: IsolatedVmLimits = isolatedVmLimits): Promise<JsonValue | undefined> {
     return await Effect.runPromise(
       Effect.suspend(() => {
         if (this.#closed) return Effect.fail(new IsolatedVmError('executor-crashed', 'Runtime Host is closed.'))
@@ -196,7 +202,7 @@ export class IsolatedVmHost {
         }
         if (invocation.signal?.aborted) return Effect.fail(normalizedError(invocation.signal.reason))
 
-        return Effect.callback<JsonValue, Error>((resume, signal) => {
+        return Effect.callback<JsonValue | undefined, Error>((resume, signal) => {
           const child = this.#child ?? this.#start()
           const executionId = ++this.#executionId
           const cancel = (): void => {
@@ -217,7 +223,7 @@ export class IsolatedVmHost {
             limits,
             projectFailure: (error) => ({ code: 'node.failed', message: normalizedError(error).message }),
             reject: (error) => resume(Effect.fail(normalizedError(error))),
-            resolve: (value) => resume(Effect.succeed(value as JsonValue)),
+            resolve: (value) => resume(Effect.succeed(value as JsonValue | undefined)),
             signal: invocation.signal,
           })
           invocation.signal?.addEventListener('abort', cancel, { once: true })
@@ -631,6 +637,7 @@ export const capability = Object.freeze({
   }),
   connector: (input) => invoke('connector', input),
   egress: (url) => invoke('egress', { url }),
+  outputs: (value) => invoke('outputs', value),
 })`
 
 function installGlobals(
@@ -789,7 +796,9 @@ export async function invoke(source) {
       signal: cancellation.signal,
     }))
     const result = await task(inputs, context)
-    return JSON.stringify({ engineDigest: ${JSON.stringify(program.engineDigest)}, ok: true, value: result })
+    return result === undefined
+      ? JSON.stringify({ engineDigest: ${JSON.stringify(program.engineDigest)}, ok: true, void: true })
+      : JSON.stringify({ engineDigest: ${JSON.stringify(program.engineDigest)}, ok: true, value: result })
   } catch (error) {
     return JSON.stringify({ error: error instanceof Error ? error.message : String(error), ok: false })
   }
@@ -829,16 +838,30 @@ async function invokeProgram(mainModule: IsolatedVM.Module, input: JsonValue, cp
   })
 }
 
-function readResult(source: unknown, program: RuntimeProgram, maxBytes: number, preserveCapabilityFailure: boolean, capabilityFailure: unknown): JsonValue {
+function readResult(
+  source: unknown,
+  program: RuntimeProgram,
+  maxBytes: number,
+  preserveCapabilityFailure: boolean,
+  capabilityFailure: unknown,
+): JsonValue | undefined {
   if (typeof source != 'string' || encoder.encode(source).byteLength > maxBytes) {
     throw new IsolatedVmError('limit-exceeded', 'Runtime result exceeds the configured byte limit.')
   }
-  const result = JSON.parse(source) as { readonly engineDigest?: string; readonly error?: string; readonly ok?: boolean; readonly value?: JsonValue }
-  if (!result.ok || result.engineDigest != program.engineDigest || !Object.hasOwn(result, 'value')) {
+  const result = JSON.parse(source) as {
+    readonly engineDigest?: string
+    readonly error?: string
+    readonly ok?: boolean
+    readonly value?: JsonValue
+    readonly void?: boolean
+  }
+  const returnedValue = Object.hasOwn(result, 'value') && result.void === undefined
+  const returnedVoid = !Object.hasOwn(result, 'value') && result.void === true
+  if (!result.ok || result.engineDigest != program.engineDigest || (!returnedValue && !returnedVoid)) {
     if (preserveCapabilityFailure && capabilityFailure != null) throw capabilityFailure
     throw new IsolatedVmError('task-failed', result.error ?? 'User Task failed.')
   }
-  return result.value as JsonValue
+  return returnedVoid ? undefined : (result.value as JsonValue)
 }
 
 async function execute(
@@ -847,7 +870,7 @@ async function execute(
   call: (invocationId: string, capabilities: readonly ConnectorCapability[], kind: string, payload: JsonValue) => Promise<RuntimeCapabilityResponse>,
   capabilities: readonly ConnectorCapability[] = [],
   preserveCapabilityFailure = false,
-): Promise<JsonValue> {
+): Promise<JsonValue | undefined> {
   if (!('program' in request)) throw new IsolatedVmError('invalid-program', 'Runtime module invocation is incomplete.')
   const { program } = request
   const invalid = programError(program)
@@ -919,7 +942,7 @@ function executeEffect(
   ) => Effect.Effect<RuntimeCapabilityResponse, Error>,
   capabilities: readonly ConnectorCapability[] = [],
   preserveCapabilityFailure = false,
-): Effect.Effect<JsonValue, Error, Scope.Scope> {
+): Effect.Effect<JsonValue | undefined, Error, Scope.Scope> {
   return Effect.gen(function* () {
     const run = yield* FiberSet.makeRuntimePromise<never, RuntimeCapabilityResponse, Error>()
     return yield* Effect.tryPromise({
@@ -959,7 +982,7 @@ function executeFlow(
     emit: (event) => remote(call({ event, type: 'event' })).pipe(Effect.asVoid),
     flowId: flow.flowId,
     ...(flow.inputs == null ? {} : { inputs: flow.inputs }),
-    invokeTask: (invocation) =>
+    invokeTask: (invocation, outputs) =>
       Effect.gen(function* () {
         if ('moduleId' in invocation) {
           const program = createRuntimeProgram(flow.prepared, invocation.moduleId, isolatedVmEngineDigest)
@@ -976,10 +999,12 @@ function executeFlow(
                 program,
                 type: 'invoke',
               },
-              (invocationId, capabilities, kind, payload) =>
-                remote(call({ capabilities, invocationId, kind, payload, type: 'capability' })).pipe(
+              (invocationId, capabilities, kind, payload) => {
+                if (kind == 'outputs') return outputs(payload).pipe(Effect.as({ body: null, status: 200 }))
+                return remote(call({ capabilities, invocationId, kind, payload, type: 'capability' })).pipe(
                   Effect.map((response) => response as RuntimeCapabilityResponse),
-                ),
+                )
+              },
               invocation.capabilities,
               true,
             ).pipe(
@@ -1034,7 +1059,7 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
 
   return Effect.scoped(
     Effect.gen(function* () {
-      let value: FlowRunResult | JsonValue
+      let value: FlowRunResult | JsonValue | undefined
       if ('flow' in request) value = yield* executeFlow(request, call)
       else {
         value = yield* executeEffect(request, (invocationId, capabilities, kind, payload) =>

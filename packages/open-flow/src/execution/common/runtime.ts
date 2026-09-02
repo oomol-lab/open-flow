@@ -50,7 +50,7 @@ export interface RuntimeInvocation {
 
 export interface RuntimeHarness {
   readonly engineDigest: string
-  invoke(invocation: RuntimeInvocation): Promise<JsonValue>
+  invoke(invocation: RuntimeInvocation): Promise<JsonValue | undefined>
 }
 
 export interface RuntimeConformanceCase {
@@ -144,6 +144,32 @@ export default () => fs.readFileSync('/etc/passwd', 'utf8')`,
         calls.map(({ invocationId, kind, payload }) => ({ invocationId, kind, payload })),
         [{ invocationId: 'async-capability', kind: 'connector', payload: { action: 'read', input: { issue: 42 } } }],
         'Capability request',
+      )
+    },
+  },
+  {
+    name: 'submits Task outputs and accepts a void result',
+    async verify(harness) {
+      const calls: RuntimeCapabilityCall[] = []
+      const value = await harness.invoke({
+        capability: async (call) => {
+          calls.push(call)
+          return { body: null, status: 200 }
+        },
+        input: null,
+        invocationId: 'task-outputs',
+        program: program(
+          harness,
+          `export default async (_input, context) => {
+  await context.outputs({ first: 1, second: 2 })
+}`,
+        ),
+      })
+      equal(value, undefined, 'Void Task result')
+      equal(
+        calls.map(({ invocationId, kind, payload }) => ({ invocationId, kind, payload })),
+        [{ invocationId: 'task-outputs', kind: 'outputs', payload: { first: 1, second: 2 } }],
+        'Task outputs request',
       )
     },
   },
