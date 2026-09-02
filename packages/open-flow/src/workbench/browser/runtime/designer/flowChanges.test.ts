@@ -106,6 +106,33 @@ describe('Code task port changes', () => {
     expect(changed.content.modules['new-code']).toMatchObject({ name: 'New code' })
   })
 
+  it('creates a code task with connection-derived ports', () => {
+    const current = draft('export default () => {}\n')
+    const changes = addNode(
+      revisionView(current),
+      { kind: 'flow' },
+      'new-code',
+      {
+        kind: 'code',
+        name: 'New code',
+        ports: {
+          inputs: [{ description: 'Count', handle: 'value', jsonSchema: { type: 'number' }, nullable: false, value: null }],
+          outputs: [{ handle: 'result', jsonSchema: {}, nullable: true }],
+        },
+      },
+      () => 'unused',
+    )
+
+    if (changes == null) throw new Error('Expected code task changes.')
+    expect(applyFlowChanges(current, changes).content.document.graph.nodes['new-code']).toMatchObject({
+      inputs: { value: { kind: 'value', value: null } },
+      task: {
+        inputs: [{ description: 'Count', handle: 'value', jsonSchema: { type: 'number' }, nullable: false, value: null }],
+        outputs: [{ handle: 'result', jsonSchema: {}, nullable: true }],
+      },
+    })
+  })
+
   it('does not rewrite module source when ports change', () => {
     const source = [
       '//#region generated meta',

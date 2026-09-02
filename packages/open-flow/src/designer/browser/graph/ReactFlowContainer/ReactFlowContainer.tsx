@@ -1083,7 +1083,7 @@ function BlockQuickPickPanelPopover(props: BlockQuickPickPanelPopoverProps) {
         props.fromSource?.side === 'left' ? { x: props.position.x - 250, y: props.position.y } : props.position,
         connect,
       )
-      if (nodeId != null && props.connection) {
+      if (connect == null && nodeId != null && props.connection) {
         if (handle != null) {
           if (item.type === 'scriptlet' && props.setupScriptletNode) {
             props.setupScriptletNode(nodeId, props.connection, handle)

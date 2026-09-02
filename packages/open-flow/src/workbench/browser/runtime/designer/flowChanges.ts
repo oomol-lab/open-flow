@@ -89,7 +89,7 @@ export interface SubflowSettings {
 }
 
 export type AddNodeIntent =
-  | { readonly kind: 'code'; readonly name: string }
+  | { readonly kind: 'code'; readonly name: string; readonly ports?: CodeTaskPorts }
   | { readonly action: ConnectorAction; readonly kind: 'connector' }
   | { readonly kind: 'condition'; readonly name: string }
   | { readonly kind: 'cron'; readonly name: string }
@@ -136,7 +136,7 @@ export function addNode(
 ): FlowChanges | undefined {
   switch (intent.kind) {
     case 'code':
-      return createCodeTask(target, { moduleId: nodeId, nodeId }, intent.name)
+      return createCodeTask(target, { moduleId: nodeId, nodeId }, intent.name, undefined, intent.ports)
     case 'llm':
       return createLlmTask(target, { nodeId, taskId: identity() }, intent.name, intent.mode, intent.outputDescription)
     case 'connector':
