@@ -82,7 +82,7 @@ docker compose up -d
 docker compose logs -f open-flow
 ```
 
-特定の tag を実行するには `OPEN_FLOW_IMAGE_TAG` を設定してください。例: `OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1 docker compose up -d`。
+特定の tag を実行するには、下記のアップグレードコマンドを含むすべての compose コマンドの前にシェルで `OPEN_FLOW_IMAGE_TAG` を export してください。そうしないと固定した Release が `tip` に戻ります。例: `export OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1`。
 
 ### ソースからビルド
 

@@ -83,7 +83,7 @@ docker compose up -d
 docker compose logs -f open-flow
 ```
 
-Чтобы запустить конкретный тег, задайте `OPEN_FLOW_IMAGE_TAG`, например `OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1 docker compose up -d`.
+Чтобы запустить конкретный тег, экспортируйте `OPEN_FLOW_IMAGE_TAG` в оболочке перед каждой командой compose, включая команды обновления ниже, иначе зафиксированный Release откатится на `tip`: `export OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1`.
 
 ### Сборка из исходников
 
