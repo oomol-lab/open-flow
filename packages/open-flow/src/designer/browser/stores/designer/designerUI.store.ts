@@ -51,6 +51,7 @@ export class DesignerUIStore {
   private readonly pseudoNodesData = new Map<NodeId, NodeUIPersistedData>()
   private readonly commentNodesData = new Map<NodeId, NodeUIPersistedData>()
   private readonly layouts = new Map<FlowDisplayMode, DesignerUILayout>()
+  private initialPositions = new Set<NodeId>()
   private initialized = false
   private observedViewport: Viewport | undefined
   private activeDisplayMode: FlowDisplayMode = 'detail'
@@ -143,7 +144,8 @@ export class DesignerUIStore {
       for (const [mode, layout] of layouts) {
         this.layouts.set(mode, layout)
       }
-      this.initialized = hasPersistedPositions(uiData.nodes, uiData.pseudoNodes, uiData.commentNodes)
+      this.initialized = false
+      this.initialPositions = positionedIds(uiData.nodes, uiData.pseudoNodes)
       const activeLayout = this.layouts.get(displayMode)
       const viewport = activeLayout?.viewport ?? uiData.viewport
       if (isViewport(viewport)) {
@@ -177,7 +179,7 @@ export class DesignerUIStore {
       this.observedViewport = viewport
       this.viewport$.set({ ...viewport })
     }
-    return this.initialized
+    return this.isActiveLayoutInitialized()
   }
 
   public captureActiveLayout(): void {
@@ -190,6 +192,10 @@ export class DesignerUIStore {
   }
 
   public isActiveLayoutInitialized(): boolean {
+    if (!this.initialized) {
+      const nodeIds = [...this.nodeStores.keys(), ...(this.pseudoNodeStores?.keys() ?? [])]
+      this.initialized = nodeIds.length > 0 && nodeIds.every((nodeId) => this.initialPositions.has(nodeId))
+    }
     return this.initialized
   }
 
@@ -232,11 +238,14 @@ function parseLayouts(data: unknown): Map<FlowDisplayMode, DesignerUILayout> {
   return result
 }
 
-function hasPersistedPositions(...collections: unknown[]): boolean {
-  return collections.some((collection) => {
-    const nodes = toPlainObject(collection)
-    return nodes && Object.values(nodes).some((node) => isXYPosition(toPlainObject(toPlainObject(node)?.rfNode)?.position))
-  })
+function positionedIds(...collections: unknown[]): Set<NodeId> {
+  const result = new Set<NodeId>()
+  for (const collection of collections) {
+    for (const [nodeId, node] of Object.entries(toPlainObject(collection) ?? {})) {
+      if (isXYPosition(toPlainObject(toPlainObject(node)?.rfNode)?.position)) result.add(nodeId as NodeId)
+    }
+  }
+  return result
 }
 
 function hasLayoutData(layout: DesignerUILayout): boolean {

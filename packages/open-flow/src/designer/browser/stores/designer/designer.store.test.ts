@@ -285,6 +285,25 @@ describe('DesignerStore display mode', () => {
     setup.dispose()
   })
 
+  it('runs the normal graph layout when any layout node has no saved position', async () => {
+    const setup = createTestSetup()
+    setup.store.designerUIStore.loadDesignerUIData({
+      commentNodes: { note: { rfNode: { position: { x: 10, y: 20 } } } },
+      nodes: { first: { rfNode: { position: { x: 30, y: 40 } } } },
+    })
+    const first = setup.createNode('first' as NodeId)
+    const second = setup.createNode('second' as NodeId)
+    setup.nodes.set(first.nodeId, first)
+    setup.nodes.set(second.nodeId, second)
+    first.$$.rfNode.set({ ...first.$.rfNode.value, measured: { width: 200, height: 80 } })
+    second.$$.rfNode.set({ ...second.$.rfNode.value, measured: { width: 200, height: 80 } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(setup.store.completeDisplayModeLayout()).toBe('relayout')
+    expect(first.$.position.value).not.toEqual(second.$.position.value)
+    setup.dispose()
+  })
+
   it('finalizes an unmeasured layout after bounded attempts', async () => {
     const setup = createTestSetup()
     const node = setup.createNode('node' as NodeId)

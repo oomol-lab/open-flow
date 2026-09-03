@@ -353,6 +353,24 @@ describe('Designer presentation layouts', () => {
     })
   })
 
+  it('keeps a valid lower-precedence position when a newer entry is malformed', () => {
+    const value = {
+      designer: {
+        flow: {
+          layouts: { overview: { nodes: { task: { x: 10, y: 20 } } } },
+          nodes: { task: { x: 'invalid', y: 30 } },
+        },
+        version: 1,
+      },
+    }
+
+    const migrated = setNodePositions(value, { kind: 'flow' }, { moved: { x: 50, y: 60 } })
+
+    expect(migrated).toMatchObject({
+      designer: { flow: { nodes: { moved: { x: 50, y: 60 }, task: { x: 10, y: 20 } } } },
+    })
+  })
+
   it('stores shared comment and subflow positions', () => {
     const target = { id: 'child', kind: 'subflow' } as const
     const positioned = setComment({}, target, 'note', {

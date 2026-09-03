@@ -168,19 +168,21 @@ function savedPositions(
 ): Readonly<Record<string, { readonly x: number; readonly y: number }>> {
   const current = targetPresentation(value, target)
   const layouts = record(current?.layouts)
-  const nodes = {
-    ...record(record(layouts?.overview)?.nodes),
-    ...record(current?.nodes),
-    ...record(record(layouts?.detail)?.nodes),
+  const positions = (source: JsonValue | undefined): Readonly<Record<string, { readonly x: number; readonly y: number }>> => {
+    return Object.fromEntries(
+      Object.entries(record(source) ?? {}).flatMap(([nodeId, candidate]) => {
+        const position = record(candidate)
+        const x = finite(position?.x)
+        const y = finite(position?.y)
+        return x == null || y == null ? [] : [[nodeId, { x, y }]]
+      }),
+    )
   }
-  return Object.fromEntries(
-    Object.entries(nodes).flatMap(([nodeId, candidate]) => {
-      const position = record(candidate)
-      const x = finite(position?.x)
-      const y = finite(position?.y)
-      return x == null || y == null ? [] : [[nodeId, { x, y }]]
-    }),
-  )
+  return {
+    ...positions(record(layouts?.overview)?.nodes),
+    ...positions(current?.nodes),
+    ...positions(record(layouts?.detail)?.nodes),
+  }
 }
 
 function optionalViewport(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget, displayMode: FlowDisplayMode): DesignerViewport | undefined {
