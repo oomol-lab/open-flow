@@ -243,7 +243,6 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
   assert.match(workbenchDesigner, /recommendedOptions\.map[\s\S]*?size="sm"[\s\S]*?variant="outline"/)
   assert.match(contextPanel, /<InputGroup>/)
   assert.match(contextPanel, /buttonVariants\(\{ variant: 'ghost' \}\)/)
-  assert.match(contextPanel, /<LibraryGroup key=/)
   assert.match(contextPanel, /<Separator \/>/)
   assert.doesNotMatch(contextPanel, /block-library-search/)
   assert.doesNotMatch(contextPanel, /BlockPickerRow|designerThemeClass/)

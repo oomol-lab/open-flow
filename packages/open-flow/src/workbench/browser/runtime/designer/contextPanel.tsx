@@ -4,8 +4,9 @@ import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
 import type { AddNodeOption } from './addNodeOptions.ts'
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { Virtualizer } from 'virtua'
 import { OverlayScrollbar } from '../../../../designer/browser/components/overlayScrollbar.tsx'
 import { filterBlockPickerItems, useBlockPickerItems } from '../../../../designer/browser/graph/blockPicker.ts'
 import { setAddItemId } from '../../../../designer/browser/graph/ReactFlowContainer/addItemDrag.ts'
@@ -36,6 +37,7 @@ interface LibraryItemProps {
   readonly onAdd: (itemId: string) => void
   readonly onDrag: (event: ReactDragEvent, itemId: string) => void
   readonly onLoadChoices: (itemId: string, signal: AbortSignal) => Promise<readonly LibraryChoice[] | undefined>
+  readonly onOpenChange: (itemId: string, open: boolean) => void
 }
 
 type LibraryChoice = NonNullable<Exclude<IAddNodeMenuItem, { type: 'divider' }>['choices']>[number]
@@ -218,7 +220,7 @@ function LibraryGroup({ label }: { readonly label: string }): ReactElement {
   )
 }
 
-function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices }: LibraryItemProps): ReactElement {
+function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices, onOpenChange }: LibraryItemProps): ReactElement {
   const t = useTranslate()
   const connectionChoices = item.type == 'trigger'
   const controller = useRef<AbortController>()
@@ -259,7 +261,13 @@ function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices }
 
   if (item.choices != null) {
     return (
-      <details className="block-library-choices" onToggle={(event) => event.currentTarget.open && !loaded && load()}>
+      <details
+        className="block-library-choices"
+        onToggle={(event) => {
+          onOpenChange(item.data ?? item.label, event.currentTarget.open)
+          if (event.currentTarget.open && !loaded) load()
+        }}
+      >
         <summary
           aria-disabled={disabled}
           className={cn(buttonVariants({ variant: 'ghost' }), 'block-library-item h-auto min-h-12 justify-start whitespace-normal px-2 py-2')}
@@ -341,7 +349,9 @@ export function BlockLibrary({
   const active = useRef(true)
   const dynamicOptions = useRef<ReadonlyMap<string, AddNodeOption>>(new Map())
   const [query, setQuery] = useState('')
+  const deferredQuery = useDeferredValue(query)
   const [adding, setAdding] = useState(false)
+  const [openItems, setOpenItems] = useState<ReadonlySet<string>>(() => new Set())
   const staticOptions = useMemo(() => indexAddNodeOptions(options), [options])
   const localItems = useMemo(() => menuItems(options), [options])
   const provideAsyncItems = useCallback(
@@ -363,12 +373,40 @@ export function BlockLibrary({
     [provideChoices],
   )
   const { error, items: catalogItems, loading, retry } = useBlockPickerItems(localItems, '', provideAsyncItems)
-  const items = useMemo(() => filterBlockPickerItems(query, catalogItems), [catalogItems, query])
+  const items = useMemo(() => filterBlockPickerItems(deferredQuery, catalogItems), [catalogItems, deferredQuery])
+  const keptItems = useMemo(() => {
+    const indexes: number[] = []
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index]!
+      if (item.type != 'divider' && openItems.has(item.data ?? item.label)) indexes.push(index)
+    }
+    return indexes
+  }, [items, openItems])
   const busy = disabled || adding
+
+  const setOpen = useCallback((itemId: string, open: boolean): void => {
+    setOpenItems((current) => {
+      const next = new Set(current)
+      if (open) next.add(itemId)
+      else next.delete(itemId)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     search.current?.focus({ preventScroll: true })
   }, [focusRequest])
+
+  useEffect(() => {
+    const itemIds = new Set<string>()
+    for (const item of items) {
+      if (item.type != 'divider') itemIds.add(item.data ?? item.label)
+    }
+    setOpenItems((current) => {
+      if ([...current].every((itemId) => itemIds.has(itemId))) return current
+      return new Set([...current].filter((itemId) => itemIds.has(itemId)))
+    })
+  }, [items])
 
   useEffect(() => {
     active.current = true
@@ -413,38 +451,41 @@ export function BlockLibrary({
         </InputGroup>
       </div>
       <OverlayScrollbar className="block-library-list" defer={false} tabIndex={-1}>
-        <div className="block-library-list-content">
-          {items.map((item) =>
-            item.type == 'divider' ? (
-              <LibraryGroup key={`group:${item.label}`} label={item.label} />
-            ) : (
-              <LibraryItem
-                disabled={busy || item.disabled == true}
-                draggable={draggable}
-                item={item}
-                key={item.data ?? item.label}
-                onAdd={(id) => void add(id)}
-                onDrag={drag}
-                onLoadChoices={loadChoices}
-              />
-            ),
-          )}
-          {loading && (
-            <div className="block-library-feedback" role="status">
-              <Spinner data-icon="inline-start" />
-              {t('contextPanel.loading')}
+        <Virtualizer data={items} itemSize={48} keepMounted={keptItems} ssrCount={Math.min(items.length, 12)}>
+          {(item) => (
+            <div className="block-library-list-entry" key={item.type == 'divider' ? `group:${item.label}` : (item.data ?? item.label)}>
+              {item.type == 'divider' ? (
+                <LibraryGroup label={item.label} />
+              ) : (
+                <LibraryItem
+                  disabled={busy || item.disabled == true}
+                  draggable={draggable}
+                  item={item}
+                  onAdd={(id) => void add(id)}
+                  onDrag={drag}
+                  onLoadChoices={loadChoices}
+                  onOpenChange={setOpen}
+                />
+              )}
             </div>
           )}
-          {!loading && error && (
-            <div className="block-library-feedback" role="alert">
-              <span>{t('contextPanel.loadFailed')}</span>
-              <Button onClick={retry} size="sm" type="button" variant="secondary">
-                {t('contextPanel.retry')}
-              </Button>
-            </div>
-          )}
-          {!loading && !error && items.length == 0 && <div className="block-library-feedback">{t('contextPanel.empty')}</div>}
-        </div>
+        </Virtualizer>
+        {loading && (
+          <div className="block-library-feedback" role="status">
+            <Spinner data-icon="inline-start" />
+            {t('contextPanel.loading')}
+          </div>
+        )}
+        {!loading && error && (
+          <div className="block-library-feedback" role="alert">
+            <span>{t('contextPanel.loadFailed')}</span>
+            <Button onClick={retry} size="sm" type="button" variant="secondary">
+              {t('contextPanel.retry')}
+            </Button>
+          </div>
+        )}
+        {!loading && !error && items.length == 0 && <div className="block-library-feedback">{t('contextPanel.empty')}</div>}
+        <div aria-hidden="true" className="h-4" />
       </OverlayScrollbar>
     </div>
   )

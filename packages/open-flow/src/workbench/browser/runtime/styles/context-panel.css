@@ -92,8 +92,8 @@
     flex: 1;
   }
 
-  .block-library-list-content {
-    padding: 0 8px 16px;
+  .block-library-list-entry {
+    padding: 0 8px;
   }
 
   .block-library-list .os-scrollbar-vertical {
@@ -222,6 +222,7 @@
     justify-content: center;
     flex-direction: column;
     gap: 8px;
+    margin: 0 8px;
     padding: 16px;
     color: var(--ui-muted-foreground);
     font-size: 11px;
