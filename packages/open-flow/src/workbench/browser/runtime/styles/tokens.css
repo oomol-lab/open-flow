@@ -13,6 +13,7 @@
   text-rendering: optimizeLegibility;
   --signature: #7c6ee6;
   --success: #16a34a;
+  --success-foreground: color-mix(in srgb, var(--success) 72%, var(--ui-foreground));
   --warning: #d97706;
   --warning-surface: color-mix(in srgb, var(--warning) 12%, var(--ui-background));
   --warning-border: color-mix(in srgb, var(--warning) 35%, var(--ui-border));

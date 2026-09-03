@@ -1,6 +1,6 @@
 {
   "name": "@oomol-lab/open-flow-command",
-  "version": "0.1.0-beta.7",
+  "version": "0.1.0-beta.8",
   "description": "Open Flow command runtime and immutable Command Artifact builder.",
   "license": "Apache-2.0",
   "type": "module",

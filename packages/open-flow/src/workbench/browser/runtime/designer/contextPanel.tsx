@@ -452,7 +452,7 @@ export function BlockLibrary({
         </InputGroup>
       </div>
       <OverlayScrollbar className="block-library-list" defer={false} tabIndex={-1}>
-        <Virtualizer data={items} itemSize={48} keepMounted={keptItems} ssrCount={Math.min(items.length, 12)}>
+        <Virtualizer data={items} itemSize={48} keepMounted={keptItems} key={items.length} ssrCount={Math.min(items.length, 12)}>
           {(item) => (
             <div className="block-library-list-entry" key={item.type == 'divider' ? `group:${item.label}` : (item.data ?? item.label)}>
               {item.type == 'divider' ? (

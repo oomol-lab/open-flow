@@ -148,15 +148,6 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
       operationDetail = <span>{t('publication.publishingDescription')}</span>
       operationLabel = t('workspace.publishing')
       break
-    case 'succeeded':
-      operationClass = 'success'
-      operationDetail = (
-        <span>
-          {t('publication.livePublication')}: <CompactId value={operation.publicationId} />
-        </span>
-      )
-      operationLabel = t('publication.published')
-      break
     case 'failed':
       operationClass = 'danger'
       operationDetail = (
@@ -195,13 +186,7 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
             <h2>{t('publication.live')}</h2>
             <p>{t('publication.liveDescription')}</p>
           </div>
-          {loading ? (
-            <span className="publication-loading">{t('publication.loading')}</span>
-          ) : live != null ? (
-            <span className="publication-status">
-              <span className={`status-dot ${liveClass(live)}`} /> {liveLabel(live, t)}
-            </span>
-          ) : null}
+          {loading && <span className="publication-loading">{t('publication.loading')}</span>}
         </div>
 
         {loadFailed ? (
@@ -211,10 +196,10 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
               {t('empty.retry')}
             </Button>
           </div>
-        ) : (
+        ) : !loading ? (
           <div className="publication-precondition">
-            {operation != null && (
-              <div className={`publication-progress ${operation.status}`}>
+            {operation != null && operation.status != 'succeeded' && (
+              <div className={`publication-progress ${operation.status}`} role={operation.status == 'failed' ? 'alert' : 'status'}>
                 <span className={`status-dot ${operationClass}`} />
                 <div>
                   <strong>{operationLabel}</strong>
@@ -222,50 +207,53 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
                 </div>
               </div>
             )}
-            {draft != null && (
-              <div className="publication-publish-action">
-                <div>
-                  <strong>{t(live?.hasUnpublishedChanges ? 'workspace.unpublishedChanges' : 'publication.upToDate')}</strong>
-                  {live?.hasUnpublishedChanges && <span>{t(invalid ? 'workspace.fixIssuesToPublish' : 'publication.publishDescription')}</span>}
+            <div className="publication-overview">
+              {live != null && (
+                <div className="publication-overview-main">
+                  <span className={`status-dot ${live.hasUnpublishedChanges ? 'running' : 'success'}`} />
+                  <div className="publication-overview-body">
+                    <div className="publication-overview-heading">
+                      <div className="publication-overview-result">
+                        <strong>{t(live.hasUnpublishedChanges ? 'workspace.unpublishedChanges' : 'publication.upToDate')}</strong>
+                        {live.hasUnpublishedChanges && <span>{t(invalid ? 'workspace.fixIssuesToPublish' : 'publication.publishDescription')}</span>}
+                      </div>
+                      <div className="publication-overview-actions">
+                        <span className="publication-status">
+                          <span className={`status-dot ${liveClass(live)}`} />
+                          {liveLabel(live, t)}
+                        </span>
+                        {draft != null && live.hasUnpublishedChanges && (
+                          <Button disabled={busy != null || invalid} onClick={() => void store.publications.publish()}>
+                            <Icon data-icon="inline-start" name="publish" />
+                            {t(publishing ? 'workspace.publishing' : 'publication.publishDraft')}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <dl className="publication-overview-meta">
+                      <div>
+                        <dt>{t('publication.draftRevision')}</dt>
+                        <dd>{draft == null ? t('publication.noDraft') : <CompactId value={draft.revisionId} />}</dd>
+                      </div>
+                      <div>
+                        <dt>{t('publication.livePublication')}</dt>
+                        <dd>{live.publication == null ? t('publication.none') : <CompactId value={live.publication.publicationId} />}</dd>
+                      </div>
+                      <div>
+                        <dt>{t('publication.liveRevision')}</dt>
+                        <dd>{live.publication == null ? '—' : <CompactId value={live.publication.revisionId} />}</dd>
+                      </div>
+                      <div>
+                        <dt>{t('publication.liveVersion')}</dt>
+                        <dd>{live.revision}</dd>
+                      </div>
+                    </dl>
+                  </div>
                 </div>
-                {live?.hasUnpublishedChanges && (
-                  <Button disabled={busy != null || invalid} onClick={() => void store.publications.publish()}>
-                    <Icon data-icon="inline-start" name="publish" />
-                    {t(publishing ? 'workspace.publishing' : 'publication.publishDraft')}
-                  </Button>
-                )}
-              </div>
-            )}
-            <div className="publication-revision-overview">
-              <div className="publication-revision-group">
-                <strong>{t('workspace.draft')}</strong>
-                <dl>
-                  <div>
-                    <dt>{t('publication.draftRevision')}</dt>
-                    <dd>{draft == null ? t('publication.noDraft') : <CompactId value={draft.revisionId} />}</dd>
-                  </div>
-                </dl>
-              </div>
-              <div className="publication-revision-group">
-                <strong>{t('publication.live')}</strong>
-                <dl>
-                  <div>
-                    <dt>{t('publication.livePublication')}</dt>
-                    <dd>{live?.publication == null ? t('publication.none') : <CompactId value={live.publication.publicationId} />}</dd>
-                  </div>
-                  <div>
-                    <dt>{t('publication.liveRevision')}</dt>
-                    <dd>{live?.publication == null ? '—' : <CompactId value={live.publication.revisionId} />}</dd>
-                  </div>
-                  <div>
-                    <dt>{t('publication.liveVersion')}</dt>
-                    <dd>{live?.revision ?? 0}</dd>
-                  </div>
-                </dl>
-              </div>
+              )}
             </div>
           </div>
-        )}
+        ) : null}
       </section>
 
       <section className="publication-triggers">
@@ -289,7 +277,7 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
               const resumable = binding.operatorState == 'paused'
               return (
                 <Fragment key={binding.triggerNodeId}>
-                  <div className={`trigger-binding-row${selected ? ' selected' : ''}`}>
+                  <div className="trigger-binding-row">
                     <Button
                       aria-expanded={selected}
                       className="trigger-binding-summary"
@@ -302,6 +290,7 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
                       <span className={'trigger-binding-state ' + triggerClass(binding)}>{triggerLabel(binding, t)}</span>
                       <code className="trigger-binding-kind">{binding.kind}</code>
                       <span className="trigger-binding-detail-label">{t(selected ? 'publication.hideTriggerDetails' : 'publication.triggerDetails')}</span>
+                      <Icon name={selected ? 'chevron-up' : 'chevron-down'} />
                     </Button>
                     {binding.currentPublicationId != null && (
                       <Button
@@ -343,7 +332,10 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
                             </div>
                             <div>
                               <dt>{t('publication.operatorState')}</dt>
-                              <dd>{detail.binding.operatorState}</dd>
+                              <dd>
+                                <span>{t(detail.binding.operatorState == 'paused' ? 'publication.suspended' : 'publication.active')}</span>{' '}
+                                <code>{detail.binding.operatorState}</code>
+                              </dd>
                             </div>
                             <div>
                               <dt>{t('publication.updatedAt')}</dt>
@@ -502,14 +494,14 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
                   return (
                     <Fragment key={publication.publicationId}>
                       <tr>
-                        <td>
+                        <td data-label={t('publication.operation')}>
                           <span className="publication-operation">
                             {t(publication.operation == 'publish' ? 'publication.published' : 'publication.rolledBack')}
                             {current && <Badge variant="secondary">{t('publication.current')}</Badge>}
                           </span>
                           <CompactId value={publication.publicationId} />
                         </td>
-                        <td>
+                        <td data-label={t('publication.revision')}>
                           <CompactId value={publication.revisionId} />
                           {publication.sourcePublicationId != null && (
                             <span title={publication.sourcePublicationId}>
@@ -517,13 +509,13 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
                             </span>
                           )}
                         </td>
-                        <td>
+                        <td data-label={t('publication.actor')}>
                           <CompactId value={publication.actorId} />
                         </td>
-                        <td>
+                        <td data-label={t('publication.createdAt')}>
                           <time dateTime={publication.createdAt}>{new Date(publication.createdAt).toLocaleString(language)}</time>
                         </td>
-                        <td>
+                        <td data-label={t('publication.actions')}>
                           {!current && currentPublicationId != null && (
                             <Button
                               disabled={busy != null}
