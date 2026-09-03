@@ -171,6 +171,52 @@ it('logs the stable Control error code for server errors at the default level', 
   )
 })
 
+it('logs the cause of an invalid Draft structure without copying the request body', async () => {
+  const captured = capture('info')
+  const service = await openService(await databaseFile())
+  services.push(service)
+  const created = await service.control.createFlow('operator', 'Invalid Draft', 'invalid-draft-flow')
+  const app = createServerApp(service, { logger: captured.logger, resolveControlActor: () => 'operator' })
+
+  const response = await app.request(`http://server.local/v1/flows/${created.flow.flowId}/draft/changes`, {
+    body: JSON.stringify({
+      expectedRevisionId: created.flow.draftRevisionId,
+      operations: [
+        {
+          kind: 'graph.node.create',
+          node: { inputsDef: 'request-body-secret', kind: 'webhook', name: 'Webhook' },
+          nodeId: 'webhook',
+          target: { kind: 'flow' },
+        },
+      ],
+      version: 1,
+    }),
+    headers: { 'content-type': 'application/json', 'idempotency-key': 'invalid-draft-change', 'x-request-id': 'request-invalid-draft' },
+    method: 'POST',
+  })
+
+  expect(response.status).toBe(400)
+  expect(response.headers.get('x-request-id')).toBe('request-invalid-draft')
+  expect(await response.json()).toEqual({
+    error: { code: 'flow.invalid', message: 'The Draft change produced invalid Revision content.' },
+    version: 1,
+  })
+  expect(captured.entries()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        category: 'http.request.rejected',
+        err: expect.objectContaining({ type: 'TypeError' }),
+        errorCode: 'flow.invalid',
+        level: 40,
+        method: 'POST',
+        path: `/v1/flows/${created.flow.flowId}/draft/changes`,
+        requestId: 'request-invalid-draft',
+      }),
+    ]),
+  )
+  expect(captured.output()).not.toContain('request-body-secret')
+})
+
 it('does not log callback endpoint identities', async () => {
   const captured = capture()
   const service = await openService(await databaseFile())

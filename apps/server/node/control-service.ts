@@ -29,7 +29,7 @@ import type { PublicationAcceptance, StoredControlRun, StoredPresentation, Store
 import type { StoredTriggerActivity, StoredTriggerBinding } from './trigger-store.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { applyFlowChanges } from '@oomol-lab/open-flow/flow-change'
+import { applyFlowChanges, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
 import { canonicalJsonBytes, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { flowClosure, prepareFlow, validateFlow, validateFlowInputs, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
@@ -311,12 +311,17 @@ export class ControlService {
     const base = this.store.revision(flowId, expectedRevisionId)
     if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
     let content: RevisionContent
-    let bytes: Uint8Array
     try {
       content = applyFlowChanges(revisionContent(base), operations)
+    } catch (error) {
+      if (error instanceof FlowChangeError) invalidFlow(`The Draft change could not be applied. ${error.message}`)
+      throw new ControlError(controlErrorCode.flowInvalid, 'The Draft operation has an invalid structure.', { cause: error })
+    }
+    let bytes: Uint8Array
+    try {
       bytes = encodeRevision(content)
-    } catch {
-      invalidFlow('The Draft change is invalid.')
+    } catch (error) {
+      throw new ControlError(controlErrorCode.flowInvalid, 'The Draft change produced invalid Revision content.', { cause: error })
     }
     const digest = await digestBytes(bytes)
     if (digest == base.digest) invalidFlow('The Draft change does not modify the Flow.')

@@ -26,7 +26,8 @@
 
 客户端只按稳定 `code` 分支。当前错误域包括 `authentication.*`、`authorization.*`、`flow.*`、`live.*`、`publication.*`、`run.*`、
 `trigger.*`、`trigger-key.*`、`connector.*`、`variable.*`、`binding.*`、`engine.*`、`page.*` 和 `route.*`；精确 code 集合由
-`@oomol-lab/open-flow/control-api` 的 `controlErrorCode` 导出。
+`@oomol-lab/open-flow/control-api` 的 `controlErrorCode` 导出。`message` 用于展示和排查，应在已知时说明请求被拒绝的直接原因，但不是稳定的机器合同，
+也不能包含 credential、请求 payload 或其他敏感值。
 
 ## 2. Variable
 

@@ -209,6 +209,14 @@ describe('Flow changes', () => {
     expect(source).toEqual(revision())
   })
 
+  it('describes why a Node cannot be created', () => {
+    const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: valueNode(1), nodeId: 'duplicate', target }])
+
+    expect(() => applyFlowChanges(source, [{ kind: 'graph.node.create', node: valueNode(2), nodeId: 'duplicate', target }])).toThrow(
+      'A Node with this ID already exists in the target graph.',
+    )
+  })
+
   it('applies independent node fields without replacing the node', () => {
     const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: taskNode(), nodeId: 'task', target }])
     const changed = applyFlowChanges(source, [

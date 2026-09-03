@@ -36,8 +36,8 @@ export class ControlError extends Error {
   readonly code: ErrorCode
   readonly status: number
 
-  constructor(code: ErrorCode, message: string) {
-    super(message)
+  constructor(code: ErrorCode, message: string, options?: ErrorOptions) {
+    super(message, options)
     this.code = code
     this.name = 'ControlError'
     this.status = errorMetadata[code].status

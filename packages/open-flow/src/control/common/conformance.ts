@@ -44,9 +44,12 @@ async function json(response: Response, status: number, message: string): Promis
   return record(await response.json().catch(() => fail(`${message} body: expected JSON.`)), `${message} body`)
 }
 
-async function error(response: Response, status: number, code: string, message: string): Promise<void> {
+async function error(response: Response, status: number, code: string, message: string, detail?: string): Promise<void> {
   const body = await json(response, status, message)
-  equal(record(body.error, `${message} error`).code, code, `${message} error code`)
+  const bodyError = record(body.error, `${message} error`)
+  equal(bodyError.code, code, `${message} error code`)
+  const errorMessage = requiredString(bodyError.message, `${message} error message`)
+  if (detail != null && !errorMessage.includes(detail)) fail(`${message} error message: expected ${JSON.stringify(detail)} in ${JSON.stringify(errorMessage)}.`)
   equal(body.version, 1, `${message} version`)
 }
 
@@ -257,6 +260,13 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
         409,
         'flow.conflict',
         'Conflicting Draft change replay',
+      )
+      await error(
+        await addValueNode(harness, flowId, currentRevisionId, 'marker'),
+        400,
+        'flow.invalid',
+        'Duplicate Draft Node',
+        'A Node with this ID already exists',
       )
       await error(
         await changeRequest(harness, flowId, currentRevisionId, [

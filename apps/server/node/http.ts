@@ -200,6 +200,19 @@ export function createServerApp(service: ServerService, options: ServerAppOption
   app.onError((error, context) => {
     if (error instanceof ControlError) {
       context.set('errorCode', error.code)
+      if (error.cause != null) {
+        logger.warn(
+          {
+            category: 'http.request.rejected',
+            err: error.cause,
+            errorCode: error.code,
+            method: context.req.method,
+            path: logPath(context.req.path),
+            requestId: context.get('requestId'),
+          },
+          'HTTP request was rejected after an internal validation error.',
+        )
+      }
       return json(error.status, { error: { code: error.code, message: error.message }, version: 1 })
     }
     if (error instanceof AcceptanceError) {
