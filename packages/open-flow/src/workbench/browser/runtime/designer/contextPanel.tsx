@@ -4,9 +4,10 @@ import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
 import type { AddNodeOption } from './addNodeOptions.ts'
 
-import { useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Virtualizer } from 'virtua'
+import { useDebouncedValue } from '../../../../designer/browser/base/react.ts'
 import { OverlayScrollbar } from '../../../../designer/browser/components/overlayScrollbar.tsx'
 import { filterBlockPickerItems, useBlockPickerItems } from '../../../../designer/browser/graph/blockPicker.ts'
 import { setAddItemId } from '../../../../designer/browser/graph/ReactFlowContainer/addItemDrag.ts'
@@ -349,7 +350,7 @@ export function BlockLibrary({
   const active = useRef(true)
   const dynamicOptions = useRef<ReadonlyMap<string, AddNodeOption>>(new Map())
   const [query, setQuery] = useState('')
-  const deferredQuery = useDeferredValue(query)
+  const filterQuery = useDebouncedValue(query, 100)
   const [adding, setAdding] = useState(false)
   const [openItems, setOpenItems] = useState<ReadonlySet<string>>(() => new Set())
   const staticOptions = useMemo(() => indexAddNodeOptions(options), [options])
@@ -373,7 +374,7 @@ export function BlockLibrary({
     [provideChoices],
   )
   const { error, items: catalogItems, loading, retry } = useBlockPickerItems(localItems, '', provideAsyncItems)
-  const items = useMemo(() => filterBlockPickerItems(deferredQuery, catalogItems), [catalogItems, deferredQuery])
+  const items = useMemo(() => filterBlockPickerItems(filterQuery, catalogItems), [catalogItems, filterQuery])
   const keptItems = useMemo(() => {
     const indexes: number[] = []
     for (let index = 0; index < items.length; index++) {
