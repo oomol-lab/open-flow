@@ -123,8 +123,8 @@ export class FlowCatalog {
   }
 
   public async loadMore(): Promise<void> {
-    const { loadingMore, nextCursor } = this.#state.value
-    if (loadingMore || nextCursor == null) return
+    const { loadingMore, nextCursor, refreshing } = this.#state.value
+    if (loadingMore || refreshing || nextCursor == null) return
     const current = this.#session.capture()
     this.#set({ loadingMore: true, loadMoreFailed: false })
     try {

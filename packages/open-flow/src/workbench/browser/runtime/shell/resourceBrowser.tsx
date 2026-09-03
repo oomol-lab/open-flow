@@ -359,7 +359,7 @@ export function FlowBrowser({
           </div>
           {nextCursor != null && (
             <div className="resource-list-footer">
-              <Button disabled={loadingMore} onClick={() => void store.workspace.loadMoreFlows()} variant="outline">
+              <Button disabled={loadingMore || refreshing} onClick={() => void store.workspace.loadMoreFlows()} variant="outline">
                 {t(loadingMore ? 'resource.loadingMore' : loadMoreFailed ? 'resource.retryLoadMore' : 'resource.loadMore')}
               </Button>
             </div>
