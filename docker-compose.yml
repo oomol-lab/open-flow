@@ -8,7 +8,7 @@ services:
   open-flow:
     image: ghcr.io/oomol-lab/open-flow:latest
     ports:
-      - "3000:3000"
+      - '3000:3000'
     volumes:
       - open-flow-data:/data/open-flow
     # Values without a default are read from the shell environment and omitted
