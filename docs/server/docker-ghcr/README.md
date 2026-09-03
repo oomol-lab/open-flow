@@ -16,26 +16,26 @@ repeated here.
 
 ## Choose A Tag
 
-| Tag             | Points at                                       | Use it when                                                    |
-| --------------- | ----------------------------------------------- | -------------------------------------------------------------- |
-| `latest`        | the newest stable release                       | you want the current stable Server                             |
-| `<release-tag>` | a specific release such as `v0.3.0` (immutable) | you deploy to production and want a pinned, reproducible build |
-| `tip`           | the latest commit on `main`                     | you want to try changes that are not released yet              |
-| `<short-sha>`   | a specific `main` commit (immutable)            | you want to pin an exact pre-release build                     |
+| Tag             | Points at                                              | Use it when                                                    |
+| --------------- | ------------------------------------------------------ | -------------------------------------------------------------- |
+| `latest`        | the newest stable release                              | you want the current stable Server                             |
+| `<release-tag>` | a specific release such as `v0.1.0-beta.1` (immutable) | you deploy to production and want a pinned, reproducible build |
+| `tip`           | the latest commit on `main`                            | you want to try changes that are not released yet              |
+| `<short-sha>`   | a specific `main` commit (immutable)                   | you want to pin an exact pre-release build                     |
 
 Every GitHub Release publishes its tag. A stable release also moves `latest`; a pre-release does
 not, so `latest` never points at a beta. Every push to `main` publishes `tip` and the short commit
 hash. A tag published by a newer build replaces the older one under the same name, so `latest` and
 `tip` move while release tags and commit hashes stay fixed.
 
-For production, pin a release tag instead of `latest`.
+Open Flow is in beta: `latest` appears with the first stable release, so until then use `tip` or a beta release tag such as `v0.1.0-beta.1`. For production, pin a release tag instead of `latest`.
 
 ## Pull
 
 The image is public, so no sign-in is required:
 
 ```bash
-docker pull ghcr.io/oomol-lab/open-flow:latest
+docker pull ghcr.io/oomol-lab/open-flow:tip
 ```
 
 If you get an `unauthorized` or `denied` error, sign in with a GitHub token that has the
@@ -63,10 +63,11 @@ export OPEN_FLOW_TOKEN="$(openssl rand -hex 32)"
 
 docker run -d \
   --name open-flow \
+  --stop-timeout 45 \
   -p 3000:3000 \
   -v open-flow-data:/data/open-flow \
   -e OPEN_FLOW_TOKEN="$OPEN_FLOW_TOKEN" \
-  ghcr.io/oomol-lab/open-flow:latest
+  ghcr.io/oomol-lab/open-flow:tip
 ```
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000) and sign in with the token. If you omit
@@ -90,7 +91,7 @@ docker compose up -d
 docker compose logs -f open-flow
 ```
 
-To run a specific tag, set the image in an override file or edit `image:` in `docker-compose.yml`.
+To run a specific tag, set `OPEN_FLOW_IMAGE_TAG`, for example `OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1 docker compose up -d`.
 
 ### Build From Source
 

@@ -14,25 +14,25 @@ SQLite migration을 포함한 하나의 Server 프로세스입니다. 구성, �
 
 ## Tag 선택
 
-| Tag             | 가리키는 대상                     | 사용 시점                                                 |
-| --------------- | --------------------------------- | --------------------------------------------------------- |
-| `latest`        | 최신 안정 Release                 | 현재 안정 버전 Server가 필요할 때                         |
-| `<release-tag>` | `v0.3.0` 같은 특정 Release (불변) | 프로덕션에 배포하며 고정되고 재현 가능한 빌드가 필요할 때 |
-| `tip`           | `main`의 최신 커밋                | 아직 릴리스되지 않은 변경을 시험하고 싶을 때              |
-| `<short-sha>`   | `main`의 특정 커밋 (불변)         | 특정 프리릴리스 빌드에 고정하고 싶을 때                   |
+| Tag             | 가리키는 대상                            | 사용 시점                                                 |
+| --------------- | ---------------------------------------- | --------------------------------------------------------- |
+| `latest`        | 최신 안정 Release                        | 현재 안정 버전 Server가 필요할 때                         |
+| `<release-tag>` | `v0.1.0-beta.1` 같은 특정 Release (불변) | 프로덕션에 배포하며 고정되고 재현 가능한 빌드가 필요할 때 |
+| `tip`           | `main`의 최신 커밋                       | 아직 릴리스되지 않은 변경을 시험하고 싶을 때              |
+| `<short-sha>`   | `main`의 특정 커밋 (불변)                | 특정 프리릴리스 빌드에 고정하고 싶을 때                   |
 
 모든 GitHub Release는 자신의 tag를 게시합니다. 안정 Release는 `latest`도 이동시키지만 pre-release는 그렇지 않으므로 `latest`는 beta를
 가리키지 않습니다. `main`에 push할 때마다 `tip`과 짧은 커밋 해시가 게시됩니다. 같은 이름의 tag는 더 새로운 빌드로 교체되므로 `latest`와
 `tip`은 이동하고, Release tag와 커밋 해시는 고정됩니다.
 
-프로덕션에서는 `latest` 대신 Release tag에 고정하세요.
+Open Flow는 beta 단계입니다. `latest`는 첫 안정 Release와 함께 생기므로 그 전에는 `tip`이나 `v0.1.0-beta.1` 같은 beta Release tag를 사용하세요. 프로덕션에서는 `latest` 대신 Release tag에 고정하세요.
 
 ## Pull
 
 이미지는 공개되어 있어 로그인이 필요 없습니다:
 
 ```bash
-docker pull ghcr.io/oomol-lab/open-flow:latest
+docker pull ghcr.io/oomol-lab/open-flow:tip
 ```
 
 `unauthorized` 또는 `denied` 오류가 나면 `read:packages` scope가 있는 GitHub token으로 로그인하세요:
@@ -57,10 +57,11 @@ export OPEN_FLOW_TOKEN="$(openssl rand -hex 32)"
 
 docker run -d \
   --name open-flow \
+  --stop-timeout 45 \
   -p 3000:3000 \
   -v open-flow-data:/data/open-flow \
   -e OPEN_FLOW_TOKEN="$OPEN_FLOW_TOKEN" \
-  ghcr.io/oomol-lab/open-flow:latest
+  ghcr.io/oomol-lab/open-flow:tip
 ```
 
 [http://127.0.0.1:3000](http://127.0.0.1:3000)을 열고 그 token으로 로그인합니다. `OPEN_FLOW_TOKEN`을 생략하면 첫 시작 시 로그에 일회성
@@ -80,7 +81,7 @@ docker compose up -d
 docker compose logs -f open-flow
 ```
 
-특정 tag를 실행하려면 override 파일에서 이미지를 지정하거나 `docker-compose.yml`의 `image:`를 수정하세요.
+특정 tag를 실행하려면 `OPEN_FLOW_IMAGE_TAG`를 설정하세요. 예: `OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1 docker compose up -d`.
 
 ### 소스에서 빌드
 

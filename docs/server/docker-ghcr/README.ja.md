@@ -14,25 +14,25 @@ SQLite migration を含む 1 つの Server プロセスです。設定、ヘル�
 
 ## Tag の選び方
 
-| Tag             | 指す先                                 | 使いどころ                                           |
-| --------------- | -------------------------------------- | ---------------------------------------------------- |
-| `latest`        | 最新の安定 Release                     | 現在の安定版 Server を使いたい                       |
-| `<release-tag>` | `v0.3.0` のような特定の Release (不変) | 本番にデプロイし、固定された再現可能なビルドが欲しい |
-| `tip`           | `main` の最新コミット                  | まだリリースされていない変更を試したい               |
-| `<short-sha>`   | `main` の特定のコミット (不変)         | 特定のプレリリースビルドに固定したい                 |
+| Tag             | 指す先                                        | 使いどころ                                           |
+| --------------- | --------------------------------------------- | ---------------------------------------------------- |
+| `latest`        | 最新の安定 Release                            | 現在の安定版 Server を使いたい                       |
+| `<release-tag>` | `v0.1.0-beta.1` のような特定の Release (不変) | 本番にデプロイし、固定された再現可能なビルドが欲しい |
+| `tip`           | `main` の最新コミット                         | まだリリースされていない変更を試したい               |
+| `<short-sha>`   | `main` の特定のコミット (不変)                | 特定のプレリリースビルドに固定したい                 |
 
 GitHub Release を公開するたびにその tag が発行されます。安定 Release は `latest` も更新しますが、pre-release は更新しないため、`latest` が beta を
 指すことはありません。`main` への push のたびに `tip` と短いコミットハッシュが発行されます。同名の tag は新しいビルドで置き換わるため、`latest` と
 `tip` は移動し、Release tag とコミットハッシュは固定されたままです。
 
-本番環境では `latest` ではなく Release tag に固定してください。
+Open Flow は beta 段階です。`latest` は最初の安定 Release と同時に現れるため、それまでは `tip` か `v0.1.0-beta.1` のような beta Release tag を使ってください。本番環境では `latest` ではなく Release tag に固定してください。
 
 ## Pull
 
 イメージは公開されているため、サインインは不要です:
 
 ```bash
-docker pull ghcr.io/oomol-lab/open-flow:latest
+docker pull ghcr.io/oomol-lab/open-flow:tip
 ```
 
 `unauthorized` や `denied` エラーが出る場合は、`read:packages` scope を持つ GitHub token でサインインしてください:
@@ -57,10 +57,11 @@ export OPEN_FLOW_TOKEN="$(openssl rand -hex 32)"
 
 docker run -d \
   --name open-flow \
+  --stop-timeout 45 \
   -p 3000:3000 \
   -v open-flow-data:/data/open-flow \
   -e OPEN_FLOW_TOKEN="$OPEN_FLOW_TOKEN" \
-  ghcr.io/oomol-lab/open-flow:latest
+  ghcr.io/oomol-lab/open-flow:tip
 ```
 
 [http://127.0.0.1:3000](http://127.0.0.1:3000) を開き、その token でサインインします。`OPEN_FLOW_TOKEN` を省略した場合、初回起動時にログへ
@@ -81,7 +82,7 @@ docker compose up -d
 docker compose logs -f open-flow
 ```
 
-特定の tag を実行するには、override ファイルでイメージを指定するか、`docker-compose.yml` の `image:` を編集してください。
+特定の tag を実行するには `OPEN_FLOW_IMAGE_TAG` を設定してください。例: `OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1 docker compose up -d`。
 
 ### ソースからビルド
 

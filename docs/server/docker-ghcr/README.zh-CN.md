@@ -13,24 +13,24 @@ SQLite migration。配置、健康检查、持久化和备份在该文档中说�
 
 ## 选择 Tag
 
-| Tag             | 指向                                     | 适用场景                         |
-| --------------- | ---------------------------------------- | -------------------------------- |
-| `latest`        | 最新的稳定 Release                       | 需要当前稳定版 Server            |
-| `<release-tag>` | 某个具体 Release，例如 `v0.3.0` (不可变) | 生产部署，需要固定且可复现的构建 |
-| `tip`           | `main` 分支最新提交                      | 想试用尚未发布的改动             |
-| `<short-sha>`   | `main` 分支某个具体提交 (不可变)         | 需要固定到某个精确的预发布构建   |
+| Tag             | 指向                                            | 适用场景                         |
+| --------------- | ----------------------------------------------- | -------------------------------- |
+| `latest`        | 最新的稳定 Release                              | 需要当前稳定版 Server            |
+| `<release-tag>` | 某个具体 Release，例如 `v0.1.0-beta.1` (不可变) | 生产部署，需要固定且可复现的构建 |
+| `tip`           | `main` 分支最新提交                             | 想试用尚未发布的改动             |
+| `<short-sha>`   | `main` 分支某个具体提交 (不可变)                | 需要固定到某个精确的预发布构建   |
 
 每个 GitHub Release 都会发布其 tag。稳定 Release 会同时移动 `latest`；pre-release 不会，因此 `latest` 不会指向 beta。每次推送到 `main`
 都会发布 `tip` 和短提交 hash。同名 tag 会被更新的构建覆盖，所以 `latest` 和 `tip` 会移动，而 Release tag 和提交 hash 固定不变。
 
-生产环境请固定到 Release tag，不要使用 `latest`。
+Open Flow 目前处于 beta 阶段: `latest` 会随首个稳定 Release 出现，在此之前请使用 `tip` 或 beta Release tag，例如 `v0.1.0-beta.1`。生产环境请固定到 Release tag，不要使用 `latest`。
 
 ## 拉取
 
 镜像是公开的，不需要登录:
 
 ```bash
-docker pull ghcr.io/oomol-lab/open-flow:latest
+docker pull ghcr.io/oomol-lab/open-flow:tip
 ```
 
 如果遇到 `unauthorized` 或 `denied` 错误，用带 `read:packages` scope 的 GitHub token 登录:
@@ -53,10 +53,11 @@ export OPEN_FLOW_TOKEN="$(openssl rand -hex 32)"
 
 docker run -d \
   --name open-flow \
+  --stop-timeout 45 \
   -p 3000:3000 \
   -v open-flow-data:/data/open-flow \
   -e OPEN_FLOW_TOKEN="$OPEN_FLOW_TOKEN" \
-  ghcr.io/oomol-lab/open-flow:latest
+  ghcr.io/oomol-lab/open-flow:tip
 ```
 
 打开 [http://127.0.0.1:3000](http://127.0.0.1:3000)，用该 token 登录。如果省略 `OPEN_FLOW_TOKEN`，首次启动会在日志中输出一次性 setup code，
@@ -75,7 +76,7 @@ docker compose up -d
 docker compose logs -f open-flow
 ```
 
-要运行指定 tag，在 override 文件中设置镜像，或直接修改 `docker-compose.yml` 中的 `image:`。
+要运行指定 tag，设置 `OPEN_FLOW_IMAGE_TAG`，例如 `OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1 docker compose up -d`。
 
 ### 从源码构建
 
