@@ -79,10 +79,12 @@ CREATE TABLE wait_notifications (
   task_id TEXT NOT NULL,
   input_json TEXT NOT NULL CHECK (json_valid(input_json) AND json_type(input_json) = 'object'),
   status TEXT NOT NULL CHECK (status IN ('pending', 'delivered', 'failed')),
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  retry_at INTEGER NOT NULL,
   claim_id TEXT,
   claim_expires_at INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 ) STRICT;
 
-CREATE INDEX wait_notifications_due ON wait_notifications (status, claim_expires_at, run_id);
+CREATE INDEX wait_notifications_due ON wait_notifications (status, retry_at, claim_expires_at, run_id);

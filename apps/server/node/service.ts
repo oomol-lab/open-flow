@@ -122,6 +122,7 @@ const maintenanceBatchSize = 100
 const maintenanceIntervalMs = 60_000
 const maintenanceRetryMs = 1_000
 const waitNotificationLeaseMs = 60_000
+const waitNotificationMaxAttempts = 3
 const admissionRetryMs = 1_000
 const defaultMaxConcurrentRuns = 4
 const defaultRunTimeoutMs = 30 * 60 * 1_000
@@ -801,9 +802,10 @@ export class ServerService {
         catch: (error) => error,
       })
       if (run.resume != null) {
-        const saved = run.resume.checkpoint.wait
+        const resume = run.resume
+        const saved = resume.checkpoint.wait
         const wait = prepared.flow.graph.nodes[saved.nodeId]
-        if (wait?.kind != 'wait' || !wait.actions.some((action) => action == run.resume!.action)) {
+        if (wait?.kind != 'wait' || !wait.actions.some((action) => action == resume.action)) {
           return yield* Effect.fail(new Error('Stored Wait resolution does not match the fixed Flow Revision.'))
         }
         return {
@@ -1085,7 +1087,13 @@ export class ServerService {
         if (notification != null) {
           const connector = this.#resolveConnector()
           if (connector == null) {
-            this.#store.finishWaitNotification(notification.runId, notification.waitId, notification.claimId, false)
+            this.#store.releaseWaitNotification(
+              notification.runId,
+              notification.waitId,
+              notification.claimId,
+              now + maintenanceRetryMs,
+              waitNotificationMaxAttempts,
+            )
           } else {
             yield* Effect.tryPromise({
               try: (signal) =>
@@ -1095,7 +1103,17 @@ export class ServerService {
               Effect.matchEffect({
                 onFailure: (error) =>
                   Effect.sync(() => {
-                    this.#store.finishWaitNotification(notification.runId, notification.waitId, notification.claimId, false)
+                    if (error instanceof ConnectorTaskError && (error.code == 'connector.action-not-found' || error.code == 'connector.connection-required')) {
+                      this.#store.finishWaitNotification(notification.runId, notification.waitId, notification.claimId, false)
+                    } else {
+                      this.#store.releaseWaitNotification(
+                        notification.runId,
+                        notification.waitId,
+                        notification.claimId,
+                        now + maintenanceRetryMs,
+                        waitNotificationMaxAttempts,
+                      )
+                    }
                     this.#logger.warn({ category: 'wait.notification.failed', runId: notification.runId, ...errorKind(error) }, 'Wait notification failed.')
                   }),
                 onSuccess: () =>
@@ -1413,7 +1431,7 @@ export class ServerService {
     const node = (JSON.parse(revision.content) as RevisionContent).document.graph.nodes[receipt.nodeId]
     if (node?.kind != 'wait' || !node.actions.some((action) => action == requested)) return
     if (receipt.action != null) {
-      return { action: requested, expiresAt: new Date(receipt.expiresAt).toISOString(), prompt: node.prompt, state: 'resolved' }
+      return { action: receipt.action, expiresAt: new Date(receipt.expiresAt).toISOString(), prompt: node.prompt, state: 'resolved' }
     }
     if (receipt.status != 'waiting' || receipt.expiresAt <= this.#clock()) return
     return { action: requested, expiresAt: new Date(receipt.expiresAt).toISOString(), prompt: node.prompt, state: 'waiting' }

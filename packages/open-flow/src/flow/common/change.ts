@@ -95,6 +95,7 @@ export type WaitAction = 'approve' | 'continue' | 'reject'
 
 export interface WaitNode extends GraphNodeBase {
   readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
+  readonly input: InputPort
   readonly kind: 'wait'
   readonly notification?: {
     readonly inputs: Readonly<Record<string, InputMapping>>
@@ -102,6 +103,7 @@ export interface WaitNode extends GraphNodeBase {
     readonly taskId: string
   }
   readonly prompt: string
+  readonly timeoutMs?: never
 }
 
 export type ConditionOperator =

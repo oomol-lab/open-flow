@@ -187,6 +187,7 @@ export function createWait(target: Extract<GraphTarget, { readonly kind: 'flow' 
       node: {
         actions: ['continue'],
         concurrency: 1,
+        input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
         inputs: { value: { kind: 'value', value: null } },
         kind: 'wait',
         name,

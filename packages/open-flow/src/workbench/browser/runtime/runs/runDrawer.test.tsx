@@ -117,7 +117,9 @@ describe('RunDrawer terminal result', () => {
       </I18nProvider>,
     )
 
+    if (run.waiting == null) throw new Error('Waiting fixture is missing.')
     expect(markup).toContain('Approve the production release?')
+    expect(markup).toContain(`Expires ${new Date(run.waiting.expiresAt).toLocaleString('en')}`)
     expect(markup).toContain('>Approve<')
     expect(markup).toContain('>Reject<')
     expect(markup).toContain('Locate Wait node')

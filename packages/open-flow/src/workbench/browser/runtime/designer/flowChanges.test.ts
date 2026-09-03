@@ -242,6 +242,7 @@ describe('Wait changes', () => {
         node: {
           actions: ['continue'],
           concurrency: 1,
+          input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: { value: { kind: 'value', value: null } },
           kind: 'wait',
           prompt: 'Continue?',
@@ -316,6 +317,7 @@ describe('Wait changes', () => {
         node: {
           actions: ['continue'],
           concurrency: 1,
+          input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: { value: { kind: 'value', value: null } },
           kind: 'wait',
           notification: {
@@ -331,7 +333,11 @@ describe('Wait changes', () => {
     ])
     const clipboard = copyNodes(revisionView(current), { kind: 'flow' }, ['wait'])
     const ids = ['wait-copy', 'recipient-copy']
-    const pasted = pasteNodes(revisionView(current), { kind: 'flow' }, clipboard, () => ids.shift()!)
+    const pasted = pasteNodes(revisionView(current), { kind: 'flow' }, clipboard, () => {
+      const id = ids.shift()
+      if (id == null) throw new Error('Expected a clipboard identity.')
+      return id
+    })
     const changed = applyFlowChanges(current, pasted.changes)
 
     expect(changed.content.document.bindings['recipient-copy']).toEqual({ kind: 'variable', target: 'RECIPIENT' })
@@ -437,7 +443,11 @@ describe('Provider Trigger changes', () => {
         },
         kind: 'provider-trigger',
       },
-      () => ids.shift()!,
+      () => {
+        const id = ids.shift()
+        if (id == null) throw new Error('Expected a Trigger identity.')
+        return id
+      },
     )
 
     if (changes == null) throw new Error('Expected provider Trigger changes.')

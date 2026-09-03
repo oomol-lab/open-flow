@@ -169,6 +169,7 @@ describe('Server Cron Trigger', () => {
             approval: {
               actions: ['continue'],
               concurrency: 1,
+              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'scheduled', output: 'payload' }] } },
               kind: 'wait',
               prompt: 'Continue?',

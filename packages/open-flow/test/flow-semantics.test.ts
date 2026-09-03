@@ -797,6 +797,7 @@ export default () => value`,
             wait: {
               actions: ['approve', 'reject'],
               concurrency: 1,
+              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: null } },
               kind: 'wait',
               notification: {
@@ -832,9 +833,41 @@ export default () => value`,
     expect([...dependencies.inputBindings]).toEqual(['recipient'])
   })
 
+  it('preserves the Wait input schema on action outputs', async () => {
+    const source = revision('export default ({ input }) => ({ input })')
+    const task = source.document.graph.nodes.task
+    if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+    const valid: RevisionFixture = {
+      ...source,
+      document: {
+        ...source.document,
+        graph: {
+          nodes: {
+            task: {
+              ...task,
+              inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'approve' }] } },
+              task: { ...task.task, inputs: [{ handle: 'input', jsonSchema: { type: 'string' }, nullable: false }] },
+            },
+            wait: {
+              actions: ['approve', 'reject'],
+              concurrency: 1,
+              input: { handle: 'value', jsonSchema: { type: 'string' }, nullable: false },
+              inputs: { value: { kind: 'value', value: 'request-1' } },
+              kind: 'wait',
+              prompt: 'Approve this request?',
+            },
+          },
+        },
+      },
+    }
+
+    await expect(validateFlow(valid, engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
+  })
+
   it.each([
     [{ actions: ['approve'] }, 'wait.actions-invalid'],
     [{ concurrency: 2 }, 'wait.concurrency-invalid'],
+    [{ input: { handle: 'other', jsonSchema: {}, nullable: true } }, 'wait.input-invalid'],
     [{ prompt: '' }, 'wait.prompt-invalid'],
     [{ timeoutMs: 1_000 }, 'wait.field-unsupported'],
   ] as const)('rejects an invalid Wait shape: %s', async (fields, code) => {
@@ -846,6 +879,7 @@ export default () => value`,
             wait: {
               actions: ['continue'],
               concurrency: 1,
+              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: null } },
               kind: 'wait',
               prompt: 'Continue?',
@@ -879,6 +913,7 @@ export default () => value`,
             wait: {
               actions: ['continue'],
               concurrency: 1,
+              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: null } },
               kind: 'wait',
               notification: { inputs: {}, messageHandle: 'missing', taskId: 'notify' },
@@ -893,6 +928,7 @@ export default () => value`,
                 wait: {
                   actions: ['continue'],
                   concurrency: 1,
+                  input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
                   inputs: { value: { kind: 'value', value: null } },
                   kind: 'wait',
                   prompt: 'Not allowed here',

@@ -215,7 +215,7 @@ export class RunStore {
 
   public async cancel(): Promise<void> {
     const run = this.#state.value.run
-    if (!canCancelRun(run) || this.#state.value.cancelingRunId != null) return
+    if (!canCancelRun(run) || this.#state.value.cancelingRunId != null || this.#state.value.resolvingAction != null) return
     const current = this.#cancellation.begin()
     this.#setNotice(undefined)
     this.#set({ cancelingRunId: run.runId })
@@ -243,7 +243,14 @@ export class RunStore {
   public async resolve(action: WaitAction): Promise<void> {
     const run = this.#state.value.run
     const waiting = run?.status == 'waiting' && 'waiting' in run ? run.waiting : undefined
-    if (run == null || waiting == null || this.#state.value.resolvingAction != null || !waiting.actions.some((candidate) => candidate == action)) return
+    if (
+      run == null ||
+      waiting == null ||
+      this.#state.value.cancelingRunId != null ||
+      this.#state.value.resolvingAction != null ||
+      !waiting.actions.some((candidate) => candidate == action)
+    )
+      return
     this.#setNotice(undefined)
     this.#set({ resolvingAction: action })
     try {

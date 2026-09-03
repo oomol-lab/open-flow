@@ -33,7 +33,7 @@
     "value": "值",
     "valueDescription": "为下游节点提供可复用的字面量。",
     "wait": "等待",
-    "waitDescription": "暂停 Run，直到 Operator 继续或审批。",
+    "waitDescription": "暂停 Run，直到 Operator 继续、审批或拒绝。",
     "webhook": "Webhook",
     "webhookDescription": "通过专属 HTTP 入口接收外部事件。"
   },

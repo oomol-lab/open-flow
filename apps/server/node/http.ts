@@ -131,6 +131,13 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     const capability = context.req.param('capability')
     const action = context.req.param('action')
     const requested = action == 'approve' || action == 'continue' || action == 'reject' ? (action satisfies WaitAction) : undefined
+    const retryAfter = admitCallback('wait-action')
+    if (retryAfter != null) {
+      const response = json(429, { error: { code: 'wait-action.rate-limited', message: 'Too many requests.' }, version: 1 })
+      response.headers.set('cache-control', 'no-store')
+      response.headers.set('retry-after', String(retryAfter))
+      return response
+    }
     const result =
       requested == null || !/^[A-Za-z0-9_-]{43}$/.test(capability)
         ? undefined

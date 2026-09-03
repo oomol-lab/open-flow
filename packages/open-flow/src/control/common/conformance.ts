@@ -402,6 +402,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
             node: {
               actions: ['approve', 'reject'],
               concurrency: 1,
+              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: { request: 1 } } },
               kind: 'wait',
               prompt: 'Approve request 1?',

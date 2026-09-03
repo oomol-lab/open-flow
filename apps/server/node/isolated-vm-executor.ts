@@ -271,7 +271,7 @@ function installGlobals(
   const now = new ivm.Reference((): number => performance.now())
   const writeLog = new ivm.Reference((level: 'debug' | 'error' | 'info' | 'warn', message: string): void => {
     if (!active || log == null) return
-    logQueue = logQueue.then(() => log(level, message))
+    logQueue = logQueue.then(() => log(level, message)).catch(() => {})
   })
   const capability = new ivm.Reference((sourceReference: IsolatedVM.Reference<string>, settle: IsolatedVM.Reference<(source: string) => void>): void => {
     const settleResult = (result: CapabilityOutcome): void => {

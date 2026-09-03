@@ -859,8 +859,8 @@ export class Store {
           .prepare(
             `INSERT INTO wait_notifications (
                run_id, wait_id, invocation_id, action, connection_id, task_id,
-               input_json, status, claim_id, claim_expires_at, created_at, updated_at
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NULL, NULL, ?, ?)`,
+               input_json, status, attempts, retry_at, claim_id, claim_expires_at, created_at, updated_at
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, ?)`,
           )
           .run(
             runId,
@@ -870,6 +870,7 @@ export class Store {
             notification.connectionId ?? null,
             notification.taskId,
             JSON.stringify(input),
+            waitingSince,
             waitingSince,
             waitingSince,
           )
@@ -1060,13 +1061,14 @@ export class Store {
                   wait_notifications.wait_id AS waitId
            FROM wait_notifications JOIN runs USING (run_id) JOIN run_waits USING (run_id)
            WHERE wait_notifications.status = 'pending'
+             AND wait_notifications.retry_at <= ?
              AND (wait_notifications.claim_id IS NULL OR wait_notifications.claim_expires_at <= ?)
              AND runs.status = 'waiting'
              AND run_waits.wait_id = wait_notifications.wait_id
              AND run_waits.expires_at > ?
            ORDER BY wait_notifications.created_at, wait_notifications.run_id LIMIT 1`,
         )
-        .get(now, now) as
+        .get(now, now, now) as
         | {
             readonly action: string
             readonly connectionId: string | null
@@ -1081,11 +1083,11 @@ export class Store {
       const claimId = randomUUID()
       const changed = this.#database
         .prepare(
-          `UPDATE wait_notifications SET claim_id = ?, claim_expires_at = ?, updated_at = ?
+          `UPDATE wait_notifications SET attempts = attempts + 1, claim_id = ?, claim_expires_at = ?, updated_at = ?
            WHERE run_id = ? AND wait_id = ? AND status = 'pending'
-             AND (claim_id IS NULL OR claim_expires_at <= ?)`,
+             AND retry_at <= ? AND (claim_id IS NULL OR claim_expires_at <= ?)`,
         )
-        .run(claimId, now + leaseMs, now, row.runId, row.waitId, now)
+        .run(claimId, now + leaseMs, now, row.runId, row.waitId, now, now)
       if (changed.changes != 1) return
       return {
         action: row.action,
@@ -1112,12 +1114,25 @@ export class Store {
     )
   }
 
+  releaseWaitNotification(runId: string, waitId: string, claimId: string, retryAt: number, maxAttempts: number): 'failed' | 'pending' | undefined {
+    const row = this.#database
+      .prepare(
+        `UPDATE wait_notifications
+         SET status = CASE WHEN attempts >= ? THEN 'failed' ELSE 'pending' END,
+             retry_at = ?, claim_id = NULL, claim_expires_at = NULL, updated_at = ?
+         WHERE run_id = ? AND wait_id = ? AND status = 'pending' AND claim_id = ?
+         RETURNING status`,
+      )
+      .get(maxAttempts, retryAt, this.#clock(), runId, waitId, claimId) as { readonly status: 'failed' | 'pending' } | undefined
+    return row?.status
+  }
+
   nextWaitNotificationAt(): number | undefined {
     return (
       (
         this.#database
           .prepare(
-            `SELECT MIN(COALESCE(wait_notifications.claim_expires_at, wait_notifications.created_at)) AS dueAt
+            `SELECT MIN(COALESCE(wait_notifications.claim_expires_at, wait_notifications.retry_at)) AS dueAt
            FROM wait_notifications JOIN runs USING (run_id) JOIN run_waits USING (run_id)
            WHERE wait_notifications.status = 'pending'
              AND runs.status = 'waiting'

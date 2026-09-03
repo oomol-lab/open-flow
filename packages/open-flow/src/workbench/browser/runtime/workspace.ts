@@ -278,8 +278,11 @@ function nodePorts(node: ResolvedSelection): NodePorts {
       break
     }
     case 'wait': {
-      inputs.set('value', { defaultValue: null, jsonSchema: {}, nullable: true })
-      for (const action of node.node.actions) outputs.set(action, { jsonSchema: {}, nullable: true })
+      const input = node.node.input
+      inputs.set(input.handle, { defaultValue: input.value, description: input.description, jsonSchema: input.jsonSchema, nullable: input.nullable })
+      for (const action of node.node.actions) {
+        outputs.set(action, { description: input.description, jsonSchema: input.jsonSchema, nullable: input.nullable })
+      }
       break
     }
     case 'subflow': {
@@ -378,6 +381,9 @@ function runProjection(
   if (target.kind != 'flow' || run?.flowId != revision.revision.flowId || run.revisionId != revision.revision.revisionId) return { nodes: new Map() }
   const active = run.status == 'queued' || run.status == 'starting' || run.status == 'running' || run.status == 'waiting'
   const nodes = new Map<string, FlowDesignerViewNodeRun>()
+  if (run.status == 'waiting' && 'waiting' in run && run.waiting != null) {
+    nodes.set(run.waiting.nodeId, { status: 'waiting' })
+  }
   const rootScopeId = events.find((event) => event.kind == 'run.started' && event.payload.flowId == revision.revision.flowId)?.payload.scopeId
   if (typeof rootScopeId != 'string') return { nodes, status: active ? 'running' : 'idle' }
   for (const event of events) {
@@ -401,10 +407,6 @@ function runProjection(
         nodes.set(nodeId, { ...current, status: 'error' })
         break
     }
-  }
-  if (run.status == 'waiting' && 'waiting' in run && run.waiting != null) {
-    const current = nodes.get(run.waiting.nodeId)
-    nodes.set(run.waiting.nodeId, { ...current, status: 'waiting' })
   }
   if (!active) {
     for (const [nodeId, state] of nodes) {

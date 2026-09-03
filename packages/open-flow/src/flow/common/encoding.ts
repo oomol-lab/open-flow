@@ -131,6 +131,7 @@ function canonicalNode(value: GraphNode): JsonValue {
       return {
         ...common,
         actions: value.actions,
+        input: { handle: value.input.handle, ...canonicalPort(value.input) },
         kind: value.kind,
         ...(value.notification == null
           ? {}

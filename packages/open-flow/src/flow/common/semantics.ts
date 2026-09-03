@@ -556,7 +556,7 @@ function nodeInputPorts(document: FlowDocument, node: GraphNode): Readonly<Recor
     case 'task':
       return portsByHandle([...(node.task != null ? node.task.inputs : (document.tasks[node.taskId]?.inputs ?? [])), ...(node.additionalInputs ?? [])])
     case 'wait':
-      return { value: { jsonSchema: {}, nullable: true, value: null } }
+      return { [node.input.handle]: node.input }
     case 'cron':
     case 'integration':
     case 'poll':
@@ -578,7 +578,7 @@ function nodeOutputPorts(document: FlowDocument, node: GraphNode): Readonly<Reco
     case 'task':
       return portsByHandle(node.task != null ? node.task.outputs : (document.tasks[node.taskId]?.outputs ?? []))
     case 'wait':
-      return Object.fromEntries(node.actions.map((action) => [action, { jsonSchema: {}, nullable: true }]))
+      return Object.fromEntries(node.actions.map((action) => [action, node.input]))
     case 'cron':
     case 'integration':
     case 'poll':
@@ -686,7 +686,7 @@ function validateWait(
   path: string,
   diagnostics: Diagnostic[],
 ): void {
-  const fields = new Set(['actions', 'concurrency', 'description', 'icon', 'inputs', 'kind', 'name', 'notification', 'prompt'])
+  const fields = new Set(['actions', 'concurrency', 'description', 'icon', 'input', 'inputs', 'kind', 'name', 'notification', 'prompt'])
   const unsupported = Object.keys(node).filter((field) => !fields.has(field))
   if (unsupported.length > 0) {
     diagnostics.push(
@@ -698,6 +698,7 @@ function validateWait(
   }
   if (!allowed) diagnostics.push(graphDiagnostic('wait.not-allowed', 'Wait nodes are only allowed in Flows.', path))
   if (node.concurrency != 1) diagnostics.push(graphDiagnostic('wait.concurrency-invalid', 'Wait concurrency must be 1.', `${path}/concurrency`))
+  if (node.input.handle != 'value') diagnostics.push(graphDiagnostic('wait.input-invalid', 'Wait input handle must be "value".', `${path}/input/handle`))
   if (typeof node.prompt != 'string' || node.prompt.trim().length == 0 || [...node.prompt].length > 1_000) {
     diagnostics.push(graphDiagnostic('wait.prompt-invalid', 'Wait prompt must contain between 1 and 1,000 Unicode code points.', `${path}/prompt`))
   }

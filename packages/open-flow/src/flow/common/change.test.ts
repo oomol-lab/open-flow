@@ -273,6 +273,7 @@ describe('Flow changes', () => {
         node: {
           actions: ['continue'],
           concurrency: 1,
+          input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: {},
           kind: 'wait',
           notification: { inputs: {}, messageHandle: 'text', taskId: 'notify' },

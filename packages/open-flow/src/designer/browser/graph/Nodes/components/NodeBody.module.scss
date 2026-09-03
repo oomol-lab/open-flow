@@ -19,6 +19,10 @@
   color: var(--text-2);
   font-size: var(--base-font-size);
   line-height: 20px;
+
+  :global(.oo-designer-node-minimap1) & {
+    visibility: hidden;
+  }
 }
 
 .noticeIcon {
@@ -46,8 +50,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-:global(.oo-designer-node-minimap1) .notice {
-  visibility: hidden;
 }

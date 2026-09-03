@@ -192,6 +192,7 @@ describe('Flow Revision encoding', () => {
     const wait = {
       actions: ['approve', 'reject'],
       concurrency: 1,
+      input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
       inputs: { value: { kind: 'value', value: { request: 1 } } },
       kind: 'wait',
       notification: {
@@ -236,6 +237,7 @@ describe('Flow Revision encoding', () => {
     expect(JSON.parse(decoder.decode(encodeRevision(first))).document.graph.nodes.wait).toEqual({
       actions: ['approve', 'reject'],
       concurrency: 1,
+      input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
       inputs: { value: { kind: 'value', value: { request: 1 } } },
       kind: 'wait',
       notification: {

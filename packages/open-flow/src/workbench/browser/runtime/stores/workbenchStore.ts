@@ -292,7 +292,9 @@ export class WorkbenchStore {
 
   public locateRunWait(): boolean {
     const run = this.runs.$.run.value
-    return run?.status == 'waiting' && 'waiting' in run && run.waiting != null && this.workspace.locateNode(run.waiting.nodeId)
+    if (run?.status != 'waiting' || !('waiting' in run) || run.waiting == null) return false
+    if (!this.workspace.selectTarget({ kind: 'flow' })) return false
+    return this.workspace.locateNode(run.waiting.nodeId)
   }
 
   public async addNode(option: AddNodeOption, position: Point, connection?: (nodeId: string) => Omit<DesignerEdge, 'id'>): Promise<string | undefined> {

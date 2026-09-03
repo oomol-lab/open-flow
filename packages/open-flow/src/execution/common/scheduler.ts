@@ -387,15 +387,14 @@ function nodePorts(prepared: PreparedFlow, node: ExecutableNode): Readonly<Recor
     case 'task':
       return portsByHandle([...(node.task != null ? node.task.inputs : prepared.tasks[node.taskId]!.inputs), ...(node.additionalInputs ?? [])])
     case 'wait': {
-      const task = node.notification == null ? undefined : prepared.tasks[node.notification.taskId]
+      const notification = node.notification
+      const task = notification == null ? undefined : prepared.tasks[notification.taskId]
       return {
-        value: { jsonSchema: {}, nullable: true, value: null },
-        ...(node.notification == null || task == null
+        [node.input.handle]: node.input,
+        ...(notification == null || task == null
           ? {}
           : Object.fromEntries(
-              task.inputs.flatMap((port) =>
-                'handle' in port && port.handle != node.notification!.messageHandle ? [[notificationInput(port.handle), port]] : [],
-              ),
+              task.inputs.flatMap((port) => ('handle' in port && port.handle != notification.messageHandle ? [[notificationInput(port.handle), port]] : [])),
             )),
       }
     }
@@ -802,7 +801,7 @@ function runGraph(
           const title = nodeTitle(context.prepared, node)
           const projectedInputs = Object.fromEntries(
             Object.entries(nodeInputs).filter(([handle]) => {
-              if (node.kind == 'wait') return handle == 'value'
+              if (node.kind == 'wait') return handle == node.input.handle
               const mapping = node.inputs[handle]
               return mapping?.kind != 'sources' || mapping.sources.every((source) => source.kind != 'binding')
             }),
@@ -929,12 +928,14 @@ function runGraph(
                   },
                 }),
             order: jobOrder,
-            value: nodeInputs.value ?? null,
+            value: nodeInputs[node.input.handle] ?? null,
             waitId: nanoid(),
           }
-          const mapping = node.inputs.value
+          const mapping = node.inputs[node.input.handle]
           const projectedInputs: Readonly<Record<string, JsonValue>> =
-            mapping?.kind == 'sources' && mapping.sources.some((source) => source.kind == 'binding') ? {} : { value: nodeInputs.value ?? null }
+            mapping?.kind == 'sources' && mapping.sources.some((source) => source.kind == 'binding')
+              ? {}
+              : { [node.input.handle]: nodeInputs[node.input.handle] ?? null }
           runNode(
             context.emit({
               inputs: projectedInputs,
@@ -993,7 +994,10 @@ function runGraph(
         if (firstCause != null || suspending) return
         const node = target.graph.nodes[nodeId]!
         const buffer = inputBuffers.get(nodeId)!
-        while (buffer.ready && (activeCounts.get(nodeId) ?? 0) < node.concurrency) startNode(nodeId)
+        while (buffer.ready && (activeCounts.get(nodeId) ?? 0) < node.concurrency) {
+          startNode(nodeId)
+          if (suspending) return
+        }
       }
 
       if (resume == null) {

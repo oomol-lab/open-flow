@@ -1,4 +1,5 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
+import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { InvokeLlmTask } from '@oomol-lab/open-flow/runtime-contract'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
@@ -187,6 +188,7 @@ function waitFlow(): RevisionContent {
           approval: {
             actions: ['approve', 'reject'],
             concurrency: 1,
+            input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
             inputs: { value: { kind: 'value', value: { request: 1 } } },
             kind: 'wait',
             name: 'Approval',
@@ -211,6 +213,7 @@ function notificationFlow(): RevisionContent {
           approval: {
             actions: ['approve', 'reject'],
             concurrency: 1,
+            input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
             inputs: { value: { kind: 'value', value: { request: 1 } } },
             kind: 'wait',
             name: 'Approval',
@@ -402,23 +405,48 @@ describe('Server application service', () => {
     expect(await replay.json()).toMatchObject({ action: 'approve', resolutionAccepted: true, state: 'resolved' })
     const rejected = await app.request(rejectPath, { method: 'POST' })
     expect(await rejected.json()).toMatchObject({ action: 'approve', resolutionAccepted: false, state: 'resolved' })
+    const inspectedResolved = await app.request(rejectPath)
+    expect(await inspectedResolved.json()).toMatchObject({ action: 'approve', state: 'resolved' })
     await service.waitForIdle()
     expect(service.run(accepted.runId)?.status).toBe('completed')
   })
 
-  it('keeps a Run waiting when its notification delivery fails', async () => {
+  it('rate limits public Wait actions before capability lookup', async () => {
+    const service = await openService(await databaseFile())
+    const inspect = vi.spyOn(service, 'inspectWaitAction')
+    const app = createServerApp(service, { callbackRequestsPerMinute: 1 })
+
+    const unsupported = await app.request(`/v1/wait-actions/${'a'.repeat(43)}/approve`, { method: 'PUT' })
+    expect(unsupported.status).toBe(405)
+    const missing = await app.request('/v1/wait-actions/invalid/approve')
+    expect(missing.status).toBe(404)
+    const limited = await app.request(`/v1/wait-actions/${'a'.repeat(43)}/approve`)
+
+    expect(limited.status).toBe(429)
+    expect(limited.headers.get('cache-control')).toBe('no-store')
+    expect(limited.headers.get('retry-after')).not.toBeNull()
+    expect(await limited.json()).toMatchObject({ error: { code: 'wait-action.rate-limited' }, version: 1 })
+    expect(inspect).not.toHaveBeenCalled()
+  })
+
+  it('retries a transient Wait notification failure with the same invocation identity', async () => {
     const file = await databaseFile()
+    let now = Date.parse('2026-09-01T00:00:00.000Z')
+    const invocationIds: string[] = []
     const service = await openService(file, {
       capabilities: {
         connector: () =>
           createConnectorHost({
-            execute: async () => {
-              throw new Error('Provider rejected the notification.')
+            execute: async (_action, _connectionId, _input, invocationId) => {
+              invocationIds.push(invocationId)
+              if (invocationIds.length == 1) throw new Error('Temporary network failure.')
+              return null
             },
             ready: async () => true,
           }),
         waitPublicOrigin: () => new URL('https://flows.example.com'),
       },
+      clock: () => now,
     })
     await startService(service)
     const accepted = await acceptRun(service, {
@@ -431,9 +459,55 @@ describe('Server application service', () => {
     await service.waitForIdle()
 
     expect(service.run(accepted.runId)?.status).toBe('waiting')
-    const database = new DatabaseSync(file)
-    expect(database.prepare('SELECT status FROM wait_notifications WHERE run_id = ?').get(accepted.runId)).toEqual({ status: 'failed' })
+    let database = new DatabaseSync(file)
+    expect(database.prepare('SELECT attempts, status FROM wait_notifications WHERE run_id = ?').get(accepted.runId)).toEqual({ attempts: 1, status: 'pending' })
     database.close()
+
+    now += 1_000
+    await service.tickMaintenance()
+
+    database = new DatabaseSync(file)
+    expect(database.prepare('SELECT attempts, status FROM wait_notifications WHERE run_id = ?').get(accepted.runId)).toEqual({
+      attempts: 2,
+      status: 'delivered',
+    })
+    database.close()
+    expect(invocationIds).toHaveLength(2)
+    expect(invocationIds[1]).toBe(invocationIds[0])
+  })
+
+  it('bounds repeated Wait notification failures', async () => {
+    const file = await databaseFile()
+    let now = Date.parse('2026-09-01T00:00:00.000Z')
+    const execute = vi.fn(async () => {
+      throw new Error('Provider rejected the notification.')
+    })
+    const service = await openService(file, {
+      capabilities: {
+        connector: () => createConnectorHost({ execute, ready: async () => true }),
+        waitPublicOrigin: () => new URL('https://flows.example.com'),
+      },
+      clock: () => now,
+    })
+    await startService(service)
+    const accepted = await acceptRun(service, {
+      flowId: 'main',
+      idempotencyKey: 'wait-notification-failure',
+      revision: notificationFlow(),
+      revisionId: 'revision-wait-notification-failure',
+    })
+    if (accepted.kind != 'accepted') throw new Error('Wait notification Run was not accepted.')
+    await service.waitForIdle()
+    for (let attempt = 1; attempt < 3; attempt += 1) {
+      now += 1_000
+      await service.tickMaintenance()
+    }
+
+    expect(service.run(accepted.runId)?.status).toBe('waiting')
+    const database = new DatabaseSync(file)
+    expect(database.prepare('SELECT attempts, status FROM wait_notifications WHERE run_id = ?').get(accepted.runId)).toEqual({ attempts: 3, status: 'failed' })
+    database.close()
+    expect(execute).toHaveBeenCalledTimes(3)
   })
 
   it('reclaims an expired notification lease with the same invocation identity', async () => {
@@ -738,6 +812,47 @@ describe('Server application service', () => {
       },
     ])
     await closeService(service)
+  })
+
+  it('keeps executing when a Code node log cannot be stored', async () => {
+    const service = await openService(await databaseFile())
+    const store = (service.control as unknown as { readonly store: { append(runId: string, event: ProjectedRunEvent): void } }).store
+    const append = store.append.bind(store)
+    let rejected = false
+    vi.spyOn(store, 'append').mockImplementation((runId, event) => {
+      if (event.kind == 'node.log' && !rejected) {
+        rejected = true
+        throw new Error('Log storage failed.')
+      }
+      append(runId, event)
+    })
+    await startService(service)
+    const flow = fullFlow()
+    const accepted = await acceptRun(service, {
+      flowId: 'main',
+      idempotencyKey: 'code-console-failure',
+      revision: {
+        ...flow,
+        modules: {
+          ...flow.modules,
+          increment: {
+            imports: [],
+            name: 'Increment',
+            source: `export default ({ value }) => {
+  console.log('First')
+  console.log('Second')
+  return { value: value + 1 }
+}`,
+          },
+        },
+      },
+      revisionId: 'revision-code-console-failure',
+    })
+    if (accepted.kind != 'accepted') throw new Error('Code console Run was not accepted.')
+    await service.waitForIdle()
+
+    expect(service.run(accepted.runId)?.status).toBe('completed')
+    expect(service.events(accepted.runId).filter(({ kind }) => kind == 'node.log')).toMatchObject([{ payload: { message: 'Second' } }])
   })
 
   it('reopens queued work after Scope interruption and completes the same Run once', async () => {

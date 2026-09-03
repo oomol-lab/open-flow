@@ -765,11 +765,12 @@ describe('FlowDesignerView model synchronization', () => {
     const view = FlowDesignerView(
       props(model([task([])]), { onChangeNodeDescription, onChangeNodeIcon, onChangeNodeTitle }),
     ) as React.ReactElement<FlowDesignerProps>
-    const node = [...view.props.flowDesignerStore.$.nodes.values()][0]!
+    const node = [...view.props.flowDesignerStore.$.nodes.values()][0]
+    if (!TaskNodeStore.is(node) || node.manifest$ == null) throw new Error('Expected an inline Task node.')
 
     node.changeDescription?.('Updated description')
-    node.manifest$!.title.set('Renamed task')
-    node.manifest$!.icon.set(':carbon:star:')
+    node.manifest$.title.set('Renamed task')
+    node.manifest$.icon.set(':carbon:star:')
     await Promise.resolve()
 
     expect(onChangeNodeDescription).toHaveBeenCalledWith('target', 'Updated description')
@@ -873,16 +874,19 @@ describe('FlowDesignerView model synchronization', () => {
     if (!TaskNodeStore.is(node)) throw new Error('Expected a Wait node.')
     const output = node.findSection<OutputSectionStore>(OutputSectionStore.TYPE)
     if (output == null) throw new Error('Expected a Wait output section.')
+    const inputsFrom = node.display$.inputs_from
+    const notice = node.display$.notice
+    if (inputsFrom == null || notice == null) throw new Error('Expected Wait display values.')
     const changes: string[] = []
     const track = (name: string) => {
       changes.push(name)
     }
     const disposers = [
       node.display$.inputs_def.reaction(() => track('inputs'), true),
-      node.display$.inputs_from!.reaction(() => track('input values'), true),
+      inputsFrom.reaction(() => track('input values'), true),
       node.display$.outputs_def.reaction(() => track('outputs'), true),
       output.$.connectedHandles.reaction(() => track('connections'), true),
-      node.display$.notice!.reaction(() => track('notice'), true),
+      notice.reaction(() => track('notice'), true),
     ]
 
     FlowDesignerView(
@@ -1067,7 +1071,8 @@ describe('FlowDesignerView model synchronization', () => {
     const initialProps = props(model([initial]), { onMoveNodes, onMoveViewport, onSelectionChange })
     const view = FlowDesignerView(initialProps) as React.ReactElement<FlowDesignerProps>
     const store = view.props.flowDesignerStore
-    const node = [...store.$.nodes.values()][0]!
+    const node = [...store.$.nodes.values()][0]
+    if (node == null) throw new Error('Expected a Task node.')
     const position = { x: 320, y: 180 }
     const viewport = { x: 40, y: 60, zoom: 1.2 }
 
@@ -1213,11 +1218,13 @@ describe('FlowDesignerView model synchronization', () => {
     const value: FlowDesignerViewModel = {
       layouts: {
         detail: {
-          nodes: { ['comment' as NodeId]: { x: 700, y: 500 }, ['target' as NodeId]: { x: 900, y: 700 } },
+          commentNodes: { ['comment' as NodeId]: { x: 700, y: 500 } },
+          nodes: { ['target' as NodeId]: { x: 900, y: 700 } },
           viewport: { x: -800, y: -600, zoom: 0.6 },
         },
         overview: {
-          nodes: { ['comment' as NodeId]: { x: 60, y: 80 }, ['target' as NodeId]: { x: 200, y: 120 } },
+          commentNodes: { ['comment' as NodeId]: { x: 60, y: 80 } },
+          nodes: { ['target' as NodeId]: { x: 200, y: 120 } },
           viewport: { x: 30, y: 40, zoom: 1.2 },
         },
       },
@@ -1227,9 +1234,11 @@ describe('FlowDesignerView model synchronization', () => {
 
     const view = FlowDesignerView(props(value)) as React.ReactElement<FlowDesignerProps>
     const store = view.props.flowDesignerStore
+    const comment = [...(store.$.commentNodes?.values() ?? [])][0]
+    if (comment == null) throw new Error('Expected a Comment node.')
 
     expect([...store.$.nodes.values()][0]?.$.position.value).toEqual({ x: 200, y: 120 })
-    expect([...store.$.commentNodes!.values()][0]?.$.position.value).toEqual({ x: 60, y: 80 })
+    expect(comment.$.position.value).toEqual({ x: 60, y: 80 })
     expect(store.$.viewport.value).toEqual({ x: 30, y: 40, zoom: 1.2 })
     store.dispose()
   })

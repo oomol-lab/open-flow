@@ -19,6 +19,7 @@ import { toPlainObject } from '../../base/trivial.ts'
 import { watchEach } from '../../base/val.ts'
 
 export interface DesignerUILayout {
+  commentNodes?: { [nodeId: NodeId]: XYPosition | undefined }
   nodes?: { [nodeId: NodeId]: XYPosition | undefined }
   pseudoNodes?: { [nodeId: NodeId]: XYPosition | undefined }
   viewport?: Viewport | undefined
@@ -149,7 +150,7 @@ export class DesignerUIStore {
         this.initializedLayouts.add(mode)
       }
       const activeLayout = this.layouts.get(displayMode)
-      if (!activeLayout && hasPersistedPositions(uiData.nodes, uiData.pseudoNodes)) {
+      if (!activeLayout && hasPersistedPositions(uiData.nodes, uiData.pseudoNodes, uiData.commentNodes)) {
         this.initializedLayouts.add(displayMode)
       }
       if (activeLayout) this.applyLayout(activeLayout)
@@ -170,7 +171,7 @@ export class DesignerUIStore {
       }
       if (isPlainObject(uiData.commentNodes)) {
         for (const [nodeId, nodeUIData] of Object.entries(uiData.commentNodes)) {
-          this.commentNodesData.set(nodeId as NodeId, nodeUIData as NodeUIPersistedData)
+          this.commentNodesData.set(nodeId as NodeId, withPosition(nodeUIData, activeLayout?.commentNodes?.[nodeId as NodeId]))
         }
       }
     }
@@ -260,10 +261,12 @@ export class DesignerUIStore {
   private captureLayout(mode: FlowDisplayMode): void {
     const nodes = positionsOf(this.nodeStores)
     const pseudoNodes = this.pseudoNodeStores && positionsOf(this.pseudoNodeStores)
+    const commentNodes = this.commentNodeStores && positionsOf(this.commentNodeStores)
     const viewport = this.viewport$.value
-    if (nodes || pseudoNodes || viewport) {
+    if (nodes || pseudoNodes || commentNodes || viewport) {
       const previous = this.layouts.get(mode)
       this.layouts.set(mode, {
+        commentNodes: commentNodes ?? previous?.commentNodes,
         nodes: nodes ?? previous?.nodes,
         pseudoNodes: pseudoNodes ?? previous?.pseudoNodes,
         viewport: viewport && { ...viewport },
@@ -273,12 +276,7 @@ export class DesignerUIStore {
 
   private applyLayout(layout: DesignerUILayout): void {
     applyPositions(this.nodeStores, layout.nodes)
-    if (this.commentNodeStores && layout.nodes) {
-      for (const [nodeId, store] of this.commentNodeStores) {
-        const position = layout.nodes[nodeId]
-        if (position) store.$$.position.set({ ...position })
-      }
-    }
+    if (this.commentNodeStores) applyPositions(this.commentNodeStores, layout.commentNodes)
     if (this.pseudoNodeStores) applyPositions(this.pseudoNodeStores, layout.pseudoNodes)
     if (layout.viewport) {
       this.observedViewport = layout.viewport
@@ -287,12 +285,12 @@ export class DesignerUIStore {
   }
 }
 
-function positionsOf(stores: ReadonlyReactiveMap<NodeId, NodeStore>): DesignerUILayout['nodes'] {
+function positionsOf<T extends NodeStore | CommentNodeStore>(stores: ReadonlyReactiveMap<NodeId, T>): DesignerUILayout['nodes'] {
   if (stores.size === 0) return
   return Object.fromEntries([...stores].map(([nodeId, store]) => [nodeId, { ...store.$.position.value }]))
 }
 
-function applyPositions(stores: ReadonlyReactiveMap<NodeId, NodeStore>, positions: DesignerUILayout['nodes']): void {
+function applyPositions<T extends NodeStore | CommentNodeStore>(stores: ReadonlyReactiveMap<NodeId, T>, positions: DesignerUILayout['nodes']): void {
   if (!positions) return
   for (const [nodeId, store] of stores) {
     const position = positions[nodeId]
@@ -318,10 +316,11 @@ function parseLayouts(data: unknown): Map<FlowDisplayMode, DesignerUILayout> {
   for (const mode of FLOW_DISPLAY_MODES) {
     const layout = toPlainObject(source?.[mode])
     if (!layout) continue
+    const commentNodes = parsePositions(layout.commentNodes)
     const nodes = parsePositions(layout.nodes)
     const pseudoNodes = parsePositions(layout.pseudoNodes)
     const viewport = isViewport(layout.viewport) ? { ...layout.viewport } : undefined
-    if (nodes || pseudoNodes || viewport) result.set(mode, { nodes, pseudoNodes, viewport })
+    if (commentNodes || nodes || pseudoNodes || viewport) result.set(mode, { commentNodes, nodes, pseudoNodes, viewport })
   }
   return result
 }
@@ -342,6 +341,7 @@ function hasPersistedPositions(...collections: unknown[]): boolean {
 
 function cloneLayout(layout: DesignerUILayout | undefined): DesignerUILayout {
   return {
+    commentNodes: clonePositions(layout?.commentNodes),
     nodes: clonePositions(layout?.nodes),
     pseudoNodes: clonePositions(layout?.pseudoNodes),
     viewport: layout?.viewport && { ...layout.viewport },
@@ -354,8 +354,12 @@ function clonePositions(positions: DesignerUILayout['nodes']): DesignerUILayout[
 }
 
 function mergeMissingPositions(target: DesignerUILayout, source: DesignerUILayout | undefined): DesignerUILayout {
+  const commentNodes = { ...target.commentNodes }
   const nodes = { ...target.nodes }
   const pseudoNodes = { ...target.pseudoNodes }
+  for (const [nodeId, position] of Object.entries(source?.commentNodes ?? {})) {
+    if (commentNodes[nodeId as NodeId] == null && position) commentNodes[nodeId as NodeId] = { ...position }
+  }
   for (const [nodeId, position] of Object.entries(source?.nodes ?? {})) {
     if (nodes[nodeId as NodeId] == null && position) nodes[nodeId as NodeId] = { ...position }
   }
@@ -363,6 +367,7 @@ function mergeMissingPositions(target: DesignerUILayout, source: DesignerUILayou
     if (pseudoNodes[nodeId as NodeId] == null && position) pseudoNodes[nodeId as NodeId] = { ...position }
   }
   return {
+    commentNodes: Object.keys(commentNodes).length > 0 ? commentNodes : undefined,
     nodes: Object.keys(nodes).length > 0 ? nodes : undefined,
     pseudoNodes: Object.keys(pseudoNodes).length > 0 ? pseudoNodes : undefined,
     viewport: target.viewport && { ...target.viewport },
@@ -370,7 +375,7 @@ function mergeMissingPositions(target: DesignerUILayout, source: DesignerUILayou
 }
 
 function sameLayoutMembership(a: DesignerUILayout, b: DesignerUILayout): boolean {
-  return samePositionKeys(a.nodes, b.nodes) && samePositionKeys(a.pseudoNodes, b.pseudoNodes)
+  return samePositionKeys(a.commentNodes, b.commentNodes) && samePositionKeys(a.nodes, b.nodes) && samePositionKeys(a.pseudoNodes, b.pseudoNodes)
 }
 
 function samePositionKeys(a: DesignerUILayout['nodes'], b: DesignerUILayout['nodes']): boolean {
@@ -380,5 +385,5 @@ function samePositionKeys(a: DesignerUILayout['nodes'], b: DesignerUILayout['nod
 }
 
 function hasLayoutData(layout: DesignerUILayout): boolean {
-  return layout.nodes != null || layout.pseudoNodes != null || layout.viewport != null
+  return layout.commentNodes != null || layout.nodes != null || layout.pseudoNodes != null || layout.viewport != null
 }

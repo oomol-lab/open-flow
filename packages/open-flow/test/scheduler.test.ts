@@ -343,6 +343,7 @@ describe('revision graph scheduler', () => {
             wait: {
               actions: ['continue'],
               concurrency: 1,
+              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
               kind: 'wait',
               prompt: 'Continue processing?',
@@ -417,6 +418,7 @@ describe('revision graph scheduler', () => {
             wait: {
               actions: ['approve', 'reject'],
               concurrency: 1,
+              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: 'request-1' } },
               kind: 'wait',
               prompt: 'Approve this request?',
@@ -477,6 +479,7 @@ describe('revision graph scheduler', () => {
             first: {
               actions: ['continue'],
               concurrency: 1,
+              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: 1 } },
               kind: 'wait',
               prompt: 'First wait',
@@ -484,6 +487,7 @@ describe('revision graph scheduler', () => {
             second: {
               actions: ['continue'],
               concurrency: 1,
+              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'first', output: 'continue' }] } },
               kind: 'wait',
               prompt: 'Second wait',

@@ -53,7 +53,11 @@ function waitDefinition(node: unknown, revision: unknown, saveWait: ReturnType<t
 describe('Wait Inspector', () => {
   it('saves a resolution change immediately', () => {
     const saveWait = vi.fn().mockResolvedValue(true)
-    const definition = waitDefinition({ actions: ['continue'], concurrency: 1, inputs: {}, kind: 'wait', prompt: 'Continue?' }, {}, saveWait)
+    const definition = waitDefinition(
+      { actions: ['continue'], concurrency: 1, input: { handle: 'value', jsonSchema: {}, nullable: true }, inputs: {}, kind: 'wait', prompt: 'Continue?' },
+      {},
+      saveWait,
+    )
     const switcher = find(definition, (item) => (item.props as { readonly className?: string }).className == 'wait-mode-switcher')
     if (switcher == null) throw new Error('Expected resolution switcher.')
 
@@ -71,6 +75,7 @@ describe('Wait Inspector', () => {
     const node = {
       actions: ['continue'],
       concurrency: 1,
+      input: { handle: 'value', jsonSchema: {}, nullable: true },
       inputs: {},
       kind: 'wait',
       notification: { inputs: {}, messageHandle: 'text', taskId: 'notify' },
