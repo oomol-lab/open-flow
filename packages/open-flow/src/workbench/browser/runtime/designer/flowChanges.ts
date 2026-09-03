@@ -430,7 +430,9 @@ export function updateCondition(revision: RevisionView, target: DesignerTarget, 
 
     if (currentNodeId == nodeId) {
       const before = { cases: current.cases, defaultOutput: current.defaultOutput, input: current.input }
-      if (!dequal(before, settings)) changes.push({ before, kind: 'graph.node.condition.set', nodeId, target, value: settings })
+      if (!dequal(current.cases, settings.cases) || current.defaultOutput != settings.defaultOutput || !dequal(current.input, settings.input)) {
+        changes.push({ before, kind: 'graph.node.condition.set', nodeId, target, value: settings })
+      }
     }
     changes.push(...changedInputs(node.inputs, inputs, target, currentNodeId))
   }
@@ -496,8 +498,25 @@ export function updateWait(
         value: sources.length == 0 ? undefined : { kind: 'sources', sources },
       })
     }
+    if (node.kind != 'wait' || node.notification == null) continue
+    const inputs: Record<string, InputMapping> = { ...node.notification.inputs }
+    for (const [handle, mapping] of Object.entries(inputs)) {
+      if (mapping.kind != 'sources') continue
+      const sources = mapping.sources.filter((source) => source.kind != 'node' || source.nodeId != nodeId || outputs.has(source.output))
+      if (sources.length == mapping.sources.length) continue
+      if (sources.length == 0) delete inputs[handle]
+      else inputs[handle] = { kind: 'sources', sources }
+    }
+    if (dequal(inputs, node.notification.inputs)) continue
+    changes.push({
+      before: { actions: node.actions, notification: node.notification, prompt: node.prompt },
+      kind: 'graph.node.wait.set',
+      nodeId: currentNodeId,
+      target,
+      value: { actions: node.actions, notification: { ...node.notification, inputs }, prompt: node.prompt },
+    })
   }
-  if (changes.length == 0) return
+  if (changes.length == 0) return []
   const cleaned = cleanVariableBindings(revision.revision.content, changes)
   return cleanTask(revision, cleaned, current.notification?.taskId == settings.notification?.taskId ? undefined : current.notification?.taskId)
 }

@@ -12,6 +12,7 @@ import {
   setInputVariable,
   setWaitNotification,
   updateCodeTaskPorts,
+  updateCondition,
   updateTaskAdditionalInputs,
   updateWait,
 } from './flowChanges.ts'
@@ -202,6 +203,34 @@ describe('Managed task additional input changes', () => {
   })
 })
 
+describe('Condition changes', () => {
+  it('does not emit a change when an optional default output remains absent', () => {
+    const current = applyFlowChanges(draft('export default () => ({})\n'), [
+      {
+        kind: 'graph.node.create',
+        node: {
+          cases: [{ expressions: [{ input: 'value', operator: 'isTrue' }], output: 'true', relation: 'all' }],
+          concurrency: 1,
+          input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+          inputs: { value: { kind: 'value', value: null } },
+          kind: 'condition',
+        },
+        nodeId: 'condition',
+        target: { kind: 'flow' },
+      },
+    ])
+    const condition = current.content.document.graph.nodes.condition
+    if (condition?.kind != 'condition') throw new Error('Expected Condition fixture.')
+
+    expect(
+      updateCondition(revisionView(current), { kind: 'flow' }, 'condition', {
+        cases: condition.cases,
+        input: condition.input,
+      }),
+    ).toEqual([])
+  })
+})
+
 describe('Wait changes', () => {
   it('creates Wait only in the root graph and removes edges for actions that no longer exist', () => {
     const current = draft('export default (input) => ({ result: input.value })\n')
@@ -219,6 +248,33 @@ describe('Wait changes', () => {
         target: { kind: 'flow' },
         value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'continue' }] },
       },
+      {
+        kind: 'graph.node.create',
+        node: {
+          actions: ['continue'],
+          concurrency: 1,
+          input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+          inputs: { value: { kind: 'value', value: null } },
+          kind: 'wait',
+          notification: {
+            inputs: {
+              message: {
+                kind: 'sources',
+                sources: [
+                  { kind: 'node', nodeId: 'wait', output: 'continue' },
+                  { kind: 'node', nodeId: 'task', output: 'result' },
+                ],
+              },
+              title: { kind: 'value', value: 'Review' },
+            },
+            messageHandle: 'message',
+            taskId: 'notify',
+          },
+          prompt: 'Review?',
+        },
+        nodeId: 'review',
+        target: { kind: 'flow' },
+      },
     ])
 
     const updated = updateWait(revisionView(changed), { kind: 'flow' }, 'wait', {
@@ -232,6 +288,14 @@ describe('Wait changes', () => {
 
     expect(changed.content.document.graph.nodes.wait).toMatchObject({ actions: ['approve', 'reject'], name: 'Approval', prompt: 'Approve this request?' })
     expect(changed.content.document.graph.nodes.task).toMatchObject({ inputs: {} })
+    expect(changed.content.document.graph.nodes.review).toMatchObject({
+      notification: {
+        inputs: {
+          message: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'task', output: 'result' }] },
+          title: { kind: 'value', value: 'Review' },
+        },
+      },
+    })
     expect(addNode(revisionView(changed), { id: 'child', kind: 'subflow' }, 'nested-wait', { kind: 'wait', name: 'Wait' }, () => 'unused')).toBeUndefined()
   })
 
@@ -285,7 +349,7 @@ describe('Wait changes', () => {
         notification: changed.content.document.graph.nodes.wait?.kind == 'wait' ? changed.content.document.graph.nodes.wait.notification : undefined,
         prompt: 'Continue?',
       }),
-    ).toBeUndefined()
+    ).toEqual([])
 
     const removed = updateWait(revisionView(changed), { kind: 'flow' }, 'wait', {
       actions: ['continue'],
