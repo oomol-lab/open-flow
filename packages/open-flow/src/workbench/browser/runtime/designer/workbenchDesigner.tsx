@@ -10,7 +10,7 @@ import type {
   FlowDesignerViewTriggerSchedule,
   FlowDesignerViewValue,
   FlowDesignerViewWebhook,
-} from '../../../../designer/browser/graph/FlowDesigner/FlowDesignerView.tsx'
+} from '../../../../designer/browser/graph/FlowDesigner/model.ts'
 import type { CreateSchemaEditorFn } from '../../../../designer/browser/services/designerService.ts'
 import type { FlowDisplayMode } from '../../../../designer/common/flowDisplay.ts'
 import type { GroupDividerDef } from '../../../../schema/index.ts'

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import type { FlowDesignerViewInput, FlowDesignerViewOutput } from '../../../designer/browser/graph/FlowDesigner/FlowDesignerView.tsx'
+import type { FlowDesignerViewInput, FlowDesignerViewOutput } from '../../../designer/browser/graph/FlowDesigner/model.ts'
 import type { GroupDividerDef } from '../../../schema/index.ts'
 import type { InputPort, JsonValue } from './api.ts'
 import type { WorkbenchLocation, WorkbenchTheme } from './contract.ts'

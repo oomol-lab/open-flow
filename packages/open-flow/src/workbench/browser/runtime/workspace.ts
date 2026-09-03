@@ -8,7 +8,7 @@ import type {
   FlowDesignerViewOutput,
   FlowDesignerViewTriggerField,
   FlowDesignerViewTriggerNode,
-} from '../../../designer/browser/graph/FlowDesigner/FlowDesignerView.tsx'
+} from '../../../designer/browser/graph/FlowDesigner/model.ts'
 import type { FlowDisplayMode } from '../../../designer/common/flowDisplay.ts'
 import type {
   ConnectorAction,

@@ -7,7 +7,7 @@ import type {
   FlowDesignerViewProps,
   FlowDesignerViewTaskNode,
   FlowDesignerViewValueNode,
-} from './FlowDesignerView.tsx'
+} from './model.ts'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConditionsSectionStore } from '../../stores/node/nodeSection/conditionsSection.store.ts'
