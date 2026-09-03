@@ -162,18 +162,25 @@ function savedLayout(
   return record(record(targetPresentation(value, target)?.layouts)?.[displayMode])
 }
 
-function savedPosition(
+function savedPositions(
   value: Readonly<Record<string, JsonValue>>,
   target: DesignerTarget,
-  nodeId: string,
-  displayMode: FlowDisplayMode = 'detail',
-): Point | undefined {
-  const savedNodes = record(savedLayout(value, target, displayMode)?.nodes)
-  const legacyNodes = displayMode == 'detail' ? record(targetPresentation(value, target)?.nodes) : undefined
-  const position = record(savedNodes?.[nodeId] ?? legacyNodes?.[nodeId])
-  const x = finite(position?.x)
-  const y = finite(position?.y)
-  return x == null || y == null ? undefined : { x, y }
+): Readonly<Record<string, { readonly x: number; readonly y: number }>> {
+  const current = targetPresentation(value, target)
+  const layouts = record(current?.layouts)
+  const nodes = {
+    ...record(record(layouts?.overview)?.nodes),
+    ...record(current?.nodes),
+    ...record(record(layouts?.detail)?.nodes),
+  }
+  return Object.fromEntries(
+    Object.entries(nodes).flatMap(([nodeId, candidate]) => {
+      const position = record(candidate)
+      const x = finite(position?.x)
+      const y = finite(position?.y)
+      return x == null || y == null ? [] : [[nodeId, { x, y }]]
+    }),
+  )
 }
 
 function optionalViewport(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget, displayMode: FlowDisplayMode): DesignerViewport | undefined {
@@ -189,60 +196,30 @@ function savedViewport(value: Readonly<Record<string, JsonValue>>, target: Desig
   return optionalViewport(value, target, displayMode) ?? { x: 0, y: 0, zoom: 1 }
 }
 
-function savedLayouts(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): DesignerGraph['layouts'] {
-  const layouts = Object.fromEntries(
+function savedLayouts(
+  value: Readonly<Record<string, JsonValue>>,
+  target: DesignerTarget,
+): Readonly<Record<string, { readonly viewport: { readonly x: number; readonly y: number; readonly zoom: number } }>> {
+  return Object.fromEntries(
     FLOW_DISPLAY_MODES.flatMap((displayMode) => {
-      const source = savedLayout(value, target, displayMode)
-      const nodes = record(source?.nodes)
-      const positions = Object.fromEntries(
-        Object.entries(nodes ?? {}).flatMap(([nodeId, candidate]) => {
-          const position = record(candidate)
-          const x = finite(position?.x)
-          const y = finite(position?.y)
-          return x == null || y == null ? [] : [[nodeId, { x, y }]]
-        }),
-      )
-      const viewport = record(source?.viewport)
-      const x = finite(viewport?.x)
-      const y = finite(viewport?.y)
-      const zoom = finite(viewport?.zoom)
-      if (Object.keys(positions).length == 0 && (x == null || y == null || zoom == null || zoom <= 0)) return []
-      return [
-        [
-          displayMode,
-          {
-            nodes: Object.keys(positions).length == 0 ? undefined : positions,
-            viewport: x == null || y == null || zoom == null || zoom <= 0 ? undefined : { x, y, zoom },
-          },
-        ],
-      ]
+      const viewport = optionalViewport(value, target, displayMode)
+      return viewport == null ? [] : [[displayMode, { viewport: { x: viewport.x, y: viewport.y, zoom: viewport.zoom } }]]
     }),
   )
-  const detail = layouts.detail
-  if (detail == null) {
-    const legacyNodes = record(targetPresentation(value, target)?.nodes)
-    const nodes = Object.fromEntries(
-      Object.entries(legacyNodes ?? {}).flatMap(([nodeId, candidate]) => {
-        const position = record(candidate)
-        const x = finite(position?.x)
-        const y = finite(position?.y)
-        return x == null || y == null ? [] : [[nodeId, { x, y }]]
-      }),
-    )
-    const viewport = optionalViewport(value, target, 'detail')
-    if (Object.keys(nodes).length > 0 || viewport != null) layouts.detail = { nodes: Object.keys(nodes).length == 0 ? undefined : nodes, viewport }
-  }
-  return layouts
 }
 
-function savedComments(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): Readonly<Record<string, DesignerComment>> {
+function savedComments(
+  value: Readonly<Record<string, JsonValue>>,
+  target: DesignerTarget,
+  positions: Readonly<Record<string, Point>>,
+): Readonly<Record<string, DesignerComment>> {
   const comments = record(targetPresentation(value, target)?.comments) ?? {}
   return Object.fromEntries(
     Object.entries(comments).flatMap(([nodeId, candidate]) => {
       const comment = record(candidate)
       const title = typeof comment?.title == 'string' ? comment.title : undefined
       const content = typeof comment?.content == 'string' ? comment.content : undefined
-      return title == null || content == null ? [] : [[nodeId, { content, position: savedPosition(value, target, nodeId) ?? { x: 80, y: 80 }, title }]]
+      return title == null || content == null ? [] : [[nodeId, { content, position: positions[nodeId] ?? { x: 80, y: 80 }, title }]]
     }),
   )
 }
@@ -819,6 +796,7 @@ export function designerGraph(
   const ports = new Map([...definitions].map(([nodeId, node]) => [nodeId, nodePorts(node)]))
   const edgeProjection = projectEdges(entries, nodeIds, ports)
   const layout = layoutNodes(nodeIds, edgeProjection.dependencies, edgeProjection.dependents)
+  const positions = savedPositions(presentation, target)
   const context: NodeProjectionContext = {
     connectionCatalogs,
     connectorActions,
@@ -835,7 +813,7 @@ export function designerGraph(
     const column = layout.depth.get(nodeId) ?? 0
     const row = rows.get(column) ?? 0
     rows.set(column, row + 1)
-    const position = savedPosition(presentation, target, nodeId) ?? { x: 80 + column * 500, y: 80 + row * 240 }
+    const position = positions[nodeId] ?? { x: 80 + column * 500, y: 80 + row * 240 }
     const resolved = definitions.get(nodeId)!
     if (resolved.kind == 'trigger') {
       nodes.push(triggerDesignerNode(nodeId, resolved.trigger, position, diagnostics))
@@ -843,7 +821,7 @@ export function designerGraph(
     }
     nodes.push(semanticDesignerNode(nodeId, resolved, ports.get(nodeId)!, position, context))
   }
-  for (const [nodeId, comment] of Object.entries(savedComments(presentation, target)).toSorted(([left], [right]) => left.localeCompare(right))) {
+  for (const [nodeId, comment] of Object.entries(savedComments(presentation, target, positions)).toSorted(([left], [right]) => left.localeCompare(right))) {
     nodes.push({ ...comment, id: nodeId, kind: 'comment' })
   }
   return {
@@ -877,6 +855,16 @@ function replacePresentationTarget(
   return { ...designer, subflows: { ...subflows, [target.id]: value }, version: 1 }
 }
 
+function normalizedTarget(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): Record<string, JsonValue> {
+  const normalized: Record<string, JsonValue> = {
+    ...targetPresentation(value, target),
+    layouts: savedLayouts(value, target),
+    nodes: savedPositions(value, target),
+  }
+  delete normalized.viewport
+  return normalized
+}
+
 export function setNodePosition(
   value: Readonly<Record<string, JsonValue>>,
   target: DesignerTarget,
@@ -890,20 +878,17 @@ export function setNodePositions(
   value: Readonly<Record<string, JsonValue>>,
   target: DesignerTarget,
   positions: Readonly<Record<string, Point>>,
-  displayMode: FlowDisplayMode = 'detail',
 ): Readonly<Record<string, JsonValue>> {
   const designer = designerPresentation(value)
-  const current = presentationTarget(designer, target) ?? {}
-  const layouts = record(current.layouts) ?? {}
-  const layout = record(layouts[displayMode]) ?? {}
-  const nodes = record(layout.nodes) ?? {}
+  const current = normalizedTarget(value, target)
+  const nodes = record(current.nodes) ?? {}
   const nextNodes: Record<string, JsonValue> = {
     ...nodes,
     ...Object.fromEntries(Object.entries(positions).map(([nodeId, position]) => [nodeId, { x: position.x, y: position.y }])),
   }
   return {
     ...value,
-    designer: replacePresentationTarget(designer, target, { ...current, layouts: { ...layouts, [displayMode]: { ...layout, nodes: nextNodes } } }),
+    designer: replacePresentationTarget(designer, target, { ...current, nodes: nextNodes }),
   }
 }
 
@@ -932,7 +917,7 @@ export function removeComments(
   nodeIds: ReadonlySet<string>,
 ): Readonly<Record<string, JsonValue>> {
   const designer = designerPresentation(value)
-  const current = presentationTarget(designer, target) ?? {}
+  const current = normalizedTarget(value, target)
   const comments = { ...record(current.comments) }
   const nodes = { ...record(current.nodes) }
   for (const nodeId of nodeIds) {
@@ -958,7 +943,7 @@ export function setFlowViewport(
   const currentViewport = optionalViewport(value, target, displayMode)
   if (currentViewport?.x == viewport.x && currentViewport.y == viewport.y && currentViewport.zoom == viewport.zoom) return value
   const designer = designerPresentation(value)
-  const current = presentationTarget(designer, target) ?? {}
+  const current = normalizedTarget(value, target)
   const layouts = record(current.layouts) ?? {}
   const layout = record(layouts[displayMode]) ?? {}
   return {

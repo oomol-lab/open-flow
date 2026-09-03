@@ -718,10 +718,10 @@ export class WorkspaceStore {
     return changed != null
   }
 
-  public async moveNodes(positions: Readonly<Record<string, Point>>, displayMode: FlowDisplayMode = 'detail'): Promise<void> {
+  public async moveNodes(positions: Readonly<Record<string, Point>>): Promise<void> {
     const target = this.#model.value.target
     if (target == null) return
-    await this.#changePresentation((value) => setNodePositions(value, target, positions, displayMode))
+    await this.#changePresentation((value) => setNodePositions(value, target, positions))
   }
 
   public async moveViewport(viewport: DesignerViewport, displayMode: FlowDisplayMode = 'detail'): Promise<void> {

@@ -739,7 +739,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             displayMode$={props.displayMode$}
             interactiveMode$={props.interactiveMode$}
             onBeforeFitView={onBeforeFitView}
-            onRelayout={props.onRelayout}
+            onRelayout={overview ? undefined : props.onRelayout}
             onFitView={props.onFitView}
             dottedBackground={props.dottedBackground}
           />

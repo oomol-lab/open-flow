@@ -66,7 +66,7 @@ interface Props {
   readonly onDeleteEdge: (edge: DesignerEdge) => void
   readonly onDeleteNodes: () => void
   readonly onDuplicate: (positions?: Readonly<Record<string, Point>>) => void
-  readonly onMoveNodes: (positions: Readonly<Record<string, Point>>, displayMode: FlowDisplayMode) => void
+  readonly onMoveNodes: (positions: Readonly<Record<string, Point>>) => void
   readonly onMoveViewport: (viewport: DesignerViewport, displayMode: FlowDisplayMode) => void
   readonly onOpenBlocks: (opener?: HTMLButtonElement) => void
   readonly onOpenInspector: () => void

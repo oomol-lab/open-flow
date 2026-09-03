@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { providerIcon } from './providerIcon.ts'
-import { designerGraph, setFlowViewport, setNodePositions } from './workspace.ts'
+import { designerGraph, setComment, setFlowViewport, setNodePositions } from './workspace.ts'
 
 describe('Designer port projection', () => {
   it('preserves revision port order', () => {
@@ -295,28 +295,99 @@ describe('Designer port projection', () => {
 })
 
 describe('Designer presentation layouts', () => {
-  it('stores positions independently for each display mode', () => {
+  it('stores one shared position for all display modes', () => {
     const target = { kind: 'flow' } as const
-    const detail = setNodePositions({}, target, { task: { x: 10, y: 20 } }, 'detail')
-    const overview = setNodePositions(detail, target, { task: { x: 30, y: 40 } }, 'overview')
+    const first = setNodePositions({}, target, { task: { x: 10, y: 20 } })
+    const moved = setNodePositions(first, target, { task: { x: 30, y: 40 }, added: { x: 50, y: 60 } })
 
-    expect(overview).toMatchObject({
+    expect(moved).toMatchObject({
+      designer: {
+        flow: {
+          layouts: {},
+          nodes: { added: { x: 50, y: 60 }, task: { x: 30, y: 40 } },
+        },
+      },
+    })
+  })
+
+  it('migrates old positions to shared nodes with detail taking precedence', () => {
+    const value = {
       designer: {
         flow: {
           layouts: {
-            detail: { nodes: { task: { x: 10, y: 20 } } },
-            overview: { nodes: { task: { x: 30, y: 40 } } },
+            detail: {
+              nodes: { detailOnly: { x: 50, y: 60 }, task: { x: 30, y: 40 } },
+              viewport: { x: 10, y: 20, zoom: 0.8 },
+            },
+            overview: {
+              nodes: { overviewOnly: { x: 70, y: 80 }, sharedOnly: { x: 1, y: 2 }, task: { x: 10, y: 20 } },
+              viewport: { x: 30, y: 40, zoom: 1.2 },
+            },
+          },
+          nodes: { sharedOnly: { x: 3, y: 4 }, task: { x: 20, y: 30 } },
+          viewport: { x: 1, y: 2, zoom: 0.5 },
+        },
+        version: 1,
+      },
+    }
+
+    const migrated = setNodePositions(value, { kind: 'flow' }, { moved: { x: 90, y: 100 } })
+
+    expect(migrated).toEqual({
+      designer: {
+        flow: {
+          layouts: {
+            detail: { viewport: { x: 10, y: 20, zoom: 0.8 } },
+            overview: { viewport: { x: 30, y: 40, zoom: 1.2 } },
+          },
+          nodes: {
+            detailOnly: { x: 50, y: 60 },
+            moved: { x: 90, y: 100 },
+            overviewOnly: { x: 70, y: 80 },
+            sharedOnly: { x: 3, y: 4 },
+            task: { x: 30, y: 40 },
+          },
+        },
+        version: 1,
+      },
+    })
+  })
+
+  it('stores shared comment and subflow positions', () => {
+    const target = { id: 'child', kind: 'subflow' } as const
+    const positioned = setComment({}, target, 'note', {
+      content: 'Body',
+      position: { x: 15, y: 25 },
+      title: 'Note',
+    })
+    const moved = setNodePositions(positioned, target, { task: { x: 35, y: 45 } })
+
+    expect(moved).toMatchObject({
+      designer: {
+        subflows: {
+          child: {
+            comments: { note: { content: 'Body', title: 'Note' } },
+            layouts: {},
+            nodes: { note: { x: 15, y: 25 }, task: { x: 35, y: 45 } },
           },
         },
       },
     })
   })
 
-  it('persists a default-looking viewport when its display mode has no saved viewport', () => {
-    const value = setFlowViewport({}, { kind: 'flow' }, { x: 0, y: 0, zoom: 1 }, 'overview')
+  it('persists independent viewports for each display mode', () => {
+    const overview = setFlowViewport({}, { kind: 'flow' }, { x: 0, y: 0, zoom: 1 }, 'overview')
+    const value = setFlowViewport(overview, { kind: 'flow' }, { x: 10, y: 20, zoom: 0.8 }, 'detail')
 
     expect(value).toMatchObject({
-      designer: { flow: { layouts: { overview: { viewport: { x: 0, y: 0, zoom: 1 } } } } },
+      designer: {
+        flow: {
+          layouts: {
+            detail: { viewport: { x: 10, y: 20, zoom: 0.8 } },
+            overview: { viewport: { x: 0, y: 0, zoom: 1 } },
+          },
+        },
+      },
     })
   })
 })

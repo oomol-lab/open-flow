@@ -376,7 +376,7 @@ export interface FlowDesignerViewProps {
   readonly onDeleteNodes: (nodeIds: readonly string[]) => void
   readonly onDisconnect: (edge: FlowDesignerViewEdge) => void
   readonly onDuplicate: (nodeIds: readonly string[], offset?: FlowDesignerViewPosition, positions?: Readonly<Record<string, FlowDesignerViewPosition>>) => void
-  readonly onMoveNodes: (positions: Readonly<Record<string, FlowDesignerViewPosition>>, displayMode: FlowDisplayMode) => void
+  readonly onMoveNodes: (positions: Readonly<Record<string, FlowDesignerViewPosition>>) => void
   readonly onMoveViewport: (viewport: FlowDesignerViewViewport, displayMode: FlowDisplayMode) => void
   readonly onPaste: (position: FlowDesignerViewPosition) => void
   readonly onSelectionChange: (nodeIds: readonly string[], edge: FlowDesignerViewEdge | undefined) => void
@@ -530,8 +530,6 @@ class FlowDesignerViewAdapter {
     this.#callbacks = callbacks
     this.#createSchemaEditor = createSchemaEditor
     this.#language = val(language)
-    const initialDisplayMode = model.layouts?.overview == null ? 'detail' : 'overview'
-
     const nodes = reactiveMap<NodeId, NodeStore>(null, { onDeleted: dispose })
     const commentNodes = reactiveMap<NodeId, CommentNodeStore>(null, {
       onDeleted: dispose,
@@ -549,7 +547,7 @@ class FlowDesignerViewAdapter {
     })
     this.store = new FlowDesignerStore({
       readonly: !editable,
-      displayMode: val<FlowDisplayMode>(initialDisplayMode),
+      displayMode: val<FlowDisplayMode>('overview'),
       lang$: this.#language,
       rfCommand: createRFCommand(nodes),
       designerUIStore,
@@ -641,8 +639,8 @@ class FlowDesignerViewAdapter {
     this.store.dispose.add(commentNodes)
     this.store.dispose.add(this.#language)
     this.#syncModel(model)
-    designerUIStore.loadDesignerUIData({ layouts: model.layouts }, initialDisplayMode)
-    if (initialDisplayMode == 'detail') this.store.switchDisplayMode('overview')
+    designerUIStore.loadDesignerUIData({ layouts: model.layouts }, 'overview')
+    designerUIStore.completeActiveLayout()
   }
 
   #cancelPendingDisconnects(): void {
@@ -1516,7 +1514,6 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
             return store == null ? [] : [[store.nodeId, item.position]]
           }),
         ),
-        adapter.store.$.displayMode.value,
       )
     },
     [adapter],

@@ -299,7 +299,7 @@ function Editor({
         onDeleteEdge={(edge) => void store.workspace.disconnect(edge)}
         onDeleteNodes={() => void store.workspace.deleteSelectedNodes()}
         onDuplicate={(positions) => void store.workspace.duplicateSelectedNodes(positions)}
-        onMoveNodes={(positions, displayMode) => void store.workspace.moveNodes(positions, displayMode)}
+        onMoveNodes={(positions) => void store.workspace.moveNodes(positions)}
         onMoveViewport={(viewport, displayMode) => void store.workspace.moveViewport(viewport, displayMode)}
         onOpenBlocks={openBlocks}
         onOpenInspector={openInspector}

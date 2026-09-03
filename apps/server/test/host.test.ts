@@ -63,7 +63,7 @@ it('uses a signed operator session, expires it on time or token rotation, and cl
     expect(login.status).toBe(200)
     const setCookie = login.headers.get('set-cookie')!
     expect(setCookie).toContain('HttpOnly')
-    expect(setCookie).toContain('Max-Age=43200')
+    expect(setCookie).toContain('Max-Age=2592000')
     expect(setCookie).toContain('SameSite=Strict')
     expect(setCookie).not.toContain('Secure')
     expect(setCookie).not.toContain(token)
@@ -104,7 +104,7 @@ it('uses a signed operator session, expires it on time or token rotation, and cl
       version: 1,
     })
 
-    now += 12 * 60 * 60 * 1_000 + 1
+    now += 30 * 24 * 60 * 60 * 1_000 + 1
     expect((await app.request('/v1/flows', { headers: { cookie } })).status).toBe(401)
 
     now = Date.UTC(2026, 7, 22)

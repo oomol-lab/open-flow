@@ -180,7 +180,7 @@ describe('DesignerStore graph projection', () => {
 })
 
 describe('DesignerStore display mode', () => {
-  it('keeps comment positions independent across layouts', () => {
+  it('shares comment positions across display modes', () => {
     const nodes = reactiveMap<NodeId, NodeStore>()
     const comments = reactiveMap<NodeId, CommentNodeStore>()
     const viewport = val<{ x: number; y: number; zoom: number } | undefined>()
@@ -198,9 +198,9 @@ describe('DesignerStore display mode', () => {
     note.$$.position.set({ x: 100, y: 200 })
     ui.switchDisplayMode('overview', 'detail')
 
-    expect(note.$.position.value).toEqual({ x: 10, y: 20 })
-    expect(ui.toUIData()?.layouts?.detail?.commentNodes).toEqual({ note: { x: 10, y: 20 } })
-    expect(ui.toUIData()?.layouts?.overview?.commentNodes).toEqual({ note: { x: 100, y: 200 } })
+    expect(note.$.position.value).toEqual({ x: 100, y: 200 })
+    expect(ui.toUIData()?.commentNodes?.['note' as NodeId]?.rfNode?.position).toEqual({ x: 100, y: 200 })
+    expect(ui.toUIData()?.layouts).toBeUndefined()
     note.dispose()
     ui.dispose()
   })
@@ -219,7 +219,7 @@ describe('DesignerStore display mode', () => {
     setup.dispose()
   })
 
-  it('keeps independent positions and viewports for overview and detail layouts', async () => {
+  it('shares positions and keeps independent viewports across display modes', async () => {
     const setup = createTestSetup()
     setup.store.designerUIStore.loadDesignerUIData(
       {
@@ -227,7 +227,10 @@ describe('DesignerStore display mode', () => {
           first: { rfNode: { position: { x: 0, y: 0 } } },
           second: { rfNode: { position: { x: 150, y: 0 } } },
         },
-        viewport: { x: 10, y: 20, zoom: 0.8 },
+        layouts: {
+          detail: { viewport: { x: 10, y: 20, zoom: 0.8 } },
+          overview: { viewport: { x: 30, y: 40, zoom: 1.2 } },
+        },
       },
       'detail',
     )
@@ -241,37 +244,23 @@ describe('DesignerStore display mode', () => {
 
     setup.store.$$.displayMode.set('overview')
     await new Promise((resolve) => setTimeout(resolve, 0))
-    first.$$.rfNode.set({ ...first.$.rfNode.value, measured: { width: 200, height: 80 } })
-    second.$$.rfNode.set({ ...second.$.rfNode.value, measured: { width: 200, height: 80 } })
-    expect(setup.store.completeDisplayModeLayout()).toBe('relayout')
-
     first.$$.position.set({ x: 40, y: 50 })
     second.$$.position.set({ x: 300, y: 50 })
-    setup.store.$$.viewport.set({ x: 30, y: 40, zoom: 1.2 })
+    setup.store.$$.viewport.set({ x: 50, y: 60, zoom: 1.4 })
     await new Promise((resolve) => setTimeout(resolve, 0))
     setup.store.$$.displayMode.set('detail')
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(first.$.position.value).toEqual({ x: 0, y: 0 })
-    expect(second.$.position.value).toEqual({ x: 150, y: 0 })
+    expect(first.$.position.value).toEqual({ x: 40, y: 50 })
+    expect(second.$.position.value).toEqual({ x: 300, y: 50 })
     expect(setup.store.$.viewport.value).toEqual({ x: 10, y: 20, zoom: 0.8 })
+    expect(setup.store.designerUIStore.toUIData()?.nodes).toMatchObject({
+      first: { rfNode: { position: { x: 40, y: 50 } } },
+      second: { rfNode: { position: { x: 300, y: 50 } } },
+    })
     expect(setup.store.designerUIStore.toUIData()?.layouts).toEqual({
-      detail: {
-        nodes: {
-          first: { x: 0, y: 0 },
-          second: { x: 150, y: 0 },
-        },
-        pseudoNodes: undefined,
-        viewport: { x: 10, y: 20, zoom: 0.8 },
-      },
-      overview: {
-        nodes: {
-          first: { x: 40, y: 50 },
-          second: { x: 300, y: 50 },
-        },
-        pseudoNodes: undefined,
-        viewport: { x: 30, y: 40, zoom: 1.2 },
-      },
+      detail: { viewport: { x: 10, y: 20, zoom: 0.8 } },
+      overview: { viewport: { x: 50, y: 60, zoom: 1.4 } },
     })
     setup.dispose()
   })
@@ -289,9 +278,9 @@ describe('DesignerStore display mode', () => {
     expect(setup.store.completeDisplayModeLayout()).toBe('relayout')
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(first.$.position.value).not.toEqual(second.$.position.value)
-    expect(setup.store.designerUIStore.toUIData()?.layouts?.detail?.nodes).toEqual({
-      first: first.$.position.value,
-      second: second.$.position.value,
+    expect(setup.store.designerUIStore.toUIData()?.nodes).toMatchObject({
+      first: { rfNode: { position: first.$.position.value } },
+      second: { rfNode: { position: second.$.position.value } },
     })
     setup.dispose()
   })
@@ -310,7 +299,7 @@ describe('DesignerStore display mode', () => {
     setup.dispose()
   })
 
-  it('keeps an initialized target layout when it inherits a newly added node', async () => {
+  it('keeps a newly added node in place across display modes', async () => {
     const setup = createTestSetup()
     setup.store.designerUIStore.loadDesignerUIData(
       {
@@ -318,16 +307,8 @@ describe('DesignerStore display mode', () => {
           first: { rfNode: { position: { x: 100, y: 200 } } },
         },
         layouts: {
-          overview: {
-            nodes: {
-              first: { x: 10, y: 20 },
-            },
-          },
-          detail: {
-            nodes: {
-              first: { x: 100, y: 200 },
-            },
-          },
+          overview: { viewport: { x: 30, y: 40, zoom: 1.2 } },
+          detail: { viewport: { x: 10, y: 20, zoom: 0.8 } },
         },
       },
       'detail',

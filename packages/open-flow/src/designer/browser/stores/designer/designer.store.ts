@@ -476,10 +476,7 @@ export class DesignerStore {
     }
   }
 
-  /**
-   * Initializes a missing display-mode layout after React Flow has measured the
-   * target node rendering. Returns "relayout" when the viewport should fit it.
-   */
+  /** Initializes the shared layout after React Flow has measured the nodes. */
   public completeDisplayModeLayout = (): boolean | 'relayout' => {
     const pending = this.pendingDisplayModeLayout
     const currentMode = this.$.displayMode.value

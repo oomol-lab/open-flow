@@ -1,4 +1,4 @@
-import type { HandleName, NodeId } from '../../../../schema/index.ts'
+import type { HandleName } from '../../../../schema/index.ts'
 import type { FlowDesignerProps } from './FlowDesigner.tsx'
 import type {
   FlowDesignerViewCommentNode,
@@ -1101,7 +1101,7 @@ describe('FlowDesignerView model synchronization', () => {
 
     expect(store.$.renderedRFGraph.value).toBe(graph)
     expect(store.$.viewport.value).toBe(currentViewport)
-    expect(onMoveNodes).toHaveBeenCalledOnce()
+    expect(onMoveNodes).toHaveBeenCalledExactlyOnceWith({ target: position })
     expect(onMoveViewport).toHaveBeenCalledOnce()
     expect(onSelectionChange).toHaveBeenCalledOnce()
     store.dispose()
@@ -1214,17 +1214,13 @@ describe('FlowDesignerView model synchronization', () => {
     view.props.flowDesignerStore.dispose()
   })
 
-  it('restores the saved overview layout when the Flow view opens', () => {
+  it('restores the saved overview viewport without replacing shared positions', () => {
     const value: FlowDesignerViewModel = {
       layouts: {
         detail: {
-          commentNodes: { ['comment' as NodeId]: { x: 700, y: 500 } },
-          nodes: { ['target' as NodeId]: { x: 900, y: 700 } },
           viewport: { x: -800, y: -600, zoom: 0.6 },
         },
         overview: {
-          commentNodes: { ['comment' as NodeId]: { x: 60, y: 80 } },
-          nodes: { ['target' as NodeId]: { x: 200, y: 120 } },
           viewport: { x: 30, y: 40, zoom: 1.2 },
         },
       },
@@ -1237,8 +1233,8 @@ describe('FlowDesignerView model synchronization', () => {
     const comment = [...(store.$.commentNodes?.values() ?? [])][0]
     if (comment == null) throw new Error('Expected a Comment node.')
 
-    expect([...store.$.nodes.values()][0]?.$.position.value).toEqual({ x: 200, y: 120 })
-    expect(comment.$.position.value).toEqual({ x: 60, y: 80 })
+    expect([...store.$.nodes.values()][0]?.$.position.value).toEqual({ x: 200, y: 0 })
+    expect(comment.$.position.value).toEqual({ x: 0, y: 100 })
     expect(store.$.viewport.value).toEqual({ x: 30, y: 40, zoom: 1.2 })
     store.dispose()
   })
@@ -1266,7 +1262,7 @@ describe('FlowDesignerView model synchronization', () => {
     const view = FlowDesignerView(props(value)) as React.ReactElement<FlowDesignerProps>
     const store = view.props.flowDesignerStore
 
-    expect(store.completeDisplayModeLayout()).toBe(false)
+    expect(store.completeDisplayModeLayout()).toBe(true)
     await new Promise((resolve) => setTimeout(resolve, 0))
     store.$$.viewport.set({ x: 30, y: 40, zoom: 1.2 })
     store.$$.displayMode.set('detail')
