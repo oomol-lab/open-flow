@@ -34,6 +34,43 @@ const draft = {
 } as const
 
 describe('WorkspaceStore', () => {
+  it('keeps the loaded Flow catalog visible while a notification refreshes it', async () => {
+    const refreshed = Promise.withResolvers<Response>()
+    const refreshRequested = Promise.withResolvers<void>()
+    let catalogListener: (() => void) | undefined
+    let flowLists = 0
+    const request = vi.fn(async (path: string) => {
+      if (path != '/v1/flows?limit=50&includeTotal=true') throw new Error(`Unexpected request: ${path}`)
+      flowLists += 1
+      if (flowLists == 1) return Response.json({ flows: [flow], total: 1, version: 1 })
+      refreshRequested.resolve()
+      return await refreshed.promise
+    })
+    const client = new WorkbenchClient(
+      request,
+      () => () => {},
+      (listener) => {
+        catalogListener = listener
+        return () => {}
+      },
+    )
+    const store = new WorkspaceStore(client, vi.fn())
+
+    try {
+      await store.start()
+      catalogListener?.()
+      await refreshRequested.promise
+
+      expect(store.$.flowLoading.value).toBe(false)
+      expect(store.$.flows.value).toEqual([flow])
+
+      refreshed.resolve(Response.json({ flows: [], total: 0, version: 1 }))
+      await vi.waitFor(() => expect(store.$.flows.value).toEqual([]))
+    } finally {
+      store.dispose()
+    }
+  })
+
   it('creates and connects a code task with the source port schema in one Draft change', async () => {
     const sourceDraft = {
       ...draft,

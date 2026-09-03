@@ -85,16 +85,20 @@ export class FlowCatalog {
 
   public async reload(): Promise<void> {
     const current = this.#session.begin()
-    this.#set({
-      failed: false,
-      loaded: false,
-      loading: true,
-      loadingMore: false,
-      loadMoreFailed: false,
-      nextCursor: undefined,
-      flows: [],
-      total: undefined,
-    })
+    const loaded = this.#state.value.loaded
+    if (loaded) {
+      this.#set({ failed: false, loadingMore: false, loadMoreFailed: false })
+    } else {
+      this.#set({
+        failed: false,
+        loading: true,
+        loadingMore: false,
+        loadMoreFailed: false,
+        nextCursor: undefined,
+        flows: [],
+        total: undefined,
+      })
+    }
     try {
       const page = await this.#client.listFlows({ includeTotal: true, limit: pageLimit })
       if (!current()) return
@@ -107,7 +111,7 @@ export class FlowCatalog {
       })
     } catch (error) {
       if (!current()) return
-      this.#set({ failed: true, loading: false })
+      this.#set({ failed: !loaded, loading: false })
       this.#setNotice(errorNotice(error, this.#i18n.t))
     }
   }
