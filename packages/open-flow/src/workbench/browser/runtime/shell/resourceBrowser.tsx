@@ -243,6 +243,7 @@ export function FlowBrowser({
   const loading = useVal(store.workspace.$.flowLoading)
   const loadingMore = useVal(store.workspace.$.flowLoadingMore)
   const nextCursor = useVal(store.workspace.$.flowNextCursor)
+  const refreshing = useVal(store.workspace.$.flowRefreshing)
   const flows = useVal(store.workspace.$.flows)
   const total = useVal(store.workspace.$.flowTotal)
   const [creating, setCreating] = useState(false)
@@ -286,13 +287,13 @@ export function FlowBrowser({
               </InputGroup>
               <Button
                 aria-label={t('common.refresh')}
-                disabled={loading || busy != null}
+                disabled={loading || refreshing || busy != null}
                 onClick={() => void store.workspace.reloadFlows()}
                 size="icon"
                 title={t('common.refresh')}
                 variant="outline"
               >
-                <Icon name="refresh" />
+                <Icon className={refreshing ? 'animate-spin' : undefined} name="refresh" />
               </Button>
               <Button className="resource-page-primary-action" disabled={busy != null} onClick={() => setCreating(true)}>
                 <Icon data-icon="inline-start" name="plus" />

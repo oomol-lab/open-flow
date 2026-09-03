@@ -62,10 +62,12 @@ describe('WorkspaceStore', () => {
       await refreshRequested.promise
 
       expect(store.$.flowLoading.value).toBe(false)
+      expect(store.$.flowRefreshing.value).toBe(true)
       expect(store.$.flows.value).toEqual([flow])
 
       refreshed.resolve(Response.json({ flows: [], total: 0, version: 1 }))
       await vi.waitFor(() => expect(store.$.flows.value).toEqual([]))
+      expect(store.$.flowRefreshing.value).toBe(false)
     } finally {
       store.dispose()
     }

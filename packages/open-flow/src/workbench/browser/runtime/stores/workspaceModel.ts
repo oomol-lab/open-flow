@@ -70,6 +70,7 @@ export interface Workspace$ {
   readonly flowLoading: ReadonlyVal<boolean>
   readonly flowLoadingMore: ReadonlyVal<boolean>
   readonly flowNextCursor: ReadonlyVal<string | undefined>
+  readonly flowRefreshing: ReadonlyVal<boolean>
   readonly flowTotal: ReadonlyVal<number | undefined>
   readonly flows: ReadonlyVal<readonly Flow[]>
   readonly inspectorDiagnostics: ReadonlyVal<readonly Diagnostic[]>
@@ -190,6 +191,7 @@ export class WorkspaceModel {
       flowLoading: flows.$.loading,
       flowLoadingMore: flows.$.loadingMore,
       flowNextCursor: flows.$.nextCursor,
+      flowRefreshing: flows.$.refreshing,
       flowTotal: flows.$.total,
       flows: flows.$.flows,
       inspectorDiagnostics: derive(this.#state, (state) =>
