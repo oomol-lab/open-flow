@@ -14,5 +14,6 @@ Open Flow 提供公共产品合同、Workbench runtime、CLI runtime 与完整 S
 ## Server 实施参考
 
 - [Server 容器交付参考](server/container-delivery.md)
+- [Docker 镜像 (GHCR)](server/docker-ghcr/README.zh-CN.md) ([English](server/docker-ghcr/README.md))
 - [Fly.io 部署](server/fly-io/README.zh-CN.md) ([English](server/fly-io/README.md))
 - [用 OpenConnector 和 oo CLI 运行 Open Flow](server/self-hosted-stack/README.zh-CN.md) ([English](server/self-hosted-stack/README.md))

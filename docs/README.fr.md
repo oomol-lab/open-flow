@@ -171,6 +171,10 @@ Ouvrez [http://127.0.0.1:3000](http://127.0.0.1:3000) et connectez-vous avec la 
 `OPEN_FLOW_TOKEN`. La même valeur sert de Bearer token pour les clients machine de la Control API.
 Les Projects et l'historique des Runs sont persistés dans le volume Docker `open-flow-data`.
 
+Pour éviter la construction, téléchargez l'image multi-architecture préconstruite `ghcr.io/oomol-lab/open-flow` ou démarrez-la avec
+le `docker-compose.yml` à la racine du dépôt. Les tags (`latest`, versions de Release, `tip` et hashs de commit) et les étapes de mise
+à niveau sont dans le [guide de l'image Docker](server/docker-ghcr/README.fr.md).
+
 Le Server est utile sans services externes. Les Actions adossées à un Connector, les Triggers de
 Provider et les Tasks LLM échouent de manière sûre (fail closed) tant que la capacité hôte
 correspondante n'est pas configurée ; rien ne bascule vers un service non déclaré.
@@ -276,6 +280,7 @@ Commencez par l'[index de la documentation](README.md). Les références les plu
 - [Distribution du Command Artifact](distribution/command-artifact.md)
 - [Notes sur le frontend du Workbench et du Designer](authoring/frontend-ui.md)
 - [Déploiement du Server](server/container-delivery.md)
+- [Image Docker sur GHCR](server/docker-ghcr/README.fr.md)
 - [Déploiement sur Fly.io](server/fly-io/README.fr.md)
 - [Utiliser Open Flow avec OpenConnector et oo CLI](server/self-hosted-stack/README.fr.md)
 - [Contribuer](../CONTRIBUTING.md)

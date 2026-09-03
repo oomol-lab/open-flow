@@ -170,6 +170,10 @@ docker run --rm \
 `OPEN_FLOW_TOKEN`. То же значение работает как Bearer token для машинных клиентов Control API.
 Project и история Run сохраняются в Docker volume `open-flow-data`.
 
+Чтобы пропустить сборку, загрузите готовый мультиархитектурный образ `ghcr.io/oomol-lab/open-flow` или запустите его через
+`docker-compose.yml` в корне репозитория. Теги (`latest`, версии Release, `tip` и хеши коммитов) и шаги обновления описаны в
+[руководстве по Docker-образу](server/docker-ghcr/README.ru.md).
+
 Server полезен и без внешних сервисов. Action на базе Connector, Trigger от Provider и LLM Task
 отказывают безопасно (fail closed), пока не настроена соответствующая host capability; ничто не
 переключается на нераскрытый сервис.
@@ -269,6 +273,7 @@ bun run build
 - [Дистрибуция Command Artifact](distribution/command-artifact.md)
 - [Заметки по frontend Workbench и Designer](authoring/frontend-ui.md)
 - [Развёртывание Server](server/container-delivery.md)
+- [Docker-образ в GHCR](server/docker-ghcr/README.ru.md)
 - [Развёртывание на Fly.io](server/fly-io/README.ru.md)
 - [Использование Open Flow с OpenConnector и oo CLI](server/self-hosted-stack/README.ru.md)
 - [Участие в разработке](../CONTRIBUTING.md)

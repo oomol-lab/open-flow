@@ -1,0 +1,39 @@
+# Runs the prebuilt Open Flow Server image published to GHCR. To build from
+# source instead, add the build overlay:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
+#
+# Tags and upgrade notes: docs/server/docker-ghcr/README.md
+# Environment variables: docs/server/container-delivery.md
+services:
+  open-flow:
+    image: ghcr.io/oomol-lab/open-flow:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - open-flow-data:/data/open-flow
+    # Values without a default are read from the shell environment and omitted
+    # when unset, so the image defaults apply.
+    environment:
+      OPEN_FLOW_TOKEN:
+      OPEN_FLOW_LOG_LEVEL:
+      OPEN_FLOW_SESSION_COOKIE_SECURE:
+      OPEN_FLOW_CONNECTOR_ORIGIN:
+      OPEN_FLOW_CONNECTOR_TOKEN:
+      OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN:
+      OPEN_FLOW_LLM_ORIGIN:
+      OPEN_FLOW_LLM_TOKEN:
+      OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN:
+      OPEN_FLOW_INTEGRATION_CALLBACK_KEY:
+      OPEN_FLOW_RUN_EVENT_RETENTION_DAYS:
+      OPEN_FLOW_MAX_PENDING_RUNS:
+      OPEN_FLOW_MAX_CONCURRENT_RUNS:
+      OPEN_FLOW_RUN_TIMEOUT_MS:
+      OPEN_FLOW_CALLBACK_REQUESTS_PER_MINUTE:
+      OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE:
+    # The Server drains Runs and closes SQLite on SIGTERM; give it more than
+    # the 30 second in-process deadline before Docker force-kills it.
+    stop_grace_period: 45s
+    restart: unless-stopped
+
+volumes:
+  open-flow-data:

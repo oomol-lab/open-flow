@@ -151,6 +151,10 @@ docker run --rm \
 [http://127.0.0.1:3000](http://127.0.0.1:3000) を開き、`OPEN_FLOW_TOKEN` の値でサインインします。同じ値は、Control API を利用するマシンクライアントの
 Bearer Token としても使えます。Project と Run の履歴は `open-flow-data` Docker volume に永続化されます。
 
+ビルドを省略するには、ビルド済みのマルチアーキテクチャイメージ `ghcr.io/oomol-lab/open-flow` を pull するか、リポジトリルートの
+`docker-compose.yml` で起動してください。Tag (`latest`、Release バージョン、`tip`、コミットハッシュ) とアップグレード手順は
+[Docker イメージガイド](server/docker-ghcr/README.ja.md) を参照してください。
+
 Server は外部サービスなしでも利用できます。Connector を利用する Action、Provider Trigger、LLM Task は、対応するホストの Capability が設定されるまで
 フェイルクローズで動作し、非公開のサービスにフォールバックすることはありません。
 
@@ -236,6 +240,7 @@ bun run build
 - [Command Artifact の配布契約](distribution/command-artifact.md)
 - [Workbench と Designer のフロントエンドに関する注意](authoring/frontend-ui.md)
 - [Server のデプロイ](server/container-delivery.md)
+- [Docker イメージ (GHCR)](server/docker-ghcr/README.ja.md)
 - [Fly.io へのデプロイ](server/fly-io/README.ja.md)
 - [OpenConnector と oo CLI で Open Flow を使う](server/self-hosted-stack/README.ja.md)
 - [コントリビューション](../CONTRIBUTING.md)

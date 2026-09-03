@@ -148,6 +148,9 @@ docker run --rm \
 打开 [http://127.0.0.1:3000](http://127.0.0.1:3000)，使用 `OPEN_FLOW_TOKEN` 的值登录。同一个值也可以作为 Control API 的 Bearer Token
 供机器客户端使用。Project 和 Run 历史会保存在 `open-flow-data` Docker volume 中。
 
+如果不想自行构建，可以直接拉取预构建的多架构镜像 `ghcr.io/oomol-lab/open-flow`，或用仓库根目录的 `docker-compose.yml` 启动。
+Tag 方案 (`latest`、Release 版本、`tip` 和提交 hash) 与升级步骤见 [Docker 镜像文档](server/docker-ghcr/README.zh-CN.md)。
+
 不接外部服务时，Server 仍然可以独立使用。Connector Action、Provider Trigger 和 LLM Task 在没有配置对应 Host Capability
 时会拒绝执行，不会退回到来源不明的服务。
 
@@ -234,6 +237,7 @@ SQLite volume 恢复。不要在仓库根目录直接运行 `bun test`，它会�
 - [Command Artifact 分发合同](distribution/command-artifact.md)
 - [Workbench 与 Designer 前端注意事项](authoring/frontend-ui.md)
 - [Server 部署](server/container-delivery.md)
+- [Docker 镜像 (GHCR)](server/docker-ghcr/README.zh-CN.md)
 - [Fly.io 部署](server/fly-io/README.zh-CN.md)
 - [用 OpenConnector 和 oo CLI 运行 Open Flow](server/self-hosted-stack/README.zh-CN.md)
 - [参与贡献](../CONTRIBUTING.md)

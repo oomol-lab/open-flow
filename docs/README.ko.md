@@ -158,6 +158,10 @@ docker run --rm \
 API의 머신 클라이언트를 위한 Bearer 토큰으로도 사용할 수 있습니다. Project와 Run 이력은 `open-flow-data` Docker
 볼륨에 저장됩니다.
 
+빌드를 건너뛰려면 미리 빌드된 멀티 아키텍처 이미지 `ghcr.io/oomol-lab/open-flow`를 pull하거나 저장소 루트의 `docker-compose.yml`로
+시작하세요. Tag (`latest`, Release 버전, `tip`, 커밋 해시)와 업그레이드 절차는 [Docker 이미지 가이드](server/docker-ghcr/README.ko.md)를
+참고하세요.
+
 Server는 외부 서비스 없이도 유용하게 사용할 수 있습니다. Connector 기반 Action, Provider Trigger, LLM Task는 해당
 호스트 Capability가 구성될 때까지 실행을 거부하며, 어떤 것도 공개되지 않은 서비스로 대체되지 않습니다.
 
@@ -250,6 +254,7 @@ bun run build
 - [Command Artifact 배포 계약](distribution/command-artifact.md)
 - [Workbench 및 Designer 프런트엔드 참고 사항](authoring/frontend-ui.md)
 - [Server 배포](server/container-delivery.md)
+- [GHCR의 Docker 이미지](server/docker-ghcr/README.ko.md)
 - [Fly.io 배포](server/fly-io/README.ko.md)
 - [OpenConnector와 oo CLI로 Open Flow 사용하기](server/self-hosted-stack/README.ko.md)
 - [기여 안내](../CONTRIBUTING.md)
