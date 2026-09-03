@@ -275,6 +275,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
   schemaDark$.set(theme == 'dark')
   useEffect(() => () => schemaDark$.dispose(), [schemaDark$])
   const [addNodeRequest, setAddNodeRequest] = useState<{
+    readonly onComplete?: () => void
     readonly position: Point
     readonly screenPosition?: Point
   }>()
@@ -413,6 +414,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
   const openAddNode = () => {
     const canvasPosition = { x: 92, y: 92 }
     setAddNodeRequest({
+      onComplete: () => setAddNodeRequest(undefined),
       position: defaultPosition(canvasPosition),
       screenPosition: screenPosition(canvasPosition),
     })

@@ -327,6 +327,7 @@ export interface FlowDesignerViewEdge {
 
 export interface FlowDesignerViewProps {
   readonly addNodeRequest?: {
+    readonly onComplete?: () => void
     readonly position: FlowDesignerViewPosition
     readonly screenPosition?: FlowDesignerViewPosition
   }

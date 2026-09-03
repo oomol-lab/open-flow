@@ -135,6 +135,7 @@ export interface ReactFlowContainerProps {
   onSelectionChange?: OnSelectionChangeFunc<RFNode<any>, RFEdge<any>>
   isValidConnection?: IsValidConnection<RFEdge<any>>
   addNodeRequest?: {
+    readonly onComplete?: () => void
     readonly position: XYPosition
     readonly screenPosition?: XYPosition
   }
@@ -393,13 +394,11 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
 
   useEffect(() => {
     const request = props.addNodeRequest
-    if (request == null) {
-      setBlockQuickPickPanel(null)
-      return
-    }
+    if (request == null) return
     const open = () => {
       const position = request.screenPosition == null ? request.position : rf.screenToFlowPosition(request.screenPosition)
       setBlockQuickPickPanel({ position })
+      request.onComplete?.()
     }
     enterDetailMode(open)
   }, [enterDetailMode, props.addNodeRequest, rf])
