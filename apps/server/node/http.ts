@@ -292,7 +292,31 @@ function reserved(path: string): boolean {
 }
 
 function acceptsHtml(accept: string | undefined): boolean {
-  return accept == null || accept.split(',').some((value) => ['*/*', 'text/*', 'text/html'].includes(value.split(';', 1)[0]!.trim()))
+  if (accept == null) return true
+  let quality = 0
+  let specificity = -1
+  for (const value of accept.split(',')) {
+    const [mediaType, ...parameters] = value.split(';')
+    const candidate = mediaType?.trim().toLowerCase()
+    const candidateSpecificity = candidate == 'text/html' ? 2 : candidate == 'text/*' ? 1 : candidate == '*/*' ? 0 : -1
+    if (candidateSpecificity < 0) continue
+    if (candidateSpecificity < specificity) continue
+    let candidateQuality = 1
+    for (const parameter of parameters) {
+      const separator = parameter.indexOf('=')
+      if (separator < 0 || parameter.slice(0, separator).trim().toLowerCase() != 'q') continue
+      const source = parameter.slice(separator + 1).trim()
+      candidateQuality = /^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/.test(source) ? Number(source) : 0
+      break
+    }
+    if (candidateSpecificity > specificity) {
+      quality = candidateQuality
+      specificity = candidateSpecificity
+    } else if (candidateSpecificity == specificity) {
+      quality = Math.max(quality, candidateQuality)
+    }
+  }
+  return quality > 0
 }
 
 class WebhookBodyTooLarge extends Error {}
