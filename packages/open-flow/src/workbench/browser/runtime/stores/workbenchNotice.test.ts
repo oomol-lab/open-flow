@@ -33,13 +33,22 @@ describe('Workbench notices', () => {
     }
   })
 
+  it('identifies the affected business object and next step', () => {
+    const i18n = createI18n('zh-CN')
+
+    expect(errorNotice(new ApiError(404, 'flow.not-found', 'Missing.'), i18n.t).message).toBe('当前 Flow 或修订不存在，请重新加载 Flow 后重试。')
+    expect(errorNotice(new ApiError(404, 'run.not-found', 'Missing.'), i18n.t).message).toBe('找不到这次 Run，请返回 Run 列表选择其他记录。')
+    expect(errorNotice(new ApiError(400, 'page.invalid-cursor', 'Invalid.'), i18n.t).message).toBe('列表加载期间内容已发生变化，请重新加载列表。')
+  })
+
   it('localizes client and network failures', () => {
     const i18n = createI18n('zh-CN')
 
     expect(errorNotice(new ApiError(502, 'response.invalid', 'The Control API returned an invalid response.'), i18n.t).message).toBe(
-      'Control API 返回了无效响应。',
+      '服务返回了无法识别的数据，请稍后重试。',
     )
-    expect(errorNotice(new TypeError('Failed to fetch'), i18n.t).message).toBe('请求失败。')
+    expect(errorNotice(new ApiError(500, 'request.failed', 'Request failed.'), i18n.t).message).toBe('服务未能完成此操作，请稍后重试。')
+    expect(errorNotice(new TypeError('Failed to fetch'), i18n.t).message).toBe('暂时无法连接服务，请检查网络后重试。')
   })
 
   it('preserves details for unknown error codes', () => {

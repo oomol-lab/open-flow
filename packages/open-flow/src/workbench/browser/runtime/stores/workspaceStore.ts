@@ -23,6 +23,7 @@ import type { PresentationUpdate } from './presentationChanges.ts'
 import type { SetNotice } from './workbenchNotice.ts'
 import type { ModuleEditorDraft, Workspace$, WorkspaceState } from './workspaceModel.ts'
 
+import { controlErrorCode } from '../../../../control/common/errors.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { connect as connectFlowNodes, disconnect as disconnectFlowNodes } from '../../../../flow/common/edgeChanges.ts'
 import { imports as moduleImports, replaceSource as replaceModuleSource } from '../../../../flow/common/moduleChanges.ts'
@@ -33,6 +34,7 @@ import {
   updateTriggerConfig,
   updateTriggerSchedule,
 } from '../../../../flow/common/nodeChanges.ts'
+import { ApiError } from '../api.ts'
 import { addNodeIntent } from '../designer/addNodeOptions.ts'
 import {
   addNode as addFlowNode,
@@ -264,8 +266,13 @@ export class WorkspaceStore {
       )
     } catch (error) {
       if (!current()) return false
-      this.#set({ workspaceLoadFailed: true, workspaceLoading: false })
-      this.#setNotice(errorNotice(error, this.#i18n.t))
+      const missing = error instanceof ApiError && error.code == controlErrorCode.flowNotFound
+      this.#set(
+        missing
+          ? { flowId: undefined, target: undefined, workspaceLoadFailed: false, workspaceLoading: false }
+          : { workspaceLoadFailed: true, workspaceLoading: false },
+      )
+      this.#setNotice(missing ? { kind: 'error', message: this.#i18n.t('notice.flowMissing') } : errorNotice(error, this.#i18n.t))
       return false
     }
     return true

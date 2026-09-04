@@ -119,12 +119,13 @@ export class NavigationStore {
   }
 
   #write(view: WorkbenchView, replace: boolean): void {
-    const location = { flowId: this.#store.workspace.$.flowId.value, view }
+    const flowId = this.#store.workspace.$.flowId.value
+    const location: WorkbenchLocation = { flowId, view: flowId == null ? 'design' : view }
     if (!sameLocation(location, this.#location)) {
       this.#location = location
       this.#navigate(location, { replace })
     }
-    this.#view.set(view)
+    this.#view.set(location.view)
   }
 }
 

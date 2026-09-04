@@ -34,6 +34,46 @@ const draft = {
 } as const
 
 describe('WorkspaceStore', () => {
+  it('returns to the Flow catalog when the selected Flow is not found', async () => {
+    const setNotice = vi.fn()
+    const request = vi.fn(async (path: string) => {
+      if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [], total: 0, version: 1 })
+      return Response.json({ error: { code: 'flow.not-found', message: 'The Flow was not found.' }, version: 1 }, { status: 404 })
+    })
+    const store = new WorkspaceStore(new WorkbenchClient(request), setNotice)
+
+    try {
+      await store.start('missing-flow')
+
+      expect(store.$.flowId.value).toBeUndefined()
+      expect(store.$.target.value).toBeUndefined()
+      expect(store.$.workspaceLoadFailed.value).toBe(false)
+      expect(setNotice).toHaveBeenLastCalledWith({
+        kind: 'error',
+        message: 'This Flow does not exist or was deleted. Returned to the Flow list.',
+      })
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('keeps a temporarily unavailable Flow selected for retry', async () => {
+    const request = vi.fn(async (path: string) => {
+      if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [], total: 0, version: 1 })
+      return Response.json({ error: { code: 'engine.unavailable', message: 'The deployment is unavailable.' }, version: 1 }, { status: 503 })
+    })
+    const store = new WorkspaceStore(new WorkbenchClient(request), vi.fn())
+
+    try {
+      await store.start('flow-1')
+
+      expect(store.$.flowId.value).toBe('flow-1')
+      expect(store.$.workspaceLoadFailed.value).toBe(true)
+    } finally {
+      store.dispose()
+    }
+  })
+
   it('keeps the loaded Flow catalog visible while a notification refreshes it', async () => {
     const refreshed = Promise.withResolvers<Response>()
     const refreshRequested = Promise.withResolvers<void>()
