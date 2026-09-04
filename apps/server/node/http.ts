@@ -449,7 +449,8 @@ async function connectorFlowRequest(request: Request): Promise<{ readonly name: 
     body.name != body.name.trim() ||
     resourceNameIssue(body.name) != null ||
     typeof body.teamId != 'string' ||
-    body.teamId.length == 0
+    body.teamId.length == 0 ||
+    body.teamId.length > 128
   ) {
     return false
   }
