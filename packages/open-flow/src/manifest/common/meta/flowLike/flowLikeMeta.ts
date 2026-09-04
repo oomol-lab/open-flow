@@ -37,7 +37,7 @@ import { WritableSubflowNodeManifest } from '../../writable/node/writableSubflow
 import { WritableTaskNodeManifest } from '../../writable/node/writableTaskNodeManifest.ts'
 import { WritableTriggerNodeManifest } from '../../writable/node/writableTriggerNodeManifest.ts'
 import { WritableValueNodeManifest } from '../../writable/node/writableValueNodeManifest.ts'
-import { getYamlNode, stringify } from '../../yaml.ts'
+import { getYamlNode } from '../../yaml.ts'
 import { Document } from 'yaml'
 import { ValueBlockMeta } from '../block/valueBlockMeta.ts'
 import { NodeMeta } from '../nodeMeta.ts'
