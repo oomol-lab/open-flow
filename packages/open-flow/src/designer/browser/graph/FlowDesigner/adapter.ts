@@ -83,7 +83,6 @@ export class FlowDesignerViewAdapter {
   readonly #callbacks: ViewCallbacks
   readonly #createSchemaEditor: CreateSchemaEditorFn
   #disconnectTimer: ReturnType<typeof setTimeout> | undefined
-  #disposeTimer: ReturnType<typeof setTimeout> | undefined
   #entries = new Map<string, NodeEntry>()
   #language: Val<string>
   #modelPositions = new Map<string, FlowDesignerViewPosition>()
@@ -230,22 +229,10 @@ export class FlowDesignerViewAdapter {
     if (!autoLayout) designerUIStore.completeActiveLayout()
   }
 
-  #cancelPendingDisconnects(): void {
+  cancelPendingDisconnects(): void {
     if (this.#disconnectTimer != null) clearTimeout(this.#disconnectTimer)
     this.#disconnectTimer = undefined
     this.#pendingDisconnects.clear()
-  }
-
-  mount(): () => void {
-    if (this.#disposeTimer != null) clearTimeout(this.#disposeTimer)
-    this.#disposeTimer = undefined
-    return () => {
-      this.#cancelPendingDisconnects()
-      this.#disposeTimer = setTimeout(() => {
-        this.#disposeTimer = undefined
-        this.store.dispose()
-      }, 0)
-    }
   }
 
   setCallbacks(callbacks: ViewCallbacks): void {

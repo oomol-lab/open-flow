@@ -101,7 +101,7 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
   }, [])
   const onDropAddItem = useCallback((itemId: string, position: FlowDesignerViewPosition) => adapter.addNode(itemId, position), [adapter])
 
-  useEffect(() => adapter.mount(), [adapter])
+  useEffect(() => () => adapter.cancelPendingDisconnects(), [adapter])
   useLayoutEffect(() => adapter.setCallbacks(callbacksFromProps(props)))
   useLayoutEffect(() => {
     adapter.reconcile(props.model, props.editable, props.language ?? 'en', props.addItems)
