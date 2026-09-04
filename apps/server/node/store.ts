@@ -1583,7 +1583,14 @@ export class Store {
     for (const row of resumes) {
       if (this.#checkpointValid(row.checkpointJson, row.checkpointDigest, row.checkpointBytes, row.waitId)) continue
       this.#transaction(() =>
-        this.#finishRun(row.runId, 'indeterminate', { error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint is unavailable.' } }, 'status = ?', this.#clock(), row.status),
+        this.#finishRun(
+          row.runId,
+          'indeterminate',
+          { error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint is unavailable.' } },
+          'status = ?',
+          this.#clock(),
+          row.status,
+        ),
       )
     }
   }
