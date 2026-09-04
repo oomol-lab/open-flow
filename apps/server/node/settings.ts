@@ -16,6 +16,7 @@ export class Settings {
   readonly #environmentOrigin?: string
   readonly #logger: Logger
   readonly #store: SettingsStore
+  #connectorCache?: { readonly client: ConnectorClient; readonly origin: string; readonly revision: number; readonly token: string }
 
   constructor(
     store: SettingsStore,
@@ -50,9 +51,14 @@ export class Settings {
   connector(): ConnectorClient | undefined {
     if (this.#environmentConnector != null) return this.#environmentConnector
     const stored = this.#store.state()
-    return stored.connectorOrigin == null || stored.connectorToken == null
-      ? undefined
-      : new ConnectorClient(stored.connectorOrigin, stored.connectorToken, 30_000, this.#logger)
+    if (stored.connectorOrigin == null || stored.connectorToken == null) return undefined
+    const cache = this.#connectorCache
+    if (cache?.origin === stored.connectorOrigin && cache?.token === stored.connectorToken && cache?.revision === stored.revision) {
+      return cache.client
+    }
+    const client = new ConnectorClient(stored.connectorOrigin, stored.connectorToken, 30_000, this.#logger)
+    this.#connectorCache = { client, origin: stored.connectorOrigin, revision: stored.revision, token: stored.connectorToken }
+    return client
   }
 
   connectorConsoleOrigin(): URL | undefined {
