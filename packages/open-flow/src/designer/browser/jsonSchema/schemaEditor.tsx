@@ -373,34 +373,19 @@ const Subpanel = /*#__PURE__*/ memo(function Subpanel(props: SubpanelProps) {
     case 'date':
       return <SubpanelDate {...props} />
     case 'select':
-      if (!props.store.isSelect()) {
-        console.warn('Expecting select widget store, got', props.store)
-        return null
-      }
+      if (!props.store.isSelect()) return null
       return <SubpanelSelect {...props} />
     case 'multiSelect':
-      if (!props.store.isMultiSelect()) {
-        console.warn('Expecting multiSelect widget store, got', props.store)
-        return null
-      }
+      if (!props.store.isMultiSelect()) return null
       return <SubpanelSelect {...props} />
     case 'array':
-      if (!props.store.isArray()) {
-        console.warn('Expecting array widget store, got', props.store)
-        return null
-      }
+      if (!props.store.isArray()) return null
       return <SubpanelArray {...props} />
     case 'object':
-      if (!props.store.isObject()) {
-        console.warn('Expecting object widget store, got', props.store)
-        return null
-      }
+      if (!props.store.isObject()) return null
       return <SubpanelObject {...props} />
     case 'anyOf':
-      if (!props.store.isAnyOf()) {
-        console.warn('Expecting anyOf widget store, got', props.store)
-        return null
-      }
+      if (!props.store.isAnyOf()) return null
       return <SubpanelAnyOf {...props} />
     default:
       return null

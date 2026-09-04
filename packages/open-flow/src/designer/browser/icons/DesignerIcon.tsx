@@ -55,8 +55,6 @@ export function parseIconifyIcon(src: string | undefined): { collection: string;
     const [, collection, icon, color] = src.split(':')
     if (collection && icon) {
       return { collection, icon, color: color || 'currentColor' }
-    } else {
-      console.warn(`Don't load icon spec: ${src}`)
     }
   }
   return null
