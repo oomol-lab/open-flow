@@ -137,8 +137,7 @@ export class SharedBlocksManager {
         break
       }
       default: {
-        // @ts-expect-error type guard
-        console.error(new Error(blockMeta.type.toString()))
+        blockMeta.blockType satisfies never
       }
     }
     this.#sharedBlocksByPath.delete(blockMeta.blockPath)
@@ -179,8 +178,7 @@ export class SharedBlocksManager {
         break
       }
       default: {
-        // @ts-expect-error type guard
-        console.error(new Error(blockMeta.type.toString()))
+        blockMeta.blockType satisfies never
       }
     }
 
@@ -213,13 +211,13 @@ export class SharedBlocksManager {
           break
         }
         default: {
-          // @ts-expect-error type guard
-          console.error(new Error(blockMeta.type.toString()))
+          blockMeta.blockType satisfies never
         }
       }
       return newBlockMeta
     } catch (e) {
-      console.error(e)
+      if (e instanceof Error) throw e
+      throw new Error(String(e))
     }
   }
 
