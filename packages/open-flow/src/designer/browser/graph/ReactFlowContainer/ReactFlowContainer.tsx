@@ -508,6 +508,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
   }, [overview, props.layoutMotion, props.onDisplayModeMeasured])
 
   useEffect(() => {
+    let active = true
     let measurementFrame = 0
     let readyFrame = 0
     let fitTimer: ReturnType<typeof setTimeout> | undefined
@@ -519,8 +520,9 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
       } else if (result === 'relayout') {
         onBeforeFitView()
         fitTimer = setTimeout(
-          () => {
-            rf.fitView({ padding: 0.15, duration: props.layoutMotion === false ? 0 : 150, maxZoom: 1 })
+          async () => {
+            await rf.fitView({ padding: 0.15, duration: props.layoutMotion === false ? 0 : 150, maxZoom: 1 })
+            if (!active) return
             readyFrame = requestAnimationFrame(() => setLayoutReady(true))
           },
           props.layoutMotion === false ? 0 : DISPLAY_MODE_REFLOW_DELAY,
@@ -544,6 +546,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
     setEdgeContextMenu(null)
     setBlockQuickPickPanel(null)
     return () => {
+      active = false
       cancelAnimationFrame(frame)
       cancelAnimationFrame(measurementFrame)
       cancelAnimationFrame(readyFrame)
