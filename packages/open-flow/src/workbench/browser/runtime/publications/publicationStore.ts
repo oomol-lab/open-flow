@@ -482,7 +482,10 @@ export class PublicationStore {
 
   async #refresh(target: Target): Promise<void> {
     const current = this.#loads.begin()
-    const [live, page, bindings] = await this.#read(target)
+    const [live, page, bindings] = await this.#read(target).catch((error) => {
+      if (current() && sameTarget(this.#state.value.target, target)) this.#set({ refreshing: false })
+      throw error
+    })
     if (current()) this.#workspace.updateLive(live)
     if (current() && sameTarget(this.#state.value.target, target)) {
       this.#set({

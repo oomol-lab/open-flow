@@ -440,7 +440,7 @@ export class RunStore {
 
   async #refreshList(flowId: string): Promise<void> {
     const current = this.#lists.begin()
-    this.#set({ refreshing: true })
+    this.#set({ loadingMore: false, refreshing: true })
     try {
       const page = await this.#client.listRuns(flowId, { limit: 50 })
       if (!current() || this.#state.value.target?.flowId != flowId) return

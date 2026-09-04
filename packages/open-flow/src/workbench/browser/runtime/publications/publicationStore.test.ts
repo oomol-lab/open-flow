@@ -213,4 +213,46 @@ describe('PublicationStore', () => {
       workspace.dispose()
     }
   })
+
+  it('clears refreshing when an operation refresh replaces a warm load and fails', async () => {
+    const warmLive = Promise.withResolvers<Response>()
+    const oldPublication = { ...publication, publicationId: 'publication-old', revisionId: 'revision-old' }
+    let liveReads = 0
+    const request = vi.fn(async (path: string) => {
+      if (path == '/v1/flows/flow-1/live') {
+        liveReads += 1
+        if (liveReads == 2) return await warmLive.promise
+        if (liveReads == 3) throw new Error('Refresh failed')
+        return Response.json({ flowId: 'flow-1', hasUnpublishedChanges: false, publication, revision: 1, status: 'runnable', version: 1 })
+      }
+      if (path == '/v1/flows/flow-1/publications?limit=50&includeTotal=true') {
+        return Response.json({ publications: [publication], total: 1, version: 1 })
+      }
+      if (path == '/v1/flows/flow-1/triggers') return Response.json({ bindings: [], flowId: 'flow-1', version: 1 })
+      if (path == `/v1/flows/flow-1/publications/${oldPublication.publicationId}/rollback`) return Response.json(oldPublication)
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const client = new WorkbenchClient(request)
+    const workspace = new WorkspaceStore(client, vi.fn())
+    const store = new PublicationStore(client, workspace, vi.fn(), { getItem: () => null, setItem: vi.fn() })
+
+    try {
+      await store.load('flow-1')
+
+      const loading = store.load('flow-1')
+      await vi.waitFor(() => expect(liveReads).toBe(2))
+      expect(store.$.refreshing.value).toBe(true)
+
+      expect(await store.rollback(oldPublication)).toBe(false)
+      expect(store.$.refreshing.value).toBe(false)
+      expect(store.$.publications.value).toEqual([publication])
+
+      warmLive.resolve(Response.json({ flowId: 'flow-1', hasUnpublishedChanges: false, publication, revision: 1, status: 'runnable', version: 1 }))
+      await loading
+      expect(store.$.refreshing.value).toBe(false)
+    } finally {
+      store.dispose()
+      workspace.dispose()
+    }
+  })
 })
