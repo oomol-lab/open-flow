@@ -196,29 +196,24 @@ export class SharedBlocksManager {
   public async duplicateSharedBlock(blockMeta: SharedBlockMeta, newName: BlockName): Promise<SharedBlockMeta | undefined> {
     if (!this.#isInScope(blockMeta.blockPath)) return
 
-    try {
-      const newDir = (await this.ctx.copyFileDir(blockMeta.blockDir, join(dirname(blockMeta.blockDir), newName))) as BlockPath
-      const newBlockPath = join(newDir, basename(blockMeta.blockPath)) as BlockPath
+    const newDir = (await this.ctx.copyFileDir(blockMeta.blockDir, join(dirname(blockMeta.blockDir), newName))) as BlockPath
+    const newBlockPath = join(newDir, basename(blockMeta.blockPath)) as BlockPath
 
-      let newBlockMeta: SharedBlockMeta | undefined
-      switch (blockMeta.blockType) {
-        case 'subflow': {
-          newBlockMeta = await this.refreshSubflowBlock(newBlockPath)
-          break
-        }
-        case 'task': {
-          newBlockMeta = await this.refreshTaskBlock(newBlockPath)
-          break
-        }
-        default: {
-          blockMeta.blockType satisfies never
-        }
+    let newBlockMeta: SharedBlockMeta | undefined
+    switch (blockMeta.blockType) {
+      case 'subflow': {
+        newBlockMeta = await this.refreshSubflowBlock(newBlockPath)
+        break
       }
-      return newBlockMeta
-    } catch (e) {
-      if (e instanceof Error) throw e
-      throw new Error(String(e))
+      case 'task': {
+        newBlockMeta = await this.refreshTaskBlock(newBlockPath)
+        break
+      }
+      default: {
+        blockMeta.blockType satisfies never
+      }
     }
+    return newBlockMeta
   }
 
   public async isBlockNameAvailable(blockName: string): Promise<boolean> {
