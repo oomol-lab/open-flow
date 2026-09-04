@@ -54,6 +54,7 @@ export function RunsView({
   const loadingMore = useVal(store.runs.$.loadingMore)
   const nextCursor = useVal(store.runs.$.nextCursor)
   const result = useVal(store.runs.$.result)
+  const refreshing = useVal(store.runs.$.refreshing)
   const run = useVal(store.runs.$.run)
   const runs = useVal(store.runs.$.runs)
   const observationFailed = useVal(store.runs.$.observationFailed)
@@ -94,7 +95,7 @@ export function RunsView({
       role="tabpanel"
       tabIndex={0}
     >
-      <aside className="run-list-panel">
+      <aside aria-busy={loading || refreshing} className="run-list-panel">
         <header className="run-list-header">
           <strong>{t('run.history')}</strong>
         </header>

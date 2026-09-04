@@ -116,4 +116,49 @@ describe('PublicationStore', () => {
       workspace.dispose()
     }
   })
+
+  it('keeps loaded Publications visible while refreshing the same Flow', async () => {
+    const refreshed = Promise.withResolvers<Response>()
+    let liveReads = 0
+    const nextPublication = { ...publication, publicationId: 'publication-2' }
+    const request = vi.fn(async (path: string) => {
+      if (path == '/v1/flows/flow-1/live') {
+        liveReads += 1
+        if (liveReads == 1) {
+          return Response.json({ flowId: 'flow-1', hasUnpublishedChanges: false, publication, revision: 1, status: 'runnable', version: 1 })
+        }
+        return await refreshed.promise
+      }
+      if (path == '/v1/flows/flow-1/publications?limit=50&includeTotal=true') {
+        return Response.json({ publications: liveReads == 1 ? [publication] : [nextPublication, publication], total: liveReads, version: 1 })
+      }
+      if (path == '/v1/flows/flow-1/triggers') return Response.json({ bindings: [], flowId: 'flow-1', version: 1 })
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const client = new WorkbenchClient(request)
+    const workspace = new WorkspaceStore(client, vi.fn())
+    const store = new PublicationStore(client, workspace, vi.fn(), { getItem: () => null, setItem: vi.fn() })
+
+    try {
+      await store.load('flow-1')
+
+      const refreshing = store.load('flow-1')
+      expect(store.$.loading.value).toBe(false)
+      expect(store.$.refreshing.value).toBe(true)
+      expect(store.$.publications.value).toEqual([publication])
+      expect(store.$.live.value?.publication?.publicationId).toBe(publication.publicationId)
+
+      refreshed.resolve(
+        Response.json({ flowId: 'flow-1', hasUnpublishedChanges: false, publication: nextPublication, revision: 2, status: 'runnable', version: 1 }),
+      )
+      await refreshing
+
+      expect(store.$.refreshing.value).toBe(false)
+      expect(store.$.publications.value.map((item) => item.publicationId)).toEqual(['publication-2', 'publication-1'])
+      expect(store.$.live.value?.publication?.publicationId).toBe(nextPublication.publicationId)
+    } finally {
+      store.dispose()
+      workspace.dispose()
+    }
+  })
 })

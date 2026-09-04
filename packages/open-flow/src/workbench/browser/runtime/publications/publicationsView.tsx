@@ -130,6 +130,7 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
   const publications = useVal(store.publications.$.publications)
   const flowId = useVal(store.workspace.$.flowId)
   const publishing = useVal(store.publications.$.publishing)
+  const refreshing = useVal(store.publications.$.refreshing)
   const rollingBackPublicationId = useVal(store.publications.$.rollingBackPublicationId)
   const revision = useVal(store.workspace.$.revision)
   const selectedTriggerId = useVal(store.publications.$.selectedTriggerId)
@@ -179,14 +180,25 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
   const currentPublicationId = live?.publication?.publicationId
 
   return (
-    <section aria-labelledby="workspace-tab-publications" className="publication-view" id="workspace-panel-publications" role="tabpanel" tabIndex={0}>
+    <section
+      aria-busy={loading || refreshing}
+      aria-labelledby="workspace-tab-publications"
+      className="publication-view"
+      id="workspace-panel-publications"
+      role="tabpanel"
+      tabIndex={0}
+    >
       <section className="publication-summary">
         <div className="publication-summary-heading">
           <div>
             <h2>{t('publication.live')}</h2>
             <p>{t('publication.liveDescription')}</p>
           </div>
-          {loading && <span className="publication-loading">{t('publication.loading')}</span>}
+          {(loading || refreshing) && (
+            <span aria-live="polite" className="publication-loading">
+              {t('publication.loading')}
+            </span>
+          )}
         </div>
 
         {loadFailed ? (

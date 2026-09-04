@@ -43,6 +43,7 @@ describe('RunsView timeline', () => {
           loadingMore: val(false),
           nextCursor: val<string | undefined>(),
           observationFailed: val(false),
+          refreshing: val(false),
           result: val(result),
           run: val(run),
           runs: val([run]),

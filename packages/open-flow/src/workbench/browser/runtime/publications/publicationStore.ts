@@ -40,6 +40,7 @@ interface PublicationState {
   readonly detail?: TriggerBindingDetail
   readonly detailLoading: boolean
   readonly live?: Live
+  readonly loaded: boolean
   readonly loadFailed: boolean
   readonly loading: boolean
   readonly loadMoreFailed: boolean
@@ -48,6 +49,7 @@ interface PublicationState {
   readonly operation?: PublishOperation
   readonly publications: readonly Publication[]
   readonly publishing: boolean
+  readonly refreshing: boolean
   readonly rollingBackPublicationId?: string
   readonly selectedTriggerId?: string
   readonly target?: Target
@@ -90,6 +92,7 @@ export interface Publication$ {
   readonly operation: ReadonlyVal<PublishOperation | undefined>
   readonly publications: ReadonlyVal<readonly Publication[]>
   readonly publishing: ReadonlyVal<boolean>
+  readonly refreshing: ReadonlyVal<boolean>
   readonly rollingBackPublicationId: ReadonlyVal<string | undefined>
   readonly selectedTriggerId: ReadonlyVal<string | undefined>
   readonly testingTriggerId: ReadonlyVal<string | undefined>
@@ -104,12 +107,14 @@ const initialState: PublicationState = {
   activitiesLoadingMore: false,
   bindings: [],
   detailLoading: false,
+  loaded: false,
   loadFailed: false,
   loading: false,
   loadMoreFailed: false,
   loadingMore: false,
   publications: [],
   publishing: false,
+  refreshing: false,
 }
 
 const activityPageLimit = 20
@@ -169,6 +174,7 @@ export class PublicationStore {
       operation: derive(this.#state, (state) => state.operation),
       publications: derive(this.#state, (state) => state.publications),
       publishing: derive(this.#state, (state) => state.publishing),
+      refreshing: derive(this.#state, (state) => state.refreshing),
       rollingBackPublicationId: derive(this.#state, (state) => state.rollingBackPublicationId),
       selectedTriggerId: derive(this.#state, (state) => state.selectedTriggerId),
       testingTriggerId: derive(this.#state, (state) => state.testingTriggerId),
@@ -197,34 +203,42 @@ export class PublicationStore {
 
   public async load(flowId: string): Promise<void> {
     const target = { flowId }
+    const state = this.#state.value
+    const warm = state.loaded && sameTarget(state.target, target)
     const current = this.#loads.begin()
-    if (!sameTarget(this.#state.value.target, target)) {
+    if (!sameTarget(state.target, target)) {
       this.#operation.invalidate()
       this.#attempt = undefined
     }
-    this.#setNotice(undefined)
-    this.#state.set({ ...initialState, loading: true, target })
+    if (warm) {
+      this.#set({ loadFailed: false, loadingMore: false, loadMoreFailed: false, refreshing: true })
+    } else {
+      this.#setNotice(undefined)
+      this.#state.set({ ...initialState, loading: true, target })
+    }
     try {
-      const operation = await this.#storedOperation(target)
+      const operation = warm ? state.operation : await this.#storedOperation(target)
       const [live, page, bindings] = await this.#read(target)
       if (!current()) return
+      this.#workspace.updateLive(live)
       this.#set({
         bindings,
         live,
+        loaded: true,
         loading: false,
         nextCursor: page.nextCursor,
-        operation,
         publications: page.publications,
-        publishing: operation?.status == 'pending',
+        refreshing: false,
         total: page.total,
+        ...(warm ? {} : { operation, publishing: operation?.status == 'pending' }),
       })
-      if (operation?.status == 'pending') {
+      if (!warm && operation?.status == 'pending') {
         const flow = this.#workspace.$.targetFlow.value
         void this.#observe(target, operation, this.#operation.begin(), flow?.flowId == target.flowId ? flow.name : target.flowId)
       }
     } catch (error) {
       if (!current()) return
-      this.#set({ loadFailed: true, loading: false })
+      this.#set({ loadFailed: !warm, loading: false, refreshing: false })
       this.#setNotice(errorNotice(error, this.#i18n.t))
     }
   }
@@ -467,12 +481,23 @@ export class PublicationStore {
   }
 
   async #refresh(target: Target): Promise<void> {
+    this.#loads.invalidate()
     const [live, page, bindings] = await this.#read(target)
     this.#workspace.updateLive(live)
-    await this.#workspace.refreshFlows()
     if (sameTarget(this.#state.value.target, target)) {
-      this.#set({ bindings, live, loadFailed: false, nextCursor: page.nextCursor, publications: page.publications, total: page.total })
+      this.#set({
+        bindings,
+        live,
+        loaded: true,
+        loadFailed: false,
+        loadingMore: false,
+        nextCursor: page.nextCursor,
+        publications: page.publications,
+        refreshing: false,
+        total: page.total,
+      })
     }
+    await this.#workspace.refreshFlows()
   }
 
   async #recover(target: Target): Promise<void> {

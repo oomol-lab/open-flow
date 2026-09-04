@@ -4,7 +4,7 @@ import type { WorkbenchClient, Run, RunDetails, RunEvent, RunResult, WaitAction 
 import type { Current } from '../stores/latest.ts'
 import type { SetNotice } from '../stores/workbenchNotice.ts'
 
-import { derive, val } from 'value-enhancer'
+import { arrayShallowEqual, derive, val } from 'value-enhancer'
 import { isRunTerminal } from '../../../../execution/common/runLifecycle.ts'
 import { ApiError } from '../api.ts'
 import { createI18n } from '../i18n.ts'
@@ -19,16 +19,19 @@ interface RunState {
   readonly eventsExpiresAt?: string
   readonly externalRunId?: string
   readonly historyComplete: boolean
+  readonly loaded: boolean
   readonly loadFailed: boolean
   readonly loading: boolean
   readonly loadMoreFailed: boolean
   readonly loadingMore: boolean
   readonly nextCursor?: string
   readonly observationFailed: boolean
+  readonly refreshing: boolean
   readonly result?: RunResult
   readonly resolvingAction?: WaitAction
-  readonly run?: Run | RunDetails
-  readonly runs: readonly Run[]
+  readonly runById: ReadonlyMap<string, Run | RunDetails>
+  readonly runIds: readonly string[]
+  readonly selectedRunId?: string
   readonly target?: { readonly flowId: string }
 }
 
@@ -47,6 +50,7 @@ export interface Run$ {
   readonly loadingMore: ReadonlyVal<boolean>
   readonly nextCursor: ReadonlyVal<string | undefined>
   readonly observationFailed: ReadonlyVal<boolean>
+  readonly refreshing: ReadonlyVal<boolean>
   readonly result: ReadonlyVal<RunResult | undefined>
   readonly resolvingAction: ReadonlyVal<WaitAction | undefined>
   readonly run: ReadonlyVal<Run | RunDetails | undefined>
@@ -60,12 +64,15 @@ const initialState: RunState = {
   eventFilter: 'all',
   events: [],
   historyComplete: true,
+  loaded: false,
   loadFailed: false,
   loading: false,
   loadMoreFailed: false,
   loadingMore: false,
   observationFailed: false,
-  runs: [],
+  refreshing: false,
+  runById: new Map(),
+  runIds: [],
 }
 
 const eventPageLimit = 100
@@ -75,6 +82,21 @@ const waitingPollDelay = 60_000
 
 export function canCancelRun(run: Run | undefined): run is Run & { readonly status: 'queued' | 'running' | 'starting' | 'waiting' } {
   return run?.status == 'queued' || run?.status == 'starting' || run?.status == 'running' || run?.status == 'waiting'
+}
+
+function selectedRun(state: RunState): Run | RunDetails | undefined {
+  return state.selectedRunId == null ? undefined : state.runById.get(state.selectedRunId)
+}
+
+function listedRuns(state: RunState, runs: readonly Run[]): Pick<RunState, 'runById' | 'runIds'> {
+  const runById = new Map(runs.map((run) => [run.runId, run] as const))
+  const selected = selectedRun(state)
+  if (selected != null) runById.set(selected.runId, selected)
+  return { runById, runIds: runs.map((run) => run.runId) }
+}
+
+function replaceRun(state: RunState, run: Run | RunDetails): ReadonlyMap<string, Run | RunDetails> {
+  return new Map(state.runById).set(run.runId, run)
 }
 
 export class RunStore {
@@ -106,10 +128,19 @@ export class RunStore {
       loadingMore: derive(this.#state, (state) => state.loadingMore),
       nextCursor: derive(this.#state, (state) => state.nextCursor),
       observationFailed: derive(this.#state, (state) => state.observationFailed),
+      refreshing: derive(this.#state, (state) => state.refreshing),
       result: derive(this.#state, (state) => state.result),
       resolvingAction: derive(this.#state, (state) => state.resolvingAction),
-      run: derive(this.#state, (state) => state.run),
-      runs: derive(this.#state, (state) => state.runs),
+      run: derive(this.#state, selectedRun),
+      runs: derive(
+        this.#state,
+        (state) =>
+          state.runIds.flatMap((runId) => {
+            const run = state.runById.get(runId)
+            return run == null ? [] : [run]
+          }),
+        { equal: arrayShallowEqual },
+      ),
     }
   }
 
@@ -131,12 +162,26 @@ export class RunStore {
   }
 
   public async load(flowId: string): Promise<void> {
+    const state = this.#state.value
+    const warm = state.loaded && state.target?.flowId == flowId
     const current = this.#lists.begin()
+    if (warm) {
+      this.#set({ loadFailed: false, loadingMore: false, loadMoreFailed: false, refreshing: true })
+      try {
+        const page = await this.#client.listRuns(flowId, { limit: 50 })
+        if (!current() || this.#state.value.target?.flowId != flowId) return
+        this.#set({ ...listedRuns(this.#state.value, page.runs), nextCursor: page.nextCursor, refreshing: false })
+      } catch (error) {
+        if (!current()) return
+        this.#set({ refreshing: false })
+        this.#setNotice(errorNotice(error, this.#i18n.t))
+      }
+      return
+    }
     this.#selection.invalidate()
     this.#clearTimer()
     this.#setNotice(undefined)
-    const state = this.#state.value
-    const cancelingRunId = state.run?.flowId == flowId ? state.cancelingRunId : undefined
+    const cancelingRunId = selectedRun(state)?.flowId == flowId ? state.cancelingRunId : undefined
     if (state.cancelingRunId != null && cancelingRunId == null) this.#cancellation.invalidate()
     this.#state.set({
       ...initialState,
@@ -148,7 +193,7 @@ export class RunStore {
     try {
       const page = await this.#client.listRuns(flowId, { limit: 50 })
       if (!current()) return
-      this.#set({ loadFailed: false, loading: false, nextCursor: page.nextCursor, runs: page.runs })
+      this.#set({ ...listedRuns(this.#state.value, page.runs), loaded: true, loadFailed: false, loading: false, nextCursor: page.nextCursor })
       const first = page.runs[0]
       if (first != null) this.#observe(first)
     } catch (error) {
@@ -169,12 +214,19 @@ export class RunStore {
         limit: 50,
       })
       if (!current()) return
-      const seen = new Set(this.#state.value.runs.map((run) => run.runId))
+      const state = this.#state.value
+      const seen = new Set(state.runIds)
+      const runs = page.runs.filter((run) => !seen.has(run.runId))
+      const runById = new Map(state.runById)
+      for (const run of runs) {
+        if (run.runId != state.selectedRunId) runById.set(run.runId, run)
+      }
       this.#set({
         loadingMore: false,
         loadMoreFailed: false,
         nextCursor: page.nextCursor,
-        runs: [...this.#state.value.runs, ...page.runs.filter((run) => !seen.has(run.runId))],
+        runById,
+        runIds: [...state.runIds, ...runs.map((run) => run.runId)],
       })
     } catch (error) {
       if (!current()) return
@@ -186,13 +238,14 @@ export class RunStore {
   public changed(runId: string): void {
     const state = this.#state.value
     if (state.target == null) return
-    if (state.run?.runId == runId) this.retryObservation()
+    if (state.selectedRunId == runId) this.retryObservation()
     void this.#refreshList(state.target.flowId)
   }
 
   public select(runId: string): void {
-    const run = this.#state.value.runs.find((candidate) => candidate.runId == runId)
-    if (run != null && run.runId != this.#state.value.run?.runId) this.#observe(run)
+    const state = this.#state.value
+    const run = state.runById.get(runId)
+    if (run != null && run.runId != state.selectedRunId) this.#observe(run)
   }
 
   public async retryLoad(): Promise<void> {
@@ -201,7 +254,7 @@ export class RunStore {
   }
 
   public retryObservation(): void {
-    const run = this.#state.value.run
+    const run = selectedRun(this.#state.value)
     if (run == null) return
     const current = this.#selection.begin()
     this.#clearTimer()
@@ -214,7 +267,7 @@ export class RunStore {
   }
 
   public async cancel(): Promise<void> {
-    const run = this.#state.value.run
+    const run = selectedRun(this.#state.value)
     if (!canCancelRun(run) || this.#state.value.cancelingRunId != null || this.#state.value.resolvingAction != null) return
     const current = this.#cancellation.begin()
     this.#setNotice(undefined)
@@ -223,16 +276,14 @@ export class RunStore {
       const cancellation = await this.#client.cancelRun(run.runId)
       if (!current()) return
       const state = this.#state.value
-      const selected = state.run?.runId == run.runId
-      const selectedRun = selected ? { ...state.run!, status: cancellation.status } : undefined
-      this.#set({
-        ...(selectedRun == null ? {} : { run: selectedRun }),
-        runs: state.runs.map((candidate) => (candidate.runId == run.runId ? Object.assign({}, candidate, { status: cancellation.status }) : candidate)),
-      })
-      if (selectedRun == null) return
+      const currentRun = state.runById.get(run.runId)
+      if (currentRun == null) return
+      const nextRun = { ...currentRun, status: cancellation.status }
+      this.#set({ runById: replaceRun(state, nextRun) })
+      if (state.selectedRunId != run.runId) return
       const observation = this.#selection.begin()
       this.#clearTimer()
-      await this.#poll(selectedRun, observation)
+      await this.#poll(nextRun, observation)
     } catch (error) {
       if (current()) this.#setNotice(errorNotice(error, this.#i18n.t))
     } finally {
@@ -241,7 +292,7 @@ export class RunStore {
   }
 
   public async resolve(action: WaitAction): Promise<void> {
-    const run = this.#state.value.run
+    const run = selectedRun(this.#state.value)
     const waiting = run?.status == 'waiting' && 'waiting' in run ? run.waiting : undefined
     if (
       run == null ||
@@ -255,19 +306,17 @@ export class RunStore {
     this.#set({ resolvingAction: action })
     try {
       const resolution = await this.#client.resolveRunWait(run.runId, waiting.waitId, action)
-      const selected = this.#state.value.run
+      const state = this.#state.value
+      const selected = selectedRun(state)
       if (selected?.runId != run.runId || !('waiting' in selected) || selected.waiting?.waitId != waiting.waitId) return
       const { waiting: _, ...rest } = selected
       const next = { ...rest, status: resolution.status }
-      this.#set({
-        run: next,
-        runs: this.#state.value.runs.map((candidate) => (candidate.runId == run.runId ? { ...candidate, status: resolution.status } : candidate)),
-      })
+      this.#set({ runById: replaceRun(state, next) })
       this.retryObservation()
       const target = this.#state.value.target
       if (target != null) void this.#refreshList(target.flowId)
     } catch (error) {
-      if (this.#state.value.run?.runId == run.runId) this.#setNotice(errorNotice(error, this.#i18n.t))
+      if (this.#state.value.selectedRunId == run.runId) this.#setNotice(errorNotice(error, this.#i18n.t))
     } finally {
       if (this.#state.value.resolvingAction == action) this.#set({ resolvingAction: undefined })
     }
@@ -277,18 +326,32 @@ export class RunStore {
     const current = this.#selection.begin()
     this.#lists.invalidate()
     this.#clearTimer()
-    this.#set({ eventCursor: 0, events: [], eventsExpiresAt: undefined, historyComplete: true, result: undefined, run: undefined })
+    this.#set({
+      eventCursor: 0,
+      events: [],
+      eventsExpiresAt: undefined,
+      historyComplete: true,
+      loadFailed: false,
+      loading: false,
+      loadingMore: false,
+      refreshing: false,
+      result: undefined,
+      selectedRunId: undefined,
+    })
     return current
   }
 
   public follow(run: Run, current: Current): boolean {
     if (!current()) return false
+    const state = this.#state.value
     this.#set({
       events: [],
       externalRunId: undefined,
+      loaded: true,
       result: undefined,
-      run,
-      runs: [run, ...this.#state.value.runs.filter((candidate) => candidate.runId != run.runId)],
+      runById: replaceRun(state, run),
+      runIds: [run.runId, ...state.runIds.filter((runId) => runId != run.runId)],
+      selectedRunId: run.runId,
       target: { flowId: run.flowId },
     })
     void this.#poll(run, current)
@@ -296,7 +359,7 @@ export class RunStore {
   }
 
   public followExternal(run: Run): boolean {
-    if (this.#state.value.run?.runId == run.runId) return false
+    if (this.#state.value.selectedRunId == run.runId) return false
     const current = this.prepareStart()
     if (!this.follow(run, current)) return false
     this.#set({ externalRunId: run.runId })
@@ -306,6 +369,7 @@ export class RunStore {
   #observe(run: Run): void {
     const current = this.#selection.begin()
     this.#clearTimer()
+    const state = this.#state.value
     this.#set({
       eventCursor: 0,
       events: [],
@@ -314,7 +378,8 @@ export class RunStore {
       observationFailed: false,
       resolvingAction: undefined,
       result: undefined,
-      run,
+      runById: replaceRun(state, run),
+      selectedRunId: run.runId,
     })
     void this.#poll(run, current)
   }
@@ -327,7 +392,7 @@ export class RunStore {
         this.#client.getRunEvents(run.runId, { after, limit: eventPageLimit }),
       ])
       if (runResponse.status == 'rejected') throw runResponse.reason
-      if (!current() || this.#state.value.run?.runId != run.runId) return
+      if (!current() || this.#state.value.selectedRunId != run.runId) return
       const nextRun = runResponse.value
       this.#set({ observationFailed: false })
       if (eventsResponse.status == 'rejected') {
@@ -335,8 +400,7 @@ export class RunStore {
         this.#set({
           eventsExpiresAt: undefined,
           historyComplete: false,
-          run: nextRun,
-          runs: this.#state.value.runs.map((candidate) => (candidate.runId == nextRun.runId ? nextRun : candidate)),
+          runById: replaceRun(this.#state.value, nextRun),
         })
         await this.#loadResult(nextRun, current)
         return
@@ -347,8 +411,7 @@ export class RunStore {
         events: [...this.#state.value.events, ...page.events],
         eventsExpiresAt: page.eventsExpiresAt,
         historyComplete: page.historyComplete,
-        run: nextRun,
-        runs: this.#state.value.runs.map((candidate) => (candidate.runId == nextRun.runId ? nextRun : candidate)),
+        runById: replaceRun(this.#state.value, nextRun),
       })
       await this.#loadResult(nextRun, current)
       if (isRunTerminal(nextRun.status) && page.done) return
@@ -364,7 +427,7 @@ export class RunStore {
               : runningPollDelay
       this.#timer = globalThis.setTimeout(() => void this.#poll(nextRun, current, nextUnchangedStartingPolls), delay)
     } catch (error) {
-      if (current() && this.#state.value.run?.runId == run.runId) {
+      if (current() && this.#state.value.selectedRunId == run.runId) {
         this.#set({ observationFailed: true })
         this.#setNotice(errorNotice(error, this.#i18n.t))
       }
@@ -376,16 +439,16 @@ export class RunStore {
     try {
       const page = await this.#client.listRuns(flowId, { limit: 50 })
       if (!current() || this.#state.value.target?.flowId != flowId) return
-      this.#set({ nextCursor: page.nextCursor, runs: page.runs })
+      this.#set({ ...listedRuns(this.#state.value, page.runs), loaded: true, loadingMore: false, nextCursor: page.nextCursor, refreshing: false })
     } catch {
-      return
+      if (current() && this.#state.value.target?.flowId == flowId) this.#set({ refreshing: false })
     }
   }
 
   async #loadResult(run: Run, current: Current): Promise<void> {
     if (!isRunTerminal(run.status) || this.#state.value.result?.runId == run.runId) return
     const result = await this.#client.getRunResult(run.runId)
-    if (current() && this.#state.value.run?.runId == run.runId) this.#set({ result })
+    if (current() && this.#state.value.selectedRunId == run.runId) this.#set({ result })
   }
 
   #clearTimer(): void {
