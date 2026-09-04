@@ -289,7 +289,7 @@ export class Store {
   resolveVariables(bindings: Readonly<Record<string, string>>): Readonly<Record<string, string>> | undefined {
     const names = [...new Set(Object.values(bindings))]
     if (names.length == 0) return {}
-    this.#database.exec('BEGIN')
+    this.#database.exec('BEGIN IMMEDIATE')
     try {
       const rows = this.#database
         .prepare(`SELECT name, value FROM variables WHERE name IN (${names.map(() => '?').join(', ')})`)
@@ -1416,10 +1416,10 @@ export class Store {
       .run(runId, cursor, kind, JSON.stringify(payload), value === undefined ? null : JSON.stringify(value), this.#clock())
   }
 
-  #finishRun(runId: string, status: RunTerminalStatus, result: unknown, condition: string, finishedAt: number): boolean {
+  #finishRun(runId: string, status: RunTerminalStatus, result: unknown, condition: string, finishedAt: number, ...conditionParams: readonly unknown[]): boolean {
     const changed = this.#database
       .prepare(`UPDATE runs SET status = ?, result = ?, finished_at = ?, events_expires_at = ? WHERE run_id = ? AND ${condition}`)
-      .run(status, JSON.stringify(result), finishedAt, finishedAt + this.#runEventRetentionMs, runId)
+      .run(status, JSON.stringify(result), finishedAt, finishedAt + this.#runEventRetentionMs, runId, ...conditionParams)
     if (changed.changes != 1) return false
     this.#database.prepare('UPDATE run_waits SET checkpoint_json = NULL WHERE run_id = ?').run(runId)
     this.#database.prepare('DELETE FROM wait_notifications WHERE run_id = ?').run(runId)
@@ -1583,13 +1583,7 @@ export class Store {
     for (const row of resumes) {
       if (this.#checkpointValid(row.checkpointJson, row.checkpointDigest, row.checkpointBytes, row.waitId)) continue
       this.#transaction(() =>
-        this.#finishRun(
-          row.runId,
-          'indeterminate',
-          { error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint is unavailable.' } },
-          `status = '${row.status}'`,
-          this.#clock(),
-        ),
+        this.#finishRun(row.runId, 'indeterminate', { error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint is unavailable.' } }, 'status = ?', this.#clock(), row.status),
       )
     }
   }
