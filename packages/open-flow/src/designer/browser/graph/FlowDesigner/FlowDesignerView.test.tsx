@@ -1194,6 +1194,17 @@ describe('FlowDesignerView model synchronization', () => {
     view.props.flowDesignerStore.dispose()
   })
 
+  it('runs the initial graph layout when requested by the host', () => {
+    const view = FlowDesignerView(props(model([task([])]), { autoLayout: true })) as React.ReactElement<FlowDesignerProps>
+    const store = view.props.flowDesignerStore
+    const node = [...store.$.nodes.values()][0]
+    if (node == null) throw new Error('Expected a Task node.')
+    node.$$.rfNode.set({ ...node.$.rfNode.value, measured: { width: 420, height: 240 } })
+
+    expect(store.completeDisplayModeLayout()).toBe('relayout')
+    store.dispose()
+  })
+
   it('restores the saved overview viewport without replacing shared positions', () => {
     const value: FlowDesignerViewModel = {
       layouts: {

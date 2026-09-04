@@ -14,7 +14,9 @@ import { ThemeProvider } from '../../src/designer/browser/theme/ThemeProvider.ts
 import { defaultUiLanguage, uiLanguageNames, uiLanguages } from '../../src/localization/common/languages.ts'
 import { TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
 import { CodeEditor } from '../../src/workbench/browser/runtime/designer/codeEditor.tsx'
+import { overviewStories } from './overview.tsx'
 import { stories } from './stories.tsx'
+import { workflowStories } from './workflow.tsx'
 
 type ThemeMode = 'dark' | 'light' | 'system'
 
@@ -56,10 +58,11 @@ const codeEditorStory: DesignerStory = {
   title: 'Code Editor',
 }
 
-const labStories: readonly DesignerStory[] = [...stories, codeEditorStory]
+const labStories: readonly DesignerStory[] = [...stories, codeEditorStory, ...workflowStories, ...overviewStories]
 
 function initialStory(): DesignerStory {
-  const story = labStories.find((item) => item.id == new URLSearchParams(location.search).get('story')) ?? labStories[0]
+  const requested = new URLSearchParams(location.search).get('story')
+  const story = labStories.find((item) => item.id == requested) ?? labStories.find((item) => item.id == 'workflow') ?? labStories[0]
   if (!story) throw new Error('Designer Lab has no stories.')
   return story
 }
@@ -90,7 +93,7 @@ export function DesignerLab() {
   }
 
   return (
-    <div className="lab-shell" data-theme={dark ? 'dark' : 'light'}>
+    <div className="lab-shell open-flow-theme" data-theme={dark ? 'dark' : 'light'}>
       <aside className="lab-sidebar">
         <div className="lab-brand">
           <strong>Designer Lab</strong>
@@ -136,10 +139,12 @@ export function DesignerLab() {
         </header>
         <div className="lab-workspace">
           {story.standalone ? (
-            <div className="standalone-stage">{story.render(log, dark)}</div>
+            <div className="standalone-stage" key={story.id}>
+              {story.render(log, dark, language)}
+            </div>
           ) : (
-            <StoryStage dark={dark} i18n={i18n}>
-              {story.render(log, dark)}
+            <StoryStage dark={dark} i18n={i18n} key={story.id}>
+              {story.render(log, dark, language)}
             </StoryStage>
           )}
         </div>
@@ -213,6 +218,8 @@ function StoryStage({ children, dark, i18n }: { readonly children: React.ReactNo
                 <ReactFlow
                   colorMode={dark ? 'dark' : 'light'}
                   edges={[]}
+                  fitView
+                  fitViewOptions={{ maxZoom: 1, padding: 0.12 }}
                   maxZoom={3}
                   minZoom={0.1}
                   nodeTypes={nodeTypes}

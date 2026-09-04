@@ -111,6 +111,7 @@ export class FlowDesignerViewAdapter {
     addItems: readonly FlowDesignerViewAddItem[],
     callbacks: ViewCallbacks,
     createSchemaEditor: CreateSchemaEditorFn,
+    autoLayout = false,
   ) {
     this.#addItems = addItems
     this.#callbacks = callbacks
@@ -226,7 +227,7 @@ export class FlowDesignerViewAdapter {
     this.store.dispose.add(this.#language)
     this.#syncModel(model)
     designerUIStore.loadDesignerUIData({ layouts: model.layouts }, 'overview')
-    designerUIStore.completeActiveLayout()
+    if (!autoLayout) designerUIStore.completeActiveLayout()
   }
 
   #cancelPendingDisconnects(): void {

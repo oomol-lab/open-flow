@@ -41,7 +41,16 @@ function callbacksFromProps(props: FlowDesignerViewProps): ViewCallbacks {
 
 export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
   const adapter = useMemo(
-    () => new FlowDesignerViewAdapter(props.model, props.editable, props.language ?? 'en', props.addItems, callbacksFromProps(props), props.createSchemaEditor),
+    () =>
+      new FlowDesignerViewAdapter(
+        props.model,
+        props.editable,
+        props.language ?? 'en',
+        props.addItems,
+        callbacksFromProps(props),
+        props.createSchemaEditor,
+        props.autoLayout,
+      ),
     [props.identity],
   )
   const propsRef = useRef(props)
@@ -115,6 +124,7 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
       flowDesignerStore={adapter.store}
       isValidConnection={isValidConnection}
       key={props.identity}
+      layoutMotion={props.layoutMotion}
       onMoveEnd={onMoveEnd}
       onNodeDragStop={onNodeDragStop}
       onDropAddItem={onDropAddItem}

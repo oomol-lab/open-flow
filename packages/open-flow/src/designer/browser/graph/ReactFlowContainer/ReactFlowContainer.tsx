@@ -168,6 +168,7 @@ export interface ReactFlowContainerProps {
   onAddHandle?: (options: IAddHandleOptions) => void
   fitView?: boolean
   fitViewOptions?: FitViewOptions
+  layoutMotion?: boolean
   dottedBackground?: boolean
   children?: React.ReactNode
 }
@@ -208,7 +209,7 @@ export const ReactFlowContainer: React.FC<ReactFlowContainerProps> = (props: Rea
 
 type FlowControlsProps = Pick<
   ReactFlowContainerProps,
-  'miniMapExpanded$' | 'displayMode$' | 'interactiveMode$' | 'showSettings$' | 'onRelayout' | 'onFitView' | 'dottedBackground'
+  'miniMapExpanded$' | 'displayMode$' | 'interactiveMode$' | 'showSettings$' | 'onRelayout' | 'onFitView' | 'dottedBackground' | 'layoutMotion'
 > & { onBeforeFitView?: () => void }
 
 const selector = (s: ReactFlowState) => ({
@@ -228,7 +229,7 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
   const selectedNodes = nodes.filter((node) => node.selected)
   const fitViewOptions: FitViewOptions = {
     padding: 0.15,
-    duration: 150,
+    duration: props.layoutMotion === false ? 0 : 150,
     maxZoom: 1,
   }
 
@@ -499,10 +500,16 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
   const displayModeMounted = useRef(false)
   const [switchingDisplayMode, setSwitchingDisplayMode] = useState(false)
   const [fittingView, setFittingView] = useState(false)
+  const [layoutReady, setLayoutReady] = useState(props.layoutMotion !== false || props.onDisplayModeMeasured == null)
   const onBeforeFitView = useCallback(() => setFittingView(true), [])
+
+  useLayoutEffect(() => {
+    setLayoutReady(props.layoutMotion !== false || props.onDisplayModeMeasured == null)
+  }, [overview, props.layoutMotion, props.onDisplayModeMeasured])
 
   useEffect(() => {
     let measurementFrame = 0
+    let readyFrame = 0
     let fitTimer: ReturnType<typeof setTimeout> | undefined
     let attempts = 0
     const completeLayout = () => {
@@ -511,9 +518,15 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
         measurementFrame = requestAnimationFrame(completeLayout)
       } else if (result === 'relayout') {
         onBeforeFitView()
-        fitTimer = setTimeout(() => {
-          rf.fitView({ padding: 0.15, duration: 150, maxZoom: 1 })
-        }, DISPLAY_MODE_REFLOW_DELAY)
+        fitTimer = setTimeout(
+          () => {
+            rf.fitView({ padding: 0.15, duration: props.layoutMotion === false ? 0 : 150, maxZoom: 1 })
+            readyFrame = requestAnimationFrame(() => setLayoutReady(true))
+          },
+          props.layoutMotion === false ? 0 : DISPLAY_MODE_REFLOW_DELAY,
+        )
+      } else {
+        setLayoutReady(true)
       }
     }
     const frame = requestAnimationFrame(() => {
@@ -522,7 +535,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
     })
     let transitionTimer: ReturnType<typeof setTimeout> | undefined
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (displayModeMounted.current && !reduceMotion) {
+    if (displayModeMounted.current && props.layoutMotion !== false && !reduceMotion) {
       setSwitchingDisplayMode(true)
       transitionTimer = setTimeout(() => setSwitchingDisplayMode(false), DISPLAY_MODE_TRANSITION_DURATION)
     } else {
@@ -533,10 +546,11 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
     return () => {
       cancelAnimationFrame(frame)
       cancelAnimationFrame(measurementFrame)
+      cancelAnimationFrame(readyFrame)
       if (fitTimer) clearTimeout(fitTimer)
       if (transitionTimer) clearTimeout(transitionTimer)
     }
-  }, [onBeforeFitView, overview, props.onDisplayModeMeasured, rf, updateNodeInternals])
+  }, [onBeforeFitView, overview, props.layoutMotion, props.onDisplayModeMeasured, rf, updateNodeInternals])
 
   const viewport = useVal(props.viewport$)
   const nonEmptyViewport = useRef(viewport)
@@ -675,11 +689,12 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             DESIGNER_CLASSNAME,
             interactiveMode,
             fittingView && FITTING_VIEW_CLASSNAME,
+            !layoutReady && styles.layoutPending,
             switchingDisplayMode && styles.switchingDisplayMode,
           )}
           style={
             {
-              '--display-mode-transition-duration': `${DISPLAY_MODE_TRANSITION_DURATION}ms`,
+              '--display-mode-transition-duration': `${props.layoutMotion === false ? 0 : DISPLAY_MODE_TRANSITION_DURATION}ms`,
             } as React.CSSProperties
           }
           colorMode={props.dark ? 'dark' : 'light'}
@@ -740,6 +755,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             miniMapExpanded$={props.miniMapExpanded$}
             displayMode$={props.displayMode$}
             interactiveMode$={props.interactiveMode$}
+            layoutMotion={props.layoutMotion}
             onBeforeFitView={onBeforeFitView}
             onRelayout={overview ? undefined : props.onRelayout}
             onFitView={props.onFitView}

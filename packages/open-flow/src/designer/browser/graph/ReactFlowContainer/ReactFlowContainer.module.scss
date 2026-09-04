@@ -84,6 +84,10 @@
   }
 }
 
+.layoutPending :global(.react-flow__viewport) {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .switchingDisplayMode :global(.react-flow__node) {
     transition: none;

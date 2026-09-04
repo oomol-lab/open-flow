@@ -286,6 +286,7 @@ export interface FlowDesignerViewProps {
     readonly screenPosition?: FlowDesignerViewPosition
   }
   readonly addItems: readonly FlowDesignerViewAddItem[]
+  readonly autoLayout?: boolean
   readonly className?: string
   readonly createSchemaEditor: CreateSchemaEditorFn
   readonly dark?: boolean
@@ -297,6 +298,7 @@ export interface FlowDesignerViewProps {
   readonly identity: string
   readonly isValidConnection?: (edge: Omit<FlowDesignerViewEdge, 'id'>) => boolean
   readonly language?: string
+  readonly layoutMotion?: boolean
   readonly model: FlowDesignerViewModel
   readonly onAddNode: (
     itemId: string,

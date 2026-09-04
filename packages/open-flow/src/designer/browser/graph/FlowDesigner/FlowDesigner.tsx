@@ -15,6 +15,7 @@ export interface FlowDesignerProps {
   flowDesignerStore: FlowDesignerStore
   dark: boolean
   fitView?: boolean
+  layoutMotion?: boolean
   className?: string
   addNodeRequest?: ReactFlowContainerProps['addNodeRequest']
   addItemRequest?: ReactFlowContainerProps['addItemRequest']
@@ -29,6 +30,7 @@ export const FlowDesigner: React.FC<FlowDesignerProps> = ({
   flowDesignerStore,
   dark,
   fitView,
+  layoutMotion,
   className,
   addNodeRequest,
   addItemRequest,
@@ -57,6 +59,7 @@ export const FlowDesigner: React.FC<FlowDesignerProps> = ({
           dottedBackground
           fitView={fitView ?? !editable}
           fitViewOptions={fitViewOptions}
+          layoutMotion={layoutMotion}
           nodeTypes={NODE_TYPES}
           edgeTypes={FLOW_EDGE_TYPES}
           miniMapExpanded$={flowDesignerStore.$$.miniMapExpanded}

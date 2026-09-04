@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { DesignerOption } from '../../src/designer/browser/components/select.tsx'
+import type { UiLanguage } from '../../src/localization/common/languages.ts'
 
 import { useState } from 'react'
 import { DateTimePicker } from '../../src/designer/browser/components/dateTimePicker.tsx'
@@ -25,7 +26,7 @@ export type LogAction = (name: string, value?: unknown) => void
 export interface DesignerStory {
   readonly group: string
   readonly id: string
-  readonly render: (log: LogAction, dark: boolean) => ReactNode
+  readonly render: (log: LogAction, dark: boolean, language: UiLanguage) => ReactNode
   readonly standalone?: boolean
   readonly title: string
 }
@@ -98,7 +99,7 @@ function MultiSelectStory({ log }: { readonly log: LogAction }) {
 }
 
 function DateTimeStory({ log }: { readonly log: LogAction }) {
-  const [date, setDate] = useState<Date | null>(new Date())
+  const [date, setDate] = useState<Date | null>(new Date(2026, 8, 3, 9, 30))
   return (
     <StoryColumn>
       <Field label="Date">
@@ -112,13 +113,13 @@ function DateTimeStory({ log }: { readonly log: LogAction }) {
         />
       </Field>
       <Field label="Date and time">
-        <DateTimePicker showDate showTime defaultValue={new Date()} isClearable onChange={(next) => log('datetime.change', next)} />
+        <DateTimePicker showDate showTime defaultValue={new Date(2026, 8, 3, 9, 30)} isClearable onChange={(next) => log('datetime.change', next)} />
       </Field>
       <Field label="Time">
-        <DateTimePicker showDate={false} showTime defaultValue={new Date()} onChange={(next) => log('time.change', next)} />
+        <DateTimePicker showDate={false} showTime defaultValue={new Date(2026, 8, 3, 9, 30)} onChange={(next) => log('time.change', next)} />
       </Field>
       <Field label="Disabled">
-        <DateTimePicker disabled value={new Date()} />
+        <DateTimePicker disabled value={new Date(2026, 8, 3, 9, 30)} />
       </Field>
     </StoryColumn>
   )
