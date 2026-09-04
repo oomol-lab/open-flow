@@ -23,6 +23,7 @@ const hooks = vi.hoisted(() => ({
   effectIndex: 0,
   effects: [] as (readonly unknown[] | undefined)[],
   memo: undefined as unknown,
+  memoDependencies: undefined as readonly unknown[] | undefined,
   refIndex: 0,
   refs: [] as { current: unknown }[],
 }))
@@ -41,6 +42,7 @@ vi.mock('react', async (importOriginal) => {
       dependencies.length != previous.length ||
       dependencies.some((dependency, dependencyIndex) => dependency !== previous[dependencyIndex])
     ) {
+      hooks.cleanups[index]?.()
       const cleanup = callback()
       hooks.cleanups[index] = typeof cleanup == 'function' ? cleanup : undefined
     }
@@ -50,10 +52,21 @@ vi.mock('react', async (importOriginal) => {
     useCallback: <T,>(callback: T) => callback,
     useEffect: effect,
     useLayoutEffect: effect,
-    useMemo: <T,>(factory: () => T) => {
+    useMemo: <T,>(factory: () => T, dependencies?: readonly unknown[]) => {
       hooks.effectIndex = 0
       hooks.refIndex = 0
-      return (hooks.memo ??= factory()) as T
+      const previous = hooks.memoDependencies
+      if (
+        hooks.memo === undefined ||
+        dependencies == null ||
+        previous == null ||
+        dependencies.length != previous.length ||
+        dependencies.some((dependency, dependencyIndex) => dependency !== previous[dependencyIndex])
+      ) {
+        hooks.memo = factory()
+        hooks.memoDependencies = dependencies
+      }
+      return hooks.memo as T
     },
     useRef: <T,>(value: T) => {
       const index = hooks.refIndex++
@@ -185,6 +198,7 @@ describe('FlowDesignerView model synchronization', () => {
     hooks.effectIndex = 0
     hooks.effects = []
     hooks.memo = undefined
+    hooks.memoDependencies = undefined
     hooks.refIndex = 0
     hooks.refs = []
   })
@@ -206,6 +220,18 @@ describe('FlowDesignerView model synchronization', () => {
       error.mockRestore()
       view.props.flowDesignerStore.dispose()
     }
+  })
+
+  it('disposes the adapter replaced by a new identity', () => {
+    const first = FlowDesignerView(props(model([]))) as React.ReactElement<FlowDesignerProps>
+    const disposed = vi.fn()
+    first.props.flowDesignerStore.dispose.add(disposed)
+
+    const second = FlowDesignerView(props(model([]), { identity: 'flow:next' })) as React.ReactElement<FlowDesignerProps>
+
+    expect(second.props.flowDesignerStore).not.toBe(first.props.flowDesignerStore)
+    expect(disposed).toHaveBeenCalledOnce()
+    second.props.flowDesignerStore.dispose()
   })
 
   it('does not publish unchanged Variable projections while mounting', () => {

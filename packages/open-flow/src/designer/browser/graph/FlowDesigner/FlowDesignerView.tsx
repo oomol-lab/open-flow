@@ -53,6 +53,7 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
       ),
     [props.identity],
   )
+  const previousAdapter = useRef(adapter)
   const propsRef = useRef(props)
   const selectedEdge = useRef<string>()
   propsRef.current = props
@@ -101,7 +102,12 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
   }, [])
   const onDropAddItem = useCallback((itemId: string, position: FlowDesignerViewPosition) => adapter.addNode(itemId, position), [adapter])
 
-  useEffect(() => () => adapter.cancelPendingDisconnects(), [adapter])
+  useEffect(() => {
+    const previous = previousAdapter.current
+    previousAdapter.current = adapter
+    if (previous !== adapter) previous.store.dispose()
+    return () => adapter.cancelPendingDisconnects()
+  }, [adapter])
   useLayoutEffect(() => adapter.setCallbacks(callbacksFromProps(props)))
   useLayoutEffect(() => {
     adapter.reconcile(props.model, props.editable, props.language ?? 'en', props.addItems)
