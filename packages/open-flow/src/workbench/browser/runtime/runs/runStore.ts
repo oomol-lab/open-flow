@@ -90,9 +90,13 @@ function selectedRun(state: RunState): Run | RunDetails | undefined {
 
 function listedRuns(state: RunState, runs: readonly Run[]): Pick<RunState, 'runById' | 'runIds'> {
   const runById = new Map(runs.map((run) => [run.runId, run] as const))
+  const runIds = runs.map((run) => run.runId)
   const selected = selectedRun(state)
-  if (selected != null) runById.set(selected.runId, selected)
-  return { runById, runIds: runs.map((run) => run.runId) }
+  if (selected != null) {
+    if (!runById.has(selected.runId)) runIds.unshift(selected.runId)
+    runById.set(selected.runId, selected)
+  }
+  return { runById, runIds }
 }
 
 function replaceRun(state: RunState, run: Run | RunDetails): ReadonlyMap<string, Run | RunDetails> {
@@ -436,6 +440,7 @@ export class RunStore {
 
   async #refreshList(flowId: string): Promise<void> {
     const current = this.#lists.begin()
+    this.#set({ refreshing: true })
     try {
       const page = await this.#client.listRuns(flowId, { limit: 50 })
       if (!current() || this.#state.value.target?.flowId != flowId) return

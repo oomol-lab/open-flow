@@ -23,7 +23,7 @@ const details = {
 } as const
 
 describe('RunStore', () => {
-  it('keeps the selected Run visible while refreshing the loaded history', async () => {
+  it('keeps the selected Run visible while a notification refreshes the loaded history', async () => {
     const refreshed = Promise.withResolvers<Response>()
     let listReads = 0
     const request = vi.fn(async (path: string) => {
@@ -47,18 +47,17 @@ describe('RunStore', () => {
       await store.load('flow-1')
       await vi.waitFor(() => expect(store.$.run.value).toEqual(details))
 
-      const refreshing = store.load('flow-1')
+      store.changed(run.runId)
       expect(store.$.loading.value).toBe(false)
       expect(store.$.refreshing.value).toBe(true)
       expect(store.$.runs.value).toEqual([details])
 
       const newer = { ...run, runId: 'run-2' }
-      refreshed.resolve(Response.json({ flowId: 'flow-1', runs: [newer, run], version: 1 }))
-      await refreshing
+      refreshed.resolve(Response.json({ flowId: 'flow-1', runs: [newer], version: 1 }))
+      await vi.waitFor(() => expect(store.$.refreshing.value).toBe(false))
 
-      expect(store.$.refreshing.value).toBe(false)
-      expect(store.$.runs.value.map((item) => item.runId)).toEqual(['run-2', 'run-1'])
-      expect(store.$.runs.value[1]).toBe(store.$.run.value)
+      expect(store.$.runs.value.map((item) => item.runId)).toEqual(['run-1', 'run-2'])
+      expect(store.$.runs.value[0]).toBe(store.$.run.value)
       expect(store.$.run.value).toEqual(details)
     } finally {
       store.dispose()
