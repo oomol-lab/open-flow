@@ -242,6 +242,8 @@ function notificationResponse(body: ReadableStream<Uint8Array>): Response {
   })
 }
 
+const keepaliveIntervalMs = 15_000
+
 function notifications<Event>(
   subscribe: (listener: (event: Event) => void) => () => void,
   signals: readonly (AbortSignal | undefined)[],
@@ -249,9 +251,11 @@ function notifications<Event>(
   let controller: ReadableStreamDefaultController<Uint8Array> | undefined
   let closed = false
   let unsubscribe: (() => void) | undefined
+  let keepaliveTimer: ReturnType<typeof setInterval> | undefined
   const cleanup = (): void => {
     if (closed) return
     closed = true
+    clearInterval(keepaliveTimer)
     for (const signal of signals) signal?.removeEventListener('abort', abort)
     unsubscribe?.()
   }
@@ -272,6 +276,9 @@ function notifications<Event>(
       if (signals.some((signal) => signal?.aborted)) return abort()
       for (const signal of signals) signal?.addEventListener('abort', abort, { once: true })
       streamController.enqueue(encoder.encode(': connected\n\n'))
+      keepaliveTimer = setInterval(() => {
+        if (!closed) streamController.enqueue(encoder.encode(': keepalive\n\n'))
+      }, keepaliveIntervalMs)
     },
   })
 }

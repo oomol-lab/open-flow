@@ -1,6 +1,7 @@
 import type { FlowCatalogEvent, FlowChangeEvent, WorkbenchHost, WorkbenchNotification } from '@oomol-lab/open-flow/workbench'
 
-const reconnectDelayMs = 1_000
+const reconnectBaseMs = 1_000
+const reconnectMaxMs = 30_000
 
 export function createBrowserHost(notify: (notification: WorkbenchNotification | undefined) => void, sessionExpired: () => void): WorkbenchHost {
   return {
@@ -44,6 +45,7 @@ async function readConnections<Event>(
   signal: AbortSignal,
   sessionExpired: () => void,
 ): Promise<void> {
+  let attempt = 0
   while (!signal.aborted) {
     try {
       const response = await fetch(path, { credentials: 'same-origin', headers: { accept: 'text/event-stream' }, signal })
@@ -52,12 +54,14 @@ async function readConnections<Event>(
         return
       }
       if (!response.ok || response.body == null) throw new Error(`Notification request returned ${response.status}.`)
+      attempt = 0
       listener()
       await readEvents(response.body, listener, decode, signal)
     } catch {
       if (signal.aborted) return
     }
-    await reconnectDelay(signal)
+    await reconnectDelay(signal, attempt)
+    attempt++
   }
 }
 
@@ -107,14 +111,17 @@ function decodeFlowEvent(value: unknown): FlowChangeEvent | undefined {
   if (event.kind == 'run.created' && typeof event.runId == 'string') return event as FlowChangeEvent
 }
 
-async function reconnectDelay(signal: AbortSignal): Promise<void> {
+async function reconnectDelay(signal: AbortSignal, attempt: number): Promise<void> {
+  const delay = Math.min(reconnectBaseMs * 2 ** attempt, reconnectMaxMs)
+  const jitter = delay * 0.5 * Math.random()
+  const ms = Math.round(delay + jitter)
   await new Promise<void>((resolve) => {
     const done = (): void => {
       clearTimeout(timer)
       signal.removeEventListener('abort', done)
       resolve()
     }
-    const timer = setTimeout(done, reconnectDelayMs)
+    const timer = setTimeout(done, ms)
     signal.addEventListener('abort', done, { once: true })
   })
 }
