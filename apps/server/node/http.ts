@@ -485,7 +485,7 @@ async function readBody(request: Request, limit: number, tooLarge: () => Error):
 function json(status: number, body: unknown): Response {
   const source = JSON.stringify(body)
   return new Response(source, {
-    headers: { 'content-length': String(encoder.encode(source).byteLength), 'content-type': 'application/json; charset=utf-8' },
+    headers: { 'cache-control': 'no-store', 'content-length': String(encoder.encode(source).byteLength), 'content-type': 'application/json; charset=utf-8' },
     status,
   })
 }
