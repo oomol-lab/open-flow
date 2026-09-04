@@ -279,6 +279,15 @@ export async function decodeCommandArchive(archive: Uint8Array): Promise<Decoded
 
 export async function extractCommandArchive(archive: Uint8Array, write: (entry: CommandArchiveEntry) => Promise<void>): Promise<CommandArtifactManifest> {
   const decoded = await decodeCommandArchive(archive)
-  for (const file of decoded.files) await write(file)
+  const written: CommandArchiveEntry[] = []
+  try {
+    for (const file of decoded.files) {
+      await write(file)
+      written.push(file)
+    }
+  } catch (error) {
+    for (const file of written) await write({ bytes: new Uint8Array(0), mode: file.mode, path: file.path })
+    throw error
+  }
   return decoded.manifest
 }

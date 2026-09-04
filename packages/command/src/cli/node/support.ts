@@ -599,7 +599,11 @@ export function inspectedEdges(nodes: Readonly<Record<string, GraphNode>>) {
             })),
       )
     })
-    .toSorted((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+    .toSorted((left, right) => {
+      const lk = `${left.target.nodeId}\0${left.input}\0${left.source.nodeId}\0${left.source.output}`
+      const rk = `${right.target.nodeId}\0${right.input}\0${right.source.nodeId}\0${right.source.output}`
+      return lk.localeCompare(rk)
+    })
 }
 
 export function requireCount(positionals: readonly string[], count: number, usage: string): void {
