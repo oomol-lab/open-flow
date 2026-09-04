@@ -472,6 +472,12 @@ it('serves immutable assets and limits the SPA fallback to non-reserved HTML nav
       expect.soft(response.headers.get('content-type'), target).toContain('application/json')
     }
     expect((await app.request('/flows/main/design', { headers: { accept: 'application/json' } })).status).toBe(404)
+    for (const accept of ['application/json, text/html;q=0', '*/*;q=1, text/html;q=0']) {
+      const response = await app.request('/flows/main/design', { headers: { accept } })
+      expect.soft(response.status, accept).toBe(404)
+      expect.soft(response.headers.get('content-type'), accept).toContain('application/json')
+    }
+    expect((await app.request('/flows/main/design', { headers: { accept: 'Text/HTML' } })).status).toBe(200)
     expect((await app.request('/flows/main/design', { headers: { accept: 'text/html' }, method: 'POST' })).status).toBe(404)
 
     const apiOnly = createServerApp(service)
