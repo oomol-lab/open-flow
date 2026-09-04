@@ -10,6 +10,7 @@ import { resourceNameIssue } from '@oomol-lab/open-flow/flow-change'
 import { integrationEndpointId } from '@oomol-lab/open-flow/integration-trigger'
 import { maximumWebhookBodyBytes, webhookEndpointId, webhookOccurrenceId } from '@oomol-lab/open-flow/webhook-trigger'
 import { Hono } from 'hono'
+import { parseAccept } from 'hono/utils/accept'
 import { randomUUID } from 'node:crypto'
 import { createConfigApp } from './config.ts'
 import { createControlApp } from './control.ts'
@@ -294,26 +295,40 @@ function reserved(path: string): boolean {
 function acceptsHtml(accept: string | undefined): boolean {
   if (accept == null) return true
   let quality = 0
-  let specificity = -1
-  for (const value of accept.split(',')) {
-    const [mediaType, ...parameters] = value.split(';')
-    const candidate = mediaType?.trim().toLowerCase()
-    const candidateSpecificity = candidate == 'text/html' ? 2 : candidate == 'text/*' ? 1 : candidate == '*/*' ? 0 : -1
-    if (candidateSpecificity < 0) continue
-    if (candidateSpecificity < specificity) continue
-    let candidateQuality = 1
-    for (const parameter of parameters) {
-      const separator = parameter.indexOf('=')
-      if (separator < 0 || parameter.slice(0, separator).trim().toLowerCase() != 'q') continue
-      const source = parameter.slice(separator + 1).trim()
-      candidateQuality = /^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/.test(source) ? Number(source) : 0
-      break
+  let bestType = -1
+  let bestParams = -1
+  for (const { type, params } of parseAccept(accept)) {
+    let typeRank: number
+    switch (type.toLowerCase()) {
+      case 'text/html':
+        typeRank = 2
+        break
+      case 'text/*':
+        typeRank = 1
+        break
+      case '*/*':
+        typeRank = 0
+        break
+      default:
+        continue
     }
-    if (candidateSpecificity > specificity) {
-      quality = candidateQuality
-      specificity = candidateSpecificity
-    } else if (candidateSpecificity == specificity) {
-      quality = Math.max(quality, candidateQuality)
+
+    const entries = Object.entries(params)
+    const q = entries.findIndex(([name]) => name.toLowerCase() == 'q')
+    const media = q < 0 ? entries : entries.slice(0, q)
+    if (media.some(([name, value]) => name.toLowerCase() != 'charset' || value.toLowerCase() != 'utf-8')) continue
+    const paramRank = media.length
+    if (typeRank < bestType || (typeRank == bestType && paramRank < bestParams)) continue
+
+    const source = q < 0 ? undefined : entries[q]?.[1]
+    let weight = 1
+    if (source != null) weight = /^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/.test(source) ? Number(source) : 0
+    if (typeRank > bestType || paramRank > bestParams) {
+      quality = weight
+      bestType = typeRank
+      bestParams = paramRank
+    } else {
+      quality = Math.max(quality, weight)
     }
   }
   return quality > 0
