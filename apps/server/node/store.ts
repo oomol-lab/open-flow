@@ -289,7 +289,7 @@ export class Store {
   resolveVariables(bindings: Readonly<Record<string, string>>): Readonly<Record<string, string>> | undefined {
     const names = [...new Set(Object.values(bindings))]
     if (names.length == 0) return {}
-    this.#database.exec('BEGIN IMMEDIATE')
+    this.#database.exec('BEGIN')
     try {
       const rows = this.#database
         .prepare(`SELECT name, value FROM variables WHERE name IN (${names.map(() => '?').join(', ')})`)
@@ -1416,7 +1416,7 @@ export class Store {
       .run(runId, cursor, kind, JSON.stringify(payload), value === undefined ? null : JSON.stringify(value), this.#clock())
   }
 
-  #finishRun(runId: string, status: RunTerminalStatus, result: unknown, condition: string, finishedAt: number, ...conditionParams: readonly unknown[]): boolean {
+  #finishRun(runId: string, status: RunTerminalStatus, result: unknown, condition: string, finishedAt: number, ...conditionParams: readonly string[]): boolean {
     const changed = this.#database
       .prepare(`UPDATE runs SET status = ?, result = ?, finished_at = ?, events_expires_at = ? WHERE run_id = ? AND ${condition}`)
       .run(status, JSON.stringify(result), finishedAt, finishedAt + this.#runEventRetentionMs, runId, ...conditionParams)
