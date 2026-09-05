@@ -44,13 +44,14 @@ describe('ConnectorStore', () => {
     const request = vi.fn(async (path: string) => {
       if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows, total: flows.length, version: 1 })
       for (const [index, flow] of flows.entries()) {
-        if (path == `/v1/flows/${flow!.flowId}/draft`) return Response.json(draft(flow!.flowId, flow!.draftRevisionId))
-        if (path == `/v1/flows/${flow!.flowId}/live`) {
-          return Response.json({ flowId: flow!.flowId, hasUnpublishedChanges: false, publication: null, revision: 0, status: 'not-published', version: 1 })
-        }
-        if (path == `/v1/flows/${flow!.flowId}/presentation`) {
-          return Response.json({ revision: 1, updatedAt: timestamp, value: {}, version: 1 })
-        }
+        if (path == `/v1/flows/${flow.flowId}/editor`)
+          return Response.json({
+            flow,
+            draft: draft(flow.flowId, flow.draftRevisionId),
+            live: { flowId: flow.flowId, hasUnpublishedChanges: false, publication: null, revision: 0, status: 'not-published', version: 1 },
+            presentation: { revision: 1, updatedAt: timestamp, value: {}, version: 1 },
+            version: 1,
+          })
         if (path == `/v1/flows/${flow!.flowId}/revisions/${flow!.draftRevisionId}/check`) {
           return Response.json({
             closureDigest: `closure-${index}`,

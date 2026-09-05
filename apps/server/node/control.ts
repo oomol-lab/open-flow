@@ -105,6 +105,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     return response(202, service.retireFlow(context.req.param('flowId')))
   })
 
+  app.get('/flows/:flowId/editor', async (context) => response(200, await service.getEditor(context.req.param('flowId'))))
   app.get('/flows/:flowId/draft', (context) => response(200, service.getDraft(context.req.param('flowId'))))
   app.get('/flows/:flowId/draft/sync', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)

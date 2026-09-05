@@ -294,7 +294,7 @@ function Session({
     const refreshConnections = (): void => {
       void store.connectors.refreshAfterAuthorization()
       void store.triggers.refreshAfterAuthorization()
-      void store.refreshVariableNames()
+      store.invalidateVariableNames()
     }
     globalThis.addEventListener('focus', refreshConnections)
     return () => {

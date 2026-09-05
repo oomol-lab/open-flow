@@ -21,29 +21,28 @@ describe('TriggerStore', () => {
     const request = vi.fn(async (path: string) => {
       requests.push(path)
       if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [flow], total: 1, version: 1 })
-      if (path == `/v1/flows/${flow.flowId}/draft`) {
+      if (path == `/v1/flows/${flow.flowId}/editor`)
         return Response.json({
-          actorId: 'actor',
-          content: {
-            document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
+          flow,
+          draft: {
+            actorId: 'actor',
+            content: {
+              document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
+              modelVersion: 1,
+              modules: {},
+            },
+            createdAt: timestamp,
+            digest: 'digest',
+            flowId: flow.flowId,
             modelVersion: 1,
-            modules: {},
+            parentRevisionId: null,
+            revisionId: flow.draftRevisionId,
+            version: 1,
           },
-          createdAt: timestamp,
-          digest: 'digest',
-          flowId: flow.flowId,
-          modelVersion: 1,
-          parentRevisionId: null,
-          revisionId: flow.draftRevisionId,
+          live: { flowId: flow.flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 },
+          presentation: { revision: 1, updatedAt: timestamp, value: {}, version: 1 },
           version: 1,
         })
-      }
-      if (path == `/v1/flows/${flow.flowId}/live`) {
-        return Response.json({ flowId: flow.flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 })
-      }
-      if (path == `/v1/flows/${flow.flowId}/presentation`) {
-        return Response.json({ revision: 1, updatedAt: timestamp, value: {}, version: 1 })
-      }
       if (path == `/v1/flows/${flow.flowId}/revisions/${flow.draftRevisionId}/check`) {
         return Response.json({
           closureDigest: 'closure',

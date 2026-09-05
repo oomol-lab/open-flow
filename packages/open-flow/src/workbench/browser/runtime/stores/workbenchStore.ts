@@ -81,7 +81,8 @@ export class WorkbenchStore {
   readonly #variableNames = val<readonly string[]>([])
   readonly #variableNamesLoaded = val(false)
   readonly #variableNamesLoading = val(false)
-  readonly #variableRefresh = new Latest()
+  #variableNamesStale = true
+  #variableRequest: Promise<void> | undefined
   #disposed = false
 
   public readonly $: Workbench$
@@ -208,7 +209,6 @@ export class WorkbenchStore {
   public dispose(): void {
     this.#disposed = true
     this.#externalRuns.invalidate()
-    this.#variableRefresh.invalidate()
     for (const value of Object.values(this.$)) value.dispose()
     this.connectors.dispose()
     this.publications.dispose()
@@ -239,20 +239,31 @@ export class WorkbenchStore {
     if (!this.#disposed) this.#notice.set(undefined)
   }
 
+  public invalidateVariableNames(): void {
+    this.#variableNamesStale = true
+  }
+
   public async refreshVariableNames(): Promise<void> {
     if (this.#disposed || !this.#variables) return
-    const current = this.#variableRefresh.begin()
+    if (this.#variableRequest != null) return this.#variableRequest
+    if (!this.#variableNamesStale) return
+    this.#variableNamesStale = false
     this.#variableNamesLoading.set(true)
-    try {
-      const { variables } = await this.#client.listVariables()
-      if (!current() || this.#disposed) return
-      this.#variableNames.set(variables.map((variable) => variable.name))
-      this.#variableNamesLoaded.set(true)
-    } catch (error) {
-      if (current() && !this.#disposed) this.#notice.set(errorNotice(error, this.#i18n.t))
-    } finally {
-      if (current() && !this.#disposed) this.#variableNamesLoading.set(false)
-    }
+    this.#variableRequest = (async () => {
+      try {
+        const { variables } = await this.#client.listVariables()
+        if (this.#disposed) return
+        this.#variableNames.set(variables.map((variable) => variable.name))
+        this.#variableNamesLoaded.set(true)
+      } catch (error) {
+        this.#variableNamesStale = true
+        if (!this.#disposed) this.#notice.set(errorNotice(error, this.#i18n.t))
+      } finally {
+        this.#variableRequest = undefined
+        if (!this.#disposed) this.#variableNamesLoading.set(false)
+      }
+    })()
+    return this.#variableRequest
   }
 
   public async selectFlow(flowId: string | undefined): Promise<boolean> {

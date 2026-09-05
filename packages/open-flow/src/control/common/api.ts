@@ -28,6 +28,13 @@ export interface Flow {
   readonly version: 1
 }
 
+export interface Presentation {
+  readonly revision: number
+  readonly updatedAt: string
+  readonly value: Readonly<Record<string, JsonValue>>
+  readonly version: 1
+}
+
 export interface FlowPage {
   readonly flows: readonly Flow[]
   readonly nextCursor?: string
@@ -701,6 +708,18 @@ function draft(value: unknown): Draft {
   return { ...revisionMetadata(source), content: source.content as RevisionContent }
 }
 
+function presentation(value: unknown): Presentation {
+  const source = record(value)
+  exact(source, ['revision', 'updatedAt', 'value', 'version'])
+  if (source.version != 1 || integer(source.revision) < 1) return invalidResponse()
+  return {
+    revision: integer(source.revision),
+    updatedAt: string(source.updatedAt),
+    value: Object.fromEntries(Object.entries(record(source.value)).map(([key, item]) => [key, jsonValue(item)])),
+    version: 1,
+  }
+}
+
 function draftChange(value: unknown): DraftChange {
   const source = record(value)
   if (source.version != 1) return invalidResponse()
@@ -1197,6 +1216,28 @@ export class ControlClient {
         method: 'POST',
       }),
     )
+  }
+
+  async getEditor(
+    flowId: string,
+  ): Promise<{ readonly flow: Flow; readonly draft: Draft; readonly live: Live; readonly presentation: Presentation; readonly version: 1 }> {
+    const source = record(await this.request(`/v1/flows/${segment(flowId)}/editor`))
+    exact(source, ['flow', 'draft', 'live', 'presentation', 'version'])
+    if (source.version != 1) return invalidResponse()
+    const result = {
+      flow: flow(source.flow),
+      draft: draft(source.draft),
+      live: live(source.live),
+      presentation: presentation(source.presentation),
+      version: 1 as const,
+    }
+    if (result.flow.flowId != flowId || result.draft.flowId != flowId || result.live.flowId != flowId || result.flow.draftRevisionId != result.draft.revisionId)
+      return invalidResponse()
+    return result
+  }
+
+  async getPresentation(flowId: string): Promise<Presentation> {
+    return presentation(await this.request(`/v1/flows/${segment(flowId)}/presentation`))
   }
 
   async getDraft(flowId: string): Promise<Draft> {

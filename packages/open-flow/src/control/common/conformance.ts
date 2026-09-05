@@ -293,6 +293,32 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
     },
   },
   {
+    name: 'loads the current editor without changing Draft or Presentation',
+    async verify(harness) {
+      const created = await createFlow(harness, 'Editor flow', 'editor-flow')
+      const flowId = requiredString(created.flowId, 'Editor Flow identity')
+      const initialRevisionId = requiredString(created.draftRevisionId, 'Editor Draft identity')
+      const changed = await json(await addValueNode(harness, flowId, initialRevisionId, 'marker'), 200, 'Change editor Draft')
+      const layout = await json(
+        await request(harness, `/v1/flows/${flowId}/presentation`, {
+          method: 'PUT',
+          body: JSON.stringify({ expectedRevision: 1, value: { nodes: { marker: { x: 12, y: 24 } } }, version: 1 }),
+        }),
+        200,
+        'Update editor Presentation',
+      )
+      const editor = await json(await request(harness, `/v1/flows/${flowId}/editor`), 200, 'Read editor')
+      equal(editor.version, 1, 'Editor version')
+      equal(record(editor.flow, 'Editor Flow').draftRevisionId, changedRevisionId(changed, 'Editor change'), 'Editor Draft head')
+      for (const key of ['flow', 'draft', 'live', 'presentation']) {
+        const path = key == 'flow' ? `/v1/flows/${flowId}` : `/v1/flows/${flowId}/${key}`
+        equal(editor[key], await json(await request(harness, path), 200, `Read editor ${key}`), `Editor ${key}`)
+      }
+      equal(editor.presentation, layout, 'Reading editor preserves Presentation')
+      await error(await request(harness, '/v1/flows/missing-editor/editor'), 404, 'flow.not-found', 'Read missing editor')
+    },
+  },
+  {
     name: 'keeps Presentation CAS independent from the Draft head',
     async verify(harness) {
       const flow = await createFlow(harness, 'Presentation flow', 'presentation-flow')
@@ -589,6 +615,8 @@ export const publicationControlApiConformanceCases: readonly ControlApiConforman
       await error(await publishRequest(harness, flowId, draftRevisionId, publicationId, 'publication-first'), 409, 'publication.conflict', 'Conflicting replay')
       const live = await json(await request(harness, `/v1/flows/${flowId}/live`), 200, 'Read published Live')
       equal(live.publication, publication, 'Live Publication')
+      const editor = await json(await request(harness, `/v1/flows/${flowId}/editor`), 200, 'Read published editor')
+      equal(editor.live, live, 'Published editor Live projection')
       const history = await json(await request(harness, `/v1/flows/${flowId}/publications?includeTotal=true`), 200, 'List Publications')
       equal(history.publications, [publication], 'Publication history')
       equal(history.total, 1, 'Publication total')

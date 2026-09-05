@@ -261,3 +261,42 @@ describe('ControlClient Wait API', () => {
     await expect(client.getRun(waiting.runId)).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
   })
 })
+
+const editor = {
+  flow,
+  draft: {
+    actorId: 'actor',
+    createdAt: flow.createdAt,
+    digest: 'digest',
+    flowId: flow.flowId,
+    modelVersion: 1,
+    parentRevisionId: null,
+    revisionId: flow.draftRevisionId,
+    version: 1,
+    content: { document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {} }, modules: {}, modelVersion: 1 },
+  },
+  live: { flowId: flow.flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 },
+  presentation: { revision: 1, updatedAt: flow.updatedAt, value: { nodes: {} }, version: 1 },
+  version: 1,
+}
+
+it('loads an encoded Flow editor in one request', async () => {
+  const request = vi.fn(async () => Response.json(editor))
+  await expect(new ControlClient(request).getEditor(flow.flowId)).resolves.toEqual(editor)
+  expect(request).toHaveBeenCalledOnce()
+  expect(request).toHaveBeenCalledWith('/v1/flows/flow%2F1/editor', expect.anything())
+})
+
+it.each([
+  { ...editor, version: 2 },
+  { ...editor, extra: true },
+  { ...editor, flow: { ...flow, flowId: 'other' } },
+  { ...editor, draft: { ...editor.draft, revisionId: 'stale' } },
+  { ...editor, draft: { ...editor.draft, flowId: 'other' } },
+  { ...editor, live: { ...editor.live, flowId: 'other' } },
+  { ...editor, presentation: { ...editor.presentation, revision: 0 } },
+  { ...editor, presentation: { ...editor.presentation, value: [] } },
+])('rejects an invalid or mismatched editor snapshot %#', async (value) => {
+  const client = new ControlClient(async () => Response.json(value))
+  await expect(client.getEditor(flow.flowId)).rejects.toThrow()
+})

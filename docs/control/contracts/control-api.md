@@ -131,6 +131,23 @@ interface Presentation {
 
 更新 body 为 `{ expectedRevision, value, version: 1 }`，stale CAS 返回 `flow.presentation-conflict`。
 
+`GET /v1/flows/{flowId}/editor` 聚合编辑器首次加载所需的数据：
+
+```ts
+{
+  flow: Flow
+  draft: Draft
+  live: Live
+  presentation: Presentation
+  version: 1
+}
+```
+
+各字段复用对应资源读取的合同。`flow.flowId`、`draft.flowId` 和 `live.flowId` 必须匹配请求的 Flow，
+`flow.draftRevisionId` 必须等于 `draft.revisionId`；Live 的 `hasUnpublishedChanges` 对应该 Draft。
+该操作只读，不创建 Revision、不改变 Presentation revision，也不执行 check；不存在的 Flow 返回 `flow.not-found`。
+各资源的独立读取与修改接口继续有效。
+
 ### 执行图与输入来源
 
 Revision 的根图和每个 Subflow graph 必须包含 `nodes` 和 `edges`；没有执行边时显式保存 `edges: []`。
@@ -395,8 +412,8 @@ Connector credential 不进入响应、Revision 或 RunEvent。
 公共 Workbench Host 合同包含两个独立 subscriber：
 
 ```ts
-subscribeFlowCatalog(listener: (event?: FlowCatalogEvent) => void): () => void
-subscribeFlow(flowId: string, listener: (event?: FlowChangeEvent) => void): () => void
+subscribeFlowCatalog(listener: (event?: FlowCatalogEvent) => void): { ready: Promise<void>; stop(): void }
+subscribeFlow(flowId: string, listener: (event?: FlowChangeEvent) => void): { ready: Promise<void>; stop(): void }
 
 interface FlowCatalogEvent {
   kind: 'flows.changed'
@@ -409,7 +426,12 @@ type FlowChangeEvent =
   | { flowId: string; kind: 'run.changed'; runId: string; version: 1 }
 ```
 
-`undefined` 表示连接或重连已经建立，客户端必须 refetch。事件只做 invalidation。Server 同源宿主使用两个独立 SSE 请求：
+`ready` 在首次订阅连接建立后 resolve，客户端在此之后读取初始状态；首次成功连接不再额外调用 `listener(undefined)`。
+首次连接失败或等待超时时，宿主也必须 resolve `ready`，允许客户端继续加载；取消订阅时同样必须 settle `ready`。
+`stop()` 关闭连接、取消重试，并停止后续回调。
+`undefined` 表示首次等待结束后连接重新建立，包含失败或超时后的第一次成功连接，客户端必须 refetch。
+在初始 snapshot 读取期间收到的 invalidation 不能丢弃；Draft revision 与 snapshot 相同时无需重复同步，否则读取当前 Draft。
+事件只做 invalidation。Server 的首次连接等待上限为 5 秒，之后继续尝试连接。Server 同源宿主使用两个独立 SSE 请求：
 
 - `GET /v1/flows/notifications`
 - `GET /v1/flows/:flowId/notifications`
@@ -419,46 +441,47 @@ type FlowChangeEvent =
 
 ## 7. Routes
 
-| Method    | Path                                                     | 成功状态 | 说明                              |
-| --------- | -------------------------------------------------------- | -------: | --------------------------------- |
-| `GET`     | `/v1/flows`                                              |      200 | `cursor`、`limit`、`includeTotal` |
-| `POST`    | `/v1/flows`                                              |  201/200 | `{ name, version: 1 }`            |
-| `GET`     | `/v1/flows/:flowId`                                      |      200 | Flow 与 Draft head                |
-| `PATCH`   | `/v1/flows/:flowId`                                      |      200 | `{ name, version: 1 }`            |
-| `DELETE`  | `/v1/flows/:flowId`                                      |      202 | 进入 `retiring`                   |
-| `GET`     | `/v1/flows/:flowId/draft`                                |      200 | 当前 Draft snapshot               |
-| `GET`     | `/v1/flows/:flowId/draft/sync`                           |      200 | 当前完整 snapshot                 |
-| `POST`    | `/v1/flows/:flowId/draft/changes`                        |      200 | `Idempotency-Key` 与 change batch |
-| `GET`     | `/v1/flows/:flowId/revisions/:revisionId`                |      200 | immutable Revision                |
-| `GET/PUT` | `/v1/flows/:flowId/presentation`                         |      200 | Presentation CAS                  |
-| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/check`          |      200 | 固定 Revision validation          |
-| `GET`     | `/v1/flows/:flowId/live`                                 |      200 | Live projection                   |
-| `GET`     | `/v1/flows/:flowId/publications`                         |      200 | Publication page                  |
-| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/publications`   |      202 | Publish operation                 |
-| `GET`     | `/v1/flows/:flowId/publish-operations/:operationId`      |      200 | Publish operation                 |
-| `POST`    | `/v1/flows/:flowId/publications/:publicationId/rollback` |  201/200 | Rollback                          |
-| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/runs`           |  202/200 | Draft Run                         |
-| `POST`    | `/v1/runs`                                               |  202/200 | Live Run                          |
-| `GET`     | `/v1/flows/:flowId/runs`                                 |      200 | `cursor`、`limit`、`status`       |
-| `GET`     | `/v1/runs/:runId`                                        |      200 | Run detail                        |
-| `GET`     | `/v1/runs/:runId/events`                                 |      200 | `after`、`limit`                  |
-| `GET`     | `/v1/runs/:runId/result`                                 |      200 | terminal result                   |
-| `POST`    | `/v1/runs/:runId/cancel`                                 |      200 | `{ version: 1 }`                  |
-| `POST`    | `/v1/runs/:runId/waits/:waitId/resolve`                  |      200 | `{ action, version: 1 }`          |
-| `GET`     | `/v1/trigger-keys`                                       |      200 | Trigger summaries                 |
-| `GET`     | `/v1/trigger-keys/catalog`                               |      200 | definitions                       |
-| `GET`     | `/v1/trigger-keys/:key`                                  |      200 | definition detail                 |
-| `GET`     | `/v1/flows/:flowId/triggers`                             |      200 | Trigger bindings                  |
-| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId`              |      200 | binding detail                    |
-| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId/activities`   |      200 | Activity page                     |
-| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/pause`        |      200 | pause                             |
-| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/resume`       |      200 | resume                            |
-| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/test`         |      200 | Poll test                         |
-| `GET`     | `/v1/connector/providers`                                |      200 | Provider catalog；可选 `flowId`   |
-| `GET`     | `/v1/connector/actions`                                  |      200 | `service` 或 `q`；可选 `flowId`   |
-| `GET`     | `/v1/connector/actions/:actionId`                        |      200 | Action detail；可选 `flowId`      |
-| `GET`     | `/v1/connector/connections/:serviceId`                   |      200 | Connections；可选 `flowId`        |
-| `POST`    | `/v1/connector/connections/:serviceId/page`              |      200 | 外部授权页 URL；可选 `flowId`     |
+| Method    | Path                                                     | 成功状态 | 说明                                       |
+| --------- | -------------------------------------------------------- | -------: | ------------------------------------------ |
+| `GET`     | `/v1/flows`                                              |      200 | `cursor`、`limit`、`includeTotal`          |
+| `POST`    | `/v1/flows`                                              |  201/200 | `{ name, version: 1 }`                     |
+| `GET`     | `/v1/flows/:flowId`                                      |      200 | Flow 与 Draft head                         |
+| `PATCH`   | `/v1/flows/:flowId`                                      |      200 | `{ name, version: 1 }`                     |
+| `DELETE`  | `/v1/flows/:flowId`                                      |      202 | 进入 `retiring`                            |
+| `GET`     | `/v1/flows/:flowId/editor`                               |      200 | Flow、Draft、Live 与 Presentation 聚合读取 |
+| `GET`     | `/v1/flows/:flowId/draft`                                |      200 | 当前 Draft snapshot                        |
+| `GET`     | `/v1/flows/:flowId/draft/sync`                           |      200 | 当前完整 snapshot                          |
+| `POST`    | `/v1/flows/:flowId/draft/changes`                        |      200 | `Idempotency-Key` 与 change batch          |
+| `GET`     | `/v1/flows/:flowId/revisions/:revisionId`                |      200 | immutable Revision                         |
+| `GET/PUT` | `/v1/flows/:flowId/presentation`                         |      200 | Presentation CAS                           |
+| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/check`          |      200 | 固定 Revision validation                   |
+| `GET`     | `/v1/flows/:flowId/live`                                 |      200 | Live projection                            |
+| `GET`     | `/v1/flows/:flowId/publications`                         |      200 | Publication page                           |
+| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/publications`   |      202 | Publish operation                          |
+| `GET`     | `/v1/flows/:flowId/publish-operations/:operationId`      |      200 | Publish operation                          |
+| `POST`    | `/v1/flows/:flowId/publications/:publicationId/rollback` |  201/200 | Rollback                                   |
+| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/runs`           |  202/200 | Draft Run                                  |
+| `POST`    | `/v1/runs`                                               |  202/200 | Live Run                                   |
+| `GET`     | `/v1/flows/:flowId/runs`                                 |      200 | `cursor`、`limit`、`status`                |
+| `GET`     | `/v1/runs/:runId`                                        |      200 | Run detail                                 |
+| `GET`     | `/v1/runs/:runId/events`                                 |      200 | `after`、`limit`                           |
+| `GET`     | `/v1/runs/:runId/result`                                 |      200 | terminal result                            |
+| `POST`    | `/v1/runs/:runId/cancel`                                 |      200 | `{ version: 1 }`                           |
+| `POST`    | `/v1/runs/:runId/waits/:waitId/resolve`                  |      200 | `{ action, version: 1 }`                   |
+| `GET`     | `/v1/trigger-keys`                                       |      200 | Trigger summaries                          |
+| `GET`     | `/v1/trigger-keys/catalog`                               |      200 | definitions                                |
+| `GET`     | `/v1/trigger-keys/:key`                                  |      200 | definition detail                          |
+| `GET`     | `/v1/flows/:flowId/triggers`                             |      200 | Trigger bindings                           |
+| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId`              |      200 | binding detail                             |
+| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId/activities`   |      200 | Activity page                              |
+| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/pause`        |      200 | pause                                      |
+| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/resume`       |      200 | resume                                     |
+| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/test`         |      200 | Poll test                                  |
+| `GET`     | `/v1/connector/providers`                                |      200 | Provider catalog；可选 `flowId`            |
+| `GET`     | `/v1/connector/actions`                                  |      200 | `service` 或 `q`；可选 `flowId`            |
+| `GET`     | `/v1/connector/actions/:actionId`                        |      200 | Action detail；可选 `flowId`               |
+| `GET`     | `/v1/connector/connections/:serviceId`                   |      200 | Connections；可选 `flowId`                 |
+| `POST`    | `/v1/connector/connections/:serviceId/page`              |      200 | 外部授权页 URL；可选 `flowId`              |
 
 Connector route 的 `flowId` 是 opaque Flow identity。提供时部署必须先确认 Flow 存在，并在该 Flow 的 Connector scope 内解析 Provider、Action 与
 Connection；客户端不能改用 Team ID、Connection owner 或其他外部 identity 代替 Flow scope。省略时使用部署的未限定 Connector catalog。
