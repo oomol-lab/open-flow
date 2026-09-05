@@ -415,6 +415,44 @@ describe('Server Integration reconciliation', () => {
 })
 
 describe('Server Integration callback fencing', () => {
+  it.each(['checkpoint', 'subscription'] as const)('updates the %s snapshot only after a successful save', async (field) => {
+    const definition: IntegrationDefinition = {
+      initialState: { checkpoint: { version: 0 }, subscription: { version: 0 } },
+      receive: () => ({ body: '', contentType: 'text/plain', outcome: 'respond', status: 202 }),
+      reconcile: async () => ({ outcome: 'ready' }),
+      snapshot,
+    }
+    const now = Date.parse('2026-08-21T00:00:00.000Z')
+    const service = await openService(
+      await databaseFile(),
+      options(() => now, [definition]),
+    )
+    try {
+      await publish(service, 'ready', null)
+      const endpoint = service.integrationEndpoint('main', 'integration')
+      if (endpoint == null) throw new Error('Integration endpoint is missing.')
+      const first = service.integrationTarget(endpoint)?.state
+      const stale = service.integrationTarget(endpoint)?.state
+      if (first == null || stale == null) throw new Error('Integration state is missing.')
+      expect(first[field]).toEqual({ version: 0 })
+      const save = (value: Readonly<Record<string, JsonValue>>) =>
+        field == 'checkpoint' ? first.saveCheckpoint(value) : first.saveSubscription(value, new Date(now + 60_000))
+      await save({ version: 1 })
+      expect(first[field]).toEqual({ version: 1 })
+      await save({ version: 2 })
+      expect(first[field]).toEqual({ version: 2 })
+
+      await expect(
+        field == 'checkpoint' ? stale.saveCheckpoint({ version: 3 }) : stale.saveSubscription({ version: 3 }, new Date(now + 120_000)),
+      ).rejects.toThrow(TransientIntegrationError)
+      expect(stale[field]).toEqual({ version: 0 })
+      expect(service.integrationState('main', 'integration')?.[field]).toEqual({ version: 2 })
+      expect(service.integrationTarget(endpoint)?.state[field]).toEqual({ version: 2 })
+    } finally {
+      await closeService(service)
+    }
+  })
+
   it('fences an in-flight old runtime and rejects concurrent checkpoint CAS', async () => {
     let mode: 'block' | 'cas' = 'block'
     let entered!: () => void
