@@ -280,6 +280,57 @@ it('claims an unconfigured deployment with a one-time setup session and restores
   }
 })
 
+it.each(['valid', 'missing', 'tampered', 'expired'])('checks a %s setup session independently of anonymous attempt limits', async (kind) => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-setup-limit-'))
+  const file = path.join(directory, 'open-flow.sqlite')
+  const service = await openService(file)
+  const code = 'open-flow-setup-code-000000000000000001'
+  let now = Date.now()
+  const session = operator(file, undefined, false, code, () => now)
+  const app = createServerApp(service, { operator: session, operatorLoginAttemptsPerMinute: 1 })
+  try {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const unauthorized = await app.request('/auth/setup', {
+        body: JSON.stringify({ token, version: 1 }),
+        method: 'POST',
+      })
+      expect(unauthorized.status).toBe(401)
+      expect(unauthorized.headers.get('set-cookie')).toBeNull()
+    }
+    const authorized = await app.request('/auth/setup/session', {
+      body: JSON.stringify({ code, version: 1 }),
+      method: 'POST',
+    })
+    expect(authorized.status).toBe(200)
+    const cookies = authorized.headers.get('set-cookie') ?? ''
+    expect(cookies).toContain('open_flow_operator_setup=')
+    const cookie = cookies.split(';', 1)[0] ?? ''
+    const limited = await app.request('/auth/setup/session', {
+      body: JSON.stringify({ code, version: 1 }),
+      method: 'POST',
+    })
+    expect(limited.status).toBe(429)
+    expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0)
+    if (kind == 'expired') now += 10 * 60_000
+    const claim = await app.request('/auth/setup', {
+      body: JSON.stringify({ token, version: 1 }),
+      headers: kind == 'missing' ? {} : { cookie: kind == 'tampered' ? `${cookie}tampered` : cookie },
+      method: 'POST',
+    })
+    expect(claim.status).toBe(kind == 'valid' ? 201 : 401)
+    expect(session.source()).toBe(kind == 'valid' ? 'settings' : 'none')
+    if (kind == 'valid') {
+      expect(claim.headers.get('set-cookie')).toContain('open_flow_operator_session=')
+      expect(await session.matches(token)).toBe(true)
+    } else {
+      expect(claim.headers.get('set-cookie')).toBeNull()
+    }
+  } finally {
+    await closeService(service)
+    await rm(directory, { force: true, recursive: true })
+  }
+})
+
 it('fixes one OOMOL Team when each Flow is created', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-team-'))
   const file = path.join(directory, 'open-flow.sqlite')
