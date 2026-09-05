@@ -4,7 +4,7 @@ import { webhookEndpointId } from '@oomol-lab/open-flow/webhook-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createServerApp } from '../node/http.ts'
 import { ServerService } from '../node/service.ts'
 import { storeRevision } from './runFixture.ts'
@@ -166,6 +166,45 @@ describe('Server Webhook Trigger admission', () => {
     })
     expect(limited.status).toBe(429)
     expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0)
+  })
+
+  it('reclaims expired callback windows without resetting active limits', async () => {
+    const service = await openService(await databaseFile())
+    services.push(service)
+    const target = await publishedWebhook(service)
+    const app = createServerApp(service, { callbackRequestsPerMinute: 1 })
+    const url = `http://server.local/v1/webhooks/${target.endpointId}`
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0)
+    const writes = vi.spyOn(Map.prototype, 'set')
+    try {
+      expect((await app.request(url)).status).toBe(405)
+      const index = writes.mock.calls.findIndex(([key]) => key == `webhook:${target.endpointId}`)
+      const windows = writes.mock.contexts[index] as Map<string, unknown> | undefined
+      if (windows == null) throw new Error('Callback window was not recorded.')
+      expect(windows.size).toBe(1)
+
+      clock.mockReturnValue(30_000)
+      const waitUrl = 'http://server.local/v1/wait-actions/unknown/approve'
+      expect((await app.request(waitUrl)).status).toBe(404)
+      expect(windows.size).toBe(2)
+
+      clock.mockReturnValue(60_000)
+      const limited = await app.request(waitUrl)
+      expect(limited.status).toBe(429)
+      expect(limited.headers.get('retry-after')).toBe('30')
+      expect(windows.has(`webhook:${target.endpointId}`)).toBe(false)
+      expect(windows.size).toBe(1)
+
+      expect((await app.request(url)).status).toBe(405)
+      expect((await app.request(url)).status).toBe(429)
+      clock.mockReturnValue(120_000)
+      expect((await app.request(url)).status).toBe(405)
+      expect(windows.size).toBe(1)
+      expect(windows.has('wait-action')).toBe(false)
+    } finally {
+      writes.mockRestore()
+      clock.mockRestore()
+    }
   })
 
   it('recovers a queued occurrence into the same Run after reopening SQLite', async () => {

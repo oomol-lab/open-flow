@@ -72,6 +72,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
   }
   const app = new Hono<AppEnv>()
   const callbackWindows = new Map<string, CallbackWindow>()
+  let callbackCleanupAt = 0
   const logger = (options.logger ?? silentLogger).child({ component: 'http' })
   const operator = options.operator
   const resolveActor = operator == null ? options.resolveControlActor : (request: Request) => operator.actor(request)
@@ -101,7 +102,16 @@ export function createServerApp(service: ServerService, options: ServerAppOption
   })
 
   app.route('/auth', createOperatorApp(operator, options.operatorLoginAttemptsPerMinute))
-  const admitCallback = (key: string): number | undefined => callbackRetryAfter(callbackWindows, key, callbackRequestsPerMinute, Date.now())
+  const admitCallback = (key: string): number | undefined => {
+    const now = Date.now()
+    if (now >= callbackCleanupAt) {
+      for (const [storedKey, window] of callbackWindows) {
+        if (window.resetAt <= now) callbackWindows.delete(storedKey)
+      }
+      callbackCleanupAt = now + 60_000
+    }
+    return callbackRetryAfter(callbackWindows, key, callbackRequestsPerMinute, now)
+  }
   app.all('/v1/integrations', (context) => integration(service, context.req.raw, logger, context.get('requestId'), admitCallback))
   app.all('/v1/integrations/*', (context) => integration(service, context.req.raw, logger, context.get('requestId'), admitCallback))
   app.all('/v1/webhooks', (context) => webhook(service, context.req.raw, logger, context.get('requestId'), admitCallback))
