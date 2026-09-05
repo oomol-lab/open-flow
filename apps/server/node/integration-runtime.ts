@@ -178,7 +178,7 @@ export class IntegrationRuntime {
     )
   }
 
-  async receive(
+  receive(
     target: IntegrationTarget,
     input: {
       readonly headers: Headers
@@ -187,85 +187,119 @@ export class IntegrationRuntime {
       readonly query: URLSearchParams
       readonly rawBody: Uint8Array
     },
-  ): Promise<IntegrationResponse> {
-    const fixed = await this.#validateFlow(JSON.parse(target.stored.content) as RevisionContent)
-    const currentTrigger = fixed.prepared.graph.nodes[target.stored.triggerNodeId]
-    if (
-      fixed.revisionDigest != target.stored.revisionDigest ||
-      fixed.prepared.closureDigest != target.stored.closureDigest ||
-      currentTrigger?.kind != 'integration' ||
-      JSON.stringify(currentTrigger) != target.stored.triggerJson
-    ) {
-      return { status: 404 }
-    }
-    const options = this.#resolveOptions()
-    if (options == null) return { status: 404 }
-    const callbackSecret = await integrationCallbackSecret(options.callbackKey, target.stored.endpointId)
-    const now = new Date(this.#clock())
-    const admit = target.current && target.stored.health == 'healthy'
-    const connector = this.#connectorProxy(target.definition, target.stored.bindingId, target.connectionId, target.stored.flowId)
-    for (let page = 0; page < maximumIntegrationDeliveryPages; page += 1) {
-      const received = await target.definition.receive({
-        admit,
-        allow: () => Promise.resolve(true),
-        bindingId: target.stored.bindingId,
-        callbackSecret,
-        config: target.trigger.config,
-        connector,
-        current: target.current,
-        header: (name) => input.headers.get(name) ?? undefined,
-        method: input.method,
-        now,
-        payload: input.payload,
-        query: (name) => input.query.get(name) ?? undefined,
-        rawBody: input.rawBody,
-        state: target.state,
-      })
-      if (received.outcome == 'respond') {
-        return {
-          body: received.body,
-          contentType: received.contentType,
-          ...(received.headers == null ? {} : { headers: received.headers }),
-          status: received.status,
-        }
+  ): Effect.Effect<IntegrationResponse, unknown> {
+    return Effect.gen({ self: this }, function* () {
+      const fixed = yield* Effect.tryPromise({ try: () => this.#validateFlow(JSON.parse(target.stored.content) as RevisionContent), catch: (error) => error })
+      const currentTrigger = fixed.prepared.graph.nodes[target.stored.triggerNodeId]
+      if (
+        fixed.revisionDigest != target.stored.revisionDigest ||
+        fixed.prepared.closureDigest != target.stored.closureDigest ||
+        currentTrigger?.kind != 'integration' ||
+        JSON.stringify(currentTrigger) != target.stored.triggerJson
+      ) {
+        return { status: 404 }
       }
-      if (!admit && target.definition.initialState == null) return { status: 404 }
-      if (received.outcome == 'event') {
-        if (!admit) return { status: target.trigger.definition.endpoint.successStatus }
-        const occurrenceId = await integrationOccurrenceId(
-          target.stored.bindingId,
-          target.stored.runtimeVersion,
-          target.definition.snapshot.key,
-          received.dedupeKey ?? null,
-        )
-        const requestDigest = await digestBytes(
-          canonicalJsonBytes({
-            bindingId: target.stored.bindingId,
+      const options = this.#resolveOptions()
+      if (options == null) return { status: 404 }
+      const callbackSecret = yield* Effect.tryPromise({
+        try: () => integrationCallbackSecret(options.callbackKey, target.stored.endpointId),
+        catch: (error) => error,
+      })
+      const now = new Date(this.#clock())
+      const admit = target.current && target.stored.health == 'healthy'
+      for (let page = 0; page < maximumIntegrationDeliveryPages; page += 1) {
+        const received = yield* Effect.tryPromise({
+          try: async (signal) =>
+            await target.definition.receive({
+              admit,
+              allow: () => Promise.resolve(true),
+              bindingId: target.stored.bindingId,
+              callbackSecret,
+              config: target.trigger.config,
+              connector: this.#connectorProxy(target.definition, target.stored.bindingId, target.connectionId, target.stored.flowId, signal),
+              signal,
+              current: target.current,
+              header: (name) => input.headers.get(name) ?? undefined,
+              method: input.method,
+              now,
+              payload: input.payload,
+              query: (name) => input.query.get(name) ?? undefined,
+              rawBody: input.rawBody,
+              state: {
+                get checkpoint() {
+                  return target.state.checkpoint
+                },
+                get subscription() {
+                  return target.state.subscription
+                },
+                saveCheckpoint: async (value) => {
+                  signal.throwIfAborted()
+                  await target.state.saveCheckpoint(value)
+                },
+                saveSubscription: async (value, at) => {
+                  signal.throwIfAborted()
+                  await target.state.saveSubscription(value, at)
+                },
+              },
+            }),
+          catch: (error) => error,
+        })
+        if (received.outcome == 'respond') {
+          return {
+            body: received.body,
+            contentType: received.contentType,
+            ...(received.headers == null ? {} : { headers: received.headers }),
+            status: received.status,
+          }
+        }
+        if (!admit && target.definition.initialState == null) return { status: 404 }
+        if (received.outcome == 'event') {
+          if (!admit) return { status: target.trigger.definition.endpoint.successStatus }
+          const occurrenceId = yield* Effect.tryPromise({
+            try: () =>
+              integrationOccurrenceId(target.stored.bindingId, target.stored.runtimeVersion, target.definition.snapshot.key, received.dedupeKey ?? null),
+            catch: (error) => error,
+          })
+          const requestDigest = yield* Effect.tryPromise({
+            try: () =>
+              digestBytes(
+                canonicalJsonBytes({
+                  bindingId: target.stored.bindingId,
+                  occurrenceId,
+                  payload: received.payload,
+                  publicationId: target.stored.currentPublicationId,
+                  revisionDigest: target.stored.revisionDigest,
+                  runtimeVersion: target.stored.runtimeVersion,
+                }),
+              ),
+            catch: (error) => error,
+          })
+          const accepted = this.#store.integrations.acceptIntegrationTarget({
+            ...target.stored,
             occurrenceId,
             payload: received.payload,
-            publicationId: target.stored.currentPublicationId,
-            revisionDigest: target.stored.revisionDigest,
-            runtimeVersion: target.stored.runtimeVersion,
-          }),
-        )
-        const accepted = this.#store.integrations.acceptIntegrationTarget({
-          ...target.stored,
-          occurrenceId,
-          payload: received.payload,
-          requestDigest,
-        })
-        if (accepted == null) return { status: 404 }
-        if (accepted.kind == 'conflict') return { status: 409 }
-        if (accepted.kind == 'overloaded') return { status: 429 }
-        if (accepted.created) {
-          this.#runCreated(target.stored.flowId, accepted.runId)
-          this.#wake()
+            requestDigest,
+          })
+          if (accepted == null) return { status: 404 }
+          if (accepted.kind == 'conflict') return { status: 409 }
+          if (accepted.kind == 'overloaded') return { status: 429 }
+          if (accepted.created) {
+            this.#runCreated(target.stored.flowId, accepted.runId)
+            this.#wake()
+          }
         }
+        const checkpoint = received.checkpoint
+        if (admit && checkpoint != null)
+          yield* Effect.tryPromise({ try: () => target.state.saveCheckpoint(checkpoint), catch: (error) => error }).pipe(Effect.uninterruptible)
+        if (received.continue != true || !admit) return { status: target.trigger.definition.endpoint.successStatus }
       }
-      if (admit && received.checkpoint != null) await target.state.saveCheckpoint(received.checkpoint)
-      if (received.continue != true || !admit) return { status: target.trigger.definition.endpoint.successStatus }
-    }
-    return { status: target.trigger.definition.endpoint.successStatus }
+      return { status: target.trigger.definition.endpoint.successStatus }
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: reconcileTimeoutMs,
+        orElse: () => Effect.fail(new TransientIntegrationError('Integration delivery exceeded its execution deadline.')),
+      }),
+    )
   }
 
   #invokeReconcile(
@@ -522,15 +556,13 @@ export class IntegrationRuntime {
     }
   }
 
-  #connectorProxy(definition: IntegrationDefinition, bindingId: string, connectionId: string, flowId: string, parentSignal?: AbortSignal): ConnectorProxy {
+  #connectorProxy(definition: IntegrationDefinition, bindingId: string, connectionId: string, flowId: string, parentSignal: AbortSignal): ConnectorProxy {
     return {
       execute: async (request, signal) => {
         try {
           const connector = this.#resolveConnector()
           if (connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
-          let connectorSignal = signal ?? parentSignal
-          if (signal != null && parentSignal != null) connectorSignal = AbortSignal.any([parentSignal, signal])
-          connectorSignal ??= AbortSignal.timeout(30_000)
+          const connectorSignal = signal == null ? parentSignal : AbortSignal.any([parentSignal, signal])
           return await connector.proxy(definition.snapshot.provider, connectionId, bindingId, request, connectorSignal, this.#store.connectorTeam(flowId))
         } catch (cause) {
           if (cause instanceof ConnectorTaskError && cause.code == 'connector.connection-required') {

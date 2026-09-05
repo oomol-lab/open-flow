@@ -28,6 +28,7 @@ import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import * as Fiber from 'effect/Fiber'
 import * as FiberMap from 'effect/FiberMap'
+import * as FiberSet from 'effect/FiberSet'
 import * as Option from 'effect/Option'
 import * as Queue from 'effect/Queue'
 import * as Scope from 'effect/Scope'
@@ -198,6 +199,7 @@ export class ServerService {
   readonly #clock: () => number
   readonly #clockService: Clock.Clock
   readonly #cronLock: Semaphore.Semaphore
+  readonly #receive: (effect: Effect.Effect<IntegrationResponse, unknown>, signal?: AbortSignal) => Promise<IntegrationResponse>
   readonly #integration: IntegrationRuntime
   readonly #isolatedVm: IsolatedVmHost
   readonly #logger: Logger
@@ -224,6 +226,7 @@ export class ServerService {
 
   private constructor(
     resources: {
+      readonly receive: (effect: Effect.Effect<IntegrationResponse, unknown>, signal?: AbortSignal) => Promise<IntegrationResponse>
       readonly clockService: Clock.Clock
       readonly cronLock: Semaphore.Semaphore
       readonly isolatedVm: IsolatedVmHost
@@ -241,6 +244,7 @@ export class ServerService {
     triggerDefinitions: readonly ProviderTriggerDefinition[],
   ) {
     const { clockService, cronLock, isolatedVm, maintenanceLock, pollLock, signals, store, tasks, workers } = resources
+    this.#receive = resources.receive
     this.#clock = clock
     this.#clockService = clockService
     this.#cronLock = cronLock
@@ -339,8 +343,21 @@ export class ServerService {
       const signals = yield* Queue.unbounded<Deferred.Deferred<void> | undefined>()
       const tasks = yield* FiberMap.make<string, void, never>()
       const workers = yield* FiberMap.make<string, void, never>()
+      const requests = yield* FiberSet.make<IntegrationResponse, unknown>()
+      const runRequest = yield* FiberSet.runtimePromise(requests)()
       const service = new ServerService(
-        { clockService, cronLock, isolatedVm, maintenanceLock, pollLock, signals, store, tasks, workers },
+        {
+          clockService,
+          cronLock,
+          isolatedVm,
+          maintenanceLock,
+          pollLock,
+          signals,
+          store,
+          tasks,
+          workers,
+          receive: (effect, signal) => runRequest(effect.pipe(Effect.provideService(Clock.Clock, clockService)), { signal }),
+        },
         capabilities,
         now,
         runtime,
@@ -722,8 +739,12 @@ export class ServerService {
     return this.#integration.target(endpointId)
   }
 
-  async receiveIntegrationTarget(target: IntegrationTarget, input: Parameters<IntegrationRuntime['receive']>[1]): Promise<IntegrationResponse> {
-    return await this.#integration.receive(target, input)
+  async receiveIntegrationTarget(
+    target: IntegrationTarget,
+    input: Parameters<IntegrationRuntime['receive']>[1],
+    signal?: AbortSignal,
+  ): Promise<IntegrationResponse> {
+    return await this.#receive(this.#integration.receive(target, input), signal)
   }
 
   webhookTarget(endpointId: string): WebhookTarget | undefined {
