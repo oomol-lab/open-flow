@@ -789,10 +789,7 @@ export class ControlService {
     const events = stored.map((event) => ({
       createdAt: timestamp(event.createdAt),
       kind: event.kind,
-      payload:
-        event.kind == 'node.output' && event.value !== undefined
-          ? { ...event.payload, output: { kind: 'inline' as const, value: event.value } }
-          : event.payload,
+      payload: event.kind == 'node.completed' && event.value !== undefined ? { ...event.payload, outputs: event.value } : event.payload,
       sequence: event.sequence,
     }))
     return {

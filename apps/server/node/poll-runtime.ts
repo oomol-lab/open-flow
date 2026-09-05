@@ -1,6 +1,6 @@
 import type { JsonValue, RevisionContent, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
-import type { PollDefinition } from '@oomol-lab/open-flow/poll-trigger'
+import type { PollContext, PollDefinition, PollResult } from '@oomol-lab/open-flow/poll-trigger'
 import type { Logger } from 'pino'
 import type { ConnectorHost } from './connector.ts'
 import type { PollCandidate } from './poll-store.ts'
@@ -111,39 +111,7 @@ export class PollRuntime {
       if (connection?.kind != 'connection' || connection.target != target.connectionId) {
         throw new ControlError(controlErrorCode.bindingUnresolved, 'The fixed Poll Trigger Connection is unresolved.')
       }
-      const connector = this.#resolveConnector()
-      if (connector == null) throw new ControlError(controlErrorCode.connectorUnavailable, 'The Connector request could not be completed.')
-      const result = await this.#run(
-        Effect.tryPromise({
-          try: (signal) =>
-            definition.poll({
-              checkpoint: target.checkpoint,
-              config: trigger.config,
-              connector: {
-                execute: (request, requestSignal) =>
-                  connector.proxy(
-                    definition.snapshot.provider,
-                    target.connectionId,
-                    target.bindingId,
-                    request,
-                    requestSignal == null ? signal : AbortSignal.any([signal, requestSignal]),
-                    this.#store.connectorTeam(flowId),
-                  ),
-              },
-              now: new Date(this.#clock()),
-              signal,
-            }),
-          catch: (error) => error,
-        }).pipe(
-          Effect.timeoutOrElse({
-            duration: timeoutMs,
-            orElse: () => Effect.fail(new TransientPollError('Poll Provider exceeded its execution deadline.')),
-          }),
-        ),
-      )
-      if (result.events.length > maximumPollEventsPerPage) {
-        throw new PermanentPollError(`Poll page exceeds ${maximumPollEventsPerPage} events.`)
-      }
+      const result = await this.#run(this.#request(target, definition, { checkpoint: target.checkpoint, config: trigger.config, now: new Date(this.#clock()) }))
       return {
         events: result.events.map((event) => event.payload),
         filtered: result.filtered ?? 0,
@@ -215,16 +183,12 @@ export class PollRuntime {
     return Effect.runPromise(effect.pipe(Effect.provideService(Clock.Clock, this.#clockService)))
   }
 
-  #baseline(candidate: PollCandidate, now: number): Effect.Effect<void> {
+  #request(
+    target: Pick<StoredPollTarget, 'bindingId' | 'connectionId' | 'flowId'>,
+    definition: PollDefinition,
+    context: Omit<PollContext, 'connector' | 'signal'>,
+  ): Effect.Effect<PollResult, unknown> {
     return Effect.gen({ self: this }, function* () {
-      const trigger = JSON.parse(candidate.triggerJson) as TriggerNode
-      if (trigger.kind != 'poll' || JSON.stringify(trigger.pollTimes) != candidate.scheduleJson) {
-        return yield* Effect.fail(new PermanentPollError('Fixed Poll candidate is invalid.'))
-      }
-      const definition = this.#definitions.get(trigger.definition.key)
-      if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion) {
-        return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger definition is not available.'))
-      }
       const connector = this.#resolveConnector()
       if (connector == null) {
         return yield* Effect.fail(new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.'))
@@ -232,20 +196,18 @@ export class PollRuntime {
       const result = yield* Effect.tryPromise({
         try: (signal) =>
           definition.poll({
-            checkpoint: JSON.parse(candidate.checkpointJson) as JsonValue,
-            config: trigger.config,
+            ...context,
             connector: {
               execute: (request, requestSignal) =>
                 connector.proxy(
                   definition.snapshot.provider,
-                  candidate.connectionId,
-                  candidate.bindingId,
+                  target.connectionId,
+                  target.bindingId,
                   request,
                   requestSignal == null ? signal : AbortSignal.any([signal, requestSignal]),
-                  this.#store.connectorTeam(candidate.flowId),
+                  this.#store.connectorTeam(target.flowId),
                 ),
             },
-            now: new Date(now),
             signal,
           }),
         catch: (error) => error,
@@ -258,6 +220,25 @@ export class PollRuntime {
       if (result.events.length > maximumPollEventsPerPage) {
         return yield* Effect.fail(new PermanentPollError(`Poll page exceeds ${maximumPollEventsPerPage} events.`))
       }
+      return result
+    })
+  }
+
+  #baseline(candidate: PollCandidate, now: number): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const trigger = JSON.parse(candidate.triggerJson) as TriggerNode
+      if (trigger.kind != 'poll' || JSON.stringify(trigger.pollTimes) != candidate.scheduleJson) {
+        return yield* Effect.fail(new PermanentPollError('Fixed Poll candidate is invalid.'))
+      }
+      const definition = this.#definitions.get(trigger.definition.key)
+      if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion) {
+        return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger definition is not available.'))
+      }
+      const result = yield* this.#request(candidate, definition, {
+        checkpoint: JSON.parse(candidate.checkpointJson) as JsonValue,
+        config: trigger.config,
+        now: new Date(now),
+      })
       const checkpointJson = JSON.stringify(result.checkpoint)
       if (checkpointJson == null || encoder.encode(checkpointJson).byteLength > maximumPollCheckpointBytes) {
         return yield* Effect.fail(new PermanentPollError('Poll checkpoint exceeds 64 KiB.'))
@@ -273,37 +254,35 @@ export class PollRuntime {
       }
       this.#signal()
     }).pipe(
-      Effect.matchEffect({
-        onFailure: (error) =>
-          Effect.sync(() => {
-            const health = failure(error)
-            if (health != null) {
-              this.#store.polls.failCandidate(
-                candidate,
-                health == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid',
-                health == 'needs_reauth' ? 'The Poll Trigger Connection requires reauthorization.' : 'The Poll Trigger baseline could not be prepared.',
-                now,
-              )
-              this.#logger.warn(
-                { category: 'publication.poll_failed', nodeId: candidate.nodeId, operationId: candidate.operationId, ...errorKind(error) },
-                'Poll candidate baseline failed.',
-              )
-              return
-            }
-            this.#store.polls.retryCandidate(candidate, now + retryMs, now)
-            this.#logger.warn(
-              {
-                category: 'publication.poll_retrying',
-                nodeId: candidate.nodeId,
-                operationId: candidate.operationId,
-                retryAt: now + retryMs,
-                ...errorKind(error),
-              },
-              'Poll candidate baseline will be retried.',
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          const health = failure(error)
+          if (health != null) {
+            this.#store.polls.failCandidate(
+              candidate,
+              health == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid',
+              health == 'needs_reauth' ? 'The Poll Trigger Connection requires reauthorization.' : 'The Poll Trigger baseline could not be prepared.',
+              now,
             )
-          }),
-        onSuccess: () => Effect.void,
-      }),
+            this.#logger.warn(
+              { category: 'publication.poll_failed', nodeId: candidate.nodeId, operationId: candidate.operationId, ...errorKind(error) },
+              'Poll candidate baseline failed.',
+            )
+            return
+          }
+          this.#store.polls.retryCandidate(candidate, now + retryMs, now)
+          this.#logger.warn(
+            {
+              category: 'publication.poll_retrying',
+              nodeId: candidate.nodeId,
+              operationId: candidate.operationId,
+              retryAt: now + retryMs,
+              ...errorKind(error),
+            },
+            'Poll candidate baseline will be retried.',
+          )
+        }),
+      ),
     )
   }
 
@@ -345,67 +324,34 @@ export class PollRuntime {
         if (connection?.kind != 'connection' || connection.target != target.connectionId) {
           return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger Connection does not match its Publication.'))
         }
-        const connector = this.#resolveConnector()
-        if (connector == null) {
-          return yield* Effect.fail(new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.'))
-        }
-        const result = yield* Effect.tryPromise({
-          try: (signal) =>
-            definition.poll({
-              checkpoint: target.checkpoint,
-              config: trigger.config,
-              connector: {
-                execute: (request, requestSignal) =>
-                  connector.proxy(
-                    definition.snapshot.provider,
-                    target.connectionId,
-                    target.bindingId,
-                    request,
-                    requestSignal == null ? signal : AbortSignal.any([signal, requestSignal]),
-                    this.#store.connectorTeam(target.flowId),
-                  ),
-              },
-              now: new Date(now),
-              signal,
-            }),
-          catch: (error) => error,
-        }).pipe(
-          Effect.timeoutOrElse({
-            duration: timeoutMs,
-            orElse: () => Effect.fail(new TransientPollError('Poll Provider exceeded its execution deadline.')),
-          }),
-        )
-        if (result.events.length > maximumPollEventsPerPage) {
-          return yield* Effect.fail(new PermanentPollError(`Poll page exceeds ${maximumPollEventsPerPage} events.`))
-        }
+        const result = yield* this.#request(target, definition, { checkpoint: target.checkpoint, config: trigger.config, now: new Date(now) })
         const checkpointJson = JSON.stringify(result.checkpoint)
         if (checkpointJson == null || encoder.encode(checkpointJson).byteLength > maximumPollCheckpointBytes) {
           return yield* Effect.fail(new PermanentPollError('Poll checkpoint exceeds 64 KiB.'))
         }
         const baseline = target.health == 'initializing'
-        const identified = yield* Effect.forEach(
-          result.events,
-          (event) =>
-            Effect.tryPromise({
-              try: () => providerEventId(target.bindingId, definition.snapshot.key, event.dedupeKey),
-              catch: (error) => error,
-            }).pipe(Effect.map((id) => ({ event, id }))),
-          { concurrency: 'unbounded' },
-        )
-        const known = baseline
-          ? new Set<string>()
-          : this.#store.polls.knownPollEvents(
-              target.bindingId,
-              identified.map((item) => item.id),
-            )
-        const pageIds = new Set<string>()
-        const fresh = baseline
+        const identified = baseline
           ? []
-          : identified.filter((item) => {
-              if (known.has(item.id) || pageIds.has(item.id)) return false
-              pageIds.add(item.id)
-              return true
-            })
+          : yield* Effect.forEach(
+              result.events,
+              (event) =>
+                Effect.tryPromise({
+                  try: () => providerEventId(target.bindingId, definition.snapshot.key, event.dedupeKey),
+                  catch: (error) => error,
+                }).pipe(Effect.map((id) => ({ event, id }))),
+              { concurrency: 'unbounded' },
+            )
+        const known = new Set(
+          this.#store.polls.knownPollEvents(
+            target.bindingId,
+            identified.map((item) => item.id),
+          ),
+        )
+        const fresh = identified.filter((item) => {
+          if (known.has(item.id)) return false
+          known.add(item.id)
+          return true
+        })
         const payload = fresh.length == 0 ? null : ({ events: fresh.map((item) => item.event.payload) } satisfies JsonValue)
         const requestDigest =
           payload == null
@@ -462,36 +408,32 @@ export class PollRuntime {
           )
         }
         this.#store.polls.prunePoll(now, batchSize)
-      }).pipe(
-        Effect.matchEffect({
-          onFailure: (error) =>
-            Effect.sync(() => {
-              const health = failure(error)
-              const fields = {
-                bindingId: target.bindingId,
-                flowId: target.flowId,
-                runtimeVersion: target.runtimeVersion,
-                triggerNodeId: target.triggerNodeId,
-                ...errorKind(error),
-              }
-              this.#store.polls.failPollClaim(
-                target.bindingId,
-                target.runtimeVersion,
-                claim.leaseToken,
-                health == null
-                  ? { retryAt: now + retryMs }
-                  : { errorCode: health == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid', health, now },
-              )
-              if (health == null) {
-                this.#logger.warn({ category: 'trigger.poll.retrying', retryAt: now + retryMs, ...fields }, 'Poll Trigger will be retried.')
-              } else {
-                this.#logger.warn({ category: 'trigger.poll.health_changed', health, ...fields }, 'Poll Trigger health changed.')
-              }
-            }),
-          onSuccess: () => Effect.void,
-        }),
-      )
+      }).pipe(Effect.catch((error) => Effect.sync(() => this.#failPoll(target, claim.leaseToken, now, error))))
     })
+  }
+
+  #failPoll(target: StoredPollTarget, leaseToken: string, now: number, error: unknown): void {
+    const health = failure(error)
+    const fields = {
+      bindingId: target.bindingId,
+      flowId: target.flowId,
+      runtimeVersion: target.runtimeVersion,
+      triggerNodeId: target.triggerNodeId,
+      ...errorKind(error),
+    }
+    this.#store.polls.failPollClaim(
+      target.bindingId,
+      target.runtimeVersion,
+      leaseToken,
+      health == null
+        ? { retryAt: now + retryMs }
+        : { errorCode: health == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid', health, now },
+    )
+    if (health == null) {
+      this.#logger.warn({ category: 'trigger.poll.retrying', retryAt: now + retryMs, ...fields }, 'Poll Trigger will be retried.')
+    } else {
+      this.#logger.warn({ category: 'trigger.poll.health_changed', health, ...fields }, 'Poll Trigger health changed.')
+    }
   }
 }
 

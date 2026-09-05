@@ -407,8 +407,57 @@ describe('revision graph scheduler', () => {
     expect(events.filter((event) => event.type == 'run.started')).toHaveLength(1)
     expect(events.filter((event) => event.type == 'node.started' && event.nodeId == 'source')).toHaveLength(1)
     expect(events.filter((event) => event.type == 'node.started' && event.nodeId == 'wait')).toHaveLength(1)
-    expect(events.filter((event) => event.type == 'node.output' && event.nodeId == 'wait' && event.handle == 'continue')).toHaveLength(1)
     expect(events.filter((event) => event.type == 'node.completed' && event.nodeId == 'wait')).toHaveLength(1)
+  })
+
+  it('includes in-flight sibling results in the Wait checkpoint without replaying them', async () => {
+    const prepared = await prepareFlow(
+      revision(
+        {
+          bindings: {},
+          graph: {
+            edges: [],
+            nodes: {
+              a: { inputs: {}, kind: 'task', task: task('a', [], ['result']) },
+              wait: {
+                actions: ['continue'],
+                input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+                inputs: {},
+                kind: 'wait',
+                prompt: 'Continue?',
+              },
+            },
+          },
+          subflows: {},
+          tasks: {},
+        },
+        ['a'],
+      ),
+      'main',
+      engine,
+    )
+    const waiting = await Effect.runPromise(Deferred.make<void>())
+    const first = await runOutcome(prepared, {
+      runId: 'parallel-wait',
+      emit: (event) => (event.type == 'node.started' && event.nodeId == 'wait' ? Deferred.succeed(waiting, undefined).pipe(Effect.asVoid) : Effect.void),
+      invokeTask: () => Deferred.await(waiting).pipe(Effect.as({ result: 42 })),
+    })
+    if (first.kind != 'waiting') throw new Error('Expected the Flow Run to wait.')
+    expect(first.checkpoint.results.a).toEqual({ jobId: expect.any(String), outputs: { result: 42 } })
+    expect(first.checkpoint.wait).toEqual({ jobId: first.wait.jobId, nodeId: 'wait', value: null, waitId: first.wait.waitId })
+
+    const resumed = await runOutcome(prepared, {
+      runId: 'parallel-wait',
+      resume: { action: 'continue', checkpoint: first.checkpoint },
+      invokeTask: () => Effect.fail(new Error('Completed siblings must not run again.')),
+    })
+    expect(resumed).toMatchObject({
+      kind: 'node-results',
+      nodes: [
+        { nodeId: 'a', status: 'completed', outputs: { result: 42 } },
+        { nodeId: 'wait', status: 'completed', outputs: { continue: null } },
+      ],
+    })
   })
 
   it.each(['approve', 'reject'] as const)('routes only the selected Approval action: %s', async (action) => {
@@ -469,8 +518,8 @@ describe('revision graph scheduler', () => {
 
     expect(completed.kind).toBe('node-results')
     expect(invoked).toEqual([action == 'approve' ? 'approved' : 'rejected'])
-    expect(events.filter((event) => event.type == 'node.output' && event.nodeId == 'wait')).toEqual([
-      expect.objectContaining({ handle: action, value: 'request-1' }),
+    expect(events.filter((event) => event.type == 'node.completed' && event.nodeId == 'wait')).toEqual([
+      expect.objectContaining({ outputs: { [action]: 'request-1' } }),
     ])
   })
 
@@ -612,7 +661,7 @@ describe('revision graph scheduler', () => {
       ],
     })
     expect(events.filter((event) => event.type == 'run.started').map((event) => event.flowId)).toEqual(['main', 'double-flow'])
-    expect(events).toContainEqual(expect.objectContaining({ handle: 'high', nodeId: 'branch', type: 'node.output', value: 7 }))
+    expect(events).toContainEqual(expect.objectContaining({ nodeId: 'branch', type: 'node.completed', outputs: { high: 7 } }))
   })
 
   it('passes a Subflow input directly to a Subflow output', async () => {
@@ -859,6 +908,40 @@ describe('revision graph scheduler', () => {
     expect(result.nodes[0]).toMatchObject({ status: 'completed', outputs: { seen: ['a', 'b'] } })
   })
 
+  it('publishes all final outputs in one completion before starting downstream work', async () => {
+    const prepared = await prepareFlow(
+      revision(
+        {
+          bindings: {},
+          graph: {
+            edges: [{ source: 'source', target: 'after' }],
+            nodes: {
+              source: { inputs: {}, kind: 'task', task: task('source', [], ['first', 'second']) },
+              after: { inputs: {}, kind: 'task', task: task('after', [], []) },
+            },
+          },
+          subflows: {},
+          tasks: {},
+        },
+        ['source', 'after'],
+      ),
+      'main',
+      engine,
+    )
+    const events: SchedulerEvent[] = []
+    await runFlow(prepared, {
+      runId: 'atomic-completion',
+      emit: (event) => Effect.sync(() => void events.push(event)),
+      invokeTask: (invocation) => Effect.succeed(invocation.nodeId == 'source' ? { first: 1, second: 2 } : {}),
+    })
+    const completed = events.filter((event) => event.type == 'node.completed')
+    expect(completed).toEqual([
+      expect.objectContaining({ nodeId: 'source', outputs: { first: 1, second: 2 } }),
+      expect.objectContaining({ nodeId: 'after', outputs: {} }),
+    ])
+    expect(events.indexOf(completed[0]!)).toBeLessThan(events.findIndex((event) => event.type == 'node.started' && event.nodeId == 'after'))
+  })
+
   it('rejects the entire final output before downstream execution if any field is invalid', async () => {
     const source = revision(
       {
@@ -903,7 +986,7 @@ describe('revision graph scheduler', () => {
       }),
     ).rejects.toThrow('does not match its declaration')
     expect(calls).toEqual(['source'])
-    expect(events.filter((event) => event.type == 'node.output')).toEqual([])
+    expect(events.filter((event) => event.type == 'node.completed')).toEqual([])
   })
 
   it('enforces timeout and Fiber interruption for each Task invocation', async () => {

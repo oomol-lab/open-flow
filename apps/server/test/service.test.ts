@@ -351,6 +351,42 @@ describe('Server application service', () => {
     }
   })
 
+  it.each([32, 600_000])('stores or truncates a complete output event atomically with %i-byte fields', async (size) => {
+    const file = await databaseFile()
+    const service = await openService(file)
+    const store = new Store(file)
+    try {
+      const accepted = await acceptRun(service, {
+        flowId: 'main',
+        idempotencyKey: 'completion-event',
+        revision: fullFlow(),
+        revisionId: 'revision-completion-event',
+      })
+      if (accepted.kind != 'accepted') throw new Error('Initial Run acceptance conflicted.')
+      expect(store.claim()?.runId).toBe(accepted.runId)
+      expect(store.start(accepted.runId, { kind: 'run.started', payload: {} })).toBe(true)
+      const outputs = { first: 'a'.repeat(size), second: 'b'.repeat(size), empty: null }
+      store.append(accepted.runId, {
+        kind: 'node.completed',
+        payload: { nodeId: 'source', executionId: 'execution', scopeId: 'scope', flowId: 'main' },
+        value: outputs,
+      })
+      const history = service.control.getRunEvents(accepted.runId, 0, 100)
+      const completions = history.events.filter((event) => event.kind == 'node.completed')
+      if (size == 32) {
+        expect(history.historyComplete).toBe(true)
+        expect(completions).toHaveLength(1)
+        expect(completions[0]?.payload.outputs).toEqual(outputs)
+      } else {
+        expect(history.historyComplete).toBe(false)
+        expect(completions).toEqual([])
+      }
+    } finally {
+      store.close()
+      await closeService(service)
+    }
+  })
+
   it('requires a valid public origin only for Wait notifications', async () => {
     const file = await databaseFile()
     await expect(openService(file, { capabilities: { waitPublicOrigin: () => new URL('http://flows.example.com') } })).rejects.toThrow(
@@ -697,7 +733,6 @@ describe('Server application service', () => {
     expect(events.filter(({ kind }) => kind == 'node.started')).toHaveLength(1)
     expect(events.filter(({ kind }) => kind == 'run.waiting')).toHaveLength(1)
     expect(events.filter(({ kind }) => kind == 'run.resolved')).toHaveLength(1)
-    expect(events.filter(({ kind }) => kind == 'node.output')).toHaveLength(1)
     expect(events.filter(({ kind }) => kind == 'node.completed')).toHaveLength(1)
     expect(service.control.resolveRunWait(accepted.runId, waiting.waiting.waitId, 'approve')).toMatchObject({
       action: 'approve',
@@ -837,7 +872,6 @@ describe('Server application service', () => {
     expect(kinds.at(-1)).toBe('run.completed')
     expect(kinds.filter((kind) => kind == 'run.started')).toHaveLength(2)
     expect(kinds.filter((kind) => kind == 'node.started')).toHaveLength(4)
-    expect(kinds.filter((kind) => kind == 'node.output')).toHaveLength(4)
     expect(kinds.filter((kind) => kind == 'node.completed')).toHaveLength(4)
     expect(kinds.filter((kind) => kind == 'run.progress')).toHaveLength(4)
     expect(events.map((event) => event.cursor)).toEqual(events.map((_, index) => index + 1))
@@ -846,7 +880,10 @@ describe('Server application service', () => {
     const projected = service.control.getRunEvents(accepted.runId, 0, 100)
     expect(projected.done).toBe(true)
     expect(projected.nextAfter).toBe(events.length)
-    expect(JSON.stringify(projected.events)).toContain('"output":{"kind":"inline"')
+    expect(projected.events.filter((event) => event.kind == 'node.completed')).toHaveLength(4)
+    expect(projected.events.find((event) => event.kind == 'node.completed' && event.payload.nodeId == 'nested')).toMatchObject({
+      payload: { outputs: { value: 6 } },
+    })
 
     await expect(acceptRun(service, { flowId: 'main', idempotencyKey: 'full-flow', revision: fullFlow(), revisionId: 'revision-a' })).resolves.toMatchObject({
       created: false,
@@ -872,7 +909,7 @@ describe('Server application service', () => {
     await service.waitForIdle()
 
     expect(service.run(accepted.runId)?.status).toBe('failed')
-    expect(service.events(accepted.runId).filter((event) => event.kind == 'node.output')).toHaveLength(0)
+    expect(service.events(accepted.runId).filter((event) => event.kind == 'node.completed')).toHaveLength(0)
     expect(service.events(accepted.runId).find((event) => event.kind == 'node.failed')).toMatchObject({
       payload: { error: { code: 'node.failed', message: 'Runtime result exceeds the configured byte limit.' } },
     })

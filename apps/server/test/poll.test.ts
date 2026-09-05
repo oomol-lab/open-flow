@@ -2,7 +2,8 @@ import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { PollDefinition, PollResult } from '@oomol-lab/open-flow/poll-trigger'
 import type { DestinationStream, Logger } from 'pino'
 
-import { maximumPollCheckpointBytes, PollConnectionError, TransientPollError } from '@oomol-lab/open-flow/poll-trigger'
+import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
+import { maximumPollCheckpointBytes, maximumPollEventsPerPage, PollConnectionError, TransientPollError } from '@oomol-lab/open-flow/poll-trigger'
 import * as Effect from 'effect/Effect'
 import { TestClock } from 'effect/testing'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -10,6 +11,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
+import { serverErrorCode } from '../node/error.ts'
 import { createLogger } from '../node/logger.ts'
 import { ServerService } from '../node/service.ts'
 import { Store } from '../node/store.ts'
@@ -269,6 +271,50 @@ describe('Server Poll Trigger', () => {
       expect(database.prepare('SELECT COUNT(*) AS count FROM poll_event_dedupe').get()).toEqual({ count: 0 })
       expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 0 })
       database.close()
+    } finally {
+      await closeService(service)
+    }
+  })
+
+  it.each([
+    ['oversized', controlErrorCode.triggerKeyInvalid],
+    ['reauth', serverErrorCode.connectorConnectionRequired],
+    ['transient', controlErrorCode.connectorUnavailable],
+  ] as const)('reports %s preview failures without changing the live checkpoint or health', async (mode, code) => {
+    let preview = false
+    const definition: PollDefinition = {
+      snapshot,
+      async poll() {
+        if (!preview) return { checkpoint: { cursor: 'baseline' }, events: [] }
+        if (mode == 'reauth') throw new PollConnectionError('Connection requires reauthorization.')
+        if (mode == 'transient') throw new TransientPollError('Provider is unavailable.')
+        return {
+          checkpoint: { cursor: 'preview' },
+          events: Array.from({ length: maximumPollEventsPerPage + 1 }, (_, index) => ({ dedupeKey: String(index), payload: { index } })),
+        }
+      },
+    }
+    const service = await openService(await databaseFile(), {
+      capabilities: { connector: () => connector },
+      clock: () => publishedAt,
+      triggerDefinitions: [definition],
+    })
+    try {
+      const created = await service.control.createFlow('operator', 'Poll preview', 'poll-preview-flow')
+      const flowId = created.flow.flowId
+      const changed = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+        { binding: { kind: 'connection', target: 'connection-main' }, bindingId: 'connection', kind: 'binding.create' },
+        { kind: 'graph.node.create', node: revision().document.graph.nodes.poll!, nodeId: 'poll', target: { kind: 'flow' } },
+      ])
+      await service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v1', null, 'poll-preview-publication')
+      await service.tickPoll()
+      await service.tickMaintenance()
+      const before = service.pollState(flowId, 'poll')
+      expect(before).toMatchObject({ checkpoint: { cursor: 'baseline' }, health: 'healthy' })
+      preview = true
+
+      await expect(service.control.testFlowPollTrigger(flowId, 'poll')).rejects.toMatchObject({ code })
+      expect(service.pollState(flowId, 'poll')).toEqual(before)
     } finally {
       await closeService(service)
     }
