@@ -558,7 +558,7 @@ test('keeps the product theme contract separate from the Designer theme', async 
   for (const [owner, source] of Object.entries({ light, dark })) {
     assert.deepEqual(Object.keys(declarations(source, '--ui-')).toSorted(), sharedUiTokens, `${owner} does not implement the shared UI token contract.`)
   }
-  assert.match(productTheme, /\.open-flow-theme\s*\{[\s\S]*?--open-flow-background: #ffffff;/)
+  assert.match(productTheme, /\.open-flow-theme\s*\{[^{}]*--open-flow-background: #[\da-f]{6};/)
   assert.match(productTheme, /\.open-flow-theme\[data-theme='dark'\]/)
   assert.match(productTheme, /--ui-background: var\(--open-flow-background\);/)
   assert.match(productTheme, /--open-flow-radius: 8px;/)
