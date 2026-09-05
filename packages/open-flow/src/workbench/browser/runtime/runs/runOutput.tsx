@@ -32,7 +32,12 @@ function EventDetail({ children, label }: { readonly children: ReactNode; readon
 }
 
 export function eventHasDetails(event: RunEvent): boolean {
-  return event.kind == 'node.artifact' || event.kind == 'node.failed' || event.kind == 'node.log' || event.kind == 'node.output'
+  return (
+    event.kind == 'node.artifact' ||
+    event.kind == 'node.failed' ||
+    event.kind == 'node.log' ||
+    (event.kind == 'node.completed' && Object.keys(record(event.payload.outputs) ?? {}).length > 0)
+  )
 }
 
 export function RunEventDetail({
@@ -42,46 +47,14 @@ export function RunEventDetail({
   readonly event: RunEvent
   readonly onConfigureConnector?: (() => void) | undefined
 }): ReactElement | null {
-  const language = useLang()
   const t = useTranslate()
   switch (event.kind) {
-    case 'node.output': {
-      const handle = typeof event.payload.handle == 'string' ? event.payload.handle : undefined
-      const label = t('run.nodeOutput')
-      const output = record(event.payload.output)
-      if (output?.kind == 'inline' && Object.hasOwn(output, 'value')) {
-        return (
-          <EventDetail label={label}>
-            {handle != null && <code className="run-output-handle">{handle}</code>}
-            <JsonValueView label={label} value={output.value!} />
-          </EventDetail>
-        )
-      }
-      if (output?.kind == 'stored') {
-        return (
-          <EventDetail label={label}>
-            <dl className="run-output-reference">
-              <div>
-                <dt>{t('run.outputId')}</dt>
-                <dd>{String(output.outputId)}</dd>
-              </div>
-              <div>
-                <dt>{t('run.digest')}</dt>
-                <dd>{String(output.digest)}</dd>
-              </div>
-              <div>
-                <dt>{t('run.encodedBytes')}</dt>
-                <dd>{typeof output.encodedBytes == 'number' ? output.encodedBytes.toLocaleString(language) : String(output.encodedBytes)}</dd>
-              </div>
-            </dl>
-            <p className="run-detail-note">{t('run.storedOutputUnavailable')}</p>
-          </EventDetail>
-        )
-      }
+    case 'node.completed': {
+      const outputs = record(event.payload.outputs)
+      if (outputs == null || Object.keys(outputs).length == 0) return null
       return (
-        <EventDetail label={label}>
-          {handle != null && <code className="run-output-handle">{handle}</code>}
-          <JsonValueView label={label} value={event.payload} />
+        <EventDetail label={t('run.nodeOutput')}>
+          <JsonValueView label={t('run.nodeOutput')} value={outputs} />
         </EventDetail>
       )
     }
@@ -135,43 +108,6 @@ export function RunEventDetail({
     default:
       return null
   }
-}
-
-export function RunEventDetails({
-  events,
-  onConfigureConnector,
-}: {
-  readonly events: readonly RunEvent[]
-  readonly onConfigureConnector?: (() => void) | undefined
-}): ReactElement | null {
-  const t = useTranslate()
-  if (events.length == 1) return <RunEventDetail event={events[0]!} onConfigureConnector={onConfigureConnector} />
-  const outputs: Record<string, JsonValue> = {}
-  for (const event of events) {
-    const handle = event.payload.handle
-    const output = record(event.payload.output)
-    if (
-      event.kind != 'node.output' ||
-      typeof handle != 'string' ||
-      output?.kind != 'inline' ||
-      !Object.hasOwn(output, 'value') ||
-      Object.hasOwn(outputs, handle)
-    ) {
-      return (
-        <>
-          {events.map((candidate) => (
-            <RunEventDetail event={candidate} key={candidate.sequence} onConfigureConnector={onConfigureConnector} />
-          ))}
-        </>
-      )
-    }
-    outputs[handle] = output.value!
-  }
-  return (
-    <EventDetail label={t('run.nodeOutput')}>
-      <JsonValueView label={t('run.nodeOutput')} value={outputs} />
-    </EventDetail>
-  )
 }
 
 export function RunResultView({ result }: { readonly result: RunResult }): ReactElement {

@@ -227,7 +227,7 @@ describe('Runtime event projector', () => {
     ).rejects.toThrow('Runtime node.failed code is invalid.')
   })
 
-  it('projects node outputs without duplicating completed outputs and rejects unknown event types or invalid ordering', async () => {
+  it('projects all final outputs in one completion and rejects unknown event types or invalid ordering', async () => {
     const project = createEventProjector(invalidOrderRunId)
 
     await expect(
@@ -239,28 +239,21 @@ describe('Runtime event projector', () => {
       }),
     ).rejects.toThrow('preceded its run.started')
     await project({ flowId: 'flows/output/flow.oo.yaml', runId: 'runtime-run', type: 'run.started' })
-    const output = await project({
-      handle: 'result',
+    const completed = {
       jobId: 'job',
       nodeId: 'node',
       runId: 'runtime-run',
-      type: 'node.output',
-      value: { visible: true },
+      type: 'node.completed',
+    }
+    expect(await project({ ...completed, outputs: { result: { visible: true }, empty: null } })).toMatchObject({
+      kind: 'node.completed',
+      payload: { nodeId: 'node' },
+      value: { result: { visible: true }, empty: null },
     })
-    expect(output).toMatchObject({
-      kind: 'node.output',
-      payload: { handle: 'result', nodeId: 'node' },
-      value: { visible: true },
-    })
-    expect(
-      await project({
-        jobId: 'job',
-        nodeId: 'node',
-        outputs: { result: { duplicated: true } },
-        runId: 'runtime-run',
-        type: 'node.completed',
-      }),
-    ).not.toHaveProperty('payload.outputs')
+    expect(await project({ ...completed, outputs: {} })).toMatchObject({ kind: 'node.completed', value: {} })
+    for (const outputs of [undefined, null, [], 42]) {
+      await expect(project({ ...completed, outputs })).rejects.toThrow('Runtime node.completed outputs must be an object.')
+    }
     await expect(project({ runId: 'runtime-run', type: 'runtime.future-event' })).rejects.toThrow('is not supported')
   })
 })

@@ -298,7 +298,6 @@ export type RunEventKind =
   | 'node.completed'
   | 'node.failed'
   | 'node.log'
-  | 'node.output'
   | 'node.progress'
   | 'node.skipped'
   | 'node.started'
@@ -960,7 +959,6 @@ const runEventKinds = new Set<RunEventKind>([
   'node.completed',
   'node.failed',
   'node.log',
-  'node.output',
   'node.progress',
   'node.skipped',
   'node.started',

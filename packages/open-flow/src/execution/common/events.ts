@@ -1,20 +1,11 @@
 export type ProjectedRunEvent =
   | {
-      readonly kind: 'node.output'
+      readonly kind: 'node.completed'
       readonly payload: Readonly<Record<string, unknown>>
       readonly value: unknown
     }
   | {
-      readonly kind:
-        | 'node.skipped'
-        | 'node.artifact'
-        | 'node.completed'
-        | 'node.failed'
-        | 'node.log'
-        | 'node.progress'
-        | 'node.started'
-        | 'run.progress'
-        | 'run.started'
+      readonly kind: 'node.skipped' | 'node.artifact' | 'node.failed' | 'node.log' | 'node.progress' | 'node.started' | 'run.progress' | 'run.started'
       readonly payload: Readonly<Record<string, unknown>>
     }
 
@@ -183,7 +174,6 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
     if (
       type == 'node.skipped' ||
       type == 'node.started' ||
-      type == 'node.output' ||
       type == 'node.progress' ||
       type == 'node.artifact' ||
       type == 'node.log' ||
@@ -199,14 +189,11 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
         scopeId: await opaqueId('scope', platformRunId, context.rawRunId),
       }
       switch (type) {
-        case 'node.output':
+        case 'node.completed':
           return {
             kind: type,
-            payload: {
-              ...payload,
-              handle: string(event.handle, 'Runtime node.output handle'),
-            },
-            value: event.value,
+            payload,
+            value: object(event.outputs, 'Runtime node.completed outputs'),
           }
         case 'node.started': {
           const kind = nodeKind(event.nodeKind)
@@ -236,7 +223,6 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
           if (!['debug', 'info', 'warn', 'error'].includes(event.level as string)) throw new TypeError('Runtime node.log level is invalid.')
           return { kind: type, payload: { ...payload, level: event.level, message: message(event.message) } }
         case 'node.skipped':
-        case 'node.completed':
           return { kind: type, payload }
         case 'node.failed':
           return { kind: type, payload: { ...payload, error: { code: nodeFailureCode(event.code, nodeFailureCodes), message: message(event.message) } } }

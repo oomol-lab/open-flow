@@ -530,8 +530,9 @@ Scheduler checkpoint 的精确对象为：
 `results` 保存已完成节点的最终 output，`skipped` 保存已跳过节点。checkpoint 不包含队列、活跃 invocation 或重复消费位置，总 JSON 大小不得超过 16 MiB。
 恢复必须验证精确字段、节点状态不冲突、结果符合声明、依赖完整且符合分支选择；当前 Wait 不能已经完成或跳过。
 
-`node.skipped` 表示节点因入边未被选中而跳过，不产生 `node.started` 或 `node.output`。
-`node.output` 仅在 Task 返回的完整 output 校验成功后产生，同一次 invocation 的 output 之后产生 `node.completed`；不支持运行中的中间 output。
+`node.skipped` 表示节点因入边未被选中而跳过，不产生 `node.started` 或 `node.completed`。
+`node.completed` 仅在节点完整 output 校验成功后产生，payload 的 `outputs` 是按 handle 索引的完整最终结果对象，无输出时为 `{}`。
+每次节点 invocation 只产生一条完成事件，且先于下游节点的 `node.started`；不再产生逐 handle 的 `node.output`，也不支持运行中的中间 output。
 
 Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 保存执行图末端节点，按 node ID 排序。
 完成项为 `{ nodeId, status: 'completed', jobId, outputs }`，跳过项为 `{ nodeId, status: 'skipped' }`，不包含重复执行的 jobs 数组。

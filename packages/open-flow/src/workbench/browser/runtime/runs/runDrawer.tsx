@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { Icon } from '../icons.tsx'
 import { eventSubject } from '../workspace.ts'
 import { downloadRunLog } from './runLogExport.ts'
-import { eventHasDetails, RunEventDetails, RunResultView } from './runOutput.tsx'
+import { eventHasDetails, RunEventDetail, RunResultView } from './runOutput.tsx'
 import { canCancelRun } from './runStore.ts'
 
 export function runLabel(run: Run | undefined, t: TFunction): string {
@@ -169,8 +169,6 @@ function eventCategory(event: RunEvent): EventCategory {
       return 'progress'
     case 'node.log':
       return 'log'
-    case 'node.output':
-      return 'output'
     case 'node.artifact':
       return 'artifact'
     case 'node.completed':
@@ -191,35 +189,13 @@ function eventCategory(event: RunEvent): EventCategory {
 }
 
 function filterEventsBy(events: readonly RunEvent[], filters: readonly RunEventFilter[]): readonly RunEvent[] {
-  return events.filter((event) => filters.includes(eventCategory(event)))
+  return events.filter(
+    (event) => filters.includes(eventCategory(event)) || (filters.includes('output') && event.kind == 'node.completed' && eventHasDetails(event)),
+  )
 }
 
 export function initialRunLogFilters(filter: RunEventFilter): readonly RunEventFilter[] {
   return filter == 'all' ? eventCategories.filter((candidate) => candidate != 'progress') : [filter]
-}
-
-interface TimelineEvent {
-  readonly event: RunEvent
-  readonly events: RunEvent[]
-}
-
-function timelineEvents(events: readonly RunEvent[]): readonly TimelineEvent[] {
-  const result: TimelineEvent[] = []
-  for (const event of events) {
-    const previous = result.at(-1)
-    const executionId = event.payload.executionId
-    if (
-      event.kind == 'node.output' &&
-      typeof executionId == 'string' &&
-      previous?.event.kind == 'node.output' &&
-      previous.event.payload.executionId == executionId
-    ) {
-      previous.events.push(event)
-    } else {
-      result.push({ event, events: [event] })
-    }
-  }
-  return result
 }
 
 export function RunLogFilters({
@@ -235,11 +211,11 @@ export function RunLogFilters({
 }): ReactElement | null {
   const t = useTranslate()
   if (events.length == 0) return null
-  const groupedEvents = timelineEvents(events)
   const counts = new Map<EventCategory, number>()
-  for (const { event } of groupedEvents) {
+  for (const event of events) {
     const category = eventCategory(event)
     counts.set(category, (counts.get(category) ?? 0) + 1)
+    if (event.kind == 'node.completed' && eventHasDetails(event)) counts.set('output', (counts.get('output') ?? 0) + 1)
   }
   return (
     <DropdownMenu>
@@ -326,9 +302,8 @@ function terminalOutputs(result: RunResult | undefined): JsonValue | undefined {
 }
 
 function latestOutputs(events: readonly RunEvent[]): JsonValue | undefined {
-  const event = events.findLast((candidate) => candidate.kind == 'node.output')
-  const output = jsonRecord(event?.payload.output)
-  return output?.kind == 'inline' && Object.hasOwn(output, 'value') ? output.value : output
+  const event = events.findLast((candidate) => candidate.kind == 'node.completed' && eventHasDetails(candidate))
+  return event?.payload.outputs
 }
 
 function eventSummary(event: RunEvent, t: TFunction): string {
@@ -349,8 +324,6 @@ function eventSummary(event: RunEvent, t: TFunction): string {
     }
     case 'node.skipped':
       return t('run.eventSkipped')
-    case 'node.output':
-      return t('run.eventOutput')
     case 'node.artifact':
       return t('run.eventArtifact')
     case 'node.log':
@@ -419,7 +392,7 @@ export function RunLog({
   const followEvents = useRef(true)
   const nodeTitles = useMemo(() => nodeTitleIndex(events), [events])
   const observation = eventObservation(events, historyComplete)
-  const visibleEvents = timelineEvents(filterEventsBy(events, filters))
+  const visibleEvents = filterEventsBy(events, filters)
   const lastEventSequence = events.at(-1)?.sequence
   const outputs = terminalOutputs(result)
   const eventScrollbarEvents = useMemo<EventListeners>(
@@ -473,7 +446,7 @@ export function RunLog({
               </span>
             </li>
           )}
-          {visibleEvents.map(({ event, events: groupedEvents }) => {
+          {visibleEvents.map((event) => {
             const subject = eventSubject(event, t, nodeTitles)
             const nodeId = eventNodes.get(event.sequence)
             return (
@@ -503,7 +476,7 @@ export function RunLog({
                       </Button>
                     )}
                   </div>
-                  <RunEventDetails events={groupedEvents} onConfigureConnector={onConfigureConnector} />
+                  <RunEventDetail event={event} onConfigureConnector={onConfigureConnector} />
                 </div>
               </li>
             )
@@ -586,15 +559,14 @@ export function RunDrawer({
   const resize = useRef<{ height: number; pointerId: number; y: number }>()
   const [resized, setResized] = useState<{ height: number; runId: string | undefined }>()
   const [filters, setFilters] = useState<readonly RunEventFilter[]>(() => initialRunLogFilters(eventFilter))
-  const groupedTimelineEvents = timelineEvents(events)
   const summaryOutputs = terminalOutputs(result) ?? latestOutputs(events)
   const timelineHeight = Math.max(
     minHeight,
     Math.min(
       maxHeight,
       timelineChromeHeight +
-        (events.length == 0 ? timelineEmptyHeight : groupedTimelineEvents.length * timelineEventHeight) +
-        groupedTimelineEvents.filter((group) => group.events.some(eventHasDetails)).length * timelineDetailHeight +
+        (events.length == 0 ? timelineEmptyHeight : events.length * timelineEventHeight) +
+        events.filter(eventHasDetails).length * timelineDetailHeight +
         (eventObservation(events, historyComplete) == null ? 0 : timelineEventHeight),
     ),
   )
