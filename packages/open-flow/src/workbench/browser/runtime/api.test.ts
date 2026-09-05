@@ -13,11 +13,11 @@ describe('WorkbenchClient notifications', () => {
       | undefined
     const subscribeCatalog = vi.fn((listener: typeof catalogListener) => {
       catalogListener = listener
-      return () => {}
+      return { ready: Promise.resolve(), stop() {} }
     })
     const subscribeFlow = vi.fn((_flowId: string, listener: NonNullable<typeof flowListener>) => {
       flowListener = listener
-      return () => {}
+      return { ready: Promise.resolve(), stop() {} }
     })
     const client = new WorkbenchClient(vi.fn(), subscribeFlow, subscribeCatalog)
     const catalogChanged = vi.fn()

@@ -89,11 +89,14 @@ describe('WorkbenchStore diagnostics', () => {
     const request = vi.fn(async (path: string) => {
       requests.push(path)
       if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [flow], total: 1, version: 1 })
-      if (path == `/v1/flows/${flow.flowId}/draft`) return Response.json(draft)
-      if (path == `/v1/flows/${flow.flowId}/live`) {
-        return Response.json({ flowId: flow.flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 })
-      }
-      if (path == `/v1/flows/${flow.flowId}/presentation`) return Response.json({ revision: 1, updatedAt: timestamp, value: {}, version: 1 })
+      if (path == `/v1/flows/${flow.flowId}/editor`)
+        return Response.json({
+          flow,
+          draft,
+          live: { flowId: flow.flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 },
+          presentation: { revision: 1, updatedAt: timestamp, value: {}, version: 1 },
+          version: 1,
+        })
       if (path == `/v1/flows/${flow.flowId}/revisions/${flow.draftRevisionId}/check`) {
         return Response.json({
           closureDigest: 'closure-1',
@@ -168,4 +171,56 @@ describe('WorkbenchStore diagnostics', () => {
       store.dispose()
     }
   })
+})
+
+it('loads Variable names on demand and reuses them until invalidated', async () => {
+  const response = Promise.withResolvers<Response>()
+  const request = vi.fn(() => response.promise)
+  const store = new WorkbenchStore(new WorkbenchClient(request), { getItem: () => null, setItem: () => {} }, () => 'identity')
+  try {
+    store.invalidateVariableNames()
+    store.invalidateVariableNames()
+    expect(request).not.toHaveBeenCalled()
+    const first = store.refreshVariableNames()
+    const second = store.refreshVariableNames()
+    expect(request).toHaveBeenCalledOnce()
+    expect(store.$.variableNamesLoading.value).toBe(true)
+    response.resolve(Response.json({ variables: [{ name: 'TOKEN', value: 'value', updatedAt: timestamp, version: 1 }], version: 1 }))
+    await Promise.all([first, second])
+    expect(store.$.variableNames.value).toEqual(['TOKEN'])
+    expect(store.$.variableNamesLoading.value).toBe(false)
+    await store.refreshVariableNames()
+    expect(request).toHaveBeenCalledOnce()
+    store.invalidateVariableNames()
+    expect(request).toHaveBeenCalledOnce()
+    request.mockImplementation(async () => Response.json({ variables: [], version: 1 }))
+    await store.refreshVariableNames()
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(store.$.variableNames.value).toEqual([])
+  } finally {
+    store.dispose()
+  }
+})
+
+it('preserves invalidation during a Variable request and retries failed requests', async () => {
+  const response = Promise.withResolvers<Response>()
+  const request = vi.fn(() => response.promise)
+  const store = new WorkbenchStore(new WorkbenchClient(request), { getItem: () => null, setItem: () => {} }, () => 'identity')
+  try {
+    const loading = store.refreshVariableNames()
+    store.invalidateVariableNames()
+    response.resolve(Response.json({ variables: [], version: 1 }))
+    await loading
+    request.mockRejectedValueOnce(new Error('Offline'))
+    await store.refreshVariableNames()
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(store.$.variableNamesLoading.value).toBe(false)
+    request.mockImplementation(async () => Response.json({ variables: [], version: 1 }))
+    await store.refreshVariableNames()
+    expect(request).toHaveBeenCalledTimes(3)
+    await store.refreshVariableNames()
+    expect(request).toHaveBeenCalledTimes(3)
+  } finally {
+    store.dispose()
+  }
 })
