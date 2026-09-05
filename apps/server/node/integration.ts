@@ -30,13 +30,17 @@ export async function handleIntegration(
       return plain(405, { allow: endpoint.methods.join(', ') })
     }
     const body = await payload(request, endpoint)
-    const result = await service.receiveIntegrationTarget(target, {
-      headers: request.headers,
-      method: method as (typeof endpoint.methods)[number],
-      payload: body.value,
-      query: new URL(request.url).searchParams,
-      rawBody: body.bytes,
-    })
+    const result = await service.receiveIntegrationTarget(
+      target,
+      {
+        headers: request.headers,
+        method: method as (typeof endpoint.methods)[number],
+        payload: body.value,
+        query: new URL(request.url).searchParams,
+        rawBody: body.bytes,
+      },
+      request.signal,
+    )
     const headers = new Headers(result.headers)
     if (result.contentType != null) headers.set('content-type', result.contentType)
     return plain(result.status, headers, result.body)

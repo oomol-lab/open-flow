@@ -1,5 +1,8 @@
 import type { FlowCatalogEvent, FlowChangeEvent, WorkbenchHost, WorkbenchNotification } from '@oomol-lab/open-flow/workbench'
 
+import * as Deferred from 'effect/Deferred'
+import * as Effect from 'effect/Effect'
+
 const reconnectDelayMs = 1_000
 const initialConnectionTimeoutMs = 5_000
 
@@ -33,53 +36,45 @@ export function createBrowserHost(notify: (notification: WorkbenchNotification |
 }
 
 function follow<Event>(path: string, listener: (event?: Event) => void, decode: (value: unknown) => Event | undefined, sessionExpired: () => void) {
-  const cancellation = new AbortController()
-  const ready = Promise.withResolvers<void>()
+  const ready = Deferred.makeUnsafe<void>()
   let initial = true
-  const finish = () => {
+  const finish = Effect.gen(function* () {
     initial = false
-    clearTimeout(timer)
-    ready.resolve()
-  }
-  const timer = setTimeout(finish, initialConnectionTimeoutMs)
-  void readConnections(path, listener, decode, cancellation.signal, sessionExpired, (connected) => {
-    if (initial) finish()
-    else if (connected) listener()
+    yield* Deferred.succeed(ready, undefined)
   })
+  const fiber = Effect.runFork(
+    Effect.scoped(
+      Effect.gen(function* () {
+        yield* Effect.forkChild(Effect.sleep(initialConnectionTimeoutMs).pipe(Effect.andThen(finish)))
+        while (true) {
+          const reconnect = yield* Effect.tryPromise({
+            try: async (signal) => {
+              const response = await fetch(path, { credentials: 'same-origin', headers: { accept: 'text/event-stream' }, signal })
+              signal.throwIfAborted()
+              if (response.status == 401) {
+                sessionExpired()
+                return false
+              }
+              if (!response.ok || response.body == null) throw new Error(`Notification request returned ${response.status}.`)
+              if (initial) Effect.runSync(finish)
+              else listener()
+              await readEvents(response.body, listener, decode, signal)
+              return true
+            },
+            catch: (error) => error,
+          }).pipe(Effect.catch(() => Effect.succeed(true)))
+          yield* finish
+          if (!reconnect) return
+          yield* Effect.sleep(reconnectDelayMs)
+        }
+      }),
+    ).pipe(Effect.ensuring(finish)),
+  )
   return {
-    ready: ready.promise,
+    ready: Effect.runPromise(Deferred.await(ready)),
     stop() {
-      cancellation.abort()
-      finish()
+      fiber.interruptUnsafe()
     },
-  }
-}
-
-async function readConnections<Event>(
-  path: string,
-  listener: (event?: Event) => void,
-  decode: (value: unknown) => Event | undefined,
-  signal: AbortSignal,
-  sessionExpired: () => void,
-  connection: (connected: boolean) => void,
-): Promise<void> {
-  while (!signal.aborted) {
-    try {
-      const response = await fetch(path, { credentials: 'same-origin', headers: { accept: 'text/event-stream' }, signal })
-      if (signal.aborted) return
-      if (response.status == 401) {
-        connection(false)
-        sessionExpired()
-        return
-      }
-      if (!response.ok || response.body == null) throw new Error(`Notification request returned ${response.status}.`)
-      connection(true)
-      await readEvents(response.body, listener, decode, signal)
-    } catch {
-      if (signal.aborted) return
-      connection(false)
-    }
-    await reconnectDelay(signal)
   }
 }
 
@@ -90,6 +85,10 @@ async function readEvents<Event>(
   signal: AbortSignal,
 ): Promise<void> {
   const reader = body.getReader()
+  const cancel = () => {
+    void reader.cancel().catch(() => {})
+  }
+  signal.addEventListener('abort', cancel, { once: true })
   const decoder = new TextDecoder()
   let buffered = ''
   try {
@@ -112,6 +111,7 @@ async function readEvents<Event>(
       }
     }
   } finally {
+    signal.removeEventListener('abort', cancel)
     await reader.cancel().catch(() => {})
     reader.releaseLock()
   }
@@ -127,16 +127,4 @@ function decodeFlowEvent(value: unknown): FlowChangeEvent | undefined {
   if (event.version != 1 || typeof event.flowId != 'string') return
   if (event.kind == 'draft.changed' && typeof event.revisionId == 'string') return event as FlowChangeEvent
   if (event.kind == 'run.created' && typeof event.runId == 'string') return event as FlowChangeEvent
-}
-
-async function reconnectDelay(signal: AbortSignal): Promise<void> {
-  await new Promise<void>((resolve) => {
-    const done = (): void => {
-      clearTimeout(timer)
-      signal.removeEventListener('abort', done)
-      resolve()
-    }
-    const timer = setTimeout(done, reconnectDelayMs)
-    signal.addEventListener('abort', done, { once: true })
-  })
 }

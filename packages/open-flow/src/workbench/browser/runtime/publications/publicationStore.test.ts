@@ -256,3 +256,49 @@ describe('PublicationStore', () => {
     }
   })
 })
+
+it('aborts an in-flight operation read on Flow switch and preserves it for later recovery', async () => {
+  vi.useFakeTimers()
+  const pending = Promise.withResolvers<Response>()
+  let signal: AbortSignal | null | undefined
+  let reads = 0
+  const request = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path.includes('/publish-operations/')) {
+      reads += 1
+      if (reads == 1) return Response.json({ ...operation, publicationId: undefined, status: 'pending' })
+      signal = init?.signal
+      return await pending.promise
+    }
+    const flowId = path.includes('/flow-1/') ? 'flow-1' : 'flow-2'
+    if (path.endsWith('/live'))
+      return Response.json({ flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 })
+    if (path.includes('/publications?')) return Response.json({ publications: [], total: 0, version: 1 })
+    if (path.endsWith('/triggers')) return Response.json({ bindings: [], flowId, version: 1 })
+    throw new Error(path)
+  })
+  const client = new WorkbenchClient(request)
+  const workspace = new WorkspaceStore(client, vi.fn())
+  const preferences = new Map([['publish-operation:flow-1', 'operation-1']])
+  const notice = vi.fn()
+  const store = new PublicationStore(client, workspace, notice, {
+    getItem: (key) => preferences.get(key) ?? null,
+    setItem: (key, value) => preferences.set(key, value),
+  })
+  try {
+    await store.load('flow-1')
+    await vi.advanceTimersByTimeAsync(750)
+    expect(signal?.aborted).toBe(false)
+    await store.load('flow-2')
+    expect(signal?.aborted).toBe(true)
+    pending.resolve(Response.json(operation))
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(reads).toBe(2)
+    expect(store.$.live.value?.flowId).toBe('flow-2')
+    expect(store.$.operation.value).toBeUndefined()
+    expect(preferences.get('publish-operation:flow-1')).toBe('operation-1')
+    expect(notice.mock.calls.flat().filter((value) => value != null)).toEqual([])
+  } finally {
+    store.dispose()
+    workspace.dispose()
+  }
+})

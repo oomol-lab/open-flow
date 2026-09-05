@@ -257,3 +257,23 @@ it('settles a cancelled initial subscription and ignores a late response', async
   await Promise.resolve()
   expect(changed).not.toHaveBeenCalled()
 })
+
+it('cancels a pending stream read and releases its reader on stop', async () => {
+  const cancel = vi.fn()
+  const body = new ReadableStream<Uint8Array>({ cancel })
+  let signal: AbortSignal | null | undefined
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_path: string, init?: RequestInit) => {
+      signal = init?.signal
+      return new Response(body)
+    }),
+  )
+  const subscription = createBrowserHost(vi.fn(), vi.fn()).subscribeFlowCatalog(vi.fn())
+  await subscription.ready
+  expect(body.locked).toBe(true)
+  subscription.stop()
+  await vi.waitFor(() => expect(body.locked).toBe(false))
+  expect(cancel).toHaveBeenCalledOnce()
+  expect(signal?.aborted).toBe(true)
+})
