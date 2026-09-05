@@ -1,15 +1,5 @@
 import type * as Cause from 'effect/Cause'
-import type {
-  ConnectorCapability,
-  Graph,
-  GraphNode,
-  InputMapping,
-  InputPortDefinition,
-  JsonValue,
-  OutputMapping,
-  TriggerNode,
-  WaitAction,
-} from '../../flow/common/change.ts'
+import type { ConnectorCapability, Graph, GraphNode, InputMapping, InputPortDefinition, JsonValue, TriggerNode, WaitAction } from '../../flow/common/change.ts'
 import type { PreparedFlow } from '../../flow/common/semantics.ts'
 
 import * as Effect from 'effect/Effect'
@@ -47,16 +37,9 @@ export type SchedulerEvent =
       readonly type: 'node.started'
     }
   | {
-      readonly handle: string
       readonly jobId: string
       readonly nodeId: string
-      readonly runId: string
-      readonly type: 'node.output'
-      readonly value: JsonValue
-    }
-  | {
-      readonly jobId: string
-      readonly nodeId: string
+      readonly outputs: Readonly<Record<string, JsonValue>>
       readonly runId: string
       readonly type: 'node.completed'
     }
@@ -123,7 +106,6 @@ export type FlowRunOutcome =
         readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
         readonly jobId: string
         readonly nodeId: string
-        readonly order: number
         readonly waitId: string
       }
     }
@@ -179,9 +161,7 @@ interface ParentRun {
 interface GraphTarget {
   readonly flowId: string
   readonly graph: Graph
-  readonly inputs: Readonly<Record<string, InputPortDefinition>>
   readonly kind: 'flow' | 'subflow'
-  readonly outputs: Readonly<Record<string, OutputMapping>>
 }
 
 function nodeFailure(error: unknown, project: FlowRunOptions['projectFailure']): SchedulerFailure {
@@ -441,7 +421,6 @@ function runGraph(
         })
       }
       const order = graphOrder(target.graph).filter((id) => 'inputs' in target.graph.nodes[id]!)
-      const resultNodes = order.filter((id) => !target.graph.edges.some((edge) => edge.source == id)).toSorted()
       const incoming = new Map<string, Graph['edges'][number][]>()
       const children = new Map<string, Set<string>>()
       for (const edge of target.graph.edges) {
@@ -452,6 +431,7 @@ function runGraph(
         targets.add(edge.target)
         children.set(edge.source, targets)
       }
+      const resultNodes = order.filter((id) => !children.has(id)).toSorted()
       const completed = new Map(Object.entries(resume?.checkpoint.results ?? {}))
       const skipped = new Set(resume?.checkpoint.skipped ?? [])
       const started = new Set(completed.keys())
@@ -470,7 +450,7 @@ function runGraph(
       let firstCause: Cause.Cause<Error> | undefined
       let firstFailure: Error | undefined
       let suspending = resume != null
-      let pendingWait: Extract<FlowRunOutcome, { readonly kind: 'waiting' }> | undefined
+      let pendingWait: (Omit<Extract<FlowRunOutcome, { readonly kind: 'waiting' }>, 'checkpoint'> & { readonly value: JsonValue }) | undefined
       const settled = (id: string) => completed.has(id) || skipped.has(id)
       const selected = (edge: Graph['edges'][number]) => {
         const result = completed.get(edge.source)
@@ -521,8 +501,7 @@ function runGraph(
       const commit = (nodeId: string, jobId: string, outputs: Readonly<Record<string, JsonValue>>) =>
         Effect.uninterruptible(
           Effect.gen(function* () {
-            for (const [handle, value] of Object.entries(outputs)) yield* context.emit({ handle, jobId, nodeId, runId, type: 'node.output', value })
-            yield* context.emit({ jobId, nodeId, runId, type: 'node.completed' })
+            yield* context.emit({ jobId, nodeId, outputs, runId, type: 'node.completed' })
             completed.set(nodeId, { jobId, outputs })
             yield* context.emit({ progress: order.length == 0 ? 100 : (order.filter(settled).length / order.length) * 100, runId, type: 'run.progress' })
           }),
@@ -576,9 +555,7 @@ function runGraph(
                 {
                   flowId: node.subflowId,
                   graph: subflow.graph,
-                  inputs: portsByHandle(subflow.inputs),
                   kind: 'subflow',
-                  outputs: portsByHandle(subflow.outputs),
                 },
                 context.createId(),
                 nodeInputs,
@@ -643,13 +620,15 @@ function runGraph(
         runNode(
           Effect.gen(function* () {
             const nodeInputs = yield* Effect.try({
-              try: () =>
-                Object.fromEntries(
+              try: () => {
+                const mappings = nodeMappings(node)
+                return Object.fromEntries(
                   Object.entries(nodePorts(context.prepared, node)).map(([handle, port]) => [
                     handle,
-                    resolveInput(nodeMappings(node)[handle], port, launch[nodeId]?.[handle], `Node "${nodeId}" input "${handle}"`),
+                    resolveInput(mappings[handle], port, launch[nodeId]?.[handle], `Node "${nodeId}" input "${handle}"`),
                   ]),
-                ),
+                )
+              },
               catch: (error) => (error instanceof Error ? error : new Error(String(error))),
             })
             if (node.kind == 'wait') {
@@ -669,15 +648,8 @@ function runGraph(
               const waitId = nanoid()
               pendingWait = {
                 kind: 'waiting',
-                checkpoint: {
-                  bindingValues: context.bindingValues,
-                  inputs: launch,
-                  results: {},
-                  skipped: [],
-                  version: 1,
-                  wait: { jobId, nodeId, value: nodeInputs[node.input.handle]!, waitId },
-                },
-                wait: { actions: node.actions, jobId, nodeId, order: 0, waitId },
+                value: nodeInputs[node.input.handle]!,
+                wait: { actions: node.actions, jobId, nodeId, waitId },
                 ...(node.notification == null
                   ? {}
                   : {
@@ -775,10 +747,15 @@ function runGraph(
       if (Exit.isFailure(activeExit)) return yield* Effect.failCause(activeExit.cause)
       if (pendingWait != null) {
         if (target.kind != 'flow') return yield* Effect.fail(new Error('Subflow Wait is not supported.'))
+        const { value, ...waiting } = pendingWait
+        const { jobId, nodeId, waitId } = waiting.wait
         const checkpointSource: FlowRunCheckpoint = {
-          ...pendingWait.checkpoint,
+          bindingValues: context.bindingValues,
+          inputs: launch,
           results: Object.fromEntries(completed),
           skipped: [...skipped].toSorted(),
+          version: 1,
+          wait: { jobId, nodeId, value, waitId },
         }
         const encoded = JSON.stringify(checkpointSource)
         if (new TextEncoder().encode(encoded).byteLength > 16 * 1024 * 1024) {
@@ -795,7 +772,7 @@ function runGraph(
           return yield* Effect.fail(new Error(`run.checkpoint-too-large: ${message}`))
         }
         const checkpoint = decodeFlowRunCheckpoint(JSON.parse(encoded))
-        return { ...pendingWait, checkpoint }
+        return { ...waiting, checkpoint }
       }
       if (!order.every(settled)) return yield* Effect.fail(new Error('Execution graph contains unresolved dependencies.'))
       if (target.kind == 'subflow') {
@@ -849,7 +826,7 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
         prepared,
         projectFailure: options.projectFailure,
       },
-      { flowId: options.flowId, graph: prepared.graph, inputs: {}, kind: 'flow', outputs: {} },
+      { flowId: options.flowId, graph: prepared.graph, kind: 'flow' },
       options.runId,
       {},
       undefined,

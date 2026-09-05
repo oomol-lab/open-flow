@@ -258,14 +258,6 @@
     background: var(--ui-card);
   }
 
-  .run-output-handle {
-    display: inline-block;
-    margin: 3px 0 0 8px;
-    color: var(--ui-muted-foreground);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 10px;
-  }
-
   .run-log-result .run-output-view {
     min-height: 0;
     padding: 0;
@@ -465,36 +457,6 @@
   .run-output-view > header time {
     color: var(--ui-muted-foreground);
     font-size: 10px;
-  }
-
-  .run-output-reference {
-    display: grid;
-    margin: 7px 0 0;
-    gap: 4px;
-  }
-
-  .run-output-reference > div {
-    display: grid;
-    min-width: 0;
-    grid-template-columns: 96px minmax(0, 1fr);
-    gap: 10px;
-  }
-
-  .run-output-reference dt,
-  .run-output-reference dd {
-    margin: 0;
-    font-size: 10px;
-    line-height: 16px;
-  }
-
-  .run-output-reference dt {
-    color: var(--ui-muted-foreground);
-  }
-
-  .run-output-reference dd {
-    overflow-wrap: anywhere;
-    color: var(--ui-muted-foreground);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
 
   .run-detail-note {

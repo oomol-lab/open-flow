@@ -101,9 +101,8 @@ try {
   const events = await requestJson<{
     readonly events: readonly { readonly kind: string; readonly payload: Record<string, unknown>; readonly value?: unknown }[]
   }>(firstOrigin, `/v1/runs/${accepted.runId}/events`, { headers: { cookie: firstCookie } }, 200)
-  const output = events.events.find((event) => event.kind == 'node.output')
-  assert.equal(output?.payload.handle, 'result')
-  assert.deepEqual(output?.payload.output, { kind: 'inline', value: 42 })
+  const output = events.events.find((event) => event.kind == 'node.completed')
+  assert.deepEqual(output?.payload.outputs, { result: 42 })
 
   await stopContainer(firstContainer)
   await docker(['rm', firstContainer])

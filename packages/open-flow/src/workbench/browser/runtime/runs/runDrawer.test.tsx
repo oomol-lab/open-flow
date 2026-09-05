@@ -1,4 +1,4 @@
-import type { Run, RunDetails, RunResult } from '../api.ts'
+import type { Run, RunDetails, RunEvent, RunResult } from '../api.ts'
 
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
@@ -124,4 +124,48 @@ describe('RunDrawer terminal result', () => {
     expect(markup).toContain('>Reject<')
     expect(markup).toContain('Locate Wait node')
   })
+})
+
+it.each(['all', 'output', 'lifecycle'] as const)('shows all final handles once in the %s event filter', (eventFilter) => {
+  const events: RunEvent[] = [
+    {
+      createdAt: '2026-09-05T10:00:00.000Z',
+      kind: 'node.completed',
+      payload: { nodeId: 'source', executionId: 'execution', outputs: { first: 17, second: 29 } },
+      sequence: 1,
+    },
+  ]
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={createI18n('en')}>
+      <RunDrawer
+        cancelDisabled={false}
+        canceling={false}
+        eventFilter={eventFilter}
+        eventNodes={new Map()}
+        events={events}
+        eventsExpiresAt={undefined}
+        historyComplete
+        observationFailed={false}
+        onCancel={() => undefined}
+        onClose={() => undefined}
+        onEventFilterChange={() => undefined}
+        onLocateEvent={() => undefined}
+        onLocateWait={() => undefined}
+        onResolve={() => undefined}
+        onRetryObservation={() => undefined}
+        onToggle={() => undefined}
+        open
+        result={undefined}
+        resolvingAction={undefined}
+        run={undefined}
+        submitting={false}
+        visible
+      />
+    </I18nProvider>,
+  )
+  expect(markup).toContain('first')
+  expect(markup).toContain('second')
+  expect(markup).toContain('17')
+  expect(markup).toContain('29')
+  expect(markup.match(/title="node.completed"/g)).toHaveLength(1)
 })

@@ -819,13 +819,13 @@ export class Store {
       this.#database
         .prepare(
           `INSERT INTO run_waits (
-             run_id, wait_id, node_id, job_id, job_order, waiting_since, expires_at,
+             run_id, wait_id, node_id, job_id, waiting_since, expires_at,
              checkpoint_json, checkpoint_version, checkpoint_digest, checkpoint_bytes,
              remaining_ms, action, resolved_at, capability_digest
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, NULL, NULL, ?)
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, NULL, NULL, ?)
            ON CONFLICT(run_id) DO UPDATE SET
              wait_id = excluded.wait_id, node_id = excluded.node_id, job_id = excluded.job_id,
-             job_order = excluded.job_order, waiting_since = excluded.waiting_since,
+             waiting_since = excluded.waiting_since,
              expires_at = excluded.expires_at, checkpoint_json = excluded.checkpoint_json,
              checkpoint_version = 1, checkpoint_digest = excluded.checkpoint_digest,
              checkpoint_bytes = excluded.checkpoint_bytes, remaining_ms = excluded.remaining_ms,
@@ -836,7 +836,6 @@ export class Store {
           outcome.wait.waitId,
           outcome.wait.nodeId,
           outcome.wait.jobId,
-          outcome.wait.order,
           waitingSince,
           expiresAt,
           checkpointJson,
