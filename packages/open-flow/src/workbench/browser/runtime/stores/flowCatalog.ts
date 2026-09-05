@@ -146,10 +146,7 @@ export class FlowCatalog {
   public async create(name: string): Promise<Flow | undefined> {
     const flow = await this.#client.createFlow(name)
     if (this.#disposed) return
-    this.#set({
-      flows: [...this.#state.value.flows, flow],
-      total: this.#state.value.total == null ? undefined : this.#state.value.total + 1,
-    })
+    this.insert(flow)
     return flow
   }
 
