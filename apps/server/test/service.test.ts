@@ -418,6 +418,18 @@ describe('Server application service', () => {
     const approveUrl = message.match(/https:\/\/flows\.example\.com\/v1\/wait-actions\/[A-Za-z0-9_-]{43}\/approve/)?.[0]
     const rejectUrl = message.match(/https:\/\/flows\.example\.com\/v1\/wait-actions\/[A-Za-z0-9_-]{43}\/reject/)?.[0]
     if (approveUrl == null || rejectUrl == null) throw new Error('Wait notification action URLs are missing.')
+    const capability = new URL(approveUrl).pathname.split('/')[3] ?? ''
+    const admit = vi.fn(() => 30)
+    expect(service.inspectWaitAction('unknown', 'approve', admit)).toBeUndefined()
+    expect(service.resolveWaitAction(capability, 'continue', admit)).toBeUndefined()
+    expect(admit).not.toHaveBeenCalled()
+    expect(service.inspectWaitAction(capability, 'approve', admit)).toEqual({ retryAfter: 30 })
+    expect(service.resolveWaitAction(capability, 'reject', admit)).toEqual({ retryAfter: 30 })
+    expect(admit).toHaveBeenCalledTimes(2)
+    expect(admit.mock.calls[0]).toEqual(admit.mock.calls[1])
+    expect(admit.mock.calls[0]).toEqual([expect.stringMatching(/^[a-f0-9]{64}$/)])
+    expect(service.run(accepted.runId)?.status).toBe('waiting')
+
     const app = createServerApp(service)
     const approvePath = new URL(approveUrl).pathname
     const rejectPath = new URL(rejectUrl).pathname
@@ -443,22 +455,73 @@ describe('Server application service', () => {
     expect(service.run(accepted.runId)?.status).toBe('completed')
   })
 
-  it('rate limits public Wait actions before capability lookup', async () => {
-    const service = await openService(await databaseFile())
-    const inspect = vi.spyOn(service, 'inspectWaitAction')
+  it('isolates Wait action limits and restores admission when the window expires', async () => {
+    const messages: string[] = []
+    const service = await openService(await databaseFile(), {
+      capabilities: {
+        connector: () =>
+          createConnectorHost({
+            execute: async (_action, _connectionId, input) => {
+              messages.push(String(input.message))
+              return null
+            },
+          }),
+        waitPublicOrigin: () => new URL('https://flows.example.com'),
+      },
+    })
+    await startService(service)
+    const runs: string[] = []
+    for (const flowId of ['first', 'second']) {
+      const accepted = await acceptRun(service, {
+        flowId,
+        idempotencyKey: flowId,
+        revision: notificationFlow(),
+        revisionId: `revision-${flowId}`,
+      })
+      if (accepted.kind != 'accepted') throw new Error('Wait notification Run was not accepted.')
+      runs.push(accepted.runId)
+      await service.waitForIdle()
+    }
+    const paths = messages.map((message) => {
+      const url = message.match(/https:\/\/flows\.example\.com\/v1\/wait-actions\/[A-Za-z0-9_-]{43}\/approve/)?.[0]
+      if (url == null) throw new Error('Wait notification action URL is missing.')
+      return new URL(url).pathname
+    })
+    expect(paths).toHaveLength(2)
+    const [first = '', second = ''] = paths
     const app = createServerApp(service, { callbackRequestsPerMinute: 1 })
+    const now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+    try {
+      expect((await app.request(first, { method: 'PUT' })).status).toBe(405)
+      expect((await app.request('/v1/wait-actions/invalid/approve')).status).toBe(404)
+      expect((await app.request(`/v1/wait-actions/${'a'.repeat(43)}/approve`)).status).toBe(404)
+      expect((await app.request(first.replace('/approve', '/continue'), { method: 'POST' })).status).toBe(404)
+      expect((await app.request(first, { method: 'HEAD' })).status).toBe(200)
 
-    const unsupported = await app.request(`/v1/wait-actions/${'a'.repeat(43)}/approve`, { method: 'PUT' })
-    expect(unsupported.status).toBe(405)
-    const missing = await app.request('/v1/wait-actions/invalid/approve')
-    expect(missing.status).toBe(404)
-    const limited = await app.request(`/v1/wait-actions/${'a'.repeat(43)}/approve`)
+      const limited = await app.request(first.replace('/approve', '/reject'), { method: 'POST' })
+      expect(limited.status).toBe(429)
+      expect(limited.headers.get('cache-control')).toBe('no-store')
+      expect(limited.headers.get('retry-after')).toBe('60')
+      expect(await limited.json()).toMatchObject({ error: { code: 'wait-action.rate-limited' }, version: 1 })
+      expect(runs.map((runId) => service.run(runId)?.status)).toEqual(['waiting', 'waiting'])
+      const head = await app.request(first, { method: 'HEAD' })
+      expect(head.status).toBe(429)
+      expect(await head.text()).toBe('')
 
-    expect(limited.status).toBe(429)
-    expect(limited.headers.get('cache-control')).toBe('no-store')
-    expect(limited.headers.get('retry-after')).not.toBeNull()
-    expect(await limited.json()).toMatchObject({ error: { code: 'wait-action.rate-limited' }, version: 1 })
-    expect(inspect).not.toHaveBeenCalled()
+      const other = await app.request(second, { method: 'POST' })
+      expect(other.status).toBe(200)
+      expect(await other.json()).toMatchObject({ action: 'approve', resolutionAccepted: true })
+
+      clock.mockReturnValue(now + 60_000)
+      const restored = await app.request(first, { method: 'POST' })
+      expect(restored.status).toBe(200)
+      expect(await restored.json()).toMatchObject({ action: 'approve', resolutionAccepted: true })
+    } finally {
+      clock.mockRestore()
+    }
+    await service.waitForIdle()
+    expect(runs.map((runId) => service.run(runId)?.status)).toEqual(['completed', 'completed'])
   })
 
   it('retries a transient Wait notification failure with the same invocation identity', async () => {

@@ -1423,23 +1423,31 @@ export class ServerService {
   inspectWaitAction(
     capability: string,
     requested: WaitAction,
-  ): { readonly action: WaitAction; readonly expiresAt: string; readonly prompt: string; readonly state: 'resolved' | 'waiting' } | undefined {
-    const receipt = this.#store.waitByCapability(createHash('sha256').update(capability).digest('hex'))
+    admit: (digest: string) => number | undefined,
+  ):
+    | { readonly action: WaitAction; readonly expiresAt: string; readonly prompt: string; readonly state: 'resolved' | 'waiting' }
+    | { readonly retryAfter: number }
+    | undefined {
+    const digest = createHash('sha256').update(capability).digest('hex')
+    const receipt = this.#store.waitByCapability(digest)
     if (receipt == null) return
     const revision = this.#store.revision(receipt.flowId, receipt.revisionId)
     if (revision == null) return
     const node = (JSON.parse(revision.content) as RevisionContent).document.graph.nodes[receipt.nodeId]
     if (node?.kind != 'wait' || !node.actions.some((action) => action == requested)) return
+    if (receipt.action == null && (receipt.status != 'waiting' || receipt.expiresAt <= this.#clock())) return
+    const retryAfter = admit(digest)
+    if (retryAfter != null) return { retryAfter }
     if (receipt.action != null) {
       return { action: receipt.action, expiresAt: new Date(receipt.expiresAt).toISOString(), prompt: node.prompt, state: 'resolved' }
     }
-    if (receipt.status != 'waiting' || receipt.expiresAt <= this.#clock()) return
     return { action: requested, expiresAt: new Date(receipt.expiresAt).toISOString(), prompt: node.prompt, state: 'waiting' }
   }
 
   resolveWaitAction(
     capability: string,
     requested: WaitAction,
+    admit: (digest: string) => number | undefined,
   ):
     | {
         readonly action: WaitAction | null
@@ -1447,13 +1455,17 @@ export class ServerService {
         readonly resolvedAt: string | null
         readonly state: 'resolved' | 'unavailable' | 'waiting'
       }
+    | { readonly retryAfter: number }
     | undefined {
-    const receipt = this.#store.waitByCapability(createHash('sha256').update(capability).digest('hex'))
+    const digest = createHash('sha256').update(capability).digest('hex')
+    const receipt = this.#store.waitByCapability(digest)
     if (receipt == null) return
     const revision = this.#store.revision(receipt.flowId, receipt.revisionId)
     if (revision == null) return
     const node = (JSON.parse(revision.content) as RevisionContent).document.graph.nodes[receipt.nodeId]
     if (node?.kind != 'wait' || !node.actions.some((action) => action == requested)) return
+    const retryAfter = admit(digest)
+    if (retryAfter != null) return { retryAfter }
     const result = this.#store.resolveWait(receipt.runId, receipt.waitId, requested, node.actions)
     if (result.kind != 'resolved') return
     if (result.changed) {

@@ -105,7 +105,7 @@ credential。设置 `OPEN_FLOW_TOKEN` 时环境配置锁定当前认证来源并
 | `OPEN_FLOW_MAX_PENDING_RUNS`                   | 全部署尚未 terminal 的 Run 上限；默认 `1000`。                                                              |
 | `OPEN_FLOW_MAX_CONCURRENT_RUNS`                | 全部署同时执行的 Run 上限；同一 Flow 最多执行一个；默认 `4`。                                               |
 | `OPEN_FLOW_RUN_TIMEOUT_MS`                     | 单个 Run 从开始执行到 terminal 的最长毫秒数；默认 `1800000`。                                               |
-| `OPEN_FLOW_CALLBACK_REQUESTS_PER_MINUTE`       | 每个 Webhook 或 Integration endpoint 的每分钟请求上限；默认 `120`。                                         |
+| `OPEN_FLOW_CALLBACK_REQUESTS_PER_MINUTE`       | 每个 Webhook / Integration endpoint 或 Wait capability 的每分钟请求上限；默认 `120`。                       |
 | `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE` | 全部署每分钟允许的 operator 登录尝试数；默认 `10`。                                                         |
 
 `OPEN_FLOW_CONNECTOR_ORIGIN` 用于启用 Connector。`OPEN_FLOW_CONNECTOR_TOKEN` 可选；Connector 本地未启用 runtime 认证时可以省略或设为空字符串，此时
@@ -146,7 +146,9 @@ setup。Operator 登录与 setup authorization 共享部署实例级限速，超
 
 达到 `OPEN_FLOW_MAX_PENDING_RUNS` 后，新 Run admission 返回 429；已接受请求的幂等重放仍返回原 Run。Cron 与 Poll 保留当前调度位置并短暂重试。
 Cron 所属 Flow 已有未终结 Run 时同样保留当前调度位置；前一个 Run 结束后只补入最早未处理 occurrence，并把下一次计划推进到当前时间之后。
-Callback 请求限流只为已存在的 endpoint 建立内存窗口，超过限制时返回 429 和 `Retry-After`。
+Callback 请求限流只为已存在的 Webhook / Integration endpoint 或验证通过的 Wait capability 建立内存窗口，超过限制时返回 429 和 `Retry-After`。
+Wait 的 `GET`、`HEAD`、`POST` 及其不同 action 共用该 capability 的额度，不同 capability 独立计数；无效 capability 或不属于该 Wait 的 action 不占用额度。
+被限流的 Wait `POST` 不提交决议。限流状态属于当前 Server app 实例，进程重启后重置。
 
 ## 5. 健康检查与停止
 
