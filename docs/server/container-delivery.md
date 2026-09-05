@@ -143,6 +143,8 @@ credential；不要让 reverse proxy access log、消息预览或分析工具采
 
 没有 env-managed 或持久化 operator credential 时，health、callback 和已持久化的 runtime 工作仍可运行，但 Control API fail closed，Workbench 进入
 setup。Operator 登录与 setup authorization 共享部署实例级限速，超过 `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE` 后返回 429 和 `Retry-After`。
+`POST /auth/setup` 必须持有有效的 setup session；缺失、篡改或过期的 session 返回 401，不占用上述额度。已授权的认领操作不受该额度限制，
+即使 setup authorization 刚好耗尽窗口额度，也能继续完成认领。
 
 达到 `OPEN_FLOW_MAX_PENDING_RUNS` 后，新 Run admission 返回 429；已接受请求的幂等重放仍返回原 Run。Cron 与 Poll 保留当前调度位置并短暂重试。
 Cron 所属 Flow 已有未终结 Run 时同样保留当前调度位置；前一个 Run 结束后只补入最早未处理 occurrence，并把下一次计划推进到当前时间之后。

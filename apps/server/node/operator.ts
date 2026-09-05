@@ -203,7 +203,9 @@ export function createOperatorApp(session?: OperatorSession, attemptsPerMinute =
     if (session.source() != 'none') {
       return json(409, { error: { code: serverErrorCode.operatorAlreadyConfigured, message: 'Operator authentication is already configured.' }, version: 1 })
     }
-    if (!admitted()) return limited()
+    if (!(await session.setupAuthorized(context.req.raw))) {
+      return json(401, { error: { code: serverErrorCode.authenticationInvalid, message: 'Setup authorization or operator token is invalid.' }, version: 1 })
+    }
     const token = await tokenRequest(context.req.raw, 'token')
     if (token == null) return json(400, { error: { code: serverErrorCode.operatorInvalid, message: 'Setup request is invalid.' }, version: 1 })
     const result = await session.claim(context, token)
