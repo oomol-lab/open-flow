@@ -25,7 +25,6 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, u
 import { useLang, useTranslate } from 'val-i18n-react'
 import { isWritable, val } from 'value-enhancer'
 import { FlowDesignerView } from '../../../../designer/browser/graph/FlowDesigner/FlowDesignerView.tsx'
-import { compareJSONSchema } from '../../../../manifest/common/schemaCompare.ts'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { CodeMirrorStringEditorFactory } from '../../codeMirrorStringEditor.ts'
@@ -335,29 +334,21 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
   const isValidConnection = useMemo(() => {
     const nodes = new Map(model.nodes.map((node) => [node.id, node]))
     return (edge: Omit<DesignerEdge, 'id'>): boolean => {
-      const sourceNode = nodes.get(edge.source)
-      const targetNode = nodes.get(edge.target)
-      if (sourceNode == null || targetNode == null || sourceNode.kind == 'comment' || targetNode.kind == 'comment') return true
-      const output = sourceNode.outputs.find((port): port is FlowDesignerViewOutput => 'handle' in port && port.handle == edge.sourceHandle)
-      const input = targetNode.inputs.find((port): port is FlowDesignerViewInput => 'handle' in port && port.handle == edge.targetHandle)
-      if (output == null || input == null) return true
-      const from = output.jsonSchema
-      const to = input.jsonSchema
-      if (from == null || to == null || typeof from != 'object' || Array.isArray(from) || typeof to != 'object' || Array.isArray(to)) return true
-      if (Object.keys(from).length == 0 || Object.keys(to).length == 0) return true
-      const result = compareJSONSchema(
-        {
-          nullable: output.nullable,
-          packageId: undefined,
-          schema: from,
-        },
-        {
-          nullable: input.nullable,
-          packageId: undefined,
-          schema: to,
-        },
+      const source = nodes.get(edge.source)
+      const destination = nodes.get(edge.target)
+      if (
+        source == null ||
+        destination == null ||
+        source.kind == 'comment' ||
+        destination.kind == 'comment' ||
+        destination.kind == 'trigger' ||
+        edge.source == edge.target ||
+        edge.targetHandle != '$in'
       )
-      return result.kind != 'incompatible'
+        return false
+      return source.kind == 'condition' || source.kind == 'wait'
+        ? source.outputs.some((port) => 'handle' in port && `$branch:${port.handle}` == edge.sourceHandle)
+        : edge.sourceHandle == '$out'
     }
   }, [model.nodes])
 

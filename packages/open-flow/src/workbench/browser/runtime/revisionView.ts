@@ -14,6 +14,8 @@ import type {
   WaitNode,
 } from './api.ts'
 
+import { availableOutputs, nodeInputPorts } from '../../../flow/common/semantics.ts'
+
 type SubflowDefinition = FlowDocument['subflows'][string]
 
 export type ResolvedNode =
@@ -71,6 +73,14 @@ export class RevisionView {
       case 'subflow':
         return this.#document.subflows[target.id]?.graph
     }
+  }
+
+  public inputSources(target: GraphTarget, nodeId: string) {
+    const graph = this.graph(target)!
+    return Object.keys(nodeInputPorts(this.#document, graph.nodes[nodeId]!)).map((handle) => ({
+      handle,
+      outputs: availableOutputs(this.#document, graph, nodeId, handle),
+    }))
   }
 
   public designerInputs(target: GraphTarget): readonly unknown[] {

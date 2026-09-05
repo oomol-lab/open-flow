@@ -131,6 +131,28 @@ interface Presentation {
 
 更新 body 为 `{ expectedRevision, value, version: 1 }`，stale CAS 返回 `flow.presentation-conflict`。
 
+### 执行图与输入来源
+
+Revision 的根图和每个 Subflow graph 必须包含 `nodes` 和 `edges`；没有执行边时显式保存 `edges: []`。
+执行边使用 `{ source: nodeId, target: nodeId, sourceHandle?: branch }`。普通节点不得设置 `sourceHandle`；Condition 和 Wait 必须指定已声明的分支或 action。
+边不含目标 input handle。重复边、缺失端点、指向 Trigger 的边和环不能通过 validation。边集合按规范顺序参与 Revision digest。
+
+`inputs[handle]` 使用 `{ kind: 'value', value }` 或 `{ kind: 'sources', sources }`。Node source 使用
+`{ kind: 'node', nodeId, output }`；Flow input 与 Variable binding 的 source 形式保持不变。Node source 必须指向经执行边可达的祖先，
+并在目标的每一条可执行路径上保证可用。多个 source 必须互斥且完整覆盖目标路径，每次执行恰好选择一个；并行前驱的两个结果不能合并到同一个 input。
+`graph.edge.connect` 与 `graph.edge.disconnect` 只修改执行边，`graph.node.input.set` 独立修改数据映射。节点不保存 `concurrency`。
+
+CLI 分开设置执行顺序与输入来源：
+
+```sh
+oo flow connect <flow> <source> <target-node> [branch]
+oo flow disconnect <flow> <source> <target-node> [branch]
+oo flow node input <flow> <node> <input> <source> <output> [<source> <output>...]
+```
+
+`oo flow apply` 的 `edges` 同样使用 `source`、`target` 和可选 `sourceHandle`。
+不提供旧数据流边、节点 concurrency 或旧 checkpoint 的兼容转换。
+
 ## 4. Validation、Publication 与 Live
 
 ```ts
@@ -465,3 +487,28 @@ capability 摘要；完整 capability 是 bearer credential，消费端不得把
 
 请求被限流时返回 `429 wait-action.rate-limited`，携带表示剩余等待秒数的 `Retry-After`；被限流的 `POST` 不提交决议。
 `HEAD` 的限流响应同样没有 response body。
+
+### Scheduler checkpoint 与节点事件
+
+Scheduler checkpoint 的精确对象为：
+
+```json
+{
+  "bindingValues": {},
+  "inputs": {},
+  "results": { "source": { "jobId": "job-1", "outputs": { "value": 42 } } },
+  "skipped": [],
+  "version": 1,
+  "wait": { "jobId": "job-2", "nodeId": "approval", "value": 42, "waitId": "opaque-id" }
+}
+```
+
+`inputs` 保存按 node ID 和 input handle 索引的启动输入，`bindingValues` 保存本次 Run 的 Variable binding 快照。
+`results` 保存已完成节点的最终 output，`skipped` 保存已跳过节点。checkpoint 不包含队列、活跃 invocation 或重复消费位置，总 JSON 大小不得超过 16 MiB。
+恢复必须验证精确字段、节点状态不冲突、结果符合声明、依赖完整且符合分支选择；当前 Wait 不能已经完成或跳过。
+
+`node.skipped` 表示节点因入边未被选中而跳过，不产生 `node.started` 或 `node.output`。
+`node.output` 仅在 Task 返回的完整 output 校验成功后产生，同一次 invocation 的 output 之后产生 `node.completed`；不支持运行中的中间 output。
+
+Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 保存执行图末端节点，按 node ID 排序。
+完成项为 `{ nodeId, status: 'completed', jobId, outputs }`，跳过项为 `{ nodeId, status: 'skipped' }`，不包含重复执行的 jobs 数组。

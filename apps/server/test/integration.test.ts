@@ -85,6 +85,7 @@ function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient'): Rev
     document: {
       bindings: { connection: { kind: 'connection', target: 'connection-main' } },
       graph: {
+        edges: [{ source: 'integration', target: 'task' }],
         nodes: {
           integration: {
             bindingId: 'connection',
@@ -94,7 +95,6 @@ function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient'): Rev
             name: 'Integration runtime test',
           },
           task: {
-            concurrency: 1,
             inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'integration', output: 'payload' }] } },
             kind: 'task',
             task: {

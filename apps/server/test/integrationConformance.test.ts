@@ -46,6 +46,7 @@ function revision(fixture: IntegrationConformanceFixture, enabled = true): Revis
     document: {
       bindings: enabled ? { connection: { kind: 'connection', target: fixture.connectionId } } : {},
       graph: {
+        edges: enabled ? [{ source: 'integration', target: 'task' }] : [],
         nodes: enabled
           ? {
               integration: {
@@ -56,7 +57,6 @@ function revision(fixture: IntegrationConformanceFixture, enabled = true): Revis
                 name: 'Integration conformance trigger',
               },
               task: {
-                concurrency: 1,
                 inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'integration', output: 'payload' }] } },
                 kind: 'task',
                 task: {

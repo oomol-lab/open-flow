@@ -60,7 +60,6 @@
     "privateHelp": "Marquez le bloc partagé comme privé pour indiquer qu'il ne peut être utilisé ni par l'IA ni par d'autres utilisateurs.",
     "public": "Public",
     "runningConfig": {
-      "concurrency": "Parallélisme",
       "progressWeight": "Poids de progression",
       "timeout": "Délai d'expiration",
       "title": "Configuration d'exécution"

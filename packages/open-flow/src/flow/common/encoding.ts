@@ -91,7 +91,6 @@ export function canonicalOutputs(value: readonly (OutputMapping & Port)[]): Json
 function canonicalNode(value: GraphNode): JsonValue {
   if (!('inputs' in value)) return canonicalTriggerNode(value)
   const common = {
-    concurrency: value.concurrency,
     ...(value.description == null ? {} : { description: value.description }),
     ...(value.icon == null ? {} : { icon: value.icon }),
     inputs: canonicalInputs(value.inputs),
@@ -149,6 +148,13 @@ function canonicalNode(value: GraphNode): JsonValue {
 
 export function canonicalGraph(value: Graph): JsonValue {
   return {
+    edges: value.edges
+      .map((edge) => ({ ...edge }))
+      .toSorted((left, right) => {
+        const a = canonicalText(left)
+        const b = canonicalText(right)
+        return a < b ? -1 : a > b ? 1 : 0
+      }),
     nodes: Object.fromEntries(entries(value.nodes).map(([id, node]) => [id, canonicalNode(node)])),
   }
 }

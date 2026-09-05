@@ -174,6 +174,7 @@ function eventCategory(event: RunEvent): EventCategory {
     case 'node.artifact':
       return 'artifact'
     case 'node.completed':
+    case 'node.skipped':
     case 'node.failed':
     case 'node.started':
     case 'run.canceled':
@@ -317,11 +318,9 @@ function terminalOutputs(result: RunResult | undefined): JsonValue | undefined {
   const outputs: JsonValue[] = []
   for (const nodeValue of value.nodes) {
     const node = jsonRecord(nodeValue)
-    if (!Array.isArray(node?.jobs)) continue
-    for (const jobValue of node.jobs) {
-      const output = jsonRecord(jsonRecord(jobValue)?.outputs)
-      if (output != null) outputs.push(output)
-    }
+    if (node?.status != 'completed') continue
+    const output = jsonRecord(node.outputs)
+    if (output != null) outputs.push(output)
   }
   return outputs.length == 1 ? outputs[0] : outputs
 }
@@ -348,6 +347,8 @@ function eventSummary(event: RunEvent, t: TFunction): string {
       const progress = event.payload.progress
       return typeof progress == 'number' ? t('run.eventProgress', { progress: Math.round(progress) }) : t('run.eventRecorded')
     }
+    case 'node.skipped':
+      return t('run.eventSkipped')
     case 'node.output':
       return t('run.eventOutput')
     case 'node.artifact':

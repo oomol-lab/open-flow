@@ -440,7 +440,7 @@ async function verifyConsumer(versions: { readonly react: string; readonly react
       process.execPath,
       [
         '-e',
-        "const Effect = await import('effect/Effect'); const { runFlow } = await import('@oomol-lab/open-flow/scheduler'); const result = await Effect.runPromise(runFlow({ closureDigest: 'consumer', engineContract: 'open-flow-engine/v1', graph: { nodes: {} }, modules: {}, subflows: {}, tasks: {} }, { createId: () => 'consumer-job', flowId: 'main', invokeTask: () => Effect.fail(new Error('Unexpected Task invocation.')), runId: 'consumer-run' })); if (result.kind !== 'node-results' || result.nodes.length !== 0) throw new Error('Scheduler Effect is not interoperable with the consumer Effect runtime.')",
+        "const Effect = await import('effect/Effect'); const { runFlow } = await import('@oomol-lab/open-flow/scheduler'); const result = await Effect.runPromise(runFlow({ closureDigest: 'consumer', engineContract: 'open-flow-engine/v1', graph: { edges: [], nodes: {} }, modules: {}, subflows: {}, tasks: {} }, { createId: () => 'consumer-job', flowId: 'main', invokeTask: () => Effect.fail(new Error('Unexpected Task invocation.')), runId: 'consumer-run' })); if (result.kind !== 'node-results' || result.nodes.length !== 0) throw new Error('Scheduler Effect is not interoperable with the consumer Effect runtime.')",
       ],
       { cwd: directory },
     )

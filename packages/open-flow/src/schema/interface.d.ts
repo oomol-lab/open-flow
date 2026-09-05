@@ -347,7 +347,6 @@ export type SubflowNode = {
   /** Provide data source for Node input Handles. */
   inputs_from?: HandleInputFrom[] | undefined
   /** the maximum number of this node can be executed concurrently. default is 1. */
-  concurrency?: number | undefined
   /** The weight of this node in current flow progress calculation. Flow will sum all nodes' progress divided by their weight sum. Default is 1. Set to 0 to ignore this node in flow's progress calculation. */
   progress_weight?: number
   /** Location of a Subflow Block manifest */
@@ -399,7 +398,6 @@ export type TaskNode = {
   /** Provide data source for Node input Handles. */
   inputs_from?: HandleInputFrom[] | undefined
   /** the maximum number of this node can be executed concurrently. default is 1. */
-  concurrency?: number | undefined
   /** The weight of this node in current flow progress calculation. Flow will sum all nodes' progress divided by their weight sum. Default is 1. Set to 0 to ignore this node in flow's progress calculation. */
   progress_weight?: number
   task: string | InlineTaskBlock

@@ -4,6 +4,7 @@ import type { Runtime, ParsedArguments, SemanticNode } from './support.ts'
 
 import { ApiError, ControlClient } from '@oomol-lab/open-flow/control-api'
 import {
+  setInputSources,
   connect as connectEdge,
   createAuthoringId,
   createBuiltinTrigger,
@@ -34,7 +35,6 @@ import {
   inspectedNode,
   inspectedNodeSummary,
   inspectedTriggerSummary,
-  inspectedEdges,
   requireCount,
   write,
   nodeText,
@@ -155,14 +155,11 @@ export async function edgeCommand(
   args: ParsedArguments,
   runtime: Runtime,
 ): Promise<void> {
-  requireCount(operands, 5, `oo flow ${operation} <flow> <source> <source-output> <target-node> <target-input> [--json]`)
+  if (operands.length != 3 && operands.length != 4) throw new CliError('cli.invalid-arguments', `Usage: oo flow ${operation} <flow> <source> <target> [branch]`)
   const selected = await selectedDraftFlow(client, flow.flowId, operands[0]!)
   const source = exactEdgeSource(selected.graph.nodes, operands[1]!)
-  if (source.kind == 'trigger' && operands[2] != 'payload') {
-    throw new CliError('trigger.output-not-found', 'Trigger output must be payload.')
-  }
-  const targetNode = exactNode(selected.graph.nodes, operands[3]!)
-  const edge = { source: source.id, sourceHandle: operands[2]!, target: targetNode.nodeId, targetHandle: operands[4]! }
+  const targetNode = exactNode(selected.graph.nodes, operands[2]!)
+  const edge = { source: source.id, target: targetNode.nodeId, ...(operands[3] == null ? {} : { sourceHandle: operands[3] }) }
   const operations =
     operation == 'connect' ? connectEdge(selected.draft.content, selected.target, edge) : disconnectEdge(selected.draft.content, selected.target, edge)
   const kind = `edge.${operation}` as const
@@ -171,7 +168,7 @@ export async function edgeCommand(
       runtime,
       args.json,
       { changed: false, edge, flowId: selected.flow.flowId, kind, revisionId: selected.draft.revisionId, version: 1 },
-      `${operation}\tunchanged\t${source.id}:${edge.sourceHandle}\t${targetNode.nodeId}:${edge.targetHandle}\t${selected.draft.revisionId}`,
+      `${operation}\tunchanged\t${source.id}${edge.sourceHandle == null ? '' : `:${edge.sourceHandle}`}\t${targetNode.nodeId}\t${selected.draft.revisionId}`,
     )
     return
   }
@@ -181,13 +178,13 @@ export async function edgeCommand(
     runtime,
     args.json,
     { edge, flowId: selected.flow.flowId, kind, revision: changed.revision, version: 1 },
-    `${operation}\t${source.id}:${edge.sourceHandle}\t${targetNode.nodeId}:${edge.targetHandle}\t${changed.revision.revisionId}`,
+    `${operation}\t${source.id}${edge.sourceHandle == null ? '' : `:${edge.sourceHandle}`}\t${targetNode.nodeId}\t${changed.revision.revisionId}`,
   )
 }
 
 export async function nodeCommand(client: ControlClient, flow: Flow, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<void> {
   const [operation, flowReference, nodeReference, ...extra] = operands
-  if (flowReference == null) throw new CliError('cli.invalid-arguments', 'Usage: oo flow node <list|show|add|set|remove> <flow> ...')
+  if (flowReference == null) throw new CliError('cli.invalid-arguments', 'Usage: oo flow node <list|show|add|set|input|remove> <flow> ...')
   const selected = await selectedDraftFlow(client, flow.flowId, flowReference)
 
   switch (operation) {
@@ -223,6 +220,31 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
           version: 1,
         },
         nodeText(resolved.nodeId, resolved.node),
+      )
+      return
+    }
+    case 'input': {
+      if (nodeReference == null || extra.length < 3 || extra.length % 2 != 1)
+        throw new CliError('cli.invalid-arguments', 'Usage: oo flow node input <flow> <node> <input> <source> <output> [<source> <output> ...]')
+      const resolved = exactNode(selected.graph.nodes, nodeReference)
+      const sources = []
+      for (let index = 1; index < extra.length; index += 2) {
+        const source = exactEdgeSource(selected.graph.nodes, extra[index]!)
+        sources.push({ kind: 'node' as const, nodeId: source.id, output: extra[index + 1]! })
+      }
+      const operations = setInputSources(selected.draft.content, selected.target, resolved.nodeId, extra[0]!, sources)
+      const changed = await changeDraft(
+        client,
+        flow.flowId,
+        selected.draft.revisionId,
+        { kind: 'input', nodeId: resolved.nodeId, handle: extra[0] },
+        operations,
+      )
+      write(
+        runtime,
+        args.json,
+        { kind: 'node.input', revision: changed.revision, version: 1 },
+        `input\t${resolved.nodeId}\t${extra[0]}\t${changed.revision.revisionId}`,
       )
       return
     }
@@ -286,10 +308,10 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
     }
     case 'set': {
       if (nodeReference == null || extra.length > 0) {
-        throw new CliError('cli.invalid-arguments', 'Usage: oo flow node set <flow> <node> [--name <name>] [--concurrency <count>] [--timeout <ms>]')
+        throw new CliError('cli.invalid-arguments', 'Usage: oo flow node set <flow> <node> [--name <name>] [--timeout <ms>]')
       }
-      if (args.name == null && args.concurrency == null && args.timeoutMs == null) {
-        throw new CliError('cli.invalid-arguments', 'Node set requires --name, --concurrency, or --timeout.')
+      if (args.name == null && args.timeoutMs == null) {
+        throw new CliError('cli.invalid-arguments', 'Node set requires --name or --timeout.')
       }
       const resolved = exactNode(selected.graph.nodes, nodeReference)
       const name = args.name?.trim()
@@ -297,11 +319,10 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
       const nextName = name ?? resolved.node.name
       const nextTimeoutMs = args.timeoutMs ?? resolved.node.timeoutMs
       const settings = {
-        concurrency: args.concurrency ?? resolved.node.concurrency,
         ...(nextName == null ? {} : { name: nextName }),
         ...(nextTimeoutMs == null ? {} : { timeoutMs: nextTimeoutMs }),
       }
-      if (settings.concurrency == resolved.node.concurrency && settings.name == resolved.node.name && settings.timeoutMs == resolved.node.timeoutMs) {
+      if (settings.name == resolved.node.name && settings.timeoutMs == resolved.node.timeoutMs) {
         write(
           runtime,
           args.json,
@@ -349,7 +370,7 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
       return
     }
     default:
-      throw new CliError('cli.invalid-arguments', 'Usage: oo flow node <list|show|add|set|remove> <flow> ...')
+      throw new CliError('cli.invalid-arguments', 'Usage: oo flow node <list|show|add|set|input|remove> <flow> ...')
   }
 }
 
@@ -378,7 +399,7 @@ export async function inspectFlowCommand(
   const { content: _content, ...revision } = selected.draft
   const result = {
     check,
-    edges: inspectedEdges(selected.graph.nodes),
+    edges: selected.graph.edges,
     flow: selected.flow,
     kind: 'flow.inspect',
     nodes,
@@ -390,13 +411,7 @@ export async function inspectFlowCommand(
   const lines = [
     `${check.valid ? 'valid' : 'invalid'}\t${selected.flow.name}\t${selected.flow.flowId}\t${selected.draft.revisionId}`,
     ...nodeSummaries.map((entry) => `node\t${entry.kind}\t${entry.name ?? '<unnamed>'}\t${entry.nodeId}`),
-    ...result.edges.map((edge) =>
-      edge.source.kind == 'node'
-        ? `edge\t${edge.source.nodeId}:${edge.source.output}\t${edge.target.nodeId}:${edge.input}`
-        : edge.source.kind == 'binding'
-          ? `binding-edge\t${edge.source.bindingId}\t${edge.target.nodeId}:${edge.input}`
-          : `flow-edge\t${edge.source.input}\t${edge.target.nodeId}:${edge.input}`,
-    ),
+    ...result.edges.map((edge) => `edge\t${edge.source}${edge.sourceHandle == null ? '' : `:${edge.sourceHandle}`}\t${edge.target}`),
   ]
   write(runtime, args.json, result, lines.join('\n'))
 }
@@ -576,15 +591,11 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
     if (localNodeId != null) resolvedSource = { id: localNodeId, kind: 'node' }
     else if (localTriggerId != null) resolvedSource = { id: localTriggerId, kind: 'trigger' }
     else resolvedSource = exactEdgeSource(graph.nodes, requested.source)
-    if (resolvedSource.kind == 'trigger' && requested.output != 'payload') {
-      throw new CliError('trigger.output-not-found', 'Trigger output must be payload.')
-    }
     const targetNodeId = nodeReferences.get(requested.target) ?? exactNode(graph.nodes, requested.target).nodeId
     const edge = {
       source: resolvedSource.id,
-      sourceHandle: requested.output,
+      ...(requested.sourceHandle == null ? {} : { sourceHandle: requested.sourceHandle }),
       target: targetNodeId,
-      targetHandle: requested.input,
     }
     const edgeOperations = connectEdge(content, selected.target, edge)
     operations.push(...edgeOperations)

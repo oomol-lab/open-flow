@@ -39,6 +39,7 @@ import { generateTyping } from '../../../../manifest/common/meta/block/generateT
 export type DesignerTarget = { readonly kind: 'flow' } | { readonly id: string; readonly kind: 'subflow' }
 
 export interface NodeClipboard {
+  readonly edges: Draft['content']['document']['graph']['edges']
   readonly bindings: Draft['content']['document']['bindings']
   readonly modules: Readonly<Record<string, CodeModule>>
   readonly nodes: Readonly<Record<string, GraphNode>>
@@ -142,7 +143,7 @@ export function createResource(id: string, name: string): FlowChanges {
     {
       kind: 'subflow.create',
       subflow: {
-        graph: { nodes: {} },
+        graph: { edges: [], nodes: {} },
         inputs: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
         name,
         outputs: [
@@ -212,6 +213,7 @@ export function copyNodes(revision: RevisionView, target: DesignerTarget, nodeId
   const nodes = revision.graph(target)?.nodes ?? {}
   const copied = Object.fromEntries(nodeIds.flatMap((nodeId) => (nodes[nodeId] == null ? [] : [[nodeId, nodes[nodeId]]])))
   return {
+    edges: (revision.graph(target)?.edges ?? []).filter((edge) => copied[edge.source] != null && copied[edge.target] != null),
     bindings: Object.fromEntries(
       Object.values(copied).flatMap((node) => {
         if (!('inputs' in node)) return []
@@ -325,6 +327,11 @@ export function pasteNodes(revision: RevisionView, target: DesignerTarget, clipb
       target,
     })
   }
+  for (const edge of clipboard.edges) {
+    const source = ids.get(edge.source)
+    const destination = ids.get(edge.target)
+    if (source != null && destination != null) operations.push({ kind: 'graph.edge.connect', target, edge: { ...edge, source, target: destination } })
+  }
   return { changes: operations, nodeIds: [...ids.values()], sourceIds }
 }
 
@@ -401,6 +408,13 @@ export function updateCondition(revision: RevisionView, target: DesignerTarget, 
   )
   const outputNames = new Set(Object.keys(nextOutputs))
   const changes: ChangeOperation[] = []
+  for (const edge of graph.edges) {
+    if (edge.source != nodeId || edge.sourceHandle == null) continue
+    const renamed = outputRename != null && edge.sourceHandle == outputRename[0] ? outputRename[1] : edge.sourceHandle
+    if (renamed == edge.sourceHandle && outputNames.has(renamed)) continue
+    changes.push({ kind: 'graph.edge.disconnect', edge, target })
+    if (outputNames.has(renamed)) changes.push({ kind: 'graph.edge.connect', edge: { ...edge, sourceHandle: renamed }, target })
+  }
 
   for (const [currentNodeId, node] of Object.entries(graph.nodes)) {
     if (!('inputs' in node)) continue
@@ -478,6 +492,9 @@ export function updateWait(
   }
   const outputs = new Set<string>(settings.actions)
   const changes: ChangeOperation[] = []
+  for (const edge of graph.edges) {
+    if (edge.source == nodeId && edge.sourceHandle != null && !outputs.has(edge.sourceHandle)) changes.push({ kind: 'graph.edge.disconnect', edge, target })
+  }
   if (current.name != settings.name) {
     changes.push({ before: current.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value: settings.name })
   }
@@ -635,7 +652,7 @@ function createSubflowNode(target: DesignerTarget, nodeId: string, subflowId: st
   return [
     {
       kind: 'graph.node.create',
-      node: { concurrency: 1, inputs: defaultInputs(inputs), kind: 'subflow', subflowId },
+      node: { inputs: defaultInputs(inputs), kind: 'subflow', subflowId },
       nodeId,
       target,
     },
@@ -691,6 +708,13 @@ function replaceCodeTaskPorts(
   const inputNames = new Set(task.inputs.flatMap((port) => ('handle' in port ? [port.handle] : [])))
   const outputNames = new Set(task.outputs.flatMap((port) => ('handle' in port ? [port.handle] : [])))
   const changes: ChangeOperation[] = []
+  for (const edge of graph.edges) {
+    if (edge.source != nodeId || edge.sourceHandle == null) continue
+    const renamed = outputRename != null && edge.sourceHandle == outputRename[0] ? outputRename[1] : edge.sourceHandle
+    if (renamed == edge.sourceHandle && outputNames.has(renamed)) continue
+    changes.push({ kind: 'graph.edge.disconnect', edge, target })
+    if (outputNames.has(renamed)) changes.push({ kind: 'graph.edge.connect', edge: { ...edge, sourceHandle: renamed }, target })
+  }
 
   for (const [currentNodeId, node] of Object.entries(graph.nodes)) {
     if (!('inputs' in node)) continue

@@ -28,9 +28,9 @@ function revision(name = 'Incoming', webhook = true): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           marker: {
-            concurrency: 1,
             inputs: {},
             kind: 'value',
             values: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
@@ -60,9 +60,9 @@ function variableRevision(): RevisionContent {
     document: {
       bindings: { token: { kind: 'variable', target: 'TOKEN' } },
       graph: {
+        edges: [],
         nodes: {
           task: {
-            concurrency: 1,
             inputs: { token: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] } },
             kind: 'task',
             task: {

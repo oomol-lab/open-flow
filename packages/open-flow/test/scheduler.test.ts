@@ -84,9 +84,9 @@ describe('revision graph scheduler', () => {
       {
         bindings: { token: { kind: 'variable', target: 'TOKEN' } },
         graph: {
+          edges: [],
           nodes: {
             capture: {
-              concurrency: 1,
               inputs: { token: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] } },
               kind: 'task',
               task: task('capture', ['token'], []),
@@ -116,7 +116,7 @@ describe('revision graph scheduler', () => {
     expect(inputs).toEqual([{ token: 'secret-value' }])
     expect(events.find((event) => event.type == 'node.started')).toMatchObject({ inputs: {}, type: 'node.started' })
     await expect(runFlow(prepared, { invokeTask: () => Effect.succeed({}), runId: 'run-variable-missing' })).rejects.toThrow(
-      'Variable binding "token" is unresolved.',
+      'requires exactly one available source',
     )
   })
 
@@ -125,30 +125,28 @@ describe('revision graph scheduler', () => {
       {
         bindings: { token: { kind: 'variable', target: 'TOKEN' } },
         graph: {
+          edges: [
+            { source: 'first', target: 'worker' },
+            { source: 'second', target: 'other' },
+          ],
           nodes: {
             first: {
-              concurrency: 1,
               inputs: {},
               kind: 'value',
               values: [{ handle: 'call', jsonSchema: {}, nullable: false, value: 1 }],
             },
             second: {
-              concurrency: 1,
               inputs: {},
               kind: 'value',
               values: [{ handle: 'call', jsonSchema: {}, nullable: false, value: 2 }],
             },
             worker: {
-              concurrency: 2,
-              inputs: {
-                call: {
-                  kind: 'sources',
-                  sources: [
-                    { kind: 'node', nodeId: 'first', output: 'call' },
-                    { kind: 'node', nodeId: 'second', output: 'call' },
-                  ],
-                },
-              },
+              inputs: { call: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'first', output: 'call' }] } },
+              kind: 'subflow',
+              subflowId: 'worker',
+            },
+            other: {
+              inputs: { call: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'second', output: 'call' }] } },
               kind: 'subflow',
               subflowId: 'worker',
             },
@@ -157,9 +155,9 @@ describe('revision graph scheduler', () => {
         subflows: {
           worker: {
             graph: {
+              edges: [],
               nodes: {
                 capture: {
-                  concurrency: 1,
                   inputs: {
                     call: { kind: 'sources', sources: [{ input: 'call', kind: 'flow' }] },
                     token: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] },
@@ -202,9 +200,9 @@ describe('revision graph scheduler', () => {
       {
         bindings: {},
         graph: {
+          edges: [],
           nodes: {
             capture: {
-              concurrency: 1,
               inputs: {},
               kind: 'task',
               task: task('capture', [], []),
@@ -232,15 +230,17 @@ describe('revision graph scheduler', () => {
       {
         bindings: {},
         graph: {
+          edges: [
+            { source: 'incoming', target: 'capture' },
+            { source: 'scheduled', target: 'ignored' },
+          ],
           nodes: {
             capture: {
-              concurrency: 1,
               inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'incoming', output: 'payload' }] } },
               kind: 'task',
               task: task('capture', ['event'], ['event']),
             },
             ignored: {
-              concurrency: 1,
               inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'scheduled', output: 'payload' }] } },
               kind: 'task',
               task: task('ignored', ['event'], ['event']),
@@ -270,8 +270,8 @@ describe('revision graph scheduler', () => {
 
     expect(invoked).toEqual(['capture'])
     expect(result.nodes).toEqual([
-      { jobs: [{ jobId: expect.any(String), outputs: { event: { action: 'opened' } } }], nodeId: 'capture' },
-      { jobs: [], nodeId: 'ignored' },
+      { status: 'completed', jobId: expect.any(String), outputs: { event: { action: 'opened' } }, nodeId: 'capture' },
+      { status: 'skipped', nodeId: 'ignored' },
     ])
     expect(events.some((event) => 'nodeId' in event && (event.nodeId == 'incoming' || event.nodeId == 'scheduled'))).toBe(false)
 
@@ -286,8 +286,8 @@ describe('revision graph scheduler', () => {
     })
     expect(invoked).toEqual([])
     expect(manual.nodes).toEqual([
-      { jobs: [], nodeId: 'capture' },
-      { jobs: [], nodeId: 'ignored' },
+      { status: 'skipped', nodeId: 'capture' },
+      { status: 'skipped', nodeId: 'ignored' },
     ])
   })
 
@@ -296,9 +296,9 @@ describe('revision graph scheduler', () => {
       {
         bindings: {},
         graph: {
+          edges: [],
           nodes: {
             value: {
-              concurrency: 1,
               inputs: {},
               kind: 'value',
               values: [
@@ -323,7 +323,7 @@ describe('revision graph scheduler', () => {
 
     expect(result).toEqual({
       kind: 'node-results',
-      nodes: [{ jobs: [{ jobId: expect.any(String), outputs: { count: 2, label: 'ready' } }], nodeId: 'value' }],
+      nodes: [{ status: 'completed', jobId: expect.any(String), outputs: { count: 2, label: 'ready' }, nodeId: 'value' }],
     })
     expect(events).toContainEqual(expect.objectContaining({ nodeId: 'value', nodeKind: 'value', type: 'node.started' }))
   })
@@ -333,23 +333,25 @@ describe('revision graph scheduler', () => {
       {
         bindings: { token: { kind: 'variable', target: 'TOKEN' } },
         graph: {
+          edges: [
+            { source: 'source', target: 'wait' },
+            { source: 'wait', sourceHandle: 'continue', target: 'after' },
+          ],
           nodes: {
             source: {
-              concurrency: 1,
               inputs: {},
               kind: 'value',
               values: [{ handle: 'value', jsonSchema: {}, nullable: true, value: { id: 42 } }],
             },
             wait: {
               actions: ['continue'],
-              concurrency: 1,
+
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
               kind: 'wait',
               prompt: 'Continue processing?',
             },
             after: {
-              concurrency: 1,
               inputs: {
                 token: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] },
                 value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'continue' }] },
@@ -399,7 +401,7 @@ describe('revision graph scheduler', () => {
 
     expect(completed).toEqual({
       kind: 'node-results',
-      nodes: [{ jobs: [{ jobId: expect.any(String), outputs: { result: { token: '', value: { id: 42 } } } }], nodeId: 'after' }],
+      nodes: [{ status: 'completed', jobId: expect.any(String), outputs: { result: { token: '', value: { id: 42 } } }, nodeId: 'after' }],
     })
     expect(invocations).toHaveLength(1)
     expect(events.filter((event) => event.type == 'run.started')).toHaveLength(1)
@@ -414,23 +416,25 @@ describe('revision graph scheduler', () => {
       {
         bindings: {},
         graph: {
+          edges: [
+            { source: 'wait', sourceHandle: 'approve', target: 'approved' },
+            { source: 'wait', sourceHandle: 'reject', target: 'rejected' },
+          ],
           nodes: {
             wait: {
               actions: ['approve', 'reject'],
-              concurrency: 1,
+
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: 'request-1' } },
               kind: 'wait',
               prompt: 'Approve this request?',
             },
             approved: {
-              concurrency: 1,
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'approve' }] } },
               kind: 'task',
               task: task('approved', ['value'], []),
             },
             rejected: {
-              concurrency: 1,
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'reject' }] } },
               kind: 'task',
               task: task('rejected', ['value'], []),
@@ -475,10 +479,11 @@ describe('revision graph scheduler', () => {
       {
         bindings: {},
         graph: {
+          edges: [{ source: 'first', sourceHandle: 'continue', target: 'second' }],
           nodes: {
             first: {
               actions: ['continue'],
-              concurrency: 1,
+
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: 1 } },
               kind: 'wait',
@@ -486,7 +491,7 @@ describe('revision graph scheduler', () => {
             },
             second: {
               actions: ['continue'],
-              concurrency: 1,
+
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'first', output: 'continue' }] } },
               kind: 'wait',
@@ -520,7 +525,7 @@ describe('revision graph scheduler', () => {
 
     expect(second.wait.nodeId).toBe('second')
     expect(second.wait.waitId).not.toBe(first.wait.waitId)
-    expect(completed).toEqual({ kind: 'node-results', nodes: [{ jobs: [{ jobId: expect.any(String), outputs: { continue: 1 } }], nodeId: 'second' }] })
+    expect(completed).toEqual({ kind: 'node-results', nodes: [{ status: 'completed', jobId: expect.any(String), outputs: { continue: 1 }, nodeId: 'second' }] })
     expect(events.filter((event) => event.type == 'run.started')).toHaveLength(1)
   })
 
@@ -529,29 +534,31 @@ describe('revision graph scheduler', () => {
       {
         bindings: {},
         graph: {
+          edges: [
+            { source: 'source', target: 'branch' },
+            { source: 'branch', sourceHandle: 'high', target: 'nested' },
+            { source: 'branch', sourceHandle: 'low', target: 'low' },
+          ],
           nodes: {
             source: {
-              concurrency: 1,
-              inputs: { value: { kind: 'value', value: 1 } },
+              inputs: {},
               kind: 'task',
               task: task('source', ['value'], ['value']),
             },
             branch: {
               cases: [{ expressions: [{ input: 'value', operator: '>', value: 5 }], output: 'high', relation: 'all' }],
-              concurrency: 1,
+
               defaultOutput: 'low',
               input: { ...port, handle: 'value' },
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
               kind: 'condition',
             },
             nested: {
-              concurrency: 1,
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'high' }] } },
               kind: 'subflow',
               subflowId: 'double-flow',
             },
             low: {
-              concurrency: 1,
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'low' }] } },
               kind: 'task',
               task: task('low', ['value'], ['value']),
@@ -561,9 +568,9 @@ describe('revision graph scheduler', () => {
         subflows: {
           'double-flow': {
             graph: {
+              edges: [],
               nodes: {
                 double: {
-                  concurrency: 1,
                   inputs: { value: { kind: 'sources', sources: [{ input: 'value', kind: 'flow' }] } },
                   kind: 'task',
                   task: task('double', ['value'], ['value']),
@@ -600,8 +607,8 @@ describe('revision graph scheduler', () => {
     expect(result).toEqual({
       kind: 'node-results',
       nodes: [
-        { jobs: [], nodeId: 'low' },
-        { jobs: [{ jobId: expect.any(String), outputs: { value: 14 } }], nodeId: 'nested' },
+        { status: 'skipped', nodeId: 'low' },
+        { status: 'completed', jobId: expect.any(String), outputs: { value: 14 }, nodeId: 'nested' },
       ],
     })
     expect(events.filter((event) => event.type == 'run.started').map((event) => event.flowId)).toEqual(['main', 'double-flow'])
@@ -613,10 +620,10 @@ describe('revision graph scheduler', () => {
       {
         bindings: {},
         graph: {
+          edges: [{ source: 'source', target: 'nested' }],
           nodes: {
-            source: { concurrency: 1, inputs: {}, kind: 'task', task: task('source', [], ['value']) },
+            source: { inputs: {}, kind: 'task', task: task('source', [], ['value']) },
             nested: {
-              concurrency: 1,
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
               kind: 'subflow',
               subflowId: 'passthrough',
@@ -625,7 +632,7 @@ describe('revision graph scheduler', () => {
         },
         subflows: {
           passthrough: {
-            graph: { nodes: {} },
+            graph: { edges: [], nodes: {} },
             inputs: [{ ...port, handle: 'value' }],
             name: 'Passthrough',
             outputs: [{ ...port, handle: 'value', sources: [{ input: 'value', kind: 'flow' }] }],
@@ -641,7 +648,7 @@ describe('revision graph scheduler', () => {
       runId: 'run-passthrough',
     })
 
-    expect(result.nodes).toEqual([{ jobs: [{ jobId: expect.any(String), outputs: { value: 42 } }], nodeId: 'nested' }])
+    expect(result.nodes).toEqual([{ status: 'completed', jobId: expect.any(String), outputs: { value: 42 }, nodeId: 'nested' }])
   })
 
   it.each([
@@ -677,6 +684,10 @@ describe('revision graph scheduler', () => {
         {
           bindings: {},
           graph: {
+            edges: [
+              { source: 'branch', sourceHandle: 'fallback', target: 'fallback' },
+              { source: 'branch', sourceHandle: 'matched', target: 'matched' },
+            ],
             nodes: {
               branch: {
                 cases: [
@@ -686,20 +697,18 @@ describe('revision graph scheduler', () => {
                     relation: 'all',
                   },
                 ],
-                concurrency: 1,
+
                 defaultOutput: 'fallback',
                 input: { ...port, handle: 'value' },
                 inputs: { value: { kind: 'value', value: left } },
                 kind: 'condition',
               },
               fallback: {
-                concurrency: 1,
                 inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'fallback' }] } },
                 kind: 'task',
                 task: task('fallback', ['value'], []),
               },
               matched: {
-                concurrency: 1,
                 inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'matched' }] } },
                 kind: 'task',
                 task: task('matched', ['value'], []),
@@ -731,6 +740,11 @@ describe('revision graph scheduler', () => {
       {
         bindings: {},
         graph: {
+          edges: [
+            { source: 'branch', sourceHandle: 'all', target: 'all' },
+            { source: 'branch', sourceHandle: 'any', target: 'any' },
+            { source: 'branch', sourceHandle: 'later', target: 'later' },
+          ],
           nodes: {
             branch: {
               cases: [
@@ -752,26 +766,23 @@ describe('revision graph scheduler', () => {
                 },
                 { expressions: [{ input: 'value', operator: 'isTrue' }], output: 'later', relation: 'all' },
               ],
-              concurrency: 1,
+
               defaultOutput: 'fallback',
               input: { ...port, handle: 'value' },
               inputs: { value: { kind: 'value', value: true } },
               kind: 'condition',
             },
             all: {
-              concurrency: 1,
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'all' }] } },
               kind: 'task',
               task: task('all', ['value'], []),
             },
             any: {
-              concurrency: 1,
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'any' }] } },
               kind: 'task',
               task: task('any', ['value'], []),
             },
             later: {
-              concurrency: 1,
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'later' }] } },
               kind: 'task',
               task: task('later', ['value'], []),
@@ -797,27 +808,28 @@ describe('revision graph scheduler', () => {
     expect(invoked).toEqual(['any'])
   })
 
-  it('queues multiple sources in delivery order while enforcing node concurrency', async () => {
+  it.each([
+    ['a', 20],
+    ['b', 20],
+  ] as const)('waits for both parallel predecessors when %s is slower', async (slow, delay) => {
     const source = revision(
       {
         bindings: {},
         graph: {
+          edges: [
+            { source: 'a', target: 'collect' },
+            { source: 'b', target: 'collect' },
+          ],
           nodes: {
-            a: { concurrency: 1, inputs: {}, kind: 'task', task: task('a', [], ['item']) },
-            b: { concurrency: 1, inputs: {}, kind: 'task', task: task('b', [], ['item']) },
+            a: { inputs: {}, kind: 'task', task: task('a', [], ['item']) },
+            b: { inputs: {}, kind: 'task', task: task('b', [], ['item']) },
             collect: {
-              concurrency: 1,
               inputs: {
-                item: {
-                  kind: 'sources',
-                  sources: [
-                    { kind: 'node', nodeId: 'a', output: 'item' },
-                    { kind: 'node', nodeId: 'b', output: 'item' },
-                  ],
-                },
+                a: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'a', output: 'item' }] },
+                b: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'b', output: 'item' }] },
               },
               kind: 'task',
-              task: task('collect', ['item'], ['seen']),
+              task: task('collect', ['a', 'b'], ['seen']),
             },
           },
         },
@@ -827,54 +839,45 @@ describe('revision graph scheduler', () => {
       ['a', 'b', 'collect'],
     )
     const prepared = await prepareFlow(source, 'main', engine)
-    let activeCollectors = 0
-    let maximumCollectors = 0
-    const seen: JsonValue[] = []
+    const finished: string[] = []
+    let calls = 0
     const result = await runFlow(prepared, {
-      invokeTask(invocation) {
-        return Effect.gen(function* () {
-          if (invocation.nodeId == 'a') {
-            yield* Effect.sleep(20)
-            return { item: 'a' }
+      runId: 'parallel',
+      invokeTask: (invocation) =>
+        Effect.gen(function* () {
+          if (invocation.nodeId != 'collect') {
+            if (invocation.nodeId == slow) yield* Effect.sleep(delay)
+            finished.push(invocation.nodeId)
+            return { item: invocation.nodeId }
           }
-          if (invocation.nodeId == 'b') return { item: 'b' }
-          activeCollectors += 1
-          maximumCollectors = Math.max(maximumCollectors, activeCollectors)
-          seen.push(invocation.input.item)
-          yield* Effect.sleep(5)
-          activeCollectors -= 1
-          return { seen: invocation.input.item }
-        })
-      },
-      runId: 'run-fifo',
+          expect(finished.toSorted()).toEqual(['a', 'b'])
+          calls++
+          return { seen: [invocation.input.a, invocation.input.b] }
+        }),
     })
-
-    expect(seen).toEqual(['b', 'a'])
-    expect(maximumCollectors).toBe(1)
-    expect(result.nodes).toEqual([
-      {
-        jobs: [
-          { jobId: expect.any(String), outputs: { seen: 'b' } },
-          { jobId: expect.any(String), outputs: { seen: 'a' } },
-        ],
-        nodeId: 'collect',
-      },
-    ])
+    expect(calls).toBe(1)
+    expect(result.nodes[0]).toMatchObject({ status: 'completed', outputs: { seen: ['a', 'b'] } })
   })
 
-  it('propagates repeated Task outputs and treats an undefined result as empty', async () => {
+  it('rejects the entire final output before downstream execution if any field is invalid', async () => {
     const source = revision(
       {
         bindings: {},
         graph: {
+          edges: [{ source: 'source', target: 'collect' }],
           nodes: {
-            source: { concurrency: 1, inputs: {}, kind: 'task', task: task('source', [], ['item']) },
-            collect: {
-              concurrency: 1,
-              inputs: { item: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'item' }] } },
+            source: {
+              inputs: {},
               kind: 'task',
-              task: task('collect', ['item'], ['seen']),
+              task: {
+                ...task('source', [], ['item', 'count']),
+                outputs: [
+                  { ...port, handle: 'item' },
+                  { handle: 'count', jsonSchema: { type: 'number' }, nullable: false },
+                ],
+              },
             },
+            collect: { inputs: {}, kind: 'task', task: task('collect', [], []) },
           },
         },
         subflows: {},
@@ -884,38 +887,30 @@ describe('revision graph scheduler', () => {
     )
     const prepared = await prepareFlow(source, 'main', engine)
     const events: SchedulerEvent[] = []
-    const result = await runFlow(prepared, {
-      emit: (event) => Effect.sync(() => void events.push(event)),
-      invokeTask(invocation, outputs) {
-        if (invocation.nodeId == 'collect') return Effect.succeed({ seen: invocation.input.item })
-        return Effect.gen(function* () {
-          yield* outputs({ item: 'first' })
-          yield* outputs({ item: 'second' })
-          return undefined
-        })
-      },
-      runId: 'run-task-outputs',
-    })
-
-    expect(
-      events.filter((event) => event.type == 'node.output' && event.nodeId == 'source').map((event) => (event.type == 'node.output' ? event.value : undefined)),
-    ).toEqual(['first', 'second'])
-    expect(result.nodes).toEqual([
-      {
-        jobs: [
-          { jobId: expect.any(String), outputs: { seen: 'first' } },
-          { jobId: expect.any(String), outputs: { seen: 'second' } },
-        ],
-        nodeId: 'collect',
-      },
-    ])
+    const calls: string[] = []
+    await expect(
+      runFlow(prepared, {
+        runId: 'invalid-result',
+        emit: (event) =>
+          Effect.sync(() => {
+            events.push(event)
+          }),
+        invokeTask: (invocation) =>
+          Effect.sync(() => {
+            calls.push(invocation.nodeId)
+            return { item: 1, count: 'invalid' }
+          }),
+      }),
+    ).rejects.toThrow('does not match its declaration')
+    expect(calls).toEqual(['source'])
+    expect(events.filter((event) => event.type == 'node.output')).toEqual([])
   })
 
   it('enforces timeout and Fiber interruption for each Task invocation', async () => {
     const source = revision(
       {
         bindings: {},
-        graph: { nodes: { slow: { concurrency: 1, inputs: {}, kind: 'task', task: task('slow', [], []), timeoutMs: 10 } } },
+        graph: { edges: [], nodes: { slow: { inputs: {}, kind: 'task', task: task('slow', [], []), timeoutMs: 10 } } },
         subflows: {},
         tasks: {},
       },
@@ -938,7 +933,7 @@ describe('revision graph scheduler', () => {
     let interrupted = false
     const canceled = Effect.runFork(
       scheduleFlow(
-        { ...prepared, graph: { nodes: { slow: { ...slow, timeoutMs: undefined } } } },
+        { ...prepared, graph: { edges: [], nodes: { slow: { ...slow, timeoutMs: undefined } } } },
         {
           createId: () => `scheduler-${++nextId}`,
           flowId: 'main',
@@ -963,9 +958,10 @@ describe('revision graph scheduler', () => {
       {
         bindings: {},
         graph: {
+          edges: [],
           nodes: {
-            fail: { concurrency: 1, inputs: {}, kind: 'task', task: task('fail', [], []) },
-            slow: { concurrency: 1, inputs: {}, kind: 'task', task: task('slow', [], []) },
+            fail: { inputs: {}, kind: 'task', task: task('fail', [], []) },
+            slow: { inputs: {}, kind: 'task', task: task('slow', [], []) },
           },
         },
         subflows: {},
@@ -1002,7 +998,7 @@ describe('revision graph scheduler', () => {
     const source = revision(
       {
         bindings: {},
-        graph: { nodes: { task: { concurrency: 1, inputs: {}, kind: 'task', task: task('task', [], []) } } },
+        graph: { edges: [], nodes: { task: { inputs: {}, kind: 'task', task: task('task', [], []) } } },
         subflows: {},
         tasks: {},
       },
@@ -1028,7 +1024,7 @@ describe('revision graph scheduler', () => {
     const source = revision(
       {
         bindings: {},
-        graph: { nodes: { task: { concurrency: 1, inputs: {}, kind: 'task', taskId: 'task-main' } } },
+        graph: { edges: [], nodes: { task: { inputs: {}, kind: 'task', taskId: 'task-main' } } },
         subflows: {},
         tasks: {
           'task-main': {

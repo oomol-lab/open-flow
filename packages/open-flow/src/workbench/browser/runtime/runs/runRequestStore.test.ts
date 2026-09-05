@@ -21,9 +21,9 @@ const draft: Draft = {
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           task: {
-            concurrency: 1,
             inputs: {},
             kind: 'task',
             task: {

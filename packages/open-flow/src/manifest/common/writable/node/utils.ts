@@ -44,11 +44,9 @@ export const bindWritableProgressNodeValGroup = (yamlParent: YamlParent): Return
 
 interface WritableScheduledNodeValGroupConfig {
   timeout: number
-  concurrency: number
 }
 
 export const bindWritableScheduledNodeValGroup = (yamlParent: YamlParent): ReturnType<typeof bindWritableValGroup<WritableScheduledNodeValGroupConfig>> =>
   bindWritableValGroup(yamlParent, {
     timeout: parseNumber,
-    concurrency: parseNumber,
   })

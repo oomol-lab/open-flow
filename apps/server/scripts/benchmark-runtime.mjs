@@ -127,9 +127,9 @@ if (typeof IsolatedVmHost.prototype.run == 'function') {
     closureDigest: 'runtime-benchmark',
     engineContract: 'open-flow-engine/v1',
     graph: {
+      edges: [],
       nodes: {
         task: {
-          concurrency: 1,
           inputs: {},
           kind: 'task',
           task: { inputs: [], moduleId: 'main', name: 'Main', outputs: [output] },

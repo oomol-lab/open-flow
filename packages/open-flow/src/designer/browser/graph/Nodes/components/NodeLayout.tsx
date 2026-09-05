@@ -1,6 +1,7 @@
 import styles from './NodeLayout.module.scss'
 import type { CSSProperties } from 'react'
 import type { Val } from 'value-enhancer'
+import type { HandleName } from '../../../../../schema/index.ts'
 import type { RFNodeId } from '../../../base/rfHelpers.ts'
 import type { DesignerStore } from '../../../stores/designer/designer.store.ts'
 import type { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
@@ -11,6 +12,8 @@ import { memo, useCallback, useRef } from 'react'
 import { useDerived, useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { DEFAULT_POSITION } from '../../../base/designer.ts'
+import { toRFHandleName } from '../../../base/rfHelpers.ts'
+import { Handle } from '../../../components/handle.tsx'
 import { NodeMiniMapPhase, NodeMiniMapProvider, useNodeMiniMapPhase } from '../../../components/minimap.tsx'
 import { Running } from '../../../components/running.tsx'
 import { NODE_MINIMAP_PHASE1_CLASSNAME, NODE_MINIMAP_PHASE2_CLASSNAME } from '../../../stores/designer/nodeMiniMap.ts'
@@ -43,6 +46,8 @@ const OVERVIEW_NODE_WIDTH = 260
 export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ designerStore, nodeStore, visible }) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
 
+  const branches = useVal(nodeStore.display$?.branches)
+  const executionInput = useVal(nodeStore.display$?.executionInput) ?? false
   const editable = useVal(designerStore.$.editable)
   const contentWidth$ = nodeStore.uiStore.$$.contentWidth
   const { status, progress, showSettings } = nodeStore.display$ || {}
@@ -132,15 +137,30 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ des
               className={clsx(styles.container, overviewNodeStore && styles.overviewContainer, skip && styles.skip)}
               style={containerStyle}
             >
-              {overviewNode ? (
-                isPseudoNodeType(nodeStore.nodeType) ? (
-                  overviewNode
+              <div className={styles.executionHead}>
+                {overviewNode ? (
+                  isPseudoNodeType(nodeStore.nodeType) ? (
+                    overviewNode
+                  ) : (
+                    <NodeHeadContextMenu designerStore={designerStore}>{overviewNode}</NodeHeadContextMenu>
+                  )
                 ) : (
-                  <NodeHeadContextMenu designerStore={designerStore}>{overviewNode}</NodeHeadContextMenu>
-                )
-              ) : (
-                <>
                   <NodeHead />
+                )}
+                {executionInput && <Handle className={styles.executionHandle} id={toRFHandleName('$in' as HandleName)} type="input" isConnectable={editable} />}
+                {!isPseudoNodeType(nodeStore.nodeType) && nodeStore.nodeType != NODE_TYPE.CommentNode && branches == null && (
+                  <Handle className={styles.executionHandle} id={toRFHandleName('$out' as HandleName)} type="output" isConnectable={editable} />
+                )}
+              </div>
+              {overviewNode &&
+                branches?.map((branch) => (
+                  <div key={branch} className={styles.executionBranch}>
+                    <span>{branch}</span>
+                    <Handle className={styles.executionHandle} id={toRFHandleName(`$branch:${branch}` as HandleName)} type="output" isConnectable={editable} />
+                  </div>
+                ))}
+              {!overviewNode && (
+                <>
                   <NodeProgress progress$={progress} status$={status} />
                   <NodeBody />
                   <NodeOutline />

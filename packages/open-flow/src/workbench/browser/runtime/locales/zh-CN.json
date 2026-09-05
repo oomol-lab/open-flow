@@ -162,9 +162,7 @@
       "portDefinitions": "请输入有效的端口定义。"
     },
     "node": {
-      "concurrency": "并发数",
-      "concurrencyError": "并发数必须是正整数。",
-      "description": "显示名称、并发与超时",
+      "description": "显示名称与超时",
       "displayName": "显示名称",
       "displayNamePlaceholder": "使用定义中的名称",
       "save": "保存节点",
@@ -227,7 +225,12 @@
       "save": "保存 Trigger",
       "title": "Trigger 定义"
     },
-    "title": "检查器"
+    "title": "检查器",
+    "sources": {
+      "title": "输入来源",
+      "local": "本地值 / 变量",
+      "unavailable": "无法保证此来源先于当前节点完成，或输出类型不匹配。"
+    }
   },
   "language": {
     "label": "语言"
@@ -474,7 +477,8 @@
     "timelineEmpty": "运行当前选中的草稿后，可查看时间线和输出。",
     "submitting": "正在提交当前固定修订并创建运行记录…",
     "waiting": "正在等待第一个事件…",
-    "waitExpires": "到期时间：{{date}}"
+    "waitExpires": "到期时间：{{date}}",
+    "eventSkipped": "已跳过"
   },
   "sidebar": {
     "createFirstFlow": "创建 Flow",

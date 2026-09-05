@@ -39,9 +39,9 @@ function webhookFlow(): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [{ source: 'incoming', target: 'capture' }],
         nodes: {
           capture: {
-            concurrency: 1,
             inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'incoming', output: 'payload' }] } },
             kind: 'task',
             task: {
@@ -113,7 +113,7 @@ describe('Server Webhook Trigger admission', () => {
     await startService(service)
     await service.waitForIdle()
     expect(service.run(accepted.runId)).toMatchObject({
-      result: { kind: 'node-results', nodes: [{ jobs: [{ outputs: { message: 'hello' } }], nodeId: 'capture' }] },
+      result: { kind: 'node-results', nodes: [{ status: 'completed', outputs: { message: 'hello' }, nodeId: 'capture' }] },
       status: 'completed',
     })
     expect(service.events(accepted.runId).some((event) => event.payload.nodeId == 'incoming')).toBe(false)

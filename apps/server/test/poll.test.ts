@@ -65,6 +65,7 @@ function revision(source = 'primary'): RevisionContent {
     document: {
       bindings: { connection: { kind: 'connection', target: 'connection-main' } },
       graph: {
+        edges: [{ source: 'poll', target: 'task' }],
         nodes: {
           poll: {
             bindingId: 'connection',
@@ -75,7 +76,6 @@ function revision(source = 'primary'): RevisionContent {
             pollTimes: [{ type: 'every', unit: 'minute', value: 1 }],
           },
           task: {
-            concurrency: 1,
             inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'poll', output: 'payload' }] } },
             kind: 'task',
             task: {

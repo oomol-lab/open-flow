@@ -148,33 +148,17 @@ export default () => fs.readFileSync('/etc/passwd', 'utf8')`,
     },
   },
   {
-    name: 'submits Task outputs and accepts a void result',
+    name: 'returns final outputs without exposing intermediate output capability',
     async verify(harness) {
-      const calls: RuntimeCapabilityCall[] = []
       const value = await harness.invoke({
-        capability: async (call) => {
-          calls.push(call)
-          return { body: null, status: 200 }
+        capability: async () => {
+          throw new Error('Capability must not be called.')
         },
         input: null,
-        invocationId: 'task-outputs',
-        program: program(
-          harness,
-          `export default async (_input, context) => {
-  await context.outputs({ first: 1 })
-  await context.outputs({ second: 2 })
-}`,
-        ),
+        invocationId: 'final-outputs',
+        program: program(harness, `export default (_input, context) => ({ available: typeof context.outputs, value: 1 })`),
       })
-      equal(value, undefined, 'Void Task result')
-      equal(
-        calls.map(({ invocationId, kind, payload }) => ({ invocationId, kind, payload })),
-        [
-          { invocationId: 'task-outputs', kind: 'outputs', payload: { first: 1 } },
-          { invocationId: 'task-outputs', kind: 'outputs', payload: { second: 2 } },
-        ],
-        'Task outputs request',
-      )
+      equal(value, { available: 'undefined', value: 1 }, 'Final Task outputs')
     },
   },
   {

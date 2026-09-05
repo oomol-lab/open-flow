@@ -30,6 +30,7 @@ function revision(rules: readonly TriggerSchedule[]): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           scheduled: {
             cronTimes: rules,
@@ -164,11 +165,12 @@ describe('Server Cron Trigger', () => {
         ...scheduled.document,
         graph: {
           ...scheduled.document.graph,
+          edges: [...scheduled.document.graph.edges, { source: 'scheduled', target: 'approval' }],
           nodes: {
             ...scheduled.document.graph.nodes,
             approval: {
               actions: ['continue'],
-              concurrency: 1,
+
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'scheduled', output: 'payload' }] } },
               kind: 'wait',

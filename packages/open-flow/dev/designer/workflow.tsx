@@ -23,6 +23,12 @@ const workflow: FlowDesignerViewModel = {
   viewport: workflowViewport,
   variableNames: ['API_KEY', 'BASE_URL'],
   variableNamesLoaded: true,
+  edges: [
+    { id: 'trigger-task', source: 'trigger', sourceHandle: '$out', target: 'task', targetHandle: '$in' },
+    { id: 'task-condition', source: 'task', sourceHandle: '$out', target: 'condition', targetHandle: '$in' },
+    { id: 'condition-value', source: 'condition', sourceHandle: '$branch:matched', target: 'value', targetHandle: '$in' },
+    { id: 'value-subflow', source: 'value', sourceHandle: '$out', target: 'subflow', targetHandle: '$in' },
+  ],
   nodes: [
     {
       id: 'trigger',
@@ -105,6 +111,7 @@ const workflow: FlowDesignerViewModel = {
 const states: FlowDesignerViewModel = {
   viewport: stateViewport,
   runStatus: 'running',
+  edges: [],
   nodes: (
     [
       { id: 'idle', title: 'Idle', run: { status: 'idle' } },

@@ -20,7 +20,6 @@ export interface ProgressNodeManifest$ extends NodeManifest$ {
 
 export interface ScheduledNodeManifest$ extends ProgressNodeManifest$ {
   readonly timeout: ReadonlyVal<number | undefined>
-  readonly concurrency: ReadonlyVal<number | undefined>
 }
 
 export interface NodeManifest {

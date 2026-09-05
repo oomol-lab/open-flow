@@ -33,18 +33,3 @@ export type CONDITIONS_SECTION_TYPE = 'conditions'
 // Trigger definition snapshot and configuration.
 export const TRIGGER_SECTION_TYPE = 'trigger'
 export type TRIGGER_SECTION_TYPE = 'trigger'
-
-// These sections belong only to input and output pseudo-nodes.
-export const PSEUDO_SECTION_TYPES: string[] = [SUBFLOW_INPUT_SECTION_TYPE, SUBFLOW_OUTPUT_SECTION_TYPE]
-
-// Connections dragged to the left can only start from these sections.
-export const LEFT_FROM_SECTION_TYPES: string[] = [INPUT_SECTION_TYPE, SUBFLOW_OUTPUT_SECTION_TYPE]
-
-// Connections dragged to the right can only start from these sections.
-export const RIGHT_FROM_SECTION_TYPES: string[] = [OUTPUT_SECTION_TYPE, VALUE_SECTION_TYPE, SUBFLOW_INPUT_SECTION_TYPE, CONDITIONS_SECTION_TYPE]
-
-// Connections dragged to the left can only create handles in these sections.
-export const LEFT_TO_SECTION_TYPES: string[] = [OUTPUT_SECTION_TYPE, VALUE_SECTION_TYPE, SUBFLOW_INPUT_SECTION_TYPE, CONDITIONS_SECTION_TYPE]
-
-// Connections dragged to the right can only create handles in these sections.
-export const RIGHT_TO_SECTION_TYPES: string[] = [INPUT_SECTION_TYPE, SUBFLOW_OUTPUT_SECTION_TYPE]

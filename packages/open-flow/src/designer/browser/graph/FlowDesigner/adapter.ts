@@ -4,10 +4,10 @@ import type { FlowDisplayMode } from '../../../common/flowDisplay.ts'
 import type { CreateSchemaEditorFn } from '../../services/designerService.ts'
 import type { IAddNodeMenuItem, IFromSource, InteractiveMode } from '../../stores/designer/designer.store.ts'
 import type { FlowRunStatus } from '../../stores/designer/typings.ts'
+import type { ManifestConnection } from '../../stores/edge/typings.ts'
 import type { NodeStore } from '../../stores/node/node.store.ts'
 import type {
   FlowDesignerViewAddItem,
-  FlowDesignerViewAddPort,
   FlowDesignerViewEdge,
   FlowDesignerViewModel,
   FlowDesignerViewNode,
@@ -79,6 +79,7 @@ function equalVariableInputs(left: ReturnType<typeof variableInputs>, right: Ret
 export class FlowDesignerViewAdapter {
   readonly store: FlowDesignerStore
 
+  #connections: Val<readonly ManifestConnection[]>
   #addItems: readonly FlowDesignerViewAddItem[]
   readonly #callbacks: ViewCallbacks
   readonly #createSchemaEditor: CreateSchemaEditorFn
@@ -131,7 +132,9 @@ export class FlowDesignerViewAdapter {
       viewport,
       nodeStores: nodes,
     })
+    this.#connections = val<readonly ManifestConnection[]>([])
     this.store = new FlowDesignerStore({
+      connections: this.#connections,
       readonly: !editable,
       displayMode: val<FlowDisplayMode>('overview'),
       lang$: this.#language,
@@ -282,14 +285,7 @@ export class FlowDesignerViewAdapter {
   #items(items: readonly FlowDesignerViewAddItem[], fromSource?: IFromSource): IAddNodeMenuItem[] {
     const result: IAddNodeMenuItem[] = []
     let group: string | undefined
-    const handles = (inputs: readonly FlowDesignerViewAddPort[], outputs: readonly FlowDesignerViewAddPort[]) =>
-      fromSource == null
-        ? undefined
-        : (fromSource.side == 'left' ? outputs : inputs).map((port) => ({
-            description: port.description,
-            json_schema: port.jsonSchema,
-            name: port.handle as HandleName,
-          }))
+    const handles = fromSource == null ? undefined : [{ name: (fromSource.side == 'left' ? '$out' : '$in') as HandleName, json_schema: {} }]
     for (const item of items) {
       if (item.group != null && group != item.group) {
         group = item.group
@@ -299,15 +295,16 @@ export class FlowDesignerViewAdapter {
         type: item.type,
         data: item.choices?.length ? undefined : item.id,
         detail: item.description,
-        disabled: item.disabled,
+        disabled:
+          item.disabled || (fromSource != null && (item.type == 'trigger' || (fromSource.side == 'left' && (item.type == 'condition' || item.type == 'wait')))),
         icon: item.icon,
         choices: item.choices?.map((choice) => ({
           data: choice.id,
           description: choice.description,
-          handles: handles(choice.inputs ?? item.inputs, choice.outputs ?? item.outputs),
+          handles,
           label: choice.label,
         })),
-        handles: handles(item.inputs, item.outputs),
+        handles,
         label: item.label,
       })
     }
@@ -332,6 +329,12 @@ export class FlowDesignerViewAdapter {
       this.store.$$.viewport.set(model.viewport)
       this.#modelViewport = { ...model.viewport }
     }
+    this.#connections.set(
+      model.edges.map((edge) => ({
+        from: { type: 'from_node', source: { node_id: edge.source as NodeId, output_handle: edge.sourceHandle as HandleName } },
+        to: { type: 'to_node', target: { node_id: edge.target as NodeId, input_handle: edge.targetHandle as HandleName } },
+      })),
+    )
     const connected = connectedOutputs(model.nodes)
     const nextEntries = new Map<string, NodeEntry>()
     const nextComments = new Map<NodeId, CommentNodeStore>()

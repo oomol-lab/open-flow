@@ -22,9 +22,9 @@ function hangingFlow(): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           task: {
-            concurrency: 1,
             inputs: {},
             kind: 'task',
             task: { inputs: [], moduleId: 'main', name: 'Main', outputs: [] },

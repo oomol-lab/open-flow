@@ -89,7 +89,6 @@ async function addMarker(service: ServerService, flowId: string, revisionId: str
     {
       kind: 'graph.node.create',
       node: {
-        concurrency: 1,
         inputs: {},
         kind: 'value',
         values: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],

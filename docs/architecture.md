@@ -107,8 +107,18 @@ credential value、Provider 当前状态、调用权限或部署资源。非确�
 Engine Contract、部署中立 Runtime invocation、Scheduler 图执行语义、RunEvent 投影和 conformance 属于 `packages/open-flow`。具体执行隔离、
 Engine digest、资源限制和恢复属于部署实现；`isolated-vm` RuntimeHost 只属于 Server。
 
-普通 Flow 数据通过声明的 input、output、edge 和 binding 传播，并在 Runtime invocation、Scheduler、Subflow、RunEvent 和 terminal result
-边界保持可序列化。脚本 `context` 提供取消、日志、进度、Artifact、网络、Connector 等宿主能力、只读运行身份，以及与第一个参数相同的 `inputs`。Task 可以通过返回对象或 `context.outputs` 沿声明的 output 提交值；调用 `context.outputs` 后可以返回 `undefined` 完成，等同于返回空对象。`context.outputs` 的每个字段复用普通 output 的事件和下游投递语义。`context` 不提供跨节点的动态 Run store、Variable 查询或任意节点输出查询。部署可以为调度、调试和恢复私有保存 Run value，但不能把内部存储变成第二条用户数据通道。
+Flow 与每次 Subflow invocation 使用无环执行图。连线表示节点之间的执行依赖，输入映射独立声明数据来源；保存或删除执行边不会隐式创建或删除输入映射。
+每个节点在一次图调用内最多运行一次。节点等待全部直接前驱完成或跳过，在至少一条入边被选中时执行；普通根节点直接执行，无依赖的分支可以并行。
+Condition 只选择首个匹配分支或 default，Wait 只选择已决议的 action；未选中的分支传播跳过状态。Trigger occurrence 只选择对应 Trigger，其他 Trigger 分支跳过。
+
+节点输入只能引用本图中经执行边可达、且在当前节点执行路径上保证已完成的祖先 output。多个 source 表示互斥分支的备选值，每次执行必须恰有一个可用值，
+不能按值到达次数重复启动节点。Subflow 的输入和最终输出保持显式声明，不能越过图边界直接引用内部或外部节点。
+
+Task 仅通过返回对象一次性提交最终 output，全部声明和可序列化性校验成功后才向下游提供结果。声明 output 的 Task 必须返回完整结果；无 output 的 Task 可以返回空对象或
+`undefined`。普通 Flow 数据在 Runtime invocation、Scheduler、Subflow、RunEvent 和 terminal result 边界保持可序列化。
+脚本 `context` 提供取消、日志、进度、Artifact、网络、Connector 等宿主能力、只读运行身份，以及与第一个参数相同的 `inputs`。
+`context` 不提供运行中的 output 提交、跨节点的动态 Run store、Variable 查询或任意节点输出查询。部署可以为调度、调试和恢复私有保存 Run value，
+但不能把内部存储变成第二条用户数据通道。
 
 Server 将一次 Flow Run 作为一个逻辑 Runtime session 交给 Executor，Scheduler 和内联 Code Task 执行都在该 session 内；SQLite、RunEvent 投影、
 外部 Task 和 Capability mediation 仍由 Host 持有。Executor process 可以承载多个并发 session，但每次 Code Task invocation 使用新的 isolate；process
@@ -126,7 +136,8 @@ Flow 的长 Run 阻塞其他 Flow。
 
 Wait 是同一个 Run 内的持久化暂停点，不是新的 Run、子流程或长驻 Runtime session。Run 到达 Wait 时，部署必须原子保存 Scheduler checkpoint、
 固定 Revision 身份、当前 Wait 和剩余执行预算，再把 Run 置为 `waiting`；暂停期间不持有 Executor session 或同 Flow 的执行槽。合法 action 只把
-该 Run 重新排队，恢复时从 checkpoint 继续，并保持 Wait 之前已经完成的节点结果和同一 `runId`。进程恢复不能重跑已完成 segment，也不能重置
+该 Run 重新排队，恢复时从 checkpoint 继续，并保持已完成节点的最终结果、跳过状态、启动输入、Variable 快照和同一 `runId`。
+暂停前必须等待正在运行的并行节点结束，恢复时不能重跑已完成或已跳过的节点。进程恢复不能重跑已完成 segment，也不能重置
 Run 的总执行预算。checkpoint 缺失、损坏或与固定 Wait 不一致时必须 fail closed，不能从 Flow 起点猜测性重放。
 
 Approval 是 Wait 对 action 集合 `approve/reject` 的一种产品语义，不是独立执行节点或部署认证机制。部署内部的 Control API resolve 使用 Operator

@@ -42,7 +42,6 @@ describe('TriggerNodeContent', () => {
     expect(markup).toContain('github')
     expect(markup).toContain('<code>payload</code>')
     expect(markup).toContain('Object')
-    expect(markup).toContain('--bg:var(--edge-primitive)')
     expect(markup).not.toContain('oo-designer-node-handle')
   })
 

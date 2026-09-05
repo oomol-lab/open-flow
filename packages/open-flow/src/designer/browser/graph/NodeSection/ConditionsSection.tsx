@@ -8,8 +8,10 @@ import { useStoreApi, useUpdateNodeInternals } from '@xyflow/react'
 import { memo, useCallback, useEffect } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
+import { toRFHandleName } from '../../base/rfHelpers.ts'
 import { coalesce, isBannedName, last, toTrue } from '../../base/trivial.ts'
 import { CssWrapper } from '../../components/cssWrapper.tsx'
+import { Handle } from '../../components/handle.tsx'
 import { HandleIcon } from '../../components/handleIcon.tsx'
 import { ConditionEditor } from '../../jsonSchema/conditionEditor.tsx'
 import { CONDITIONS_SECTION_TYPE } from '../../stores/node/nodeSection/constants.ts'
@@ -27,6 +29,7 @@ export const ConditionsSection: React.FC<ConditionsSectionProps> = /*#__PURE__*/
   const t = useTranslate()
   const nodeStore = useNodeStore()
   const designerStore = useDesignerStore()
+  const editable = useVal(designerStore.$.editable)
   const handles = useVal(section.$.handles)
   const allHandleNames = useVal(section.$.allHandleNames)
   const canEditSchema = section.role === 'author'
@@ -65,20 +68,22 @@ export const ConditionsSection: React.FC<ConditionsSectionProps> = /*#__PURE__*/
   }
 
   const renderHandle = (handle: ConditionRowStore) => (
-    <ConditionEditor
-      key={handle.name}
-      store={handle}
-      panelWidth$={designerStore.$$.settingsPanelWidth}
-      reactFlowStore={reactFlowStore}
-      validate={validateName}
-      dragTarget={dnd.dragTarget}
-      dragPosition={dnd.dragPosition}
-      onRename={(newName) => section.renameHandle(handle.name, newName as HandleName)}
-      onDelete={() => section.deleteHandle(handle.name)}
-      onDragStart={(ev) => dnd.onDragStart(ev, handle)}
-      onDragOver={(ev) => dnd.onDragOver(ev, handle)}
-      addCondition={() => section.addNewHandle(handle.name)}
-    />
+    <div key={handle.name} className={styles.branchRow}>
+      <Handle className={styles.branchHandle} id={toRFHandleName(`$branch:${handle.name}` as HandleName)} type="output" isConnectable={editable} />
+      <ConditionEditor
+        store={handle}
+        panelWidth$={designerStore.$$.settingsPanelWidth}
+        reactFlowStore={reactFlowStore}
+        validate={validateName}
+        dragTarget={dnd.dragTarget}
+        dragPosition={dnd.dragPosition}
+        onRename={(newName) => section.renameHandle(handle.name, newName as HandleName)}
+        onDelete={() => section.deleteHandle(handle.name)}
+        onDragStart={(ev) => dnd.onDragStart(ev, handle)}
+        onDragOver={(ev) => dnd.onDragOver(ev, handle)}
+        addCondition={() => section.addNewHandle(handle.name)}
+      />
+    </div>
   )
 
   return (
