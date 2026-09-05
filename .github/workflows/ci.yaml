@@ -219,6 +219,11 @@ jobs:
         with:
           bun-version-file: .bun-version
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+
       - name: Install
         run: bun install --frozen-lockfile
 
