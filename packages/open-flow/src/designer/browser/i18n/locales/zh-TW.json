@@ -60,7 +60,6 @@
     "privateHelp": "將共享區塊標記為私有，表示 AI 和其他使用者無法使用它。",
     "public": "已公開",
     "runningConfig": {
-      "concurrency": "並行數",
       "progressWeight": "進度權重",
       "timeout": "逾時時間",
       "title": "執行設定"

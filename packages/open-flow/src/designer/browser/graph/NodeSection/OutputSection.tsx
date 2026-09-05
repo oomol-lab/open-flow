@@ -9,7 +9,9 @@ import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { NODE_HANDLE_CLASSNAME } from '../../base/designer.ts'
 import { stopPropagation } from '../../base/dom.ts'
+import { toRFHandleName } from '../../base/rfHelpers.ts'
 import { arrayFindIndexOrLength, isBannedName, toTrue } from '../../base/trivial.ts'
+import { Handle } from '../../components/handle.tsx'
 import { HandleIcon } from '../../components/handleIcon.tsx'
 import { HandleEditor } from '../../jsonSchema/handleEditor.tsx'
 import { SUBFLOW_VIEW_MODE } from '../../stores/designer/subflowDesigner.store.ts'
@@ -34,6 +36,8 @@ export const OutputSection: React.FC<OutputSectionProps> = /* @__PURE__ */ memo(
   const designerStore = useDesignerStore()
   const subflowViewMode = useSubflowViewMode()
   const isInBlock = designerStore.designerType === DESIGNER_TYPE.Block || subflowViewMode === SUBFLOW_VIEW_MODE.Block
+  const branches = useVal(nodeStore.display$?.branches)
+  const editable = useVal(designerStore.$.editable)
   const handles = useVal(section.$.handles)
   const allHandleNames = useVal(section.$.allHandleNames)
   const additionalOutputs = useVal(section.$.additionalOutputs)
@@ -82,21 +86,31 @@ export const OutputSection: React.FC<OutputSectionProps> = /* @__PURE__ */ memo(
     return null
   }
 
-  const renderHandle = (handle: HandleRowStore) => (
-    <HandleEditor
-      key={handle.name}
-      store={handle}
-      panelWidth$={designerStore.$$.settingsPanelWidth}
-      reactFlowStore={reactFlowStore}
-      validate={validateName}
-      dragTarget={dnd.dragTarget}
-      dragPosition={dnd.dragPosition}
-      onRename={(newName) => section.renameHandle(handle.name, newName as HandleName)}
-      onDelete={() => section.deleteHandle(handle.name)}
-      onDragStart={(ev) => dnd.onDragStart(ev, handle)}
-      onDragOver={(ev) => dnd.onDragOver(ev, handle)}
-    />
-  )
+  const renderHandle = (handle: HandleRowStore) => {
+    const editor = (
+      <HandleEditor
+        key={handle.name}
+        store={handle}
+        panelWidth$={designerStore.$$.settingsPanelWidth}
+        reactFlowStore={reactFlowStore}
+        validate={validateName}
+        dragTarget={dnd.dragTarget}
+        dragPosition={dnd.dragPosition}
+        onRename={(newName) => section.renameHandle(handle.name, newName as HandleName)}
+        onDelete={() => section.deleteHandle(handle.name)}
+        onDragStart={(ev) => dnd.onDragStart(ev, handle)}
+        onDragOver={(ev) => dnd.onDragOver(ev, handle)}
+      />
+    )
+    return branches?.includes(handle.name) ? (
+      <div key={handle.name} className={styles.branchRow}>
+        <Handle className={styles.branchHandle} id={toRFHandleName(`$branch:${handle.name}` as HandleName)} type="output" isConnectable={editable} />
+        {editor}
+      </div>
+    ) : (
+      editor
+    )
+  }
 
   const renderAdditionalHeader = () => {
     const action: ICardAction = {
@@ -134,6 +148,7 @@ export const OutputSection: React.FC<OutputSectionProps> = /* @__PURE__ */ memo(
   return (
     <Card
       name={OUTPUT_SECTION_TYPE}
+      className={branches != null ? styles.branchSection : undefined}
       icon="i-carbon:port-output"
       title={t('outputHandleEditor.title')}
       contentClassName={styles.inoutSectionCard}

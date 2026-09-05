@@ -60,7 +60,6 @@
     "privateHelp": "共有ブロックをプライベートに設定すると、AI や他のユーザーが使用できないことを示せます。",
     "public": "いいえ",
     "runningConfig": {
-      "concurrency": "並列数",
       "progressWeight": "進捗の重み",
       "timeout": "タイムアウト",
       "title": "実行設定"

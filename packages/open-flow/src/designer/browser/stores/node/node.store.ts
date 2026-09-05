@@ -35,7 +35,6 @@ export interface NodeStoreManifest$ {
   readonly title: Val<string | undefined>
   readonly description: Val<string | undefined>
   readonly timeout?: Val<number | undefined>
-  readonly concurrency?: Val<number | undefined>
   readonly progressWeight?: Val<number | undefined>
   // Private shared blocks are hidden from agents and other users.
   readonly private?: Val<boolean | undefined>
@@ -51,11 +50,12 @@ export interface NodeShowSettings {
 
 /** Reactive presentation values used to render a node. */
 export interface NodeStoreDisplay$ {
+  readonly branches?: ReadonlyVal<readonly string[] | undefined>
+  readonly executionInput?: ReadonlyVal<boolean>
   readonly icon: ReadonlyVal<string | undefined>
   readonly title: ReadonlyVal<string | undefined>
   readonly description: ReadonlyVal<string | undefined>
   readonly timeout?: ReadonlyVal<number | undefined>
-  readonly concurrency?: ReadonlyVal<number | undefined>
   readonly progressWeight?: ReadonlyVal<number | undefined>
   readonly status: Val<NodeStatus>
   readonly successCount?: Val<number | undefined>

@@ -11,10 +11,12 @@ export const defaultFlowIcon = 'i-carbon:flow-connection'
 export const defaultTriggerIcon = 'i-codicon:symbol-event'
 
 export const iconForNodeType = (nodeType: NodeType): string =>
-  nodeType === NODE_TYPE.ConditionNode
-    ? defaultConditionIcon
-    : nodeType === NODE_TYPE.SubflowNode
-      ? defaultSubflowIcon
-      : nodeType === NODE_TYPE.TriggerNode
-        ? defaultTriggerIcon
-        : defaultNodeIcon
+  nodeType === NODE_TYPE.TaskNode
+    ? 'i-carbon:code'
+    : nodeType === NODE_TYPE.ConditionNode
+      ? defaultConditionIcon
+      : nodeType === NODE_TYPE.SubflowNode
+        ? defaultSubflowIcon
+        : nodeType === NODE_TYPE.TriggerNode
+          ? defaultTriggerIcon
+          : defaultNodeIcon

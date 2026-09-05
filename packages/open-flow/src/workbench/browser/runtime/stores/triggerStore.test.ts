@@ -25,7 +25,7 @@ describe('TriggerStore', () => {
         return Response.json({
           actorId: 'actor',
           content: {
-            document: { bindings: {}, graph: { nodes: {} }, subflows: {}, tasks: {} },
+            document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
             modelVersion: 1,
             modules: {},
           },

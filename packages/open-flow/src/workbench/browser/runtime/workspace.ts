@@ -379,6 +379,9 @@ function runProjection(
         if (typeof progress == 'number') nodes.set(nodeId, { ...current, progress, status: current?.status ?? 'running' })
         break
       }
+      case 'node.skipped':
+        nodes.set(nodeId, { status: 'idle', skipped: true })
+        break
       case 'node.completed':
         nodes.set(nodeId, { progress: 100, status: 'success', successCount: (current?.successCount ?? 0) + 1 })
         break
@@ -431,29 +434,20 @@ function triggerDiagnosticCount(triggerId: string, diagnostics: readonly Diagnos
     .length
 }
 
-function projectEdges(entries: readonly (readonly [string, GraphNode])[], nodeIds: ReadonlySet<string>, ports: ReadonlyMap<string, NodePorts>): EdgeProjection {
+function projectEdges(
+  graph: { readonly edges: readonly { readonly source: string; readonly sourceHandle?: string; readonly target: string }[] },
+  nodeIds: ReadonlySet<string>,
+): EdgeProjection {
   const edges: DesignerEdge[] = []
-  const edgeIds = new Set<string>()
-  const dependencies = new Map([...nodeIds].map((nodeId) => [nodeId, new Set<string>()]))
-  const dependents = new Map([...nodeIds].map((nodeId) => [nodeId, new Set<string>()]))
-  for (const [targetId, node] of entries) {
-    if (!('inputs' in node)) continue
-    for (const [targetHandle, mapping] of Object.entries(node.inputs)) {
-      if (mapping.kind != 'sources') continue
-      for (const source of mapping.sources) {
-        if (source.kind != 'node' || !nodeIds.has(source.nodeId)) continue
-        const sourceId = source.nodeId
-        const output = source.output
-        const id = edgeId(sourceId, output, targetId, targetHandle)
-        if (edgeIds.has(id)) continue
-        edgeIds.add(id)
-        if (!ports.get(sourceId)!.outputs.has(output)) ports.get(sourceId)!.outputs.set(output, {})
-        if (!ports.get(targetId)!.inputs.has(targetHandle)) ports.get(targetId)!.inputs.set(targetHandle, {})
-        edges.push({ id, source: sourceId, sourceHandle: output, target: targetId, targetHandle })
-        dependencies.get(targetId)!.add(sourceId)
-        dependents.get(sourceId)!.add(targetId)
-      }
-    }
+  const dependencies = new Map([...nodeIds].map((id) => [id, new Set<string>()]))
+  const dependents = new Map([...nodeIds].map((id) => [id, new Set<string>()]))
+  for (const edge of graph.edges) {
+    if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) continue
+    const sourceHandle = edge.sourceHandle == null ? '$out' : `$branch:${edge.sourceHandle}`
+    const targetHandle = '$in'
+    edges.push({ id: edgeId(edge.source, sourceHandle, edge.target, targetHandle), source: edge.source, sourceHandle, target: edge.target, targetHandle })
+    dependencies.get(edge.target)!.add(edge.source)
+    dependents.get(edge.source)!.add(edge.target)
   }
   return { dependencies, dependents, edges }
 }
@@ -704,7 +698,6 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
     connectorAction?.authenticated == true && (connector?.connectionId == null || (connections != null && selectedConnection?.status != 'active'))
   const nodeRun = context.runNodes.get(nodeId)
   const common = {
-    concurrency: node.concurrency,
     description: node.description,
     diagnostics: nodeDiagnosticCount(context.target, resolved, context.diagnostics),
     icon: node.icon ?? (connectorAction == null ? nodeIcon(resolved) : providerIcon(connectorAction)),
@@ -796,7 +789,7 @@ export function designerGraph(
   const definitions = new Map(entries.map(([nodeId, node]) => [nodeId, revision.resolveNode(nodeId, node)]))
   const nodeIds = new Set(entries.map(([nodeId]) => nodeId))
   const ports = new Map([...definitions].map(([nodeId, node]) => [nodeId, nodePorts(node)]))
-  const edgeProjection = projectEdges(entries, nodeIds, ports)
+  const edgeProjection = projectEdges(graph, nodeIds)
   const layout = layoutNodes(nodeIds, edgeProjection.dependencies, edgeProjection.dependents)
   const positions = savedPositions(presentation, target)
   const context: NodeProjectionContext = {

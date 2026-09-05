@@ -21,6 +21,7 @@ function revision(rules?: readonly TriggerSchedule[]): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes:
           rules == null
             ? {}

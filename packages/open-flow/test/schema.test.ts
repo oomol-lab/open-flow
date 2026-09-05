@@ -80,9 +80,9 @@ outputs_from:
   it('keeps running fields on executable node kinds only', () => {
     assert.deepEqual(
       FlowSchema.parse({
-        nodes: [{ node_id: 'task', task: 'self::task', timeout: 0.25, concurrency: 2, progress_weight: 3 }],
+        nodes: [{ node_id: 'task', task: 'self::task', timeout: 0.25, progress_weight: 3 }],
       }),
-      { nodes: [{ node_id: 'task', task: 'self::task', timeout: 0.25, concurrency: 2, progress_weight: 3 }] },
+      { nodes: [{ node_id: 'task', task: 'self::task', timeout: 0.25, progress_weight: 3 }] },
     )
     assert.deepEqual(
       FlowSchema.parse({

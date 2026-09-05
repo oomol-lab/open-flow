@@ -162,9 +162,7 @@
       "portDefinitions": "Saisissez des définitions de ports valides."
     },
     "node": {
-      "concurrency": "Parallélisme",
-      "concurrencyError": "Le parallélisme doit être un entier positif.",
-      "description": "Nom d'affichage, parallélisme et délai d'expiration",
+      "description": "Nom affiché et délai maximal",
       "displayName": "Nom d'affichage",
       "displayNamePlaceholder": "Utiliser le nom de la définition",
       "save": "Enregistrer le nœud",
@@ -227,7 +225,12 @@
       "save": "Enregistrer le Trigger",
       "title": "Définition du Trigger"
     },
-    "title": "Inspecteur"
+    "title": "Inspecteur",
+    "sources": {
+      "title": "Sources des entrées",
+      "local": "Valeur locale / variable",
+      "unavailable": "Cette source ne termine pas nécessairement avant ce nœud, ou son type est incompatible."
+    }
   },
   "language": {
     "label": "Langue"
@@ -474,7 +477,8 @@
     "timelineEmpty": "Exécutez le Brouillon sélectionné pour inspecter sa chronologie et sa sortie.",
     "submitting": "Envoi de cette révision figée et création de son enregistrement d'exécution…",
     "waiting": "En attente du premier événement…",
-    "waitExpires": "Expire le {{date}}"
+    "waitExpires": "Expire le {{date}}",
+    "eventSkipped": "Ignoré"
   },
   "sidebar": {
     "createFirstFlow": "Créer un Flow",

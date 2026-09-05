@@ -94,7 +94,6 @@ function addValueNode(harness: ControlApiConformanceHarness, flowId: string, rev
       {
         kind: 'graph.node.create',
         node: {
-          concurrency: 1,
           inputs: {},
           kind: 'value',
           values: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
@@ -300,7 +299,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       const flowId = requiredString(flow.flowId, 'Presentation Flow flowId')
       const draftRevisionId = requiredString(flow.draftRevisionId, 'Presentation Flow revisionId')
       const path = `/v1/flows/${flowId}/presentation`
-      const value = { nodes: { task: { x: 120, y: 80 } } }
+      const value = { edges: [], nodes: { task: { x: 120, y: 80 } } }
       const updated = await json(
         await request(harness, path, { body: JSON.stringify({ expectedRevision: 1, value, version: 1 }), method: 'PUT' }),
         200,
@@ -411,7 +410,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
             kind: 'graph.node.create',
             node: {
               actions: ['approve', 'reject'],
-              concurrency: 1,
+
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: { request: 1 } } },
               kind: 'wait',

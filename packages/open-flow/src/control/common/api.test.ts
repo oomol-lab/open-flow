@@ -46,7 +46,7 @@ describe('ControlClient Flow API', () => {
     const operations = [
       {
         kind: 'graph.node.create' as const,
-        node: { concurrency: 1, inputs: {}, kind: 'value' as const, values: [] },
+        node: { inputs: {}, kind: 'value' as const, values: [] },
         nodeId: 'value',
         target: { kind: 'flow' as const },
       },

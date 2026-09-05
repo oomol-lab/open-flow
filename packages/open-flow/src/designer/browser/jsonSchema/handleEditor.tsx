@@ -2,6 +2,7 @@ import styles from './handleEditor.module.scss'
 import type { useStoreApi } from '@xyflow/react'
 import type { JSX } from 'react/jsx-runtime'
 import type { Val } from 'value-enhancer'
+import type { NodeId } from '../../../schema/index.ts'
 import type { ColorType } from '../components/constants.ts'
 import type { IHandleAction } from '../components/handleRow.tsx'
 import type { DesignerOption as IBasicOption } from '../components/select.tsx'
@@ -18,14 +19,13 @@ import type { JsonSchema } from './types.ts'
 import { isDefined, isString } from '@wopjs/cast'
 import { clsx } from 'clsx'
 import { dequal } from 'dequal/lite'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDerived, useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { setValue, val } from 'value-enhancer'
 import { HANDLE_ROW_CLASSNAME, HANDLE_ROW_EXPANDED_CLASSNAME } from '../base/designer.ts'
 import { stopEvent } from '../base/dom.ts'
 import { useDelayedTrue } from '../base/react.ts'
-import { toRFHandleName } from '../base/rfHelpers.ts'
 import {
   asArray,
   asNumber,
@@ -48,7 +48,6 @@ import { DesignerCheckbox } from '../components/checkbox.tsx'
 import { ColorPicker } from '../components/colorPicker.tsx'
 import { asColorType, asDate, asDateTimeFormat, formatDate } from '../components/constants.ts'
 import { DateTimePicker } from '../components/dateTimePicker.tsx'
-import { Handle } from '../components/handle.tsx'
 import { HandleRow } from '../components/handleRow.tsx'
 import { Input } from '../components/input.tsx'
 import { Label } from '../components/label.tsx'
@@ -56,8 +55,8 @@ import { Null } from '../components/null.tsx'
 import { DesignerCombobox as Select } from '../components/select.tsx'
 import { LabeledSwitch } from '../components/toggleSwitch.tsx'
 import { DesignerTooltip } from '../components/tooltip.tsx'
-import { useDesignerType } from '../graph/DesignerStoreContext.tsx'
-import { useNodeType } from '../graph/Nodes/NodeStoreContext.tsx'
+import { useDesignerStore, useDesignerType } from '../graph/DesignerStoreContext.tsx'
+import { NodeStoreContext, useNodeType } from '../graph/Nodes/NodeStoreContext.tsx'
 import { useSubflowViewMode } from '../graph/SubflowDesigner/SubflowViewModeContext.ts'
 import { SUBFLOW_VIEW_MODE } from '../stores/designer/subflowDesigner.store.ts'
 import { DESIGNER_TYPE } from '../stores/designer/typings.ts'
@@ -136,12 +135,9 @@ export function HandleEditor({
   const reference = useVal(store.reference$)
   const nullable = useVal(store.nullable$)
   const showSettings = useVal(store.showSettings$)
-  const kind = useVal(store.kind$)
   const formError = useVal(presentation === 'form' && showFormError ? store.error$ : undefined)
   const formSchema = useVal(presentation === 'form' ? store.schema$ : undefined)
   const formValue = useVal(presentation === 'form' ? store.value$ : undefined)
-
-  const rfHandleId = toRFHandleName(store.name)
 
   const renameError$ = useMemo(() => val<string | undefined>(), [])
   const onUpdateName = useCallback((name: string): void => renameError$.set(validate?.(name, store.name)), [renameError$, store, validate])
@@ -209,7 +205,6 @@ export function HandleEditor({
         className={clsx(styles[context.inout])}
         prefix={
           <>
-            {(context.handlePosition || context.inout) === 'in' && <Handle id={rfHandleId} type="input" kind={kind} />}
             {context.canEditSchema && onDragStart && (
               <div draggable className={styles.dragHandle} onDragStart={onDragStart} data-handle={`h:${store.name}`}>
                 <i className="i-carbon:draggable" />
@@ -217,7 +212,6 @@ export function HandleEditor({
             )}
           </>
         }
-        suffix={(context.handlePosition || context.inout) === 'out' && <Handle id={rfHandleId} type="output" kind={kind} />}
         expanded={reference ? null : hasSubpanel ? !collapsed : null}
         onExpandedChange={(e) => setValue(widget.collapsed$, !e)}
         name={
@@ -241,6 +235,7 @@ export function HandleEditor({
         }
         value={
           <RootField
+            handle={store.name}
             reference={reference}
             nullable={nullable}
             type={schemaType}
@@ -306,6 +301,7 @@ export function HandleEditor({
 }
 
 interface RootFieldProps {
+  readonly handle: string
   readonly reference?: boolean
   readonly nullable?: boolean
   readonly type: WidgetType
@@ -411,7 +407,7 @@ function RootField(props: RootFieldProps) {
           <DesignerTooltip className={styles.errorOverlay} placement="top" title={showError && localize(error?.message)}>
             <div className={clsx(styles.inlineValue, showError && error && styles.error)}>
               {props.reference ? (
-                <ValueReference isSuffix type="binary" store={props.store} />
+                <ValueReference isSuffix handle={props.handle} />
               ) : (
                 <ValueReconciler isSuffix type={props.type} nullable={props.nullable} store={props.store} showError={showError} />
               )}
@@ -1582,18 +1578,36 @@ function ValueUnknown(props: ValueProps) {
   )
 }
 
-function ValueReference(props: ValueProps) {
+function ValueReference(props: { readonly handle: string; readonly isSuffix?: boolean }) {
   const t = useTranslate()
+  const node = useContext(NodeStoreContext)
+  const mappings = useVal(node?.display$?.inputs_from)
+  const sources = mappings?.find((mapping) => mapping.handle == props.handle)?.from_node
 
   return (
-    <Label
-      className={styles.reference}
-      disabled={!props.store.context.canEditValue}
-      isSuffix={props.isSuffix}
-      // prefix={<i className="i-carbon:data-refinery-reference ml-1" />}
-    >
-      {`<${t('inputHandleEditor.reference')}>`}
+    <Label className={styles.reference} isSuffix={props.isSuffix} prefix={<i className="i-carbon:arrow-up-right" />}>
+      {sources?.length
+        ? sources.map((source, index) => (
+            <span key={`${source.node_id}:${source.output_handle}`}>
+              {index > 0 && ' / '}
+              <OutputReference nodeId={source.node_id} handle={source.output_handle} />
+            </span>
+          ))
+        : t('inputHandleEditor.reference')}
     </Label>
+  )
+}
+
+function OutputReference({ nodeId, handle }: { readonly nodeId: NodeId; readonly handle: string }) {
+  const designer = useDesignerStore()
+  const source = useDerived(designer.$.nodes.$, (nodes) => nodes.get(nodeId))
+  const title = useVal(source?.display$.title)
+  const label = `${title || nodeId}.${handle}`
+  return (
+    <span title={label}>
+      {title || nodeId}
+      <span className={styles.outputHandle}>.{handle}</span>
+    </span>
   )
 }
 

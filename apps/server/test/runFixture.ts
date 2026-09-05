@@ -38,6 +38,7 @@ export async function storeRevision(
         nodeId,
         target: { kind: 'flow' as const },
       })),
+      ...revision.document.graph.edges.map((edge) => ({ kind: 'graph.edge.connect' as const, edge, target: { kind: 'flow' as const } })),
     ]
     const revisionId =
       operations.length == 0

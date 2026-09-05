@@ -568,10 +568,8 @@ function RunningConfigs() {
   const editable = useVal(designerStore.$.editable)
 
   const timeout = useVal(nodeStore.display$?.timeout)
-  const concurrency = useVal(nodeStore.display$?.concurrency)
   const progressWeight = useVal(nodeStore.display$?.progressWeight)
   const showTimeout = !ConditionNodeStore.is(nodeStore)
-  const showConcurrency = nodeStore.display$?.concurrency != null
   const showProgressWeight = designerStore.designerType !== DESIGNER_TYPE.Block && designerStore.flowNode !== nodeStore
 
   return (
@@ -579,7 +577,7 @@ function RunningConfigs() {
       {showTimeout && (
         <HandleRow
           level=" "
-          isLast={!showConcurrency && !showProgressWeight}
+          isLast={!showProgressWeight}
           name={
             <Label className={styles.label} tooltipClassName={styles.labelTooltip} title="timeout">
               {t('blockEditor.runningConfig.timeout')}
@@ -599,34 +597,6 @@ function RunningConfigs() {
                 }}
               />
               <span className={styles.unit}>{t('s')}</span>
-            </div>
-          }
-        />
-      )}
-      {showConcurrency && (
-        <HandleRow
-          level=" "
-          isLast={!showProgressWeight}
-          name={
-            <Label className={styles.label} tooltipClassName={styles.labelTooltip} title="concurrency">
-              {t('blockEditor.runningConfig.concurrency')}
-            </Label>
-          }
-          value={
-            <div className={styles.inputWithUnit}>
-              <Input
-                readOnly={!editable || nodeStore.manifest$?.concurrency == null}
-                className={styles.input}
-                type="number"
-                placeholder={t('inputHandleEditor.unset')}
-                value={formatOptionalNumber(concurrency)}
-                min={1}
-                step={1}
-                onRealChange={(value) => nodeStore.manifest$?.concurrency?.set(parsePositiveInteger(value))}
-                onBlur={(input) => {
-                  input.value = formatOptionalNumber(concurrency)
-                }}
-              />
             </div>
           }
         />
@@ -880,12 +850,6 @@ function ConnectorConnectionConfig(props: {
 
 function formatEntry(value: string | undefined, unset: string): string {
   return value ? basename(value) : unset
-}
-
-function parsePositiveInteger(value: string): number | undefined {
-  if (value === '') return
-  const parsed = Number.parseInt(value, 10)
-  return String(parsed) === value && Number.isSafeInteger(parsed) && parsed > 0 ? parsed : void 0
 }
 
 function parsePositiveNumber(value: string): number | undefined {

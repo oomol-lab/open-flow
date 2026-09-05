@@ -71,6 +71,7 @@ export interface FlowDesignerViewConditionChange {
 }
 
 export interface FlowDesignerViewNodeRun {
+  readonly skipped?: boolean
   readonly progress?: number
   readonly status: 'error' | 'idle' | 'running' | 'success' | 'waiting'
   readonly successCount?: number
@@ -86,7 +87,6 @@ export interface FlowDesignerViewViewport extends FlowDesignerViewPosition {
 }
 
 interface FlowDesignerViewNodeBase {
-  readonly concurrency?: number
   readonly description?: string
   readonly diagnostics?: number
   readonly icon?: string
@@ -231,6 +231,7 @@ export type FlowDesignerViewNode =
 export type FlowDesignerViewSemanticNode = Exclude<FlowDesignerViewNode, FlowDesignerViewCommentNode>
 
 export interface FlowDesignerViewModel {
+  readonly edges: readonly FlowDesignerViewEdge[]
   readonly layouts?: Partial<Record<FlowDisplayMode, DesignerUILayout>>
   readonly nodes: readonly FlowDesignerViewNode[]
   readonly runStatus?: 'idle' | 'running'

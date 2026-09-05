@@ -46,9 +46,10 @@ describe('WorkbenchStore diagnostics', () => {
         document: {
           bindings: {},
           graph: {
+            edges: [],
             nodes: {
-              connected: { concurrency: 1, inputs: {}, kind: 'task', taskId: 'connected' },
-              connector: { concurrency: 1, inputs: {}, kind: 'task', taskId: 'geocode' },
+              connected: { inputs: {}, kind: 'task', taskId: 'connected' },
+              connector: { inputs: {}, kind: 'task', taskId: 'geocode' },
             },
           },
           subflows: {},

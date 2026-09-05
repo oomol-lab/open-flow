@@ -8,14 +8,12 @@ import type { LocaleTextStore } from '../../../../localization/common/localizati
 import type { HandleName, NodeId } from '../../../../schema/index.ts'
 import type { FlowDisplayMode } from '../../../common/flowDisplay.ts'
 import type { AddNodeType } from '../../base/dragNDrop.ts'
-import type { PartialConnection, RFConnection, RFEdge, RFNode, RFNodeId } from '../../base/rfHelpers.ts'
+import type { RFConnection, RFEdge, RFNode, RFNodeId } from '../../base/rfHelpers.ts'
 import type { ToReadonly$Group } from '../../base/val.ts'
 import type { TranslateKeyEvent, UserLocalesContext } from '../../components/userLocales.tsx'
 import type { EdgeStore } from '../edge/edge.store.ts'
 import type { RenderedRFEdge } from '../edge/overviewEdges.ts'
 import type { ManifestConnection } from '../edge/typings.ts'
-import type { HandleIndex } from '../node/constants.ts'
-import type { IHandleRowDragNDrop } from '../node/nodeSection/interface.ts'
 import type { ConnectorConnectionStore } from './connectorConnection.store.ts'
 import type { DesignerUIStore } from './designerUI.store.ts'
 import type { RFCommand } from './rfCommand.ts'
@@ -24,38 +22,21 @@ import type { DesignerType, FlowRunStatus } from './typings.ts'
 import { graphlib, layout } from '@dagrejs/dagre'
 import { disposableStore } from '@wopjs/disposable'
 import { event } from '@wopjs/event'
-import { Position } from '@xyflow/react'
-import { cluster, isObject } from 'radash'
+import { cluster } from 'radash'
 import { compute, derive, val } from 'value-enhancer'
 import { DESIGNER_CLASSNAME } from '../../base/designer.ts'
 import { dispatchEvent, isInside, isMac } from '../../base/dom.ts'
-import {
-  applyEdgeChanges,
-  applyNodeChanges,
-  getRFNodeType,
-  makeConnection,
-  RF_NODE_TYPE,
-  toManifestHandleName,
-  toManifestNodeId,
-} from '../../base/rfHelpers.ts'
+import { applyEdgeChanges, applyNodeChanges, getRFNodeType, RF_NODE_TYPE, toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
 import { coalesce, filterMap, Negative } from '../../base/trivial.ts'
 import { createI18n } from '../../i18n/index.ts'
-import { deriveEdgesFromNodes } from '../edge/edges.ts'
-import { deriveOverviewEdges } from '../edge/overviewEdges.ts'
+import { deriveEdges } from '../edge/edges.ts'
 import { CommentNodeStore } from '../node/commentNode.store.ts'
-import { ConditionNodeStore } from '../node/conditionNode.store.ts'
-import { InputNodeStore } from '../node/inputNode.store.ts'
 import { NodeStore } from '../node/node.store.ts'
-import { LEFT_FROM_SECTION_TYPES, RIGHT_FROM_SECTION_TYPES, RIGHT_TO_SECTION_TYPES } from '../node/nodeSection/constants.ts'
 import { InputSectionStore } from '../node/nodeSection/inputSection.store.ts'
 import { OutputSectionStore } from '../node/nodeSection/outputSection.store.ts'
-import { OutputNodeStore } from '../node/outputNode.store.ts'
 import { SubflowNodeStore } from '../node/subflowNode.store.ts'
-import { TaskNodeStore } from '../node/taskNode.store.ts'
-import { ValueNodeStore } from '../node/valueNode.store.ts'
 import { HandleRowStore } from '../nodeHandle/handleRow.store.ts'
 import { getNodeMinimap, NodeMiniMapPhase } from './nodeMiniMap.ts'
-import { decodeRFSourceHandle, decodeRFTargetHandle } from './rfConnection.ts'
 
 export type IAddNodeMenuItem =
   | {
@@ -119,21 +100,6 @@ export interface IFromSource {
   readonly side: 'left' | 'right'
 }
 
-/** @internal */
-export interface IAddHandleOptions {
-  fromFlow: boolean
-  fromNodeId: NodeId
-  fromPosition: Position
-  fromHandleName: HandleName
-  toFlow: boolean
-  toNodeId: NodeId
-  toSection: string
-  // Omitting the index inserts the handle at one end of the section.
-  toHandleIndex?: HandleIndex | null
-  // Controls which end is used when toHandleIndex is null.
-  insertBefore?: boolean
-}
-
 export type InteractiveMode = 'mouse' | 'touchpad'
 
 export interface OverviewConnectedNodes {
@@ -190,6 +156,7 @@ export interface DesignerStore$ extends ToReadonly$Group<DesignerStore$$> {
 }
 
 export interface DesignerStoreProps {
+  readonly connections?: ReadonlyVal<readonly ManifestConnection[]>
   readonly lang$: ReadonlyVal<string>
   readonly userLocales?: LocaleTextStore
   /** Makes every input and output section read-only for previews. */
@@ -354,25 +321,9 @@ export class DesignerStore {
     this.userLocales = props.userLocales
     this.dispose.add(this.lang$.reaction((lang) => this.i18n.switchLang(lang)))
 
-    const { nodes, pseudoNodes, flowNode, commentNodes } = props
-    const edges = this.dispose.add(deriveEdgesFromNodes(nodes, pseudoNodes, flowNode, props.bindValidateConnection))
+    const { nodes, pseudoNodes, commentNodes } = props
+    const edges = this.dispose.add(deriveEdges(props.connections ?? val<readonly ManifestConnection[]>([]), nodes))
     const rfEdges = this.dispose.add(compute((get) => coalesce(get(edges).map((edge) => get(edge.$.rfEdge)))))
-    const selectedNodeIds = this.dispose.add(
-      compute((get) => {
-        const result = new Set<RFNodeId>()
-        for (const node of get(nodes.$).values()) {
-          if (get(node.$.selected)) result.add(node.rfNodeId)
-        }
-        if (pseudoNodes) {
-          for (const node of get(pseudoNodes.$).values()) {
-            if (get(node.$.selected)) result.add(node.rfNodeId)
-          }
-        }
-        return result
-      }),
-    )
-    const overviewRFEdges = this.dispose.add(deriveOverviewEdges(edges, selectedNodeIds))
-
     this.$$ = {
       initialized: this.dispose.add(val(false)),
       editable: this.dispose.add(val(editable)),
@@ -389,7 +340,7 @@ export class DesignerStore {
     this.activeDisplayMode = this.$$.displayMode.value
 
     const rfNodes = this.dispose.add(compute((get) => [...(get(commentNodes?.$)?.values() ?? []), ...get(nodes.$).values()].map((node) => get(node.$.rfNode))))
-    const renderedRFEdges = this.dispose.add(compute((get) => (get(this.$$.displayMode) == 'overview' ? get(overviewRFEdges) : get(rfEdges))))
+    const renderedRFEdges = rfEdges
 
     this.$ = {
       ...this.$$,
@@ -586,19 +537,10 @@ export class DesignerStore {
 
     const { source, target, sourceHandle, targetHandle } = rfConnection as RFConnection
 
-    const from = decodeRFSourceHandle(this.$.nodes, this.pseudoNodes, source, sourceHandle)
-    if (!from) {
-      console.error(`not found source handle ${source}:${sourceHandle}`)
-      return
-    }
-
-    const to = decodeRFTargetHandle(this.$.nodes, this.pseudoNodes, target, targetHandle)
-    if (!to) {
-      console.error(`not found target handle ${target}:${targetHandle}`)
-      return
-    }
-
-    this.onConnect?.({ from, to })
+    this.onConnect?.({
+      from: { type: 'from_node', source: { node_id: toManifestNodeId(source), output_handle: toManifestHandleName(sourceHandle) } },
+      to: { type: 'to_node', target: { node_id: toManifestNodeId(target), input_handle: toManifestHandleName(targetHandle) } },
+    })
   }
 
   /**
@@ -774,80 +716,6 @@ export class DesignerStore {
     }
   }
 
-  /**
-   * Adds a handle definition by dropping a connection on a target node.
-   * @internal
-   */
-  public onAddHandle = (options: IAddHandleOptions): void => {
-    if (!this.$.editable.value) {
-      console.warn('onAddHandle: Designer is not editable')
-      return
-    }
-
-    const fromNode = (options.fromFlow ? this.$.pseudoNodes : this.$.nodes)?.get(options.fromNodeId)
-    if (!fromNode) {
-      console.warn(`onAddHandle: fromNode ${options.fromNodeId} not found`)
-      return
-    }
-
-    const toNode = (options.toFlow ? this.$.pseudoNodes : this.$.nodes)?.get(options.toNodeId)
-    if (!toNode) {
-      console.warn(`onAddHandle: toNode ${options.toNodeId} not found`)
-      return
-    }
-
-    let fromSection: IHandleRowDragNDrop | undefined
-    if (options.fromPosition === Position.Left) {
-      fromSection = fromNode.findSection<IHandleRowDragNDrop>(LEFT_FROM_SECTION_TYPES)
-    } else if (options.fromPosition === Position.Right) {
-      fromSection = fromNode.findSection<IHandleRowDragNDrop>(RIGHT_FROM_SECTION_TYPES)
-    }
-    if (!fromSection) {
-      console.warn(`onAddHandle: fromSection ${options.fromPosition} not found`)
-      return
-    }
-
-    const row = fromSection.grabHandleRow(options.fromHandleName)
-    if (!row) {
-      console.warn(`onAddHandle: fromHandleRow ${options.fromHandleName} not found`)
-      return
-    }
-
-    const toSection = toNode.findSection<IHandleRowDragNDrop>(options.toSection)
-    if (!toSection) {
-      console.warn(`onAddHandle: toSection ${options.toSection} not found`)
-      return
-    }
-
-    const newHandleName = toSection.dropHandleRow(options.toHandleIndex, row, options.insertBefore)
-    if (!newHandleName) {
-      console.warn(`onAddHandle: Failed to create handle ${options.toHandleIndex}`)
-      return
-    }
-
-    // When dragging left, toNode becomes the connection source.
-    const orderIsCorrect = RIGHT_TO_SECTION_TYPES.includes(options.toSection)
-    if (orderIsCorrect) {
-      this.onConnect?.({
-        from: options.fromFlow
-          ? { type: 'from_flow', source: { input_handle: options.fromHandleName } }
-          : { type: 'from_node', source: { node_id: options.fromNodeId, output_handle: options.fromHandleName } },
-        to: options.toFlow
-          ? { type: 'to_flow', target: { output_handle: newHandleName } }
-          : { type: 'to_node', target: { node_id: options.toNodeId, input_handle: newHandleName } },
-      })
-    } else {
-      this.onConnect?.({
-        from: options.toFlow
-          ? { type: 'from_flow', source: { input_handle: newHandleName } }
-          : { type: 'from_node', source: { node_id: options.toNodeId, output_handle: newHandleName } },
-        to: options.fromFlow
-          ? { type: 'to_flow', target: { output_handle: options.fromHandleName } }
-          : { type: 'to_node', target: { node_id: options.fromNodeId, input_handle: options.fromHandleName } },
-      })
-    }
-  }
-
   /** Returns UI-visible diagnostics for programmatic inspection. */
   public getDiagnostics(): FlowDiagnostics {
     const handleErrors: {
@@ -946,142 +814,4 @@ export class DesignerStore {
       })
     })
   }
-
-  private resolveRFNode(rfNodeId: RFNodeId): NodeStore | undefined {
-    const nodeId = toManifestNodeId(rfNodeId)
-    if (getRFNodeType(rfNodeId) === RF_NODE_TYPE.ManifestNode) {
-      return this.$.nodes.get(nodeId)
-    } else {
-      return this.$.pseudoNodes?.get(nodeId)
-    }
-  }
-
-  /**
-   * Adds a handle and connection after the value node appears.
-   * @internal
-   */
-  public setupValueNode = async (source: NodeId, connection: Pick<RFConnection, 'target' | 'targetHandle'>): Promise<void> => {
-    const targetNode = this.resolveRFNode(connection.target)
-    const handle = toManifestHandleName(connection.targetHandle)
-    if (TaskNodeStore.is(targetNode) || SubflowNodeStore.is(targetNode) || OutputNodeStore.is(targetNode) || ConditionNodeStore.is(targetNode)) {
-      const def = targetNode.getInputHandleDef(handle)
-      if (def) {
-        const sourceNode = await this.waitValueNode(source)
-        sourceNode?.setupHandle(def, targetNode.getInputFrom(handle))
-        if (OutputNodeStore.is(targetNode)) {
-          this.onConnect?.({
-            from: { type: 'from_node', source: { node_id: source, output_handle: handle } },
-            to: { type: 'to_flow', target: { output_handle: handle } },
-          })
-        } else {
-          this.onConnect?.({
-            from: { type: 'from_node', source: { node_id: source, output_handle: handle } },
-            to: { type: 'to_node', target: { node_id: toManifestNodeId(connection.target), input_handle: handle } },
-          })
-        }
-      }
-    }
-  }
-
-  private async waitValueNode(nodeId: NodeId): Promise<ValueNodeStore | null> {
-    const alreadyExist = this.$.nodes.get(nodeId)
-    if (ValueNodeStore.is(alreadyExist)) {
-      return alreadyExist
-    }
-    return new Promise<ValueNodeStore | null>((resolve) => {
-      const timer = setTimeout(() => {
-        console.error(`value node ${nodeId} not found`)
-        dispose()
-        resolve(null)
-      }, 5000)
-      const dispose = this.$.nodes.$.reaction((nodes) => {
-        const node = nodes.get(nodeId)
-        if (node) {
-          clearTimeout(timer)
-          dispose()
-          if (ValueNodeStore.is(node)) {
-            resolve(node)
-          } else {
-            console.error(`node ${nodeId} is not a value node`)
-            resolve(null)
-          }
-        }
-      })
-    })
-  }
-
-  /**
-   * Updates a scriptlet handle after its task node appears.
-   * @internal
-   * @param nodeId The newly created scriptlet node ID.
-   * @param handle The scriptlet input or output handle.
-   */
-  public setupScriptletNode = async (nodeId: NodeId, connection: PartialConnection, handle: HandleName): Promise<void> => {
-    if (handle && 'source' in connection) {
-      // Dragging right from a value or task node determines the scriptlet input type.
-      const sourceNode = this.resolveRFNode(connection.source)
-      const sourceHandle = toManifestHandleName(connection.sourceHandle)
-      if (
-        ValueNodeStore.is(sourceNode) ||
-        TaskNodeStore.is(sourceNode) ||
-        SubflowNodeStore.is(sourceNode) ||
-        InputNodeStore.is(sourceNode) ||
-        ConditionNodeStore.is(sourceNode)
-      ) {
-        const def = sourceNode.getOutputHandleDef(sourceHandle)
-        if (def) {
-          const targetNode = await this.waitInlineTaskNode(nodeId)
-          targetNode?.setupInputHandle(handle, def)
-        }
-      }
-    } else if (handle && 'target' in connection) {
-      // Dragging left from a task node determines the scriptlet output type.
-      const targetNode = this.resolveRFNode(connection.target)
-      const targetHandle = toManifestHandleName(connection.targetHandle)
-      if (TaskNodeStore.is(targetNode) || SubflowNodeStore.is(targetNode) || OutputNodeStore.is(targetNode) || ConditionNodeStore.is(targetNode)) {
-        const def = targetNode.getInputHandleDef(targetHandle)
-        if (def) {
-          const sourceNode = await this.waitInlineTaskNode(nodeId)
-          sourceNode?.setupOutputHandle(handle, def)
-        }
-      }
-    }
-    this.onRFConnect(makeConnection(connection, nodeId, handle))
-  }
-
-  private async waitInlineTaskNode(nodeId: NodeId): Promise<TaskNodeStore | null> {
-    const alreadyExist = this.$.nodes.get(nodeId)
-    if (TaskNodeStore.is(alreadyExist)) {
-      if (isInlineTaskNode(alreadyExist)) {
-        return alreadyExist
-      } else {
-        console.error(`node ${nodeId} is not an inline task node`)
-        return null
-      }
-    }
-    return new Promise<TaskNodeStore | null>((resolve) => {
-      const timer = setTimeout(() => {
-        console.error(`task node ${nodeId} not found`)
-        dispose()
-        resolve(null)
-      }, 5000)
-      const dispose = this.$.nodes.$.reaction((nodes) => {
-        const node = nodes.get(nodeId)
-        if (node) {
-          clearTimeout(timer)
-          dispose()
-          if (TaskNodeStore.is(node) && isInlineTaskNode(node)) {
-            resolve(node)
-          } else {
-            console.error(`node ${nodeId} is not an inline task node`)
-            resolve(null)
-          }
-        }
-      })
-    })
-  }
-}
-
-function isInlineTaskNode(node: TaskNodeStore): boolean {
-  return isObject(node.manifest$?.task.value)
 }

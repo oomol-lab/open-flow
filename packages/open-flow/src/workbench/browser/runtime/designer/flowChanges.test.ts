@@ -24,9 +24,9 @@ function draft(source: string): Draft {
       document: {
         bindings: {},
         graph: {
+          edges: [],
           nodes: {
             task: {
-              concurrency: 1,
               inputs: {},
               kind: 'task',
               name: 'Code',
@@ -64,10 +64,11 @@ function managedDraft(): Draft {
       document: {
         ...base.content.document,
         graph: {
+          edges: [],
           nodes: {
             task: {
               additionalInputs: [{ handle: 'start', jsonSchema: {}, nullable: false }],
-              concurrency: 1,
+
               inputs: {
                 message: { kind: 'value', value: 'Hello' },
                 start: { kind: 'value', value: 'manual' },
@@ -195,7 +196,6 @@ describe('Managed task additional input changes', () => {
     const removed = updateTaskAdditionalInputs(revisionView(changed), { kind: 'flow' }, 'task', [])
     if (removed == null) throw new Error('Expected additional input removal.')
     expect(applyFlowChanges(changed, removed).content.document.graph.nodes.task).toEqual({
-      concurrency: 1,
       inputs: { message: { kind: 'value', value: 'Hello' } },
       kind: 'task',
       taskId: 'connector',
@@ -204,13 +204,54 @@ describe('Managed task additional input changes', () => {
 })
 
 describe('Condition changes', () => {
+  it('renames branch edges and data references together and copies execution order', () => {
+    const target = { kind: 'flow' } as const
+    let current = applyFlowChanges(draft('export default () => ({})'), [
+      {
+        kind: 'graph.node.create',
+        target,
+        nodeId: 'condition',
+        node: {
+          kind: 'condition',
+          input: { handle: 'value', jsonSchema: {}, nullable: true },
+          inputs: {},
+          cases: [{ output: 'yes', relation: 'all', expressions: [{ input: 'value', operator: 'isTrue' }] }],
+        },
+      },
+      { kind: 'graph.edge.connect', target, edge: { source: 'condition', sourceHandle: 'yes', target: 'task' } },
+      {
+        kind: 'graph.node.input.set',
+        target,
+        nodeId: 'task',
+        handle: 'value',
+        value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'condition', output: 'yes' }] },
+      },
+    ])
+    const node = current.content.document.graph.nodes.condition
+    if (node?.kind != 'condition') throw new Error('Expected condition.')
+    const changes = updateCondition(revisionView(current), target, 'condition', { input: node.input, cases: [{ ...node.cases[0]!, output: 'matched' }] })!
+    current = applyFlowChanges(current, changes)
+    expect(current.content.document.graph.edges).toEqual([{ source: 'condition', sourceHandle: 'matched', target: 'task' }])
+    expect(current.content.document.graph.nodes.task).toMatchObject({
+      inputs: { value: { sources: [{ kind: 'node', nodeId: 'condition', output: 'matched' }] } },
+    })
+    const clipboard = copyNodes(revisionView(current), target, ['condition', 'task'])
+    let id = 0
+    const pasted = pasteNodes(revisionView(current), target, clipboard, () => `copy-${++id}`)
+    const copied = applyFlowChanges(current, pasted.changes)
+    const sourceId = pasted.nodeIds[pasted.sourceIds.indexOf('condition')]
+    const targetId = pasted.nodeIds[pasted.sourceIds.indexOf('task')]
+    expect(copied.content.document.graph.edges).toContainEqual({ source: sourceId, sourceHandle: 'matched', target: targetId })
+    expect(copyNodes(revisionView(current), target, ['task']).edges).toEqual([])
+  })
+
   it('does not emit a change when an optional default output remains absent', () => {
     const current = applyFlowChanges(draft('export default () => ({})\n'), [
       {
         kind: 'graph.node.create',
         node: {
           cases: [{ expressions: [{ input: 'value', operator: 'isTrue' }], output: 'true', relation: 'all' }],
-          concurrency: 1,
+
           input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: { value: { kind: 'value', value: null } },
           kind: 'condition',
@@ -252,7 +293,7 @@ describe('Wait changes', () => {
         kind: 'graph.node.create',
         node: {
           actions: ['continue'],
-          concurrency: 1,
+
           input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: { value: { kind: 'value', value: null } },
           kind: 'wait',
@@ -277,6 +318,9 @@ describe('Wait changes', () => {
       },
     ])
 
+    changed = applyFlowChanges(changed, [
+      { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'wait', sourceHandle: 'continue', target: 'task' } },
+    ])
     const updated = updateWait(revisionView(changed), { kind: 'flow' }, 'wait', {
       actions: ['approve', 'reject'],
       name: 'Approval',
@@ -286,6 +330,7 @@ describe('Wait changes', () => {
     if (updated == null) throw new Error('Expected updated Wait changes.')
     changed = applyFlowChanges(changed, updated)
 
+    expect(changed.content.document.graph.edges).toEqual([])
     expect(changed.content.document.graph.nodes.wait).toMatchObject({ actions: ['approve', 'reject'], name: 'Approval', prompt: 'Approve this request?' })
     expect(changed.content.document.graph.nodes.task).toMatchObject({ inputs: {} })
     expect(changed.content.document.graph.nodes.review).toMatchObject({
@@ -305,7 +350,7 @@ describe('Wait changes', () => {
         kind: 'graph.node.create',
         node: {
           actions: ['continue'],
-          concurrency: 1,
+
           input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: { value: { kind: 'value', value: null } },
           kind: 'wait',
@@ -380,7 +425,7 @@ describe('Wait changes', () => {
         kind: 'graph.node.create',
         node: {
           actions: ['continue'],
-          concurrency: 1,
+
           input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: { value: { kind: 'value', value: null } },
           kind: 'wait',

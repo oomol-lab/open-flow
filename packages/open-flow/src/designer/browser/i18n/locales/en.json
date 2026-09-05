@@ -60,7 +60,6 @@
     "privateHelp": "Mark the shared block as private to indicate it cannot be used by AI and other users.",
     "public": "False",
     "runningConfig": {
-      "concurrency": "Concurrency",
       "progressWeight": "Progress weight",
       "timeout": "Timeout",
       "title": "Running config"

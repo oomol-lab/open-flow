@@ -39,9 +39,9 @@ function connectorFlow(options: { readonly action?: string; readonly connectionI
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           connector: {
-            concurrency: 1,
             inputs: { message: { kind: 'value', value: 'hello' } },
             kind: 'task',
             taskId: 'connector',
@@ -73,9 +73,9 @@ function capabilityFlow(declared = true): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           capability: {
-            concurrency: 1,
             inputs: { message: { kind: 'value', value: 'hello' } },
             kind: 'task',
             task: {
@@ -705,7 +705,7 @@ describe('Server Connector client', () => {
     const runId = await run(service)
 
     expect(service.run(runId)).toMatchObject({
-      result: { kind: 'node-results', nodes: [{ jobs: [{ outputs: { message: 'hello' } }], nodeId: 'connector' }] },
+      result: { kind: 'node-results', nodes: [{ status: 'completed', outputs: { message: 'hello' }, nodeId: 'connector' }] },
       status: 'completed',
     })
     expect(calls).toEqual([
@@ -771,7 +771,7 @@ describe('Server Connector client', () => {
     const allowedRunId = await run(service, capabilityFlow())
 
     expect(service.run(allowedRunId)).toMatchObject({
-      result: { kind: 'node-results', nodes: [{ jobs: [{ outputs: { message: 'hello' } }], nodeId: 'capability' }] },
+      result: { kind: 'node-results', nodes: [{ status: 'completed', outputs: { message: 'hello' }, nodeId: 'capability' }] },
       status: 'completed',
     })
     expect(calls).toEqual(['/v1/apps', '/v1/actions/example.echo'])

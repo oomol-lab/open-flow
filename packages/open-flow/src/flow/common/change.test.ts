@@ -13,7 +13,7 @@ function revision(): RevisionContent {
   return {
     document: {
       bindings: {},
-      graph: { nodes: {} },
+      graph: { edges: [], nodes: {} },
       subflows: {},
       tasks: {},
     },
@@ -23,12 +23,11 @@ function revision(): RevisionContent {
 }
 
 function valueNode(value: number): GraphNode {
-  return { concurrency: 1, inputs: {}, kind: 'value', values: [{ ...port, handle: 'value', value }] }
+  return { inputs: {}, kind: 'value', values: [{ ...port, handle: 'value', value }] }
 }
 
 function taskNode(): GraphNode {
   return {
-    concurrency: 1,
     inputs: {},
     kind: 'task',
     task: { inputs: [{ ...port, handle: 'input' }], moduleId: 'module-main', name: 'Task', outputs: [{ ...port, handle: 'output' }] },
@@ -48,7 +47,12 @@ describe('Flow changes', () => {
   })
 
   it('applies every resource lifecycle operation in order', () => {
-    const subflow = { graph: { nodes: {} }, inputs: [{ ...port, handle: 'input' }], name: 'Child', outputs: [{ ...port, handle: 'output', sources: [] }] }
+    const subflow = {
+      graph: { edges: [], nodes: {} },
+      inputs: [{ ...port, handle: 'input' }],
+      name: 'Child',
+      outputs: [{ ...port, handle: 'output', sources: [] }],
+    }
     const task = { executor: { kind: 'llm' as const, mode: 'chat' as const }, inputs: [], name: 'Managed', outputs: [] }
     const operations: readonly ChangeOperation[] = [
       { binding: { kind: 'connection', target: 'connection-a' }, bindingId: 'binding', kind: 'binding.create' },
@@ -79,7 +83,7 @@ describe('Flow changes', () => {
 
     expect(changed.document.bindings.binding).toEqual({ kind: 'connection', target: 'connection-b' })
     expect(changed.modules.module).toEqual({ imports: ['helper'], name: 'Renamed module', source: 'export default () => 2' })
-    expect(changed.document.subflows.child).toEqual({ graph: { nodes: {} }, inputs: [], name: 'Renamed child', outputs: [] })
+    expect(changed.document.subflows.child).toEqual({ graph: { edges: [], nodes: {} }, inputs: [], name: 'Renamed child', outputs: [] })
     expect(changed.document.tasks.managed).toMatchObject({ executor: { kind: 'llm', mode: 'json' }, name: 'Replaced' })
 
     const removed = applyFlowChanges(changed, [
@@ -96,7 +100,7 @@ describe('Flow changes', () => {
       { kind: 'graph.node.create', node: valueNode(1), nodeId: 'source', target },
       { kind: 'graph.node.create', node: taskNode(), nodeId: 'target', target },
       {
-        edge: { source: 'source', sourceHandle: 'value', target: 'target', targetHandle: 'input' },
+        edge: { source: 'source', target: 'target' },
         kind: 'graph.edge.connect',
         target,
       },
@@ -109,14 +113,12 @@ describe('Flow changes', () => {
       },
     ])
     expect(created.document.graph.nodes.source).toEqual(valueNode(2))
-    expect(created.document.graph.nodes.target).toMatchObject({
-      inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
-    })
+    expect(created.document.graph.nodes.target).toEqual(taskNode())
+    expect(created.document.graph.edges).toEqual([{ source: 'source', target: 'target' }])
 
     const disconnected = applyFlowChanges(created, [
       {
-        before: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] },
-        edge: { source: 'source', sourceHandle: 'value', target: 'target', targetHandle: 'input' },
+        edge: { source: 'source', target: 'target' },
         kind: 'graph.edge.disconnect',
         target,
       },
@@ -125,7 +127,7 @@ describe('Flow changes', () => {
 
     const connected = applyFlowChanges(disconnected, [
       {
-        edge: { source: 'source', sourceHandle: 'value', target: 'target', targetHandle: 'input' },
+        edge: { source: 'source', target: 'target' },
         kind: 'graph.edge.connect',
         target,
       },
@@ -134,7 +136,7 @@ describe('Flow changes', () => {
     expect(connected.document.graph.nodes).toEqual({ target: expect.objectContaining({ inputs: {} }) })
   })
 
-  it('removes an orphaned Variable binding when a node connection replaces it', () => {
+  it('preserves Variable bindings when adding an execution dependency', () => {
     const base = revision()
     const task = taskNode()
     if (task.kind != 'task') throw new Error('Expected Task fixture.')
@@ -144,6 +146,7 @@ describe('Flow changes', () => {
         ...base.document,
         bindings: { token: { kind: 'variable', target: 'TOKEN' } },
         graph: {
+          edges: [],
           nodes: {
             source: valueNode(1),
             target: {
@@ -155,11 +158,11 @@ describe('Flow changes', () => {
       },
     }
 
-    const changed = applyFlowChanges(content, connect(content, target, { source: 'source', sourceHandle: 'value', target: 'target', targetHandle: 'input' }))
+    const changed = applyFlowChanges(content, connect(content, target, { source: 'source', target: 'target' }))
 
-    expect(changed.document.bindings).toEqual({})
+    expect(changed.document.bindings).toEqual(content.document.bindings)
     expect(changed.document.graph.nodes.target).toMatchObject({
-      inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
+      inputs: { input: { kind: 'sources', sources: [{ kind: 'binding', bindingId: 'token' }] } },
     })
   })
 
@@ -169,7 +172,7 @@ describe('Flow changes', () => {
       {
         kind: 'subflow.create',
         subflow: {
-          graph: { nodes: { source: valueNode(1) } },
+          graph: { edges: [], nodes: { source: valueNode(1) } },
           inputs: [],
           name: 'Child',
           outputs: [{ ...port, handle: 'output', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] }],
@@ -179,7 +182,7 @@ describe('Flow changes', () => {
       { kind: 'graph.node.delete', nodeId: 'source', target: { id: 'child', kind: 'subflow' } },
     ])
 
-    expect(withSubflow.document.subflows.child).toMatchObject({ graph: { nodes: {} }, outputs: [{ handle: 'output', sources: [] }] })
+    expect(withSubflow.document.subflows.child).toMatchObject({ graph: { edges: [], nodes: {} }, outputs: [{ handle: 'output', sources: [] }] })
   })
 
   it.each([
@@ -190,12 +193,6 @@ describe('Flow changes', () => {
     { kind: 'graph.node.create', node: { inputsDef: [], kind: 'webhook', name: 'Invalid' }, nodeId: 'trigger', target: { id: 'missing', kind: 'subflow' } },
   ] satisfies readonly ChangeOperation[])('rejects invalid operation %#', (operation) => {
     expect(() => applyFlowChanges(revision(), [operation])).toThrow(FlowChangeError)
-  })
-
-  it('rejects removing node concurrency', () => {
-    expect(() => applyFlowChanges(revision(), [{ before: 1, field: 'concurrency', kind: 'graph.node.field.set', nodeId: 'value', target }])).toThrow(
-      FlowChangeError,
-    )
   })
 
   it('does not mutate the input when a later operation fails', () => {
@@ -280,7 +277,7 @@ describe('Flow changes', () => {
         kind: 'graph.node.create',
         node: {
           actions: ['continue'],
-          concurrency: 1,
+
           input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: {},
           kind: 'wait',

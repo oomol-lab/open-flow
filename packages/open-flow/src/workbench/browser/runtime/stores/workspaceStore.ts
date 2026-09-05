@@ -28,6 +28,7 @@ import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { connect as connectFlowNodes, disconnect as disconnectFlowNodes } from '../../../../flow/common/edgeChanges.ts'
 import { imports as moduleImports, replaceSource as replaceModuleSource } from '../../../../flow/common/moduleChanges.ts'
 import {
+  setInputSources,
   setConnectorConnection as changeConnectorConnection,
   setTriggerConnection as changeTriggerConnection,
   updateTrigger,
@@ -88,45 +89,6 @@ interface ReconciledRevision {
 function reconcileTarget(revision: RevisionView, target: DesignerTarget | undefined): DesignerTarget | undefined {
   if (target == null) return
   return target.kind == 'flow' || revision.subflow(target.id) != null ? target : { kind: 'flow' }
-}
-
-function connectedCodePorts(draft: Draft, target: DesignerTarget, nodeId: string, edge: Omit<DesignerEdge, 'id'>): CodeTaskPorts | undefined {
-  const nodes = designerGraph(draft, target).nodes
-  if (edge.target == nodeId) {
-    const source = nodes.find((node) => node.id == edge.source)
-    if (source == null || source.kind == 'comment') return
-    const port = source.outputs.find((output) => 'handle' in output && output.handle == edge.sourceHandle)
-    if (port == null || !('handle' in port)) return
-    return {
-      inputs: [
-        {
-          description: port.description,
-          handle: edge.targetHandle,
-          jsonSchema: (port.jsonSchema ?? {}) as JsonValue,
-          nullable: port.nullable ?? false,
-          value: null,
-        },
-      ],
-      outputs: [{ handle: 'result', jsonSchema: {}, nullable: true }],
-    }
-  }
-  if (edge.source == nodeId) {
-    const targetNode = nodes.find((node) => node.id == edge.target)
-    if (targetNode == null || targetNode.kind == 'comment') return
-    const port = targetNode.inputs.find((input) => 'handle' in input && input.handle == edge.targetHandle)
-    if (port == null || !('handle' in port)) return
-    return {
-      inputs: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
-      outputs: [
-        {
-          description: port.description,
-          handle: edge.sourceHandle,
-          jsonSchema: (port.jsonSchema ?? {}) as JsonValue,
-          nullable: port.nullable ?? false,
-        },
-      ],
-    }
-  }
 }
 
 export class WorkspaceStore {
@@ -393,17 +355,22 @@ export class WorkspaceStore {
     const nodeId = this.#identity()
     if (option.kind == 'comment') return await this.#addComment(target, nodeId, position)
     const revision = revisionView(draft)
-    let intent = addNodeIntent(option, revision, target, this.#i18n.t)
+    const intent = addNodeIntent(option, revision, target, this.#i18n.t)
     if (intent == null) return
     const edge = connection?.(nodeId)
-    if (intent.kind == 'code' && edge != null) {
-      const ports = connectedCodePorts(draft, target, nodeId, edge)
-      if (ports == null) return
-      intent = { ...intent, ports }
-    }
     const nodeChanges = addFlowNode(revision, target, nodeId, intent, this.#identity)
     if (nodeChanges == null) return
-    const changes = edge == null ? nodeChanges : [...nodeChanges, ...connectFlowNodes(applyFlowChanges(draft, nodeChanges).content, target, edge)]
+    const changes =
+      edge == null
+        ? nodeChanges
+        : [
+            ...nodeChanges,
+            ...connectFlowNodes(applyFlowChanges(draft, nodeChanges).content, target, {
+              source: edge.source,
+              target: edge.target,
+              ...(edge.sourceHandle.startsWith('$branch:') ? { sourceHandle: edge.sourceHandle.slice(8) } : {}),
+            }),
+          ]
     const change = this.#changeDraft(changes)
     this.selectNodes([nodeId])
     const move = this.moveNodes({ [nodeId]: position })
@@ -418,7 +385,11 @@ export class WorkspaceStore {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null) return
-    const changes = connectFlowNodes(revision.revision.content, target, edge)
+    const changes = connectFlowNodes(revision.revision.content, target, {
+      source: edge.source,
+      target: edge.target,
+      ...(edge.sourceHandle.startsWith('$branch:') ? { sourceHandle: edge.sourceHandle.slice(8) } : {}),
+    })
     if (changes.length > 0) await this.#changeDraft(changes)
   }
 
@@ -426,7 +397,11 @@ export class WorkspaceStore {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null) return
-    const changes = disconnectFlowNodes(revision.revision.content, target, edge)
+    const changes = disconnectFlowNodes(revision.revision.content, target, {
+      source: edge.source,
+      target: edge.target,
+      ...(edge.sourceHandle.startsWith('$branch:') ? { sourceHandle: edge.sourceHandle.slice(8) } : {}),
+    })
     if (changes.length > 0) await this.#changeDraft(changes)
   }
 
@@ -551,6 +526,13 @@ export class WorkspaceStore {
     if (revision == null || target == null) return false
     const changes = changeInputValue(revision, target, nodeId, handle, value)
     return changes != null && (await this.#changeDraft(changes)) != null
+  }
+
+  public async setInputSource(nodeId: string, handle: string, source: { readonly nodeId: string; readonly output: string }): Promise<boolean> {
+    const revision = this.$.revision.value
+    const target = this.#model.value.target
+    if (revision == null || target == null) return false
+    return (await this.#changeDraft(setInputSources(revision.revision.content, target, nodeId, handle, [{ kind: 'node', ...source }]))) != null
   }
 
   public async setInputVariable(nodeId: string, handle: string, name: string | undefined): Promise<boolean> {

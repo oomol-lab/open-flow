@@ -454,7 +454,7 @@ it('streams independent Flow catalog and current Flow invalidations', async () =
     const changed = await service.control.changeDraft('operator', created.flowId, created.draftRevisionId, [
       {
         kind: 'graph.node.create',
-        node: { concurrency: 1, inputs: {}, kind: 'value', values: [] },
+        node: { inputs: {}, kind: 'value', values: [] },
         nodeId: 'marker',
         target: { kind: 'flow' },
       },

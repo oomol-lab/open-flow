@@ -232,9 +232,20 @@
   }
 }
 
-.reference,
+.reference.reference {
+  border: 1px solid color-mix(in srgb, var(--brand-highlight-color) 22%, var(--node-background-color));
+  border-radius: var(--widget-radius);
+  background: color-mix(in srgb, var(--brand-highlight-color) 6%, var(--node-background-color));
+}
+
 .reference label {
-  color: var(--text-2);
+  color: var(--widget-font-color);
+  font-size: 11px;
+}
+
+.outputHandle {
+  font-family: var(--font-monospace);
+  font-weight: 500;
 }
 
 .binary {

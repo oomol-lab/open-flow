@@ -77,11 +77,13 @@ export const NodeHead: React.FC = /* @__PURE__ */ memo(function NodeHead() {
             </span>
           </DesignerTooltip>
         ) : (
-          <DesignerIcon2
-            rawIcon$={toTrue(editable) && nodeStore.manifest$?.icon}
-            displayIcon$={nodeStore.display$.icon}
-            fallback={<i className={fallbackIcon} />}
-          />
+          <span className={styles.nodeIcon}>
+            <DesignerIcon2
+              rawIcon$={toTrue(editable) && nodeStore.manifest$?.icon}
+              displayIcon$={nodeStore.display$.icon}
+              fallback={<i className={fallbackIcon} />}
+            />
+          </span>
         ))}
       {CommentNodeStore.is(nodeStore) && (
         <span className={styles.commentIcon}>

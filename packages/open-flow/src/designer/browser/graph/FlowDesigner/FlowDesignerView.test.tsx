@@ -95,7 +95,14 @@ const source: FlowDesignerViewTaskNode = {
   title: 'Source',
 }
 
-const model = (nodes: FlowDesignerViewModel['nodes']): FlowDesignerViewModel => ({ nodes, viewport: { x: 0, y: 0, zoom: 1 } })
+const model = (nodes: FlowDesignerViewModel['nodes']): FlowDesignerViewModel => ({
+  edges:
+    nodes.some((node) => node.id == 'source') && nodes.some((node) => node.id == 'target')
+      ? [{ id: 'execution', source: 'source', sourceHandle: '$out', target: 'target', targetHandle: '$in' }]
+      : [],
+  nodes,
+  viewport: { x: 0, y: 0, zoom: 1 },
+})
 
 const valueNode = (content: unknown): FlowDesignerViewValueNode => ({
   id: 'value',
@@ -361,6 +368,7 @@ describe('FlowDesignerView model synchronization', () => {
     const onChangeInputVariable = vi.fn()
     const onOpenVariables = vi.fn()
     const value: FlowDesignerViewModel = {
+      edges: [],
       nodes: [
         task([
           {
@@ -433,6 +441,7 @@ describe('FlowDesignerView model synchronization', () => {
   it('treats a valid Variable binding as an input source', () => {
     const validate = captureIdleValidation()
     const value: FlowDesignerViewModel = {
+      edges: [],
       nodes: [
         task([
           {
@@ -463,6 +472,7 @@ describe('FlowDesignerView model synchronization', () => {
   it('restores literal validation after clearing a Variable binding', async () => {
     const validate = captureIdleValidation()
     const bound: FlowDesignerViewModel = {
+      edges: [],
       nodes: [
         task([
           {
@@ -480,6 +490,7 @@ describe('FlowDesignerView model synchronization', () => {
     }
     const cleared: FlowDesignerViewModel = {
       ...bound,
+      edges: [],
       nodes: [
         task([
           {
@@ -506,6 +517,7 @@ describe('FlowDesignerView model synchronization', () => {
   it('keeps a missing Variable binding separate from literal validation', () => {
     const validate = captureIdleValidation()
     const bound: FlowDesignerViewModel = {
+      edges: [],
       nodes: [
         task([
           {
@@ -1033,6 +1045,7 @@ describe('FlowDesignerView model synchronization', () => {
     FlowDesignerView(
       props({
         ...value,
+        edges: [],
         nodes: value.nodes.map((item) => ({ ...item })),
         viewport: { ...value.viewport },
       }),
@@ -1070,7 +1083,7 @@ describe('FlowDesignerView model synchronization', () => {
     const currentViewport = store.$.viewport.value
     FlowDesignerView(
       props(
-        { nodes: [{ ...initial, position: { ...position } }], viewport: { ...viewport } },
+        { edges: [], nodes: [{ ...initial, position: { ...position } }], viewport: { ...viewport } },
         {
           onMoveNodes,
           onMoveViewport,
@@ -1150,19 +1163,10 @@ describe('FlowDesignerView model synchronization', () => {
     view.props.flowDesignerStore.dispose()
   })
 
-  it('does not project a connection until both handles exist', () => {
-    const missingOutput = { ...source, outputs: [] }
-    const connected = task([
-      {
-        handle: 'value',
-        jsonSchema: {},
-        sources: [{ nodeId: 'source', output: 'result' }],
-      },
-    ])
-    const view = FlowDesignerView(props(model([missingOutput, connected]))) as React.ReactElement<FlowDesignerProps>
-
-    expect(view.props.flowDesignerStore.$.renderedRFEdges.value).toEqual([])
-    FlowDesignerView(props(model([source, connected])))
+  it('keeps execution edges independent of data ports', () => {
+    const view = FlowDesignerView(props(model([source, { ...task([]), inputs: [], outputs: [] }]))) as React.ReactElement<FlowDesignerProps>
+    expect(view.props.flowDesignerStore.$.renderedRFEdges.value).toHaveLength(1)
+    FlowDesignerView(props(model([source, task([])])))
     expect(view.props.flowDesignerStore.$.renderedRFEdges.value).toHaveLength(1)
     view.props.flowDesignerStore.dispose()
   })
@@ -1216,6 +1220,7 @@ describe('FlowDesignerView model synchronization', () => {
           viewport: { x: 30, y: 40, zoom: 1.2 },
         },
       },
+      edges: [],
       nodes: [task([]), commentNode('Comment')],
       viewport: { x: -800, y: -600, zoom: 0.6 },
     }
@@ -1248,6 +1253,7 @@ describe('FlowDesignerView model synchronization', () => {
           viewport: { x: 10, y: 20, zoom: 0.8 },
         },
       },
+      edges: [],
       nodes: [task([])],
       viewport: { x: 10, y: 20, zoom: 0.8 },
     }

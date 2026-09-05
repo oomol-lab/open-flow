@@ -45,6 +45,7 @@ describe('Workbench Diagnostic messages', () => {
         document: {
           bindings: {},
           graph: {
+            edges: [],
             nodes: {
               trigger: {
                 bindingId: 'binding',

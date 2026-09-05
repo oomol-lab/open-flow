@@ -19,10 +19,8 @@ import { useTranslate } from 'val-i18n-react'
 import { setValue, val } from 'value-enhancer'
 import { NODE_HANDLE_CLASSNAME } from '../base/designer.ts'
 import { stopEvent } from '../base/dom.ts'
-import { toRFHandleName } from '../base/rfHelpers.ts'
 import { asNumber, asString, asTrue, inspect, toTrue, trueFalse } from '../base/trivial.ts'
 import { Button } from '../components/button.tsx'
-import { Handle } from '../components/handle.tsx'
 import { HandleRow } from '../components/handleRow.tsx'
 import { Input } from '../components/input.tsx'
 import { TranslationInput } from '../components/input2.tsx'
@@ -82,10 +80,8 @@ export function ConditionEditor({
   const logical = useVal(store.logical$)
   const description = useVal(store.displayDescription$)
   const showSettings = useVal(store.showSettings$)
-  const kind = useVal(store.kind$)
 
   const labelId = useId()
-  const rfHandleId = toRFHandleName(store.name)
 
   const { renameError$, renameError, onUpdateName, onCommit } = useRename(store, validate, onRename)
 
@@ -96,7 +92,6 @@ export function ConditionEditor({
         className={styles.row}
         prefix={
           <>
-            {context.inout === 'in' && <Handle id={rfHandleId} type="input" kind={kind} />}
             {context.canEditSchema && onDragStart && (
               <div draggable className={styles.dragHandle} onDragStart={onDragStart} data-handle={`h:${store.name}`}>
                 <i className="i-carbon:draggable" />
@@ -104,7 +99,6 @@ export function ConditionEditor({
             )}
           </>
         }
-        suffix={context.inout === 'out' && <Handle id={rfHandleId} type="output" kind={kind} />}
         expanded={context.isDefault ? null : !collapsed}
         onExpandedChange={(e) => setValue(widget.collapsed$, !e)}
         name={

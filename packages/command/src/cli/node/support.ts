@@ -46,7 +46,6 @@ export interface ParsedArguments {
   readonly after?: number
   readonly code?: string
   readonly connection?: string
-  readonly concurrency?: number
   readonly cron?: string
   readonly cursor?: string
   readonly description?: string
@@ -99,8 +98,7 @@ type ApplyNode =
   | { readonly kind: 'condition' | 'value'; readonly name: string }
 
 interface ApplyEdge {
-  readonly input: string
-  readonly output: string
+  readonly sourceHandle?: string
   readonly source: string
   readonly target: string
 }
@@ -157,7 +155,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
   let after: number | undefined
   let code: string | undefined
   let connection: string | undefined
-  let concurrency: number | undefined
   let cron: string | undefined
   let cursor: string | undefined
   let description: string | undefined
@@ -208,7 +205,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       argument == '--cursor' ||
       argument == '--limit' ||
       argument == '--after' ||
-      argument == '--concurrency' ||
       argument == '--timeout' ||
       argument == '--timezone' ||
       argument == '--set' ||
@@ -244,7 +240,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
         }
         if (argument == '--limit') limit = numeric
         else if (argument == '--after') after = numeric
-        else if (argument == '--concurrency') concurrency = numeric
         else timeoutMs = numeric
       }
     } else if (argument.startsWith('--flow=')) {
@@ -288,7 +283,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     ...(after == null ? {} : { after }),
     ...(code == null ? {} : { code }),
     ...(connection == null ? {} : { connection }),
-    ...(concurrency == null ? {} : { concurrency }),
     ...(cron == null ? {} : { cron }),
     ...(cursor == null ? {} : { cursor }),
     ...(description == null ? {} : { description }),
@@ -585,23 +579,6 @@ export function inspectedTriggerSummary(content: RevisionContent, triggerId: str
   }
 }
 
-export function inspectedEdges(nodes: Readonly<Record<string, GraphNode>>) {
-  return Object.entries(nodes)
-    .flatMap(([targetNodeId, node]) => {
-      if (!('inputs' in node)) return []
-      return Object.entries(node.inputs).flatMap(([input, mapping]) =>
-        mapping.kind != 'sources'
-          ? []
-          : mapping.sources.map((source) => ({
-              input,
-              source: { ...source },
-              target: { nodeId: targetNodeId },
-            })),
-      )
-    })
-    .toSorted((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
-}
-
 export function requireCount(positionals: readonly string[], count: number, usage: string): void {
   if (positionals.length != count) throw new CliError('cli.invalid-arguments', `Usage: ${usage}`)
 }
@@ -861,10 +838,9 @@ export function applySpec(source: string): ApplySpec {
   if (!Array.isArray(edgeValues)) throw new CliError('flow.apply-invalid', 'Flow apply edges must be an array.')
   const edges = edgeValues.map((candidate, index) => {
     const edge = applyObject(candidate, `edges[${index}] must be an object.`)
-    applyKeys(edge, ['input', 'output', 'source', 'target'], `edges[${index}]`)
+    applyKeys(edge, ['sourceHandle', 'source', 'target'], `edges[${index}]`)
     return {
-      input: applyString(edge.input, `edges[${index}].input`),
-      output: applyString(edge.output, `edges[${index}].output`),
+      sourceHandle: edge.sourceHandle == null ? undefined : applyString(edge.sourceHandle, `edges[${index}].sourceHandle`),
       source: applyString(edge.source, `edges[${index}].source`),
       target: applyString(edge.target, `edges[${index}].target`),
     }

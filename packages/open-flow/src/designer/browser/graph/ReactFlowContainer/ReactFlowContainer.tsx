@@ -34,10 +34,9 @@ import type { FlowDisplayMode } from '../../../common/flowDisplay.ts'
 import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { PartialConnection, RFConnection, RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
 import type { HandleImpl } from '../../components/handle.tsx'
-import type { IAddHandleOptions, IAddNodeMenuItem, IFromSource, InteractiveMode, RFGraph } from '../../stores/designer/designer.store.ts'
+import type { IAddNodeMenuItem, IFromSource, InteractiveMode, RFGraph } from '../../stores/designer/designer.store.ts'
 import type { NodeType } from '../../stores/node/constants.ts'
 import type { NodeStore } from '../../stores/node/node.store.ts'
-import type { TaskNodeStore } from '../../stores/node/taskNode.store.ts'
 import type { GetPopupContainer } from './useGetPopupContainer.ts'
 
 import {
@@ -69,14 +68,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { TooltipProvider } from '../../../../ui/browser/tooltip.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
-import { DESIGNER_CLASSNAME, HANDLE_ROW_CLASSNAME } from '../../base/designer.ts'
+import { DESIGNER_CLASSNAME } from '../../base/designer.ts'
 import { getScriptletType, getSharedBlockPath, getTriggerType, isWithCommentType, isWithConditionType, isWithValueType } from '../../base/dragNDrop.ts'
 import { makeConnection, toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
 import { coalesce, toTrue } from '../../base/trivial.ts'
 import { HandleContextProvider } from '../../components/handle.tsx'
 import { DesignerTooltip } from '../../components/tooltip.tsx'
 import { CommentNodeStore } from '../../stores/node/commentNode.store.ts'
-import { FITTING_VIEW_CLASSNAME, isPseudoNodeType, NODE_TYPE } from '../../stores/node/constants.ts'
+import { FITTING_VIEW_CLASSNAME, isPseudoNodeType } from '../../stores/node/constants.ts'
 import { ThemeProvider } from '../../theme/index.ts'
 import { BlockQuickPickPanel } from '../BlockQuickPickPanel.tsx'
 import { EdgeDefs } from '../Edges/EdgeDefs.tsx'
@@ -87,9 +86,7 @@ import { BottomRight } from './BottomRight.tsx'
 import { ConnectionLine } from './ConnectingLine.tsx'
 import { DisplayModeToggle } from './DisplayModeToggle.tsx'
 import { HelperLines, useHelperLines } from './HelperLines/index.ts'
-import { NewHandleIndicator } from './NewHandleIndicator.tsx'
 import { GetPopupContainerContext, useGetStaticPopupContainer } from './useGetPopupContainer.ts'
-import { getInsertBefore, getNewHandleIndicator } from './useNewHandleIndicator.ts'
 
 // Mouse buttons.
 const PAN_ON_DRAG_MOUSE = [0]
@@ -148,8 +145,6 @@ export interface ReactFlowContainerProps {
   }
   duplicateNodes?: (manifestNodeIds?: NodeId[], offset?: XYPosition) => Promise<void>
   waitNode?: (nodeId: NodeId) => Promise<NodeStore | undefined>
-  setupValueNode?: (nodeId: NodeId, connection: Pick<RFConnection, 'target' | 'targetHandle'>) => void
-  setupScriptletNode?: (nodeId: NodeId, connection: PartialConnection, handle: HandleName) => void
   onAddNode?: (
     type: AddNodeType,
     payload: string,
@@ -165,7 +160,6 @@ export interface ReactFlowContainerProps {
   onPaste?: (position: XYPosition) => void
   provideAddNodeMenuItems?: (fromSource?: IFromSource) => IAddNodeMenuItem[] | undefined
   provideAsyncAddNodeMenuItems?: (fromSource: IFromSource | undefined, searchTerm: string, signal: AbortSignal) => Promise<IAddNodeMenuItem[] | undefined>
-  onAddHandle?: (options: IAddHandleOptions) => void
   fitView?: boolean
   fitViewOptions?: FitViewOptions
   layoutMotion?: boolean
@@ -427,24 +421,6 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
         if (tooShort(state.from, position)) {
           return
         }
-        // Create a new handle when the drop target supports one.
-        if (props.onAddHandle) {
-          const element = document.elementFromPoint(event.clientX, event.clientY)
-          const $section = element?.closest('[data-section]')
-          const $handleRow = element?.closest(`.${HANDLE_ROW_CLASSNAME}`)
-          const options = getNewHandleIndicator(
-            state.fromNode.id,
-            state.fromPosition,
-            state.fromHandle.id,
-            $section,
-            $handleRow,
-            getInsertBefore($section, event.clientY),
-          )
-          if (options) {
-            props.onAddHandle(options)
-            return
-          }
-        }
         // Otherwise open the add-node menu.
         const data: BlockQuickPickPanelData = {
           position,
@@ -468,7 +444,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
         quickPickFrame.current = requestAnimationFrame(() => setBlockQuickPickPanel(data))
       }
     },
-    [rf, props.onAddHandle, props.onAddNode, props.provideAddNodeMenuItems],
+    [rf, props.onAddNode, props.provideAddNodeMenuItems],
   )
 
   const editable = toTrue(props.editable)
@@ -604,35 +580,6 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
     [onBeforeApplyNodesChanges, props.onNodesChange, nodes],
   )
 
-  const isValidConnection: IsValidConnection<RFEdge<any>> = useCallback(
-    (edge) => {
-      const source = nodes.find((node) => node.id === edge.source)
-      if (edge.targetHandle) {
-        const target = nodes.find((node) => node.id === edge.target)
-        const targetStore = target?.data?.store as NodeStore | undefined
-        const inputFrom = targetStore?.display$.inputs_from?.value?.find(
-          (candidate) => candidate.handle === toManifestHandleName(edge.targetHandle as RFHandleName),
-        )
-        const existingSources = inputFrom?.from_node ?? []
-        const existingTrigger = existingSources.some((candidate) =>
-          nodes.some((node) => toManifestNodeId(node.id as RFNodeId) === candidate.node_id && node.type === NODE_TYPE.TriggerNode),
-        )
-        if ((source?.type === NODE_TYPE.TriggerNode && existingSources.length > 0) || existingTrigger) return false
-      }
-      if (source?.type === NODE_TYPE.ValueNode && edge.targetHandle) {
-        const target = nodes.find((node) => node.id === edge.target)
-        if (target?.type === NODE_TYPE.TaskNode) {
-          const nodeStore = target.data?.store as TaskNodeStore | undefined
-          if (nodeStore) {
-            return !nodeStore.handleHasValueNodeConnected(toManifestHandleName(edge.targetHandle as RFHandleName))
-          }
-        }
-      }
-      return props.isValidConnection?.(edge) ?? true
-    },
-    [nodes, props.isValidConnection],
-  )
-
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       const itemId = getAddItemId(event.dataTransfer)
@@ -728,7 +675,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             setPaneContextMenu(rf.screenToFlowPosition(paneContextMenuScreen.current))
           }}
           onConnectEnd={overview ? undefined : onConnectEnd}
-          isValidConnection={isValidConnection}
+          isValidConnection={props.isValidConnection}
           onConnect={!overview && editable ? props.onConnect : undefined}
           onDragOver={editable && (props.onAddNode != null || props.onDropAddItem != null) ? handleDragOver : undefined}
           onDrop={editable && (props.onAddNode != null || props.onDropAddItem != null) ? onDrop : undefined}
@@ -765,7 +712,6 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             dottedBackground={props.dottedBackground}
           />
           <HelperLines horizontal={helperLineHorizontal} vertical={helperLineVertical} />
-          <NewHandleIndicator zoom={viewport?.zoom} editable={!overview && props.editable} />
           {props.children}
           <ViewportPortal>
             {edgeContextMenu && edgeContextMenuPosition && (
@@ -828,8 +774,6 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
                 onAddNode={props.onAddNode}
                 onConnect={props.onConnect}
                 waitNode={props.waitNode}
-                setupValueNode={props.setupValueNode}
-                setupScriptletNode={props.setupScriptletNode}
               />
             )}
           </ViewportPortal>
@@ -1072,8 +1016,6 @@ interface BlockQuickPickPanelPopoverProps {
   readonly onAddNode: NonNullable<ReactFlowContainerProps['onAddNode']>
   readonly onConnect: ReactFlowContainerProps['onConnect']
   readonly waitNode?: ReactFlowContainerProps['waitNode']
-  readonly setupValueNode: ReactFlowContainerProps['setupValueNode']
-  readonly setupScriptletNode: ReactFlowContainerProps['setupScriptletNode']
 }
 
 function BlockQuickPickPanelPopover(props: BlockQuickPickPanelPopoverProps) {
@@ -1087,34 +1029,18 @@ function BlockQuickPickPanelPopover(props: BlockQuickPickPanelPopoverProps) {
     return (searchTerm: string, signal: AbortSignal) => provider(fromSource, searchTerm, signal)
   }, [props.fromSource, props.provideAsyncItems])
 
-  // Connecting the new node to an existing node remains unsupported.
   const onClick = async (item: IAddNodeMenuItem, data?: string, handle?: HandleName) => {
     if (item.type === 'divider' || addingNode.current) return
     addingNode.current = true
     props.onClose()
     try {
-      const connect =
-        props.connection != null && handle != null && item.type !== 'scriptlet'
-          ? (nodeId: NodeId) => makeConnection(props.connection!, nodeId, handle)
-          : undefined
-      const nodeId = await props.onAddNode(
+      const connect = props.connection != null && handle != null ? (nodeId: NodeId) => makeConnection(props.connection!, nodeId, handle) : undefined
+      await props.onAddNode(
         item.type,
         data ?? item.data ?? '',
         props.fromSource?.side === 'left' ? { x: props.position.x - 250, y: props.position.y } : props.position,
         connect,
       )
-      if (connect == null && nodeId != null && props.connection) {
-        if (handle != null) {
-          if (item.type === 'scriptlet' && props.setupScriptletNode) {
-            props.setupScriptletNode(nodeId, props.connection, handle)
-          } else {
-            await props.waitNode?.(nodeId)
-            props.onConnect?.(makeConnection(props.connection, nodeId, handle))
-          }
-        } else if (item.type === 'value' && props.setupValueNode && 'target' in props.connection) {
-          props.setupValueNode(nodeId, props.connection)
-        }
-      }
     } catch (error) {
       console.error('Failed to add node.', error)
     } finally {

@@ -7,10 +7,8 @@ import { memo, useEffect, useRef } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { NODE_HANDLE_CLASSNAME } from '../../../base/designer.ts'
-import { Handle } from '../../../components/handle.tsx'
 import { DesignerTooltip } from '../../../components/tooltip.tsx'
 import { DesignerIcon } from '../../../icons/DesignerIcon.tsx'
-import { OVERVIEW_INPUT_HANDLE_ID, OVERVIEW_OUTPUT_HANDLE_ID } from '../../../stores/edge/overviewEdges.ts'
 import { isPseudoNodeType, NODE_STATUS, NODE_TYPE } from '../../../stores/node/constants.ts'
 import { ErrorNodeStore, parseError } from '../../../stores/node/errorNode.store.ts'
 import { resolveOverviewNodeText, resolveOverviewPortCapability } from '../../../stores/node/overviewNode.ts'
@@ -26,15 +24,9 @@ export interface OverviewNodeProps {
   readonly showError?: boolean
 }
 
-export const OverviewNode: React.FC<OverviewNodeProps> = /* @__PURE__ */ memo(function OverviewNode({
-  nodeStore,
-  inputConnected = false,
-  outputConnected = false,
-  showError = false,
-}) {
+export const OverviewNode: React.FC<OverviewNodeProps> = /* @__PURE__ */ memo(function OverviewNode({ nodeStore, showError = false }) {
   const t = useTranslate()
   const designerStore = useDesignerStore()
-  const editable = useVal(designerStore.$.editable)
   const scale = useVal(designerStore.$.scale)
   const selected = useVal(nodeStore.$.selected)
   const displayTitle = useVal(nodeStore.display$.title)
@@ -77,13 +69,6 @@ export const OverviewNode: React.FC<OverviewNodeProps> = /* @__PURE__ */ memo(fu
   const showProgress = running || success || (failed && progress != null)
   const progressWidth = showProgress ? (success ? 100 : Math.min(100, Math.max(0, progress ?? 0))) : 0
   const indeterminate = running && progress == null
-  const inputHandleProgress = showProgress && !indeterminate && progressWidth > 0
-  const outputHandleProgress = inputHandleProgress && progressWidth == 100
-  const onHandlePointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
-    event.preventDefault()
-    event.stopPropagation()
-    designerStore.switchDisplayMode('detail')
-  }
 
   useEffect(() => {
     if (mounted.current) {
@@ -123,19 +108,6 @@ export const OverviewNode: React.FC<OverviewNodeProps> = /* @__PURE__ */ memo(fu
         />
         {indeterminate && <span className={styles.indeterminate} />}
       </span>
-      {ports.hasInput && (
-        <Handle
-          id={OVERVIEW_INPUT_HANDLE_ID}
-          type="input"
-          className={clsx(styles.handle, inputHandleProgress && styles.progressHandle)}
-          active={inputConnected}
-          disabled
-          isConnectable={false}
-          onPointerDown={editable ? onHandlePointerDown : undefined}
-          tabIndex={-1}
-          ariaHidden
-        />
-      )}
       {showError ? (
         <DesignerTooltip placement="top" title={t('nodeStatus.hasError')}>
           {icon}
@@ -157,19 +129,6 @@ export const OverviewNode: React.FC<OverviewNodeProps> = /* @__PURE__ */ memo(fu
           )
         )}
       </span>
-      {ports.hasOutput && (
-        <Handle
-          id={OVERVIEW_OUTPUT_HANDLE_ID}
-          type="output"
-          className={clsx(styles.handle, outputHandleProgress && styles.progressHandle)}
-          active={outputConnected}
-          disabled
-          isConnectable={false}
-          onPointerDown={editable ? onHandlePointerDown : undefined}
-          tabIndex={-1}
-          ariaHidden
-        />
-      )}
     </div>
   )
 })

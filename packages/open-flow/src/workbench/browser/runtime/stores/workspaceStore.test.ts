@@ -17,7 +17,7 @@ const draft = {
   content: {
     document: {
       bindings: {},
-      graph: { nodes: {} },
+      graph: { edges: [], nodes: {} },
       subflows: {},
       tasks: {},
     },
@@ -158,7 +158,7 @@ describe('WorkspaceStore', () => {
     }
   })
 
-  it('creates and connects a code task with the source port schema in one Draft change', async () => {
+  it('creates a code task and an independent execution dependency in one Draft change', async () => {
     const sourceDraft = {
       ...draft,
       content: {
@@ -166,9 +166,9 @@ describe('WorkspaceStore', () => {
         document: {
           ...draft.content.document,
           graph: {
+            edges: [],
             nodes: {
               source: {
-                concurrency: 1,
                 inputs: {},
                 kind: 'value',
                 values: [{ description: 'Count', handle: 'count', jsonSchema: { type: 'number' }, nullable: false, value: 1 }],
@@ -229,9 +229,9 @@ describe('WorkspaceStore', () => {
 
       const nodeId = await store.addNode(option, { x: 100, y: 100 }, (createdNodeId) => ({
         source: 'source',
-        sourceHandle: 'count',
+        sourceHandle: '$out',
         target: createdNodeId,
-        targetHandle: 'value',
+        targetHandle: '$in',
       }))
 
       expect(nodeId).toBe('code')
@@ -242,13 +242,13 @@ describe('WorkspaceStore', () => {
             kind: 'graph.node.create',
             node: expect.objectContaining({
               task: expect.objectContaining({
-                inputs: [{ description: 'Count', handle: 'value', jsonSchema: { type: 'number' }, nullable: false, value: null }],
+                inputs: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
               }),
             }),
             nodeId: 'code',
           }),
           expect.objectContaining({
-            edge: { source: 'source', sourceHandle: 'count', target: 'code', targetHandle: 'value' },
+            edge: { source: 'source', target: 'code' },
             kind: 'graph.edge.connect',
           }),
         ]),

@@ -65,7 +65,6 @@ const NodeBase = {
 
 const ScheduledNodeBase = {
   ...NodeBase,
-  concurrency: z.number().int().positive().optional().describe('Maximum concurrent executions for this node. Defaults to 1.'),
   timeout: z.number().positive().optional().describe('Node execution timeout in seconds'),
 }
 
