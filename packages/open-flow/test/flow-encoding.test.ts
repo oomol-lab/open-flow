@@ -19,13 +19,13 @@ function revision(reverse = false): RevisionContent {
           relation: 'all' as const,
         },
       ],
-      concurrency: 1,
+
       defaultOutput: 'other',
       input: { ...port, handle: 'value' },
       inputs: { value: { kind: 'sources' as const, sources: [{ kind: 'node' as const, nodeId: 'value', output: 'value' }] } },
       kind: 'condition' as const,
     },
-    value: { concurrency: 1, inputs: {}, kind: 'value' as const, values: [{ ...port, handle: 'value', value: 12 }] },
+    value: { inputs: {}, kind: 'value' as const, values: [{ ...port, handle: 'value', value: 12 }] },
   }
   const modules = {
     helper: { imports: [], name: 'Helper', source: 'export const value = 1' },
@@ -34,10 +34,10 @@ function revision(reverse = false): RevisionContent {
   return {
     document: {
       bindings: { variable: { kind: 'variable', target: 'TOKEN' } },
-      graph: { nodes: reverse ? { value: nodes.value, condition: nodes.condition } : nodes },
+      graph: { edges: [], nodes: reverse ? { value: nodes.value, condition: nodes.condition } : nodes },
       subflows: {
         child: {
-          graph: { nodes: {} },
+          graph: { edges: [], nodes: {} },
           inputs: [{ ...port, handle: 'input' }],
           name: 'Child',
           outputs: [{ ...port, handle: 'output', sources: [{ input: 'input', kind: 'flow' }] }],
@@ -92,7 +92,7 @@ describe('Flow Revision encoding', () => {
     expect(JSON.parse(decoder.decode(first))).toMatchObject({
       document: {
         bindings: { variable: { kind: 'variable', target: 'TOKEN' } },
-        graph: { nodes: { condition: {}, value: {} } },
+        graph: { edges: [], nodes: { condition: {}, value: {} } },
         subflows: { child: { name: 'Child' } },
         tasks: { managed: { executor: { kind: 'llm', mode: 'json' }, name: 'LLM' } },
       },
@@ -101,14 +101,14 @@ describe('Flow Revision encoding', () => {
       modules: { helper: { imports: [] }, main: { imports: ['helper'] } },
       version: 1,
     })
-    await expect(digestBytes(first)).resolves.toBe('sha256:fb5639eb4b28963502eb298e3ecfb9cc4c52a4be1e333896ac9fbee161fa1c09')
+    await expect(digestBytes(first)).resolves.toBe('sha256:9cea46b687eacdcf1ff19c131197d737d345e90b848a4679b6604dd77c2edd56')
   })
 
   it('changes the encoded Revision when workflow semantics change', () => {
     const source = revision()
     const changed: RevisionContent = {
       ...source,
-      document: { ...source.document, graph: { nodes: { ...source.document.graph.nodes, added: { concurrency: 1, inputs: {}, kind: 'value', values: [] } } } },
+      document: { ...source.document, graph: { edges: [], nodes: { ...source.document.graph.nodes, added: { inputs: {}, kind: 'value', values: [] } } } },
     }
 
     expect(encodeRevision(changed)).not.toEqual(encodeRevision(source))
@@ -122,12 +122,12 @@ describe('Flow Revision encoding', () => {
       ...source,
       document: {
         ...source.document,
-        graph: { nodes: { ...source.document.graph.nodes, value: { ...value, icon: ':carbon:star:' } } },
+        graph: { edges: [], nodes: { ...source.document.graph.nodes, value: { ...value, icon: ':carbon:star:' } } },
       },
     }
 
     expect(JSON.parse(decoder.decode(encodeRevision(changed)))).toMatchObject({
-      document: { graph: { nodes: { value: { icon: ':carbon:star:' } } } },
+      document: { graph: { edges: [], nodes: { value: { icon: ':carbon:star:' } } } },
     })
   })
 
@@ -168,6 +168,7 @@ describe('Flow Revision encoding', () => {
       document: {
         ...source.document,
         graph: {
+          edges: [],
           nodes: {
             ...source.document.graph.nodes,
             value: {
@@ -183,7 +184,7 @@ describe('Flow Revision encoding', () => {
     }
 
     expect(JSON.parse(decoder.decode(encodeRevision(changed)))).toMatchObject({
-      document: { graph: { nodes: { value: { values: [{ handle: 'value' }, { handle: 'detail' }] } } } },
+      document: { graph: { edges: [], nodes: { value: { values: [{ handle: 'value' }, { handle: 'detail' }] } } } },
     })
   })
 
@@ -191,7 +192,7 @@ describe('Flow Revision encoding', () => {
     const source = revision()
     const wait = {
       actions: ['approve', 'reject'],
-      concurrency: 1,
+
       input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
       inputs: { value: { kind: 'value', value: { request: 1 } } },
       kind: 'wait',
@@ -209,7 +210,7 @@ describe('Flow Revision encoding', () => {
       ...source,
       document: {
         ...source.document,
-        graph: { nodes: { wait } },
+        graph: { edges: [], nodes: { wait } },
       },
     }
     const second: RevisionContent = {
@@ -217,6 +218,7 @@ describe('Flow Revision encoding', () => {
       document: {
         ...first.document,
         graph: {
+          edges: [],
           nodes: {
             wait: {
               ...wait,
@@ -236,7 +238,7 @@ describe('Flow Revision encoding', () => {
     expect(encodeRevision(second)).toEqual(encodeRevision(first))
     expect(JSON.parse(decoder.decode(encodeRevision(first))).document.graph.nodes.wait).toEqual({
       actions: ['approve', 'reject'],
-      concurrency: 1,
+
       input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
       inputs: { value: { kind: 'value', value: { request: 1 } } },
       kind: 'wait',

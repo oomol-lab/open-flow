@@ -162,9 +162,7 @@
       "portDefinitions": "有効なポート定義を入力してください。"
     },
     "node": {
-      "concurrency": "並列数",
-      "concurrencyError": "並列数は正の整数で指定してください。",
-      "description": "表示名、並列数、タイムアウト",
+      "description": "表示名とタイムアウト",
       "displayName": "表示名",
       "displayNamePlaceholder": "定義の名前を使用",
       "save": "ノードを保存",
@@ -227,7 +225,12 @@
       "save": "Trigger を保存",
       "title": "Trigger 定義"
     },
-    "title": "インスペクター"
+    "title": "インスペクター",
+    "sources": {
+      "title": "入力元",
+      "local": "ローカル値 / 変数",
+      "unavailable": "この入力元が現在のノードより先に完了する保証がないか、型が一致していません。"
+    }
   },
   "language": {
     "label": "言語"
@@ -474,7 +477,8 @@
     "timelineEmpty": "選択中のドラフトを実行すると、タイムラインと出力を確認できます。",
     "submitting": "この固定リビジョンを送信し、実行記録を作成しています…",
     "waiting": "最初のイベントを待っています…",
-    "waitExpires": "期限: {{date}}"
+    "waitExpires": "期限: {{date}}",
+    "eventSkipped": "スキップ済み"
   },
   "sidebar": {
     "createFirstFlow": "Flow を作成",

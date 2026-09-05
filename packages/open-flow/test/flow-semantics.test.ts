@@ -19,8 +19,9 @@ function revision(source: string, imports: readonly string[] = [], modules: Revi
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
-          task: { concurrency: 1, inputs: {}, kind: 'task', task: { inputs: [], moduleId: 'module-main', name: 'Main', outputs: [] } },
+          task: { inputs: {}, kind: 'task', task: { inputs: [], moduleId: 'module-main', name: 'Main', outputs: [] } },
         },
       },
       subflows: {},
@@ -48,6 +49,7 @@ function variableRevision(jsonSchema: JsonValue): RevisionFixture {
       ...source.document,
       bindings: { token: { kind: 'variable', target: 'TOKEN' } },
       graph: {
+        edges: [],
         nodes: {
           task: {
             ...task,
@@ -70,6 +72,7 @@ function triggerRevision(config: Readonly<Record<string, JsonValue>>, jsonSchema
       ...source.document,
       bindings: { trigger: { kind: 'connection', target: 'connection-1' } },
       graph: {
+        edges: [{ source: 'trigger', target: 'task' }],
         nodes: {
           trigger: {
             bindingId: 'trigger',
@@ -275,7 +278,7 @@ export default () => value`,
     const source: RevisionFixture = {
       document: {
         bindings: {},
-        graph: { nodes: { news: { concurrency: 1, inputs: {}, kind: 'task', taskId: 'news' } } },
+        graph: { edges: [], nodes: { news: { inputs: {}, kind: 'task', taskId: 'news' } } },
         subflows: {},
         tasks: {
           news: {
@@ -298,6 +301,7 @@ export default () => value`,
       document: {
         bindings: {},
         graph: {
+          edges: [],
           nodes: {
             trigger: {
               bindingId: 'binding',
@@ -379,6 +383,7 @@ export default () => value`,
       document: {
         ...source.document,
         graph: {
+          edges: [],
           nodes: {
             task: {
               ...task,
@@ -415,6 +420,7 @@ export default () => value`,
       document: {
         ...source.document,
         graph: {
+          edges: [],
           nodes: {
             task: {
               ...task,
@@ -440,9 +446,9 @@ export default () => value`,
       document: {
         ...source.document,
         graph: {
+          edges: [{ source: 'gmail', target: 'task' }],
           nodes: {
             gmail: {
-              concurrency: 1,
               inputs: {},
               kind: 'value',
               name: 'Gmail',
@@ -491,9 +497,9 @@ export default () => value`,
       document: {
         ...source.document,
         graph: {
+          edges: [{ source: 'source', target: 'task' }],
           nodes: {
             source: {
-              concurrency: 1,
               inputs: {},
               kind: 'value',
               name: 'Source',
@@ -523,9 +529,9 @@ export default () => value`,
       document: {
         ...source.document,
         graph: {
+          edges: [{ source: 'source', target: 'task' }],
           nodes: {
             source: {
-              concurrency: 1,
               inputs: {},
               kind: 'value',
               name: 'Source',
@@ -550,6 +556,7 @@ export default () => value`,
       document: {
         ...valid.document,
         graph: {
+          edges: valid.document.graph.edges,
           nodes: {
             ...valid.document.graph.nodes,
             task: { ...target, task: { ...target.task, inputs: [{ handle: 'input', jsonSchema: { type: 'string' }, nullable: false }] } },
@@ -568,9 +575,9 @@ export default () => value`,
       document: {
         bindings: {},
         graph: {
+          edges: [],
           nodes: {
             call: {
-              concurrency: 1,
               inputs: { text: { kind: 'value', value: 'ok' } },
               kind: 'subflow',
               name: 'Subflow',
@@ -581,10 +588,11 @@ export default () => value`,
         subflows: {
           subflow: {
             graph: {
+              edges: [],
               nodes: {
                 check: {
                   cases: [{ expressions: [{ input: 'value', operator: '>', value: 0 }], output: 'yes', relation: 'all' }],
-                  concurrency: 1,
+
                   defaultOutput: 'no',
                   input: { handle: 'value', jsonSchema: { type: 'number' }, nullable: false },
                   inputs: { value: { kind: 'sources', sources: [{ input: 'text', kind: 'flow' }] } },
@@ -592,7 +600,6 @@ export default () => value`,
                   name: 'Check',
                 },
                 number: {
-                  concurrency: 1,
                   inputs: {},
                   kind: 'value',
                   name: 'Number',
@@ -636,9 +643,9 @@ export default () => value`,
       document: {
         ...source.document,
         graph: {
+          edges: [{ source: 'call', target: 'task' }],
           nodes: {
             call: {
-              concurrency: 1,
               inputs: { text: { kind: 'value', value: 'hello' } },
               kind: 'subflow',
               name: 'Subflow',
@@ -654,13 +661,15 @@ export default () => value`,
         subflows: {
           subflow: {
             graph: {
+              edges: [],
               nodes: {
                 check: {
                   cases: [{ expressions: [{ input: 'text', operator: '==', value: 'hello' }], output: 'yes', relation: 'all' }],
-                  concurrency: 1,
+
                   input: { handle: 'text', jsonSchema: { type: 'string' }, nullable: false },
                   inputs: { text: { kind: 'sources', sources: [{ input: 'text', kind: 'flow' }] } },
                   kind: 'condition',
+                  defaultOutput: 'no',
                   name: 'Check',
                 },
               },
@@ -672,7 +681,10 @@ export default () => value`,
                 handle: 'result',
                 jsonSchema: { type: 'string' },
                 nullable: false,
-                sources: [{ kind: 'node', nodeId: 'check', output: 'yes' }],
+                sources: [
+                  { kind: 'node', nodeId: 'check', output: 'yes' },
+                  { kind: 'node', nodeId: 'check', output: 'no' },
+                ],
               },
             ],
           },
@@ -689,6 +701,7 @@ export default () => value`,
       document: {
         ...valid.document,
         graph: {
+          edges: valid.document.graph.edges,
           nodes: {
             ...valid.document.graph.nodes,
             task: { ...target, task: { ...target.task, inputs: [{ handle: 'input', jsonSchema: { type: 'number' }, nullable: false }] } },
@@ -711,6 +724,7 @@ export default () => value`,
       document: {
         ...source.document,
         graph: {
+          edges: [],
           nodes: {
             task: {
               ...task,
@@ -759,6 +773,7 @@ export default () => value`,
         document: {
           ...mixed.document,
           graph: {
+            edges: [],
             nodes: {
               task: {
                 ...task,
@@ -793,10 +808,11 @@ export default () => value`,
       document: {
         bindings: { recipient: { kind: 'variable', target: 'RECIPIENT' } },
         graph: {
+          edges: [],
           nodes: {
             wait: {
               actions: ['approve', 'reject'],
-              concurrency: 1,
+
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: null } },
               kind: 'wait',
@@ -842,6 +858,7 @@ export default () => value`,
       document: {
         ...source.document,
         graph: {
+          edges: [{ source: 'wait', sourceHandle: 'approve', target: 'task' }],
           nodes: {
             task: {
               ...task,
@@ -850,7 +867,7 @@ export default () => value`,
             },
             wait: {
               actions: ['approve', 'reject'],
-              concurrency: 1,
+
               input: { handle: 'value', jsonSchema: { type: 'string' }, nullable: false },
               inputs: { value: { kind: 'value', value: 'request-1' } },
               kind: 'wait',
@@ -866,7 +883,6 @@ export default () => value`,
 
   it.each([
     [{ actions: ['approve'] }, 'wait.actions-invalid'],
-    [{ concurrency: 2 }, 'wait.concurrency-invalid'],
     [{ input: { handle: 'other', jsonSchema: {}, nullable: true } }, 'wait.input-invalid'],
     [{ prompt: '' }, 'wait.prompt-invalid'],
     [{ timeoutMs: 1_000 }, 'wait.field-unsupported'],
@@ -875,10 +891,11 @@ export default () => value`,
       document: {
         bindings: {},
         graph: {
+          edges: [],
           nodes: {
             wait: {
               actions: ['continue'],
-              concurrency: 1,
+
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: null } },
               kind: 'wait',
@@ -903,16 +920,16 @@ export default () => value`,
       document: {
         bindings: {},
         graph: {
+          edges: [],
           nodes: {
             call: {
-              concurrency: 1,
               inputs: {},
               kind: 'subflow',
               subflowId: 'child',
             },
             wait: {
               actions: ['continue'],
-              concurrency: 1,
+
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: null } },
               kind: 'wait',
@@ -924,10 +941,11 @@ export default () => value`,
         subflows: {
           child: {
             graph: {
+              edges: [],
               nodes: {
                 wait: {
                   actions: ['continue'],
-                  concurrency: 1,
+
                   input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
                   inputs: { value: { kind: 'value', value: null } },
                   kind: 'wait',

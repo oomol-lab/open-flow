@@ -50,6 +50,7 @@ function revision(config: Readonly<Record<string, JsonValue>>, connectionId: str
     document: {
       bindings: enabled ? { connection: { kind: 'connection', target: connectionId } } : {},
       graph: {
+        edges: enabled ? [{ source: 'poll', target: 'task' }] : [],
         nodes: enabled
           ? {
               poll: {
@@ -61,7 +62,6 @@ function revision(config: Readonly<Record<string, JsonValue>>, connectionId: str
                 pollTimes: rules,
               },
               task: {
-                concurrency: 1,
                 inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'poll', output: 'payload' }] } },
                 kind: 'task',
                 task: {

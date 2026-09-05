@@ -22,7 +22,6 @@ const codeTaskTemplate = `export default async function (inputs, context) {
 `
 
 export interface Settings {
-  readonly concurrency: number
   readonly name?: string
   readonly timeoutMs?: number
 }
@@ -76,7 +75,6 @@ export function createCodeTask(
     {
       kind: 'graph.node.create',
       node: {
-        concurrency: 1,
         inputs: defaultInputs(ports.inputs),
         kind: 'task',
         name,
@@ -103,7 +101,6 @@ export function createManagedTask(
     {
       kind: 'graph.node.create',
       node: {
-        concurrency: 1,
         inputs: defaultInputs(task.inputs),
         kind: 'task',
         name: task.name,
@@ -156,7 +153,6 @@ export function createCondition(target: GraphTarget, nodeId: string, name: strin
       kind: 'graph.node.create',
       node: {
         cases: [{ expressions: [{ input: 'value', operator: 'isTrue' }], output: 'true', relation: 'all' }],
-        concurrency: 1,
         defaultOutput: 'false',
         input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
         inputs: { value: { kind: 'value', value: null } },
@@ -173,7 +169,7 @@ export function createValue(target: GraphTarget, nodeId: string, name: string): 
   return [
     {
       kind: 'graph.node.create',
-      node: { concurrency: 1, inputs: {}, kind: 'value', name, values: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }] },
+      node: { inputs: {}, kind: 'value', name, values: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }] },
       nodeId,
       target,
     },
@@ -186,7 +182,6 @@ export function createWait(target: Extract<GraphTarget, { readonly kind: 'flow' 
       kind: 'graph.node.create',
       node: {
         actions: ['continue'],
-        concurrency: 1,
         input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
         inputs: { value: { kind: 'value', value: null } },
         kind: 'wait',
@@ -276,9 +271,7 @@ export function updateSettings(content: RevisionContent, target: GraphTarget, no
   const node = graph(content, target)?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return
   const operations: ChangeOperation[] = []
-  if (node.concurrency != settings.concurrency) {
-    operations.push({ before: node.concurrency, field: 'concurrency', kind: 'graph.node.field.set', nodeId, target, value: settings.concurrency })
-  }
+
   if (node.name != settings.name) operations.push({ before: node.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value: settings.name })
   if (node.timeoutMs != settings.timeoutMs) {
     operations.push({ before: node.timeoutMs, field: 'timeoutMs', kind: 'graph.node.field.set', nodeId, target, value: settings.timeoutMs })
@@ -312,6 +305,20 @@ export function setInputValues(
     operations.push({ before, handle, kind: 'graph.node.input.set', nodeId, target, value: next })
   }
   return cleanVariableBindings(content, operations)
+}
+
+export function setInputSources(
+  content: RevisionContent,
+  target: GraphTarget,
+  nodeId: string,
+  handle: string,
+  sources: Extract<InputMapping, { readonly kind: 'sources' }>['sources'],
+): readonly ChangeOperation[] {
+  const node = (target.kind == 'flow' ? content.document.graph : content.document.subflows[target.id]?.graph)?.nodes[nodeId]
+  if (node == null || !('inputs' in node)) return []
+  return cleanVariableBindings(content, [
+    { kind: 'graph.node.input.set', nodeId, handle, target, before: node.inputs[handle], value: { kind: 'sources', sources } },
+  ])
 }
 
 export function setInputVariable(

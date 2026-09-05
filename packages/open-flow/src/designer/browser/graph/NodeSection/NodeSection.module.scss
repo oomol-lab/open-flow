@@ -1,8 +1,8 @@
 .inputHeader,
 .outputHeader,
 .additionalHeader {
-  margin-bottom: 5px;
-  font-size: 0.9em;
+  margin-bottom: 6px;
+  font-size: 10px;
   color: var(--table-head-color);
   display: flex;
   align-items: center;
@@ -92,4 +92,35 @@
 
 .click {
   padding-left: 2px;
+}
+
+.branchRow {
+  position: relative;
+}
+
+.branchHandle.branchHandle {
+  top: calc(var(--widget-height) / 2 - 8px);
+  right: -20px;
+  --bg: var(--edge-primitive);
+
+  > :global(.react-flow__handle) {
+    top: 0;
+    left: 0;
+    right: auto;
+    cursor: crosshair;
+
+    &:hover::after,
+    &:global(.connectingfrom)::after,
+    &:global(.connectingto.valid)::after {
+      background: var(--brand-highlight-color);
+    }
+  }
+}
+
+.branchSection.branchSection {
+  overflow: visible;
+
+  > .inoutSectionCard {
+    overflow: visible;
+  }
 }

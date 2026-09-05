@@ -40,14 +40,10 @@
 }
 
 .container {
-  overflow: hidden;
+  overflow: visible;
   border-radius: var(--node-container-radius);
   background: var(--node-background-color);
   box-shadow: var(--node-shadow);
-
-  &:has(:global([data-slot='combobox-content'])) {
-    overflow: visible;
-  }
 
   :global(.react-flow__node.selectable.selected) & {
     box-shadow: var(--node-selected-shadow);
@@ -87,4 +83,54 @@
   right: -8px;
   top: 0;
   cursor: e-resize;
+}
+
+.executionHead {
+  position: relative;
+
+  > header {
+    min-height: 36px;
+    padding: 5px 10px;
+    gap: 6px;
+    background: var(--node-background-color);
+    border-bottom: 1px solid var(--node-border-color);
+    border-radius: var(--node-container-radius) var(--node-container-radius) 0 0;
+  }
+}
+
+.executionBranch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: var(--widget-height);
+  padding: 4px 14px;
+  color: var(--text-2);
+  border-top: 1px solid var(--node-border-color);
+  background: var(--node-background-color);
+
+  > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.executionHandle.executionHandle {
+  top: calc(50% - 8px);
+  margin-top: 0;
+  --bg: var(--edge-primitive);
+
+  > :global(.react-flow__handle) {
+    top: 0;
+    left: 0;
+    right: auto;
+    cursor: crosshair;
+
+    &:hover::after,
+    &:global(.connectingfrom)::after,
+    &:global(.connectingto.valid)::after {
+      background: var(--brand-highlight-color);
+    }
+  }
 }

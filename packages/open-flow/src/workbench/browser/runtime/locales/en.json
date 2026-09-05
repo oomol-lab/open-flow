@@ -162,9 +162,7 @@
       "portDefinitions": "Enter valid port definitions."
     },
     "node": {
-      "concurrency": "Concurrency",
-      "concurrencyError": "Concurrency must be a positive integer.",
-      "description": "Display name, concurrency, and timeout",
+      "description": "Display name and timeout",
       "displayName": "Display name",
       "displayNamePlaceholder": "Use definition name",
       "save": "Save node",
@@ -227,7 +225,12 @@
       "save": "Save Trigger",
       "title": "Trigger definition"
     },
-    "title": "Inspector"
+    "title": "Inspector",
+    "sources": {
+      "title": "Input sources",
+      "local": "Local value / variable",
+      "unavailable": "This source is not guaranteed to complete before this node, or its type does not match."
+    }
   },
   "language": {
     "label": "Language"
@@ -474,7 +477,8 @@
     "timelineEmpty": "Run the selected Draft to inspect its timeline and output.",
     "submitting": "Submitting this fixed revision and creating its run record…",
     "waiting": "Waiting for the first event…",
-    "waitExpires": "Expires {{date}}"
+    "waitExpires": "Expires {{date}}",
+    "eventSkipped": "Skipped"
   },
   "sidebar": {
     "createFirstFlow": "Create Flow",

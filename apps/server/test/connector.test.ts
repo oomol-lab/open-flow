@@ -33,9 +33,9 @@ function connectorFlow(timeoutMs?: number, optionalNull = false): RevisionConten
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           connector: {
-            concurrency: 1,
             inputs: {
               message: { kind: 'value', value: 'hello' },
               ...(optionalNull ? { tags: { kind: 'value' as const, value: null } } : {}),
@@ -72,9 +72,9 @@ function capabilityFlow(
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           capability: {
-            concurrency: 1,
             inputs: { message: { kind: 'value', value: 'hello' } },
             kind: 'task',
             task: {
@@ -173,7 +173,7 @@ describe('Server Connector host', () => {
 
     expect(execute).toHaveBeenCalledWith('example.echo', 'connection-work', { message: 'hello' }, expect.any(String), expect.any(AbortSignal), undefined)
     expect(service.run(runId)).toMatchObject({
-      result: { kind: 'node-results', nodes: [{ jobs: [{ outputs: { message: 'hello' } }], nodeId: 'connector' }] },
+      result: { kind: 'node-results', nodes: [{ status: 'completed', outputs: { message: 'hello' }, nodeId: 'connector' }] },
       status: 'completed',
     })
   })

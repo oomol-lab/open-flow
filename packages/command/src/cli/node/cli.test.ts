@@ -1,5 +1,7 @@
+import type { ChangeOperation, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { UiLanguage } from '@oomol-lab/open-flow/localization'
 
+import { applyFlowChanges } from '@oomol-lab/open-flow/flow-change'
 import { uiLanguages } from '@oomol-lab/open-flow/localization'
 import { describe, expect, it, vi } from 'vitest'
 import { runCli } from './cli.ts'
@@ -44,6 +46,66 @@ function runtime(language: UiLanguage = 'en') {
 }
 
 describe('CLI', () => {
+  it('edits execution order and input sources independently through revision changes', async () => {
+    let content: RevisionContent = {
+      modelVersion: 1,
+      modules: {},
+      document: {
+        bindings: {},
+        tasks: {},
+        subflows: {},
+        graph: {
+          edges: [],
+          nodes: {
+            a: { kind: 'value', inputs: {}, values: [{ handle: 'value', jsonSchema: {}, nullable: false, value: 42 }] },
+            b: { kind: 'condition', inputs: {}, input: { handle: 'input', jsonSchema: {}, nullable: false }, cases: [] },
+          },
+        },
+      },
+    }
+    let sequence = 1
+    const operations: ChangeOperation[][] = []
+    const metadata = () => ({
+      actorId: 'operator',
+      createdAt: flow.createdAt,
+      digest: 'digest',
+      flowId: flow.flowId,
+      modelVersion: 1,
+      parentRevisionId: null,
+      revisionId: `revision-${sequence}`,
+      version: 1,
+    })
+    const request = async (path: string, init?: RequestInit) => {
+      if (path == '/v1/flows/flow-1') return Response.json({ ...flow, draftRevisionId: `revision-${sequence}` })
+      if (path == `/v1/flows/flow-1/revisions/revision-${sequence}`) return Response.json({ ...metadata(), content })
+      if (path == '/v1/flows/flow-1/draft/changes') {
+        const body = JSON.parse(String(init?.body)) as { expectedRevisionId: string; operations: ChangeOperation[] }
+        expect(body.expectedRevisionId).toBe(`revision-${sequence}`)
+        expect(new Headers(init?.headers).get('idempotency-key')).toBeTruthy()
+        operations.push(body.operations)
+        content = applyFlowChanges(content, body.operations)
+        sequence++
+        return Response.json({ revision: metadata(), version: 1 })
+      }
+      throw new Error(`Unexpected request ${path}`)
+    }
+    for (const args of [
+      ['connect', 'flow-1', 'a', 'b'],
+      ['node', 'input', 'flow-1', 'b', 'input', 'a', 'value'],
+      ['disconnect', 'flow-1', 'a', 'b'],
+    ]) {
+      const output = runtime()
+      expect(await runCli([...args, '--json'], { request }, output.value), output.stderr()).toBe(0)
+    }
+    expect(operations.map((batch) => batch.map((operation) => operation.kind))).toEqual([
+      ['graph.edge.connect'],
+      ['graph.node.input.set'],
+      ['graph.edge.disconnect'],
+    ])
+    expect(content.document.graph.edges).toEqual([])
+    expect(content.document.graph.nodes.b).toMatchObject({ inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'a', output: 'value' }] } } })
+  })
+
   it('prints help without making a Control API request', async () => {
     const output = runtime()
     const request = vi.fn()

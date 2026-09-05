@@ -14,9 +14,9 @@ function draft(revisionId: string, name?: string, description?: string): Draft {
       document: {
         bindings: {},
         graph: {
+          edges: [],
           nodes: {
             task: {
-              concurrency: 1,
               description,
               inputs: {},
               kind: 'task',

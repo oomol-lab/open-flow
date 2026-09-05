@@ -1,7 +1,8 @@
 .container {
   overflow: hidden;
 
-  &:has(:global([data-slot='combobox-content'])) {
+  &:has(:global([data-slot='combobox-content'])),
+  &:has(:global(.react-flow__handle)) {
     overflow: visible;
   }
 }

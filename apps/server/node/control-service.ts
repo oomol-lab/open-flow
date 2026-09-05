@@ -939,7 +939,7 @@ export class ControlService {
 
 function emptyRevision(): RevisionContent {
   return {
-    document: { bindings: {}, graph: { nodes: {} }, subflows: {}, tasks: {} },
+    document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
     modelVersion: 1,
     modules: {},
   }

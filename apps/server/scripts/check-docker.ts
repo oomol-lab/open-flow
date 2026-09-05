@@ -229,9 +229,9 @@ function codeFlow(): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           code: {
-            concurrency: 1,
             inputs: {},
             kind: 'task',
             task: { inputs: [], moduleId: 'code', name: 'Code', outputs: [{ ...result, handle: 'result' }] },

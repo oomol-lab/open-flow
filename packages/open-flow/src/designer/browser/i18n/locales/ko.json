@@ -60,7 +60,6 @@
     "privateHelp": "AI와 외부 사용자가 사용할 수 없도록 공유 블록을 비공개로 표시합니다.",
     "public": "공개",
     "runningConfig": {
-      "concurrency": "동시 실행 수",
       "progressWeight": "진행률 가중치",
       "timeout": "제한 시간",
       "title": "실행 설정"

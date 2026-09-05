@@ -37,16 +37,19 @@ function fullFlow(value = 2): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [
+          { source: 'value', target: 'increment' },
+          { source: 'increment', target: 'nested' },
+        ],
         nodes: {
           value: {
-            concurrency: 1,
             inputs: {},
             kind: 'value',
             values: [{ ...port, handle: 'value', value }],
           },
           increment: {
             additionalInputs: [{ ...port, handle: 'start' }],
-            concurrency: 1,
+
             inputs: {
               start: { kind: 'value', value: 'manual' },
               value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'value', output: 'value' }] },
@@ -55,7 +58,6 @@ function fullFlow(value = 2): RevisionContent {
             task: { inputs: [{ ...port, handle: 'value' }], moduleId: 'increment', name: 'Increment', outputs: [{ ...port, handle: 'value' }] },
           },
           nested: {
-            concurrency: 1,
             inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'increment', output: 'value' }] } },
             kind: 'subflow',
             subflowId: 'double',
@@ -65,9 +67,9 @@ function fullFlow(value = 2): RevisionContent {
       subflows: {
         double: {
           graph: {
+            edges: [],
             nodes: {
               task: {
-                concurrency: 1,
                 inputs: { value: { kind: 'sources', sources: [{ input: 'value', kind: 'flow' }] } },
                 kind: 'task',
                 task: { inputs: [{ ...port, handle: 'value' }], moduleId: 'double', name: 'Double', outputs: [{ ...port, handle: 'value' }] },
@@ -92,7 +94,7 @@ function fullFlow(value = 2): RevisionContent {
   if (context.blockId != 'increment' || typeof context.flowId != 'string' || typeof context.runId != 'string') throw new Error('Task identity is incomplete.')
   if (inputs.start != 'manual') throw new Error('Additional input was not passed to the Task.')
   context.signal.throwIfAborted()
-  await context.outputs({ value: inputs.value + 1 })
+  return { value: inputs.value + 1 }
 }`,
       },
     },
@@ -104,9 +106,9 @@ function hangingFlow(): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           task: {
-            concurrency: 1,
             inputs: {},
             kind: 'task',
             task: { inputs: [], moduleId: 'main', name: 'Main', outputs: [] },
@@ -133,9 +135,9 @@ function oversizedOutputsFlow(): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           task: {
-            concurrency: 1,
             inputs: {},
             kind: 'task',
             task: { inputs: [], moduleId: 'main', name: 'Main', outputs: [{ ...port, handle: 'value' }] },
@@ -147,7 +149,7 @@ function oversizedOutputsFlow(): RevisionContent {
     },
     modelVersion: 1,
     modules: {
-      main: { imports: [], name: 'Main', source: "export default async (_inputs, context) => context.outputs({ value: 'x'.repeat(2_000_000) })" },
+      main: { imports: [], name: 'Main', source: "export default async () => ({ value: 'x'.repeat(2_000_000) })" },
     },
   }
 }
@@ -157,9 +159,9 @@ function variableFlow(): RevisionContent {
     document: {
       bindings: { token: { kind: 'variable', target: 'TOKEN' } },
       graph: {
+        edges: [],
         nodes: {
           task: {
-            concurrency: 1,
             inputs: { token: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] } },
             kind: 'task',
             task: {
@@ -184,10 +186,11 @@ function waitFlow(): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           approval: {
             actions: ['approve', 'reject'],
-            concurrency: 1,
+
             input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
             inputs: { value: { kind: 'value', value: { request: 1 } } },
             kind: 'wait',
@@ -209,10 +212,11 @@ function notificationFlow(): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           approval: {
             actions: ['approve', 'reject'],
-            concurrency: 1,
+
             input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
             inputs: { value: { kind: 'value', value: { request: 1 } } },
             kind: 'wait',
@@ -249,10 +253,11 @@ function llmFlow(): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           llm: {
             additionalInputs: [{ ...port, handle: 'topic' }],
-            concurrency: 1,
+
             inputs: { prompt: { kind: 'value', value: 'Hello' }, topic: { kind: 'value', value: 'Open Flow' } },
             kind: 'task',
             taskId: 'llm',
@@ -279,10 +284,11 @@ function connectorFlow(): RevisionContent {
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: {
           connector: {
             additionalInputs: [{ ...port, handle: 'start' }],
-            concurrency: 1,
+
             inputs: { message: { kind: 'value', value: 'Hello' }, start: { kind: 'value', value: 'manual' } },
             kind: 'task',
             taskId: 'connector',
@@ -682,7 +688,7 @@ describe('Server application service', () => {
     await service.waitForIdle()
 
     expect(service.control.getRunResult(accepted.runId)).toMatchObject({
-      result: { kind: 'node-results', nodes: [{ jobs: [{ outputs: { approve: { request: 1 } } }], nodeId: 'approval' }] },
+      result: { kind: 'node-results', nodes: [{ status: 'completed', outputs: { approve: { request: 1 } }, nodeId: 'approval' }] },
       status: 'completed',
     })
     const events = service.events(accepted.runId)
@@ -796,7 +802,7 @@ describe('Server application service', () => {
     await service.waitForIdle()
 
     expect(service.control.getRunResult(accepted.runId)).toMatchObject({
-      result: { nodes: [{ jobs: [{ outputs: { token: 'start-value' } }], nodeId: 'task' }] },
+      result: { nodes: [{ status: 'completed', outputs: { token: 'start-value' }, nodeId: 'task' }] },
       status: 'completed',
     })
     const started = service.events(accepted.runId).filter(({ kind }) => kind == 'node.started')
@@ -820,7 +826,7 @@ describe('Server application service', () => {
       eventsTruncated: false,
       result: {
         kind: 'node-results',
-        nodes: [{ jobs: [{ outputs: { value: 6 } }], nodeId: 'nested' }],
+        nodes: [{ status: 'completed', outputs: { value: 6 }, nodeId: 'nested' }],
       },
       status: 'completed',
     })
@@ -852,7 +858,7 @@ describe('Server application service', () => {
     await closeService(service)
   })
 
-  it('rejects context outputs larger than the Runtime result limit before delivery', async () => {
+  it('rejects final outputs larger than the Runtime result limit before delivery', async () => {
     const service = await openService(await databaseFile())
     await startService(service)
     const accepted = await acceptRun(service, {
@@ -1224,7 +1230,7 @@ describe('Server application service', () => {
 
     expect(invocations).toEqual([{ input: { prompt: 'Hello', topic: 'Open Flow' }, mode: 'json' }])
     expect(configured.run(completed.runId)).toMatchObject({
-      result: { kind: 'node-results', nodes: [{ jobs: [{ outputs: { answer: 'Hello back' } }], nodeId: 'llm' }] },
+      result: { kind: 'node-results', nodes: [{ status: 'completed', outputs: { answer: 'Hello back' }, nodeId: 'llm' }] },
       status: 'completed',
     })
     await closeService(configured)

@@ -60,7 +60,7 @@ export interface TaskLogger {
   error(message: string, data?: unknown): void
 }
 
-export interface TaskContext<Outputs extends object = Record<string, unknown>> {
+export interface TaskContext {
   readonly signal: AbortSignal
   readonly flowId: string
   readonly inputs: Readonly<Record<string, unknown>>
@@ -69,13 +69,12 @@ export interface TaskContext<Outputs extends object = Record<string, unknown>> {
   readonly artifact: ArtifactCapability
   readonly fetch: typeof fetch
   readonly logger: TaskLogger
-  outputs(value: Partial<Outputs>): Promise<void>
   preview(payload: PreviewPayload, id?: string): Promise<void>
   reportProgress(progress: number): Promise<void>
 }
 
-export type TaskResult<Outputs extends object> = Partial<Outputs> | void
+export type TaskResult<Outputs extends object> = keyof Outputs extends never ? Outputs | void : Outputs
 
 export interface Task<Inputs extends object = Record<string, unknown>, Outputs extends object = Record<string, unknown>> {
-  (inputs: Inputs, context: TaskContext<Outputs>): TaskResult<Outputs> | Promise<TaskResult<Outputs>>
+  (inputs: Inputs, context: TaskContext): TaskResult<Outputs> | Promise<TaskResult<Outputs>>
 }

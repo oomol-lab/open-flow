@@ -7,8 +7,6 @@ import { memo, useEffect, useMemo } from 'react'
 import { useDerived, useVal } from 'use-value-enhancer'
 import { arrayShallowEqual } from 'value-enhancer'
 import { NODE_HANDLE_CLASSNAME } from '../../../base/designer.ts'
-import { toRFHandleName } from '../../../base/rfHelpers.ts'
-import { Handle } from '../../../components/handle.tsx'
 import { useNodeMiniMapPhase } from '../../../components/minimap.tsx'
 import { NodeMiniMapPhase } from '../../../stores/designer/nodeMiniMap.ts'
 import { parseError } from '../../../stores/node/errorNode.store.ts'
@@ -51,9 +49,6 @@ export const ErrorNodeContent: React.FC<ErrorNodeContentProps> = /*#__PURE__*/ m
           {handles.map((handle, i) => (
             <div key={i} className={styles.handle}>
               <div className={styles.handleName}>{handle}</div>
-              <div className={styles.handleSuffix}>
-                <Handle id={toRFHandleName(handle)} type="output" kind="error" disabled />
-              </div>
             </div>
           ))}
         </div>

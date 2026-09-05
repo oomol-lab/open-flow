@@ -89,9 +89,6 @@ export const FlowDesigner: React.FC<FlowDesignerProps> = ({
           provideAddNodeMenuItems={flowDesignerStore.provideAddNodeMenuItems}
           provideAsyncAddNodeMenuItems={flowDesignerStore.provideAsyncAddNodeMenuItems}
           waitNode={flowDesignerStore.waitNode}
-          setupValueNode={flowDesignerStore.setupValueNode}
-          setupScriptletNode={flowDesignerStore.setupScriptletNode}
-          onAddHandle={flowDesignerStore.onAddHandle}
           duplicateNodes={flowDesignerStore.duplicateNodes}
         >
           {showSettings$ != null && <FlowSettingsContainer />}

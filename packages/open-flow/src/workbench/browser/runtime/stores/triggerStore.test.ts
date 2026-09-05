@@ -29,6 +29,7 @@ function createSetup() {
           document: {
             bindings: Object.fromEntries(['github', 'mail'].map((provider) => [provider, { kind: 'connection', target: `${provider}-old` }])),
             graph: {
+              edges: [],
               nodes: Object.fromEntries(
                 ['github', 'mail'].map((provider) => [
                   provider,

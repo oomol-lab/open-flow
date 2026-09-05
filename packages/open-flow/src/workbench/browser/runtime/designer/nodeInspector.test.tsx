@@ -54,7 +54,7 @@ describe('Wait Inspector', () => {
   it('saves a resolution change immediately', () => {
     const saveWait = vi.fn().mockResolvedValue(true)
     const definition = waitDefinition(
-      { actions: ['continue'], concurrency: 1, input: { handle: 'value', jsonSchema: {}, nullable: true }, inputs: {}, kind: 'wait', prompt: 'Continue?' },
+      { actions: ['continue'], input: { handle: 'value', jsonSchema: {}, nullable: true }, inputs: {}, kind: 'wait', prompt: 'Continue?' },
       {},
       saveWait,
     )
@@ -74,7 +74,7 @@ describe('Wait Inspector', () => {
     const saveWait = vi.fn().mockResolvedValue(true)
     const node = {
       actions: ['continue'],
-      concurrency: 1,
+
       input: { handle: 'value', jsonSchema: {}, nullable: true },
       inputs: {},
       kind: 'wait',

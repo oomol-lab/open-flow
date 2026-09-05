@@ -74,7 +74,6 @@ describe('writable flow manifest', () => {
 
     task.$$.title.set('Updated task')
     task.$$.timeout.set(30)
-    task.$$.concurrency.set(2)
     task.$$.progress_weight.set(3)
     value.$$.title.set('Updated value')
     value.$$.description.set('Static inputs')
@@ -91,7 +90,7 @@ describe('writable flow manifest', () => {
           task: 'self::task',
           title: 'Updated task',
           timeout: 30,
-          concurrency: 2,
+
           progress_weight: 3,
         },
         {

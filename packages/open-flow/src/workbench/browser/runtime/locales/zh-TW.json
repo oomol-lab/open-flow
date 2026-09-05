@@ -162,9 +162,7 @@
       "portDefinitions": "請輸入有效的埠定義。"
     },
     "node": {
-      "concurrency": "並行數",
-      "concurrencyError": "並行數必須是正整數。",
-      "description": "顯示名稱、並行數與逾時時間",
+      "description": "顯示名稱與逾時",
       "displayName": "顯示名稱",
       "displayNamePlaceholder": "使用定義中的名稱",
       "save": "儲存節點",
@@ -227,7 +225,12 @@
       "save": "儲存 Trigger",
       "title": "Trigger 定義"
     },
-    "title": "檢查器"
+    "title": "檢查器",
+    "sources": {
+      "title": "輸入來源",
+      "local": "本機值 / 變數",
+      "unavailable": "無法保證此來源先於目前節點完成，或輸出類型不符。"
+    }
   },
   "language": {
     "label": "語言"
@@ -474,7 +477,8 @@
     "timelineEmpty": "執行選取的草稿後，就可以檢視它的時間軸與輸出。",
     "submitting": "正在提交這個固定修訂並建立執行紀錄…",
     "waiting": "正在等待第一個事件…",
-    "waitExpires": "到期時間：{{date}}"
+    "waitExpires": "到期時間：{{date}}",
+    "eventSkipped": "已略過"
   },
   "sidebar": {
     "createFirstFlow": "建立 Flow",

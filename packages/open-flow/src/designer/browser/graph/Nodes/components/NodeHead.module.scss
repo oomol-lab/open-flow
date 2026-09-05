@@ -36,7 +36,8 @@
   flex: 1;
   min-width: 0;
   margin-right: 0.25em;
-  font-weight: bold;
+  font-size: 13px;
+  font-weight: 600;
 
   > input {
     background-color: transparent;
@@ -124,4 +125,15 @@
   width: 32px;
   height: 32px;
   font-size: 18px;
+}
+
+.nodeIcon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--brand-highlight-color);
+  background: color-mix(in srgb, var(--brand-highlight-color) 9%, var(--node-background-color));
 }

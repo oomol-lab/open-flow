@@ -202,7 +202,6 @@ export const capability = Object.freeze({
   }),
   connector: (input) => invoke('connector', input),
   egress: (url) => invoke('egress', { url }),
-  outputs: (value) => invoke('outputs', value),
 })`
 
 function installGlobals(
@@ -559,7 +558,7 @@ function executeFlow(
     emit: (event) => remote(call({ event, type: 'event' })).pipe(Effect.asVoid),
     flowId: flow.flowId,
     ...(flow.inputs == null ? {} : { inputs: flow.inputs }),
-    invokeTask: (invocation, outputs) =>
+    invokeTask: (invocation) =>
       Effect.gen(function* () {
         if ('moduleId' in invocation) {
           const program = createRuntimeProgram(flow.prepared, invocation.moduleId, isolatedVmEngineDigest)
@@ -577,12 +576,6 @@ function executeFlow(
                 type: 'invoke',
               },
               (invocationId, capabilities, kind, payload) => {
-                if (kind == 'outputs') {
-                  if (serializedBytes(payload) > request.limits.maxResultBytes) {
-                    return Effect.fail(new IsolatedVmError('limit-exceeded', 'Runtime result exceeds the configured byte limit.'))
-                  }
-                  return outputs(payload).pipe(Effect.as({ body: null, status: 200 }))
-                }
                 return remote(call({ capabilities, invocationId, kind, payload, type: 'capability' })).pipe(
                   Effect.map((response) => response as RuntimeCapabilityResponse),
                 )

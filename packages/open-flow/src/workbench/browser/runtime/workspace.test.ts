@@ -10,9 +10,9 @@ describe('Designer port projection', () => {
         document: {
           bindings: {},
           graph: {
+            edges: [],
             nodes: {
               task: {
-                concurrency: 1,
                 inputs: {},
                 kind: 'task',
                 task: {
@@ -69,10 +69,11 @@ describe('Designer port projection', () => {
         document: {
           bindings: {},
           graph: {
+            edges: [],
             nodes: {
               news: {
                 additionalInputs: [{ handle: 'start', jsonSchema: {}, nullable: false }],
-                concurrency: 1,
+
                 inputs: {},
                 kind: 'task',
                 taskId: 'news',
@@ -145,10 +146,11 @@ describe('Designer port projection', () => {
         document: {
           bindings: {},
           graph: {
+            edges: [],
             nodes: {
               wait: {
                 actions: ['approve', 'reject'],
-                concurrency: 1,
+
                 input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
                 inputs: {},
                 kind: 'wait',
@@ -230,6 +232,7 @@ describe('Designer port projection', () => {
         document: {
           bindings: {},
           graph: {
+            edges: [],
             nodes: {
               trigger: {
                 bindingId: 'binding',
@@ -302,10 +305,7 @@ describe('Designer presentation layouts', () => {
 
     expect(moved).toMatchObject({
       designer: {
-        flow: {
-          layouts: {},
-          nodes: { added: { x: 50, y: 60 }, task: { x: 30, y: 40 } },
-        },
+        flow: { layouts: {}, nodes: { added: { x: 50, y: 60 }, task: { x: 30, y: 40 } } },
       },
     })
   })
@@ -315,10 +315,7 @@ describe('Designer presentation layouts', () => {
       designer: {
         flow: {
           layouts: {
-            detail: {
-              nodes: { detailOnly: { x: 50, y: 60 }, task: { x: 30, y: 40 } },
-              viewport: { x: 10, y: 20, zoom: 0.8 },
-            },
+            detail: { nodes: { detailOnly: { x: 50, y: 60 }, task: { x: 30, y: 40 } }, viewport: { x: 10, y: 20, zoom: 0.8 } },
             overview: {
               nodes: { overviewOnly: { x: 70, y: 80 }, sharedOnly: { x: 1, y: 2 }, task: { x: 10, y: 20 } },
               viewport: { x: 30, y: 40, zoom: 1.2 },
@@ -356,10 +353,7 @@ describe('Designer presentation layouts', () => {
   it('keeps a valid lower-precedence position when a newer entry is malformed', () => {
     const value = {
       designer: {
-        flow: {
-          layouts: { overview: { nodes: { task: { x: 10, y: 20 } } } },
-          nodes: { task: { x: 'invalid', y: 30 } },
-        },
+        flow: { layouts: { overview: { nodes: { task: { x: 10, y: 20 } } } }, nodes: { task: { x: 'invalid', y: 30 } } },
         version: 1,
       },
     }
@@ -383,11 +377,7 @@ describe('Designer presentation layouts', () => {
     expect(moved).toMatchObject({
       designer: {
         subflows: {
-          child: {
-            comments: { note: { content: 'Body', title: 'Note' } },
-            layouts: {},
-            nodes: { note: { x: 15, y: 25 }, task: { x: 35, y: 45 } },
-          },
+          child: { comments: { note: { content: 'Body', title: 'Note' } }, layouts: {}, nodes: { note: { x: 15, y: 25 }, task: { x: 35, y: 45 } } },
         },
       },
     })

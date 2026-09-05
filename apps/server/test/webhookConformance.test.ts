@@ -22,6 +22,7 @@ function revision(fixture: WebhookConformanceFixture, enabled = true): RevisionC
     document: {
       bindings: {},
       graph: {
+        edges: [],
         nodes: enabled
           ? {
               webhook: {

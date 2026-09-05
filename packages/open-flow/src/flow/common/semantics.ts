@@ -545,7 +545,7 @@ function validateTrigger(triggerId: string, trigger: TriggerNode, document: Flow
   }
 }
 
-function nodeInputPorts(document: FlowDocument, node: GraphNode): Readonly<Record<string, InputPortDefinition>> {
+export function nodeInputPorts(document: FlowDocument, node: GraphNode): Readonly<Record<string, InputPortDefinition>> {
   switch (node.kind) {
     case 'condition':
       return { [node.input.handle]: node.input }
@@ -663,17 +663,137 @@ function checkSource(
   }
 }
 
-function nodeDependencies(graph: Graph, node: GraphNode): Set<string> {
-  const dependencies = new Set<string>()
-  if (!('inputs' in node)) return dependencies
-  const inputs = [...Object.values(node.inputs), ...(node.kind == 'wait' && node.notification != null ? Object.values(node.notification.inputs) : [])]
-  for (const mapping of inputs) {
-    if (mapping.kind != 'sources') continue
-    for (const source of mapping.sources) {
-      if (source.kind == 'node' && graph.nodes[source.nodeId] != null) dependencies.add(source.nodeId)
+export function graphOrder(graph: Graph): readonly string[] {
+  const pending = new Map(Object.keys(graph.nodes).map((id) => [id, new Set<string>()]))
+  const children = new Map<string, Set<string>>()
+  for (const edge of graph.edges) {
+    if (!pending.has(edge.source) || !pending.has(edge.target)) continue
+    pending.get(edge.target)?.add(edge.source)
+    const targets = children.get(edge.source) ?? new Set<string>()
+    targets.add(edge.target)
+    children.set(edge.source, targets)
+  }
+  const ready = [...pending]
+    .filter(([, parents]) => parents.size == 0)
+    .map(([id]) => id)
+    .toSorted()
+  for (let index = 0; index < ready.length; index++) {
+    const id = ready[index]!
+    pending.delete(id)
+    for (const child of children.get(id) ?? []) {
+      const parents = pending.get(child)
+      parents?.delete(id)
+      if (parents?.size == 0) ready.push(child)
     }
   }
-  return dependencies
+  return ready
+}
+
+const pathsByGraph = new WeakMap<
+  Graph,
+  {
+    readonly paths: Map<string, readonly Readonly<Record<string, string>>[]>
+    readonly ancestors: Map<string, Set<string>>
+  }
+>()
+
+function graphPaths(graph: Graph) {
+  const cached = pathsByGraph.get(graph)
+  if (cached != null) return cached
+  const paths = new Map<string, readonly Readonly<Record<string, string>>[]>()
+  const ancestors = new Map<string, Set<string>>()
+  const incoming = new Map<string, Graph['edges'][number][]>()
+  for (const edge of graph.edges) {
+    const edges = incoming.get(edge.target) ?? []
+    edges.push(edge)
+    incoming.set(edge.target, edges)
+  }
+  for (const id of graphOrder(graph)) {
+    const node = graph.nodes[id]!
+    const edges = incoming.get(id) ?? []
+    const parents = new Set<string>()
+    const routes: Readonly<Record<string, string>>[] = []
+    for (const edge of edges) {
+      parents.add(edge.source)
+      for (const parent of ancestors.get(edge.source) ?? []) parents.add(parent)
+      for (const route of paths.get(edge.source) ?? []) {
+        const next = edge.sourceHandle == null ? route : { ...route, [edge.source]: edge.sourceHandle }
+        if (routes.some((known) => Object.entries(known).every(([key, value]) => next[key] == value))) continue
+        for (let index = routes.length - 1; index >= 0; index--) {
+          if (Object.entries(next).every(([key, value]) => routes[index]![key] == value)) routes.splice(index, 1)
+        }
+        routes.push(next)
+      }
+    }
+    ancestors.set(id, parents)
+    paths.set(id, edges.length == 0 ? ('inputs' in node ? [{}] : [{ $trigger: id }]) : routes)
+  }
+  const analysis = { ancestors, paths }
+  pathsByGraph.set(graph, analysis)
+  return analysis
+}
+
+function sourcePaths(graph: Graph, paths: ReturnType<typeof graphPaths>['paths'], source: BindingSource | FlowSource | NodeSource) {
+  if (source.kind != 'node') return [{}]
+  const node = graph.nodes[source.nodeId]
+  const routes = paths.get(source.nodeId) ?? []
+  return node?.kind == 'condition' || node?.kind == 'wait' ? routes.map((route) => ({ ...route, [source.nodeId]: source.output })) : routes
+}
+
+function covers(routes: readonly Readonly<Record<string, string>>[], target: Readonly<Record<string, string>>, graph: Graph): boolean {
+  const possible = routes.filter((route) => Object.entries(route).every(([key, value]) => target[key] == null || target[key] == value))
+  if (possible.some((route) => Object.entries(route).every(([key, value]) => target[key] == value))) return true
+  const key = possible.flatMap((route) => Object.keys(route)).find((candidate) => target[candidate] == null)
+  if (key == null) return false
+  const node = graph.nodes[key]
+  const choices =
+    node?.kind == 'condition'
+      ? [...node.cases.map((item) => item.output), node.defaultOutput ?? '']
+      : node?.kind == 'wait'
+        ? node.actions
+        : ['', ...Object.keys(graph.nodes).filter((id) => !('inputs' in graph.nodes[id]!))]
+  return choices.every((value) => covers(possible, { ...target, [key]: value }, graph))
+}
+
+function mappingAvailable(graph: Graph, target: string | undefined, mapping: InputMapping, analysis: ReturnType<typeof graphPaths>): boolean {
+  if (mapping.kind == 'value') return true
+  const { ancestors, paths } = analysis
+  if (mapping.sources.length == 0) return false
+  if (target != null && mapping.sources.some((source) => source.kind == 'node' && !ancestors.get(target)?.has(source.nodeId))) return false
+  const sources = mapping.sources.map((source) => sourcePaths(graph, paths, source))
+  const targetPaths = target == null ? [{}] : (paths.get(target) ?? [])
+  if (!targetPaths.every((route) => covers(sources.flat(), route, graph))) return false
+  return sources.every((routes, index) =>
+    sources.slice(index + 1).every((other) =>
+      routes.every((left) =>
+        other.every((right) =>
+          targetPaths.every((targetRoute) => {
+            const values = { ...targetRoute, ...left }
+            return (
+              Object.entries(left).some(([key, value]) => targetRoute[key] != null && targetRoute[key] != value) ||
+              Object.entries(right).some(([key, value]) => values[key] != null && values[key] != value)
+            )
+          }),
+        ),
+      ),
+    ),
+  )
+}
+
+export function availableOutputs(document: FlowDocument, graph: Graph, target: string, handle?: string): Readonly<Record<string, readonly string[]>> {
+  const analysis = graphPaths(graph)
+  return Object.fromEntries(
+    [...(analysis.ancestors.get(target) ?? [])].flatMap((id) => {
+      const node = graph.nodes[id]
+      if (node == null) return []
+      const outputs = Object.keys(nodeOutputPorts(document, node)).filter(
+        (output) =>
+          mappingAvailable(graph, target, { kind: 'sources', sources: [{ kind: 'node', nodeId: id, output }] }, analysis) &&
+          (handle == null || portsAssignable(nodeOutputPorts(document, node)[output]!, nodeInputPorts(document, graph.nodes[target]!)[handle]!)),
+      )
+      return outputs.length == 0 ? [] : [[id, outputs]]
+    }),
+  )
 }
 
 function validateWait(
@@ -686,7 +806,7 @@ function validateWait(
   path: string,
   diagnostics: Diagnostic[],
 ): void {
-  const fields = new Set(['actions', 'concurrency', 'description', 'icon', 'input', 'inputs', 'kind', 'name', 'notification', 'prompt'])
+  const fields = new Set(['actions', 'description', 'icon', 'input', 'inputs', 'kind', 'name', 'notification', 'prompt'])
   const unsupported = Object.keys(node).filter((field) => !fields.has(field))
   if (unsupported.length > 0) {
     diagnostics.push(
@@ -697,7 +817,6 @@ function validateWait(
     )
   }
   if (!allowed) diagnostics.push(graphDiagnostic('wait.not-allowed', 'Wait nodes are only allowed in Flows.', path))
-  if (node.concurrency != 1) diagnostics.push(graphDiagnostic('wait.concurrency-invalid', 'Wait concurrency must be 1.', `${path}/concurrency`))
   if (node.input.handle != 'value') diagnostics.push(graphDiagnostic('wait.input-invalid', 'Wait input handle must be "value".', `${path}/input/handle`))
   if (typeof node.prompt != 'string' || node.prompt.trim().length == 0 || [...node.prompt].length > 1_000) {
     diagnostics.push(graphDiagnostic('wait.prompt-invalid', 'Wait prompt must contain between 1 and 1,000 Unicode code points.', `${path}/prompt`))
@@ -782,20 +901,6 @@ function validateWait(
   }
 }
 
-function checkCycles(graph: Graph, path: string, diagnostics: Diagnostic[]): void {
-  const dependencies = new Map(Object.entries(graph.nodes).map(([nodeId, node]) => [nodeId, nodeDependencies(graph, node)]))
-  while (dependencies.size > 0) {
-    const ready = [...dependencies].filter(([, sources]) => sources.size == 0).map(([nodeId]) => nodeId)
-    if (ready.length == 0) {
-      const nodes = [...dependencies.keys()].toSorted().join(', ')
-      diagnostics.push(graphDiagnostic('graph.cycle', `Graph contains a dependency cycle among nodes: ${nodes}.`, path, { nodes }))
-      return
-    }
-    for (const nodeId of ready) dependencies.delete(nodeId)
-    for (const sources of dependencies.values()) for (const nodeId of ready) sources.delete(nodeId)
-  }
-}
-
 function validateGraph(
   graph: Graph,
   document: FlowDocument,
@@ -804,6 +909,30 @@ function validateGraph(
   path: string,
   diagnostics: Diagnostic[],
 ): void {
+  const analysis = graphPaths(graph)
+  const seen = new Set<string>()
+  for (const [index, edge] of graph.edges.entries()) {
+    const edgePath = `${path}/edges/${index}`
+    const source = graph.nodes[edge.source]
+    const target = graph.nodes[edge.target]
+    if (source == null || target == null || !('inputs' in target)) {
+      diagnostics.push(graphDiagnostic('graph.edge-invalid', 'Execution edges require an existing source and an executable target.', edgePath))
+    } else if (source.kind == 'condition' || source.kind == 'wait') {
+      const exits =
+        source.kind == 'wait' ? source.actions : [...source.cases.map((item) => item.output), ...(source.defaultOutput == null ? [] : [source.defaultOutput])]
+      if (edge.sourceHandle == null || !exits.some((exit) => exit == edge.sourceHandle)) {
+        diagnostics.push(graphDiagnostic('graph.edge-invalid', 'Choose a declared execution branch.', edgePath))
+      }
+    } else if (edge.sourceHandle != null) {
+      diagnostics.push(graphDiagnostic('graph.edge-invalid', 'Ordinary execution edges do not select a data output.', edgePath))
+    }
+    const key = JSON.stringify([edge.source, edge.sourceHandle, edge.target])
+    if (seen.has(key)) diagnostics.push(graphDiagnostic('graph.edge-duplicate', 'Execution edge is duplicated.', edgePath))
+    seen.add(key)
+  }
+  if (graphOrder(graph).length != Object.keys(graph.nodes).length) {
+    diagnostics.push(graphDiagnostic('graph.cycle', 'Graph contains an execution dependency cycle.', path))
+  }
   for (const [nodeId, node] of Object.entries(graph.nodes)) {
     const nodePath = `${path}/nodes/${nodeId}`
     if (!('inputs' in node)) {
@@ -831,6 +960,28 @@ function validateGraph(
           variant: 'subflow',
         }),
       )
+    }
+    for (const [handle, mapping] of Object.entries(node.inputs)) {
+      if (!mappingAvailable(graph, nodeId, mapping, analysis))
+        diagnostics.push(
+          graphDiagnostic(
+            'graph.source-unavailable',
+            'Input sources must provide exactly one value from completed ancestors on every execution path.',
+            `${nodePath}/inputs/${handle}`,
+          ),
+        )
+    }
+    if (node.kind == 'wait' && node.notification != null) {
+      for (const [handle, mapping] of Object.entries(node.notification.inputs)) {
+        if (!mappingAvailable(graph, nodeId, mapping, analysis))
+          diagnostics.push(
+            graphDiagnostic(
+              'graph.source-unavailable',
+              'Notification sources must provide exactly one value from completed ancestors.',
+              `${nodePath}/notification/inputs/${handle}`,
+            ),
+          )
+      }
     }
     const inputPorts = nodeInputPorts(document, node)
     if (node.kind == 'task') {
@@ -895,7 +1046,6 @@ function validateGraph(
       }
     }
   }
-  checkCycles(graph, path, diagnostics)
 }
 
 function validateSubflowCycles(document: FlowDocument, diagnostics: Diagnostic[]): void {
@@ -941,6 +1091,15 @@ function validateFlowGraph(revision: RevisionContent, closure: SemanticClosure):
     const inputs = portsByHandle(subflow.inputs)
     validateGraph(subflow.graph, revision.document, inputs, false, `${path}/graph`, diagnostics)
     for (const output of subflow.outputs) {
+      if (!mappingAvailable(subflow.graph, undefined, { kind: 'sources', sources: output.sources }, graphPaths(subflow.graph))) {
+        diagnostics.push(
+          graphDiagnostic(
+            'graph.source-unavailable',
+            'Subflow output sources must provide exactly one final value.',
+            `${path}/outputs/${output.handle}/sources`,
+          ),
+        )
+      }
       for (const source of output.sources) {
         const sourcePort = checkSource(source, subflow.graph, revision.document, inputs, undefined, `${path}/outputs/${output.handle}/sources`, diagnostics)
         if (sourcePort != null && !portsAssignable(sourcePort, output)) {

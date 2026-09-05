@@ -1,8 +1,6 @@
-import type { HandleName, NodeId } from '../../../../schema/index.ts'
-import type { RFHandleName } from '../../base/rfHelpers.ts'
+import type { NodeId } from '../../../../schema/index.ts'
 import type { NodeStatus, NodeType } from '../node/constants.ts'
 import type { NodeStoreDisplay$ } from '../node/node.store.ts'
-import type { TaskNodeStoreDisplay$ } from '../node/taskNode.store.ts'
 import type { InteractiveMode } from './designer.store.ts'
 
 import { val } from 'value-enhancer'
@@ -11,7 +9,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CommentNodeStore } from '../node/commentNode.store.ts'
 import { NODE_STATUS, NODE_TYPE } from '../node/constants.ts'
 import { NodeStore } from '../node/node.store.ts'
-import { TaskNodeStore } from '../node/taskNode.store.ts'
 import { DesignerStore } from './designer.store.ts'
 import { DesignerUIStore } from './designerUI.store.ts'
 import { NodeMiniMapPhase } from './nodeMiniMap.ts'
@@ -21,9 +18,7 @@ import { DESIGNER_TYPE, FLOW_RUN_STATUS } from './typings.ts'
 interface TestSetup {
   readonly store: DesignerStore
   readonly nodes: ReturnType<typeof reactiveMap<NodeId, NodeStore>>
-  readonly onConnect: ReturnType<typeof vi.fn>
   createNode(nodeId: NodeId, nodeType?: NodeType): NodeStore
-  createTaskNode(nodeId: NodeId): TaskNodeStore
   dispose(): void
 }
 
@@ -31,7 +26,6 @@ function createTestSetup(): TestSetup {
   const nodes = reactiveMap<NodeId, NodeStore>()
   const viewport = val<{ x: number; y: number; zoom: number } | undefined>()
   const designerUIStore = new DesignerUIStore({ viewport, nodeStores: nodes })
-  const onConnect = vi.fn()
   const store = new DesignerStore(DESIGNER_TYPE.Flow, true, {
     lang$: val('en'),
     rfCommand: createRFCommand(nodes),
@@ -46,7 +40,7 @@ function createTestSetup(): TestSetup {
     bindValidateConnection: () => {},
     onAddNode: async () => undefined,
     onDeleteNodes: () => {},
-    onConnect,
+    onConnect: vi.fn(),
     onDisconnect: () => {},
     onDuplicate: async () => {},
   })
@@ -54,7 +48,6 @@ function createTestSetup(): TestSetup {
   return {
     store,
     nodes,
-    onConnect,
     createNode(nodeId, nodeType = NODE_TYPE.TaskNode) {
       const display$: NodeStoreDisplay$ = {
         icon: val(),
@@ -69,25 +62,6 @@ function createTestSetup(): TestSetup {
         outputs_def: val(),
       }
       const node = new NodeStore(nodeId, nodeType, { display$, designerUIStore })
-      createdNodes.push(node)
-      return node
-    },
-    createTaskNode(nodeId) {
-      const display$: TaskNodeStoreDisplay$ = {
-        icon: val(),
-        title: val(),
-        description: val(),
-        status: val<NodeStatus>(NODE_STATUS.Idle),
-        progress: val(),
-        showSettings: val(),
-        ignore: val(),
-        sections: val([]),
-        inputs_def: val([{ handle: 'value' as HandleName, jsonSchema: {} }]),
-        outputs_def: val([]),
-        task: val(),
-        executorName: val(),
-      }
-      const node = new TaskNodeStore(nodeId, { display$, designerUIStore })
       createdNodes.push(node)
       return node
     },
@@ -186,75 +160,6 @@ describe('DesignerStore.waitNode', () => {
     setup.nodes.set(nodeId, setup.createNode(nodeId))
     await vi.runAllTimersAsync()
     expect(logError).toHaveBeenCalledTimes(1)
-    setup.dispose()
-  })
-})
-
-describe('DesignerStore.setupValueNode', () => {
-  it('does not connect when the source value node never appears', async () => {
-    vi.useFakeTimers()
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    const setup = createTestSetup()
-    const target = setup.createTaskNode('target' as NodeId)
-    setup.nodes.set(target.nodeId, target)
-
-    const operation = setup.store.setupValueNode('missing' as NodeId, {
-      target: target.rfNodeId,
-      targetHandle: 'value' as RFHandleName,
-    })
-
-    await vi.advanceTimersByTimeAsync(5000)
-    await operation
-
-    expect(setup.onConnect).not.toHaveBeenCalled()
-    setup.dispose()
-  })
-})
-
-describe('DesignerStore pending node setup', () => {
-  it.each(['value', 'scriptlet'] as const)('cancels %s setup without connecting after disposal', async (kind) => {
-    vi.useFakeTimers()
-    const logError = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const setup = createTestSetup()
-    const target = setup.createTaskNode('target' as NodeId)
-    setup.nodes.set(target.nodeId, target)
-    const connection = { target: target.rfNodeId, targetHandle: 'value' as RFHandleName }
-    const connect = vi.spyOn(setup.store, 'onRFConnect')
-    const operation =
-      kind == 'value'
-        ? setup.store.setupValueNode('missing' as NodeId, connection)
-        : setup.store.setupScriptletNode('missing' as NodeId, connection, 'value' as HandleName)
-
-    setup.dispose()
-    await operation
-
-    expect(vi.getTimerCount()).toBe(0)
-    await vi.advanceTimersByTimeAsync(5000)
-    expect(connect).not.toHaveBeenCalled()
-    expect(setup.onConnect).not.toHaveBeenCalled()
-    expect(logError).not.toHaveBeenCalled()
-  })
-
-  it('does not connect a scriptlet when its node times out', async () => {
-    vi.useFakeTimers()
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    const setup = createTestSetup()
-    const target = setup.createTaskNode('target' as NodeId)
-    setup.nodes.set(target.nodeId, target)
-    const connect = vi.spyOn(setup.store, 'onRFConnect')
-    const operation = setup.store.setupScriptletNode(
-      'missing' as NodeId,
-      {
-        target: target.rfNodeId,
-        targetHandle: 'value' as RFHandleName,
-      },
-      'value' as HandleName,
-    )
-
-    await vi.advanceTimersByTimeAsync(5000)
-    await operation
-
-    expect(connect).not.toHaveBeenCalled()
     setup.dispose()
   })
 })

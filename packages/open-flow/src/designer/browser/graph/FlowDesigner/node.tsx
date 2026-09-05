@@ -50,9 +50,11 @@ import { TriggerNodeStore } from '../../stores/node/triggerNode.store.ts'
 import { ValueNodeStore } from '../../stores/node/valueNode.store.ts'
 
 interface NodeValues {
+  readonly skipped: Val<boolean | undefined>
+  readonly branches: Val<readonly string[] | undefined>
+  readonly executionInput: Val<boolean>
   conditionCases?: Val<ConditionHandleDef[]>
   defaultCondition?: Val<DefaultConditionHandleDef | undefined>
-  readonly concurrency: Val<number | undefined>
   readonly description: Val<string | undefined>
   readonly diagnostics: Val<boolean>
   readonly executorName: Val<string | undefined>
@@ -387,12 +389,20 @@ export function createNodeEntry(
     return handles
   })
   const values: NodeValues = {
+    skipped: val(node.run?.skipped),
+    branches: val<readonly string[] | undefined>(
+      node.kind == 'condition'
+        ? node.outputs.flatMap((port) => ('handle' in port ? [port.handle] : []))
+        : node.kind == 'wait'
+          ? node.outputs.flatMap((port) => ('handle' in port ? [port.handle] : []))
+          : undefined,
+    ),
+    executionInput: val(node.kind != 'trigger'),
     additionalInputDefs: val<InputHandleDef[] | undefined>(additionalInputDefs(node), equalConfig),
-    concurrency: val(node.concurrency),
     description: val(node.description),
     diagnostics: val((node.diagnostics ?? 0) > 0),
     executorName: val(node.kind == 'task' ? node.executorName : undefined),
-    icon: val(node.icon),
+    icon: val(node.icon ?? (node.kind == 'wait' ? ':carbon:time:' : undefined)),
     inputDefs: val(inputDefs(node), equalConfig),
     inputsFrom: val<readonly HandleInputFrom[] | undefined>(nodeInputsFrom, equalConfig),
     outputDefs: val(outputDefs(node), equalConfig),
@@ -452,11 +462,12 @@ export function createNodeEntry(
   }
   const changeDescription = callbacks.onChangeNodeDescription == null ? undefined : manifest$.description.set
   const commonDisplay = {
+    branches: values.branches,
+    executionInput: values.executionInput,
     icon: values.icon,
     title: values.title,
     description: values.description,
     timeout: values.timeout,
-    concurrency: values.concurrency,
     progressWeight: val<number | undefined>(),
     status: values.status,
     progress: values.progress,
@@ -467,7 +478,7 @@ export function createNodeEntry(
     ),
     outputs_def: values.outputDefs,
     inputs_from: values.inputsFrom,
-    ignore: val<boolean | undefined>(),
+    ignore: values.skipped,
   }
 
   let store: NodeStore
@@ -701,11 +712,15 @@ export function updateNodeEntry(
   contentKey: string,
 ): SemanticNodeEntry {
   entry.values.applyingModel = true
+  entry.values.skipped.set(node.run?.skipped)
+  entry.values.branches.set(
+    node.kind == 'condition' || node.kind == 'wait' ? node.outputs.flatMap((port) => ('handle' in port ? [port.handle] : [])) : undefined,
+  )
+  entry.values.executionInput.set(node.kind != 'trigger')
   entry.values.description.set(node.description)
   entry.values.diagnostics.set((node.diagnostics ?? 0) > 0)
-  entry.values.concurrency.set(node.concurrency)
   entry.values.executorName.set(node.kind == 'task' ? node.executorName : undefined)
-  entry.values.icon.set(node.icon)
+  entry.values.icon.set(node.icon ?? (node.kind == 'wait' ? ':carbon:time:' : undefined))
   entry.values.notice?.set(node.kind == 'wait' ? node.notice : undefined)
   entry.values.rawIcon.set(node.rawIcon)
   entry.values.rawTitle.set(node.rawTitle)

@@ -1,7 +1,6 @@
 import styles from './TriggerNodeContent.module.scss'
 import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
-import type { HandleName } from '../../../../../schema/index.ts'
 import type { DesignerOption as IBasicOption } from '../../../components/select.tsx'
 import type { WidgetType } from '../../../jsonSchema/preset.ts'
 import type {
@@ -17,15 +16,12 @@ import type {
 import { memo, useId, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
-import { toRFHandleName } from '../../../base/rfHelpers.ts'
 import { Button } from '../../../components/button.tsx'
 import { DesignerCheckbox } from '../../../components/checkbox.tsx'
-import { Handle } from '../../../components/handle.tsx'
 import { Input } from '../../../components/input.tsx'
 import { DesignerCombobox as Select } from '../../../components/select.tsx'
 import { getBaseSchema, optionOf, typeOfSchema } from '../../../jsonSchema/preset.ts'
 import { isHandleDef } from '../../../stores/node/constants.ts'
-import { getHandleKind } from '../../../stores/nodeHandle/handleKind.ts'
 
 interface TriggerNodeContentProps {
   readonly store: TriggerNodeStore
@@ -715,7 +711,6 @@ export const TriggerNodeContent: React.FC<TriggerNodeContentProps> = /* @__PURE_
         <i className={`${payloadType.icon} ${styles.payloadIcon}`} />
         <code>payload</code>
         <span className={styles.payloadType}>{payloadType.label}</span>
-        <Handle id={toRFHandleName('payload' as HandleName)} kind={getHandleKind(payload?.json_schema)} type="output" />
       </div>
     </div>
   )

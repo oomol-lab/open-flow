@@ -21,7 +21,7 @@ function draft(flowId: string, revisionId: string) {
     content: {
       document: {
         bindings: {},
-        graph: { nodes: {} },
+        graph: { edges: [], nodes: {} },
         subflows: {},
         tasks: {},
       },
