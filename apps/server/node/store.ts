@@ -1424,7 +1424,8 @@ export class Store {
     this.#database.prepare('UPDATE run_waits SET checkpoint_json = NULL WHERE run_id = ?').run(runId)
     this.#database.prepare('DELETE FROM wait_notifications WHERE run_id = ?').run(runId)
     this.#insertEvent(runId, `run.${status}`, { result })
-    this.#database.prepare('UPDATE runs SET event_count = event_count + 1 WHERE run_id = ?').run(runId)
+    const bytes = encoder.encode(JSON.stringify({ kind: `run.${status}`, payload: { result } })).byteLength
+    this.#database.prepare('UPDATE runs SET event_count = event_count + 1, event_bytes = event_bytes + ? WHERE run_id = ?').run(bytes, runId)
     this.#database.prepare('DELETE FROM work WHERE run_id = ?').run(runId)
     return true
   }
