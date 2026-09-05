@@ -159,9 +159,14 @@ export class WorkspaceStore {
   }
 
   public async start(flowId?: string): Promise<void> {
-    this.#stopCatalogWatch ??= this.#client.watchFlowCatalog(() => void this.reloadFlows())
+    if (this.#stopCatalogWatch == null) {
+      const subscription = this.#client.watchFlowCatalog(() => void this.reloadFlows())
+      this.#stopCatalogWatch = subscription.stop
+      await subscription.ready
+    }
+    if (this.#disposed) return
     await this.reloadFlows()
-    await this.selectFlow(flowId)
+    if (!this.#disposed) await this.selectFlow(flowId)
   }
 
   public async reloadFlows(): Promise<void> {
@@ -199,13 +204,27 @@ export class WorkspaceStore {
     })
     if (flowId == null) return true
     try {
-      const knownFlow = this.#flows.flow(flowId)
-      const [flow, draft, live, presentation] = await Promise.all([
-        knownFlow ?? this.#client.getFlow(flowId),
-        this.#client.getDraft(flowId),
-        this.#client.getLive(flowId),
-        this.#client.getPresentation(flowId),
-      ])
+      let invalidated = false
+      let pendingRevision: string | undefined
+      const subscription = this.#client.watchFlow(
+        flowId,
+        (revisionId) => {
+          if (!current()) return
+          if (this.#draftChanges.committed == null) {
+            invalidated = true
+            pendingRevision = revisionId
+          } else if (revisionId != this.#draftChanges.committed.revisionId) {
+            void this.#refreshDraft(revisionId)
+          }
+        },
+        (event) => {
+          if (current()) this.#runChanged(event)
+        },
+      )
+      this.#stopFlowWatch = subscription.stop
+      await subscription.ready
+      if (!current()) return false
+      const { flow, draft, live, presentation } = await this.#client.getEditor(flowId)
       if (!current()) return false
       this.#draftChanges.reset(draft)
       this.#presentationChanges.reset(presentation)
@@ -219,15 +238,11 @@ export class WorkspaceStore {
         workspaceLoading: false,
       })
       void this.#checkTarget()
-      this.#stopFlowWatch = this.#client.watchFlow(
-        flowId,
-        (revisionId) => {
-          if (!this.#disposed && revisionId != this.#draftChanges.committed?.revisionId) void this.#refreshDraft(revisionId)
-        },
-        this.#runChanged,
-      )
+      if (invalidated && pendingRevision != draft.revisionId) void this.#refreshDraft(pendingRevision)
     } catch (error) {
       if (!current()) return false
+      this.#stopFlowWatch?.()
+      this.#stopFlowWatch = undefined
       const missing = error instanceof ApiError && error.code == controlErrorCode.flowNotFound
       this.#set(
         missing
@@ -880,8 +895,8 @@ export class WorkspaceStore {
           kind: preserveModuleEditor ? 'error' : 'success',
           message: this.#i18n.t(preserveModuleEditor ? 'notice.moduleUpdated' : 'notice.draftUpdated'),
         })
-        if (!preserveDiagnostics) void this.#checkTarget()
       }
+      if (!preserveDiagnostics) void this.#checkTarget()
       return true
     } catch (error) {
       if (reportError && this.#isDraftChangeCurrent(context)) this.#setNotice(errorNotice(error, this.#i18n.t))

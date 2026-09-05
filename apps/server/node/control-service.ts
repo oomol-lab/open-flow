@@ -9,6 +9,7 @@ import type {
   FlowCheck,
   Live,
   PollTriggerTestResult,
+  Presentation,
   Publication,
   PublishOperation,
   Run,
@@ -50,13 +51,6 @@ type PublishInput = {
   readonly revision: RevisionContent
   readonly revisionDigest: string
   readonly revisionId: string
-}
-
-interface Presentation {
-  readonly revision: number
-  readonly updatedAt: string
-  readonly value: Readonly<Record<string, JsonValue>>
-  readonly version: 1
 }
 
 export interface TriggerActivityPosition {
@@ -285,6 +279,14 @@ export class ControlService {
     return flow(stored)
   }
 
+  async getEditor(flowId: string) {
+    const currentFlow = this.getFlow(flowId)
+    const currentDraft = this.getDraft(flowId)
+    const currentPresentation = this.getPresentation(flowId)
+    const live = await this.getLive(flowId)
+    return { flow: currentFlow, draft: currentDraft, live, presentation: currentPresentation, version: 1 as const }
+  }
+
   getDraft(flowId: string): Draft {
     return draft(this.requireDraft(flowId))
   }
@@ -356,7 +358,6 @@ export class ControlService {
   async getLive(flowId: string): Promise<Live> {
     const currentFlow = this.getFlow(flowId)
     const current = this.requireDraft(flowId)
-    const draftClosure = await flowClosure(revisionContent(current))
     const stored = this.store.publications.live(flowId)
     if (stored == null) {
       return {
@@ -368,6 +369,7 @@ export class ControlService {
         version: 1,
       }
     }
+    const draftClosure = await flowClosure(revisionContent(current))
     return {
       flowId,
       hasUnpublishedChanges: draftClosure.digest != stored.publication.closureDigest,

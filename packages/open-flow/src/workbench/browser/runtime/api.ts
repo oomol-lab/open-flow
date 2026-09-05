@@ -1,3 +1,4 @@
+import type { Presentation } from '../../../control/common/api.ts'
 import type { JsonValue } from '../../../flow/common/change.ts'
 import type { FlowCatalogEvent, FlowChangeEvent, WorkbenchHost } from './contract.ts'
 
@@ -15,6 +16,7 @@ export type {
   ConnectorProvider,
   Live,
   LiveRun,
+  Presentation,
   Publication,
   PublicationPage,
   PublishOperation,
@@ -69,13 +71,6 @@ export type {
   WebhookOptions,
 } from '../../../flow/common/change.ts'
 
-export interface Presentation {
-  readonly revision: number
-  readonly updatedAt: string
-  readonly value: Readonly<Record<string, JsonValue>>
-  readonly version: 1
-}
-
 type Fetcher = WorkbenchHost['request']
 type FlowSubscriber = WorkbenchHost['subscribeFlow']
 type FlowCatalogSubscriber = WorkbenchHost['subscribeFlowCatalog']
@@ -84,13 +79,13 @@ const segment = encodeURIComponent
 export class WorkbenchClient extends ControlClient {
   constructor(
     fetcher: Fetcher,
-    private readonly subscribeFlow: FlowSubscriber = () => () => {},
-    private readonly subscribeFlowCatalog: FlowCatalogSubscriber = () => () => {},
+    private readonly subscribeFlow: FlowSubscriber = () => ({ ready: Promise.resolve(), stop() {} }),
+    private readonly subscribeFlowCatalog: FlowCatalogSubscriber = () => ({ ready: Promise.resolve(), stop() {} }),
   ) {
     super(fetcher)
   }
 
-  watchFlowCatalog(changed: (event?: FlowCatalogEvent) => void): () => void {
+  watchFlowCatalog(changed: (event?: FlowCatalogEvent) => void): ReturnType<FlowCatalogSubscriber> {
     return this.subscribeFlowCatalog(changed)
   }
 
@@ -98,16 +93,12 @@ export class WorkbenchClient extends ControlClient {
     flowId: string,
     changed: (revisionId?: string) => void,
     runChanged: (event: Extract<FlowChangeEvent, { readonly kind: 'run.changed' | 'run.created' }>) => void = () => {},
-  ): () => void {
+  ): ReturnType<FlowSubscriber> {
     return this.subscribeFlow(flowId, (event?: FlowChangeEvent) => {
       if (event == null) changed()
       else if (event.kind == 'draft.changed') changed(event.revisionId)
       else runChanged(event)
     })
-  }
-
-  async getPresentation(flowId: string): Promise<Presentation> {
-    return await this.request(`/v1/flows/${segment(flowId)}/presentation`)
   }
 
   async updatePresentation(flowId: string, expectedRevision: number, value: Readonly<Record<string, JsonValue>>): Promise<Presentation> {

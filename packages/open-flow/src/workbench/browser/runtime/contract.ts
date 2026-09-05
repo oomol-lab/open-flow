@@ -16,8 +16,8 @@ export interface WorkbenchHost {
   notify(notification: WorkbenchNotification | undefined): void
   openExternalPage(resolveUrl: () => Promise<string>): Promise<boolean>
   request(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
-  subscribeFlow(flowId: string, listener: (event?: FlowChangeEvent) => void): () => void
-  subscribeFlowCatalog(listener: (event?: FlowCatalogEvent) => void): () => void
+  subscribeFlow(flowId: string, listener: (event?: FlowChangeEvent) => void): { readonly ready: Promise<void>; stop(): void }
+  subscribeFlowCatalog(listener: (event?: FlowCatalogEvent) => void): { readonly ready: Promise<void>; stop(): void }
 }
 
 export interface WorkbenchLocation {

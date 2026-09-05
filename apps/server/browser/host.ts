@@ -1,6 +1,7 @@
 import type { FlowCatalogEvent, FlowChangeEvent, WorkbenchHost, WorkbenchNotification } from '@oomol-lab/open-flow/workbench'
 
 const reconnectDelayMs = 1_000
+const initialConnectionTimeoutMs = 5_000
 
 export function createBrowserHost(notify: (notification: WorkbenchNotification | undefined) => void, sessionExpired: () => void): WorkbenchHost {
   return {
@@ -31,10 +32,27 @@ export function createBrowserHost(notify: (notification: WorkbenchNotification |
   }
 }
 
-function follow<Event>(path: string, listener: (event?: Event) => void, decode: (value: unknown) => Event | undefined, sessionExpired: () => void): () => void {
+function follow<Event>(path: string, listener: (event?: Event) => void, decode: (value: unknown) => Event | undefined, sessionExpired: () => void) {
   const cancellation = new AbortController()
-  void readConnections(path, listener, decode, cancellation.signal, sessionExpired)
-  return () => cancellation.abort()
+  const ready = Promise.withResolvers<void>()
+  let initial = true
+  const finish = () => {
+    initial = false
+    clearTimeout(timer)
+    ready.resolve()
+  }
+  const timer = setTimeout(finish, initialConnectionTimeoutMs)
+  void readConnections(path, listener, decode, cancellation.signal, sessionExpired, (connected) => {
+    if (initial) finish()
+    else if (connected) listener()
+  })
+  return {
+    ready: ready.promise,
+    stop() {
+      cancellation.abort()
+      finish()
+    },
+  }
 }
 
 async function readConnections<Event>(
@@ -43,19 +61,23 @@ async function readConnections<Event>(
   decode: (value: unknown) => Event | undefined,
   signal: AbortSignal,
   sessionExpired: () => void,
+  connection: (connected: boolean) => void,
 ): Promise<void> {
   while (!signal.aborted) {
     try {
       const response = await fetch(path, { credentials: 'same-origin', headers: { accept: 'text/event-stream' }, signal })
+      if (signal.aborted) return
       if (response.status == 401) {
+        connection(false)
         sessionExpired()
         return
       }
       if (!response.ok || response.body == null) throw new Error(`Notification request returned ${response.status}.`)
-      listener()
+      connection(true)
       await readEvents(response.body, listener, decode, signal)
     } catch {
       if (signal.aborted) return
+      connection(false)
     }
     await reconnectDelay(signal)
   }
@@ -73,10 +95,10 @@ async function readEvents<Event>(
   try {
     while (!signal.aborted) {
       const chunk = await reader.read()
-      if (chunk.done) return
+      if (signal.aborted || chunk.done) return
       buffered += decoder.decode(chunk.value, { stream: true })
       let boundary: number
-      while ((boundary = buffered.indexOf('\n\n')) >= 0) {
+      while (!signal.aborted && (boundary = buffered.indexOf('\n\n')) >= 0) {
         const frame = buffered.slice(0, boundary)
         buffered = buffered.slice(boundary + 2)
         const data = frame
