@@ -895,3 +895,35 @@ describe('Server Connector client', () => {
     })
   })
 })
+
+it('aborts all active catalog requests when the caller cancels discovery', async () => {
+  const signals: AbortSignal[] = []
+  const started = Promise.withResolvers<void>()
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString())
+      if (url.pathname == '/v1/providers')
+        return Response.json(
+          success([
+            { authTypes: ['no_auth'], displayName: 'First', service: 'first' },
+            { authTypes: ['no_auth'], displayName: 'Second', service: 'second' },
+          ]),
+        )
+      if (url.pathname == '/v1/apps') return Response.json(success([]))
+      const signal = init?.signal
+      if (signal == null) throw new Error('Missing catalog signal')
+      signals.push(signal)
+      if (signals.length == 2) started.resolve()
+      return await new Promise<Response>((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+    }),
+  )
+  const controller = new AbortController()
+  const pending = new ConnectorClient('https://connector.test', 'token').listActions(undefined, controller.signal)
+  const rejected = expect(pending).rejects.toBeDefined()
+  await started.promise
+  controller.abort()
+  await rejected
+  expect(signals).toHaveLength(2)
+  expect(signals.every((signal) => signal.aborted)).toBe(true)
+})

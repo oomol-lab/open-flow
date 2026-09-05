@@ -186,6 +186,9 @@ package；subscription、checkpoint、调度持久化、endpoint routing 和 adm
 一次有效 Trigger occurrence 只能准入普通 Flow Run，之后复用相同的 Run、执行、事件、取消和 terminal 语义。重投 occurrence 必须通过稳定 identity
 和权威 store 约束为最多一个 Run。
 
+Integration callback 的处理生命周期同时受请求取消、部署关闭和整次 delivery deadline 约束，并向 Provider 与 Connector 传播取消。
+这些取消只能停止尚未完成的回调处理，不能撤销已准入的 Run；部署不能自动重试整段 callback，以免重放 Provider 的外部副作用。
+
 Cron 不为同一 Flow 创建重叠的未终结 Run。已有未终结 Run 时保留当前到期位置并重试；前一个 Run terminal 后最多补入一个最早未处理
 occurrence，再把计划推进到当前时间之后。手动 Run 和其他 Trigger 保留各自的 admission 与 backpressure 语义。
 

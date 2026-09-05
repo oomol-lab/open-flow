@@ -5,6 +5,8 @@ import type { ServerServiceOptions } from '../node/service.ts'
 
 import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '@oomol-lab/open-flow/integration-trigger'
 import * as Effect from 'effect/Effect'
+import * as Exit from 'effect/Exit'
+import * as Scope from 'effect/Scope'
 import { TestClock } from 'effect/testing'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -538,3 +540,66 @@ function admissionCount(file: string): number {
     database.close()
   }
 }
+
+it.each(['request', 'service', 'deadline'] as const)('interrupts callback delivery on %s cancellation without accepting late events', async (stop) => {
+  const file = await databaseFile()
+  const entered = Promise.withResolvers<Parameters<IntegrationDefinition['receive']>[0]>()
+  const release = Promise.withResolvers<void>()
+  const saved = Promise.withResolvers<unknown>()
+  const definition: IntegrationDefinition = {
+    initialState: { checkpoint: null, subscription: {} },
+    snapshot,
+    reconcile: async () => ({ outcome: 'ready' }),
+    async receive(context) {
+      entered.resolve(context)
+      await release.promise
+      try {
+        if (context.state == null) throw new Error('Missing provider state')
+        await context.state.saveCheckpoint({ late: true })
+        saved.resolve('saved')
+      } catch (error) {
+        saved.resolve(error)
+      }
+      return { outcome: 'event', dedupeKey: 'late', payload: { body: {}, deliveryId: 'late', event: 'test' } }
+    },
+  }
+  const scope = await Effect.runPromise(Scope.make())
+  const clock = await Effect.runPromise(TestClock.make().pipe(Scope.provide(scope)))
+  const service = await openService(file, options(clock, [definition]))
+  try {
+    await publish(service, 'ready', null)
+    await service.tickIntegration(new Date(0).toISOString())
+    const endpoint = service.integrationEndpoint('main', 'integration')
+    if (endpoint == null) throw new Error('Missing endpoint')
+    const target = service.integrationTarget(endpoint)
+    if (target == null) throw new Error('Missing target')
+    const cancellation = new AbortController()
+    const pending = service.receiveIntegrationTarget(
+      target,
+      {
+        headers: new Headers(),
+        method: 'POST',
+        payload: {},
+        query: new URLSearchParams(),
+        rawBody: new Uint8Array(),
+      },
+      cancellation.signal,
+    )
+    const rejected = expect(pending).rejects.toBeDefined()
+    const context = await entered.promise
+    expect(context.signal?.aborted).toBe(false)
+    if (stop == 'request') cancellation.abort()
+    else if (stop == 'service') await closeService(service)
+    else await Effect.runPromise(clock.adjust(30_000))
+    await rejected
+    expect(context.signal?.aborted).toBe(true)
+    release.resolve()
+    expect(await saved.promise).toBeInstanceOf(Error)
+    expect(admissionCount(file)).toBe(0)
+    if (stop != 'service') expect(service.integrationState('main', 'integration')?.checkpoint).toBeNull()
+  } finally {
+    release.resolve()
+    await closeService(service)
+    await Effect.runPromise(Scope.close(scope, Exit.void))
+  }
+})

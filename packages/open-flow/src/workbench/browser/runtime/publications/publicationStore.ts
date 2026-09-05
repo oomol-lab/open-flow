@@ -14,6 +14,10 @@ import type { WorkbenchPreferences } from '../contract.ts'
 import type { SetNotice } from '../stores/workbenchNotice.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 
+import * as Cause from 'effect/Cause'
+import * as Effect from 'effect/Effect'
+import * as Exit from 'effect/Exit'
+import * as Fiber from 'effect/Fiber'
 import { derive, val } from 'value-enhancer'
 import { ApiError } from '../api.ts'
 import { createI18n } from '../i18n.ts'
@@ -137,6 +141,7 @@ export class PublicationStore {
   readonly #setNotice: SetNotice
   readonly #state: Val<PublicationState> = val(initialState)
   readonly #workspace: WorkspaceStore
+  #observation?: Fiber.Fiber<boolean, unknown>
   #attempt?: Attempt
 
   public readonly $: Publication$
@@ -186,6 +191,7 @@ export class PublicationStore {
   public dispose(): void {
     this.#loads.invalidate()
     this.#operation.invalidate()
+    this.#stopObservation()
     this.#triggerDetails.invalidate()
     this.#triggerTest.invalidate()
     for (const value of Object.values(this.$)) value.dispose()
@@ -195,6 +201,7 @@ export class PublicationStore {
   public reset(): void {
     this.#loads.invalidate()
     this.#operation.invalidate()
+    this.#stopObservation()
     this.#triggerDetails.invalidate()
     this.#triggerTest.invalidate()
     this.#attempt = undefined
@@ -208,6 +215,7 @@ export class PublicationStore {
     const current = this.#loads.begin()
     if (!sameTarget(state.target, target)) {
       this.#operation.invalidate()
+      this.#stopObservation()
       this.#attempt = undefined
     }
     if (warm) {
@@ -281,6 +289,7 @@ export class PublicationStore {
     const expectedLivePublicationId = this.#workspace.$.live.value?.publication?.publicationId ?? null
     const signature = JSON.stringify({ expectedLivePublicationId, flowId: flow.flowId, kind: 'publish', revisionId: draft.revisionId })
     const attempt = this.#attempt?.signature == signature ? this.#attempt : { key: this.#identity(), signature }
+    this.#stopObservation()
     const current = this.#operation.begin()
     this.#attempt = attempt
     this.#setNotice(undefined)
@@ -321,6 +330,7 @@ export class PublicationStore {
       targetPublicationId: publication.publicationId,
     })
     const attempt = this.#attempt?.signature == signature ? this.#attempt : { key: this.#identity(), signature }
+    this.#stopObservation()
     const current = this.#operation.begin()
     this.#attempt = attempt
     this.#setNotice(undefined)
@@ -457,6 +467,7 @@ export class PublicationStore {
     if (target == null || this.#state.value.changingTriggerId != null || this.#state.value.publishing || this.#state.value.rollingBackPublicationId != null) {
       return false
     }
+    this.#stopObservation()
     const current = this.#operation.begin()
     this.#set({ changingTriggerId: binding.triggerNodeId })
     try {
@@ -480,12 +491,13 @@ export class PublicationStore {
     }
   }
 
-  async #refresh(target: Target): Promise<void> {
+  async #refresh(target: Target, signal?: AbortSignal): Promise<void> {
     const current = this.#loads.begin()
-    const [live, page, bindings] = await this.#read(target).catch((error) => {
+    const [live, page, bindings] = await this.#read(target, signal).catch((error) => {
       if (current() && sameTarget(this.#state.value.target, target)) this.#set({ refreshing: false })
       throw error
     })
+    signal?.throwIfAborted()
     if (current()) this.#workspace.updateLive(live)
     if (current() && sameTarget(this.#state.value.target, target)) {
       this.#set({
@@ -512,11 +524,11 @@ export class PublicationStore {
     }
   }
 
-  async #read(target: Target) {
+  async #read(target: Target, signal?: AbortSignal) {
     return await Promise.all([
-      this.#client.getLive(target.flowId),
-      this.#client.listPublications(target.flowId, { includeTotal: true, limit: pageLimit }),
-      this.#client.listFlowTriggerBindings(target.flowId),
+      this.#client.getLive(target.flowId, signal),
+      this.#client.listPublications(target.flowId, { includeTotal: true, limit: pageLimit }, signal),
+      this.#client.listFlowTriggerBindings(target.flowId, signal),
     ])
   }
 
@@ -535,41 +547,71 @@ export class PublicationStore {
   }
 
   async #observe(target: Target, initial: PublishOperation, current: () => boolean, name: string): Promise<boolean> {
-    let operation = initial
-    while (operation.status == 'pending') {
-      await new Promise((resolve) => setTimeout(resolve, publishPollMs))
-      if (!current()) return false
-      try {
-        operation = await this.#client.getPublishOperation(target.flowId, operation.operationId)
-      } catch (error) {
+    this.#stopObservation()
+    const fiber = Effect.runFork(
+      Effect.gen({ self: this }, function* () {
+        let operation = initial
+        while (operation.status == 'pending') {
+          yield* Effect.sleep(publishPollMs)
+          if (!current()) return false
+          const result = yield* Effect.tryPromise({
+            try: (signal) => this.#client.getPublishOperation(target.flowId, operation.operationId, signal),
+            catch: (error) => error,
+          }).pipe(
+            Effect.match({
+              onFailure: (error) => ({ error }),
+              onSuccess: (value) => ({ value }),
+            }),
+          )
+          if (!current()) return false
+          if ('error' in result) {
+            const error = result.error
+            if (error instanceof ApiError && error.code == 'publication.operation-not-found') {
+              this.#preferences.setItem(this.#operationKey(target.flowId), '')
+              this.#setTarget(target, { operation: undefined, publishing: false })
+              this.#setNotice(errorNotice(error, this.#i18n.t))
+              return false
+            }
+            this.#setNotice(errorNotice(error, this.#i18n.t))
+            continue
+          }
+          operation = result.value
+          this.#setTarget(target, { operation })
+        }
         if (!current()) return false
-        if (error instanceof ApiError && error.code == 'publication.operation-not-found') {
-          this.#preferences.setItem(this.#operationKey(target.flowId), '')
-          this.#setTarget(target, { operation: undefined, publishing: false })
-          this.#setNotice(errorNotice(error, this.#i18n.t))
+        this.#attempt = undefined
+        this.#setTarget(target, { operation, publishing: false })
+        if (operation.status == 'failed') {
+          this.#setNotice({ kind: 'error', message: operation.issue.message })
           return false
         }
-        this.#setNotice(errorNotice(error, this.#i18n.t))
-        continue
-      }
-      if (!current()) return false
-      this.#setTarget(target, { operation })
-    }
-    this.#attempt = undefined
-    this.#setTarget(target, { operation, publishing: false })
-    if (operation.status == 'failed') {
-      this.#setNotice({ kind: 'error', message: operation.issue.message })
-      return false
-    }
-    try {
-      await this.#refresh(target)
-    } catch (error) {
-      if (current()) this.#setNotice(errorNotice(error, this.#i18n.t))
-      return true
-    }
-    if (!current()) return false
-    this.#setNotice({ kind: 'success', message: this.#i18n.t('notice.published', { name }) })
-    return true
+        const refreshed = yield* Effect.tryPromise({
+          try: (signal) => this.#refresh(target, signal),
+          catch: (error) => error,
+        }).pipe(
+          Effect.match({
+            onFailure: (error) => {
+              if (current()) this.#setNotice(errorNotice(error, this.#i18n.t))
+              return false
+            },
+            onSuccess: () => true,
+          }),
+        )
+        if (!current()) return false
+        if (refreshed) this.#setNotice({ kind: 'success', message: this.#i18n.t('notice.published', { name }) })
+        return true
+      }),
+    )
+    this.#observation = fiber
+    const exit = await Effect.runPromiseExit(Fiber.join(fiber))
+    if (Exit.isSuccess(exit)) return exit.value
+    if (Cause.hasInterruptsOnly(exit.cause)) return false
+    throw Cause.squash(exit.cause)
+  }
+
+  #stopObservation(): void {
+    this.#observation?.interruptUnsafe()
+    this.#observation = undefined
   }
 
   #operationKey(flowId: string): string {

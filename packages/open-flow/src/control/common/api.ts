@@ -1165,8 +1165,8 @@ export class ControlClient {
     return triggerKey(source.definition)
   }
 
-  async listFlowTriggerBindings(flowId: string): Promise<readonly TriggerBinding[]> {
-    const source = record(await this.request(`/v1/flows/${segment(flowId)}/triggers`))
+  async listFlowTriggerBindings(flowId: string, signal?: AbortSignal): Promise<readonly TriggerBinding[]> {
+    const source = record(await this.request(`/v1/flows/${segment(flowId)}/triggers`, { signal }))
     if (source.version != 1 || string(source.flowId) != flowId || !Array.isArray(source.bindings)) {
       return invalidResponse()
     }
@@ -1325,20 +1325,21 @@ export class ControlClient {
     )
   }
 
-  async getLive(flowId: string): Promise<Live> {
-    return live(await this.request(`/v1/flows/${segment(flowId)}/live`))
+  async getLive(flowId: string, signal?: AbortSignal): Promise<Live> {
+    return live(await this.request(`/v1/flows/${segment(flowId)}/live`, { signal }))
   }
 
   async listPublications(
     flowId: string,
     options: { readonly cursor?: string; readonly includeTotal?: boolean; readonly limit?: number } = {},
+    signal?: AbortSignal,
   ): Promise<PublicationPage> {
     const parameters = new URLSearchParams()
     if (options.cursor != null) parameters.set('cursor', options.cursor)
     if (options.limit != null) parameters.set('limit', String(options.limit))
     if (options.includeTotal != null) parameters.set('includeTotal', String(options.includeTotal))
     const query = parameters.size == 0 ? '' : `?${parameters}`
-    return publicationPage(await this.request(`/v1/flows/${segment(flowId)}/publications${query}`))
+    return publicationPage(await this.request(`/v1/flows/${segment(flowId)}/publications${query}`, { signal }))
   }
 
   async createDraftRun(flowId: string, revisionId: string, options: RunOptions = {}): Promise<DraftRun> {
@@ -1373,8 +1374,8 @@ export class ControlClient {
     )
   }
 
-  async getPublishOperation(flowId: string, operationId: string): Promise<PublishOperation> {
-    return publishOperation(await this.request(`/v1/flows/${segment(flowId)}/publish-operations/${segment(operationId)}`))
+  async getPublishOperation(flowId: string, operationId: string, signal?: AbortSignal): Promise<PublishOperation> {
+    return publishOperation(await this.request(`/v1/flows/${segment(flowId)}/publish-operations/${segment(operationId)}`, { signal }))
   }
 
   async rollbackFlow(flowId: string, publicationId: string, expectedLivePublicationId: string, options: PublicationOptions = {}): Promise<Publication> {
@@ -1387,8 +1388,8 @@ export class ControlClient {
     )
   }
 
-  async getRun(runId: string): Promise<RunDetails> {
-    return runDetails(await this.request(`/v1/runs/${segment(runId)}`))
+  async getRun(runId: string, signal?: AbortSignal): Promise<RunDetails> {
+    return runDetails(await this.request(`/v1/runs/${segment(runId)}`, { signal }))
   }
 
   async listRuns(flowId: string, options: { readonly cursor?: string; readonly limit?: number; readonly status?: RunStatus } = {}): Promise<RunPage> {
@@ -1400,16 +1401,16 @@ export class ControlClient {
     return runPage(await this.request(`/v1/flows/${segment(flowId)}/runs${query}`))
   }
 
-  async getRunEvents(runId: string, options: { readonly after?: number; readonly limit?: number } = {}): Promise<RunEvents> {
+  async getRunEvents(runId: string, options: { readonly after?: number; readonly limit?: number } = {}, signal?: AbortSignal): Promise<RunEvents> {
     const parameters = new URLSearchParams()
     if (options.after != null) parameters.set('after', String(options.after))
     if (options.limit != null) parameters.set('limit', String(options.limit))
     const query = parameters.size == 0 ? '' : `?${parameters}`
-    return runEvents(await this.request(`/v1/runs/${segment(runId)}/events${query}`))
+    return runEvents(await this.request(`/v1/runs/${segment(runId)}/events${query}`, { signal }))
   }
 
-  async getRunResult(runId: string): Promise<RunResult> {
-    return runResult(await this.request(`/v1/runs/${segment(runId)}/result`))
+  async getRunResult(runId: string, signal?: AbortSignal): Promise<RunResult> {
+    return runResult(await this.request(`/v1/runs/${segment(runId)}/result`, { signal }))
   }
 
   async cancelRun(runId: string): Promise<RunCancellation> {

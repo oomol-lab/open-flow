@@ -1,9 +1,12 @@
+import type * as Fiber from 'effect/Fiber'
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { WorkbenchClient, Run, RunDetails, RunEvent, RunResult, WaitAction } from '../api.ts'
 import type { Current } from '../stores/latest.ts'
 import type { SetNotice } from '../stores/workbenchNotice.ts'
 
+import * as Deferred from 'effect/Deferred'
+import * as Effect from 'effect/Effect'
 import { arrayShallowEqual, derive, val } from 'value-enhancer'
 import { isRunTerminal } from '../../../../execution/common/runLifecycle.ts'
 import { ApiError } from '../api.ts'
@@ -111,7 +114,7 @@ export class RunStore {
   readonly #selection = new Latest()
   readonly #setNotice: SetNotice
   readonly #state: Val<RunState> = val(initialState)
-  #timer?: ReturnType<typeof globalThis.setTimeout>
+  #observation?: Fiber.Fiber<void>
 
   public readonly $: Run$
 
@@ -152,7 +155,7 @@ export class RunStore {
     this.#cancellation.invalidate()
     this.#lists.invalidate()
     this.#selection.invalidate()
-    this.#clearTimer()
+    this.#stopObservation()
     for (const value of Object.values(this.$)) value.dispose()
     this.#state.dispose()
   }
@@ -161,7 +164,7 @@ export class RunStore {
     this.#cancellation.invalidate()
     this.#lists.invalidate()
     this.#selection.invalidate()
-    this.#clearTimer()
+    this.#stopObservation()
     this.#state.set(initialState)
   }
 
@@ -183,7 +186,7 @@ export class RunStore {
       return
     }
     this.#selection.invalidate()
-    this.#clearTimer()
+    this.#stopObservation()
     this.#setNotice(undefined)
     const cancelingRunId = selectedRun(state)?.flowId == flowId ? state.cancelingRunId : undefined
     if (state.cancelingRunId != null && cancelingRunId == null) this.#cancellation.invalidate()
@@ -261,7 +264,7 @@ export class RunStore {
     const run = selectedRun(this.#state.value)
     if (run == null) return
     const current = this.#selection.begin()
-    this.#clearTimer()
+    this.#stopObservation()
     this.#set({ observationFailed: false })
     void this.#poll(run, current)
   }
@@ -286,7 +289,7 @@ export class RunStore {
       this.#set({ runById: replaceRun(state, nextRun) })
       if (state.selectedRunId != run.runId) return
       const observation = this.#selection.begin()
-      this.#clearTimer()
+      this.#stopObservation()
       await this.#poll(nextRun, observation)
     } catch (error) {
       if (current()) this.#setNotice(errorNotice(error, this.#i18n.t))
@@ -329,7 +332,7 @@ export class RunStore {
   public prepareStart(): Current {
     const current = this.#selection.begin()
     this.#lists.invalidate()
-    this.#clearTimer()
+    this.#stopObservation()
     this.#set({
       eventCursor: 0,
       events: [],
@@ -372,7 +375,7 @@ export class RunStore {
 
   #observe(run: Run): void {
     const current = this.#selection.begin()
-    this.#clearTimer()
+    this.#stopObservation()
     const state = this.#state.value
     this.#set({
       eventCursor: 0,
@@ -388,54 +391,67 @@ export class RunStore {
     void this.#poll(run, current)
   }
 
-  async #poll(run: Run, current: Current, unchangedStartingPolls = 0): Promise<void> {
-    try {
-      const after = this.#state.value.eventCursor
-      const [runResponse, eventsResponse] = await Promise.allSettled([
-        this.#client.getRun(run.runId),
-        this.#client.getRunEvents(run.runId, { after, limit: eventPageLimit }),
-      ])
-      if (runResponse.status == 'rejected') throw runResponse.reason
-      if (!current() || this.#state.value.selectedRunId != run.runId) return
-      const nextRun = runResponse.value
-      this.#set({ observationFailed: false })
-      if (eventsResponse.status == 'rejected') {
-        if (!(eventsResponse.reason instanceof ApiError) || eventsResponse.reason.code != 'run.events-expired') throw eventsResponse.reason
-        this.#set({
-          eventsExpiresAt: undefined,
-          historyComplete: false,
-          runById: replaceRun(this.#state.value, nextRun),
-        })
-        await this.#loadResult(nextRun, current)
-        return
-      }
-      const page = eventsResponse.value
-      this.#set({
-        eventCursor: page.nextAfter,
-        events: [...this.#state.value.events, ...page.events],
-        eventsExpiresAt: page.eventsExpiresAt,
-        historyComplete: page.historyComplete,
-        runById: replaceRun(this.#state.value, nextRun),
-      })
-      await this.#loadResult(nextRun, current)
-      if (isRunTerminal(nextRun.status) && page.done) return
-      const starting = nextRun.status == 'queued' || nextRun.status == 'starting'
-      const nextUnchangedStartingPolls = starting && nextRun.status == run.status ? unchangedStartingPolls + 1 : 0
-      const delay =
-        isRunTerminal(nextRun.status) || page.events.length == eventPageLimit
-          ? 0
-          : nextRun.status == 'waiting'
-            ? waitingPollDelay
-            : starting
-              ? Math.min(runningPollDelay, startingPollDelay * 2 ** Math.max(0, nextUnchangedStartingPolls - 1))
-              : runningPollDelay
-      this.#timer = globalThis.setTimeout(() => void this.#poll(nextRun, current, nextUnchangedStartingPolls), delay)
-    } catch (error) {
-      if (current() && this.#state.value.selectedRunId == run.runId) {
-        this.#set({ observationFailed: true })
-        this.#setNotice(errorNotice(error, this.#i18n.t))
-      }
-    }
+  async #poll(run: Run, current: Current): Promise<void> {
+    const ready = Deferred.makeUnsafe<void>()
+    this.#observation = Effect.runFork(
+      Effect.gen({ self: this }, function* () {
+        let previous = run
+        let unchangedStartingPolls = 0
+        while (current()) {
+          const after = this.#state.value.eventCursor
+          const [runResponse, eventsResponse] = yield* Effect.tryPromise({
+            try: (signal) =>
+              Promise.allSettled([this.#client.getRun(run.runId, signal), this.#client.getRunEvents(run.runId, { after, limit: eventPageLimit }, signal)]),
+            catch: (error) => error,
+          })
+          if (runResponse.status == 'rejected') return yield* Effect.fail(runResponse.reason)
+          if (!current() || this.#state.value.selectedRunId != run.runId) return
+          const nextRun = runResponse.value
+          this.#set({ observationFailed: false })
+          if (eventsResponse.status == 'rejected') {
+            if (!(eventsResponse.reason instanceof ApiError) || eventsResponse.reason.code != 'run.events-expired')
+              return yield* Effect.fail(eventsResponse.reason)
+            this.#set({ eventsExpiresAt: undefined, historyComplete: false, runById: replaceRun(this.#state.value, nextRun) })
+            yield* Effect.tryPromise({ try: (signal) => this.#loadResult(nextRun, current, signal), catch: (error) => error })
+            return
+          }
+          const page = eventsResponse.value
+          this.#set({
+            eventCursor: page.nextAfter,
+            events: [...this.#state.value.events, ...page.events],
+            eventsExpiresAt: page.eventsExpiresAt,
+            historyComplete: page.historyComplete,
+            runById: replaceRun(this.#state.value, nextRun),
+          })
+          yield* Effect.tryPromise({ try: (signal) => this.#loadResult(nextRun, current, signal), catch: (error) => error })
+          yield* Deferred.succeed(ready, undefined)
+          if (isRunTerminal(nextRun.status) && page.done) return
+          const starting = nextRun.status == 'queued' || nextRun.status == 'starting'
+          unchangedStartingPolls = starting && nextRun.status == previous.status ? unchangedStartingPolls + 1 : 0
+          const delay =
+            isRunTerminal(nextRun.status) || page.events.length == eventPageLimit
+              ? 0
+              : nextRun.status == 'waiting'
+                ? waitingPollDelay
+                : starting
+                  ? Math.min(runningPollDelay, startingPollDelay * 2 ** Math.max(0, unchangedStartingPolls - 1))
+                  : runningPollDelay
+          previous = nextRun
+          yield* Effect.sleep(delay)
+        }
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            if (current() && this.#state.value.selectedRunId == run.runId) {
+              this.#set({ observationFailed: true })
+              this.#setNotice(errorNotice(error, this.#i18n.t))
+            }
+          }),
+        ),
+        Effect.ensuring(Deferred.succeed(ready, undefined)),
+      ),
+    )
+    await Effect.runPromise(Deferred.await(ready))
   }
 
   async #refreshList(flowId: string): Promise<void> {
@@ -450,15 +466,15 @@ export class RunStore {
     }
   }
 
-  async #loadResult(run: Run, current: Current): Promise<void> {
+  async #loadResult(run: Run, current: Current, signal?: AbortSignal): Promise<void> {
     if (!isRunTerminal(run.status) || this.#state.value.result?.runId == run.runId) return
-    const result = await this.#client.getRunResult(run.runId)
+    const result = await this.#client.getRunResult(run.runId, signal)
     if (current() && this.#state.value.selectedRunId == run.runId) this.#set({ result })
   }
 
-  #clearTimer(): void {
-    if (this.#timer != null) globalThis.clearTimeout(this.#timer)
-    this.#timer = undefined
+  #stopObservation(): void {
+    this.#observation?.interruptUnsafe()
+    this.#observation = undefined
   }
 
   #set(patch: Partial<RunState>): void {

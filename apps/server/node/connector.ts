@@ -4,6 +4,8 @@ import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { Logger } from 'pino'
 
 import { connectorActionPorts } from '@oomol-lab/open-flow/connector-action'
+import * as Deferred from 'effect/Deferred'
+import * as Effect from 'effect/Effect'
 import { errorKind, silentLogger } from './logger.ts'
 
 const maxResponseBytes = 1024 * 1024
@@ -133,59 +135,58 @@ export class ConnectorClient implements ConnectorHost {
       ])
       return this.#decode('actions.list', { serviceId }, () => mapActions(actions, providers, connections))
     }
-    const [providers, connections] = await Promise.all([this.#providers(signal, teamId), this.#connections(undefined, signal, teamId)])
-    const catalogs: (readonly RuntimeAction[])[] = []
-    const controller = new AbortController()
-    const requestSignal = signal == null ? controller.signal : AbortSignal.any([signal, controller.signal])
-    let catalogError: ConnectorTaskError | undefined
-    const budget = {
-      exhaust: (responseBytes: number) => {
-        if (catalogError != null) return catalogError
-        catalogError = unavailable()
-        this.#logger.warn(
-          {
-            category: 'connector.request.failed',
-            failure: 'response-too-large',
-            limitBytes: maxActionCatalogBytes,
-            operation: 'actions.list',
-            responseBytes,
-          },
-          'Connector Action catalog was too large.',
+    return await Effect.runPromise(
+      Effect.gen({ self: this }, function* () {
+        const [providers, connections] = yield* Effect.all(
+          [
+            Effect.tryPromise({ try: (requestSignal) => this.#providers(requestSignal, teamId), catch: (error) => error }),
+            Effect.tryPromise({ try: (requestSignal) => this.#connections(undefined, requestSignal, teamId), catch: (error) => error }),
+          ],
+          { concurrency: 'unbounded' },
         )
-        controller.abort(catalogError)
-        return catalogError
-      },
-      limit: maxActionCatalogBytes,
-      used: 0,
-    }
-    let next = 0
-    try {
-      await Promise.all(
-        Array.from({ length: Math.min(catalogConcurrency, providers.length) }, async () => {
-          while (next < providers.length) {
-            const index = next++
-            const provider = providers[index]
-            if (provider == null) return
-            const current = await this.#actions(
-              `v1/actions?service=${encodeURIComponent(provider.serviceId)}`,
-              false,
-              requestSignal,
-              teamId,
+        const exhausted = Deferred.makeUnsafe<never, ConnectorTaskError>()
+        let catalogError: ConnectorTaskError | undefined
+        const budget = {
+          exhaust: (responseBytes: number) => {
+            if (catalogError != null) return catalogError
+            catalogError = unavailable()
+            this.#logger.warn(
               {
-                serviceId: provider.serviceId,
+                category: 'connector.request.failed',
+                failure: 'response-too-large',
+                limitBytes: maxActionCatalogBytes,
+                operation: 'actions.list',
+                responseBytes,
               },
-              budget,
+              'Connector Action catalog was too large.',
             )
-            catalogs[index] = current
-          }
-        }),
-      )
-    } catch (error) {
-      controller.abort(error)
-      throw error
-    }
-    const actions = catalogs.flat()
-    return this.#decode('actions.list', {}, () => mapActions(actions, providers, connections))
+            Deferred.doneUnsafe(exhausted, Effect.fail(catalogError))
+            return catalogError
+          },
+          limit: maxActionCatalogBytes,
+          used: 0,
+        }
+        const catalogs = yield* Effect.forEach(
+          providers,
+          (provider) =>
+            Effect.tryPromise({
+              try: (requestSignal) =>
+                this.#actions(
+                  `v1/actions?service=${encodeURIComponent(provider.serviceId)}`,
+                  false,
+                  requestSignal,
+                  teamId,
+                  { serviceId: provider.serviceId },
+                  budget,
+                ),
+              catch: (error) => error,
+            }),
+          { concurrency: catalogConcurrency },
+        ).pipe(Effect.raceFirst(Deferred.await(exhausted)))
+        return this.#decode('actions.list', {}, () => mapActions(catalogs.flat(), providers, connections))
+      }),
+      { signal },
+    )
   }
 
   async searchActions(query: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorAction[]> {

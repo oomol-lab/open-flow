@@ -149,3 +149,29 @@ describe('RunStore', () => {
     }
   })
 })
+
+it('aborts both pending Run reads on reset and ignores their late responses', async () => {
+  const signals: AbortSignal[] = []
+  const pending = Promise.withResolvers<Response>()
+  const notice = vi.fn()
+  const request = vi.fn(async (_path: string, init?: RequestInit) => {
+    if (init?.signal == null) throw new Error('Missing observation signal')
+    signals.push(init.signal)
+    return await pending.promise
+  })
+  const store = new RunStore(new WorkbenchClient(request), notice)
+  try {
+    store.follow(run, store.prepareStart())
+    await vi.waitFor(() => expect(signals).toHaveLength(2))
+    store.reset()
+    expect(signals.every((signal) => signal.aborted)).toBe(true)
+    pending.resolve(Response.json(details))
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(store.$.run.value).toBeUndefined()
+    expect(store.$.observationFailed.value).toBe(false)
+    expect(request).toHaveBeenCalledTimes(2)
+  } finally {
+    store.dispose()
+  }
+})

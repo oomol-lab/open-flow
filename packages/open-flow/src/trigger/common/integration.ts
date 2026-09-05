@@ -34,6 +34,7 @@ export interface IntegrationStateContext {
 }
 
 export interface IntegrationReceiveContext {
+  readonly signal?: AbortSignal
   readonly admit: boolean
   readonly allow?: () => Promise<boolean>
   readonly bindingId: string

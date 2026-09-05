@@ -300,3 +300,35 @@ it.each([
   const client = new ControlClient(async () => Response.json(value))
   await expect(client.getEditor(flow.flowId)).rejects.toThrow()
 })
+
+it.each(['run', 'events', 'result', 'operation', 'live', 'publications', 'bindings'] as const)('cancels the %s observation request', async (resource) => {
+  const cancellation = new AbortController()
+  const started = Promise.withResolvers<void>()
+  const client = new ControlClient(async (_path, init) => {
+    const signal = init?.signal
+    if (signal == null) throw new Error('Missing request signal')
+    started.resolve()
+    return await new Promise<Response>((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    })
+  })
+  const signal = cancellation.signal
+  const pending =
+    resource == 'run'
+      ? client.getRun('run', signal)
+      : resource == 'events'
+        ? client.getRunEvents('run', {}, signal)
+        : resource == 'result'
+          ? client.getRunResult('run', signal)
+          : resource == 'operation'
+            ? client.getPublishOperation('flow', 'operation', signal)
+            : resource == 'live'
+              ? client.getLive('flow', signal)
+              : resource == 'publications'
+                ? client.listPublications('flow', {}, signal)
+                : client.listFlowTriggerBindings('flow', signal)
+  const rejected = expect(pending).rejects.toThrow('Observation stopped')
+  await started.promise
+  cancellation.abort(new Error('Observation stopped'))
+  await rejected
+})
