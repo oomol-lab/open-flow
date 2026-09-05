@@ -146,18 +146,17 @@ export class IntegrationRuntime {
   target(endpointId: string): IntegrationTarget | undefined {
     let stored = this.#store.integrations.integrationTarget(endpointId)
     if (stored == null) return
-    let state = stored.state
-    let current = state == null || state.runtimeVersion == stored.runtimeVersion
-    let resolved = this.#trigger(state == null || current ? stored.triggerJson : state.triggerJson)
-    if (state == null) {
-      const initial = resolved.definition.initialState ?? { checkpoint: null, subscription: {} }
+    if (stored.state == null) {
+      const { definition } = this.#trigger(stored.triggerJson)
+      const initial = definition.initialState ?? { checkpoint: null, subscription: {} }
       this.#store.integrations.createIntegrationState(stored, initial.checkpoint, initial.subscription, this.#clock())
       stored = this.#store.integrations.integrationTarget(endpointId)
-      state = stored?.state
-      if (stored == null || state == null) throw new TransientIntegrationError('Integration runtime state changed.')
-      current = state.runtimeVersion == stored.runtimeVersion
-      resolved = this.#trigger(current ? stored.triggerJson : state.triggerJson)
+      if (stored == null) throw new TransientIntegrationError('Integration runtime state changed.')
     }
+    const state = stored.state
+    if (state == null) throw new TransientIntegrationError('Integration runtime state changed.')
+    const current = state.runtimeVersion == stored.runtimeVersion
+    const resolved = this.#trigger(current ? stored.triggerJson : state.triggerJson)
     return {
       connectionId: current ? stored.connectionId : state.connectionId,
       current,
@@ -296,30 +295,13 @@ export class IntegrationRuntime {
     if (candidate.checkpointJson == null || candidate.subscriptionJson == null) {
       throw new TransientIntegrationError('Integration candidate state is not initialized.')
     }
-    let checkpointJson: string = candidate.checkpointJson
-    let subscriptionJson: string = candidate.subscriptionJson
-    return {
-      get checkpoint() {
-        return JSON.parse(checkpointJson) as JsonValue
-      },
-      get subscription() {
-        return JSON.parse(subscriptionJson) as Readonly<Record<string, JsonValue>>
-      },
-      saveCheckpoint: async (checkpoint) => {
-        const next = JSON.stringify(checkpoint)
-        if (!this.#store.integrations.updateCandidateCheckpoint(candidate, checkpointJson, next, now)) {
-          throw new TransientIntegrationError('Integration candidate checkpoint changed concurrently.')
-        }
-        checkpointJson = next
-      },
-      saveSubscription: async (subscription, reconcileAt) => {
-        const next = JSON.stringify(subscription)
-        if (!this.#store.integrations.updateCandidateSubscription(candidate, subscriptionJson, next, reconcileAt.getTime(), now)) {
-          throw new TransientIntegrationError('Integration candidate subscription changed concurrently.')
-        }
-        subscriptionJson = next
-      },
-    }
+    return stateContext(
+      candidate.checkpointJson,
+      candidate.subscriptionJson,
+      (expected, next) => this.#store.integrations.updateCandidateCheckpoint(candidate, expected, next, now),
+      (expected, next, reconcileAt) => this.#store.integrations.updateCandidateSubscription(candidate, expected, next, reconcileAt, now),
+      'Integration candidate',
+    )
   }
 
   #reconcileCandidate(candidate: IntegrationCandidate, now: number): Effect.Effect<void> {
@@ -377,56 +359,47 @@ export class IntegrationRuntime {
           'Integration candidate cleanup completed.',
         )
       }
-    }).pipe(
-      Effect.matchEffect({
-        onFailure: (error) =>
-          Effect.sync(() => {
-            const health = failure(error)
-            if (candidate.status == 'preparing' && health != null) {
-              this.#store.integrations.failCandidate(
-                candidate,
-                health == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid',
-                health == 'needs_reauth' ? 'The Integration Connection requires reauthorization.' : 'The Integration subscription could not be prepared.',
-                now,
-              )
-              this.#logger.warn(
-                {
-                  category: 'publication.integration_failed',
-                  nodeId: candidate.nodeId,
-                  operationId: candidate.operationId,
-                  ...errorKind(error),
-                },
-                'Integration candidate preparation failed.',
-              )
-              return
-            }
-            if (candidate.status == 'cleanup' && health == 'failed') {
-              this.#store.integrations.deleteCandidate(candidate)
-              this.#logger.warn(
-                {
-                  category: 'publication.integration_cleanup_failed',
-                  nodeId: candidate.nodeId,
-                  operationId: candidate.operationId,
-                  ...errorKind(error),
-                },
-                'Integration candidate cleanup failed permanently.',
-              )
-              return
-            }
-            this.#store.integrations.retryCandidate(candidate, now + retryMs, now)
-            this.#logger.warn(
-              {
-                category: candidate.status == 'cleanup' ? 'publication.integration_cleanup_retrying' : 'publication.integration_retrying',
-                nodeId: candidate.nodeId,
-                operationId: candidate.operationId,
-                retryAt: now + retryMs,
-                ...errorKind(error),
-              },
-              'Integration candidate will be retried.',
-            )
-          }),
-        onSuccess: () => Effect.void,
-      }),
+    }).pipe(Effect.catch((error) => Effect.sync(() => this.#failCandidate(candidate, now, error))))
+  }
+
+  #failCandidate(candidate: IntegrationCandidate, now: number, error: unknown): void {
+    const health = failure(error)
+    const fields = { nodeId: candidate.nodeId, operationId: candidate.operationId, ...errorKind(error) }
+    if (candidate.status == 'preparing' && health != null) {
+      this.#store.integrations.failCandidate(
+        candidate,
+        health == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid',
+        health == 'needs_reauth' ? 'The Integration Connection requires reauthorization.' : 'The Integration subscription could not be prepared.',
+        now,
+      )
+      this.#logger.warn(
+        {
+          category: 'publication.integration_failed',
+          ...fields,
+        },
+        'Integration candidate preparation failed.',
+      )
+      return
+    }
+    if (candidate.status == 'cleanup' && health == 'failed') {
+      this.#store.integrations.deleteCandidate(candidate)
+      this.#logger.warn(
+        {
+          category: 'publication.integration_cleanup_failed',
+          ...fields,
+        },
+        'Integration candidate cleanup failed permanently.',
+      )
+      return
+    }
+    this.#store.integrations.retryCandidate(candidate, now + retryMs, now)
+    this.#logger.warn(
+      {
+        category: candidate.status == 'cleanup' ? 'publication.integration_cleanup_retrying' : 'publication.integration_retrying',
+        retryAt: now + retryMs,
+        ...fields,
+      },
+      'Integration candidate will be retried.',
     )
   }
 
@@ -519,38 +492,34 @@ export class IntegrationRuntime {
           'Integration Trigger is healthy.',
         )
       }
-    }).pipe(
-      Effect.matchEffect({
-        onFailure: (error) =>
-          Effect.sync(() => {
-            const health = failure(error)
-            this.#store.integrations.failIntegration(
-              binding.bindingId,
-              binding.runtimeVersion,
-              health == null
-                ? { retryAt: now + retryMs }
-                : { errorCode: health == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid', health, now },
-            )
-            const fields = {
-              bindingId: binding.bindingId,
-              flowId: binding.flowId,
-              runtimeVersion: binding.runtimeVersion,
-              triggerNodeId: binding.triggerNodeId,
-              ...errorKind(error),
-            }
-            if (health == null) {
-              if (!this.#retrying.has(binding.bindingId)) {
-                this.#logger.warn({ category: 'trigger.integration.retrying', retryAt: now + retryMs, ...fields }, 'Integration Trigger will be retried.')
-              }
-              this.#retrying.add(binding.bindingId)
-            } else {
-              this.#retrying.delete(binding.bindingId)
-              this.#logger.warn({ category: 'trigger.integration.health_changed', health, ...fields }, 'Integration Trigger health changed.')
-            }
-          }),
-        onSuccess: () => Effect.void,
-      }),
+    }).pipe(Effect.catch((error) => Effect.sync(() => this.#failReconcile(binding, now, error))))
+  }
+
+  #failReconcile(binding: StoredIntegrationBinding, now: number, error: unknown): void {
+    const health = failure(error)
+    this.#store.integrations.failIntegration(
+      binding.bindingId,
+      binding.runtimeVersion,
+      health == null
+        ? { retryAt: now + retryMs }
+        : { errorCode: health == 'needs_reauth' ? 'connector.connection-required' : 'trigger-key.invalid', health, now },
     )
+    const fields = {
+      bindingId: binding.bindingId,
+      flowId: binding.flowId,
+      runtimeVersion: binding.runtimeVersion,
+      triggerNodeId: binding.triggerNodeId,
+      ...errorKind(error),
+    }
+    if (health == null) {
+      if (!this.#retrying.has(binding.bindingId)) {
+        this.#logger.warn({ category: 'trigger.integration.retrying', retryAt: now + retryMs, ...fields }, 'Integration Trigger will be retried.')
+      }
+      this.#retrying.add(binding.bindingId)
+    } else {
+      this.#retrying.delete(binding.bindingId)
+      this.#logger.warn({ category: 'trigger.integration.health_changed', health, ...fields }, 'Integration Trigger health changed.')
+    }
   }
 
   #connectorProxy(definition: IntegrationDefinition, bindingId: string, connectionId: string, flowId: string, parentSignal?: AbortSignal): ConnectorProxy {
@@ -574,32 +543,14 @@ export class IntegrationRuntime {
   }
 
   #stateContext(record: StoredIntegrationState, now: number): IntegrationStateContext {
-    let checkpointJson = record.checkpointJson
-    let subscriptionJson = record.subscriptionJson
-    return {
-      get checkpoint() {
-        return JSON.parse(checkpointJson) as JsonValue
-      },
-      get subscription() {
-        return JSON.parse(subscriptionJson) as Readonly<Record<string, JsonValue>>
-      },
-      saveCheckpoint: async (checkpoint) => {
-        const next = JSON.stringify(checkpoint)
-        if (!this.#store.integrations.updateIntegrationCheckpoint(record.bindingId, record.runtimeVersion, checkpointJson, next, now)) {
-          throw new TransientIntegrationError('Integration checkpoint changed concurrently.')
-        }
-        checkpointJson = next
-      },
-      saveSubscription: async (subscription, reconcileAt) => {
-        const next = JSON.stringify(subscription)
-        if (
-          !this.#store.integrations.updateIntegrationSubscription(record.bindingId, record.runtimeVersion, subscriptionJson, next, reconcileAt.getTime(), now)
-        ) {
-          throw new TransientIntegrationError('Integration subscription changed concurrently.')
-        }
-        subscriptionJson = next
-      },
-    }
+    return stateContext(
+      record.checkpointJson,
+      record.subscriptionJson,
+      (expected, next) => this.#store.integrations.updateIntegrationCheckpoint(record.bindingId, record.runtimeVersion, expected, next, now),
+      (expected, next, reconcileAt) =>
+        this.#store.integrations.updateIntegrationSubscription(record.bindingId, record.runtimeVersion, expected, next, reconcileAt, now),
+      'Integration',
+    )
   }
 
   #tick(now: number): Effect.Effect<void, unknown> {
@@ -630,6 +581,34 @@ export class IntegrationRuntime {
       throw new PermanentIntegrationError('Fixed Integration Trigger definition is not available.')
     }
     return { definition, trigger }
+  }
+}
+
+function stateContext(
+  checkpointJson: string,
+  subscriptionJson: string,
+  saveCheckpoint: (expected: string, next: string) => boolean,
+  saveSubscription: (expected: string, next: string, reconcileAt: number) => boolean,
+  description: string,
+): IntegrationStateContext {
+  return {
+    get checkpoint() {
+      return JSON.parse(checkpointJson) as JsonValue
+    },
+    get subscription() {
+      return JSON.parse(subscriptionJson) as Readonly<Record<string, JsonValue>>
+    },
+    saveCheckpoint: async (checkpoint) => {
+      const next = JSON.stringify(checkpoint)
+      if (!saveCheckpoint(checkpointJson, next)) throw new TransientIntegrationError(`${description} checkpoint changed concurrently.`)
+      checkpointJson = next
+    },
+    saveSubscription: async (subscription, reconcileAt) => {
+      const next = JSON.stringify(subscription)
+      if (!saveSubscription(subscriptionJson, next, reconcileAt.getTime()))
+        throw new TransientIntegrationError(`${description} subscription changed concurrently.`)
+      subscriptionJson = next
+    },
   }
 }
 
