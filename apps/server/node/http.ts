@@ -142,19 +142,18 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     const capability = context.req.param('capability')
     const action = context.req.param('action')
     const requested = action == 'approve' || action == 'continue' || action == 'reject' ? (action satisfies WaitAction) : undefined
-    const retryAfter = admitCallback('wait-action')
-    if (retryAfter != null) {
-      const response = json(429, { error: { code: 'wait-action.rate-limited', message: 'Too many requests.' }, version: 1 })
-      response.headers.set('cache-control', 'no-store')
-      response.headers.set('retry-after', String(retryAfter))
-      return response
-    }
+    const admit = (digest: string): number | undefined => admitCallback(`wait-action:${digest}`)
     const result =
       requested == null || !/^[A-Za-z0-9_-]{43}$/.test(capability)
         ? undefined
         : method == 'POST'
-          ? service.resolveWaitAction(capability, requested)
-          : service.inspectWaitAction(capability, requested)
+          ? service.resolveWaitAction(capability, requested, admit)
+          : service.inspectWaitAction(capability, requested, admit)
+    if (result != null && 'retryAfter' in result) {
+      const response = json(429, { error: { code: 'wait-action.rate-limited', message: 'Too many requests.' }, version: 1 })
+      response.headers.set('retry-after', String(result.retryAfter))
+      return method == 'HEAD' ? new Response(null, { headers: response.headers, status: response.status }) : response
+    }
     const response =
       result == null
         ? json(404, { error: { code: 'wait-action.not-found', message: 'Wait action was not found.' }, version: 1 })

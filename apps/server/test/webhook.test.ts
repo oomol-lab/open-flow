@@ -68,9 +68,9 @@ function webhookFlow(): RevisionContent {
   }
 }
 
-async function publishedWebhook(service: ServerService) {
-  const stored = await storeRevision(service, webhookFlow(), 'revision-webhook')
-  await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v1', null, 'publication-webhook')
+async function publishedWebhook(service: ServerService, key = 'webhook') {
+  const stored = await storeRevision(service, webhookFlow(), `revision-${key}`)
+  await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v1', null, `publication-${key}`)
   await service.tickMaintenance()
   const binding = service.control.getFlowTriggerBinding(stored.flowId, 'incoming', 'http://server.local')
   const endpointId = binding.endpointUrl == null ? undefined : webhookEndpointId(new URL(binding.endpointUrl))
@@ -172,6 +172,7 @@ describe('Server Webhook Trigger admission', () => {
     const service = await openService(await databaseFile())
     services.push(service)
     const target = await publishedWebhook(service)
+    const other = await publishedWebhook(service, 'other')
     const app = createServerApp(service, { callbackRequestsPerMinute: 1 })
     const url = `http://server.local/v1/webhooks/${target.endpointId}`
     const clock = vi.spyOn(Date, 'now').mockReturnValue(0)
@@ -184,12 +185,12 @@ describe('Server Webhook Trigger admission', () => {
       expect(windows.size).toBe(1)
 
       clock.mockReturnValue(30_000)
-      const waitUrl = 'http://server.local/v1/wait-actions/unknown/approve'
-      expect((await app.request(waitUrl)).status).toBe(404)
+      const otherUrl = `http://server.local/v1/webhooks/${other.endpointId}`
+      expect((await app.request(otherUrl)).status).toBe(405)
       expect(windows.size).toBe(2)
 
       clock.mockReturnValue(60_000)
-      const limited = await app.request(waitUrl)
+      const limited = await app.request(otherUrl)
       expect(limited.status).toBe(429)
       expect(limited.headers.get('retry-after')).toBe('30')
       expect(windows.has(`webhook:${target.endpointId}`)).toBe(false)
@@ -200,7 +201,7 @@ describe('Server Webhook Trigger admission', () => {
       clock.mockReturnValue(120_000)
       expect((await app.request(url)).status).toBe(405)
       expect(windows.size).toBe(1)
-      expect(windows.has('wait-action')).toBe(false)
+      expect(windows.has(`webhook:${other.endpointId}`)).toBe(false)
     } finally {
       writes.mockRestore()
       clock.mockRestore()

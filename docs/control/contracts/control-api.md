@@ -462,3 +462,6 @@ Connection；客户端不能改用 Team ID、Connection owner 或其他外部 id
 `POST` 服从与认证 resolve route 相同的 first-writer-wins 和幂等重放语义。capability、action、固定 Revision 或 active Wait 不匹配时返回
 `404 wait-action.not-found`；其他方法返回 `405 wait-action.method-not-allowed` 并携带 `Allow: GET, HEAD, POST`。服务端只持久化
 capability 摘要；完整 capability 是 bearer credential，消费端不得把它作为普通可公开 URL 记录或转发。
+
+请求被限流时返回 `429 wait-action.rate-limited`，携带表示剩余等待秒数的 `Retry-After`；被限流的 `POST` 不提交决议。
+`HEAD` 的限流响应同样没有 response body。
