@@ -125,7 +125,7 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   const [token, setToken] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [team, setTeam] = useState<
-    | { readonly kind: 'error' | 'hidden' | 'loading' }
+    | { readonly kind: 'empty' | 'error' | 'hidden' | 'loading' }
     | {
         readonly bindings: readonly { readonly flowId: string; readonly teamId: string }[]
         readonly kind: 'ready'
@@ -158,7 +158,12 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
           current.kind == 'ready' && status.teams.some((item) => item.id == current.selectedTeamId)
             ? current.selectedTeamId
             : (status.teams.find((item) => item.systemCreated)?.id ?? status.teams[0]?.id)
-        return { bindings: status.bindings, kind: 'ready', selectedTeamId, teams: status.teams }
+        return {
+          bindings: status.bindings,
+          kind: status.teams.length == 0 ? 'empty' : 'ready',
+          selectedTeamId,
+          teams: status.teams,
+        }
       })
     } catch {
       if (!signal?.aborted) setTeam({ kind: 'error' })
@@ -359,14 +364,14 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
       state: 'ready',
       value: team.selectedTeamId,
     }
-  } else if (team.kind == 'error') {
+  } else if (team.kind == 'empty' || team.kind == 'error') {
     createFlowField = {
       description: t('team.fixedHint'),
       label: t('team.label'),
       onRetry: () => void loadTeams(),
       retry: t('team.retry'),
       state: 'error',
-      status: t('team.loadFailed'),
+      status: t(team.kind == 'empty' ? 'team.noTeams' : 'team.loadFailed'),
     }
   } else if (team.kind == 'loading') {
     createFlowField = {

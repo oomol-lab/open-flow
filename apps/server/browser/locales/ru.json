@@ -69,6 +69,7 @@
     "label": "Команда OOMOL",
     "loadFailed": "Не удалось загрузить команды.",
     "loading": "Загрузка команд…",
+    "noTeams": "Для этого Operator нет доступных команд OOMOL.",
     "retry": "Повторить загрузку команд",
     "selectForCreation": "Выбрать команду Connector для нового Flow"
   },

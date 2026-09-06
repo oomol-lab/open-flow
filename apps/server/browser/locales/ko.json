@@ -69,6 +69,7 @@
     "label": "OOMOL 팀",
     "loadFailed": "팀을 불러오지 못했습니다.",
     "loading": "팀을 불러오는 중…",
+    "noTeams": "이 Operator에서 사용할 수 있는 OOMOL 팀이 없습니다.",
     "retry": "팀 다시 불러오기",
     "selectForCreation": "새 Flow의 Connector 팀 선택"
   },

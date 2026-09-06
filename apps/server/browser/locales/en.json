@@ -69,6 +69,7 @@
     "label": "OOMOL Team",
     "loadFailed": "Teams could not be loaded.",
     "loading": "Loading Teams…",
+    "noTeams": "No OOMOL Teams are available for this Operator.",
     "retry": "Retry Teams",
     "selectForCreation": "Select the Connector Team for the new Flow"
   },
