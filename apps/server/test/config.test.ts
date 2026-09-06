@@ -213,3 +213,29 @@ it('authenticates configuration requests, hides tokens, and rejects stale or env
     await closeService(service)
   }
 })
+
+it('rejects malformed UTF-8 in configuration JSON bodies', async () => {
+  const file = await databaseFile()
+  const service = await openService(file)
+  const configured = settings(file)
+  const app = createServerApp(service, { resolveControlActor: () => 'operator', settings: configured })
+  try {
+    const prefix = new TextEncoder().encode('{"expectedRevision":1,"origin":"https://models.example.com","token":"')
+    const suffix = new TextEncoder().encode('","version":1}')
+    const malformed = new Uint8Array(prefix.length + 2 + suffix.length)
+    malformed.set(prefix)
+    malformed.set([0xc3, 0x28], prefix.length)
+    malformed.set(suffix, prefix.length + 2)
+
+    const response = await app.request('/config/llm', {
+      body: malformed,
+      headers: { 'content-type': 'application/json' },
+      method: 'PUT',
+    })
+
+    expect(response.status).toBe(400)
+    expect(configured.status().llm.configured).toBe(false)
+  } finally {
+    await closeService(service)
+  }
+})
