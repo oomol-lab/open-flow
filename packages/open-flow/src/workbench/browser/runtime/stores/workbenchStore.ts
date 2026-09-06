@@ -14,6 +14,7 @@ import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { diagnosticItems } from '../designer/diagnostics.ts'
 import { createI18n } from '../i18n.ts'
 import { PublicationStore } from '../publications/publicationStore.ts'
+import { randomId } from '../random.ts'
 import { revisionView } from '../revisionView.ts'
 import { RunRequestStore } from '../runs/runRequestStore.ts'
 import { RunStore } from '../runs/runStore.ts'
@@ -95,7 +96,7 @@ export class WorkbenchStore {
   public constructor(
     client: WorkbenchClient,
     preferences: WorkbenchPreferences,
-    identity: () => string = () => crypto.randomUUID(),
+    identity: () => string = randomId,
     i18n: I18n = createI18n(),
     host: Pick<WorkbenchHost, 'openExternalPage'> = blockedExternalPages,
     variables = true,

@@ -17,6 +17,7 @@ import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 import { derive, val } from 'value-enhancer'
 import { ApiError } from '../api.ts'
 import { createI18n } from '../i18n.ts'
+import { randomId } from '../random.ts'
 import { Latest } from '../stores/latest.ts'
 import { errorNotice } from '../stores/workbenchNotice.ts'
 
@@ -146,7 +147,7 @@ export class PublicationStore {
     workspace: WorkspaceStore,
     setNotice: SetNotice,
     preferences: WorkbenchPreferences,
-    identity: () => string = () => crypto.randomUUID(),
+    identity: () => string = randomId,
     i18n: I18n = createI18n(),
   ) {
     this.#client = client

@@ -10,6 +10,7 @@ import type { RunStore } from './runStore.ts'
 import { compute, derive, val } from 'value-enhancer'
 import { portsByHandle } from '../../../../flow/common/change.ts'
 import { createI18n } from '../i18n.ts'
+import { randomId } from '../random.ts'
 import { revisionView } from '../revisionView.ts'
 import { Latest } from '../stores/latest.ts'
 import { errorNotice } from '../stores/workbenchNotice.ts'
@@ -110,7 +111,7 @@ export class RunRequestStore {
     runs: Pick<RunStore, 'follow' | 'prepareStart'>,
     setNotice: SetNotice,
     i18n: I18n = createI18n(),
-    identity: () => string = () => crypto.randomUUID(),
+    identity: () => string = randomId,
   ) {
     this.#client = client
     this.#runs = runs

@@ -12,6 +12,7 @@ import { Spinner } from '../../../ui/browser/spinner.tsx'
 import { WorkbenchClient } from './api.ts'
 import { createI18n } from './i18n.ts'
 import { NavigationStore } from './navigation.ts'
+import { randomId } from './random.ts'
 import { FlowBrowser } from './shell/resourceBrowser.tsx'
 import { WorkbenchStore } from './stores/workbenchStore.ts'
 
@@ -278,7 +279,7 @@ function Session({
         (listener) => host.subscribeFlowCatalog(listener),
       ),
       preferences,
-      () => crypto.randomUUID(),
+      randomId,
       workbenchI18n,
       host,
       variables,
