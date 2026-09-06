@@ -1,5 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ControlClient } from './api.ts'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 const flow = {
   createdAt: '2026-08-14T00:00:00.000Z',
@@ -24,6 +28,15 @@ describe('ControlClient Flow API', () => {
     await expect(client.listFlows({ includeTotal: true, limit: 50 })).resolves.toEqual({ flows: [flow], total: 1, version: 1 })
     expect(JSON.parse(String(request.mock.calls[0]![1]?.body))).toEqual({ name: 'Main', version: 1 })
     expect(new Headers(request.mock.calls[0]![1]?.headers).get('idempotency-key')).toBe('flow-create')
+  })
+
+  it('creates a Flow without randomUUID support', async () => {
+    vi.stubGlobal('crypto', undefined)
+    const request = vi.fn(async (_path: string, _init?: RequestInit) => Response.json(flow, { status: 201 }))
+    const client = new ControlClient(request)
+
+    await expect(client.createFlow('Main')).resolves.toEqual(flow)
+    expect(new Headers(request.mock.calls[0]![1]?.headers).get('idempotency-key')).toMatch(/^flow-[a-z0-9]+-[a-z0-9]+$/)
   })
 
   it('changes the top-level Flow Draft graph', async () => {
