@@ -190,6 +190,22 @@ describe('Server Connector client', () => {
     expect(new ConnectorClient('https://connector.oomol.com', '').teamSupported()).toBe(false)
   })
 
+  it('rejects malformed UTF-8 in Connector JSON responses', async () => {
+    const prefix = new TextEncoder().encode('{"teams":[{"id":"team-1","name":"')
+    const suffix = new TextEncoder().encode('","status":"normal","system_created":true}]}')
+    const malformed = new Uint8Array(prefix.length + 2 + suffix.length)
+    malformed.set(prefix)
+    malformed.set([0xc3, 0x28], prefix.length)
+    malformed.set(suffix, prefix.length + 2)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(malformed, { headers: { 'content-type': 'application/json' }, status: 200 })),
+    )
+
+    const connector = new ConnectorClient('https://connector.oomol.dev', 'runtime-token')
+    await expect(connector.listTeams()).rejects.toMatchObject({ code: 'connector.unavailable' })
+  })
+
   it('checks Connector readiness without using the runtime token', async () => {
     let status = 200
     const requests: { readonly authorization?: string; readonly path: string }[] = []
