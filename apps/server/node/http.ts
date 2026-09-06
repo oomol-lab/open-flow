@@ -470,11 +470,8 @@ function withOrigin(headers: Headers, origin: string | undefined): void {
 function trustworthyOrigin(url: URL, host = url.host): boolean {
   if (url.protocol == 'https:') return true
   if (url.protocol != 'http:') return false
-  try {
-    return ['127.0.0.1', '::1', '[::1]', 'localhost'].includes(new URL(`http://${host}`).hostname)
-  } catch {
-    return false
-  }
+  const match = /^(localhost|127\.0\.0\.1|\[::1\])(?::(\d{1,5}))?$/i.exec(host)
+  return match != null && (match[2] == null || Number(match[2]) <= 65_535)
 }
 
 function requestHeader(request: Request, name: string): string | undefined {
