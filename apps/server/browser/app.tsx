@@ -15,6 +15,7 @@ import { Toaster, toast } from 'sonner'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { createBrowserHost } from './host.ts'
 import { createI18n } from './i18n.ts'
+import { idempotencyKey } from './idempotency.ts'
 import { initialLanguage, languagePreference } from './language.ts'
 import { parseRoute, routePath } from './route.ts'
 import { SettingsPage } from './settings.tsx'
@@ -316,7 +317,7 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
     const response = await fetch('/connector/flows', {
       body: JSON.stringify({ name, teamId, version: 1 }),
       credentials: 'same-origin',
-      headers: { 'content-type': 'application/json', 'idempotency-key': `flow-${crypto.randomUUID()}` },
+      headers: { 'content-type': 'application/json', 'idempotency-key': `flow-${idempotencyKey()}` },
       method: 'POST',
     })
     const value = (await response.json()) as unknown
