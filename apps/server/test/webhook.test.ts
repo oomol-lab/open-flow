@@ -168,6 +168,27 @@ describe('Server Webhook Trigger admission', () => {
     expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0)
   })
 
+  it('rejects malformed UTF-8 instead of silently rewriting the webhook payload', async () => {
+    const service = await openService(await databaseFile())
+    services.push(service)
+    const target = await publishedWebhook(service)
+    const prefix = new TextEncoder().encode('{"message":"')
+    const suffix = new TextEncoder().encode('"}')
+    const malformed = new Uint8Array(prefix.length + 2 + suffix.length)
+    malformed.set(prefix)
+    malformed.set([0xc3, 0x28], prefix.length)
+    malformed.set(suffix, prefix.length + 2)
+
+    const response = await createServerApp(service).request(`http://server.local/v1/webhooks/${target.endpointId}`, {
+      body: malformed,
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'malformed-utf8' },
+      method: 'POST',
+    })
+
+    expect(response.status).toBe(400)
+    expect(service.control.listRuns(target.flowId, 10).page.runs).toHaveLength(0)
+  })
+
   it('reclaims expired callback windows without resetting active limits', async () => {
     const service = await openService(await databaseFile())
     services.push(service)

@@ -345,6 +345,7 @@ function acceptsHtml(accept: string | undefined): boolean {
 
 class WebhookBodyTooLarge extends Error {}
 class WebhookRequestInvalid extends Error {}
+const webhookDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false })
 
 async function integration(
   service: ServerService,
@@ -472,9 +473,10 @@ function requestHeader(request: Request, name: string): string | undefined {
 }
 
 async function readWebhookPayload(request: Request): Promise<JsonValue> {
-  const source = new TextDecoder().decode(await readBody(request, maximumWebhookBodyBytes, () => new WebhookBodyTooLarge()))
-  if (source.length == 0) return {}
+  const bytes = await readBody(request, maximumWebhookBodyBytes, () => new WebhookBodyTooLarge())
   try {
+    const source = webhookDecoder.decode(bytes)
+    if (source.length == 0) return {}
     return JSON.parse(source) as JsonValue
   } catch {
     throw new WebhookRequestInvalid()
