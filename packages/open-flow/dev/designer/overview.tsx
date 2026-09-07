@@ -40,6 +40,7 @@ const designerTokens = [
       '--edge-color',
       '--edge-string',
       '--edge-primitive',
+      '--edge-selected',
       '--edge-bin',
       '--edge-error',
       '--widget-success-progress-color',
