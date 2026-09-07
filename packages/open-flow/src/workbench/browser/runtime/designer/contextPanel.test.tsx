@@ -148,8 +148,6 @@ describe('Context Panel', () => {
     )
 
     expect(markup.match(/class="context-panel"/g)).toHaveLength(1)
-    expect(markup).toContain('class="block-library-group"')
-    expect(markup).toContain('data-slot="separator"')
     expect(markup).toContain('aria-hidden="true" class="context-panel-backdrop"')
     expect(markup).toContain('data-theme="dark"')
     expect(markup).toContain('Search blocks')

@@ -15,7 +15,6 @@ import { DesignerIcon } from '../../../../designer/browser/icons/DesignerIcon.ts
 import { ThemeProvider } from '../../../../designer/browser/theme/ThemeProvider.tsx'
 import { Button, buttonVariants } from '../../../../ui/browser/button.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
-import { Separator } from '../../../../ui/browser/separator.tsx'
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
@@ -246,17 +245,24 @@ function LibraryGroup({
   readonly onToggle?: () => void
 }): ReactElement {
   return (
-    <div className="block-library-group">
+    <div className={cn('block-library-group', nested ? 'block-library-subgroup' : 'block-library-category')}>
       {onToggle == null ? (
-        <span>{label}</span>
+        <span className={nested ? 'block-library-subgroup-title' : 'block-library-category-title'}>{label}</span>
       ) : (
-        <Button aria-expanded={open} className="min-w-0 flex-1 justify-start text-left" onClick={onToggle} size="sm" type="button" variant="disclosure">
-          <Icon className={open ? undefined : '-rotate-90'} name="chevron-down" />
-          <span className="truncate">{label}</span>
+        <Button
+          aria-expanded={open}
+          className={cn('min-w-0 flex-1 text-left', nested ? 'justify-start' : 'justify-between px-0')}
+          onClick={onToggle}
+          size="sm"
+          type="button"
+          variant="disclosure"
+        >
+          {nested && <Icon className={open ? undefined : '-rotate-90'} name="chevron-down" />}
+          <span className={cn('truncate', nested ? 'block-library-subgroup-title' : 'block-library-category-title')}>{label}</span>
+          {!nested && <Icon className={open ? undefined : '-rotate-90'} name="chevron-down" />}
         </Button>
       )}
       {children}
-      {!nested && onToggle == null && <Separator />}
     </div>
   )
 }
