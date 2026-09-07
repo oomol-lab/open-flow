@@ -17,6 +17,12 @@ afterEach(() => {
   for (const store of operatorStores.splice(0)) store.close()
 })
 
+async function cleanup(directory: string): Promise<void> {
+  // Windows 不允许在 SQLite WAL 文件仍被 OperatorStore 打开时删除测试目录。
+  for (const store of operatorStores.splice(0)) store.close()
+  await rm(directory, { force: true, recursive: true })
+}
+
 function operator(file: string, envToken: string | undefined, secure = false, setupCode?: string, now?: () => number): OperatorSession {
   const store = new OperatorStore(file, now)
   operatorStores.push(store)
@@ -118,7 +124,7 @@ it('uses a signed operator session, expires it on time or token rotation, and cl
     expect(await callback.text()).toBe('')
   } finally {
     await closeService(service)
-    await rm(directory, { force: true, recursive: true })
+    await cleanup(directory)
   }
 })
 
@@ -147,7 +153,7 @@ it('rate limits operator login attempts', async () => {
     expect(limited.headers.get('set-cookie')).toBeNull()
   } finally {
     await closeService(service)
-    await rm(directory, { force: true, recursive: true })
+    await cleanup(directory)
   }
 })
 
@@ -171,7 +177,7 @@ it('throttles failed stored token verification and caches a verified token', asy
     expect(await restored.matches(token)).toBe(true)
   } finally {
     await closeService(service)
-    await rm(directory, { force: true, recursive: true })
+    await cleanup(directory)
   }
 })
 
@@ -197,7 +203,7 @@ it('reports missing operator configuration without disabling callbacks or health
     expect((await app.request('/v1/webhooks/not-an-endpoint')).status).toBe(404)
   } finally {
     await closeService(service)
-    await rm(directory, { force: true, recursive: true })
+    await cleanup(directory)
   }
 })
 
@@ -276,7 +282,7 @@ it('claims an unconfigured deployment with a one-time setup session and restores
     expect(login.status).toBe(200)
   } finally {
     await closeService(service)
-    await rm(directory, { force: true, recursive: true })
+    await cleanup(directory)
   }
 })
 
@@ -327,7 +333,7 @@ it.each(['valid', 'missing', 'tampered', 'expired'])('checks a %s setup session 
     }
   } finally {
     await closeService(service)
-    await rm(directory, { force: true, recursive: true })
+    await cleanup(directory)
   }
 })
 
@@ -408,7 +414,7 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
     expect(requests.at(-1)).toEqual({ teamId: 'team-2', url: 'https://connector.oomol.com/v1/providers' })
   } finally {
     await closeService(reopened)
-    await rm(directory, { force: true, recursive: true })
+    await cleanup(directory)
   }
 })
 
@@ -422,7 +428,7 @@ it('hides OOMOL Team selection for a custom Connector', async () => {
     expect(await (await app.request('/connector/teams')).json()).toEqual({ bindings: [], enabled: false, teams: [], version: 1 })
   } finally {
     await closeService(service)
-    await rm(directory, { force: true, recursive: true })
+    await cleanup(directory)
   }
 })
 
@@ -472,7 +478,7 @@ it('streams independent Flow catalog and current Flow invalidations', async () =
     await catalogReader.cancel()
   } finally {
     await closeService(service)
-    await rm(directory, { force: true, recursive: true })
+    await cleanup(directory)
   }
 })
 
@@ -492,7 +498,7 @@ it('closes Flow notification streams during shutdown', async () => {
     await expect(reader.read()).resolves.toEqual({ done: true, value: undefined })
   } finally {
     await closeService(service)
-    await rm(directory, { force: true, recursive: true })
+    await cleanup(directory)
   }
 })
 
@@ -544,7 +550,7 @@ it('serves immutable assets and limits the SPA fallback to non-reserved HTML nav
     expect(withoutAssets.headers.get('content-type')).toContain('application/json')
   } finally {
     await closeService(service)
-    await rm(directory, { force: true, recursive: true })
+    await cleanup(directory)
   }
 })
 
@@ -558,6 +564,6 @@ it('preserves opener isolation behind a TLS-terminating proxy', async () => {
     expect(response.headers.get('cross-origin-opener-policy')).toBe('same-origin')
   } finally {
     await closeService(service)
-    await rm(directory, { force: true, recursive: true })
+    await cleanup(directory)
   }
 })
