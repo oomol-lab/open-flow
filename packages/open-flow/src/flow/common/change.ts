@@ -1,5 +1,7 @@
 import { dequal } from 'dequal/lite'
 
+export { changeOperationsSchema, decodeChangeOperations } from './changeSchema.ts'
+
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
 export const resourceNameMaxLength = 80

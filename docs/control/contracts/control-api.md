@@ -638,3 +638,9 @@ Run 取消、deadline、兄弟节点失败和节点退出沿既有执行生命�
 当前 Connector adapter 先按稳定 ID 查询账号，再用 `x-oo-connector-alias` 执行。上游需要 transport alias；账号缺少它时明确失败。
 查询和 POST 之间 alias 被重新分配的竞态尚未消除，本次实现不声称具备端到端的稳定 ID 原子执行保证。
 要完成该项验收，上游必须支持按 Connection ID 原子解析并执行，或在同一次执行请求中校验 ID 与 alias / 版本条件；重复查询 alias 不能代替该保证。
+
+### Draft 操作结构发现
+
+公开 `flow-change` 的 `changeOperationsSchema()` 返回 ChangeOperation 数组的 JSON Schema，传入 operation kind 时返回单个操作的独立 schema。
+`decodeChangeOperations()` 与该 schema 使用相同的字段定义，拒绝未知 kind、未知字段和不完整结构；Server 在 Draft change HTTP 边界调用它。
+结构校验不替代操作顺序、before 值、图语义或 Revision 并发校验。

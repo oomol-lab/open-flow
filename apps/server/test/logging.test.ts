@@ -198,7 +198,7 @@ it('logs the cause of an invalid Draft structure without copying the request bod
   expect(response.status).toBe(400)
   expect(response.headers.get('x-request-id')).toBe('request-invalid-draft')
   expect(await response.json()).toEqual({
-    error: { code: 'flow.invalid', message: 'The Draft change produced invalid Revision content.' },
+    error: { code: 'flow.invalid', message: 'The Draft operation has an invalid structure.' },
     version: 1,
   })
   expect(captured.entries()).toEqual(

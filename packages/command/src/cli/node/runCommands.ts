@@ -1,4 +1,4 @@
-import type { JsonValue, RunDetails, RunEvent, RunEvents } from '@oomol-lab/open-flow/control-api'
+import type { JsonValue, RunDetails } from '@oomol-lab/open-flow/control-api'
 import type { Runtime, ParsedArguments } from './support.ts'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
@@ -13,14 +13,16 @@ import {
   referencedFlow,
   requireCount,
   runInputs,
+  runExitCode,
   runPageLimit,
   runSummaryText,
   runText,
   waitForRun,
+  waitForPublication,
   write,
 } from './support.ts'
 
-export async function createRunCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<void> {
+export async function createRunCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<number | void> {
   requireCount(
     operands,
     1,
@@ -28,9 +30,14 @@ export async function createRunCommand(client: ControlClient, operands: readonly
   )
   const flow = await referencedFlow(client, operands[0]!)
   const inputs = await runInputs(args, runtime)
-  const live = args.source == 'live' ? await client.getLive(flow.flowId) : undefined
+  const live =
+    args.source == 'live'
+      ? args.expectedPublication == null
+        ? await client.getLive(flow.flowId)
+        : { publication: await publicationById(client, flow.flowId, args.expectedPublication) }
+      : undefined
   if (args.source == 'live' && live?.publication == null) throw new CliError('live.not-found', `Flow ${JSON.stringify(operands[0])} has no Live Publication.`)
-  const revisionId = live?.publication?.revisionId ?? flow.draftRevisionId
+  const revisionId = live?.publication?.revisionId ?? args.expectedRevision ?? flow.draftRevisionId
   const revision = await client.getRevision(flow.flowId, revisionId)
   const triggers = Object.entries(revision.content.document.graph.nodes).filter(([, node]) => !('inputs' in node))
   const only = triggers.length == 1 && triggers[0]?.[1].kind == 'manual' ? triggers[0][0] : undefined
@@ -51,13 +58,14 @@ export async function createRunCommand(client: ControlClient, operands: readonly
   }
   const trigger = { nodeId: selected.triggerId, payload }
   let created: RunDetails
-  if (live?.publication != null) created = await client.createLiveRun(live.publication.publicationId, { inputs, trigger })
-  else created = await client.createDraftRun(flow.flowId, revisionId, { inputs, trigger })
-  if (args.wait) created = await waitForRun(client, created, runtime)
-  write(runtime, args.json, { kind: 'run.create', run: created, version: 1 }, runText(created))
+  if (live?.publication != null) created = await client.createLiveRun(live.publication.publicationId, { inputs, trigger, idempotencyKey: args.idempotencyKey })
+  else created = await client.createDraftRun(flow.flowId, revisionId, { inputs, trigger, idempotencyKey: args.idempotencyKey })
+  const result = args.wait ? await waitForRun(client, created, runtime, args.timeoutMs) : { run: created, timedOut: false }
+  write(runtime, args.json, { kind: 'run.create', idempotencyKey: args.idempotencyKey, ...result, version: 1 }, runText(result.run))
+  return runExitCode(result.run, result.timedOut)
 }
 
-export async function runsCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<void> {
+export async function runsCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<number | void> {
   const [operation, ...references] = operands
   switch (operation) {
     case 'list': {
@@ -78,25 +86,72 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
       write(runtime, args.json, { kind: 'run.show', run, version: 1 }, runText(run))
       return
     }
-    case 'events': {
-      requireCount(references, 1, 'oo flow runs events <run> [--after <sequence>] [--limit <count>] [--follow] [--json]')
-      let after = args.after ?? 0
-      const events: RunEvent[] = []
-      let page: RunEvents
-      do {
-        page = await client.getRunEvents(references[0]!, { after, limit: args.limit ?? runPageLimit })
-        events.push(...page.events)
-        after = page.nextAfter
-        if (args.follow && !page.done && page.events.length == 0) await runtime.wait(1_000)
-      } while (args.follow && !page.done)
-      write(runtime, args.json, { ...page, events, kind: 'run.events', version: 1 }, events.map(eventText).join('\n'))
+    case 'wait': {
+      requireCount(references, 1, 'oo flow runs wait <run> [--timeout <milliseconds>] [--json]')
+      const runId = references[0]!
+      const deadline = Date.now() + (args.timeoutMs ?? 60_000)
+      try {
+        const current = await client.getRun(runId, AbortSignal.timeout(args.timeoutMs ?? 60_000))
+        const result = await waitForRun(client, current, runtime, Math.max(0, deadline - Date.now()))
+        write(runtime, args.json, { kind: 'run.wait', runId, ...result, version: 1 }, runText(result.run))
+        return runExitCode(result.run, result.timedOut)
+      } catch (error) {
+        if (Date.now() >= deadline || (error instanceof Error && error.name == 'TimeoutError')) {
+          write(runtime, args.json, { kind: 'run.wait', runId, timedOut: true, version: 1 }, `timeout\t${runId}`)
+          return 3
+        }
+        if (error instanceof CliError) throw error
+        throw new CliError('run.wait-failed', error instanceof Error ? error.message : String(error), { runId })
+      }
+    }
+    case 'resolve': {
+      requireCount(references, 3, 'oo flow runs resolve <run> <wait> <continue|approve|reject> [--json]')
+      const [runId, waitId, action] = references
+      if (action != 'continue' && action != 'approve' && action != 'reject') throw new CliError('cli.invalid-arguments', 'Invalid Wait action.')
+      const resolution = await client.resolveRunWait(runId!, waitId!, action)
+      write(runtime, args.json, { kind: 'run.resolve', resolution, version: 1 }, JSON.stringify(resolution))
       return
+    }
+    case 'events': {
+      requireCount(references, 1, 'oo flow runs events <run> [--after <sequence>] [--limit <count>] [--follow] [--timeout <milliseconds>] [--json]')
+      const runId = references[0]!
+      let after = args.after ?? 0
+      const deadline = Date.now() + (args.timeoutMs ?? 60_000)
+      let run: RunDetails | undefined
+      try {
+        do {
+          if (args.follow && Date.now() >= deadline) break
+          const page = await client.getRunEvents(
+            runId,
+            { after, limit: args.limit ?? runPageLimit },
+            args.follow ? AbortSignal.timeout(Math.max(1, deadline - Date.now())) : undefined,
+          )
+          after = page.nextAfter
+          write(runtime, args.json, { ...page, kind: 'run.events', runId, version: 1 }, page.events.map(eventText).join('\n'))
+          if (!args.follow) return
+          run = await client.getRun(runId, AbortSignal.timeout(Math.max(1, deadline - Date.now())))
+          if (page.done) return runExitCode(run)
+          if (run.status == 'waiting') {
+            write(runtime, args.json, { kind: 'run.wait', runId, run, nextAfter: after, timedOut: false, version: 1 }, runText(run))
+            return 2
+          }
+          const remaining = deadline - Date.now()
+          if (remaining <= 0) break
+          if (page.events.length == 0) await runtime.wait(Math.min(1_000, remaining))
+        } while (args.follow)
+      } catch (error) {
+        if (!args.follow || (Date.now() < deadline && !(error instanceof Error && error.name == 'TimeoutError'))) {
+          throw new CliError('run.events-failed', error instanceof Error ? error.message : String(error), { runId, nextAfter: after })
+        }
+      }
+      write(runtime, args.json, { kind: 'run.wait', runId, run, nextAfter: after, timedOut: true, version: 1 }, `timeout\t${runId}\t${after}`)
+      return 3
     }
     case 'result': {
       requireCount(references, 1, 'oo flow runs result <run> [--json]')
       const result = await client.getRunResult(references[0]!)
       write(runtime, args.json, { kind: 'run.result', result, version: 1 }, JSON.stringify(result))
-      return
+      return result.status == 'completed' ? 0 : 1
     }
     case 'cancel': {
       requireCount(references, 1, 'oo flow runs cancel <run> [--json]')
@@ -110,30 +165,57 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
       return
     }
     default:
-      throw new CliError('cli.invalid-arguments', 'Usage: oo flow runs <list|show|events|result|cancel>')
+      throw new CliError('cli.invalid-arguments', 'Usage: oo flow runs <list|show|wait|resolve|events|result|cancel>')
   }
 }
 
-export async function publishCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<void> {
+export async function publishCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<number | void> {
   requireCount(operands, 1, 'oo flow publish <flow> [--json]')
   const flow = await referencedFlow(client, operands[0]!)
-  const live = await client.getLive(flow.flowId)
-  let operation = await client.publishFlow(flow.flowId, flow.draftRevisionId, live.publication?.publicationId ?? null)
-  while (operation.status == 'pending') {
-    await runtime.wait(1_000)
-    operation = await client.getPublishOperation(flow.flowId, operation.operationId)
+  const expectedPublicationId =
+    args.expectedPublication == 'none' ? null : (args.expectedPublication ?? (await client.getLive(flow.flowId)).publication?.publicationId ?? null)
+  let operation = await client.publishFlow(flow.flowId, args.expectedRevision ?? flow.draftRevisionId, expectedPublicationId, {
+    idempotencyKey: args.idempotencyKey,
+  })
+  const result = await waitForPublication(client, flow.flowId, operation, runtime, args.timeoutMs)
+  operation = result.operation
+  if (operation.status == 'pending') {
+    write(
+      runtime,
+      args.json,
+      { kind: 'publication.publish', expectedPublicationId, idempotencyKey: args.idempotencyKey, flowId: flow.flowId, ...result, version: 1 },
+      JSON.stringify(operation),
+    )
+    return 3
   }
   if (operation.status == 'failed') {
     throw new CliError(operation.issue.code, operation.issue.message, {
       ...(operation.issue.nodeId == null ? {} : { nodeId: operation.issue.nodeId }),
       operationId: operation.operationId,
+      flowId: flow.flowId,
+      idempotencyKey: args.idempotencyKey,
     })
   }
-  const publication = await publicationById(client, flow.flowId, operation.publicationId)
-  write(runtime, args.json, { kind: 'publication.publish', publication, version: 1 }, publicationText(publication))
+  let publication
+  try {
+    publication = await publicationById(client, flow.flowId, operation.publicationId)
+  } catch (error) {
+    throw new CliError('publication.read-failed', error instanceof Error ? error.message : String(error), {
+      flowId: flow.flowId,
+      operationId: operation.operationId,
+      publicationId: operation.publicationId,
+      idempotencyKey: args.idempotencyKey,
+    })
+  }
+  write(
+    runtime,
+    args.json,
+    { kind: 'publication.publish', expectedPublicationId, idempotencyKey: args.idempotencyKey, publication, version: 1 },
+    publicationText(publication),
+  )
 }
 
-export async function publicationsCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<void> {
+export async function publicationsCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<number | void> {
   const [operation, flowReference, publicationId, ...extra] = operands
   if (flowReference == null || extra.length > 0) throw new CliError('cli.invalid-arguments', 'Usage: oo flow publications <list|show> <flow> [publication]')
   const flow = await referencedFlow(client, flowReference)
@@ -146,6 +228,34 @@ export async function publicationsCommand(client: ControlClient, operands: reado
     write(runtime, args.json, { flow, kind: 'publication.list', ...page, version: 1 }, page.publications.map(publicationText).join('\n'))
     return
   }
+  if ((operation == 'operation' || operation == 'wait') && publicationId != null) {
+    const deadline = Date.now() + (args.timeoutMs ?? 60_000)
+    try {
+      const current = await client.getPublishOperation(
+        flow.flowId,
+        publicationId,
+        operation == 'wait' ? AbortSignal.timeout(args.timeoutMs ?? 60_000) : undefined,
+      )
+      const result =
+        operation == 'wait'
+          ? await waitForPublication(client, flow.flowId, current, runtime, Math.max(0, deadline - Date.now()))
+          : { operation: current, timedOut: false }
+      write(runtime, args.json, { kind: `publication.${operation}`, flowId: flow.flowId, ...result, version: 1 }, JSON.stringify(result.operation))
+      return result.operation.status == 'failed' ? 1 : result.operation.status == 'pending' ? 3 : 0
+    } catch (error) {
+      if (operation == 'wait' && (Date.now() >= deadline || (error instanceof Error && error.name == 'TimeoutError'))) {
+        write(
+          runtime,
+          args.json,
+          { kind: 'publication.wait', flowId: flow.flowId, operationId: publicationId, timedOut: true, version: 1 },
+          `timeout\t${publicationId}`,
+        )
+        return 3
+      }
+      if (error instanceof CliError) throw error
+      throw new CliError('publication.wait-failed', error instanceof Error ? error.message : String(error), { flowId: flow.flowId, operationId: publicationId })
+    }
+  }
   if (operation == 'show' && publicationId != null) {
     const publication = await publicationById(client, flow.flowId, publicationId)
     write(runtime, args.json, { kind: 'publication.show', publication, version: 1 }, publicationText(publication))
@@ -154,12 +264,19 @@ export async function publicationsCommand(client: ControlClient, operands: reado
   throw new CliError('cli.invalid-arguments', 'Usage: oo flow publications <list|show> <flow> [publication]')
 }
 
-export async function rollbackCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<void> {
+export async function rollbackCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<number | void> {
   requireCount(operands, 2, 'oo flow rollback <flow> <publication> [--json]')
   const flow = await referencedFlow(client, operands[0]!)
   const source = await publicationById(client, flow.flowId, operands[1]!)
-  const live = await client.getLive(flow.flowId)
-  if (live.publication == null) throw new CliError('live.not-found', `Flow ${JSON.stringify(operands[0])} has no Live Publication.`)
-  const rolledBack = await client.rollbackFlow(flow.flowId, source.publicationId, live.publication.publicationId)
-  write(runtime, args.json, { kind: 'publication.rollback', publication: rolledBack, version: 1 }, publicationText(rolledBack))
+  const expectedPublicationId = args.expectedPublication ?? (await client.getLive(flow.flowId)).publication?.publicationId
+  if (expectedPublicationId == null) throw new CliError('live.not-found', `Flow ${JSON.stringify(operands[0])} has no Live Publication.`)
+  const rolledBack = await client.rollbackFlow(flow.flowId, source.publicationId, expectedPublicationId, {
+    idempotencyKey: args.idempotencyKey,
+  })
+  write(
+    runtime,
+    args.json,
+    { kind: 'publication.rollback', expectedPublicationId, idempotencyKey: args.idempotencyKey, publication: rolledBack, version: 1 },
+    publicationText(rolledBack),
+  )
 }

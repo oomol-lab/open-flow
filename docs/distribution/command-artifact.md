@@ -70,8 +70,8 @@ Builder 固定 uid、gid、mode、mtime、gzip header 和文件顺序；相同 s
 export const commandArtifactVersion = 2
 
 interface OpenFlowCommandHost {
-  readonly cloudRequest: (path: string, init?: RequestInit) => Promise<Response>
-  readonly getWorkbenchUrl: (flowId?: string) => Promise<string>
+  readonly cloudRequest?: (path: string, init?: RequestInit) => Promise<Response>
+  readonly getWorkbenchUrl?: (flowId?: string) => Promise<string>
   readonly language?: string
 }
 
@@ -85,8 +85,10 @@ link。Artifact 不保存 Flow 或 deployment 选择，也不从当前工作目�
 `language` 接受任意 BCP 47 tag，entry 会把它解析成 en、zh-CN、zh-TW、ja、ko、ru、fr 之一（fr-CA 归到 fr，zh-HK 与 zh-Hant-\*
 归到 zh-TW，其余 zh\* 归到 zh-CN），无法识别的 tag 回退到 en。
 
-CLI 的用户可见文案全部来自 `packages/command/src/cli/node/locales/<tag>.json`，由 val-i18n 加载并在构建时内联进 `entry.js`，
-artifact 不额外分发 locale 文件。`--help` 在每种语言下都输出同一份完整命令清单，只有标题行、用法行和选项行被翻译。
+CLI 的本地化标题与选项提示来自 `packages/command/src/cli/node/locales/<tag>.json`，由 val-i18n 加载并在构建时内联进 `entry.js`，
+artifact 不额外分发 locale 文件。根 `--help` 返回命令索引，子命令返回对应的选项与示例；`--help --json` 返回机器可读合同。
+Help、schema 和 version 无需宿主；其他命令按需使用 cloudRequest，open/workbench 另需 getWorkbenchUrl。
+命令参数、退出码、事务重试和等待语义见 [Flow 命令调用合同](../authoring/flow-command.md)。
 
 Artifact 与宿主在同一个受信任 Bun process 中运行，不构成 JavaScript sandbox。宿主负责注入当前身份，并拒绝跨 origin、非 Control API
 path 和 Artifact 伪造的授权 header。Artifact 不能直连 Connector、Provider 或 Cloud 返回的任意 URL。

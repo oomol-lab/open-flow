@@ -40,6 +40,18 @@ try {
   assert.equal(version.stderr, '')
   assert.deepEqual(JSON.parse(version.stdout), { version: decoded.manifest.openFlowVersion })
 
+  const help = await execFileAsync(process.execPath, [entryPath, 'runs', 'wait', '--help', '--json'])
+  assert.equal(help.stderr, '')
+  assert.equal(JSON.parse(help.stdout).commands[0].command, 'runs wait')
+  const schema = await execFileAsync(process.execPath, [entryPath, 'schema', 'graph.node.input.set', '--json'])
+  assert.equal(schema.stderr, '')
+  assert.equal(JSON.parse(schema.stdout).properties.kind.const, 'graph.node.input.set')
+  await assert.rejects(execFileAsync(process.execPath, [entryPath, 'list', '--json']), (error: unknown) => {
+    assert.ok(error != null && typeof error == 'object' && 'stderr' in error)
+    assert.equal(JSON.parse(String(error.stderr)).error.code, 'host.unavailable')
+    return true
+  })
+
   const firstCwd = path.join(directory, 'first-cwd')
   const secondCwd = path.join(directory, 'second-cwd')
   await Promise.all([mkdir(firstCwd), mkdir(secondCwd)])

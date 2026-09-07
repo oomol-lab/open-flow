@@ -5,7 +5,6 @@ import type { Runtime, ParsedArguments } from './support.ts'
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import {
   createBuiltinTrigger,
-  createAuthoringId,
   createManagedTask,
   createProviderTrigger,
   deleteNodes,
@@ -17,6 +16,7 @@ import {
 import {
   CliError,
   selectedDraftFlow,
+  authoringId,
   exactNode,
   referencedAction,
   preferredConnection,
@@ -45,7 +45,7 @@ export async function connectorCommand(
   switch (operation) {
     case 'list': {
       if (first != null) throw new CliError('cli.invalid-arguments', 'Usage: oo flow connector list [--json]')
-      const actions = await client.listConnectorActions()
+      const actions = await client.listConnectorActions(undefined, undefined, flow?.flowId)
       write(runtime, args.json, { actions: actions.map(actionSummary), kind: 'connector.list', version: 1 }, actions.map(actionText).join('\n'))
       return
     }
@@ -53,19 +53,19 @@ export async function connectorCommand(
       if (first == null || second != null) throw new CliError('cli.invalid-arguments', 'Usage: oo flow connector search <query> [--json]')
       const query = first.trim()
       if (query.length == 0 || query.length > 256) throw new CliError('cli.invalid-arguments', 'Connector search query must contain 1–256 characters.')
-      const actions = await client.searchConnectorActions(query)
+      const actions = await client.searchConnectorActions(query, undefined, flow?.flowId)
       write(runtime, args.json, { actions: actions.map(actionSummary), kind: 'connector.search', query, version: 1 }, actions.map(actionText).join('\n'))
       return
     }
     case 'show': {
       if (first == null || second != null) throw new CliError('cli.invalid-arguments', 'Usage: oo flow connector show <action> [--json]')
-      const action = await referencedAction(client, first)
+      const action = await referencedAction(client, first, flow?.flowId)
       write(runtime, args.json, { action, kind: 'connector.show', version: 1 }, actionText(action))
       return
     }
     case 'connections': {
       if (first == null || second != null) throw new CliError('cli.invalid-arguments', 'Usage: oo flow connector connections <service> [--json]')
-      const connections = await client.listConnectorConnections(first)
+      const connections = await client.listConnectorConnections(first, undefined, flow?.flowId)
       write(runtime, args.json, { connections, kind: 'connector.connections', serviceId: first, version: 1 }, connections.map(connectionText).join('\n'))
       return
     }
@@ -76,14 +76,14 @@ export async function connectorCommand(
           'Usage: oo flow connector add <flow> <action> [--name <name>] [--connection <connection>] [--set <input=value>] [--json]',
         )
       }
-      const selected = await selectedDraftFlow(client, requiredFlowId(flow), first)
-      const action = await referencedAction(client, second)
+      const selected = await selectedDraftFlow(client, flow!, args)
+      const action = await referencedAction(client, second, flow?.flowId)
       const values = await settingValues(args, runtime, action.inputs)
-      const connection = await preferredConnection(client, action.serviceId, args.connection, action.defaultConnection, false)
+      const connection = await preferredConnection(client, action.serviceId, args.connection, action.defaultConnection, false, flow?.flowId)
       const name = args.name?.trim() ?? action.name
       if (name.length == 0) throw new CliError('cli.invalid-arguments', 'Connector Node name cannot be empty.')
-      const nodeId = createAuthoringId()
-      const taskId = createAuthoringId()
+      const nodeId = authoringId(args, 'node')
+      const taskId = authoringId(args, 'task')
       const operations = createManagedTask(
         selected.target,
         { nodeId, taskId },
@@ -95,7 +95,7 @@ export async function connectorCommand(
         },
       )
       const target = { actionId: action.actionId, flowId: selected.flow.flowId, kind: 'connector', nodeId, taskId }
-      const changed = await changeDraft(client, requiredFlowId(flow), selected.draft.revisionId, target, operations)
+      const changed = await changeDraft(client, args, requiredFlowId(flow), selected.draft.revisionId, target, operations)
       write(
         runtime,
         args.json,
@@ -103,6 +103,10 @@ export async function connectorCommand(
           ...(connection == null ? {} : { connection }),
           connectionId: connection?.connectionId,
           kind: 'connector.add',
+          changed: true,
+          baseRevisionId: changed.baseRevisionId,
+          idempotencyKey: args.idempotencyKey,
+          revisionId: changed.revision.revisionId,
           revision: changed.revision,
           target,
           version: 1,
@@ -118,7 +122,7 @@ export async function connectorCommand(
           'Usage: oo flow connector set <flow> <node> [--connection <connection>] [--set <input=value>] [--unset <input>] [--json]',
         )
       }
-      const selected = await selectedDraftFlow(client, requiredFlowId(flow), first)
+      const selected = await selectedDraftFlow(client, flow!, args)
       const resolved = exactNode(selected.graph.nodes, second)
       if (resolved.node.kind != 'task' || resolved.node.task != null) {
         throw new CliError('connector.node-invalid', `Node ${JSON.stringify(second)} is not a Connector Node.`)
@@ -138,8 +142,8 @@ export async function connectorCommand(
       })
       let connectionId = task.executor.connectionId
       if (args.connection != null) {
-        const action = await client.getConnectorAction(task.executor.action)
-        connectionId = (await preferredConnection(client, action.serviceId, args.connection, action.defaultConnection, true))!.connectionId
+        const action = await client.getConnectorAction(task.executor.action, undefined, flow?.flowId)
+        connectionId = (await preferredConnection(client, action.serviceId, args.connection, action.defaultConnection, true, flow?.flowId))!.connectionId
       }
       const connectionChanged = connectionId != task.executor.connectionId
       if (!inputChanged && !connectionChanged) {
@@ -148,6 +152,7 @@ export async function connectorCommand(
           args.json,
           {
             changed: false,
+            idempotencyKey: args.idempotencyKey,
             connectionId,
             flowId: selected.flow.flowId,
             kind: 'connector.set',
@@ -164,11 +169,21 @@ export async function connectorCommand(
         ...(inputChanged ? setInputValues(selected.draft.content, selected.target, resolved.nodeId, values)! : []),
       ]
       const target = { flowId: selected.flow.flowId, kind: 'connector', nodeId: resolved.nodeId, taskId: resolved.node.taskId }
-      const changed = await changeDraft(client, requiredFlowId(flow), selected.draft.revisionId, target, operations)
+      const changed = await changeDraft(client, args, requiredFlowId(flow), selected.draft.revisionId, target, operations)
       write(
         runtime,
         args.json,
-        { connectionId, kind: 'connector.set', revision: changed.revision, target, version: 1 },
+        {
+          connectionId,
+          kind: 'connector.set',
+          changed: true,
+          baseRevisionId: changed.baseRevisionId,
+          idempotencyKey: args.idempotencyKey,
+          revisionId: changed.revision.revisionId,
+          revision: changed.revision,
+          target,
+          version: 1,
+        },
         `${resolved.node.name ?? task.name}\t${resolved.nodeId}\t${connectionId ?? 'unconfigured'}\t${changed.revision.revisionId}`,
       )
       return
@@ -205,7 +220,7 @@ export async function triggerCommand(
     }
     case 'list': {
       if (first == null || second != null) throw new CliError('cli.invalid-arguments', 'Usage: oo flow trigger list <flow> [--json]')
-      const selected = await selectedDraftFlow(client, requiredFlowId(flow), first)
+      const selected = await selectedDraftFlow(client, flow!, args)
       const entries = Object.entries(selected.graph.nodes).filter((entry): entry is [string, TriggerNode] => !('inputs' in entry[1]))
       const triggers = entries.map(([triggerId, trigger]) => ({ trigger, triggerId }))
       write(
@@ -229,11 +244,11 @@ export async function triggerCommand(
           'Usage: oo flow trigger add <flow> <manual|webhook|cron|trigger-key> [--name <name>] [--connection <connection>] [--set <field=value>] [--every <interval>|--cron <expression>] [--json]',
         )
       }
-      const selected = await selectedDraftFlow(client, requiredFlowId(flow), first)
+      const selected = await selectedDraftFlow(client, flow!, args)
       const configuredSchedule = triggerSchedule(args.every, args.cron, args.timezone)
       const values = await settingValues(args, runtime)
       const config = Object.fromEntries(Object.entries(values).filter((entry): entry is [string, JsonValue] => entry[1] !== undefined))
-      const triggerId = createAuthoringId()
+      const triggerId = authoringId(args, 'trigger')
       let operations
       let name: string
       let kind: TriggerNode['kind']
@@ -263,10 +278,10 @@ export async function triggerCommand(
         })
       } else {
         const definition = await referencedTriggerKey(client, second)
-        const connection = await preferredConnection(client, definition.provider, args.connection, undefined, true)
+        const connection = await preferredConnection(client, definition.provider, args.connection, undefined, true, flow?.flowId)
         name = args.name?.trim() ?? definition.displayName
         kind = definition.type
-        operations = createProviderTrigger(selected.target, { bindingId: createAuthoringId(), nodeId: triggerId }, definition, {
+        operations = createProviderTrigger(selected.target, { bindingId: authoringId(args, 'binding'), nodeId: triggerId }, definition, {
           config,
           connectionId: connection!.connectionId,
           name,
@@ -275,11 +290,20 @@ export async function triggerCommand(
       }
       if (name.length == 0) throw new CliError('cli.invalid-arguments', 'Trigger name cannot be empty.')
       const target = { flowId: selected.flow.flowId, kind: 'trigger', triggerId }
-      const changed = await changeDraft(client, requiredFlowId(flow), selected.draft.revisionId, target, operations)
+      const changed = await changeDraft(client, args, requiredFlowId(flow), selected.draft.revisionId, target, operations)
       write(
         runtime,
         args.json,
-        { kind: 'trigger.add', revision: changed.revision, target: { ...target, name, triggerKind: kind }, version: 1 },
+        {
+          kind: 'trigger.add',
+          changed: true,
+          baseRevisionId: changed.baseRevisionId,
+          idempotencyKey: args.idempotencyKey,
+          revisionId: changed.revision.revisionId,
+          revision: changed.revision,
+          target: { ...target, name, triggerKind: kind },
+          version: 1,
+        },
         `${name}\t${triggerId}\t${kind}\t${changed.revision.revisionId}`,
       )
       return
@@ -291,7 +315,7 @@ export async function triggerCommand(
           'Usage: oo flow trigger set <flow> <trigger> [--name <name>] [--description <text>] [--connection <connection>] [--set <field=value>] [--unset <field>] [--every <interval>|--cron <expression>] [--json]',
         )
       }
-      const selected = await selectedDraftFlow(client, requiredFlowId(flow), first)
+      const selected = await selectedDraftFlow(client, flow!, args)
       const resolved = exactTrigger(selected.draft.content, second)
       const configuredSchedule = triggerSchedule(args.every, args.cron, args.timezone)
       const values = await settingValues(args, runtime)
@@ -372,7 +396,7 @@ export async function triggerCommand(
         if (changedTrigger != null) operations.push(...changedTrigger)
       }
       if (args.connection != null && (resolved.trigger.kind == 'poll' || resolved.trigger.kind == 'integration')) {
-        const connection = await preferredConnection(client, resolved.trigger.definition.provider, args.connection, undefined, true)
+        const connection = await preferredConnection(client, resolved.trigger.definition.provider, args.connection, undefined, true, flow?.flowId)
         const binding = selected.draft.content.document.bindings[resolved.trigger.bindingId]
         if (binding?.target != connection!.connectionId)
           operations.push(...setTriggerConnection(selected.draft.content, selected.target, resolved.triggerId, connection!.connectionId)!)
@@ -383,6 +407,7 @@ export async function triggerCommand(
           args.json,
           {
             changed: false,
+            idempotencyKey: args.idempotencyKey,
             flowId: selected.flow.flowId,
             kind: 'trigger.set',
             revisionId: selected.draft.revisionId,
@@ -394,11 +419,20 @@ export async function triggerCommand(
         return
       }
       const target = { flowId: selected.flow.flowId, kind: 'trigger', triggerId: resolved.triggerId }
-      const changed = await changeDraft(client, requiredFlowId(flow), selected.draft.revisionId, target, operations)
+      const changed = await changeDraft(client, args, requiredFlowId(flow), selected.draft.revisionId, target, operations)
       write(
         runtime,
         args.json,
-        { kind: 'trigger.set', revision: changed.revision, target, version: 1 },
+        {
+          kind: 'trigger.set',
+          changed: true,
+          baseRevisionId: changed.baseRevisionId,
+          idempotencyKey: args.idempotencyKey,
+          revisionId: changed.revision.revisionId,
+          revision: changed.revision,
+          target,
+          version: 1,
+        },
         `${resolved.trigger.name}\t${resolved.triggerId}\t${changed.revision.revisionId}`,
       )
       return
@@ -408,11 +442,12 @@ export async function triggerCommand(
         throw new CliError('cli.invalid-arguments', 'Usage: oo flow trigger remove <flow> <trigger> --yes [--json]')
       }
       if (!args.yes) throw new CliError('trigger.confirmation-required', 'Trigger removal requires --yes.')
-      const selected = await selectedDraftFlow(client, requiredFlowId(flow), first)
+      const selected = await selectedDraftFlow(client, flow!, args)
       const resolved = exactTrigger(selected.draft.content, second)
       const target = { flowId: selected.flow.flowId, kind: 'trigger', triggerId: resolved.triggerId }
       const changed = await changeDraft(
         client,
+        args,
         requiredFlowId(flow),
         selected.draft.revisionId,
         target,
@@ -421,7 +456,16 @@ export async function triggerCommand(
       write(
         runtime,
         args.json,
-        { kind: 'trigger.remove', revision: changed.revision, target, version: 1 },
+        {
+          kind: 'trigger.remove',
+          changed: true,
+          baseRevisionId: changed.baseRevisionId,
+          idempotencyKey: args.idempotencyKey,
+          revisionId: changed.revision.revisionId,
+          revision: changed.revision,
+          target,
+          version: 1,
+        },
         `${resolved.trigger.name}\t${resolved.triggerId}\t${changed.revision.revisionId}`,
       )
       return

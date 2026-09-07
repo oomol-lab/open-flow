@@ -215,7 +215,14 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       "'./change.ts'",
       "'./flow-change.js'",
     )
-    const flowChangeDeclaration = await readFile(path.join(declarationRoot, 'flow/common/change.d.ts'), 'utf8')
+    const flowChangeDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/change.d.ts'), 'utf8')).replaceAll(
+      "'./changeSchema.ts'",
+      "'./flow-change-schema.js'",
+    )
+    const flowChangeSchemaDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/changeSchema.d.ts'), 'utf8')).replaceAll(
+      "'./change.ts'",
+      "'./flow-change.js'",
+    )
     const connectorActionDeclaration = await readFile(path.join(declarationRoot, 'connector/common/actionSchema.d.ts'), 'utf8')
     const connectorProxyDeclaration = await readFile(path.join(declarationRoot, 'connector/common/proxy.d.ts'), 'utf8')
     const controlApiDeclaration = (await readFile(path.join(declarationRoot, 'control/common/api.d.ts'), 'utf8'))
@@ -271,6 +278,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(browserOutputPath, 'flow-authoring-module.d.ts'), flowAuthoringModuleDeclaration),
       writeFile(path.join(browserOutputPath, 'flow-authoring-node.d.ts'), flowAuthoringNodeDeclaration),
       writeFile(path.join(browserOutputPath, 'flow-change.d.ts'), flowChangeDeclaration),
+      writeFile(path.join(browserOutputPath, 'flow-change-schema.d.ts'), flowChangeSchemaDeclaration),
       writeFile(path.join(commonOutputPath, 'flow-encoding.d.ts'), flowEncodingDeclaration),
       writeFile(
         path.join(browserOutputPath, 'workbench.d.ts'),
