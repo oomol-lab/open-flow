@@ -174,7 +174,7 @@ describe('CLI', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v1',
+          engineContract: 'open-flow-engine/v2',
           flowId: flow.flowId,
           modelVersion: 1,
           revisionDigest: 'digest-1',

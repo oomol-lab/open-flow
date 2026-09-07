@@ -18,9 +18,11 @@ import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId, validateTriggerSchedule } from '@oomol-lab/open-flow/cron-trigger'
 import { canonicalJsonBytes, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
+import { codeActions } from '@oomol-lab/open-flow/flow-semantics'
 import { matchesSchema, prepareFlow, triggerPayloadSchema, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { triggerDefinitions as providerTriggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { createEventProjector } from '@oomol-lab/open-flow/run-events'
+import { resolveAction } from '@oomol-lab/open-flow/runtime-contract'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import * as Cause from 'effect/Cause'
 import * as Clock from 'effect/Clock'
@@ -34,6 +36,7 @@ import * as Queue from 'effect/Queue'
 import * as Scope from 'effect/Scope'
 import * as Semaphore from 'effect/Semaphore'
 import { createHash } from 'node:crypto'
+import { checkCodeActions } from './connector.ts'
 import { ConnectorClient, ConnectorTaskError } from './connector.ts'
 import { ControlService } from './control-service.ts'
 import { AcceptanceError, ControlError } from './error.ts'
@@ -444,6 +447,9 @@ export class ServerService {
   }
 
   async publishFlow(input: PublishFlowInput): Promise<PublicationAcceptance> {
+    const revisionDigest = input.revisionDigest ?? (await validatedFlow(input.revision)).revisionDigest
+    const replay = this.#store.publications.replayPublication(input.flowId, input.idempotencyKey, await this.#publicationRequestDigest(input, revisionDigest))
+    if (replay != null) return replay
     const planned = await this.#publication(input)
     const accepted = this.#store.publications.publish(planned)
     this.#signal()
@@ -451,16 +457,15 @@ export class ServerService {
   }
 
   async acceptPublishOperation(input: PublishFlowInput): Promise<PublishOperation> {
-    if (input.revisionDigest != null) {
-      const replay = this.#store.publications.replayPublishOperation(
-        input.flowId,
-        input.idempotencyKey,
-        await this.#publicationRequestDigest(input, input.revisionDigest),
-      )
-      if (replay?.kind == 'accepted') return replay.operation
-      if (replay?.kind == 'conflict') {
-        throw new ControlError(controlErrorCode.publicationConflict, 'The idempotency key refers to another Publish request.')
-      }
+    const revisionDigest = input.revisionDigest ?? (await validatedFlow(input.revision)).revisionDigest
+    const replay = this.#store.publications.replayPublishOperation(
+      input.flowId,
+      input.idempotencyKey,
+      await this.#publicationRequestDigest(input, revisionDigest),
+    )
+    if (replay?.kind == 'accepted') return replay.operation
+    if (replay?.kind == 'conflict') {
+      throw new ControlError(controlErrorCode.publicationConflict, 'The idempotency key refers to another Publish request.')
     }
     const accepted = this.#store.publications.acceptPublishOperation(await this.#publication(input))
     switch (accepted.kind) {
@@ -487,6 +492,7 @@ export class ServerService {
 
   async #publication(input: PublishFlowInput): Promise<Parameters<PublicationStore['publish']>[0]> {
     const fixed = await validatedFlow(input.revision)
+    await checkCodeActions(codeActions(fixed.prepared), this.#resolveConnector(), this.#store.connectorTeam(input.flowId))
     const engineContract = input.engineContract ?? currentEngineContract
     if (input.revisionDigest != null && input.revisionDigest != fixed.revisionDigest) {
       throw new AcceptanceError('revision-conflict', 'The fixed Revision digest does not match its content.')
@@ -817,6 +823,10 @@ export class ServerService {
       if (prepared.kind != 'prepared') {
         return yield* Effect.fail(new Error(`Fixed Flow Revision can no longer be prepared: ${prepared.kind}.`))
       }
+      yield* Effect.tryPromise({
+        try: (signal) => checkCodeActions(codeActions(prepared.flow), this.#resolveConnector(), run.connectorTeamId, signal),
+        catch: (error) => error,
+      })
       const projectEvent = createEventProjector(run.runId, nodeFailureCodes)
       const started = yield* Effect.tryPromise({
         try: () => projectEvent({ flowId: run.flowId, runId: run.runId, type: 'run.started' }),
@@ -869,7 +879,10 @@ export class ServerService {
               const committed =
                 run.resume == null
                   ? this.#store.failStarting(run.runId, {
-                      error: { code: 'execution.unavailable', message: 'The fixed Run could not be started by this deployment.' },
+                      error:
+                        error instanceof ConnectorTaskError
+                          ? { code: error.code, message: error.message }
+                          : { code: 'execution.unavailable', message: 'The fixed Run could not be started by this deployment.' },
                     })
                   : this.#store.failResume(run.runId, {
                       error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint cannot resume against the fixed Flow.' },
@@ -1200,14 +1213,25 @@ export class ServerService {
 
   async #invokeCapability(capabilities: readonly ConnectorCapability[], call: RuntimeCapabilityCall, teamId?: string): Promise<RuntimeCapabilityResponse> {
     if (call.kind != 'connector') throw new TaskHostError('capability.denied', 'The Runtime Capability is not declared for this Task.')
-    const payload = connectorCapabilityPayload(call.payload)
-    if (!capabilities.some((capability) => capability.action == payload.action && capability.connectionId == payload.connectionId)) {
-      throw new TaskHostError('capability.denied', 'The Runtime Capability is not declared for this Task.')
+    let payload: ReturnType<typeof resolveAction>
+    try {
+      payload = resolveAction(capabilities, call.payload)
+    } catch (error) {
+      const failure = error as Error & { code: TaskErrorCode }
+      if (failure.code == 'capability.denied' || failure.code == 'capability.invalid') throw new TaskHostError(failure.code, failure.message)
+      throw new ConnectorTaskError('connector.connection-required', failure.message)
     }
     const connector = this.#resolveConnector()
-    if (connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
+    if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
+    if (payload.connectionId == null && (await connector.getAction(payload.action, call.signal, teamId)).authenticated) {
+      throw new ConnectorTaskError('connector.connection-required', 'Choose a Connector Connection for this Action.')
+    }
+    this.#logger.debug(
+      { category: 'connector.action', invocationId: call.invocationId, callId: call.callId, action: payload.action, connectionId: payload.connectionId },
+      'Code Action started.',
+    )
     return {
-      body: await connector.execute(payload.action, payload.connectionId, payload.input, call.invocationId, call.signal, teamId),
+      body: await connector.execute(payload.action, payload.connectionId, payload.input, call.callId, call.signal, teamId),
       status: 200,
     }
   }
@@ -1500,34 +1524,6 @@ export class ServerService {
       state: result.action != null ? 'resolved' : result.status == 'waiting' ? 'waiting' : 'unavailable',
     }
   }
-}
-
-function connectorCapabilityPayload(value: JsonValue): {
-  readonly action: string
-  readonly connectionId: string
-  readonly input: Readonly<Record<string, JsonValue>>
-} {
-  if (value == null || typeof value != 'object' || Array.isArray(value)) {
-    throw new TaskHostError('capability.invalid', 'The Runtime Capability request is invalid.')
-  }
-  const source = value as Readonly<Record<string, JsonValue>>
-  const keys = Object.keys(source)
-  if (
-    keys.length != 3 ||
-    !keys.includes('action') ||
-    !keys.includes('connectionId') ||
-    !keys.includes('input') ||
-    typeof source.action != 'string' ||
-    source.action.length == 0 ||
-    typeof source.connectionId != 'string' ||
-    source.connectionId.length == 0 ||
-    source.input == null ||
-    typeof source.input != 'object' ||
-    Array.isArray(source.input)
-  ) {
-    throw new TaskHostError('capability.invalid', 'The Runtime Capability request is invalid.')
-  }
-  return { action: source.action, connectionId: source.connectionId, input: source.input as Readonly<Record<string, JsonValue>> }
 }
 
 async function validatedFlow(revision: RevisionContent): Promise<{

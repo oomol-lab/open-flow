@@ -1,5 +1,5 @@
 import type { ConnectorAction, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
-import type { JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
+import type { ConnectorCapability, JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { ConnectorHost } from '../node/connector.ts'
 
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConnectorClient, ConnectorTaskError } from '../node/connector.ts'
 import { ServerService } from '../node/service.ts'
 import { createConnectorHost } from './connectorHost.ts'
-import { acceptRun } from './runFixture.ts'
+import { acceptRun, storeRevision } from './runFixture.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
 
 const directories: string[] = []
@@ -66,7 +66,8 @@ function connectorFlow(timeoutMs?: number, optionalNull = false): RevisionConten
 
 function capabilityFlow(
   declared = true,
-  invocation = "capability.connector({ action: 'example.echo', connectionId: 'connection-work', input })",
+  invocation = 'capability.actions.example.echo(input)',
+  capabilities?: readonly ConnectorCapability[],
 ): RevisionContent {
   return {
     document: {
@@ -78,7 +79,18 @@ function capabilityFlow(
             inputs: { message: { kind: 'value', value: 'hello' } },
             kind: 'task',
             task: {
-              ...(declared ? { capabilities: [{ action: 'example.echo', connectionId: 'connection-work', kind: 'connector' as const }] } : {}),
+              ...(declared
+                ? {
+                    capabilities: capabilities ?? [
+                      {
+                        action: 'example.echo',
+                        connections: [{ connectionId: 'connection-work' }],
+                        connectionId: 'connection-work',
+                        kind: 'connector' as const,
+                      },
+                    ],
+                  }
+                : {}),
               inputs: [{ ...port, handle: 'message' }],
               moduleId: 'capability',
               name: 'Capability',
@@ -95,7 +107,7 @@ function capabilityFlow(
       capability: {
         imports: [],
         name: 'Capability',
-        source: `export default async (input, capability) => (await ${invocation}).body`,
+        source: `export default async (input, capability) => await ${invocation}`,
       },
     },
   }
@@ -122,6 +134,135 @@ async function run(service: ServerService, revision: RevisionContent): Promise<s
 }
 
 describe('Server Connector host', () => {
+  it('routes sequential and concurrent Code calls by fixed ID and alias with independent identities', async () => {
+    const execute = vi.fn<ConnectorHost['execute']>(async (_action, connectionId, input) => {
+      if (input.message == 'slow') await new Promise((resolve) => setTimeout(resolve, 20))
+      return { message: `${connectionId}:${String(input.message)}` }
+    })
+    const service = await open(
+      createConnectorHost({
+        execute,
+        getAction: async () => ({
+          actionId: 'example.echo',
+          authenticated: true,
+          description: '',
+          inputs: {},
+          outputs: {},
+          name: 'Echo',
+          serviceId: 'example',
+          serviceName: 'Example',
+        }),
+        listConnections: async () => [
+          { connectionId: 'work', alias: 'renamed-on-provider', displayName: 'Work', isDefault: false, serviceId: 'example', status: 'active' },
+          { connectionId: 'home', alias: 'office', displayName: 'Home', isDefault: true, serviceId: 'example', status: 'active' },
+        ],
+      }),
+    )
+    const source = capabilityFlow(
+      true,
+      `(async () => {
+      const values = []
+      for (let i = 0; i < 3; i++) values.push((await capability.actions.example.echo({ message: i }, { connectionAlias: 'office' })).message)
+      const parallel = await Promise.all([
+        capability.actions['example.echo']({ message: 'slow' }, { connectionId: 'work' }),
+        capability.actions.example.echo({ message: 'fast' }, { connectionId: 'home' }),
+      ])
+      return { message: [...values, ...parallel.map(value => value.message)].join(',') }
+    })()`,
+      [{ kind: 'connector', action: 'example.echo', connections: [{ connectionId: 'work', alias: 'office' }, { connectionId: 'home' }] }],
+    )
+    const runId = await run(service, source)
+    expect(service.run(runId)).toMatchObject({
+      status: 'completed',
+      result: { nodes: [{ nodeId: 'capability', outputs: { message: 'work:0,work:1,work:2,work:slow,home:fast' } }] },
+    })
+    expect(new Set(execute.mock.calls.map((call) => call[3])).size).toBe(5)
+    await run(service, source)
+    expect(new Set(execute.mock.calls.map((call) => call[3])).size).toBe(10)
+  })
+
+  it('permits recovery from Code Action errors and preserves later uncaught failures', async () => {
+    const service = await open(
+      createConnectorHost({
+        execute: async () => {
+          throw new ConnectorTaskError('connector.unavailable', 'Provider is unavailable.')
+        },
+        getAction: async () => ({
+          actionId: 'example.echo',
+          authenticated: false,
+          description: '',
+          inputs: {},
+          outputs: {},
+          name: 'Echo',
+          serviceId: 'example',
+          serviceName: 'Example',
+        }),
+      }),
+    )
+    const declarations = [{ kind: 'connector' as const, action: 'example.echo', connections: [] }]
+    const recovered = await run(
+      service,
+      capabilityFlow(
+        true,
+        `(async () => { try { await capability.actions.example.echo({ value: null }) } catch (error) { return { message: error.code } } })()`,
+        declarations,
+      ),
+    )
+    expect(service.run(recovered)).toMatchObject({ status: 'completed', result: { nodes: [{ outputs: { message: 'connector.unavailable' } }] } })
+    const failed = await run(
+      service,
+      capabilityFlow(true, `(async () => { try { await capability.actions.example.echo({}) } catch {} throw new Error('Later error.') })()`, declarations),
+    )
+    expect(service.events(failed).find((event) => event.kind == 'node.failed')).toMatchObject({
+      payload: { error: { code: 'node.failed', message: expect.stringContaining('Later error.') } },
+    })
+    const uncaught = await run(service, capabilityFlow(true, 'capability.actions.example.echo({})', declarations))
+    expect(service.events(uncaught).find((event) => event.kind == 'node.failed')).toMatchObject({ payload: { error: { code: 'connector.unavailable' } } })
+  })
+
+  it('checks every allowed Connection before publishing and replays accepted operations before probing the provider', async () => {
+    let active = true
+    const listConnections = vi.fn(
+      async (): Promise<readonly ConnectorConnection[]> => [
+        { connectionId: 'work', displayName: 'Work', isDefault: false, serviceId: 'example', status: 'active' },
+        { connectionId: 'home', displayName: 'Home', isDefault: false, serviceId: 'example', status: active ? 'active' : 'disconnected' },
+      ],
+    )
+    const service = await open(
+      createConnectorHost({
+        listConnections,
+        getAction: async () => ({
+          actionId: 'example.echo',
+          authenticated: true,
+          description: '',
+          inputs: {},
+          outputs: {},
+          name: 'Echo',
+          serviceId: 'example',
+          serviceName: 'Example',
+        }),
+      }),
+    )
+    const revision = capabilityFlow(true, 'capability.actions.example.echo(input, { connectionId: "work" })', [
+      { kind: 'connector', action: 'example.echo', connections: [{ connectionId: 'work' }, { connectionId: 'home' }] },
+    ])
+    const stored = await storeRevision(service, revision, 'multi-account-publish')
+    active = false
+    await expect(service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v2', null, 'publish')).rejects.toMatchObject({
+      code: 'connector.connection-required',
+    })
+    await expect(service.control.createDraftRun(stored.flowId, stored.revisionId, 'open-flow-engine/v2', {}, 'run')).rejects.toMatchObject({
+      code: 'connector.connection-required',
+    })
+    active = true
+    const accepted = await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v2', null, 'publish')
+    const checks = listConnections.mock.calls.length
+    active = false
+    const replay = await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v2', null, 'publish')
+    expect(replay.operationId).toBe(accepted.operationId)
+    expect(listConnections).toHaveBeenCalledTimes(checks)
+  })
+
   it('distinguishes an unconfigured Connector from an unavailable Connector', async () => {
     const service = await open()
 
@@ -298,7 +439,7 @@ describe('Server Connector host', () => {
       { kind: 'task.create', task: revision.document.tasks.connector!, taskId: 'connector' },
       { kind: 'graph.node.create', node: revision.document.graph.nodes.connector!, nodeId: 'connector', target: { kind: 'flow' } },
     ])
-    const accepted = await service.control.createDraftRun(created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v1', {}, 'team-run')
+    const accepted = await service.control.createDraftRun(created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v2', {}, 'team-run')
     await service.waitForIdle()
 
     expect(service.run(accepted.run.runId)?.status).toBe('completed')
@@ -319,38 +460,80 @@ describe('Server Connector host', () => {
 
   it('allows only Connector Capabilities declared by the current inline Task', async () => {
     const execute = vi.fn(async (_action: string, _connectionId: string, input: Readonly<Record<string, JsonValue>>) => input)
-    const service = await open(createConnectorHost({ execute }))
+    const service = await open(
+      createConnectorHost({
+        execute,
+        getAction: async () => ({
+          actionId: 'example.echo',
+          authenticated: true,
+          description: '',
+          inputs: {},
+          outputs: {},
+          name: 'Echo',
+          serviceId: 'example',
+          serviceName: 'Example',
+        }),
+        listConnections: async () => [{ connectionId: 'connection-work', displayName: 'Work', isDefault: true, serviceId: 'example', status: 'active' }],
+      }),
+    )
     const allowedRunId = await run(service, capabilityFlow())
     expect(service.run(allowedRunId)?.status).toBe('completed')
     expect(execute).toHaveBeenCalledTimes(1)
 
     const deniedRunId = await run(service, capabilityFlow(false))
     expect(service.events(deniedRunId).find((event) => event.kind == 'node.failed')).toMatchObject({
-      payload: { error: { code: 'capability.denied', message: 'The Runtime Capability is not declared for this Task.' } },
+      payload: { error: { code: 'node.failed' } },
     })
     expect(execute).toHaveBeenCalledTimes(1)
   })
 
-  it.each([
-    'null',
-    "{ action: '', connectionId: 'connection-work', input }",
-    "{ action: 'example.echo', input }",
-    "{ action: 'example.echo', connectionId: 'connection-work', input: [] }",
-    "{ action: 'example.echo', connectionId: 'connection-work', extra: true, input }",
-  ])('rejects malformed Connector Capability payload %s', async (payload) => {
-    const execute = vi.fn(async () => ({}))
-    const service = await open(createConnectorHost({ execute }))
-    const runId = await run(service, capabilityFlow(true, `capability.connector(${payload})`))
+  it.each(['null', '{}', "{ connectionId: '' }", "{ connectionId: 'connection-work', connectionAlias: 'work' }", '{ extra: true }'])(
+    'rejects malformed Connector Capability payload %s',
+    async (payload) => {
+      const execute = vi.fn(async () => ({}))
+      const service = await open(
+        createConnectorHost({
+          execute,
+          getAction: async () => ({
+            actionId: 'example.echo',
+            authenticated: true,
+            description: '',
+            inputs: {},
+            outputs: {},
+            name: 'Echo',
+            serviceId: 'example',
+            serviceName: 'Example',
+          }),
+          listConnections: async () => [{ connectionId: 'connection-work', displayName: 'Work', isDefault: true, serviceId: 'example', status: 'active' }],
+        }),
+      )
+      const runId = await run(service, capabilityFlow(true, `capability.actions.example.echo(input, ${payload})`))
 
-    expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({
-      payload: { error: { code: 'capability.invalid', message: 'The Runtime Capability request is invalid.' } },
-    })
-    expect(execute).not.toHaveBeenCalled()
-  })
+      expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({
+        payload: { error: { code: 'capability.invalid', message: 'The Action request is invalid.' } },
+      })
+      expect(execute).not.toHaveBeenCalled()
+    },
+  )
 
   it('denies a Runtime Capability kind that was not declared by the Task', async () => {
     const execute = vi.fn(async () => ({}))
-    const service = await open(createConnectorHost({ execute }))
+    const service = await open(
+      createConnectorHost({
+        execute,
+        getAction: async () => ({
+          actionId: 'example.echo',
+          authenticated: true,
+          description: '',
+          inputs: {},
+          outputs: {},
+          name: 'Echo',
+          serviceId: 'example',
+          serviceName: 'Example',
+        }),
+        listConnections: async () => [{ connectionId: 'connection-work', displayName: 'Work', isDefault: true, serviceId: 'example', status: 'active' }],
+      }),
+    )
     const runId = await run(service, capabilityFlow(true, "capability.egress('https://example.com')"))
 
     expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({

@@ -6,7 +6,7 @@ import type IsolatedVM from 'isolated-vm'
 import type { CapabilityResult, ExecutorMessage, InvokeContext, InvokeRequest, IsolatedVmLimits, ParentMessage } from './isolated-vm.ts'
 
 import { createRuntimeProgram } from '@oomol-lab/open-flow/flow-semantics'
-import { findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
+import { createActions, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { runFlow } from '@oomol-lab/open-flow/scheduler'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
@@ -192,15 +192,18 @@ async function invoke(kind, payload) {
     call.applyIgnored(undefined, [JSON.stringify({ kind, payload }), resolve], { arguments: { reference: true } })
   })
   const result = JSON.parse(source)
-  if (!result.ok) throw new Error(result.error)
+  if (!result.ok) throw Object.assign(new Error(result.error), { code: result.code })
   return result.value
 }
+const declarations = globalThis.__openFlowActions
+delete globalThis.__openFlowActions
+const createActions = ${createActions.toString()}
 export const capability = Object.freeze({
+  actions: createActions(declarations, (payload) => invoke('connector', payload)),
   artifact: Object.freeze({
     open: (reference) => invoke('artifact.open', reference),
     put: (input) => invoke('artifact.put', input),
   }),
-  connector: (input) => invoke('connector', input),
   egress: (url) => invoke('egress', { url }),
 })`
 
@@ -275,7 +278,7 @@ function installGlobals(
   const capability = new ivm.Reference((sourceReference: IsolatedVM.Reference<string>, settle: IsolatedVM.Reference<(source: string) => void>): void => {
     const settleResult = (result: CapabilityOutcome): void => {
       if (!active) return
-      const source = result.ok ? JSON.stringify({ ok: true, value: result.value }) : JSON.stringify({ error: result.error, ok: false })
+      const source = result.ok ? JSON.stringify({ ok: true, value: result.value }) : JSON.stringify({ code: result.code, error: result.error, ok: false })
       settle.applyIgnored(undefined, [source], { arguments: { copy: true } })
       settle.release()
     }
@@ -298,14 +301,29 @@ function installGlobals(
         void call(request.invocationId, capabilities, capabilityCall.kind, capabilityCall.payload).then(
           (result) => settleResult({ id: 0, ok: true, type: 'capability.result', value: result }),
           (error) => {
-            capabilityFailure = error
-            settleResult({ error: normalizedError(error).message, id: 0, ok: false, type: 'capability.result' })
+            if (Reflect.get(Object(error), 'schedulerCode') == 'runtime.limit-exceeded') capabilityFailure = error
+            settleResult({
+              code: (error as { code?: string; schedulerCode?: string }).schedulerCode ?? (error as { code?: string }).code,
+              error: normalizedError(error).message,
+              id: 0,
+              ok: false,
+              type: 'capability.result',
+            })
           },
         )
       })
-      .catch((error) => settleResult({ error: normalizedError(error).message, id: 0, ok: false, type: 'capability.result' }))
+      .catch((error) =>
+        settleResult({
+          code: (error as { code?: string; schedulerCode?: string }).schedulerCode ?? (error as { code?: string }).code,
+          error: normalizedError(error).message,
+          id: 0,
+          ok: false,
+          type: 'capability.result',
+        }),
+      )
       .finally(() => sourceReference.release())
   })
+  context.global.setSync('__openFlowActions', new ivm.ExternalCopy(capabilities).copyInto())
   context.global.setSync('__openFlowCapability', capability)
   context.global.setSync('__openFlowClearTimeout', cancelTimer)
   context.global.setSync('__openFlowClone', cloneValue)
@@ -371,7 +389,7 @@ export async function invoke(source) {
       ? JSON.stringify({ engineDigest: ${JSON.stringify(program.engineDigest)}, ok: true, void: true })
       : JSON.stringify({ engineDigest: ${JSON.stringify(program.engineDigest)}, ok: true, value: result })
   } catch (error) {
-    return JSON.stringify({ error: error instanceof Error ? error.message : String(error), ok: false })
+    return JSON.stringify({ code: typeof error?.code == 'string' ? error.code : undefined, error: error instanceof Error ? error.message : String(error), ok: false })
   }
 }`,
     { filename: 'open-flow:engine/main.mjs' },
@@ -421,15 +439,18 @@ function readResult(
   }
   const result = JSON.parse(source) as {
     readonly engineDigest?: string
+    readonly code?: string
     readonly error?: string
     readonly ok?: boolean
     readonly value?: JsonValue
     readonly void?: boolean
   }
+  if (capabilityFailure != null) throw new IsolatedVmError('limit-exceeded', normalizedError(capabilityFailure).message)
   const returnedValue = Object.hasOwn(result, 'value') && result.void === undefined
   const returnedVoid = !Object.hasOwn(result, 'value') && result.void === true
   if (!result.ok || result.engineDigest != program.engineDigest || (!returnedValue && !returnedVoid)) {
-    if (preserveCapabilityFailure && capabilityFailure != null) throw capabilityFailure
+    if (preserveCapabilityFailure && typeof result.code == 'string')
+      throw Object.assign(new Error(result.error ?? 'Action failed.'), { schedulerCode: result.code })
     throw new IsolatedVmError('task-failed', result.error ?? 'User Task failed.')
   }
   return returnedVoid ? undefined : (result.value as JsonValue)
@@ -491,7 +512,7 @@ async function execute(
     return result
   } catch (error) {
     if (error instanceof IsolatedVmError) throw error
-    if (preserveCapabilityFailure && error === globals?.failure()) throw error
+    if (preserveCapabilityFailure && typeof Reflect.get(Object(error), 'schedulerCode') == 'string') throw error
     const message = normalizedError(error).message
     const code = /memory|heap|timed out|timeout/i.test(message) ? 'limit-exceeded' : 'invalid-program'
     throw new IsolatedVmError(code, message)
@@ -652,12 +673,16 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
       let value: FlowRunOutcome | JsonValue | undefined
       if ('flow' in request) value = yield* executeFlow(request, call)
       else {
-        value = yield* executeEffect(request, (invocationId, capabilities, kind, payload) =>
-          Effect.gen(function* () {
-            const response = yield* call({ capabilities, invocationId, kind, payload, type: 'capability' })
-            if (!response.ok) return yield* Effect.fail(new Error(response.error ?? 'Capability call failed.'))
-            return response.value as RuntimeCapabilityResponse
-          }),
+        value = yield* executeEffect(
+          request,
+          (invocationId, capabilities, kind, payload) =>
+            Effect.gen(function* () {
+              const response = yield* call({ capabilities, invocationId, kind, payload, type: 'capability' })
+              if (!response.ok)
+                return yield* Effect.fail(Object.assign(new Error(response.error ?? 'Capability call failed.'), { schedulerCode: response.code }))
+              return response.value as RuntimeCapabilityResponse
+            }),
+          request.capabilities,
         )
       }
       yield* Effect.sync(() => {

@@ -11,6 +11,7 @@ export interface ConnectorAction {
 }
 
 export interface ConnectorConnection {
+  readonly alias?: string
   readonly displayName: string
   readonly id: string
   readonly isDefault: boolean

@@ -124,7 +124,7 @@ it('recovers Stripe candidate creation with one fixed idempotency key, fences ca
   services.add(service)
   const created = await service.control.createFlow('operator', 'Stripe', 'stripe-flow')
   const revisionId = await addStripe(service, created.flow.flowId, created.flow.draftRevisionId, ['charge.succeeded'])
-  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v1', null, 'stripe-publish')
+  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v2', null, 'stripe-publish')
   const database = new DatabaseSync(file)
   const candidate = database.prepare('SELECT endpoint_id AS endpointId FROM integration_candidates WHERE operation_id = ?').get(operation.operationId) as {
     readonly endpointId: string
@@ -171,7 +171,7 @@ it('recovers Stripe candidate creation with one fixed idempotency key, fences ca
     'operator',
     created.flow.flowId,
     unchangedRevisionId,
-    'open-flow-engine/v1',
+    'open-flow-engine/v2',
     completed.publicationId,
     'stripe-unchanged',
   )
@@ -188,7 +188,7 @@ it('recovers Stripe candidate creation with one fixed idempotency key, fences ca
       'operator',
       created.flow.flowId,
       changedRevisionId,
-      'open-flow-engine/v1',
+      'open-flow-engine/v2',
       live.publication?.publicationId ?? null,
       'stripe-changed',
     ),
@@ -234,7 +234,7 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
     'operator',
     created.flow.flowId,
     created.flow.draftRevisionId,
-    'open-flow-engine/v1',
+    'open-flow-engine/v2',
     null,
     'initial-publish',
   )
@@ -247,7 +247,7 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
     'operator',
     created.flow.flowId,
     revisionId,
-    'open-flow-engine/v1',
+    'open-flow-engine/v2',
     initialDone.publicationId,
     'failed-stripe',
   )
@@ -283,7 +283,7 @@ it('removes a cleanup candidate whose fixed Integration definition is unavailabl
   services.add(service)
   const created = await service.control.createFlow('operator', 'Stripe cleanup', 'stripe-cleanup-flow')
   const revisionId = await addStripe(service, created.flow.flowId, created.flow.draftRevisionId, ['charge.succeeded'])
-  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v1', null, 'stripe-cleanup')
+  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v2', null, 'stripe-cleanup')
   const unavailable = { ...stripeNode(['charge.succeeded']), definition: { ...stripe.snapshot, key: 'stripe.unavailable' } }
   const database = new DatabaseSync(file)
   database

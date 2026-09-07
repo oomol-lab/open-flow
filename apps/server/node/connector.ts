@@ -1,6 +1,6 @@
 import type { ConnectorProxyRequest, ConnectorProxyResult } from '@oomol-lab/open-flow/connector-proxy'
 import type { ConnectorAction, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
-import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { Logger } from 'pino'
 
 import { connectorActionPorts } from '@oomol-lab/open-flow/connector-action'
@@ -552,6 +552,7 @@ function runtimeConnection(value: unknown): ConnectorConnection {
   const status = connectionStatus(source.status)
   if (typeof source.isDefault != 'boolean') throw unavailable('Connector Connection isDefault must be a boolean.')
   return {
+    ...(source.alias == null ? {} : { alias: string(source.alias, 'connection.alias') }),
     connectionId: string(source.id, 'connection.id'),
     displayName: string(source.displayName, 'connection.displayName'),
     isDefault: source.isDefault,
@@ -607,6 +608,8 @@ function mapAction(
   }
   return {
     actionId: action.id,
+    inputSchema: action.inputSchema,
+    outputSchema: action.outputSchema,
     authenticated: provider.authenticated,
     ...(defaultConnection == null ? {} : { defaultConnection }),
     description: action.description,
@@ -647,4 +650,40 @@ function mapAction(
 
 function unavailable(message = 'The Connector request could not be completed.'): ConnectorTaskError {
   return new ConnectorTaskError('connector.unavailable', message)
+}
+
+export async function checkCodeActions(
+  declarations: readonly ConnectorCapability[],
+  connector: ConnectorHost | undefined,
+  teamId?: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (declarations.length == 0) return
+  if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
+  const actions = new Map<string, Promise<ConnectorAction>>()
+  const catalogs = new Map<string, Promise<readonly ConnectorConnection[]>>()
+  for (const declaration of declarations) {
+    let action = actions.get(declaration.action)
+    if (action == null) {
+      action = connector.getAction(declaration.action, signal, teamId)
+      actions.set(declaration.action, action)
+    }
+    const definition = await action
+    if (definition.authenticated && declaration.connections.length == 0) throw connectionRequired()
+    if (declaration.connections.length == 0) continue
+    let catalog = catalogs.get(definition.serviceId)
+    if (catalog == null) {
+      catalog = connector.listConnections(definition.serviceId, signal, teamId)
+      catalogs.set(definition.serviceId, catalog)
+    }
+    const connections = await catalog
+    for (const allowed of declaration.connections) {
+      if (
+        !connections.some(
+          (connection) => connection.connectionId == allowed.connectionId && connection.serviceId == definition.serviceId && connection.status == 'active',
+        )
+      )
+        throw connectionRequired()
+    }
+  }
 }

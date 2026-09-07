@@ -728,7 +728,7 @@ export default () => value`,
           nodes: {
             task: {
               ...task,
-              task: { ...task.task, capabilities: [{ action: '', connectionId: 'connection-1', kind: 'connector' }] },
+              task: { ...task.task, capabilities: [{ action: '', connections: [], kind: 'connector' }] },
             },
           },
         },
@@ -738,7 +738,7 @@ export default () => value`,
     await expect(prepareFlow(invalid, currentEngineContract)).resolves.toMatchObject({
       kind: 'flow-invalid',
       validation: {
-        diagnostics: [expect.objectContaining({ code: 'task.capability-incomplete', path: '/document/graph/nodes/task/task/capabilities/0' })],
+        diagnostics: [expect.objectContaining({ code: 'task.capability-incomplete', path: '/document/graph/nodes/task/task/capabilities' })],
       },
     })
   })

@@ -143,7 +143,7 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
   services.add(service)
   const created = await service.control.createFlow('operator', 'Poll staging', 'poll-staging-flow')
   const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'initial')
-  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v1', null, 'poll-staging')
+  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v2', null, 'poll-staging')
 
   await service.tickPoll('2026-08-31T10:00:30.000Z')
   expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('pending')
@@ -180,7 +180,7 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
     'operator',
     created.flow.flowId,
     unchangedRevisionId,
-    'open-flow-engine/v1',
+    'open-flow-engine/v2',
     completed.publicationId,
     'poll-unchanged',
   )
@@ -195,7 +195,7 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
     'operator',
     created.flow.flowId,
     changedRevisionId,
-    'open-flow-engine/v1',
+    'open-flow-engine/v2',
     live.publication?.publicationId ?? null,
     'poll-changed',
   )
@@ -233,7 +233,7 @@ it('fails a permanent Poll baseline before activation and preserves the old Live
   })
   services.add(service)
   const created = await service.control.createFlow('operator', 'Poll failure', 'poll-failure-flow')
-  const initial = await service.control.publishFlow('operator', created.flow.flowId, created.flow.draftRevisionId, 'open-flow-engine/v1', null, 'poll-initial')
+  const initial = await service.control.publishFlow('operator', created.flow.flowId, created.flow.draftRevisionId, 'open-flow-engine/v2', null, 'poll-initial')
   await service.tickMaintenance('2026-08-31T11:00:00.000Z')
   const initialDone = service.control.getPublishOperation(created.flow.flowId, initial.operationId)
   if (initialDone.status != 'succeeded') throw new Error('Initial Publish operation did not succeed.')
@@ -243,7 +243,7 @@ it('fails a permanent Poll baseline before activation and preserves the old Live
     'operator',
     created.flow.flowId,
     revisionId,
-    'open-flow-engine/v1',
+    'open-flow-engine/v2',
     initialDone.publicationId,
     'poll-failed',
   )
@@ -275,7 +275,7 @@ it('rolls back a changed Poll candidate during activation and succeeds after rec
   services.add(service)
   const created = await service.control.createFlow('operator', 'Poll activation', 'poll-activation-flow')
   const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'activation')
-  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v1', null, 'poll-activation')
+  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v2', null, 'poll-activation')
   await service.tickPoll('2026-08-31T12:00:00.000Z')
 
   const database = new DatabaseSync(file)

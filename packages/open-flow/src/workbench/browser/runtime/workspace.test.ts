@@ -202,7 +202,7 @@ describe('Designer port projection', () => {
     const waiting = {
       closureDigest: 'closure',
       createdAt: '2026-09-02T00:00:00.000Z',
-      engineContract: 'open-flow-engine/v1',
+      engineContract: 'open-flow-engine/v2',
       engineDigest: 'sha256:engine',
       flowId: draft.flowId,
       modelVersion: 1,

@@ -1,3 +1,5 @@
+import type { ConnectorConnection } from '../api.ts'
+
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
 import { providerIcon } from '../providerIcon.ts'
@@ -56,7 +58,7 @@ describe('ConnectorStore', () => {
           return Response.json({
             closureDigest: `closure-${index}`,
             diagnostics: [],
-            engineContract: 'open-flow-engine/v1',
+            engineContract: 'open-flow-engine/v2',
             flowId: flow!.flowId,
             modelVersion: 1,
             revisionDigest: `digest-${flow!.flowId}`,
@@ -108,8 +110,20 @@ describe('ConnectorStore', () => {
       expect(firstActions?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail flow-a' }))
       expect(connectors.$.actions.value['mail.send']?.description).toBe('Send for flow-a.')
 
+      const action = connectors.$.actions.value['mail.send']
+      if (action == null) throw new Error('Expected the loaded Action.')
+      const lateAction = Promise.withResolvers<typeof action>()
+      const lateConnections = Promise.withResolvers<readonly ConnectorConnection[]>()
+      vi.spyOn(client, 'getConnectorAction').mockReturnValueOnce(lateAction.promise)
+      vi.spyOn(client, 'listConnectorConnections').mockReturnValueOnce(lateConnections.promise)
+      const pending = Promise.all([connectors.loadCodeAction('mail.send', signal), connectors.loadCodeConnections('mail', signal)])
+
       await workspace.selectFlow(flows[1]!.flowId)
+      lateAction.resolve({ ...action, description: 'Stale Flow A schema.' })
+      lateConnections.resolve([{ connectionId: 'flow-a-account', alias: 'work', displayName: 'Work', isDefault: true, serviceId: 'mail', status: 'active' }])
+      await pending
       expect(connectors.$.actions.value).toEqual({})
+      expect(connectors.$.catalogs.value).toEqual({})
 
       const secondProviders = await connectors.browseAddNodeOptions(signal)
       await connectors.provideAddNodeOptionChoices('connector-provider:mail', signal)

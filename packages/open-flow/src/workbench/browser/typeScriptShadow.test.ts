@@ -76,7 +76,7 @@ describe('TypeScript shadow documents', () => {
 
     expect(document.source).toBe(source)
     expect(document.text).toContain('@param {__TaskInputs} data')
-    expect(document.text).toContain('@param {import("@oomol-lab/open-flow").TaskContext<__TaskOutputs>} task')
+    expect(document.text).toContain('@param {import("@oomol-lab/open-flow").TaskContext} task')
     for (let offset = 0; offset <= source.length; offset++) expect(document.toSource(document.toShadow(offset))).toBe(offset)
     expect(document.positionAt(1)).toBeUndefined()
   })

@@ -370,7 +370,7 @@ async function verifyConsumer(versions: { readonly react: string; readonly react
         "const controlError: ControlErrorCode = 'flow.not-found'",
         "const uiLanguage: UiLanguage = resolveUiLanguage(['fr-CA'])",
         "const transition = transitionRun('queued', { kind: 'claim' })",
-        "const runtimeProgram: RuntimeProgram = { engineContract: 'open-flow-engine/v1', engineDigest: 'sha256:test', entryModuleId: 'main', modules: {} }",
+        "const runtimeProgram: RuntimeProgram = { engineContract: 'open-flow-engine/v2', engineDigest: 'sha256:test', entryModuleId: 'main', modules: {} }",
         "const location: WorkbenchLocation = { view: 'design' }",
         'const host: WorkbenchHost = {',
         '  notify: () => undefined, openExternalPage: async () => false,',
@@ -440,7 +440,7 @@ async function verifyConsumer(versions: { readonly react: string; readonly react
       process.execPath,
       [
         '-e',
-        "const Effect = await import('effect/Effect'); const { runFlow } = await import('@oomol-lab/open-flow/scheduler'); const result = await Effect.runPromise(runFlow({ closureDigest: 'consumer', engineContract: 'open-flow-engine/v1', graph: { edges: [], nodes: {} }, modules: {}, subflows: {}, tasks: {} }, { createId: () => 'consumer-job', flowId: 'main', invokeTask: () => Effect.fail(new Error('Unexpected Task invocation.')), runId: 'consumer-run' })); if (result.kind !== 'node-results' || result.nodes.length !== 0) throw new Error('Scheduler Effect is not interoperable with the consumer Effect runtime.')",
+        "const Effect = await import('effect/Effect'); const { runFlow } = await import('@oomol-lab/open-flow/scheduler'); const result = await Effect.runPromise(runFlow({ closureDigest: 'consumer', engineContract: 'open-flow-engine/v2', graph: { edges: [], nodes: {} }, modules: {}, subflows: {}, tasks: {} }, { createId: () => 'consumer-job', flowId: 'main', invokeTask: () => Effect.fail(new Error('Unexpected Task invocation.')), runId: 'consumer-run' })); if (result.kind !== 'node-results' || result.nodes.length !== 0) throw new Error('Scheduler Effect is not interoperable with the consumer Effect runtime.')",
       ],
       { cwd: directory },
     )

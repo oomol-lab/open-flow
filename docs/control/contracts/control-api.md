@@ -193,7 +193,7 @@ interface FlowCheck {
 }
 ```
 
-Check body 是 `{ engineContract: 'open-flow-engine/v1', version: 1 }`，始终验证 path 中固定的 Flow Revision。
+Check body 是 `{ engineContract: 'open-flow-engine/v2', version: 1 }`，始终验证 path 中固定的 Flow Revision。
 `message` 是稳定的 canonical English fallback；Workbench 可以使用 `code`、可选 `values.variant` 和其余 `values` 显示本地化文案，未知 code 或 variant
 必须回退到 `message`。
 
@@ -536,3 +536,101 @@ Scheduler checkpoint 的精确对象为：
 
 Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 保存执行图末端节点，按 node ID 排序。
 完成项为 `{ nodeId, status: 'completed', jobId, outputs }`，跳过项为 `{ nodeId, status: 'skipped' }`，不包含重复执行的 jobs 数组。
+
+## 9. Code Action 合同
+
+当前脚本合同为 `open-flow-engine/v2`。它用 `context.actions` 替代 v1 的 `context.connector`，不提供旧名转发；
+固定为 v1 的 Publication / Run 必须由相应 Engine 执行，当前 Server 对 v1 明确返回不支持。
+升级已有 Code Task 时，将单账号 capability 改为以下允许集合，并更新源码后创建 v2 Publication。
+
+### Revision 与编辑 operation
+
+Inline Task 的 `capabilities` 可省略或为空数组；每个元素使用现有 `ConnectorCapability`：
+
+```json
+{
+  "kind": "connector",
+  "action": "github.get_current_user",
+  "connections": [
+    { "connectionId": "connection-work", "alias": "work" },
+    { "connectionId": "connection-personal", "alias": "personal" }
+  ],
+  "connectionId": "connection-work"
+}
+```
+
+`action` 必须是目录原始完整 ID，匹配 `^[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+$`。以第一个 `.` 分成 provider 与剩余动作名；
+provider 不含 `.`，所以两种入口在根表没有键冲突。每个 Task 中 Action 不重复；每个 Action 的 Connection ID 和已保存 alias 分别唯一。
+ID 和 alias 是非空、大小写敏感的字符串，不把 displayName 当 alias。所有对象拒绝未知字段。
+
+`connections` 必需，可为空；可选的顶层 `connectionId` 是固定默认，存在时必须属于允许集合。authenticated Action 在 Draft 中可暂不绑账号，
+Publish 和 Run admission 要求其至少有一个 active Connection，并检查全部允许账号的 service、状态和固定 scope。无需默认项也可以发布。
+无认证 Action 允许空集合。绑定、alias 和默认值均进入 canonical Revision 与 semantic closure digest；schema 和目录缓存不进入声明。
+
+通过既有 Draft changes 提交：
+
+```ts
+{
+  kind: 'graph.node.task.capabilities.set',
+  target: { kind: 'flow' }, // Subflow 使用 { kind: 'subflow', id }。
+  nodeId: 'code-node',
+  before: previousCapabilities, // 原声明不存在时省略。
+  value: nextCapabilities, // 省略时删除整个 capabilities 属性。
+}
+```
+
+operation 检查目标是 inline Code Task，并精确比较 `before`，沿既有 expected Revision 和 change identity 提交。
+公开 `setCodeActions(content, target, nodeId, capabilities)` 生成该 operation；`createCodeTask` 的端口配置参数也接受 `capabilities`。
+CLI 的 `flow apply` JSON 中，`kind: "code"` 节点直接接受同一 `capabilities` 数组，无需独立命令或另一套配置格式。
+普通源码、端口修改和复制保留声明。
+
+### 脚本 API
+
+```js
+export default async (inputs, context) => {
+  // 省略账号选项时使用声明中的固定默认。
+  const user = await context.actions.github.get_current_user({})
+
+  // 完整 ID 索引与分层方法是同一个函数，支持解构后调用。
+  const getUser = context.actions['github.get_current_user']
+  const [work, personal] = await Promise.all([getUser({}, { connectionId: 'connection-work' }), getUser({}, { connectionAlias: 'personal' })])
+  return { user, work, personal }
+}
+```
+
+非 JavaScript 标识符名称使用方括号，如 `context.actions['google-drive'].list_files({})`；剩余动作名含点时也只占第二级键。
+根表和 provider 表使用空原型并冻结，仅暴露当前节点声明的方法。
+
+省略第一个参数或传入 `undefined` 等价于传入 `{}`，必填字段仍由 Action schema 校验。业务参数必须是 JSON 对象，保留字段中的显式 `null`，不套用图端口的 null/default 归一化。循环引用、`undefined` 属性、非有限数字、函数、BigInt、
+Date 等非 JSON 值在进入 transport 前失败。方法返回 Connector Action data，直接 `await` 取得；失败抛出含稳定 `code` 的 Error。
+
+第二参数可以省略，或恰为 `{ connectionId: string }` / `{ connectionAlias: string }`，两个字段互斥。空对象、空字符串、null 和未知字段返回
+`capability.invalid`；未授权 Action、ID 或 alias 返回 `capability.denied`。需选账号而未设置默认、也未显式选择时返回
+`connector.connection-required`，不按目录默认或集合顺序回退。访问不存在的方法得到普通 JavaScript TypeError；伪造桥接请求仍由宿主拒绝。
+
+alias 按 Revision 内的原值精确匹配并解析为固定 ID。Connector 目录中的改名、默认变更或 alias 重用不改变这份映射；
+Workbench 的显式刷新绑定生成新 Revision 才会采纳新 alias。每次调用都可以选择不同账号，允许循环和并发。
+
+公开 `TaskContext<Actions>` 和 `Task<Inputs, Outputs, Actions>` 接受节点对应的 Action 方法表类型；默认表为空。
+Workbench 由当前声明和目录的原始 schema 生成局部精确类型，包含两种入口、允许的 ID / alias、必需的账号选项与返回值。
+普通 `string` 必须先收窄为已声明 ID；不同方法参数的联合也需要相应收窄。取不到 schema 时参数为 `Record<string, unknown>`、结果为 `unknown`。
+
+Workbench 的调用示例以只读预览展示，支持分层写法与完整 ID 写法切换，并复制当前预览。预览按当前声明生成账号选择；不直接修改源码、光标或代码保存状态。
+
+### 调用身份、生命周期与目录投影
+
+`RuntimeInvocation.capabilities` 固定直接程序的声明，Flow 执行从固定 Inline Task 取得声明。
+每个 `RuntimeCapabilityCall` 都携带独立 `callId`，`invocationId` 继续标识 Task。Server 从可信桥接请求身份构造 call ID，
+将它作为 Connector 幂等键；不同业务调用互不去重，同一传输请求保留身份。宿主日志记录 Action、Connection ID 和两种调用身份，不记录业务参数。
+
+用户可以捕获普通 Connector 错误并返回成功，之后抛出的其他错误不会被已捕获的旧错误覆盖。能力数量或响应大小超限导致节点失败，捕获不能将其变成成功。
+Run 取消、deadline、兄弟节点失败和节点退出沿既有执行生命周期终止能力；未等待的请求也会清理。取消请求不承诺撤销已发生的外部副作用。
+
+`ConnectorConnection` 额外投影可选 `alias`，缺省时仍可按 ID 绑定；`ConnectorAction` 额外投影可选 `inputSchema` / `outputSchema` 原始 JSON Schema。
+旧的 `inputs` / `outputs` 仍是图端口 projection。schema 的暂时缺失不移除声明，也不扩大运行权限。
+
+### 当前 Server 的上游身份限制
+
+当前 Connector adapter 先按稳定 ID 查询账号，再用 `x-oo-connector-alias` 执行。上游需要 transport alias；账号缺少它时明确失败。
+查询和 POST 之间 alias 被重新分配的竞态尚未消除，本次实现不声称具备端到端的稳定 ID 原子执行保证。
+要完成该项验收，上游必须支持按 Connection ID 原子解析并执行，或在同一次执行请求中校验 ID 与 alias / 版本条件；重复查询 alias 不能代替该保证。

@@ -152,8 +152,54 @@ export type ManagedTaskExecutor =
 
 export interface ConnectorCapability {
   readonly action: string
-  readonly connectionId: string
+  readonly connections: readonly { readonly connectionId: string; readonly alias?: string }[]
+  readonly connectionId?: string
   readonly kind: 'connector'
+}
+
+export function decodeConnectorCapabilities(value: unknown): readonly ConnectorCapability[] {
+  if (!Array.isArray(value)) throw new TypeError('Connector capabilities must be an array.')
+  const actions = new Set<string>()
+  return value.map((item: unknown) => {
+    if (item == null || typeof item != 'object' || Array.isArray(item)) throw new TypeError('Invalid Connector capability.')
+    const source = item as Record<string, unknown>
+    if (
+      Object.keys(source).some((key) => !['kind', 'action', 'connections', 'connectionId'].includes(key)) ||
+      source.kind != 'connector' ||
+      typeof source.action != 'string' ||
+      !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+$/.test(source.action) ||
+      !Array.isArray(source.connections)
+    ) {
+      throw new TypeError('Invalid Connector capability.')
+    }
+    if (actions.has(source.action)) throw new TypeError('Connector Action is declared more than once.')
+    actions.add(source.action)
+    const ids = new Set<string>()
+    const aliases = new Set<string>()
+    const connections = source.connections.map((entry: unknown) => {
+      if (entry == null || typeof entry != 'object' || Array.isArray(entry)) throw new TypeError('Invalid Connector Connection.')
+      const connection = entry as Record<string, unknown>
+      if (
+        Object.keys(connection).some((key) => !['connectionId', 'alias'].includes(key)) ||
+        typeof connection.connectionId != 'string' ||
+        connection.connectionId.length == 0 ||
+        ids.has(connection.connectionId)
+      ) {
+        throw new TypeError('Invalid or duplicate Connector Connection ID.')
+      }
+      ids.add(connection.connectionId)
+      if (Object.hasOwn(connection, 'alias')) {
+        if (typeof connection.alias != 'string' || connection.alias.length == 0 || aliases.has(connection.alias))
+          throw new TypeError('Invalid or duplicate Connector alias.')
+        aliases.add(connection.alias)
+      }
+      return { connectionId: connection.connectionId, ...(connection.alias == null ? {} : { alias: connection.alias as string }) }
+    })
+    if (Object.hasOwn(source, 'connectionId') && (typeof source.connectionId != 'string' || !ids.has(source.connectionId))) {
+      throw new TypeError('The default Connector Connection must be declared.')
+    }
+    return { kind: 'connector', action: source.action, connections, ...(source.connectionId == null ? {} : { connectionId: source.connectionId as string }) }
+  })
 }
 
 interface TaskDefinitionBase {
@@ -294,6 +340,13 @@ export interface GraphEdge {
 }
 
 export type ChangeOperation =
+  | {
+      readonly before?: readonly ConnectorCapability[]
+      readonly kind: 'graph.node.task.capabilities.set'
+      readonly nodeId: string
+      readonly target: GraphTarget
+      readonly value?: readonly ConnectorCapability[]
+    }
   | { readonly binding: FlowDocument['bindings'][string]; readonly bindingId: string; readonly kind: 'binding.create' }
   | { readonly bindingId: string; readonly kind: 'binding.delete' }
   | { readonly before: string; readonly bindingId: string; readonly kind: 'binding.target.set'; readonly value: string }
@@ -510,6 +563,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const graph = selectedGraph(document, operation.target)
         if (graph.nodes[operation.nodeId] != null) invalid('A Node with this ID already exists in the target graph.')
         if (operation.target.kind == 'subflow' && !('inputs' in operation.node)) invalid('Trigger Nodes cannot be created inside a Subflow.')
+        if (operation.node.kind == 'task' && operation.node.task?.capabilities !== undefined) decodeConnectorCapabilities(operation.node.task.capabilities)
         Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: operation.node } }))
         break
       }
@@ -560,6 +614,17 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: { ...node, inputs } } }))
         break
       }
+      case 'graph.node.task.capabilities.set': {
+        const graph = selectedGraph(document, operation.target)
+        const node = graph.nodes[operation.nodeId]
+        if (node?.kind != 'task' || node.task == null) invalid('The inline Task Node does not exist.')
+        if (!dequal(node.task.capabilities, operation.before)) invalid('The inline Task capabilities changed before this operation was applied.')
+        const task = { ...node.task }
+        if (operation.value === undefined) delete task.capabilities
+        else task.capabilities = decodeConnectorCapabilities(operation.value)
+        Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: { ...node, task } } }))
+        break
+      }
       case 'graph.node.task.name.set': {
         const graph = selectedGraph(document, operation.target)
         const node = graph.nodes[operation.nodeId]
@@ -576,7 +641,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         if (!dequal({ inputs: node.task.inputs, outputs: node.task.outputs }, operation.before)) {
           invalid('The inline Task ports changed before this operation was applied.')
         }
-        const updated = { ...node, task: { ...node.task, ...operation.value } }
+        const updated = { ...node, task: { ...node.task, inputs: operation.value.inputs, outputs: operation.value.outputs } }
         Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
         break
       }
@@ -671,6 +736,9 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
       }
       case 'subflow.create':
         if (document.subflows[operation.subflowId] != null) invalid('A Subflow with this ID already exists.')
+        for (const node of Object.values(operation.subflow.graph.nodes)) {
+          if (node.kind == 'task' && node.task?.capabilities !== undefined) decodeConnectorCapabilities(node.task.capabilities)
+        }
         document.subflows = { ...document.subflows, [operation.subflowId]: operation.subflow }
         break
       case 'subflow.definition.set': {

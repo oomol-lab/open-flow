@@ -1,6 +1,7 @@
 import type {
   ChangeOperation,
   CodeModule,
+  ConnectorCapability,
   GraphTarget,
   InputMapping,
   JsonValue,
@@ -57,7 +58,7 @@ export function createCodeTask(
   identity: { readonly moduleId: string; readonly nodeId: string },
   name: string,
   module: Pick<CodeModule, 'imports' | 'source'> | undefined = undefined,
-  ports: Pick<Extract<TaskDefinition, { readonly moduleId: string }>, 'inputs' | 'outputs'> = {
+  ports: Pick<Extract<TaskDefinition, { readonly moduleId: string }>, 'inputs' | 'outputs' | 'capabilities'> = {
     inputs: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
     outputs: [{ handle: 'result', jsonSchema: {}, nullable: true }],
   },
@@ -79,6 +80,7 @@ export function createCodeTask(
         kind: 'task',
         name,
         task: {
+          ...(ports.capabilities == null ? {} : { capabilities: ports.capabilities }),
           inputs: ports.inputs,
           moduleId: identity.moduleId,
           name,
@@ -500,4 +502,16 @@ function defaultInputs(ports: TaskDefinition['inputs']): Readonly<Record<string,
 
 function llmInputValue(values: LlmTaskOptions['inputs'], handle: LlmInputHandle, fallback: JsonValue): JsonValue {
   return values != null && Object.hasOwn(values, handle) ? values[handle]! : fallback
+}
+
+export function setCodeActions(
+  content: RevisionContent,
+  target: GraphTarget,
+  nodeId: string,
+  capabilities: readonly ConnectorCapability[],
+): readonly ChangeOperation[] | undefined {
+  const selected = target.kind == 'flow' ? content.document.graph : content.document.subflows[target.id]?.graph
+  const node = selected?.nodes[nodeId]
+  if (node?.kind != 'task' || node.task == null || dequal(node.task.capabilities ?? [], capabilities)) return
+  return [{ kind: 'graph.node.task.capabilities.set', target, nodeId, before: node.task.capabilities, value: capabilities }]
 }

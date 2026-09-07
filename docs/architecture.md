@@ -152,6 +152,10 @@ Wait 通知复用固定 Revision 中显式选择的 Connector action。部署必
 用户代码只在隔离 realm 中获得目标 closure、固定 platform module 和当前 Task invocation 明确声明的窄 Capability。Capability host 必须校验当前
 Flow、Run、Task、invocation、binding 和 Run 状态；Task 或 Run 结束后旧 Capability 必须 fail closed。
 
+Code Task 的 Action 声明属于 Revision，固定允许的 Action、Connection 集合和可选默认账号。分层属性与完整 Action ID 索引共享同一调用合同；
+每次业务调用有独立身份，用于外部幂等处理，不复用 Task invocation identity。Action 调用仍属于当前节点的生命周期，不创建图节点或独立 Run。
+普通调用错误可以被代码捕获，取消、deadline 和资源限制不能因用户捕获错误而失效。
+
 ## 4. Publication、Connector 与 Trigger
 
 Publication 是 Flow 在固定 Revision 上的不可变成功记录。每个 Flow 独立拥有 Publication 历史和最多一个 Live pointer。Publish 在同步接受前固定
@@ -166,9 +170,13 @@ current Trigger binding 与 Live pointer 共同构成 Trigger admission authorit
 都不能绕过该 authority 创建 Run；Poll baseline checkpoint 只在激活 transaction 中安装。不能使用独立候选 endpoint 安全替换的 Integration 变更必须
 fail closed，不能先修改 current provider resource 再依赖补偿恢复。
 
-Connector service 拥有 Provider 授权、credential、Connection lifecycle 和 proxy transport。Open Flow 只保存稳定的 opaque Connection identity，
+Connector service 拥有 Provider 授权、credential、Connection lifecycle 和 proxy transport。Open Flow 保存稳定的 opaque Connection identity，
 不能把 credential、token 或 Connector 数据库复制进 Revision、Browser 或 RunEvent。Connector catalog 和 Connection 是 deployment scope 资源，
 不从属于单个 Flow。
+
+Code Action 可以将绑定时的 Connector alias 与稳定 ID 一起固定在 Revision；alias 只是当前 Action 允许集合内的选择名称，不能成为动态授权依据。
+目录改名不修改旧 Revision。Publish 与 Run eligibility 检查完整执行 closure 的允许账号集合，具体调用仍由宿主检查当前外部授权状态。
+Connector adapter 必须明确自己的执行身份保证；本地按 ID 解析到 alias 不等于上游按稳定 ID 原子执行。
 
 Server 使用 OOMOL-hosted Connector 时，Operator 创建 Flow 必须选择一个具体 OOMOL Team，并由 Server 在同一个创建 operation boundary 内保存为
 不可变的 Flow metadata；选择默认 Team 也必须固定其具体 identity，不能保存为随账户默认值漂移的动态选择。Node 不拥有或覆盖 Team，既有 Flow 也不能

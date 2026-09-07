@@ -18,6 +18,8 @@ interface CodeMirrorModules {
   readonly EditorState: typeof import('@codemirror/state').EditorState
   readonly EditorView: typeof import('@codemirror/view').EditorView
   readonly basicSetup: typeof import('codemirror').basicSetup
+  readonly indentWithTab: typeof import('@codemirror/commands').indentWithTab
+  readonly keymap: typeof import('@codemirror/view').keymap
   readonly githubDark: typeof import('@uiw/codemirror-theme-github').githubDark
   readonly githubLight: typeof import('@uiw/codemirror-theme-github').githubLight
   readonly javascript: typeof import('@codemirror/lang-javascript').javascript
@@ -81,8 +83,11 @@ async function loadCodeMirrorModules(): Promise<CodeMirrorModules> {
       import('@codemirror/lang-json'),
       import('@codemirror/lang-markdown'),
       import('@codemirror/lang-yaml'),
-    ]).then(([codeMirror, state, view, github, javascript, json, markdown, yaml]) => ({
+      import('@codemirror/commands'),
+    ]).then(([codeMirror, state, view, github, javascript, json, markdown, yaml, commands]) => ({
       basicSetup: codeMirror.basicSetup,
+      indentWithTab: commands.indentWithTab,
+      keymap: view.keymap,
       Compartment: state.Compartment,
       EditorState: state.EditorState,
       EditorView: view.EditorView,
@@ -191,6 +196,7 @@ class CodeMirrorStringEditorControl implements StringEditorControl {
       parent: layoutRoot,
       extensions: [
         modules.basicSetup,
+        modules.keymap.of([modules.indentWithTab]),
         this.themeCompartment.of(createEditorTheme(modules, dark)),
         this.languageCompartment.of(createLanguageExtension(modules, this.language)),
         this.readOnlyCompartment.of(modules.EditorState.readOnly.of(this.readOnly)),

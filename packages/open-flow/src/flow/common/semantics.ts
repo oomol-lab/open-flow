@@ -1,5 +1,6 @@
 import type {
   BindingSource,
+  ConnectorCapability,
   FlowDocument,
   FlowSource,
   Graph,
@@ -18,7 +19,7 @@ import type { RuntimeProgram } from '../../execution/common/runtime.ts'
 import { parse } from '@babel/parser'
 import { findEngineContract } from '../../execution/common/engineContract.ts'
 import { compareJSONSchema } from '../../manifest/common/schemaCompare.ts'
-import { portsByHandle, validVariableName } from './change.ts'
+import { decodeConnectorCapabilities, portsByHandle, validVariableName } from './change.ts'
 import { canonicalGraph, canonicalJsonBytes, canonicalModule, canonicalOutputs, canonicalPorts, canonicalTask, digestBytes } from './encoding.ts'
 
 export interface SemanticClosure {
@@ -1276,14 +1277,15 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
           values: { moduleId: node.task.moduleId },
         })
       }
-      for (const [index, capability] of (node.task.capabilities ?? []).entries()) {
-        if (capability.action.length > 0 && capability.connectionId.length > 0) continue
+      try {
+        decodeConnectorCapabilities(node.task.capabilities === undefined ? [] : node.task.capabilities)
+      } catch {
         checked.diagnostics.push({
           code: 'task.capability-incomplete',
           column: 0,
           line: 1,
           message: `Inline Task "${nodeId}" has an incomplete Connector Capability.`,
-          path: `${graphPath}/nodes/${nodeId}/task/capabilities/${index}`,
+          path: `${graphPath}/nodes/${nodeId}/task/capabilities`,
           values: { nodeId },
         })
       }
@@ -1349,4 +1351,10 @@ export function createRuntimeProgram(prepared: PreparedFlow, entryModuleId: stri
     entryModuleId,
     modules: prepared.modules,
   }
+}
+
+export function codeActions(flow: Pick<PreparedFlow, 'graph' | 'subflows'>): readonly ConnectorCapability[] {
+  return [flow.graph, ...Object.values(flow.subflows).map((subflow) => subflow.graph)].flatMap((graph) =>
+    Object.values(graph.nodes).flatMap((node) => (node.kind == 'task' && node.task != null ? (node.task.capabilities ?? []) : [])),
+  )
 }

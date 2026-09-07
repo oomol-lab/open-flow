@@ -34,7 +34,7 @@ export const isolatedVmLimits: IsolatedVmLimits = {
   wallMs: 30_000,
 }
 
-export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/2 isolated-vm/7.0.1 node/26 web-globals/2').digest('hex')}`
+export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/2 isolated-vm/7.0.1 node/26 web-globals/2 actions/1').digest('hex')}`
 
 export class IsolatedVmError extends Error {
   readonly code: 'canceled' | 'executor-crashed' | 'invalid-program' | 'limit-exceeded' | 'task-failed'
@@ -54,6 +54,7 @@ export type InvokeContext = {
 
 export type InvokeRequest =
   | {
+      readonly capabilities?: readonly ConnectorCapability[]
       readonly context?: InvokeContext
       readonly executionId: number
       readonly input: JsonValue
@@ -196,7 +197,10 @@ export class IsolatedVmHost {
             activeCalls: new Map(),
             cancel,
             limits,
-            projectFailure: (error) => ({ code: 'node.failed', message: normalizedError(error).message }),
+            projectFailure: (error) => ({
+              code: typeof Reflect.get(Object(error), 'code') == 'string' ? (Reflect.get(Object(error), 'code') as string) : 'node.failed',
+              message: normalizedError(error).message,
+            }),
             reject: (error) => resume(Effect.fail(normalizedError(error))),
             resolve: (value) => resume(Effect.succeed(value as JsonValue | undefined)),
             signal: invocation.signal,
@@ -205,6 +209,7 @@ export class IsolatedVmHost {
           signal.addEventListener('abort', interrupt, { once: true })
           this.#send(child, {
             executionId,
+            capabilities: invocation.capabilities,
             input: invocation.input,
             invocationId: invocation.invocationId,
             limits,
@@ -373,7 +378,7 @@ export class IsolatedVmHost {
     pending.capabilityCalls.set(message.invocationId, calls)
     if (calls > pending.limits.maxCapabilityCalls) {
       this.#send(child, {
-        code: 'node.failed',
+        code: 'runtime.limit-exceeded',
         error: 'Capability call limit exceeded.',
         executionId: message.executionId,
         id: message.id,
@@ -389,6 +394,7 @@ export class IsolatedVmHost {
       pending,
       (signal) =>
         pending.capability(message.capabilities ?? [], {
+          callId: JSON.stringify([message.invocationId, message.id]),
           invocationId: message.invocationId,
           kind: message.kind,
           payload: message.payload,
@@ -417,7 +423,7 @@ export class IsolatedVmHost {
               if (!this.#pending.has(executionId)) return
               if (byteLimit != null && serializedBytes(value) > byteLimit) {
                 this.#send(child, {
-                  code: 'node.failed',
+                  code: 'runtime.limit-exceeded',
                   error: 'Runtime response exceeds the configured byte limit.',
                   executionId,
                   id,

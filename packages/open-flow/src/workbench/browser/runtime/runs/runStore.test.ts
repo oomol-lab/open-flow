@@ -16,7 +16,7 @@ const run = {
 const details = {
   ...run,
   closureDigest: 'closure-1',
-  engineContract: 'open-flow-engine/v1',
+  engineContract: 'open-flow-engine/v2',
   engineDigest: 'engine-1',
   modelVersion: 1,
   revisionDigest: 'digest-1',

@@ -45,7 +45,7 @@ it('keeps Live fixed while persistent Publish work is pending or failed and acti
   const flowId = created.flow.flowId
   const firstRevisionId = await addMarker(service, flowId, created.flow.draftRevisionId, 'first')
 
-  const first = await service.control.publishFlow('operator', flowId, firstRevisionId, 'open-flow-engine/v1', null, 'publish-first')
+  const first = await service.control.publishFlow('operator', flowId, firstRevisionId, 'open-flow-engine/v2', null, 'publish-first')
   expect(first).toMatchObject({ flowId, revisionId: firstRevisionId, status: 'pending' })
   await expect(service.control.getLive(flowId)).resolves.toMatchObject({ publication: null, status: 'not-published' })
   await service.tickMaintenance()
@@ -62,11 +62,11 @@ it('keeps Live fixed while persistent Publish work is pending or failed and acti
   `)
 
   const failedRevisionId = await addMarker(service, flowId, firstRevisionId, 'failed-candidate')
-  const failed = await service.control.publishFlow('operator', flowId, failedRevisionId, 'open-flow-engine/v1', firstPublicationId, 'publish-failed')
-  const replay = await service.control.publishFlow('operator', flowId, failedRevisionId, 'open-flow-engine/v1', firstPublicationId, 'publish-failed')
+  const failed = await service.control.publishFlow('operator', flowId, failedRevisionId, 'open-flow-engine/v2', firstPublicationId, 'publish-failed')
+  const replay = await service.control.publishFlow('operator', flowId, failedRevisionId, 'open-flow-engine/v2', firstPublicationId, 'publish-failed')
   expect(replay).toEqual(failed)
   await expect(
-    service.control.publishFlow('operator', flowId, failedRevisionId, 'open-flow-engine/v1', firstPublicationId, 'publish-concurrent'),
+    service.control.publishFlow('operator', flowId, failedRevisionId, 'open-flow-engine/v2', firstPublicationId, 'publish-concurrent'),
   ).rejects.toMatchObject({ code: 'flow.busy' })
 
   await service.tickMaintenance()
@@ -88,7 +88,7 @@ it('keeps Live fixed while persistent Publish work is pending or failed and acti
   expect(service.control.listPublications(flowId, 10).page.publications).toHaveLength(1)
 
   const readyRevisionId = await addMarker(service, flowId, failedRevisionId, 'ready-candidate')
-  const ready = await service.control.publishFlow('operator', flowId, readyRevisionId, 'open-flow-engine/v1', firstPublicationId, 'publish-ready')
+  const ready = await service.control.publishFlow('operator', flowId, readyRevisionId, 'open-flow-engine/v2', firstPublicationId, 'publish-ready')
   database.prepare("UPDATE publish_work SET status = 'ready', next_at = NULL, updated_at = updated_at + 1 WHERE operation_id = ?").run(ready.operationId)
   database.close()
 

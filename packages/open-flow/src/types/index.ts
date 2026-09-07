@@ -60,7 +60,8 @@ export interface TaskLogger {
   error(message: string, data?: unknown): void
 }
 
-export interface TaskContext {
+export interface TaskContext<Actions extends object = Record<string, never>> {
+  readonly actions: Actions
   readonly signal: AbortSignal
   readonly flowId: string
   readonly inputs: Readonly<Record<string, unknown>>
@@ -75,6 +76,10 @@ export interface TaskContext {
 
 export type TaskResult<Outputs extends object> = keyof Outputs extends never ? Outputs | void : Outputs
 
-export interface Task<Inputs extends object = Record<string, unknown>, Outputs extends object = Record<string, unknown>> {
-  (inputs: Inputs, context: TaskContext): TaskResult<Outputs> | Promise<TaskResult<Outputs>>
+export interface Task<
+  Inputs extends object = Record<string, unknown>,
+  Outputs extends object = Record<string, unknown>,
+  Actions extends object = Record<string, never>,
+> {
+  (inputs: Inputs, context: TaskContext<Actions>): TaskResult<Outputs> | Promise<TaskResult<Outputs>>
 }

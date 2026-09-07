@@ -55,7 +55,7 @@ export async function storeRevision(
 export async function acceptRun(service: ServerService, input: Input): Promise<RunAcceptance> {
   const stored = await storeRevision(service, input.revision, input.revisionId)
   try {
-    const accepted = await service.control.createDraftRun(stored.flowId, stored.revisionId, 'open-flow-engine/v1', input.inputs ?? {}, input.idempotencyKey)
+    const accepted = await service.control.createDraftRun(stored.flowId, stored.revisionId, 'open-flow-engine/v2', input.inputs ?? {}, input.idempotencyKey)
     return { created: accepted.created, kind: 'accepted', runId: accepted.run.runId, status: accepted.run.status }
   } catch (error) {
     if (error instanceof ControlError && error.code == controlErrorCode.runConflict) return { kind: 'conflict' }
