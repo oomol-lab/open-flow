@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM oven/bun:1.4.0 AS bun
+FROM oven/bun:1.4.2 AS bun
 
 FROM node:26-bookworm AS build
 

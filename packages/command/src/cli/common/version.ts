@@ -1,1 +1,1 @@
-export const buildBunVersion = '1.4.0'
+export const buildBunVersion = '1.4.2'
