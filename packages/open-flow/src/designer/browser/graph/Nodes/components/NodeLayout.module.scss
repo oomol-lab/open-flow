@@ -118,6 +118,7 @@
 }
 
 .executionBranch {
+  grid-column: 1 / -1;
   position: relative;
   display: flex;
   align-items: center;
@@ -134,7 +135,8 @@
 }
 
 .conditionBranch {
-  grid-template-columns: minmax(0, 1fr) 12px 84px;
+  grid-template-columns: subgrid;
+  column-gap: inherit;
   display: grid;
   min-height: 30px;
   margin: 4px 8px 0;
@@ -207,6 +209,10 @@
 
 .cardContainer .conditionBranch > .executionHandle {
   right: -17px;
+}
+
+:global(.react-flow__node.selected) .cardContainer .conditionBranch > .executionHandle {
+  right: -18px;
 }
 
 .cardContainer .executionHandle > :global(.react-flow__handle) {

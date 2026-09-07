@@ -96,5 +96,8 @@
 }
 
 .branches {
+  grid-template-columns: minmax(0, 1fr) 12px 84px;
+  column-gap: 12px;
+  display: grid;
   margin: 0 -8px;
 }
