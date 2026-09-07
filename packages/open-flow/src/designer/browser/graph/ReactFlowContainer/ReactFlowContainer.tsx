@@ -1108,7 +1108,7 @@ function BlockQuickPickPanelPopover(props: BlockQuickPickPanelPopoverProps) {
           if (item.type === 'scriptlet' && props.setupScriptletNode) {
             props.setupScriptletNode(nodeId, props.connection, handle)
           } else {
-            await props.waitNode?.(nodeId)
+            if (props.waitNode != null && (await props.waitNode(nodeId)) == null) return
             props.onConnect?.(makeConnection(props.connection, nodeId, handle))
           }
         } else if (item.type === 'value' && props.setupValueNode && 'target' in props.connection) {
