@@ -54,16 +54,17 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
   const connectionMeta = useVal(edgeStore?.$.connectionMeta)
 
   const inverse = props.sourceX > props.targetX
-  const strokeWidth = selected || nodeSelected ? 2.5 : 1.5
-  const arrowSize = (7 * 1.5) / strokeWidth
+  const emphasized = selected || nodeSelected
+  const strokeWidth = emphasized ? 2.5 : 1.5
+  const stroke = selected ? 'var(--edge-selected)' : connectionMeta?.muted ? undefined : gradientToStroke(sourceGradientColor, targetGradientColor, inverse)
 
   const style = useMemo<React.CSSProperties>(
     () => ({
-      stroke: connectionMeta?.muted ? undefined : gradientToStroke(sourceGradientColor, targetGradientColor, inverse),
+      stroke,
       strokeDasharray: connectionMeta?.dashed ? '5,5' : undefined,
       strokeWidth,
     }),
-    [strokeWidth, sourceGradientColor, targetGradientColor, inverse, connectionMeta],
+    [stroke, strokeWidth, connectionMeta?.dashed],
   )
 
   const adjustedScale = scale > 2 ? scale * 0.8 : scale > 1 ? scale : 1
@@ -71,24 +72,27 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
   return (
     <>
       <defs>
-        <marker id={arrowId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth={arrowSize} markerHeight={arrowSize} orient="auto-start-reverse">
-          <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="var(--edge-primitive)" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+        <marker
+          id={arrowId}
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="10.5"
+          markerHeight="10.5"
+          markerUnits="userSpaceOnUse"
+          orient="auto-start-reverse"
+          overflow="visible"
+        >
+          <path
+            d="M 1 1 L 9 5 L 1 9"
+            fill="none"
+            stroke={selected ? 'var(--edge-selected)' : 'var(--edge-primitive)'}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </marker>
       </defs>
-      {selected && (
-        <BaseEdge
-          id={props.id + '-selected'}
-          path={path}
-          style={{
-            ...style,
-            strokeWidth: strokeWidth + 2,
-            stroke: 'var(--highlight-indicate-color)',
-            pointerEvents: 'none',
-          }}
-          markerStart={props.markerStart}
-          interactionWidth={props.interactionWidth}
-        />
-      )}
       <BaseEdge
         id={props.id}
         path={path}
