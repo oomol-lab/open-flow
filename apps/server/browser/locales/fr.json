@@ -74,6 +74,7 @@
     "selectForCreation": "Sélectionner l’équipe du Connector pour le nouveau Flow"
   },
   "variables": {
+    "nameExists": "Une Variable portant ce nom existe déjà. Modifiez la Variable existante.",
     "all": "Toutes les Variables",
     "cancel": "Annuler",
     "count": "{{count}} sur 200",

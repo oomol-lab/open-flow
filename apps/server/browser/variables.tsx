@@ -55,12 +55,13 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
     return query == '' ? variables : variables.filter((variable) => variable.name.toLocaleLowerCase().includes(query))
   }, [filter, variables])
   const valueTooLarge = new TextEncoder().encode(value).byteLength > maxValueBytes
-  const nameInvalid = editing == '' && !validVariableName(name)
+  const nameExists = editing == '' && variables.some((variable) => variable.name == name)
+  const nameInvalid = editing == '' && (!validVariableName(name) || nameExists)
 
   async function save(event: FormEvent): Promise<void> {
     event.preventDefault()
     const target = editing == '' ? name : editing
-    if (target == null || !validVariableName(target) || valueTooLarge || pending) return
+    if (target == null || !validVariableName(target) || nameExists || valueTooLarge || loading || failed || pending) return
     setPending(true)
     try {
       await client.putVariable(target, value)
@@ -134,7 +135,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
               </button>
               <button
                 className="server-button server-button-primary"
-                disabled={pending || variables.length >= maxCount}
+                disabled={loading || failed || pending || variables.length >= maxCount}
                 onClick={() => {
                   setEditing('')
                   setName('')
@@ -167,7 +168,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
               />
               {nameInvalid && name != '' && (
                 <span className="variable-error" id="variable-name-error">
-                  {t('variables.invalidName')}
+                  {t(nameExists ? 'variables.nameExists' : 'variables.invalidName')}
                 </span>
               )}
               <label htmlFor="variable-value">{t('variables.value')}</label>
@@ -191,7 +192,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                 <button className="server-button server-button-outline" disabled={pending} onClick={() => setEditing(undefined)} type="button">
                   {t('variables.cancel')}
                 </button>
-                <button className="server-button server-button-primary" disabled={pending || nameInvalid || valueTooLarge} type="submit">
+                <button className="server-button server-button-primary" disabled={loading || failed || pending || nameInvalid || valueTooLarge} type="submit">
                   {t('variables.save')}
                 </button>
               </div>

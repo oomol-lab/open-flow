@@ -74,6 +74,7 @@
     "selectForCreation": "新しい Flow の Connector チームを選択"
   },
   "variables": {
+    "nameExists": "同じ名前の Variable が既に存在します。既存の Variable を編集してください。",
     "all": "すべての Variable",
     "cancel": "キャンセル",
     "count": "{{count}} / 200",

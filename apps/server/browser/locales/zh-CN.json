@@ -74,6 +74,7 @@
     "selectForCreation": "选择新 Flow 使用的 Connector 团队"
   },
   "variables": {
+    "nameExists": "同名 Variable 已存在，请编辑已有 Variable。",
     "all": "全部 Variable",
     "cancel": "取消",
     "count": "已使用 {{count}} / 200",
