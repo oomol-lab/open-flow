@@ -104,6 +104,53 @@ afterEach(() => {
 })
 
 describe('DesignerStore.waitNode', () => {
+  it('cancels all pending waits on disposal without logging timeouts', async () => {
+    vi.useFakeTimers()
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const setup = createTestSetup()
+    const first = setup.store.waitNode('first' as NodeId)
+    const second = setup.store.waitNode('second' as NodeId)
+
+    setup.dispose()
+
+    await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined])
+    expect(vi.getTimerCount()).toBe(0)
+    setup.nodes.set('first' as NodeId, setup.createNode('first' as NodeId))
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(logError).not.toHaveBeenCalled()
+    setup.dispose()
+  })
+
+  it('does not start waits or return existing nodes after disposal', async () => {
+    vi.useFakeTimers()
+    const setup = createTestSetup()
+    const node = setup.createNode('existing' as NodeId)
+    setup.nodes.set(node.nodeId, node)
+    setup.dispose()
+
+    await expect(setup.store.waitNode(node.nodeId)).resolves.toBeUndefined()
+    await expect(setup.store.waitNode('missing' as NodeId)).resolves.toBeUndefined()
+    expect(vi.getTimerCount()).toBe(0)
+    expect(setup.store.dispose.size()).toBe(0)
+  })
+
+  it.each(['success', 'timeout'] as const)('releases completed %s waits from the disposal list', async (outcome) => {
+    vi.useFakeTimers()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const setup = createTestSetup()
+    const size = setup.store.dispose.size()
+    const nodeId = 'node' as NodeId
+    const result = setup.store.waitNode(nodeId)
+
+    if (outcome == 'success') setup.nodes.set(nodeId, setup.createNode(nodeId))
+    else await vi.advanceTimersByTimeAsync(5000)
+    await result
+
+    expect(setup.store.dispose.size()).toBe(size)
+    expect(vi.getTimerCount()).toBe(0)
+    setup.dispose()
+  })
+
   it('returns an existing node immediately', async () => {
     const setup = createTestSetup()
     const nodeId = 'existing' as NodeId
@@ -160,6 +207,54 @@ describe('DesignerStore.setupValueNode', () => {
     await operation
 
     expect(setup.onConnect).not.toHaveBeenCalled()
+    setup.dispose()
+  })
+})
+
+describe('DesignerStore pending node setup', () => {
+  it.each(['value', 'scriptlet'] as const)('cancels %s setup without connecting after disposal', async (kind) => {
+    vi.useFakeTimers()
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const setup = createTestSetup()
+    const target = setup.createTaskNode('target' as NodeId)
+    setup.nodes.set(target.nodeId, target)
+    const connection = { target: target.rfNodeId, targetHandle: 'value' as RFHandleName }
+    const connect = vi.spyOn(setup.store, 'onRFConnect')
+    const operation =
+      kind == 'value'
+        ? setup.store.setupValueNode('missing' as NodeId, connection)
+        : setup.store.setupScriptletNode('missing' as NodeId, connection, 'value' as HandleName)
+
+    setup.dispose()
+    await operation
+
+    expect(vi.getTimerCount()).toBe(0)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(connect).not.toHaveBeenCalled()
+    expect(setup.onConnect).not.toHaveBeenCalled()
+    expect(logError).not.toHaveBeenCalled()
+  })
+
+  it('does not connect a scriptlet when its node times out', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const setup = createTestSetup()
+    const target = setup.createTaskNode('target' as NodeId)
+    setup.nodes.set(target.nodeId, target)
+    const connect = vi.spyOn(setup.store, 'onRFConnect')
+    const operation = setup.store.setupScriptletNode(
+      'missing' as NodeId,
+      {
+        target: target.rfNodeId,
+        targetHandle: 'value' as RFHandleName,
+      },
+      'value' as HandleName,
+    )
+
+    await vi.advanceTimersByTimeAsync(5000)
+    await operation
+
+    expect(connect).not.toHaveBeenCalled()
     setup.dispose()
   })
 })

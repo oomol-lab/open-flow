@@ -319,11 +319,15 @@ export class DesignerStore {
   /** @internal */
   public readonly userLocalesContext: UserLocalesContext
 
+  private disposed = false
   private pendingDisplayModeLayout: FlowDisplayMode | undefined
   private displayModeLayoutMeasurementAttempts = 0
   private activeDisplayMode: FlowDisplayMode
 
   public constructor(type: DesignerType, editable: boolean, props: DesignerStoreProps) {
+    this.dispose.add(() => {
+      this.disposed = true
+    })
     this.rfCommand = this.dispose.add(props.rfCommand)
     this.designerUIStore = this.dispose.add(props.designerUIStore)
     this.connectorConnections = props.connectorConnections
@@ -921,6 +925,7 @@ export class DesignerStore {
    * @internal
    */
   public waitNode = async <T extends NodeStore = NodeStore>(nodeId: NodeId): Promise<T | undefined> => {
+    if (this.disposed) return undefined
     const existingNode = this.$.nodes.get(nodeId)
     if (existingNode) return existingNode as T
     return new Promise<T | undefined>((resolve) => {
@@ -931,13 +936,16 @@ export class DesignerStore {
           settled = true
           clearTimeout(timer)
           disposeReaction?.()
+          this.dispose.remove(cancel)
           resolve(node)
         }
       }
+      const cancel = () => finish(undefined)
       const timer = setTimeout(() => {
         console.error(`node ${nodeId} not found`)
         finish(undefined)
       }, 5000)
+      this.dispose.add(cancel)
       disposeReaction = this.$.nodes.$.reaction((nodeMap) => {
         const node = nodeMap.get(nodeId)
         if (node) {
@@ -961,13 +969,14 @@ export class DesignerStore {
    * @internal
    */
   public setupValueNode = async (source: NodeId, connection: Pick<RFConnection, 'target' | 'targetHandle'>): Promise<void> => {
+    if (this.disposed) return
     const targetNode = this.resolveRFNode(connection.target)
     const handle = toManifestHandleName(connection.targetHandle)
     if (TaskNodeStore.is(targetNode) || SubflowNodeStore.is(targetNode) || OutputNodeStore.is(targetNode) || ConditionNodeStore.is(targetNode)) {
       const def = targetNode.getInputHandleDef(handle)
       if (def) {
         const sourceNode = await this.waitValueNode(source)
-        if (sourceNode == null) return
+        if (sourceNode == null || this.disposed) return
         sourceNode.setupHandle(def, targetNode.getInputFrom(handle))
         if (OutputNodeStore.is(targetNode)) {
           this.onConnect?.({
@@ -985,30 +994,11 @@ export class DesignerStore {
   }
 
   private async waitValueNode(nodeId: NodeId): Promise<ValueNodeStore | null> {
-    const alreadyExist = this.$.nodes.get(nodeId)
-    if (ValueNodeStore.is(alreadyExist)) {
-      return alreadyExist
-    }
-    return new Promise<ValueNodeStore | null>((resolve) => {
-      const timer = setTimeout(() => {
-        console.error(`value node ${nodeId} not found`)
-        dispose()
-        resolve(null)
-      }, 5000)
-      const dispose = this.$.nodes.$.reaction((nodes) => {
-        const node = nodes.get(nodeId)
-        if (node) {
-          clearTimeout(timer)
-          dispose()
-          if (ValueNodeStore.is(node)) {
-            resolve(node)
-          } else {
-            console.error(`node ${nodeId} is not a value node`)
-            resolve(null)
-          }
-        }
-      })
-    })
+    const node = await this.waitNode(nodeId)
+    if (node == null || this.disposed) return null
+    if (ValueNodeStore.is(node)) return node
+    console.error(`node ${nodeId} is not a value node`)
+    return null
   }
 
   /**
@@ -1018,6 +1008,7 @@ export class DesignerStore {
    * @param handle The scriptlet input or output handle.
    */
   public setupScriptletNode = async (nodeId: NodeId, connection: PartialConnection, handle: HandleName): Promise<void> => {
+    if (this.disposed) return
     if (handle && 'source' in connection) {
       // Dragging right from a value or task node determines the scriptlet input type.
       const sourceNode = this.resolveRFNode(connection.source)
@@ -1032,7 +1023,8 @@ export class DesignerStore {
         const def = sourceNode.getOutputHandleDef(sourceHandle)
         if (def) {
           const targetNode = await this.waitInlineTaskNode(nodeId)
-          targetNode?.setupInputHandle(handle, def)
+          if (targetNode == null || this.disposed) return
+          targetNode.setupInputHandle(handle, def)
         }
       }
     } else if (handle && 'target' in connection) {
@@ -1043,7 +1035,8 @@ export class DesignerStore {
         const def = targetNode.getInputHandleDef(targetHandle)
         if (def) {
           const sourceNode = await this.waitInlineTaskNode(nodeId)
-          sourceNode?.setupOutputHandle(handle, def)
+          if (sourceNode == null || this.disposed) return
+          sourceNode.setupOutputHandle(handle, def)
         }
       }
     }
@@ -1051,35 +1044,11 @@ export class DesignerStore {
   }
 
   private async waitInlineTaskNode(nodeId: NodeId): Promise<TaskNodeStore | null> {
-    const alreadyExist = this.$.nodes.get(nodeId)
-    if (TaskNodeStore.is(alreadyExist)) {
-      if (isInlineTaskNode(alreadyExist)) {
-        return alreadyExist
-      } else {
-        console.error(`node ${nodeId} is not an inline task node`)
-        return null
-      }
-    }
-    return new Promise<TaskNodeStore | null>((resolve) => {
-      const timer = setTimeout(() => {
-        console.error(`task node ${nodeId} not found`)
-        dispose()
-        resolve(null)
-      }, 5000)
-      const dispose = this.$.nodes.$.reaction((nodes) => {
-        const node = nodes.get(nodeId)
-        if (node) {
-          clearTimeout(timer)
-          dispose()
-          if (TaskNodeStore.is(node) && isInlineTaskNode(node)) {
-            resolve(node)
-          } else {
-            console.error(`node ${nodeId} is not an inline task node`)
-            resolve(null)
-          }
-        }
-      })
-    })
+    const node = await this.waitNode(nodeId)
+    if (node == null || this.disposed) return null
+    if (TaskNodeStore.is(node) && isInlineTaskNode(node)) return node
+    console.error(`node ${nodeId} is not an inline task node`)
+    return null
   }
 }
 
