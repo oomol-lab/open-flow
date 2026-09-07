@@ -4,6 +4,7 @@ import * as Effect from 'effect/Effect'
 import { expect, it } from 'vitest'
 import { currentEngineContract } from '../src/execution/common/runtime.ts'
 import { runFlow } from '../src/execution/common/scheduler.ts'
+import { applyFlowChanges } from '../src/flow/common/change.ts'
 import { encodeRevision } from '../src/flow/common/encoding.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
 
@@ -22,7 +23,7 @@ it('requires an entry and skips unrelated roots and other trigger branches', asy
         ],
         nodes: {
           manual: { kind: 'manual', name: 'Start' },
-          other: { kind: 'manual', name: 'Other' },
+          other: { kind: 'cron', name: 'Other', cronTimes: [] },
           selected: { kind: 'value', inputs: {}, values: [] },
           unselected: { kind: 'value', inputs: {}, values: [] },
           orphan: { kind: 'value', inputs: {}, values: [] },
@@ -54,4 +55,40 @@ it('requires an entry and skips unrelated roots and other trigger branches', asy
   )
   expect(started).toEqual(['selected'])
   await expect(Effect.runPromise(runFlow(prepared.flow, { ...options, trigger: { nodeId: 'orphan', payload: {} } }))).rejects.toThrow('not a TriggerNode')
+})
+
+it('rejects adding a second manual trigger and allows replacing the existing one', () => {
+  const content: RevisionContent = {
+    modelVersion: 1,
+    modules: {},
+    document: { bindings: {}, subflows: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
+  }
+  const create = { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'other', node: { kind: 'manual', name: 'Other' } } as const
+  expect(() => applyFlowChanges(content, [create])).toThrow('only one manual Trigger')
+  const replaced = applyFlowChanges(content, [{ kind: 'graph.node.delete', target: { kind: 'flow' }, nodeId: 'start' }, create])
+  expect(Object.keys(replaced.document.graph.nodes)).toEqual(['other'])
+  expect(Object.keys(content.document.graph.nodes)).toEqual(['start'])
+})
+
+it('rejects imported graphs with multiple manual triggers during preparation', async () => {
+  const content: RevisionContent = {
+    modelVersion: 1,
+    modules: {},
+    document: {
+      bindings: {},
+      subflows: {},
+      tasks: {},
+      graph: {
+        edges: [],
+        nodes: {
+          first: { kind: 'manual', name: 'First' },
+          second: { kind: 'manual', name: 'Second' },
+        },
+      },
+    },
+  }
+  const result = await prepareFlow(content, currentEngineContract)
+  expect(result.kind).toBe('flow-invalid')
+  if (result.kind != 'flow-invalid') throw new Error('Expected invalid Flow.')
+  expect(result.validation.diagnostics.filter((item) => item.code == 'graph.manual-trigger-duplicate')).toHaveLength(2)
 })

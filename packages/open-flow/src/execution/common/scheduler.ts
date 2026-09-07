@@ -7,7 +7,8 @@ import * as Exit from 'effect/Exit'
 import * as FiberSet from 'effect/FiberSet'
 import { nanoid } from 'nanoid'
 import { portsByHandle } from '../../flow/common/change.ts'
-import { graphOrder, matchesSchema } from '../../flow/common/semantics.ts'
+import { graphOrder } from '../../flow/common/graph.ts'
+import { matchesSchema } from '../../flow/common/schema.ts'
 
 type ExecutableNode = Exclude<GraphNode, TriggerNode>
 

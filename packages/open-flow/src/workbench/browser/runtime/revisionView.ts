@@ -14,7 +14,8 @@ import type {
   WaitNode,
 } from './api.ts'
 
-import { codeActions, availableOutputs, nodeInputPorts } from '../../../flow/common/semantics.ts'
+import { availableOutputs, nodeInputPorts } from '../../../flow/common/graph.ts'
+import { codeActions } from '../../../flow/common/semantics.ts'
 
 type SubflowDefinition = FlowDocument['subflows'][string]
 
