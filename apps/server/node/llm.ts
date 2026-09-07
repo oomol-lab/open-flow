@@ -68,6 +68,7 @@ function invokeLlm(origin: URL, token: string): InvokeLlmTask {
 function requestBody(input: Readonly<Record<string, JsonValue>>, mode: 'chat' | 'json'): Record<string, unknown> {
   const model = record(input.model)
   const messages = [
+    ...(mode == 'json' ? [{ content: 'Respond with a valid JSON object. Do not include Markdown or text outside the JSON object.', role: 'system' }] : []),
     ...(input.messages == null ? [] : chatMessages(input.messages, (content) => content)),
     ...chatMessages(input.template, (content) => render(content, input)),
   ]
