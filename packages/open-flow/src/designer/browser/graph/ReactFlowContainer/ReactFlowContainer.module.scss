@@ -154,8 +154,6 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  padding-left: 8px;
-  border-left: 1px solid var(--ui-border);
 }
 
 @container open-flow-workbench (max-width: 720px) {
@@ -170,6 +168,5 @@
   }
   .dockActions {
     gap: 3px;
-    padding-left: 5px;
   }
 }

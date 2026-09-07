@@ -26,6 +26,7 @@ import { isWritable, val } from 'value-enhancer'
 import { FlowDesignerView } from '../../../../designer/browser/graph/FlowDesigner/FlowDesignerView.tsx'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { Separator } from '../../../../ui/browser/separator.tsx'
 import { CodeMirrorStringEditorFactory } from '../../codeMirrorStringEditor.ts'
 import { Icon } from '../icons.tsx'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
@@ -475,6 +476,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         inspectorContainer={inspectorContainer}
         toolbar={
           <div className="designer-actions">
+            <Separator orientation="vertical" className="mx-1" />
             <Button
               aria-expanded={blocksOpen}
               disabled={disabled || target == null}
@@ -500,6 +502,20 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
                 {t('designer.delete')}
               </Button>
             )}
+            {runControl}
+            {needsTrigger && model.nodes.length > 0 && manualTrigger != null && (
+              <Button
+                size="sm"
+                disabled={disabled}
+                onClick={() => void addRecommended(manualTrigger)}
+                title={t('designer.triggerDescription')}
+                type="button"
+                variant="outline"
+              >
+                <Icon data-icon="inline-start" name="plus" /> {t('designer.addTriggerToRun')}
+              </Button>
+            )}
+            <Separator orientation="vertical" className="mx-1" />
             <Button
               aria-label={t('designer.toggleInspector')}
               aria-expanded={inspectorOpen}
@@ -566,20 +582,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         }}
         selectedNodeIds={selectedNodeIds}
       />
-      {runControl != null && <div className="designer-run-control">{runControl}</div>}
-      {needsTrigger && model.nodes.length > 0 && manualTrigger != null && (
-        <div className="designer-run-control">
-          <Button
-            disabled={disabled}
-            onClick={() => void addRecommended(manualTrigger)}
-            title={t('designer.triggerDescription')}
-            type="button"
-            variant="outline"
-          >
-            <Icon data-icon="inline-start" name="plus" /> {t('designer.addTriggerToRun')}
-          </Button>
-        </div>
-      )}
       <Badge className="designer-overlay top-left" variant="secondary">
         <span className="status-dot neutral" />
         {t('designer.draftBadge', {

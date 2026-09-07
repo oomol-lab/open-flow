@@ -287,6 +287,7 @@ function Editor({
           target?.kind == 'flow' && triggers.length > 0 ? (
             <ButtonGroup ref={setRunMenuRoot} aria-label={t('workspace.run')}>
               <Button
+                size="sm"
                 aria-controls="run-input-panel"
                 aria-expanded={runInputRequest != null}
                 disabled={busy != null || diagnostics?.valid == false || runInputRequest != null || (triggers.length > 1 && selectedTrigger == null)}
@@ -301,7 +302,7 @@ function Editor({
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     render={
-                      <Button size="icon" aria-label={t('runInput.selectTrigger')} disabled={busy != null || runInputRequest != null}>
+                      <Button size="icon-sm" aria-label={t('runInput.selectTrigger')} disabled={busy != null || runInputRequest != null}>
                         <Icon name="chevron-down" />
                       </Button>
                     }
