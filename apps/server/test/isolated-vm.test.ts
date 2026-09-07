@@ -1,13 +1,11 @@
 import type { RuntimeHarness, RuntimeProgram } from '@oomol-lab/open-flow/runtime-contract'
 
 import { runtimeConformanceCases } from '@oomol-lab/open-flow/runtime-contract'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import { afterAll, describe, expect, it } from 'vitest'
 import { IsolatedVmError, isolatedVmEngineDigest, isolatedVmLimits, IsolatedVmHost } from '../node/isolated-vm.ts'
+import { childProcessId } from './processTree.ts'
 
 const host = new IsolatedVmHost()
-const execFileAsync = promisify(execFile)
 
 const harness: RuntimeHarness = {
   engineDigest: isolatedVmEngineDigest,
@@ -38,13 +36,7 @@ function invoke(source: string, limits = isolatedVmLimits) {
 }
 
 async function executorPid(): Promise<number> {
-  const { stdout } = await execFileAsync('ps', ['-A', '-o', 'pid=,ppid=,command='])
-  const processLine = stdout
-    .split('\n')
-    .map((line) => /^(\s*\d+)\s+(\d+)\s+(.+)$/.exec(line))
-    .find((match) => match?.[2] == String(process.pid) && match[3].includes('--executor'))
-  if (processLine == null) throw new Error('Runtime Executor process was not found.')
-  return Number(processLine[1])
+  return await childProcessId(process.pid, '--executor')
 }
 
 describe('isolated-vm runtime conformance', () => {
