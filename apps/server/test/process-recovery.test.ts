@@ -98,6 +98,15 @@ async function terminate(child: ChildProcessWithoutNullStreams): Promise<{ reado
   return result
 }
 
+function expectSuccessfulTermination(result: { readonly code: number | null; readonly signal: NodeJS.Signals | null }): void {
+  if (process.platform == 'win32') {
+    // Windows 将控制事件终止报告为 SIGTERM，而不是零退出码。
+    expect(result).toEqual({ code: null, signal: 'SIGTERM' })
+  } else {
+    expect(result).toEqual({ code: 0, signal: null })
+  }
+}
+
 async function json<Body>(response: Response): Promise<Body> {
   const body = (await response.json()) as Body
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${JSON.stringify(body)}`)
@@ -180,7 +189,7 @@ it('closes the HTTP server and SQLite store on SIGTERM', async () => {
   directories.push(directory)
   let app = await start(directory)
 
-  await expect(terminate(app.child)).resolves.toEqual({ code: 0, signal: null })
+  expectSuccessfulTermination(await terminate(app.child))
 
   app = await start(directory)
   await expect(json(await fetch(`${app.origin}/healthz`))).resolves.toEqual({ status: 'ok' })
@@ -220,5 +229,5 @@ it('serves the compiled Workbench and authenticates the Control API in the real 
   const flows = await fetch(`${app.origin}/v1/flows`, { headers: { cookie } })
   expect(flows.status).toBe(200)
   await expect(flows.json()).resolves.toMatchObject({ flows: [], version: 1 })
-  await expect(terminate(app.child)).resolves.toEqual({ code: 0, signal: null })
+  expectSuccessfulTermination(await terminate(app.child))
 })
