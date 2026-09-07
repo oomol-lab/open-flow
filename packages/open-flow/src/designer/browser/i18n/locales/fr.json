@@ -139,7 +139,9 @@
     "webhookResponseData": "Corps de la réponse",
     "webhookStatus": "Code de statut",
     "webhookSummary": "À la réception d'une requête HTTP",
-    "webhookDescription": "Recevoir un objet JSON via un point de terminaison HTTP généré."
+    "webhookDescription": "Recevoir un objet JSON via un point de terminaison HTTP généré.",
+    "summaryManual": "Déclencheur manuel",
+    "manualSummary": "Cliquez sur Exécuter pour démarrer ici."
   },
   "condition": {
     "addCondition": "Ajouter une condition",

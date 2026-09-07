@@ -11,7 +11,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { IconifyProvider } from '../../../designer/browser/icons/iconifyContext.tsx'
+import { ButtonGroup } from '../../../ui/browser/button-group.tsx'
 import { Button } from '../../../ui/browser/button.tsx'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '../../../ui/browser/dropdown-menu.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../ui/browser/empty.tsx'
 import { BlockLibrary, ContextPanel } from './designer/contextPanel.tsx'
 import { inspectorIcon, NodeInspector } from './designer/nodeInspector.tsx'
@@ -128,7 +130,7 @@ function RunDrawerContainer({
 }
 
 function Editor({
-  onRunDraft,
+  onRun,
   onCloseRuns,
   onConfigureConnector,
   onToggleRuns,
@@ -137,7 +139,7 @@ function Editor({
   store,
   theme,
 }: {
-  readonly onRunDraft: () => void
+  readonly onRun: (triggerId?: string) => void
   readonly onCloseRuns: () => void
   readonly onConfigureConnector?: (() => void) | undefined
   readonly onToggleRuns: () => void
@@ -148,10 +150,14 @@ function Editor({
 }): ReactElement {
   const t = useTranslate()
   const addNodeOptions = useVal(store.workspace.$.addNodeOptions)
-  const check = useVal(store.$.diagnostics)
-  const inputRequest = useVal(store.runRequests.$.inputRequest)
+  const [startId, setStartId] = useState<string>()
+  const [runMenuRoot, setRunMenuRoot] = useState<HTMLDivElement | null>(null)
+  const diagnostics = useVal(store.$.diagnostics)
+  const runInputRequest = useVal(store.runRequests.$.inputRequest)
   const busy = useVal(store.$.busy)
   const designer = useVal(store.$.designer)
+  const triggers = designer.nodes.filter((node) => node.kind == 'trigger')
+  const selectedTrigger = triggers.find((node) => node.id == startId)
   const diagnosticFocus = useVal(store.workspace.$.diagnosticFocus)
   const draft = useVal(store.workspace.$.draft)
   const inspectorDiagnostics = useVal(store.workspace.$.inspectorDiagnostics)
@@ -186,6 +192,7 @@ function Editor({
   const opener = useRef<HTMLElement>()
 
   useEffect(() => {
+    setStartId(undefined)
     addingFromBlocks.current = false
     blockAddCount.current = 0
     focusInspectorOnOpen.current = false
@@ -276,18 +283,49 @@ function Editor({
       tabIndex={0}
     >
       <WorkbenchDesigner
-        runAction={
-          <Button
-            size="sm"
-            onClick={onRunDraft}
-            disabled={busy != null || check?.valid == false || target?.kind != 'flow' || inputRequest != null}
-            aria-controls="run-input-panel"
-            aria-expanded={inputRequest?.source == 'draft'}
-            title={t(check?.valid == false ? 'workspace.fixIssuesToRun' : 'workspace.runDraft')}
-          >
-            <Icon name="play" />
-            {t(busy == 'run' ? 'workspace.starting' : 'workspace.runDraft')}
-          </Button>
+        runControl={
+          target?.kind == 'flow' && triggers.length > 0 ? (
+            <ButtonGroup ref={setRunMenuRoot} aria-label={t('workspace.run')}>
+              <Button
+                aria-controls="run-input-panel"
+                aria-expanded={runInputRequest != null}
+                disabled={busy != null || diagnostics?.valid == false || runInputRequest != null || (triggers.length > 1 && selectedTrigger == null)}
+                onClick={() => onRun(triggers.length > 1 ? selectedTrigger?.id : undefined)}
+                title={diagnostics?.valid == false ? t('workspace.fixIssuesToRun') : undefined}
+              >
+                <Icon data-icon="inline-start" name="play" />
+                {t(busy == 'run' ? 'workspace.starting' : 'workspace.run')}
+                {triggers.length > 1 && selectedTrigger != null && <span>{selectedTrigger.title}</span>}
+              </Button>
+              {triggers.length > 1 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button size="icon" aria-label={t('runInput.selectTrigger')} disabled={busy != null || runInputRequest != null}>
+                        <Icon name="chevron-down" />
+                      </Button>
+                    }
+                  />
+                  <DropdownMenuContent container={runMenuRoot} side="top" align="end" className="w-64 max-w-(--available-width)">
+                    <DropdownMenuRadioGroup value={selectedTrigger?.id ?? ''} onValueChange={setStartId}>
+                      {triggers.map((trigger) => (
+                        <DropdownMenuRadioItem key={trigger.id} value={trigger.id}>
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate" title={trigger.title}>
+                              {trigger.title}
+                            </span>
+                            {triggers.some((other) => other.id != trigger.id && other.title == trigger.title) && (
+                              <code className="truncate text-xs text-muted-foreground">{trigger.id}</code>
+                            )}
+                          </span>
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </ButtonGroup>
+          ) : undefined
         }
         inspectorContainer={inspectorContainer}
         addNodeOptions={addNodeOptions}
@@ -481,12 +519,9 @@ export default function FlowWorkspace({
       setRunDrawerOpen(open)
     }
   }
-  const runDraft = async (): Promise<void> => {
+  const run = async (triggerId?: string): Promise<void> => {
     navigation.open('design')
-    if ((await store.requestDraftRun()) == 'started') revealRun()
-  }
-  const runLive = async (): Promise<void> => {
-    if ((await store.requestLiveRun()) == 'started') revealRun()
+    if ((await store.requestDraftRun(triggerId)) == 'started') revealRun()
   }
   const locateRunEvent = (sequence: number): void => {
     if (store.locateRunEvent(sequence)) revealRun()
@@ -513,8 +548,6 @@ export default function FlowWorkspace({
             navigation.open('runs')
           }}
           onHostAction={onHostAction}
-          onRunDraft={() => void runDraft()}
-          onRunLive={() => void runLive()}
           store={store}
         />
         <RunInputPanel onStarted={revealRun} store={store.runRequests} theme={theme} />
@@ -547,7 +580,7 @@ export default function FlowWorkspace({
           </div>
         ) : view == 'design' ? (
           <Editor
-            onRunDraft={() => void runDraft()}
+            onRun={(triggerId) => void run(triggerId)}
             onCloseRuns={() => setRunDrawerVisible(false)}
             onConfigureConnector={onConfigureConnector}
             onToggleRuns={() => setRunDrawerOpen(!runDrawerOpen)}

@@ -10,6 +10,7 @@ import type { RunStore } from './runStore.ts'
 import { compute, derive, val } from 'value-enhancer'
 import { randomId } from '../../../../control/common/random.ts'
 import { portsByHandle } from '../../../../flow/common/change.ts'
+import { triggerPayloadSchema } from '../../../../flow/common/semantics.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
 import { Latest } from '../stores/latest.ts'
@@ -36,6 +37,9 @@ export interface RunInputGroup {
 }
 
 export interface RunInputRequest {
+  readonly revision: Draft
+  readonly triggers: readonly { readonly nodeId: string; readonly title: string }[]
+  readonly triggerId?: string
   readonly attempted: boolean
   readonly flow: Flow
   readonly groups: readonly RunInputGroup[]
@@ -73,16 +77,32 @@ function nodeTitle(node: ResolvedNode): string {
   return node.id
 }
 
-async function inputGroups(draft: Draft, language: ReadonlyVal<string>): Promise<readonly RunInputGroup[]> {
+async function inputGroups(draft: Draft, language: ReadonlyVal<string>, triggerId: string): Promise<readonly RunInputGroup[]> {
   const { FlowRunInputEditorStore } = await import('../../flowRunInputEditorStore.ts')
   const revision = revisionView(draft)
   const graph = revision.graph({ kind: 'flow' })
   if (graph == null) return []
+  const reachable = new Set([triggerId])
+  const pending = [triggerId]
+  while (pending.length > 0) {
+    const source = pending.pop()
+    for (const edge of graph.edges) {
+      if (edge.source != source || reachable.has(edge.target)) continue
+      reachable.add(edge.target)
+      pending.push(edge.target)
+    }
+  }
   return Object.entries(graph.nodes)
+    .filter(([id]) => reachable.has(id))
     .toSorted(([left], [right]) => left.localeCompare(right))
     .flatMap(([nodeId, node]) => {
       const resolved = revision.resolveNode(nodeId, node)
-      if (resolved.kind == 'trigger') return []
+      if (resolved.kind == 'trigger') {
+        if (resolved.trigger.kind == 'manual') return []
+        const editor = new FlowRunInputEditorStore([{ handle: 'payload', jsonSchema: triggerPayloadSchema(resolved.trigger), nullable: false }], language)
+        editor.replaceValues({ payload: {} })
+        return [{ editor, nodeId, title: resolved.trigger.name }]
+      }
       const definitions = Object.entries(inputPorts(resolved))
         .filter(([handle, port]) => resolved.node.inputs[handle] == null && !Object.hasOwn(port, 'value'))
         .toSorted(([left], [right]) => left.localeCompare(right))
@@ -142,9 +162,16 @@ export class RunRequestStore {
     this.#disposeInputRequest(request)
   }
 
-  public async requestDraft(flow: Flow, draft: Draft): Promise<RunRequestOutcome> {
+  public async requestDraft(flow: Flow, draft: Draft, triggerId?: string): Promise<RunRequestOutcome> {
     const current = this.#requests.begin()
-    return await this.#request('draft', flow, draft, draft.revisionId, current)
+    try {
+      return await this.#request('draft', flow, draft, draft.revisionId, current, undefined, triggerId)
+    } catch (error) {
+      if (current()) this.#setNotice(errorNotice(error, this.#i18n.t))
+      return 'unavailable'
+    } finally {
+      if (current()) this.#set({ starting: false })
+    }
   }
 
   public async requestLive(flow: Flow): Promise<RunRequestOutcome> {
@@ -174,38 +201,88 @@ export class RunRequestStore {
 
   public async confirmInputs(): Promise<boolean> {
     const request = this.#state.value.inputRequest
-    if (request == null) return false
+    if (request == null || request.triggerId == null) return false
     if (!request.valid.value) {
       this.#set({ inputRequest: { ...request, attempted: true } })
       return false
     }
-    const inputs = Object.fromEntries(request.groups.map((group) => [group.nodeId, group.editor.values()])) as Readonly<
-      Record<string, Readonly<Record<string, JsonValue>>>
-    >
-    const started = await this.#start(request.source, request.flow, request.revisionId, inputs, request.publicationId)
+    const inputs = Object.fromEntries(
+      request.groups.filter((group) => group.nodeId != request.triggerId).map((group) => [group.nodeId, group.editor.values()]),
+    ) as Readonly<Record<string, Readonly<Record<string, JsonValue>>>>
+    const payload = (request.groups.find((group) => group.nodeId == request.triggerId)?.editor.values().payload ?? {}) as JsonValue
+    const started = await this.#start(request.source, request.flow, request.revisionId, { nodeId: request.triggerId, payload }, inputs, request.publicationId)
     if (started && this.#state.value.inputRequest === request) this.dismissInputs()
     return started
   }
 
-  async #request(source: RunSource, flow: Flow, revision: Draft, revisionId: string, current: Current, publicationId?: string): Promise<RunRequestOutcome> {
+  public async selectTrigger(triggerId: string): Promise<void> {
+    const request = this.#state.value.inputRequest
+    if (request == null || !request.triggers.some((trigger) => trigger.nodeId == triggerId)) return
+    const current = this.#requests.begin()
+    this.#set({ starting: true })
+    try {
+      const groups = await inputGroups(request.revision, this.#i18n.lang$, triggerId)
+      if (!current() || this.#state.value.inputRequest !== request) {
+        for (const group of groups) group.editor.dispose()
+        return
+      }
+      const valid = compute((get) => groups.every((group) => get(group.editor.valid$)))
+      this.#set({ inputRequest: { ...request, attempted: false, groups, triggerId, valid } })
+      this.#disposeInputRequest(request)
+    } catch (error) {
+      if (current()) this.#setNotice(errorNotice(error, this.#i18n.t))
+    } finally {
+      if (current()) this.#set({ starting: false })
+    }
+  }
+
+  async #request(
+    source: RunSource,
+    flow: Flow,
+    revision: Draft,
+    revisionId: string,
+    current: Current,
+    publicationId?: string,
+    triggerId?: string,
+  ): Promise<RunRequestOutcome> {
     const previous = this.#state.value.inputRequest
     this.#set({ inputRequest: undefined, starting: true, submitting: undefined })
     this.#disposeInputRequest(previous)
-    let groups: readonly RunInputGroup[]
-    try {
-      groups = await inputGroups(revision, this.#i18n.lang$)
-    } catch (error) {
-      if (current()) this.#set({ starting: false, submitting: undefined })
-      throw error
+    const graph = revisionView(revision).graph({ kind: 'flow' })
+    const triggers = Object.entries(graph?.nodes ?? {}).flatMap(([nodeId, node]) => ('inputs' in node ? [] : [{ nodeId, title: node.name }]))
+    if (triggers.length == 0) {
+      this.#set({ starting: false })
+      this.#setNotice({ kind: 'error', message: this.#i18n.t('runInput.noTrigger') })
+      return 'unavailable'
     }
+    const only = triggerId == null ? (triggers.length == 1 ? triggers[0] : undefined) : triggers.find((trigger) => trigger.nodeId == triggerId)
+    if (triggerId != null && only == null) {
+      this.#set({ starting: false })
+      this.#setNotice({ kind: 'error', message: this.#i18n.t('runInput.selectTrigger') })
+      return 'unavailable'
+    }
+    const groups = only == null ? [] : await inputGroups(revision, this.#i18n.lang$, only.nodeId)
     if (!current()) {
       for (const group of groups) group.editor.dispose()
       return 'unavailable'
     }
-    if (groups.length == 0) return (await this.#start(source, flow, revisionId, {}, publicationId)) ? 'started' : 'unavailable'
-    const valid = compute((get) => groups.every((group) => get(group.editor.valid$)))
+    if (only != null && graph?.nodes[only.nodeId]?.kind == 'manual' && groups.length == 0) {
+      return (await this.#start(source, flow, revisionId, { nodeId: only.nodeId, payload: {} }, {}, publicationId)) ? 'started' : 'unavailable'
+    }
+    const valid = compute((get) => only != null && groups.every((group) => get(group.editor.valid$)))
     this.#set({
-      inputRequest: { attempted: false, flow, groups, ...(publicationId == null ? {} : { publicationId }), revisionId, source, valid },
+      inputRequest: {
+        attempted: false,
+        flow,
+        groups,
+        revision,
+        triggers,
+        triggerId: only?.nodeId,
+        ...(publicationId == null ? {} : { publicationId }),
+        revisionId,
+        source,
+        valid,
+      },
       starting: false,
       submitting: undefined,
     })
@@ -216,6 +293,7 @@ export class RunRequestStore {
     source: RunSource,
     flow: Flow,
     revisionId: string,
+    trigger: { readonly nodeId: string; readonly payload: JsonValue },
     inputs: Readonly<Record<string, Readonly<Record<string, JsonValue>>>> = {},
     publicationId?: string,
   ): Promise<boolean> {
@@ -225,14 +303,14 @@ export class RunRequestStore {
     this.#setNotice(undefined)
     this.#set({ starting: true, submitting: source })
     const target = source == 'draft' ? { flowId: flow.flowId, revisionId } : { publicationId: publicationId! }
-    const signature = JSON.stringify({ inputs, source, ...target })
+    const signature = JSON.stringify({ inputs, trigger, source, ...target })
     const attempt = this.#attempt?.signature == signature ? this.#attempt : { key: this.#identity(), signature }
     this.#attempt = attempt
     try {
       const run =
         source == 'draft'
-          ? await this.#client.createDraftRun(flow.flowId, revisionId, { idempotencyKey: attempt.key, inputs })
-          : await this.#client.createLiveRun(publicationId!, { idempotencyKey: attempt.key, inputs })
+          ? await this.#client.createDraftRun(flow.flowId, revisionId, { idempotencyKey: attempt.key, inputs, trigger })
+          : await this.#client.createLiveRun(publicationId!, { idempotencyKey: attempt.key, inputs, trigger })
       if (!alive() || !current()) return false
       this.#attempt = undefined
       return this.#runs.follow(run, current)

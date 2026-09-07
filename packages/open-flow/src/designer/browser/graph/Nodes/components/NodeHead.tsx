@@ -91,6 +91,11 @@ export const NodeHead: React.FC = /* @__PURE__ */ memo(function NodeHead() {
         </span>
       )}
       {isInBlock ? nodeTitle : <NodeHeadContextMenu designerStore={designerStore}>{nodeTitle}</NodeHeadContextMenu>}
+      {!isInBlock && isManifestNodeType(nodeStore.nodeType) && (
+        <code className={styles.nodeId} title={nodeStore.nodeId}>
+          {nodeStore.nodeId}
+        </code>
+      )}
       {executor?.name == 'connector' && (
         <ConnectorConnectionBadge action={executor.options.action} className={styles.connection} connection={executor.options.connection} />
       )}

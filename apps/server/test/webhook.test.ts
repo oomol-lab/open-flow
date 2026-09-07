@@ -140,7 +140,12 @@ describe('Server Webhook Trigger admission', () => {
       runId: first.runId,
       status: 'queued',
     })
-    await expect(service.control.createDraftRun(target.flowId, target.revisionId, target.engineContract, {}, 'manual-run')).rejects.toMatchObject({
+    await expect(
+      service.control.createDraftRun(target.flowId, target.revisionId, target.engineContract, {}, 'manual-run', {
+        nodeId: target.triggerNodeId,
+        payload: { message: 'hello' },
+      }),
+    ).rejects.toMatchObject({
       code: 'run.overloaded',
       status: 429,
     })

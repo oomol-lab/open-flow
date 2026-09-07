@@ -45,6 +45,8 @@ type WebhookFieldType = (typeof webhookFieldTypes)[number]
 
 function kindLabel(kind: TriggerNodePresentation['kind'], t: TFunction): string {
   switch (kind) {
+    case 'manual':
+      return t('trigger.summaryManual')
     case 'cron':
       return t('trigger.summaryCron')
     case 'integration':
@@ -58,6 +60,8 @@ function kindLabel(kind: TriggerNodePresentation['kind'], t: TFunction): string 
 
 function emptySummary(kind: TriggerNodePresentation['kind'], t: TFunction): string {
   switch (kind) {
+    case 'manual':
+      return t('trigger.manualSummary')
     case 'cron':
     case 'poll':
       return t('trigger.scheduleMissing')
@@ -70,6 +74,8 @@ function emptySummary(kind: TriggerNodePresentation['kind'], t: TFunction): stri
 
 function emptyIcon(kind: TriggerNodePresentation['kind']): string {
   switch (kind) {
+    case 'manual':
+      return 'i-carbon:play'
     case 'integration':
       return 'i-carbon:events'
     case 'webhook':

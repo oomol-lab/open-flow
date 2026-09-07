@@ -352,6 +352,7 @@ export type RunResult =
   | { readonly finishedAt: string; readonly runId: string; readonly status: 'canceled'; readonly version: 1 }
 
 interface RunOptions {
+  readonly trigger: { readonly nodeId: string; readonly payload: JsonValue }
   readonly idempotencyKey?: string
   readonly inputs?: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>
 }
@@ -1351,10 +1352,10 @@ export class ControlClient {
     return publicationPage(await this.request(`/v1/flows/${segment(flowId)}/publications${query}`, { signal }))
   }
 
-  async createDraftRun(flowId: string, revisionId: string, options: RunOptions = {}): Promise<DraftRun> {
+  async createDraftRun(flowId: string, revisionId: string, options: RunOptions): Promise<DraftRun> {
     const created = runDetails(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/runs`, {
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v2', inputs: options.inputs ?? {}, version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v2', inputs: options.inputs ?? {}, trigger: options.trigger, version: 1 }),
         headers: { 'idempotency-key': options.idempotencyKey ?? operationKey('run') },
         method: 'POST',
       }),
@@ -1362,10 +1363,10 @@ export class ControlClient {
     return created.source == 'draft' ? created : invalidResponse()
   }
 
-  async createLiveRun(publicationId: string, options: RunOptions = {}): Promise<LiveRun> {
+  async createLiveRun(publicationId: string, options: RunOptions): Promise<LiveRun> {
     const created = runDetails(
       await this.request('/v1/runs', {
-        body: JSON.stringify({ inputs: options.inputs ?? {}, publicationId, version: 1 }),
+        body: JSON.stringify({ inputs: options.inputs ?? {}, trigger: options.trigger, publicationId, version: 1 }),
         headers: { 'idempotency-key': options.idempotencyKey ?? operationKey('run') },
         method: 'POST',
       }),

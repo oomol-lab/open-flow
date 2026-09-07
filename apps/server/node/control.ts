@@ -290,7 +290,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.post('/flows/:flowId/revisions/:revisionId/runs', async (context) => {
     const body = await requestObject(context.req.raw, controlErrorCode.runInvalid)
-    exact(body, ['engineContract', 'inputs', 'version'], controlErrorCode.runInvalid)
+    exact(body, ['engineContract', 'inputs', 'trigger', 'version'], controlErrorCode.runInvalid)
     version(body.version, controlErrorCode.runInvalid)
     const accepted = await service.createDraftRun(
       context.req.param('flowId'),
@@ -298,18 +298,20 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       text(body.engineContract, controlErrorCode.runInvalid),
       record(body.inputs, controlErrorCode.runInvalid) as RunInputs,
       idempotencyKey(context.req.raw, controlErrorCode.runInvalid),
+      body.trigger as NonNullable<FlowRunOptions['trigger']>,
     )
     return response(accepted.created ? 202 : 200, accepted.run)
   })
 
   app.post('/runs', async (context) => {
     const body = await requestObject(context.req.raw, controlErrorCode.runInvalid)
-    exact(body, ['inputs', 'publicationId', 'version'], controlErrorCode.runInvalid)
+    exact(body, ['inputs', 'publicationId', 'trigger', 'version'], controlErrorCode.runInvalid)
     version(body.version, controlErrorCode.runInvalid)
     const accepted = await service.createLiveRun(
       text(body.publicationId, controlErrorCode.runInvalid),
       record(body.inputs, controlErrorCode.runInvalid) as RunInputs,
       idempotencyKey(context.req.raw, controlErrorCode.runInvalid),
+      body.trigger as NonNullable<FlowRunOptions['trigger']>,
     )
     return response(accepted.created ? 202 : 200, accepted.run)
   })

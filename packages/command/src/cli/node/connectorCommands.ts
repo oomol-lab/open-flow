@@ -226,7 +226,7 @@ export async function triggerCommand(
       if (first == null || second == null || extra.length > 0) {
         throw new CliError(
           'cli.invalid-arguments',
-          'Usage: oo flow trigger add <flow> <webhook|cron|trigger-key> [--name <name>] [--connection <connection>] [--set <field=value>] [--every <interval>|--cron <expression>] [--json]',
+          'Usage: oo flow trigger add <flow> <manual|webhook|cron|trigger-key> [--name <name>] [--connection <connection>] [--set <field=value>] [--every <interval>|--cron <expression>] [--json]',
         )
       }
       const selected = await selectedDraftFlow(client, requiredFlowId(flow), first)
@@ -237,7 +237,13 @@ export async function triggerCommand(
       let operations
       let name: string
       let kind: TriggerNode['kind']
-      if (second == 'webhook') {
+      if (second == 'manual') {
+        if (args.connection != null || configuredSchedule != null || Object.keys(values).length > 0)
+          throw new CliError('trigger.config-invalid', 'Manual trigger creation only accepts --name.')
+        name = args.name?.trim() ?? 'Manual trigger'
+        kind = 'manual'
+        operations = createBuiltinTrigger(selected.target, triggerId, { kind, name })
+      } else if (second == 'webhook') {
         if (args.connection != null || configuredSchedule != null || Object.keys(values).length > 0) {
           throw new CliError('trigger.config-invalid', 'Webhook creation only accepts --name; configure request and response fields in Workbench.')
         }
@@ -309,6 +315,13 @@ export async function triggerCommand(
         const description = args.description ?? resolved.trigger.description
         let changedTrigger
         switch (resolved.trigger.kind) {
+          case 'manual':
+            changedTrigger = updateTrigger(selected.draft.content, selected.target, resolved.triggerId, {
+              ...(description == null ? {} : { description }),
+              kind: 'manual',
+              name,
+            })
+            break
           case 'webhook':
             changedTrigger = updateTrigger(selected.draft.content, selected.target, resolved.triggerId, {
               ...(description == null ? {} : { description }),

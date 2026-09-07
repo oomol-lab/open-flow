@@ -35,7 +35,9 @@
     "wait": "待機",
     "waitDescription": "オペレーターが続行または承認するまで Run を一時停止します。",
     "webhook": "Webhook",
-    "webhookDescription": "専用の HTTP エンドポイントで外部イベントを受信します。"
+    "webhookDescription": "専用の HTTP エンドポイントで外部イベントを受信します。",
+    "manual": "手動トリガー",
+    "manualDescription": "ここから手動で実行を開始します。"
   },
   "common": {
     "cancel": "キャンセル",
@@ -69,7 +71,10 @@
     "flowDesigner": "Flow デザイナー",
     "openBlocks": "ノードを参照",
     "quickSearchHint": "A キーでクイック検索できます。",
-    "toggleInspector": "インスペクターを切り替え"
+    "toggleInspector": "インスペクターを切り替え",
+    "triggerTitle": "Flow の開始方法を選択",
+    "triggerDescription": "トリガーを追加してタスクに接続します。手動トリガーを使うと、クリックして実行できます。",
+    "addTriggerToRun": "実行するためにトリガーを追加"
   },
   "contextPanel": {
     "blocks": "ノードライブラリ",
@@ -624,7 +629,10 @@
     "close": "実行入力を閉じる",
     "description": "未接続の入力ごとに値を指定してください。グラフ接続、静的な値、定義のデフォルト値がある入力は表示されません。ここで入力した値は今回の実行にのみ使用され、Flow には保存されません。",
     "invalid": "実行する前に、表示されているすべての入力へ有効な JSON 値を設定してください。",
-    "title": "実行入力"
+    "title": "実行入力",
+    "trigger": "開始ノード",
+    "selectTrigger": "開始ノードを選択",
+    "noTrigger": "実行する前に開始ノードとなるトリガーを追加してください。"
   },
   "workspace": {
     "check": "現在のドラフトを検査",
@@ -638,15 +646,11 @@
     "liveAndDraft": "本番 + ドラフト",
     "loadFailed": "ドラフトを読み込めませんでした",
     "loadFailedDescription": "デプロイ先への接続を確認してから、もう一度お試しください。",
-    "moreActions": "その他の操作",
     "notChecked": "未検査",
-    "openFlowToRun": "Flow を開くと実行できます。",
     "publish": "公開",
     "publishing": "公開中…",
     "publications": "公開記録",
     "run": "実行",
-    "runDraft": "ドラフトを実行",
-    "runLive": "本番を実行",
     "runs": "実行記録",
     "starting": "開始中…",
     "status": {

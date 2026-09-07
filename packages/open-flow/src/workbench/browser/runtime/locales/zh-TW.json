@@ -35,7 +35,9 @@
     "wait": "等待",
     "waitDescription": "暫停 Run，直到 Operator 繼續或審批。",
     "webhook": "Webhook",
-    "webhookDescription": "透過專屬的 HTTP 端點接收外部事件。"
+    "webhookDescription": "透過專屬的 HTTP 端點接收外部事件。",
+    "manual": "手動觸發",
+    "manualDescription": "從這裡手動啟動執行。"
   },
   "common": {
     "cancel": "取消",
@@ -69,7 +71,10 @@
     "flowDesigner": "Flow 設計工具",
     "openBlocks": "瀏覽節點",
     "quickSearchHint": "按 A 可快速搜尋。",
-    "toggleInspector": "切換檢查器"
+    "toggleInspector": "切換檢查器",
+    "triggerTitle": "先選擇 Flow 的啟動方式",
+    "triggerDescription": "新增觸發器，再連接到任務。使用手動觸發器，即可點擊執行。",
+    "addTriggerToRun": "新增觸發器以執行"
   },
   "contextPanel": {
     "blocks": "節點庫",
@@ -624,7 +629,10 @@
     "close": "關閉執行輸入",
     "description": "請為每個未連接的輸入提供值。已有流程圖連線、靜態值或定義預設值的輸入不會顯示。在此填寫的值僅用於本次執行，不會儲存至 Flow。",
     "invalid": "執行前，請將列出的每個輸入都設為有效的 JSON 值。",
-    "title": "執行輸入"
+    "title": "執行輸入",
+    "trigger": "起始節點",
+    "selectTrigger": "選擇起始節點",
+    "noTrigger": "請先新增一個觸發器作為起始節點。"
   },
   "workspace": {
     "check": "檢查目前的草稿",
@@ -638,15 +646,11 @@
     "liveAndDraft": "線上 + 草稿",
     "loadFailed": "無法載入草稿",
     "loadFailedDescription": "請檢查部署連線，然後再試一次。",
-    "moreActions": "更多操作",
     "notChecked": "尚未檢查",
-    "openFlowToRun": "請先開啟一個 Flow 才能執行。",
     "publish": "發布",
     "publishing": "發布中…",
     "publications": "發布紀錄",
     "run": "執行",
-    "runDraft": "執行草稿",
-    "runLive": "執行線上版本",
     "runs": "執行紀錄",
     "starting": "啟動中…",
     "status": {

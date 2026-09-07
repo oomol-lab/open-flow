@@ -22,7 +22,7 @@ const commandSyntax: readonly string[] = [
   '  oo flow code <list|show|edit|set>',
   '  oo flow connector <list|search|show|connections|add|set>',
   '  oo flow trigger <search|show|list|add|set|remove>',
-  '  oo flow run <flow> [--source draft|live] [--input <json|@file|->] [--wait]',
+  '  oo flow run <flow> [--source draft|live] [--trigger <name|id>] [--payload <json|@file|->] [--input <json|@file|->] [--wait]',
   '  oo flow runs <list|show|events|result|cancel>',
   '  oo flow publish <flow>',
   '  oo flow publications <list|show> <flow>',

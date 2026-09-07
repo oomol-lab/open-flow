@@ -460,7 +460,7 @@ it('streams independent Flow catalog and current Flow invalidations', async () =
     const changed = await service.control.changeDraft('operator', created.flowId, created.draftRevisionId, [
       {
         kind: 'graph.node.create',
-        node: { inputs: {}, kind: 'value', values: [] },
+        node: { kind: 'manual', name: 'Start' },
         nodeId: 'marker',
         target: { kind: 'flow' },
       },
@@ -469,7 +469,10 @@ it('streams independent Flow catalog and current Flow invalidations', async () =
     expect(new TextDecoder().decode(notification.value)).toBe(
       `data: ${JSON.stringify({ kind: 'draft.changed', flowId: created.flowId, revisionId: changed.revision.revisionId, version: 1 })}\n\n`,
     )
-    const accepted = await service.control.createDraftRun(created.flowId, changed.revision.revisionId, currentEngineContract, {}, 'notification-run')
+    const accepted = await service.control.createDraftRun(created.flowId, changed.revision.revisionId, currentEngineContract, {}, 'notification-run', {
+      nodeId: 'marker',
+      payload: {},
+    })
     const runNotification = await reader.read()
     expect(new TextDecoder().decode(runNotification.value)).toBe(
       `data: ${JSON.stringify({ flowId: created.flowId, kind: 'run.created', runId: accepted.run.runId, version: 1 })}\n\n`,

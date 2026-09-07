@@ -95,6 +95,7 @@ export function flowDependencies(content: RevisionContent): SemanticClosure['dep
           visitBinding(node.bindingId)
           break
         case 'cron':
+        case 'manual':
         case 'webhook':
           break
       }
@@ -182,7 +183,7 @@ export interface FlowValidation {
 
 export function triggerPayloadSchema(trigger: TriggerNode): JsonValue {
   if (trigger.kind == 'poll' || trigger.kind == 'integration') return trigger.definition.payloadSchema
-  if (trigger.kind == 'cron') return { additionalProperties: false, type: 'object' }
+  if (trigger.kind == 'cron' || trigger.kind == 'manual') return { additionalProperties: false, type: 'object' }
   return {
     additionalProperties: false,
     properties: Object.fromEntries(trigger.inputsDef.map((input) => [input.handle, input.jsonSchema])),
@@ -515,7 +516,7 @@ function validateTrigger(triggerId: string, trigger: TriggerNode, document: Flow
     }
     return
   }
-  if (trigger.kind == 'cron') return
+  if (trigger.kind == 'cron' || trigger.kind == 'manual') return
   const binding = document.bindings[trigger.bindingId]
   if (binding == null) {
     diagnostics.push(
@@ -561,6 +562,7 @@ export function nodeInputPorts(document: FlowDocument, node: GraphNode): Readonl
     case 'cron':
     case 'integration':
     case 'poll':
+    case 'manual':
     case 'webhook':
       return {}
   }
@@ -583,6 +585,7 @@ function nodeOutputPorts(document: FlowDocument, node: GraphNode): Readonly<Reco
     case 'cron':
     case 'integration':
     case 'poll':
+    case 'manual':
     case 'webhook':
       return { payload: { jsonSchema: triggerPayloadSchema(node), nullable: false } }
   }
@@ -1121,6 +1124,15 @@ function validateFlowGraph(revision: RevisionContent, closure: SemanticClosure):
 }
 
 export type FlowInputsValidation = 'invalid' | 'valid'
+
+export function validRunTrigger(revision: RevisionContent, value: unknown): boolean {
+  if (value == null || typeof value != 'object' || Array.isArray(value)) return false
+  const trigger = value as Readonly<Record<string, unknown>>
+  if (Object.keys(trigger).some((key) => key != 'nodeId' && key != 'payload') || typeof trigger.nodeId != 'string' || !Object.hasOwn(trigger, 'payload'))
+    return false
+  const node = revision.document.graph.nodes[trigger.nodeId]
+  return node != null && !('inputs' in node) && matchesSchema(trigger.payload as JsonValue, triggerPayloadSchema(node))
+}
 
 export function validateFlowInputs(revision: RevisionContent, value: unknown): FlowInputsValidation {
   if (value == null || typeof value != 'object' || Array.isArray(value)) return 'invalid'

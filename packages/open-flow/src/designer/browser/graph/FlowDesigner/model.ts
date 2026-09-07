@@ -178,7 +178,7 @@ export type FlowDesignerViewTriggerField =
 
 export interface FlowDesignerViewTriggerPresentation {
   readonly config?: readonly FlowDesignerViewTriggerField[]
-  readonly kind: 'cron' | 'integration' | 'poll' | 'webhook'
+  readonly kind: 'cron' | 'integration' | 'manual' | 'poll' | 'webhook'
   readonly schedules: readonly FlowDesignerViewTriggerSchedule[]
   readonly source?: string
   readonly webhook?: {

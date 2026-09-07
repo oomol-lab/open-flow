@@ -129,6 +129,7 @@ export class RevisionView {
       case 'wait':
         resolved = { id: nodeId, kind: node.kind, node }
         break
+      case 'manual':
       case 'cron':
       case 'integration':
       case 'poll':

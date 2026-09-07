@@ -330,7 +330,6 @@ test('keeps responsive control density on component APIs', async () => {
   assert.match(tabs, /motion-reduce:transition-none/)
   assert.match(tabs, /motion-reduce:after:transition-none/)
   assert.match(workspaceHeader, /className="validation-state"[\s\S]*?size="default"/)
-  assert.match(workspaceHeader, /onClick=\{onRunDraft\}[\s\S]*?size="default"/)
   assert.match(workspaceHeader, /store\.publications\.publish\(\)[\s\S]*?size="default"/)
   assert.match(workspaceHeader, /className="action-help publish-action"/)
   assert.match(workspaceHeader, /className="workspace-tabs" variant="line"/)

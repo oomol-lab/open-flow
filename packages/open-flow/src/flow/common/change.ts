@@ -280,6 +280,7 @@ interface TriggerNodeBase {
 }
 
 export type TriggerNode =
+  | (TriggerNodeBase & { readonly kind: 'manual' })
   | (TriggerNodeBase & {
       readonly inputsDef: readonly WebhookInputDefinition[]
       readonly kind: 'webhook'

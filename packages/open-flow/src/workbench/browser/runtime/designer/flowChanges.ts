@@ -123,6 +123,7 @@ export type AddNodeIntent =
   | { readonly kind: 'code'; readonly name: string; readonly ports?: CodeTaskPorts }
   | { readonly action: ConnectorAction; readonly kind: 'connector' }
   | { readonly kind: 'condition'; readonly name: string }
+  | { readonly kind: 'manual'; readonly name: string }
   | { readonly kind: 'cron'; readonly name: string }
   | { readonly kind: 'llm'; readonly mode: 'chat' | 'json'; readonly name: string; readonly outputDescription: string }
   | { readonly kind: 'provider-trigger'; readonly connectionId?: string; readonly definition: TriggerKeySnapshot }
@@ -213,6 +214,8 @@ export function addNode(
       if (subflow == null) return
       return createSubflowNode(target, nodeId, intent.subflowId, subflow.inputs)
     }
+    case 'manual':
+      return target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { kind: 'manual', name: intent.name }) : undefined
     case 'webhook':
       return target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { inputsDef: [], kind: 'webhook', name: intent.name }) : undefined
     case 'cron':

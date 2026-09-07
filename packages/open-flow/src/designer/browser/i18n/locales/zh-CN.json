@@ -139,7 +139,9 @@
     "webhookResponseData": "响应内容",
     "webhookStatus": "状态码",
     "webhookSummary": "收到 HTTP 请求时触发",
-    "webhookDescription": "通过部署后生成的 HTTP 地址接收 JSON 对象。"
+    "webhookDescription": "通过部署后生成的 HTTP 地址接收 JSON 对象。",
+    "summaryManual": "手动触发",
+    "manualSummary": "点击运行，从这里开始执行。"
   },
   "condition": {
     "addCondition": "添加条件",

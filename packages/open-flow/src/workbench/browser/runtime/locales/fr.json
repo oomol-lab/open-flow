@@ -35,7 +35,9 @@
     "wait": "Attente",
     "waitDescription": "Mettre le Run en pause jusqu’à ce qu’un opérateur le poursuive ou l’approuve.",
     "webhook": "Webhook",
-    "webhookDescription": "Recevoir des événements externes via un point de terminaison HTTP dédié."
+    "webhookDescription": "Recevoir des événements externes via un point de terminaison HTTP dédié.",
+    "manual": "Déclencheur manuel",
+    "manualDescription": "Démarrer manuellement à partir de ce nœud."
   },
   "common": {
     "cancel": "Annuler",
@@ -69,7 +71,10 @@
     "flowDesigner": "Designer de Flow",
     "openBlocks": "Parcourir les blocs",
     "quickSearchHint": "Appuyez sur A pour la recherche rapide.",
-    "toggleInspector": "Afficher ou masquer l'inspecteur"
+    "toggleInspector": "Afficher ou masquer l'inspecteur",
+    "triggerTitle": "Choisissez comment démarrer ce Flow",
+    "triggerDescription": "Ajoutez un déclencheur, puis reliez-le à une tâche. Un déclencheur manuel permet de lancer le Flow vous-même.",
+    "addTriggerToRun": "Ajouter un déclencheur pour exécuter"
   },
   "contextPanel": {
     "blocks": "Blocs",
@@ -624,7 +629,10 @@
     "close": "Fermer les entrées d'exécution",
     "description": "Fournissez une valeur pour chaque entrée non connectée. Les entrées ayant une connexion dans le graphe, une valeur statique ou une valeur par défaut ne sont pas affichées. Les valeurs saisies ici s’appliquent uniquement à cette exécution et ne sont pas enregistrées dans le Flow.",
     "invalid": "Définissez une valeur JSON valide pour chaque entrée listée avant d'exécuter.",
-    "title": "Entrées d'exécution"
+    "title": "Entrées d'exécution",
+    "trigger": "Nœud de départ",
+    "selectTrigger": "Choisir un nœud de départ",
+    "noTrigger": "Ajoutez un déclencheur comme nœud de départ avant de lancer le flux."
   },
   "workspace": {
     "check": "Vérifier le Brouillon actuel",
@@ -638,15 +646,11 @@
     "liveAndDraft": "En ligne + Brouillon",
     "loadFailed": "Impossible de charger le Brouillon",
     "loadFailedDescription": "Vérifiez la connexion au déploiement, puis réessayez.",
-    "moreActions": "Plus d'actions",
     "notChecked": "Non vérifié",
-    "openFlowToRun": "Ouvrez un Flow pour l'exécuter.",
     "publish": "Publier",
     "publishing": "Publication…",
     "publications": "Publications",
     "run": "Exécuter",
-    "runDraft": "Exécuter le Brouillon",
-    "runLive": "Exécuter en ligne",
     "runs": "Exécutions",
     "starting": "Démarrage…",
     "status": {

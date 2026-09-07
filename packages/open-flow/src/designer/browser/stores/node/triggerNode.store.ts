@@ -34,7 +34,7 @@ export type TriggerNodeField =
 
 export interface TriggerNodePresentation {
   readonly config?: readonly TriggerNodeField[]
-  readonly kind: 'cron' | 'integration' | 'poll' | 'webhook'
+  readonly kind: 'cron' | 'integration' | 'manual' | 'poll' | 'webhook'
   readonly schedules: readonly TriggerNodeSchedule[]
   readonly source?: string
   readonly webhook?: {

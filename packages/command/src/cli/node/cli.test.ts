@@ -225,3 +225,68 @@ describe('CLI', () => {
     expect(output.opened).toEqual(['https://console.example/flows/flow-1'])
   })
 })
+
+it.each([
+  { multiple: false, options: [], selected: 'start', status: 0 },
+  { multiple: true, options: [], selected: undefined, status: 1 },
+  { multiple: true, options: ['--trigger', 'Other'], selected: 'other', status: 0 },
+  { multiple: true, options: ['--trigger=other', '--payload={}'], selected: 'other', status: 0 },
+])('runs only an explicit entry or the sole manual trigger: %j', async ({ multiple, options, selected, status }) => {
+  const output = runtime()
+  const bodies: unknown[] = []
+  const request = async (path: string, init?: RequestInit) => {
+    if (path == '/v1/flows/flow-1') return Response.json(flow)
+    if (path == '/v1/flows/flow-1/revisions/revision-1')
+      return Response.json({
+        actorId: 'operator',
+        createdAt: flow.createdAt,
+        digest: 'digest',
+        flowId: flow.flowId,
+        modelVersion: 1,
+        parentRevisionId: null,
+        revisionId: 'revision-1',
+        version: 1,
+        content: {
+          modelVersion: 1,
+          modules: {},
+          document: {
+            bindings: {},
+            tasks: {},
+            subflows: {},
+            graph: {
+              edges: [],
+              nodes: {
+                start: { kind: 'manual', name: 'Start' },
+                ...(multiple ? { other: { kind: 'manual', name: 'Other' } } : {}),
+              },
+            },
+          },
+        },
+      })
+    if (path == '/v1/flows/flow-1/revisions/revision-1/runs') {
+      bodies.push(JSON.parse(String(init?.body)))
+      return Response.json({
+        createdAt: flow.createdAt,
+        flowId: flow.flowId,
+        revisionId: 'revision-1',
+        runId: 'run',
+        source: 'draft',
+        status: 'queued',
+        version: 1,
+        closureDigest: 'closure',
+        engineContract: 'open-flow-engine/v2',
+        engineDigest: 'engine',
+        modelVersion: 1,
+        revisionDigest: 'digest',
+      })
+    }
+    throw new Error(`Unexpected request ${path}`)
+  }
+  expect(await runCli(['run', 'flow-1', '--source', 'draft', '--json', ...options], { request }, output.value), output.stderr()).toBe(status)
+  if (selected == null) {
+    expect(bodies).toEqual([])
+    expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'run.trigger-required' } })
+  } else {
+    expect(bodies).toEqual([expect.objectContaining({ trigger: { nodeId: selected, payload: {} } })])
+  }
+})

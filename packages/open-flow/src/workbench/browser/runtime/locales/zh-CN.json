@@ -35,7 +35,9 @@
     "wait": "等待",
     "waitDescription": "暂停 Run，直到 Operator 继续、审批或拒绝。",
     "webhook": "Webhook",
-    "webhookDescription": "通过专属 HTTP 入口接收外部事件。"
+    "webhookDescription": "通过专属 HTTP 入口接收外部事件。",
+    "manual": "手动触发",
+    "manualDescription": "从这里手动启动执行。"
   },
   "common": {
     "cancel": "取消",
@@ -69,7 +71,10 @@
     "flowDesigner": "Flow 设计器",
     "openBlocks": "浏览节点",
     "quickSearchHint": "按 A 快速搜索。",
-    "toggleInspector": "切换检查器"
+    "toggleInspector": "切换检查器",
+    "triggerTitle": "先选择 Flow 的启动方式",
+    "triggerDescription": "添加触发器，再连接到任务。使用手动触发器，即可点击运行。",
+    "addTriggerToRun": "添加触发器以运行"
   },
   "contextPanel": {
     "blocks": "节点库",
@@ -624,7 +629,10 @@
     "close": "关闭运行输入",
     "description": "为每个未连接的输入提供值。已有图连接、静态值或定义默认值的输入不会显示。这里填写的值仅用于本次运行，不会保存到 Flow。",
     "invalid": "请为所有列出的输入设置有效的 JSON 值后再运行。",
-    "title": "运行输入"
+    "title": "运行输入",
+    "trigger": "起始节点",
+    "selectTrigger": "选择起始节点",
+    "noTrigger": "请先添加一个触发器作为起始节点。"
   },
   "workspace": {
     "check": "检查当前草稿",
@@ -638,15 +646,11 @@
     "liveAndDraft": "线上 + 草稿",
     "loadFailed": "无法加载草稿",
     "loadFailedDescription": "请检查部署连接，然后重试。",
-    "moreActions": "更多操作",
     "notChecked": "未检查",
-    "openFlowToRun": "打开一个 Flow 后才能运行。",
     "publish": "发布",
     "publishing": "发布中…",
     "publications": "发布记录",
     "run": "运行",
-    "runDraft": "运行草稿",
-    "runLive": "运行线上",
     "runs": "运行记录",
     "starting": "启动中…",
     "status": {

@@ -8,7 +8,6 @@ import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { useDelayedTrue } from '../../../../designer/browser/base/react.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Tabs, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Icon } from '../icons.tsx'
 import { followWorkbenchLink } from '../navigationLink.ts'
@@ -29,8 +28,6 @@ interface Props {
   readonly onOpenFlows: () => void
   readonly onOpenPublications: () => void
   readonly onOpenRuns: () => void
-  readonly onRunDraft: () => void
-  readonly onRunLive: () => void
   readonly store: WorkbenchStore
 }
 
@@ -66,8 +63,6 @@ export function WorkspaceHeader({
   onOpenFlows,
   onOpenPublications,
   onOpenRuns,
-  onRunDraft,
-  onRunLive,
   store,
 }: Props): ReactElement {
   const t = useTranslate()
@@ -88,10 +83,8 @@ export function WorkspaceHeader({
   const workspaceLoading = useVal(store.workspace.$.workspaceLoading)
   const diagnosticsButton = useRef<HTMLButtonElement>(null)
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
-  const [menuRoot, setMenuRoot] = useState<HTMLDivElement | null>(null)
   const invalid = diagnostics?.valid == false
   const subflow = target?.kind == 'subflow'
-  const draftRunUnavailable = invalid ? t('workspace.fixIssuesToRun') : subflow ? t('workspace.openFlowToRun') : undefined
   const publishUnavailable = invalid ? t('workspace.fixIssuesToPublish') : subflow ? t('workspace.subflowPublishHelp') : undefined
 
   useEffect(() => {
@@ -179,21 +172,6 @@ export function WorkspaceHeader({
           {workspaceLoading || draft == null ? null : <Icon name="check" size={16} />}
           <span>{t(`workspace.status.${displayedStatus}`)}</span>
         </span>
-        {activeView != 'design' && (
-          <span className="action-help" title={draftRunUnavailable}>
-            <Button
-              aria-controls="run-input-panel"
-              aria-expanded={runInputRequest?.source == 'draft'}
-              disabled={busy != null || invalid || subflow || runInputRequest != null}
-              onClick={onRunDraft}
-              size="default"
-              variant="outline"
-            >
-              <Icon data-icon="inline-start" name="play" />
-              {t(busy == 'run' ? 'workspace.starting' : 'workspace.runDraft')}
-            </Button>
-          </span>
-        )}
         <span className="action-help publish-action" title={publishUnavailable}>
           <Button
             disabled={busy != null || invalid || subflow || live?.hasUnpublishedChanges == false}
@@ -204,28 +182,6 @@ export function WorkspaceHeader({
             {t(busy == 'publish' ? 'workspace.publishing' : 'publication.publishDraft')}
           </Button>
         </span>
-        {live?.publication != null && (
-          <div className="workspace-more" ref={setMenuRoot}>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                aria-label={t('workspace.moreActions')}
-                render={
-                  <Button size="icon" title={t('workspace.moreActions')} variant="ghost">
-                    <Icon name="more" />
-                  </Button>
-                }
-              />
-              <DropdownMenuContent align="end" className="min-w-40" container={menuRoot} side="bottom">
-                <DropdownMenuGroup>
-                  <DropdownMenuItem disabled={busy != null || live.status == 'suspended' || runInputRequest != null} onClick={onRunLive}>
-                    <Icon name="play" />
-                    {t(busy == 'run' ? 'workspace.starting' : 'workspace.runLive')}
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
         {hostAction != null && hostTitle != null && onHostAction != null && <HostMenu action={hostAction} onAction={onHostAction} title={hostTitle} />}
       </div>
       {diagnosticsOpen && (
