@@ -79,7 +79,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const cursor = parameters.get('cursor')
     const after = cursor == null ? undefined : decodeFlowCursor(cursor)
     const { next, page } = service.listFlows(limit, after, optionalBoolean(parameters.get('includeTotal'), controlErrorCode.flowInvalid))
-    return response(200, { ...page, ...(next == null ? {} : { nextCursor: encodeCursor('flows', next) }) })
+    return response(200, { ...page, ...(next == null ? {} : { nextCursor: encodeFlowCursor(next) }) })
   })
   app.post('/flows', async (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
@@ -314,15 +314,16 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.get('/flows/:flowId/runs', (context) => {
     const parameters = query(context.req.raw, ['cursor', 'limit', 'status'], controlErrorCode.runInvalid)
+    const flowId = context.req.param('flowId')
     const cursor = parameters.get('cursor')
-    const after = cursor == null ? undefined : decodeRunCursor(cursor)
+    const after = cursor == null ? undefined : decodeRunCursor(cursor, flowId)
     const status = parameters.get('status')
     if (status != null && !runStatusSet.has(status)) invalid(controlErrorCode.runInvalid, 'Run status is invalid.')
-    const { next, page } = service.listRuns(context.req.param('flowId'), pageSize(parameters, controlErrorCode.runInvalid), {
+    const { next, page } = service.listRuns(flowId, pageSize(parameters, controlErrorCode.runInvalid), {
       ...(after == null ? {} : { after }),
       ...(status == null ? {} : { status: status as RunStatus }),
     })
-    return response(200, { ...page, ...(next == null ? {} : { nextCursor: encodeCursor('runs', next) }) })
+    return response(200, { ...page, ...(next == null ? {} : { nextCursor: encodeRunCursor(flowId, next) }) })
   })
   app.get('/runs/:runId', (context) => response(200, service.getRun(context.req.param('runId'))))
   app.get('/runs/:runId/events', (context) => {
@@ -473,8 +474,12 @@ function idempotencyKey(request: Request, code: InvalidCode): string {
   return value
 }
 
-function encodeCursor(kind: 'flows' | 'runs', position: FlowPosition | RunPosition): string {
-  return Buffer.from(JSON.stringify({ kind, ...position })).toString('base64url')
+function encodeFlowCursor(position: FlowPosition): string {
+  return Buffer.from(JSON.stringify({ kind: 'flows', ...position })).toString('base64url')
+}
+
+function encodeRunCursor(flowId: string, position: RunPosition): string {
+  return Buffer.from(JSON.stringify({ flowId, kind: 'runs', ...position })).toString('base64url')
 }
 
 function encodePublicationCursor(flowId: string, position: PublicationPosition): string {
@@ -490,8 +495,9 @@ function decodeFlowCursor(value: string): FlowPosition {
   return { createdAt: decoded.createdAt as number, flowId: text(decoded.flowId, controlErrorCode.pageInvalidCursor) }
 }
 
-function decodeRunCursor(value: string): RunPosition {
-  const decoded = decodeCursor(value, 'runs', ['createdAt', 'kind', 'runId'])
+function decodeRunCursor(value: string, flowId: string): RunPosition {
+  const decoded = decodeCursor(value, 'runs', ['createdAt', 'flowId', 'kind', 'runId'])
+  if (decoded.flowId != flowId) invalid(controlErrorCode.pageInvalidCursor, 'Cursor is invalid.')
   return { createdAt: decoded.createdAt as number, runId: text(decoded.runId, controlErrorCode.pageInvalidCursor) }
 }
 

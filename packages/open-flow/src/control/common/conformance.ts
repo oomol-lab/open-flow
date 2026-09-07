@@ -374,6 +374,14 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
         [runId],
         'Listed next Runs',
       )
+      const otherFlow = await createFlow(harness, 'Other Run flow', 'other-run-flow')
+      const otherFlowId = requiredString(otherFlow.flowId, 'Other Run Flow flowId')
+      await error(
+        await request(harness, `/v1/flows/${otherFlowId}/runs?limit=1&cursor=${encodeURIComponent(cursor)}`),
+        400,
+        'page.invalid-cursor',
+        'Reject Run cursor from another Flow',
+      )
       const canceled = await json(
         await request(harness, `/v1/runs/${runId}/cancel`, { body: JSON.stringify({ version: 1 }), method: 'POST' }),
         200,
