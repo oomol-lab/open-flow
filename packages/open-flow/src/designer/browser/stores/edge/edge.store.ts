@@ -237,9 +237,10 @@ function toRFEdgeConnection(nodes: ReadonlyReactiveMap<NodeId, NodeStore>, conne
       source = nodes.get(connection.from.source.node_id)?.rfNodeId || toRFNodeId(connection.from.source.node_id)
       sourceHandle = toRFHandleName(connection.from.source.output_handle)
       break
-    default:
-      // @ts-expect-error This branch should be unreachable.
-      throw new Error(`Unknown connection.from.type: ${connection.from.type}`)
+    default: {
+      connection.from satisfies never
+      throw new Error(`Unknown connection.from: ${JSON.stringify(connection.from)}`)
+    }
   }
 
   switch (connection.to.type) {
@@ -251,9 +252,10 @@ function toRFEdgeConnection(nodes: ReadonlyReactiveMap<NodeId, NodeStore>, conne
       target = toRFNodeId(connection.to.target.node_id)
       targetHandle = toRFHandleName(connection.to.target.input_handle)
       break
-    default:
-      // @ts-expect-error This branch should be unreachable.
-      throw new Error(`Unknown connection.to.type: ${connection.to.type}`)
+    default: {
+      connection.to satisfies never
+      throw new Error(`Unknown connection.to: ${JSON.stringify(connection.to)}`)
+    }
   }
 
   return {
