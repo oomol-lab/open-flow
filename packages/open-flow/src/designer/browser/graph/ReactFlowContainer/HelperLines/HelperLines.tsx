@@ -24,7 +24,7 @@ export interface HelperLinesProps {
 }
 
 // Render helper lines on a canvas above the React Flow pane.
-export function HelperLines({ horizontal, vertical, strokeStyle = '#7d7fe9' }: HelperLinesProps): React.ReactElement {
+export function HelperLines({ horizontal, vertical, strokeStyle = '#b7654d' }: HelperLinesProps): React.ReactElement {
   const { width, height, transform } = useStore(storeSelector)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
