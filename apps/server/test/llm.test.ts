@@ -119,6 +119,31 @@ describe('OOMOL LLM host', () => {
     ).resolves.toEqual({ code: 'llm.output-invalid', kind: 'failed', message: 'The model returned invalid JSON.', version: 1 })
   })
 
+  it('reports the validation reason for invalid Task input', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    const llm = oomolLlm('https://connector.oomol.com', 'runtime-token')!
+
+    await expect(
+      llm({
+        input: { messages: null, model: { max_tokens: 0 }, template: [{ content: 'Answer.', role: 'user' }] },
+        invocationId: 'invocation-invalid-tokens',
+        mode: 'chat',
+        signal: new AbortController().signal,
+        version: 1,
+      }),
+    ).resolves.toEqual({ code: 'llm.unavailable', kind: 'failed', message: 'Invalid LLM max_tokens.', version: 1 })
+    await expect(
+      llm({
+        input: { messages: [{ content: 'Hi.', role: 'wizard' }], model: {}, template: [] },
+        invocationId: 'invocation-invalid-role',
+        mode: 'chat',
+        signal: new AbortController().signal,
+        version: 1,
+      }),
+    ).resolves.toEqual({ code: 'llm.unavailable', kind: 'failed', message: 'Invalid LLM message role.', version: 1 })
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled()
+  })
+
   it('does not infer an LLM host for a custom Connector or an empty token', () => {
     expect(oomolLlm('https://connector.example.com', 'runtime-token')).toBeUndefined()
     expect(oomolLlm('https://connector.oomol.com', '')).toBeUndefined()

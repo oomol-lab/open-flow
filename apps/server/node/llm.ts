@@ -29,24 +29,15 @@ export function oomolLlm(connectorOrigin: string | undefined, token: string | un
 
 function invokeLlm(origin: URL, token: string): InvokeLlmTask {
   return async ({ input, mode, signal }) => {
+    let body: Record<string, unknown>
     try {
-      const model = record(input.model)
-      const messages = [
-        ...(input.messages == null ? [] : chatMessages(input.messages, (content) => content)),
-        ...chatMessages(input.template, (content) => render(content, input)),
-      ]
-      const body: Record<string, unknown> = {
-        messages,
-        model: typeof model.model == 'string' && model.model.length > 0 ? model.model : defaultModel,
-        ...(mode == 'json' ? { response_format: { type: 'json_object' } } : {}),
-      }
-      if (model.temperature != null) body.temperature = finite(model.temperature)
-      if (model.top_p != null) body.top_p = finite(model.top_p)
-      if (model.max_tokens != null) {
-        if (!Number.isSafeInteger(model.max_tokens) || Number(model.max_tokens) <= 0) throw new TypeError('Invalid LLM max_tokens.')
-        body.max_tokens = model.max_tokens
-      }
-
+      body = requestBody(input, mode)
+    } catch (error) {
+      // Task input validation messages are local and safe to report; other thrown values stay generic.
+      if (error instanceof TypeError) return { code: 'llm.unavailable', kind: 'failed', message: error.message, version: 1 }
+      throw error
+    }
+    try {
       const response = await fetch(new URL('chat/completions', origin), {
         body: JSON.stringify(body),
         headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' },
@@ -72,6 +63,26 @@ function invokeLlm(origin: URL, token: string): InvokeLlmTask {
       return unavailable()
     }
   }
+}
+
+function requestBody(input: Readonly<Record<string, JsonValue>>, mode: 'chat' | 'json'): Record<string, unknown> {
+  const model = record(input.model)
+  const messages = [
+    ...(input.messages == null ? [] : chatMessages(input.messages, (content) => content)),
+    ...chatMessages(input.template, (content) => render(content, input)),
+  ]
+  const body: Record<string, unknown> = {
+    messages,
+    model: typeof model.model == 'string' && model.model.length > 0 ? model.model : defaultModel,
+    ...(mode == 'json' ? { response_format: { type: 'json_object' } } : {}),
+  }
+  if (model.temperature != null) body.temperature = finite(model.temperature)
+  if (model.top_p != null) body.top_p = finite(model.top_p)
+  if (model.max_tokens != null) {
+    if (!Number.isSafeInteger(model.max_tokens) || Number(model.max_tokens) <= 0) throw new TypeError('Invalid LLM max_tokens.')
+    body.max_tokens = model.max_tokens
+  }
+  return body
 }
 
 function record(value: unknown): Record<string, unknown> {
