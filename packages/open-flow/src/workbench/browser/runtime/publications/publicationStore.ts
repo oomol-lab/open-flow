@@ -15,9 +15,9 @@ import type { SetNotice } from '../stores/workbenchNotice.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 
 import { derive, val } from 'value-enhancer'
+import { randomId } from '../../../../control/common/random.ts'
 import { ApiError } from '../api.ts'
 import { createI18n } from '../i18n.ts'
-import { randomId } from '../random.ts'
 import { Latest } from '../stores/latest.ts'
 import { errorNotice } from '../stores/workbenchNotice.ts'
 

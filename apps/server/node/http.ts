@@ -83,7 +83,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     context.set('requestId', requestId)
     await next()
     context.header('x-request-id', requestId)
-    if (trustworthyOrigin(new URL(context.req.url), context.req.header('host'))) context.header('cross-origin-opener-policy', 'same-origin')
+    context.header('cross-origin-opener-policy', 'same-origin')
     context.header('permissions-policy', 'camera=(), geolocation=(), microphone=()')
     context.header('referrer-policy', 'no-referrer')
     context.header('x-content-type-options', 'nosniff')
@@ -465,13 +465,6 @@ function withOrigin(headers: Headers, origin: string | undefined): void {
   ) {
     headers.append('vary', 'Origin')
   }
-}
-
-function trustworthyOrigin(url: URL, host = url.host): boolean {
-  if (url.protocol == 'https:') return true
-  if (url.protocol != 'http:') return false
-  const match = /^(localhost|127\.0\.0\.1|\[::1\])(?::(\d{1,5}))?$/i.exec(host)
-  return match != null && (match[2] == null || Number(match[2]) <= 65_535)
 }
 
 function requestHeader(request: Request, name: string): string | undefined {

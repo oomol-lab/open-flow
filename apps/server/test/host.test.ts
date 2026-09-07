@@ -34,14 +34,6 @@ it('uses a signed operator session, expires it on time or token rotation, and cl
     const anonymous = await app.request('/auth/session')
     expect(anonymous.headers.get('cache-control')).toBe('no-store')
     expect(anonymous.headers.get('cross-origin-opener-policy')).toBe('same-origin')
-    const untrusted = await app.request('http://server.local/auth/session')
-    expect(untrusted.headers.get('cross-origin-opener-policy')).toBeNull()
-    const proxied = await app.request('http://127.0.0.1/auth/session', { headers: { host: 'server.local' } })
-    expect(proxied.headers.get('cross-origin-opener-policy')).toBeNull()
-    const invalidHost = await app.request('http://127.0.0.1/auth/session', { headers: { host: 'attacker.com@localhost' } })
-    expect(invalidHost.headers.get('cross-origin-opener-policy')).toBeNull()
-    const invalidPath = await app.request('http://127.0.0.1/auth/session', { headers: { host: 'localhost/path' } })
-    expect(invalidPath.headers.get('cross-origin-opener-policy')).toBeNull()
     expect(anonymous.headers.get('permissions-policy')).toBe('camera=(), geolocation=(), microphone=()')
     expect(anonymous.headers.get('referrer-policy')).toBe('no-referrer')
     expect(anonymous.headers.get('x-content-type-options')).toBe('nosniff')
@@ -550,6 +542,20 @@ it('serves immutable assets and limits the SPA fallback to non-reserved HTML nav
     const withoutAssets = await apiOnly.request('/', { headers: { accept: 'text/html' } })
     expect(withoutAssets.status).toBe(404)
     expect(withoutAssets.headers.get('content-type')).toContain('application/json')
+  } finally {
+    await closeService(service)
+    await rm(directory, { force: true, recursive: true })
+  }
+})
+
+it('preserves opener isolation behind a TLS-terminating proxy', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-proxy-'))
+  const service = await openService(path.join(directory, 'open-flow.sqlite'))
+  try {
+    const response = await createServerApp(service).request('http://flow.example.com/auth/session', {
+      headers: { 'host': 'flow.example.com', 'x-forwarded-proto': 'https' },
+    })
+    expect(response.headers.get('cross-origin-opener-policy')).toBe('same-origin')
   } finally {
     await closeService(service)
     await rm(directory, { force: true, recursive: true })
