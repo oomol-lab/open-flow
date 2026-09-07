@@ -967,7 +967,8 @@ export class DesignerStore {
       const def = targetNode.getInputHandleDef(handle)
       if (def) {
         const sourceNode = await this.waitValueNode(source)
-        sourceNode?.setupHandle(def, targetNode.getInputFrom(handle))
+        if (sourceNode == null) return
+        sourceNode.setupHandle(def, targetNode.getInputFrom(handle))
         if (OutputNodeStore.is(targetNode)) {
           this.onConnect?.({
             from: { type: 'from_node', source: { node_id: source, output_handle: handle } },
