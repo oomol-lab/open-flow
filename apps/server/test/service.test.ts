@@ -5,22 +5,20 @@ import type { InvokeLlmTask } from '@oomol-lab/open-flow/runtime-contract'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import * as Effect from 'effect/Effect'
 import { TestClock } from 'effect/testing'
-import { execFile } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { promisify } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createServerApp } from '../node/http.ts'
 import { ServerService } from '../node/service.ts'
 import { Store } from '../node/store.ts'
 import { createConnectorHost } from './connectorHost.ts'
+import { childProcessId } from './processTree.ts'
 import { acceptRun, storeRevision } from './runFixture.ts'
 import { closeOpenServices, closeService, openService, startService } from './serviceFixture.ts'
 
 const directories: string[] = []
-const execFileAsync = promisify(execFile)
 const port = { jsonSchema: {}, nullable: false } as const
 
 afterEach(async () => {
@@ -1145,13 +1143,7 @@ describe('Server application service', () => {
     if (first.kind != 'accepted' || second.kind != 'accepted') throw new Error('Concurrent Run setup conflicted.')
 
     await started.promise
-    const { stdout } = await execFileAsync('ps', ['-A', '-o', 'pid=,ppid=,command='])
-    const executor = stdout
-      .split('\n')
-      .map((line) => /^(\s*\d+)\s+(\d+)\s+(.+)$/.exec(line))
-      .find((match) => match?.[2] == String(process.pid) && match[3].includes('--executor'))
-    if (executor == null) throw new Error('Runtime Executor process was not found.')
-    process.kill(Number(executor[1]), 'SIGKILL')
+    process.kill(await childProcessId(process.pid, '--executor'), 'SIGKILL')
 
     await service.waitForIdle()
     await vi.waitFor(() => expect(aborted).toBe(2))
