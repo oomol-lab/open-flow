@@ -101,6 +101,28 @@ describe('OOMOL LLM host', () => {
     })
   })
 
+  it('instructs JSON output even when the user prompt does not mention JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body))
+        const instructed = body.messages.some((message: { role: string; content: string }) => message.role == 'system' && message.content.includes('JSON'))
+        if (!instructed) return Response.json({ error: { message: 'Messages must contain JSON.' } }, { status: 400 })
+        expect(body.messages.at(-1)).toEqual({ role: 'user', content: "Hello, I'm Alex" })
+        expect(body.response_format).toEqual({ type: 'json_object' })
+        return Response.json({ choices: [{ message: { content: '{"greeting":"Hello, Alex"}' } }] })
+      }),
+    )
+    const input = { input: 'Alex', messages: null, model: { model: 'deepseek-v4-flash' }, template: [{ content: "Hello, I'm {{input}}", role: 'user' }] }
+    const llm = createLlm('https://llm.oomol.com', 'runtime-token')
+    await expect(llm({ input, invocationId: 'json-instruction', mode: 'json', signal: new AbortController().signal, version: 1 })).resolves.toEqual({
+      kind: 'completed',
+      value: { output: { greeting: 'Hello, Alex' } },
+      version: 1,
+    })
+    expect(input.template).toEqual([{ content: "Hello, I'm {{input}}", role: 'user' }])
+  })
+
   it('fails invalid structured output without exposing the response', async () => {
     vi.stubGlobal(
       'fetch',
