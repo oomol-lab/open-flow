@@ -4,33 +4,33 @@
   @extend %theme;
   color-scheme: dark;
 
-  --fill-1: #18191b;
-  --fill-2: #111113;
-  --fill-3: #212225;
-  --fill-4: #272a2d;
-  --fill-5: #2e3135;
-  --fill-6: #363a3f;
-  --fill-7: #43484e;
-  --border-1: #363a3f;
-  --border-2: #43484e;
-  --text-1: #777b84;
-  --text-2: #b0b4ba;
-  --text-3: #b0b4ba;
-  --text-4: #edeef0;
-  --text-5: #edeef0;
+  --fill-1: #242424;
+  --fill-2: #1c1c1c;
+  --fill-3: #2b2b2b;
+  --fill-4: #303030;
+  --fill-5: #363636;
+  --fill-6: #3c3c3c;
+  --fill-7: #484848;
+  --border-1: #3c3c3c;
+  --border-2: #484848;
+  --text-1: #858585;
+  --text-2: #ababab;
+  --text-3: #ababab;
+  --text-4: #eeeeee;
+  --text-5: #eeeeee;
 
-  --accent-soft: #34324f;
-  --accent-soft-hover: #3e3b5c;
-  --accent-foreground: #c2c0ff;
-  --canvas-grid: rgb(176 180 186 / 16%);
+  --accent-soft: #353535;
+  --accent-soft-hover: #424242;
+  --accent-foreground: #e0e0e0;
+  --canvas-grid: rgb(180 180 180 / 13%);
   --node-shadow: none;
-  --node-selected-shadow: 0 0 0 2px rgb(146 144 239 / 20%), 0 2px 6px rgb(0 0 0 / 20%);
+  --node-selected-shadow: 0 0 0 2px rgb(190 190 190 / 16%), 0 2px 6px rgb(0 0 0 / 20%);
   --node-error-selected-shadow: 0 0 0 2px rgb(204 62 68 / 24%), 0 2px 6px rgb(0 0 0 / 20%);
   --floating-control-shadow: 0 1px 3px rgb(0 0 0 / 16%);
 
-  --brand-color: var(--brand-4);
-  --brand-highlight-color: #9290ef;
-  --brand-hover-color: color-mix(in srgb, var(--brand-5) 50%, transparent);
+  --brand-color: #cccccc;
+  --brand-highlight-color: #b8b8b8;
+  --brand-hover-color: color-mix(in srgb, var(--brand-highlight-color) 20%, transparent);
   --ui-background: var(--fill-1);
   --ui-foreground: var(--text-5);
   --ui-card: var(--widget-popup-background);
@@ -76,7 +76,7 @@
   --widget-null-bg-color: #79c0ff33;
 
   --widget-border-color: var(--border-2);
-  --widget-border-highlight-color: #5a6169;
+  --widget-border-highlight-color: #747474;
   --widget-background: var(--fill-4);
   --widget-background-highlight-color: var(--fill-5);
   --widget-background-mask-highlight-color: #ffffff1a;
@@ -123,7 +123,7 @@
 
   --edge-string: #f9ae58;
   --edge-json: #9ca0df;
-  --edge-primitive: #9ca0df;
+  --edge-primitive: #737373;
   --edge-bin: #00d6b9;
   --edge-error: var(--seti-red);
   --flow-bg: var(--fill-2);

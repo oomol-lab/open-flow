@@ -12,7 +12,6 @@ import type {
   FlowDesignerViewWebhook,
 } from '../../../../designer/browser/graph/FlowDesigner/model.ts'
 import type { CreateSchemaEditorFn } from '../../../../designer/browser/services/designerService.ts'
-import type { FlowDisplayMode } from '../../../../designer/common/flowDisplay.ts'
 import type { GroupDividerDef } from '../../../../schema/index.ts'
 import type { ConditionOperator, JsonValue } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
@@ -32,6 +31,8 @@ import { Icon } from '../icons.tsx'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
 
 interface Props {
+  readonly runAction?: React.ReactNode
+  readonly inspectorContainer?: HTMLElement | null
   readonly addNodeOptions: readonly AddNodeOption[]
   readonly blocksOpen: boolean
   readonly disabled: boolean
@@ -66,7 +67,7 @@ interface Props {
   readonly onDeleteNodes: () => void
   readonly onDuplicate: (positions?: Readonly<Record<string, Point>>) => void
   readonly onMoveNodes: (positions: Readonly<Record<string, Point>>) => void
-  readonly onMoveViewport: (viewport: DesignerViewport, displayMode: FlowDisplayMode) => void
+  readonly onMoveViewport: (viewport: DesignerViewport) => void
   readonly onOpenBlocks: (opener?: HTMLButtonElement) => void
   readonly onOpenInspector: () => void
   readonly onOpenVariables: () => void
@@ -232,6 +233,8 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
     disabled,
     focusNodeRequest,
     inspectorOpen,
+    inspectorContainer,
+    runAction,
     model,
     onAddNode,
     onConnect,
@@ -426,6 +429,8 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
 
   const keyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (disabled || target == null) return
+    if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return
+    if (event.target instanceof Element && event.target.closest('[contenteditable="true"], [role="dialog"], .nokey')) return
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return
     const modifier = event.metaKey || event.ctrlKey
     if (!modifier && event.key.toLocaleLowerCase() == 'a') {
@@ -465,6 +470,48 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         isValidConnection={isValidConnection}
         language={language}
         model={model}
+        inspectorContainer={inspectorContainer}
+        toolbar={
+          <div className="designer-actions">
+            <Button
+              aria-expanded={blocksOpen}
+              disabled={disabled || target == null}
+              onClick={(event) => onOpenBlocks(event.currentTarget)}
+              size="sm"
+              title={t('designer.openBlocks')}
+              type="button"
+              variant="ghost"
+            >
+              <Icon data-icon="inline-start" name="plus" /> {t('designer.addNode')}
+            </Button>
+            {(selectedNodeIds.length > 0 || selectedEdge != null) && (
+              <Button
+                disabled={disabled}
+                onClick={() => {
+                  if (selectedNodeIds.length > 0) onDeleteNodes()
+                  else if (selectedEdge != null) onDeleteEdge(selectedEdge)
+                }}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                {t('designer.delete')}
+              </Button>
+            )}
+            <Button
+              aria-label={t('designer.toggleInspector')}
+              aria-expanded={inspectorOpen}
+              onClick={(event) => onToggleInspector(event.currentTarget)}
+              size="icon-sm"
+              title={t('designer.toggleInspector')}
+              type="button"
+              variant="ghost"
+            >
+              <Icon name="panel" />
+            </Button>
+            {runAction}
+          </div>
+        }
         onAddNode={async (itemId, position, connection) => {
           if (itemId == browseProviderTriggersId) {
             onOpenBlocks()
@@ -524,44 +571,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
           kind: t(target?.kind == 'subflow' ? 'common.subflow' : 'common.flow'),
         })}
       </Badge>
-      <div className="designer-actions designer-overlay top-right">
-        <Button
-          aria-expanded={blocksOpen}
-          disabled={disabled || target == null}
-          onClick={(event) => onOpenBlocks(event.currentTarget)}
-          size="default"
-          title={t('designer.openBlocks')}
-          type="button"
-          variant="outline"
-        >
-          <Icon data-icon="inline-start" name="plus" /> {t('designer.addNode')}
-        </Button>
-        {(selectedNodeIds.length > 0 || selectedEdge != null) && (
-          <Button
-            disabled={disabled}
-            onClick={() => {
-              if (selectedNodeIds.length > 0) onDeleteNodes()
-              else if (selectedEdge != null) onDeleteEdge(selectedEdge)
-            }}
-            size="default"
-            type="button"
-            variant="destructive"
-          >
-            {t('designer.delete')}
-          </Button>
-        )}
-        <Button
-          aria-label={t('designer.toggleInspector')}
-          aria-expanded={inspectorOpen}
-          onClick={(event) => onToggleInspector(event.currentTarget)}
-          size="icon"
-          title={t('designer.toggleInspector')}
-          type="button"
-          variant="outline"
-        >
-          <Icon name="panel" />
-        </Button>
-      </div>
       {target != null && model.nodes.length == 0 && (
         <div className="canvas-empty">
           <span className="empty-icon">

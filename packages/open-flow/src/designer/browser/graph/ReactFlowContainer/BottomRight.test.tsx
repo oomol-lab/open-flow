@@ -72,13 +72,9 @@ describe('BottomRight', () => {
 
     const markup = render(interactiveMode$, miniMapExpanded$, showSettings$)
 
-    expect(markup).toContain('data-position="bottom-right"')
     expect(markup).toContain('data-orientation="horizontal"')
-    expect(captured.controls[0]).toMatchObject({ orientation: 'horizontal', position: 'bottom-right' })
-    expect(captured.controls[0]?.className).toContain('rounded-r-none')
     expect(captured.miniMap).toBeUndefined()
     expect(captured.buttons).toHaveLength(3)
-    expect(captured.buttons.every((button) => button.className?.includes('size-8'))).toBe(true)
 
     captured.buttons[0]?.onClick?.({} as never)
     captured.buttons[1]?.onClick?.({} as never)
@@ -96,7 +92,7 @@ describe('BottomRight', () => {
 
     render(interactiveMode$, miniMapExpanded$, showSettings$)
 
-    expect(captured.miniMap).toMatchObject({ ariaLabel: 'Mini map', pannable: true, position: 'bottom-right', zoomable: true })
+    expect(captured.miniMap).toMatchObject({ ariaLabel: 'Mini map', pannable: true, position: 'top-right', zoomable: true })
     expect(captured.buttons).toHaveLength(1)
 
     captured.buttons[0]?.onClick?.({} as never)

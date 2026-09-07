@@ -64,6 +64,8 @@
     }
 
     .editor-grid > .context-panel {
+      margin: 0;
+      border-radius: 0;
       position: absolute;
       z-index: 6;
       inset: 0;

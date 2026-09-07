@@ -179,19 +179,21 @@ export function WorkspaceHeader({
           {workspaceLoading || draft == null ? null : <Icon name="check" size={16} />}
           <span>{t(`workspace.status.${displayedStatus}`)}</span>
         </span>
-        <span className="action-help" title={draftRunUnavailable}>
-          <Button
-            aria-controls="run-input-panel"
-            aria-expanded={runInputRequest?.source == 'draft'}
-            disabled={busy != null || invalid || subflow || runInputRequest != null}
-            onClick={onRunDraft}
-            size="default"
-            variant="outline"
-          >
-            <Icon data-icon="inline-start" name="play" />
-            {t(busy == 'run' ? 'workspace.starting' : 'workspace.runDraft')}
-          </Button>
-        </span>
+        {activeView != 'design' && (
+          <span className="action-help" title={draftRunUnavailable}>
+            <Button
+              aria-controls="run-input-panel"
+              aria-expanded={runInputRequest?.source == 'draft'}
+              disabled={busy != null || invalid || subflow || runInputRequest != null}
+              onClick={onRunDraft}
+              size="default"
+              variant="outline"
+            >
+              <Icon data-icon="inline-start" name="play" />
+              {t(busy == 'run' ? 'workspace.starting' : 'workspace.runDraft')}
+            </Button>
+          </span>
+        )}
         <span className="action-help publish-action" title={publishUnavailable}>
           <Button
             disabled={busy != null || invalid || subflow || live?.hasUnpublishedChanges == false}

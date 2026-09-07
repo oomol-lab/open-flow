@@ -325,12 +325,6 @@
     "zh-CN": "中文"
   },
   "miniMap": "小地图",
-  "flowDisplayMode": {
-    "detail": "详细",
-    "detailDescription": "显示完整节点、端口、编辑器和控件",
-    "overview": "概览",
-    "overviewDescription": "显示简化节点和只读连接"
-  },
   "settingsPanel": {
     "hide": "隐藏设置",
     "show": "显示设置"
@@ -549,7 +543,6 @@
       "connectorTokenOverride": "输入 Token 以创建本地覆盖",
       "connectorTokenUnchanged": "已保存的 Token 保持不变",
       "editor": "编辑器",
-      "defaultFlowDisplayMode": "设置打开 Flow 或 Subflow 时使用的显示模式。",
       "expandScriptletEditor": "默认展开新建小脚本的编辑器",
       "llm": "大语言模型",
       "llmApiKey": "API Key",
@@ -593,5 +586,43 @@
     "reload": "重新加载"
   },
   "zoomIn": "放大",
-  "zoomOut": "缩小"
+  "zoomOut": "缩小",
+  "canvasCard": {
+    "run": "运行",
+    "result": "结果",
+    "logs": "日志 {{count}}",
+    "files": "文件 {{count}}",
+    "images": "图片 {{count}}",
+    "started": "开始时间",
+    "previewUnavailable": "预览不可用",
+    "artifactMetadata": "当前记录包含文件元数据，未提供下载地址。",
+    "description": "用途说明",
+    "describe": "描述这一步要完成什么。",
+    "every": "每 {{value}} {{unit}}",
+    "status": {
+      "idle": "未开始",
+      "running": "运行中",
+      "success": "已完成",
+      "error": "失败",
+      "waiting": "等待处理",
+      "skipped": "已跳过"
+    },
+    "kind": {
+      "task": "任务",
+      "trigger": "触发器",
+      "condition": "条件判断",
+      "wait": "等待",
+      "subflow": "子流程",
+      "value": "设定值",
+      "input": "流程输入",
+      "output": "流程输出"
+    },
+    "units": {
+      "minute": "分钟",
+      "hour": "小时",
+      "day": "天",
+      "week": "周",
+      "month": "个月"
+    }
+  }
 }

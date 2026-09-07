@@ -78,9 +78,9 @@
   }
 }
 
-.switchingDisplayMode {
+.movingLayout {
   :global(.react-flow__node) {
-    transition: transform var(--display-mode-transition-duration) cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform var(--layout-transition-duration) cubic-bezier(0.22, 1, 0.36, 1);
   }
 }
 
@@ -89,7 +89,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .switchingDisplayMode :global(.react-flow__node) {
+  .movingLayout :global(.react-flow__node) {
     transition: none;
   }
 
@@ -121,4 +121,55 @@
   padding: 0;
   border: 1px solid var(--border-weak);
   box-shadow: 0 3px 8px var(--contextmenu-shadow);
+}
+
+.dock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px;
+  margin-bottom: 22px;
+  max-width: calc(100% - 32px);
+  border: 1px solid var(--ui-border);
+  border-radius: 20px;
+  background: var(--ui-popover);
+  box-shadow:
+    0 4px 6px rgb(0 0 0 / 3%),
+    0 12px 36px rgb(0 0 0 / 9%);
+}
+
+.flow .dockControls:global(.react-flow__controls) {
+  position: static;
+  transform: none;
+  display: flex;
+  gap: 3px;
+  margin: 0;
+  flex-shrink: 0;
+  :global(.react-flow__controls-button) {
+    border-radius: var(--ui-radius);
+  }
+}
+
+.dockActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 8px;
+  border-left: 1px solid var(--ui-border);
+}
+
+@container open-flow-workbench (max-width: 720px) {
+  .dock {
+    gap: 4px;
+    padding: 5px;
+    margin-bottom: 14px;
+  }
+  .dockControls :global(.react-flow__controls-button-zoom-in),
+  .dockControls :global(.react-flow__controls-button-zoom-out) {
+    display: none;
+  }
+  .dockActions {
+    gap: 3px;
+    padding-left: 5px;
+  }
 }

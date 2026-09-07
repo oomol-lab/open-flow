@@ -23,8 +23,10 @@ export interface HandleProps {
   ariaHidden?: React.AriaAttributes['aria-hidden']
 }
 
-export function Handle(props: HandleProps): React.ReactElement {
-  const Component = useHandleContext()?.Handle ?? HandleImpl
+export function Handle(props: HandleProps): React.ReactElement | null {
+  const context = useHandleContext()
+  if (context != null && context.Handle == null) return null
+  const Component = context?.Handle ?? HandleImpl
 
   const position = props.position ?? (props.type === 'input' ? 'left' : 'right')
 
@@ -69,7 +71,7 @@ export interface HandleImplProps extends React.AriaAttributes {
 export type HandleImpl = React.ComponentType<HandleImplProps>
 interface IHandleContext {
   // React Flow supplies its Handle component for drag recognition; the fallback renders a static handle.
-  readonly Handle: HandleImpl
+  readonly Handle: HandleImpl | null
 }
 
 export const HandleContext: React.Context<IHandleContext | null> = /*#__PURE__*/ createContext<IHandleContext | null>(null)

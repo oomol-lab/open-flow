@@ -9,7 +9,6 @@ import type {
   FlowDesignerViewTriggerField,
   FlowDesignerViewTriggerNode,
 } from '../../../designer/browser/graph/FlowDesigner/model.ts'
-import type { FlowDisplayMode } from '../../../designer/common/flowDisplay.ts'
 import type {
   ConnectorAction,
   ConnectorConnection,
@@ -27,7 +26,6 @@ import type {
 import type { DesignerTarget } from './designer/flowChanges.ts'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionView.ts'
 
-import { FLOW_DISPLAY_MODES } from '../../../designer/common/flowDisplay.ts'
 import { variableInputCompatible } from '../../../flow/common/semantics.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
@@ -154,20 +152,11 @@ export function targetPresentation(value: Readonly<Record<string, JsonValue>>, t
   return presentationTarget(designer, target)
 }
 
-function savedLayout(
-  value: Readonly<Record<string, JsonValue>>,
-  target: DesignerTarget,
-  displayMode: FlowDisplayMode,
-): Readonly<Record<string, JsonValue>> | undefined {
-  return record(record(targetPresentation(value, target)?.layouts)?.[displayMode])
-}
-
 function savedPositions(
   value: Readonly<Record<string, JsonValue>>,
   target: DesignerTarget,
 ): Readonly<Record<string, { readonly x: number; readonly y: number }>> {
   const current = targetPresentation(value, target)
-  const layouts = record(current?.layouts)
   const positions = (source: JsonValue | undefined): Readonly<Record<string, { readonly x: number; readonly y: number }>> => {
     return Object.fromEntries(
       Object.entries(record(source) ?? {}).flatMap(([nodeId, candidate]) => {
@@ -178,36 +167,19 @@ function savedPositions(
       }),
     )
   }
-  return {
-    ...positions(record(layouts?.overview)?.nodes),
-    ...positions(current?.nodes),
-    ...positions(record(layouts?.detail)?.nodes),
-  }
+  return positions(current?.nodes)
 }
 
-function optionalViewport(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget, displayMode: FlowDisplayMode): DesignerViewport | undefined {
-  const legacyViewport = displayMode == 'detail' ? targetPresentation(value, target)?.viewport : undefined
-  const viewport = record(savedLayout(value, target, displayMode)?.viewport ?? legacyViewport)
+function optionalViewport(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): DesignerViewport | undefined {
+  const viewport = record(targetPresentation(value, target)?.viewport)
   const x = finite(viewport?.x)
   const y = finite(viewport?.y)
   const zoom = finite(viewport?.zoom)
   return x == null || y == null || zoom == null || zoom <= 0 ? undefined : { x, y, zoom }
 }
 
-function savedViewport(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget, displayMode: FlowDisplayMode = 'detail'): DesignerViewport {
-  return optionalViewport(value, target, displayMode) ?? { x: 0, y: 0, zoom: 1 }
-}
-
-function savedLayouts(
-  value: Readonly<Record<string, JsonValue>>,
-  target: DesignerTarget,
-): Readonly<Record<string, { readonly viewport: { readonly x: number; readonly y: number; readonly zoom: number } }>> {
-  return Object.fromEntries(
-    FLOW_DISPLAY_MODES.flatMap((displayMode) => {
-      const viewport = optionalViewport(value, target, displayMode)
-      return viewport == null ? [] : [[displayMode, { viewport: { x: viewport.x, y: viewport.y, zoom: viewport.zoom } }]]
-    }),
-  )
+function savedViewport(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): DesignerViewport {
+  return optionalViewport(value, target) ?? { x: 0, y: 0, zoom: 1 }
 }
 
 function savedComments(
@@ -361,7 +333,7 @@ function runProjection(
   const active = run.status == 'queued' || run.status == 'starting' || run.status == 'running' || run.status == 'waiting'
   const nodes = new Map<string, FlowDesignerViewNodeRun>()
   if (run.status == 'waiting' && 'waiting' in run && run.waiting != null) {
-    nodes.set(run.waiting.nodeId, { status: 'waiting' })
+    nodes.set(run.waiting.nodeId, { runId: run.runId, status: 'waiting' })
   }
   const rootScopeId = events.find((event) => event.kind == 'run.started' && event.payload.flowId == revision.revision.flowId)?.payload.scopeId
   if (typeof rootScopeId != 'string') return { nodes, status: active ? 'running' : 'idle' }
@@ -372,7 +344,7 @@ function runProjection(
     const current = nodes.get(nodeId)
     switch (event.kind) {
       case 'node.started':
-        nodes.set(nodeId, { ...current, progress: 0, status: 'running' })
+        nodes.set(nodeId, { ...current, runId: run.runId, startedAt: event.createdAt, status: 'running' })
         break
       case 'node.progress': {
         const progress = event.payload.progress
@@ -380,13 +352,40 @@ function runProjection(
         break
       }
       case 'node.skipped':
-        nodes.set(nodeId, { status: 'idle', skipped: true })
+        nodes.set(nodeId, { ...current, runId: run.runId, status: 'idle', skipped: true })
         break
       case 'node.completed':
-        nodes.set(nodeId, { progress: 100, status: 'success', successCount: (current?.successCount ?? 0) + 1 })
+        nodes.set(nodeId, {
+          ...current,
+          runId: run.runId,
+          finishedAt: event.createdAt,
+          outputs: event.payload.outputs,
+          progress: 100,
+          status: 'success',
+          successCount: (current?.successCount ?? 0) + 1,
+        })
         break
       case 'node.failed':
-        nodes.set(nodeId, { ...current, status: 'error' })
+        nodes.set(nodeId, { ...current, runId: run.runId, finishedAt: event.createdAt, error: event.payload.error, status: 'error' })
+        break
+      case 'node.log':
+        nodes.set(nodeId, {
+          ...current,
+          runId: run.runId,
+          status: current?.status ?? 'idle',
+          logs: [
+            ...(current?.logs ?? []),
+            { message: String(event.payload.message ?? ''), level: String(event.payload.level ?? 'info'), time: event.createdAt },
+          ],
+        })
+        break
+      case 'node.artifact':
+        nodes.set(nodeId, {
+          ...current,
+          runId: run.runId,
+          status: current?.status ?? 'idle',
+          artifacts: [...(current?.artifacts ?? []), event.payload.artifact],
+        })
         break
     }
   }
@@ -821,7 +820,6 @@ export function designerGraph(
   }
   return {
     edges: edgeProjection.edges,
-    layouts: savedLayouts(presentation, target),
     nodes,
     ...(projectedRun.status == null ? {} : { runStatus: projectedRun.status }),
     viewport: savedViewport(presentation, target),
@@ -853,10 +851,10 @@ function replacePresentationTarget(
 function normalizedTarget(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): Record<string, JsonValue> {
   const normalized: Record<string, JsonValue> = {
     ...targetPresentation(value, target),
-    layouts: savedLayouts(value, target),
+    viewport: { ...savedViewport(value, target) },
     nodes: savedPositions(value, target),
   }
-  delete normalized.viewport
+  delete normalized.layouts
   return normalized
 }
 
@@ -933,19 +931,16 @@ export function setFlowViewport(
   value: Readonly<Record<string, JsonValue>>,
   target: DesignerTarget,
   viewport: DesignerViewport,
-  displayMode: FlowDisplayMode = 'detail',
 ): Readonly<Record<string, JsonValue>> {
-  const currentViewport = optionalViewport(value, target, displayMode)
+  const currentViewport = optionalViewport(value, target)
   if (currentViewport?.x == viewport.x && currentViewport.y == viewport.y && currentViewport.zoom == viewport.zoom) return value
   const designer = designerPresentation(value)
   const current = normalizedTarget(value, target)
-  const layouts = record(current.layouts) ?? {}
-  const layout = record(layouts[displayMode]) ?? {}
   return {
     ...value,
     designer: replacePresentationTarget(designer, target, {
       ...current,
-      layouts: { ...layouts, [displayMode]: { ...layout, viewport: { x: viewport.x, y: viewport.y, zoom: viewport.zoom } } },
+      viewport: { x: viewport.x, y: viewport.y, zoom: viewport.zoom },
     }),
   }
 }

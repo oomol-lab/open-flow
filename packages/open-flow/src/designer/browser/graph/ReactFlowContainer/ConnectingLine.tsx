@@ -5,7 +5,7 @@ import type { RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
 import type { HandleKind } from '../../components/handle.tsx'
 import type { GroupedInputHandleDef, GroupedOutputHandleDef } from '../../stores/node/constants.ts'
 
-import { getBezierPath } from '@xyflow/react'
+import { getSmoothStepPath } from '@xyflow/react'
 import { useMemo } from 'react'
 import { toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
 import { gradientToStroke } from '../../stores/edge/colors.ts'
@@ -28,13 +28,15 @@ export const ConnectionLine: React.FC<ConnectionLineComponentProps> = ({
 }: ConnectionLineComponentProps) => {
   const designerStore = useDesignerStore()
 
-  const [edgePath] = getBezierPath({
+  const [edgePath] = getSmoothStepPath({
     sourceX: fromX,
     sourceY: fromY,
     sourcePosition: fromPosition,
     targetX: toX,
     targetY: toY,
     targetPosition: toPosition,
+    borderRadius: 20,
+    offset: 32,
   })
 
   const isStartOutputHandle = rfStartHandle?.type !== 'target'
@@ -83,5 +85,5 @@ export const ConnectionLine: React.FC<ConnectionLineComponentProps> = ({
     return gradientToStroke(fromColor || toColor || 'primitive', toColor || fromColor || 'primitive', inverse)
   }, [fromColor, toColor, inverse])
 
-  return <path style={connectionLineStyle} fill="none" opacity={0.75} stroke={gradientColor} strokeWidth={3} d={edgePath} />
+  return <path style={connectionLineStyle} fill="none" opacity={0.75} stroke={gradientColor} strokeWidth={2} d={edgePath} />
 }

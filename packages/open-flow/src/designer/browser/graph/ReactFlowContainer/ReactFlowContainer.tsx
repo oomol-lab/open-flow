@@ -30,7 +30,6 @@ import type {
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { HandleName, NodeId } from '../../../../schema/index.ts'
-import type { FlowDisplayMode } from '../../../common/flowDisplay.ts'
 import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { PartialConnection, RFConnection, RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
 import type { HandleImpl } from '../../components/handle.tsx'
@@ -44,6 +43,7 @@ import {
   BackgroundVariant,
   ControlButton,
   Controls,
+  Panel,
   Handle,
   NodeToolbar,
   ReactFlow,
@@ -62,7 +62,6 @@ import { useVal } from 'use-value-enhancer'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { combine, derive } from 'value-enhancer'
 import { shallowPlainObjectEqual } from '../../../../base/common/equality.ts'
-import { buttonGroupVariants } from '../../../../ui/browser/button-group.tsx'
 import { Button, buttonVariants } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
@@ -84,7 +83,6 @@ import { getPaneRect, PaneRectContext } from '../Nodes/usePaneRect.ts'
 import { getAddItemId } from './addItemDrag.ts'
 import { BottomRight } from './BottomRight.tsx'
 import { ConnectionLine } from './ConnectingLine.tsx'
-import { DisplayModeToggle } from './DisplayModeToggle.tsx'
 import { HelperLines, useHelperLines } from './HelperLines/index.ts'
 import { GetPopupContainerContext, useGetStaticPopupContainer } from './useGetPopupContainer.ts'
 
@@ -96,8 +94,8 @@ const GRID_GAP: [number, number] = [20, 20]
 
 const PRO_OPTIONS = { hideAttribution: true }
 
-const DISPLAY_MODE_TRANSITION_DURATION = 200
-const DISPLAY_MODE_REFLOW_DELAY = DISPLAY_MODE_TRANSITION_DURATION + 100
+const LAYOUT_TRANSITION_DURATION = 200
+const LAYOUT_REFLOW_DELAY = LAYOUT_TRANSITION_DURATION + 100
 
 const GET_SIZE = (s: ReactFlowState): Dimensions => ({
   width: s.width,
@@ -113,7 +111,6 @@ export interface ReactFlowContainerProps {
   dark: boolean
   i18n: I18n
   miniMapExpanded$?: Val<boolean | undefined>
-  displayMode$?: Val<FlowDisplayMode>
   interactiveMode$: Val<InteractiveMode>
   editable: boolean
   nodeTypes?: NodeTypes
@@ -153,7 +150,7 @@ export interface ReactFlowContainerProps {
   ) => Promise<NodeId | undefined>
   onDropAddItem?: (itemId: string, position: XYPosition) => Promise<string | undefined> | string | undefined
   onRelayout?: () => void
-  onDisplayModeMeasured?: () => boolean | 'relayout'
+  onLayoutMeasured?: () => boolean | 'relayout'
   onFitView?: () => void
   onInstance?: (rf: ReactFlowInstance) => () => void
   onInit?: OnInit<RFNode<any>, RFEdge<any>>
@@ -164,6 +161,7 @@ export interface ReactFlowContainerProps {
   fitViewOptions?: FitViewOptions
   layoutMotion?: boolean
   dottedBackground?: boolean
+  toolbar?: React.ReactNode
   children?: React.ReactNode
 }
 
@@ -203,7 +201,7 @@ export const ReactFlowContainer: React.FC<ReactFlowContainerProps> = (props: Rea
 
 type FlowControlsProps = Pick<
   ReactFlowContainerProps,
-  'miniMapExpanded$' | 'displayMode$' | 'interactiveMode$' | 'showSettings$' | 'onRelayout' | 'onFitView' | 'dottedBackground' | 'layoutMotion'
+  'toolbar' | 'miniMapExpanded$' | 'interactiveMode$' | 'showSettings$' | 'onRelayout' | 'onFitView' | 'dottedBackground' | 'layoutMotion'
 > & { onBeforeFitView?: () => void }
 
 const selector = (s: ReactFlowState) => ({
@@ -230,73 +228,69 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
   return (
     <>
       {props.dottedBackground && <Background id={bgId} color="var(--canvas-grid)" gap={GRID_GAP} variant={BackgroundVariant.Dots} />}
-      <Controls
-        className={buttonGroupVariants({ orientation: 'vertical' })}
-        orientation="vertical"
-        showInteractive={false}
-        showFitView={false}
-        showZoom={false}
-      >
-        <ControlButton
-          className={cn(buttonVariants({ size: 'icon', variant: 'outline' }), styles.btnCtrl, 'react-flow__controls-button-zoom-in')}
-          data-slot="button"
-          onClick={() => rf.zoomIn()}
-          title={t('zoomIn')}
-          aria-label={t('zoomIn')}
-          disabled={maxZoomReached}
-        >
-          <i className="i-codicon:zoom-in" />
-        </ControlButton>
-        <ControlButton
-          className={cn(buttonVariants({ size: 'icon', variant: 'outline' }), styles.btnCtrl, 'react-flow__controls-button-zoom-out')}
-          data-slot="button"
-          onClick={() => rf.zoomOut()}
-          title={t('zoomOut')}
-          aria-label={t('zoomOut')}
-          disabled={minZoomReached}
-        >
-          <i className="i-codicon:zoom-out" />
-        </ControlButton>
-        <ControlButton
-          className={cn(buttonVariants({ size: 'icon', variant: 'outline' }), styles.btnCtrl, 'react-flow__controls-button-fit-view')}
-          data-slot="button"
-          onClick={() => {
-            props.onBeforeFitView?.()
-            // Wait for the node description height before fitting the view to avoid overlap.
-            setTimeout(() => {
-              rf.fitView({
-                ...fitViewOptions,
-                nodes: selectedNodes.length === 0 ? undefined : selectedNodes,
-              })
-              props.onFitView?.()
-            }, 100)
-          }}
-          title={t('fitView')}
-          aria-label={t('fitView')}
-        >
-          <i className="i-custom:screen" />
-        </ControlButton>
-        {props.onRelayout && (
+      <Panel position="bottom-center" className={styles.dock} data-canvas-control-scope>
+        <Controls className={styles.dockControls} orientation="horizontal" showInteractive={false} showFitView={false} showZoom={false}>
           <ControlButton
-            className={cn(buttonVariants({ size: 'icon', variant: 'outline' }), styles.btnCtrl, 'react-flow__controls-button-optimize')}
+            className={cn(buttonVariants({ size: 'icon', variant: 'ghost' }), styles.btnCtrl, 'react-flow__controls-button-zoom-in')}
+            data-slot="button"
+            onClick={() => rf.zoomIn()}
+            title={t('zoomIn')}
+            aria-label={t('zoomIn')}
+            disabled={maxZoomReached}
+          >
+            <i className="i-codicon:zoom-in" />
+          </ControlButton>
+          <ControlButton
+            className={cn(buttonVariants({ size: 'icon', variant: 'ghost' }), styles.btnCtrl, 'react-flow__controls-button-zoom-out')}
+            data-slot="button"
+            onClick={() => rf.zoomOut()}
+            title={t('zoomOut')}
+            aria-label={t('zoomOut')}
+            disabled={minZoomReached}
+          >
+            <i className="i-codicon:zoom-out" />
+          </ControlButton>
+          <ControlButton
+            className={cn(buttonVariants({ size: 'icon', variant: 'ghost' }), styles.btnCtrl, 'react-flow__controls-button-fit-view')}
             data-slot="button"
             onClick={() => {
-              props.onRelayout?.()
               props.onBeforeFitView?.()
               // Wait for the node description height before fitting the view to avoid overlap.
               setTimeout(() => {
-                rf.fitView(fitViewOptions)
+                rf.fitView({
+                  ...fitViewOptions,
+                  nodes: selectedNodes.length === 0 ? undefined : selectedNodes,
+                })
+                props.onFitView?.()
               }, 100)
             }}
-            title={t('optimize')}
-            aria-label={t('optimize')}
+            title={t('fitView')}
+            aria-label={t('fitView')}
           >
-            <i className="i-custom:layout" />
+            <i className="i-custom:screen" />
           </ControlButton>
-        )}
-      </Controls>
+          {props.onRelayout && (
+            <ControlButton
+              className={cn(buttonVariants({ size: 'icon', variant: 'ghost' }), styles.btnCtrl, 'react-flow__controls-button-optimize')}
+              data-slot="button"
+              onClick={() => {
+                props.onRelayout?.()
+                props.onBeforeFitView?.()
+                // Wait for the node description height before fitting the view to avoid overlap.
+                setTimeout(() => {
+                  rf.fitView(fitViewOptions)
+                }, 100)
+              }}
+              title={t('optimize')}
+              aria-label={t('optimize')}
+            >
+              <i className="i-custom:layout" />
+            </ControlButton>
+          )}
+        </Controls>
+        {props.toolbar != null && <div className={styles.dockActions}>{props.toolbar}</div>}
+      </Panel>
       <BottomRight miniMapExpanded$={props.miniMapExpanded$} interactiveMode$={props.interactiveMode$} showSettings$={props.showSettings$} />
-      {props.displayMode$ && <DisplayModeToggle displayMode$={props.displayMode$} />}
     </>
   )
 })
@@ -322,20 +316,11 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
   const rf = useReactFlow()
   const updateNodeInternals = useUpdateNodeInternals()
   const mounted = useRef(true)
-  const detailModeFrame = useRef(0)
-
-  const enterDetailMode = useCallback(
+  const editCanvas = useCallback(
     (action?: () => void) => {
-      if (!props.editable) return
-      if (props.displayMode$?.value != 'overview') {
-        action?.()
-        return
-      }
-      props.displayMode$.set('detail')
-      cancelAnimationFrame(detailModeFrame.current)
-      detailModeFrame.current = requestAnimationFrame(() => action?.())
+      if (props.editable) action?.()
     },
-    [props.displayMode$, props.editable],
+    [props.editable],
   )
 
   useLayoutEffect(() => props.onInstance?.(rf), [rf, props.onInstance])
@@ -343,7 +328,6 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
     mounted.current = true
     return () => {
       mounted.current = false
-      cancelAnimationFrame(detailModeFrame.current)
     }
   }, [])
   // https://github.com/xyflow/xyflow/issues/4263
@@ -396,20 +380,20 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
       setBlockQuickPickPanel({ position })
       request.onComplete?.()
     }
-    enterDetailMode(open)
-  }, [enterDetailMode, props.addNodeRequest, rf])
+    editCanvas(open)
+  }, [editCanvas, props.addNodeRequest, rf])
 
   useEffect(() => {
     const request = props.addItemRequest
     if (request == null) return
-    enterDetailMode(() => {
+    editCanvas(() => {
       const position = request.screenPosition == null ? request.position : rf.screenToFlowPosition(request.screenPosition)
       Promise.resolve(props.onDropAddItem?.(request.itemId, position)).then(request.onComplete, (error) => {
         console.error('Failed to add node.', error)
         request.onComplete?.(undefined)
       })
     })
-  }, [enterDetailMode, props.addItemRequest, props.onDropAddItem, rf])
+  }, [editCanvas, props.addItemRequest, props.onDropAddItem, rf])
 
   const onConnectEnd: OnConnectEnd = useCallback(
     (event, state) => {
@@ -451,7 +435,6 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
 
   const interactiveMode = useVal(props.interactiveMode$)
   const isMouse = interactiveMode === 'mouse'
-  const overview = useVal(props.displayMode$) == 'overview'
 
   const nodes = useVal(props.nodes$)
   const projectedEdges = useVal(props.edges$)
@@ -462,8 +445,8 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
     }
   }, [props.onBeforeDelete, props.onNodesChange, selectedNodes])
   const edgeTopology = useMemo(
-    () => JSON.stringify([overview, projectedEdges.map((edge) => [edge.id, edge.source, edge.sourceHandle, edge.target, edge.targetHandle])]),
-    [overview, projectedEdges],
+    () => JSON.stringify([projectedEdges.map((edge) => [edge.id, edge.source, edge.sourceHandle, edge.target, edge.targetHandle])]),
+    [projectedEdges],
   )
   const [readyEdgeTopology, setReadyEdgeTopology] = useState(() => (projectedEdges.length == 0 ? edgeTopology : ''))
   useEffect(() => {
@@ -473,15 +456,15 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
   const edges = readyEdgeTopology == edgeTopology ? projectedEdges : []
   const nodeIdsRef = useRef<string[]>([])
   nodeIdsRef.current = nodes.map((node) => node.id)
-  const displayModeMounted = useRef(false)
-  const [switchingDisplayMode, setSwitchingDisplayMode] = useState(false)
+  const layoutMounted = useRef(false)
+  const [movingLayout, setMovingLayout] = useState(false)
   const [fittingView, setFittingView] = useState(false)
-  const [layoutReady, setLayoutReady] = useState(props.layoutMotion !== false || props.onDisplayModeMeasured == null)
+  const [layoutReady, setLayoutReady] = useState(props.layoutMotion !== false || props.onLayoutMeasured == null)
   const onBeforeFitView = useCallback(() => setFittingView(true), [])
 
   useLayoutEffect(() => {
-    setLayoutReady(props.layoutMotion !== false || props.onDisplayModeMeasured == null)
-  }, [overview, props.layoutMotion, props.onDisplayModeMeasured])
+    setLayoutReady(props.layoutMotion !== false || props.onLayoutMeasured == null)
+  }, [props.layoutMotion, props.onLayoutMeasured])
 
   useEffect(() => {
     let active = true
@@ -490,7 +473,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
     let fitTimer: ReturnType<typeof setTimeout> | undefined
     let attempts = 0
     const completeLayout = () => {
-      const result = props.onDisplayModeMeasured?.()
+      const result = props.onLayoutMeasured?.()
       if (result === false && attempts++ < 5) {
         measurementFrame = requestAnimationFrame(completeLayout)
       } else if (result === 'relayout') {
@@ -501,7 +484,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             if (!active) return
             readyFrame = requestAnimationFrame(() => setLayoutReady(true))
           },
-          props.layoutMotion === false ? 0 : DISPLAY_MODE_REFLOW_DELAY,
+          props.layoutMotion === false ? 0 : LAYOUT_REFLOW_DELAY,
         )
       } else {
         setLayoutReady(true)
@@ -513,11 +496,11 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
     })
     let transitionTimer: ReturnType<typeof setTimeout> | undefined
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (displayModeMounted.current && props.layoutMotion !== false && !reduceMotion) {
-      setSwitchingDisplayMode(true)
-      transitionTimer = setTimeout(() => setSwitchingDisplayMode(false), DISPLAY_MODE_TRANSITION_DURATION)
+    if (layoutMounted.current && props.layoutMotion !== false && !reduceMotion) {
+      setMovingLayout(true)
+      transitionTimer = setTimeout(() => setMovingLayout(false), LAYOUT_TRANSITION_DURATION)
     } else {
-      displayModeMounted.current = true
+      layoutMounted.current = true
     }
     setEdgeContextMenu(null)
     setBlockQuickPickPanel(null)
@@ -529,7 +512,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
       if (fitTimer) clearTimeout(fitTimer)
       if (transitionTimer) clearTimeout(transitionTimer)
     }
-  }, [onBeforeFitView, overview, props.layoutMotion, props.onDisplayModeMeasured, rf, updateNodeInternals])
+  }, [onBeforeFitView, props.layoutMotion, props.onLayoutMeasured, rf, updateNodeInternals])
 
   const viewport = useVal(props.viewport$)
   const nonEmptyViewport = useRef(viewport)
@@ -586,7 +569,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
       if (itemId != '' && props.onDropAddItem != null) {
         event.preventDefault()
         const screenPosition = { x: event.clientX, y: event.clientY }
-        enterDetailMode(() => props.onDropAddItem?.(itemId, rf.screenToFlowPosition(screenPosition)))
+        editCanvas(() => props.onDropAddItem?.(itemId, rf.screenToFlowPosition(screenPosition)))
         restoreFlowFocus(event)
         return
       }
@@ -614,7 +597,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
 
       const screenPosition = { x: event.clientX, y: event.clientY }
 
-      enterDetailMode(() => {
+      editCanvas(() => {
         const zoom = rf.getZoom()
         const position = rf.screenToFlowPosition({
           x: screenPosition.x - 100 * zoom,
@@ -624,7 +607,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
       })
       restoreFlowFocus(event)
     },
-    [enterDetailMode, rf, props.onAddNode, props.onDropAddItem],
+    [editCanvas, rf, props.onAddNode, props.onDropAddItem],
   )
 
   const queue = useMemo(() => new NodePlaceholderQueue(), [])
@@ -640,11 +623,11 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             interactiveMode,
             fittingView && FITTING_VIEW_CLASSNAME,
             !layoutReady && styles.layoutPending,
-            switchingDisplayMode && styles.switchingDisplayMode,
+            movingLayout && styles.movingLayout,
           )}
           style={
             {
-              '--display-mode-transition-duration': `${props.layoutMotion === false ? 0 : DISPLAY_MODE_TRANSITION_DURATION}ms`,
+              '--layout-transition-duration': `${props.layoutMotion === false ? 0 : LAYOUT_TRANSITION_DURATION}ms`,
             } as React.CSSProperties
           }
           colorMode={props.dark ? 'dark' : 'light'}
@@ -656,15 +639,15 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           edges={edges}
           onBeforeDelete={props.onBeforeDelete}
           onNodesChange={onNodesChange}
-          onEdgesChange={overview ? undefined : props.onEdgesChange}
+          onEdgesChange={props.onEdgesChange}
           fitView={reactFlowFitView}
           fitViewOptions={props.fitViewOptions}
           viewport={viewport}
           onViewportChange={onViewportChange}
           maxZoom={3}
           minZoom={0.1}
-          nodesConnectable={!overview && editable && props.onConnect != null}
-          onEdgeContextMenu={overview ? undefined : (event, edge) => (event.preventDefault(), setEdgeContextMenu({ edge, event }))}
+          nodesConnectable={editable && props.onConnect != null}
+          onEdgeContextMenu={(event, edge) => (event.preventDefault(), setEdgeContextMenu({ edge, event }))}
           onSelectionContextMenu={(event, selectionNodes) => (event.preventDefault(), setSelectionContextMenu({ nodes: selectionNodes, event }))}
           onPaneContextMenu={(event) => {
             event.preventDefault()
@@ -674,15 +657,15 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             }
             setPaneContextMenu(rf.screenToFlowPosition(paneContextMenuScreen.current))
           }}
-          onConnectEnd={overview ? undefined : onConnectEnd}
+          onConnectEnd={onConnectEnd}
           isValidConnection={props.isValidConnection}
-          onConnect={!overview && editable ? props.onConnect : undefined}
+          onConnect={editable ? props.onConnect : undefined}
           onDragOver={editable && (props.onAddNode != null || props.onDropAddItem != null) ? handleDragOver : undefined}
           onDrop={editable && (props.onAddNode != null || props.onDropAddItem != null) ? onDrop : undefined}
           onMoveEnd={props.onMoveEnd}
           onNodeDragStop={props.onNodeDragStop}
           onSelectionChange={props.onSelectionChange}
-          onFocus={() => setRfFocused(true)}
+          onFocus={(event) => setRfFocused(event.currentTarget.contains(event.target))}
           onBlur={() => setRfFocused(false)}
           deleteKeyCode={editable && focused && (props.canDeleteNodes ?? true) ? ['Backspace', 'Delete'] : null}
           /* React Flow can leave the Meta key active after the browser releases it. */
@@ -701,13 +684,13 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
         >
           {(props.canDeleteNodes ?? true) && <SelectionFloatBar nodes={selectedNodes} onDelete={deleteSelectedNodes} duplicateNodes={props.duplicateNodes} />}
           <FlowControls
+            toolbar={props.toolbar}
             showSettings$={props.showSettings$}
             miniMapExpanded$={props.miniMapExpanded$}
-            displayMode$={props.displayMode$}
             interactiveMode$={props.interactiveMode$}
             layoutMotion={props.layoutMotion}
             onBeforeFitView={onBeforeFitView}
-            onRelayout={overview ? undefined : props.onRelayout}
+            onRelayout={props.onRelayout}
             onFitView={props.onFitView}
             dottedBackground={props.dottedBackground}
           />
@@ -754,7 +737,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
                   props.provideAddNodeMenuItems &&
                   (() => {
                     const screenPosition = paneContextMenuScreen.current
-                    enterDetailMode(() =>
+                    editCanvas(() =>
                       setBlockQuickPickPanel({
                         position: screenPosition == null ? paneContextMenu : rf.screenToFlowPosition(screenPosition),
                       }),

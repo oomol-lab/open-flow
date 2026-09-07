@@ -90,13 +90,11 @@ export class SubflowDesignerStore extends DesignerStore {
 
     const rfNodes = this.dispose.add(this.deriveRFNodes(this.$.rfNodes, this.$$.viewMode, props))
     const rfEdges = this.dispose.add(this.deriveRFEdges(this.$.rfEdges, this.$$.viewMode))
-    const renderedRFEdges = this.dispose.add(this.deriveRFEdges(this.$.renderedRFEdges, this.$$.viewMode))
 
     Object.assign(this.$, {
       viewMode: this.$$.viewMode,
       rfNodes,
       rfEdges,
-      renderedRFEdges,
       nodeMiniMapPhase: this.dispose.add(this.deriveNodeMiniMapPhase(this.$.nodeMiniMapPhase, this.$$.viewMode)),
       forwardPreviewOptions: this.dispose.add(this.deriveForwardPreviewOptions(this.$.nodes, props.display$)),
     } satisfies Partial<SubflowDesignerStore$>)

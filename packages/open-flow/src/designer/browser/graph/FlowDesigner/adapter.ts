@@ -1,6 +1,5 @@
 import type { Val } from 'value-enhancer'
 import type { HandleName, NodeId } from '../../../../schema/index.ts'
-import type { FlowDisplayMode } from '../../../common/flowDisplay.ts'
 import type { CreateSchemaEditorFn } from '../../services/designerService.ts'
 import type { IAddNodeMenuItem, IFromSource, InteractiveMode } from '../../stores/designer/designer.store.ts'
 import type { FlowRunStatus } from '../../stores/designer/typings.ts'
@@ -136,7 +135,6 @@ export class FlowDesignerViewAdapter {
     this.store = new FlowDesignerStore({
       connections: this.#connections,
       readonly: !editable,
-      displayMode: val<FlowDisplayMode>('overview'),
       lang$: this.#language,
       rfCommand: createRFCommand(nodes),
       designerUIStore,
@@ -228,7 +226,7 @@ export class FlowDesignerViewAdapter {
     this.store.dispose.add(commentNodes)
     this.store.dispose.add(this.#language)
     this.#syncModel(model)
-    designerUIStore.loadDesignerUIData({ layouts: model.layouts }, 'overview')
+    designerUIStore.loadDesignerUIData({ viewport: model.viewport })
     if (!autoLayout) designerUIStore.completeActiveLayout()
   }
 

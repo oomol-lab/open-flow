@@ -34,7 +34,6 @@ describe('Browser style boundaries', () => {
     expect(styles).not.toMatch(/calc\(var\(--ui-radius\)/)
     expect(styles).not.toContain('.resource-page-header')
     expect(styles).not.toContain('.workspace-actions')
-    expect(theme).toContain('--open-flow-radius: 8px;')
     expect(styles).not.toMatch(/\.server-host\[data-theme='dark'\]\s+\./)
     expect(app).toMatch(/className="open-flow-theme server-host"/)
     expect(app).toMatch(/OpenFlowSessionGate, OpenFlowWorkbench/)

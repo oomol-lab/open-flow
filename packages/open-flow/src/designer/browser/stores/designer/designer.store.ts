@@ -6,13 +6,11 @@ import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { ReactiveMap, ReadonlyReactiveMap } from 'value-enhancer/collections'
 import type { LocaleTextStore } from '../../../../localization/common/localization.ts'
 import type { HandleName, NodeId } from '../../../../schema/index.ts'
-import type { FlowDisplayMode } from '../../../common/flowDisplay.ts'
 import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { RFConnection, RFEdge, RFNode, RFNodeId } from '../../base/rfHelpers.ts'
 import type { ToReadonly$Group } from '../../base/val.ts'
 import type { TranslateKeyEvent, UserLocalesContext } from '../../components/userLocales.tsx'
 import type { EdgeStore } from '../edge/edge.store.ts'
-import type { RenderedRFEdge } from '../edge/overviewEdges.ts'
 import type { ManifestConnection } from '../edge/typings.ts'
 import type { ConnectorConnectionStore } from './connectorConnection.store.ts'
 import type { DesignerUIStore } from './designerUI.store.ts'
@@ -36,7 +34,7 @@ import { InputSectionStore } from '../node/nodeSection/inputSection.store.ts'
 import { OutputSectionStore } from '../node/nodeSection/outputSection.store.ts'
 import { SubflowNodeStore } from '../node/subflowNode.store.ts'
 import { HandleRowStore } from '../nodeHandle/handleRow.store.ts'
-import { getNodeMinimap, NodeMiniMapPhase } from './nodeMiniMap.ts'
+import { NodeMiniMapPhase } from './nodeMiniMap.ts'
 
 export type IAddNodeMenuItem =
   | {
@@ -102,14 +100,9 @@ export interface IFromSource {
 
 export type InteractiveMode = 'mouse' | 'touchpad'
 
-export interface OverviewConnectedNodes {
-  readonly inputs: ReadonlySet<RFNodeId>
-  readonly outputs: ReadonlySet<RFNodeId>
-}
-
 export interface RFGraph {
   readonly nodes: RFNode[]
-  readonly edges: RenderedRFEdge[]
+  readonly edges: RFEdge[]
 }
 
 export interface DesignerStore$$ {
@@ -119,7 +112,6 @@ export interface DesignerStore$$ {
   readonly viewport: DesignerStoreProps['viewport']
   readonly miniMapExpanded: DesignerStoreProps['miniMapExpanded']
   readonly interactiveMode: Val<InteractiveMode>
-  readonly displayMode: Val<FlowDisplayMode>
 
   /** Nodes persisted in flow.oo.yaml, excluding virtual input and output nodes. */
   readonly nodes: ReactiveMap<NodeId, NodeStore>
@@ -143,8 +135,6 @@ export interface DesignerStore$ extends ToReadonly$Group<DesignerStore$$> {
 
   readonly rfNodes: ReadonlyVal<RFNode[]>
   readonly rfEdges: ReadonlyVal<RFEdge[]>
-  readonly renderedRFEdges: ReadonlyVal<RenderedRFEdge[]>
-  readonly overviewConnectedNodes: ReadonlyVal<OverviewConnectedNodes>
 
   readonly runStatus: ReadonlyVal<FlowRunStatus>
 
@@ -165,7 +155,6 @@ export interface DesignerStoreProps {
   readonly rfCommand: RFCommand
   readonly miniMapExpanded: Val<boolean | undefined>
   readonly interactiveMode: Val<InteractiveMode>
-  readonly displayMode?: Val<FlowDisplayMode>
   readonly viewport: Val<Viewport | undefined>
   readonly settingsPanelWidth: Val<number | undefined>
   readonly connectorConnections?: ConnectorConnectionStore
@@ -287,9 +276,7 @@ export class DesignerStore {
   public readonly userLocalesContext: UserLocalesContext
 
   private disposed = false
-  private pendingDisplayModeLayout: FlowDisplayMode | undefined
-  private displayModeLayoutMeasurementAttempts = 0
-  private activeDisplayMode: FlowDisplayMode
+  private layoutMeasurementAttempts = 0
 
   public constructor(type: DesignerType, editable: boolean, props: DesignerStoreProps) {
     this.dispose.add(() => {
@@ -334,17 +321,14 @@ export class DesignerStore {
       miniMapExpanded: this.dispose.add(props.miniMapExpanded),
       viewport: this.dispose.add(props.viewport),
       interactiveMode: this.dispose.add(props.interactiveMode),
-      displayMode: this.dispose.add(props.displayMode ?? val<FlowDisplayMode>('detail')),
       nodes,
       pseudoNodes,
       commentNodes,
       showSettings: this.dispose.add(val(false)),
       settingsPanelWidth: this.dispose.add(props.settingsPanelWidth),
     }
-    this.activeDisplayMode = this.$$.displayMode.value
 
     const rfNodes = this.dispose.add(compute((get) => [...(get(commentNodes?.$)?.values() ?? []), ...get(nodes.$).values()].map((node) => get(node.$.rfNode))))
-    const renderedRFEdges = rfEdges
 
     this.$ = {
       ...this.$$,
@@ -373,23 +357,7 @@ export class DesignerStore {
       ),
       rfNodes,
       rfEdges,
-      renderedRFEdges,
-      overviewConnectedNodes: this.dispose.add(
-        compute((get) => {
-          const inputs = new Set<RFNodeId>()
-          const outputs = new Set<RFNodeId>()
-          for (const edge of get(rfEdges)) {
-            inputs.add(edge.target as RFNodeId)
-            outputs.add(edge.source as RFNodeId)
-          }
-          return { inputs, outputs }
-        }),
-      ),
-      nodeMiniMapPhase: this.dispose.add(
-        compute((get) =>
-          get(this.$$.displayMode) == 'overview' ? NodeMiniMapPhase.None : getNodeMinimap(get(this.$$.nodes.$).size, get(this.$$.viewport)?.zoom || 1),
-        ),
-      ),
+      nodeMiniMapPhase: this.dispose.add(val(NodeMiniMapPhase.None)),
       variableInputs: this.dispose.add(props.variableInputs ?? val(new Map())),
       variableNames: this.dispose.add(props.variableNames ?? val([])),
       variableNamesLoaded: this.dispose.add(props.variableNamesLoaded ?? val(false)),
@@ -401,51 +369,24 @@ export class DesignerStore {
       userLocales: this.userLocales,
       onDidChangeTranslateKey: this.onDidChangeTranslateKey,
     }
-
-    this.dispose.add(
-      this.$.displayMode.reaction((mode) => {
-        this.applyDisplayMode(mode)
-      }),
-    )
-  }
-
-  public switchDisplayMode(mode: FlowDisplayMode): void {
-    this.applyDisplayMode(mode)
-    this.$$.displayMode.set(mode)
-  }
-
-  private applyDisplayMode(mode: FlowDisplayMode): void {
-    if (mode == this.activeDisplayMode) return
-    const restored = this.designerUIStore.switchDisplayMode(this.activeDisplayMode, mode)
-    this.pendingDisplayModeLayout = restored ? undefined : mode
-    this.displayModeLayoutMeasurementAttempts = 0
-    this.activeDisplayMode = mode
-    if (mode == 'overview') {
-      for (const edgeStore of this.$.edges.value) edgeStore.$$.selected.set(undefined)
-    }
   }
 
   /** Initializes the shared layout after React Flow has measured the nodes. */
-  public completeDisplayModeLayout = (): boolean | 'relayout' => {
-    const pending = this.pendingDisplayModeLayout
-    const currentMode = this.$.displayMode.value
-    if (pending && pending !== currentMode) return true
-    if (!pending && this.designerUIStore.isActiveLayoutInitialized()) return true
+  public completeLayout = (): boolean | 'relayout' => {
+    if (this.designerUIStore.isActiveLayoutInitialized()) return true
     const nodes = this.allLayoutNodes()
     if (nodes.length === 0) return true
     for (const node of nodes) {
       const measured = node.$.measured.value
       if (!measured?.width || !measured.height) {
-        if (this.displayModeLayoutMeasurementAttempts++ < 5) return false
-        this.pendingDisplayModeLayout = undefined
-        this.displayModeLayoutMeasurementAttempts = 0
+        if (this.layoutMeasurementAttempts++ < 5) return false
+        this.layoutMeasurementAttempts = 0
         this.designerUIStore.completeActiveLayout()
         return true
       }
     }
     this.doRelayout()
-    this.pendingDisplayModeLayout = undefined
-    this.displayModeLayoutMeasurementAttempts = 0
+    this.layoutMeasurementAttempts = 0
     this.designerUIStore.completeActiveLayout()
     return 'relayout'
   }

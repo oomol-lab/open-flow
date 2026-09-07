@@ -6,7 +6,7 @@ import type { FlowRunStatus } from '../../../stores/designer/typings.ts'
 import type { NodeStore, NodeStoreDisplay$ } from '../../../stores/node/node.store.ts'
 
 import { NodeToolbar, useStoreApi, useViewport } from '@xyflow/react'
-import { memo } from 'react'
+import { memo, useContext } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../../ui/browser/button.tsx'
@@ -25,6 +25,7 @@ import { ErrorNodeStore } from '../../../stores/node/errorNode.store.ts'
 import { SubflowNodeStore } from '../../../stores/node/subflowNode.store.ts'
 import { TaskNodeStore, toTaskNodeStore } from '../../../stores/node/taskNode.store.ts'
 import { useDesignerStore } from '../../DesignerStoreContext.tsx'
+import { CanvasContext } from '../../FlowDesigner/CanvasContext.ts'
 import { useGetStaticPopupContainer } from '../../ReactFlowContainer/useGetPopupContainer.ts'
 import { useSubflowViewMode } from '../../SubflowDesigner/SubflowViewModeContext.ts'
 import { useNodeStore } from '../NodeStoreContext.tsx'
@@ -74,7 +75,8 @@ function InFlowDesigner({ designerStore }: SharedProps) {
 
   const onOpenBlockDesigner = sharedBlockNodeStore?.openBlockDesigner
   const onOpenSharedTaskSource = taskNodeStore?.openSharedTaskSource
-  const onToggleSettings = toggle(nodeStore.$$.showSettings)
+  const view = useContext(CanvasContext)
+  const onToggleSettings = view == null ? toggle(nodeStore.$$.showSettings) : undefined
 
   const onDelete = toTrue(editable) && (() => designerStore.deleteNodes([nodeStore]))
   const items = getContextMenuItems({
@@ -175,7 +177,8 @@ export function NodeHeadContextMenu({ designerStore, children }: NodeHeadContext
 
   const onOpenBlockDesigner = sharedBlockNodeStore?.openBlockDesigner
   const onOpenSharedTaskSource = taskNodeStore?.openSharedTaskSource
-  const onToggleSettings = toggle(nodeStore.$$.showSettings)
+  const view = useContext(CanvasContext)
+  const onToggleSettings = view == null ? toggle(nodeStore.$$.showSettings) : undefined
 
   const onDelete = toTrue(editable && designerStore.canDeleteNodes && !isInBlock) && (() => designerStore.deleteNodes([nodeStore]))
   const items = getContextMenuItems({
@@ -347,7 +350,8 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
   const getPopupContainer = useGetStaticPopupContainer()
 
   const onOpenSharedTaskSource = taskNodeStore?.openSharedTaskSource
-  const onToggleSettings = toggle(nodeStore.$$.showSettings)
+  const view = useContext(CanvasContext)
+  const onToggleSettings = view == null ? toggle(nodeStore.$$.showSettings) : undefined
 
   const items = getContextMenuItems({
     t,

@@ -33,7 +33,7 @@ export const BottomRight: React.FC<BottomRightProps> = /* @__PURE__ */ memo(func
         <Controls
           className={buttonGroupVariants({ orientation: 'horizontal' })}
           orientation="horizontal"
-          position="bottom-right"
+          position="top-right"
           showFitView={false}
           showInteractive={false}
           showZoom={false}
@@ -75,11 +75,11 @@ export const BottomRight: React.FC<BottomRightProps> = /* @__PURE__ */ memo(func
       )}
       {props.miniMapExpanded$ && miniMapExpanded && (
         <>
-          <RFMiniMap ariaLabel={t('miniMap')} className={styles.miniMap} pannable position="bottom-right" zoomable />
+          <RFMiniMap ariaLabel={t('miniMap')} className={styles.miniMap} pannable position="top-right" zoomable />
           <Controls
             className={cn(buttonGroupVariants({ orientation: 'horizontal' }), styles.miniMapToggle)}
             orientation="horizontal"
-            position="bottom-right"
+            position="top-right"
             showFitView={false}
             showInteractive={false}
             showZoom={false}

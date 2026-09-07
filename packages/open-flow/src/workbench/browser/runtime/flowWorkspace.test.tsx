@@ -42,6 +42,7 @@ function renderWorkspace(busy?: string) {
   const store = {
     $: {
       busy: value(busy),
+      diagnostics: value(undefined),
       designer: value({ nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }),
       selectedDesignerNode: value(undefined),
     },
@@ -60,7 +61,7 @@ function renderWorkspace(busy?: string) {
     requestDraftRun: vi.fn().mockResolvedValue('started'),
     requestLiveRun: vi.fn().mockResolvedValue('started'),
     runRequests: {
-      $: { submitting: value(undefined) },
+      $: { submitting: value(undefined), inputRequest: value(undefined) },
       dismissInputs: vi.fn(),
     },
     runs: { $: { externalRunId: value(undefined) } },

@@ -2,7 +2,8 @@
   overflow: hidden;
 
   &:has(:global([data-slot='combobox-content'])),
-  &:has(:global(.react-flow__handle)) {
+  &:has(:global(.react-flow__handle)),
+  :global([data-node-editor]) & {
     overflow: visible;
   }
 }

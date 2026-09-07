@@ -5,26 +5,26 @@
   color-scheme: light;
 
   --fill-1: #ffffff;
-  --fill-2: #fcfcfd;
-  --fill-3: #f9f9fb;
-  --fill-4: #f0f0f3;
-  --fill-5: #e8e8ec;
-  --fill-6: #e0e1e6;
-  --fill-7: #d9d9e0;
-  --border-1: #d9d9e0;
-  --border-2: #cdced6;
-  --text-1: #80838d;
-  --text-2: #60646c;
-  --text-3: #60646c;
-  --text-4: #1c2024;
-  --text-5: #1c2024;
+  --fill-2: #fafafa;
+  --fill-3: #f6f6f6;
+  --fill-4: #eeeeee;
+  --fill-5: #e7e7e7;
+  --fill-6: #e3e3e3;
+  --fill-7: #dedede;
+  --border-1: #dedede;
+  --border-2: #d2d2d2;
+  --text-1: #858585;
+  --text-2: #6b6b6b;
+  --text-3: #6b6b6b;
+  --text-4: #242424;
+  --text-5: #242424;
 
-  --accent-soft: #ecebff;
-  --accent-soft-hover: #e3e2fb;
-  --accent-foreground: #5753b8;
-  --canvas-grid: rgb(96 100 108 / 16%);
+  --accent-soft: #ededed;
+  --accent-soft-hover: #e3e3e3;
+  --accent-foreground: #333333;
+  --canvas-grid: rgb(100 100 100 / 14%);
   --node-shadow: none;
-  --node-selected-shadow: 0 0 0 2px rgb(125 127 233 / 16%), 0 2px 6px rgb(28 32 36 / 5%);
+  --node-selected-shadow: 0 0 0 2px rgb(70 70 70 / 12%), 0 2px 6px rgb(0 0 0 / 5%);
   --node-error-selected-shadow: 0 0 0 2px rgb(204 62 68 / 14%), 0 2px 6px rgb(28 32 36 / 5%);
   --floating-control-shadow: 0 1px 3px rgb(28 32 36 / 4%);
 
@@ -50,9 +50,9 @@
   --ui-ring: var(--brand-highlight-color);
   --ui-radius: 6px;
 
-  --brand-color: var(--brand-2);
-  --brand-highlight-color: var(--brand-5);
-  --brand-hover-color: color-mix(in srgb, var(--brand-5) 50%, transparent);
+  --brand-color: #3d3d3d;
+  --brand-highlight-color: #505050;
+  --brand-hover-color: color-mix(in srgb, var(--brand-highlight-color) 20%, transparent);
 
   --node-background-color: var(--fill-1);
   --node-border-color: var(--border-1);
@@ -79,7 +79,7 @@
   --widget-null-bg-color: #79c0ff33;
 
   --widget-border-color: var(--border-2);
-  --widget-border-highlight-color: #b9bbc6;
+  --widget-border-highlight-color: #a3a3a3;
   --widget-background: var(--fill-4);
   --widget-background-highlight-color: var(--fill-5);
   --widget-background-mask-highlight-color: rgba(0, 0, 0, 0.1);
@@ -126,7 +126,7 @@
 
   --edge-string: #f9ae58;
   --edge-json: #9ca0df;
-  --edge-primitive: #9ca0df;
+  --edge-primitive: #a3a3a3;
   --edge-bin: #00d6b9;
   --edge-error: var(--seti-red);
   --flow-bg: var(--fill-4);

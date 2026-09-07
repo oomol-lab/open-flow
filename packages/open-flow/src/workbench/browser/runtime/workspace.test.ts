@@ -297,105 +297,111 @@ describe('Designer port projection', () => {
   })
 })
 
-describe('Designer presentation layouts', () => {
-  it('stores one shared position for all display modes', () => {
+describe('Designer presentation', () => {
+  it('preserves positions and comments while replacing the single viewport', () => {
     const target = { kind: 'flow' } as const
-    const first = setNodePositions({}, target, { task: { x: 10, y: 20 } })
-    const moved = setNodePositions(first, target, { task: { x: 30, y: 40 }, added: { x: 50, y: 60 } })
-
+    const noted = setComment({}, target, 'note', { title: 'Note', content: 'Body', position: { x: 15, y: 25 } })
+    const positioned = setNodePositions(noted, target, { task: { x: 30, y: 40 } })
+    const moved = setFlowViewport(positioned, target, { x: 10, y: 20, zoom: 0.8 })
     expect(moved).toMatchObject({
       designer: {
-        flow: { layouts: {}, nodes: { added: { x: 50, y: 60 }, task: { x: 30, y: 40 } } },
+        flow: {
+          viewport: { x: 10, y: 20, zoom: 0.8 },
+          nodes: { note: { x: 15, y: 25 }, task: { x: 30, y: 40 } },
+          comments: { note: { title: 'Note', content: 'Body' } },
+        },
+      },
+    })
+    expect(setFlowViewport(moved, target, { x: 10, y: 20, zoom: 0.8 })).toBe(moved)
+  })
+
+  it('keeps independent viewports for the root graph and a subflow', () => {
+    const root = setFlowViewport({}, { kind: 'flow' }, { x: 0, y: 0, zoom: 1 })
+    const child = setFlowViewport(root, { kind: 'subflow', id: 'child' }, { x: 50, y: 60, zoom: 0.5 })
+    expect(child).toMatchObject({
+      designer: {
+        flow: { viewport: { x: 0, y: 0, zoom: 1 } },
+        subflows: { child: { viewport: { x: 50, y: 60, zoom: 0.5 } } },
       },
     })
   })
+})
 
-  it('migrates old positions to shared nodes with detail taking precedence', () => {
-    const value = {
-      designer: {
-        flow: {
-          layouts: {
-            detail: { nodes: { detailOnly: { x: 50, y: 60 }, task: { x: 30, y: 40 } }, viewport: { x: 10, y: 20, zoom: 0.8 } },
-            overview: {
-              nodes: { overviewOnly: { x: 70, y: 80 }, sharedOnly: { x: 1, y: 2 }, task: { x: 10, y: 20 } },
-              viewport: { x: 30, y: 40, zoom: 1.2 },
+describe('Canvas run records', () => {
+  const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+    actorId: 'actor',
+    createdAt: '2026-09-05T01:00:00Z',
+    digest: 'digest',
+    flowId: 'flow',
+    modelVersion: 1,
+    parentRevisionId: null,
+    revisionId: 'revision',
+    version: 1,
+    content: {
+      modelVersion: 1,
+      modules: { module: { imports: [], name: 'Task', source: 'export default () => ({ result: 42 })' } },
+      document: {
+        bindings: {},
+        subflows: {},
+        tasks: {},
+        graph: {
+          edges: [],
+          nodes: {
+            task: {
+              kind: 'task',
+              inputs: {},
+              task: { name: 'Task', moduleId: 'module', inputs: [], outputs: [{ handle: 'result', jsonSchema: {}, nullable: false }] },
             },
           },
-          nodes: { sharedOnly: { x: 3, y: 4 }, task: { x: 20, y: 30 } },
-          viewport: { x: 1, y: 2, zoom: 0.5 },
         },
-        version: 1,
       },
-    }
-
-    const migrated = setNodePositions(value, { kind: 'flow' }, { moved: { x: 90, y: 100 } })
-
-    expect(migrated).toEqual({
-      designer: {
-        flow: {
-          layouts: {
-            detail: { viewport: { x: 10, y: 20, zoom: 0.8 } },
-            overview: { viewport: { x: 30, y: 40, zoom: 1.2 } },
-          },
-          nodes: {
-            detailOnly: { x: 50, y: 60 },
-            moved: { x: 90, y: 100 },
-            overviewOnly: { x: 70, y: 80 },
-            sharedOnly: { x: 3, y: 4 },
-            task: { x: 30, y: 40 },
-          },
-        },
-        version: 1,
+    },
+  }
+  const run = {
+    createdAt: draft.createdAt,
+    flowId: draft.flowId,
+    revisionId: draft.revisionId,
+    runId: 'run',
+    source: 'draft',
+    status: 'completed',
+    version: 1,
+  } as const
+  const events: NonNullable<Parameters<typeof designerGraph>[8]> = [
+    { sequence: 1, kind: 'run.started', createdAt: draft.createdAt, payload: { flowId: 'flow', scopeId: 'root' } },
+    { sequence: 2, kind: 'node.started', createdAt: '2026-09-05T01:00:01Z', payload: { flowId: 'flow', scopeId: 'root', nodeId: 'task' } },
+    {
+      sequence: 3,
+      kind: 'node.log',
+      createdAt: '2026-09-05T01:00:02Z',
+      payload: { flowId: 'flow', scopeId: 'root', nodeId: 'task', level: 'info', message: 'Ready.' },
+    },
+    {
+      sequence: 4,
+      kind: 'node.completed',
+      createdAt: '2026-09-05T01:00:03Z',
+      payload: { flowId: 'flow', scopeId: 'root', nodeId: 'task', outputs: { result: 42 } },
+    },
+    {
+      sequence: 5,
+      kind: 'node.completed',
+      createdAt: '2026-09-05T01:00:04Z',
+      payload: { flowId: 'child', scopeId: 'child', nodeId: 'task', outputs: { result: 'nested' } },
+    },
+  ]
+  it('keeps output, logs and timing together for the selected root execution', () => {
+    expect(designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, undefined, run, events).nodes[0]).toMatchObject({
+      run: {
+        runId: 'run',
+        status: 'success',
+        outputs: { result: 42 },
+        startedAt: events[1]?.createdAt,
+        finishedAt: events[3]?.createdAt,
+        logs: [{ level: 'info', message: 'Ready.' }],
       },
     })
   })
-
-  it('keeps a valid lower-precedence position when a newer entry is malformed', () => {
-    const value = {
-      designer: {
-        flow: { layouts: { overview: { nodes: { task: { x: 10, y: 20 } } } }, nodes: { task: { x: 'invalid', y: 30 } } },
-        version: 1,
-      },
-    }
-
-    const migrated = setNodePositions(value, { kind: 'flow' }, { moved: { x: 50, y: 60 } })
-
-    expect(migrated).toMatchObject({
-      designer: { flow: { nodes: { moved: { x: 50, y: 60 }, task: { x: 10, y: 20 } } } },
-    })
-  })
-
-  it('stores shared comment and subflow positions', () => {
-    const target = { id: 'child', kind: 'subflow' } as const
-    const positioned = setComment({}, target, 'note', {
-      content: 'Body',
-      position: { x: 15, y: 25 },
-      title: 'Note',
-    })
-    const moved = setNodePositions(positioned, target, { task: { x: 35, y: 45 } })
-
-    expect(moved).toMatchObject({
-      designer: {
-        subflows: {
-          child: { comments: { note: { content: 'Body', title: 'Note' } }, layouts: {}, nodes: { note: { x: 15, y: 25 }, task: { x: 35, y: 45 } } },
-        },
-      },
-    })
-  })
-
-  it('persists independent viewports for each display mode', () => {
-    const overview = setFlowViewport({}, { kind: 'flow' }, { x: 0, y: 0, zoom: 1 }, 'overview')
-    const value = setFlowViewport(overview, { kind: 'flow' }, { x: 10, y: 20, zoom: 0.8 }, 'detail')
-
-    expect(value).toMatchObject({
-      designer: {
-        flow: {
-          layouts: {
-            detail: { viewport: { x: 10, y: 20, zoom: 0.8 } },
-            overview: { viewport: { x: 0, y: 0, zoom: 1 } },
-          },
-        },
-      },
-    })
+  it('does not attach historical results to a changed draft', () => {
+    const node = designerGraph({ ...draft, revisionId: 'changed' }, { kind: 'flow' }, {}, [], {}, {}, undefined, run, events).nodes[0]
+    expect(node).not.toHaveProperty('run')
   })
 })

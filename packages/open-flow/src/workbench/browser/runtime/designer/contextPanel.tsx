@@ -1,4 +1,4 @@
-import type { DragEvent as ReactDragEvent, KeyboardEvent as ReactKeyboardEvent, ReactElement, ReactNode, RefObject } from 'react'
+import type { DragEvent as ReactDragEvent, ReactElement, ReactNode, RefObject } from 'react'
 import type { IAddNodeMenuItem } from '../../../../designer/browser/stores/designer/designer.store.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
@@ -88,7 +88,10 @@ export function ContextPanel({ children, focusOnOpen, icon, onClose, theme, titl
     return () => globalThis.removeEventListener('keydown', close)
   }, [onClose, overlay])
 
-  const keyDown = (event: ReactKeyboardEvent<HTMLElement>): void => {
+  const keyDown = (event: KeyboardEvent): void => {
+    if (event.defaultPrevented) return
+    const current = panel.current
+    if (current == null || !(event.target instanceof Node) || !current.contains(event.target)) return
     if (event.key == 'Escape') {
       event.preventDefault()
       event.stopPropagation()
@@ -97,12 +100,18 @@ export function ContextPanel({ children, focusOnOpen, icon, onClose, theme, titl
     }
     if (!overlay || event.key != 'Tab') return
     const focusable = [
-      ...event.currentTarget.querySelectorAll<HTMLElement>(
+      ...current.querySelectorAll<HTMLElement>(
         'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
       ),
     ]
-    if (cycleContextPanelFocus(event.currentTarget, focusable, event.currentTarget.ownerDocument.activeElement, event.shiftKey)) event.preventDefault()
+    if (cycleContextPanelFocus(current, focusable, current.ownerDocument.activeElement, event.shiftKey)) event.preventDefault()
   }
+
+  useEffect(() => {
+    const current = panel.current
+    current?.ownerDocument.addEventListener('keydown', keyDown)
+    return () => current?.ownerDocument.removeEventListener('keydown', keyDown)
+  }, [onClose, overlay])
 
   return (
     <ThemeProvider dark={theme == 'dark'}>
@@ -113,7 +122,6 @@ export function ContextPanel({ children, focusOnOpen, icon, onClose, theme, titl
           aria-modal={overlay || undefined}
           className="context-panel"
           data-theme={theme}
-          onKeyDown={keyDown}
           ref={panel}
           role={overlay ? 'dialog' : 'complementary'}
           tabIndex={-1}

@@ -128,6 +128,7 @@ function RunDrawerContainer({
 }
 
 function Editor({
+  onRunDraft,
   onCloseRuns,
   onConfigureConnector,
   onToggleRuns,
@@ -136,6 +137,7 @@ function Editor({
   store,
   theme,
 }: {
+  readonly onRunDraft: () => void
   readonly onCloseRuns: () => void
   readonly onConfigureConnector?: (() => void) | undefined
   readonly onToggleRuns: () => void
@@ -146,6 +148,8 @@ function Editor({
 }): ReactElement {
   const t = useTranslate()
   const addNodeOptions = useVal(store.workspace.$.addNodeOptions)
+  const check = useVal(store.$.diagnostics)
+  const inputRequest = useVal(store.runRequests.$.inputRequest)
   const busy = useVal(store.$.busy)
   const designer = useVal(store.$.designer)
   const diagnosticFocus = useVal(store.workspace.$.diagnosticFocus)
@@ -177,6 +181,7 @@ function Editor({
   const addingFromBlocks = useRef(false)
   const blockAddCount = useRef(0)
   const designerRef = useRef<WorkbenchDesignerHandle>(null)
+  const [inspectorContainer, setInspectorContainer] = useState<HTMLDivElement | null>(null)
   const focusInspectorOnOpen = useRef(false)
   const opener = useRef<HTMLElement>()
 
@@ -271,6 +276,20 @@ function Editor({
       tabIndex={0}
     >
       <WorkbenchDesigner
+        runAction={
+          <Button
+            size="sm"
+            onClick={onRunDraft}
+            disabled={busy != null || check?.valid == false || target?.kind != 'flow' || inputRequest != null}
+            aria-controls="run-input-panel"
+            aria-expanded={inputRequest?.source == 'draft'}
+            title={t(check?.valid == false ? 'workspace.fixIssuesToRun' : 'workspace.runDraft')}
+          >
+            <Icon name="play" />
+            {t(busy == 'run' ? 'workspace.starting' : 'workspace.runDraft')}
+          </Button>
+        }
+        inspectorContainer={inspectorContainer}
         addNodeOptions={addNodeOptions}
         blocksOpen={contextPanelVisible && contextPanelMode == 'blocks'}
         disabled={authoringDisabled}
@@ -300,7 +319,7 @@ function Editor({
         onDeleteNodes={() => void store.workspace.deleteSelectedNodes()}
         onDuplicate={(positions) => void store.workspace.duplicateSelectedNodes(positions)}
         onMoveNodes={(positions) => void store.workspace.moveNodes(positions)}
-        onMoveViewport={(viewport, displayMode) => void store.workspace.moveViewport(viewport, displayMode)}
+        onMoveViewport={(viewport) => void store.workspace.moveViewport(viewport)}
         onOpenBlocks={openBlocks}
         onOpenInspector={openInspector}
         onOpenVariables={() => void store.refreshVariableNames()}
@@ -355,6 +374,7 @@ function Editor({
           ) : (
             revision != null && (
               <NodeInspector
+                editorRef={setInspectorContainer}
                 connectorAction={connectorAction}
                 connectorActionError={connectorActionError}
                 connectorAuthorizationPending={connectorAuthorizationPending}
@@ -527,6 +547,7 @@ export default function FlowWorkspace({
           </div>
         ) : view == 'design' ? (
           <Editor
+            onRunDraft={() => void runDraft()}
             onCloseRuns={() => setRunDrawerVisible(false)}
             onConfigureConnector={onConfigureConnector}
             onToggleRuns={() => setRunDrawerOpen(!runDrawerOpen)}

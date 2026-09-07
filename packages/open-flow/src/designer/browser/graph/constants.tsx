@@ -2,7 +2,6 @@ import type { EdgeTypes, NodeTypes } from '@xyflow/react'
 
 import { NODE_TYPE } from '../stores/node/constants.ts'
 import { BasicEdge } from './Edges/BasicEdge.tsx'
-import { OVERVIEW_EDGE_TYPES } from './Edges/OverviewEdge.tsx'
 import { BasicNode } from './Nodes/BasicNode.tsx'
 import { CommentNode } from './Nodes/CommentNode.tsx'
 import { ConditionNode } from './Nodes/ConditionNode.tsx'
@@ -27,9 +26,4 @@ export const NODE_TYPES: NodeTypes = {
 
 export const EDGE_TYPES: EdgeTypes = {
   default: BasicEdge,
-}
-
-export const FLOW_EDGE_TYPES: EdgeTypes = {
-  ...EDGE_TYPES,
-  ...OVERVIEW_EDGE_TYPES,
 }

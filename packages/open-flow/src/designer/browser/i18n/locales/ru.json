@@ -325,12 +325,6 @@
     "zh-CN": "Китайский"
   },
   "miniMap": "Мини-карта",
-  "flowDisplayMode": {
-    "detail": "Подробно",
-    "detailDescription": "Полные узлы, порты, редакторы и элементы управления",
-    "overview": "Обзор",
-    "overviewDescription": "Упрощённые узлы и связи только для чтения"
-  },
   "settingsPanel": {
     "hide": "Скрыть настройки",
     "show": "Показать настройки"
@@ -549,7 +543,6 @@
       "connectorTokenOverride": "Введите Token, чтобы создать локальное переопределение",
       "connectorTokenUnchanged": "Сохранённый Token не изменился",
       "editor": "Редактор",
-      "defaultFlowDisplayMode": "Задаёт режим отображения при открытии Flow или Subflow.",
       "expandScriptletEditor": "Разворачивать редакторы для новых скриптлетов",
       "llm": "Языковая модель",
       "llmApiKey": "Ключ API",
@@ -593,5 +586,43 @@
     "reload": "Обновить"
   },
   "zoomIn": "увеличить",
-  "zoomOut": "уменьшить"
+  "zoomOut": "уменьшить",
+  "canvasCard": {
+    "run": "Запуск",
+    "result": "Результат",
+    "logs": "Журналы ({{count}})",
+    "files": "Файлы ({{count}})",
+    "images": "Изображения ({{count}})",
+    "started": "Начало",
+    "previewUnavailable": "Предпросмотр недоступен",
+    "artifactMetadata": "Доступны метаданные файла. Адрес загрузки не предоставлен.",
+    "description": "Назначение",
+    "describe": "Опишите назначение этого шага.",
+    "every": "Каждые {{value}} {{unit}}",
+    "status": {
+      "idle": "Не начат",
+      "running": "Выполняется",
+      "success": "Завершён",
+      "error": "Ошибка",
+      "waiting": "Ожидание",
+      "skipped": "Пропущен"
+    },
+    "kind": {
+      "task": "Задача",
+      "trigger": "Триггер",
+      "condition": "Условие",
+      "wait": "Ожидание",
+      "subflow": "Подпроцесс",
+      "value": "Значения",
+      "input": "Вход",
+      "output": "Выход"
+    },
+    "units": {
+      "minute": "мин.",
+      "hour": "ч.",
+      "day": "дн.",
+      "week": "нед.",
+      "month": "мес."
+    }
+  }
 }

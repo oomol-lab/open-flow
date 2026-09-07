@@ -4,6 +4,11 @@
   background-color: var(--block-editor-item-background-color);
   border-radius: var(--widget-radius);
 
+  :global([data-node-editor]) &,
+  :global([data-node-editor]) & > .content {
+    overflow: visible;
+  }
+
   :global(.react-flow__node.selected) &:has(:global(.oo-active), :global(.designer-preview-active)) {
     background-color: var(--brand-1);
 
