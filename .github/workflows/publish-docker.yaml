@@ -3,29 +3,20 @@ name: Publish Docker image
 # Build the Open Flow Server image from apps/server/Dockerfile and publish it to
 # the GitHub Packages container registry (GHCR) at ghcr.io/<owner>/<repo>.
 #
-# Triggers and tags:
-#   - push to main (this includes merged PRs): `tip` + the short commit hash
-#   - published release:                       the release tag, plus `latest`
-#                                              for a stable (non-prerelease) release
+# Published releases use the release tag, plus `latest` for a stable
+# (non-prerelease) release.
 #
 # Each architecture is built natively on its own Blacksmith runner (no QEMU
 # emulation), pushed by digest, and then merged into a multi-architecture
 # manifest for every tag.
-#
-# main-branch pushes and releases never overlap: `push` ignores tag refs and
-# publishing a release does not fire a branch `push`.
 on:
-  push:
-    branches: [main]
   release:
     types: [published]
 
-# One in-flight publish per ref. main pushes share a group so a newer commit
-# cancels an older, still-running build, which keeps `tip` pointing at the most
-# recent commit. Releases use their own per-tag group and are never cancelled.
+# One in-flight publish per release tag. Releases are never cancelled.
 concurrency:
   group: publish-docker-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -115,7 +106,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # tip + short sha on push, release tag (+ latest for stable) on release.
+      # Use the release tag, plus latest for stable releases.
       - name: Compute tags
         id: meta
         uses: docker/metadata-action@v6
@@ -123,10 +114,8 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           flavor: latest=false
           tags: |
-            type=raw,value=tip,enable=${{ github.event_name == 'push' }}
-            type=sha,prefix=,format=short,enable=${{ github.event_name == 'push' }}
-            type=raw,value=latest,enable=${{ github.event_name == 'release' && github.event.release.prerelease == false }}
-            type=raw,value=${{ github.event.release.tag_name }},enable=${{ github.event_name == 'release' }}
+            type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
+            type=raw,value=${{ github.event.release.tag_name }}
 
       - name: Create and push multi-architecture manifest
         working-directory: ${{ runner.temp }}/digests
