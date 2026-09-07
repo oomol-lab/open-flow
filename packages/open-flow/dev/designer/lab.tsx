@@ -15,6 +15,7 @@ import { defaultUiLanguage, uiLanguageNames, uiLanguages } from '../../src/local
 import { TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
 import { CodeEditor } from '../../src/workbench/browser/runtime/designer/codeEditor.tsx'
 import { cardStories } from './cards.tsx'
+import { nodeStories } from './nodeStories.tsx'
 import { overviewStories } from './overview.tsx'
 import { stories } from './stories.tsx'
 import { workflowStories } from './workflow.tsx'
@@ -59,7 +60,7 @@ const codeEditorStory: DesignerStory = {
   title: 'Code Editor',
 }
 
-const labStories: readonly DesignerStory[] = [...cardStories, ...workflowStories, ...stories, codeEditorStory, ...overviewStories]
+const labStories: readonly DesignerStory[] = [...nodeStories, ...cardStories, ...workflowStories, ...stories, codeEditorStory, ...overviewStories]
 
 function initialStory(): DesignerStory {
   const requested = new URLSearchParams(location.search).get('story')
