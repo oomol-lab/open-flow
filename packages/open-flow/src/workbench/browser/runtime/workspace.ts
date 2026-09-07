@@ -26,7 +26,7 @@ import type {
 import type { DesignerTarget } from './designer/flowChanges.ts'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionView.ts'
 
-import { triggerPayloadSchema, variableInputCompatible } from '../../../flow/common/semantics.ts'
+import { triggerPayloadSchema, variableInputCompatible } from '../../../flow/common/schema.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
 

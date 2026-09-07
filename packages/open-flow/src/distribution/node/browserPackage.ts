@@ -226,9 +226,19 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
     const controlApiConformanceDeclaration = await readFile(path.join(declarationRoot, 'control/common/conformance.d.ts'), 'utf8')
     const controlApiErrorsDeclaration = await readFile(path.join(declarationRoot, 'control/common/errors.d.ts'), 'utf8')
     const flowEncodingDeclaration = await readFile(path.join(declarationRoot, 'flow/common/encoding.d.ts'), 'utf8')
-    const flowSemanticsDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/semantics.d.ts'), 'utf8'))
-      .replaceAll("'../../execution/common/engineContract.ts'", "'./engine-contract.js'")
-      .replaceAll("'../../execution/common/runtime.ts'", "'./runtime-contract.js'")
+    await Promise.all(
+      ['semantics', 'graph', 'schema', 'modules'].map(async (name) => {
+        const declaration = (await readFile(path.join(declarationRoot, `flow/common/${name}.d.ts`), 'utf8'))
+          .replaceAll("'../../execution/common/engineContract.ts'", "'./engine-contract.js'")
+          .replaceAll("'../../execution/common/runtime.ts'", "'./runtime-contract.js'")
+          .replaceAll("'./change.ts'", "'../browser/flow-change.js'")
+          .replaceAll("'./semantics.ts'", "'./flow-semantics.js'")
+          .replaceAll("'./graph.ts'", "'./flow-graph.js'")
+          .replaceAll("'./schema.ts'", "'./flow-schema.js'")
+          .replaceAll("'./modules.ts'", "'./flow-modules.js'")
+        await writeFile(path.join(commonOutputPath, `flow-${name}.d.ts`), declaration)
+      }),
+    )
     const runLifecycleDeclaration = await readFile(path.join(declarationRoot, 'execution/common/runLifecycle.d.ts'), 'utf8')
     const runEventsDeclaration = await readFile(path.join(declarationRoot, 'execution/common/events.d.ts'), 'utf8')
     const engineContractDeclaration = await readFile(path.join(declarationRoot, 'execution/common/engineContract.d.ts'), 'utf8')
@@ -262,7 +272,6 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(browserOutputPath, 'flow-authoring-node.d.ts'), flowAuthoringNodeDeclaration),
       writeFile(path.join(browserOutputPath, 'flow-change.d.ts'), flowChangeDeclaration),
       writeFile(path.join(commonOutputPath, 'flow-encoding.d.ts'), flowEncodingDeclaration),
-      writeFile(path.join(commonOutputPath, 'flow-semantics.d.ts'), flowSemanticsDeclaration),
       writeFile(
         path.join(browserOutputPath, 'workbench.d.ts'),
         workbenchDeclaration

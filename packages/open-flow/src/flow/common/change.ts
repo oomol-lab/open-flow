@@ -564,6 +564,9 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const graph = selectedGraph(document, operation.target)
         if (graph.nodes[operation.nodeId] != null) invalid('A Node with this ID already exists in the target graph.')
         if (operation.target.kind == 'subflow' && !('inputs' in operation.node)) invalid('Trigger Nodes cannot be created inside a Subflow.')
+        if (operation.node.kind == 'manual' && Object.values(graph.nodes).some((node) => node.kind == 'manual')) {
+          invalid('A graph can contain only one manual Trigger.')
+        }
         if (operation.node.kind == 'task' && operation.node.task?.capabilities !== undefined) decodeConnectorCapabilities(operation.node.task.capabilities)
         Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: operation.node } }))
         break

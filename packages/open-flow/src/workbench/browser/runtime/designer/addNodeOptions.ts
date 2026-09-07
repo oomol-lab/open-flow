@@ -3,6 +3,8 @@ import type { ConnectorAction, Draft, JsonValue, TriggerKeySnapshot } from '../a
 import type { RevisionView } from '../revisionView.ts'
 import type { AddNodeIntent, DesignerTarget } from './flowChanges.ts'
 
+import { revisionView } from '../revisionView.ts'
+
 interface AddNodePort {
   readonly description?: string
   readonly handle: string
@@ -151,7 +153,7 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: DesignerT
   const options = builtinOptions(t)
   if (target.kind != 'flow') return options
   const group = t('addNode.triggers')
-  return [
+  const triggers: readonly AddNodeOption[] = [
     {
       description: t('addNode.manualDescription'),
       group,
@@ -202,6 +204,9 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: DesignerT
     },
     ...options,
   ]
+  return Object.values(revisionView(draft).graph(target)?.nodes ?? {}).some((node) => node.kind == 'manual')
+    ? triggers.filter((option) => option.id != 'trigger:manual')
+    : triggers
 }
 
 export function addNodeIntent(option: AddNodeOption, revision: RevisionView, target: DesignerTarget, t: TFunction): AddNodeIntent | undefined {

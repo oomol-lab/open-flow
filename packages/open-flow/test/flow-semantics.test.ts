@@ -2,15 +2,9 @@ import type { JsonValue, RevisionContent as RevisionFixture } from '../src/flow/
 
 import { describe, expect, it } from 'vitest'
 import { currentEngineContract, findEngineContract } from '../src/execution/common/runtime.ts'
-import {
-  createRuntimeProgram,
-  flowDependencies,
-  matchesSchema,
-  prepareFlow,
-  validateFlow,
-  validateFlowInputs,
-  validateModules,
-} from '../src/flow/common/semantics.ts'
+import { validateModules } from '../src/flow/common/modules.ts'
+import { matchesSchema } from '../src/flow/common/schema.ts'
+import { createRuntimeProgram, flowDependencies, prepareFlow, validateFlow, validateFlowInputs } from '../src/flow/common/semantics.ts'
 
 const engine = findEngineContract(currentEngineContract)!
 

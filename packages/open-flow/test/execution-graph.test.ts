@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest'
 import { currentEngineContract } from '../src/execution/common/runtime.ts'
 import { runFlow } from '../src/execution/common/scheduler.ts'
 import { applyFlowChanges } from '../src/flow/common/change.ts'
-import { availableOutputs, prepareFlow } from '../src/flow/common/semantics.ts'
+import { availableOutputs } from '../src/flow/common/graph.ts'
+import { prepareFlow } from '../src/flow/common/semantics.ts'
 
 const port = { jsonSchema: {}, nullable: true }
 const value = { inputs: {}, kind: 'value' as const, values: [{ ...port, handle: 'value', value: 1 }] }
