@@ -170,6 +170,8 @@
       "description": "표시 이름 및 시간 제한",
       "displayName": "표시 이름",
       "displayNamePlaceholder": "정의된 이름 사용",
+      "nameDuplicate": "이 그래프에 같은 이름의 노드가 이미 있습니다.",
+      "nameEmpty": "노드 이름은 비워 둘 수 없습니다.",
       "save": "노드 저장",
       "timeout": "제한 시간(ms)",
       "timeoutError": "제한 시간은 밀리초 단위의 양의 정수여야 합니다.",

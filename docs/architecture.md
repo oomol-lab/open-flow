@@ -19,6 +19,9 @@ CLI ───────┘
 Flow 是部署生成的顶层产品资源和稳定 opaque identity，不从属于 Project。每个 Flow 独立拥有名称、生命周期、Draft head、Revision 历史、
 Presentation、Publication、Live、Run 和 Trigger binding。
 
+每个 Flow 或 Subflow graph 内的 Node title 是非空且唯一的用户标识；`nodeId` 是稳定的内部 identity，继续用于连线、binding、运行事件和机器协议，
+不能随 title 修改。Workbench 读取不满足约束的 Draft 后，必须通过正常的 Draft change 创建修正 Revision，不能在读取时改写既有 Revision。
+
 Flow 有一个可变 Draft head 和不可变的 Revision 历史。Revision 是该 Flow 的 graph、Subflow、Task、binding 和 CodeModule source 的完整事实来源；
 语义修改必须以预期 Revision 为前提并使用稳定 change identity 原子提交，不能静默覆盖 stale head；幂等重放必须先于 Draft head 比较返回已经接受的
 Revision。Draft 同步只返回当前完整 Revision snapshot，不提供持久化 authoring operation history。内部索引、缓存、增量记录和存储布局不能成为第二个事实来源。

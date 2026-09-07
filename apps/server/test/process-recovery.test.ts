@@ -27,6 +27,7 @@ function hangingFlow(): RevisionContent {
           task: {
             inputs: {},
             kind: 'task',
+            name: 'Main',
             task: { inputs: [], moduleId: 'main', name: 'Main', outputs: [] },
           },
         },

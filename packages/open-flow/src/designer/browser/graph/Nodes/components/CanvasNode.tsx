@@ -7,7 +7,7 @@ import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { NODE_HANDLE_CLASSNAME } from '../../../base/designer.ts'
 import { DesignerIcon } from '../../../icons/DesignerIcon.tsx'
-import { isManifestNodeType, NODE_TYPE } from '../../../stores/node/constants.ts'
+import { NODE_TYPE } from '../../../stores/node/constants.ts'
 import { ErrorNodeStore, parseError } from '../../../stores/node/errorNode.store.ts'
 import { CanvasContext } from '../../FlowDesigner/CanvasContext.ts'
 import { imageSources, nodeSummary } from '../../FlowDesigner/cardContent.ts'
@@ -19,7 +19,7 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
   const t = useTranslate()
   const view = useContext(CanvasContext)
   const selected = useVal(nodeStore.$.selected)
-  const title = useVal(nodeStore.display$.title) || nodeStore.nodeId
+  const title = useVal(nodeStore.display$.title) || ''
   const description = useVal(nodeStore.display$.description)
   const icon = useVal(nodeStore.display$.icon)
   const error = useVal(ErrorNodeStore.is(nodeStore) ? nodeStore.error$ : undefined)
@@ -39,13 +39,6 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
         title={title}
         icon={<DesignerIcon src={icon} fallback={<i className={iconForNodeType(nodeStore.nodeType)} />} />}
         subtitle={distinctSubtitle}
-        actions={
-          isManifestNodeType(nodeStore.nodeType) ? (
-            <code className={styles.nodeId} title={nodeStore.nodeId}>
-              {nodeStore.nodeId}
-            </code>
-          ) : undefined
-        }
         selected={selected}
         problem={problem}
         branches={branches}

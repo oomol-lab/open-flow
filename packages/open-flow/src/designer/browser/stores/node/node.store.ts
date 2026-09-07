@@ -96,6 +96,7 @@ export interface NodeStoreProps<TManifest$ extends NodeStoreManifest$ = NodeStor
   readonly duplicateNode?: (offset?: XYPosition | undefined) => void
   readonly execute?: (executeWithCache: boolean) => void
   readonly remove?: () => void
+  readonly titleIssue?: (title: string) => string | undefined
 }
 
 export class NodeStore<TManifest$ extends NodeStoreManifest$ = NodeStoreManifest$, TDisplay$ extends NodeStoreDisplay$ = NodeStoreDisplay$> {
@@ -116,6 +117,7 @@ export class NodeStore<TManifest$ extends NodeStoreManifest$ = NodeStoreManifest
   public readonly duplicateNode: ((offset?: XYPosition) => void) | undefined
   public readonly execute: ((executeWithCache: boolean) => void) | undefined
   public readonly remove: (() => void) | undefined
+  public readonly titleIssue: ((title: string) => string | undefined) | undefined
 
   public readonly nodeType: NodeType
   public readonly nodeId: NodeId
@@ -147,6 +149,7 @@ export class NodeStore<TManifest$ extends NodeStoreManifest$ = NodeStoreManifest
     this.duplicateNode = props.duplicateNode
     this.execute = props.execute
     this.remove = props.remove
+    this.titleIssue = props.titleIssue
 
     if (this.manifest$) {
       this.dispose.add(Object.values(this.manifest$))

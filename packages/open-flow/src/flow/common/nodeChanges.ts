@@ -2,6 +2,8 @@ import type {
   ChangeOperation,
   CodeModule,
   ConnectorCapability,
+  Graph,
+  GraphNode,
   GraphTarget,
   InputMapping,
   JsonValue,
@@ -15,7 +17,7 @@ import type {
 } from './change.ts'
 
 import { dequal } from 'dequal/lite'
-import { applyFlowChanges } from './change.ts'
+import { applyFlowChanges, nextNodeName, normalizeNodeName } from './change.ts'
 
 const codeTaskTemplate = `export default async function (inputs, context) {
   return { result: inputs.value }
@@ -33,6 +35,49 @@ export interface LlmTaskOptions {
 }
 
 export type LlmInputHandle = 'input' | 'messages' | 'model' | 'template'
+
+export function defaultNodeName(content: RevisionContent, node: GraphNode): string {
+  switch (node.kind) {
+    case 'condition':
+      return 'Condition'
+    case 'value':
+      return 'Value'
+    case 'wait':
+      return 'Wait'
+    case 'subflow':
+      return normalizeNodeName(content.document.subflows[node.subflowId]?.name ?? '') || 'Subflow'
+    case 'task':
+      return normalizeNodeName(node.task != null ? node.task.name : (content.document.tasks[node.taskId]?.name ?? '')) || 'Task'
+    case 'manual':
+      return 'Manual Trigger'
+    case 'webhook':
+      return 'Webhook'
+    case 'cron':
+      return 'Scheduled Trigger'
+    case 'integration':
+    case 'poll':
+      return normalizeNodeName(node.definition.displayName) || 'Trigger'
+  }
+}
+
+function graphNameRepairs(content: RevisionContent, targetGraph: Graph, target: GraphTarget): readonly ChangeOperation[] {
+  const names = new Set<string>()
+  const changed: { readonly nodeId: string; readonly node: GraphNode; readonly name: string }[] = []
+  for (const [nodeId, node] of Object.entries(targetGraph.nodes)) {
+    const requested = normalizeNodeName(node.name ?? '') || defaultNodeName(content, node)
+    const name = nextNodeName(requested, names)
+    names.add(name)
+    if (node.name != name) changed.push({ name, node, nodeId })
+  }
+  return changed.toReversed().map(({ name, node, nodeId }) => ({ before: node.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value: name }))
+}
+
+export function repairNodeNames(content: RevisionContent): readonly ChangeOperation[] {
+  return [
+    ...graphNameRepairs(content, content.document.graph, { kind: 'flow' }),
+    ...Object.entries(content.document.subflows).flatMap(([id, subflow]) => graphNameRepairs(content, subflow.graph, { id, kind: 'subflow' })),
+  ]
+}
 
 interface TriggerSettingsBase {
   readonly description?: string

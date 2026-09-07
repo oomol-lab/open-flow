@@ -44,6 +44,76 @@ const editor = {
 } as const
 
 describe('WorkspaceStore', () => {
+  it('repairs missing and duplicate Node names after opening a Draft', async () => {
+    const sourceDraft = {
+      ...draft,
+      content: {
+        ...draft.content,
+        document: {
+          ...draft.content.document,
+          graph: {
+            edges: [],
+            nodes: {
+              a: { inputs: {}, kind: 'value', name: 'Review', values: [] },
+              b: { inputs: {}, kind: 'value', name: 'Review', values: [] },
+              c: { inputs: {}, kind: 'value', values: [] },
+            },
+          },
+        },
+      },
+    } as const
+    let operations: readonly unknown[] = []
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [flow], total: 1, version: 1 })
+      if (path == `/v1/flows/${flow.flowId}/editor`) return Response.json({ ...editor, draft: sourceDraft })
+      if (path == `/v1/flows/${flow.flowId}/draft/changes`) {
+        operations = (JSON.parse(String(init?.body)) as { readonly operations: readonly unknown[] }).operations
+        return Response.json({
+          revision: {
+            actorId: 'actor-1',
+            createdAt: timestamp,
+            digest: 'digest-2',
+            flowId: flow.flowId,
+            modelVersion: 1,
+            parentRevisionId: sourceDraft.revisionId,
+            revisionId: 'revision-2',
+            version: 1,
+          },
+          version: 1,
+        })
+      }
+      if (path.endsWith('/check')) {
+        return Response.json({
+          closureDigest: 'closure-1',
+          diagnostics: [],
+          engineContract: 'open-flow-engine/v2',
+          flowId: flow.flowId,
+          modelVersion: 1,
+          revisionDigest: 'digest-2',
+          revisionId: 'revision-2',
+          valid: true,
+          version: 1,
+        })
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const store = new WorkspaceStore(new WorkbenchClient(request), vi.fn())
+
+    try {
+      await store.start(flow.flowId)
+
+      expect(store.$.draft.value?.revisionId).toBe('revision-2')
+      expect(store.$.draft.value?.content.document.graph.nodes.b?.name).toBe('Review (2)')
+      expect(store.$.draft.value?.content.document.graph.nodes.c?.name).toBe('Value')
+      expect(operations).toEqual([
+        expect.objectContaining({ field: 'name', kind: 'graph.node.field.set', nodeId: 'c', value: 'Value' }),
+        expect.objectContaining({ field: 'name', kind: 'graph.node.field.set', nodeId: 'b', value: 'Review (2)' }),
+      ])
+    } finally {
+      store.dispose()
+    }
+  })
+
   it('returns to the Flow catalog when the selected Flow is not found', async () => {
     const setNotice = vi.fn()
     const request = vi.fn(async (path: string) => {
@@ -220,6 +290,7 @@ describe('WorkspaceStore', () => {
               source: {
                 inputs: {},
                 kind: 'value',
+                name: 'Source',
                 values: [{ description: 'Count', handle: 'count', jsonSchema: { type: 'number' }, nullable: false, value: 1 }],
               },
             },

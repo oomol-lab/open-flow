@@ -42,21 +42,10 @@
   > input {
     background-color: transparent;
 
-    &:focus-visible {
+    &:focus-visible:not([aria-invalid='true']) {
       border-color: transparent;
     }
   }
-}
-
-.nodeId {
-  flex: 0 1 auto;
-  max-width: 40%;
-  margin: 0 4px;
-  overflow: hidden;
-  color: var(--text-3);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .connection {

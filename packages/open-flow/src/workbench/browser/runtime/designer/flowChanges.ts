@@ -18,7 +18,7 @@ import type {
 import type { RevisionView } from '../revisionView.ts'
 
 import { dequal } from 'dequal/lite'
-import { applyFlowChanges as reduceFlowChanges } from '../../../../flow/common/change.ts'
+import { applyFlowChanges as reduceFlowChanges, nextNodeName, normalizeNodeName } from '../../../../flow/common/change.ts'
 import {
   cleanVariableBindings,
   createCodeTask,
@@ -29,6 +29,7 @@ import {
   createProviderTrigger,
   createValue,
   createWait,
+  defaultNodeName,
   deleteNodes,
   setInputValue as setGraphInputValue,
   setInputVariable as setGraphInputVariable,
@@ -189,6 +190,20 @@ export function createResource(id: string, name: string): FlowChanges {
   ]
 }
 
+function nameCreatedNodes(revision: RevisionView, target: DesignerTarget, changes: FlowChanges): FlowChanges {
+  const graph = revision.graph(target)
+  if (graph == null) return changes
+  const names = new Set(Object.values(graph.nodes).flatMap((node) => (node.name == null ? [] : [node.name])))
+  return changes.map((operation) => {
+    if (operation.kind != 'graph.node.create' || operation.target.kind != target.kind) return operation
+    if (target.kind == 'subflow' && (operation.target.kind != 'subflow' || operation.target.id != target.id)) return operation
+    const requested = normalizeNodeName(operation.node.name ?? '') || defaultNodeName(revision.revision.content, operation.node)
+    const name = nextNodeName(requested, names)
+    names.add(name)
+    return { ...operation, node: { ...operation.node, name } }
+  })
+}
+
 export function addNode(
   revision: RevisionView,
   target: DesignerTarget,
@@ -196,44 +211,58 @@ export function addNode(
   intent: AddNodeIntent,
   identity: () => string,
 ): FlowChanges | undefined {
+  let changes: FlowChanges | undefined
   switch (intent.kind) {
     case 'code':
-      return createCodeTask(target, { moduleId: nodeId, nodeId }, intent.name, undefined, intent.ports)
+      changes = createCodeTask(target, { moduleId: nodeId, nodeId }, intent.name, undefined, intent.ports)
+      break
     case 'llm':
-      return createLlmTask(target, { nodeId, taskId: identity() }, intent.name, intent.mode, intent.outputDescription)
+      changes = createLlmTask(target, { nodeId, taskId: identity() }, intent.name, intent.mode, intent.outputDescription)
+      break
     case 'connector':
-      return createManagedTask(target, { nodeId, taskId: identity() }, connectorTask(intent.action))
+      changes = createManagedTask(target, { nodeId, taskId: identity() }, connectorTask(intent.action))
+      break
     case 'condition':
-      return createCondition(target, nodeId, intent.name)
+      changes = createCondition(target, nodeId, intent.name)
+      break
     case 'value':
-      return createValue(target, nodeId, intent.name)
+      changes = createValue(target, nodeId, intent.name)
+      break
     case 'wait':
-      return target.kind == 'flow' ? createWait(target, nodeId, intent.name) : undefined
+      changes = target.kind == 'flow' ? createWait(target, nodeId, intent.name) : undefined
+      break
     case 'subflow': {
       const subflow = revision.subflow(intent.subflowId)
       if (subflow == null) return
-      return createSubflowNode(target, nodeId, intent.subflowId, subflow.inputs)
+      changes = createSubflowNode(target, nodeId, intent.subflowId, subflow.inputs)
+      break
     }
     case 'manual':
-      return target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { kind: 'manual', name: intent.name }) : undefined
+      changes = target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { kind: 'manual', name: intent.name }) : undefined
+      break
     case 'webhook':
-      return target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { inputsDef: [], kind: 'webhook', name: intent.name }) : undefined
+      changes = target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { inputsDef: [], kind: 'webhook', name: intent.name }) : undefined
+      break
     case 'cron':
-      return target.kind == 'flow'
-        ? createBuiltinTrigger(target, nodeId, {
-            cronTimes: [{ type: 'every', unit: 'hour', value: 1 }],
-            kind: 'cron',
-            name: intent.name,
-          })
-        : undefined
+      changes =
+        target.kind == 'flow'
+          ? createBuiltinTrigger(target, nodeId, {
+              cronTimes: [{ type: 'every', unit: 'hour', value: 1 }],
+              kind: 'cron',
+              name: intent.name,
+            })
+          : undefined
+      break
     case 'provider-trigger': {
       if (target.kind != 'flow') return
-      return createProviderTrigger(target, { bindingId: identity(), nodeId }, intent.definition, {
+      changes = createProviderTrigger(target, { bindingId: identity(), nodeId }, intent.definition, {
         config: {},
         ...(intent.connectionId == null ? {} : { connectionId: intent.connectionId }),
       })
+      break
     }
   }
+  return changes == null ? undefined : nameCreatedNodes(revision, target, changes)
 }
 
 export function deleteSelection(revision: RevisionView, target: DesignerTarget, nodeIds: readonly string[]): FlowChanges {
@@ -302,9 +331,9 @@ export function pasteNodes(revision: RevisionView, target: DesignerTarget, clipb
         const binding = revision.binding(node.bindingId)
         const bindingId = identity()
         if (binding != null) operations.push({ binding, bindingId, kind: 'binding.create' })
-        operations.push({ kind: 'graph.node.create', node: { ...node, bindingId, name: `${node.name} copy` }, nodeId, target })
+        operations.push({ kind: 'graph.node.create', node: { ...node, bindingId }, nodeId, target })
       } else {
-        operations.push({ kind: 'graph.node.create', node: { ...node, name: `${node.name} copy` }, nodeId, target })
+        operations.push({ kind: 'graph.node.create', node, nodeId, target })
       }
       continue
     }
@@ -338,7 +367,6 @@ export function pasteNodes(revision: RevisionView, target: DesignerTarget, clipb
       ...node,
       inputs,
       ...(node.kind == 'wait' && node.notification != null ? { notification: { ...node.notification, inputs: remapInputs(node.notification.inputs) } } : {}),
-      ...(node.name == null ? {} : { name: `${node.name} copy` }),
     }
     if (node.kind == 'task' && node.task != null) {
       const moduleId = nodeId
@@ -347,7 +375,7 @@ export function pasteNodes(revision: RevisionView, target: DesignerTarget, clipb
       copy = {
         ...node,
         inputs,
-        ...(node.name == null ? {} : { name: `${node.name} copy` }),
+        ...(node.name == null ? {} : { name: node.name }),
         task: { ...node.task, moduleId, name: `${node.task.name} copy` },
       }
     }
@@ -363,7 +391,7 @@ export function pasteNodes(revision: RevisionView, target: DesignerTarget, clipb
     const destination = ids.get(edge.target)
     if (source != null && destination != null) operations.push({ kind: 'graph.edge.connect', target, edge: { ...edge, source, target: destination } })
   }
-  return { changes: operations, nodeIds: [...ids.values()], sourceIds }
+  return { changes: nameCreatedNodes(revision, target, operations), nodeIds: [...ids.values()], sourceIds }
 }
 
 export function updateNodeSettings(revision: RevisionView, target: DesignerTarget, nodeId: string, settings: NodeSettings): FlowChanges | undefined {

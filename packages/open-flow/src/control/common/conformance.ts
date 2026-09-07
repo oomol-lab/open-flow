@@ -96,6 +96,7 @@ function addValueNode(harness: ControlApiConformanceHarness, flowId: string, rev
         node: {
           inputs: {},
           kind: 'value',
+          name: nodeId,
           values: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
         },
         nodeId,
@@ -484,6 +485,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: { request: 1 } } },
               kind: 'wait',
+              name: 'Approval',
               prompt: 'Approve request 1?',
             },
             nodeId: 'approval',

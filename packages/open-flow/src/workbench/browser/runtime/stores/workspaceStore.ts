@@ -32,6 +32,7 @@ import {
   setInputSources,
   setConnectorConnection as changeConnectorConnection,
   setTriggerConnection as changeTriggerConnection,
+  repairNodeNames,
   updateTrigger,
   updateTriggerConfig,
   updateTriggerSchedule,
@@ -238,7 +239,7 @@ export class WorkspaceStore {
         workspaceLoadFailed: false,
         workspaceLoading: false,
       })
-      void this.#checkTarget()
+      await this.#repairDraftNodeNames(current)
       if (invalidated && pendingRevision != draft.revisionId) void this.#refreshDraft(pendingRevision)
     } catch (error) {
       if (!current()) return false
@@ -803,6 +804,22 @@ export class WorkspaceStore {
     if (flowId == null || draft == null) return
     if (changes.length == 0) return draft
     return await this.#draftChanges.change({ current: this.#draftSession.capture(), flowId }, draft, changes, manageBusy)
+  }
+
+  async #repairDraftNodeNames(current: () => boolean): Promise<void> {
+    for (let attempt = 0; attempt < 2 && current(); attempt += 1) {
+      const draft = this.#model.value.draft
+      if (draft == null) return
+      const repairs = repairNodeNames(draft.content)
+      if (repairs.length == 0) {
+        void this.#checkTarget()
+        return
+      }
+      const changed = await this.#changeDraft(repairs, false)
+      if (changed != null || !current()) return
+      if (this.#model.value.draft?.revisionId == draft.revisionId) break
+    }
+    if (current()) void this.#checkTarget()
   }
 
   #applyProjectedDraft(draft: Draft, preserveDiagnostics = false): RevisionView {

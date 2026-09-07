@@ -37,7 +37,7 @@ export const NodeHead: React.FC = /* @__PURE__ */ memo(function NodeHead() {
 
   const fallbackIcon = iconForNodeType(nodeStore.nodeType)
   const isCommentNode = CommentNodeStore.is(nodeStore)
-  const placeholder = isInBlock || isCommentNode ? t('blockEditor.nodeTitlePlaceholder') : nodeStore.nodeId
+  const placeholder = t('blockEditor.nodeTitlePlaceholder')
   const hasMoreMenu = isManifestNodeType(nodeStore.nodeType) || (isCommentNode && !!nodeStore.duplicateNode)
   const runStatus = useVal(designerStore.$.runStatus)
   const task = useVal(TaskNodeStore.is(nodeStore) ? nodeStore.manifest$?.task || nodeStore.display$.task : undefined)
@@ -51,8 +51,8 @@ export const NodeHead: React.FC = /* @__PURE__ */ memo(function NodeHead() {
       rawValue$={toTrue(editable) && nodeStore.manifest$?.title}
       displayValue$={nodeStore.display$.title}
       placeholder={placeholder}
-      translationFallback={isInBlock ? undefined : nodeStore.nodeId}
       useRealChange
+      validate={nodeStore.titleIssue}
     />
   ) : (
     <TranslationInput
@@ -91,11 +91,6 @@ export const NodeHead: React.FC = /* @__PURE__ */ memo(function NodeHead() {
         </span>
       )}
       {isInBlock ? nodeTitle : <NodeHeadContextMenu designerStore={designerStore}>{nodeTitle}</NodeHeadContextMenu>}
-      {!isInBlock && isManifestNodeType(nodeStore.nodeType) && (
-        <code className={styles.nodeId} title={nodeStore.nodeId}>
-          {nodeStore.nodeId}
-        </code>
-      )}
       {executor?.name == 'connector' && (
         <ConnectorConnectionBadge action={executor.options.action} className={styles.connection} connection={executor.options.connection} />
       )}

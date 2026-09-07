@@ -27,6 +27,7 @@ export interface TranslationInputProps extends Omit<InputProps, 'value' | 'onCha
   /** With a hint, translation key generation only resolves duplicate names. */
   translateKeyHint?: string
   translationFallback?: string
+  validate?: (value: string) => string | undefined
 }
 
 /** A `%key%` `rawValue$` resolves its display value through `userLocales`. */
@@ -37,6 +38,7 @@ export const TranslationInput: React.FC<TranslationInputProps> = /*#__PURE__*/ m
   useRealChange,
   translateKeyHint,
   translationFallback,
+  validate,
   ...props
 }: TranslationInputProps) {
   const currentLang = useLang()
@@ -47,9 +49,19 @@ export const TranslationInput: React.FC<TranslationInputProps> = /*#__PURE__*/ m
   const [focused, setFocused] = useState(false)
   const [localeFocused, setLocaleFocused] = useState(false)
   const [localeOpen, setLocaleOpen] = useState(false)
+  const [validationWarning, setValidationWarning] = useState<string>()
+  const validationWarningRef = useRef<string>()
   const focusedValue = translateKey != null ? displayValue : rawValue$ ? rawValue : (rawValue ?? displayValue)
 
+  const validateValue = (value: string) => {
+    const warning = validate?.(value)
+    validationWarningRef.current = warning
+    setValidationWarning(warning)
+    return warning
+  }
+
   const onChange = (value: string) => {
+    if (validateValue(value) != null) return
     if (translateKey == null || l10n?.userLocales == null || l10n.userLocales[currentLang] == null) {
       rawValue$?.set(value)
     } else {
@@ -147,11 +159,12 @@ export const TranslationInput: React.FC<TranslationInputProps> = /*#__PURE__*/ m
   return (
     <Input
       {...props}
+      ariaInvalid={validationWarning != null || props.ariaInvalid}
       className={clsx(className, focused && 'nodrag')}
       readOnly={!rawValue$}
       value={focused ? focusedValue : displayValue}
       title={focused ? focusedValue : displayValue}
-      onChange={useRealChange ? undefined : onChange}
+      onChange={useRealChange ? validateValue : onChange}
       onRealChange={useRealChange ? onChange : undefined}
       onFocus={() => {
         setFocused(true)
@@ -159,8 +172,16 @@ export const TranslationInput: React.FC<TranslationInputProps> = /*#__PURE__*/ m
         if (translateKey != null) setLocaleOpen(true)
       }}
       // Delay losing focus because input blur fires before the button receives focus.
-      onBlur={() => setTimeout(() => setFocused(false))}
+      onBlur={(input) => {
+        if (validationWarningRef.current != null) input.value = focusedValue ?? ''
+        setTimeout(() => {
+          setFocused(false)
+          validationWarningRef.current = undefined
+          setValidationWarning(undefined)
+        })
+      }}
       suffix={focused || localeOpen || localeFocused ? suffix : props.suffix}
+      warning={validationWarning ?? props.warning}
     />
   )
 })

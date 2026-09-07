@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { IconifyProvider } from '../../../designer/browser/icons/iconifyContext.tsx'
+import { nodeNameIssue } from '../../../flow/common/change.ts'
 import { ButtonGroup } from '../../../ui/browser/button-group.tsx'
 import { Button } from '../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '../../../ui/browser/dropdown-menu.tsx'
@@ -345,6 +346,13 @@ function Editor({
         onChangeNodeDescription={(nodeId, description) => void store.workspace.saveNodeDescription(nodeId, description)}
         onChangeNodeIcon={(nodeId, icon) => void store.workspace.saveNodeIcon(nodeId, icon)}
         onChangeNodeTitle={(nodeId, title) => void store.workspace.saveNodeTitle(nodeId, title)}
+        nodeTitleIssue={(nodeId, title) => {
+          if (revision == null || target == null) return
+          const graph = revision.graph(target)
+          if (graph == null) return
+          const issue = nodeNameIssue(graph, nodeId, title)
+          return issue == null ? undefined : t(`inspector.node.${issue == 'empty' ? 'nameEmpty' : 'nameDuplicate'}`)
+        }}
         onChangeInput={(nodeId, handle, value) => void store.workspace.setInputValue(nodeId, handle, value)}
         onChangeInputVariable={(nodeId, handle, name) => void store.workspace.setInputVariable(nodeId, handle, name)}
         onChangeTaskAdditionalInputs={(nodeId, inputs) => void store.workspace.saveTaskAdditionalInputs(nodeId, additionalTaskInputs(inputs))}

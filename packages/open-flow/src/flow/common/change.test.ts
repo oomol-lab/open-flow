@@ -2,9 +2,9 @@ import type { ChangeOperation, GraphNode, RevisionContent } from './change.ts'
 
 import { describe, expect, it } from 'vitest'
 import { createAuthoringId } from './authoring.ts'
-import { applyFlowChanges, FlowChangeError } from './change.ts'
+import { applyFlowChanges, FlowChangeError, nextNodeName } from './change.ts'
 import { connect } from './edgeChanges.ts'
-import { createCodeTask } from './nodeChanges.ts'
+import { createCodeTask, repairNodeNames } from './nodeChanges.ts'
 
 const port = { jsonSchema: {}, nullable: false } as const
 const target = { kind: 'flow' } as const
@@ -23,18 +23,80 @@ function revision(): RevisionContent {
 }
 
 function valueNode(value: number): GraphNode {
-  return { inputs: {}, kind: 'value', values: [{ ...port, handle: 'value', value }] }
+  return { inputs: {}, kind: 'value', name: 'Value', values: [{ ...port, handle: 'value', value }] }
 }
 
 function taskNode(): GraphNode {
   return {
     inputs: {},
     kind: 'task',
+    name: 'Task',
     task: { inputs: [{ ...port, handle: 'input' }], moduleId: 'module-main', name: 'Task', outputs: [{ ...port, handle: 'output' }] },
   }
 }
 
 describe('Flow changes', () => {
+  it('allocates familiar numeric suffixes for duplicate Node names', () => {
+    expect(nextNodeName('Review', [])).toBe('Review')
+    expect(nextNodeName('Review', ['Review'])).toBe('Review (2)')
+    expect(nextNodeName('Review', ['Review', 'Review (2)', 'Review (4)'])).toBe('Review (3)')
+    expect(nextNodeName(' Review (2) ', ['Review (2)'])).toBe('Review (3)')
+    expect(nextNodeName('Review (9)', ['Review (9)'])).toBe('Review (10)')
+  })
+
+  it('repairs missing and duplicate Node names in every graph', () => {
+    const source: RevisionContent = {
+      ...revision(),
+      document: {
+        ...revision().document,
+        graph: {
+          edges: [],
+          nodes: {
+            b: { inputs: {}, kind: 'value', name: 'Review', values: [] },
+            a: { cases: [], input: { handle: 'value', jsonSchema: {}, nullable: true }, inputs: {}, kind: 'condition', name: ' Review ' },
+            c: { inputs: {}, kind: 'value', values: [] },
+            d: { inputs: {}, kind: 'value', name: 'Review (2)', values: [] },
+          },
+        },
+        subflows: {
+          child: {
+            graph: { edges: [], nodes: { task: { inputs: {}, kind: 'task', taskId: 'shared' } } },
+            inputs: [],
+            name: 'Child',
+            outputs: [],
+          },
+        },
+        tasks: { shared: { executor: { kind: 'llm', mode: 'chat' }, inputs: [], name: 'Summarize', outputs: [] } },
+      },
+    }
+
+    const changed = applyFlowChanges(source, repairNodeNames(source))
+
+    expect(changed.document.graph.nodes.a?.name).toBe('Review (2)')
+    expect(changed.document.graph.nodes.b?.name).toBe('Review')
+    expect(changed.document.graph.nodes.c?.name).toBe('Value')
+    expect(changed.document.graph.nodes.d?.name).toBe('Review (3)')
+    expect(changed.document.subflows.child?.graph.nodes.task?.name).toBe('Summarize')
+    expect(repairNodeNames(changed)).toEqual([])
+  })
+
+  it('rejects a duplicate or empty Node name edit', () => {
+    const source = applyFlowChanges(revision(), [
+      { kind: 'graph.node.create', node: { inputs: {}, kind: 'value', name: 'First', values: [] }, nodeId: 'first', target },
+      { kind: 'graph.node.create', node: { inputs: {}, kind: 'value', name: 'Second', values: [] }, nodeId: 'second', target },
+    ])
+
+    expect(() =>
+      applyFlowChanges(source, [{ before: 'Second', field: 'name', kind: 'graph.node.field.set', nodeId: 'second', target, value: ' First ' }]),
+    ).toThrow(/name already exists/)
+    expect(() => applyFlowChanges(source, [{ before: 'Second', field: 'name', kind: 'graph.node.field.set', nodeId: 'second', target, value: '  ' }])).toThrow(
+      /cannot be empty/,
+    )
+    expect(() => applyFlowChanges(source, [{ kind: 'graph.node.create', node: { inputs: {}, kind: 'value', values: [] }, nodeId: 'missing', target }])).toThrow(
+      /cannot be empty/,
+    )
+  })
+
   it('creates short readable authoring IDs', () => {
     expect(createAuthoringId()).toMatch(/^[23456789abcdefghjkmnpqrstuvwxyz]{10}$/)
   })
@@ -217,7 +279,7 @@ describe('Flow changes', () => {
   it('applies independent node fields without replacing the node', () => {
     const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: taskNode(), nodeId: 'task', target }])
     const changed = applyFlowChanges(source, [
-      { before: undefined, field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Renamed' },
+      { before: 'Task', field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Renamed' },
       {
         before: undefined,
         handle: 'input',
@@ -281,6 +343,7 @@ describe('Flow changes', () => {
           input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: {},
           kind: 'wait',
+          name: 'Wait',
           notification: { inputs: {}, messageHandle: 'text', taskId: 'notify' },
           prompt: 'Continue?',
         },

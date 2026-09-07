@@ -170,6 +170,8 @@
       "description": "顯示名稱與逾時",
       "displayName": "顯示名稱",
       "displayNamePlaceholder": "使用定義中的名稱",
+      "nameDuplicate": "目前圖中已存在同名節點。",
+      "nameEmpty": "節點名稱不能為空。",
       "save": "儲存節點",
       "timeout": "逾時時間（毫秒）",
       "timeoutError": "逾時時間必須是以毫秒為單位的正整數。",
