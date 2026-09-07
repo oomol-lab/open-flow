@@ -10,6 +10,7 @@ const maxResponseBytes = 1024 * 1024
 const maxActionCatalogBytes = 8 * 1024 * 1024
 const catalogConcurrency = 16
 const readinessTimeoutMs = 1_000
+const responseDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false })
 
 interface RuntimeAction {
   readonly description: string
@@ -487,7 +488,7 @@ async function readJson(
     reader.releaseLock()
   }
   try {
-    return JSON.parse(Buffer.concat(chunks, bytes).toString('utf8')) as unknown
+    return JSON.parse(responseDecoder.decode(Buffer.concat(chunks, bytes))) as unknown
   } catch (error) {
     throw unavailable(error instanceof Error ? error.message : String(error))
   }
