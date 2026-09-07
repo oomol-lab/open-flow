@@ -1,5 +1,20 @@
 import type { TFunction } from 'val-i18n'
-import type { FlowDesignerViewSemanticNode } from './model.ts'
+import type { FlowDesignerViewConditionCase, FlowDesignerViewConditionNode, FlowDesignerViewSemanticNode } from './model.ts'
+
+export function conditionCaseSummary(item: FlowDesignerViewConditionCase, t: TFunction): string {
+  return item.expressions
+    .map((expression) => {
+      const operator = t(`condition.operator.${expression.operator.replace(/\s+/g, '_')}`)
+      return `${expression.input} ${operator}${expression.value === undefined ? '' : ` ${JSON.stringify(expression.value)}`}`
+    })
+    .join(item.relation == 'all' ? ' ∧ ' : ' ∨ ')
+}
+
+export function conditionBranchSummary(node: FlowDesignerViewConditionNode, output: string, t: TFunction): string {
+  const item = node.cases.find((candidate) => candidate.output == output)
+  if (item != null) return conditionCaseSummary(item, t)
+  return node.defaultOutput == output ? t('condition.default') : ''
+}
 
 export function nodeSummary(node: FlowDesignerViewSemanticNode, t: TFunction): string {
   if (node.kind == 'trigger') {
@@ -12,16 +27,7 @@ export function nodeSummary(node: FlowDesignerViewSemanticNode, t: TFunction): s
     return node.description?.trim() || ''
   }
   if (node.kind == 'condition') {
-    return (
-      node.cases
-        .map(
-          (item) =>
-            `${item.expressions.map((expression) => `${expression.input} ${expression.operator}${expression.value === undefined ? '' : ` ${JSON.stringify(expression.value)}`}`).join(item.relation == 'all' ? ' ∧ ' : ' ∨ ')} → ${item.output}`,
-        )
-        .join('\n') ||
-      node.description?.trim() ||
-      ''
-    )
+    return node.description?.trim() || ''
   }
   if (node.kind == 'wait') return node.description?.trim() || node.notice?.text.trim() || ''
   if (node.kind == 'value') {

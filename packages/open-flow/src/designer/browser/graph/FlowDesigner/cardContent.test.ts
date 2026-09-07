@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createI18n } from '../../i18n/i18n-loader.ts'
-import { imageSources, nodeSummary } from './cardContent.ts'
+import { conditionBranchSummary, imageSources, nodeSummary } from './cardContent.ts'
 
 const base = { id: 'node', title: 'Schedule', position: { x: 0, y: 0 }, inputs: [], outputs: [] }
 
@@ -38,17 +38,28 @@ describe('Canvas content', () => {
       ),
     ).toBe('Every 2 days')
   })
-  it('uses actual conditions rather than an authored explanation', () => {
-    const summary = nodeSummary(
-      {
-        ...base,
-        kind: 'condition',
-        description: 'Everyone qualifies',
-        cases: [{ expressions: [{ input: 'score', operator: '>=', value: 80 }], output: 'qualified', relation: 'all' }],
-      },
-      createI18n('en').t,
-    )
-    expect(summary).toBe('score >= 80 → qualified')
+  it('keeps a condition purpose in the card body and puts each rule on its branch', () => {
+    const node = {
+      ...base,
+      kind: 'condition' as const,
+      description: 'Route qualified applications.',
+      cases: [
+        {
+          expressions: [
+            { input: 'score', operator: '>=' as const, value: 80 },
+            { input: 'active', operator: 'is true' as const },
+          ],
+          output: 'qualified',
+          relation: 'all' as const,
+        },
+      ],
+      defaultOutput: 'review',
+    }
+    const t = createI18n('en').t
+    expect(nodeSummary(node, t)).toBe('Route qualified applications.')
+    expect(conditionBranchSummary(node, 'qualified', t)).toBe('score ≥ 80 ∧ active is true')
+    expect(conditionBranchSummary(node, 'review', t)).toBe('Default')
+    expect(conditionBranchSummary(node, 'unused', t)).toBe('')
   })
   it('recognizes raster outputs and signed image URLs without treating artifact IDs as links', () => {
     expect(

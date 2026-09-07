@@ -31,12 +31,14 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
   const problem = showError ? t('nodeStatus.hasError') : node?.run?.status == 'error' ? t('canvasCard.status.error') : undefined
   const kind = node?.kind ?? (nodeStore.nodeType == NODE_TYPE.InputNode ? 'input' : nodeStore.nodeType == NODE_TYPE.OutputNode ? 'output' : 'task')
   const inline = node?.kind == 'trigger' && summary && !summary.includes('\n') && summary.length <= 48
+  const subtitle = inline ? summary : node?.kind == 'task' ? node.executorName || t('canvasCard.kind.task') : t(`canvasCard.kind.${kind}`)
+  const distinctSubtitle = subtitle.trim().toLocaleLowerCase() == title.trim().toLocaleLowerCase() ? undefined : subtitle
   return (
     <div className={NODE_HANDLE_CLASSNAME}>
       <CanvasCard
         title={title}
         icon={<DesignerIcon src={icon} fallback={<i className={iconForNodeType(nodeStore.nodeType)} />} />}
-        subtitle={inline ? summary : node?.kind == 'task' ? node.executorName || t('canvasCard.kind.task') : t(`canvasCard.kind.${kind}`)}
+        subtitle={distinctSubtitle}
         selected={selected}
         problem={problem}
         branches={branches}
