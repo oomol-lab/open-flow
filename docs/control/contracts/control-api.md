@@ -314,8 +314,12 @@ waiting: {
 这是当前 active Wait 的投影，不是历史列表。客户端用 `nodeId` 定位 Flow 中的 Wait node，用 `waitId` 提交一次固定暂停的决议。
 Run 离开 `waiting` 后不再返回该投影；历史由 RunEvent 表达。
 
-Draft Run body 是 `{ engineContract, inputs, version: 1 }`。Live Run body 是 `{ publicationId, inputs, version: 1 }`。首次接受返回 `202`，
+Draft Run body 是 `{ engineContract, inputs, trigger, version: 1 }`。Live Run body 是 `{ publicationId, inputs, trigger, version: 1 }`。首次接受返回 `202`，
 幂等重放返回 `200`。Run 接受后不受后续 Draft change、Publish 或 Rollback 影响。
+
+`trigger` 必填，形如 `{ nodeId: string, payload: JsonValue }`，固定本次运行的起始 Trigger 和输入。缺少入口、入口不是固定 Revision 中的 Trigger，或 payload 不符合其 schema 时返回 `run.invalid`。入口及 payload 参与幂等 request digest，并随 Run 持久化；不会自动选择入口或退回整图运行。
+
+Manual Trigger 的节点结构为 `{ kind: "manual", name: string, description?: string, icon?: string }`，无输入和调度配置，`payload` 固定为空对象 `{}`。其执行出口沿普通执行边连接下游，数据输出 `payload` 的 schema 为 `{ type: "object", additionalProperties: false }`。其他 Trigger 可通过显式 payload 模拟执行，仍保留 Draft/Live Run source，不伪造外部 occurrence。
 
 首次 Run admission 在创建 Run 的权威 transaction 中确认固定 closure 使用的 Variable 均存在；缺失返回 `binding.unresolved`。幂等重放先于
 该 eligibility 检查。Run 真正开始时再在一个读取 snapshot 中解析所有 Variable value，所以排队期间的更新会用于本次执行；开始后的更新不影响

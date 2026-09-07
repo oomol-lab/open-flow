@@ -139,7 +139,9 @@
     "webhookResponseData": "응답 본문",
     "webhookStatus": "상태 코드",
     "webhookSummary": "HTTP 요청이 도착하면 실행",
-    "webhookDescription": "생성된 HTTP 엔드포인트로 JSON 객체를 수신합니다."
+    "webhookDescription": "생성된 HTTP 엔드포인트로 JSON 객체를 수신합니다.",
+    "summaryManual": "수동 트리거",
+    "manualSummary": "실행을 클릭하면 여기에서 시작합니다."
   },
   "condition": {
     "addCondition": "조건 추가",

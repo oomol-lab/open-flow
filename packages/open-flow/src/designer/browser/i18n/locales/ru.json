@@ -139,7 +139,9 @@
     "webhookResponseData": "Тело ответа",
     "webhookStatus": "Код статуса",
     "webhookSummary": "При получении HTTP-запроса",
-    "webhookDescription": "Получать JSON-объект через сгенерированный HTTP-адрес."
+    "webhookDescription": "Получать JSON-объект через сгенерированный HTTP-адрес.",
+    "summaryManual": "Ручной триггер",
+    "manualSummary": "Нажмите «Запустить», чтобы начать с этого узла."
   },
   "condition": {
     "addCondition": "Добавить условие",

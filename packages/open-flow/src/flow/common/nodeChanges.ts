@@ -40,6 +40,7 @@ interface TriggerSettingsBase {
 }
 
 export type TriggerSettings =
+  | (TriggerSettingsBase & { readonly kind: 'manual' })
   | (TriggerSettingsBase & {
       readonly inputs: Extract<TriggerNode, { readonly kind: 'webhook' }>['inputsDef']
       readonly kind: 'webhook'
@@ -199,7 +200,7 @@ export function createWait(target: Extract<GraphTarget, { readonly kind: 'flow' 
 export function createBuiltinTrigger(
   target: Extract<GraphTarget, { readonly kind: 'flow' }>,
   nodeId: string,
-  node: Extract<TriggerNode, { readonly kind: 'cron' | 'webhook' }>,
+  node: Extract<TriggerNode, { readonly kind: 'cron' | 'manual' | 'webhook' }>,
 ): readonly ChangeOperation[] {
   return [{ kind: 'graph.node.create', node, nodeId, target }]
 }
@@ -403,6 +404,9 @@ export function updateTrigger(
     operations.push({ before: trigger.description, field: 'description', kind: 'graph.node.field.set', nodeId, target, value: settings.description })
   }
   switch (settings.kind) {
+    case 'manual':
+      if (trigger.kind != 'manual') return
+      break
     case 'webhook': {
       if (trigger.kind != 'webhook') return
       const value = { inputsDef: settings.inputs, options: Object.keys(settings.options).length == 0 ? undefined : settings.options }
@@ -466,6 +470,7 @@ export function updateTriggerSchedule(
     case 'poll':
       return dequal(trigger.pollTimes, schedule) ? [] : [{ before: trigger.pollTimes, kind: 'graph.trigger.schedule.set', nodeId, value: schedule }]
     case 'integration':
+    case 'manual':
     case 'webhook':
       return
     default:

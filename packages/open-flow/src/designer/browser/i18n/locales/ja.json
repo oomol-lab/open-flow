@@ -139,7 +139,9 @@
     "webhookResponseData": "レスポンスボディ",
     "webhookStatus": "ステータスコード",
     "webhookSummary": "HTTP リクエストを受信したとき",
-    "webhookDescription": "生成された HTTP エンドポイントで JSON オブジェクトを受信します。"
+    "webhookDescription": "生成された HTTP エンドポイントで JSON オブジェクトを受信します。",
+    "summaryManual": "手動トリガー",
+    "manualSummary": "実行をクリックすると、ここから開始します。"
   },
   "condition": {
     "addCondition": "条件を追加",

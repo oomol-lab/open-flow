@@ -139,7 +139,9 @@
     "webhookResponseData": "回應內容",
     "webhookStatus": "狀態碼",
     "webhookSummary": "收到 HTTP 請求時觸發",
-    "webhookDescription": "透過產生的 HTTP 端點接收 JSON 物件。"
+    "webhookDescription": "透過產生的 HTTP 端點接收 JSON 物件。",
+    "summaryManual": "手動觸發",
+    "manualSummary": "點擊執行，從這裡開始。"
   },
   "condition": {
     "addCondition": "新增條件",

@@ -35,7 +35,9 @@
     "wait": "Wait",
     "waitDescription": "Pause the Run until an operator continues or approves it.",
     "webhook": "Webhook",
-    "webhookDescription": "Receive external events through a dedicated HTTP endpoint."
+    "webhookDescription": "Receive external events through a dedicated HTTP endpoint.",
+    "manual": "Manual trigger",
+    "manualDescription": "Start execution manually from here."
   },
   "common": {
     "cancel": "Cancel",
@@ -69,7 +71,10 @@
     "flowDesigner": "Flow Designer",
     "openBlocks": "Browse blocks",
     "quickSearchHint": "Press A for quick search.",
-    "toggleInspector": "Toggle inspector"
+    "toggleInspector": "Toggle inspector",
+    "triggerTitle": "Choose how this Flow starts",
+    "triggerDescription": "Add a trigger, then connect it to a task. Use a manual trigger to run the Flow yourself.",
+    "addTriggerToRun": "Add a trigger to run"
   },
   "contextPanel": {
     "blocks": "Blocks",
@@ -624,7 +629,10 @@
     "close": "Close run inputs",
     "description": "Provide a value for each unconnected input. Inputs with a graph connection, static value, or definition default are not shown. Values entered here apply only to this run and are not saved to the Flow.",
     "invalid": "Set every listed input to a valid JSON value before running.",
-    "title": "Run inputs"
+    "title": "Run inputs",
+    "trigger": "Start node",
+    "selectTrigger": "Select a start node",
+    "noTrigger": "Add a trigger as a start node before running."
   },
   "workspace": {
     "check": "Check the current Draft",
@@ -638,15 +646,11 @@
     "liveAndDraft": "Live + Draft",
     "loadFailed": "Couldn’t load the Draft",
     "loadFailedDescription": "Check the deployment connection, then try again.",
-    "moreActions": "More actions",
     "notChecked": "Not checked",
-    "openFlowToRun": "Open a Flow to run it.",
     "publish": "Publish",
     "publishing": "Publishing…",
     "publications": "Publications",
     "run": "Run",
-    "runDraft": "Run Draft",
-    "runLive": "Run Live",
     "runs": "Runs",
     "starting": "Starting…",
     "status": {

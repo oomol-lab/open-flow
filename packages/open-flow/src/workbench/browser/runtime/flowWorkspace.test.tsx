@@ -32,7 +32,7 @@ vi.mock('./designer/workbenchDesigner.tsx', () => ({ WorkbenchDesigner: () => nu
 
 const value = <T,>(current: T): { readonly value: T } => ({ value: current })
 
-function renderWorkspace(busy?: string) {
+function renderWorkspace(busy?: string, withTrigger = true) {
   const navigation = {
     $: { view: value('design') },
     open: vi.fn(),
@@ -43,7 +43,7 @@ function renderWorkspace(busy?: string) {
     $: {
       busy: value(busy),
       diagnostics: value(undefined),
-      designer: value({ nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }),
+      designer: value({ nodes: withTrigger ? [{ kind: 'trigger' }] : [], viewport: { x: 0, y: 0, zoom: 1 } }),
       selectedDesignerNode: value(undefined),
     },
     connectors: {
@@ -99,12 +99,8 @@ function renderWorkspace(busy?: string) {
     theme: 'light',
   })
   const main = element.props.children as ReactElement
-  const header = (main.props.children as ReactElement[])[0]! as ReactElement<{
-    readonly onRunDraft: () => void
-    readonly onRunLive: () => void
-  }>
   const editor = (main.props.children as ReactElement[])[2]!
-  return { editor, header, navigation, store }
+  return { editor, navigation, store }
 }
 
 describe('FlowWorkspace run drawer', () => {
@@ -114,14 +110,21 @@ describe('FlowWorkspace run drawer', () => {
     mocks.stateCall = 0
   })
 
-  it.each(['onRunDraft', 'onRunLive'] as const)('opens the log panel after %s starts', async (action) => {
-    const { header } = renderWorkspace()
-
-    header.props[action]()
+  it('opens the log panel after running from the canvas', async () => {
+    const { editor } = renderWorkspace()
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const designer = (view.props.children as ReactElement[])[0]!
+    designer.props.runControl.props.children[0].props.onClick()
     await Promise.resolve()
-
     expect(mocks.setVisible).toHaveBeenCalledWith(true)
     expect(mocks.setOpen).toHaveBeenCalledWith(true)
+  })
+
+  it('hides execution when the graph has no trigger', () => {
+    const { editor } = renderWorkspace(undefined, false)
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const designer = (view.props.children as ReactElement[])[0]!
+    expect(designer.props.runControl).toBeUndefined()
   })
 
   it('keeps the Designer editable while preparing a run', () => {

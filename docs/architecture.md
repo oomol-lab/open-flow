@@ -109,7 +109,7 @@ Engine Contract、部署中立 Runtime invocation、Scheduler 图执行语义、
 Engine digest、资源限制和恢复属于部署实现；`isolated-vm` RuntimeHost 只属于 Server。
 
 Flow 与每次 Subflow invocation 使用无环执行图。连线表示节点之间的执行依赖，输入映射独立声明数据来源；保存或删除执行边不会隐式创建或删除输入映射。
-每个节点在一次图调用内最多运行一次。节点等待全部直接前驱完成或跳过，在至少一条入边被选中时执行；普通根节点直接执行，无依赖的分支可以并行。
+每个节点在一次图调用内最多运行一次。节点等待全部直接前驱完成或跳过，在至少一条入边被选中时执行；Flow Run 必须固定一个 Trigger 起始节点，未连接入口的普通根节点跳过；Subflow 的普通根节点由调用启动，无依赖的分支可以并行。
 Condition 只选择首个匹配分支或 default，Wait 只选择已决议的 action；未选中的分支传播跳过状态。Trigger occurrence 只选择对应 Trigger，其他 Trigger 分支跳过。
 
 节点输入只能引用本图中经执行边可达、且在当前节点执行路径上保证已完成的祖先 output。多个 source 表示互斥分支的备选值，每次执行必须恰有一个可用值，
@@ -188,7 +188,7 @@ Server 可以显式配置独立的 LLM origin 和 token；未显式配置时，O
 LLM host。自建或自定义 Connector origin 不隐含模型能力，未配置的 Connector 或 LLM capability 必须分别 fail closed；Workbench 不能把外部服务
 暂时不可用误报为部署尚未配置。
 
-Trigger 是 Flow graph 中的 source node。Webhook、Cron、Poll 和 Integration 的确定性协议、Provider definitions、Registry 与 conformance 属于公共
+Trigger 是 Flow graph 中的 source node。Manual 由用户显式启动，不建立外部订阅或调度 binding。Webhook、Cron、Poll 和 Integration 的确定性协议、Provider definitions、Registry 与 conformance 属于公共
 package；subscription、checkpoint、调度持久化、endpoint routing 和 admission 事务属于部署实现。
 
 一次有效 Trigger occurrence 只能准入普通 Flow Run，之后复用相同的 Run、执行、事件、取消和 terminal 语义。重投 occurrence 必须通过稳定 identity

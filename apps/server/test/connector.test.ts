@@ -251,7 +251,9 @@ describe('Server Connector host', () => {
     await expect(service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v2', null, 'publish')).rejects.toMatchObject({
       code: 'connector.connection-required',
     })
-    await expect(service.control.createDraftRun(stored.flowId, stored.revisionId, 'open-flow-engine/v2', {}, 'run')).rejects.toMatchObject({
+    await expect(
+      service.control.createDraftRun(stored.flowId, stored.revisionId, 'open-flow-engine/v2', {}, 'run', { nodeId: 'start', payload: {} }),
+    ).rejects.toMatchObject({
       code: 'connector.connection-required',
     })
     active = true
@@ -436,10 +438,15 @@ describe('Server Connector host', () => {
     const created = await service.control.createFlow('test', 'Team Run', 'create-team-run', 'team-a')
     const revision = connectorFlow()
     const changed = await service.control.changeDraft('test', created.flow.flowId, created.flow.draftRevisionId, [
+      { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start', target: { kind: 'flow' } },
       { kind: 'task.create', task: revision.document.tasks.connector!, taskId: 'connector' },
       { kind: 'graph.node.create', node: revision.document.graph.nodes.connector!, nodeId: 'connector', target: { kind: 'flow' } },
+      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'connector' }, target: { kind: 'flow' } },
     ])
-    const accepted = await service.control.createDraftRun(created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v2', {}, 'team-run')
+    const accepted = await service.control.createDraftRun(created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v2', {}, 'team-run', {
+      nodeId: 'start',
+      payload: {},
+    })
     await service.waitForIdle()
 
     expect(service.run(accepted.run.runId)?.status).toBe('completed')

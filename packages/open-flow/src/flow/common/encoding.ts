@@ -237,6 +237,8 @@ function canonicalTriggerNode(trigger: TriggerNode): JsonValue {
     name: trigger.name,
   })
   switch (trigger.kind) {
+    case 'manual':
+      return common(trigger.kind)
     case 'webhook':
       return {
         ...common(trigger.kind),

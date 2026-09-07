@@ -139,7 +139,9 @@
     "webhookResponseData": "Response body",
     "webhookStatus": "Status code",
     "webhookSummary": "When an HTTP request arrives",
-    "webhookDescription": "Receive a JSON object through a generated HTTP endpoint."
+    "webhookDescription": "Receive a JSON object through a generated HTTP endpoint.",
+    "summaryManual": "Manual trigger",
+    "manualSummary": "Click Run to start execution here."
   },
   "condition": {
     "addCondition": "Add condition",

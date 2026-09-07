@@ -25,6 +25,7 @@ async function runOutcome(prepared: PreparedFlow, options: Omit<FlowRunOptions, 
         if (error instanceof TaskError) return { code: error.code, message: error.message }
         return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
       },
+      ...(options.resume == null ? { trigger: { nodeId: 'start', payload: {} } } : {}),
       ...options,
     }),
   )
@@ -62,7 +63,18 @@ function task(name: string, inputs: readonly string[], outputs: readonly string[
 
 function revision(document: RevisionContent['document'], exports: readonly string[]): RevisionContent {
   return {
-    document,
+    document: {
+      ...document,
+      graph: {
+        nodes: { start: { kind: 'manual', name: 'Start' }, ...document.graph.nodes },
+        edges: [
+          ...document.graph.edges,
+          ...Object.entries(document.graph.nodes)
+            .filter(([id, node]) => 'inputs' in node && !document.graph.edges.some((edge) => edge.target == id))
+            .map(([target]) => ({ source: 'start', target })),
+        ],
+      },
+    },
     modelVersion: 1,
     modules: {
       'module-main': {
@@ -1016,7 +1028,7 @@ describe('revision graph scheduler', () => {
     let interrupted = false
     const canceled = Effect.runFork(
       scheduleFlow(
-        { ...prepared, graph: { edges: [], nodes: { slow: { ...slow, timeoutMs: undefined } } } },
+        { ...prepared, graph: { ...prepared.graph, nodes: { ...prepared.graph.nodes, slow: { ...slow, timeoutMs: undefined } } } },
         {
           createId: () => `scheduler-${++nextId}`,
           flowId: 'main',
@@ -1029,6 +1041,7 @@ describe('revision graph scheduler', () => {
               ),
             ),
           runId: 'run-cancel',
+          trigger: { nodeId: 'start', payload: {} },
         },
       ),
     )

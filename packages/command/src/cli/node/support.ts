@@ -44,6 +44,8 @@ export interface Runtime {
 }
 
 export interface ParsedArguments {
+  readonly trigger?: string
+  readonly payload?: string
   readonly after?: number
   readonly code?: string
   readonly connection?: string
@@ -106,6 +108,7 @@ interface ApplyEdge {
 }
 
 type ApplyTrigger =
+  | { readonly kind: 'manual'; readonly name?: string }
   | { readonly kind: 'webhook'; readonly name?: string }
   | { readonly kind: 'cron'; readonly name?: string; readonly schedule?: readonly TriggerSchedule[] }
   | {
@@ -154,6 +157,8 @@ const runStatuses: ReadonlySet<RunStatus> = new Set(runStatusValues)
 
 export function parseArguments(args: readonly string[]): ParsedArguments {
   const positionals: string[] = []
+  let trigger: string | undefined
+  let payload: string | undefined
   let after: number | undefined
   let code: string | undefined
   let connection: string | undefined
@@ -203,6 +208,8 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       argument == '--name' ||
       argument == '--source' ||
       argument == '--input' ||
+      argument == '--trigger' ||
+      argument == '--payload' ||
       argument == '--status' ||
       argument == '--cursor' ||
       argument == '--limit' ||
@@ -224,6 +231,8 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       else if (argument == '--flow') flow = value
       else if (argument == '--name') name = value
       else if (argument == '--input') input = value
+      else if (argument == '--trigger') trigger = value
+      else if (argument == '--payload') payload = value
       else if (argument == '--cursor') cursor = value
       else if (argument == '--timezone') timezone = value
       else if (argument == '--set') sets.push(value)
@@ -271,6 +280,12 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       const value = argument.slice('--source='.length)
       if (value != 'draft' && value != 'live') throw new CliError('cli.invalid-arguments', '--source must be draft or live.')
       source = value
+    } else if (argument.startsWith('--trigger=')) {
+      trigger = argument.slice('--trigger='.length)
+      if (trigger.length == 0) throw new CliError('cli.invalid-arguments', '--trigger requires a value.')
+    } else if (argument.startsWith('--payload=')) {
+      payload = argument.slice('--payload='.length)
+      if (payload.length == 0) throw new CliError('cli.invalid-arguments', '--payload requires a value.')
     } else if (argument.startsWith('--input=')) {
       input = argument.slice('--input='.length)
       if (input.length == 0) throw new CliError('cli.invalid-arguments', '--input requires a value.')
@@ -298,6 +313,8 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     ...(limit == null ? {} : { limit }),
     ...(name == null ? {} : { name }),
     positionals,
+    ...(trigger == null ? {} : { trigger }),
+    ...(payload == null ? {} : { payload }),
     sets,
     source,
     ...(status == null ? {} : { status }),
@@ -810,6 +827,7 @@ export function applySpec(source: string): ApplySpec {
       const kind = applyString(trigger.kind, `triggers.${reference}.kind`)
       const name = trigger.name == null ? undefined : applyString(trigger.name, `triggers.${reference}.name`)
       switch (kind) {
+        case 'manual':
         case 'webhook':
           applyKeys(trigger, ['kind', 'name'], `triggers.${reference}`)
           return [reference, { kind, ...(name == null ? {} : { name }) }] as const

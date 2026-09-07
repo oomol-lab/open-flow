@@ -7,6 +7,8 @@ import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { Alert, AlertDescription } from '../../../../ui/browser/alert.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
+import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { FlowRunInputEditor } from '../../flowRunInputEditor.tsx'
 import { Icon } from '../icons.tsx'
@@ -74,9 +76,7 @@ function Panel({ onStarted, request, store, theme }: Props & { readonly request:
         <header>
           <div>
             <strong id="run-input-title">{t('runInput.title')}</strong>
-            <span>
-              {request.flow.name} · {t(request.source == 'draft' ? 'run.sourceDraft' : 'run.sourceLive')}
-            </span>
+            <span>{request.flow.name}</span>
           </div>
           <Button aria-label={t('runInput.close')} disabled={starting} onClick={close} size="icon-sm" type="button" variant="ghost">
             <Icon name="close" />
@@ -84,6 +84,24 @@ function Panel({ onStarted, request, store, theme }: Props & { readonly request:
         </header>
         <div className="run-input-content">
           <p id="run-input-description">{t('runInput.description')}</p>
+          <Field>
+            <FieldLabel htmlFor="run-trigger">{t('runInput.trigger')}</FieldLabel>
+            <NativeSelect
+              id="run-trigger"
+              disabled={starting}
+              value={request.triggerId ?? ''}
+              onChange={(event) => void store.selectTrigger(event.target.value)}
+            >
+              <NativeSelectOption value="" disabled>
+                {t('runInput.selectTrigger')}
+              </NativeSelectOption>
+              {request.triggers.map((trigger) => (
+                <NativeSelectOption key={trigger.nodeId} value={trigger.nodeId}>
+                  {trigger.title}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
           {request.attempted && !valid && (
             <Alert className="mb-4" variant="destructive">
               <Icon name="alert" />
@@ -98,9 +116,9 @@ function Panel({ onStarted, request, store, theme }: Props & { readonly request:
           <Button disabled={starting} onClick={close} type="button" variant="secondary">
             {t('common.cancel')}
           </Button>
-          <Button disabled={starting} type="submit">
+          <Button disabled={starting || request.triggerId == null} type="submit">
             {starting ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" name="play" />}
-            {t(starting ? 'workspace.starting' : request.source == 'draft' ? 'workspace.runDraft' : 'workspace.runLive')}
+            {t(starting ? 'workspace.starting' : 'workspace.run')}
           </Button>
         </footer>
       </form>

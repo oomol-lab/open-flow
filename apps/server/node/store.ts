@@ -565,6 +565,7 @@ export class Store {
     readonly flowId: string
     readonly idempotencyKey: string
     readonly inputs: RunInputs
+    readonly trigger: TriggerSeed
     readonly modelVersion: number
     readonly requestDigest: string
     readonly revisionDigest: string
@@ -607,6 +608,7 @@ export class Store {
     readonly flowId: string
     readonly idempotencyKey: string
     readonly inputs: RunInputs
+    readonly trigger: TriggerSeed
     readonly modelVersion: number
     readonly requestDigest: string
     readonly revisionDigest: string
@@ -697,7 +699,7 @@ export class Store {
                   runs.revision_digest AS revisionDigest, runs.run_id AS runId,
                   run_waits.action AS waitAction, run_waits.checkpoint_json AS checkpointJson,
                   run_waits.remaining_ms AS remainingMs, run_waits.wait_id AS waitId,
-                  trigger_occurrences.payload AS triggerPayload, trigger_occurrences.trigger_node_id AS triggerNodeId
+                  runs.trigger_payload AS triggerPayload, runs.trigger_node_id AS triggerNodeId
            FROM runs JOIN revisions USING (revision_id)
            LEFT JOIN trigger_occurrences USING (run_id)
            LEFT JOIN run_waits USING (run_id)
@@ -1390,7 +1392,7 @@ export class Store {
                 runs.publication_id AS publicationId,
                 runs.revision_digest AS revisionDigest, runs.revision_id AS revisionId,
                 runs.run_id AS runId, runs.source, runs.started_at AS startedAt, runs.status,
-                trigger_occurrences.trigger_node_id AS triggerNodeId
+                runs.trigger_node_id AS triggerNodeId
          FROM runs LEFT JOIN trigger_occurrences USING (run_id)
          WHERE ${condition}
          ${suffix}`,
@@ -1448,6 +1450,7 @@ export class Store {
       ...input,
       idempotencyKey: `trigger:${randomUUID()}`,
       inputs: {},
+      trigger: { nodeId: input.triggerNodeId, payload: input.payload },
     })
     this.#database
       .prepare('INSERT INTO trigger_occurrences (occurrence_id, run_id, trigger_node_id, payload) VALUES (?, ?, ?, ?)')
@@ -1476,6 +1479,7 @@ export class Store {
     readonly flowId: string
     readonly idempotencyKey: string
     readonly inputs: RunInputs
+    readonly trigger: TriggerSeed
     readonly modelVersion: number
     readonly publicationId?: string
     readonly requestDigest: string
@@ -1490,8 +1494,8 @@ export class Store {
         `INSERT INTO runs (
            run_id, idempotency_key, request_digest, revision_id, revision_digest, flow_id,
            engine_contract, engine_digest, inputs, status, source, closure_digest,
-           model_version, created_at, publication_id, connector_team_id
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?)`,
+           model_version, created_at, publication_id, connector_team_id, trigger_node_id, trigger_payload
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         runId,
@@ -1509,6 +1513,8 @@ export class Store {
         this.#clock(),
         input.publicationId ?? null,
         connectorTeamId ?? null,
+        input.trigger.nodeId,
+        JSON.stringify(input.trigger.payload),
       )
     this.#database.prepare('INSERT INTO work (run_id) VALUES (?)').run(runId)
     const payload = {}

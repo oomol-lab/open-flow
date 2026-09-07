@@ -604,7 +604,7 @@ function runGraph(
         if (!('inputs' in node)) return
         const edges = incoming.get(nodeId) ?? []
         if (!edges.every((edge) => settled(edge.source))) return
-        if (edges.length > 0 && !edges.some(selected)) {
+        if ((edges.length == 0 && target.kind == 'flow') || (edges.length > 0 && !edges.some(selected))) {
           skipped.add(nodeId)
           runNode(
             Effect.gen(function* () {
@@ -702,7 +702,7 @@ function runGraph(
               if (!settled(id)) continue
               const edges = incoming.get(id) ?? []
               if (!edges.every((edge) => settled(edge.source))) throw new Error('Checkpoint node dependencies are incomplete.')
-              const runnable = edges.length == 0 || edges.some(selected)
+              const runnable = (edges.length == 0 && target.kind == 'subflow') || edges.some(selected)
               if (completed.has(id) != runnable) throw new Error('Checkpoint node state conflicts with its execution branches.')
               const result = completed.get(id)
               if (result != null) {
@@ -712,7 +712,7 @@ function runGraph(
                   throw new Error('Checkpoint branch result is invalid.')
               }
             }
-            if (triggers > 1) throw new Error('Checkpoint contains multiple selected Triggers.')
+            if (target.kind == 'flow' && triggers != 1) throw new Error('Checkpoint must contain exactly one selected Trigger.')
             for (const [id, values] of Object.entries(launch)) {
               const node = target.graph.nodes[id]!
               if (!('inputs' in node) || Object.keys(values).some((handle) => nodePorts(context.prepared, node)[handle] == null))
@@ -726,7 +726,7 @@ function runGraph(
         if (node?.kind != 'wait' || !node.actions.some((action) => action == resume.action))
           return yield* Effect.fail(new Error('Flow Run checkpoint resolution does not match the prepared Wait node.'))
         const waitEdges = incoming.get(saved.nodeId) ?? []
-        if (!waitEdges.every((edge) => settled(edge.source)) || (waitEdges.length > 0 && !waitEdges.some(selected)))
+        if (!waitEdges.every((edge) => settled(edge.source)) || waitEdges.length == 0 || !waitEdges.some(selected))
           return yield* Effect.fail(new Error('Flow Run checkpoint Wait dependencies are incomplete.'))
         yield* commit(saved.nodeId, saved.jobId, validateOutputs(saved.nodeId, node, { [resume.action]: saved.value }))
         started.add(saved.nodeId)
@@ -812,6 +812,9 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
     const checkpoint = options.resume == null ? undefined : decodeFlowRunCheckpoint(options.resume.checkpoint)
     if (checkpoint != null && new TextEncoder().encode(JSON.stringify(checkpoint)).byteLength > 16 * 1024 * 1024) {
       return yield* Effect.fail(new Error('Flow Run checkpoint exceeds 16 MiB.'))
+    }
+    if (checkpoint == null && options.trigger == null) {
+      return yield* Effect.fail(new Error('A Flow Run requires a Trigger seed.'))
     }
     const triggerNode = options.trigger == null ? undefined : prepared.graph.nodes[options.trigger.nodeId]
     if (options.trigger != null && (triggerNode == null || 'inputs' in triggerNode)) {

@@ -1,4 +1,4 @@
-import type { KeyboardEvent, PointerEvent, ReactElement } from 'react'
+import type { KeyboardEvent, PointerEvent, ReactElement, ReactNode } from 'react'
 import type { ReadonlyVal } from 'value-enhancer'
 import type { EditorDisposable } from '../../../../base/browser/stringEditor.ts'
 import type {
@@ -31,8 +31,8 @@ import { Icon } from '../icons.tsx'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
 
 interface Props {
-  readonly runAction?: React.ReactNode
   readonly inspectorContainer?: HTMLElement | null
+  readonly runControl?: ReactNode
   readonly addNodeOptions: readonly AddNodeOption[]
   readonly blocksOpen: boolean
   readonly disabled: boolean
@@ -234,7 +234,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
     focusNodeRequest,
     inspectorOpen,
     inspectorContainer,
-    runAction,
     model,
     onAddNode,
     onConnect,
@@ -264,6 +263,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
     provideAddNodeOptions,
     onSelectNodes,
     onToggleInspector,
+    runControl,
     selectedNodeIds,
     target,
     theme,
@@ -413,7 +413,9 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
       screenPosition: screenPosition(canvasPosition),
     })
   }
-  const recommendedOptions = ['javascript', 'llm:chat', 'trigger:webhook'].flatMap((id) => {
+  const manualTrigger = staticOptions.get('trigger:manual')
+  const needsTrigger = target?.kind == 'flow' && !model.nodes.some((node) => node.kind == 'trigger')
+  const recommendedOptions = (target?.kind == 'flow' ? ['trigger:webhook', 'trigger:cron'] : ['javascript', 'llm:chat']).flatMap((id) => {
     const option = staticOptions.get(id)
     return option == null ? [] : [option]
   })
@@ -509,7 +511,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
             >
               <Icon name="panel" />
             </Button>
-            {runAction}
           </div>
         }
         onAddNode={async (itemId, position, connection) => {
@@ -565,6 +566,20 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         }}
         selectedNodeIds={selectedNodeIds}
       />
+      {runControl != null && <div className="designer-run-control">{runControl}</div>}
+      {needsTrigger && model.nodes.length > 0 && manualTrigger != null && (
+        <div className="designer-run-control">
+          <Button
+            disabled={disabled}
+            onClick={() => void addRecommended(manualTrigger)}
+            title={t('designer.triggerDescription')}
+            type="button"
+            variant="outline"
+          >
+            <Icon data-icon="inline-start" name="plus" /> {t('designer.addTriggerToRun')}
+          </Button>
+        </div>
+      )}
       <Badge className="designer-overlay top-left" variant="secondary">
         <span className="status-dot neutral" />
         {t('designer.draftBadge', {
@@ -577,14 +592,20 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
             <Icon name={target.kind == 'flow' ? 'flow' : 'subflow'} size={22} />
           </span>
           <strong>
-            {t('designer.emptyTitle', {
+            {t(target.kind == 'flow' ? 'designer.triggerTitle' : 'designer.emptyTitle', {
               kind: t(target.kind == 'flow' ? 'common.flow' : 'common.subflow'),
             })}
           </strong>
-          <span className="canvas-empty-description">{t('designer.emptyDescription')}</span>
-          <Button disabled={disabled} onClick={openAddNode} type="button">
-            <Icon data-icon="inline-start" name="plus" /> {t('designer.addFirstNode')}
-          </Button>
+          <span className="canvas-empty-description">{t(target.kind == 'flow' ? 'designer.triggerDescription' : 'designer.emptyDescription')}</span>
+          {target.kind == 'flow' ? (
+            <Button disabled={disabled || manualTrigger == null} onClick={() => manualTrigger != null && void addRecommended(manualTrigger)} type="button">
+              <Icon data-icon="inline-start" name="plus" /> {t('addNode.manual')}
+            </Button>
+          ) : (
+            <Button disabled={disabled} onClick={openAddNode} type="button">
+              <Icon data-icon="inline-start" name="plus" /> {t('designer.addFirstNode')}
+            </Button>
+          )}
           {recommendedOptions.length > 0 && (
             <div className="canvas-empty-recommendations">
               {recommendedOptions.map((option) => (

@@ -533,6 +533,13 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
     Object.entries(spec.triggers).map(async ([reference, trigger]) => {
       const triggerId = createAuthoringId()
       switch (trigger.kind) {
+        case 'manual': {
+          const name = trigger.name ?? 'Manual trigger'
+          return {
+            identity: { kind: trigger.kind, name, reference, triggerId },
+            operations: createBuiltinTrigger(selected.target, triggerId, { kind: 'manual', name }),
+          }
+        }
         case 'webhook': {
           const name = trigger.name ?? 'Webhook'
           return {

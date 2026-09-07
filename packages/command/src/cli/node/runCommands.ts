@@ -1,9 +1,11 @@
-import type { RunDetails, RunEvent, RunEvents } from '@oomol-lab/open-flow/control-api'
+import type { JsonValue, RunDetails, RunEvent, RunEvents } from '@oomol-lab/open-flow/control-api'
 import type { Runtime, ParsedArguments } from './support.ts'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import {
   CliError,
+  argumentText,
+  exactTrigger,
   eventText,
   publicationById,
   publicationPageLimit,
@@ -19,17 +21,38 @@ import {
 } from './support.ts'
 
 export async function createRunCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<void> {
-  requireCount(operands, 1, 'oo flow run <flow> [--source draft|live] [--input <json|@file|->] [--wait] [--json]')
+  requireCount(
+    operands,
+    1,
+    'oo flow run <flow> [--source draft|live] [--trigger <name|id>] [--payload <json|@file|->] [--input <json|@file|->] [--wait] [--json]',
+  )
   const flow = await referencedFlow(client, operands[0]!)
   const inputs = await runInputs(args, runtime)
-  let created: RunDetails
-  if (args.source == 'draft') {
-    created = await client.createDraftRun(flow.flowId, flow.draftRevisionId, { inputs })
-  } else {
-    const live = await client.getLive(flow.flowId)
-    if (live.publication == null) throw new CliError('live.not-found', `Flow ${JSON.stringify(operands[0])} has no Live Publication.`)
-    created = await client.createLiveRun(live.publication.publicationId, { inputs })
+  const live = args.source == 'live' ? await client.getLive(flow.flowId) : undefined
+  if (args.source == 'live' && live?.publication == null) throw new CliError('live.not-found', `Flow ${JSON.stringify(operands[0])} has no Live Publication.`)
+  const revisionId = live?.publication?.revisionId ?? flow.draftRevisionId
+  const revision = await client.getRevision(flow.flowId, revisionId)
+  const triggers = Object.entries(revision.content.document.graph.nodes).filter(([, node]) => !('inputs' in node))
+  const only = triggers.length == 1 && triggers[0]?.[1].kind == 'manual' ? triggers[0][0] : undefined
+  const reference = args.trigger ?? only
+  if (reference == null)
+    throw new CliError('run.trigger-required', 'Choose a start node with --trigger <name|id>.', {
+      candidates: triggers.map(([triggerId, node]) => ({ triggerId, name: node.name })),
+    })
+  const selected = exactTrigger(revision.content, reference)
+  let payload: JsonValue = {}
+  if (args.payload != null) {
+    const text = await argumentText(args.payload, '--payload', 'run.input-unreadable', runtime)
+    try {
+      payload = JSON.parse(text) as JsonValue
+    } catch {
+      throw new CliError('run.input-invalid', 'Trigger payload must be valid JSON.')
+    }
   }
+  const trigger = { nodeId: selected.triggerId, payload }
+  let created: RunDetails
+  if (live?.publication != null) created = await client.createLiveRun(live.publication.publicationId, { inputs, trigger })
+  else created = await client.createDraftRun(flow.flowId, revisionId, { inputs, trigger })
   if (args.wait) created = await waitForRun(client, created, runtime)
   write(runtime, args.json, { kind: 'run.create', run: created, version: 1 }, runText(created))
 }

@@ -112,7 +112,18 @@ describe('Execution graph scheduling', () => {
         },
       },
     }
-    const prepared = await prepareFlow(revision(graph), currentEngineContract)
+    const prepared = await prepareFlow(
+      revision({
+        nodes: { start: { kind: 'manual', name: 'Start' }, ...graph.nodes },
+        edges: [
+          ...graph.edges,
+          ...Object.keys(graph.nodes)
+            .filter((id) => !graph.edges.some((edge) => edge.target == id))
+            .map((target) => ({ source: 'start', target })),
+        ],
+      }),
+      currentEngineContract,
+    )
     expect(prepared.kind).toBe('prepared')
     if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
     const calls: unknown[] = []
@@ -123,6 +134,7 @@ describe('Execution graph scheduling', () => {
         createId: () => String(++id),
         flowId: 'main',
         runId: 'run',
+        trigger: { nodeId: 'start', payload: {} },
         emit: (event) =>
           Effect.sync(() => {
             if (event.type == 'node.skipped') skipped.push(event.nodeId)
@@ -158,11 +170,24 @@ describe('Execution graph scheduling', () => {
         after: { ...task, inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'before', output: 'value' }] } } },
       },
     }
-    const prepared = await prepareFlow(revision(graph), currentEngineContract)
+    const prepared = await prepareFlow(
+      revision({
+        nodes: { start: { kind: 'manual', name: 'Start' }, ...graph.nodes },
+        edges: [
+          ...graph.edges,
+          ...Object.keys(graph.nodes)
+            .filter((id) => !graph.edges.some((edge) => edge.target == id))
+            .map((target) => ({ source: 'start', target })),
+        ],
+      }),
+      currentEngineContract,
+    )
     if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
     let id = 0
     const options = { createId: () => String(++id), flowId: 'main', runId: 'run' }
-    const first = await Effect.runPromise(runFlow(prepared.flow, { ...options, invokeTask: () => Effect.succeed({ value: 42 }) }))
+    const first = await Effect.runPromise(
+      runFlow(prepared.flow, { ...options, trigger: { nodeId: 'start', payload: {} }, invokeTask: () => Effect.succeed({ value: 42 }) }),
+    )
     if (first.kind != 'waiting') throw new Error('Expected Wait.')
     const calls: unknown[] = []
     await Effect.runPromise(

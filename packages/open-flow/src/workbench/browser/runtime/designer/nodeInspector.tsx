@@ -1083,6 +1083,9 @@ function TriggerDefinition({
           const common = { ...(description.trim() == '' ? {} : { description: description.trim() }), name: name.trim() }
           let settings: TriggerSettings
           switch (trigger.kind) {
+            case 'manual':
+              settings = { ...common, kind: trigger.kind }
+              break
             case 'webhook':
               settings = { ...common, inputs: trigger.inputsDef, kind: trigger.kind, options: trigger.options ?? {} }
               break

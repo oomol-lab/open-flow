@@ -49,6 +49,14 @@
     right: 15px;
   }
 
+  .designer-run-control {
+    position: absolute;
+    z-index: 5;
+    bottom: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
   .designer-actions {
     display: flex;
     align-items: center;

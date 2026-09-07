@@ -77,10 +77,6 @@
     gap: 4px;
   }
 
-  .workspace-more {
-    display: flex;
-  }
-
   .action-help {
     display: inline-flex;
   }

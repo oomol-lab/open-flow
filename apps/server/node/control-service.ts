@@ -24,7 +24,7 @@ import type {
 } from '@oomol-lab/open-flow/control-api'
 import type { ChangeOperation, JsonValue, RevisionContent, TriggerKeySnapshot, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
-import type { FlowRunOptions } from '@oomol-lab/open-flow/scheduler'
+import type { FlowRunOptions, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
 import type { ConnectorHost } from './connector.ts'
 import type { PublicationAcceptance, StoredControlRun, StoredPresentation, StoredFlow, StoredFlowRevision, StoredPublication } from './store.ts'
 import type { StoredTriggerActivity, StoredTriggerBinding } from './trigger-store.ts'
@@ -32,7 +32,7 @@ import type { StoredTriggerActivity, StoredTriggerBinding } from './trigger-stor
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { applyFlowChanges, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
 import { canonicalJsonBytes, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
-import { codeActions, flowClosure, prepareFlow, validateFlow, validateFlowInputs, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
+import { codeActions, flowClosure, prepareFlow, validateFlow, validateFlowInputs, validRunTrigger, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { randomUUID } from 'node:crypto'
 import { checkCodeActions, ConnectorTaskError } from './connector.ts'
@@ -575,8 +575,9 @@ export class ControlService {
     engineContract: string,
     inputs: RunInputs,
     idempotencyKey: string,
+    trigger: TriggerSeed,
   ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
-    const requestDigest = await digestBytes(canonicalJsonBytes({ engineContract, flowId, inputs, kind: 'draft', revisionId }))
+    const requestDigest = await digestBytes(canonicalJsonBytes({ engineContract, flowId, inputs, trigger: { ...trigger }, kind: 'draft', revisionId }))
     const existing = this.store.runRequest(idempotencyKey)
     if (existing != null) {
       if (existing.requestDigest != requestDigest || existing.source != 'draft') {
@@ -601,6 +602,7 @@ export class ControlService {
     if (Object.values(fixed.flow.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) && this.resolveWaitPublicOrigin() == null) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
     }
+    if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and payload.')
     await checkCodeActions(codeActions(fixed.flow), this.resolveConnector(), this.store.connectorTeam(flowId))
     if (validateFlowInputs(content, inputs) != 'valid') throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
     const accepted = this.store.acceptControlRun({
@@ -608,6 +610,7 @@ export class ControlService {
       flowId,
       idempotencyKey,
       inputs,
+      trigger,
       modelVersion: content.modelVersion,
       requestDigest,
       revisionDigest: stored.digest,
@@ -635,8 +638,13 @@ export class ControlService {
     }
   }
 
-  async createLiveRun(publicationId: string, inputs: RunInputs, idempotencyKey: string): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
-    const requestDigest = await digestBytes(canonicalJsonBytes({ inputs, kind: 'live', publicationId }))
+  async createLiveRun(
+    publicationId: string,
+    inputs: RunInputs,
+    idempotencyKey: string,
+    trigger: TriggerSeed,
+  ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
+    const requestDigest = await digestBytes(canonicalJsonBytes({ inputs, trigger: { ...trigger }, kind: 'live', publicationId }))
     const existing = this.store.runRequest(idempotencyKey)
     if (existing != null) {
       if (existing.requestDigest != requestDigest || existing.source != 'live') {
@@ -676,6 +684,7 @@ export class ControlService {
     if (Object.values(fixed.flow.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) && this.resolveWaitPublicOrigin() == null) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
     }
+    if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and payload.')
     const inputsValid = validateFlowInputs(content, inputs) == 'valid'
     if (!inputsValid) throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
     if (fixed.flow.closureDigest != livePublication.closureDigest || content.modelVersion != livePublication.modelVersion) {
@@ -688,6 +697,7 @@ export class ControlService {
       flowId,
       idempotencyKey,
       inputs,
+      trigger,
       modelVersion: livePublication.modelVersion,
       requestDigest,
       revisionDigest: livePublication.revisionDigest,

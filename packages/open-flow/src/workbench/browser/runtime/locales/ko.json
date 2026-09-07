@@ -35,7 +35,9 @@
     "wait": "대기",
     "waitDescription": "운영자가 계속하거나 승인할 때까지 Run을 일시 중지합니다.",
     "webhook": "Webhook",
-    "webhookDescription": "전용 HTTP 엔드포인트로 외부 이벤트를 수신합니다."
+    "webhookDescription": "전용 HTTP 엔드포인트로 외부 이벤트를 수신합니다.",
+    "manual": "수동 트리거",
+    "manualDescription": "여기에서 수동으로 실행을 시작합니다."
   },
   "common": {
     "cancel": "취소",
@@ -69,7 +71,10 @@
     "flowDesigner": "Flow 디자이너",
     "openBlocks": "블록 찾아보기",
     "quickSearchHint": "A 키를 누르면 빠른 검색이 열립니다.",
-    "toggleInspector": "인스펙터 표시 전환"
+    "toggleInspector": "인스펙터 표시 전환",
+    "triggerTitle": "Flow 시작 방식 선택",
+    "triggerDescription": "트리거를 추가한 다음 작업에 연결하세요. 수동 트리거를 사용하면 클릭하여 실행할 수 있습니다.",
+    "addTriggerToRun": "실행하려면 트리거 추가"
   },
   "contextPanel": {
     "blocks": "블록",
@@ -624,7 +629,10 @@
     "close": "실행 입력 닫기",
     "description": "연결되지 않은 각 입력에 값을 지정하세요. 그래프 연결, 정적 값 또는 정의된 기본값이 있는 입력은 표시되지 않습니다. 여기에 입력한 값은 이번 실행에만 사용되며 Flow에 저장되지 않습니다.",
     "invalid": "실행하기 전에 나열된 모든 입력에 유효한 JSON 값을 설정하세요.",
-    "title": "실행 입력"
+    "title": "실행 입력",
+    "trigger": "시작 노드",
+    "selectTrigger": "시작 노드 선택",
+    "noTrigger": "실행하기 전에 시작 노드로 사용할 트리거를 추가하세요."
   },
   "workspace": {
     "check": "현재 초안 검사",
@@ -638,15 +646,11 @@
     "liveAndDraft": "라이브 + 초안",
     "loadFailed": "초안을 불러오지 못했습니다",
     "loadFailedDescription": "배포 연결을 확인한 뒤 다시 시도하세요.",
-    "moreActions": "추가 작업",
     "notChecked": "검사 안 됨",
-    "openFlowToRun": "실행하려면 Flow를 여세요.",
     "publish": "게시",
     "publishing": "게시하는 중…",
     "publications": "게시 기록",
     "run": "실행",
-    "runDraft": "초안 실행",
-    "runLive": "라이브 실행",
     "runs": "실행 기록",
     "starting": "시작하는 중…",
     "status": {

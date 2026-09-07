@@ -26,7 +26,7 @@ import type {
 import type { DesignerTarget } from './designer/flowChanges.ts'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionView.ts'
 
-import { variableInputCompatible } from '../../../flow/common/semantics.ts'
+import { triggerPayloadSchema, variableInputCompatible } from '../../../flow/common/semantics.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
 
@@ -404,19 +404,10 @@ function executorName(task: TaskDefinition | undefined, connectionRequired: bool
   return task.executor.kind == 'llm' ? (t?.('designer.executorLlm') ?? 'llm') : (t?.('designer.executorConnector') ?? 'connector')
 }
 
-function triggerPayloadSchema(trigger: TriggerNode): JsonValue {
-  if (trigger.kind == 'poll' || trigger.kind == 'integration') return trigger.definition.payloadSchema
-  if (trigger.kind == 'cron') return { additionalProperties: false, type: 'object' }
-  return {
-    additionalProperties: false,
-    properties: Object.fromEntries(trigger.inputsDef.map((input) => [input.handle, input.jsonSchema])),
-    required: trigger.inputsDef.filter((input) => !input.nullable && !Object.hasOwn(input, 'value')).map((input) => input.handle),
-    type: 'object',
-  }
-}
-
 function triggerIcon(trigger: TriggerNode): string {
   switch (trigger.kind) {
+    case 'manual':
+      return ':carbon:play:'
     case 'cron':
       return ':carbon:time:'
     case 'integration':
@@ -630,6 +621,9 @@ function triggerConfigFields(triggerId: string, trigger: TriggerNode, diagnostic
 function triggerDesignerNode(triggerId: string, trigger: TriggerNode, position: Point, diagnostics: readonly Diagnostic[]): DesignerNode {
   let presentation: FlowDesignerViewTriggerNode['presentation']
   switch (trigger.kind) {
+    case 'manual':
+      presentation = { kind: trigger.kind, schedules: [] }
+      break
     case 'cron':
       presentation = { kind: trigger.kind, schedules: trigger.cronTimes }
       break

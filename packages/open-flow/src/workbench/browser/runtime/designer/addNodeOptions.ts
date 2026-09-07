@@ -31,6 +31,7 @@ type AddTrigger =
       readonly definition: TriggerKeySnapshot
     }
   | { readonly kind: 'connect'; readonly provider: string }
+  | { readonly kind: 'manual' }
   | { readonly kind: 'cron' }
   | { readonly kind: 'webhook' }
 
@@ -152,6 +153,17 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: DesignerT
   const group = t('addNode.triggers')
   return [
     {
+      description: t('addNode.manualDescription'),
+      group,
+      id: 'trigger:manual',
+      icon: ':carbon:play:',
+      inputs: [],
+      kind: 'trigger',
+      label: t('addNode.manual'),
+      outputs: [{ handle: 'payload', jsonSchema: { additionalProperties: false, type: 'object' } }],
+      trigger: { kind: 'manual' },
+    },
+    {
       description: t('addNode.webhookDescription'),
       group,
       id: 'trigger:webhook',
@@ -216,6 +228,8 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, tar
     case 'trigger': {
       if (!('trigger' in option) || option.trigger.kind == 'connect') return
       switch (option.trigger.kind) {
+        case 'manual':
+          return { kind: 'manual', name: t('addNode.manual') }
         case 'webhook':
           return { kind: 'webhook', name: t('addNode.webhook') }
         case 'cron':

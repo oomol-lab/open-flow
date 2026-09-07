@@ -352,11 +352,11 @@ export class WorkbenchStore {
     await this.connectors.refresh(force)
   }
 
-  public async requestDraftRun() {
+  public async requestDraftRun(triggerId?: string) {
     const flow = this.workspace.$.targetFlow.value
     const draft = this.workspace.$.draft.value
     if (flow == null || draft == null) return 'unavailable' as const
-    return await this.runRequests.requestDraft(flow, draft)
+    return await this.runRequests.requestDraft(flow, draft, triggerId)
   }
 
   public async requestLiveRun() {

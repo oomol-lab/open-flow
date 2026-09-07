@@ -153,8 +153,10 @@ it('recovers a process crash after the start barrier as one indeterminate termin
       body: JSON.stringify({
         expectedRevisionId: flow.draftRevisionId,
         operations: [
+          { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start', target: { kind: 'flow' } },
           { kind: 'module.create', module: revision.modules.main, moduleId: 'main' },
           { kind: 'graph.node.create', node: revision.document.graph.nodes.task, nodeId: 'task', target: { kind: 'flow' } },
+          { kind: 'graph.edge.connect', edge: { source: 'start', target: 'task' }, target: { kind: 'flow' } },
         ],
         version: 1,
       }),
@@ -164,7 +166,7 @@ it('recovers a process crash after the start barrier as one indeterminate termin
   )
   const accepted = await json<{ readonly runId: string }>(
     await fetch(`${app.origin}/v1/flows/${flow.flowId}/revisions/${changed.revision.revisionId}/runs`, {
-      body: JSON.stringify({ engineContract: 'open-flow-engine/v2', inputs: {}, version: 1 }),
+      body: JSON.stringify({ engineContract: 'open-flow-engine/v2', inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
       headers: { 'content-type': 'application/json', cookie, 'idempotency-key': 'crash' },
       method: 'POST',
     }),

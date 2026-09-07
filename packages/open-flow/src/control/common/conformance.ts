@@ -106,6 +106,19 @@ function addValueNode(harness: ControlApiConformanceHarness, flowId: string, rev
   )
 }
 
+async function addManualTrigger(harness: ControlApiConformanceHarness, flowId: string, revisionId: string): Promise<string> {
+  return changedRevisionId(
+    await json(
+      await changeRequest(harness, flowId, revisionId, [
+        { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start', target: { kind: 'flow' } },
+      ]),
+      200,
+      'Add manual trigger',
+    ),
+    'Manual trigger Revision',
+  )
+}
+
 function changedRevisionId(change: RecordValue, message: string): string {
   return requiredString(record(change.revision, `${message} revision`).revisionId, `${message} revisionId`)
 }
@@ -158,7 +171,7 @@ function rollbackRequest(harness: ControlApiConformanceHarness, flowId: string, 
 
 function liveRunRequest(harness: ControlApiConformanceHarness, publicationId: string, key: string): Promise<Response> {
   return request(harness, '/v1/runs', {
-    body: JSON.stringify({ inputs: {}, publicationId, version: 1 }),
+    body: JSON.stringify({ inputs: {}, trigger: { nodeId: 'start', payload: {} }, publicationId, version: 1 }),
     headers: { 'idempotency-key': key },
     method: 'POST',
   })
@@ -355,7 +368,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
     async verify(harness) {
       const flow = await createFlow(harness, 'Run flow', 'run-flow')
       const flowId = requiredString(flow.flowId, 'Run Flow flowId')
-      const draftRevisionId = requiredString(flow.draftRevisionId, 'Run Flow revisionId')
+      const draftRevisionId = await addManualTrigger(harness, flowId, requiredString(flow.draftRevisionId, 'Run Flow revisionId'))
       const checked = await json(
         await request(harness, `/v1/flows/${flowId}/revisions/${draftRevisionId}/check`, {
           body: JSON.stringify({ engineContract, version: 1 }),
@@ -366,19 +379,42 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       )
       equal(checked.valid, true, 'Flow validity')
       const runPath = `/v1/flows/${flowId}/revisions/${draftRevisionId}/runs`
+      for (const trigger of [undefined, { nodeId: 'missing', payload: {} }, { nodeId: 'start', payload: { unexpected: true } }]) {
+        await error(
+          await request(harness, runPath, {
+            body: JSON.stringify({ engineContract, inputs: {}, trigger, version: 1 }),
+            headers: { 'idempotency-key': `invalid-entry-${JSON.stringify(trigger)}` },
+            method: 'POST',
+          }),
+          400,
+          'run.invalid',
+          'Reject invalid start node or payload',
+        )
+      }
       const create = () =>
         request(harness, runPath, {
-          body: JSON.stringify({ engineContract, inputs: {}, version: 1 }),
+          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
           headers: { 'idempotency-key': 'draft-run' },
           method: 'POST',
         })
       const run = await json(await create(), 202, 'Create Draft Run')
       const runId = requiredString(run.runId, 'Draft Run runId')
       equal(await json(await create(), 200, 'Replay Draft Run'), run, 'Replayed Draft Run')
+      await error(
+        await request(harness, runPath, {
+          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'another', payload: {} }, version: 1 }),
+          headers: { 'idempotency-key': 'draft-run' },
+          method: 'POST',
+        }),
+        409,
+        'run.conflict',
+        'Changing the entry conflicts with the original Run request',
+      )
+
       await error(await request(harness, `/v1/runs/${runId}/result`), 409, 'run.not-terminal', 'Read queued Run result')
       const secondRun = await json(
         await request(harness, runPath, {
-          body: JSON.stringify({ engineContract, inputs: {}, version: 1 }),
+          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
           headers: { 'idempotency-key': 'draft-run-second' },
           method: 'POST',
         }),
@@ -437,7 +473,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
     async verify(harness) {
       const flow = await createFlow(harness, 'Wait flow', 'wait-flow')
       const flowId = requiredString(flow.flowId, 'Wait Flow flowId')
-      const initialRevisionId = requiredString(flow.draftRevisionId, 'Wait Flow revisionId')
+      const initialRevisionId = await addManualTrigger(harness, flowId, requiredString(flow.draftRevisionId, 'Wait Flow revisionId'))
       const changed = await json(
         await changeRequest(harness, flowId, initialRevisionId, [
           {
@@ -453,6 +489,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
             nodeId: 'approval',
             target: { kind: 'flow' },
           },
+          { kind: 'graph.edge.connect', edge: { source: 'start', target: 'approval' }, target: { kind: 'flow' } },
         ]),
         200,
         'Create Wait',
@@ -462,7 +499,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       const create = async (key: string, message: string) =>
         json(
           await request(harness, runPath, {
-            body: JSON.stringify({ engineContract, inputs: {}, version: 1 }),
+            body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
             headers: { 'idempotency-key': key },
             method: 'POST',
           }),
@@ -597,7 +634,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       await error(await check(missingRevision, engineContract), 404, 'flow.not-found', 'Check missing Revision')
       const run = (targetRevision: string, contract: string, key: string) =>
         request(harness, `/v1/flows/${flowId}/revisions/${targetRevision}/runs`, {
-          body: JSON.stringify({ engineContract: contract, inputs: {}, version: 1 }),
+          body: JSON.stringify({ engineContract: contract, inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
           headers: { 'idempotency-key': key },
           method: 'POST',
         })
@@ -613,7 +650,7 @@ export const publicationControlApiConformanceCases: readonly ControlApiConforman
     async verify(harness) {
       const flow = await createFlow(harness, 'Publication flow', 'publication-flow')
       const flowId = requiredString(flow.flowId, 'Publication Flow flowId')
-      const draftRevisionId = requiredString(flow.draftRevisionId, 'Publication Flow revisionId')
+      const draftRevisionId = await addManualTrigger(harness, flowId, requiredString(flow.draftRevisionId, 'Publication Flow revisionId'))
       equal((await json(await request(harness, `/v1/flows/${flowId}/live`), 200, 'Read Live')).status, 'not-published', 'Initial Live status')
       const publish = () => publishRequest(harness, flowId, draftRevisionId, null, 'publication-first')
       const completed = await completePublish(harness, await publish(), 202, 'Publish Flow')
@@ -663,7 +700,7 @@ export const publicationControlApiConformanceCases: readonly ControlApiConforman
     async verify(harness) {
       const flow = await createFlow(harness, 'Rollback flow', 'rollback-flow')
       const flowId = requiredString(flow.flowId, 'Rollback Flow flowId')
-      const firstRevisionId = requiredString(flow.draftRevisionId, 'Rollback Flow revisionId')
+      const firstRevisionId = await addManualTrigger(harness, flowId, requiredString(flow.draftRevisionId, 'Rollback Flow revisionId'))
       const first = (
         await completePublish(harness, await publishRequest(harness, flowId, firstRevisionId, null, 'publish-first'), 202, 'Publish first Revision')
       ).publication
