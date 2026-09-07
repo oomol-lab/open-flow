@@ -158,6 +158,45 @@ describe('WorkspaceStore', () => {
     }
   })
 
+  it('does not duplicate a created Flow when its catalog notification reloads first', async () => {
+    const created = Promise.withResolvers<Response>()
+    let catalogListener: (() => void) | undefined
+    let flowLists = 0
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path == '/v1/flows?limit=50&includeTotal=true') {
+        flowLists += 1
+        return Response.json(flowLists == 1 ? { flows: [], total: 0, version: 1 } : { flows: [flow], total: 1, version: 1 })
+      }
+      if (path == '/v1/flows' && init?.method == 'POST') return await created.promise
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const client = new WorkbenchClient(
+      request,
+      () => () => {},
+      (listener) => {
+        catalogListener = listener
+        return () => {}
+      },
+    )
+    const store = new WorkspaceStore(client, vi.fn())
+
+    try {
+      await store.start()
+      const creating = store.createFlow(flow.name)
+      await vi.waitFor(() => expect(request).toHaveBeenCalledWith('/v1/flows', expect.objectContaining({ method: 'POST' })))
+
+      catalogListener?.()
+      await vi.waitFor(() => expect(store.$.flows.value).toEqual([flow]))
+      created.resolve(Response.json(flow, { status: 201 }))
+      await expect(creating).resolves.toEqual(flow)
+
+      expect(store.$.flows.value).toEqual([flow])
+      expect(store.$.flowTotal.value).toBe(1)
+    } finally {
+      store.dispose()
+    }
+  })
+
   it('creates and connects a code task with the source port schema in one Draft change', async () => {
     const sourceDraft = {
       ...draft,
