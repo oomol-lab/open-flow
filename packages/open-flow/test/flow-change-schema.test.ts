@@ -9,7 +9,7 @@ const operations = [
     kind: 'graph.node.create',
     target,
     nodeId: 'pause',
-    node: { kind: 'wait', inputs: {}, input: { handle: 'value', jsonSchema: {}, nullable: true }, actions: ['continue'], prompt: 'Continue?' },
+    node: { kind: 'wait', name: 'Pause', inputs: {}, input: { handle: 'value', jsonSchema: {}, nullable: true }, actions: ['continue'], prompt: 'Continue?' },
   },
   { kind: 'graph.edge.connect', target, edge: { source: 'start', target: 'pause' } },
   {
