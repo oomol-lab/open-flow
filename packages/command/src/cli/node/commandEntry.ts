@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises'
 import { setTimeout } from 'node:timers/promises'
 import { commandArtifactVersion } from '../../distribution/common/commandProtocol.ts'
 import { runCli } from './cli.ts'
+import { CliError } from './support.ts'
 
 export { commandArtifactVersion }
 
@@ -33,14 +34,14 @@ export async function runOpenFlowCommand(args: readonly string[], host: OpenFlow
     process.stdout.write(args.includes('--json') ? `${JSON.stringify({ version: openFlowVersionBuildConstant })}\n` : `${openFlowVersionBuildConstant}\n`)
     return 0
   }
-  if (host.cloudRequest == null || host.getWorkbenchUrl == null) {
-    process.stderr.write('Open Flow Control API is not configured in this CLI host.\n')
-    return 1
-  }
   return await runCli(
     args,
     {
-      request: host.cloudRequest,
+      request:
+        host.cloudRequest ??
+        (async () => {
+          throw new CliError('host.unavailable', 'Open Flow Control API is not configured in this CLI host.')
+        }),
       getWorkbenchUrl: host.getWorkbenchUrl,
     },
     {

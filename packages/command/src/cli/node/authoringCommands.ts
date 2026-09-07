@@ -6,7 +6,6 @@ import { ApiError, ControlClient } from '@oomol-lab/open-flow/control-api'
 import {
   setInputSources,
   connect as connectEdge,
-  createAuthoringId,
   createBuiltinTrigger,
   createCodeTask,
   createCondition,
@@ -25,6 +24,7 @@ import { applyFlowChanges } from '@oomol-lab/open-flow/flow-change'
 import {
   CliError,
   selectedDraftFlow,
+  authoringId,
   exactNode,
   exactModule,
   referencedAction,
@@ -32,7 +32,6 @@ import {
   exactEdgeSource,
   referencedTriggerKey,
   nodeDetails,
-  inspectedNode,
   inspectedNodeSummary,
   inspectedTriggerSummary,
   requireCount,
@@ -48,7 +47,7 @@ import {
 
 export async function codeCommand(client: ControlClient, flow: Flow, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<void> {
   const [operation, moduleReference, ...extra] = operands
-  const draft = await client.getDraft(flow.flowId)
+  const { draft } = await selectedDraftFlow(client, flow, args)
 
   switch (operation) {
     case 'list': {
@@ -95,7 +94,15 @@ export async function codeCommand(client: ControlClient, flow: Flow, operands: r
         write(
           runtime,
           args.json,
-          { changed: false, kind: 'code.edit', moduleId: resolved.moduleId, flowId: flow.flowId, revisionId: draft.revisionId, version: 1 },
+          {
+            changed: false,
+            idempotencyKey: args.idempotencyKey,
+            kind: 'code.edit',
+            moduleId: resolved.moduleId,
+            flowId: flow.flowId,
+            revisionId: draft.revisionId,
+            version: 1,
+          },
           `${moduleText(resolved.moduleId, resolved.module)}\t${draft.revisionId}`,
         )
         return
@@ -103,6 +110,7 @@ export async function codeCommand(client: ControlClient, flow: Flow, operands: r
       const target = { kind: 'module', moduleId: resolved.moduleId }
       const changed = await changeDraft(
         client,
+        args,
         flow.flowId,
         draft.revisionId,
         target,
@@ -111,7 +119,18 @@ export async function codeCommand(client: ControlClient, flow: Flow, operands: r
       write(
         runtime,
         args.json,
-        { imports, kind: 'code.edit', moduleId: resolved.moduleId, flowId: flow.flowId, revision: changed.revision, version: 1 },
+        {
+          imports,
+          kind: 'code.edit',
+          moduleId: resolved.moduleId,
+          flowId: flow.flowId,
+          changed: true,
+          baseRevisionId: changed.baseRevisionId,
+          idempotencyKey: args.idempotencyKey,
+          revisionId: changed.revision.revisionId,
+          revision: changed.revision,
+          version: 1,
+        },
         `${resolved.module.name}\t${resolved.moduleId}\t${changed.revision.revisionId}`,
       )
       return
@@ -127,17 +146,36 @@ export async function codeCommand(client: ControlClient, flow: Flow, operands: r
         write(
           runtime,
           args.json,
-          { changed: false, kind: 'code.set', moduleId: resolved.moduleId, flowId: flow.flowId, revisionId: draft.revisionId, version: 1 },
+          {
+            changed: false,
+            idempotencyKey: args.idempotencyKey,
+            kind: 'code.set',
+            moduleId: resolved.moduleId,
+            flowId: flow.flowId,
+            revisionId: draft.revisionId,
+            version: 1,
+          },
           `${moduleText(resolved.moduleId, resolved.module)}\t${draft.revisionId}`,
         )
         return
       }
       const target = { kind: 'module', moduleId: resolved.moduleId }
-      const changed = await changeDraft(client, flow.flowId, draft.revisionId, target, renameModule(resolved.moduleId, resolved.module.name, name))
+      const changed = await changeDraft(client, args, flow.flowId, draft.revisionId, target, renameModule(resolved.moduleId, resolved.module.name, name))
       write(
         runtime,
         args.json,
-        { kind: 'code.set', moduleId: resolved.moduleId, name, flowId: flow.flowId, revision: changed.revision, version: 1 },
+        {
+          kind: 'code.set',
+          moduleId: resolved.moduleId,
+          name,
+          flowId: flow.flowId,
+          changed: true,
+          baseRevisionId: changed.baseRevisionId,
+          idempotencyKey: args.idempotencyKey,
+          revisionId: changed.revision.revisionId,
+          revision: changed.revision,
+          version: 1,
+        },
         `${name}\t${resolved.moduleId}\t${changed.revision.revisionId}`,
       )
       return
@@ -156,7 +194,7 @@ export async function edgeCommand(
   runtime: Runtime,
 ): Promise<void> {
   if (operands.length != 3 && operands.length != 4) throw new CliError('cli.invalid-arguments', `Usage: oo flow ${operation} <flow> <source> <target> [branch]`)
-  const selected = await selectedDraftFlow(client, flow.flowId, operands[0]!)
+  const selected = await selectedDraftFlow(client, flow, args)
   const source = exactEdgeSource(selected.graph.nodes, operands[1]!)
   const targetNode = exactNode(selected.graph.nodes, operands[2]!)
   const edge = { source: source.id, target: targetNode.nodeId, ...(operands[3] == null ? {} : { sourceHandle: operands[3] }) }
@@ -167,17 +205,27 @@ export async function edgeCommand(
     write(
       runtime,
       args.json,
-      { changed: false, edge, flowId: selected.flow.flowId, kind, revisionId: selected.draft.revisionId, version: 1 },
+      { changed: false, idempotencyKey: args.idempotencyKey, edge, flowId: selected.flow.flowId, kind, revisionId: selected.draft.revisionId, version: 1 },
       `${operation}\tunchanged\t${source.id}${edge.sourceHandle == null ? '' : `:${edge.sourceHandle}`}\t${targetNode.nodeId}\t${selected.draft.revisionId}`,
     )
     return
   }
   const changeTarget = { edge, flowId: selected.flow.flowId, kind: 'edge' }
-  const changed = await changeDraft(client, flow.flowId, selected.draft.revisionId, changeTarget, operations)
+  const changed = await changeDraft(client, args, flow.flowId, selected.draft.revisionId, changeTarget, operations)
   write(
     runtime,
     args.json,
-    { edge, flowId: selected.flow.flowId, kind, revision: changed.revision, version: 1 },
+    {
+      edge,
+      flowId: selected.flow.flowId,
+      kind,
+      changed: true,
+      baseRevisionId: changed.baseRevisionId,
+      idempotencyKey: args.idempotencyKey,
+      revisionId: changed.revision.revisionId,
+      revision: changed.revision,
+      version: 1,
+    },
     `${operation}\t${source.id}${edge.sourceHandle == null ? '' : `:${edge.sourceHandle}`}\t${targetNode.nodeId}\t${changed.revision.revisionId}`,
   )
 }
@@ -185,7 +233,7 @@ export async function edgeCommand(
 export async function nodeCommand(client: ControlClient, flow: Flow, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<void> {
   const [operation, flowReference, nodeReference, ...extra] = operands
   if (flowReference == null) throw new CliError('cli.invalid-arguments', 'Usage: oo flow node <list|show|add|set|input|remove> <flow> ...')
-  const selected = await selectedDraftFlow(client, flow.flowId, flowReference)
+  const selected = await selectedDraftFlow(client, flow, args)
 
   switch (operation) {
     case 'list': {
@@ -235,6 +283,7 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
       const operations = setInputSources(selected.draft.content, selected.target, resolved.nodeId, extra[0]!, sources)
       const changed = await changeDraft(
         client,
+        args,
         flow.flowId,
         selected.draft.revisionId,
         { kind: 'input', nodeId: resolved.nodeId, handle: extra[0] },
@@ -243,7 +292,15 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
       write(
         runtime,
         args.json,
-        { kind: 'node.input', revision: changed.revision, version: 1 },
+        {
+          kind: 'node.input',
+          changed: true,
+          baseRevisionId: changed.baseRevisionId,
+          idempotencyKey: args.idempotencyKey,
+          revisionId: changed.revision.revisionId,
+          revision: changed.revision,
+          version: 1,
+        },
         `input\t${resolved.nodeId}\t${extra[0]}\t${changed.revision.revisionId}`,
       )
       return
@@ -257,12 +314,12 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
       }
       const name = extra[0]!.trim()
       if (name.length == 0) throw new CliError('cli.invalid-arguments', 'Node name cannot be empty.')
-      const nodeId = createAuthoringId()
+      const nodeId = authoringId(args, 'node')
       let identity: { readonly moduleId?: string; readonly taskId?: string } = {}
       let operations
       switch (nodeReference) {
         case 'code': {
-          const moduleId = createAuthoringId()
+          const moduleId = authoringId(args, 'module')
           const source = args.code == null ? undefined : await argumentText(args.code, '--code', 'code.source-unreadable', runtime)
           operations = createCodeTask(
             selected.target,
@@ -280,7 +337,7 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
         case 'llm-chat':
         case 'llm-json':
           if (args.code != null) throw new CliError('cli.invalid-arguments', '--code is only valid when adding a Code Node.')
-          identity = { taskId: createAuthoringId() }
+          identity = { taskId: authoringId(args, 'task') }
           operations = createLlmTask(
             selected.target,
             { nodeId, taskId: identity.taskId! },
@@ -297,11 +354,20 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
           throw new CliError('node.kind-invalid', `Unknown Node kind ${JSON.stringify(nodeReference)}.`)
       }
       const target = { flowId: selected.flow.flowId, ...identity, kind: 'node', name, nodeId }
-      const changed = await changeDraft(client, flow.flowId, selected.draft.revisionId, target, operations)
+      const changed = await changeDraft(client, args, flow.flowId, selected.draft.revisionId, target, operations)
       write(
         runtime,
         args.json,
-        { kind: 'node.add', revision: changed.revision, target, version: 1 },
+        {
+          kind: 'node.add',
+          changed: true,
+          baseRevisionId: changed.baseRevisionId,
+          idempotencyKey: args.idempotencyKey,
+          revisionId: changed.revision.revisionId,
+          revision: changed.revision,
+          target,
+          version: 1,
+        },
         `${name}\t${nodeId}\t${nodeReference}\t${changed.revision.revisionId}`,
       )
       return
@@ -328,6 +394,7 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
           args.json,
           {
             changed: false,
+            idempotencyKey: args.idempotencyKey,
             flowId: selected.flow.flowId,
             kind: 'node.set',
             node: nodeDetails(selected.draft.content, resolved.nodeId, resolved.node),
@@ -340,11 +407,20 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
       }
       const operations = updateSettings(selected.draft.content, selected.target, resolved.nodeId, settings)!
       const target = { flowId: selected.flow.flowId, kind: 'node', nodeId: resolved.nodeId }
-      const changed = await changeDraft(client, flow.flowId, selected.draft.revisionId, target, operations)
+      const changed = await changeDraft(client, args, flow.flowId, selected.draft.revisionId, target, operations)
       write(
         runtime,
         args.json,
-        { kind: 'node.set', revision: changed.revision, target, version: 1 },
+        {
+          kind: 'node.set',
+          changed: true,
+          baseRevisionId: changed.baseRevisionId,
+          idempotencyKey: args.idempotencyKey,
+          revisionId: changed.revision.revisionId,
+          revision: changed.revision,
+          target,
+          version: 1,
+        },
         `${name ?? resolved.node.name ?? '<unnamed>'}\t${resolved.nodeId}\t${changed.revision.revisionId}`,
       )
       return
@@ -356,6 +432,7 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
       const target = { flowId: selected.flow.flowId, kind: 'node', nodeId: resolved.nodeId }
       const changed = await changeDraft(
         client,
+        args,
         flow.flowId,
         selected.draft.revisionId,
         target,
@@ -364,7 +441,16 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
       write(
         runtime,
         args.json,
-        { kind: 'node.remove', revision: changed.revision, target, version: 1 },
+        {
+          kind: 'node.remove',
+          changed: true,
+          baseRevisionId: changed.baseRevisionId,
+          idempotencyKey: args.idempotencyKey,
+          revisionId: changed.revision.revisionId,
+          revision: changed.revision,
+          target,
+          version: 1,
+        },
         `${resolved.node.name ?? '<unnamed>'}\t${resolved.nodeId}\t${changed.revision.revisionId}`,
       )
       return
@@ -382,36 +468,26 @@ export async function inspectFlowCommand(
   runtime: Runtime,
 ): Promise<void> {
   requireCount(operands, 1, 'oo flow inspect <flow> [--summary] [--json]')
-  const selected = await selectedDraftFlow(client, flow.flowId, operands[0]!)
-  const check = await client.checkFlow(flow.flowId, selected.draft.revisionId)
+  const selected = await selectedDraftFlow(client, flow, args)
   const nodeEntries = Object.entries(selected.graph.nodes).filter((entry): entry is [string, SemanticNode] => 'inputs' in entry[1])
-  const nodeSummaries = nodeEntries.map(([nodeId, node]) => inspectedNodeSummary(selected.draft.content, nodeId, node))
-  const nodes = args.summary ? nodeSummaries : nodeEntries.map(([nodeId, node]) => inspectedNode(selected.draft.content, nodeId, node))
-  const triggerEntries = Object.entries(selected.graph.nodes)
+  const nodes = nodeEntries.map(([nodeId, node]) => inspectedNodeSummary(selected.draft.content, nodeId, node))
+  const triggers = Object.entries(selected.graph.nodes)
     .filter((entry): entry is [string, TriggerNode] => !('inputs' in entry[1]))
-    .map(([triggerId, trigger]) => ({ trigger, triggerId }))
-  const triggers = args.summary
-    ? triggerEntries.map(({ trigger, triggerId }) => inspectedTriggerSummary(selected.draft.content, triggerId, trigger))
-    : triggerEntries.map(({ trigger, triggerId }) => {
-        const binding = trigger.kind == 'poll' || trigger.kind == 'integration' ? selected.draft.content.document.bindings[trigger.bindingId] : undefined
-        return binding == null ? { trigger, triggerId } : { binding, trigger, triggerId }
-      })
-  const { content: _content, ...revision } = selected.draft
+    .map(([triggerId, trigger]) => inspectedTriggerSummary(selected.draft.content, triggerId, trigger))
+  const { content, ...revision } = selected.draft
   const result = {
-    check,
-    edges: selected.graph.edges,
     flow: selected.flow,
     kind: 'flow.inspect',
-    nodes,
     revision,
-    ...(args.summary ? { summary: true } : {}),
-    triggers,
+    revisionId: revision.revisionId,
+    ...(args.summary ? { summary: true, nodes, triggers, edges: selected.graph.edges } : { content }),
     version: 1,
   }
   const lines = [
-    `${check.valid ? 'valid' : 'invalid'}\t${selected.flow.name}\t${selected.flow.flowId}\t${selected.draft.revisionId}`,
-    ...nodeSummaries.map((entry) => `node\t${entry.kind}\t${entry.name ?? '<unnamed>'}\t${entry.nodeId}`),
-    ...result.edges.map((edge) => `edge\t${edge.source}${edge.sourceHandle == null ? '' : `:${edge.sourceHandle}`}\t${edge.target}`),
+    `${selected.flow.name}\t${selected.flow.flowId}\t${revision.revisionId}`,
+    ...triggers.map((entry) => `trigger\t${entry.kind}\t${entry.name}\t${entry.triggerId}`),
+    ...nodes.map((entry) => `node\t${entry.kind}\t${entry.name ?? '<unnamed>'}\t${entry.nodeId}`),
+    ...selected.graph.edges.map((edge) => `edge\t${edge.source}${edge.sourceHandle == null ? '' : `:${edge.sourceHandle}`}\t${edge.target}`),
   ]
   write(runtime, args.json, result, lines.join('\n'))
 }
@@ -421,14 +497,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
   if (args.file == null) {
     throw new CliError('cli.invalid-arguments', 'Usage: oo flow apply <flow> --file <path|-> [--expected-revision <revision>] [--json]')
   }
-  const selected = await selectedDraftFlow(client, flow.flowId, operands[0]!)
-  if (args.expectedRevision != null && args.expectedRevision != selected.draft.revisionId) {
-    throw new CliError('flow.revision-conflict', 'The selected Flow Draft changed after it was inspected.', {
-      actualRevisionId: selected.draft.revisionId,
-      expectedRevisionId: args.expectedRevision,
-      flowId: selected.flow.flowId,
-    })
-  }
+  const selected = await selectedDraftFlow(client, flow, args)
   let source: string
   try {
     source = args.file == '-' ? await runtime.readStdin() : await runtime.readFile(args.file.startsWith('@') ? args.file.slice(1) : args.file)
@@ -440,7 +509,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
   const triggerRequests = new Map<string, Promise<TriggerKeySnapshot>>()
   for (const node of Object.values(spec.nodes)) {
     if (node.kind == 'connector' && !actionRequests.has(node.action)) {
-      actionRequests.set(node.action, referencedAction(client, node.action))
+      actionRequests.set(node.action, referencedAction(client, node.action, flow.flowId))
     }
   }
   for (const trigger of Object.values(spec.triggers)) {
@@ -450,14 +519,14 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
   }
   const preparedNodes = await Promise.all(
     Object.entries(spec.nodes).map(async ([reference, node]) => {
-      const nodeId = createAuthoringId()
+      const nodeId = authoringId(args, `node:${reference}`)
       switch (node.kind) {
         case 'code': {
           if (args.file == '-' && node.code == '-') {
             throw new CliError('flow.apply-invalid', 'A Flow apply request read from stdin cannot also read Code source from stdin.')
           }
           const code = await argumentText(node.code, 'nodes.code', 'code.source-unreadable', runtime)
-          const identity = { moduleId: createAuthoringId(), nodeId }
+          const identity = { moduleId: authoringId(args, `module:${reference}`), nodeId }
           return {
             identity: { kind: node.kind, moduleId: identity.moduleId, name: node.name, nodeId, reference },
             operations: createCodeTask(
@@ -479,8 +548,8 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
         }
         case 'connector': {
           const action = await actionRequests.get(node.action)!
-          const connection = await preferredConnection(client, action.serviceId, node.connection, action.defaultConnection, false)
-          const identity = { nodeId, taskId: createAuthoringId() }
+          const connection = await preferredConnection(client, action.serviceId, node.connection, action.defaultConnection, false, flow?.flowId)
+          const identity = { nodeId, taskId: authoringId(args, `task:${reference}`) }
           const name = node.name ?? action.name
           return {
             identity: {
@@ -512,7 +581,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
           }
         case 'llm-chat':
         case 'llm-json': {
-          const taskId = createAuthoringId()
+          const taskId = authoringId(args, `task:${reference}`)
           return {
             identity: { kind: node.kind, name: node.name, nodeId, reference, taskId },
             operations: createLlmTask(selected.target, { nodeId, taskId }, node.name, node.kind == 'llm-chat' ? 'chat' : 'json', 'Generated response.', {
@@ -531,7 +600,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
   )
   const preparedTriggers = await Promise.all(
     Object.entries(spec.triggers).map(async ([reference, trigger]) => {
-      const triggerId = createAuthoringId()
+      const triggerId = authoringId(args, `trigger:${reference}`)
       switch (trigger.kind) {
         case 'manual': {
           const name = trigger.name ?? 'Manual trigger'
@@ -560,7 +629,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
         }
         case 'provider': {
           const definition = await triggerRequests.get(trigger.key)!
-          const connection = await preferredConnection(client, definition.provider, trigger.connection, undefined, true)
+          const connection = await preferredConnection(client, definition.provider, trigger.connection, undefined, true, flow?.flowId)
           const name = trigger.name ?? definition.displayName
           return {
             identity: {
@@ -573,7 +642,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
               triggerId,
               triggerKind: definition.type,
             },
-            operations: createProviderTrigger(selected.target, { bindingId: createAuthoringId(), nodeId: triggerId }, definition, {
+            operations: createProviderTrigger(selected.target, { bindingId: authoringId(args, `binding:${reference}`), nodeId: triggerId }, definition, {
               config: trigger.config,
               connectionId: connection!.connectionId,
               name,
@@ -586,7 +655,11 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
   )
   const nodeIdentities = preparedNodes.map((node) => node.identity)
   const triggerIdentities = preparedTriggers.map((trigger) => trigger.identity)
-  const operations = [...preparedNodes.flatMap((node) => node.operations), ...preparedTriggers.flatMap((trigger) => trigger.operations)]
+  const operations = [
+    ...(spec.operations ?? []),
+    ...preparedNodes.flatMap((node) => node.operations),
+    ...preparedTriggers.flatMap((trigger) => trigger.operations),
+  ]
   let content = operations.length == 0 ? selected.draft.content : applyFlowChanges(selected.draft.content, operations)
   const nodeReferences = new Map(nodeIdentities.map((identity) => [identity.reference, identity.nodeId]))
   const triggerReferences = new Map(triggerIdentities.map((identity) => [identity.reference, identity.triggerId]))
@@ -617,10 +690,13 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
       args.json,
       {
         changed: false,
+        idempotencyKey: args.idempotencyKey,
         check,
+        valid: check.valid,
         edges,
         flowId: selected.flow.flowId,
         kind: 'flow.apply',
+        operationCount: operations.length,
         nodes: nodeIdentities,
         revisionId: selected.draft.revisionId,
         triggers: triggerIdentities,
@@ -633,9 +709,10 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
   const target = {
     flowId: selected.flow.flowId,
     kind: 'flow.apply',
+    operationCount: operations.length,
     references: [...nodeIdentities.map((identity) => identity.reference), ...triggerIdentities.map((identity) => identity.reference)],
   }
-  const changed = await changeDraft(client, flow.flowId, selected.draft.revisionId, target, operations)
+  const changed = await changeDraft(client, args, flow.flowId, selected.draft.revisionId, target, operations)
   let check
   try {
     check = await client.checkFlow(flow.flowId, changed.revision.revisionId)
@@ -646,18 +723,23 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
       runtime,
       args.json,
       {
-        changed: true,
         check: { error: checkError, status: 'unavailable' },
+        valid: null,
         edges,
         flowId: selected.flow.flowId,
         kind: 'flow.apply',
+        operationCount: operations.length,
         nodes: nodeIdentities,
+        changed: true,
+        baseRevisionId: changed.baseRevisionId,
+        idempotencyKey: args.idempotencyKey,
+        revisionId: changed.revision.revisionId,
         revision: changed.revision,
         triggers: triggerIdentities,
         version: 1,
       },
       [
-        `applied\t${selected.flow.name}\t${changed.revision.revisionId}\tcheck-unavailable\t${preparedNodes.length} nodes\t${preparedTriggers.length} triggers\t${edges.length} edges`,
+        `applied\t${selected.flow.name}\t${changed.revision.revisionId}\tcheck-unavailable\t${operations.length} operations`,
         `check-error\t${checkError.code ?? 'unavailable'}\t${checkError.message}`,
       ].join('\n'),
     )
@@ -667,18 +749,23 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
     runtime,
     args.json,
     {
-      changed: true,
       check,
+      valid: check.valid,
       edges,
       flowId: selected.flow.flowId,
       kind: 'flow.apply',
+      operationCount: operations.length,
       nodes: nodeIdentities,
+      changed: true,
+      baseRevisionId: changed.baseRevisionId,
+      idempotencyKey: args.idempotencyKey,
+      revisionId: changed.revision.revisionId,
       revision: changed.revision,
       triggers: triggerIdentities,
       version: 1,
     },
     [
-      `applied\t${selected.flow.name}\t${changed.revision.revisionId}\t${check.valid ? 'valid' : 'invalid'}\t${preparedNodes.length} nodes\t${preparedTriggers.length} triggers\t${edges.length} edges`,
+      `applied\t${selected.flow.name}\t${changed.revision.revisionId}\t${check.valid ? 'valid' : 'invalid'}\t${operations.length} operations`,
       ...check.diagnostics.map((diagnostic) => `diagnostic\t${diagnostic.code}\t${diagnostic.path}\t${diagnostic.message}`),
     ].join('\n'),
   )

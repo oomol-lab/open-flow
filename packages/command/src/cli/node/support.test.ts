@@ -27,3 +27,10 @@ describe('Flow apply Code Actions', () => {
     )
   })
 })
+
+it('normalizes option syntax without rewriting values that resemble options', async () => {
+  const { parseArguments } = await import('./support.ts')
+  expect(parseArguments(['code', 'edit', 'flow', 'module', '--code', '--x=y']).code).toBe('--x=y')
+  expect(parseArguments(['code', 'edit', 'flow', 'module', '--code=--x=y']).code).toBe('--x=y')
+  expect(() => parseArguments(['list', '--json=true'])).toThrow(/does not accept a value/)
+})

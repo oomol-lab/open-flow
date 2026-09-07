@@ -4,6 +4,7 @@ import type {
   Flow,
   JsonValue,
   Publication,
+  PublishOperation,
   RunDetails,
   RunEvent,
   RunStatus,
@@ -11,6 +12,7 @@ import type {
   TriggerKeySummary,
 } from '@oomol-lab/open-flow/control-api'
 import type {
+  ChangeOperation,
   CodeModule,
   ConnectorCapability,
   GraphNode,
@@ -24,8 +26,9 @@ import type {
 import type { UiLanguage } from '@oomol-lab/open-flow/localization'
 
 import { ApiError, ControlClient } from '@oomol-lab/open-flow/control-api'
-import { decodeConnectorCapabilities, resourceNameIssue, resourceNameMaxLength } from '@oomol-lab/open-flow/flow-change'
+import { decodeChangeOperations, decodeConnectorCapabilities, resourceNameIssue, resourceNameMaxLength } from '@oomol-lab/open-flow/flow-change'
 import { runStatuses as runStatusValues } from '@oomol-lab/open-flow/run-lifecycle'
+import { createHash, randomUUID } from 'node:crypto'
 
 export interface CommandHost {
   readonly request: (path: string, init?: RequestInit) => Promise<Response>
@@ -44,6 +47,8 @@ export interface Runtime {
 }
 
 export interface ParsedArguments {
+  readonly idempotencyKey: string
+  readonly expectedPublication?: string
   readonly trigger?: string
   readonly payload?: string
   readonly after?: number
@@ -61,6 +66,7 @@ export interface ParsedArguments {
   readonly json: boolean
   readonly limit?: number
   readonly name?: string
+  readonly options: readonly string[]
   readonly positionals: readonly string[]
   readonly source: 'draft' | 'live'
   readonly status?: RunStatus
@@ -121,6 +127,7 @@ type ApplyTrigger =
     }
 
 interface ApplySpec {
+  readonly operations?: readonly ChangeOperation[]
   readonly edges: readonly ApplyEdge[]
   readonly nodes: Readonly<Record<string, ApplyNode>>
   readonly triggers: Readonly<Record<string, ApplyTrigger>>
@@ -156,7 +163,10 @@ const terminalRunStatuses = new Set<RunStatus>(['canceled', 'completed', 'failed
 const runStatuses: ReadonlySet<RunStatus> = new Set(runStatusValues)
 
 export function parseArguments(args: readonly string[]): ParsedArguments {
+  let idempotencyKey = randomUUID() as string
+  let expectedPublication: string | undefined
   const positionals: string[] = []
+  const options: string[] = []
   let trigger: string | undefined
   let payload: string | undefined
   let after: number | undefined
@@ -185,7 +195,17 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
   let yes = false
 
   for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index]!
+    const raw = args[index]!
+    const equals = raw.startsWith('--') ? raw.indexOf('=') : -1
+    const argument = equals < 0 ? raw : raw.slice(0, equals)
+    const inlineValue = equals < 0 ? undefined : raw.slice(equals + 1)
+    if (inlineValue != null && ['--json', '--follow', '--wait', '--yes', '--summary'].includes(argument))
+      throw new CliError('cli.invalid-arguments', `${argument} does not accept a value.`)
+    if (argument.startsWith('--')) {
+      const flag = argument.slice(2)
+      if (options.includes(flag) && flag != 'set' && flag != 'unset') throw new CliError('cli.invalid-arguments', `Duplicate option --${flag}.`)
+      options.push(flag)
+    }
     if (argument == '--json') {
       json = true
     } else if (argument == '--follow') {
@@ -197,6 +217,8 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     } else if (argument == '--summary') {
       summary = true
     } else if (
+      argument == '--idempotency-key' ||
+      argument == '--expected-publication' ||
       argument == '--code' ||
       argument == '--connection' ||
       argument == '--cron' ||
@@ -219,9 +241,11 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       argument == '--set' ||
       argument == '--unset'
     ) {
-      const value = args[++index]
+      const value = inlineValue ?? args[++index]
       if (value == null || value.length == 0) throw new CliError('cli.invalid-arguments', `${argument} requires a value.`)
-      if (argument == '--code') code = value
+      if (argument == '--idempotency-key') idempotencyKey = value
+      else if (argument == '--expected-publication') expectedPublication = value
+      else if (argument == '--code') code = value
       else if (argument == '--connection') connection = value
       else if (argument == '--cron') cron = value
       else if (argument == '--description') description = value
@@ -246,49 +270,13 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       } else {
         const numeric = Number(value)
         const minimum = argument == '--after' ? 0 : 1
-        if (!Number.isSafeInteger(numeric) || numeric < minimum || (argument == '--limit' && numeric > 1000)) {
+        if (!Number.isSafeInteger(numeric) || numeric < minimum || (argument == '--limit' && numeric > 100)) {
           throw new CliError('cli.invalid-arguments', `${argument} has an invalid value.`)
         }
         if (argument == '--limit') limit = numeric
         else if (argument == '--after') after = numeric
         else timeoutMs = numeric
       }
-    } else if (argument.startsWith('--flow=')) {
-      flow = argument.slice('--flow='.length)
-      if (flow.length == 0) throw new CliError('cli.invalid-arguments', '--flow requires a value.')
-    } else if (argument.startsWith('--expected-revision=')) {
-      expectedRevision = argument.slice('--expected-revision='.length)
-      if (expectedRevision.length == 0) throw new CliError('cli.invalid-arguments', '--expected-revision requires a value.')
-    } else if (argument.startsWith('--file=')) {
-      file = argument.slice('--file='.length)
-      if (file.length == 0) throw new CliError('cli.invalid-arguments', '--file requires a value.')
-    } else if (argument.startsWith('--name=')) {
-      name = argument.slice('--name='.length)
-      if (name.length == 0) throw new CliError('cli.invalid-arguments', '--name requires a value.')
-    } else if (argument.startsWith('--connection=')) {
-      connection = argument.slice('--connection='.length)
-      if (connection.length == 0) throw new CliError('cli.invalid-arguments', '--connection requires a value.')
-    } else if (argument.startsWith('--set=')) {
-      const value = argument.slice('--set='.length)
-      if (value.length == 0) throw new CliError('cli.invalid-arguments', '--set requires a value.')
-      sets.push(value)
-    } else if (argument.startsWith('--unset=')) {
-      const value = argument.slice('--unset='.length)
-      if (value.length == 0) throw new CliError('cli.invalid-arguments', '--unset requires a value.')
-      unsets.push(value)
-    } else if (argument.startsWith('--source=')) {
-      const value = argument.slice('--source='.length)
-      if (value != 'draft' && value != 'live') throw new CliError('cli.invalid-arguments', '--source must be draft or live.')
-      source = value
-    } else if (argument.startsWith('--trigger=')) {
-      trigger = argument.slice('--trigger='.length)
-      if (trigger.length == 0) throw new CliError('cli.invalid-arguments', '--trigger requires a value.')
-    } else if (argument.startsWith('--payload=')) {
-      payload = argument.slice('--payload='.length)
-      if (payload.length == 0) throw new CliError('cli.invalid-arguments', '--payload requires a value.')
-    } else if (argument.startsWith('--input=')) {
-      input = argument.slice('--input='.length)
-      if (input.length == 0) throw new CliError('cli.invalid-arguments', '--input requires a value.')
     } else if (argument.startsWith('-')) {
       throw new CliError('cli.invalid-arguments', `Unknown option ${JSON.stringify(argument)}.`)
     } else {
@@ -297,6 +285,8 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
   }
 
   return {
+    idempotencyKey,
+    ...(expectedPublication == null ? {} : { expectedPublication }),
     ...(after == null ? {} : { after }),
     ...(code == null ? {} : { code }),
     ...(connection == null ? {} : { connection }),
@@ -313,6 +303,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     ...(limit == null ? {} : { limit }),
     ...(name == null ? {} : { name }),
     positionals,
+    options,
     ...(trigger == null ? {} : { trigger }),
     ...(payload == null ? {} : { payload }),
     sets,
@@ -363,10 +354,15 @@ export async function referencedFlow(client: ControlClient, reference: string): 
   return exactFlow(await allFlows(client), reference)
 }
 
-export async function selectedDraftFlow(client: ControlClient, flowId: string, reference: string) {
-  const flow = await referencedFlow(client, reference)
-  if (flow.flowId != flowId) throw new CliError('flow.not-found', `Flow ${JSON.stringify(reference)} was not found.`)
-  const draft = await client.getRevision(flowId, flow.draftRevisionId)
+export async function selectedDraftFlow(client: ControlClient, flow: Flow, args: ParsedArguments) {
+  if (args.expectedRevision != null && args.expectedRevision != flow.draftRevisionId && !args.options.includes('idempotency-key')) {
+    throw new CliError('flow.revision-conflict', 'The Flow Draft changed. Inspect it before submitting a new mutation.', {
+      expectedRevisionId: args.expectedRevision,
+      actualRevisionId: flow.draftRevisionId,
+      flowId: flow.flowId,
+    })
+  }
+  const draft = await client.getRevision(flow.flowId, args.expectedRevision ?? flow.draftRevisionId)
   return { draft, flow, graph: draft.content.document.graph, target: { kind: 'flow' } as const }
 }
 
@@ -412,13 +408,13 @@ function exactAction(actions: readonly ConnectorAction[], reference: string): Co
   throw new CliError('connector.action-not-found', `Connector Action ${JSON.stringify(reference)} was not found.`)
 }
 
-export async function referencedAction(client: ControlClient, reference: string): Promise<ConnectorAction> {
+export async function referencedAction(client: ControlClient, reference: string, flowId?: string): Promise<ConnectorAction> {
   try {
-    return await client.getConnectorAction(reference)
+    return await client.getConnectorAction(reference, undefined, flowId)
   } catch (error) {
     if (!(error instanceof ApiError) || error.status != 404) throw error
   }
-  return exactAction(await client.searchConnectorActions(reference), reference)
+  return exactAction(await client.searchConnectorActions(reference, undefined, flowId), reference)
 }
 
 function exactConnection(connections: readonly ConnectorConnection[], reference: string): ConnectorConnection {
@@ -441,10 +437,11 @@ export async function preferredConnection(
   reference: string | undefined,
   fallback: ConnectorConnection | undefined,
   required: boolean,
+  flowId?: string,
 ): Promise<ConnectorConnection | undefined> {
   const selected = reference == 'default' ? undefined : reference
   if (selected == null && fallback?.status == 'active') return fallback
-  const connections = await client.listConnectorConnections(serviceId)
+  const connections = await client.listConnectorConnections(serviceId, undefined, flowId)
   if (selected != null) return exactConnection(connections, selected)
   const active = connections.filter((connection) => connection.status == 'active')
   const preferred = active.find((connection) => connection.isDefault) ?? (active.length == 1 ? active[0] : undefined)
@@ -543,32 +540,6 @@ export function nodeDetails(content: RevisionContent, nodeId: string, node: Grap
   return { node, nodeId, ...(task == null ? {} : { task }) }
 }
 
-export function inspectedNode(content: RevisionContent, nodeId: string, node: GraphNode) {
-  if (node.kind != 'task') return { kind: node.kind, node, nodeId }
-  if (node.task != null) {
-    return {
-      kind: 'code',
-      module: content.modules[node.task.moduleId],
-      moduleId: node.task.moduleId,
-      node,
-      nodeId,
-      task: node.task,
-    }
-  }
-  const task = content.document.tasks[node.taskId]
-  if (task == null) return { kind: 'task', node, nodeId, taskId: node.taskId }
-  return {
-    ...(task.executor.kind == 'connector'
-      ? { actionId: task.executor.action, ...(task.executor.connectionId == null ? {} : { connectionId: task.executor.connectionId }) }
-      : {}),
-    kind: task.executor.kind,
-    node,
-    nodeId,
-    task,
-    taskId: node.taskId,
-  }
-}
-
 export function inspectedNodeSummary(content: RevisionContent, nodeId: string, node: GraphNode) {
   if (node.kind != 'task') return { kind: node.kind, ...(node.name == null ? {} : { name: node.name }), nodeId }
   if (node.task != null) {
@@ -628,7 +599,7 @@ export function publicationText(publication: Publication): string {
 
 export function runText(run: RunDetails): string {
   const publication = run.source == 'draft' ? '' : `\t${run.publicationId}`
-  return `${run.source}\t${run.status}\t${run.runId}\t${run.revisionId}${publication}`
+  return `${run.source}\t${run.status}\t${run.runId}\t${run.revisionId}${publication}${run.waiting == null ? '' : `\n${JSON.stringify(run.waiting)}`}`
 }
 
 export function runSummaryText(run: { readonly revisionId: string; readonly runId: string; readonly source: string; readonly status: string }): string {
@@ -748,6 +719,15 @@ export function applySpec(source: string): ApplySpec {
     throw new CliError('flow.apply-invalid', 'Flow apply input must be valid JSON.')
   }
   const root = applyObject(parsed, 'Flow apply input must be an object.')
+  if (Object.hasOwn(root, 'operations')) {
+    applyKeys(root, ['version', 'operations'], 'Flow apply input')
+    if (root.version != 1) throw new CliError('flow.apply-invalid', 'Flow apply version must be 1.')
+    try {
+      return { version: 1, nodes: {}, triggers: {}, edges: [], operations: decodeChangeOperations(root.operations) }
+    } catch (error) {
+      throw new CliError('flow.apply-invalid', error instanceof Error ? error.message : String(error))
+    }
+  }
   applyKeys(root, ['edges', 'nodes', 'triggers', 'version'], 'Flow apply input')
   if (root.version !== 1) throw new CliError('flow.apply-invalid', 'Flow apply input version must be 1.')
 
@@ -985,13 +965,28 @@ export async function publicationById(client: ControlClient, flowId: string, pub
   throw new CliError('publication.not-found', `Publication ${JSON.stringify(publicationId)} was not found.`)
 }
 
-export async function waitForRun(client: ControlClient, created: RunDetails, runtime: Runtime): Promise<RunDetails> {
+export async function waitForRun(client: ControlClient, created: RunDetails, runtime: Runtime, timeoutMs = 60_000) {
+  const deadline = Date.now() + timeoutMs
   let current = created
-  while (!terminalRunStatuses.has(current.status)) {
-    await runtime.wait(1_000)
-    current = await client.getRun(current.runId)
+  while (!terminalRunStatuses.has(current.status) && current.status != 'waiting') {
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) return { run: current, timedOut: true }
+    await runtime.wait(Math.min(1_000, remaining))
+    if (Date.now() >= deadline) return { run: current, timedOut: true }
+    try {
+      current = await client.getRun(current.runId, AbortSignal.timeout(Math.max(1, deadline - Date.now())))
+    } catch (error) {
+      if (Date.now() >= deadline || (error instanceof Error && error.name == 'TimeoutError')) return { run: current, timedOut: true }
+      throw new CliError('run.wait-failed', error instanceof Error ? error.message : String(error), { runId: current.runId })
+    }
   }
-  return current
+  return { run: current, timedOut: false }
+}
+
+export function runExitCode(run: RunDetails, timedOut = false): number {
+  if (timedOut) return 3
+  if (run.status == 'waiting') return 2
+  return run.status == 'failed' || run.status == 'canceled' || run.status == 'indeterminate' ? 1 : 0
 }
 
 export function cloudError(error: ApiError): CliError {
@@ -1000,23 +995,50 @@ export function cloudError(error: ApiError): CliError {
 
 export async function changeDraft(
   client: ControlClient,
+  args: ParsedArguments,
   flowId: string,
   baseRevisionId: string,
   target: ErrorDetails,
   operations: Parameters<ControlClient['changeDraft']>[2],
 ) {
   try {
-    return await client.changeDraft(flowId, baseRevisionId, operations)
+    return { ...(await client.changeDraft(flowId, baseRevisionId, operations, args.idempotencyKey)), baseRevisionId }
   } catch (error) {
     if (error instanceof ApiError && error.code != 'response.invalid') throw cloudError(error)
     throw new CliError(
       'flow.mutation-outcome-unknown',
-      'The deployment did not confirm whether the Draft change was accepted. Read the Flow again before retrying.',
+      'The deployment did not confirm whether the Draft change was accepted. Retry with the same --idempotency-key, --expected-revision and arguments.',
       {
         baseRevisionId,
+        idempotencyKey: args.idempotencyKey,
         flowId,
         target,
       },
     )
   }
+}
+
+export function authoringId(args: ParsedArguments, label: string): string {
+  return createHash('sha256')
+    .update(JSON.stringify([args.idempotencyKey, label]))
+    .digest('hex')
+    .slice(0, 24)
+}
+
+export async function waitForPublication(client: ControlClient, flowId: string, created: PublishOperation, runtime: Runtime, timeoutMs = 60_000) {
+  const deadline = Date.now() + timeoutMs
+  let operation = created
+  while (operation.status == 'pending') {
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) return { operation, timedOut: true }
+    await runtime.wait(Math.min(1_000, remaining))
+    if (Date.now() >= deadline) return { operation, timedOut: true }
+    try {
+      operation = await client.getPublishOperation(flowId, operation.operationId, AbortSignal.timeout(Math.max(1, deadline - Date.now())))
+    } catch (error) {
+      if (Date.now() >= deadline || (error instanceof Error && error.name == 'TimeoutError')) return { operation, timedOut: true }
+      throw new CliError('publication.wait-failed', error instanceof Error ? error.message : String(error), { flowId, operationId: operation.operationId })
+    }
+  }
+  return { operation, timedOut: false }
 }

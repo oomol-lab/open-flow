@@ -4,9 +4,9 @@ import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { applyFlowCommand, codeCommand, edgeCommand, inspectFlowCommand, nodeCommand } from './authoringCommands.ts'
 import { connectorCommand, triggerCommand } from './connectorCommands.ts'
 import { createRunCommand, publicationsCommand, publishCommand, rollbackCommand, runsCommand } from './runCommands.ts'
-import { allFlows, checkedResourceName, CliError, flowText, referencedFlow, requireCount, write } from './support.ts'
+import { checkedResourceName, CliError, flowText, referencedFlow, requireCount, write } from './support.ts'
 
-export async function flowCommand(client: ControlClient, host: CommandHost, args: ParsedArguments, runtime: Runtime): Promise<void> {
+export async function flowCommand(client: ControlClient, host: CommandHost, args: ParsedArguments, runtime: Runtime): Promise<number | void> {
   const [operation, ...operands] = args.positionals
 
   switch (operation) {
@@ -22,7 +22,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
     }
     case 'connector': {
       const mutation = operands[0] == 'add' || operands[0] == 'set' || operands[0] == 'remove'
-      const flow = mutation ? await operandFlow(client, operands.slice(1)) : undefined
+      const flow = mutation ? await operandFlow(client, operands.slice(1)) : args.flow == null ? undefined : await referencedFlow(client, args.flow)
       return await connectorCommand(client, flow, operands, args, runtime)
     }
     case 'connect':
@@ -65,14 +65,14 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
     }
     case 'list': {
       requireCount(operands, 0, 'oo flow list [--json]')
-      const flows = await allFlows(client)
-      write(runtime, args.json, { flows, kind: 'flow.list', version: 1 }, flows.map(flowText).join('\n'))
+      const page = await client.listFlows({ cursor: args.cursor, limit: args.limit ?? 100 })
+      write(runtime, args.json, { ...page, kind: 'flow.list', version: 1 }, page.flows.map(flowText).join('\n'))
       return
     }
     case 'create': {
       requireCount(operands, 1, 'oo flow create <name> [--json]')
-      const flow = await client.createFlow(checkedResourceName(operands[0]!, 'Flow'))
-      write(runtime, args.json, { flow, kind: 'flow.create', version: 1 }, flowText(flow))
+      const flow = await client.createFlow(checkedResourceName(operands[0]!, 'Flow'), args.idempotencyKey)
+      write(runtime, args.json, { flow, idempotencyKey: args.idempotencyKey, kind: 'flow.create', version: 1 }, flowText(flow))
       return
     }
     case 'show': {
@@ -103,11 +103,10 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       write(
         runtime,
         args.json,
-        { check, kind: 'flow.check', scope: 'revision', version: 1 },
+        { check, valid: check.valid, revisionId: flow.draftRevisionId, kind: 'flow.check', scope: 'revision', version: 1 },
         `${check.valid ? 'valid' : 'invalid'}\trevision\t${flow.name}\t${flow.flowId}`,
       )
-      if (!check.valid) throw new CliError('flow.invalid', 'The Flow has diagnostics.', { diagnostics: check.diagnostics })
-      return
+      return check.valid ? 0 : 1
     }
     default:
       throw new CliError(

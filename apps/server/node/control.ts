@@ -1,11 +1,11 @@
-import type { ChangeOperation, JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
+import type { JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions } from '@oomol-lab/open-flow/scheduler'
 import type { Context, Next } from 'hono'
 import type { ControlService, FlowPosition, PublicationPosition, RunPosition, TriggerActivityPosition } from './control-service.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { resourceNameIssue, validVariableName } from '@oomol-lab/open-flow/flow-change'
+import { decodeChangeOperations, resourceNameIssue, validVariableName } from '@oomol-lab/open-flow/flow-change'
 import { runStatuses } from '@oomol-lab/open-flow/run-lifecycle'
 import { Hono } from 'hono'
 import { ControlError } from './error.ts'
@@ -117,9 +117,11 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)
     exact(body, ['expectedRevisionId', 'operations', 'version'], controlErrorCode.flowInvalid)
     version(body.version, controlErrorCode.flowInvalid)
-    if (!Array.isArray(body.operations) || body.operations.length == 0) invalid(controlErrorCode.flowInvalid, 'Draft operations must be a non-empty array.')
-    for (const operation of body.operations) {
-      if (typeof record(operation, controlErrorCode.flowInvalid).kind != 'string') invalid(controlErrorCode.flowInvalid, 'Draft operation kind is invalid.')
+    let operations
+    try {
+      operations = decodeChangeOperations(body.operations)
+    } catch (error) {
+      throw new ControlError(controlErrorCode.flowInvalid, 'The Draft operation has an invalid structure.', { cause: error })
     }
     return response(
       200,
@@ -127,7 +129,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
         context.get('actorId'),
         context.req.param('flowId'),
         text(body.expectedRevisionId, controlErrorCode.flowInvalid),
-        body.operations as readonly ChangeOperation[],
+        operations,
         idempotencyKey(context.req.raw, controlErrorCode.flowInvalid),
       ),
     )
