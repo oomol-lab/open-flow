@@ -82,6 +82,7 @@ export class TriggerStore {
   readonly #host: Pick<WorkbenchHost, 'openExternalPage'>
   readonly #i18n: I18n
   readonly #refresh = new Latest()
+  readonly #stale = new Set<string>()
   readonly #selected: ReadonlyVal<Selection>
   readonly #setNotice: SetNotice
   readonly #state: Val<TriggerState> = val(initialState)
@@ -143,6 +144,7 @@ export class TriggerStore {
     this.#catalogController.abort()
     this.#catalogController = new AbortController()
     this.#catalog = undefined
+    this.#stale.clear()
     this.#refresh.invalidate()
     this.#state.set(initialState)
   }
@@ -169,19 +171,23 @@ export class TriggerStore {
   }
 
   public async refresh(force = false): Promise<void> {
+    if (this.#disposed) return
     const current = this.#refresh.begin()
     const flowId = this.#workspace.$.flowId.value
     const selected = target(this.#workspace.$.selection.value, this.#workspace)
-    if (this.#disposed) return
     if (flowId == null || selected == null) {
       if (this.#state.value.connectionLoading != null) this.#set({ connectionLoading: undefined })
       return
     }
-    if (!force && this.#state.value.catalogs[selected.provider] != null) return
+    if (!force && !this.#stale.has(selected.provider) && this.#state.value.catalogs[selected.provider] != null) {
+      if (this.#state.value.connectionLoading != null) this.#set({ connectionLoading: undefined })
+      return
+    }
     this.#set({ connectionError: undefined, connectionLoading: selected.provider })
     try {
       const catalog = connectionCatalog(await this.#client.listConnectorConnections(selected.provider, undefined, flowId))
       if (!this.#current(current, flowId)) return
+      this.#stale.delete(selected.provider)
       this.#set({ catalogs: { ...this.#state.value.catalogs, [selected.provider]: catalog } })
     } catch (error) {
       if (this.#current(current, flowId)) {
@@ -216,11 +222,11 @@ export class TriggerStore {
   }
 
   public async refreshAfterAuthorization(): Promise<void> {
+    if (this.#disposed) return
     const provider = this.#state.value.authorizationProvider
-    if (this.#disposed || provider == null) return
-    const catalogs = { ...this.#state.value.catalogs }
-    delete catalogs[provider]
-    this.#set({ authorizationProvider: undefined, catalogs })
+    if (provider == null) return
+    this.#stale.add(provider)
+    this.#set({ authorizationProvider: undefined })
     if (target(this.#workspace.$.selection.value, this.#workspace)?.provider == provider) await this.refresh(true)
   }
 
