@@ -15,6 +15,7 @@ import type { DesignerTarget, SubflowSettings, TaskSettings } from './flowChange
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
+import { OverlayScrollbar } from '../../../../designer/browser/components/overlayScrollbar.tsx'
 import { nodeNameIssue } from '../../../../flow/common/change.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
@@ -115,7 +116,7 @@ function InputSources({
   const ports = revision.inputSources(target, selection.id)
   if (ports.length == 0) return null
   return (
-    <section className="inspector-section" data-inspector-section="inputs" ref={setPortalRoot}>
+    <section className="inspector-section inspector-sources" data-inspector-section="inputs" ref={setPortalRoot}>
       <h3>{t('inspector.sources.title')}</h3>
       <FieldGroup className="gap-2">
         {ports.map(({ handle, outputs: options }) => {
@@ -126,13 +127,10 @@ function InputSources({
           const valid = source != null && options[source.nodeId]?.includes(source.output)
           const fieldId = `source-${selection.id}-${handle}`
           return (
-            <Field key={handle} className="grid grid-cols-[minmax(0,5.5rem)_1rem_minmax(0,1fr)] items-center gap-x-2 gap-y-1">
+            <Field key={handle} className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-x-2 gap-y-1">
               <FieldLabel htmlFor={fieldId} className="min-w-0" title={handle}>
                 <code className="truncate text-xs font-normal text-muted-foreground">{handle}</code>
               </FieldLabel>
-              <span aria-hidden="true" className="text-center text-xs text-muted-foreground">
-                ←
-              </span>
               <Select
                 disabled={disabled}
                 value={current}
@@ -145,7 +143,7 @@ function InputSources({
                   }
                 }}
               >
-                <SelectTrigger id={fieldId} size="sm" className="min-w-0 w-full" aria-invalid={source != null && !valid}>
+                <SelectTrigger id={fieldId} size="sm" variant="subtle" className="min-w-0 w-full" aria-invalid={source != null && !valid}>
                   <SelectValue className="min-w-0">
                     {sources.length == 0 ? (
                       <span className="truncate">{t('inspector.sources.local')}</span>
@@ -194,7 +192,7 @@ function InputSources({
                   ))}
                 </SelectContent>
               </Select>
-              {source != null && !valid && <FieldError className="col-start-3">{t('inspector.sources.unavailable')}</FieldError>}
+              {source != null && !valid && <FieldError className="col-start-2">{t('inspector.sources.unavailable')}</FieldError>}
             </Field>
           )
         })}
@@ -774,17 +772,18 @@ function TaskDefinition({
       <form
         className="inspector-section inspector-form code-section"
         data-inspector-section="module"
+        onKeyDown={(event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() == 's') {
+            event.preventDefault()
+            event.stopPropagation()
+            if (!disabled) void store.saveModuleEditor()
+          }
+        }}
         onSubmit={(event) => {
           event.preventDefault()
           void store.saveModuleEditor()
         }}
       >
-        <div className="code-section-heading">
-          <h3>{t('inspector.task.javascriptModule')}</h3>
-          <span className={`code-save-status ${moduleEditor.status}`} aria-live="polite">
-            <span /> {codeStatusLabel(moduleEditor.status, t)}
-          </span>
-        </div>
         <CodeActions
           key={`${moduleEditor.moduleId}-${selection.id}`}
           capabilities={task.capabilities ?? []}
@@ -796,7 +795,7 @@ function TaskDefinition({
         />
         <CodeEditor
           ariaLabel={t('inspector.task.source')}
-          disabled={disabled || moduleEditor.status == 'saving'}
+          disabled={disabled}
           errorLabel={t('inspector.task.editorUnavailable')}
           loadingLabel={t('inspector.task.editorLoading')}
           location={moduleLocation == null ? undefined : { column: moduleLocation.column, line: moduleLocation.line }}
@@ -807,16 +806,16 @@ function TaskDefinition({
           value={moduleEditor.source}
         />
         <span className="code-source-note">{t('inspector.task.importsFromSource')}</span>
-        <div className="form-actions code-actions">
-          {(moduleEditor.status == 'dirty' || moduleEditor.status == 'failed') && (
+        {moduleEditor.status == 'failed' && (
+          <div className="form-actions code-actions">
             <Button disabled={disabled} onClick={() => store.discardModuleChanges()} size="sm" type="button" variant="secondary">
               {t('inspector.task.discardCode')}
             </Button>
-          )}
-          <Button disabled={disabled || moduleEditor.status == 'saved' || moduleEditor.status == 'saving'} size="sm" type="submit">
-            {t('inspector.task.saveCode')}
-          </Button>
-        </div>
+            <Button disabled={disabled} size="sm" type="submit">
+              {t('inspector.task.retrySave')}
+            </Button>
+          </div>
+        )}
       </form>
     ) : undefined
   const settingsPanel = (
@@ -917,10 +916,21 @@ function TaskDefinition({
         settingsPanel
       ) : (
         <Tabs className="inspector-task-tabs gap-0" onValueChange={(value) => value != null && onSectionChange(value as 'code' | 'settings')} value={section}>
-          <TabsList aria-label={t('inspector.title')} className="w-full shrink-0 justify-start px-3 pt-1" variant="line">
-            <TabsTrigger value="code">{t('inspector.task.javascriptModule')}</TabsTrigger>
-            <TabsTrigger value="settings">{t('inspector.node.title')}</TabsTrigger>
-          </TabsList>
+          <div className="inspector-task-toolbar">
+            <TabsList aria-label={t('inspector.title')} className="min-w-0 justify-start" variant="line">
+              <TabsTrigger className="flex-none" value="code">
+                {t('inspector.task.javascriptModule')}
+              </TabsTrigger>
+              <TabsTrigger className="flex-none" value="settings">
+                {t('inspector.node.title')}
+              </TabsTrigger>
+            </TabsList>
+            {moduleEditor != null && (
+              <span className={`code-save-status ${moduleEditor.status}`} aria-live="polite">
+                <span /> {codeStatusLabel(moduleEditor.status, t)}
+              </span>
+            )}
+          </div>
           <TabsContent className="inspector-task-tab-panel code-tab" keepMounted value="code">
             {codeEditor}
           </TabsContent>
@@ -1031,7 +1041,7 @@ function TriggerDefinition({
   readonly revision: RevisionView
   readonly selection: Extract<ResolvedSelection, { readonly kind: 'trigger' }>
   readonly triggers: TriggerStore
-}): ReactElement {
+}): ReactElement | null {
   const t = useTranslate()
   const trigger = selection.trigger
   const [name, setName] = useState(trigger.name)
@@ -1044,6 +1054,8 @@ function TriggerDefinition({
     setName(trigger.name)
     setDescription(trigger.description ?? '')
   }, [trigger])
+
+  if (trigger.kind == 'manual' || trigger.kind == 'cron') return null
 
   const connectionSection =
     providerTrigger == null ? null : (
@@ -1112,20 +1124,9 @@ function TriggerDefinition({
           const common = { ...(description.trim() == '' ? {} : { description: description.trim() }), name: name.trim() }
           let settings: TriggerSettings
           switch (trigger.kind) {
-            case 'manual':
-              settings = { ...common, kind: trigger.kind }
-              break
             case 'webhook':
               settings = { ...common, inputs: trigger.inputsDef, kind: trigger.kind, options: trigger.options ?? {} }
               break
-            case 'cron': {
-              settings = {
-                ...common,
-                kind: trigger.kind,
-                schedule: trigger.cronTimes,
-              }
-              break
-            }
             case 'poll': {
               settings = {
                 ...common,
@@ -1249,80 +1250,82 @@ export function NodeInspector({
   }, [focus, selection?.id, selection?.kind, taskSection])
 
   return (
-    <div className="inspector-content" ref={content}>
-      <Diagnostics diagnostics={diagnostics} />
-      <div className="inspector-node-editor" ref={editorRef} />
-      {selection != null && selection.kind != 'trigger' && (
-        <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} />
-      )}
-      {selection == null ? (
-        target.kind == 'subflow' ? (
-          <SubflowDefinition definition={revision.subflow(target.id)!} disabled={disabled} store={store} subflowId={target.id} />
-        ) : (
-          <div className="inspector-empty">{t('inspector.selectNode')}</div>
-        )
-      ) : (
-        <>
-          {selection.kind == 'trigger' ? (
-            <TriggerDefinition
-              activeConnections={triggerActiveConnections}
-              authorizationPending={triggerAuthorizationPending}
-              connection={triggerConnection}
-              connectionError={triggerConnectionError}
-              connectionLoading={triggerConnectionLoading}
-              disabled={disabled}
-              revision={revision}
-              selection={selection}
-              triggers={triggers}
-            />
-          ) : selection.kind == 'task' ? (
-            <TaskDefinition
-              connectorAction={connectorAction}
-              connectorActionError={connectorActionError}
-              connectorAuthorizationPending={connectorAuthorizationPending}
-              connectorConnection={connectorConnection}
-              connectorConnectionError={connectorConnectionError}
-              activeConnectorConnections={activeConnectorConnections}
-              connectors={connectors}
-              connectorLoading={connectorLoading}
-              disabled={disabled}
-              focus={focus}
-              onSectionChange={setTaskSection}
-              section={taskSection}
-              selection={selection}
-              store={store}
-              theme={theme}
-            >
-              <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} revision={revision} store={store} target={target} />
-            </TaskDefinition>
-          ) : selection.kind == 'wait' ? (
-            <WaitDefinition
-              activeConnectorConnections={activeConnectorConnections}
-              connectorAction={connectorAction}
-              connectorActionError={connectorActionError}
-              connectorAuthorizationPending={connectorAuthorizationPending}
-              connectorConnection={connectorConnection}
-              connectorConnectionError={connectorConnectionError}
-              connectorLoading={connectorLoading}
-              connectors={connectors}
-              disabled={disabled}
-              onChooseNotification={onChooseWaitNotification}
-              revision={revision}
-              selection={selection}
-              store={store}
-              theme={theme}
-            />
+    <OverlayScrollbar className="inspector-scroll" defer={false} tabIndex={-1}>
+      <div className="inspector-content" ref={content}>
+        <Diagnostics diagnostics={diagnostics} />
+        <div className="inspector-node-editor" ref={editorRef} />
+        {selection != null && selection.kind != 'trigger' && (
+          <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} />
+        )}
+        {selection == null ? (
+          target.kind == 'subflow' ? (
+            <SubflowDefinition definition={revision.subflow(target.id)!} disabled={disabled} store={store} subflowId={target.id} />
           ) : (
-            <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} revision={revision} store={store} target={target} />
-          )}
-          {selection.kind == 'subflow' && (
-            <section className="inspector-section">
-              <h3>{t('inspector.subflow.referenced')}</h3>
-              <p className="reference-value">{selection.definition?.name ?? selection.node.subflowId}</p>
-            </section>
-          )}
-        </>
-      )}
-    </div>
+            <div className="inspector-empty">{t('inspector.selectNode')}</div>
+          )
+        ) : (
+          <>
+            {selection.kind == 'trigger' ? (
+              <TriggerDefinition
+                activeConnections={triggerActiveConnections}
+                authorizationPending={triggerAuthorizationPending}
+                connection={triggerConnection}
+                connectionError={triggerConnectionError}
+                connectionLoading={triggerConnectionLoading}
+                disabled={disabled}
+                revision={revision}
+                selection={selection}
+                triggers={triggers}
+              />
+            ) : selection.kind == 'task' ? (
+              <TaskDefinition
+                connectorAction={connectorAction}
+                connectorActionError={connectorActionError}
+                connectorAuthorizationPending={connectorAuthorizationPending}
+                connectorConnection={connectorConnection}
+                connectorConnectionError={connectorConnectionError}
+                activeConnectorConnections={activeConnectorConnections}
+                connectors={connectors}
+                connectorLoading={connectorLoading}
+                disabled={disabled}
+                focus={focus}
+                onSectionChange={setTaskSection}
+                section={taskSection}
+                selection={selection}
+                store={store}
+                theme={theme}
+              >
+                <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} revision={revision} store={store} target={target} />
+              </TaskDefinition>
+            ) : selection.kind == 'wait' ? (
+              <WaitDefinition
+                activeConnectorConnections={activeConnectorConnections}
+                connectorAction={connectorAction}
+                connectorActionError={connectorActionError}
+                connectorAuthorizationPending={connectorAuthorizationPending}
+                connectorConnection={connectorConnection}
+                connectorConnectionError={connectorConnectionError}
+                connectorLoading={connectorLoading}
+                connectors={connectors}
+                disabled={disabled}
+                onChooseNotification={onChooseWaitNotification}
+                revision={revision}
+                selection={selection}
+                store={store}
+                theme={theme}
+              />
+            ) : (
+              <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} revision={revision} store={store} target={target} />
+            )}
+            {selection.kind == 'subflow' && (
+              <section className="inspector-section">
+                <h3>{t('inspector.subflow.referenced')}</h3>
+                <p className="reference-value">{selection.definition?.name ?? selection.node.subflowId}</p>
+              </section>
+            )}
+          </>
+        )}
+      </div>
+    </OverlayScrollbar>
   )
 }

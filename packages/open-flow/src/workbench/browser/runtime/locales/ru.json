@@ -37,7 +37,8 @@
     "webhook": "Webhook",
     "webhookDescription": "Получать внешние события через выделенный HTTP-адрес.",
     "manual": "Ручной триггер",
-    "manualDescription": "Запустить выполнение вручную с этого узла."
+    "manualDescription": "Запустить выполнение вручную с этого узла.",
+    "integrationTriggers": "Триггеры внешних сервисов"
   },
   "common": {
     "cancel": "Отмена",
@@ -188,7 +189,7 @@
     },
     "task": {
       "chatText": "Текст чата",
-      "codeDirty": "Не сохранено",
+      "codeDirty": "Ожидание автосохранения…",
       "codeFailed": "Не удалось сохранить",
       "codeSaved": "Сохранено",
       "codeSaving": "Сохранение…",
@@ -205,9 +206,9 @@
       "outputPorts": "Выходные порты",
       "responseMode": "Режим ответа",
       "save": "Сохранить задачу",
-      "saveCode": "Сохранить код",
       "source": "Исходный код",
-      "structuredJson": "Структурированный JSON"
+      "structuredJson": "Структурированный JSON",
+      "retrySave": "Повторить сохранение"
     },
     "wait": {
       "approval": "Одобрить или отклонить",
@@ -332,8 +333,7 @@
     "rolledBack": "Рабочая версия откачена к ревизии {{revision}}.",
     "requestFailed": "Сервис не смог выполнить эту операцию. Повторите попытку позже.",
     "triggerPaused": "Активация Trigger приостановлена.",
-    "triggerResumed": "Активация Trigger возобновляется.",
-    "unsavedCode": "Сохраните или отмените изменения JavaScript, прежде чем покинуть этот узел."
+    "triggerResumed": "Активация Trigger возобновляется."
   },
   "publication": {
     "active": "Активно",
@@ -659,7 +659,8 @@
       "loading": "Загрузка черновика…",
       "noDraft": "Черновик не загружен",
       "saved": "Сохранено",
-      "saving": "Сохранение черновика…"
+      "saving": "Сохранение черновика…",
+      "failed": "Ошибка сохранения"
     },
     "subflowDraft": "Черновик Subflow",
     "subflowPublishHelp": "Subflow публикуется вместе с Flow.",

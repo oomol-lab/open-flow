@@ -23,6 +23,7 @@ import { indexAddNodeOptions } from './addNodeOptions.ts'
 import { cycleContextPanelFocus, observeContextPanelOverlay } from './contextPanelBehavior.ts'
 
 interface ContextPanelProps {
+  readonly headerRef?: (element: HTMLDivElement | null) => void
   readonly children: ReactNode
   readonly focusOnOpen: boolean
   readonly icon: IconName
@@ -66,7 +67,7 @@ function useOverlayPanel(panel: RefObject<HTMLElement | null>): boolean {
   return overlay
 }
 
-export function ContextPanel({ children, focusOnOpen, icon, onClose, theme, title }: ContextPanelProps): ReactElement {
+export function ContextPanel({ children, focusOnOpen, headerRef, icon, onClose, theme, title }: ContextPanelProps): ReactElement {
   const t = useTranslate()
   const panel = useRef<HTMLElement>(null)
   const overlay = useOverlayPanel(panel)
@@ -127,10 +128,21 @@ export function ContextPanel({ children, focusOnOpen, icon, onClose, theme, titl
           tabIndex={-1}
         >
           <header>
-            <span className="node-icon small">
-              <Icon name={icon} size={16} />
-            </span>
-            <strong id={titleId}>{title}</strong>
+            {headerRef == null ? (
+              <>
+                <span className="node-icon small">
+                  <Icon name={icon} size={16} />
+                </span>
+                <strong id={titleId}>{title}</strong>
+              </>
+            ) : (
+              <>
+                <span className="sr-only" id={titleId}>
+                  {title}
+                </span>
+                <div className="context-panel-node-heading" ref={headerRef} />
+              </>
+            )}
             <Button aria-label={t('contextPanel.close')} onClick={onClose} size="icon-sm" type="button" variant="ghost">
               <Icon name="close" />
             </Button>
@@ -220,11 +232,31 @@ function LibraryRow({ item, trailing }: { readonly item: Exclude<IAddNodeMenuIte
   )
 }
 
-function LibraryGroup({ label }: { readonly label: string }): ReactElement {
+function LibraryGroup({
+  label,
+  children,
+  nested,
+  open,
+  onToggle,
+}: {
+  readonly label: string
+  readonly children?: ReactNode
+  readonly nested?: boolean
+  readonly open?: boolean
+  readonly onToggle?: () => void
+}): ReactElement {
   return (
     <div className="block-library-group">
-      <span>{label}</span>
-      <Separator />
+      {onToggle == null ? (
+        <span>{label}</span>
+      ) : (
+        <Button aria-expanded={open} className="min-w-0 flex-1 justify-start text-left" onClick={onToggle} size="sm" type="button" variant="disclosure">
+          <Icon className={open ? undefined : '-rotate-90'} name="chevron-down" />
+          <span className="truncate">{label}</span>
+        </Button>
+      )}
+      {children}
+      {!nested && onToggle == null && <Separator />}
     </div>
   )
 }
@@ -358,17 +390,35 @@ export function BlockLibrary({
   const active = useRef(true)
   const dynamicOptions = useRef<ReadonlyMap<string, AddNodeOption>>(new Map())
   const [query, setQuery] = useState('')
+  const [viewport, setViewport] = useState<HTMLElement | null>(null)
   const filterQuery = useDebouncedValue(query, 100)
   const [adding, setAdding] = useState(false)
+  const [settled, setSettled] = useState(false)
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(() => new Set())
   const [openItems, setOpenItems] = useState<ReadonlySet<string>>(() => new Set())
   const staticOptions = useMemo(() => indexAddNodeOptions(options), [options])
-  const localItems = useMemo(() => menuItems(options), [options])
+  const integrationGroup = t('addNode.connectorActions')
+  const triggerGroup = t('addNode.integrationTriggers')
+  const triggers = t('addNode.triggers')
+  const localItems = useMemo(() => {
+    const items = menuItems(options)
+    if (!items.some((item) => item.type == 'divider' && item.label == integrationGroup)) items.push({ type: 'divider', label: integrationGroup })
+    if (items.some((item) => item.type == 'divider' && item.label == triggers) && !items.some((item) => item.type == 'divider' && item.label == triggerGroup)) {
+      items.push({ type: 'divider', label: triggerGroup })
+    }
+    return items
+  }, [options, integrationGroup, triggerGroup, triggers])
   const provideAsyncItems = useCallback(
     async (_searchTerm: string, signal: AbortSignal): Promise<readonly IAddNodeMenuItem[] | undefined> => {
-      const nextOptions = await browseOptions(signal)
-      if (signal.aborted || nextOptions == null) return
-      dynamicOptions.current = indexAddNodeOptions(nextOptions)
-      return menuItems(nextOptions)
+      setSettled(false)
+      try {
+        const nextOptions = await browseOptions(signal)
+        if (signal.aborted || nextOptions == null) return
+        dynamicOptions.current = indexAddNodeOptions(nextOptions)
+        return menuItems(nextOptions)
+      } finally {
+        if (!signal.aborted) setSettled(true)
+      }
     },
     [browseOptions],
   )
@@ -381,8 +431,32 @@ export function BlockLibrary({
     },
     [provideChoices],
   )
-  const { error, items: catalogItems, loading, retry } = useBlockPickerItems(localItems, '', provideAsyncItems)
-  const items = useMemo(() => filterBlockPickerItems(filterQuery, catalogItems), [catalogItems, filterQuery])
+  const { error, items: catalogItems, retry } = useBlockPickerItems(localItems, '', provideAsyncItems)
+  const loading = !settled
+  const searching = filterQuery.trim() != ''
+  const items = useMemo(() => {
+    const ordered = [...catalogItems]
+    const start = ordered.findIndex((item) => item.type == 'divider' && item.label == triggerGroup)
+    if (start >= 0) {
+      const next = ordered.findIndex((item, index) => index > start && item.type == 'divider')
+      const group = ordered.splice(start, (next < 0 ? ordered.length : next) - start)
+      const parent = ordered.findIndex((item) => item.type == 'divider' && item.label == triggers)
+      const end = parent < 0 ? -1 : ordered.findIndex((item, index) => index > parent && item.type == 'divider')
+      const heading = group[0]
+      if (heading != null) group[0] = { ...heading, detail: triggers }
+      ordered.splice(end < 0 ? ordered.length : end, 0, ...group)
+    }
+    const matches = filterBlockPickerItems(filterQuery, ordered)
+    if (searching) return matches
+    let hidden = false
+    return matches.filter((item) => {
+      if (item.type == 'divider') {
+        hidden = (item.label == integrationGroup || item.label == triggerGroup) && !openGroups.has(item.label)
+        return true
+      }
+      return !hidden
+    })
+  }, [catalogItems, filterQuery, integrationGroup, triggerGroup, triggers, openGroups, searching])
   const keptItems = useMemo(() => {
     const indexes: number[] = []
     for (let index = 0; index < items.length; index++) {
@@ -442,6 +516,74 @@ export function BlockLibrary({
     setAddItemId(event.dataTransfer, itemId)
   }
 
+  const feedback = loading ? (
+    <span className="inline-flex items-center gap-1.5" role="status">
+      <Spinner /> {t('contextPanel.loading')}
+    </span>
+  ) : error ? (
+    <span className="inline-flex flex-wrap items-center gap-1.5" role="alert">
+      {t('contextPanel.loadFailed')}
+      <Button
+        onClick={() => {
+          setSettled(false)
+          retry()
+        }}
+        size="sm"
+        type="button"
+        variant="secondary"
+      >
+        {t('contextPanel.retry')}
+      </Button>
+    </span>
+  ) : undefined
+  const hasConnectors = catalogItems.some((item) => item.type == 'connector')
+
+  const renderItem = (item: (typeof items)[number]): ReactElement => {
+    const option = item.type == 'divider' || item.data == null ? undefined : resolve(item.data)
+    const nested =
+      option?.kind == 'connector' || option?.kind == 'connector-group' || (option?.kind == 'trigger' && 'trigger' in option && option.trigger.kind == 'catalog')
+    return (
+      <div
+        className={cn('block-library-list-entry', nested && 'block-library-subitem')}
+        key={item.type == 'divider' ? `group:${item.label}` : (item.data ?? item.label)}
+      >
+        {item.type == 'divider' ? (
+          <LibraryGroup
+            label={item.label}
+            nested={item.label == triggerGroup}
+            open={searching || openGroups.has(item.label)}
+            onToggle={
+              (item.label == integrationGroup || item.label == triggerGroup) && !searching
+                ? () =>
+                    setOpenGroups((current) => {
+                      const next = new Set(current)
+                      if (next.has(item.label)) next.delete(item.label)
+                      else next.add(item.label)
+                      return next
+                    })
+                : undefined
+            }
+          >
+            {item.label == integrationGroup && feedback}
+            {item.label == integrationGroup && !loading && !error && !hasConnectors && openGroups.has(integrationGroup) && (
+              <span role="status">{t('contextPanel.empty')}</span>
+            )}
+          </LibraryGroup>
+        ) : (
+          <LibraryItem
+            disabled={busy || item.disabled == true}
+            draggable={draggable}
+            item={item}
+            onAdd={(id) => void add(id)}
+            onDrag={drag}
+            onLoadChoices={loadChoices}
+            onOpenChange={setOpen}
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div aria-busy={adding || loading} className="block-library">
       <div className="mx-3.5 mb-2 mt-3 flex-none">
@@ -459,39 +601,21 @@ export function BlockLibrary({
           />
         </InputGroup>
       </div>
-      <OverlayScrollbar className="block-library-list" defer={false} tabIndex={-1}>
-        <Virtualizer data={items} itemSize={48} keepMounted={keptItems} key={items.length} ssrCount={Math.min(items.length, 12)}>
-          {(item) => (
-            <div className="block-library-list-entry" key={item.type == 'divider' ? `group:${item.label}` : (item.data ?? item.label)}>
-              {item.type == 'divider' ? (
-                <LibraryGroup label={item.label} />
-              ) : (
-                <LibraryItem
-                  disabled={busy || item.disabled == true}
-                  draggable={draggable}
-                  item={item}
-                  onAdd={(id) => void add(id)}
-                  onDrag={drag}
-                  onLoadChoices={loadChoices}
-                  onOpenChange={setOpen}
-                />
-              )}
-            </div>
-          )}
-        </Virtualizer>
-        {loading && (
-          <div className="block-library-feedback" role="status">
-            <Spinner data-icon="inline-start" />
-            {t('contextPanel.loading')}
-          </div>
+      <OverlayScrollbar
+        className="block-library-list"
+        defer={false}
+        events={{ initialized: (instance) => setViewport(instance.elements().viewport) }}
+        tabIndex={-1}
+      >
+        {viewport == null ? (
+          items.map(renderItem)
+        ) : (
+          <Virtualizer data={items} itemSize={48} keepMounted={keptItems} key={items.length} scrollRef={{ current: viewport }}>
+            {renderItem}
+          </Virtualizer>
         )}
-        {!loading && error && (
-          <div className="block-library-feedback" role="alert">
-            <span>{t('contextPanel.loadFailed')}</span>
-            <Button onClick={retry} size="sm" type="button" variant="secondary">
-              {t('contextPanel.retry')}
-            </Button>
-          </div>
+        {!items.some((item) => item.type == 'divider' && item.label == integrationGroup) && feedback != null && (
+          <div className="block-library-feedback">{feedback}</div>
         )}
         {!loading && !error && items.length == 0 && <div className="block-library-feedback">{t('contextPanel.empty')}</div>}
         <div aria-hidden="true" className="h-4" />

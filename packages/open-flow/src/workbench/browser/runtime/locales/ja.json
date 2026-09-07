@@ -37,7 +37,8 @@
     "webhook": "Webhook",
     "webhookDescription": "専用の HTTP エンドポイントで外部イベントを受信します。",
     "manual": "手動トリガー",
-    "manualDescription": "ここから手動で実行を開始します。"
+    "manualDescription": "ここから手動で実行を開始します。",
+    "integrationTriggers": "外部サービスの Trigger"
   },
   "common": {
     "cancel": "キャンセル",
@@ -188,7 +189,7 @@
     },
     "task": {
       "chatText": "チャットテキスト",
-      "codeDirty": "未保存",
+      "codeDirty": "自動保存を待機中…",
       "codeFailed": "保存に失敗",
       "codeSaved": "保存済み",
       "codeSaving": "保存中…",
@@ -205,9 +206,9 @@
       "outputPorts": "出力ポート",
       "responseMode": "応答モード",
       "save": "タスクを保存",
-      "saveCode": "コードを保存",
       "source": "ソースコード",
-      "structuredJson": "構造化 JSON"
+      "structuredJson": "構造化 JSON",
+      "retrySave": "保存を再試行"
     },
     "wait": {
       "approval": "承認または拒否",
@@ -332,8 +333,7 @@
     "rolledBack": "本番をリビジョン {{revision}} にロールバックしました。",
     "requestFailed": "サービスがこの操作を完了できませんでした。しばらくしてから再試行してください。",
     "triggerPaused": "Trigger の有効化を一時停止しました。",
-    "triggerResumed": "Trigger の有効化を再開しています。",
-    "unsavedCode": "このノードを離れる前に、JavaScript の変更を保存するか破棄してください。"
+    "triggerResumed": "Trigger の有効化を再開しています。"
   },
   "publication": {
     "active": "稼働中",
@@ -659,7 +659,8 @@
       "loading": "ドラフトを読み込み中…",
       "noDraft": "ドラフトが読み込まれていません",
       "saved": "保存済み",
-      "saving": "ドラフトを保存中…"
+      "saving": "ドラフトを保存中…",
+      "failed": "保存に失敗"
     },
     "subflowDraft": "Subflow ドラフト",
     "subflowPublishHelp": "Subflow は Flow を通じて公開されます。",

@@ -16,7 +16,7 @@ import { FlowSettingsContainer } from './FlowSettingsContainer.tsx'
 
 export interface FlowDesignerProps {
   toolbar?: React.ReactNode
-  view?: Pick<FlowDesignerViewProps, 'model' | 'inspectorContainer' | 'selectedNodeIds'>
+  view?: Pick<FlowDesignerViewProps, 'model' | 'inspectorContainer' | 'inspectorHeaderContainer' | 'selectedNodeIds'>
   flowDesignerStore: FlowDesignerStore
   dark: boolean
   fitView?: boolean

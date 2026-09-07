@@ -33,6 +33,7 @@ import { indexAddNodeOptions } from './addNodeOptions.ts'
 
 interface Props {
   readonly inspectorContainer?: HTMLElement | null
+  readonly inspectorHeaderContainer?: HTMLElement | null
   readonly runControl?: ReactNode
   readonly addNodeOptions: readonly AddNodeOption[]
   readonly blocksOpen: boolean
@@ -236,6 +237,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
     focusNodeRequest,
     inspectorOpen,
     inspectorContainer,
+    inspectorHeaderContainer,
     model,
     onAddNode,
     onConnect,
@@ -476,6 +478,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         language={language}
         model={model}
         inspectorContainer={inspectorContainer}
+        inspectorHeaderContainer={inspectorHeaderContainer}
         toolbar={
           <div className="designer-actions">
             <Separator orientation="vertical" className="mx-1" />
@@ -538,10 +541,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
           }
           const option = staticOptions.get(itemId) ?? dynamicOptions.current.get(itemId)
           if (option == null) return
-          const firstNode = model.nodes.length == 0
-          const nodeId = await onAddNode(option, position, connection)
-          if (nodeId != null && firstNode && option.kind == 'new-task') onOpenInspector()
-          return nodeId
+          return await onAddNode(option, position, connection)
         }}
         onConnect={onConnect}
         onChangeComment={onChangeComment}

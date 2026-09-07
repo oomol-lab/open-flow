@@ -131,6 +131,7 @@ describe('TriggerStore', () => {
 
       expect(options).toHaveLength(1)
       expect(options?.[0]).toMatchObject({
+        group: 'Integration triggers',
         icon: providerIcon({ serviceId: 'github', serviceName: 'github' }),
         id: 'trigger:github.on_repo_event',
         outputs: [{ handle: 'payload' }],

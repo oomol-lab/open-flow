@@ -6,11 +6,8 @@
     flex-direction: column;
     overflow: hidden;
     overscroll-behavior: contain;
-    margin: 12px 12px 12px 0;
-    border: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius);
+    border-left: 1px solid var(--ui-border);
     background: var(--ui-card);
-    scrollbar-gutter: stable;
   }
 
   .context-panel:focus-visible {
@@ -41,6 +38,11 @@
     white-space: nowrap;
   }
 
+  .context-panel-node-heading {
+    min-width: 0;
+    flex: 1;
+  }
+
   .context-panel-content {
     min-height: 0;
     flex: 1;
@@ -56,13 +58,19 @@
     min-width: 0;
   }
 
+  .inspector-scroll {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .inspector-scroll [data-overlayscrollbars-viewport] {
+    overscroll-behavior: contain;
+  }
+
   .inspector-content {
     display: flex;
-    height: 100%;
+    min-height: 100%;
     flex-direction: column;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-gutter: stable;
   }
 
   .inspector-task-tabs {
@@ -75,16 +83,8 @@
     min-height: 0;
   }
 
-  .inspector-task-tab-panel.code-tab {
-    height: 420px;
+  .inspector-task-tab-panel.code-tab:not([hidden]) {
     display: flex;
-    overflow: hidden;
-  }
-
-  .inspector-task-tab-panel.settings-tab {
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-gutter: stable;
   }
 
   .block-library {
@@ -104,6 +104,7 @@
     padding: 0 8px;
   }
 
+  .inspector-scroll > .os-scrollbar-vertical,
   .block-library-list .os-scrollbar-vertical,
   .code-action-panel .os-scrollbar-vertical {
     --os-size: 10px;
@@ -174,6 +175,10 @@
     color: var(--ui-muted-foreground);
     font-size: 10px;
     font-weight: 600;
+  }
+
+  .block-library-subitem {
+    padding-left: 32px;
   }
 
   .block-library-group [data-slot='separator'] {
@@ -448,15 +453,21 @@
     color: var(--ui-muted-foreground);
   }
 
-  .code-section-heading {
+  .inspector-task-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    padding: 4px 12px 0;
   }
 
-  .code-section-heading h3 {
-    margin: 0;
+  .inspector-sources {
+    padding-top: 8px;
+  }
+
+  .inspector-sources h3 {
+    font-size: 11px;
+    color: var(--ui-muted-foreground);
   }
 
   .code-action-panel {
@@ -465,7 +476,7 @@
     height: auto;
     max-height: min(40vh, 320px);
     padding: 4px 0;
-    border-block: 1px solid var(--ui-border);
+    border-bottom: 1px solid var(--ui-border);
     font-size: 12px;
   }
 
@@ -761,9 +772,8 @@
   }
 
   .code-tab .code-editor {
-    height: auto;
-    min-height: 0;
-    flex: 1;
+    min-height: 280px;
+    flex: 1 0 280px;
   }
 
   .code-actions {

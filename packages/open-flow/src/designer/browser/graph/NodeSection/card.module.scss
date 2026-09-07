@@ -156,3 +156,7 @@
 .wrapper[data-section='conditions'] > .content {
   overflow: visible;
 }
+
+:global([data-node-editor]) .wrapper:is([data-section='inputs'], [data-section='outputs'], [data-section='conditions']) {
+  margin-inline: 0;
+}

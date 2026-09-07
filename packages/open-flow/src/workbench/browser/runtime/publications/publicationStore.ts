@@ -275,6 +275,8 @@ export class PublicationStore {
   }
 
   public async publish(): Promise<boolean> {
+    const flowId = this.#workspace.$.flowId.value
+    if (!(await this.#workspace.saveModuleEditor()) || flowId != this.#workspace.$.flowId.value) return false
     const flow = this.#workspace.$.targetFlow.value
     const draft = this.#workspace.$.draft.value
     if (

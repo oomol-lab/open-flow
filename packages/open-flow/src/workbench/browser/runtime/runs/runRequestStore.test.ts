@@ -62,6 +62,7 @@ describe('RunRequestStore input preparation', () => {
       },
       { follow: vi.fn(), prepareStart: vi.fn() },
       vi.fn(),
+      async () => draft.revisionId,
     )
 
     try {
@@ -84,7 +85,7 @@ function harness() {
     getRevision: vi.fn(),
   }
   const notice = vi.fn()
-  const store = new RunRequestStore(client, { follow: vi.fn().mockResolvedValue(true), prepareStart: () => () => true }, notice)
+  const store = new RunRequestStore(client, { follow: vi.fn().mockResolvedValue(true), prepareStart: () => () => true }, notice, async () => draft.revisionId)
   return { client, notice, store }
 }
 
@@ -177,6 +178,28 @@ it('refuses a deleted selection instead of running the remaining trigger', async
   try {
     expect(await store.requestDraft(flow, entryDraft(), 'other')).toBe('unavailable')
     expect(client.createDraftRun).not.toHaveBeenCalled()
+  } finally {
+    store.dispose()
+  }
+})
+
+it('flushes pending code again before confirming inputs and uses the saved revision', async () => {
+  const createDraftRun = vi.fn().mockResolvedValue({ runId: 'run' })
+  const prepare = vi.fn(async () => 'saved-revision' as string | undefined)
+  const store = new RunRequestStore(
+    { createDraftRun, createLiveRun: vi.fn(), getLive: vi.fn(), getRevision: vi.fn() },
+    { follow: vi.fn().mockResolvedValue(true), prepareStart: () => () => true },
+    vi.fn(),
+    prepare,
+  )
+  try {
+    expect(await store.requestDraft(flow, entryDraft(true))).toBe('input')
+    await store.selectTrigger('other')
+    prepare.mockResolvedValueOnce(undefined)
+    expect(await store.confirmInputs()).toBe(false)
+    expect(createDraftRun).not.toHaveBeenCalled()
+    expect(await store.confirmInputs()).toBe(true)
+    expect(createDraftRun).toHaveBeenCalledWith('flow', 'saved-revision', expect.objectContaining({ trigger: { nodeId: 'other', payload: {} } }))
   } finally {
     store.dispose()
   }

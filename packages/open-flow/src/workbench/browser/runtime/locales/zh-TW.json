@@ -37,7 +37,8 @@
     "webhook": "Webhook",
     "webhookDescription": "透過專屬的 HTTP 端點接收外部事件。",
     "manual": "手動觸發",
-    "manualDescription": "從這裡手動啟動執行。"
+    "manualDescription": "從這裡手動啟動執行。",
+    "integrationTriggers": "第三方 Trigger"
   },
   "common": {
     "cancel": "取消",
@@ -188,7 +189,7 @@
     },
     "task": {
       "chatText": "對話文字",
-      "codeDirty": "未儲存",
+      "codeDirty": "等待自動儲存…",
       "codeFailed": "儲存失敗",
       "codeSaved": "已儲存",
       "codeSaving": "儲存中…",
@@ -205,9 +206,9 @@
       "outputPorts": "輸出埠",
       "responseMode": "回應模式",
       "save": "儲存任務",
-      "saveCode": "儲存程式碼",
       "source": "原始碼",
-      "structuredJson": "結構化 JSON"
+      "structuredJson": "結構化 JSON",
+      "retrySave": "重試儲存"
     },
     "wait": {
       "approval": "通過或拒絕",
@@ -332,8 +333,7 @@
     "rolledBack": "已將線上版本還原到修訂 {{revision}}。",
     "requestFailed": "服務未能完成此操作，請稍後再試一次。",
     "triggerPaused": "Trigger 啟用已暫停。",
-    "triggerResumed": "Trigger 啟用正在恢復。",
-    "unsavedCode": "離開這個節點前，請先儲存或放棄 JavaScript 的變更。"
+    "triggerResumed": "Trigger 啟用正在恢復。"
   },
   "publication": {
     "active": "運作中",
@@ -659,7 +659,8 @@
       "loading": "正在載入草稿…",
       "noDraft": "未載入草稿",
       "saved": "已儲存",
-      "saving": "正在儲存草稿…"
+      "saving": "正在儲存草稿…",
+      "failed": "儲存失敗"
     },
     "subflowDraft": "Subflow 草稿",
     "subflowPublishHelp": "Subflow 會隨著 Flow 一起發布。",

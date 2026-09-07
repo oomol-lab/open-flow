@@ -114,6 +114,7 @@ async function inputGroups(draft: Draft, language: ReadonlyVal<string>, triggerI
 }
 
 export class RunRequestStore {
+  readonly #prepareDraft: (flowId: string) => Promise<string | undefined>
   readonly #client: Client
   readonly #identity: () => string
   readonly #i18n: I18n
@@ -130,9 +131,11 @@ export class RunRequestStore {
     client: Client,
     runs: Pick<RunStore, 'follow' | 'prepareStart'>,
     setNotice: SetNotice,
+    prepareDraft: (flowId: string) => Promise<string | undefined>,
     i18n: I18n = createI18n(),
     identity: () => string = randomId,
   ) {
+    this.#prepareDraft = prepareDraft
     this.#client = client
     this.#runs = runs
     this.#setNotice = setNotice
@@ -302,11 +305,16 @@ export class RunRequestStore {
     const current = this.#runs.prepareStart()
     this.#setNotice(undefined)
     this.#set({ starting: true, submitting: source })
-    const target = source == 'draft' ? { flowId: flow.flowId, revisionId } : { publicationId: publicationId! }
-    const signature = JSON.stringify({ inputs, trigger, source, ...target })
-    const attempt = this.#attempt?.signature == signature ? this.#attempt : { key: this.#identity(), signature }
-    this.#attempt = attempt
     try {
+      if (source == 'draft') {
+        const savedRevision = await this.#prepareDraft(flow.flowId)
+        if (savedRevision == null || !alive() || !current()) return false
+        revisionId = savedRevision
+      }
+      const target = source == 'draft' ? { flowId: flow.flowId, revisionId } : { publicationId: publicationId! }
+      const signature = JSON.stringify({ inputs, trigger, source, ...target })
+      const attempt = this.#attempt?.signature == signature ? this.#attempt : { key: this.#identity(), signature }
+      this.#attempt = attempt
       const run =
         source == 'draft'
           ? await this.#client.createDraftRun(flow.flowId, revisionId, { idempotencyKey: attempt.key, inputs, trigger })

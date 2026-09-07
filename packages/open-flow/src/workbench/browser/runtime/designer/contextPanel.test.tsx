@@ -44,6 +44,92 @@ describe('Context Panel', () => {
     expect(indexAddNodeOptions([group]).get(connector.id)).toBe(connector)
   })
 
+  it.each(['Connector actions', 'Integration triggers'])('keeps %s collapsed so common nodes remain visible', (label) => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <BlockLibrary
+          browseOptions={async () => []}
+          disabled={false}
+          focusRequest={0}
+          onAdd={async () => undefined}
+          onRegisterDragOption={() => undefined}
+          options={[
+            { ...group, group: label },
+            {
+              id: 'manual',
+              description: 'Start manually.',
+              kind: 'trigger',
+              trigger: { kind: 'manual' },
+              group: 'Triggers',
+              label: 'Manual trigger',
+              inputs: [],
+              outputs: [],
+            },
+            { id: 'code', description: 'Run JavaScript.', kind: 'new-task', group: 'Blocks', label: 'Code task', inputs: [], outputs: [] },
+          ]}
+          provideChoices={async () => []}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain(label)
+    expect(markup).toContain('Manual trigger')
+    expect(markup).toContain('aria-expanded="false"')
+    expect(markup).not.toContain('GitHub')
+    expect(markup).toContain('Code task')
+    if (label == 'Integration triggers') {
+      expect(markup.indexOf('Manual trigger')).toBeLessThan(markup.indexOf(label))
+      expect(markup.indexOf(label)).toBeLessThan(markup.indexOf('Code task'))
+    }
+  })
+
+  it('shows the final connector group before the scroll viewport is initialized', () => {
+    const nodes: AddNodeOption[] = Array.from({ length: 16 }, (_, index) => ({
+      id: `code-${index}`,
+      description: 'Run code.',
+      kind: 'new-task',
+      group: 'Blocks',
+      label: `Code ${index}`,
+      inputs: [],
+      outputs: [],
+    }))
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <BlockLibrary
+          browseOptions={async () => []}
+          disabled={false}
+          focusRequest={0}
+          onAdd={async () => undefined}
+          onRegisterDragOption={() => undefined}
+          options={[...nodes, { ...group, group: 'Connector actions' }]}
+          provideChoices={async () => []}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('Code 15')
+    expect(markup).toContain('Connector actions')
+    expect(markup).toContain('aria-expanded="false"')
+  })
+
+  it('shows the connector entry and its loading state before the catalog arrives', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <BlockLibrary
+          browseOptions={async () => []}
+          disabled={false}
+          focusRequest={0}
+          onAdd={async () => undefined}
+          onRegisterDragOption={() => undefined}
+          options={[]}
+          provideChoices={async () => []}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('Connector actions')
+    expect(markup).toContain('aria-expanded="false"')
+    expect(markup).toContain('role="status"')
+    expect(markup).toContain('Loading catalog blocks')
+  })
+
   it('renders one panel shell and a browsable list with descriptions and choices', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>

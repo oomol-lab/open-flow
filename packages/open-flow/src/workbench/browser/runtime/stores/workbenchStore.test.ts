@@ -224,3 +224,24 @@ it('preserves invalidation during a Variable request and retries failed requests
     store.dispose()
   }
 })
+
+describe('WorkbenchStore node catalog', () => {
+  it('reports a partial catalog failure and allows a later retry', async () => {
+    const store = new WorkbenchStore(
+      new WorkbenchClient(async () => {
+        throw new Error('Unexpected request.')
+      }),
+      { getItem: () => null, setItem: () => {} },
+    )
+    try {
+      vi.spyOn(store.triggers, 'browseAddNodeOptions').mockResolvedValue([])
+      const connectors = vi.spyOn(store.connectors, 'browseAddNodeOptions').mockRejectedValueOnce(new Error('Catalog unavailable')).mockResolvedValue([])
+      const signal = new AbortController().signal
+      await expect(store.browseAddNodeOptions(signal)).rejects.toThrow('Catalog unavailable')
+      await expect(store.browseAddNodeOptions(signal)).resolves.toEqual([])
+      expect(connectors).toHaveBeenCalledTimes(2)
+    } finally {
+      store.dispose()
+    }
+  })
+})

@@ -169,7 +169,9 @@ export function WorkspaceHeader({
           {validationLabel(diagnostics?.valid, diagnostics?.diagnostics.length ?? 0, displayedCheckLoading, t)}
         </Button>
         <span aria-atomic="true" aria-live="polite" className="saved-state">
-          {workspaceLoading || draft == null ? null : <Icon name="check" size={16} />}
+          {workspaceLoading || draft == null ? null : (
+            <Icon name={displayedStatus == 'failed' ? 'alert' : displayedStatus == 'saving' ? 'wait' : 'check'} size={16} />
+          )}
           <span>{t(`workspace.status.${displayedStatus}`)}</span>
         </span>
         <span className="action-help publish-action" title={publishUnavailable}>

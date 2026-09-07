@@ -258,3 +258,33 @@
 :global(.oo-designer-node-minimap1) .wrapper {
   visibility: hidden;
 }
+
+.wrapper[data-trigger-kind='manual'] {
+  min-height: 0;
+
+  .summary {
+    padding: 0 0 12px;
+  }
+
+  .schedule {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--widget-secondary-font-color);
+
+    > strong {
+      font-weight: 400;
+      white-space: normal;
+    }
+  }
+
+  .payload {
+    min-height: 36px;
+    padding-inline: 0;
+    background: transparent;
+
+    > code {
+      font-size: 12px;
+      font-weight: 400;
+    }
+  }
+}

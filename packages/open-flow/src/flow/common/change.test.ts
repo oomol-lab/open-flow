@@ -1,9 +1,10 @@
 import type { ChangeOperation, GraphNode, RevisionContent } from './change.ts'
 
-import { describe, expect, it } from 'vitest'
+import { assert, describe, expect, it } from 'vitest'
 import { createAuthoringId } from './authoring.ts'
 import { applyFlowChanges, FlowChangeError, nextNodeName } from './change.ts'
 import { connect } from './edgeChanges.ts'
+import { imports as moduleImports, replaceSource } from './moduleChanges.ts'
 import { createCodeTask, repairNodeNames } from './nodeChanges.ts'
 
 const port = { jsonSchema: {}, nullable: false } as const
@@ -36,6 +37,17 @@ function taskNode(): GraphNode {
 }
 
 describe('Flow changes', () => {
+  it('preserves incomplete code in a Draft without requiring valid syntax', async () => {
+    const content = applyFlowChanges(revision(), createCodeTask(target, { moduleId: 'module', nodeId: 'task' }, 'Task'))
+    const module = content.modules.module
+    assert(module != null)
+    const source = 'export default async function ('
+    const imports = await moduleImports(source)
+    const changed = applyFlowChanges(content, replaceSource('module', module.source, module.imports, source, imports))
+    expect(changed.modules.module?.source).toBe(source)
+    expect(content.modules.module?.source).toBe(module.source)
+  })
+
   it('allocates familiar numeric suffixes for duplicate Node names', () => {
     expect(nextNodeName('Review', [])).toBe('Review')
     expect(nextNodeName('Review', ['Review'])).toBe('Review (2)')

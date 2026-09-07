@@ -37,7 +37,8 @@
     "webhook": "Webhook",
     "webhookDescription": "Receive external events through a dedicated HTTP endpoint.",
     "manual": "Manual trigger",
-    "manualDescription": "Start execution manually from here."
+    "manualDescription": "Start execution manually from here.",
+    "integrationTriggers": "Integration triggers"
   },
   "common": {
     "cancel": "Cancel",
@@ -188,7 +189,7 @@
     },
     "task": {
       "chatText": "Chat text",
-      "codeDirty": "Unsaved",
+      "codeDirty": "Waiting to save…",
       "codeFailed": "Save failed",
       "codeSaved": "Saved",
       "codeSaving": "Saving…",
@@ -205,9 +206,9 @@
       "outputPorts": "Output ports",
       "responseMode": "Response mode",
       "save": "Save task",
-      "saveCode": "Save code",
       "source": "Source",
-      "structuredJson": "Structured JSON"
+      "structuredJson": "Structured JSON",
+      "retrySave": "Retry save"
     },
     "wait": {
       "approval": "Approve or reject",
@@ -332,8 +333,7 @@
     "rolledBack": "Rolled Live back to revision {{revision}}.",
     "requestFailed": "The service could not complete this operation. Try again later.",
     "triggerPaused": "Trigger activation is paused.",
-    "triggerResumed": "Trigger activation is resuming.",
-    "unsavedCode": "Save or discard the JavaScript changes before leaving this node."
+    "triggerResumed": "Trigger activation is resuming."
   },
   "publication": {
     "active": "Active",
@@ -659,7 +659,8 @@
       "loading": "Loading Draft…",
       "noDraft": "No Draft loaded",
       "saved": "Saved",
-      "saving": "Saving Draft…"
+      "saving": "Saving Draft…",
+      "failed": "Save failed"
     },
     "subflowDraft": "Subflow Draft",
     "subflowPublishHelp": "Subflows are published through a Flow.",
