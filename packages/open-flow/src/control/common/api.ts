@@ -15,6 +15,7 @@ export { controlErrorCode, controlErrorMetadata, type ControlErrorCode } from '.
 export type { FlowCatalogEvent, FlowChangeEvent } from './flowNotifications.ts'
 
 import { runStatuses } from '../../execution/common/runLifecycle.ts'
+import { randomId } from './random.ts'
 
 export type ControlRequest = (path: string, init?: RequestInit) => Promise<Response>
 
@@ -1056,7 +1057,7 @@ function runResult(value: unknown): RunResult {
 const segment = encodeURIComponent
 
 function operationKey(operation: string): string {
-  return `${operation}-${crypto.randomUUID()}`
+  return `${operation}-${randomId()}`
 }
 
 export class ControlClient {
@@ -1101,7 +1102,7 @@ export class ControlClient {
     if (source.version != 1) return invalidResponse()
   }
 
-  async createFlow(name: string, idempotencyKey = `flow-${crypto.randomUUID()}`): Promise<Flow> {
+  async createFlow(name: string, idempotencyKey = `flow-${randomId()}`): Promise<Flow> {
     return flow(
       await this.request('/v1/flows', {
         body: JSON.stringify({ name, version: 1 }),

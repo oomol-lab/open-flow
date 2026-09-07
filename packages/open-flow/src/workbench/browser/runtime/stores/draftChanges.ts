@@ -4,6 +4,7 @@ import type { FlowChanges } from '../designer/flowChanges.ts'
 import type { Current } from './latest.ts'
 import type { SetNotice } from './workbenchNotice.ts'
 
+import { randomId } from '../../../../control/common/random.ts'
 import { FlowChangeError } from '../../../../flow/common/change.ts'
 import { ApiError } from '../api.ts'
 import { applyFlowChanges } from '../designer/flowChanges.ts'
@@ -120,7 +121,7 @@ export class DraftChanges {
       return tail.result
     }
     this.#hooks.beforeChange(manageBusy)
-    const pending: PendingChange = { ...context, active: true, changeId: crypto.randomUUID(), changes, started: false }
+    const pending: PendingChange = { ...context, active: true, changeId: randomId(), changes, started: false }
     this.#committed ??= draft
     this.#pending.push(pending)
     this.#hooks.apply(this.project(this.#committed))
@@ -155,7 +156,7 @@ export class DraftChanges {
         if (error instanceof ApiError && error.code == 'flow.revision-conflict') {
           if (!recovered && (await this.#hooks.recover(pending))) {
             recovered = true
-            pending.changeId = crypto.randomUUID()
+            pending.changeId = randomId()
             continue
           }
           if (recovered) await this.#hooks.recover(pending)
@@ -165,7 +166,7 @@ export class DraftChanges {
             const revisionId = this.#committed?.revisionId
             if (await this.#hooks.recover(pending)) {
               recovered = true
-              if (pending.active && this.#committed?.revisionId != revisionId) pending.changeId = crypto.randomUUID()
+              if (pending.active && this.#committed?.revisionId != revisionId) pending.changeId = randomId()
               continue
             }
           }

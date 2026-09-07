@@ -5,6 +5,7 @@ import type { WorkbenchHost, WorkbenchLanguage, WorkbenchLocation, WorkbenchNavi
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
+import { randomId } from '../../../control/common/random.ts'
 import { Button } from '../../../ui/browser/button.tsx'
 import { Field, FieldError, FieldGroup, FieldLabel } from '../../../ui/browser/field.tsx'
 import { Input } from '../../../ui/browser/input.tsx'
@@ -278,7 +279,7 @@ function Session({
         (listener) => host.subscribeFlowCatalog(listener),
       ),
       preferences,
-      () => crypto.randomUUID(),
+      randomId,
       workbenchI18n,
       host,
       variables,

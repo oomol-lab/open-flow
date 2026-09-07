@@ -69,6 +69,7 @@
     "label": "OOMOL 团队",
     "loadFailed": "无法加载团队。",
     "loading": "正在加载团队…",
+    "noTeams": "当前 Operator 没有可用的 OOMOL 团队。",
     "retry": "重新加载团队",
     "selectForCreation": "选择新 Flow 使用的 Connector 团队"
   },

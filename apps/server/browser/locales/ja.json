@@ -69,6 +69,7 @@
     "label": "OOMOL チーム",
     "loadFailed": "チームを読み込めませんでした。",
     "loading": "チームを読み込んでいます…",
+    "noTeams": "この Operator で利用できる OOMOL Team がありません。",
     "retry": "チームを再読み込み",
     "selectForCreation": "新しい Flow の Connector チームを選択"
   },

@@ -10,6 +10,7 @@ import type { Notice } from './workbenchNotice.ts'
 import type { WorkspaceBusy } from './workspaceModel.ts'
 
 import { compute, derive, val } from 'value-enhancer'
+import { randomId } from '../../../../control/common/random.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { diagnosticItems } from '../designer/diagnostics.ts'
 import { createI18n } from '../i18n.ts'
@@ -95,7 +96,7 @@ export class WorkbenchStore {
   public constructor(
     client: WorkbenchClient,
     preferences: WorkbenchPreferences,
-    identity: () => string = () => crypto.randomUUID(),
+    identity: () => string = randomId,
     i18n: I18n = createI18n(),
     host: Pick<WorkbenchHost, 'openExternalPage'> = blockedExternalPages,
     variables = true,

@@ -547,3 +547,17 @@ it('serves immutable assets and limits the SPA fallback to non-reserved HTML nav
     await rm(directory, { force: true, recursive: true })
   }
 })
+
+it('preserves opener isolation behind a TLS-terminating proxy', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-proxy-'))
+  const service = await openService(path.join(directory, 'open-flow.sqlite'))
+  try {
+    const response = await createServerApp(service).request('http://flow.example.com/auth/session', {
+      headers: { 'host': 'flow.example.com', 'x-forwarded-proto': 'https' },
+    })
+    expect(response.headers.get('cross-origin-opener-policy')).toBe('same-origin')
+  } finally {
+    await closeService(service)
+    await rm(directory, { force: true, recursive: true })
+  }
+})

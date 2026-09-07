@@ -69,6 +69,7 @@
     "label": "Équipe OOMOL",
     "loadFailed": "Impossible de charger les équipes.",
     "loading": "Chargement des équipes…",
+    "noTeams": "Aucune équipe OOMOL n’est disponible pour cet opérateur.",
     "retry": "Réessayer",
     "selectForCreation": "Sélectionner l’équipe du Connector pour le nouveau Flow"
   },
