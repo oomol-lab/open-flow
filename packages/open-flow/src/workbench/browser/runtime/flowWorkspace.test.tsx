@@ -58,6 +58,7 @@ function renderWorkspace(busy?: string, withTrigger = true) {
         selectedConnectionError: value(undefined),
       },
     },
+    addNode: vi.fn().mockResolvedValue('new-node'),
     requestDraftRun: vi.fn().mockResolvedValue('started'),
     requestLiveRun: vi.fn().mockResolvedValue('started'),
     runRequests: {
@@ -118,6 +119,21 @@ describe('FlowWorkspace run drawer', () => {
     await Promise.resolve()
     expect(mocks.setVisible).toHaveBeenCalledWith(true)
     expect(mocks.setOpen).toHaveBeenCalledWith(true)
+  })
+
+  it.each(['new-node', undefined])('opens node details only after a successful addition: %s', async (nodeId) => {
+    const { editor, store } = renderWorkspace()
+    vi.mocked(store.addNode).mockResolvedValue(nodeId)
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const designer = (view.props.children as ReactElement[])[0]!
+    mocks.setOpen.mockClear()
+    const option = { kind: 'new-task', executor: 'llm' }
+    const position = { x: 92, y: 92 }
+
+    expect(await designer.props.onAddNode(option, position)).toBe(nodeId)
+    expect(store.addNode).toHaveBeenCalledWith(option, position, undefined)
+    if (nodeId == null) expect(mocks.setOpen).not.toHaveBeenCalled()
+    else expect(mocks.setOpen).toHaveBeenCalledWith('inspector')
   })
 
   it('hides execution when the graph has no trigger', () => {

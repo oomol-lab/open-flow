@@ -39,6 +39,8 @@ export function NodeEditorPortal() {
 export function NodeEditor() {
   const t = useTranslate()
   const root = useRef<HTMLDivElement>(null)
+  const heading = useRef<HTMLDivElement>(null)
+  const view = useContext(CanvasContext)
   const theme = useThemeData()
   const store = useDesignerStore()
   const node = useNodeStore()
@@ -55,7 +57,22 @@ export function NodeEditor() {
       <GetPopupContainerContext.Provider value={popup}>
         <ThemeProvider dark={theme.isDark} getPopupContainer={popup.default}>
           <HandleContext.Provider value={{ Handle: null }}>
-            <NodeHead />
+            {view?.inspectorHeaderContainer != null &&
+              createPortal(
+                <div
+                  ref={heading}
+                  className={`oo-designer-root nokey ${designerThemeClass(theme.isDark)} ${styles.heading}`}
+                  data-theme={theme.isDark ? 'dark' : 'light'}
+                  onPointerDown={(event) => event.stopPropagation()}
+                >
+                  <GetPopupContainerContext.Provider
+                    value={{ default: () => heading.current ?? document.body, static: () => heading.current ?? document.body }}
+                  >
+                    <NodeHead />
+                  </GetPopupContainerContext.Provider>
+                </div>,
+                view.inspectorHeaderContainer,
+              )}
             {node.display$ && (
               <div className={styles.description}>
                 <span>{t('canvasCard.description')}</span>

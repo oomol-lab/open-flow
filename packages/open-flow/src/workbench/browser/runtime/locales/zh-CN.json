@@ -37,7 +37,8 @@
     "webhook": "Webhook",
     "webhookDescription": "通过专属 HTTP 入口接收外部事件。",
     "manual": "手动触发",
-    "manualDescription": "从这里手动启动执行。"
+    "manualDescription": "从这里手动启动执行。",
+    "integrationTriggers": "第三方 Trigger"
   },
   "common": {
     "cancel": "取消",
@@ -188,7 +189,7 @@
     },
     "task": {
       "chatText": "对话文本",
-      "codeDirty": "未保存",
+      "codeDirty": "等待自动保存…",
       "codeFailed": "保存失败",
       "codeSaved": "已保存",
       "codeSaving": "保存中…",
@@ -205,9 +206,9 @@
       "outputPorts": "输出端口",
       "responseMode": "响应模式",
       "save": "保存任务",
-      "saveCode": "保存代码",
       "source": "源代码",
-      "structuredJson": "结构化 JSON"
+      "structuredJson": "结构化 JSON",
+      "retrySave": "重试保存"
     },
     "wait": {
       "approval": "通过或拒绝",
@@ -332,8 +333,7 @@
     "rolledBack": "已将线上版本回滚到修订 {{revision}}。",
     "requestFailed": "服务未能完成此操作，请稍后重试。",
     "triggerPaused": "Trigger 激活已暂停。",
-    "triggerResumed": "Trigger 激活正在恢复。",
-    "unsavedCode": "请先保存或放弃 JavaScript 修改，再离开当前节点。"
+    "triggerResumed": "Trigger 激活正在恢复。"
   },
   "publication": {
     "active": "运行中",
@@ -659,7 +659,8 @@
       "loading": "正在加载草稿…",
       "noDraft": "未加载草稿",
       "saved": "已保存",
-      "saving": "正在保存草稿…"
+      "saving": "正在保存草稿…",
+      "failed": "保存失败"
     },
     "subflowDraft": "Subflow 草稿",
     "subflowPublishHelp": "Subflow 会随 Flow 一起发布。",

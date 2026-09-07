@@ -673,12 +673,14 @@ export const TriggerNodeContent: React.FC<TriggerNodeContentProps> = /* @__PURE_
   const config = presentation.config ?? []
 
   return (
-    <div className={styles.wrapper}>
+    <div className={styles.wrapper} data-trigger-kind={presentation.kind}>
       <section className={styles.summary} aria-label={label}>
-        <div className={styles.meta}>
-          <span>{label}</span>
-          {presentation.source != null && <span className={styles.source}>{presentation.source}</span>}
-        </div>
+        {presentation.kind != 'manual' && (
+          <div className={styles.meta}>
+            <span>{label}</span>
+            {presentation.source != null && <span className={styles.source}>{presentation.source}</span>}
+          </div>
+        )}
         <div className={styles.schedules}>
           {presentation.schedules.length > 0 ? (
             presentation.schedules.map((schedule, index) => (

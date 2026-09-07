@@ -104,6 +104,9 @@ export class WorkspaceStore {
   readonly #runChanged: (event: Extract<FlowChangeEvent, { readonly kind: 'run.changed' | 'run.created' }>) => void
   readonly #setNotice: SetNotice
   readonly #model: WorkspaceModel
+  readonly #moduleDrafts = new Map<string, { editor: ModuleEditorDraft; base: Draft['content']['modules'][string] }>()
+  #moduleTimer?: ReturnType<typeof setTimeout>
+  #moduleSave?: Promise<boolean>
   #clipboard?: Clipboard
   #diagnosticFocusId = 0
   #draftInvalidation = 0
@@ -152,6 +155,7 @@ export class WorkspaceStore {
 
   public dispose(): void {
     this.#disposed = true
+    clearTimeout(this.#moduleTimer)
     this.#draftSession.invalidate()
     this.#presentationChanges.dispose()
     this.#stopCatalogWatch?.()
@@ -180,7 +184,7 @@ export class WorkspaceStore {
   }
 
   public async selectFlow(flowId: string | undefined): Promise<boolean> {
-    if (!this.#allowModuleNavigation()) return false
+    if (!(await this.saveModuleEditor())) return false
     const current = this.#draftSession.begin()
     this.#draftChanges.reset()
     this.#presentationChanges.reset()
@@ -258,7 +262,7 @@ export class WorkspaceStore {
   }
 
   public selectTarget(target: DesignerTarget | undefined): boolean {
-    if (!this.#allowModuleNavigation()) return false
+    void this.#flushModules()
     this.#set({
       diagnosticFocus: undefined,
       diagnostics: undefined,
@@ -274,7 +278,7 @@ export class WorkspaceStore {
   public selectNodes(nodeIds: readonly string[]): boolean {
     if (nodeIds.length == this.#model.value.selectedNodeIds.length && nodeIds.every((nodeId, index) => nodeId == this.#model.value.selectedNodeIds[index]))
       return true
-    if (!this.#allowModuleNavigation()) return false
+    void this.#flushModules()
     this.#set({
       diagnosticFocus: undefined,
       moduleEditor: selectedModuleEditor(
@@ -289,7 +293,7 @@ export class WorkspaceStore {
   }
 
   public async createFlow(name: string, create?: (name: string) => Promise<string>): Promise<Flow | undefined> {
-    if (!this.#allowModuleNavigation()) return
+    if (!(await this.saveModuleEditor())) return
     this.#set({ busy: 'flow' })
     this.#setNotice(undefined)
     try {
@@ -305,7 +309,7 @@ export class WorkspaceStore {
   }
 
   public async deleteFlow(flowId: string): Promise<boolean> {
-    if (!this.#allowModuleNavigation()) return false
+    if (!(await this.saveModuleEditor())) return false
     const flow = this.#flows.flow(flowId)
     if (flow == null || flow.status == 'retiring') return false
     this.#set({ busy: 'flow' })
@@ -325,7 +329,7 @@ export class WorkspaceStore {
   }
 
   public async createResource(name: string): Promise<boolean> {
-    if (!this.#allowModuleNavigation()) return false
+    if (!(await this.saveModuleEditor())) return false
     if (this.#model.value.draft == null) return false
     const id = this.#identity()
     this.#set({ busy: 'resource' })
@@ -365,7 +369,7 @@ export class WorkspaceStore {
   }
 
   public async addNode(option: AddNodeOption, position: Point, connection?: (nodeId: string) => Omit<DesignerEdge, 'id'>): Promise<string | undefined> {
-    if (!this.#allowModuleNavigation()) return
+    if (!(await this.saveModuleEditor())) return
     const draft = this.#model.value.draft
     const target = this.#model.value.target
     if (draft == null || target == null) return
@@ -423,7 +427,7 @@ export class WorkspaceStore {
   }
 
   public async deleteSelectedNodes(): Promise<void> {
-    if (!this.#allowModuleNavigation()) return
+    if (!(await this.saveModuleEditor())) return
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null || this.#model.value.selectedNodeIds.length == 0) return
@@ -460,7 +464,7 @@ export class WorkspaceStore {
   }
 
   public async pasteNodes(sourcePositions?: Readonly<Record<string, Point>>): Promise<void> {
-    if (!this.#allowModuleNavigation()) return
+    if (!(await this.saveModuleEditor())) return
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null || this.#clipboard == null) return
@@ -696,40 +700,88 @@ export class WorkspaceStore {
   public updateModuleSource(source: string): void {
     const editor = this.#model.value.moduleEditor
     if (editor == null || editor.source == source) return
-    this.#set({ moduleEditor: { ...editor, phase: undefined, source } })
+    const pending = this.#moduleDrafts.get(editor.moduleId)
+    const base = pending?.base ?? this.#model.value.draft?.content.modules[editor.moduleId]
+    if (base == null) return
+    this.#moduleDrafts.set(editor.moduleId, { base, editor: { ...editor, phase: undefined, source } })
+    this.#set({})
+    clearTimeout(this.#moduleTimer)
+    this.#moduleTimer = setTimeout(() => void this.#flushModules(), 800)
   }
 
   public discardModuleChanges(): void {
     const editor = this.#model.value.moduleEditor
-    if (editor == null) return
+    if (editor == null || this.#moduleSave != null) return
+    this.#moduleDrafts.delete(editor.moduleId)
     const module = this.#model.value.draft?.content.modules[editor.moduleId]
-    if (module == null) {
-      this.#set({ moduleEditor: undefined })
-      return
-    }
-    this.#set({
-      moduleEditor: { moduleId: editor.moduleId, source: module.source },
-    })
+    this.#set({ moduleEditor: module == null ? undefined : { moduleId: editor.moduleId, source: module.source } })
+  }
+
+  public get hasUnsavedCode(): boolean {
+    return this.#moduleDrafts.size > 0
   }
 
   public async saveModuleEditor(): Promise<boolean> {
-    const editor = this.#model.value.moduleEditor
-    if (editor == null || editor.phase == 'saving') return false
-    this.#set({ moduleEditor: { ...editor, phase: 'saving' } })
-    const imports = await moduleImports(editor.source)
     if (this.#disposed) return false
-    const module = this.#model.value.draft?.content.modules[editor.moduleId]
-    if (module == null) return false
-    const changed = await this.#changeDraft(replaceModuleSource(editor.moduleId, module.source, module.imports, editor.source, imports))
-    if (!this.#disposed && this.#model.value.moduleEditor?.moduleId == editor.moduleId) {
-      this.#set({
-        moduleEditor: {
-          ...this.#model.value.moduleEditor,
-          phase: changed == null ? 'failed' : undefined,
-        },
-      })
+    for (const pending of this.#moduleDrafts.values()) {
+      if (pending.editor.phase == 'failed') pending.editor = { ...pending.editor, phase: undefined }
     }
-    return changed != null
+    this.#set({})
+    return await this.#flushModules()
+  }
+
+  #flushModules(): Promise<boolean> {
+    clearTimeout(this.#moduleTimer)
+    if (this.#moduleSave != null) return this.#moduleSave
+    if (this.#disposed) return Promise.resolve(false)
+    if (![...this.#moduleDrafts.values()].some((pending) => pending.editor.phase != 'failed')) return Promise.resolve(this.#moduleDrafts.size == 0)
+    const current = this.#draftSession.capture()
+    this.#moduleSave = this.#saveModules(current).finally(() => {
+      this.#moduleSave = undefined
+    })
+    return this.#moduleSave
+  }
+
+  async #saveModules(current: () => boolean): Promise<boolean> {
+    while (!this.#disposed && current()) {
+      const entry = [...this.#moduleDrafts.entries()].find(([, pending]) => pending.editor.phase != 'failed')
+      if (entry == null) return this.#moduleDrafts.size == 0
+      const [moduleId, pending] = entry
+      const source = pending.editor.source
+      pending.editor = { ...pending.editor, phase: 'saving' }
+      this.#set({})
+      try {
+        const imports = await moduleImports(source)
+        if (this.#disposed || !current()) return false
+        const module = this.#model.value.draft?.content.modules[moduleId]
+        if (module == null || module.source != pending.base.source || JSON.stringify(module.imports) != JSON.stringify(pending.base.imports)) {
+          throw new Error(this.#i18n.t('notice.moduleUpdated'))
+        }
+        const changed =
+          source == module.source && JSON.stringify(imports) == JSON.stringify(module.imports)
+            ? this.#model.value.draft
+            : await this.#changeDraft(replaceModuleSource(moduleId, pending.base.source, pending.base.imports, source, imports), false)
+        if (this.#disposed || !current()) return false
+        const latest = this.#moduleDrafts.get(moduleId)
+        if (latest == null) continue
+        if (changed == null) {
+          latest.editor = { ...latest.editor, phase: 'failed' }
+        } else if (latest.editor.source == source) {
+          this.#moduleDrafts.delete(moduleId)
+          if (this.#model.value.moduleEditor?.moduleId == moduleId) this.#set({ moduleEditor: { moduleId, source } })
+        } else {
+          latest.base = { ...pending.base, source, imports }
+          latest.editor = { ...latest.editor, phase: undefined }
+        }
+      } catch (error) {
+        if (this.#disposed || !current()) return false
+        const latest = this.#moduleDrafts.get(moduleId)
+        if (latest != null) latest.editor = { ...latest.editor, phase: 'failed' }
+        this.#setNotice(errorNotice(error, this.#i18n.t))
+      }
+      this.#set({})
+    }
+    return false
   }
 
   public async moveNodes(positions: Readonly<Record<string, Point>>): Promise<void> {
@@ -939,16 +991,6 @@ export class WorkspaceStore {
     return designerGraph(state.draft, state.target, state.presentation?.value, state.diagnostics?.diagnostics, {}, {}, this.#i18n.t)
   }
 
-  #allowModuleNavigation(): boolean {
-    const editor = this.#model.value.moduleEditor
-    if (editor == null || moduleEditorStatus(this.#model.value.draft, editor) == 'saved') return true
-    this.#setNotice({
-      kind: 'error',
-      message: this.#i18n.t('notice.unsavedCode'),
-    })
-    return false
-  }
-
   #reconcileRevision(draft: Draft): ReconciledRevision {
     const revision = revisionView(draft)
     const target = reconcileTarget(revision, this.#model.value.target)
@@ -990,6 +1032,13 @@ export class WorkspaceStore {
 
   #set(patch: Partial<WorkspaceState>): void {
     if (this.#disposed) return
-    this.#model.set(patch)
+    const editor = Object.hasOwn(patch, 'moduleEditor') ? patch.moduleEditor : this.#model.value.moduleEditor
+    const moduleEditor = editor == null ? undefined : (this.#moduleDrafts.get(editor.moduleId)?.editor ?? editor)
+    const moduleSaveStatus = [...this.#moduleDrafts.values()].some((pending) => pending.editor.phase == 'failed')
+      ? 'failed'
+      : this.#moduleDrafts.size > 0
+        ? 'saving'
+        : undefined
+    this.#model.set({ ...patch, moduleEditor, moduleSaveStatus })
   }
 }

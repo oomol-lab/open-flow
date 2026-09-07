@@ -13,7 +13,7 @@ import { diagnosticItems, deriveInspectorDiagnostics } from '../designer/diagnos
 import { revisionView } from '../revisionView.ts'
 
 export type WorkspaceBusy = 'designer' | 'flow' | 'resource'
-export type WorkspaceStatus = 'loading' | 'noDraft' | 'saved' | 'saving'
+export type WorkspaceStatus = 'loading' | 'noDraft' | 'saved' | 'saving' | 'failed'
 export type ModuleEditorStatus = 'dirty' | 'failed' | 'saved' | 'saving'
 
 export interface ModuleEditor {
@@ -42,6 +42,7 @@ export interface WorkspaceState {
   readonly flowId?: string
   readonly live?: Live
   readonly moduleEditor?: ModuleEditorDraft
+  readonly moduleSaveStatus?: 'saving' | 'failed'
   readonly nodeFocus?: NodeFocus
   readonly presentation?: Presentation
   readonly selectedNodeIds: readonly string[]
@@ -99,6 +100,7 @@ const initialState: WorkspaceState = {
 
 function status(state: WorkspaceState): WorkspaceStatus {
   if (state.workspaceLoading) return 'loading'
+  if (state.moduleSaveStatus != null) return state.moduleSaveStatus
   if (state.busy == 'designer') return 'saving'
   if (state.draft == null) return 'noDraft'
   return 'saved'

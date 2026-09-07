@@ -116,7 +116,18 @@ export class WorkbenchStore {
     this.connectors = new ConnectorStore(client, this.workspace, setNotice, host, i18n)
     this.triggers = new TriggerStore(client, this.workspace, setNotice, host, i18n)
     this.publications = new PublicationStore(client, this.workspace, setNotice, preferences, identity, i18n)
-    this.runRequests = new RunRequestStore(client, this.runs, setNotice, i18n, identity)
+    this.runRequests = new RunRequestStore(
+      client,
+      this.runs,
+      setNotice,
+      async (flowId) => {
+        if (flowId != this.workspace.$.flowId.value || !(await this.workspace.saveModuleEditor()) || this.#disposed || flowId != this.workspace.$.flowId.value)
+          return
+        return this.workspace.$.draft.value?.revisionId
+      },
+      i18n,
+      identity,
+    )
     const diagnostics = compute<FlowCheck | undefined>((get) => {
       const check = get(this.workspace.$.diagnostics)
       if (check == null) return
@@ -340,7 +351,9 @@ export class WorkbenchStore {
   }
 
   public readonly browseAddNodeOptions = async (signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
-    return await this.#mergeAddNodeOptions([this.triggers.browseAddNodeOptions(signal), this.connectors.browseAddNodeOptions(signal)], signal)
+    const options = await Promise.all([this.triggers.browseAddNodeOptions(signal), this.connectors.browseAddNodeOptions(signal)])
+    if (signal.aborted || this.#disposed) return
+    return options.flatMap((items) => items ?? [])
   }
 
   public readonly provideAddNodeOptionChoices = async (optionId: string, signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
@@ -353,6 +366,8 @@ export class WorkbenchStore {
   }
 
   public async requestDraftRun(triggerId?: string) {
+    const flowId = this.workspace.$.flowId.value
+    if (!(await this.workspace.saveModuleEditor()) || this.#disposed || flowId != this.workspace.$.flowId.value) return 'unavailable' as const
     const flow = this.workspace.$.targetFlow.value
     const draft = this.workspace.$.draft.value
     if (flow == null || draft == null) return 'unavailable' as const

@@ -37,7 +37,8 @@
     "webhook": "Webhook",
     "webhookDescription": "Recevoir des événements externes via un point de terminaison HTTP dédié.",
     "manual": "Déclencheur manuel",
-    "manualDescription": "Démarrer manuellement à partir de ce nœud."
+    "manualDescription": "Démarrer manuellement à partir de ce nœud.",
+    "integrationTriggers": "Triggers de services tiers"
   },
   "common": {
     "cancel": "Annuler",
@@ -188,7 +189,7 @@
     },
     "task": {
       "chatText": "Texte de conversation",
-      "codeDirty": "Non enregistré",
+      "codeDirty": "En attente de sauvegarde…",
       "codeFailed": "Échec de l'enregistrement",
       "codeSaved": "Enregistré",
       "codeSaving": "Enregistrement…",
@@ -205,9 +206,9 @@
       "outputPorts": "Ports de sortie",
       "responseMode": "Mode de réponse",
       "save": "Enregistrer la tâche",
-      "saveCode": "Enregistrer le code",
       "source": "Source",
-      "structuredJson": "JSON structuré"
+      "structuredJson": "JSON structuré",
+      "retrySave": "Réessayer"
     },
     "wait": {
       "approval": "Approuver ou refuser",
@@ -332,8 +333,7 @@
     "rolledBack": "Version en ligne restaurée à la révision {{revision}}.",
     "requestFailed": "Le service n’a pas pu terminer cette opération. Réessayez plus tard.",
     "triggerPaused": "L'activation du Trigger est en pause.",
-    "triggerResumed": "L'activation du Trigger reprend.",
-    "unsavedCode": "Enregistrez ou abandonnez les modifications JavaScript avant de quitter ce nœud."
+    "triggerResumed": "L'activation du Trigger reprend."
   },
   "publication": {
     "active": "Actif",
@@ -659,7 +659,8 @@
       "loading": "Chargement du Brouillon…",
       "noDraft": "Aucun Brouillon chargé",
       "saved": "Enregistré",
-      "saving": "Enregistrement du Brouillon…"
+      "saving": "Enregistrement du Brouillon…",
+      "failed": "Échec de la sauvegarde"
     },
     "subflowDraft": "Brouillon du Subflow",
     "subflowPublishHelp": "Les Subflows sont publiés avec un Flow.",

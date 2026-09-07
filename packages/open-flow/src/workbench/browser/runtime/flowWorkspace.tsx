@@ -185,16 +185,25 @@ function Editor({
   const triggerActiveConnections = useVal(store.triggers.$.selectedActiveConnections)
   const [contextPanelMode, setContextPanelMode] = useState<ContextPanelMode>()
   const [blocksFocusRequest, setBlocksFocusRequest] = useState(0)
-  const addingFromBlocks = useRef(false)
   const blockAddCount = useRef(0)
   const designerRef = useRef<WorkbenchDesignerHandle>(null)
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent): void => {
+      if (!store.workspace.hasUnsavedCode) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', beforeUnload)
+    return () => window.removeEventListener('beforeunload', beforeUnload)
+  }, [store])
+
   const [inspectorContainer, setInspectorContainer] = useState<HTMLDivElement | null>(null)
+  const [inspectorHeaderContainer, setInspectorHeaderContainer] = useState<HTMLDivElement | null>(null)
   const focusInspectorOnOpen = useRef(false)
   const opener = useRef<HTMLElement>()
 
   useEffect(() => {
     setStartId(undefined)
-    addingFromBlocks.current = false
     blockAddCount.current = 0
     focusInspectorOnOpen.current = false
     opener.current = undefined
@@ -225,10 +234,6 @@ function Editor({
     setBlocksFocusRequest((request) => request + 1)
   }
   const openInspector = (): void => {
-    if (addingFromBlocks.current) {
-      addingFromBlocks.current = false
-      return
-    }
     opener.current = undefined
     focusInspectorOnOpen.current = false
     setContextPanelMode('inspector')
@@ -251,20 +256,11 @@ function Editor({
   const addFromBlocks = async (option: AddNodeOption): Promise<string | undefined> => {
     const offset = blockAddCount.current * 32
     const canvasPosition = { x: 92 + offset, y: 92 + offset }
-    addingFromBlocks.current = true
-    let waitForSelection = false
-    try {
-      const nodeId = await designerRef.current?.addNode(option, canvasPosition)
-      if (nodeId != null) {
-        waitForSelection = true
-        blockAddCount.current++
-        setContextPanelMode(option.kind == 'connector' || option.kind == 'trigger' ? 'inspector' : 'blocks')
-      }
-      return nodeId
-    } finally {
-      if (!waitForSelection) addingFromBlocks.current = false
-    }
+    const nodeId = await designerRef.current?.addNode(option, canvasPosition)
+    if (nodeId != null) blockAddCount.current++
+    return nodeId
   }
+
   const setNotification = async (option: AddNodeOption): Promise<string | undefined> => {
     if (selection?.kind != 'wait' || option.kind != 'connector') return
     if (!(await store.workspace.setWaitNotification(selection.id, option.connector))) return
@@ -330,6 +326,7 @@ function Editor({
           ) : undefined
         }
         inspectorContainer={inspectorContainer}
+        inspectorHeaderContainer={inspectorHeaderContainer}
         addNodeOptions={addNodeOptions}
         blocksOpen={contextPanelVisible && contextPanelMode == 'blocks'}
         disabled={authoringDisabled}
@@ -338,6 +335,7 @@ function Editor({
         model={designer}
         onAddNode={async (option, position, connection) => {
           const nodeId = await store.addNode(option, position, connection)
+          if (nodeId != null) openInspector()
           return nodeId
         }}
         onConnect={(edge) => void store.workspace.connect(edge)}
@@ -381,6 +379,7 @@ function Editor({
       />
       {contextPanelVisible && (
         <ContextPanel
+          headerRef={contextPanelMode == 'inspector' && selectedDesignerNode != null ? setInspectorHeaderContainer : undefined}
           focusOnOpen={contextPanelMode == 'inspector' && focusInspectorOnOpen.current}
           icon={contextPanelMode == 'blocks' ? 'plus' : contextPanelMode == 'notification' ? 'connection' : inspectorIcon(selection, target)}
           onClose={() => (contextPanelMode == 'notification' ? setContextPanelMode('inspector') : closeContextPanel())}

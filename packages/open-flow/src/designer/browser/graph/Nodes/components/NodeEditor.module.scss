@@ -4,16 +4,9 @@
   --base-font-size: 12px;
   width: 100%;
   min-width: 0;
-  padding: 16px 14px;
+  padding: 14px 12px 6px;
   background: var(--node-background-color);
   line-height: 1.5;
-  > :global(header) {
-    display: flex;
-    align-items: center;
-    min-height: 38px;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
 }
 
 .description {
@@ -23,5 +16,16 @@
   color: var(--text-2);
   > span {
     font-size: 11px;
+  }
+}
+
+.heading {
+  min-width: 0;
+  width: 100%;
+  > :global(header) {
+    min-height: 38px;
+    gap: 8px;
+    padding: 0;
+    background: transparent;
   }
 }
