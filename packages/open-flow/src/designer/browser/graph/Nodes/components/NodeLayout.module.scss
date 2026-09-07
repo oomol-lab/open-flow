@@ -54,10 +54,29 @@
   }
 }
 
-.overviewContainer {
+.cardContainer {
+  --execution-port-opacity: 0;
+  --execution-port-color: var(--edge-primitive);
+  --execution-port-active-color: var(--text-3);
+
+  :global(.react-flow__node.selected) & {
+    --execution-port-color: var(--node-selected-border-color);
+    --execution-port-active-color: var(--node-selected-border-color);
+  }
+
+  :global(.react-flow__node:hover) &,
+  :global(.react-flow__node.selected) &,
+  &:focus-within {
+    --execution-port-opacity: 1;
+  }
+
   position: relative;
   overflow: visible;
   background: transparent;
+  box-shadow: none;
+  :global(.react-flow__node.selectable.selected) & {
+    box-shadow: none;
+  }
 }
 
 .resizeHandle {
@@ -105,9 +124,12 @@
   justify-content: flex-end;
   min-height: var(--widget-height);
   padding: 4px 14px;
-  color: var(--text-2);
+  color: var(--text-4);
+  font-size: 11px;
+  line-height: 20px;
   border-top: 1px solid var(--node-border-color);
-  background: var(--node-background-color);
+  background: transparent;
+  padding-right: 18px;
 
   > span {
     overflow: hidden;
@@ -133,4 +155,72 @@
       background: var(--brand-highlight-color);
     }
   }
+}
+
+.cardContainer > .executionHead > .executionHandle {
+  top: 30px;
+}
+
+// Branch rows sit inside the card's 1px border; align their ports with the outer edge.
+.cardContainer .executionBranch > .executionHandle {
+  right: -9px;
+}
+
+.cardContainer .executionHandle > :global(.react-flow__handle) {
+  width: 2px;
+  min-width: 0;
+  height: 12px;
+  top: 2px;
+  left: 6px;
+  background: transparent;
+
+  &::before {
+    border: 0;
+    border-radius: 0.5px;
+    background: var(--execution-port-color);
+    box-shadow: none;
+    opacity: var(--execution-port-opacity);
+  }
+
+  &::after {
+    inset: -3px -8px;
+    background: transparent;
+  }
+
+  &:hover::after,
+  &:global(.connectingfrom)::after,
+  &:global(.connectingto.valid)::after {
+    background: transparent;
+  }
+
+  &:hover::before,
+  &:global(.connectingfrom)::before,
+  &:global(.connectingto.valid)::before {
+    background: var(--execution-port-active-color);
+    opacity: 1;
+  }
+}
+
+.cardContainer .executionHandle > :global(.react-flow__handle-right) {
+  left: 8px;
+}
+
+// Keep the outer edge fixed while overlapping the selected card border to avoid subpixel gaps.
+:global(.react-flow__node.selected) .cardContainer .executionHandle > :global(.react-flow__handle) {
+  width: 3px;
+}
+
+:global(.react-flow__node.selected) .cardContainer .executionHandle > :global(.react-flow__handle-right) {
+  left: 7px;
+}
+
+// Match the visible mark to the measured bounds so edges meet it without a gap.
+.cardContainer .executionHandle > :global(.react-flow__handle)::before,
+:global(.react-flow__node.selected) .cardContainer .executionHandle > :global(.react-flow__handle)::before {
+  inset: 0;
+}
+
+.cardContainer .executionHandle.connected,
+.cardContainer .executionHandle.connecting {
+  --execution-port-opacity: 1;
 }

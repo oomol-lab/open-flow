@@ -325,12 +325,6 @@
     "zh-CN": "Chinois"
   },
   "miniMap": "Mini-carte",
-  "flowDisplayMode": {
-    "detail": "Détaillé",
-    "detailDescription": "Nœuds, ports, éditeurs et contrôles complets",
-    "overview": "Simplifié",
-    "overviewDescription": "Nœuds simplifiés et connexions en lecture seule"
-  },
   "settingsPanel": {
     "hide": "Masquer les paramètres",
     "show": "Afficher les paramètres"
@@ -549,7 +543,6 @@
       "connectorTokenOverride": "Saisissez un Token pour créer un remplacement local",
       "connectorTokenUnchanged": "Le Token enregistré est inchangé",
       "editor": "Éditeur",
-      "defaultFlowDisplayMode": "Définit le mode d'affichage utilisé à l'ouverture d'un Flow ou d'un Subflow.",
       "expandScriptletEditor": "Déplier l'éditeur des mini-scripts nouvellement créés",
       "llm": "Modèle de langage",
       "llmApiKey": "Clé API",
@@ -593,5 +586,43 @@
     "reload": "Recharger"
   },
   "zoomIn": "zoom avant",
-  "zoomOut": "zoom arrière"
+  "zoomOut": "zoom arrière",
+  "canvasCard": {
+    "run": "Exécution",
+    "result": "Résultat",
+    "logs": "Journaux ({{count}})",
+    "files": "Fichiers ({{count}})",
+    "images": "Images ({{count}})",
+    "started": "Début",
+    "previewUnavailable": "Aperçu indisponible",
+    "artifactMetadata": "Seules les métadonnées sont disponibles. Aucune adresse de téléchargement n’a été fournie.",
+    "description": "Objectif",
+    "describe": "Décrivez le rôle de cette étape.",
+    "every": "Toutes les {{value}} {{unit}}",
+    "status": {
+      "idle": "Non démarré",
+      "running": "En cours",
+      "success": "Terminé",
+      "error": "Échec",
+      "waiting": "En attente",
+      "skipped": "Ignoré"
+    },
+    "kind": {
+      "task": "Tâche",
+      "trigger": "Déclencheur",
+      "condition": "Condition",
+      "wait": "Attente",
+      "subflow": "Sous-flux",
+      "value": "Valeurs",
+      "input": "Entrée",
+      "output": "Sortie"
+    },
+    "units": {
+      "minute": "minutes",
+      "hour": "heures",
+      "day": "jours",
+      "week": "semaines",
+      "month": "mois"
+    }
+  }
 }

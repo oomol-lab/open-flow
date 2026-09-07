@@ -11,7 +11,6 @@ import type { CompareResult, CompareSchemaInfo } from '../../../manifest/common/
 import type { HandleName } from '../../../schema/index.ts'
 import type { TriggerCatalogCompatibleItem, TriggerCatalogItem } from '../../../trigger/common/catalog.ts'
 import type { DesignerHost } from '../../common/designerHost.ts'
-import type { FlowDisplayMode } from '../../common/flowDisplay.ts'
 import type { PackageAuthoring } from '../../common/packageAuthoring.ts'
 import type { BrowserTheme } from '../browserTheme.ts'
 import type { DesignerConfirmation } from '../confirmation.ts'
@@ -22,7 +21,6 @@ import type { DesignerResourceService } from '../resourceService.ts'
 import type { DesignerStore, IAddNodeMenuItem, IFromSource, InteractiveMode } from '../stores/designer/designer.store.ts'
 
 import { disposableStore } from '@wopjs/disposable'
-import { val } from 'value-enhancer'
 import { jsonTryParse, jsonTryStringify } from '../../../base/common/parse.ts'
 import { connectorActionIcon, connectorActionTitle } from '../../../connector/common/actionNode.ts'
 import { connectorActionPorts } from '../../../connector/common/actionSchema.ts'
@@ -68,7 +66,6 @@ export interface AbstractDesignerServiceProps {
   readonly confirmation: DesignerConfirmation
   readonly dirtyResources: DirtyResourceTracker
   readonly expandScriptletEditor: ReadonlyVal<boolean>
-  readonly defaultFlowDisplayMode?: ReadonlyVal<FlowDisplayMode>
   readonly navigation: ResourceNavigation
   readonly notification: DesignerNotification
   readonly resourceService: DesignerResourceService
@@ -92,7 +89,6 @@ export abstract class AbstractDesignerService {
   protected readonly confirmation: DesignerConfirmation
   protected readonly dirtyResources: DirtyResourceTracker
   protected readonly expandScriptletEditor: ReadonlyVal<boolean>
-  protected readonly defaultFlowDisplayMode: ReadonlyVal<FlowDisplayMode>
   protected readonly navigation: ResourceNavigation
   protected readonly notification: DesignerNotification
   protected readonly resourceService: DesignerResourceService
@@ -120,7 +116,6 @@ export abstract class AbstractDesignerService {
     this.confirmation = props.confirmation
     this.dirtyResources = props.dirtyResources
     this.expandScriptletEditor = props.expandScriptletEditor
-    this.defaultFlowDisplayMode = props.defaultFlowDisplayMode ?? this.dispose.add(val<FlowDisplayMode>('overview'))
     this.navigation = props.navigation
     this.notification = props.notification
     this.resourceService = props.resourceService

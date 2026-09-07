@@ -1,7 +1,6 @@
+import type { ReactNode } from 'react'
 import type { GroupDividerDef } from '../../../../schema/index.ts'
-import type { FlowDisplayMode } from '../../../common/flowDisplay.ts'
 import type { CreateSchemaEditorFn } from '../../services/designerService.ts'
-import type { DesignerUILayout } from '../../stores/designer/designerUI.store.ts'
 
 export interface FlowDesignerViewSource {
   readonly nodeId: string
@@ -71,6 +70,13 @@ export interface FlowDesignerViewConditionChange {
 }
 
 export interface FlowDesignerViewNodeRun {
+  readonly runId?: string
+  readonly startedAt?: string
+  readonly finishedAt?: string
+  readonly outputs?: unknown
+  readonly error?: unknown
+  readonly logs?: readonly { readonly message: string; readonly level: string; readonly time: string }[]
+  readonly artifacts?: readonly unknown[]
   readonly skipped?: boolean
   readonly progress?: number
   readonly status: 'error' | 'idle' | 'running' | 'success' | 'waiting'
@@ -232,7 +238,6 @@ export type FlowDesignerViewSemanticNode = Exclude<FlowDesignerViewNode, FlowDes
 
 export interface FlowDesignerViewModel {
   readonly edges: readonly FlowDesignerViewEdge[]
-  readonly layouts?: Partial<Record<FlowDisplayMode, DesignerUILayout>>
   readonly nodes: readonly FlowDesignerViewNode[]
   readonly runStatus?: 'idle' | 'running'
   readonly viewport: FlowDesignerViewViewport
@@ -275,6 +280,8 @@ export interface FlowDesignerViewEdge {
 }
 
 export interface FlowDesignerViewProps {
+  readonly inspectorContainer?: HTMLElement | null
+  readonly toolbar?: ReactNode
   readonly addNodeRequest?: {
     readonly onComplete?: () => void
     readonly position: FlowDesignerViewPosition
@@ -328,7 +335,7 @@ export interface FlowDesignerViewProps {
   readonly onDisconnect: (edge: FlowDesignerViewEdge) => void
   readonly onDuplicate: (nodeIds: readonly string[], offset?: FlowDesignerViewPosition, positions?: Readonly<Record<string, FlowDesignerViewPosition>>) => void
   readonly onMoveNodes: (positions: Readonly<Record<string, FlowDesignerViewPosition>>) => void
-  readonly onMoveViewport: (viewport: FlowDesignerViewViewport, displayMode: FlowDisplayMode) => void
+  readonly onMoveViewport: (viewport: FlowDesignerViewViewport) => void
   readonly onPaste: (position: FlowDesignerViewPosition) => void
   readonly onSelectionChange: (nodeIds: readonly string[], edge: FlowDesignerViewEdge | undefined) => void
   readonly provideAddItems?: (searchTerm: string, signal: AbortSignal) => Promise<readonly FlowDesignerViewAddItem[] | undefined>

@@ -325,12 +325,6 @@
     "zh-CN": "Chinese"
   },
   "miniMap": "Mini map",
-  "flowDisplayMode": {
-    "detail": "Detailed",
-    "detailDescription": "Full nodes, ports, editors, and controls",
-    "overview": "Overview",
-    "overviewDescription": "Simplified nodes and read-only connections"
-  },
   "settingsPanel": {
     "hide": "Hide settings",
     "show": "Show settings"
@@ -549,7 +543,6 @@
       "connectorTokenOverride": "Enter a token to create a local override",
       "connectorTokenUnchanged": "Saved token is unchanged",
       "editor": "Editor",
-      "defaultFlowDisplayMode": "Sets the display mode used when opening a Flow or Subflow.",
       "expandScriptletEditor": "Expand editors for newly created scriptlets",
       "llm": "Language model",
       "llmApiKey": "API key",
@@ -593,5 +586,43 @@
     "reload": "Reload"
   },
   "zoomIn": "zoom in",
-  "zoomOut": "zoom out"
+  "zoomOut": "zoom out",
+  "canvasCard": {
+    "run": "Run",
+    "result": "Result",
+    "logs": "Logs ({{count}})",
+    "files": "Files ({{count}})",
+    "images": "Images ({{count}})",
+    "started": "Started",
+    "previewUnavailable": "Preview unavailable",
+    "artifactMetadata": "File metadata is available. A download address has not been provided.",
+    "description": "Purpose",
+    "describe": "Describe what this step does.",
+    "every": "Every {{value}} {{unit}}",
+    "status": {
+      "idle": "Not started",
+      "running": "Running",
+      "success": "Completed",
+      "error": "Failed",
+      "waiting": "Waiting",
+      "skipped": "Skipped"
+    },
+    "kind": {
+      "task": "Task",
+      "trigger": "Trigger",
+      "condition": "Condition",
+      "wait": "Wait",
+      "subflow": "Subflow",
+      "value": "Values",
+      "input": "Flow input",
+      "output": "Flow output"
+    },
+    "units": {
+      "minute": "minutes",
+      "hour": "hours",
+      "day": "days",
+      "week": "weeks",
+      "month": "months"
+    }
+  }
 }

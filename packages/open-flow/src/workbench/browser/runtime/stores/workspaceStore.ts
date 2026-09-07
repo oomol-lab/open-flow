@@ -1,5 +1,4 @@
 import type { I18n } from 'val-i18n'
-import type { FlowDisplayMode } from '../../../../designer/common/flowDisplay.ts'
 import type { ConnectorCapability } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings, TriggerSettings } from '../../../../flow/common/nodeChanges.ts'
 import type { WorkbenchClient, ConnectorAction, Draft, Flow, GraphNode, InputPort, JsonValue, Live, TriggerSchedule } from '../api.ts'
@@ -738,10 +737,10 @@ export class WorkspaceStore {
     await this.#changePresentation((value) => setNodePositions(value, target, positions))
   }
 
-  public async moveViewport(viewport: DesignerViewport, displayMode: FlowDisplayMode = 'detail'): Promise<void> {
+  public async moveViewport(viewport: DesignerViewport): Promise<void> {
     const target = this.#model.value.target
     if (target == null) return
-    await this.#changePresentation((value) => setFlowViewport(value, target, viewport, displayMode))
+    await this.#changePresentation((value) => setFlowViewport(value, target, viewport))
   }
 
   public async check(): Promise<void> {

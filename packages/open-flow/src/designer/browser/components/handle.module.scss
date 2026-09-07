@@ -11,6 +11,10 @@
   margin-top: 2px;
   left: -8px;
 
+  :global(.react-flow__node.selected) & {
+    left: -9px;
+  }
+
   .handle {
     --angle: 270deg;
   }
@@ -18,6 +22,10 @@
 
 .right {
   right: -8px;
+
+  :global(.react-flow__node.selected) & {
+    right: -9px;
+  }
 
   .handle {
     --angle: 90deg;

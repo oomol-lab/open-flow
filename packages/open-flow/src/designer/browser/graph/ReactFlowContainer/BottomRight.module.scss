@@ -24,5 +24,6 @@
 
 .miniMapToggle:global(.react-flow__panel) {
   right: calc(200px - var(--canvas-control-container-size) - 4px);
-  bottom: calc(150px - var(--canvas-control-container-size) - 4px);
+  bottom: auto;
+  top: calc(150px - var(--canvas-control-container-size) - 4px);
 }

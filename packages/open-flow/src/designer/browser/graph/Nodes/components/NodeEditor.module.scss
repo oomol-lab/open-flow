@@ -1,0 +1,27 @@
+.editor {
+  --widget-height: 30px;
+  --widget-radius: 7px;
+  --base-font-size: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 16px 14px;
+  background: var(--node-background-color);
+  line-height: 1.5;
+  > :global(header) {
+    display: flex;
+    align-items: center;
+    min-height: 38px;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+}
+
+.description {
+  margin: 0 0 16px;
+  display: grid;
+  gap: 6px;
+  color: var(--text-2);
+  > span {
+    font-size: 11px;
+  }
+}

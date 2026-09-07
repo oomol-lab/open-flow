@@ -14,6 +14,7 @@ import { ThemeProvider } from '../../src/designer/browser/theme/ThemeProvider.ts
 import { defaultUiLanguage, uiLanguageNames, uiLanguages } from '../../src/localization/common/languages.ts'
 import { TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
 import { CodeEditor } from '../../src/workbench/browser/runtime/designer/codeEditor.tsx'
+import { cardStories } from './cards.tsx'
 import { overviewStories } from './overview.tsx'
 import { stories } from './stories.tsx'
 import { workflowStories } from './workflow.tsx'
@@ -58,17 +59,18 @@ const codeEditorStory: DesignerStory = {
   title: 'Code Editor',
 }
 
-const labStories: readonly DesignerStory[] = [...stories, codeEditorStory, ...workflowStories, ...overviewStories]
+const labStories: readonly DesignerStory[] = [...cardStories, ...workflowStories, ...stories, codeEditorStory, ...overviewStories]
 
 function initialStory(): DesignerStory {
   const requested = new URLSearchParams(location.search).get('story')
-  const story = labStories.find((item) => item.id == requested) ?? labStories.find((item) => item.id == 'workflow') ?? labStories[0]
+  const story = labStories.find((item) => item.id == requested) ?? labStories.find((item) => item.id == 'canvas-cards') ?? labStories[0]
   if (!story) throw new Error('Designer Lab has no stories.')
   return story
 }
 
 export function DesignerLab() {
-  const [story, setStory] = useState(initialStory)
+  const [storyId, setStoryId] = useState(() => initialStory().id)
+  const story = labStories.find((entry) => entry.id == storyId) ?? initialStory()
   const [theme, setTheme] = useState<ThemeMode>('system')
   const [systemDark, setSystemDark] = useState(() => matchMedia('(prefers-color-scheme: dark)').matches)
   const [language, setLanguage] = useState<UiLanguage>(defaultUiLanguage)
@@ -86,7 +88,7 @@ export function DesignerLab() {
   }, [language])
   const log: LogAction = (name, value) => setAction({ message: `${name}${value === undefined ? '' : ` ${print(value)}`}` })
   const selectStory = (next: DesignerStory) => {
-    setStory(next)
+    setStoryId(next.id)
     const url = new URL(location.href)
     url.searchParams.set('story', next.id)
     history.replaceState(null, '', url)

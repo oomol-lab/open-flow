@@ -241,9 +241,6 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
   assert.doesNotMatch(resourceBrowser, /rounded-none|border-0/)
   assert.match(runInputPanel, /<Alert className="mb-4" variant="destructive">/)
   assert.doesNotMatch(runInputPanel, /run-input-error/)
-  assert.match(workbenchDesigner, /aria-expanded=\{blocksOpen\}[\s\S]*?size="default"[\s\S]*?title=\{t\('designer\.openBlocks'\)\}[\s\S]*?variant="outline"/)
-  assert.match(workbenchDesigner, /onDeleteNodes\(\)[\s\S]*?size="default"[\s\S]*?variant="destructive"/)
-  assert.match(workbenchDesigner, /aria-label=\{t\('designer\.toggleInspector'\)\}[\s\S]*?size="icon"[\s\S]*?variant="outline"/)
   assert.match(workbenchDesigner, /recommendedOptions\.map[\s\S]*?size="sm"[\s\S]*?variant="outline"/)
   assert.match(contextPanel, /<InputGroup>/)
   assert.match(contextPanel, /buttonVariants\(\{ variant: 'ghost' \}\)/)
@@ -453,70 +450,6 @@ test('keeps the Run input editor on the product theme adapter', async () => {
   assert.match(workspace, /<RunInputPanel onStarted=\{revealRun\} store=\{store\.runRequests\} theme=\{theme\}/)
 })
 
-test('uses React Flow ownership for canvas chrome without custom toolbar primitives', async () => {
-  const [displayMode, displayModeStyles, bottomRight, workbenchDesigner, button, buttonGroup, canvasStyles, reactFlow, reactFlowStyles, designerMixins] =
-    await Promise.all([
-      readFile(new URL('src/designer/browser/graph/ReactFlowContainer/DisplayModeToggle.tsx', packageRoot), 'utf8'),
-      readFile(new URL('src/designer/browser/graph/ReactFlowContainer/DisplayModeToggle.module.scss', packageRoot), 'utf8'),
-      readFile(new URL('src/designer/browser/graph/ReactFlowContainer/BottomRight.tsx', packageRoot), 'utf8'),
-      readFile(new URL('src/workbench/browser/runtime/designer/workbenchDesigner.tsx', packageRoot), 'utf8'),
-      readFile(new URL('src/ui/browser/button.tsx', packageRoot), 'utf8'),
-      readFile(new URL('src/ui/browser/button-group.tsx', packageRoot), 'utf8'),
-      readFile(new URL('src/workbench/browser/runtime/styles/canvas.css', packageRoot), 'utf8'),
-      readFile(new URL('src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.tsx', packageRoot), 'utf8'),
-      readFile(new URL('src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.scss', packageRoot), 'utf8'),
-      readFile(new URL('src/designer/browser/styles/_mixins.scss', packageRoot), 'utf8'),
-    ])
-
-  assert.match(displayMode, /import \{ Panel \} from '@xyflow\/react'/)
-  assert.match(displayMode, /ToggleGroup/)
-  assert.match(displayMode, /size="default"/)
-  assert.doesNotMatch(displayMode, /Tabs|CanvasControl/)
-  assert.match(bottomRight, /ControlButton, Controls, MiniMap as RFMiniMap/)
-  assert.match(bottomRight, /position="bottom-right"/)
-  assert.match(bottomRight, /title=\{modeBtnTitle\}/)
-  assert.match(bottomRight, /buttonGroupVariants/)
-  assert.match(bottomRight, /buttonGroupVariants\(\{ orientation: 'horizontal' \}\)/)
-  assert.match(bottomRight, /orientation="horizontal"/)
-  assert.doesNotMatch(bottomRight, /data-orientation=|data-slot="button-group"/)
-  assert.match(bottomRight, /buttonVariants\(\{ size: 'icon', variant: 'outline' \}\)/)
-  assert.doesNotMatch(bottomRight, /CanvasControl|DesignerTooltip/)
-  assert.match(workbenchDesigner, /ui\/browser\/badge\.tsx/)
-  assert.match(workbenchDesigner, /<Badge className="designer-overlay top-left" variant="secondary">/)
-  assert.doesNotMatch(workbenchDesigner, /designer\/browser\/styles\/(?:dark|light)\.module\.scss|CanvasControl/)
-  assert.doesNotMatch(displayModeStyles, /border:|border-radius:|background:|box-shadow:|color:|font-size:|font-weight:/)
-  assert.doesNotMatch(canvasStyles, /--canvas-control-|\.designer-draft-status/)
-  assert.match(buttonGroup, /vertical:[\s\S]*?rounded-b-none[\s\S]*?rounded-t-none[\s\S]*?border-t-0/)
-  assert.match(reactFlow, /buttonGroupVariants\(\{ orientation: 'vertical' \}\)/)
-  assert.match(reactFlow, /orientation="vertical"/)
-  assert.match(reactFlow, /buttonVariants\(\{ size: 'icon', variant: 'outline' \}\)/)
-  assert.match(reactFlow, /data-slot="button"/)
-  assert.doesNotMatch(reactFlow, /data-orientation=|data-slot="button-group"/)
-  assert.match(reactFlowStyles, /react-flow__controls\.horizontal[\s\S]*?flex-direction: row !important/)
-  assert.match(reactFlowStyles, /:is\(\.horizontal, \.vertical\)[\s\S]*?data-slot='button'[\s\S]*?border-radius: 0 !important/)
-  assert.match(
-    reactFlowStyles,
-    /:is\(\.horizontal, \.vertical\)[\s\S]*?width: var\(--canvas-control-container-size\) !important[\s\S]*?height: var\(--canvas-control-container-size\) !important/,
-  )
-  assert.match(
-    reactFlowStyles,
-    /react-flow__controls\.vertical[\s\S]*?not\(:last-child\)[\s\S]*?border-bottom-color: color-mix\(in srgb, var\(--ui-border\) 55%, transparent\) !important/,
-  )
-  assert.match(
-    reactFlowStyles,
-    /react-flow__controls\.horizontal[\s\S]*?not\(:last-child\)[\s\S]*?border-right-color: color-mix\(in srgb, var\(--ui-border\) 55%, transparent\) !important/,
-  )
-  assert.match(reactFlowStyles, /react-flow__controls\.vertical[\s\S]*?first-child[\s\S]*?border-top-left-radius:[\s\S]*?border-top-right-radius:/)
-  assert.match(reactFlowStyles, /react-flow__controls\.vertical[\s\S]*?last-child[\s\S]*?border-bottom-right-radius:[\s\S]*?border-bottom-left-radius:/)
-  assert.match(reactFlowStyles, /react-flow__controls\.horizontal[\s\S]*?first-child[\s\S]*?border-top-left-radius:[\s\S]*?border-bottom-left-radius:/)
-  assert.match(reactFlowStyles, /react-flow__controls\.horizontal[\s\S]*?last-child[\s\S]*?border-top-right-radius:[\s\S]*?border-bottom-right-radius:/)
-  assert.doesNotMatch(reactFlowStyles, /react-flow__controls-button[^}]*border-radius:/)
-  assert.doesNotMatch(reactFlowStyles, /react-flow__controls-button[^}]*border-radius: 0/)
-  assert.match(designerMixins, /--canvas-control-container-size: 32px/)
-  assert.doesNotMatch(designerMixins, /--canvas-control-size:|--canvas-control-padding:/)
-  assert.match(button, /forwardRef<HTMLButtonElement/)
-})
-
 test('keeps concrete Designer theme modules behind the Designer theme adapter', async () => {
   const workbenchSources: string[] = []
   for await (const path of glob('src/workbench/browser/**/*.{ts,tsx}', { cwd: packageRoot })) {
@@ -565,7 +498,6 @@ test('keeps the product theme contract separate from the Designer theme', async 
   assert.match(productTheme, /\.open-flow-theme\s*\{[^{}]*--open-flow-background: #[\da-f]{6};/)
   assert.match(productTheme, /\.open-flow-theme\[data-theme='dark'\]/)
   assert.match(productTheme, /--ui-background: var\(--open-flow-background\);/)
-  assert.match(productTheme, /--open-flow-radius: 8px;/)
   assert.doesNotMatch(uiSources.join('\n'), /var\(--radius-(?:sm|md|lg)\)/)
   for (const theme of [light, dark]) assert.match(theme, /--ui-radius: 6px;/)
   assert.doesNotMatch(workbench, /--ui-[\w-]+\s*:/)

@@ -1132,6 +1132,7 @@ function TriggerDefinition({
 }
 
 interface Props {
+  readonly editorRef?: (element: HTMLDivElement | null) => void
   readonly connectorAction?: ConnectorAction
   readonly connectorActionError?: string
   readonly connectorAuthorizationPending: boolean
@@ -1158,6 +1159,7 @@ interface Props {
 }
 
 export function NodeInspector({
+  editorRef,
   connectorAction,
   connectorActionError,
   connectorAuthorizationPending,
@@ -1210,6 +1212,7 @@ export function NodeInspector({
   return (
     <div className="inspector-content" ref={content}>
       <Diagnostics diagnostics={diagnostics} />
+      <div className="inspector-node-editor" ref={editorRef} />
       {selection != null && selection.kind != 'trigger' && (
         <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} />
       )}

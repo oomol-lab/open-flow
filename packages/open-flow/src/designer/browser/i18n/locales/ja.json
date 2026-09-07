@@ -325,12 +325,6 @@
     "zh-CN": "中国語"
   },
   "miniMap": "ミニマップ",
-  "flowDisplayMode": {
-    "detail": "詳細",
-    "detailDescription": "ノード、ポート、エディター、コントロールをすべて表示します",
-    "overview": "概要",
-    "overviewDescription": "簡易表示のノードと読み取り専用の接続を表示します"
-  },
   "settingsPanel": {
     "hide": "設定を隠す",
     "show": "設定を表示"
@@ -549,7 +543,6 @@
       "connectorTokenOverride": "Token を入力すると、ローカルの上書き設定を作成します",
       "connectorTokenUnchanged": "保存済みの Token は変更されません",
       "editor": "エディター",
-      "defaultFlowDisplayMode": "Flow または Subflow を開いたときに使用する表示モードを設定します。",
       "expandScriptletEditor": "新規作成したスクリプトレットのエディターを展開する",
       "llm": "大規模言語モデル",
       "llmApiKey": "API Key",
@@ -593,5 +586,43 @@
     "reload": "再読み込み"
   },
   "zoomIn": "拡大",
-  "zoomOut": "縮小"
+  "zoomOut": "縮小",
+  "canvasCard": {
+    "run": "実行",
+    "result": "結果",
+    "logs": "ログ {{count}}",
+    "files": "ファイル {{count}}",
+    "images": "画像 {{count}}",
+    "started": "開始時刻",
+    "previewUnavailable": "プレビューできません",
+    "artifactMetadata": "ファイルのメタデータのみです。ダウンロード先は提供されていません。",
+    "description": "目的",
+    "describe": "このステップの目的を記述します。",
+    "every": "{{value}} {{unit}}ごと",
+    "status": {
+      "idle": "未開始",
+      "running": "実行中",
+      "success": "完了",
+      "error": "失敗",
+      "waiting": "待機中",
+      "skipped": "スキップ"
+    },
+    "kind": {
+      "task": "タスク",
+      "trigger": "トリガー",
+      "condition": "条件",
+      "wait": "待機",
+      "subflow": "サブフロー",
+      "value": "設定値",
+      "input": "入力",
+      "output": "出力"
+    },
+    "units": {
+      "minute": "分",
+      "hour": "時間",
+      "day": "日",
+      "week": "週",
+      "month": "か月"
+    }
+  }
 }

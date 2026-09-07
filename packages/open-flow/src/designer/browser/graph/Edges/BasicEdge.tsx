@@ -1,29 +1,50 @@
 import styles from './BasicEdge.module.scss'
-import type { EdgeProps } from '@xyflow/react'
+import type { EdgeProps, Rect } from '@xyflow/react'
 import type { RFEdge } from '../../base/rfHelpers.ts'
 
-import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react'
-import { useMemo } from 'react'
+import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, Position, useInternalNode } from '@xyflow/react'
+import { useId, useMemo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { ErrorCircle } from '../../components/errorCircle.tsx'
 import { gradientToStroke } from '../../stores/edge/colors.ts'
 import { DEFAULT_HANDLE_KIND } from '../../stores/nodeHandle/handleKind.ts'
 import { useDesignerStore } from '../DesignerStoreContext.tsx'
+import { EDGE_GAP, getTurnY } from './route.ts'
 
 export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
+  const arrowId = useId().replaceAll(':', '')
   const edgeStore = props.data?.store
   const error = useVal(edgeStore?.$.error)
   const designerStore = useDesignerStore()
   const scale = useVal(designerStore.$.scale)
+  const sourceNode = useInternalNode(props.source)
+  const targetNode = useInternalNode(props.target)
 
-  const [path, labelX, labelY] = getBezierPath({
+  // Leave space between the arrow tip and the target port in every direction.
+  const gap = 3
+  const targetX = props.targetX + (props.targetPosition == Position.Left ? -gap : props.targetPosition == Position.Right ? gap : 0)
+  const targetY = props.targetY + (props.targetPosition == Position.Top ? -gap : props.targetPosition == Position.Bottom ? gap : 0)
+  const sourceRect: Rect | undefined = sourceNode && {
+    ...sourceNode.internals.positionAbsolute,
+    width: sourceNode.measured.width ?? 0,
+    height: sourceNode.measured.height ?? 0,
+  }
+  const targetRect: Rect | undefined = targetNode && {
+    ...targetNode.internals.positionAbsolute,
+    width: targetNode.measured.width ?? 0,
+    height: targetNode.measured.height ?? 0,
+  }
+
+  const [path, labelX, labelY] = getSmoothStepPath({
     sourceX: props.sourceX,
     sourceY: props.sourceY,
     sourcePosition: props.sourcePosition,
-    targetX: props.targetX,
-    targetY: props.targetY,
+    targetX,
+    targetY,
     targetPosition: props.targetPosition,
-    curvature: props.pathOptions?.curvature,
+    borderRadius: 20,
+    centerY: getTurnY(props, sourceRect, targetRect),
+    offset: EDGE_GAP,
   })
 
   const selected = useVal(edgeStore?.$.selected)
@@ -33,7 +54,8 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
   const connectionMeta = useVal(edgeStore?.$.connectionMeta)
 
   const inverse = props.sourceX > props.targetX
-  const strokeWidth = selected || nodeSelected ? 4 : 2
+  const strokeWidth = selected || nodeSelected ? 2.5 : 1.5
+  const arrowSize = (7 * 1.5) / strokeWidth
 
   const style = useMemo<React.CSSProperties>(
     () => ({
@@ -48,6 +70,11 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
 
   return (
     <>
+      <defs>
+        <marker id={arrowId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth={arrowSize} markerHeight={arrowSize} orient="auto-start-reverse">
+          <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="var(--edge-primitive)" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+        </marker>
+      </defs>
       {selected && (
         <BaseEdge
           id={props.id + '-selected'}
@@ -58,12 +85,18 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
             stroke: 'var(--highlight-indicate-color)',
             pointerEvents: 'none',
           }}
-          markerEnd={props.markerEnd}
           markerStart={props.markerStart}
           interactionWidth={props.interactionWidth}
         />
       )}
-      <BaseEdge id={props.id} path={path} style={style} markerEnd={props.markerEnd} markerStart={props.markerStart} interactionWidth={props.interactionWidth} />
+      <BaseEdge
+        id={props.id}
+        path={path}
+        style={style}
+        markerEnd={props.markerEnd ?? `url(#${arrowId})`}
+        markerStart={props.markerStart}
+        interactionWidth={props.interactionWidth}
+      />
       <EdgeLabelRenderer>
         <div
           className={styles.label}

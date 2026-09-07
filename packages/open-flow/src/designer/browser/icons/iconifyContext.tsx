@@ -57,12 +57,12 @@ export const IconifyProvider: FC<IconifyProviderProps> = ({ children }) => {
     if (mountedRef.current) setData(iconifyData)
   }, [])
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
       mountedRef.current = false
-    },
-    [],
-  )
+    }
+  }, [])
 
   const value = useMemo<IconifyContextValue>(() => ({ data, loadCollection }), [data, loadCollection])
   return <IconifyContext.Provider value={value}>{children}</IconifyContext.Provider>

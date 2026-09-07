@@ -3,10 +3,11 @@ import type { CSSProperties } from 'react'
 import type { Val } from 'value-enhancer'
 import type { HandleName } from '../../../../../schema/index.ts'
 import type { RFNodeId } from '../../../base/rfHelpers.ts'
+import type { HandleProps } from '../../../components/handle.tsx'
 import type { DesignerStore } from '../../../stores/designer/designer.store.ts'
 import type { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 
-import { useStoreApi } from '@xyflow/react'
+import { useConnection, useNodeConnections, useStoreApi } from '@xyflow/react'
 import { clsx } from 'clsx'
 import { memo, useCallback, useRef } from 'react'
 import { useDerived, useVal } from 'use-value-enhancer'
@@ -23,6 +24,7 @@ import { DEFAULT_NODE_WIDTH, FITTING_VIEW_CLASSNAME, isManifestNodeType, isPseud
 import { NodeStore } from '../../../stores/node/node.store.ts'
 import { useSubflowViewMode } from '../../SubflowDesigner/SubflowViewModeContext.ts'
 import { NodeStoreContext } from '../NodeStoreContext.tsx'
+import { CanvasNode } from './CanvasNode.tsx'
 import { NodeBody } from './NodeBody.tsx'
 import { NodeDescriptionPopup } from './NodeDescriptionPopup.tsx'
 import { NodeHead } from './NodeHead.tsx'
@@ -32,7 +34,6 @@ import { NodeOutline } from './NodeOutline.tsx'
 import { NodeProgress } from './NodeProgress.tsx'
 import { NodeStatusLabel } from './NodeStatusLabel.tsx'
 import { NodeTopLeftLabel } from './NodeTopLeftLabel.tsx'
-import { OverviewNode } from './OverviewNode.tsx'
 import { useShowNodeError } from './useShowNodeError.ts'
 
 export interface NodeLayoutProps {
@@ -41,7 +42,7 @@ export interface NodeLayoutProps {
   visible: boolean
 }
 
-const OVERVIEW_NODE_WIDTH = 260
+const CARD_WIDTH = 320
 
 export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ designerStore, nodeStore, visible }) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -56,11 +57,9 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ des
   const showError = useShowNodeError(nodeStore)
   const isSubflowBlock = useSubflowViewMode() === SUBFLOW_VIEW_MODE.Block
   const isInBlock = designerStore.designerType === DESIGNER_TYPE.Block || isSubflowBlock
-  const displayMode = useVal(designerStore.$.displayMode)
-  const overviewNodeStore = !isInBlock && displayMode == 'overview' && NodeStore.is(nodeStore) ? nodeStore : undefined
-  const overviewConnections = useVal(designerStore.$.overviewConnectedNodes)
+  const cardStore = !isInBlock && NodeStore.is(nodeStore) ? nodeStore : undefined
   const canvasMiniMapPhase = useNodeMiniMapPhase()
-  const nodeMiniMapPhase = overviewNodeStore ? NodeMiniMapPhase.None : visible ? canvasMiniMapPhase : selected ? NodeMiniMapPhase.None : NodeMiniMapPhase.Phase2
+  const nodeMiniMapPhase = cardStore ? NodeMiniMapPhase.None : visible ? canvasMiniMapPhase : selected ? NodeMiniMapPhase.None : NodeMiniMapPhase.Phase2
 
   const handleTrack = useHandleTrack(nodeStore.rfNodeId, MIN_NODE_WIDTH, contentWidth$, containerRef, DEFAULT_NODE_WIDTH)
 
@@ -74,16 +73,20 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ des
   const selectedOutlineColor = showError ? 'var(--edge-error)' : undefined
 
   const containerStyle: CSSProperties = {
-    width: overviewNodeStore ? OVERVIEW_NODE_WIDTH : Math.max(contentWidth || DEFAULT_NODE_WIDTH, MIN_NODE_WIDTH),
+    width: cardStore ? CARD_WIDTH : Math.max(contentWidth || DEFAULT_NODE_WIDTH, MIN_NODE_WIDTH),
     ['--node-selected-border-color' as any]: selectedOutlineColor,
     ['--node-selected-shadow' as any]: showError ? 'var(--node-error-selected-shadow)' : undefined,
   }
-  const overviewNode = overviewNodeStore ? (
-    <OverviewNode
-      nodeStore={overviewNodeStore}
-      inputConnected={overviewConnections.inputs.has(overviewNodeStore.rfNodeId)}
-      outputConnected={overviewConnections.outputs.has(overviewNodeStore.rfNodeId)}
+  const card = cardStore ? (
+    <CanvasNode
+      nodeStore={cardStore}
       showError={showError}
+      branches={branches?.map((branch) => (
+        <div key={branch} className={styles.executionBranch}>
+          <span>{branch}</span>
+          <ExecutionHandle id={toRFHandleName(`$branch:${branch}` as HandleName)} type="output" isConnectable={editable} />
+        </div>
+      ))}
     />
   ) : undefined
 
@@ -103,7 +106,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ des
           )}
         >
           <div className={clsx(styles.offsetContainer, skip && styles.skipOuter)}>
-            {!isPseudoNodeType(nodeStore.nodeType) && !isInBlock && (
+            {!cardStore && !isPseudoNodeType(nodeStore.nodeType) && !isInBlock && (
               <>
                 <NodeFloatBar designerStore={designerStore} nodeStore={nodeStore} />
                 <NodeSettingsPanelHost designerStore={designerStore} nodeStore={nodeStore} />
@@ -119,7 +122,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ des
                 <i className="i-carbon:port-output mr-1" /> {t('outputHandleEditor.title')}
               </NodeTopLeftLabel>
             )}
-            {!selected && status && nodeStore.display$ && (
+            {!cardStore && !selected && status && nodeStore.display$ && (
               <NodeStatusLabel
                 skip$={nodeStore.display$.ignore}
                 flowStatus$={designerStore.$.runStatus}
@@ -129,37 +132,26 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ des
                 viewport$={designerStore.$.viewport}
               />
             )}
-            {status && <Running variant="gradient" status$={status} scale$={designerStore.$.scale} />}
+            {!cardStore && status && <Running variant="gradient" status$={status} scale$={designerStore.$.scale} />}
             <NodeMinimap />
-            {!overviewNodeStore && <div data-pos="w" className={`${styles.resizeHandle} ${styles.resizeHandleW}`} onPointerDown={handleTrack} />}
-            <main
-              ref={containerRef}
-              className={clsx(styles.container, overviewNodeStore && styles.overviewContainer, skip && styles.skip)}
-              style={containerStyle}
-            >
+            {!cardStore && <div data-pos="w" className={`${styles.resizeHandle} ${styles.resizeHandleW}`} onPointerDown={handleTrack} />}
+            <main ref={containerRef} className={clsx(styles.container, cardStore && styles.cardContainer, skip && styles.skip)} style={containerStyle}>
               <div className={styles.executionHead}>
-                {overviewNode ? (
+                {card ? (
                   isPseudoNodeType(nodeStore.nodeType) ? (
-                    overviewNode
+                    card
                   ) : (
-                    <NodeHeadContextMenu designerStore={designerStore}>{overviewNode}</NodeHeadContextMenu>
+                    <NodeHeadContextMenu designerStore={designerStore}>{card}</NodeHeadContextMenu>
                   )
                 ) : (
                   <NodeHead />
                 )}
-                {executionInput && <Handle className={styles.executionHandle} id={toRFHandleName('$in' as HandleName)} type="input" isConnectable={editable} />}
+                {executionInput && <ExecutionHandle id={toRFHandleName('$in' as HandleName)} type="input" isConnectable={editable} />}
                 {!isPseudoNodeType(nodeStore.nodeType) && nodeStore.nodeType != NODE_TYPE.CommentNode && branches == null && (
-                  <Handle className={styles.executionHandle} id={toRFHandleName('$out' as HandleName)} type="output" isConnectable={editable} />
+                  <ExecutionHandle id={toRFHandleName('$out' as HandleName)} type="output" isConnectable={editable} />
                 )}
               </div>
-              {overviewNode &&
-                branches?.map((branch) => (
-                  <div key={branch} className={styles.executionBranch}>
-                    <span>{branch}</span>
-                    <Handle className={styles.executionHandle} id={toRFHandleName(`$branch:${branch}` as HandleName)} type="output" isConnectable={editable} />
-                  </div>
-                ))}
-              {!overviewNode && (
+              {!card && (
                 <>
                   <NodeProgress progress$={progress} status$={status} />
                   <NodeBody />
@@ -167,9 +159,9 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ des
                 </>
               )}
             </main>
-            {!overviewNodeStore && <div data-pos="e" className={`${styles.resizeHandle} ${styles.resizeHandleE}`} onPointerDown={handleTrack} />}
+            {!cardStore && <div data-pos="e" className={`${styles.resizeHandle} ${styles.resizeHandleE}`} onPointerDown={handleTrack} />}
           </div>
-          {!overviewNodeStore && nodeStore.manifest$ && isManifestNodeType(nodeStore.nodeType) && (
+          {!cardStore && nodeStore.manifest$ && isManifestNodeType(nodeStore.nodeType) && (
             <NodeDescriptionPopup editable={editable} rawValue$={nodeStore.manifest$.description} displayValue$={nodeStore.display$.description} />
           )}
         </div>
@@ -177,6 +169,20 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ des
     </NodeMiniMapProvider>
   )
 })
+
+function ExecutionHandle({ id, type, isConnectable }: Pick<HandleProps, 'id' | 'type' | 'isConnectable'>) {
+  const handleType = type == 'input' ? 'target' : 'source'
+  const connections = useNodeConnections({ handleType, handleId: id })
+  const connecting = useConnection((connection) => connection.inProgress && connection.fromHandle.type != handleType)
+  return (
+    <Handle
+      id={id}
+      type={type}
+      isConnectable={isConnectable}
+      className={clsx(styles.executionHandle, connections.length > 0 && styles.connected, isConnectable && connecting && styles.connecting)}
+    />
+  )
+}
 
 function useHandleTrack(
   rfNodeId: RFNodeId,

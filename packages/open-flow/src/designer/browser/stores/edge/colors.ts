@@ -17,6 +17,8 @@ export function gradientId(from: EdgeColor, to: EdgeColor): string {
 }
 
 export function gradientToStroke(from: EdgeColor, to: EdgeColor, inverse: boolean): string {
+  // Solid strokes remain visible when a straight edge has a zero-height bounding box.
+  if (from == to) return edgeColors[from]
   return `url(#${inverse ? gradientId(to, from) : gradientId(from, to)})`
 }
 

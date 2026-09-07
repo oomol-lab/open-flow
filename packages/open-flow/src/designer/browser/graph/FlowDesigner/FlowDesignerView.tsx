@@ -58,7 +58,7 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
   const selectedEdge = useRef<string>()
   propsRef.current = props
 
-  const onMoveEnd = useCallback<OnMoveEnd>((_, viewport) => propsRef.current.onMoveViewport(viewport, adapter.store.$.displayMode.value), [adapter])
+  const onMoveEnd = useCallback<OnMoveEnd>((_, viewport) => propsRef.current.onMoveViewport(viewport), [adapter])
   const onNodeDragStop = useCallback<OnNodeDrag<RFNode<any>>>(
     (_, node, nodes) => {
       const moved = nodes.length > 0 ? nodes : [node]
@@ -122,6 +122,8 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
 
   return (
     <FlowDesigner
+      view={props}
+      toolbar={props.toolbar}
       addItemRequest={props.addItemRequest}
       addNodeRequest={props.addNodeRequest}
       className={props.className}

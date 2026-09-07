@@ -4,7 +4,6 @@ import type { Viewport } from '@xyflow/react'
 import type { Val } from 'value-enhancer'
 import type { ReadonlyReactiveMap } from 'value-enhancer/collections'
 import type { NodeId } from '../../../../schema/index.ts'
-import type { FlowDisplayMode } from '../../../common/flowDisplay.ts'
 import type { CommentNodeStore } from '../node/commentNode.store.ts'
 import type { NodeStore } from '../node/node.store.ts'
 import type { NodeUIPersistedData } from '../node/nodeUI.store.ts'
@@ -12,20 +11,15 @@ import type { NodeUIPersistedData } from '../node/nodeUI.store.ts'
 import { isPlainObject } from '@wopjs/cast'
 import { disposableStore } from '@wopjs/disposable'
 import { event, send } from '@wopjs/event'
-import { FLOW_DISPLAY_MODES } from '../../../common/flowDisplay.ts'
 import { isSameViewport, isViewport, isXYPosition } from '../../base/compare.ts'
 import { toPlainObject } from '../../base/trivial.ts'
 import { watchEach } from '../../base/val.ts'
-
-export interface DesignerUILayout {
-  viewport?: Viewport | undefined
-}
 
 export interface DesignerUIData {
   nodes?: { [nodeId: NodeId]: NodeUIPersistedData | undefined }
   pseudoNodes?: { [nodeId: NodeId]: NodeUIPersistedData | undefined }
   commentNodes?: { [nodeId: NodeId]: NodeUIPersistedData | undefined }
-  layouts?: Partial<Record<FlowDisplayMode, DesignerUILayout>>
+  viewport?: Viewport
 }
 
 export interface DesignerUIStoreProps {
@@ -50,11 +44,9 @@ export class DesignerUIStore {
   private readonly nodesData = new Map<NodeId, NodeUIPersistedData>()
   private readonly pseudoNodesData = new Map<NodeId, NodeUIPersistedData>()
   private readonly commentNodesData = new Map<NodeId, NodeUIPersistedData>()
-  private readonly layouts = new Map<FlowDisplayMode, DesignerUILayout>()
   private initialPositions = new Set<NodeId>()
   private initialized = false
   private observedViewport: Viewport | undefined
-  private activeDisplayMode: FlowDisplayMode = 'detail'
 
   public constructor({ viewport, nodeStores, pseudoNodeStores, commentNodeStores }: DesignerUIStoreProps) {
     this.viewport$ = this.dispose.add(viewport)
@@ -135,19 +127,12 @@ export class DesignerUIStore {
 
   public loadDesignerUIData(data: DesignerUIData): this
   public loadDesignerUIData(data: unknown): this
-  public loadDesignerUIData(data: unknown, displayMode?: FlowDisplayMode): this
-  public loadDesignerUIData(data: unknown, displayMode: FlowDisplayMode = 'detail'): this {
-    this.activeDisplayMode = displayMode
+  public loadDesignerUIData(data: unknown): this {
     const uiData = toPlainObject(data)
     if (uiData) {
-      const layouts = parseLayouts(uiData.layouts)
-      for (const [mode, layout] of layouts) {
-        this.layouts.set(mode, layout)
-      }
       this.initialized = false
       this.initialPositions = positionedIds(uiData.nodes, uiData.pseudoNodes)
-      const activeLayout = this.layouts.get(displayMode)
-      const viewport = activeLayout?.viewport ?? uiData.viewport
+      const viewport = uiData.viewport
       if (isViewport(viewport)) {
         this.observedViewport = viewport
         this.viewport$.set({ ...viewport })
@@ -171,23 +156,7 @@ export class DesignerUIStore {
     return this
   }
 
-  public switchDisplayMode(previousMode: FlowDisplayMode, nextMode: FlowDisplayMode): boolean {
-    this.captureViewport(previousMode)
-    this.activeDisplayMode = nextMode
-    const viewport = this.layouts.get(nextMode)?.viewport
-    if (viewport) {
-      this.observedViewport = viewport
-      this.viewport$.set({ ...viewport })
-    }
-    return this.isActiveLayoutInitialized()
-  }
-
-  public captureActiveLayout(): void {
-    this.captureViewport(this.activeDisplayMode)
-  }
-
   public completeActiveLayout(): void {
-    this.captureActiveLayout()
     this.initialized = true
   }
 
@@ -200,7 +169,6 @@ export class DesignerUIStore {
   }
 
   public toUIData(): DesignerUIData | undefined {
-    this.captureActiveLayout()
     const nodes = this.nodeStores.size
       ? Object.fromEntries([...this.nodeStores].map(([nodeId, nodeStore]) => [nodeId, nodeStore.uiStore.toUIData()] as const))
       : undefined
@@ -213,29 +181,11 @@ export class DesignerUIStore {
       ? Object.fromEntries([...this.commentNodeStores].map(([nodeId, commentNodeStore]) => [nodeId, commentNodeStore.uiStore.toUIData()] as const))
       : undefined
 
-    const persistedLayouts = [...this.layouts].filter(([, layout]) => hasLayoutData(layout))
-    const layouts = persistedLayouts.length > 0 ? Object.fromEntries(persistedLayouts) : undefined
-    if (nodes || pseudoNodes || commentNodes || layouts) {
-      return { nodes, pseudoNodes, commentNodes, layouts }
+    const viewport = this.viewport$.value
+    if (nodes || pseudoNodes || commentNodes || viewport) {
+      return { nodes, pseudoNodes, commentNodes, ...(viewport == null ? {} : { viewport: { ...viewport } }) }
     }
   }
-
-  private captureViewport(mode: FlowDisplayMode): void {
-    const viewport = this.viewport$.value
-    if (viewport) this.layouts.set(mode, { viewport: { ...viewport } })
-  }
-}
-
-function parseLayouts(data: unknown): Map<FlowDisplayMode, DesignerUILayout> {
-  const source = toPlainObject(data)
-  const result = new Map<FlowDisplayMode, DesignerUILayout>()
-  for (const mode of FLOW_DISPLAY_MODES) {
-    const layout = toPlainObject(source?.[mode])
-    if (!layout) continue
-    const viewport = isViewport(layout.viewport) ? { ...layout.viewport } : undefined
-    if (viewport) result.set(mode, { viewport })
-  }
-  return result
 }
 
 function positionedIds(...collections: unknown[]): Set<NodeId> {
@@ -246,8 +196,4 @@ function positionedIds(...collections: unknown[]): Set<NodeId> {
     }
   }
   return result
-}
-
-function hasLayoutData(layout: DesignerUILayout): boolean {
-  return layout.viewport != null
 }

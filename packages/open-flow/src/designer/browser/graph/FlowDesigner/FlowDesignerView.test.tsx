@@ -325,7 +325,7 @@ describe('FlowDesignerView model synchronization', () => {
       [expect.objectContaining({ handle: 'result' })],
     )
     expect(onChangeInput).not.toHaveBeenCalled()
-    expect(view.props.flowDesignerStore.$.renderedRFEdges.value).toHaveLength(1)
+    expect(view.props.flowDesignerStore.$.rfEdges.value).toHaveLength(1)
     view.props.flowDesignerStore.dispose()
   })
 
@@ -667,7 +667,7 @@ describe('FlowDesignerView model synchronization', () => {
         { onConnect, onChangeTaskAdditionalInputs },
       ),
     )
-    expect(view.props.flowDesignerStore.$.renderedRFEdges.value).toHaveLength(1)
+    expect(view.props.flowDesignerStore.$.rfEdges.value).toHaveLength(1)
     view.props.flowDesignerStore.dispose()
   })
 
@@ -1165,9 +1165,9 @@ describe('FlowDesignerView model synchronization', () => {
 
   it('keeps execution edges independent of data ports', () => {
     const view = FlowDesignerView(props(model([source, { ...task([]), inputs: [], outputs: [] }]))) as React.ReactElement<FlowDesignerProps>
-    expect(view.props.flowDesignerStore.$.renderedRFEdges.value).toHaveLength(1)
+    expect(view.props.flowDesignerStore.$.rfEdges.value).toHaveLength(1)
     FlowDesignerView(props(model([source, task([])])))
-    expect(view.props.flowDesignerStore.$.renderedRFEdges.value).toHaveLength(1)
+    expect(view.props.flowDesignerStore.$.rfEdges.value).toHaveLength(1)
     view.props.flowDesignerStore.dispose()
   })
 
@@ -1192,13 +1192,6 @@ describe('FlowDesignerView model synchronization', () => {
     view.props.flowDesignerStore.dispose()
   })
 
-  it('starts each independent Flow view in overview mode', () => {
-    const view = FlowDesignerView(props(model([]))) as React.ReactElement<FlowDesignerProps>
-
-    expect(view.props.flowDesignerStore.$.displayMode.value).toBe('overview')
-    view.props.flowDesignerStore.dispose()
-  })
-
   it('runs the initial graph layout when requested by the host', () => {
     const view = FlowDesignerView(props(model([task([])]), { autoLayout: true })) as React.ReactElement<FlowDesignerProps>
     const store = view.props.flowDesignerStore
@@ -1206,20 +1199,12 @@ describe('FlowDesignerView model synchronization', () => {
     if (node == null) throw new Error('Expected a Task node.')
     node.$$.rfNode.set({ ...node.$.rfNode.value, measured: { width: 420, height: 240 } })
 
-    expect(store.completeDisplayModeLayout()).toBe('relayout')
+    expect(store.completeLayout()).toBe('relayout')
     store.dispose()
   })
 
-  it('restores the saved overview viewport without replacing shared positions', () => {
+  it('restores the viewport without replacing node positions', () => {
     const value: FlowDesignerViewModel = {
-      layouts: {
-        detail: {
-          viewport: { x: -800, y: -600, zoom: 0.6 },
-        },
-        overview: {
-          viewport: { x: 30, y: 40, zoom: 1.2 },
-        },
-      },
       edges: [],
       nodes: [task([]), commentNode('Comment')],
       viewport: { x: -800, y: -600, zoom: 0.6 },
@@ -1232,41 +1217,17 @@ describe('FlowDesignerView model synchronization', () => {
 
     expect([...store.$.nodes.values()][0]?.$.position.value).toEqual({ x: 200, y: 0 })
     expect(comment.$.position.value).toEqual({ x: 0, y: 100 })
-    expect(store.$.viewport.value).toEqual({ x: 30, y: 40, zoom: 1.2 })
+    expect(store.$.viewport.value).toEqual({ x: -800, y: -600, zoom: 0.6 })
     store.dispose()
   })
 
-  it('keeps overview mode when an external update adds a node', () => {
+  it('preserves the viewport when an external update adds a node', () => {
     const initial = props(model([]))
     const next = props(model([task([])]))
     const store = update(initial, next)
 
-    expect(store.$.displayMode.value).toBe('overview')
+    expect(store.$.viewport.value).toEqual(next.model.viewport)
     expect(store.$.nodes.size).toBe(1)
-    store.dispose()
-  })
-
-  it('restores the detail viewport when switching from overview', async () => {
-    const value: FlowDesignerViewModel = {
-      layouts: {
-        detail: {
-          viewport: { x: 10, y: 20, zoom: 0.8 },
-        },
-      },
-      edges: [],
-      nodes: [task([])],
-      viewport: { x: 10, y: 20, zoom: 0.8 },
-    }
-    const view = FlowDesignerView(props(value)) as React.ReactElement<FlowDesignerProps>
-    const store = view.props.flowDesignerStore
-
-    expect(store.completeDisplayModeLayout()).toBe(true)
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    store.$$.viewport.set({ x: 30, y: 40, zoom: 1.2 })
-    store.$$.displayMode.set('detail')
-    await new Promise((resolve) => setTimeout(resolve, 0))
-
-    expect(store.$.viewport.value).toEqual({ x: 10, y: 20, zoom: 0.8 })
     store.dispose()
   })
 })

@@ -3,7 +3,7 @@
     display: grid;
     min-width: 0;
     min-height: 0;
-    grid-template-columns: minmax(0, 1fr) clamp(380px, 36cqi, 560px);
+    grid-template-columns: minmax(0, 1fr) clamp(400px, 34cqi, 520px);
     grid-template-rows: minmax(0, 1fr) auto;
   }
 
@@ -52,15 +52,7 @@
   .designer-actions {
     display: flex;
     align-items: center;
-    gap: 4px;
-  }
-
-  .designer-actions [data-slot='button'][data-variant='destructive'] {
-    background: var(--danger-surface);
-  }
-
-  .designer-actions [data-slot='button'][data-variant='destructive']:hover {
-    background: color-mix(in srgb, var(--ui-destructive) 20%, var(--ui-background));
+    gap: 5px;
   }
 
   .node-icon {
@@ -101,14 +93,14 @@
 
   .canvas-empty strong {
     color: var(--ui-foreground);
-    font-size: 14px;
+    font-size: 22px;
     font-weight: 600;
   }
 
   .canvas-empty-description {
-    max-width: 360px;
-    font-size: 12px;
-    line-height: 18px;
+    max-width: 380px;
+    font-size: 13px;
+    line-height: 21px;
   }
 
   .canvas-empty-recommendations {
