@@ -1,4 +1,5 @@
-import type { NodeId } from '../../../../schema/index.ts'
+import type { HandleName, NodeId } from '../../../../schema/index.ts'
+import type { ManifestConnection } from '../edge/typings.ts'
 import type { NodeStatus, NodeType } from '../node/constants.ts'
 import type { NodeStoreDisplay$ } from '../node/node.store.ts'
 import type { InteractiveMode } from './designer.store.ts'
@@ -21,7 +22,7 @@ interface TestSetup {
   dispose(): void
 }
 
-function createTestSetup(): TestSetup {
+function createTestSetup(connections = val<readonly ManifestConnection[]>([])): TestSetup {
   const nodes = reactiveMap<NodeId, NodeStore>()
   const viewport = val<{ x: number; y: number; zoom: number } | undefined>()
   const designerUIStore = new DesignerUIStore({ viewport, nodeStores: nodes })
@@ -33,6 +34,7 @@ function createTestSetup(): TestSetup {
     viewport,
     settingsPanelWidth: val(),
     nodes,
+    connections,
     runStatus: val(FLOW_RUN_STATUS.Idle),
     designerUIStore,
     showConfirmDialog: async () => true,
@@ -268,6 +270,30 @@ describe('DesignerStore layout', () => {
       first: { rfNode: { position: first.$.position.value } },
       second: { rfNode: { position: second.$.position.value } },
     })
+    setup.dispose()
+  })
+
+  it('leaves enough horizontal space for edge turns between connected nodes', async () => {
+    const firstId = 'first' as NodeId
+    const secondId = 'second' as NodeId
+    const setup = createTestSetup(
+      val([
+        {
+          from: { type: 'from_node', source: { node_id: firstId, output_handle: 'output' as HandleName } },
+          to: { type: 'to_node', target: { node_id: secondId, input_handle: 'input' as HandleName } },
+        },
+      ] as readonly ManifestConnection[]),
+    )
+    const first = setup.createNode(firstId)
+    const second = setup.createNode(secondId)
+    setup.nodes.set(first.nodeId, first)
+    setup.nodes.set(second.nodeId, second)
+    first.$$.rfNode.set({ ...first.$.rfNode.value, measured: { width: 200, height: 80 } })
+    second.$$.rfNode.set({ ...second.$.rfNode.value, measured: { width: 200, height: 80 } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(setup.store.completeLayout()).toBe('relayout')
+    expect(second.$.position.value.x - first.$.position.value.x - 200).toBe(80)
     setup.dispose()
   })
 

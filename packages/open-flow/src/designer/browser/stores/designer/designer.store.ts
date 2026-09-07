@@ -535,7 +535,8 @@ export class DesignerStore {
   // https://reactflow.dev/learn/layouting/layouting#dagre
   private doRelayout() {
     const g = new graphlib.Graph().setDefaultEdgeLabel(() => ({}))
-    g.setGraph({ rankdir: 'LR' })
+    // Leave enough room for both ends of a smooth-step edge and a short middle segment.
+    g.setGraph({ rankdir: 'LR', ranksep: 80 })
 
     const singles = new Set<string>()
     for (const rfNode of this.$.rfNodes.value) {
