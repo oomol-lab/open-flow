@@ -63,7 +63,7 @@ export function calculateObject<E>(context: Context<E>, schema1: CompiledSchema<
     for (const optionalKey of [...getOptionalKeys(schema1, schema2)].toSorted()) {
       const expression = calculateKey(optionalKey)
       if (expression !== ExpressionNone) {
-        quantumVariable.push(calculateKey(optionalKey), calculator)
+        quantumVariable.push(expression, calculator)
       }
     }
     const additionalProperties1 = (schema1.additionalProperties as Schema<E>) ?? ANY

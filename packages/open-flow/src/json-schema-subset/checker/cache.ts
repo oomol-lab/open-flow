@@ -50,7 +50,7 @@ function getWithCache<R, E, N extends ExtendsSchema | DeepReadonly<CompiledSchem
   const key = `${id1}/${id2}`
 
   let result = map.get(key)
-  if (!result) {
+  if (result === undefined) {
     map.set(key, (result = check(node1, node2)))
   }
   return result
