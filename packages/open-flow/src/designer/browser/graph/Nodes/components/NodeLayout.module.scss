@@ -122,6 +122,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 12px;
   min-height: var(--widget-height);
   padding: 4px 14px;
   color: var(--text-4);
@@ -130,12 +131,50 @@
   border-top: 1px solid var(--node-border-color);
   background: transparent;
   padding-right: 18px;
+}
 
-  > span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+.conditionBranch {
+  grid-template-columns: minmax(0, 1fr) 12px 84px;
+  display: grid;
+  min-height: 30px;
+  margin: 4px 8px 0;
+  padding: 5px 14px 5px 12px;
+  border-top: 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--node-background-color) 72%, transparent);
+}
+
+.conditionBranch .branchName {
+  width: 100%;
+  max-width: none;
+  text-align: right;
+}
+
+.branchRule,
+.branchName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branchRule {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-2);
+  font-family: var(--font-monospace);
+}
+
+.branchArrow {
+  flex: none;
+  color: var(--text-1);
+  opacity: 0.55;
+  text-align: center;
+}
+
+.branchName {
+  flex: none;
+  max-width: 50%;
+  font-weight: 500;
 }
 
 .executionHandle.executionHandle {
@@ -164,6 +203,10 @@
 // Branch rows sit inside the card's 1px border; align their ports with the outer edge.
 .cardContainer .executionBranch > .executionHandle {
   right: -9px;
+}
+
+.cardContainer .conditionBranch > .executionHandle {
+  right: -17px;
 }
 
 .cardContainer .executionHandle > :global(.react-flow__handle) {

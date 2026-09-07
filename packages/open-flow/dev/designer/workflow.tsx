@@ -66,7 +66,7 @@ const workflow: FlowDesignerViewModel = {
     {
       id: 'condition',
       kind: 'condition',
-      title: 'Condition · Has records',
+      title: 'Has records',
       position: workflowPositions.condition,
       inputs: [{ handle: 'count', jsonSchema: { type: 'number' }, sources: [{ nodeId: 'task', output: 'count' }] }],
       outputs: [

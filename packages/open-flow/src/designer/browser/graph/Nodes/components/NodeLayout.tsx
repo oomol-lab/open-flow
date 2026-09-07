@@ -9,7 +9,7 @@ import type { CommentNodeStore } from '../../../stores/node/commentNode.store.ts
 
 import { useConnection, useNodeConnections, useStoreApi } from '@xyflow/react'
 import { clsx } from 'clsx'
-import { memo, useCallback, useRef } from 'react'
+import { memo, useCallback, useContext, useRef } from 'react'
 import { useDerived, useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { DEFAULT_POSITION } from '../../../base/designer.ts'
@@ -22,6 +22,8 @@ import { SUBFLOW_VIEW_MODE } from '../../../stores/designer/subflowDesigner.stor
 import { DESIGNER_TYPE } from '../../../stores/designer/typings.ts'
 import { DEFAULT_NODE_WIDTH, FITTING_VIEW_CLASSNAME, isManifestNodeType, isPseudoNodeType, MIN_NODE_WIDTH, NODE_TYPE } from '../../../stores/node/constants.ts'
 import { NodeStore } from '../../../stores/node/node.store.ts'
+import { CanvasContext } from '../../FlowDesigner/CanvasContext.ts'
+import { conditionBranchSummary } from '../../FlowDesigner/cardContent.ts'
 import { useSubflowViewMode } from '../../SubflowDesigner/SubflowViewModeContext.ts'
 import { NodeStoreContext } from '../NodeStoreContext.tsx'
 import { CanvasNode } from './CanvasNode.tsx'
@@ -46,6 +48,8 @@ const CARD_WIDTH = 320
 
 export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ designerStore, nodeStore, visible }) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const t = useTranslate()
+  const view = useContext(CanvasContext)
 
   const branches = useVal(nodeStore.display$?.branches)
   const executionInput = useVal(nodeStore.display$?.executionInput) ?? false
@@ -71,6 +75,8 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ des
 
   const contentWidth = useVal(contentWidth$)
   const selectedOutlineColor = showError ? 'var(--edge-error)' : undefined
+  const modelNode = view?.model.nodes.find((node) => node.id == nodeStore.nodeId)
+  const conditionNode = modelNode?.kind == 'condition' ? modelNode : undefined
 
   const containerStyle: CSSProperties = {
     width: cardStore ? CARD_WIDTH : Math.max(contentWidth || DEFAULT_NODE_WIDTH, MIN_NODE_WIDTH),
@@ -81,16 +87,27 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ des
     <CanvasNode
       nodeStore={cardStore}
       showError={showError}
-      branches={branches?.map((branch) => (
-        <div key={branch} className={styles.executionBranch}>
-          <span>{branch}</span>
-          <ExecutionHandle id={toRFHandleName(`$branch:${branch}` as HandleName)} type="output" isConnectable={editable} />
-        </div>
-      ))}
+      branches={branches?.map((branch) => {
+        const summary = conditionNode == null ? '' : conditionBranchSummary(conditionNode, branch, t)
+        return (
+          <div key={branch} className={clsx(styles.executionBranch, conditionNode != null && styles.conditionBranch)}>
+            {summary && (
+              <span className={styles.branchRule} title={summary}>
+                {summary}
+              </span>
+            )}
+            {summary && (
+              <span aria-hidden="true" className={styles.branchArrow}>
+                →
+              </span>
+            )}
+            <span className={styles.branchName}>{branch}</span>
+            <ExecutionHandle id={toRFHandleName(`$branch:${branch}` as HandleName)} type="output" isConnectable={editable} />
+          </div>
+        )
+      })}
     />
   ) : undefined
-
-  const t = useTranslate()
 
   return (
     <NodeMiniMapProvider value={nodeMiniMapPhase}>
