@@ -170,6 +170,8 @@
       "description": "表示名とタイムアウト",
       "displayName": "表示名",
       "displayNamePlaceholder": "定義の名前を使用",
+      "nameDuplicate": "このグラフには同じ名前のノードが既に存在します。",
+      "nameEmpty": "ノード名を空にすることはできません。",
       "save": "ノードを保存",
       "timeout": "タイムアウト（ミリ秒）",
       "timeoutError": "タイムアウトはミリ秒単位の正の整数で指定してください。",

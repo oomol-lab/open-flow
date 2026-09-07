@@ -440,7 +440,12 @@ describe('Server Connector host', () => {
     const changed = await service.control.changeDraft('test', created.flow.flowId, created.flow.draftRevisionId, [
       { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start', target: { kind: 'flow' } },
       { kind: 'task.create', task: revision.document.tasks.connector!, taskId: 'connector' },
-      { kind: 'graph.node.create', node: revision.document.graph.nodes.connector!, nodeId: 'connector', target: { kind: 'flow' } },
+      {
+        kind: 'graph.node.create',
+        node: { ...revision.document.graph.nodes.connector!, name: 'Connector' },
+        nodeId: 'connector',
+        target: { kind: 'flow' },
+      },
       { kind: 'graph.edge.connect', edge: { source: 'start', target: 'connector' }, target: { kind: 'flow' } },
     ])
     const accepted = await service.control.createDraftRun(created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v2', {}, 'team-run', {

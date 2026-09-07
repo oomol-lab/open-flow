@@ -51,6 +51,7 @@ interface Props {
   readonly onChangeNodeDescription: (nodeId: string, description: string | undefined) => void
   readonly onChangeNodeIcon: (nodeId: string, icon: string | undefined) => void
   readonly onChangeNodeTitle: (nodeId: string, title: string | undefined) => void
+  readonly nodeTitleIssue: (nodeId: string, title: string) => string | undefined
   readonly onChangeInput: (nodeId: string, handle: string, value: JsonValue | undefined) => void
   readonly onChangeInputVariable: (nodeId: string, handle: string, name: string | undefined) => void
   readonly onChangeTaskAdditionalInputs: (nodeId: string, inputs: readonly FlowDesignerViewInput[]) => void
@@ -243,6 +244,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
     onChangeNodeDescription,
     onChangeNodeIcon,
     onChangeNodeTitle,
+    nodeTitleIssue,
     onChangeInput,
     onChangeInputVariable,
     onChangeTaskAdditionalInputs,
@@ -547,6 +549,7 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         onChangeNodeDescription={onChangeNodeDescription}
         onChangeNodeIcon={onChangeNodeIcon}
         onChangeNodeTitle={onChangeNodeTitle}
+        nodeTitleIssue={nodeTitleIssue}
         onChangeInput={(nodeId, handle, value) => onChangeInput(nodeId, handle, value as JsonValue | undefined)}
         onChangeInputVariable={onChangeInputVariable}
         onChangeTaskAdditionalInputs={onChangeTaskAdditionalInputs}

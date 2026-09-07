@@ -170,6 +170,8 @@
       "description": "Display name and timeout",
       "displayName": "Display name",
       "displayNamePlaceholder": "Use definition name",
+      "nameDuplicate": "A node with this name already exists in this graph.",
+      "nameEmpty": "Node name cannot be empty.",
       "save": "Save node",
       "timeout": "Timeout (ms)",
       "timeoutError": "Timeout must be a positive integer in milliseconds.",

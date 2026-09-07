@@ -461,6 +461,7 @@ export function createNodeEntry(
     title: edit(values.rawTitle, (title) => callbacks.onChangeNodeTitle?.(node.id, title)),
   }
   const changeDescription = callbacks.onChangeNodeDescription == null ? undefined : manifest$.description.set
+  const titleIssue = callbacks.nodeTitleIssue == null ? undefined : (title: string) => callbacks.nodeTitleIssue?.(node.id, title)
   const commonDisplay = {
     branches: values.branches,
     executionInput: values.executionInput,
@@ -509,6 +510,7 @@ export function createNodeEntry(
         designerUIStore,
         duplicateNode,
         manifest$,
+        titleIssue,
       })
       store.dispose.add(values.conditionCases.reaction(notifyChange, true))
       store.dispose.add(values.defaultCondition.reaction(notifyChange, true))
@@ -534,6 +536,7 @@ export function createNodeEntry(
         designerUIStore,
         duplicateNode,
         manifest$,
+        titleIssue,
       })
       break
     }
@@ -560,6 +563,7 @@ export function createNodeEntry(
           ...manifest$,
           task: val<string | InlineTask | undefined>(node.reference),
         },
+        titleIssue,
       })
       if (node.editablePorts) {
         const changePorts = () => {
@@ -622,6 +626,7 @@ export function createNodeEntry(
           ...manifest$,
           trigger: val<TriggerDescriptor | undefined>(undefined),
         },
+        titleIssue,
       })
       break
     }
@@ -646,6 +651,7 @@ export function createNodeEntry(
         designerUIStore,
         duplicateNode,
         manifest$,
+        titleIssue,
       })
       store.dispose.add(
         valueSection.$.valueHandleDefs.reaction((nextDefs) => {
@@ -691,6 +697,7 @@ export function createNodeEntry(
         designerUIStore,
         duplicateNode,
         manifest$: { ...manifest$, task: val<string | InlineTask | undefined>() },
+        titleIssue,
       })
       break
     }

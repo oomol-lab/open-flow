@@ -342,6 +342,31 @@ export interface GraphEdge {
   readonly target: string
 }
 
+export function normalizeNodeName(value: string): string {
+  return value.trim().normalize('NFC')
+}
+
+export function nextNodeName(value: string, names: Iterable<string>): string {
+  const name = normalizeNodeName(value)
+  const used = new Set([...names].map(normalizeNodeName))
+  if (!used.has(name)) return name
+  const match = /^(.*) \((\d+)\)$/.exec(name)
+  const ordinalText = match?.[2]
+  const ordinal = ordinalText != null && Number(ordinalText) >= 2 ? Number(ordinalText) : undefined
+  const base = ordinal == null ? name : (match?.[1] ?? name)
+  let number = ordinal == null ? 2 : ordinal + 1
+  while (used.has(`${base} (${number})`)) number += 1
+  return `${base} (${number})`
+}
+
+export function nodeNameIssue(graph: Graph, nodeId: string, value: string): 'duplicate' | 'empty' | undefined {
+  const name = normalizeNodeName(value)
+  if (name.length == 0) return 'empty'
+  return Object.entries(graph.nodes).some(([candidateId, node]) => candidateId != nodeId && node.name != null && normalizeNodeName(node.name) == name)
+    ? 'duplicate'
+    : undefined
+}
+
 export type ChangeOperation =
   | {
       readonly before?: readonly ConnectorCapability[]
@@ -570,7 +595,13 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
           invalid('A graph can contain only one manual Trigger.')
         }
         if (operation.node.kind == 'task' && operation.node.task?.capabilities !== undefined) decodeConnectorCapabilities(operation.node.task.capabilities)
-        Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: operation.node } }))
+        if (operation.node.name == null) invalid('A Node name cannot be empty.')
+        const name = normalizeNodeName(operation.node.name)
+        const issue = nodeNameIssue(graph, operation.nodeId, name)
+        if (issue == 'empty') invalid('A Node name cannot be empty.')
+        if (issue == 'duplicate') invalid('A Node with this name already exists in the target graph.')
+        const node = name == operation.node.name ? operation.node : { ...operation.node, name }
+        Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: node } }))
         break
       }
       case 'graph.node.delete': {
@@ -604,7 +635,14 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         if (node == null) invalid('The Node does not exist in the target graph.')
         if (!dequal(Reflect.get(node, operation.field), operation.before)) invalid('The Node field changed before this operation was applied.')
         const updated = { ...node }
-        if (operation.value == null) Reflect.deleteProperty(updated, operation.field)
+        if (operation.field == 'name') {
+          if (typeof operation.value != 'string') invalid('A Node name cannot be empty.')
+          const name = normalizeNodeName(operation.value as string)
+          const issue = nodeNameIssue(graph, operation.nodeId, name)
+          if (issue == 'empty') invalid('A Node name cannot be empty.')
+          if (issue == 'duplicate') invalid('A Node with this name already exists in the target graph.')
+          Object.assign(updated, { name })
+        } else if (operation.value == null) Reflect.deleteProperty(updated, operation.field)
         else Object.assign(updated, { [operation.field]: operation.value })
         Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
         break

@@ -110,6 +110,14 @@ describe('Code task port changes', () => {
     expect(changed.content.modules['new-code']).toMatchObject({ name: 'New code' })
   })
 
+  it('adds a numeric suffix when a new Node name is already used', () => {
+    const current = draft('export default () => {}\n')
+    const changes = addNode(revisionView(current), { kind: 'flow' }, 'new-code', { kind: 'code', name: 'Code' }, () => 'unused')
+
+    if (changes == null) throw new Error('Expected code task changes.')
+    expect(applyFlowChanges(current, changes).content.document.graph.nodes['new-code']?.name).toBe('Code (2)')
+  })
+
   it('creates a code task with connection-derived ports', () => {
     const current = draft('export default () => {}\n')
     const changes = addNode(
@@ -216,6 +224,7 @@ describe('Condition changes', () => {
           input: { handle: 'value', jsonSchema: {}, nullable: true },
           inputs: {},
           cases: [{ output: 'yes', relation: 'all', expressions: [{ input: 'value', operator: 'isTrue' }] }],
+          name: 'Condition',
         },
       },
       { kind: 'graph.edge.connect', target, edge: { source: 'condition', sourceHandle: 'yes', target: 'task' } },
@@ -255,6 +264,7 @@ describe('Condition changes', () => {
           input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: { value: { kind: 'value', value: null } },
           kind: 'condition',
+          name: 'Condition',
         },
         nodeId: 'condition',
         target: { kind: 'flow' },
@@ -297,6 +307,7 @@ describe('Wait changes', () => {
           input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: { value: { kind: 'value', value: null } },
           kind: 'wait',
+          name: 'Review',
           notification: {
             inputs: {
               message: {
@@ -354,6 +365,7 @@ describe('Wait changes', () => {
           input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: { value: { kind: 'value', value: null } },
           kind: 'wait',
+          name: 'Wait',
           prompt: 'Continue?',
         },
         nodeId: 'wait',
@@ -391,6 +403,7 @@ describe('Wait changes', () => {
     expect(
       updateWait(revisionView(changed), { kind: 'flow' }, 'wait', {
         actions: ['continue'],
+        name: 'Wait',
         notification: changed.content.document.graph.nodes.wait?.kind == 'wait' ? changed.content.document.graph.nodes.wait.notification : undefined,
         prompt: 'Continue?',
       }),
@@ -398,6 +411,7 @@ describe('Wait changes', () => {
 
     const removed = updateWait(revisionView(changed), { kind: 'flow' }, 'wait', {
       actions: ['continue'],
+      name: 'Wait',
       notification: undefined,
       prompt: 'Continue?',
     })
@@ -429,6 +443,7 @@ describe('Wait changes', () => {
           input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: { value: { kind: 'value', value: null } },
           kind: 'wait',
+          name: 'Wait',
           notification: {
             inputs: { recipient: { kind: 'sources', sources: [{ bindingId: 'recipient', kind: 'binding' }] } },
             messageHandle: 'message',

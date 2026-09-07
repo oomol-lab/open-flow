@@ -170,6 +170,8 @@
       "description": "Nom affiché et délai maximal",
       "displayName": "Nom d'affichage",
       "displayNamePlaceholder": "Utiliser le nom de la définition",
+      "nameDuplicate": "Un nœud portant ce nom existe déjà dans ce graphe.",
+      "nameEmpty": "Le nom du nœud ne peut pas être vide.",
       "save": "Enregistrer le nœud",
       "timeout": "Délai d'expiration (ms)",
       "timeoutError": "Le délai d'expiration doit être un entier positif exprimé en millisecondes.",

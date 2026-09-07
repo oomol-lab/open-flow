@@ -170,6 +170,8 @@
       "description": "显示名称与超时",
       "displayName": "显示名称",
       "displayNamePlaceholder": "使用定义中的名称",
+      "nameDuplicate": "当前图中已存在同名节点。",
+      "nameEmpty": "节点名称不能为空。",
       "save": "保存节点",
       "timeout": "超时时间（毫秒）",
       "timeoutError": "超时时间必须是以毫秒为单位的正整数。",

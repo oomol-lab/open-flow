@@ -28,6 +28,7 @@ function find(element: ReactElement, predicate: (item: ReactElement) => boolean)
 }
 
 function waitDefinition(node: unknown, revision: unknown, saveWait: ReturnType<typeof vi.fn>): ReactElement {
+  const view = { graph: () => ({ nodes: { wait: node } }), ...(revision as object) }
   const element = NodeInspector({
     activeConnectorConnections: [],
     connectorAuthorizationPending: false,
@@ -36,7 +37,7 @@ function waitDefinition(node: unknown, revision: unknown, saveWait: ReturnType<t
     diagnostics: [],
     disabled: false,
     onChooseWaitNotification: vi.fn(),
-    revision: revision as never,
+    revision: view as never,
     selection: { id: 'wait', kind: 'wait', node } as never,
     store: { saveWait } as never,
     target: { kind: 'flow' },
@@ -54,7 +55,7 @@ describe('Wait Inspector', () => {
   it('saves a resolution change immediately', () => {
     const saveWait = vi.fn().mockResolvedValue(true)
     const definition = waitDefinition(
-      { actions: ['continue'], input: { handle: 'value', jsonSchema: {}, nullable: true }, inputs: {}, kind: 'wait', prompt: 'Continue?' },
+      { actions: ['continue'], input: { handle: 'value', jsonSchema: {}, nullable: true }, inputs: {}, kind: 'wait', name: 'Wait', prompt: 'Continue?' },
       {},
       saveWait,
     )
@@ -65,6 +66,7 @@ describe('Wait Inspector', () => {
 
     expect(saveWait).toHaveBeenCalledWith('wait', {
       actions: ['approve', 'reject'],
+      name: 'Wait',
       notification: undefined,
       prompt: 'Continue?',
     })
@@ -78,6 +80,7 @@ describe('Wait Inspector', () => {
       input: { handle: 'value', jsonSchema: {}, nullable: true },
       inputs: {},
       kind: 'wait',
+      name: 'Wait',
       notification: { inputs: {}, messageHandle: 'text', taskId: 'notify' },
       prompt: 'Continue?',
     }
@@ -100,8 +103,49 @@ describe('Wait Inspector', () => {
 
     expect(saveWait).toHaveBeenCalledWith('wait', {
       actions: ['continue'],
+      name: 'Wait',
       notification: undefined,
       prompt: 'Continue?',
     })
+  })
+})
+
+describe('Node name validation', () => {
+  it('marks a duplicate name invalid and prevents saving', () => {
+    const saveNodeSettings = vi.fn()
+    const node = { inputs: {}, kind: 'value', name: 'Review', values: [] }
+    const revision = {
+      graph: () => ({ nodes: { current: node, other: { inputs: {}, kind: 'value', name: 'Review', values: [] } } }),
+      inputSources: () => [],
+    }
+    const element = NodeInspector({
+      activeConnectorConnections: [],
+      connectorAuthorizationPending: false,
+      connectorLoading: false,
+      connectors: {} as never,
+      diagnostics: [],
+      disabled: false,
+      onChooseWaitNotification: vi.fn(),
+      revision: revision as never,
+      selection: { id: 'current', kind: 'value', node } as never,
+      store: { saveNodeSettings } as never,
+      target: { kind: 'flow' },
+      theme: 'light',
+      triggerAuthorizationPending: false,
+      triggerConnectionLoading: false,
+      triggers: {} as never,
+    })
+    const settings = find(element, (item) => typeof item.type == 'function' && item.type.name == 'GeneralSettings')
+    if (settings == null || typeof settings.type != 'function') throw new Error('Expected general settings.')
+    const rendered = (settings.type as (props: unknown) => ReactElement)(settings.props)
+    const input = find(rendered, (item) => (item.props as { readonly id?: string }).id == 'node-current-name')
+    const form = find(rendered, (item) => item.type == 'form')
+    const save = find(rendered, (item) => item.type != 'form' && (item.props as { readonly type?: string }).type == 'submit')
+
+    expect(input?.props).toMatchObject({ 'aria-invalid': true })
+    expect(save?.props).toMatchObject({ disabled: true })
+    if (form == null) throw new Error('Expected settings form.')
+    ;(form.props as { readonly onSubmit: (event: { preventDefault(): void }) => void }).onSubmit({ preventDefault() {} })
+    expect(saveNodeSettings).not.toHaveBeenCalled()
   })
 })

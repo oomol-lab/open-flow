@@ -15,6 +15,7 @@ import type { DesignerTarget, SubflowSettings, TaskSettings } from './flowChange
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
+import { nodeNameIssue } from '../../../../flow/common/change.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
@@ -50,6 +51,13 @@ export function inspectorIcon(node: ResolvedSelection | undefined, target: Desig
 
 function json(value: unknown): string {
   return JSON.stringify(value, null, 2)
+}
+
+function nodeNameError(revision: RevisionView, target: DesignerTarget, nodeId: string, name: string, t: TFunction): string | undefined {
+  const graph = revision.graph(target)
+  if (graph == null) return
+  const issue = nodeNameIssue(graph, nodeId, name)
+  return issue == null ? undefined : t(`inspector.node.${issue == 'empty' ? 'nameEmpty' : 'nameDuplicate'}`)
 }
 
 function arrayValue<Value extends readonly unknown[]>(value: string, label: string, t: TFunction): Value {
@@ -199,18 +207,23 @@ function GeneralSettings({
   disabled,
   node,
   nodeId,
+  revision,
   store,
+  target,
 }: {
   readonly disabled: boolean
   readonly node: ResolvedNode['node']
   readonly nodeId: string
+  readonly revision: RevisionView
   readonly store: WorkspaceStore
+  readonly target: DesignerTarget
 }): ReactElement {
   const t = useTranslate()
   const [name, setName] = useState(node.name ?? '')
   const [timeout, setTimeoutValue] = useState(node.timeoutMs == null ? '' : String(node.timeoutMs))
   const [error, setError] = useState<string>()
   const fieldIdPrefix = `node-${nodeId}`
+  const nameError = nodeNameError(revision, target, nodeId, name, t)
 
   useEffect(() => {
     setName(node.name ?? '')
@@ -231,6 +244,7 @@ function GeneralSettings({
         className="inspector-form inspector-disclosure-content"
         onSubmit={(event) => {
           event.preventDefault()
+          if (nameError != null) return
           const timeoutValue = timeout == '' ? undefined : Number(timeout)
           if (timeoutValue != null && (!Number.isInteger(timeoutValue) || timeoutValue < 1)) {
             setError(t('inspector.node.timeoutError'))
@@ -238,21 +252,23 @@ function GeneralSettings({
           }
           setError(undefined)
           void store.saveNodeSettings(nodeId, {
-            ...(name.trim() == '' ? {} : { name: name.trim() }),
+            name: name.trim(),
             ...(timeoutValue == null ? {} : { timeoutMs: timeoutValue }),
           })
         }}
       >
         <FieldGroup>
-          <Field>
+          <Field data-invalid={nameError != null}>
             <FieldLabel htmlFor={`${fieldIdPrefix}-name`}>{t('inspector.node.displayName')}</FieldLabel>
             <Input
               disabled={disabled}
+              aria-invalid={nameError != null}
               id={`${fieldIdPrefix}-name`}
               onChange={(event) => setName(event.target.value)}
               placeholder={t('inspector.node.displayNamePlaceholder')}
               value={name}
             />
+            {nameError != null && <FieldError>{nameError}</FieldError>}
           </Field>
           <div className="field-pair">
             <Field>
@@ -271,7 +287,7 @@ function GeneralSettings({
           {error != null && <FieldError>{error}</FieldError>}
         </FieldGroup>
         <div className="form-actions">
-          <Button disabled={disabled} size="sm" type="submit" variant="secondary">
+          <Button disabled={disabled || nameError != null} size="sm" type="submit" variant="secondary">
             {t('inspector.node.save')}
           </Button>
         </div>
@@ -452,6 +468,7 @@ function WaitDefinition({
   const [error, setError] = useState<string>()
   const [inputAttempted, setInputAttempted] = useState(false)
   const fieldIdPrefix = `wait-${selection.id}`
+  const nameError = nodeNameError(revision, { kind: 'flow' }, selection.id, name, t)
   const savedMode = node.actions.length == 1 ? 'continue' : 'approval'
   const notificationTask = notificationTaskId == '' ? undefined : revision.task(notificationTaskId)
   const notificationName = (connectorAction?.name ?? notificationTask?.name ?? '').replaceAll('_', ' ')
@@ -505,6 +522,7 @@ function WaitDefinition({
   useEffect(() => setInputsValid(inputDefinitions.length == 0), [inputDefinitions])
 
   const save = async (validateInputs = true, nextMode = mode, nextNotificationTaskId = notificationTaskId): Promise<boolean> => {
+    if (nameError != null) return false
     const value = prompt.trim()
     if (value.length == 0 || [...value].length > 1_000) {
       setError(t('inspector.wait.promptError'))
@@ -534,7 +552,7 @@ function WaitDefinition({
     setError(undefined)
     return await store.saveWait(selection.id, {
       actions: nextMode == 'continue' ? ['continue'] : ['approve', 'reject'],
-      ...(name.trim() == '' ? {} : { name: name.trim() }),
+      name: name.trim(),
       notification,
       prompt: value,
     })
@@ -559,9 +577,16 @@ function WaitDefinition({
         }}
       >
         <FieldGroup>
-          <Field>
+          <Field data-invalid={nameError != null}>
             <FieldLabel htmlFor={`${fieldIdPrefix}-name`}>{t('common.name')}</FieldLabel>
-            <Input disabled={disabled} id={`${fieldIdPrefix}-name`} onChange={(event) => setName(event.target.value)} value={name} />
+            <Input
+              aria-invalid={nameError != null}
+              disabled={disabled}
+              id={`${fieldIdPrefix}-name`}
+              onChange={(event) => setName(event.target.value)}
+              value={name}
+            />
+            {nameError != null && <FieldError>{nameError}</FieldError>}
           </Field>
           <Field>
             <FieldLabel htmlFor={`${fieldIdPrefix}-prompt`}>{t('inspector.wait.prompt')}</FieldLabel>
@@ -663,7 +688,7 @@ function WaitDefinition({
           {error != null && <FieldError>{error}</FieldError>}
         </FieldGroup>
         <div className="form-actions">
-          <Button disabled={disabled} size="sm" type="submit" variant="secondary">
+          <Button disabled={disabled || nameError != null} size="sm" type="submit" variant="secondary">
             {t('inspector.wait.save')}
           </Button>
         </div>
@@ -993,6 +1018,7 @@ function TriggerDefinition({
   connectionError,
   connectionLoading,
   disabled,
+  revision,
   selection,
   triggers,
 }: {
@@ -1002,6 +1028,7 @@ function TriggerDefinition({
   readonly connectionError?: string
   readonly connectionLoading: boolean
   readonly disabled: boolean
+  readonly revision: RevisionView
   readonly selection: Extract<ResolvedSelection, { readonly kind: 'trigger' }>
   readonly triggers: TriggerStore
 }): ReactElement {
@@ -1011,6 +1038,7 @@ function TriggerDefinition({
   const [description, setDescription] = useState(trigger.description ?? '')
   const providerTrigger = trigger.kind == 'poll' || trigger.kind == 'integration' ? trigger : undefined
   const fieldIdPrefix = `trigger-${selection.id}`
+  const nameError = nodeNameError(revision, { kind: 'flow' }, selection.id, name, t)
 
   useEffect(() => {
     setName(trigger.name)
@@ -1080,6 +1108,7 @@ function TriggerDefinition({
         data-inspector-section="trigger"
         onSubmit={(event) => {
           event.preventDefault()
+          if (nameError != null) return
           const common = { ...(description.trim() == '' ? {} : { description: description.trim() }), name: name.trim() }
           let settings: TriggerSettings
           switch (trigger.kind) {
@@ -1115,9 +1144,16 @@ function TriggerDefinition({
       >
         <h3>{t('inspector.trigger.title')}</h3>
         <FieldGroup>
-          <Field>
+          <Field data-invalid={nameError != null}>
             <FieldLabel htmlFor={`${fieldIdPrefix}-name`}>{t('common.name')}</FieldLabel>
-            <Input disabled={disabled} id={`${fieldIdPrefix}-name`} onChange={(event) => setName(event.target.value)} value={name} />
+            <Input
+              aria-invalid={nameError != null}
+              disabled={disabled}
+              id={`${fieldIdPrefix}-name`}
+              onChange={(event) => setName(event.target.value)}
+              value={name}
+            />
+            {nameError != null && <FieldError>{nameError}</FieldError>}
           </Field>
           <Field>
             <FieldLabel htmlFor={`${fieldIdPrefix}-description`}>{t('inspector.trigger.description')}</FieldLabel>
@@ -1125,7 +1161,7 @@ function TriggerDefinition({
           </Field>
         </FieldGroup>
         <div className="form-actions">
-          <Button disabled={disabled || name.trim() == ''} size="sm" type="submit" variant="secondary">
+          <Button disabled={disabled || nameError != null} size="sm" type="submit" variant="secondary">
             {t('inspector.trigger.save')}
           </Button>
         </div>
@@ -1235,6 +1271,7 @@ export function NodeInspector({
               connectionError={triggerConnectionError}
               connectionLoading={triggerConnectionLoading}
               disabled={disabled}
+              revision={revision}
               selection={selection}
               triggers={triggers}
             />
@@ -1256,7 +1293,7 @@ export function NodeInspector({
               store={store}
               theme={theme}
             >
-              <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
+              <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} revision={revision} store={store} target={target} />
             </TaskDefinition>
           ) : selection.kind == 'wait' ? (
             <WaitDefinition
@@ -1276,7 +1313,7 @@ export function NodeInspector({
               theme={theme}
             />
           ) : (
-            <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
+            <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} revision={revision} store={store} target={target} />
           )}
           {selection.kind == 'subflow' && (
             <section className="inspector-section">

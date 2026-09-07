@@ -319,6 +319,7 @@ export interface FlowDesignerViewProps {
   readonly onChangeNodeDescription?: (nodeId: string, description: string | undefined) => void
   readonly onChangeNodeIcon?: (nodeId: string, icon: string | undefined) => void
   readonly onChangeNodeTitle?: (nodeId: string, title: string | undefined) => void
+  readonly nodeTitleIssue?: (nodeId: string, title: string) => string | undefined
   readonly onChangeInput?: (nodeId: string, handle: string, value: unknown) => void
   readonly onChangeInputVariable?: (nodeId: string, handle: string, name: string | undefined) => void
   readonly onChangeTaskAdditionalInputs?: (nodeId: string, inputs: readonly FlowDesignerViewInput[]) => void
@@ -351,6 +352,7 @@ export interface ViewCallbacks {
   readonly onChangeNodeDescription: FlowDesignerViewProps['onChangeNodeDescription']
   readonly onChangeNodeIcon: FlowDesignerViewProps['onChangeNodeIcon']
   readonly onChangeNodeTitle: FlowDesignerViewProps['onChangeNodeTitle']
+  readonly nodeTitleIssue: FlowDesignerViewProps['nodeTitleIssue']
   readonly onChangeInput: FlowDesignerViewProps['onChangeInput']
   readonly onChangeInputVariable: FlowDesignerViewProps['onChangeInputVariable']
   readonly onChangeTaskAdditionalInputs: FlowDesignerViewProps['onChangeTaskAdditionalInputs']

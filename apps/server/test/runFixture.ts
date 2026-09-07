@@ -36,7 +36,7 @@ export async function storeRevision(
       ...Object.entries(revision.document.subflows).map(([subflowId, subflow]) => ({ kind: 'subflow.create' as const, subflow, subflowId })),
       ...Object.entries(revision.document.graph.nodes).map(([nodeId, node]) => ({
         kind: 'graph.node.create' as const,
-        node,
+        node: { ...node, name: node.name ?? nodeId },
         nodeId,
         target: { kind: 'flow' as const },
       })),

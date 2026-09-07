@@ -91,6 +91,7 @@ async function addMarker(service: ServerService, flowId: string, revisionId: str
       node: {
         inputs: {},
         kind: 'value',
+        name: 'Marker',
         values: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
       },
       nodeId: 'marker',

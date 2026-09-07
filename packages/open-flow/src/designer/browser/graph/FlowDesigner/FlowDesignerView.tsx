@@ -21,6 +21,7 @@ function callbacksFromProps(props: FlowDesignerViewProps): ViewCallbacks {
     onChangeNodeDescription: props.onChangeNodeDescription,
     onChangeNodeIcon: props.onChangeNodeIcon,
     onChangeNodeTitle: props.onChangeNodeTitle,
+    nodeTitleIssue: props.nodeTitleIssue,
     onChangeInput: props.onChangeInput,
     onChangeInputVariable: props.onChangeInputVariable,
     onChangeTaskAdditionalInputs: props.onChangeTaskAdditionalInputs,
