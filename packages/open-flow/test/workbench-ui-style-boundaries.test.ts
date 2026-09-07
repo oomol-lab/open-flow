@@ -60,6 +60,10 @@ function referencedTokens(source: string, prefix: string): string[] {
   return [...new Set([...source.matchAll(new RegExp(`var\\((${prefix}[\\w-]+)`, 'g'))].map((match) => match[1]!))].toSorted()
 }
 
+function normalizeLineEndings(source: string): string {
+  return source.replaceAll('\r\n', '\n')
+}
+
 function relativeLuminance(hex: string): number {
   const channels = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255)
   const [red, green, blue] = channels.map((channel) => (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4))
@@ -118,7 +122,7 @@ test('keeps Workbench feature styles in their original cascade order', async () 
   assert.match(runs, /\.run-drawer \{/)
   assert.match(publications, /\.publication-view \{/)
   assert.match(responsive, /@container open-flow-workbench/)
-  assert.equal(entry.trim(), workbenchStyleImports.join('\n'))
+  assert.equal(normalizeLineEndings(entry).trim(), workbenchStyleImports.join('\n'))
 })
 
 test('keeps Resource Browser primitives on shared visual ownership', async () => {

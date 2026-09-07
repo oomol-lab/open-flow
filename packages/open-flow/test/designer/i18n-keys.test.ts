@@ -86,7 +86,8 @@ describe.each(bundles)('$name translations', ({ locales, name, sources }) => {
 
     for await (const file of glob(sources)) {
       // The IconPicker carries its own bundle, so the designer scan leaves those keys to it.
-      if (name == 'designer' && file.includes(iconPickerPath)) continue
+      // glob 返回平台原生路径分隔符，先统一后再判断语言包边界。
+      if (name == 'designer' && file.replaceAll('\\', '/').includes(iconPickerPath)) continue
       const source = await readFile(file, 'utf8')
       for (const match of source.matchAll(keyPattern)) {
         const key = match[2]!
