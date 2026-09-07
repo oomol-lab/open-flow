@@ -5,12 +5,14 @@ import { onTestFinished } from 'vitest'
 import { ServerService } from '../node/service.ts'
 
 const scopes = new WeakMap<ServerService, Scope.Closeable>()
+const openServices = new Set<ServerService>()
 
 export async function openService(...args: Parameters<typeof ServerService.open>): Promise<ServerService> {
   const scope = await Effect.runPromise(Scope.make())
   try {
     const service = await Effect.runPromise(ServerService.open(...args).pipe(Scope.provide(scope)))
     scopes.set(service, scope)
+    openServices.add(service)
     onTestFinished(() => closeService(service))
     return service
   } catch (error) {
@@ -23,7 +25,12 @@ export async function closeService(service: ServerService): Promise<void> {
   const scope = scopes.get(service)
   if (scope == null) return
   scopes.delete(service)
+  openServices.delete(service)
   await Effect.runPromise(Scope.close(scope, Exit.void))
+}
+
+export async function closeOpenServices(): Promise<void> {
+  await Promise.all([...openServices].map(closeService))
 }
 
 export async function startService(service: ServerService): Promise<void> {

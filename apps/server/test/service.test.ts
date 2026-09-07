@@ -17,13 +17,14 @@ import { ServerService } from '../node/service.ts'
 import { Store } from '../node/store.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { acceptRun, storeRevision } from './runFixture.ts'
-import { closeService, openService, startService } from './serviceFixture.ts'
+import { closeOpenServices, closeService, openService, startService } from './serviceFixture.ts'
 
 const directories: string[] = []
 const execFileAsync = promisify(execFile)
 const port = { jsonSchema: {}, nullable: false } as const
 
 afterEach(async () => {
+  await closeOpenServices()
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { force: true, recursive: true })))
 })
 
