@@ -109,7 +109,7 @@ const host = {
       return Response.json({
         closureDigest: 'closure-1',
         diagnostics: [],
-        engineContract: 'open-flow-engine/v1',
+        engineContract: 'open-flow-engine/v2',
         flowId: 'flow-1',
         modelVersion: 1,
         revisionDigest: 'digest-revision-1',

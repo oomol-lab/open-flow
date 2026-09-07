@@ -18,6 +18,7 @@ export {
   deleteNodes,
   cleanVariableBindings,
   setConnectorConnection,
+  setCodeActions,
   setInputSources,
   setInputVariable,
   setInputValues,

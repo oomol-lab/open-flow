@@ -1,3 +1,4 @@
+import type { ConnectorCapability } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
 import type {
   ChangeOperation,
@@ -34,7 +35,7 @@ import {
   updateSettings,
 } from '../../../../flow/common/nodeChanges.ts'
 import { flowDependencies } from '../../../../flow/common/semantics.ts'
-import { generateTyping } from '../../../../manifest/common/meta/block/generateTyping.ts'
+import { generateTyping, typescriptOf } from '../../../../manifest/common/meta/block/generateTyping.ts'
 
 export type DesignerTarget = { readonly kind: 'flow' } | { readonly id: string; readonly kind: 'subflow' }
 
@@ -77,12 +78,39 @@ export type TaskSettings =
 
 export type CodeTaskPorts = Pick<TaskDefinition, 'inputs' | 'outputs'>
 
-export function codeTyping(ports: CodeTaskPorts): string {
-  return generateTyping(
+export function codeTyping(
+  ports: CodeTaskPorts,
+  capabilities: readonly ConnectorCapability[] = [],
+  catalog: Readonly<Record<string, ConnectorAction>> = {},
+): string {
+  const typing = generateTyping(
     'javascript',
     ports.inputs.flatMap((port) => ('handle' in port ? [{ handle: port.handle, json_schema: port.jsonSchema, nullable: port.nullable }] : [])),
     ports.outputs.flatMap((port) => ('handle' in port ? [{ handle: port.handle, json_schema: port.jsonSchema, nullable: port.nullable }] : [])),
   )
+  const fields: string[] = []
+  const providers = new Map<string, string[]>()
+  for (const declaration of capabilities) {
+    const definition = catalog[declaration.action]
+    const input = definition?.inputSchema == null ? 'Record<string, unknown>' : typescriptOf(definition.inputSchema, false)
+    const output = definition?.outputSchema == null ? 'unknown' : typescriptOf(definition.outputSchema, false)
+    const ids = declaration.connections.map((connection) => JSON.stringify(connection.connectionId)).join(' | ') || 'never'
+    const aliases = declaration.connections.flatMap((connection) => (connection.alias == null ? [] : [JSON.stringify(connection.alias)])).join(' | ') || 'never'
+    const options = `{ connectionId: ${ids}; connectionAlias?: never } | { connectionAlias: ${aliases}; connectionId?: never }`
+    const required = declaration.connections.length > 0 && declaration.connectionId == null
+    const args = required
+      ? `[input: {} extends ${input} ? ${input} | undefined : ${input}, options: ${options}]`
+      : `{} extends ${input} ? [input?: ${input}, options?: ${options}] : [input: ${input}, options?: ${options}]`
+    const signature = `(...args: ${args}) => Promise<${output}>`
+    fields.push(`${JSON.stringify(declaration.action)}: ${signature}`)
+    const separator = declaration.action.indexOf('.')
+    const provider = declaration.action.slice(0, separator)
+    const methods = providers.get(provider) ?? []
+    methods.push(`${JSON.stringify(declaration.action.slice(separator + 1))}: ${signature}`)
+    providers.set(provider, methods)
+  }
+  for (const [provider, methods] of providers) fields.push(`${JSON.stringify(provider)}: { ${methods.join('; ')} }`)
+  return `${typing}/** @typedef {import("@oomol-lab/open-flow").TaskContext<{ ${fields.join('; ').replaceAll('*/', '*\\/')} }>} TaskContext */\n`
 }
 
 export interface SubflowSettings {

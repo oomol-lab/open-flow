@@ -82,7 +82,7 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
           language: 'javascript',
           readOnly: disabledRef.current,
           value: valueRef.current,
-          wordWrap: 'off',
+          wordWrap: 'on',
         })
       })
       .then((created) => {

@@ -5,7 +5,7 @@ type Outputs = {}
 
 import type { TaskContext } from '@oomol-lab/open-flow'
 
-export default async function (_params: Inputs, _context: TaskContext<Outputs>): Promise<Partial<Outputs> | undefined | void> {
+export default async function (_params: Inputs, _context: TaskContext): Promise<Partial<Outputs> | undefined | void> {
   // Add task logic here.
   // return { output: "output_value" };
 }

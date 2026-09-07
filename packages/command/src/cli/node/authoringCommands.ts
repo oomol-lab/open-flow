@@ -466,6 +466,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
               node.name,
               { imports: await moduleImports(code), source: code },
               {
+                ...(node.capabilities == null ? {} : { capabilities: node.capabilities }),
                 inputs: Object.entries(node.inputs ?? { value: { jsonSchema: {}, nullable: true, value: null } }).map(([handle, port]) =>
                   Object.assign({ handle }, port),
                 ),

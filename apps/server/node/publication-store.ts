@@ -381,6 +381,19 @@ export class PublicationStore {
     })
   }
 
+  replayPublication(
+    flowId: string,
+    idempotencyKey: string,
+    requestDigest: string,
+  ): Extract<PublicationAcceptance, { readonly kind: 'published' }> | { readonly kind: 'conflict' } | undefined {
+    const existing = this.#database
+      .prepare('SELECT publication_id AS publicationId, request_digest AS requestDigest FROM publications WHERE flow_id = ? AND idempotency_key = ?')
+      .get(flowId, idempotencyKey) as { readonly publicationId: string; readonly requestDigest: string } | undefined
+    if (existing == null) return
+    if (existing.requestDigest != requestDigest) return { kind: 'conflict' }
+    return { created: false, kind: 'published', publicationId: existing.publicationId }
+  }
+
   publish(input: {
     readonly closureDigest: string
     readonly content: string
@@ -424,11 +437,9 @@ export class PublicationStore {
     readonly webhooks: readonly { readonly triggerJson: string; readonly triggerNodeId: string }[]
   }): PublicationAcceptance {
     return this.#transaction(() => {
-      const existing = this.#database
-        .prepare('SELECT publication_id AS publicationId, request_digest AS requestDigest FROM publications WHERE flow_id = ? AND idempotency_key = ?')
-        .get(input.flowId, input.idempotencyKey) as { readonly publicationId: string; readonly requestDigest: string } | undefined
+      const existing = this.replayPublication(input.flowId, input.idempotencyKey, input.requestDigest)
       if (existing != null) {
-        if (existing.requestDigest != input.requestDigest) return { kind: 'conflict' }
+        if (existing.kind == 'conflict') return existing
         if (input.operationId != null) {
           this.#database
             .prepare(
@@ -437,7 +448,7 @@ export class PublicationStore {
             )
             .run(existing.publicationId, input.publishedAt, input.operationId)
         }
-        return { created: false, kind: 'published', publicationId: existing.publicationId }
+        return existing
       }
 
       if (input.operationId != null) {

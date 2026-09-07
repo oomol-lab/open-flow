@@ -12,6 +12,7 @@ import type {
 } from '@oomol-lab/open-flow/control-api'
 import type {
   CodeModule,
+  ConnectorCapability,
   GraphNode,
   InputPort,
   InputPortDefinition,
@@ -23,7 +24,7 @@ import type {
 import type { UiLanguage } from '@oomol-lab/open-flow/localization'
 
 import { ApiError, ControlClient } from '@oomol-lab/open-flow/control-api'
-import { resourceNameIssue, resourceNameMaxLength } from '@oomol-lab/open-flow/flow-change'
+import { decodeConnectorCapabilities, resourceNameIssue, resourceNameMaxLength } from '@oomol-lab/open-flow/flow-change'
 import { runStatuses as runStatusValues } from '@oomol-lab/open-flow/run-lifecycle'
 
 export interface CommandHost {
@@ -83,6 +84,7 @@ type ApplyNode =
       readonly name?: string
     }
   | {
+      readonly capabilities?: readonly ConnectorCapability[]
       readonly code: string
       readonly inputs?: Readonly<Record<string, InputPortDefinition>>
       readonly kind: 'code'
@@ -754,10 +756,19 @@ export function applySpec(source: string): ApplySpec {
           ] as const
         }
         case 'code': {
-          applyKeys(node, ['code', 'inputs', 'kind', 'name', 'outputs'], `nodes.${reference}`)
+          applyKeys(node, ['capabilities', 'code', 'inputs', 'kind', 'name', 'outputs'], `nodes.${reference}`)
+          let capabilities: readonly ConnectorCapability[] | undefined
+          if (Object.hasOwn(node, 'capabilities')) {
+            try {
+              capabilities = decodeConnectorCapabilities(node.capabilities)
+            } catch (error) {
+              throw new CliError('flow.apply-invalid', `nodes.${reference}.capabilities: ${error instanceof Error ? error.message : String(error)}`)
+            }
+          }
           return [
             reference,
             {
+              ...(capabilities == null ? {} : { capabilities }),
               code: applyString(node.code, `nodes.${reference}.code`),
               ...(node.inputs == null ? {} : { inputs: applyPortDefinitions(node.inputs, `nodes.${reference}.inputs`, true) }),
               kind,

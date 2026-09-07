@@ -331,6 +331,22 @@ export class ConnectorStore {
     }
   }
 
+  public async loadCodeConnections(serviceId: string, signal: AbortSignal): Promise<void> {
+    const flowId = this.#workspace.$.flowId.value
+    if (flowId == null || this.#disposed) return
+    const connections = await this.#client.listConnectorConnections(serviceId, signal, flowId)
+    if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
+    this.#set({ catalogs: { ...this.#state.value.catalogs, [serviceId]: connectionCatalog(connections) } })
+  }
+
+  public async loadCodeAction(actionId: string, signal: AbortSignal): Promise<void> {
+    const flowId = this.#workspace.$.flowId.value
+    if (flowId == null || this.#disposed) return
+    const action = await this.#client.getConnectorAction(actionId, signal, flowId)
+    if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
+    this.#set({ actions: { ...this.#state.value.actions, [actionId]: action } })
+  }
+
   public async connect(serviceId: string): Promise<void> {
     if (this.#disposed) return
     const flowId = this.#workspace.$.flowId.value

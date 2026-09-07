@@ -91,7 +91,7 @@ function genJavaScript(
 }
 
 export function typescriptOf(schema: any, nullable: boolean | undefined): string {
-  if (!schema) return 'any'
+  if (!schema) return 'unknown'
 
   switch (schema.contentMediaType) {
     case 'oomol/bin':
@@ -107,12 +107,12 @@ export function typescriptOf(schema: any, nullable: boolean | undefined): string
 
   if (Array.isArray(schema.anyOf)) {
     const a = nullable ? schema.anyOf.concat({ type: 'null' }) : schema.anyOf
-    return union(a.map((s: any) => quote(typescriptOf(s, false)))) || 'any'
+    return union(a.map((s: any) => quote(typescriptOf(s, false)))) || 'unknown'
   }
 
   if (Array.isArray(schema.enum)) {
     const a = nullable ? schema.enum.concat(null) : schema.enum
-    return union(a.map((s: string) => JSON.stringify(s))) || 'any'
+    return union(a.map((s: string) => JSON.stringify(s))) || 'unknown'
   }
 
   switch (schema.type) {
@@ -127,9 +127,9 @@ export function typescriptOf(schema: any, nullable: boolean | undefined): string
       return nullable ? 'string | null' : 'string'
     case 'object': {
       const keys = Object.keys(schema.properties || {})
-      if (keys.length === 0) return 'Record<string, any>'
-      const r = Array.isArray(schema?.required) ? new Set(schema.required) : undefined
-      const s = `{ ${keys.map((k) => `${k}${r && !r.has(k) ? '?' : ''}: ${typescriptOf(schema.properties[k], false)}`).join('; ')} }`
+      if (keys.length === 0) return 'Record<string, unknown>'
+      const r = Array.isArray(schema?.required) ? new Set(schema.required) : new Set()
+      const s = `{ ${keys.map((k) => `${JSON.stringify(k)}${!r.has(k) ? '?' : ''}: ${typescriptOf(schema.properties[k], false)}`).join('; ')} }`
       return nullable ? `${s} | null` : s
     }
     case 'array': {
@@ -142,14 +142,14 @@ export function typescriptOf(schema: any, nullable: boolean | undefined): string
       }
     }
     default:
-      return 'any'
+      return 'unknown'
   }
 }
 
 function union(types: string[]): string {
   const unique = Array.from(new Set(types.filter((x) => !!x)))
-  if (unique.length === 0 || unique.includes('any')) {
-    return 'any'
+  if (unique.length === 0 || unique.includes('unknown')) {
+    return 'unknown'
   }
   return unique.join(' | ')
 }

@@ -1329,7 +1329,7 @@ describe('Server application service', () => {
     const unavailable = await openService(await databaseFile())
     const stored = await storeRevision(unavailable, llmFlow(), 'llm-check-unavailable')
 
-    expect(await unavailable.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v1')).toMatchObject({
+    expect(await unavailable.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v2')).toMatchObject({
       diagnostics: [
         {
           code: 'llm.unconfigured',
@@ -1346,7 +1346,7 @@ describe('Server application service', () => {
     })
     const configuredStored = await storeRevision(configured, llmFlow(), 'llm-check-configured')
 
-    expect(await configured.control.checkFlow(configuredStored.flowId, configuredStored.revisionId, 'open-flow-engine/v1')).toMatchObject({
+    expect(await configured.control.checkFlow(configuredStored.flowId, configuredStored.revisionId, 'open-flow-engine/v2')).toMatchObject({
       diagnostics: [],
       valid: true,
     })
@@ -1357,9 +1357,9 @@ describe('Server application service', () => {
     const service = await openService(await databaseFile(), { capabilities: { llm: () => llm }, clock: Date.now })
     const stored = await storeRevision(service, llmFlow(), 'llm-current')
 
-    expect(await service.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v1')).toMatchObject({ valid: false })
+    expect(await service.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v2')).toMatchObject({ valid: false })
     llm = async () => ({ kind: 'completed', value: { answer: 'current' }, version: 1 })
-    expect(await service.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v1')).toMatchObject({ diagnostics: [], valid: true })
+    expect(await service.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v2')).toMatchObject({ diagnostics: [], valid: true })
 
     await startService(service)
     const accepted = await acceptRun(service, { flowId: 'main', idempotencyKey: 'llm-current', revision: llmFlow(), revisionId: 'llm-current' })
@@ -1405,7 +1405,7 @@ describe('Server application service', () => {
       'llm-check-unreferenced',
     )
 
-    expect(await unavailable.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v1')).toMatchObject({
+    expect(await unavailable.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v2')).toMatchObject({
       diagnostics: [],
       valid: true,
     })

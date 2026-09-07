@@ -170,7 +170,11 @@ export function canonicalTask(task: FlowDocument['tasks'][string]): JsonValue {
 
 function canonicalInlineTask(task: InlineTaskDefinition): JsonValue {
   return {
-    ...(task.capabilities == null ? {} : { capabilities: task.capabilities.map(({ action, connectionId, kind }) => ({ action, connectionId, kind })) }),
+    ...(task.capabilities == null
+      ? {}
+      : {
+          capabilities: task.capabilities as unknown as JsonValue,
+        }),
     inputs: canonicalPorts(task.inputs),
     moduleId: task.moduleId,
     name: task.name,

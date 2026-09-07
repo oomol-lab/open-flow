@@ -32,10 +32,10 @@ import type { StoredTriggerActivity, StoredTriggerBinding } from './trigger-stor
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { applyFlowChanges, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
 import { canonicalJsonBytes, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
-import { flowClosure, prepareFlow, validateFlow, validateFlowInputs, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
+import { codeActions, flowClosure, prepareFlow, validateFlow, validateFlowInputs, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { randomUUID } from 'node:crypto'
-import { ConnectorTaskError } from './connector.ts'
+import { checkCodeActions, ConnectorTaskError } from './connector.ts'
 import { AcceptanceError, ControlError, serverErrorCode } from './error.ts'
 import { Store } from './store.ts'
 
@@ -601,6 +601,7 @@ export class ControlService {
     if (Object.values(fixed.flow.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) && this.resolveWaitPublicOrigin() == null) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
     }
+    await checkCodeActions(codeActions(fixed.flow), this.resolveConnector(), this.store.connectorTeam(flowId))
     if (validateFlowInputs(content, inputs) != 'valid') throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
     const accepted = this.store.acceptControlRun({
       closureDigest: fixed.flow.closureDigest,
@@ -680,6 +681,7 @@ export class ControlService {
     if (fixed.flow.closureDigest != livePublication.closureDigest || content.modelVersion != livePublication.modelVersion) {
       throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Flow does not match the Publication.')
     }
+    await checkCodeActions(codeActions(fixed.flow), this.resolveConnector(), this.store.connectorTeam(flowId))
     const accepted = this.store.acceptLiveControlRun({
       closureDigest: livePublication.closureDigest,
       expectedPublicationId: livePublication.publicationId,

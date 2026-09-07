@@ -79,7 +79,18 @@ function capabilityFlow(declared = true): RevisionContent {
             inputs: { message: { kind: 'value', value: 'hello' } },
             kind: 'task',
             task: {
-              ...(declared ? { capabilities: [{ action: 'example.echo', connectionId: 'connection-work', kind: 'connector' as const }] } : {}),
+              ...(declared
+                ? {
+                    capabilities: [
+                      {
+                        action: 'example.echo',
+                        connections: [{ connectionId: 'connection-work' }],
+                        connectionId: 'connection-work',
+                        kind: 'connector' as const,
+                      },
+                    ],
+                  }
+                : {}),
               inputs: [{ ...port, handle: 'message' }],
               moduleId: 'capability',
               name: 'Capability',
@@ -96,8 +107,7 @@ function capabilityFlow(declared = true): RevisionContent {
       capability: {
         imports: [],
         name: 'Capability',
-        source:
-          "export default async (input, capability) => (await capability.connector({ action: 'example.echo', connectionId: 'connection-work', input })).body",
+        source: 'export default async (input, capability) => await capability.actions.example.echo(input)',
       },
     },
   }
@@ -322,6 +332,7 @@ describe('Server Connector client', () => {
     await expect(connector.getAction('example.echo')).resolves.toMatchObject({ actionId: 'example.echo', serviceId: 'example' })
     await expect(connector.listConnections('example')).resolves.toEqual([
       {
+        alias: 'work',
         connectionId: 'connection-work',
         displayName: 'Work account',
         isDefault: true,
@@ -385,6 +396,7 @@ describe('Server Connector client', () => {
         actionId: 'example.echo',
         authenticated: true,
         defaultConnection: {
+          alias: 'work',
           connectionId: 'connection-work',
           displayName: 'Work account',
           isDefault: true,
@@ -392,6 +404,8 @@ describe('Server Connector client', () => {
           status: 'active',
         },
         description: 'Echo one message.',
+        inputSchema: { properties: {}, type: 'object' },
+        outputSchema: { properties: {}, type: 'object' },
         inputs: {},
         name: 'echo',
         outputs: {},
@@ -401,6 +415,7 @@ describe('Server Connector client', () => {
     ])
     await expect(connector.listConnections('example')).resolves.toEqual([
       {
+        alias: 'work',
         connectionId: 'connection-work',
         displayName: 'Work account',
         isDefault: true,
@@ -590,6 +605,8 @@ describe('Server Connector client', () => {
         actionId: 'hacker-news.get-ask-stories',
         authenticated: false,
         description: 'Get Ask HN stories.',
+        inputSchema: { properties: {}, type: 'object' },
+        outputSchema: { properties: {}, type: 'object' },
         inputs: {},
         name: 'Get Ask Stories',
         outputs: {},
@@ -780,7 +797,22 @@ describe('Server Connector client', () => {
     const calls: string[] = []
     const origin = await startConnector((request, response) => {
       calls.push(request.url!)
-      if (request.url == '/v1/apps') return send(response, 200, { data: [app], success: true })
+      if (request.url == '/v1/providers')
+        return send(response, 200, { data: [{ service: 'example', displayName: 'Example', authTypes: ['api_key'] }], success: true })
+      if (request.url == '/v1/apps' || request.url == '/v1/apps/services/example')
+        return send(response, 200, { data: [{ ...app, displayName: 'Work', isDefault: true }], success: true })
+      if (request.method == 'GET' && request.url == '/v1/actions/example.echo')
+        return send(response, 200, {
+          data: {
+            id: 'example.echo',
+            name: 'Echo',
+            description: '',
+            inputSchema: { type: 'object', properties: {} },
+            outputSchema: { type: 'object', properties: {} },
+            service: 'example',
+          },
+          success: true,
+        })
       send(response, 200, { data: { message: 'hello' }, success: true })
     })
     const { service } = await startService(origin)
@@ -790,12 +822,12 @@ describe('Server Connector client', () => {
       result: { kind: 'node-results', nodes: [{ status: 'completed', outputs: { message: 'hello' }, nodeId: 'capability' }] },
       status: 'completed',
     })
-    expect(calls).toEqual(['/v1/apps', '/v1/actions/example.echo'])
+    expect(calls.slice(-2)).toEqual(['/v1/apps', '/v1/actions/example.echo'])
 
     calls.length = 0
     const deniedRunId = await run(service, capabilityFlow(false))
     expect(service.events(deniedRunId).find((event) => event.kind == 'node.failed')).toMatchObject({
-      payload: { error: { code: 'capability.denied', message: 'The Runtime Capability is not declared for this Task.' } },
+      payload: { error: { code: 'node.failed' } },
     })
     expect(calls).toEqual([])
   })

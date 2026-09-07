@@ -16,7 +16,7 @@ afterAll(async () => await host.close())
 
 function program(source: string): RuntimeProgram {
   return {
-    engineContract: 'open-flow-engine/v1',
+    engineContract: 'open-flow-engine/v2',
     engineDigest: isolatedVmEngineDigest,
     entryModuleId: 'main',
     modules: { main: { imports: [], source } },
@@ -40,6 +40,137 @@ async function executorPid(): Promise<number> {
 }
 
 describe('isolated-vm runtime conformance', () => {
+  it('preserves catchable Action codes and does not let a caught error replace a later failure', async () => {
+    const invocation = {
+      capabilities: [{ kind: 'connector' as const, action: 'example.echo', connections: [] }],
+      capability: async () => {
+        throw Object.assign(new Error('Try again.'), { code: 'connector.unavailable' })
+      },
+      input: null,
+      invocationId: 'caught-action',
+    }
+    await expect(
+      host.invoke({
+        ...invocation,
+        program: program(`export default async (_, context) => {
+      try { await context.actions.example.echo({}) } catch (error) { return { code: error.code } }
+    }`),
+      }),
+    ).resolves.toEqual({ code: 'connector.unavailable' })
+    await expect(
+      host.invoke({
+        ...invocation,
+        program: program(`export default async (_, context) => {
+      try { await context.actions.example.echo({}) } catch {}
+      throw new Error('A different failure.')
+    }`),
+      }),
+    ).rejects.toMatchObject({ code: 'task-failed', message: expect.stringContaining('A different failure.') })
+  })
+
+  it('cannot turn a capability limit into success by catching the Action error', async () => {
+    await expect(
+      host.invoke(
+        {
+          capabilities: [{ kind: 'connector', action: 'example.echo', connections: [] }],
+          capability: async () => ({ body: null, status: 200 }),
+          input: null,
+          invocationId: 'caught-limit',
+          program: program(`export default async (_, context) => {
+        try { await context.actions.example.echo({}); await context.actions.example.echo({}) } catch {}
+        return { recovered: true }
+      }`),
+        },
+        { ...isolatedVmLimits, maxCapabilityCalls: 1 },
+      ),
+    ).rejects.toMatchObject({ code: 'limit-exceeded' })
+  })
+
+  it('treats omitted Action input as an empty object for both call forms', async () => {
+    const seen: unknown[] = []
+    await expect(
+      host.invoke({
+        capabilities: [{ kind: 'connector', action: 'example.echo', connections: [] }],
+        capability: async ({ payload }) => {
+          seen.push(payload)
+          return { body: 'ok', status: 200 }
+        },
+        input: null,
+        invocationId: 'omitted-action-input',
+        program: program(`export default async (_, context) => [
+        await context.actions.example.echo(),
+        await context.actions['example.echo'](),
+        await context.actions.example.echo(undefined)
+      ]`),
+      }),
+    ).resolves.toEqual(['ok', 'ok', 'ok'])
+    expect(seen).toEqual(Array.from({ length: 3 }, () => ({ action: 'example.echo', input: {} })))
+  })
+
+  it('rejects lossy JSON Action parameters before host dispatch', async () => {
+    let calls = 0
+    await expect(
+      host.invoke({
+        capabilities: [{ kind: 'connector', action: 'example.echo', connections: [] }],
+        capability: async () => {
+          calls++
+          return { body: null, status: 200 }
+        },
+        input: null,
+        invocationId: 'invalid-json',
+        program: program(`export default async (_, context) => {
+        const circular = {}; circular.self = circular
+        const results = []
+        for (const value of [{ value: undefined }, { value: NaN }, { value: () => 1 }, { value: 1n }, circular, { value: new Date() }]) {
+          try { await context.actions.example.echo(value) } catch (error) { results.push(error.code) }
+        }
+        return results
+      }`),
+      }),
+    ).resolves.toEqual(Array.from({ length: 6 }, () => 'capability.invalid'))
+    expect(calls).toBe(0)
+  })
+
+  it('aborts an unawaited Action when its node finishes', async () => {
+    let aborted = false
+    await expect(
+      host.invoke({
+        capabilities: [{ kind: 'connector', action: 'example.echo', connections: [] }],
+        capability: async ({ signal }) =>
+          await new Promise((resolve) => {
+            signal.addEventListener(
+              'abort',
+              () => {
+                aborted = true
+                resolve({ body: null, status: 200 })
+              },
+              { once: true },
+            )
+          }),
+        input: null,
+        invocationId: 'unawaited-action',
+        program: program(`export default async (_, context) => {
+        void context.actions.example.echo({})
+        await new Promise(resolve => setTimeout(resolve, 20))
+        return null
+      }`),
+      }),
+    ).resolves.toBeNull()
+    expect(aborted).toBe(true)
+  })
+
+  it('rejects the replaced Engine contract and removes the old connector method', async () => {
+    await expect(
+      host.invoke({
+        capability: async () => ({ body: null, status: 200 }),
+        input: null,
+        invocationId: 'old-engine',
+        program: { ...program('export default () => null'), engineContract: 'open-flow-engine/v1' },
+      }),
+    ).rejects.toMatchObject({ code: 'invalid-program' })
+    await expect(invoke('export default (_, context) => typeof context.connector')).resolves.toBe('undefined')
+  })
+
   for (const conformance of runtimeConformanceCases) {
     it(conformance.name, async () => await conformance.verify(harness))
   }
@@ -210,13 +341,13 @@ describe('isolated-vm runtime conformance', () => {
           input: null,
           invocationId: 'capability-count-limit',
           program: program(`export default async (_input, capability) => {
-  await capability.connector({ call: 1 })
-  return await capability.connector({ call: 2 })
+  await capability.artifact.put({ call: 1 })
+  return await capability.artifact.put({ call: 2 })
 }`),
         },
         { ...isolatedVmLimits, maxCapabilityCalls: 1 },
       ),
-    ).rejects.toMatchObject({ code: 'task-failed' })
+    ).rejects.toMatchObject({ code: 'limit-exceeded' })
     expect(calls).toBe(1)
 
     await expect(
@@ -225,11 +356,11 @@ describe('isolated-vm runtime conformance', () => {
           capability: async () => ({ body: 'x'.repeat(256), status: 200 }),
           input: null,
           invocationId: 'capability-response-limit',
-          program: program('export default async (_input, capability) => capability.connector({})'),
+          program: program('export default async (_input, capability) => capability.artifact.put({})'),
         },
         { ...isolatedVmLimits, maxCapabilityResponseBytes: 64 },
       ),
-    ).rejects.toMatchObject({ code: 'task-failed' })
+    ).rejects.toMatchObject({ code: 'limit-exceeded' })
   })
 
   it('enforces the wall-clock and isolate memory limits', async () => {
@@ -277,7 +408,7 @@ describe('isolated-vm runtime conformance', () => {
       program: program(
         `export default async (input, capability) => {
   globalThis.count = (globalThis.count ?? 0) + 1
-  return { count: globalThis.count, response: await capability.connector(input) }
+  return { count: globalThis.count, response: await capability.artifact.put(input) }
 }`,
       ),
     })
@@ -288,7 +419,7 @@ describe('isolated-vm runtime conformance', () => {
       program: program(
         `export default async (input, capability) => {
   globalThis.count = (globalThis.count ?? 0) + 1
-  return { count: globalThis.count, response: await capability.connector(input) }
+  return { count: globalThis.count, response: await capability.artifact.put(input) }
 }`,
       ),
     })
@@ -312,14 +443,14 @@ describe('isolated-vm runtime conformance', () => {
       },
       input: null,
       invocationId: 'concurrent-canceled',
-      program: program(`export default async (_input, capability) => capability.connector({ wait: true })`),
+      program: program(`export default async (_input, capability) => capability.artifact.put({ wait: true })`),
       signal: cancellation.signal,
     })
     const completed = host.invoke({
       capability: async () => ({ body: 'completed', status: 200 }),
       input: null,
       invocationId: 'concurrent-completed',
-      program: program(`export default async (_input, capability) => capability.connector({ wait: false })`),
+      program: program(`export default async (_input, capability) => capability.artifact.put({ wait: false })`),
     })
 
     await started
@@ -341,7 +472,7 @@ describe('isolated-vm runtime conformance', () => {
       },
       input: null,
       invocationId: 'closed-pending',
-      program: program('export default async (_input, capability) => capability.connector({})'),
+      program: program('export default async (_input, capability) => capability.artifact.put({})'),
     })
     await started
     const rejected = expect(pending).rejects.toMatchObject({ code: 'canceled' })
@@ -371,7 +502,7 @@ describe('isolated-vm runtime conformance', () => {
       },
       input: null,
       invocationId: 'executor-loss',
-      program: program('export default async (_input, capability) => capability.connector({})'),
+      program: program('export default async (_input, capability) => capability.artifact.put({})'),
     })
     await started
     const crashed = expect(pending).rejects.toMatchObject({ code: 'executor-crashed' })

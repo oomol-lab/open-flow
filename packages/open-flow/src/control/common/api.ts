@@ -110,6 +110,7 @@ export interface PollTriggerTestResult {
 }
 
 export interface ConnectorConnection {
+  readonly alias?: string
   readonly connectionId: string
   readonly displayName: string
   readonly isDefault: boolean
@@ -118,6 +119,8 @@ export interface ConnectorConnection {
 }
 
 export interface ConnectorAction {
+  readonly inputSchema?: JsonValue
+  readonly outputSchema?: JsonValue
   readonly actionId: string
   readonly authenticated: boolean
   readonly defaultConnection?: ConnectorConnection
@@ -401,11 +404,12 @@ function jsonValue(value: unknown): JsonValue {
 
 function connection(value: unknown): ConnectorConnection {
   const source = record(value)
-  exact(source, ['connectionId', 'displayName', 'isDefault', 'serviceId', 'status'])
+  exact(source, [...(Object.hasOwn(source, 'alias') ? ['alias'] : []), 'connectionId', 'displayName', 'isDefault', 'serviceId', 'status'])
   const status = source.status
   if (status != 'active' && status != 'disconnected' && status != 'error' && status != 'reauth_required') return invalidResponse()
   if (typeof source.isDefault != 'boolean') return invalidResponse()
   return {
+    ...(source.alias === undefined ? {} : { alias: string(source.alias) }),
     connectionId: string(source.connectionId),
     displayName: string(source.displayName),
     isDefault: source.isDefault,
@@ -444,6 +448,8 @@ function connectorAction(value: unknown): ConnectorAction {
   const hasConnection = source.defaultConnection != null
   exact(source, [
     'actionId',
+    ...(Object.hasOwn(source, 'inputSchema') ? ['inputSchema'] : []),
+    ...(Object.hasOwn(source, 'outputSchema') ? ['outputSchema'] : []),
     'authenticated',
     ...(hasConnection ? ['defaultConnection'] : []),
     'description',
@@ -457,6 +463,8 @@ function connectorAction(value: unknown): ConnectorAction {
   ])
   if ((homepageUrl != null && typeof homepageUrl != 'string') || (icon != null && typeof icon != 'string')) return invalidResponse()
   const result: ConnectorAction = {
+    ...(source.inputSchema === undefined ? {} : { inputSchema: jsonValue(source.inputSchema) }),
+    ...(source.outputSchema === undefined ? {} : { outputSchema: jsonValue(source.outputSchema) }),
     actionId: string(source.actionId),
     authenticated: typeof source.authenticated == 'boolean' ? source.authenticated : invalidResponse(),
     ...(hasConnection ? { defaultConnection: connection(source.defaultConnection) } : {}),
@@ -1320,7 +1328,7 @@ export class ControlClient {
   async checkFlow(flowId: string, revisionId: string): Promise<FlowCheck> {
     return flowCheck(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/check`, {
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v1', version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v2', version: 1 }),
         method: 'POST',
       }),
     )
@@ -1346,7 +1354,7 @@ export class ControlClient {
   async createDraftRun(flowId: string, revisionId: string, options: RunOptions = {}): Promise<DraftRun> {
     const created = runDetails(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/runs`, {
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v1', inputs: options.inputs ?? {}, version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v2', inputs: options.inputs ?? {}, version: 1 }),
         headers: { 'idempotency-key': options.idempotencyKey ?? operationKey('run') },
         method: 'POST',
       }),
@@ -1368,7 +1376,7 @@ export class ControlClient {
   async publishFlow(flowId: string, revisionId: string, expectedLivePublicationId: string | null, options: PublicationOptions = {}): Promise<PublishOperation> {
     return publishOperation(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/publications`, {
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v1', expectedLivePublicationId, version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v2', expectedLivePublicationId, version: 1 }),
         headers: { 'idempotency-key': options.idempotencyKey ?? operationKey('publication') },
         method: 'POST',
       }),

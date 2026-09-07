@@ -14,7 +14,7 @@ let invocationId = 0
 
 function program(source) {
   return {
-    engineContract: 'open-flow-engine/v1',
+    engineContract: 'open-flow-engine/v2',
     engineDigest: isolatedVmEngineDigest,
     entryModuleId: 'main',
     modules: { main: { imports: [], source } },
@@ -125,7 +125,7 @@ if (typeof IsolatedVmHost.prototype.run == 'function') {
   const output = { handle: 'value', jsonSchema: {}, nullable: false }
   const prepared = {
     closureDigest: 'runtime-benchmark',
-    engineContract: 'open-flow-engine/v1',
+    engineContract: 'open-flow-engine/v2',
     graph: {
       edges: [],
       nodes: {

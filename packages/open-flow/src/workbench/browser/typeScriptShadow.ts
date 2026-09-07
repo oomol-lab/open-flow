@@ -15,21 +15,25 @@ function directFunction(file: ts.SourceFile): readonly [number, ts.FunctionLikeD
   }
 }
 
-function functionTyping(node: ts.FunctionLikeDeclaration): string | undefined {
+function functionTyping(node: ts.FunctionLikeDeclaration, typing: string): string | undefined {
   const input = node.parameters[0]?.name
   const context = node.parameters[1]?.name
   const lines = ['/**']
   if (input != null && ts.isIdentifier(input)) lines.push(` * @param {__TaskInputs} ${input.text}`)
   if (context != null && ts.isIdentifier(context)) {
-    lines.push(` * @param {import("@oomol-lab/open-flow").TaskContext<__TaskOutputs>} ${context.text}`)
+    lines.push(` * @param {${typing.includes('} TaskContext */') ? '__TaskContext' : 'import("@oomol-lab/open-flow").TaskContext'}} ${context.text}`)
   }
   if (lines.length == 1) return
-  lines.push(
-    ' * @returns {import("@oomol-lab/open-flow").TaskResult<__TaskOutputs> | Promise<import("@oomol-lab/open-flow").TaskResult<__TaskOutputs>>}',
-    ' */',
-    '',
-  )
+  const result = 'import("@oomol-lab/open-flow").TaskResult<__TaskOutputs>'
+  const async = node.modifiers?.some((modifier) => modifier.kind == ts.SyntaxKind.AsyncKeyword)
+  lines.push(` * @returns {${async ? `Promise<${result}>` : `${result} | Promise<${result}>`}}`, ' */', '')
   return lines.join('\n')
+}
+
+export function contextName(source: string): string | undefined {
+  const file = ts.createSourceFile('module.js', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+  const parameter = directFunction(file)?.[1].parameters[1]?.name
+  return parameter != null && ts.isIdentifier(parameter) ? parameter.text : undefined
 }
 
 export class ShadowDocument {
@@ -43,12 +47,15 @@ export class ShadowDocument {
     this.file = ts.createSourceFile('/module.js', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
     const inserts: (readonly [number, string])[] = []
     if (typing != '') {
-      const names = typing.replace('}} Inputs;', '}} __TaskInputs;').replace('}} Outputs;', '}} __TaskOutputs;')
+      const names = typing
+        .replace('}} Inputs;', '}} __TaskInputs;')
+        .replace('}} Outputs;', '}} __TaskOutputs;')
+        .replace('} TaskContext */', '} __TaskContext */')
       inserts.push([0, names.endsWith('\n') ? names : `${names}\n`])
     }
     const found = directFunction(this.file)
     if (found != null) {
-      const annotation = functionTyping(found[1])
+      const annotation = functionTyping(found[1], typing)
       if (annotation != null) inserts.push([found[0], annotation])
     }
     this.inserts = inserts.toSorted((left, right) => left[0] - right[0])

@@ -255,7 +255,7 @@ describe('WorkspaceStore', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v1',
+          engineContract: 'open-flow-engine/v2',
           flowId: flow.flowId,
           modelVersion: 1,
           revisionDigest: path.includes('revision-2') ? 'digest-2' : sourceDraft.digest,
@@ -309,7 +309,7 @@ describe('WorkspaceStore', () => {
       actorId: 'actor-1',
       closureDigest: 'closure-1',
       createdAt: timestamp,
-      engineContract: 'open-flow-engine/v1',
+      engineContract: 'open-flow-engine/v2',
       flowId: flow.flowId,
       modelVersion: 1,
       operation: 'publish',
@@ -444,7 +444,7 @@ describe('WorkspaceStore', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v1',
+          engineContract: 'open-flow-engine/v2',
           flowId: flow.flowId,
           modelVersion: 1,
           revisionDigest: draft.digest,
@@ -487,7 +487,7 @@ function checked(revisionId: string): Response {
   return Response.json({
     closureDigest: `closure-${revisionId}`,
     diagnostics: [],
-    engineContract: 'open-flow-engine/v1',
+    engineContract: 'open-flow-engine/v2',
     flowId: flow.flowId,
     modelVersion: 1,
     revisionDigest: `digest-${revisionId}`,
