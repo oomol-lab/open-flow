@@ -1031,7 +1031,8 @@ export class DesignerStore {
         const def = sourceNode.getOutputHandleDef(sourceHandle)
         if (def) {
           const targetNode = await this.waitInlineTaskNode(nodeId)
-          targetNode?.setupInputHandle(handle, def)
+          if (targetNode == null) return
+          targetNode.setupInputHandle(handle, def)
         }
       }
     } else if (handle && 'target' in connection) {
@@ -1042,7 +1043,8 @@ export class DesignerStore {
         const def = targetNode.getInputHandleDef(targetHandle)
         if (def) {
           const sourceNode = await this.waitInlineTaskNode(nodeId)
-          sourceNode?.setupOutputHandle(handle, def)
+          if (sourceNode == null) return
+          sourceNode.setupOutputHandle(handle, def)
         }
       }
     }

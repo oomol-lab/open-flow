@@ -1,4 +1,4 @@
-import type { NodeId } from '../../../../schema/index.ts'
+import type { HandleName, NodeId } from '../../../../schema/index.ts'
 import type { NodeStatus, NodeType } from '../node/constants.ts'
 import type { NodeStoreDisplay$ } from '../node/node.store.ts'
 import type { InteractiveMode } from './designer.store.ts'
@@ -6,9 +6,11 @@ import type { InteractiveMode } from './designer.store.ts'
 import { val } from 'value-enhancer'
 import { reactiveMap } from 'value-enhancer/collections'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { toRFHandleName } from '../../base/rfHelpers.ts'
 import { CommentNodeStore } from '../node/commentNode.store.ts'
 import { NODE_STATUS, NODE_TYPE } from '../node/constants.ts'
 import { NodeStore } from '../node/node.store.ts'
+import { TaskNodeStore } from '../node/taskNode.store.ts'
 import { DesignerStore } from './designer.store.ts'
 import { DesignerUIStore } from './designerUI.store.ts'
 import { NodeMiniMapPhase } from './nodeMiniMap.ts'
@@ -19,10 +21,11 @@ interface TestSetup {
   readonly store: DesignerStore
   readonly nodes: ReturnType<typeof reactiveMap<NodeId, NodeStore>>
   createNode(nodeId: NodeId, nodeType?: NodeType): NodeStore
+  createTaskNode(nodeId: NodeId): TaskNodeStore
   dispose(): void
 }
 
-function createTestSetup(): TestSetup {
+function createTestSetup(onConnect: () => void = () => {}): TestSetup {
   const nodes = reactiveMap<NodeId, NodeStore>()
   const viewport = val<{ x: number; y: number; zoom: number } | undefined>()
   const designerUIStore = new DesignerUIStore({ viewport, nodeStores: nodes })
@@ -40,7 +43,7 @@ function createTestSetup(): TestSetup {
     bindValidateConnection: () => {},
     onAddNode: async () => undefined,
     onDeleteNodes: () => {},
-    onConnect: () => {},
+    onConnect,
     onDisconnect: () => {},
     onDuplicate: async () => {},
   })
@@ -62,6 +65,28 @@ function createTestSetup(): TestSetup {
         outputs_def: val(),
       }
       const node = new NodeStore(nodeId, nodeType, { display$, designerUIStore })
+      createdNodes.push(node)
+      return node
+    },
+    createTaskNode(nodeId) {
+      const node = new TaskNodeStore(nodeId, {
+        designerUIStore,
+        display$: {
+          icon: val(),
+          title: val(),
+          description: val(),
+          status: val<NodeStatus>(NODE_STATUS.Idle),
+          progress: val(),
+          showSettings: val(),
+          ignore: val(),
+          sections: val([]),
+          inputs_def: val([{ handle: 'input' as HandleName }]),
+          outputs_def: val([{ handle: 'output' as HandleName }]),
+          inputs_from: val([]),
+          task: val(),
+          executorName: val(),
+        },
+      })
       createdNodes.push(node)
       return node
     },
@@ -113,6 +138,29 @@ describe('DesignerStore.waitNode', () => {
     setup.nodes.set(nodeId, setup.createNode(nodeId))
     await vi.runAllTimersAsync()
     expect(logError).toHaveBeenCalledTimes(1)
+    setup.dispose()
+  })
+})
+
+describe('DesignerStore.setupScriptletNode', () => {
+  it('does not publish a connection when the target is not an inline task', async () => {
+    const onConnect = vi.fn()
+    const setup = createTestSetup(onConnect)
+    const source = setup.createTaskNode('source' as NodeId)
+    const target = setup.createTaskNode('scriptlet' as NodeId)
+    setup.nodes.set(source.nodeId, source)
+    setup.nodes.set(target.nodeId, target)
+
+    await setup.store.setupScriptletNode(
+      target.nodeId,
+      {
+        source: source.rfNodeId,
+        sourceHandle: toRFHandleName('output' as HandleName),
+      },
+      'input' as HandleName,
+    )
+
+    expect(onConnect).not.toHaveBeenCalled()
     setup.dispose()
   })
 })
