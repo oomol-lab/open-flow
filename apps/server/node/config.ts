@@ -4,6 +4,7 @@ import { Settings } from './settings.ts'
 
 const maxRequestBytes = 4 * 1024
 const encoder = new TextEncoder()
+const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false })
 
 export function createConfigApp(settings: Settings, authenticate: (request: Request) => Promise<string>, changed: () => void = () => {}): Hono {
   const app = new Hono()
@@ -140,7 +141,7 @@ async function objectRequest(request: Request): Promise<Record<string, unknown> 
   }
   let value: unknown
   try {
-    value = JSON.parse(new TextDecoder().decode(bytes)) as unknown
+    value = JSON.parse(decoder.decode(bytes)) as unknown
   } catch {
     return
   }

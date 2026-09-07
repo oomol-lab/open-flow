@@ -26,6 +26,7 @@ const maxPageSize = 100
 const defaultPageSize = 50
 const runStatusSet: ReadonlySet<string> = new Set(runStatuses)
 const encoder = new TextEncoder()
+const controlDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false })
 
 export function createControlApp(service: ControlService, resolveActor?: ResolveControlActor): Hono<Environment> {
   const app = new Hono<Environment>()
@@ -382,7 +383,7 @@ async function requestObject(request: Request, code: InvalidCode): Promise<Recor
       bytes.set(chunk, offset)
       offset += chunk.byteLength
     }
-    return record(JSON.parse(new TextDecoder().decode(bytes)) as unknown, code)
+    return record(JSON.parse(controlDecoder.decode(bytes)) as unknown, code)
   } catch {
     return invalid(code, 'Request body must be valid JSON.')
   }
