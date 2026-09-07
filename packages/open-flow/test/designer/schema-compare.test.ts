@@ -170,6 +170,24 @@ describe('In-process schema compare', () => {
       name: 'oneOf to matching anyOf',
       to: { anyOf: [{ type: 'string' }, { type: 'number' }] },
     },
+    {
+      from: { oneOf: [{ type: 'string' }] },
+      kind: 'compatible',
+      name: 'single-branch oneOf to a matching type',
+      to: { type: 'string' },
+    },
+    {
+      from: { oneOf: [{ type: 'string' }] },
+      kind: 'incompatible',
+      name: 'single-branch oneOf to a mismatched type',
+      to: { type: 'number' },
+    },
+    {
+      from: { oneOf: [{ maxLength: 0, minLength: 1, type: 'string' }, { type: 'number' }] },
+      kind: 'incompatible',
+      name: 'oneOf with a never branch to a mismatched type',
+      to: { type: 'boolean' },
+    },
     { from: { type: 'string' }, kind: 'compatible', name: 'string outside a numeric not', to: { not: { type: 'number' } } },
     { from: { not: { type: 'number' } }, kind: 'incompatible', name: 'numeric not wider than string', to: { type: 'string' } },
   ])('compares $name directionally', ({ from, kind, to }) => {

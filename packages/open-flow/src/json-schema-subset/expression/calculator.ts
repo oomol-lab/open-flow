@@ -52,6 +52,10 @@ export function swap(expression: ExpressionResult): ExpressionResult {
  * ![](../../doc/images/all_of_expression.png)
  */
 function calculateOneOf(expressions: readonly ExpressionResult[]): ExpressionResult {
+  // A single remaining branch makes oneOf equivalent to that branch.
+  if (expressions.length === 1) {
+    return expressions[0]
+  }
   const unionSet = calculateCombination(CalculatorOperator.AnyOf, expressions)
   const intersectionList: ExpressionResult[] = []
 
