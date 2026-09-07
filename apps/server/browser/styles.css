@@ -636,6 +636,14 @@ body {
   justify-content: flex-end;
 }
 
+.settings-form input[aria-invalid='true'] {
+  border-color: var(--ui-destructive);
+}
+
+.settings-form input[aria-invalid='true'] + .settings-hint {
+  color: var(--ui-destructive);
+}
+
 .settings-summary,
 .settings-state {
   display: flex;

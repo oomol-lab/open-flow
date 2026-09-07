@@ -74,6 +74,7 @@
     "selectForCreation": "Выбрать команду Connector для нового Flow"
   },
   "variables": {
+    "nameExists": "Variable с таким именем уже существует. Отредактируйте существующую Variable.",
     "all": "Все Variables",
     "cancel": "Отмена",
     "count": "{{count}} из 200",

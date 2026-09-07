@@ -1,6 +1,6 @@
 import type { FormEvent, ReactElement } from 'react'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslate } from 'val-i18n-react'
 
@@ -80,6 +80,7 @@ function SettingItem({
   const [secret, setSecret] = useState('')
   const t = useTranslate()
   const managed = source == 'environment' || source == 'derived'
+  const secretTooShort = endpoint == '/config/integration' && new TextEncoder().encode(secret).byteLength < 32
   const Heading = heading
 
   async function request(method: 'DELETE' | 'PUT', requestBody: Record<string, unknown>): Promise<void> {
@@ -122,7 +123,7 @@ function SettingItem({
 
   function save(event: FormEvent): void {
     event.preventDefault()
-    if (draftOrigin.length == 0 || (secretLabel != null && secretRequired && secret.length == 0) || pending) return
+    if (draftOrigin.length == 0 || (secretLabel != null && secretRequired && secret.length == 0) || secretTooShort || pending) return
     void request('PUT', { ...body(draftOrigin, secret), expectedRevision: revision, version: 1 })
   }
 
@@ -180,6 +181,8 @@ function SettingItem({
             <>
               <label htmlFor={`${endpoint}-secret`}>{secretLabel}</label>
               <input
+                aria-describedby={`${endpoint}-secret-hint`}
+                aria-invalid={secretTooShort && secret != ''}
                 autoComplete="new-password"
                 id={`${endpoint}-secret`}
                 onChange={(event) => setSecret(event.target.value)}
@@ -187,7 +190,9 @@ function SettingItem({
                 type="password"
                 value={secret}
               />
-              <span className="settings-hint">{t(endpoint == '/config/integration' ? 'settings.callbackKeyHint' : 'settings.tokenHint')}</span>
+              <span className="settings-hint" id={`${endpoint}-secret-hint`}>
+                {t(endpoint == '/config/integration' ? 'settings.callbackKeyHint' : 'settings.tokenHint')}
+              </span>
             </>
           )}
           <div className="settings-form-actions">
@@ -196,7 +201,7 @@ function SettingItem({
             </button>
             <button
               className="server-button server-button-primary"
-              disabled={pending || draftOrigin.length == 0 || (secretLabel != null && secretRequired && secret.length == 0)}
+              disabled={pending || draftOrigin.length == 0 || (secretLabel != null && secretRequired && secret.length == 0) || secretTooShort}
               type="submit"
             >
               {t('settings.save')}
@@ -223,24 +228,36 @@ export function SettingsPage({
   const [current, setCurrent] = useState<NonNullable<ReturnType<typeof config>>>()
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
+  const loadSequence = useRef(0)
   const t = useTranslate()
 
+  const saved = useCallback((value: NonNullable<ReturnType<typeof config>>): void => {
+    loadSequence.current += 1
+    setCurrent((previous) => (previous != null && previous.revision > value.revision ? previous : value))
+    setFailed(false)
+    setLoading(false)
+  }, [])
+
   const load = useCallback(async (): Promise<void> => {
+    const sequence = ++loadSequence.current
     try {
       const response = await fetch('/config', { credentials: 'same-origin' })
+      if (sequence != loadSequence.current) return
       if (response.status == 401) {
         onUnauthorized()
         return
       }
       const value = config(await response.json())
+      if (sequence != loadSequence.current) return
       if (!response.ok || value == null) throw new Error('Invalid configuration response.')
-      setCurrent(value)
+      setCurrent((previous) => (previous != null && previous.revision > value.revision ? previous : value))
       setFailed(false)
     } catch {
+      if (sequence != loadSequence.current) return
       setFailed(true)
       toast.error(t('settings.loadFailed'))
     } finally {
-      setLoading(false)
+      if (sequence == loadSequence.current) setLoading(false)
     }
   }, [onUnauthorized, t])
 
@@ -248,7 +265,10 @@ export function SettingsPage({
     void load()
     const refresh = (): void => void load()
     globalThis.addEventListener('focus', refresh)
-    return () => globalThis.removeEventListener('focus', refresh)
+    return () => {
+      loadSequence.current += 1
+      globalThis.removeEventListener('focus', refresh)
+    }
   }, [load])
 
   return (
@@ -292,7 +312,7 @@ export function SettingsPage({
                 name={t('settings.runtime')}
                 onConflict={load}
                 onSaved={(value) => {
-                  setCurrent(value)
+                  saved(value)
                   onConnectorChange()
                 }}
                 onUnauthorized={onUnauthorized}
@@ -310,7 +330,7 @@ export function SettingsPage({
                 heading="h3"
                 name={t('settings.console')}
                 onConflict={load}
-                onSaved={setCurrent}
+                onSaved={saved}
                 onUnauthorized={onUnauthorized}
                 originLabel={t('settings.console')}
                 placeholder="https://console.example.com"
@@ -324,7 +344,7 @@ export function SettingsPage({
                 endpoint="/config/llm"
                 name="LLM"
                 onConflict={load}
-                onSaved={setCurrent}
+                onSaved={saved}
                 onUnauthorized={onUnauthorized}
                 originLabel={t('settings.origin')}
                 placeholder="https://llm.example.com"
@@ -339,7 +359,7 @@ export function SettingsPage({
                 endpoint="/config/integration"
                 name={t('settings.integration')}
                 onConflict={load}
-                onSaved={setCurrent}
+                onSaved={saved}
                 onUnauthorized={onUnauthorized}
                 originLabel={t('settings.publicOrigin')}
                 placeholder="https://flows.example.com"
