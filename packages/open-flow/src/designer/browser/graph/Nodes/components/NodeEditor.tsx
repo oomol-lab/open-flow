@@ -1,7 +1,7 @@
 import styles from './NodeEditor.module.scss'
 import type { NodeId } from '../../../../../schema/index.ts'
 
-import { useContext, useMemo, useRef } from 'react'
+import { useContext, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
@@ -39,7 +39,7 @@ export function NodeEditorPortal() {
 export function NodeEditor() {
   const t = useTranslate()
   const root = useRef<HTMLDivElement>(null)
-  const heading = useRef<HTMLDivElement>(null)
+  const [heading, setHeading] = useState<HTMLDivElement | null>(null)
   const view = useContext(CanvasContext)
   const theme = useThemeData()
   const store = useDesignerStore()
@@ -60,16 +60,18 @@ export function NodeEditor() {
             {view?.inspectorHeaderContainer != null &&
               createPortal(
                 <div
-                  ref={heading}
+                  ref={setHeading}
                   className={`oo-designer-root nokey ${designerThemeClass(theme.isDark)} ${styles.heading}`}
                   data-theme={theme.isDark ? 'dark' : 'light'}
                   onPointerDown={(event) => event.stopPropagation()}
                 >
-                  <GetPopupContainerContext.Provider
-                    value={{ default: () => heading.current ?? document.body, static: () => heading.current ?? document.body }}
-                  >
-                    <NodeHead />
-                  </GetPopupContainerContext.Provider>
+                  {heading != null && (
+                    <GetPopupContainerContext.Provider value={{ default: () => heading, static: () => heading }}>
+                      <ThemeProvider dark={theme.isDark} getPopupContainer={() => heading}>
+                        <NodeHead />
+                      </ThemeProvider>
+                    </GetPopupContainerContext.Provider>
+                  )}
                 </div>,
                 view.inspectorHeaderContainer,
               )}
