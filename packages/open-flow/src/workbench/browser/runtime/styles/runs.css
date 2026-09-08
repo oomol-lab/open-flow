@@ -511,9 +511,8 @@
 
   .run-list {
     min-height: 0;
-    overflow: auto;
+    overflow: hidden;
     padding: 8px;
-    scrollbar-gutter: stable;
   }
 
   .run-list-item {
