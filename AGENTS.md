@@ -1,69 +1,59 @@
-# Repository Instructions
+# Development Principles
 
-Read [`docs/architecture.md`](docs/architecture.md) before changing manifests, project
-persistence, compilation, runtime behavior, the Workbench, or public CLI behavior. It is the only
-product-boundary document. Update it only when a change introduces or revises a durable product
-boundary, cross-module ownership rule, or runtime invariant. Do not record local data structures,
-algorithms, UI defaults, implementation steps, or other decisions that are clear from code and
-tests. Put exact serialized and protocol contracts in their technical references, and keep
-implementation history in Git. Do not reference unavailable repositories.
+## Purpose and authority
 
-## Development Rules
+Deliver the user's intended outcome with the least unnecessary complexity. Exercise independent
+judgment: raise material errors and tradeoffs, and respect the user's informed decisions.
 
-- Keep one TypeScript project per deployable workspace unless a real generated-code or platform
-  constraint requires another project.
-- Keep the public npm product in `packages/open-flow`. Deployables belong under `apps/` and must
-  not deep-import another workspace's source files.
-- Preserve `common/browser/node` ownership. Common code must not import browser or Node modules,
-  and browser code must not import Node modules.
-- Use direct imports. Do not add broad barrels or path aliases that hide ownership.
-- Use neutral domain names for product-owned code. The npm scope and serialized format tokens are
-  exceptions, not internal naming patterns.
-- Remove obsolete unpublished behavior instead of adding compatibility adapters.
-- For changes involving a contract or `packages/command`, work bottom-up in waterfall order: make
-  the lower-level model and its specification tests correct first, then implement adapters and
-  upper clients. Do not compensate for an incomplete lower layer in a command, Workbench, or other
-  client; a complete lower contract should leave upper layers with fewer states and bugs to handle.
-- Keep comments in plain English sentence style with terminal punctuation.
-- When adding or replacing UI icons, use the project skill
-  [iconify-icons](.agents/skills/iconify-icons/SKILL.md). Search local Iconify JSON and use the
-  existing UnoCSS integration instead of drawing custom icons.
-- Stories must render the real production components they exercise. Story-owned code may provide
-  fixtures, providers, layout, and event logging, but must not reproduce product DOM, styles,
-  control groups, or behavior. If a product UI cannot be rendered independently in a Story, extract
-  an independent production component first, then use it in both production and the Story.
-- Before changing frontend interaction involving Select, popup, portal, focus, or outside-click
-  handling, read [`docs/authoring/frontend-ui.md`](docs/authoring/frontend-ui.md).
-- Do not launch or automate a browser for UI testing. Verify frontend changes with repository
-  checks, tests, and builds only.
-- UI work may use temporary probes and tests while investigating behavior. Before finishing, remove
-  low-value tests that only assert markup, class names, component wiring, or library details. Keep
-  tests that protect user-visible behavior and real interaction regressions.
+The user owns goals, scope, and consequential product choices. The agent owns routine engineering
+decisions, including names, types, decomposition, tools, and execution order. Clarification is
+warranted when missing information changes the intended outcome or exceeds the authorized scope.
 
-## TypeScript Style
+Preserve unrelated work and staging state. Temporary resources created for a task are the agent's
+responsibility; stop verification servers and confirm termination before delivery.
 
-- Use short names made from basic English words.
-- Ask the user to choose the name before adding or extracting a type or interface. Do not invent a
-  long descriptive name.
-- TypeScript files executed directly by Node must use erasable syntax. Do not use enums,
-  namespaces, parameter properties, or runtime loaders such as `tsx`.
-- Prefer `interface` for object shapes and `type` for unions.
-- Prefer `==` for nullish checks and comparisons whose operands are already the same obvious type.
-- Avoid non-null assertions when a local check or default value expresses the invariant clearly.
+## Ownership and contracts
 
-## Checks
+Each behavior has one authoritative owner. Correct defects at that owner; clients must not
+compensate for incomplete contracts or maintain competing sources of truth.
 
-```bash
-bun run format
-bun run check
-bun run test
-bun run build
-```
+`packages/open-flow` owns the public product, `packages/command` owns the CLI, and `apps/` owns
+deployments. Cross-workspace dependencies use public entries. Common code is platform-neutral;
+browser code is independent of Node. Dependencies must make these boundaries visible.
 
-Use `bun run format`, this project does NOT use Prettier.
+Preserve established product contracts unless the task calls for changing them. A contract change
+includes its affected implementations, consumers, and specifications.
 
-Do not use `bun test` at the repository root. It bypasses the workspace test scripts and incorrectly
-loads Vitest files with Bun's built-in test runner.
+## Simplicity and coherence
 
-Run `bun run test:package` when changing the published CLI, bundle entries, package metadata, or
-static Workbench assets.
+Prefer clear, direct code and existing project conventions. Abstractions, compatibility layers,
+and new infrastructure need a concrete benefit to the current product. Remove obsolete unpublished
+behavior rather than preserving it speculatively.
+
+Shared behavior belongs in shared production code. Features compose it rather than duplicate it.
+Tests and Stories exercise the real behavior; their fixtures must not become parallel implementations.
+
+Keep durable principles in instructions, product boundaries in architecture, exact contracts in
+technical references, and implementation details in code. Historical plans provide context, not
+current policy. A local fix should not become a permanent universal rule.
+
+## Verification
+
+Evidence must support the claimed outcome. Choose verification by the affected behavior, consumers,
+and risk, not by a fixed ritual. During iteration, resolve the current uncertainty with focused
+checks. Before delivery, ensure the combined evidence covers the final change and its consequences.
+Reuse valid results; broaden checks when the impact or remaining uncertainty warrants it.
+
+Browser acceptance is appropriate when rendering or real interaction is material to correctness
+and other evidence is insufficient. Clear, low-risk edits and non-UI work do not warrant it by default.
+Static tests and successful builds do not establish visual correctness. Report material verification
+gaps honestly, and satisfy required CI before merging.
+
+## References
+
+Consult only references relevant to the task:
+
+- [Architecture](docs/architecture.md): product contracts, persistence, execution, and ownership.
+- [Frontend](docs/authoring/frontend-ui.md): shared UI and Designer integration boundaries.
+- [Iconify skill](.agents/skills/iconify-icons/SKILL.md): UI icon selection and integration.
+- [Contributing](CONTRIBUTING.md): environment, check commands, and contribution requirements.
