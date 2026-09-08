@@ -282,6 +282,7 @@ export interface FlowDesignerViewEdge {
 export interface FlowDesignerViewProps {
   readonly inspectorContainer?: HTMLElement | null
   readonly inspectorHeaderContainer?: HTMLElement | null
+  readonly cornerTools?: ReactNode
   readonly toolbar?: ReactNode
   readonly addNodeRequest?: {
     readonly onComplete?: () => void

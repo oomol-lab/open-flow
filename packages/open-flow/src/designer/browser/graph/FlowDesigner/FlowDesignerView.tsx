@@ -131,6 +131,7 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
   return (
     <FlowDesigner
       view={props}
+      cornerTools={props.cornerTools}
       toolbar={props.toolbar}
       addItemRequest={props.addItemRequest}
       addNodeRequest={props.addNodeRequest}

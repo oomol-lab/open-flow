@@ -119,19 +119,22 @@
   box-shadow: 0 3px 8px var(--contextmenu-shadow);
 }
 
-.dock {
+.island.island {
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 5px;
-  margin-bottom: 22px;
-  max-width: calc(100% - 32px);
   border: 1px solid var(--ui-border);
   border-radius: 16px;
   background: var(--ui-popover);
   box-shadow:
     0 4px 6px rgb(0 0 0 / 3%),
     0 12px 36px rgb(0 0 0 / 9%);
+}
+
+.dock {
+  margin-bottom: 22px;
+  max-width: calc(100% - 32px);
 }
 
 .viewDock {

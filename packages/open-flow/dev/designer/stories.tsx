@@ -1,3 +1,5 @@
+import cornerStyles from '../../src/designer/browser/graph/ReactFlowContainer/CornerControls.module.scss'
+import containerStyles from '../../src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.module.scss'
 import type { ReactNode } from 'react'
 import type { DesignerOption } from '../../src/designer/browser/components/select.tsx'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
@@ -7,6 +9,7 @@ import { I18nProvider } from 'val-i18n-react'
 import { DateTimePicker } from '../../src/designer/browser/components/dateTimePicker.tsx'
 import { DesignerCombobox } from '../../src/designer/browser/components/select.tsx'
 import { DesignerTooltip } from '../../src/designer/browser/components/tooltip.tsx'
+import { MiniMapToggleIcon } from '../../src/designer/browser/graph/ReactFlowContainer/CornerControls.tsx'
 import { useGetStaticPopupContainer } from '../../src/designer/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuTrigger } from '../../src/ui/browser/context-menu.tsx'
@@ -22,7 +25,6 @@ import {
 } from '../../src/ui/browser/dropdown-menu.tsx'
 import { Field as UiField, FieldLabel } from '../../src/ui/browser/field.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../src/ui/browser/popover.tsx'
-import { Separator } from '../../src/ui/browser/separator.tsx'
 import { Textarea } from '../../src/ui/browser/textarea.tsx'
 import { createI18n as createWorkbenchI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { Icon } from '../../src/workbench/browser/runtime/icons.tsx'
@@ -219,41 +221,30 @@ function RunControlSample({
             <span>Node configuration</span>
           </aside>
         )}
-        <Button
-          aria-label="Toggle inspector"
-          aria-expanded={inspectorOpen}
-          className="run-control-story-inspector"
-          onClick={() => setInspectorOpen(!inspectorOpen)}
-          size="icon"
-          title="Toggle inspector"
-          type="button"
-          variant="outline"
-        >
-          <Icon name="panel" />
-        </Button>
-        {mapOpen ? (
+        <div className={`${containerStyles.island} ${cornerStyles.surface} run-control-story-corner`}>
+          <Button aria-label="Mini map" aria-expanded={mapOpen} onClick={() => setMapOpen(!mapOpen)} size="icon" title="Mini map" type="button" variant="ghost">
+            <MiniMapToggleIcon expanded={mapOpen} />
+          </Button>
+          <Button
+            aria-label="Toggle inspector"
+            aria-expanded={inspectorOpen}
+            onClick={() => setInspectorOpen(!inspectorOpen)}
+            size="icon"
+            title="Toggle inspector"
+            type="button"
+            variant="ghost"
+          >
+            <i className={inspectorOpen ? 'i-carbon:right-panel-close' : 'i-carbon:right-panel-open'} data-corner-icon />
+          </Button>
+        </div>
+        {mapOpen && (
           <div className="run-control-story-minimap">
             <span />
             <span />
             <span />
-            <Button aria-label="Close mini map" onClick={() => setMapOpen(false)} size="icon-xs" title="Close mini map" type="button" variant="outline">
-              <i className="i-carbon:shrink-screen" />
-            </Button>
           </div>
-        ) : (
-          <Button
-            aria-label="Mini map"
-            className="run-control-story-map-button"
-            onClick={() => setMapOpen(true)}
-            size="icon"
-            title="Mini map"
-            type="button"
-            variant="outline"
-          >
-            <i className="i-custom:minimap" />
-          </Button>
         )}
-        <div className="run-control-story-island run-control-story-view">
+        <div className={`${containerStyles.island} run-control-story-dock run-control-story-view`}>
           <Button aria-label="Zoom out" size="icon" title="Zoom out" type="button" variant="ghost">
             <i className="i-codicon:zoom-out" />
           </Button>
@@ -287,11 +278,10 @@ function RunControlSample({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <div className="run-control-story-island run-control-story-create">
+        <div className={`${containerStyles.island} run-control-story-dock run-control-story-create`}>
           <Button size="default" type="button" variant="ghost">
             <Icon data-icon="inline-start" name="plus" /> Add node
           </Button>
-          <Separator className="mx-1" orientation="vertical" />
           <RunControl
             disabled={disabled}
             inputContent={
@@ -344,7 +334,7 @@ function RunControlStory({ dark, language, log }: { readonly dark: boolean; read
       <div className="run-control-stories open-flow-workbench" data-theme={dark ? 'dark' : 'light'}>
         <header>
           <strong>Canvas toolbar system</strong>
-          <p>Navigation, editing, testing, and view controls share one dock while preserving clear task groups.</p>
+          <p>Navigation, editing, testing, and view controls use the same production island and button styles.</p>
         </header>
         <div className="run-control-story-grid">
           <RunControlSample inputStatus="none" label="Direct run" log={log} triggers={one} />

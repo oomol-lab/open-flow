@@ -15,6 +15,7 @@ import { CanvasContext } from './CanvasContext.ts'
 import { FlowSettingsContainer } from './FlowSettingsContainer.tsx'
 
 export interface FlowDesignerProps {
+  cornerTools?: React.ReactNode
   toolbar?: React.ReactNode
   view?: Pick<FlowDesignerViewProps, 'model' | 'inspectorContainer' | 'inspectorHeaderContainer' | 'selectedNodeIds'>
   flowDesignerStore: FlowDesignerStore
@@ -34,6 +35,7 @@ export interface FlowDesignerProps {
 export const FlowDesigner: React.FC<FlowDesignerProps> = ({
   flowDesignerStore,
   view,
+  cornerTools,
   toolbar,
   dark,
   fitView,
@@ -58,6 +60,7 @@ export const FlowDesigner: React.FC<FlowDesignerProps> = ({
       <DesignerStoreProvider value={flowDesignerStore}>
         <NodeMiniMapProvider value={nodeMiniMapPhase}>
           <ReactFlowContainer
+            cornerTools={cornerTools}
             toolbar={toolbar}
             showSettings$={showSettings$}
             focused$={flowDesignerStore.focused$}

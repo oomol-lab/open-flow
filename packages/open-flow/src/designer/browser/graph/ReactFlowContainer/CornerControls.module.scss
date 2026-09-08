@@ -1,0 +1,32 @@
+.miniMap:global(.react-flow__panel) {
+  top: 52px;
+  right: 0;
+  width: 200px;
+  height: 150px;
+}
+
+.surface.surface.surface {
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 2%),
+    0 6px 18px rgb(0 0 0 / 5%);
+}
+
+.surface.surface > [data-slot='button'][aria-expanded='true'] {
+  color: var(--ui-muted-foreground);
+  background: transparent;
+}
+
+.surface.surface > [data-slot='button'][aria-expanded='true']:hover {
+  color: var(--ui-foreground);
+  background: var(--ui-muted);
+}
+
+.surface [data-corner-icon] {
+  width: 1em;
+  height: 1em;
+  font-size: var(--canvas-control-icon-size);
+}
+
+.corner.corner:global(.react-flow__panel) {
+  right: 0;
+}
