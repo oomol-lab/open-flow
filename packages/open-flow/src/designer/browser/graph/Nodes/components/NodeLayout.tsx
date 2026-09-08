@@ -124,10 +124,10 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ des
           )}
         >
           <div className={clsx(styles.offsetContainer, skip && styles.skipOuter)}>
-            {!cardStore && !isPseudoNodeType(nodeStore.nodeType) && !isInBlock && (
+            {!isPseudoNodeType(nodeStore.nodeType) && !isInBlock && (
               <>
                 <NodeFloatBar designerStore={designerStore} nodeStore={nodeStore} />
-                <NodeSettingsPanelHost designerStore={designerStore} nodeStore={nodeStore} />
+                {!cardStore && <NodeSettingsPanelHost designerStore={designerStore} nodeStore={nodeStore} />}
               </>
             )}
             {nodeMiniMapPhase >= NodeMiniMapPhase.Phase1 && nodeStore.nodeType == NODE_TYPE.InputNode && (

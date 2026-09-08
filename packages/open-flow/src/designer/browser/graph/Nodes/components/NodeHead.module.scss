@@ -102,19 +102,21 @@
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
-  background-color: var(--node-background-color);
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
   border: 1px solid var(--node-border-color);
-  border-radius: 5px;
-  padding: 0;
-  overflow: hidden;
-  --icon-font-size: 24px;
+  border-radius: 10px;
+  background: var(--fill-3);
+  color: var(--ui-muted-foreground);
+  box-shadow: var(--floating-control-shadow);
+  --icon-font-size: 16px;
   --icon-size: 32px;
 }
 
 .floatBarButton {
-  padding: 6px;
-  border-radius: 0;
-  width: 36px;
+  border-radius: var(--ui-radius);
+  font-size: var(--icon-font-size);
 }
 
 .floatBarStatus {
