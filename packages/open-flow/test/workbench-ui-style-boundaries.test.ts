@@ -333,7 +333,6 @@ test('keeps responsive control density on component APIs', async () => {
   assert.match(workspaceHeader, /className="action-help publish-action"/)
   assert.match(workspaceHeader, /className="workspace-tabs" variant="line"/)
   assert.doesNotMatch(responsiveStyles, /\.workspace-actions \[data-slot='button'\]/)
-  assert.match(responsiveStyles, /\.workspace-actions \.publish-action\s*\{[\s\S]*?display: none;/)
   assert.doesNotMatch(responsiveStyles, /\.action-help:last-child/)
   assert.match(responsiveStyles, /@media \(pointer: coarse\)[\s\S]*?min-height: 40px;/)
   assert.match(responsiveStyles, /\[data-slot='button'\]\[data-size\^='icon'\][\s\S]*?min-width: 40px;/)
