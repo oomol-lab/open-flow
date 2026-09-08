@@ -752,9 +752,13 @@ describe('FlowDesignerView model synchronization', () => {
 
     await node.duplicateNode?.()
 
-    expect(onDuplicate).toHaveBeenCalledWith(['target'], undefined, {
-      target: { x: 320, y: 180 },
-    })
+    expect(onDuplicate).toHaveBeenCalledWith(
+      ['target'],
+      { x: 24, y: 24 },
+      {
+        target: { x: 320, y: 180 },
+      },
+    )
     view.props.flowDesignerStore.dispose()
   })
 
@@ -993,6 +997,18 @@ describe('FlowDesignerView model synchronization', () => {
 
     expect(setSelection).not.toHaveBeenCalled()
     expect(replaceNodes).not.toHaveBeenCalled()
+    view.props.flowDesignerStore.dispose()
+  })
+
+  it('moves the controlled selection to a copied node', () => {
+    const original = task([])
+    const copy = { ...task([]), id: 'copy', position: { x: 560, y: 0 }, title: 'Task (2)' }
+    const view = FlowDesignerView(props(model([original]), { selectedNodeIds: ['target'] })) as React.ReactElement<FlowDesignerProps>
+
+    FlowDesignerView(props(model([original, copy]), { selectedNodeIds: ['copy'] }))
+
+    expect(view.props.flowDesignerStore.$.nodes.get('target' as NodeId)?.$.selected.value).toBe(false)
+    expect(view.props.flowDesignerStore.$.nodes.get('copy' as NodeId)?.$.selected.value).toBe(true)
     view.props.flowDesignerStore.dispose()
   })
 

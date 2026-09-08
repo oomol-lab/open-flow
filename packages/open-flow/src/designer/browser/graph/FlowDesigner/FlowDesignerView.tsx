@@ -112,8 +112,8 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
   }, [adapter])
   useLayoutEffect(() => adapter.setCallbacks(callbacksFromProps(props)))
   useLayoutEffect(() => {
-    adapter.reconcile(props.model, props.editable, props.language ?? 'en', props.addItems)
-  }, [adapter, props.addItems, props.editable, props.language, props.model])
+    adapter.reconcile(props.model, props.editable, props.language ?? 'en', props.addItems, props.selectedNodeIds)
+  }, [adapter, props.addItems, props.editable, props.language, props.model, props.selectedNodeIds])
   useEffect(() => {
     if (props.focusNodeRequest != null) {
       const reducedMotion =
