@@ -129,7 +129,6 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
   const operation = useVal(store.publications.$.operation)
   const publications = useVal(store.publications.$.publications)
   const flowId = useVal(store.workspace.$.flowId)
-  const publishing = useVal(store.publications.$.publishing)
   const refreshing = useVal(store.publications.$.refreshing)
   const rollingBackPublicationId = useVal(store.publications.$.rollingBackPublicationId)
   const revision = useVal(store.workspace.$.revision)
@@ -222,24 +221,13 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
             <div className="publication-overview">
               {live != null && (
                 <div className="publication-overview-main">
-                  <span className={`status-dot ${live.hasUnpublishedChanges ? 'running' : 'success'}`} />
+                  <span className={`status-dot ${liveClass(live)}`} />
                   <div className="publication-overview-body">
                     <div className="publication-overview-heading">
                       <div className="publication-overview-result">
-                        <strong>{t(live.hasUnpublishedChanges ? 'workspace.unpublishedChanges' : 'publication.upToDate')}</strong>
+                        <strong>{liveLabel(live, t)}</strong>
+                        <span>{t(live.hasUnpublishedChanges ? 'workspace.unpublishedChanges' : 'publication.upToDate')}</span>
                         {live.hasUnpublishedChanges && <span>{t(invalid ? 'workspace.fixIssuesToPublish' : 'publication.publishDescription')}</span>}
-                      </div>
-                      <div className="publication-overview-actions">
-                        <span className="publication-status">
-                          <span className={`status-dot ${liveClass(live)}`} />
-                          {liveLabel(live, t)}
-                        </span>
-                        {draft != null && live.hasUnpublishedChanges && (
-                          <Button disabled={busy != null || invalid} onClick={() => void store.publications.publish()}>
-                            <Icon data-icon="inline-start" name="publish" />
-                            {t(publishing ? 'workspace.publishing' : 'publication.publishDraft')}
-                          </Button>
-                        )}
                       </div>
                     </div>
                     <dl className="publication-overview-meta">
@@ -478,7 +466,7 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
         {loading ? (
           <div className="publication-history-loading">{t('publication.loading')}</div>
         ) : publications.length == 0 ? (
-          <Empty className="h-full rounded-none">
+          <Empty className="min-h-48 rounded-none border-0">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <Icon name="publish" />

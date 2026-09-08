@@ -176,12 +176,13 @@ export function WorkspaceHeader({
         </span>
         <span className="action-help publish-action" title={publishUnavailable}>
           <Button
+            aria-label={t(busy == 'publish' ? 'workspace.publishing' : 'publication.publishDraft')}
             disabled={busy != null || invalid || subflow || live?.hasUnpublishedChanges == false}
             onClick={() => void store.publications.publish()}
             size="default"
           >
             <Icon data-icon="inline-start" name="publish" />
-            {t(busy == 'publish' ? 'workspace.publishing' : 'publication.publishDraft')}
+            <span className="publish-label">{t(busy == 'publish' ? 'workspace.publishing' : 'publication.publishDraft')}</span>
           </Button>
         </span>
         {hostAction != null && hostTitle != null && onHostAction != null && <HostMenu action={hostAction} onAction={onHostAction} title={hostTitle} />}

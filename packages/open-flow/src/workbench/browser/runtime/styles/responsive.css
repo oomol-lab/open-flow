@@ -157,15 +157,9 @@
       padding-left: env(safe-area-inset-left);
     }
 
-    .publication-summary,
-    .publication-triggers,
-    .publication-history > header {
-      padding-right: 16px;
-      padding-left: 16px;
-    }
-
-    .publication-summary {
+    .publication-view {
       padding: 16px;
+      gap: 16px;
     }
 
     .publication-summary-heading,
@@ -301,6 +295,10 @@
   }
 
   @container open-flow-workbench (width <= 520px) {
+    .publish-label {
+      display: none;
+    }
+
     .resource-item-row {
       grid-template-columns: minmax(0, 1fr) 40px;
     }
@@ -316,10 +314,6 @@
     }
 
     .resource-list-columns.flow-columns {
-      display: none;
-    }
-
-    .workspace-actions .publish-action {
       display: none;
     }
 
