@@ -211,7 +211,7 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
           path: `${graphPath}/nodes/${nodeId}/task/moduleId`,
           values: { moduleId: node.task.moduleId, nodeId },
         })
-      } else if (!checked.analysis.get(node.task.moduleId)?.exports.has('default') && !missingEntryModules.has(node.task.moduleId)) {
+      } else if (checked.analysis.get(node.task.moduleId)?.exports.has('default') == false && !missingEntryModules.has(node.task.moduleId)) {
         missingEntryModules.add(node.task.moduleId)
         checked.diagnostics.push({
           code: 'task.missing-entry',

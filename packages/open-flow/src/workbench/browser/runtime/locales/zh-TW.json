@@ -198,7 +198,7 @@
     },
     "task": {
       "chatText": "對話文字",
-      "codeDirty": "等待自動儲存…",
+      "codeDirty": "待儲存",
       "codeFailed": "儲存失敗",
       "codeSaved": "已儲存",
       "codeSaving": "儲存中…",
@@ -241,7 +241,7 @@
       "unavailable": "無法保證此來源先於目前節點完成，或輸出類型不符。"
     },
     "actions": {
-      "title": "可呼叫動作",
+      "title": "程式碼可呼叫的動作",
       "search": "搜尋應用程式或動作…",
       "description": "搜尋並新增這段程式碼需要呼叫的動作。",
       "empty": "沒有符合的 Action。",
@@ -268,7 +268,9 @@
       "fullId": "完整 ID",
       "copy": "複製",
       "copied": "已複製",
-      "copyError": "複製失敗，請選取範例程式碼手動複製。"
+      "copyError": "複製失敗，請選取範例程式碼手動複製。",
+      "introDescription": "依需求新增動作，透過 {{context}} 呼叫外部應用程式。",
+      "chooseAccounts": "管理帳號"
     }
   },
   "language": {

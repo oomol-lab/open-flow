@@ -32,6 +32,7 @@ interface Props {
   readonly errorLabel: string
   readonly loadingLabel: string
   readonly location?: { readonly column: number; readonly line: number }
+  readonly onBlur: () => void
   readonly onChange: (value: string) => void
   readonly theme: WorkbenchTheme
   readonly typing: string
@@ -39,13 +40,14 @@ interface Props {
   readonly value: string
 }
 
-export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, location, onChange, theme, typing, uri, value }: Props): ReactElement {
+export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, location, onBlur, onChange, theme, typing, uri, value }: Props): ReactElement {
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<Editor>()
   const syncing = useRef(false)
   const valueRef = useRef(value)
   const disabledRef = useRef(disabled)
   const locationRef = useRef(location)
+  const onBlurRef = useRef(onBlur)
   const onChangeRef = useRef(onChange)
   const typingRef = useRef(typing)
   const [failed, setFailed] = useState(false)
@@ -53,6 +55,7 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
   valueRef.current = value
   disabledRef.current = disabled
   locationRef.current = location
+  onBlurRef.current = onBlur
   onChangeRef.current = onChange
   typingRef.current = typing
 
@@ -112,6 +115,7 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
         }
       })
     return () => {
+      if (current != null) onBlurRef.current()
       disposed = true
       changeListener?.dispose()
       current?.dispose()
@@ -143,7 +147,12 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
   }, [location?.column, location?.line])
 
   return (
-    <div className="code-editor">
+    <div
+      className="code-editor"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) onBlur()
+      }}
+    >
       <div className="code-editor-host" ref={host} />
       {loading && <span className="code-editor-state">{loadingLabel}</span>}
       {failed && <span className="code-editor-state error">{errorLabel}</span>}

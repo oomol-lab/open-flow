@@ -168,6 +168,7 @@ function CodeEditorStory({ dark, log }: { readonly dark: boolean; readonly log: 
         disabled={false}
         errorLabel="Code editor unavailable"
         loadingLabel="Loading code editor"
+        onBlur={() => log('code.blur', { length: value.length })}
         onChange={(source) => {
           setValue(source)
           log('code.change', { length: source.length })

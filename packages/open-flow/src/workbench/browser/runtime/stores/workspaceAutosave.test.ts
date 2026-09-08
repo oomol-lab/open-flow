@@ -75,16 +75,16 @@ async function setup() {
 afterEach(() => vi.useRealTimers())
 
 describe('code autosave', () => {
-  it('debounces typing and saves incomplete source', async () => {
+  it('keeps typing local until a save is requested, including incomplete source', async () => {
     const { commit, store, workspace, revision } = await setup()
     vi.useFakeTimers()
     try {
       workspace.updateModuleSource('export default function')
       await vi.advanceTimersByTimeAsync(500)
       workspace.updateModuleSource('export default function (')
-      await vi.advanceTimersByTimeAsync(799)
+      await vi.advanceTimersByTimeAsync(60_000)
       expect(commit).not.toHaveBeenCalled()
-      await vi.advanceTimersByTimeAsync(1)
+      expect(workspace.$.moduleEditor.value).toMatchObject({ source: 'export default function (', status: 'dirty' })
       expect(await workspace.saveModuleEditor()).toBe(true)
       expect(commit).toHaveBeenCalledTimes(1)
       expect(revision().content.modules.a?.source).toBe('export default function (')
@@ -207,7 +207,7 @@ describe('code autosave', () => {
     }
   })
 
-  it('saves before leaving a flow and cancels pending timers on disposal', async () => {
+  it('saves before leaving a flow and does not save after disposal', async () => {
     const { commit, store, workspace } = await setup()
     vi.useFakeTimers()
     try {
