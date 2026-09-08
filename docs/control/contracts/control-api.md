@@ -325,6 +325,11 @@ Draft Run body 是 `{ engineContract, inputs, trigger, version: 1 }`。Live Run 
 
 `trigger` 必填，形如 `{ nodeId: string, payload: JsonValue }`，固定本次运行的起始 Trigger 和输入。缺少入口、入口不是固定 Revision 中的 Trigger，或 payload 不符合其 schema 时返回 `run.invalid`。入口及 payload 参与幂等 request digest，并随 Run 持久化；不会自动选择入口或退回整图运行。
 
+Draft Run 只对选中 Trigger 沿执行边可达的节点及其依赖进行语义校验、能力检查和 Variable 准入检查。其他分支的未配置 Trigger、无效代码和缺失资源仍出现在全图 check 中，但不阻断此次测试。
+共享下游输入的多来源映射忽略本次不可达的已有节点来源；剩余来源仍须在每条执行路径上恰好提供一个值。缺失节点引用、选中分支内的环、无效代码及实际使用的 Subflow 错误仍返回 `flow.invalid`。
+Draft Run 的 `revisionDigest` 标识完整 Revision，`closureDigest` 标识本次入口的执行 closure，可以与全图 check 的 `closureDigest` 不同。读取和恢复 Run 不修改原 Revision。
+Publish 和 Live Run 保持完整 Flow 校验。
+
 Manual Trigger 的节点结构为 `{ kind: "manual", name: string, description?: string, icon?: string }`，无输入和调度配置，`payload` 固定为空对象 `{}`。其执行出口沿普通执行边连接下游，数据输出 `payload` 的 schema 为 `{ type: "object", additionalProperties: false }`。其他 Trigger 可通过显式 payload 模拟执行，仍保留 Draft/Live Run source，不伪造外部 occurrence。
 
 首次 Run admission 在创建 Run 的权威 transaction 中确认固定 closure 使用的 Variable 均存在；缺失返回 `binding.unresolved`。幂等重放先于
@@ -682,7 +687,7 @@ Run 取消、deadline、兄弟节点失败和节点退出沿既有执行生命�
 ### Draft 操作结构发现
 
 公开 `flow-change` 的 `changeOperationsSchema()` 返回 ChangeOperation 数组的 JSON Schema，传入 operation kind 时返回单个操作的独立 schema。
-`decodeChangeOperations()` 与该 schema 使用相同的字段定义，拒绝未知 kind、未知字段和不完整结构；Server 在 Draft change HTTP 边界调用它。
+`decodeChangeOperations()` 与该 schema 使用相同的字段定义，忽略并移除未知字段，拒绝未知 kind、已知字段类型错误和不完整结构；Server 在 Draft change HTTP 边界调用它。
 结构校验不替代操作顺序、before 值、图语义或 Revision 并发校验。
 
 公共解码入口、版本兼容和部署一致性验证见[公共契约与版本演进](compatibility.md)。

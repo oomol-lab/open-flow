@@ -29,6 +29,7 @@ import * as Queue from 'effect/Queue'
 import * as Scope from 'effect/Scope'
 import * as Semaphore from 'effect/Semaphore'
 import { createHash } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 import { ConnectorClient, ConnectorTaskError } from '../deployment/connector.ts'
 import { AcceptanceError, ControlError } from '../error.ts'
 import { errorKind, silentLogger } from '../logger.ts'
@@ -376,7 +377,7 @@ export class ServerService {
       fixed.revisionDigest != target.revisionDigest ||
       fixed.prepared.closureDigest != target.closureDigest ||
       trigger?.kind != 'webhook' ||
-      JSON.stringify(trigger) != JSON.stringify(target.trigger)
+      !isDeepStrictEqual(trigger, target.trigger)
     ) {
       return
     }
@@ -410,7 +411,7 @@ export class ServerService {
       revisionDigest: fixed.revisionDigest,
       revisionId: target.revisionId,
       runtimeVersion: target.runtimeVersion,
-      triggerJson: JSON.stringify(trigger),
+      triggerJson: JSON.stringify(target.trigger),
       triggerNodeId: target.triggerNodeId,
     })
     if (accepted?.kind == 'accepted' && accepted.created) this.#runCreated(target.flowId, accepted.runId)
@@ -573,8 +574,8 @@ export class ServerService {
         fixed.revisionDigest != target.revisionDigest ||
         fixed.prepared.closureDigest != target.closureDigest ||
         trigger?.kind != 'cron' ||
-        JSON.stringify(trigger) != target.triggerJson ||
-        JSON.stringify(trigger.cronTimes) != target.scheduleJson
+        !isDeepStrictEqual(trigger, JSON.parse(target.triggerJson)) ||
+        !isDeepStrictEqual(trigger.cronTimes, JSON.parse(target.scheduleJson))
       ) {
         return yield* Effect.fail(new Error('Fixed Cron Trigger target does not match its Publication.'))
       }

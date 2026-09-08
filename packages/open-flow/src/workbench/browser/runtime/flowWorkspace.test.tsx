@@ -32,7 +32,7 @@ vi.mock('./designer/workbenchDesigner.tsx', () => ({ WorkbenchDesigner: () => nu
 
 const value = <T,>(current: T): { readonly value: T } => ({ value: current })
 
-function renderWorkspace(busy?: string, withTrigger = true) {
+function renderWorkspace(busy?: string, withTrigger = true, invalid = false) {
   const navigation = {
     $: { view: value('design') },
     open: vi.fn(),
@@ -42,7 +42,7 @@ function renderWorkspace(busy?: string, withTrigger = true) {
   const store = {
     $: {
       busy: value(busy),
-      diagnostics: value(undefined),
+      diagnostics: value(invalid ? { valid: false, diagnostics: [{ code: 'trigger.connection-missing' }] } : undefined),
       designer: value({ nodes: withTrigger ? [{ id: 'start', kind: 'trigger', title: 'Start' }] : [], viewport: { x: 0, y: 0, zoom: 1 } }),
       selectedDesignerNode: value(undefined),
     },
@@ -113,10 +113,11 @@ describe('FlowWorkspace run drawer', () => {
     mocks.stateCall = 0
   })
 
-  it('opens the log panel after running from the canvas', async () => {
-    const { editor, store } = renderWorkspace()
+  it.each([false, true])('runs from the canvas and opens logs despite unrelated diagnostics (invalid: %s)', async (invalid) => {
+    const { editor, store } = renderWorkspace(undefined, true, invalid)
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
     const designer = (view.props.children as ReactElement[])[0]!
+    expect(designer.props.runControl.props.disabled).toBe(false)
     designer.props.runControl.props.onRun()
     await Promise.resolve()
     expect(store.requestDraftRun).toHaveBeenCalledWith('start')

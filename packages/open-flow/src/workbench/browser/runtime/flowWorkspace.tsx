@@ -287,7 +287,7 @@ function Editor({
         runControl={
           target?.kind == 'flow' && draft != null && selectedTrigger != null ? (
             <RunControl
-              disabled={diagnostics?.valid == false || (busy != null && busy != 'run')}
+              disabled={busy != null && busy != 'run'}
               inputContent={<RunInputPanel onStarted={onRunStarted} store={store.runRequests} theme={theme} />}
               inputOpen={runInputRequest?.triggerId == selectedTrigger.id}
               inputStatus={store.runRequests.inputStatus(draft.flowId, draft, selectedTrigger.id)}
@@ -302,7 +302,6 @@ function Editor({
               }}
               selectedTriggerId={selectedTrigger.id}
               starting={busy == 'run'}
-              title={diagnostics?.valid == false ? t('workspace.fixIssuesToRun') : undefined}
               triggers={triggers.map((trigger) => ({ id: trigger.id, title: trigger.title }))}
             />
           ) : undefined

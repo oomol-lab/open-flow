@@ -6,38 +6,38 @@ import { checkJsonDepth } from './json.ts'
 const text = z.string()
 const json = z.json()
 const strings = z.array(text)
-const port = z.strictObject({ description: text.optional(), jsonSchema: json, nullable: z.boolean(), handle: text })
+const port = z.object({ description: text.optional(), jsonSchema: json, nullable: z.boolean(), handle: text })
 const input = port.extend({ value: json.optional() })
-const group = z.strictObject({ collapsed: z.boolean().optional(), group: text })
-const nodeSource = z.strictObject({ kind: z.literal('node'), nodeId: text, output: text })
-const flowSource = z.strictObject({ kind: z.literal('flow'), input: text })
-const source = z.union([nodeSource, flowSource, z.strictObject({ kind: z.literal('binding'), bindingId: text })])
-const mapping = z.union([z.strictObject({ kind: z.literal('value'), value: json }), z.strictObject({ kind: z.literal('sources'), sources: z.array(source) })])
+const group = z.object({ collapsed: z.boolean().optional(), group: text })
+const nodeSource = z.object({ kind: z.literal('node'), nodeId: text, output: text })
+const flowSource = z.object({ kind: z.literal('flow'), input: text })
+const source = z.union([nodeSource, flowSource, z.object({ kind: z.literal('binding'), bindingId: text })])
+const mapping = z.union([z.object({ kind: z.literal('value'), value: json }), z.object({ kind: z.literal('sources'), sources: z.array(source) })])
 const inputs = z.record(text, mapping)
 const ports = { inputs: z.array(z.union([input, group])), outputs: z.array(z.union([port, group])) }
-const capability = z.strictObject({
+const capability = z.object({
   kind: z.literal('connector'),
   action: text,
   connectionId: text.optional(),
-  connections: z.array(z.strictObject({ connectionId: text, alias: text.optional() })),
+  connections: z.array(z.object({ connectionId: text, alias: text.optional() })),
 })
-const inline = z.strictObject({ ...ports, name: text, moduleId: text, capabilities: z.array(capability).optional() })
-const managed = z.strictObject({
+const inline = z.object({ ...ports, name: text, moduleId: text, capabilities: z.array(capability).optional() })
+const managed = z.object({
   ...ports,
   name: text,
   executor: z.union([
-    z.strictObject({ kind: z.literal('connector'), action: text, connectionId: text.optional() }),
-    z.strictObject({ kind: z.literal('llm'), mode: z.enum(['chat', 'json']) }),
+    z.object({ kind: z.literal('connector'), action: text, connectionId: text.optional() }),
+    z.object({ kind: z.literal('llm'), mode: z.enum(['chat', 'json']) }),
   ]),
 })
 const condition = {
   input,
   cases: z.array(
-    z.strictObject({
+    z.object({
       output: text,
       relation: z.enum(['all', 'any']),
       expressions: z.array(
-        z.strictObject({
+        z.object({
           input: text,
           operator: z.enum([
             '!=',
@@ -71,12 +71,12 @@ const condition = {
 const wait = {
   actions: z.union([z.tuple([z.literal('continue')]), z.tuple([z.literal('approve'), z.literal('reject')])]),
   prompt: text,
-  notification: z.strictObject({ inputs, messageHandle: text, taskId: text }).optional(),
+  notification: z.object({ inputs, messageHandle: text, taskId: text }).optional(),
 }
 const webhook = {
   inputsDef: z.array(input),
   options: z
-    .strictObject({
+    .object({
       allowedMethods: strings.optional(),
       allowedOrigins: strings.optional(),
       noResponseBody: z.boolean().optional(),
@@ -88,8 +88,8 @@ const webhook = {
 }
 const schedule = z.array(
   z.union([
-    z.strictObject({ type: z.literal('cron'), expression: text, timezone: text }),
-    z.strictObject({ type: z.literal('every'), unit: z.enum(['day', 'hour', 'minute', 'month', 'week']), value: z.number() }),
+    z.object({ type: z.literal('cron'), expression: text, timezone: text }),
+    z.object({ type: z.literal('every'), unit: z.enum(['day', 'hour', 'minute', 'month', 'week']), value: z.number() }),
   ]),
 )
 const definition = {
@@ -102,71 +102,68 @@ const definition = {
   payloadSchema: json,
   provider: text,
 }
-const endpoint = z.strictObject({
-  body: z.strictObject({ allowArray: z.boolean(), allowEmpty: z.boolean(), formats: z.array(z.enum(['form', 'json', 'multipart', 'text'])) }),
+const endpoint = z.object({
+  body: z.object({ allowArray: z.boolean(), allowEmpty: z.boolean(), formats: z.array(z.enum(['form', 'json', 'multipart', 'text'])) }),
   methods: z.array(z.enum(['DELETE', 'GET', 'HEAD', 'PATCH', 'POST', 'PUT'])),
   successStatus: z.number(),
 })
 const trigger = { name: text, description: text.optional(), icon: text.optional() }
 const base = { inputs, name: text.optional(), description: text.optional(), icon: text.optional(), timeoutMs: z.number().optional() }
 const node = z.union([
-  z.strictObject({ ...base, kind: z.literal('condition'), ...condition }),
-  z.strictObject({ ...base, kind: z.literal('value'), values: z.array(input) }),
-  z.strictObject({ ...base, kind: z.literal('subflow'), subflowId: text }),
-  z.strictObject({ ...base, kind: z.literal('task'), task: inline, additionalInputs: z.array(input).optional() }),
-  z.strictObject({ ...base, kind: z.literal('task'), taskId: text, additionalInputs: z.array(input).optional() }),
-  z.strictObject({ ...base, kind: z.literal('wait'), input, ...wait }).omit({ timeoutMs: true }),
-  z.strictObject({ ...trigger, kind: z.literal('manual') }),
-  z.strictObject({ ...trigger, kind: z.literal('webhook'), ...webhook }),
-  z.strictObject({ ...trigger, kind: z.literal('cron'), cronTimes: schedule }),
-  z.strictObject({
+  z.object({ ...base, kind: z.literal('condition'), ...condition }),
+  z.object({ ...base, kind: z.literal('value'), values: z.array(input) }),
+  z.object({ ...base, kind: z.literal('subflow'), subflowId: text }),
+  z.object({ ...base, kind: z.literal('task'), task: inline, additionalInputs: z.array(input).optional() }),
+  z.object({ ...base, kind: z.literal('task'), taskId: text, additionalInputs: z.array(input).optional() }),
+  z.object({ ...base, kind: z.literal('wait'), input, ...wait }).omit({ timeoutMs: true }),
+  z.object({ ...trigger, kind: z.literal('manual') }),
+  z.object({ ...trigger, kind: z.literal('webhook'), ...webhook }),
+  z.object({ ...trigger, kind: z.literal('cron'), cronTimes: schedule }),
+  z.object({
     ...trigger,
     kind: z.literal('poll'),
     bindingId: text,
     config: z.record(text, json),
-    definition: z.strictObject({ ...definition, type: z.literal('poll') }),
+    definition: z.object({ ...definition, type: z.literal('poll') }),
     pollTimes: schedule,
   }),
-  z.strictObject({
+  z.object({
     ...trigger,
     kind: z.literal('integration'),
     bindingId: text,
     config: z.record(text, json),
-    definition: z.strictObject({ ...definition, type: z.literal('integration'), endpoint }),
+    definition: z.object({ ...definition, type: z.literal('integration'), endpoint }),
   }),
 ])
-const target = z.union([z.strictObject({ kind: z.literal('flow') }), z.strictObject({ kind: z.literal('subflow'), id: text })])
-const edge = z.strictObject({ source: text, target: text, sourceHandle: text.optional() })
+const target = z.union([z.object({ kind: z.literal('flow') }), z.object({ kind: z.literal('subflow'), id: text })])
+const edge = z.object({ source: text, target: text, sourceHandle: text.optional() })
 const at = { nodeId: text, target }
-const subflow = z.strictObject({ name: text, inputs: z.array(input), outputs: z.array(port.extend({ sources: z.array(z.union([nodeSource, flowSource])) })) })
-const graph = z.strictObject({ nodes: z.record(text, node), edges: z.array(edge) })
-const binding = z.strictObject({ kind: z.enum(['connection', 'variable']), target: text })
-const module = z.strictObject({ name: text, imports: strings, source: text })
-const document = z.strictObject({
+const subflow = z.object({ name: text, inputs: z.array(input), outputs: z.array(port.extend({ sources: z.array(z.union([nodeSource, flowSource])) })) })
+const graph = z.object({ nodes: z.record(text, node), edges: z.array(edge) })
+const binding = z.object({ kind: z.enum(['connection', 'variable']), target: text })
+const module = z.object({ name: text, imports: strings, source: text })
+const document = z.object({
   bindings: z.record(text, binding),
   graph,
   subflows: z.record(text, subflow.extend({ graph })),
   tasks: z.record(text, managed),
 })
-const revision = z.strictObject({ modelVersion: z.literal(1), document, modules: z.record(text, module) })
+const revision = z.object({ modelVersion: z.literal(1), document, modules: z.record(text, module) })
 const envelope = revision.extend({ kind: z.literal('open-flow-flow-revision'), version: z.literal(1) })
 
 export function decodeFlowDocument(value: unknown): FlowDocument {
   checkJsonDepth(value)
-  document.parse(value)
-  return value as FlowDocument
+  return document.parse(value) as FlowDocument
 }
 
 export function decodeRevisionContent(value: unknown): RevisionContent {
   checkJsonDepth(value)
-  revision.parse(value)
-  return value as RevisionContent
+  return revision.parse(value) as RevisionContent
 }
 
 export function decodeRevisionEnvelope(value: unknown): RevisionContent {
   checkJsonDepth(value)
-  envelope.parse(value)
-  const content = value as RevisionContent
+  const content = envelope.parse(value) as RevisionContent
   return { modelVersion: content.modelVersion, document: content.document, modules: content.modules }
 }
 
@@ -179,14 +176,14 @@ const shapes = {
   'graph.node.create': { ...at, node },
   'graph.node.delete': at,
   'graph.node.field.set': z.union([
-    z.strictObject({
+    z.object({
       ...at,
       kind: z.literal('graph.node.field.set'),
       field: z.enum(['description', 'icon', 'name']),
       before: text.optional(),
       value: text.optional(),
     }),
-    z.strictObject({
+    z.object({
       ...at,
       kind: z.literal('graph.node.field.set'),
       field: z.literal('timeoutMs'),
@@ -196,11 +193,11 @@ const shapes = {
   ]),
   'graph.node.input.set': { ...at, handle: text, before: mapping.optional(), value: mapping.optional() },
   'graph.node.additional-inputs.set': { ...at, before: z.array(input).optional(), value: z.array(input).optional() },
-  'graph.node.condition.set': { ...at, before: z.strictObject(condition), value: z.strictObject(condition) },
+  'graph.node.condition.set': { ...at, before: z.object(condition), value: z.object(condition) },
   'graph.node.values.set': { ...at, before: z.array(input), value: z.array(input) },
-  'graph.node.wait.set': { ...at, target: z.strictObject({ kind: z.literal('flow') }), before: z.strictObject(wait), value: z.strictObject(wait) },
-  'graph.node.webhook.set': { ...at, target: z.strictObject({ kind: z.literal('flow') }), before: z.strictObject(webhook), value: z.strictObject(webhook) },
-  'graph.node.task.ports.set': { ...at, before: z.strictObject(ports), value: z.strictObject(ports) },
+  'graph.node.wait.set': { ...at, target: z.object({ kind: z.literal('flow') }), before: z.object(wait), value: z.object(wait) },
+  'graph.node.webhook.set': { ...at, target: z.object({ kind: z.literal('flow') }), before: z.object(webhook), value: z.object(webhook) },
+  'graph.node.task.ports.set': { ...at, before: z.object(ports), value: z.object(ports) },
   'graph.node.task.name.set': { ...at, before: text, value: text },
   'graph.node.task.capabilities.set': { ...at, before: z.array(capability).optional(), value: z.array(capability).optional() },
   'graph.trigger.config.set': { nodeId: text, name: text, before: json.optional(), value: json.optional() },
@@ -219,7 +216,7 @@ const shapes = {
   'task.name.set': { taskId: text, before: text, value: text },
 } satisfies Record<ChangeOperation['kind'], z.ZodRawShape | z.ZodType>
 const variants = new Map(
-  Object.entries(shapes).map(([kind, shape]) => [kind, shape instanceof z.ZodType ? shape : z.strictObject({ kind: z.literal(kind), ...shape })]),
+  Object.entries(shapes).map(([kind, shape]) => [kind, shape instanceof z.ZodType ? shape : z.object({ kind: z.literal(kind), ...shape })]),
 )
 const operations = z.array(z.union([...variants.values()])).min(1)
 
@@ -243,5 +240,5 @@ export function decodeChangeOperations(value: unknown): readonly ChangeOperation
 export function changeOperationsSchema(kind?: string): JsonValue {
   const schema = kind == null ? operations : variants.get(kind)
   if (schema == null) throw new TypeError(`Unknown operation ${JSON.stringify(kind)}.`)
-  return z.toJSONSchema(schema) as JsonValue
+  return z.toJSONSchema(schema, { io: 'input' }) as JsonValue
 }

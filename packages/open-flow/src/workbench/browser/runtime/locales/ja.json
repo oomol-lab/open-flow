@@ -652,7 +652,6 @@
     "design": "設計",
     "draft": "ドラフト",
     "fixIssuesToPublish": "公開する前に、ドラフトの問題を修正してください。",
-    "fixIssuesToRun": "実行する前に、ドラフトの問題を修正してください。",
     "issues": "問題 {{count}} 件",
     "issueSingle": "問題 1 件",
     "liveAndDraft": "本番 + ドラフト",

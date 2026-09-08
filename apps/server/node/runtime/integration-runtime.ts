@@ -25,6 +25,7 @@ import {
 } from '@oomol-lab/open-flow/integration-trigger'
 import * as Effect from 'effect/Effect'
 import * as Semaphore from 'effect/Semaphore'
+import { isDeepStrictEqual } from 'node:util'
 import { ConnectorTaskError } from '../deployment/connector.ts'
 import { AcceptanceError } from '../error.ts'
 import { errorKind } from '../logger.ts'
@@ -199,7 +200,7 @@ export class IntegrationRuntime {
         fixed.revisionDigest != target.stored.revisionDigest ||
         fixed.prepared.closureDigest != target.stored.closureDigest ||
         currentTrigger?.kind != 'integration' ||
-        JSON.stringify(currentTrigger) != target.stored.triggerJson
+        !isDeepStrictEqual(currentTrigger, JSON.parse(target.stored.triggerJson))
       ) {
         return { status: 404 }
       }

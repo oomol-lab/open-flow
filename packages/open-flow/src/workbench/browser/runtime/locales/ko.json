@@ -652,7 +652,6 @@
     "design": "디자인",
     "draft": "초안",
     "fixIssuesToPublish": "게시하기 전에 초안의 문제를 해결하세요.",
-    "fixIssuesToRun": "실행하기 전에 초안의 문제를 해결하세요.",
     "issues": "문제 {{count}}개",
     "issueSingle": "문제 1개",
     "liveAndDraft": "라이브 + 초안",

@@ -23,8 +23,8 @@
 - `decodeRevisionContent(value)`：解码 `{ modelVersion, document, modules }`。
 - `decodeRevision(bytes)`：严格 UTF-8、JSON、信封和内容解码，与 `encodeRevision` 配对。
 
-三者拒绝未知字段和不支持的版本，嵌套深度上限为 `maxJsonDepth`。结构合法不意味着图可执行：引用、标题、环、端口和模块语义继续由 Flow validation 检查。
-解码不填充缺失字段、不迁移旧节点、不规范化用户源代码。`encodeRevision(decodeRevision(bytes))` 产生 canonical bytes；只有输入本来就是 canonical bytes 时才保证字节不变。
+三者忽略并移除对象中未声明的字段，继续校验已知字段的类型、必填项和支持的版本，嵌套深度上限为 `maxJsonDepth`。JSON 数据值和 JSON Schema 内的自定义键保持不变。结构合法不意味着图可执行：引用、标题、环、端口和模块语义继续由 Flow validation 检查。
+解码不填充缺失字段、不迁移旧节点、不规范化用户源代码。`encodeRevision(decodeRevision(bytes))` 产生 canonical bytes；只有输入不含未知字段且本来就是 canonical bytes 时才保证字节不变。
 
 `@oomol-lab/open-flow/control-requests` 提供 `controlRequests` 解码函数和 `controlRequestSchema`，覆盖 Flow 创建、改名、Draft changes、Live 启停、Presentation、检查、发布、回滚、Draft/Live Run、Wait resolution、Variable 写入和仅版本请求。
 部署把解码异常映射到相应的公共 invalid 错误。HTTP body 大小、身份、scope、权限、路由参数、分页 cursor 和存储事务仍由部署负责。

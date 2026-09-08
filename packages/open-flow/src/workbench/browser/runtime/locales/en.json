@@ -652,7 +652,6 @@
     "design": "Design",
     "draft": "Draft",
     "fixIssuesToPublish": "Fix Draft problems before publishing.",
-    "fixIssuesToRun": "Fix Draft problems before running.",
     "issues": "{{count}} issues",
     "issueSingle": "1 issue",
     "liveAndDraft": "Live + Draft",

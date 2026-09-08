@@ -138,6 +138,7 @@ export interface StoredRun {
   readonly resume?: { readonly action: WaitAction; readonly checkpoint: FlowRunCheckpoint }
   readonly resumeUnavailable?: true
   readonly runId: string
+  readonly source: StoredControlRun['source'] | null
   readonly trigger?: TriggerSeed
 }
 
@@ -713,7 +714,7 @@ export class Store {
         .prepare(
           `SELECT revisions.content, runs.engine_contract AS engineContract, runs.engine_digest AS engineDigest,
                   runs.connector_team_id AS connectorTeamId, runs.flow_id AS flowId, runs.inputs,
-                  runs.revision_digest AS revisionDigest, runs.run_id AS runId,
+                  runs.revision_digest AS revisionDigest, runs.run_id AS runId, runs.source,
                   run_waits.action AS waitAction, run_waits.checkpoint_json AS checkpointJson,
                   run_waits.remaining_ms AS remainingMs, run_waits.wait_id AS waitId,
                   runs.trigger_payload AS triggerPayload, runs.trigger_node_id AS triggerNodeId
@@ -733,6 +734,7 @@ export class Store {
         readonly checkpointJson: string | null
         readonly remainingMs: number | null
         readonly runId: string
+        readonly source: StoredRun['source']
         readonly triggerNodeId: string | null
         readonly triggerPayload: string | null
         readonly waitAction: WaitAction | null
@@ -763,6 +765,7 @@ export class Store {
             : { remainingMs: row.remainingMs, resume }),
         revisionDigest: row.revisionDigest,
         runId: row.runId,
+        source: row.source,
         ...(row.triggerNodeId == null || row.triggerPayload == null
           ? {}
           : { trigger: { nodeId: row.triggerNodeId, payload: JSON.parse(row.triggerPayload) as JsonValue } }),

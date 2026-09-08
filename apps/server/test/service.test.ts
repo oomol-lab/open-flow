@@ -319,6 +319,97 @@ async function waitForStatus(service: ServerService, runId: string, status: stri
 }
 
 describe('Server application service', () => {
+  it.each([false, true])('runs a valid Draft branch across restart with unrelated incomplete nodes (wait: %s)', async (wait) => {
+    const file = await databaseFile()
+    let service = await openService(file)
+    const stored = await storeRevision(service, wait ? waitFlow() : fullFlow(), 'partial-draft')
+    const changed = await service.control.changeDraft('test', stored.flowId, stored.revisionId, [
+      {
+        kind: 'graph.node.create',
+        target: { kind: 'flow' },
+        nodeId: 'other',
+        node: {
+          kind: 'poll',
+          name: 'Unconfigured',
+          bindingId: 'missing',
+          config: {},
+          pollTimes: [],
+          definition: {
+            configSchema: {},
+            payloadSchema: {},
+            definitionVersion: 1,
+            description: '',
+            displayName: 'Other',
+            key: 'example.event',
+            name: 'event',
+            provider: 'example',
+            type: 'poll',
+          },
+        },
+      },
+      { kind: 'binding.create', bindingId: 'unused', binding: { kind: 'variable', target: 'MISSING' } },
+      {
+        kind: 'graph.node.create',
+        target: { kind: 'flow' },
+        nodeId: 'unused',
+        node: {
+          kind: 'task',
+          name: 'Unused',
+          inputs: { value: { kind: 'sources', sources: [{ kind: 'binding', bindingId: 'unused' }] } },
+          task: {
+            inputs: [{ handle: 'value', jsonSchema: {}, nullable: false }],
+            outputs: [],
+            moduleId: 'increment',
+            name: 'Unused',
+            capabilities: [{ kind: 'connector', action: 'mail.send', connections: [] }],
+          },
+        },
+      },
+      {
+        kind: 'graph.node.create',
+        target: { kind: 'flow' },
+        nodeId: 'unused-wait',
+        node: {
+          kind: 'wait',
+          name: 'Unused Wait',
+          inputs: {},
+          input: { handle: 'value', jsonSchema: {}, nullable: true },
+          actions: ['continue'],
+          prompt: 'Continue?',
+          notification: { taskId: 'missing', messageHandle: 'message', inputs: {} },
+        },
+      },
+    ])
+    const revisionId = changed.revision.revisionId
+    expect((await service.control.checkFlow(stored.flowId, revisionId, 'open-flow-engine/v2')).valid).toBe(false)
+    const accepted = await service.control.createDraftRun(stored.flowId, revisionId, 'open-flow-engine/v2', {}, 'partial-run', { nodeId: 'start', payload: {} })
+    await expect(
+      service.control.createDraftRun(stored.flowId, revisionId, 'open-flow-engine/v2', {}, 'invalid-entry', { nodeId: 'other', payload: {} }),
+    ).rejects.toMatchObject({ code: 'flow.invalid' })
+    await closeService(service)
+    service = await openService(file)
+    await startService(service)
+    await service.waitForIdle()
+    if (wait) {
+      const waiting = service.control.getRun(accepted.run.runId)
+      expect(waiting.status).toBe('waiting')
+      if (waiting.waiting == null) throw new Error('Expected an active Wait.')
+      await closeService(service)
+      service = await openService(file)
+      service.control.resolveRunWait(accepted.run.runId, waiting.waiting.waitId, 'approve')
+      await startService(service)
+      await service.waitForIdle()
+    }
+    expect(service.run(accepted.run.runId)?.status).toBe('completed')
+    const nodes = service
+      .events(accepted.run.runId)
+      .filter((event) => event.kind == 'node.started')
+      .map((event) => event.payload.nodeId)
+    expect(nodes).not.toContain('unused')
+    expect(nodes).not.toContain('unused-wait')
+    expect(nodes).toContain(wait ? 'approval' : 'increment')
+  })
+
   it.each(['completed', 'failed', 'canceled', 'indeterminate'] as const)('counts %s event bytes exactly once', async (status) => {
     const file = await databaseFile()
     const service = await openService(file)
