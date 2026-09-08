@@ -3,6 +3,49 @@ import { providerIcon } from './providerIcon.ts'
 import { designerGraph, setComment, setFlowViewport, setNodePositions } from './workspace.ts'
 
 describe('Designer port projection', () => {
+  it('ignores malformed remote edges instead of throwing', () => {
+    const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+      actorId: 'actor',
+      content: {
+        document: {
+          bindings: {},
+          graph: {
+            edges: [null, {}, { source: 'first', target: 'second' }, { source: 1, target: 'second' }] as never,
+            nodes: {
+              first: { inputs: {}, kind: 'value', name: 'First', values: [] },
+              second: { inputs: {}, kind: 'value', name: 'Second', values: [] },
+            },
+          },
+          subflows: {},
+          tasks: {},
+        },
+        modelVersion: 1,
+        modules: {},
+      },
+      createdAt: '2026-09-08T00:00:00.000Z',
+      digest: 'digest',
+      flowId: 'flow',
+      modelVersion: 1,
+      parentRevisionId: null,
+      revisionId: 'revision',
+      version: 1,
+    }
+
+    expect(designerGraph(draft, { kind: 'flow' })).toMatchObject({
+      edges: [expect.objectContaining({ source: 'first', target: 'second' })],
+      nodes: [expect.objectContaining({ id: 'first' }), expect.objectContaining({ id: 'second' })],
+    })
+
+    const missing = {
+      ...draft,
+      content: {
+        ...draft.content,
+        document: { ...draft.content.document, graph: { ...draft.content.document.graph, edges: undefined as never } },
+      },
+    }
+    expect(designerGraph(missing, { kind: 'flow' })).toMatchObject({ edges: [], nodes: expect.any(Array) })
+  })
+
   it('preserves revision port order', () => {
     const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
       actorId: 'actor',

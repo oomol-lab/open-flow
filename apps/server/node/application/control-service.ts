@@ -550,7 +550,12 @@ export class ControlService {
     const stored = this.store.revision(flowId, revisionId)
     if (stored == null) notFound()
     const content = revisionContent(stored)
-    const checked = await validateFlow(content, engine)
+    let checked: Awaited<ReturnType<typeof validateFlow>>
+    try {
+      checked = await validateFlow(content, engine)
+    } catch (error) {
+      throw new ControlError(controlErrorCode.flowInvalid, 'The stored Flow Revision is not structurally valid.', { cause: error })
+    }
     const llmDiagnostics = this.llmAvailable()
       ? []
       : [...checked.closure.dependencies.tasks].toSorted().flatMap((taskId) => {
@@ -1035,7 +1040,12 @@ function variable(stored: { readonly name: string; readonly updatedAt: number; r
 }
 
 function revisionContent(stored: { readonly content: string }): RevisionContent {
-  return decodeRevision(new TextEncoder().encode(stored.content))
+  try {
+    return decodeRevision(new TextEncoder().encode(stored.content))
+  } catch (error) {
+    if (error instanceof ControlError) throw error
+    throw new ControlError(controlErrorCode.flowInvalid, 'The stored Flow Revision is not structurally valid.', { cause: error })
+  }
 }
 
 function revisionMetadata(stored: StoredFlowRevision): Omit<Draft, 'content'> {

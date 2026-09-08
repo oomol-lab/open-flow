@@ -374,6 +374,15 @@ export class WorkbenchStore {
     return await this.runRequests.requestDraft(flow, draft, triggerId)
   }
 
+  public async editDraftRunInputs(triggerId: string) {
+    const flowId = this.workspace.$.flowId.value
+    if (!(await this.workspace.saveModuleEditor()) || this.#disposed || flowId != this.workspace.$.flowId.value) return 'unavailable' as const
+    const flow = this.workspace.$.targetFlow.value
+    const draft = this.workspace.$.draft.value
+    if (flow == null || draft == null) return 'unavailable' as const
+    return await this.runRequests.editDraft(flow, draft, triggerId)
+  }
+
   public async requestLiveRun() {
     const flow = this.workspace.$.targetFlow.value
     if (flow == null) return 'unavailable' as const

@@ -41,8 +41,6 @@ import type { GetPopupContainer } from './useGetPopupContainer.ts'
 import {
   Background,
   BackgroundVariant,
-  ControlButton,
-  Controls,
   Panel,
   Handle,
   NodeToolbar,
@@ -62,8 +60,15 @@ import { useVal } from 'use-value-enhancer'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { combine, derive } from 'value-enhancer'
 import { shallowPlainObjectEqual } from '../../../../base/common/equality.ts'
-import { Button, buttonVariants } from '../../../../ui/browser/button.tsx'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
+import { Button } from '../../../../ui/browser/button.tsx'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../../../../ui/browser/dropdown-menu.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { TooltipProvider } from '../../../../ui/browser/tooltip.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
@@ -207,12 +212,70 @@ type FlowControlsProps = Pick<
 const selector = (s: ReactFlowState) => ({
   minZoomReached: s.transform[2] <= s.minZoom,
   maxZoomReached: s.transform[2] >= s.maxZoom,
+  zoom: s.transform[2],
 })
+
+export function CanvasViewMenu({
+  interactiveMode$,
+  onRelayout,
+  showSettings$,
+}: Pick<ReactFlowContainerProps, 'interactiveMode$' | 'onRelayout' | 'showSettings$'>) {
+  const t = useTranslate()
+  const mode = useVal(interactiveMode$)
+  const showSettings = useVal(showSettings$)
+  const getPopupContainer = useGetStaticPopupContainer()
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button aria-label={t('view')} className={styles.viewMenuTrigger} size="default" title={t('view')} type="button" variant="ghost">
+            <i className="i-carbon:view" />
+            <span>{t('view')}</span>
+            <i className="i-codicon:chevron-down" />
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end" className="w-48" container={typeof document == 'undefined' ? undefined : getPopupContainer()} side="top">
+        {onRelayout != null && (
+          <>
+            <DropdownMenuItem onClick={onRelayout}>
+              <i className="i-custom:layout" />
+              <span>{t('optimize')}</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={() => interactiveMode$.set('mouse')}>
+            <i className="i-custom:mouse" />
+            <span className="flex-1">{t('interactiveMode.mouse')}</span>
+            <i className={mode == 'mouse' ? 'i-codicon:check' : 'invisible i-codicon:check'} />
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => interactiveMode$.set('touchpad')}>
+            <i className="i-custom:touchpad" />
+            <span className="flex-1">{t('interactiveMode.touchpad')}</span>
+            <i className={mode == 'touchpad' ? 'i-codicon:check' : 'invisible i-codicon:check'} />
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+        {showSettings$ != null && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => showSettings$.set(showSettings !== true)}>
+              <i className="i-codicon:settings-gear" />
+              <span>{t(showSettings ? 'settingsPanel.hide' : 'settingsPanel.show')}</span>
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
 
 const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
   const t = useTranslate()
   const rf = useReactFlow()
-  const { minZoomReached, maxZoomReached } = useStore(selector, shallowPlainObjectEqual)
+  const { minZoomReached, maxZoomReached, zoom } = useStore(selector, shallowPlainObjectEqual)
   const nodes = useNodes()
 
   // The SVG background pattern needs a document-unique identifier without CSS-special characters.
@@ -224,72 +287,56 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
     duration: props.layoutMotion === false ? 0 : 150,
     maxZoom: 1,
   }
+  const relayout =
+    props.onRelayout == null
+      ? undefined
+      : () => {
+          props.onRelayout?.()
+          props.onBeforeFitView?.()
+          // Wait for the node description height before fitting the view to avoid overlap.
+          setTimeout(() => rf.fitView(fitViewOptions), 100)
+        }
 
   return (
     <>
       {props.dottedBackground && <Background id={bgId} color="var(--canvas-grid)" gap={GRID_GAP} variant={BackgroundVariant.Dots} />}
-      <Panel position="bottom-center" className={styles.dock} data-canvas-control-scope>
-        <Controls className={styles.dockControls} orientation="horizontal" showInteractive={false} showFitView={false} showZoom={false}>
-          <ControlButton
-            className={cn(buttonVariants({ size: 'icon', variant: 'ghost' }), styles.btnCtrl, 'react-flow__controls-button-zoom-in')}
-            data-slot="button"
-            onClick={() => rf.zoomIn()}
-            title={t('zoomIn')}
-            aria-label={t('zoomIn')}
-            disabled={maxZoomReached}
-          >
-            <i className="i-codicon:zoom-in" />
-          </ControlButton>
-          <ControlButton
-            className={cn(buttonVariants({ size: 'icon', variant: 'ghost' }), styles.btnCtrl, 'react-flow__controls-button-zoom-out')}
-            data-slot="button"
-            onClick={() => rf.zoomOut()}
-            title={t('zoomOut')}
-            aria-label={t('zoomOut')}
-            disabled={minZoomReached}
-          >
-            <i className="i-codicon:zoom-out" />
-          </ControlButton>
-          <ControlButton
-            className={cn(buttonVariants({ size: 'icon', variant: 'ghost' }), styles.btnCtrl, 'react-flow__controls-button-fit-view')}
-            data-slot="button"
-            onClick={() => {
-              props.onBeforeFitView?.()
-              // Wait for the node description height before fitting the view to avoid overlap.
-              setTimeout(() => {
-                rf.fitView({
-                  ...fitViewOptions,
-                  nodes: selectedNodes.length === 0 ? undefined : selectedNodes,
-                })
-                props.onFitView?.()
-              }, 100)
-            }}
-            title={t('fitView')}
-            aria-label={t('fitView')}
-          >
-            <i className="i-custom:screen" />
-          </ControlButton>
-          {props.onRelayout && (
-            <ControlButton
-              className={cn(buttonVariants({ size: 'icon', variant: 'ghost' }), styles.btnCtrl, 'react-flow__controls-button-optimize')}
-              data-slot="button"
-              onClick={() => {
-                props.onRelayout?.()
-                props.onBeforeFitView?.()
-                // Wait for the node description height before fitting the view to avoid overlap.
-                setTimeout(() => {
-                  rf.fitView(fitViewOptions)
-                }, 100)
-              }}
-              title={t('optimize')}
-              aria-label={t('optimize')}
-            >
-              <i className="i-custom:layout" />
-            </ControlButton>
-          )}
-        </Controls>
-        {props.toolbar != null && <div className={styles.dockActions}>{props.toolbar}</div>}
+      <Panel position="bottom-left" className={cn(styles.dock, styles.viewDock)} data-canvas-control-scope>
+        <Button aria-label={t('zoomOut')} disabled={minZoomReached} onClick={() => rf.zoomOut()} size="icon" title={t('zoomOut')} type="button" variant="ghost">
+          <i className="i-codicon:zoom-out" />
+        </Button>
+        <Button className={styles.zoomValue} onClick={() => rf.zoomTo(1)} size="default" title={t('zoomReset')} type="button" variant="ghost">
+          {Math.round(zoom * 100)}%
+        </Button>
+        <Button aria-label={t('zoomIn')} disabled={maxZoomReached} onClick={() => rf.zoomIn()} size="icon" title={t('zoomIn')} type="button" variant="ghost">
+          <i className="i-codicon:zoom-in" />
+        </Button>
+        <Button
+          aria-label={t('fitView')}
+          onClick={() => {
+            props.onBeforeFitView?.()
+            // Wait for the node description height before fitting the view to avoid overlap.
+            setTimeout(() => {
+              rf.fitView({
+                ...fitViewOptions,
+                nodes: selectedNodes.length === 0 ? undefined : selectedNodes,
+              })
+              props.onFitView?.()
+            }, 100)
+          }}
+          size="icon"
+          title={t('fitView')}
+          type="button"
+          variant="ghost"
+        >
+          <i className="i-custom:screen" />
+        </Button>
+        <CanvasViewMenu interactiveMode$={props.interactiveMode$} onRelayout={relayout} showSettings$={props.showSettings$} />
       </Panel>
+      {props.toolbar != null && (
+        <Panel position="bottom-center" className={cn(styles.dock, styles.createDock)} data-canvas-control-scope>
+          <div className={styles.dockActions}>{props.toolbar}</div>
+        </Panel>
+      )}
       <BottomRight miniMapExpanded$={props.miniMapExpanded$} interactiveMode$={props.interactiveMode$} showSettings$={props.showSettings$} />
     </>
   )

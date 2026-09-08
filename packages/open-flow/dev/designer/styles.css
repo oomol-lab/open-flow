@@ -382,6 +382,179 @@ select {
   background: var(--widget-background);
   user-select: none;
 }
+.run-control-stories {
+  width: 100%;
+  min-height: 100%;
+  padding: 32px;
+  color: var(--ui-foreground);
+  background: var(--ui-background);
+  overflow: auto;
+}
+.run-control-stories > header {
+  max-width: 720px;
+  margin: 0 auto 28px;
+}
+.run-control-stories > header > strong {
+  font-size: 20px;
+}
+.run-control-stories > header > p {
+  margin: 7px 0 0;
+  color: var(--ui-muted-foreground);
+  font-size: 13px;
+}
+.run-control-story-grid {
+  display: grid;
+  max-width: 1040px;
+  margin: auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.run-control-sample {
+  min-width: 0;
+  min-height: 232px;
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-card);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+}
+.run-control-story-label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.run-control-story-label > strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.run-control-story-label > span {
+  color: var(--ui-muted-foreground);
+  font-size: 11px;
+}
+.run-control-story-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 152px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background-color: var(--ui-background);
+  background-image: radial-gradient(var(--ui-border) 0.7px, transparent 0.7px);
+  background-size: 16px 16px;
+}
+.run-control-story-island {
+  position: absolute;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--ui-border);
+  border-radius: 16px;
+  background: var(--ui-popover);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 8%);
+}
+.run-control-story-view {
+  left: 12px;
+}
+.run-control-story-create {
+  left: 50%;
+  gap: 5px;
+  transform: translateX(-50%);
+}
+.run-control-story-zoom {
+  min-width: 48px;
+  padding-inline: 5px;
+  color: var(--ui-muted-foreground);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.run-control-story-inspector,
+.run-control-story-map-button {
+  position: absolute;
+  z-index: 1;
+  right: 12px;
+}
+.run-control-story-inspector {
+  top: 12px;
+}
+.run-control-story-map-button {
+  bottom: 12px;
+}
+.run-control-story-minimap {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 88px;
+  height: 62px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-muted);
+}
+.run-control-story-minimap > span {
+  position: absolute;
+  width: 18px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--ui-muted-foreground);
+  opacity: 0.28;
+}
+.run-control-story-minimap > span:nth-child(1) {
+  top: 17px;
+  left: 15px;
+}
+.run-control-story-minimap > span:nth-child(2) {
+  top: 31px;
+  left: 35px;
+}
+.run-control-story-minimap > span:nth-child(3) {
+  top: 14px;
+  right: 11px;
+}
+.run-control-story-minimap > button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+.run-control-story-panel {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  width: 148px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 54px 12px 12px;
+  border-left: 1px solid var(--ui-border);
+  background: var(--ui-card);
+  font-size: 11px;
+}
+.run-control-story-panel > strong {
+  font-size: 12px;
+}
+.run-control-story-panel > span {
+  color: var(--ui-muted-foreground);
+}
+.run-control-story-inputs {
+  display: grid;
+  gap: 14px;
+}
+.run-control-story-inputs > header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.run-control-story-inputs > header > span {
+  color: var(--ui-muted-foreground);
+  font-size: 11px;
+}
+.run-control-story-inputs > button {
+  justify-self: end;
+}
 .lab-status {
   min-width: 0;
   padding: 5px 10px;
@@ -400,6 +573,17 @@ select {
   }
   .lab-toolbar {
     flex-wrap: wrap;
+  }
+  .run-control-story-stage {
+    min-height: 224px;
+  }
+  .run-control-story-create {
+    left: 12px;
+    transform: none;
+  }
+  .run-control-story-view {
+    top: 12px;
+    bottom: auto;
   }
 }
 

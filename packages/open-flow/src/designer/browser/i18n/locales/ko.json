@@ -593,6 +593,8 @@
   },
   "zoomIn": "확대",
   "zoomOut": "축소",
+  "zoomReset": "확대/축소를 100%로 재설정",
+  "view": "보기",
   "canvasCard": {
     "waitBranch": { "approve": "승인", "reject": "거부", "continue": "계속" },
     "run": "실행",

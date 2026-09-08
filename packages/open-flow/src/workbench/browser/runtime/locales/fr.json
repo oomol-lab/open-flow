@@ -630,7 +630,13 @@
     "title": "Problèmes"
   },
   "runInput": {
-    "triggerDataHint": "Saisissez des données de test dans les champs à droite, puis lancez l’exécution pour tester les nœuds suivants.",
+    "editMissing": "Ajouter des données de test",
+    "editReady": "Modifier les données de test enregistrées",
+    "remembered": "Les données de test sont conservées pendant cette session d’édition et ne modifient pas le workflow.",
+    "startTest": "Démarrer le test",
+    "testTrigger": "Tester {{name}}",
+    "triggerCount": "{{count}} nœuds de départ",
+    "triggerDataHint": "Saisissez des données d’exemple pour ce Trigger, puis démarrez le test.",
     "triggerData": "Données du déclencheur",
     "close": "Fermer les entrées d'exécution",
     "description": "Saisissez les données pour cette exécution. Le workflow ne sera pas modifié.",

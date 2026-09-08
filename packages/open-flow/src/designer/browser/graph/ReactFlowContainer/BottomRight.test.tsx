@@ -65,34 +65,31 @@ describe('BottomRight', () => {
     captured.miniMap = undefined
   })
 
-  it('keeps collapsed canvas commands in React Flow Controls', () => {
+  it('keeps the collapsed MiniMap control in the bottom-right corner', () => {
     const interactiveMode$ = val<InteractiveMode>('mouse')
     const miniMapExpanded$ = val<boolean | undefined>(false)
     const showSettings$ = val(false)
 
-    const markup = render(interactiveMode$, miniMapExpanded$, showSettings$)
+    render(interactiveMode$, miniMapExpanded$, showSettings$)
 
-    expect(markup).toContain('data-orientation="horizontal"')
     expect(captured.miniMap).toBeUndefined()
-    expect(captured.buttons).toHaveLength(3)
+    expect(captured.controls).toContainEqual(expect.objectContaining({ position: 'bottom-right' }))
+    expect(captured.buttons).toHaveLength(1)
 
     captured.buttons[0]?.onClick?.({} as never)
-    captured.buttons[1]?.onClick?.({} as never)
-    captured.buttons[2]?.onClick?.({} as never)
 
-    expect(interactiveMode$.value).toBe('touchpad')
     expect(miniMapExpanded$.value).toBe(true)
-    expect(showSettings$.value).toBe(true)
   })
 
-  it('lets the official MiniMap own its expanded position', () => {
+  it('keeps the expanded MiniMap and its close control in the bottom-right corner', () => {
     const interactiveMode$ = val<InteractiveMode>('mouse')
     const miniMapExpanded$ = val<boolean | undefined>(true)
     const showSettings$ = val(false)
 
     render(interactiveMode$, miniMapExpanded$, showSettings$)
 
-    expect(captured.miniMap).toMatchObject({ ariaLabel: 'Mini map', pannable: true, position: 'top-right', zoomable: true })
+    expect(captured.miniMap).toMatchObject({ ariaLabel: 'Mini map', pannable: true, position: 'bottom-right', zoomable: true })
+    expect(captured.controls).toContainEqual(expect.objectContaining({ position: 'bottom-right' }))
     expect(captured.buttons).toHaveLength(1)
 
     captured.buttons[0]?.onClick?.({} as never)

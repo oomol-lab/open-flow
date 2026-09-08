@@ -98,10 +98,6 @@
   }
 }
 
-.btnCtrl {
-  font-size: var(--canvas-control-icon-size);
-}
-
 .contextMenu {
   min-width: 150px;
   padding: 4px;
@@ -126,28 +122,38 @@
 .dock {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px;
+  gap: 2px;
+  padding: 5px;
   margin-bottom: 22px;
   max-width: calc(100% - 32px);
   border: 1px solid var(--ui-border);
-  border-radius: 20px;
+  border-radius: 16px;
   background: var(--ui-popover);
   box-shadow:
     0 4px 6px rgb(0 0 0 / 3%),
     0 12px 36px rgb(0 0 0 / 9%);
 }
 
-.flow .dockControls:global(.react-flow__controls) {
-  position: static;
-  transform: none;
-  display: flex;
-  gap: 3px;
-  margin: 0;
-  flex-shrink: 0;
-  :global(.react-flow__controls-button) {
-    border-radius: var(--ui-radius);
-  }
+.viewDock {
+  font-size: var(--canvas-control-icon-size);
+}
+
+.createDock {
+  gap: 5px;
+}
+
+.zoomValue {
+  min-width: 48px;
+  padding-inline: 5px;
+  color: var(--ui-muted-foreground);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.viewMenuTrigger {
+  padding-inline: 8px;
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
 }
 
 .dockActions {
@@ -158,15 +164,26 @@
 
 @container open-flow-workbench (max-width: 720px) {
   .dock {
-    gap: 4px;
     padding: 5px;
     margin-bottom: 14px;
   }
-  .dockControls :global(.react-flow__controls-button-zoom-in),
-  .dockControls :global(.react-flow__controls-button-zoom-out) {
-    display: none;
-  }
   .dockActions {
     gap: 3px;
+  }
+}
+
+@container open-flow-workbench (max-width: 560px) {
+  .zoomValue,
+  .viewMenuTrigger > span {
+    display: none;
+  }
+
+  .viewMenuTrigger {
+    width: 32px;
+    padding: 0;
+  }
+
+  .viewMenuTrigger > :last-child {
+    display: none;
   }
 }

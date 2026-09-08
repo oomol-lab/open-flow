@@ -593,6 +593,8 @@
   },
   "zoomIn": "увеличить",
   "zoomOut": "уменьшить",
+  "zoomReset": "Сбросить масштаб до 100%",
+  "view": "Вид",
   "canvasCard": {
     "waitBranch": { "approve": "Одобрено", "reject": "Отклонено", "continue": "Продолжить" },
     "run": "Запуск",

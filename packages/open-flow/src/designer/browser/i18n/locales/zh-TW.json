@@ -593,6 +593,8 @@
   },
   "zoomIn": "放大",
   "zoomOut": "縮小",
+  "zoomReset": "將縮放重設為 100%",
+  "view": "檢視",
   "canvasCard": {
     "waitBranch": { "approve": "通過", "reject": "拒絕", "continue": "繼續" },
     "run": "執行",

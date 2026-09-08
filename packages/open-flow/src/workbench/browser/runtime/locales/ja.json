@@ -630,7 +630,13 @@
     "title": "問題"
   },
   "runInput": {
-    "triggerDataHint": "右側の入力欄にテストデータを入力し、実行をクリックして後続のノードをテストします。",
+    "editMissing": "テストデータを入力",
+    "editReady": "保存済みのテストデータを編集",
+    "remembered": "テストデータはこの編集セッション中に保持され、ワークフローは変更されません。",
+    "startTest": "テストを開始",
+    "testTrigger": "{{name}}をテスト",
+    "triggerCount": "開始ノード {{count}} 件",
+    "triggerDataHint": "この Trigger のサンプルデータを入力して、テストを開始します。",
     "triggerData": "トリガーデータ",
     "close": "実行入力を閉じる",
     "description": "今回の実行に必要なデータを入力してください。ワークフローは変更されません。",

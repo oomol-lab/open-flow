@@ -173,18 +173,12 @@ it('collects downstream inputs for a cron test without asking for a trigger payl
   }
 })
 
-it('requires an explicit choice for multiple triggers and submits only the selected entry', async () => {
+it('auto-selects the first entry when a graph has multiple triggers', async () => {
   const { client, store } = harness()
   try {
-    expect(await store.requestDraft(flow, entryDraft(true))).toBe('input')
-    expect(store.$.inputRequest.value?.triggerId).toBeUndefined()
-    expect(await store.confirmInputs()).toBe(false)
-    expect(client.createDraftRun).not.toHaveBeenCalled()
-    await store.selectTrigger('other')
-    expect(await store.confirmInputs()).toBe(true)
-    expect(client.createDraftRun).toHaveBeenCalledWith('flow', 'revision', expect.objectContaining({ trigger: { nodeId: 'other', payload: {} } }))
-    expect(await store.requestDraft(flow, entryDraft(true))).toBe('input')
-    expect(store.$.inputRequest.value?.triggerId).toBeUndefined()
+    expect(await store.requestDraft(flow, entryDraft(true))).toBe('started')
+    expect(store.$.inputRequest.value).toBeUndefined()
+    expect(client.createDraftRun).toHaveBeenCalledWith('flow', 'revision', expect.objectContaining({ trigger: { nodeId: 'start', payload: {} } }))
   } finally {
     store.dispose()
   }
@@ -204,16 +198,14 @@ it('does not run a graph without an entry', async () => {
   }
 })
 
-it('uses the fixed Live revision when choosing an entry', async () => {
+it('uses the fixed Live revision and its first entry', async () => {
   const { client, store } = harness()
   client.getLive.mockResolvedValue({ publication: { publicationId: 'publication', revisionId: 'published' } })
   client.getRevision.mockResolvedValue({ ...entryDraft(true), revisionId: 'published' })
   try {
-    expect(await store.requestLive(flow)).toBe('input')
-    await store.selectTrigger('other')
-    expect(await store.confirmInputs()).toBe(true)
+    expect(await store.requestLive(flow)).toBe('started')
     expect(client.getRevision).toHaveBeenCalledWith('flow', 'published')
-    expect(client.createLiveRun).toHaveBeenCalledWith('publication', expect.objectContaining({ trigger: { nodeId: 'other', payload: {} } }))
+    expect(client.createLiveRun).toHaveBeenCalledWith('publication', expect.objectContaining({ trigger: { nodeId: 'start', payload: {} } }))
   } finally {
     store.dispose()
   }
@@ -250,13 +242,77 @@ it('flushes pending code again before confirming inputs and uses the saved revis
     prepare,
   )
   try {
-    expect(await store.requestDraft(flow, entryDraft(true))).toBe('input')
-    await store.selectTrigger('other')
+    expect(await store.requestDraft(flow, draft)).toBe('input')
+    store.$.inputRequest.value?.groups[0]?.editor.replaceValues({ value: 'test' })
     prepare.mockResolvedValueOnce(undefined)
     expect(await store.confirmInputs()).toBe(false)
     expect(createDraftRun).not.toHaveBeenCalled()
     expect(await store.confirmInputs()).toBe(true)
-    expect(createDraftRun).toHaveBeenCalledWith('flow', 'saved-revision', expect.objectContaining({ trigger: { nodeId: 'other', payload: {} } }))
+    expect(createDraftRun).toHaveBeenCalledWith(
+      'flow',
+      'saved-revision',
+      expect.objectContaining({ inputs: { task: { value: 'test' } }, trigger: { nodeId: 'start', payload: {} } }),
+    )
+  } finally {
+    store.dispose()
+  }
+})
+
+it('remembers valid test data for the selected trigger and reuses it on the next run', async () => {
+  const { client, store } = harness()
+  try {
+    expect(store.inputStatus(flow.flowId, draft, 'start')).toBe('missing')
+    expect(await store.requestDraft(flow, draft, 'start')).toBe('input')
+    store.$.inputRequest.value?.groups[0]?.editor.replaceValues({ value: 'remembered' })
+    store.dismissInputs()
+
+    expect(store.inputStatus(flow.flowId, draft, 'start')).toBe('ready')
+    expect(await store.requestDraft(flow, draft, 'start')).toBe('started')
+    expect(client.createDraftRun).toHaveBeenCalledWith(
+      'flow',
+      'revision',
+      expect.objectContaining({ inputs: { task: { value: 'remembered' } }, trigger: { nodeId: 'start', payload: {} } }),
+    )
+  } finally {
+    store.dispose()
+  }
+})
+
+it('reopens test data when its input shape changes', async () => {
+  const { client, store } = harness()
+  try {
+    expect(await store.requestDraft(flow, draft, 'start')).toBe('input')
+    store.$.inputRequest.value?.groups[0]?.editor.replaceValues({ value: 'remembered' })
+    store.dismissInputs()
+    const changed = {
+      ...draft,
+      content: {
+        ...draft.content,
+        document: {
+          ...draft.content.document,
+          graph: {
+            ...draft.content.document.graph,
+            nodes: {
+              ...draft.content.document.graph.nodes,
+              task: {
+                inputs: {},
+                kind: 'task',
+                task: {
+                  inputs: [{ handle: 'value', jsonSchema: { type: 'number' }, nullable: false }],
+                  moduleId: 'module',
+                  name: 'Code',
+                  outputs: [],
+                },
+              },
+            },
+          },
+        },
+      },
+    } satisfies Draft
+
+    expect(store.inputStatus(flow.flowId, changed, 'start')).toBe('missing')
+    expect(await store.requestDraft(flow, changed, 'start')).toBe('input')
+    expect(client.createDraftRun).not.toHaveBeenCalled()
   } finally {
     store.dispose()
   }

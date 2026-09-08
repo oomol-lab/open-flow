@@ -630,7 +630,13 @@
     "title": "Problems"
   },
   "runInput": {
-    "triggerDataHint": "Enter sample data in the fields on the right, then click Run to test the following nodes.",
+    "editMissing": "Add test data",
+    "editReady": "Edit saved test data",
+    "remembered": "Test data is remembered for this editing session and does not change the workflow.",
+    "startTest": "Start test",
+    "testTrigger": "Test {{name}}",
+    "triggerCount": "{{count}} start nodes",
+    "triggerDataHint": "Enter sample data for this Trigger, then start the test.",
     "triggerData": "Trigger data",
     "close": "Close run inputs",
     "description": "Enter data for this run. Your workflow will not be changed.",

@@ -49,7 +49,7 @@ export const FlowDesigner: React.FC<FlowDesignerProps> = ({
 }) => {
   const editable = useVal(flowDesignerStore.$.editable)
   const nodeMiniMapPhase = useVal(flowDesignerStore.$.nodeMiniMapPhase)
-  const showSettings$ = flowDesignerStore.manifest$ == null ? undefined : flowDesignerStore.$$.showSettings
+  const showSettings$ = flowDesignerStore.manifest$ == null || view != null ? undefined : flowDesignerStore.$$.showSettings
 
   useEffect(flowDesignerStore.setupForceDelete, [])
 
