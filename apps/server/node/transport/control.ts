@@ -1,12 +1,13 @@
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { Context, Next } from 'hono'
-import type { ControlService } from './control-service.ts'
+import type { ControlService } from '../application/control-service.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { controlRequests } from '@oomol-lab/open-flow/control-requests'
 import { validVariableName } from '@oomol-lab/open-flow/flow-change'
 import { runStatuses } from '@oomol-lab/open-flow/run-lifecycle'
 import { Hono } from 'hono'
+import { ControlError } from '../error.ts'
 import {
   decodeFlowCursor,
   decodeRunCursor,
@@ -17,7 +18,6 @@ import {
   encodePublicationCursor,
   encodeTriggerActivityCursor,
 } from './control-cursor.ts'
-import { ControlError } from './error.ts'
 
 export type ResolveControlActor = (request: Request) => Promise<string | undefined> | string | undefined
 

@@ -131,7 +131,7 @@ it.each(['all', 'output', 'lifecycle'] as const)('shows all final handles once i
     {
       createdAt: '2026-09-05T10:00:00.000Z',
       kind: 'node.completed',
-      payload: { nodeId: 'source', executionId: 'execution', outputs: { first: 17, second: 29 } },
+      payload: { flowId: 'flow', scopeId: 'scope', nodeId: 'source', executionId: 'execution', outputs: { first: 17, second: 29 } },
       sequence: 1,
     },
   ]

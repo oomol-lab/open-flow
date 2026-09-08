@@ -345,3 +345,58 @@ it.each(['run', 'events', 'result', 'operation', 'live', 'publications', 'bindin
   cancellation.abort(new Error('Observation stopped'))
   await rejected
 })
+
+describe('Run event contract', () => {
+  const node = { executionId: 'execution', flowId: 'flow', nodeId: 'node', scopeId: 'scope' }
+  const cases = [
+    ['run.queued', {}],
+    ['run.started', { flowId: 'flow', scopeId: 'scope' }],
+    ['run.progress', { flowId: 'flow', scopeId: 'scope', progress: 25 }],
+    ['run.waiting', { expiresAt: 'later', nodeId: 'node', waitId: 'wait', waitingSince: 'now' }],
+    ['run.resolved', { action: 'approve', resolvedAt: 'now', waitId: 'wait' }],
+    ['run.completed', { result: { nested: [null, true, 1, 'value'] } }],
+    ['run.failed', { result: { error: { code: 'run.failed', message: 'Failed.' } } }],
+    ['run.indeterminate', { result: {} }],
+    ['run.canceled', { result: {} }],
+    ['run.events-truncated', {}],
+    ['node.started', { ...node, nodeKind: 'javascript', nodeTitle: 'Task' }],
+    ['node.completed', { ...node, outputs: { nested: [null, { value: true }] } }],
+    ['node.failed', { ...node, error: { code: 'node.failed', message: 'Failed.' } }],
+    ['node.log', { ...node, level: 'info', message: 'Message.' }],
+    ['node.progress', { ...node, progress: 100 }],
+    ['node.artifact', { ...node, artifact: { kind: 'artifact', id: 'artifact', name: 'File', size: 0, digest: `sha256:${'0'.repeat(64)}` } }],
+  ] as const
+
+  it.each(cases)('decodes %s and rejects missing required payload fields', async (kind, payload) => {
+    const event = { createdAt: 'now', kind, payload, sequence: 1 }
+    let events: unknown[] = [event]
+    const client = new ControlClient(async () => Response.json({ done: false, events, historyComplete: true, nextAfter: 1, runId: 'run', version: 1 }))
+    expect((await client.getRunEvents('run')).events).toEqual([event])
+    for (const key of Object.keys(payload)) {
+      if (key == 'nodeTitle' || key == 'nodeKind') continue
+      events = [{ ...event, payload: Object.fromEntries(Object.entries(payload).filter(([name]) => name != key)) }]
+      await expect(client.getRunEvents('run')).rejects.toMatchObject({ code: 'response.invalid' })
+    }
+  })
+
+  it.each([
+    ['node.completed', { ...node, outputs: [] }],
+    ['node.log', { ...node, level: 'verbose', message: 'Message.' }],
+    ['node.progress', { ...node, progress: -1 }],
+    ['run.progress', { flowId: 'flow', scopeId: 'scope', progress: 101 }],
+    ['run.resolved', { action: 'cancel', resolvedAt: 'now', waitId: 'wait' }],
+    ['node.artifact', { ...node, artifact: { kind: 'artifact', id: 'artifact', name: 'File', size: -1, digest: 'invalid' } }],
+  ])('rejects invalid %s payload values', async (kind, payload) => {
+    const client = new ControlClient(async () =>
+      Response.json({
+        done: false,
+        events: [{ createdAt: 'now', kind, payload, sequence: 1 }],
+        historyComplete: true,
+        nextAfter: 1,
+        runId: 'run',
+        version: 1,
+      }),
+    )
+    await expect(client.getRunEvents('run')).rejects.toMatchObject({ code: 'response.invalid' })
+  })
+})

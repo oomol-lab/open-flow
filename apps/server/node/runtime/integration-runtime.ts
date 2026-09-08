@@ -9,9 +9,9 @@ import type {
   IntegrationStateContext,
 } from '@oomol-lab/open-flow/integration-trigger'
 import type { Logger } from 'pino'
-import type { ConnectorHost } from './connector.ts'
-import type { IntegrationCandidate } from './integration-store.ts'
-import type { IntegrationHealth, StoredIntegrationBinding, StoredIntegrationState, StoredIntegrationTarget } from './trigger-store.ts'
+import type { ConnectorHost } from '../deployment/connector.ts'
+import type { IntegrationCandidate } from '../storage/integration-store.ts'
+import type { IntegrationHealth, StoredIntegrationBinding, StoredIntegrationState, StoredIntegrationTarget } from '../storage/trigger-store.ts'
 
 import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
@@ -25,10 +25,10 @@ import {
 } from '@oomol-lab/open-flow/integration-trigger'
 import * as Effect from 'effect/Effect'
 import * as Semaphore from 'effect/Semaphore'
-import { ConnectorTaskError } from './connector.ts'
-import { AcceptanceError } from './error.ts'
-import { errorKind } from './logger.ts'
-import { Store } from './store.ts'
+import { ConnectorTaskError } from '../deployment/connector.ts'
+import { AcceptanceError } from '../error.ts'
+import { errorKind } from '../logger.ts'
+import { Store } from '../storage/store.ts'
 
 export interface IntegrationOptions {
   readonly callbackKey: string

@@ -2,8 +2,8 @@ import type { IntegrationBodyFormat, IntegrationEndpointDeclaration, JsonValue }
 import type { Logger } from 'pino'
 
 import { maximumIntegrationBodyBytes } from '@oomol-lab/open-flow/integration-trigger'
-import { errorKind } from './logger.ts'
-import { ServerService } from './service.ts'
+import { ServerService } from '../application/service.ts'
+import { errorKind } from '../logger.ts'
 
 const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false })
 const encoder = new TextEncoder()

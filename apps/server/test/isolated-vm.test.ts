@@ -2,7 +2,7 @@ import type { RuntimeHarness, RuntimeProgram } from '@oomol-lab/open-flow/runtim
 
 import { runtimeConformanceCases } from '@oomol-lab/open-flow/runtime-contract'
 import { afterAll, describe, expect, it } from 'vitest'
-import { IsolatedVmError, isolatedVmEngineDigest, isolatedVmLimits, IsolatedVmHost } from '../node/isolated-vm.ts'
+import { IsolatedVmError, isolatedVmEngineDigest, isolatedVmLimits, IsolatedVmHost } from '../node/runtime/isolated-vm.ts'
 import { childProcessId } from './processTree.ts'
 
 const host = new IsolatedVmHost()

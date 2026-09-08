@@ -115,7 +115,7 @@ async function createHarness(fixture: PollConformanceFixture): Promise<PollConfo
   let active = true
   let nextAt = nextTriggerScheduledAt(fixture.rules, now)
   let lastOccurrence: { readonly bindingId: string; readonly occurredAt: string; readonly occurrenceId: string; readonly runtimeVersion: number } | undefined
-  const publication = await service.publishFlow({
+  const publication = await service.publisher.publish({
     expectedLivePublicationId: null,
     flowId: 'main',
     idempotencyKey: next('publish'),
@@ -136,7 +136,7 @@ async function createHarness(fixture: PollConformanceFixture): Promise<PollConfo
       now = Date.parse(at)
       config = change?.config ?? config
       connectionId = change?.connectionId ?? connectionId
-      const republished = await service.publishFlow({
+      const republished = await service.publisher.publish({
         expectedLivePublicationId: publicationId,
         flowId: 'main',
         idempotencyKey: next('publish'),
@@ -153,7 +153,7 @@ async function createHarness(fixture: PollConformanceFixture): Promise<PollConfo
     },
     async retire(at) {
       now = Date.parse(at)
-      const retired = await service.publishFlow({
+      const retired = await service.publisher.publish({
         expectedLivePublicationId: publicationId,
         flowId: 'main',
         idempotencyKey: next('publish'),

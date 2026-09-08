@@ -142,18 +142,28 @@ export interface SchedulerFailure {
   readonly message: string
 }
 
-export interface FlowRunOptions {
-  readonly bindingValues?: Readonly<Record<string, string>>
+export type FlowRunOptions = {
   readonly createId: () => string
   readonly emit?: (event: SchedulerEvent) => Effect.Effect<void, Error>
   readonly flowId: string
-  readonly inputs?: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>
   readonly invokeTask: (invocation: TaskInvocation) => Effect.Effect<unknown, Error>
   readonly projectFailure?: (error: unknown) => SchedulerFailure
-  readonly resume?: { readonly action: WaitAction; readonly checkpoint: unknown }
   readonly runId: string
-  readonly trigger?: TriggerSeed
-}
+} & RunLaunch
+
+export type RunLaunch =
+  | {
+      readonly bindingValues?: Readonly<Record<string, string>>
+      readonly inputs?: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>
+      readonly trigger: TriggerSeed
+      readonly resume?: never
+    }
+  | {
+      readonly resume: { readonly action: WaitAction; readonly checkpoint: unknown }
+      readonly bindingValues?: never
+      readonly inputs?: never
+      readonly trigger?: never
+    }
 
 interface ParentRun {
   readonly jobId: string
@@ -807,8 +817,8 @@ function runGraph(
 export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect.Effect<FlowRunOutcome, Error> {
   const emit = options.emit ?? (() => Effect.void)
   const program = Effect.gen(function* () {
-    if (options.resume != null && (options.inputs != null || options.trigger != null)) {
-      return yield* Effect.fail(new Error('A resumed Flow Run cannot accept launch inputs or a Trigger seed.'))
+    if (options.resume != null && (options.inputs != null || options.trigger != null || options.bindingValues != null)) {
+      return yield* Effect.fail(new Error('A resumed Flow Run cannot accept launch inputs, binding values, or a Trigger seed.'))
     }
     const checkpoint = options.resume == null ? undefined : decodeFlowRunCheckpoint(options.resume.checkpoint)
     if (checkpoint != null && new TextEncoder().encode(JSON.stringify(checkpoint)).byteLength > 16 * 1024 * 1024) {

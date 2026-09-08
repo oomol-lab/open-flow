@@ -1,28 +1,21 @@
-import type { FlowCatalogEvent, FlowChangeEvent, PublishOperation } from '@oomol-lab/open-flow/control-api'
-import type { ConnectorCapability, JsonValue, RevisionContent, TriggerNode, WaitAction } from '@oomol-lab/open-flow/flow-change'
+import type { FlowCatalogEvent, FlowChangeEvent } from '@oomol-lab/open-flow/control-api'
+import type { JsonValue, RevisionContent, TriggerNode, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { IntegrationDefinition } from '@oomol-lab/open-flow/integration-trigger'
 import type { PollDefinition } from '@oomol-lab/open-flow/poll-trigger'
 import type { ProviderTriggerDefinition } from '@oomol-lab/open-flow/provider-triggers'
-import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
-import type { InvokeLlmTask, RuntimeCapabilityCall, RuntimeCapabilityResponse } from '@oomol-lab/open-flow/runtime-contract'
-import type { FlowRunOutcome, FlowRunResult, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
+import type { InvokeLlmTask } from '@oomol-lab/open-flow/runtime-contract'
 import type { Logger } from 'pino'
-import type { ConnectorHost } from './connector.ts'
-import type { IntegrationOptions, IntegrationResponse, IntegrationRuntimeState, IntegrationTarget } from './integration-runtime.ts'
-import type { PublicationStore } from './publication-store.ts'
-import type { PublicationAcceptance, RunEvent, RunRecord, StoredRun } from './store.ts'
-import type { PollState, RunAdmission, StoredCronTarget } from './trigger-store.ts'
+import type { ConnectorHost } from '../deployment/connector.ts'
+import type { IntegrationOptions, IntegrationResponse, IntegrationRuntimeState, IntegrationTarget } from '../runtime/integration-runtime.ts'
+import type { RunEvent, RunRecord } from '../storage/store.ts'
+import type { PollState, RunAdmission, StoredCronTarget } from '../storage/trigger-store.ts'
 
-import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-action'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId, validateTriggerSchedule } from '@oomol-lab/open-flow/cron-trigger'
+import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId } from '@oomol-lab/open-flow/cron-trigger'
 import { canonicalJsonBytes, decodeRevision, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
-import { codeActions } from '@oomol-lab/open-flow/flow-semantics'
 import { matchesSchema, prepareFlow, triggerPayloadSchema, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { triggerDefinitions as providerTriggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
-import { createEventProjector } from '@oomol-lab/open-flow/run-events'
-import { resolveAction } from '@oomol-lab/open-flow/runtime-contract'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import * as Cause from 'effect/Cause'
 import * as Clock from 'effect/Clock'
@@ -36,34 +29,17 @@ import * as Queue from 'effect/Queue'
 import * as Scope from 'effect/Scope'
 import * as Semaphore from 'effect/Semaphore'
 import { createHash } from 'node:crypto'
-import { checkCodeActions } from './connector.ts'
-import { ConnectorClient, ConnectorTaskError } from './connector.ts'
+import { ConnectorClient, ConnectorTaskError } from '../deployment/connector.ts'
+import { AcceptanceError, ControlError } from '../error.ts'
+import { errorKind, silentLogger } from '../logger.ts'
+import { IntegrationRuntime } from '../runtime/integration-runtime.ts'
+import { IsolatedVmHost } from '../runtime/isolated-vm.ts'
+import { PollRuntime } from '../runtime/poll-runtime.ts'
+import { migrateDatabase } from '../storage/migrate.ts'
+import { Store } from '../storage/store.ts'
 import { ControlService } from './control-service.ts'
-import { AcceptanceError, ControlError } from './error.ts'
-import { IntegrationRuntime } from './integration-runtime.ts'
-import { isolatedVmEngineDigest, IsolatedVmHost } from './isolated-vm.ts'
-import { errorKind, silentLogger } from './logger.ts'
-import { migrateDatabase } from './migrate.ts'
-import { PollRuntime } from './poll-runtime.ts'
-import { publishPending } from './publication-store.ts'
-import { Store } from './store.ts'
-
-interface PublishFlowInput {
-  readonly control?:
-    | { readonly actorId: string; readonly operation: 'publish' }
-    | { readonly actorId: string; readonly operation: 'rollback'; readonly sourcePublicationId: string }
-  readonly engineContract?: string
-  readonly expectedLivePublicationId: string | null
-  readonly flowId: string
-  readonly idempotencyKey: string
-  readonly revision: RevisionContent
-  readonly revisionDigest?: string
-  readonly revisionId: string
-}
-
-type PublicationMetadata =
-  | { readonly actorId: string; readonly modelVersion: number; readonly operation: 'publish' }
-  | { readonly actorId: string; readonly modelVersion: number; readonly operation: 'rollback'; readonly sourcePublicationId: string }
+import { Publisher } from './publication.ts'
+import { RunExecutor } from './run.ts'
 
 interface PollOccurrenceInput {
   readonly bindingId: string
@@ -109,17 +85,6 @@ interface WebhookTarget {
   readonly triggerNodeId: string
 }
 
-const encoder = new TextEncoder()
-const nodeFailureCodes: ReadonlySet<string> = new Set([
-  'capability.denied',
-  'capability.invalid',
-  'connector.connection-required',
-  'connector.unavailable',
-  'connector.unconfigured',
-  'llm.output-invalid',
-  'llm.unavailable',
-  'node.failed',
-])
 const cronBatchSize = 100
 const maxTimerDelayMs = 2_147_483_647
 const maintenanceBatchSize = 100
@@ -185,26 +150,14 @@ async function loadTeams(
   }
 }
 
-type TaskErrorCode = 'capability.denied' | 'capability.invalid' | 'llm.output-invalid' | 'llm.unavailable'
-
-class TaskHostError extends Error {
-  readonly code: TaskErrorCode
-
-  constructor(code: TaskErrorCode, message: string) {
-    super(message)
-    this.code = code
-    this.name = 'TaskHostError'
-  }
-}
-
 export class ServerService {
+  readonly publisher: Publisher
   readonly control: ControlService
   readonly #clock: () => number
   readonly #clockService: Clock.Clock
   readonly #cronLock: Semaphore.Semaphore
   readonly #receive: (effect: Effect.Effect<IntegrationResponse, unknown>, signal?: AbortSignal) => Promise<IntegrationResponse>
   readonly #integration: IntegrationRuntime
-  readonly #isolatedVm: IsolatedVmHost
   readonly #logger: Logger
   readonly #maxConcurrentRuns: number
   readonly #maintenanceLock: Semaphore.Semaphore
@@ -215,7 +168,7 @@ export class ServerService {
   readonly #flowSubscribers = new Map<string, Set<(event: FlowChangeEvent) => void>>()
   readonly #runningFlows = new Set<string>()
   readonly #resolveIntegration: () => IntegrationOptions | undefined
-  readonly #runTimeoutMs: number
+  readonly #executor: RunExecutor
   readonly #resolveLlm: () => InvokeLlmTask | undefined
   readonly #resolveWaitPublicOrigin: () => URL | undefined
   readonly #signals: Queue.Queue<Deferred.Deferred<void> | undefined>
@@ -251,44 +204,32 @@ export class ServerService {
     this.#clock = clock
     this.#clockService = clockService
     this.#cronLock = cronLock
-    this.#isolatedVm = isolatedVm
     this.#logger = logger.child({ component: 'runtime' })
     this.#maintenanceLock = maintenanceLock
     this.#maxConcurrentRuns = runtime.maxConcurrentRuns ?? defaultMaxConcurrentRuns
     this.#resolveConnector = capabilities.connector ?? (() => undefined)
     this.#resolveConnectorConsoleOrigin = capabilities.connectorConsoleOrigin ?? (() => undefined)
     this.#resolveIntegration = capabilities.integration ?? (() => undefined)
-    this.#runTimeoutMs = runtime.runTimeoutMs ?? defaultRunTimeoutMs
     this.#resolveLlm = capabilities.llm ?? (() => undefined)
     this.#resolveWaitPublicOrigin = capabilities.waitPublicOrigin ?? (() => undefined)
     this.#signals = signals
     this.#store = store
     this.#tasks = tasks
     this.#workers = workers
+    this.#executor = new RunExecutor(
+      store,
+      isolatedVm,
+      this.#resolveConnector,
+      this.#resolveLlm,
+      this.#resolveWaitPublicOrigin,
+      runtime.runTimeoutMs ?? defaultRunTimeoutMs,
+      this.#logger,
+      (flowId, runId) => this.#runChanged(flowId, runId),
+      () => this.#wakeMaintenance(),
+    )
     const pollDefinitions = triggerDefinitions.filter((definition): definition is PollDefinition => definition.snapshot.type == 'poll')
     const integrationDefinitions = triggerDefinitions.filter((definition): definition is IntegrationDefinition => definition.snapshot.type == 'integration')
     const snapshots = triggerDefinitions.map((definition) => definition.snapshot).toSorted((left, right) => left.key.localeCompare(right.key))
-    this.control = new ControlService(
-      store,
-      this.#clock,
-      (runId) => this.#interrupt(runId),
-      () => this.#signal(),
-      (input) => this.publishFlow(input),
-      (input) => this.acceptPublishOperation(input),
-      () => {
-        this.#maintenanceAt = this.#clock()
-        this.#signal()
-      },
-      snapshots,
-      (flowId, triggerNodeId) => this.#poll.test(flowId, triggerNodeId),
-      () => this.#notifyFlowCatalog(),
-      (event) => this.#notifyFlow(event),
-      () => this.#resolveLlm() != null,
-      this.#resolveConnector,
-      this.#resolveConnectorConsoleOrigin,
-      this.#resolveWaitPublicOrigin,
-      (teamId) => this.#connectorTeam(teamId),
-    )
     this.#integration = new IntegrationRuntime(
       store,
       this.#resolveConnector,
@@ -311,6 +252,37 @@ export class ServerService {
       () => this.#signal(),
       (flowId, runId) => this.#runCreated(flowId, runId),
       logger,
+    )
+    this.publisher = new Publisher(
+      store,
+      this.#integration,
+      this.#poll,
+      this.#resolveConnector,
+      this.#resolveWaitPublicOrigin,
+      this.#clock,
+      this.#logger,
+      validatedFlow,
+      () => this.#signal(),
+      () => this.#wakeMaintenance(),
+      () => this.#notifyFlowCatalog(),
+    )
+    this.control = new ControlService(
+      store,
+      this.#clock,
+      (runId) => this.#interrupt(runId),
+      () => this.#signal(),
+      (input) => this.publisher.publish(input),
+      (input) => this.publisher.accept(input),
+      () => this.#wakeMaintenance(),
+      snapshots,
+      (flowId, triggerNodeId) => this.#poll.test(flowId, triggerNodeId),
+      () => this.#notifyFlowCatalog(),
+      (event) => this.#notifyFlow(event),
+      () => this.#resolveLlm() != null,
+      this.#resolveConnector,
+      this.#resolveConnectorConsoleOrigin,
+      this.#resolveWaitPublicOrigin,
+      (teamId) => this.#connectorTeam(teamId),
     )
   }
 
@@ -444,201 +416,6 @@ export class ServerService {
     if (accepted?.kind == 'accepted' && accepted.created) this.#runCreated(target.flowId, accepted.runId)
     if (accepted != null) this.#signal()
     return accepted
-  }
-
-  async publishFlow(input: PublishFlowInput): Promise<PublicationAcceptance> {
-    const revisionDigest = input.revisionDigest ?? (await validatedFlow(input.revision)).revisionDigest
-    const replay = this.#store.publications.replayPublication(input.flowId, input.idempotencyKey, await this.#publicationRequestDigest(input, revisionDigest))
-    if (replay != null) return replay
-    const planned = await this.#publication(input)
-    const accepted = this.#store.publications.publish(planned)
-    this.#signal()
-    return accepted
-  }
-
-  async acceptPublishOperation(input: PublishFlowInput): Promise<PublishOperation> {
-    const revisionDigest = input.revisionDigest ?? (await validatedFlow(input.revision)).revisionDigest
-    const replay = this.#store.publications.replayPublishOperation(
-      input.flowId,
-      input.idempotencyKey,
-      await this.#publicationRequestDigest(input, revisionDigest),
-    )
-    if (replay?.kind == 'accepted') return replay.operation
-    if (replay?.kind == 'conflict') {
-      throw new ControlError(controlErrorCode.publicationConflict, 'The idempotency key refers to another Publish request.')
-    }
-    const accepted = this.#store.publications.acceptPublishOperation(await this.#publication(input))
-    switch (accepted.kind) {
-      case 'accepted':
-        this.#maintenanceAt = this.#clock()
-        this.#signal()
-        return accepted.operation
-      case 'binding-unresolved':
-        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required Variable is unresolved.')
-      case 'busy':
-        throw new ControlError(controlErrorCode.flowBusy, 'Another Publish operation is already pending for this Flow.')
-      case 'conflict':
-        throw new ControlError(controlErrorCode.publicationConflict, 'The idempotency key refers to another Publish request.')
-      case 'live-conflict':
-        throw new ControlError(controlErrorCode.liveConflict, 'The Flow Live pointer no longer matches the expected Publication.')
-      case 'not-found':
-        throw new ControlError(controlErrorCode.flowNotFound, 'The Flow was not found.')
-      case 'revision-conflict':
-        throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
-      case 'unsupported':
-        throw new ControlError(controlErrorCode.publicationUnsupported, 'The existing Integration subscription cannot be changed safely during Publish.')
-    }
-  }
-
-  async #publication(input: PublishFlowInput): Promise<Parameters<PublicationStore['publish']>[0]> {
-    const fixed = await validatedFlow(input.revision)
-    await checkCodeActions(codeActions(fixed.prepared), this.#resolveConnector(), this.#store.connectorTeam(input.flowId))
-    const engineContract = input.engineContract ?? currentEngineContract
-    if (input.revisionDigest != null && input.revisionDigest != fixed.revisionDigest) {
-      throw new AcceptanceError('revision-conflict', 'The fixed Revision digest does not match its content.')
-    }
-    if (Object.values(fixed.prepared.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) && this.#resolveWaitPublicOrigin() == null) {
-      throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
-    }
-    const requestDigest = await this.#publicationRequestDigest(input, fixed.revisionDigest)
-    const publishedAt = this.#clock()
-    const integrations = this.#integration.bindings(input.revision, fixed.prepared, publishedAt)
-    const connectorTasks = Object.values(fixed.prepared.tasks).flatMap((task) =>
-      'executor' in task && task.executor.kind == 'connector' ? [task.executor] : [],
-    )
-    const providerTriggers = Object.values(fixed.prepared.graph.nodes).filter(
-      (trigger): trigger is Extract<TriggerNode, { readonly kind: 'integration' | 'poll' }> => trigger.kind == 'integration' || trigger.kind == 'poll',
-    )
-    if (connectorTasks.length > 0 || providerTriggers.length > 0) {
-      const connector = this.#resolveConnector()
-      if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
-      const teamId = this.#store.connectorTeam(input.flowId)
-      const actionRequests = new Map<string, ReturnType<ConnectorHost['getAction']>>()
-      const connectionRequests = new Map<string, ReturnType<ConnectorHost['listConnections']>>()
-      const action = (actionId: string): ReturnType<ConnectorHost['getAction']> => {
-        const existing = actionRequests.get(actionId)
-        if (existing != null) return existing
-        const request = connector.getAction(actionId, undefined, teamId)
-        actionRequests.set(actionId, request)
-        return request
-      }
-      const connections = (serviceId: string): ReturnType<ConnectorHost['listConnections']> => {
-        const existing = connectionRequests.get(serviceId)
-        if (existing != null) return existing
-        const request = connector.listConnections(serviceId, undefined, teamId)
-        connectionRequests.set(serviceId, request)
-        return request
-      }
-      await Promise.all([
-        ...connectorTasks.map(async (executor) => {
-          const definition = await action(executor.action)
-          if (!definition.authenticated && executor.connectionId == null) return
-          if (executor.connectionId == null) {
-            throw new ConnectorTaskError('connector.connection-required', 'The Connector Task requires a Connection before it can be published.')
-          }
-          const available = await connections(definition.serviceId)
-          if (!available.some((candidate) => candidate.connectionId == executor.connectionId && candidate.status == 'active')) {
-            throw new ConnectorTaskError('connector.connection-required', 'The selected Connector Connection must be reconnected or replaced.')
-          }
-        }),
-        ...providerTriggers.map(async (trigger) => {
-          const binding = input.revision.document.bindings[trigger.bindingId]
-          if (binding?.kind != 'connection') {
-            throw new ConnectorTaskError('connector.connection-required', 'The Trigger requires a Connection before it can be published.')
-          }
-          const available = await connections(trigger.definition.provider)
-          if (!available.some((candidate) => candidate.connectionId == binding.target && candidate.status == 'active')) {
-            throw new ConnectorTaskError('connector.connection-required', 'The selected Connector Connection must be reconnected or replaced.')
-          }
-        }),
-      ])
-    }
-    const webhooks = Object.entries(fixed.prepared.graph.nodes)
-      .filter((entry): entry is [string, Extract<TriggerNode, { readonly kind: 'webhook' }>] => entry[1].kind == 'webhook')
-      .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .map(([triggerNodeId, trigger]) => ({ triggerJson: JSON.stringify(trigger), triggerNodeId }))
-    const crons = Object.entries(fixed.prepared.graph.nodes)
-      .filter((entry): entry is [string, Extract<TriggerNode, { readonly kind: 'cron' }>] => entry[1].kind == 'cron')
-      .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .map(([triggerNodeId, trigger]) => {
-        try {
-          validateTriggerSchedule(trigger.cronTimes)
-        } catch (error) {
-          throw new AcceptanceError('trigger-invalid', error instanceof Error ? error.message : 'Cron Trigger schedule is invalid.')
-        }
-        return {
-          nextAt: nextTriggerScheduledAt(trigger.cronTimes, publishedAt),
-          scheduleJson: JSON.stringify(trigger.cronTimes),
-          triggerJson: JSON.stringify(trigger),
-          triggerNodeId,
-        }
-      })
-    const polls = Object.entries(fixed.prepared.graph.nodes)
-      .filter((entry): entry is [string, Extract<TriggerNode, { readonly kind: 'poll' }>] => entry[1].kind == 'poll')
-      .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .map(([triggerNodeId, trigger]) => {
-        try {
-          validateTriggerSchedule(trigger.pollTimes)
-        } catch (error) {
-          throw new AcceptanceError('trigger-invalid', error instanceof Error ? error.message : 'Poll Trigger schedule is invalid.')
-        }
-        if (!this.#poll.supports(trigger.definition.key, trigger.definition.definitionVersion)) {
-          throw new AcceptanceError('trigger-invalid', 'Poll Trigger definition is not available.')
-        }
-        const binding = input.revision.document.bindings[trigger.bindingId]
-        if (binding?.kind != 'connection' || binding.target.length == 0) {
-          throw new AcceptanceError('trigger-invalid', 'Poll Trigger Connection is unresolved.')
-        }
-        return {
-          connectionId: binding.target,
-          nextAt: nextTriggerScheduledAt(trigger.pollTimes, publishedAt),
-          scheduleJson: JSON.stringify(trigger.pollTimes),
-          triggerJson: JSON.stringify(trigger),
-          triggerNodeId,
-        }
-      })
-    let metadata: PublicationMetadata | undefined
-    if (input.control?.operation == 'publish') {
-      metadata = { actorId: input.control.actorId, modelVersion: input.revision.modelVersion, operation: 'publish' }
-    } else if (input.control?.operation == 'rollback') {
-      metadata = {
-        actorId: input.control.actorId,
-        modelVersion: input.revision.modelVersion,
-        operation: 'rollback',
-        sourcePublicationId: input.control.sourcePublicationId,
-      }
-    }
-    return {
-      closureDigest: fixed.prepared.closureDigest,
-      content: fixed.content,
-      crons,
-      engineContract,
-      expectedLivePublicationId: input.expectedLivePublicationId,
-      flowId: input.flowId,
-      idempotencyKey: input.idempotencyKey,
-      integrations,
-      ...(metadata == null ? {} : { metadata }),
-      polls,
-      publishedAt,
-      requestDigest,
-      revisionDigest: fixed.revisionDigest,
-      revisionId: input.revisionId,
-      variableNames: Object.values(fixed.variableBindings),
-      webhooks,
-    }
-  }
-
-  async #publicationRequestDigest(input: PublishFlowInput, revisionDigest: string): Promise<string> {
-    return await digestBytes(
-      canonicalJsonBytes({
-        engineContract: input.engineContract ?? currentEngineContract,
-        expectedLivePublicationId: input.expectedLivePublicationId,
-        flowId: input.flowId,
-        operation: input.control?.operation ?? 'publish',
-        revisionDigest,
-        ...(input.control?.operation == 'rollback' ? { sourcePublicationId: input.control.sourcePublicationId } : {}),
-      }),
-    )
   }
 
   cancel(runId: string): boolean {
@@ -785,255 +562,6 @@ export class ServerService {
     if (this.#failure != null) throw this.#failure
   }
 
-  #dispatch(run: StoredRun): Effect.Effect<void> {
-    return Effect.gen({ self: this }, function* () {
-      const prepared = yield* this.#prepareRun(run)
-      if (prepared == null) return
-      yield* this.#executeRun(run, prepared.flow, prepared.bindingValues, prepared.projectEvent)
-    })
-  }
-
-  #loadRun(run: StoredRun): Effect.Effect<
-    | { readonly kind: 'binding-unresolved' }
-    | {
-        readonly bindingValues: Readonly<Record<string, string>>
-        readonly flow: PreparedFlow
-        readonly kind: 'prepared'
-        readonly projectEvent: ReturnType<typeof createEventProjector>
-        readonly started: ProjectedRunEvent | undefined
-      },
-    unknown
-  > {
-    return Effect.gen({ self: this }, function* () {
-      if (run.engineDigest != isolatedVmEngineDigest) {
-        return yield* Effect.fail(new Error('Fixed Run Engine implementation is not available.'))
-      }
-      const revisionDigest = yield* Effect.tryPromise({
-        try: () => digestBytes(encoder.encode(run.content)),
-        catch: (error) => error,
-      })
-      if (revisionDigest != run.revisionDigest) {
-        return yield* Effect.fail(new Error('Fixed Flow Revision digest does not match stored content.'))
-      }
-      const revision = decodeRevision(new TextEncoder().encode(run.content))
-      const prepared = yield* Effect.tryPromise({
-        try: () => prepareFlow(revision, run.engineContract),
-        catch: (error) => error,
-      })
-      if (prepared.kind != 'prepared') {
-        return yield* Effect.fail(new Error(`Fixed Flow Revision can no longer be prepared: ${prepared.kind}.`))
-      }
-      yield* Effect.tryPromise({
-        try: (signal) => checkCodeActions(codeActions(prepared.flow), this.#resolveConnector(), run.connectorTeamId, signal),
-        catch: (error) => error,
-      })
-      const projectEvent = createEventProjector(run.runId, nodeFailureCodes)
-      const started = yield* Effect.tryPromise({
-        try: () => projectEvent({ flowId: run.flowId, runId: run.runId, type: 'run.started' }),
-        catch: (error) => error,
-      })
-      if (run.resume != null) {
-        const resume = run.resume
-        const saved = resume.checkpoint.wait
-        const wait = prepared.flow.graph.nodes[saved.nodeId]
-        if (wait?.kind != 'wait' || !wait.actions.some((action) => action == resume.action)) {
-          return yield* Effect.fail(new Error('Stored Wait resolution does not match the fixed Flow Revision.'))
-        }
-        return {
-          bindingValues: run.resume.checkpoint.bindingValues,
-          flow: prepared.flow,
-          kind: 'prepared' as const,
-          projectEvent,
-          started,
-        }
-      }
-      const bindingValues = this.#store.resolveVariables(variableBindings(revision, prepared.validation.closure.dependencies.inputBindings))
-      if (bindingValues == null) return { kind: 'binding-unresolved' as const }
-      return { bindingValues, flow: prepared.flow, kind: 'prepared' as const, projectEvent, started }
-    })
-  }
-
-  #prepareRun(run: StoredRun): Effect.Effect<
-    | {
-        readonly bindingValues: Readonly<Record<string, string>>
-        readonly flow: PreparedFlow
-        readonly projectEvent: ReturnType<typeof createEventProjector>
-      }
-    | undefined
-  > {
-    return Effect.gen({ self: this }, function* () {
-      if (run.resumeUnavailable) {
-        if (
-          this.#store.failResume(run.runId, {
-            error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint is unavailable.' },
-          })
-        ) {
-          this.#runChanged(run.flowId, run.runId)
-        }
-        return
-      }
-      const start = yield* this.#loadRun(run).pipe(
-        Effect.matchEffect({
-          onFailure: (error) =>
-            Effect.sync(() => {
-              const committed =
-                run.resume == null
-                  ? this.#store.failStarting(run.runId, {
-                      error:
-                        error instanceof ConnectorTaskError
-                          ? { code: error.code, message: error.message }
-                          : { code: 'execution.unavailable', message: 'The fixed Run could not be started by this deployment.' },
-                    })
-                  : this.#store.failResume(run.runId, {
-                      error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint cannot resume against the fixed Flow.' },
-                    })
-              if (committed) {
-                this.#runChanged(run.flowId, run.runId)
-                this.#logger.error({ category: 'run.start_failed', flowId: run.flowId, runId: run.runId, ...errorKind(error) }, 'Run could not be started.')
-              }
-            }).pipe(Effect.as(undefined)),
-          onSuccess: Effect.succeed,
-        }),
-      )
-      if (start?.kind == 'binding-unresolved') {
-        this.#store.failStarting(run.runId, {
-          error: { code: controlErrorCode.bindingUnresolved, message: 'A required Variable is unresolved.' },
-        })
-        return
-      }
-      if (start == null || start.started == null) return
-      const started = run.resume == null ? this.#store.start(run.runId, start.started) : this.#store.resume(run.runId, run.resume.checkpoint.wait.waitId)
-      if (!started) return
-      return { bindingValues: start.bindingValues, flow: start.flow, projectEvent: start.projectEvent }
-    })
-  }
-
-  #executeRun(
-    run: StoredRun,
-    flow: PreparedFlow,
-    bindingValues: Readonly<Record<string, string>>,
-    projectEvent: ReturnType<typeof createEventProjector>,
-  ): Effect.Effect<void> {
-    return Effect.gen({ self: this }, function* () {
-      const startedAt = performance.now()
-      const budgetMs = run.remainingMs ?? this.#runTimeoutMs
-      this.#logger.info({ category: 'run.started', flowId: run.flowId, runId: run.runId }, 'Run started.')
-
-      const timeoutReason = new Error('Run exceeded its execution deadline.')
-      let timedOut = false
-      yield* this.#isolatedVm
-        .run(flow, {
-          capability: (capabilities, call) => this.#invokeCapability(capabilities, call, run.connectorTeamId),
-          emit: async (event) => {
-            if (event.type == 'run.started' && event.runId == run.runId) return
-            const projected = await projectEvent(event)
-            if (projected != null) this.#store.append(run.runId, projected)
-          },
-          flowId: run.flowId,
-          ...(run.resume == null ? { bindingValues, inputs: run.inputs } : { resume: run.resume }),
-          invokeTask: (invocation) => {
-            if (!('taskId' in invocation)) throw new Error('Runtime Executor returned a Code Task to the Host.')
-            return this.#invokeTask(flow, invocation, run.connectorTeamId)
-          },
-          projectFailure: (error) => {
-            if (error instanceof ConnectorTaskError) return { code: error.code, message: error.message }
-            if (error instanceof TaskHostError) return { code: error.code, message: error.message }
-            return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
-          },
-          runId: run.runId,
-          ...(run.resume != null || run.trigger == null ? {} : { trigger: run.trigger }),
-        })
-        .pipe(
-          Effect.timeoutOrElse({
-            duration: budgetMs,
-            orElse: () =>
-              Effect.sync(() => {
-                timedOut = true
-              }).pipe(Effect.andThen(Effect.fail(timeoutReason))),
-          }),
-          Effect.matchEffect({
-            onFailure: (error) => Effect.sync(() => this.#failRun(run, startedAt, timedOut, error)),
-            onSuccess: (output) => Effect.sync(() => this.#commitOutcome(run, flow, startedAt, budgetMs, output)),
-          }),
-        )
-    })
-  }
-
-  #commitOutcome(run: StoredRun, flow: PreparedFlow, startedAt: number, budgetMs: number, output: FlowRunOutcome): void {
-    if (output.kind == 'waiting') {
-      const remainingMs = Math.max(0, budgetMs - Math.round(performance.now() - startedAt))
-      let notification:
-        | {
-            readonly action: string
-            readonly connectionId?: string
-            readonly input: Readonly<Record<string, JsonValue>>
-            readonly messageHandle: string
-            readonly prompt: string
-            readonly publicOrigin: string
-            readonly taskId: string
-          }
-        | undefined
-      if (output.notification != null) {
-        const wait = flow.graph.nodes[output.wait.nodeId]
-        const task = flow.tasks[output.notification.taskId]
-        const publicOrigin = this.#resolveWaitPublicOrigin()
-        if (wait?.kind != 'wait' || task == null || task.executor.kind != 'connector' || publicOrigin == null) {
-          this.#failRun(run, startedAt, false, new Error('Wait notification is unavailable.'))
-          return
-        }
-        notification = {
-          action: task.executor.action,
-          connectionId: task.executor.connectionId,
-          input: normalizeConnectorRuntimeInputs(
-            task.inputs.filter((input) => 'handle' in input),
-            output.notification.input,
-          ),
-          messageHandle: output.notification.messageHandle,
-          prompt: wait.prompt,
-          publicOrigin: publicOrigin.href,
-          taskId: output.notification.taskId,
-        }
-      }
-      if (this.#store.wait(run.runId, output, remainingMs, notification) == null) return
-      this.#runChanged(run.flowId, run.runId)
-      this.#maintenanceAt = this.#clock()
-      this.#signal()
-      this.#logger.info(
-        { category: 'run.waiting', durationMs: Math.round(performance.now() - startedAt), flowId: run.flowId, runId: run.runId, waitId: output.wait.waitId },
-        'Run is waiting.',
-      )
-      return
-    }
-    this.#completeRun(run, startedAt, output)
-  }
-
-  #failRun(run: StoredRun, startedAt: number, timedOut: boolean, error: unknown): void {
-    const result = timedOut
-      ? { error: { code: 'run.timeout', message: 'The Run exceeded its execution deadline.' } }
-      : { error: { code: 'run.failed', message: 'The Flow could not be completed.' } }
-    if (!this.#store.commit(run.runId, 'failed', result)) return
-    this.#runChanged(run.flowId, run.runId)
-    this.#logger.error(
-      {
-        category: timedOut ? 'run.timed_out' : 'run.failed',
-        durationMs: Math.round(performance.now() - startedAt),
-        flowId: run.flowId,
-        runId: run.runId,
-        ...errorKind(error),
-      },
-      'Run failed.',
-    )
-  }
-
-  #completeRun(run: StoredRun, startedAt: number, output: FlowRunResult): void {
-    if (!this.#store.commit(run.runId, 'completed', output)) return
-    this.#runChanged(run.flowId, run.runId)
-    this.#logger.info(
-      { category: 'run.completed', durationMs: Math.round(performance.now() - startedAt), flowId: run.flowId, runId: run.runId },
-      'Run completed.',
-    )
-  }
-
   #admitCron(target: StoredCronTarget, now: number): Effect.Effect<'admitted' | 'overloaded', unknown> {
     return Effect.gen({ self: this }, function* () {
       const fixed = yield* Effect.tryPromise({
@@ -1168,74 +696,6 @@ export class ServerService {
     )
   }
 
-  async #invokeTask(
-    prepared: PreparedFlow,
-    invocation: Extract<TaskInvocation, { readonly taskId: string }> & { readonly signal: AbortSignal },
-    teamId?: string,
-  ): Promise<JsonValue> {
-    const task = prepared.tasks[invocation.taskId]!
-    const executor = task.executor
-    switch (executor.kind) {
-      case 'connector':
-        const connector = this.#resolveConnector()
-        if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
-        return await connector.execute(
-          executor.action,
-          executor.connectionId,
-          normalizeConnectorRuntimeInputs(
-            task.inputs.filter((input) => 'handle' in input),
-            invocation.input,
-          ),
-          invocation.invocationId,
-          invocation.signal,
-          teamId,
-        )
-      case 'llm':
-        const llm = this.#resolveLlm()
-        if (llm == null) throw new TaskHostError('llm.unavailable', 'The LLM request could not be completed.')
-        let result
-        try {
-          result = await llm({
-            input: Object.assign({}, invocation.additionalInputs, invocation.input),
-            invocationId: invocation.invocationId,
-            mode: executor.mode,
-            signal: invocation.signal,
-            version: 1,
-          })
-        } catch {
-          if (invocation.signal.aborted) throw invocation.signal.reason
-          throw new TaskHostError('llm.unavailable', 'The LLM request could not be completed.')
-        }
-        if (result.kind == 'failed') throw new TaskHostError(result.code, result.message)
-        return result.value
-    }
-  }
-
-  async #invokeCapability(capabilities: readonly ConnectorCapability[], call: RuntimeCapabilityCall, teamId?: string): Promise<RuntimeCapabilityResponse> {
-    if (call.kind != 'connector') throw new TaskHostError('capability.denied', 'The Runtime Capability is not declared for this Task.')
-    let payload: ReturnType<typeof resolveAction>
-    try {
-      payload = resolveAction(capabilities, call.payload)
-    } catch (error) {
-      const failure = error as Error & { code: TaskErrorCode }
-      if (failure.code == 'capability.denied' || failure.code == 'capability.invalid') throw new TaskHostError(failure.code, failure.message)
-      throw new ConnectorTaskError('connector.connection-required', failure.message)
-    }
-    const connector = this.#resolveConnector()
-    if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
-    if (payload.connectionId == null && (await connector.getAction(payload.action, call.signal, teamId)).authenticated) {
-      throw new ConnectorTaskError('connector.connection-required', 'Choose a Connector Connection for this Action.')
-    }
-    this.#logger.debug(
-      { category: 'connector.action', invocationId: call.invocationId, callId: call.callId, action: payload.action, connectionId: payload.connectionId },
-      'Code Action started.',
-    )
-    return {
-      body: await connector.execute(payload.action, payload.connectionId, payload.input, call.callId, call.signal, teamId),
-      status: 200,
-    }
-  }
-
   #notifyFlow(event: FlowChangeEvent): void {
     for (const listener of this.#flowSubscribers.get(event.flowId) ?? []) listener(event)
   }
@@ -1254,70 +714,9 @@ export class ServerService {
   }
 
   #maintain(now: number): number {
-    let publishCount = 0
-    for (; publishCount < maintenanceBatchSize; publishCount += 1) {
-      const target = this.#store.publications.nextPublishOperation(now)
-      if (target == null) break
-      if (target.kind == 'failed') {
-        const { operationId, ...issue } = target
-        this.#store.publications.failPublishOperation(operationId, issue)
-        this.#logger.warn({ category: 'publication.failed', operationId, ...issue }, 'Publish operation failed.')
-        continue
-      }
-      const input = JSON.parse(target.input) as Parameters<PublicationStore['publish']>[0]
-      let accepted: PublicationAcceptance
-      try {
-        accepted = this.#store.publications.publish({ ...input, operationId: target.operationId, publishedAt: now })
-      } catch (error) {
-        if (error === publishPending) return maintenanceRetryMs
-        throw error
-      }
-      switch (accepted.kind) {
-        case 'published':
-          this.#notifyFlowCatalog()
-          this.#logger.info(
-            { category: 'publication.succeeded', operationId: target.operationId, publicationId: accepted.publicationId },
-            'Publish operation succeeded.',
-          )
-          break
-        case 'binding-unresolved':
-          this.#store.publications.failPublishOperation(target.operationId, {
-            code: controlErrorCode.bindingUnresolved,
-            message: 'A required Variable is unresolved.',
-          })
-          break
-        case 'busy':
-          this.#store.publications.failPublishOperation(target.operationId, { code: controlErrorCode.flowBusy, message: 'The Flow is retiring.' })
-          break
-        case 'conflict':
-          this.#store.publications.failPublishOperation(target.operationId, {
-            code: controlErrorCode.publicationConflict,
-            message: 'The idempotency key refers to another Publication request.',
-          })
-          break
-        case 'live-conflict':
-          this.#store.publications.failPublishOperation(target.operationId, {
-            code: controlErrorCode.liveConflict,
-            message: 'The Flow Live pointer no longer matches the expected Publication.',
-          })
-          break
-        case 'not-found':
-          this.#store.publications.failPublishOperation(target.operationId, { code: controlErrorCode.flowNotFound, message: 'The Flow was not found.' })
-          break
-        case 'revision-conflict':
-          this.#store.publications.failPublishOperation(target.operationId, { code: controlErrorCode.flowRevisionConflict, message: 'The Draft changed.' })
-          break
-        case 'source-not-found':
-          this.#store.publications.failPublishOperation(target.operationId, {
-            code: controlErrorCode.publicationNotFound,
-            message: 'The source Publication was not found.',
-          })
-          break
-        case 'operation-pending':
-          return maintenanceRetryMs
-      }
-    }
-    let nextDelay = publishCount == maintenanceBatchSize || this.#store.pruneExpiredEvents(now, maintenanceBatchSize) > 0 ? 0 : maintenanceIntervalMs
+    const publication = this.publisher.advance(now)
+    if (publication == 'pending') return maintenanceRetryMs
+    let nextDelay = publication == 'more' || this.#store.pruneExpiredEvents(now, maintenanceBatchSize) > 0 ? 0 : maintenanceIntervalMs
     if (this.#store.publications.prunePublishOperations(now, maintenanceBatchSize) > 0) nextDelay = 0
     const expiredWaits = this.#store.expireWaits(now, maintenanceBatchSize)
     for (const { flowId, runId } of expiredWaits) this.#runChanged(flowId, runId)
@@ -1340,6 +739,11 @@ export class ServerService {
     this.#notifyFlowCatalog()
     if (this.#store.collectOrphanRevisions(maintenanceBatchSize) > 0) return 0
     return nextDelay
+  }
+
+  #wakeMaintenance(): void {
+    this.#maintenanceAt = this.#clock()
+    this.#signal()
   }
 
   #signal(): void {
@@ -1420,7 +824,7 @@ export class ServerService {
         yield* FiberMap.run(
           this.#workers,
           run.runId,
-          this.#dispatch(run).pipe(
+          this.#executor.run(run).pipe(
             Effect.catchCause((cause) =>
               Cause.hasInterruptsOnly(cause) ? Effect.void : Effect.sync(() => this.#fail('runtime.worker.failed', Cause.squash(cause))),
             ),

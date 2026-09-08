@@ -1,7 +1,7 @@
 import type { ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RuntimeCapabilityResponse, RuntimeInvocation, RuntimeProgram } from '@oomol-lab/open-flow/runtime-contract'
-import type { FlowRunOptions, FlowRunOutcome, SchedulerEvent, SchedulerFailure, TaskInvocation, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
+import type { FlowRunOutcome, RunLaunch, SchedulerEvent, SchedulerFailure, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
 import type { ChildProcess, ChildProcessByStdio } from 'node:child_process'
 import type { Readable } from 'node:stream'
 
@@ -65,14 +65,10 @@ export type InvokeRequest =
     }
   | {
       readonly executionId: number
-      readonly flow: {
-        readonly bindingValues?: FlowRunOptions['bindingValues']
+      readonly flow: RunLaunch & {
         readonly flowId: string
-        readonly inputs?: FlowRunOptions['inputs']
         readonly prepared: PreparedFlow
-        readonly resume?: FlowRunOptions['resume']
         readonly runId: string
-        readonly trigger?: TriggerSeed
       }
       readonly limits: IsolatedVmLimits
       readonly type: 'invoke'
@@ -229,23 +225,20 @@ export class IsolatedVmHost {
 
   run(
     prepared: PreparedFlow,
-    options: {
+    options: RunLaunch & {
       readonly capability: (
         capabilities: readonly ConnectorCapability[],
         call: Parameters<RuntimeInvocation['capability']>[0],
       ) => Promise<RuntimeCapabilityResponse>
       readonly emit?: (event: SchedulerEvent) => void | Promise<void>
-      readonly bindingValues?: FlowRunOptions['bindingValues']
       readonly flowId: string
-      readonly inputs?: FlowRunOptions['inputs']
       readonly invokeTask: (invocation: TaskInvocation & { readonly signal: AbortSignal }) => Promise<unknown>
       readonly projectFailure: (error: unknown) => SchedulerFailure
-      readonly resume?: FlowRunOptions['resume']
       readonly runId: string
-      readonly trigger?: TriggerSeed
     },
     limits: IsolatedVmLimits = isolatedVmLimits,
   ): Effect.Effect<FlowRunOutcome, Error> {
+    const { capability, emit, invokeTask, projectFailure, ...flow } = options
     return Effect.suspend(() => {
       if (this.#closed) return Effect.fail(new IsolatedVmError('executor-crashed', 'Runtime Host is closed.'))
       if (serializedBytes(prepared) > limits.maxProgramBytes) {
@@ -259,29 +252,21 @@ export class IsolatedVmHost {
           this.#finish(executionId, () => {})
         }
         this.#pending.set(executionId, {
-          capability: options.capability,
+          capability,
           capabilityCalls: new Map(),
           activeCalls: new Map(),
           cancel: interrupt,
-          emit: options.emit,
-          invokeTask: options.invokeTask,
+          emit,
+          invokeTask,
           limits,
-          projectFailure: options.projectFailure,
+          projectFailure,
           reject: (error) => resume(Effect.fail(normalizedError(error))),
           resolve: (value) => resume(Effect.succeed(value as FlowRunOutcome)),
         })
         signal.addEventListener('abort', interrupt, { once: true })
         this.#send(child, {
           executionId,
-          flow: {
-            ...(options.bindingValues == null ? {} : { bindingValues: options.bindingValues }),
-            flowId: options.flowId,
-            ...(options.inputs == null ? {} : { inputs: options.inputs }),
-            prepared,
-            ...(options.resume == null ? {} : { resume: options.resume }),
-            runId: options.runId,
-            ...(options.trigger == null ? {} : { trigger: options.trigger }),
-          },
+          flow: { ...flow, prepared },
           limits,
           type: 'invoke',
         })

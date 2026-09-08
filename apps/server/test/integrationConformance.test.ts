@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { describe, it } from 'vitest'
-import { createServerApp } from '../node/http.ts'
+import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService } from './serviceFixture.ts'
 
@@ -116,7 +116,7 @@ async function createHarness(fixture: IntegrationConformanceFixture): Promise<In
     })
   let service = await open()
   let revisionId = next('revision')
-  const published = await service.publishFlow({
+  const published = await service.publisher.publish({
     expectedLivePublicationId: null,
     flowId: 'main',
     idempotencyKey: next('publish'),
@@ -143,7 +143,7 @@ async function createHarness(fixture: IntegrationConformanceFixture): Promise<In
     },
     async republish(at) {
       now = Date.parse(at)
-      const republished = await service.publishFlow({
+      const republished = await service.publisher.publish({
         expectedLivePublicationId: publicationId,
         flowId: 'main',
         idempotencyKey: next('publish'),
@@ -164,7 +164,7 @@ async function createHarness(fixture: IntegrationConformanceFixture): Promise<In
     async retire(at) {
       now = Date.parse(at)
       revisionId = next('revision')
-      const retired = await service.publishFlow({
+      const retired = await service.publisher.publish({
         expectedLivePublicationId: publicationId,
         flowId: 'main',
         idempotencyKey: next('publish'),

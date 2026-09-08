@@ -2,7 +2,7 @@ import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import * as Scope from 'effect/Scope'
 import { onTestFinished } from 'vitest'
-import { ServerService } from '../node/service.ts'
+import { ServerService } from '../node/application/service.ts'
 
 const scopes = new WeakMap<ServerService, Scope.Closeable>()
 const openServices = new Set<ServerService>()

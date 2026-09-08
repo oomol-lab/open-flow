@@ -1,7 +1,7 @@
 import type { JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { IntegrationDefinition } from '@oomol-lab/open-flow/integration-trigger'
 import type { DestinationStream, Logger } from 'pino'
-import type { ServerServiceOptions } from '../node/service.ts'
+import type { ServerServiceOptions } from '../node/application/service.ts'
 
 import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '@oomol-lab/open-flow/integration-trigger'
 import * as Effect from 'effect/Effect'
@@ -13,9 +13,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createServerApp } from '../node/http.ts'
+import { ServerService } from '../node/application/service.ts'
 import { createLogger } from '../node/logger.ts'
-import { ServerService } from '../node/service.ts'
+import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
 
@@ -121,7 +121,7 @@ async function publish(
   mode: 'connection' | 'permanent' | 'ready' | 'transient',
   expectedLivePublicationId: string | null,
 ): Promise<string> {
-  const result = await service.publishFlow({
+  const result = await service.publisher.publish({
     expectedLivePublicationId,
     flowId: 'main',
     idempotencyKey: next('publish'),

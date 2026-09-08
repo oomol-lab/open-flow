@@ -4,8 +4,8 @@ import type { FlowRunOptions } from '@oomol-lab/open-flow/scheduler'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { randomUUID } from 'node:crypto'
+import { ServerService } from '../node/application/service.ts'
 import { ControlError } from '../node/error.ts'
-import { ServerService } from '../node/service.ts'
 
 type RunInputs = NonNullable<FlowRunOptions['inputs']>
 

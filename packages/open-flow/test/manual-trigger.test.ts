@@ -42,6 +42,7 @@ it('requires an entry and skips unrelated roots and other trigger branches', asy
     runId: 'run',
     invokeTask: () => Effect.succeed({}),
   }
+  // @ts-expect-error A new Run requires a Trigger seed.
   await expect(Effect.runPromise(runFlow(prepared.flow, options))).rejects.toThrow('requires a Trigger')
   await Effect.runPromise(
     runFlow(prepared.flow, {

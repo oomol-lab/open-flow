@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { ServerService } from '../node/service.ts'
+import { ServerService } from '../node/application/service.ts'
 import { closeService, openService } from './serviceFixture.ts'
 
 const directories: string[] = []
@@ -91,7 +91,7 @@ function publish(
     readonly revisionId: string
   },
 ) {
-  return service.publishFlow({
+  return service.publisher.publish({
     ...input,
     flowId: 'main',
   })

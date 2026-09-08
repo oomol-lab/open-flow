@@ -61,7 +61,7 @@ describe('Server Cron Trigger', () => {
   it('keeps disabled schedules stopped across restart and resumes them when enabled', async () => {
     const file = await databaseFile()
     let service = await openService(file, { clock: () => Date.parse('2026-08-21T00:00:30.000Z') })
-    await service.publishFlow({
+    await service.publisher.publish({
       expectedLivePublicationId: null,
       flowId: 'main',
       idempotencyKey: 'disabled-cron',
@@ -88,7 +88,7 @@ describe('Server Cron Trigger', () => {
     const file = await databaseFile()
     const service = await openService(file, { clock: () => Date.parse('2026-08-21T00:00:30.000Z') })
     await expect(
-      service.publishFlow({
+      service.publisher.publish({
         expectedLivePublicationId: null,
         flowId: 'main',
         idempotencyKey: 'publish-invalid',
@@ -111,7 +111,7 @@ describe('Server Cron Trigger', () => {
   it('recovers the earliest due grid from SQLite and advances past the actual tick', async () => {
     const file = await databaseFile()
     let service = await openService(file, { clock: () => Date.parse('2026-08-21T00:00:30.000Z') })
-    const published = await service.publishFlow({
+    const published = await service.publisher.publish({
       expectedLivePublicationId: null,
       flowId: 'main',
       idempotencyKey: 'publish-cron',
@@ -153,7 +153,7 @@ describe('Server Cron Trigger', () => {
     await withClock(Date.parse('2026-08-21T00:00:30.000Z'), async (clock) => {
       const service = await openService(file, { clock })
       try {
-        await service.publishFlow({
+        await service.publisher.publish({
           expectedLivePublicationId: null,
           flowId: 'main',
           idempotencyKey: 'publish-timer',
@@ -206,7 +206,7 @@ describe('Server Cron Trigger', () => {
         },
       },
     }
-    await service.publishFlow({
+    await service.publisher.publish({
       expectedLivePublicationId: null,
       flowId: 'main',
       idempotencyKey: 'publish-waiting-cron',
@@ -252,7 +252,7 @@ describe('Server Cron Trigger', () => {
     const file = await databaseFile()
     await withClock(Date.parse('2026-08-21T00:00:59.990Z'), async (clock) => {
       const service = await openService(file, { clock })
-      await service.publishFlow({
+      await service.publisher.publish({
         expectedLivePublicationId: null,
         flowId: 'main',
         idempotencyKey: 'publish-close',
@@ -277,7 +277,7 @@ describe('Server Cron Trigger', () => {
     const file = await databaseFile()
     let now = Date.parse('2026-08-21T00:00:30.000Z')
     const service = await openService(file, { clock: () => now })
-    const published = await service.publishFlow({
+    const published = await service.publisher.publish({
       expectedLivePublicationId: null,
       flowId: 'main',
       idempotencyKey: 'publish-before-race',
@@ -311,7 +311,7 @@ describe('Server Cron Trigger', () => {
       await intercepted
       Reflect.deleteProperty(subtle, 'digest')
       now = Date.parse('2026-08-21T00:00:45.000Z')
-      const republished = await service.publishFlow({
+      const republished = await service.publisher.publish({
         expectedLivePublicationId: published.publicationId,
         flowId: 'main',
         idempotencyKey: 'publish-during-race',

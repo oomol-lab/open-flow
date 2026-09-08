@@ -9,9 +9,9 @@ import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { decodeFlowRunCheckpoint } from '@oomol-lab/open-flow/scheduler'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
-import { AcceptanceError } from './error.ts'
+import { AcceptanceError } from '../error.ts'
+import { isolatedVmEngineDigest } from '../runtime/isolated-vm.ts'
 import { IntegrationStore } from './integration-store.ts'
-import { isolatedVmEngineDigest } from './isolated-vm.ts'
 import { PollStore } from './poll-store.ts'
 import { PublicationStore } from './publication-store.ts'
 import { TriggerStore } from './trigger-store.ts'
@@ -798,7 +798,12 @@ export class Store {
 
   commit(runId: string, status: RunTerminalStatus, result: unknown): boolean {
     return this.#transaction(() => {
-      const condition = status == 'canceled' ? "status IN ('queued', 'starting', 'running', 'waiting')" : "status = 'running'"
+      const condition =
+        status == 'canceled'
+          ? "status IN ('queued', 'starting', 'running', 'waiting')"
+          : status == 'failed'
+            ? "status IN ('running', 'waiting')"
+            : "status = 'running'"
       return this.#finishRun(runId, status, result, condition, this.#clock())
     })
   }

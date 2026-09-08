@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { TriggerActivityKind } from './trigger-store.ts'
+import type { TriggerActivityKind } from '../storage/trigger-store.ts'
 
 import { randomUUID } from 'node:crypto'
 

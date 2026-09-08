@@ -257,3 +257,8 @@ describe('Runtime event projector', () => {
     await expect(project({ runId: 'runtime-run', type: 'runtime.future-event' })).rejects.toThrow('is not supported')
   })
 })
+
+it.each(['node.cache-hit', 'node.preview', 'run.output'])('rejects retired runtime event %s', async (type) => {
+  const project = createEventProjector('run')
+  await expect(project({ type, runId: 'run' })).rejects.toThrow('is not supported')
+})
