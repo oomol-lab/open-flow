@@ -99,7 +99,7 @@ export function RunsView({
         <header className="run-list-header">
           <strong>{t('run.history')}</strong>
         </header>
-        <div className="run-list">
+        <OverlayScrollbar className="run-list run-content-scroll" defer={false} tabIndex={-1}>
           {loading ? (
             <div className="run-list-empty">{t('run.loading')}</div>
           ) : loadFailed ? (
@@ -150,7 +150,7 @@ export function RunsView({
               </Button>
             ))
           )}
-        </div>
+        </OverlayScrollbar>
         {nextCursor != null && (
           <Button className="mx-2 mb-2" disabled={loadingMore} onClick={() => void store.runs.loadMore()} size="lg" variant="outline">
             {t(loadingMore ? 'run.loadingMore' : loadMoreFailed ? 'run.retryLoadMore' : 'run.loadMore')}

@@ -6,10 +6,26 @@ import { controlErrorCode } from '../../../../control/common/errors.ts'
 import { collapseAllNested, JSONViewer } from '../../../../designer/browser/jsonViewer/index.ts'
 import { Alert, AlertDescription, AlertTitle } from '../../../../ui/browser/alert.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { Icon } from '../icons.tsx'
 
 function record(value: JsonValue | undefined): Readonly<Record<string, JsonValue>> | undefined {
   if (value == null || typeof value != 'object' || Array.isArray(value)) return undefined
   return value as Readonly<Record<string, JsonValue>>
+}
+
+function RunError({ code, message, children }: { readonly code: string; readonly message: string; readonly children?: ReactNode }): ReactElement {
+  return (
+    <Alert className="mt-2.5" variant="error">
+      <Icon name="alert" />
+      <AlertTitle className="whitespace-pre-wrap wrap-anywhere">{message}</AlertTitle>
+      <AlertDescription className="flex flex-col items-start gap-2">
+        <code className="text-xs wrap-anywhere" translate="no">
+          {code}
+        </code>
+        {children}
+      </AlertDescription>
+    </Alert>
+  )
 }
 
 function JsonValueView({ label, value }: { readonly label: string; readonly value: JsonValue }): ReactElement {
@@ -89,19 +105,13 @@ export function RunEventDetail({
                 : t('run.nodeFailed')
       return (
         <EventDetail label={t('run.nodeError')}>
-          <Alert className="mt-2.5" variant="destructive">
-            <AlertTitle>
-              <code>{code}</code>
-            </AlertTitle>
-            <AlertDescription className="flex flex-col items-start gap-2">
-              <span>{message}</span>
-              {code == controlErrorCode.connectorUnconfigured && onConfigureConnector != null && (
-                <Button onClick={onConfigureConnector} size="sm" type="button" variant="outline">
-                  {t('run.configureConnector')}
-                </Button>
-              )}
-            </AlertDescription>
-          </Alert>
+          <RunError code={code} message={message}>
+            {code == controlErrorCode.connectorUnconfigured && onConfigureConnector != null && (
+              <Button onClick={onConfigureConnector} size="sm" type="button" variant="outline">
+                {t('run.configureConnector')}
+              </Button>
+            )}
+          </RunError>
         </EventDetail>
       )
     }
@@ -124,12 +134,7 @@ export function RunResultView({ result }: { readonly result: RunResult }): React
       ) : result.status == 'canceled' ? (
         <div className="run-empty">{t('run.canceledWithoutOutput')}</div>
       ) : (
-        <Alert variant="destructive">
-          <AlertTitle>
-            <code>{result.error.code}</code>
-          </AlertTitle>
-          <AlertDescription>{result.error.message}</AlertDescription>
-        </Alert>
+        <RunError code={result.error.code} message={result.error.message} />
       )}
     </section>
   )

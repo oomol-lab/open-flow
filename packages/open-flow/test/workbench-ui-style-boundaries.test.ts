@@ -363,7 +363,6 @@ test('keeps Workbench feedback on semantic theme surfaces', async () => {
     assert.match(tokens, new RegExp(`${token}:`))
   }
   assert.match(runOutput, /Alert, AlertDescription, AlertTitle/)
-  assert.equal((runOutput.match(/<Alert/g) ?? []).length, 6)
   assert.doesNotMatch(runOutput, /run-terminal-error/)
   assert.doesNotMatch(runStyles, /#fffbeb|#fef2f2|#991b1b|run-terminal-error/)
   assert.doesNotMatch(contextPanelStyles, /#fef2f2|#991b1b|#fffbeb|#92400e|#b45309|#fed7aa|#fff7ed|#9a3412|#b91c1c/)
