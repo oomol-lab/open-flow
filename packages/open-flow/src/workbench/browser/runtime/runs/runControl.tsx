@@ -113,8 +113,8 @@ export function RunControl({
               }
             />
             <DropdownMenuContent align="end" className="w-64 max-w-(--available-width)" container={popupContainer} side="top">
-              <DropdownMenuLabel>{t('runInput.triggerCount', { count: triggers.length })}</DropdownMenuLabel>
               <DropdownMenuGroup>
+                <DropdownMenuLabel>{t('runInput.triggerCount', { count: triggers.length })}</DropdownMenuLabel>
                 {triggers.map((trigger) => (
                   <DropdownMenuItem key={trigger.id} onClick={() => onSelectTrigger(trigger.id)}>
                     <Icon className={trigger.id == selected.id ? '' : 'invisible'} name="check" />

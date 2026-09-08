@@ -444,17 +444,9 @@ select {
   background-image: radial-gradient(var(--ui-border) 0.7px, transparent 0.7px);
   background-size: 16px 16px;
 }
-.run-control-story-island {
+.run-control-story-dock {
   position: absolute;
   bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 5px;
-  border: 1px solid var(--ui-border);
-  border-radius: 16px;
-  background: var(--ui-popover);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 8%);
 }
 .run-control-story-view {
   left: 12px;
@@ -471,22 +463,17 @@ select {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
-.run-control-story-inspector,
-.run-control-story-map-button {
+.run-control-story-corner {
   position: absolute;
-  z-index: 1;
-  right: 12px;
-}
-.run-control-story-inspector {
+  z-index: 2;
   top: 12px;
-}
-.run-control-story-map-button {
-  bottom: 12px;
+  right: 12px;
 }
 .run-control-story-minimap {
   position: absolute;
+  z-index: 1;
+  top: 64px;
   right: 12px;
-  bottom: 12px;
   width: 88px;
   height: 62px;
   border: 1px solid var(--ui-border);
@@ -512,11 +499,6 @@ select {
 .run-control-story-minimap > span:nth-child(3) {
   top: 14px;
   right: 11px;
-}
-.run-control-story-minimap > button {
-  position: absolute;
-  top: 4px;
-  right: 4px;
 }
 .run-control-story-panel {
   position: absolute;

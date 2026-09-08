@@ -86,8 +86,8 @@ import { EdgeDefs } from '../Edges/EdgeDefs.tsx'
 import { NodePlaceholder, NodePlaceholderQueue } from '../Nodes/useNodePlaceholder.ts'
 import { getPaneRect, PaneRectContext } from '../Nodes/usePaneRect.ts'
 import { getAddItemId } from './addItemDrag.ts'
-import { BottomRight } from './BottomRight.tsx'
 import { ConnectionLine } from './ConnectingLine.tsx'
+import { CornerControls } from './CornerControls.tsx'
 import { HelperLines, useHelperLines } from './HelperLines/index.ts'
 import { GetPopupContainerContext, useGetStaticPopupContainer } from './useGetPopupContainer.ts'
 
@@ -113,6 +113,7 @@ const isRectEqual = (a: Rect, b: Rect) => isSizeEqual(a, b) && a.x === b.x && a.
 
 export interface ReactFlowContainerProps {
   className?: string
+  cornerTools?: React.ReactNode
   dark: boolean
   i18n: I18n
   miniMapExpanded$?: Val<boolean | undefined>
@@ -206,7 +207,7 @@ export const ReactFlowContainer: React.FC<ReactFlowContainerProps> = (props: Rea
 
 type FlowControlsProps = Pick<
   ReactFlowContainerProps,
-  'toolbar' | 'miniMapExpanded$' | 'interactiveMode$' | 'showSettings$' | 'onRelayout' | 'onFitView' | 'dottedBackground' | 'layoutMotion'
+  'cornerTools' | 'toolbar' | 'miniMapExpanded$' | 'interactiveMode$' | 'showSettings$' | 'onRelayout' | 'onFitView' | 'dottedBackground' | 'layoutMotion'
 > & { onBeforeFitView?: () => void }
 
 const selector = (s: ReactFlowState) => ({
@@ -300,7 +301,7 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
   return (
     <>
       {props.dottedBackground && <Background id={bgId} color="var(--canvas-grid)" gap={GRID_GAP} variant={BackgroundVariant.Dots} />}
-      <Panel position="bottom-left" className={cn(styles.dock, styles.viewDock)} data-canvas-control-scope>
+      <Panel position="bottom-left" className={cn(styles.island, styles.dock, styles.viewDock)} data-canvas-control-scope>
         <Button aria-label={t('zoomOut')} disabled={minZoomReached} onClick={() => rf.zoomOut()} size="icon" title={t('zoomOut')} type="button" variant="ghost">
           <i className="i-codicon:zoom-out" />
         </Button>
@@ -333,11 +334,11 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
         <CanvasViewMenu interactiveMode$={props.interactiveMode$} onRelayout={relayout} showSettings$={props.showSettings$} />
       </Panel>
       {props.toolbar != null && (
-        <Panel position="bottom-center" className={cn(styles.dock, styles.createDock)} data-canvas-control-scope>
+        <Panel position="bottom-center" className={cn(styles.island, styles.dock, styles.createDock)} data-canvas-control-scope>
           <div className={styles.dockActions}>{props.toolbar}</div>
         </Panel>
       )}
-      <BottomRight miniMapExpanded$={props.miniMapExpanded$} interactiveMode$={props.interactiveMode$} showSettings$={props.showSettings$} />
+      <CornerControls miniMapExpanded$={props.miniMapExpanded$}>{props.cornerTools}</CornerControls>
     </>
   )
 })
@@ -733,6 +734,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
         >
           {(props.canDeleteNodes ?? true) && <SelectionFloatBar nodes={selectedNodes} onDelete={deleteSelectedNodes} duplicateNodes={props.duplicateNodes} />}
           <FlowControls
+            cornerTools={props.cornerTools}
             toolbar={props.toolbar}
             showSettings$={props.showSettings$}
             miniMapExpanded$={props.miniMapExpanded$}

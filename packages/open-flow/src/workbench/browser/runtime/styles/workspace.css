@@ -127,16 +127,13 @@
     color: var(--ui-primary-foreground);
     border-radius: var(--ui-radius);
     background: var(--ui-primary);
-    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--ui-primary-foreground) 8%, transparent);
   }
 
-  .run-control-group:has([data-slot='button']:focus-visible) {
-    box-shadow:
-      inset 0 0 0 1px color-mix(in oklch, var(--ui-primary-foreground) 8%, transparent),
-      0 0 0 3px color-mix(in oklch, var(--ui-ring) 38%, transparent);
+  .run-control-group:has(:is(.run-control-main, .run-control-segment):focus-visible) {
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--ui-ring) 38%, transparent);
   }
 
-  .run-control-group [data-slot='button'] {
+  .run-control-group :is(.run-control-main, .run-control-segment) {
     color: inherit;
     border: 0;
     border-radius: 0;
@@ -144,8 +141,8 @@
     box-shadow: none;
   }
 
-  .run-control-group [data-slot='button']:hover,
-  .run-control-group [data-slot='button'][aria-expanded='true'] {
+  .run-control-group :is(.run-control-main, .run-control-segment):hover,
+  .run-control-group .run-control-segment:is([aria-expanded='true'], [data-popup-open]) {
     color: inherit;
     background: color-mix(in oklch, var(--ui-primary-foreground) 11%, transparent);
   }
@@ -158,7 +155,6 @@
 
   .run-control-group .run-control-segment {
     width: 32px;
-    box-shadow: inset 1px 0 color-mix(in oklch, var(--ui-primary-foreground) 18%, transparent);
   }
 
   .run-input-popover > form {

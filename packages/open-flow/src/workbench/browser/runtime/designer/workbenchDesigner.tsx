@@ -25,7 +25,6 @@ import { isWritable, val } from 'value-enhancer'
 import { FlowDesignerView } from '../../../../designer/browser/graph/FlowDesigner/FlowDesignerView.tsx'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { Separator } from '../../../../ui/browser/separator.tsx'
 import { CodeMirrorStringEditorFactory } from '../../codeMirrorStringEditor.ts'
 import { Icon } from '../icons.tsx'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
@@ -477,6 +476,20 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         model={model}
         inspectorContainer={inspectorContainer}
         inspectorHeaderContainer={inspectorHeaderContainer}
+        cornerTools={
+          <Button
+            aria-label={t('designer.toggleInspector')}
+            aria-expanded={inspectorOpen}
+            disabled={target == null}
+            onClick={(event) => onToggleInspector(event.currentTarget)}
+            size="icon"
+            title={t('designer.toggleInspector')}
+            type="button"
+            variant="ghost"
+          >
+            <i className={inspectorOpen ? 'i-carbon:right-panel-close' : 'i-carbon:right-panel-open'} data-corner-icon />
+          </Button>
+        }
         toolbar={
           <div className="designer-actions">
             <Button
@@ -490,7 +503,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
             >
               <Icon data-icon="inline-start" name="plus" /> {t('designer.addNode')}
             </Button>
-            {(runControl != null || (needsTrigger && model.nodes.length > 0 && manualTrigger != null)) && <Separator orientation="vertical" className="mx-1" />}
             {runControl}
             {needsTrigger && model.nodes.length > 0 && manualTrigger != null && (
               <Button
@@ -562,19 +574,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
           kind: t(target?.kind == 'subflow' ? 'common.subflow' : 'common.flow'),
         })}
       </Badge>
-      <Button
-        aria-label={t('designer.toggleInspector')}
-        aria-expanded={inspectorOpen}
-        className="designer-overlay top-right"
-        disabled={target == null}
-        onClick={(event) => onToggleInspector(event.currentTarget)}
-        size="icon"
-        title={t('designer.toggleInspector')}
-        type="button"
-        variant="outline"
-      >
-        <Icon name="panel" />
-      </Button>
       {target != null && model.nodes.length == 0 && (
         <div className="canvas-empty">
           <span className="empty-icon">

@@ -1,13 +1,12 @@
-import type { ButtonHTMLAttributes, HTMLAttributes } from 'react'
+import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react'
 import type { Val } from 'value-enhancer'
-import type { InteractiveMode } from '../../stores/designer/designer.store.ts'
 
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { val } from 'value-enhancer'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createI18n } from '../../i18n/index.ts'
-import { BottomRight } from './BottomRight.tsx'
+import { CornerControls } from './CornerControls.tsx'
 
 const captured = vi.hoisted(() => ({
   buttons: [] as ButtonHTMLAttributes<HTMLButtonElement>[],
@@ -23,14 +22,6 @@ const captured = vi.hoisted(() => ({
 }))
 
 vi.mock('@xyflow/react', () => ({
-  ControlButton: (props: ButtonHTMLAttributes<HTMLButtonElement>) => {
-    captured.buttons.push(props)
-    return (
-      <button aria-expanded={props['aria-expanded']} aria-label={props['aria-label']} type="button">
-        {props.children}
-      </button>
-    )
-  },
   Controls: ({
     children,
     className,
@@ -50,49 +41,65 @@ vi.mock('@xyflow/react', () => ({
   },
 }))
 
-function render(interactiveMode$: Val<InteractiveMode>, miniMapExpanded$: Val<boolean | undefined>, showSettings$: Val<boolean>): string {
+vi.mock('../../../../ui/browser/button.tsx', () => ({
+  Button: (props: ButtonHTMLAttributes<HTMLButtonElement>) => {
+    captured.buttons.push(props)
+    return (
+      <button aria-expanded={props['aria-expanded']} aria-label={props['aria-label']} type="button">
+        {props.children}
+      </button>
+    )
+  },
+}))
+
+function render(miniMapExpanded$: Val<boolean | undefined>, children?: ReactNode): string {
   return renderToStaticMarkup(
     <I18nProvider i18n={createI18n('en')}>
-      <BottomRight interactiveMode$={interactiveMode$} miniMapExpanded$={miniMapExpanded$} showSettings$={showSettings$} />
+      <CornerControls miniMapExpanded$={miniMapExpanded$}>{children}</CornerControls>
     </I18nProvider>,
   )
 }
 
-describe('BottomRight', () => {
+describe('CornerControls', () => {
   beforeEach(() => {
     captured.buttons = []
     captured.controls = []
     captured.miniMap = undefined
   })
 
-  it('keeps the collapsed MiniMap control in the bottom-right corner', () => {
-    const interactiveMode$ = val<InteractiveMode>('mouse')
+  it('keeps the collapsed MiniMap control in the top-right corner', () => {
     const miniMapExpanded$ = val<boolean | undefined>(false)
-    const showSettings$ = val(false)
 
-    render(interactiveMode$, miniMapExpanded$, showSettings$)
+    const markup = render(miniMapExpanded$)
 
     expect(captured.miniMap).toBeUndefined()
-    expect(captured.controls).toContainEqual(expect.objectContaining({ position: 'bottom-right' }))
+    expect(captured.controls).toContainEqual(expect.objectContaining({ position: 'top-right' }))
     expect(captured.buttons).toHaveLength(1)
+    expect(markup).toContain('data-icon="mini-map-open"')
 
     captured.buttons[0]?.onClick?.({} as never)
 
     expect(miniMapExpanded$.value).toBe(true)
   })
 
-  it('keeps the expanded MiniMap and its close control in the bottom-right corner', () => {
-    const interactiveMode$ = val<InteractiveMode>('mouse')
+  it('keeps the expanded MiniMap below its top-right control', () => {
     const miniMapExpanded$ = val<boolean | undefined>(true)
-    const showSettings$ = val(false)
 
-    render(interactiveMode$, miniMapExpanded$, showSettings$)
+    const markup = render(miniMapExpanded$)
 
-    expect(captured.miniMap).toMatchObject({ ariaLabel: 'Mini map', pannable: true, position: 'bottom-right', zoomable: true })
-    expect(captured.controls).toContainEqual(expect.objectContaining({ position: 'bottom-right' }))
+    expect(captured.miniMap).toMatchObject({ ariaLabel: 'Mini map', pannable: true, position: 'top-right', zoomable: true })
+    expect(captured.controls).toContainEqual(expect.objectContaining({ position: 'top-right' }))
     expect(captured.buttons).toHaveLength(1)
+    expect(markup).toContain('data-icon="mini-map-close"')
 
     captured.buttons[0]?.onClick?.({} as never)
     expect(miniMapExpanded$.value).toBe(false)
+  })
+
+  it('places host tools after the MiniMap button in the same control group', () => {
+    const markup = render(val<boolean | undefined>(false), <button aria-label="Inspector" type="button" />)
+
+    expect(captured.controls).toHaveLength(1)
+    expect(markup.indexOf('Mini map')).toBeLessThan(markup.indexOf('Inspector'))
   })
 })
