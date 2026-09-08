@@ -1,5 +1,3 @@
-import { icons as carbonIcons } from '@iconify-json/carbon'
-import { icons as codiconIcons } from '@iconify-json/codicon'
 import { presetIcons } from '@unocss/preset-icons'
 import { defineConfig } from '@unocss/vite'
 import { glob, readFile } from 'node:fs/promises'
@@ -28,9 +26,8 @@ export default defineConfig({
   presets: [
     presetIcons({
       warn: true,
+      collectionsNodeResolvePath: sourceRoot,
       collections: {
-        carbon: () => carbonIcons,
-        codicon: () => codiconIcons,
         file: fileIcons,
         custom: {
           mouse: `<svg viewBox="0 0 16 22" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M6.5 3V3.5C6.5 4.05228 6.94772 4.5 7.5 4.5V5H7C4.79086 5 3 6.79086 3 9V15C3 17.2091 4.79086 19 7 19H9C11.2091 19 13 17.2091 13 15V9C13 6.79086 11.2091 5 9 5H8.5V4.5C8.5 3.94772 8.05228 3.5 7.5 3.5V3H6.5ZM8.5 12V8H7.5V12H8.5ZM7 6H9C10.6569 6 12 7.34315 12 9V15C12 16.6569 10.6569 18 9 18H7C5.34315 18 4 16.6569 4 15V9C4 7.34315 5.34315 6 7 6Z" fill="currentColor"/></svg>`,

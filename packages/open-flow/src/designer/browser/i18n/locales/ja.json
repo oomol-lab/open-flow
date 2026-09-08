@@ -313,7 +313,10 @@
   },
   "interactiveMode": {
     "mouse": "マウス操作向け",
-    "touchpad": "タッチパッド操作向け"
+    "mouseDescription": "マウスの左ボタンでキャンバスをドラッグし、ホイールでズームします。",
+    "title": "操作方法",
+    "touchpad": "タッチパッド操作向け",
+    "touchpadDescription": "2 本指でキャンバスを移動し、ピンチ操作でズームします。"
   },
   "jsonViewer": {
     "bin": "バイナリ",

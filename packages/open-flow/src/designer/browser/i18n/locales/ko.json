@@ -313,7 +313,10 @@
   },
   "interactiveMode": {
     "mouse": "마우스 최적화",
-    "touchpad": "터치패드 최적화"
+    "mouseDescription": "마우스 왼쪽 버튼으로 캔버스를 드래그하고 휠로 확대하거나 축소합니다.",
+    "title": "상호작용 방식",
+    "touchpad": "터치패드 최적화",
+    "touchpadDescription": "두 손가락으로 캔버스를 이동하고 손가락을 오므리거나 벌려 확대하거나 축소합니다."
   },
   "jsonViewer": {
     "bin": "바이너리",

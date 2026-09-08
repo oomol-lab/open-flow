@@ -313,7 +313,10 @@
   },
   "interactiveMode": {
     "mouse": "滑鼠友善",
-    "touchpad": "觸控板友善"
+    "mouseDescription": "按住滑鼠左鍵拖動畫布，滾動滾輪縮放。",
+    "title": "互動方式",
+    "touchpad": "觸控板友善",
+    "touchpadDescription": "雙指同向滑動拖動畫布，雙指捏合或張開縮放。"
   },
   "jsonViewer": {
     "bin": "二進位",

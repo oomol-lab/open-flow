@@ -92,6 +92,14 @@ Workbench 持有且位于 `FlowDesignerView` 兄弟位置的顶部 action 可以
 也不要让 Workbench 导入 Designer 的具体 light/dark theme module。Workbench 中确实嵌入 Designer 控件时，只能通过 Designer-owned
 `designerThemeClass` adapter 取得 root theme class；具体 SCSS module 的所有权仍留在 Designer。
 
+## Story 真实性
+
+开发 Story 是生产组件的场景消费者。Story 可以拥有 fixture 数据、Provider、场景布局和事件日志；凡是作为产品 UI 展示或测试的组件，都必须直接从 `src`
+导入并渲染可独立使用的生产组件。现有组合无法独立渲染时，先在生产代码中提取真实组件，再把它用于生产入口和 Story。
+
+Story 不得复制生产组件的 DOM、交互状态机或控件组合，也不得导入生产组件私有的 CSS Module 或内部碎片来重组视觉替身。开发入口可以导入公开的全局样式入口
+以建立运行环境，但组件私有样式只能由对应生产组件自己加载。Story 自有组件只负责场景装配，不能拥有被展示产品行为的平行实现。
+
 ## Utility 与图标生成
 
 Tailwind CSS v4 是 `src/ui/browser`、`src/designer/browser` 和 `src/workbench/browser` 中布局与视觉 utility 的唯一 owner。不要使用 UnoCSS Wind3

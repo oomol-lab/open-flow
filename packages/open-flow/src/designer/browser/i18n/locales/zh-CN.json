@@ -313,7 +313,10 @@
   },
   "interactiveMode": {
     "mouse": "鼠标友好",
-    "touchpad": "触控板友好"
+    "mouseDescription": "按住鼠标左键拖动画布，滚动滚轮缩放。",
+    "title": "交互方式",
+    "touchpad": "触控板友好",
+    "touchpadDescription": "双指同向滑动拖动画布，双指捏合或张开缩放。"
   },
   "jsonViewer": {
     "bin": "二进制",

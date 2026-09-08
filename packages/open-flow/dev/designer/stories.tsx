@@ -1,16 +1,18 @@
-import cornerStyles from '../../src/designer/browser/graph/ReactFlowContainer/CornerControls.module.scss'
-import containerStyles from '../../src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.module.scss'
 import type { ReactNode } from 'react'
 import type { DesignerOption } from '../../src/designer/browser/components/select.tsx'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 
-import { useEffect, useMemo, useState } from 'react'
+import { ReactFlowProvider } from '@xyflow/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
+import { val } from 'value-enhancer'
 import { DateTimePicker } from '../../src/designer/browser/components/dateTimePicker.tsx'
 import { DesignerCombobox } from '../../src/designer/browser/components/select.tsx'
 import { DesignerTooltip } from '../../src/designer/browser/components/tooltip.tsx'
-import { MiniMapToggleIcon } from '../../src/designer/browser/graph/ReactFlowContainer/CornerControls.tsx'
-import { useGetStaticPopupContainer } from '../../src/designer/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
+import { CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from '../../src/designer/browser/graph/ReactFlowContainer/CanvasControls.tsx'
+import { CornerControls } from '../../src/designer/browser/graph/ReactFlowContainer/CornerControls.tsx'
+import { GetPopupContainerContext, useGetStaticPopupContainer } from '../../src/designer/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
+import { createI18n as createDesignerI18n } from '../../src/designer/browser/i18n/i18n-loader.ts'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuTrigger } from '../../src/ui/browser/context-menu.tsx'
 import {
@@ -185,10 +187,60 @@ function ContextMenuStory({ log }: { readonly log: LogAction }) {
   )
 }
 
+function CanvasChromeStory({
+  children,
+  language,
+  log,
+  miniMapOpen,
+}: {
+  readonly children: ReactNode
+  readonly language: UiLanguage
+  readonly log: LogAction
+  readonly miniMapOpen: boolean
+}) {
+  const i18n = useMemo(() => createDesignerI18n(language), [language])
+  const interactiveMode$ = useMemo(() => val<'mouse' | 'touchpad'>('touchpad'), [])
+  const miniMapExpanded$ = useMemo(() => val<boolean | undefined>(miniMapOpen), [])
+  const stageRef = useRef<HTMLDivElement>(null)
+  const popup = useMemo(
+    () => ({
+      default: () => stageRef.current || document.body,
+      static: () => stageRef.current || document.body,
+    }),
+    [],
+  )
+
+  useEffect(() => () => i18n.dispose(), [i18n])
+
+  return (
+    <GetPopupContainerContext.Provider value={popup}>
+      <div className="run-control-story-stage" data-canvas-control-scope ref={stageRef}>
+        <ReactFlowProvider>
+          <I18nProvider i18n={i18n}>
+            <CornerControls leading={<CanvasInteractiveMode interactiveMode$={interactiveMode$} />} miniMapExpanded$={miniMapExpanded$} />
+            <CanvasViewControls
+              maxZoomReached={false}
+              minZoomReached={false}
+              onFitView={() => log('canvas.fit')}
+              onRelayout={() => log('canvas.layout')}
+              onZoomIn={() => log('canvas.zoom', 'in')}
+              onZoomOut={() => log('canvas.zoom', 'out')}
+              onZoomReset={() => log('canvas.zoom', 'reset')}
+              zoom={1}
+            />
+          </I18nProvider>
+          <CanvasToolbar>{children}</CanvasToolbar>
+        </ReactFlowProvider>
+      </div>
+    </GetPopupContainerContext.Provider>
+  )
+}
+
 function RunControlSample({
   defaultOpen = false,
   disabled = false,
   inputStatus,
+  language,
   label,
   log,
   miniMapOpen = false,
@@ -198,6 +250,7 @@ function RunControlSample({
   readonly defaultOpen?: boolean
   readonly disabled?: boolean
   readonly inputStatus: 'missing' | 'none' | 'ready'
+  readonly language: UiLanguage
   readonly label: string
   readonly log: LogAction
   readonly miniMapOpen?: boolean
@@ -205,8 +258,6 @@ function RunControlSample({
   readonly triggers: readonly { readonly id: string; readonly title: string }[]
 }) {
   const [inputOpen, setInputOpen] = useState(defaultOpen)
-  const [inspectorOpen, setInspectorOpen] = useState(false)
-  const [mapOpen, setMapOpen] = useState(miniMapOpen)
   const [selectedTriggerId, setSelectedTriggerId] = useState(triggers[0]!.id)
   return (
     <section className="run-control-sample">
@@ -214,71 +265,8 @@ function RunControlSample({
         <strong>{label}</strong>
         <span>{inputStatus == 'none' ? 'No test data' : inputStatus == 'ready' ? 'Test data ready' : 'Test data required'}</span>
       </div>
-      <div className="run-control-story-stage" data-canvas-control-scope>
-        {inspectorOpen && (
-          <aside className="run-control-story-panel">
-            <strong>Inspector</strong>
-            <span>Node configuration</span>
-          </aside>
-        )}
-        <div className={`${containerStyles.island} ${cornerStyles.surface} run-control-story-corner`}>
-          <Button aria-label="Mini map" aria-expanded={mapOpen} onClick={() => setMapOpen(!mapOpen)} size="icon" title="Mini map" type="button" variant="ghost">
-            <MiniMapToggleIcon expanded={mapOpen} />
-          </Button>
-          <Button
-            aria-label="Toggle inspector"
-            aria-expanded={inspectorOpen}
-            onClick={() => setInspectorOpen(!inspectorOpen)}
-            size="icon"
-            title="Toggle inspector"
-            type="button"
-            variant="ghost"
-          >
-            <i className={inspectorOpen ? 'i-carbon:right-panel-close' : 'i-carbon:right-panel-open'} data-corner-icon />
-          </Button>
-        </div>
-        {mapOpen && (
-          <div className="run-control-story-minimap">
-            <span />
-            <span />
-            <span />
-          </div>
-        )}
-        <div className={`${containerStyles.island} run-control-story-dock run-control-story-view`}>
-          <Button aria-label="Zoom out" size="icon" title="Zoom out" type="button" variant="ghost">
-            <i className="i-codicon:zoom-out" />
-          </Button>
-          <Button className="run-control-story-zoom" title="Reset zoom" type="button" variant="ghost">
-            100%
-          </Button>
-          <Button aria-label="Zoom in" size="icon" title="Zoom in" type="button" variant="ghost">
-            <i className="i-codicon:zoom-in" />
-          </Button>
-          <Button aria-label="Fit view" size="icon" title="Fit view" type="button" variant="ghost">
-            <i className="i-custom:screen" />
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button title="View" type="button" variant="ghost">
-                  <i className="i-carbon:view" /> View <i className="i-codicon:chevron-down" />
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="end" className="w-48" side="top">
-              <DropdownMenuItem onClick={() => log('canvas.layout')}>
-                <i className="i-custom:layout" /> Tidy layout
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => log('canvas.mode', 'mouse')}>
-                <i className="i-custom:mouse" /> Mouse-friendly
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => log('canvas.mode', 'touchpad')}>
-                <i className="i-custom:touchpad" /> Touchpad-friendly
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        <div className={`${containerStyles.island} run-control-story-dock run-control-story-create`}>
+      <CanvasChromeStory language={language} log={log} miniMapOpen={miniMapOpen}>
+        <>
           <Button size="default" type="button" variant="ghost">
             <Icon data-icon="inline-start" name="plus" /> Add node
           </Button>
@@ -315,8 +303,8 @@ function RunControlSample({
             starting={starting}
             triggers={triggers}
           />
-        </div>
-      </div>
+        </>
+      </CanvasChromeStory>
     </section>
   )
 }
@@ -333,17 +321,17 @@ function RunControlStory({ dark, language, log }: { readonly dark: boolean; read
     <I18nProvider i18n={i18n}>
       <div className="run-control-stories open-flow-workbench" data-theme={dark ? 'dark' : 'light'}>
         <header>
-          <strong>Canvas toolbar system</strong>
-          <p>Navigation, editing, testing, and view controls use the same production island and button styles.</p>
+          <strong>Run control states</strong>
+          <p>Run controls are rendered inside the production canvas toolbar alongside the production canvas chrome.</p>
         </header>
         <div className="run-control-story-grid">
-          <RunControlSample inputStatus="none" label="Direct run" log={log} triggers={one} />
-          <RunControlSample defaultOpen inputStatus="missing" label="Input required" log={log} triggers={[multiple[1]!]} />
-          <RunControlSample inputStatus="ready" label="Remembered input" log={log} triggers={[multiple[1]!]} />
-          <RunControlSample inputStatus="none" label="Multiple triggers" log={log} triggers={multiple} />
-          <RunControlSample inputStatus="ready" label="Starting" log={log} starting triggers={[multiple[1]!]} />
-          <RunControlSample disabled inputStatus="missing" label="Draft has problems" log={log} triggers={[multiple[1]!]} />
-          <RunControlSample inputStatus="none" label="Mini map open" log={log} miniMapOpen triggers={one} />
+          <RunControlSample inputStatus="none" language={language} label="Direct run" log={log} triggers={one} />
+          <RunControlSample defaultOpen inputStatus="missing" language={language} label="Input required" log={log} triggers={[multiple[1]!]} />
+          <RunControlSample inputStatus="ready" language={language} label="Remembered input" log={log} triggers={[multiple[1]!]} />
+          <RunControlSample inputStatus="none" language={language} label="Multiple triggers" log={log} triggers={multiple} />
+          <RunControlSample inputStatus="ready" language={language} label="Starting" log={log} starting triggers={[multiple[1]!]} />
+          <RunControlSample disabled inputStatus="missing" language={language} label="Draft has problems" log={log} triggers={[multiple[1]!]} />
+          <RunControlSample inputStatus="none" language={language} label="Mini map open" log={log} miniMapOpen triggers={one} />
         </div>
       </div>
     </I18nProvider>

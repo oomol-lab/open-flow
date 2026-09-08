@@ -313,7 +313,10 @@
   },
   "interactiveMode": {
     "mouse": "Mouse-friendly",
-    "touchpad": "Touchpad-friendly"
+    "mouseDescription": "Drag the canvas with the left mouse button and zoom with the scroll wheel.",
+    "title": "Interactive",
+    "touchpad": "Touchpad-friendly",
+    "touchpadDescription": "Scroll with two fingers to move the canvas, and pinch or spread to zoom."
   },
   "jsonViewer": {
     "bin": "Binary",
