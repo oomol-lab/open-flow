@@ -652,7 +652,6 @@
     "design": "設計",
     "draft": "草稿",
     "fixIssuesToPublish": "請先修正草稿的問題再發布。",
-    "fixIssuesToRun": "請先修正草稿的問題再執行。",
     "issues": "{{count}} 個問題",
     "issueSingle": "1 個問題",
     "liveAndDraft": "線上 + 草稿",

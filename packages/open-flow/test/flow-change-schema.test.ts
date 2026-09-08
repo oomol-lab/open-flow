@@ -32,11 +32,20 @@ describe('ChangeOperation wire contract', () => {
     expect(decodeChangeOperations(operations)).toEqual(operations)
   })
 
+  it('ignores unknown operation and node fields in the decoder and advertised schema', () => {
+    const extended = operations.map((operation) => ({
+      ...operation,
+      extra: true,
+      ...(operation.node == null ? {} : { node: { ...operation.node, extra: true } }),
+    }))
+    expect(decodeChangeOperations(extended)).toEqual(operations)
+    expect(new Validator(changeOperationsSchema() as object).validate(extended).valid).toBe(true)
+  })
+
   it.each(
     [
       [],
       [{ kind: 'unknown' }],
-      [{ ...operations[0], extra: true }],
       [{ ...operations[0], node: { kind: 'manual' } }],
       [{ ...operations[3], value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'start' }] } }],
     ].map((value) => [value]),

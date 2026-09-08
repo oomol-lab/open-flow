@@ -268,9 +268,70 @@ export type PrepareFlowResult =
   | { readonly kind: 'flow-invalid'; readonly validation: FlowValidation }
   | { readonly flow: PreparedFlow; readonly kind: 'prepared'; readonly validation: FlowValidation }
 
-export async function prepareFlow(revision: RevisionContent, engineContract: string): Promise<PrepareFlowResult> {
+function runRevision(revision: RevisionContent, triggerId: string): RevisionContent {
+  const graph = revision.document.graph
+  const reachable = new Set([triggerId])
+  for (const nodeId of reachable) {
+    for (const edge of graph.edges) if (edge.source == nodeId) reachable.add(edge.target)
+  }
+  function inputs(mappings: Readonly<Record<string, InputMapping>>): Readonly<Record<string, InputMapping>> {
+    return Object.fromEntries(
+      Object.entries(mappings).map(([handle, mapping]) => [
+        handle,
+        mapping.kind == 'value'
+          ? mapping
+          : {
+              ...mapping,
+              sources: mapping.sources.filter((source) => source.kind != 'node' || graph.nodes[source.nodeId] == null || reachable.has(source.nodeId)),
+            },
+      ]),
+    )
+  }
+  const nodes: Record<string, Graph['nodes'][string]> = {}
+  for (const nodeId of reachable) {
+    const node = graph.nodes[nodeId]
+    if (node == null) continue
+    nodes[nodeId] = !('inputs' in node)
+      ? node
+      : {
+          ...node,
+          inputs: inputs(node.inputs),
+          ...(node.kind == 'wait' && node.notification != null ? { notification: { ...node.notification, inputs: inputs(node.notification.inputs) } } : {}),
+        }
+  }
+  const content = { ...revision, document: { ...revision.document, graph: { nodes, edges: graph.edges.filter((edge) => reachable.has(edge.source)) } } }
+  const { bindings } = flowDependencies(content)
+  return {
+    ...content,
+    document: { ...content.document, bindings: Object.fromEntries(Object.entries(content.document.bindings).filter(([id]) => bindings.has(id))) },
+  }
+}
+
+export async function prepareFlow(revision: RevisionContent, engineContract: string, triggerId?: string): Promise<PrepareFlowResult> {
   const engine = findEngineContract(engineContract)
   if (engine == null) return { kind: 'engine-unsupported' }
+  if (triggerId != null) {
+    const trigger = revision.document.graph.nodes[triggerId]
+    if (trigger == null || 'inputs' in trigger)
+      return {
+        kind: 'flow-invalid',
+        validation: {
+          closure: await flowClosure(revision),
+          diagnostics: [
+            {
+              code: 'graph.trigger-invalid',
+              column: 0,
+              line: 1,
+              message: 'Select an existing Trigger node.',
+              path: '/document/graph',
+              values: { nodeId: triggerId },
+            },
+          ],
+          valid: false,
+        },
+      }
+    revision = runRevision(revision, triggerId)
+  }
   const validation = await validateFlow(revision, engine)
   if (!validation.valid) return { kind: 'flow-invalid', validation }
   const { closure } = validation

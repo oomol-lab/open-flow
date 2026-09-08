@@ -107,7 +107,7 @@ export class RunExecutor {
       }
       const revision = decodeRevision(new TextEncoder().encode(run.content))
       const prepared = yield* Effect.tryPromise({
-        try: () => prepareFlow(revision, run.engineContract),
+        try: () => prepareFlow(revision, run.engineContract, run.source == 'draft' ? run.trigger?.nodeId : undefined),
         catch: (error) => error,
       })
       if (prepared.kind != 'prepared') {

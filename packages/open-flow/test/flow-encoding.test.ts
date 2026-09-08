@@ -264,14 +264,35 @@ describe('Revision decoding', () => {
     expect(decodeFlowDocument(revision().document)).toEqual(revision().document)
   })
 
+  it('ignores unknown fields before validation and canonical encoding', () => {
+    const content = {
+      modelVersion: 1,
+      modules: {},
+      document: { bindings: {}, subflows: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
+    } as const
+    const extended = {
+      ...content,
+      extra: true,
+      document: {
+        ...content.document,
+        extra: true,
+        graph: { ...content.document.graph, extra: true, nodes: { start: { ...content.document.graph.nodes.start, inputs: {}, extra: true } } },
+      },
+    }
+    expect(decodeFlowDocument(extended.document)).toEqual(content.document)
+    expect(decodeRevisionContent(extended)).toEqual(content)
+    const bytes = new TextEncoder().encode(JSON.stringify({ ...extended, kind: 'open-flow-flow-revision', version: 1 }))
+    expect(decodeRevision(bytes)).toEqual(content)
+    expect(encodeRevision(decodeRevision(bytes))).toEqual(encodeRevision(content))
+    expect(extended.document.graph.nodes.start).toHaveProperty('inputs')
+  })
+
   it.each([
     { version: 2 },
     { modelVersion: 2 },
     { kind: 'other' },
-    { extra: true },
     { modules: { bad: { name: 'Bad', imports: [3], source: '' } } },
     { document: { ...revision().document, graph: { nodes: {}, edges: [{ source: 'a' }] } } },
-    { document: { ...revision().document, graph: { nodes: { bad: { kind: 'manual', name: 'Start', inputs: {} } }, edges: [] } } },
   ])('rejects malformed or unsupported envelopes: %j', (patch) => {
     const value = { ...JSON.parse(decoder.decode(encodeRevision(revision()))), ...patch }
     expect(() => decodeRevision(new TextEncoder().encode(JSON.stringify(value)))).toThrow()
@@ -282,6 +303,6 @@ describe('Revision decoding', () => {
     expect(() => decodeRevision(new TextEncoder().encode('{'))).toThrow()
     expect(() => decodeRevision(new TextEncoder().encode('['.repeat(66) + '0' + ']'.repeat(66)))).toThrow(/depth/)
     expect(() => decodeRevisionContent({ ...revision(), modules: undefined })).toThrow()
-    expect(() => decodeFlowDocument({ ...revision().document, unexpected: true })).toThrow()
+    expect(() => decodeFlowDocument({ ...revision().document, graph: { nodes: {} } })).toThrow()
   })
 })

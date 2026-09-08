@@ -425,6 +425,48 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
     },
   },
   {
+    name: 'admits a Draft entry while unrelated branches remain invalid',
+    async verify(harness) {
+      const flow = await createFlow(harness, 'Partial Draft', 'partial-draft')
+      const flowId = requiredString(flow.flowId, 'Partial Flow identity')
+      const initial = await addManualTrigger(harness, flowId, requiredString(flow.draftRevisionId, 'Partial Draft identity'))
+      const changed = await json(
+        await changeRequest(harness, flowId, initial, [
+          { kind: 'graph.node.create', nodeId: 'other', target: { kind: 'flow' }, node: { kind: 'webhook', name: 'Other', inputsDef: [] } },
+          {
+            kind: 'graph.node.create',
+            nodeId: 'broken',
+            target: { kind: 'flow' },
+            node: { kind: 'task', name: 'Broken', inputs: {}, task: { name: 'Broken', moduleId: 'missing', inputs: [], outputs: [] } },
+          },
+          { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'other', target: 'broken' } },
+        ]),
+        200,
+        'Add unfinished branch',
+      )
+      const revisionId = changedRevisionId(changed, 'Partial Draft')
+      const path = `/v1/flows/${flowId}/revisions/${revisionId}`
+      const checked = await json(
+        await request(harness, `${path}/check`, {
+          method: 'POST',
+          body: JSON.stringify({ engineContract, version: 1 }),
+        }),
+        200,
+        'Check entire Draft',
+      )
+      equal(checked.valid, false, 'Entire Draft remains invalid')
+      const run = (nodeId: string) =>
+        request(harness, `${path}/runs`, {
+          method: 'POST',
+          headers: { 'idempotency-key': `partial-${nodeId}` },
+          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId, payload: {} }, version: 1 }),
+        })
+      await json(await run('start'), 202, 'Run valid entry')
+      await error(await run('other'), 400, 'flow.invalid', 'Reject invalid entry branch')
+      await error(await publishRequest(harness, flowId, revisionId, null, 'partial-publish'), 400, 'flow.invalid', 'Reject incomplete publication')
+    },
+  },
+  {
     name: 'validates, admits, lists, and cancels one Draft Run',
     async verify(harness) {
       const flow = await createFlow(harness, 'Run flow', 'run-flow')

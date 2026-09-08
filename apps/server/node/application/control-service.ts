@@ -607,7 +607,8 @@ export class ControlService {
     const stored = this.store.revision(flowId, revisionId)
     if (stored == null) notFound()
     const content = revisionContent(stored)
-    const fixed = await prepareFlow(content, engineContract)
+    if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and payload.')
+    const fixed = await prepareFlow(content, engineContract, trigger.nodeId)
     switch (fixed.kind) {
       case 'engine-unsupported':
         throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
@@ -619,7 +620,6 @@ export class ControlService {
     if (Object.values(fixed.flow.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) && this.resolveWaitPublicOrigin() == null) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
     }
-    if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and payload.')
     await checkCodeActions(codeActions(fixed.flow), this.resolveConnector(), this.store.connectorTeam(flowId))
     if (validateFlowInputs(content, inputs) != 'valid') throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
     const accepted = this.store.acceptControlRun({

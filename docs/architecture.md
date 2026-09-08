@@ -107,10 +107,15 @@ Common 代码不能依赖 Browser 或 Node，Browser 代码不能依赖 Node。�
 
 ## 3. Validation 与执行
 
+Flow Revision 和 change operation 在公共解码边界忽略并移除未声明的对象字段；已知字段、必填项和版本仍须满足合同，任意 JSON 数据内容保持不变。
+
 权威 validation 的输入是固定 Flow Revision、model version 和 Engine Contract。它必须确定性检查 graph、Module、Task 和 closure，不读取
 credential value、Provider 当前状态、调用权限或部署资源。非确定性 eligibility 必须在 Run 或 Publish 的 operation boundary 重新检查。
 部署 Control check 可以在确定性 validation 之后追加静态 capability 配置缺失的 diagnostic，例如 Flow 使用 LLM Task 但 Server 没有 LLM host；
 这类 diagnostic 不进入 Revision 或 digest，也不能通过探测外部服务状态产生。
+
+草稿从指定 Trigger 测试运行时，只校验并准备该入口沿执行边可达的节点及其 Task、Module、Subflow 和 binding 依赖；无关分支的语义错误或部署能力缺失不阻断本次运行。
+准入、队列执行和 Wait 恢复必须使用同一入口范围，固定完整 Revision 身份及本次执行 closure。全图 check 和 Publish 仍检查完整 Flow，Workbench 不得用全图诊断禁用草稿入口测试。
 
 Engine Contract、部署中立 Runtime invocation、Scheduler 图执行语义、RunEvent 投影和 conformance 属于 `packages/open-flow`。具体执行隔离、
 Engine digest、资源限制和恢复属于部署实现；`isolated-vm` RuntimeHost 只属于 Server。

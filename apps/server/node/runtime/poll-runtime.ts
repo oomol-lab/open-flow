@@ -23,6 +23,7 @@ import {
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Semaphore from 'effect/Semaphore'
+import { isDeepStrictEqual } from 'node:util'
 import { ConnectorTaskError } from '../deployment/connector.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
 import { errorKind } from '../logger.ts'
@@ -100,7 +101,7 @@ export class PollRuntime {
         fixed.revisionDigest != target.revisionDigest ||
         fixed.prepared.closureDigest != target.closureDigest ||
         trigger?.kind != 'poll' ||
-        JSON.stringify(trigger) != target.triggerJson
+        !isDeepStrictEqual(trigger, JSON.parse(target.triggerJson))
       ) {
         throw new PermanentPollError('Fixed Poll Trigger target does not match its Publication.')
       }
@@ -228,7 +229,7 @@ export class PollRuntime {
   #baseline(candidate: PollCandidate, now: number): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
       const trigger = JSON.parse(candidate.triggerJson) as TriggerNode
-      if (trigger.kind != 'poll' || JSON.stringify(trigger.pollTimes) != candidate.scheduleJson) {
+      if (trigger.kind != 'poll' || !isDeepStrictEqual(trigger.pollTimes, JSON.parse(candidate.scheduleJson))) {
         return yield* Effect.fail(new PermanentPollError('Fixed Poll candidate is invalid.'))
       }
       const definition = this.#definitions.get(trigger.definition.key)
@@ -312,8 +313,8 @@ export class PollRuntime {
           fixed.revisionDigest != target.revisionDigest ||
           fixed.prepared.closureDigest != target.closureDigest ||
           trigger?.kind != 'poll' ||
-          JSON.stringify(trigger) != target.triggerJson ||
-          JSON.stringify(trigger.pollTimes) != target.scheduleJson
+          !isDeepStrictEqual(trigger, JSON.parse(target.triggerJson)) ||
+          !isDeepStrictEqual(trigger.pollTimes, JSON.parse(target.scheduleJson))
         ) {
           return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger target does not match its Publication.'))
         }

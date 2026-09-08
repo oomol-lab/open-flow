@@ -652,7 +652,6 @@
     "design": "Conception",
     "draft": "Brouillon",
     "fixIssuesToPublish": "Corrigez les problèmes du Brouillon avant de publier.",
-    "fixIssuesToRun": "Corrigez les problèmes du Brouillon avant d'exécuter.",
     "issues": "{{count}} problèmes",
     "issueSingle": "1 problème",
     "liveAndDraft": "En ligne + Brouillon",
