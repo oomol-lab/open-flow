@@ -34,7 +34,7 @@ collections if needed. Try related English keywords when an exact search is spar
 Read only the selected candidates and their alias parents for SVG inspection; use
 `@iconify/utils` to resolve aliases when rendering previews locally. Compare stroke
 weight, proportions, and appearance at the intended size, not just icon names.
-Do not launch or automate a browser for UI testing in this repository.
+Choose verification using the [repository verification principles](../../../AGENTS.md#verification).
 
 ## Use through UnoCSS
 
