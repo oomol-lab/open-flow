@@ -198,7 +198,7 @@
     },
     "task": {
       "chatText": "チャットテキスト",
-      "codeDirty": "自動保存を待機中…",
+      "codeDirty": "未保存",
       "codeFailed": "保存に失敗",
       "codeSaved": "保存済み",
       "codeSaving": "保存中…",
@@ -241,7 +241,7 @@
       "unavailable": "この入力元が現在のノードより先に完了する保証がないか、型が一致していません。"
     },
     "actions": {
-      "title": "Actions",
+      "title": "このコードから呼び出せるアクション",
       "search": "Action を検索",
       "description": "このコードで使用する Action とアカウントを選択します。",
       "empty": "一致する Action はありません。",
@@ -268,7 +268,9 @@
       "fullId": "完全な ID",
       "copy": "コピー",
       "copied": "コピー済み",
-      "copyError": "コピーできませんでした。コードを選択して手動でコピーしてください。"
+      "copyError": "コピーできませんでした。コードを選択して手動でコピーしてください。",
+      "introDescription": "必要に応じてアクションを追加し、{{context}} から外部アプリを呼び出せます。",
+      "chooseAccounts": "アカウントを管理"
     }
   },
   "language": {

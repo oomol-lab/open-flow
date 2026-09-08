@@ -198,7 +198,7 @@
     },
     "task": {
       "chatText": "Chat text",
-      "codeDirty": "Waiting to save…",
+      "codeDirty": "Unsaved",
       "codeFailed": "Save failed",
       "codeSaved": "Saved",
       "codeSaving": "Saving…",
@@ -241,7 +241,7 @@
       "unavailable": "This source is not guaranteed to complete before this node, or its type does not match."
     },
     "actions": {
-      "title": "Actions",
+      "title": "Actions available to this code",
       "search": "Search actions",
       "description": "Choose the actions and accounts this code can use.",
       "empty": "No matching actions.",
@@ -268,7 +268,9 @@
       "fullId": "Full ID",
       "copy": "Copy",
       "copied": "Copied",
-      "copyError": "Copy failed. Select the code and copy it manually."
+      "copyError": "Copy failed. Select the code and copy it manually.",
+      "introDescription": "Add actions as needed to call external apps through {{context}}.",
+      "chooseAccounts": "Manage accounts"
     }
   },
   "language": {

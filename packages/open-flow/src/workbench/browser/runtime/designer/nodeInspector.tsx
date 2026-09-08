@@ -726,9 +726,8 @@ function TaskDefinition({
   const task = selection.definition
   const module = selection.module
   const fieldIdPrefix = `task-${selection.id}`
-  const moduleDiagnostics = useVal(store.$.moduleDiagnostics)
   const moduleEditor = useVal(store.$.moduleEditor)
-  const moduleLocation = focus?.section == 'module' ? focus.diagnostic : focus == null ? moduleDiagnostics[0] : undefined
+  const moduleLocation = focus?.section == 'module' ? focus.diagnostic : undefined
 
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
   const llm = 'executor' in task && task.executor.kind == 'llm' ? task.executor : undefined
@@ -764,6 +763,9 @@ function TaskDefinition({
           errorLabel={t('inspector.task.editorUnavailable')}
           loadingLabel={t('inspector.task.editorLoading')}
           location={moduleLocation == null ? undefined : { column: moduleLocation.column, line: moduleLocation.line }}
+          onBlur={() => {
+            if (store.hasUnsavedCode) void store.saveModuleEditor()
+          }}
           onChange={(value) => store.updateModuleSource(value)}
           theme={theme}
           typing={codeTyping(task, task.capabilities, actionCatalog)}

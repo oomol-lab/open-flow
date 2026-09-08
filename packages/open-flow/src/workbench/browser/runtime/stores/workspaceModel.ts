@@ -76,7 +76,6 @@ export interface Workspace$ {
   readonly flows: ReadonlyVal<readonly Flow[]>
   readonly inspectorDiagnostics: ReadonlyVal<readonly Diagnostic[]>
   readonly live: ReadonlyVal<Live | undefined>
-  readonly moduleDiagnostics: ReadonlyVal<readonly Diagnostic[]>
   readonly moduleEditor: ReadonlyVal<ModuleEditor | undefined>
   readonly nodeFocus: ReadonlyVal<NodeFocus | undefined>
   readonly presentation: ReadonlyVal<Presentation | undefined>
@@ -200,10 +199,6 @@ export class WorkspaceModel {
         deriveInspectorDiagnostics(state.draft == null ? undefined : revisionView(state.draft), state.target, state.diagnostics, selection.value),
       ),
       live,
-      moduleDiagnostics: derive(this.#state, (state) => {
-        const moduleId = state.moduleEditor?.moduleId
-        return moduleId == null ? [] : (state.diagnostics?.diagnostics.filter((diagnostic) => diagnostic.path.startsWith(`/modules/${moduleId}/source`)) ?? [])
-      }),
       moduleEditor,
       nodeFocus,
       presentation,

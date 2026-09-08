@@ -178,6 +178,19 @@ export function run() { return identity({ engineContract, value }) }`,
     expect(validate(source, ['module-main', 'module-helper'])).toEqual([])
   })
 
+  it('does not report a missing entry while an inline task has incomplete syntax', async () => {
+    const source = revision('export default async function (inputs, context) {\n  context.\n}')
+    const result = await validateFlow(source, engine)
+
+    expect(result.valid).toBe(false)
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain('module.syntax')
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain('task.missing-entry')
+
+    const complete = await validateFlow(revision('export default async function (inputs, context) { return inputs }'), engine)
+    expect(complete.valid).toBe(true)
+    expect(complete.diagnostics).toEqual([])
+  })
+
   it('maps syntax, missing Module and missing export diagnostics to user source', () => {
     const syntax = validate(revision('export function broken( {'), ['module-main'])
     const missingModule = validate(revision('import { value } from "./module-missing.mjs"\nexport { value }'), ['module-main'])

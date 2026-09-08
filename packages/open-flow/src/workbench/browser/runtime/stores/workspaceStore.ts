@@ -106,7 +106,6 @@ export class WorkspaceStore {
   readonly #setNotice: SetNotice
   readonly #model: WorkspaceModel
   readonly #moduleDrafts = new Map<string, { editor: ModuleEditorDraft; base: Draft['content']['modules'][string] }>()
-  #moduleTimer?: ReturnType<typeof setTimeout>
   #moduleSave?: Promise<boolean>
   #clipboard?: Clipboard
   #diagnosticFocusId = 0
@@ -156,7 +155,6 @@ export class WorkspaceStore {
 
   public dispose(): void {
     this.#disposed = true
-    clearTimeout(this.#moduleTimer)
     this.#draftSession.invalidate()
     this.#presentationChanges.dispose()
     this.#stopCatalogWatch?.()
@@ -716,8 +714,6 @@ export class WorkspaceStore {
     if (base == null) return
     this.#moduleDrafts.set(editor.moduleId, { base, editor: { ...editor, phase: undefined, source } })
     this.#set({})
-    clearTimeout(this.#moduleTimer)
-    this.#moduleTimer = setTimeout(() => void this.#flushModules(), 800)
   }
 
   public discardModuleChanges(): void {
@@ -742,7 +738,6 @@ export class WorkspaceStore {
   }
 
   #flushModules(): Promise<boolean> {
-    clearTimeout(this.#moduleTimer)
     if (this.#moduleSave != null) return this.#moduleSave
     if (this.#disposed) return Promise.resolve(false)
     if (![...this.#moduleDrafts.values()].some((pending) => pending.editor.phase != 'failed')) return Promise.resolve(this.#moduleDrafts.size == 0)

@@ -17,6 +17,7 @@ interface CodeMirrorModules {
   readonly Compartment: typeof import('@codemirror/state').Compartment
   readonly EditorState: typeof import('@codemirror/state').EditorState
   readonly EditorView: typeof import('@codemirror/view').EditorView
+  readonly autocompletion: typeof import('@codemirror/autocomplete').autocompletion
   readonly basicSetup: typeof import('codemirror').basicSetup
   readonly indentWithTab: typeof import('@codemirror/commands').indentWithTab
   readonly keymap: typeof import('@codemirror/view').keymap
@@ -35,6 +36,22 @@ interface CodeMirrorStringEditorFactoryOptions {
 }
 
 type Listener<T> = (event: T) => void
+
+const completionIcons = new Map([
+  ['class', 'i-codicon:symbol-class'],
+  ['constant', 'i-codicon:symbol-constant'],
+  ['enum', 'i-codicon:symbol-enum'],
+  ['enumMember', 'i-codicon:symbol-enum-member'],
+  ['function', 'i-codicon:symbol-method'],
+  ['interface', 'i-codicon:symbol-interface'],
+  ['keyword', 'i-codicon:symbol-keyword'],
+  ['method', 'i-codicon:symbol-method'],
+  ['namespace', 'i-codicon:symbol-namespace'],
+  ['property', 'i-codicon:symbol-property'],
+  ['text', 'i-codicon:symbol-string'],
+  ['type', 'i-codicon:symbol-structure'],
+  ['variable', 'i-codicon:symbol-variable'],
+])
 
 let codeMirrorModulesPromise: Promise<CodeMirrorModules> | undefined
 
@@ -84,7 +101,9 @@ async function loadCodeMirrorModules(): Promise<CodeMirrorModules> {
       import('@codemirror/lang-markdown'),
       import('@codemirror/lang-yaml'),
       import('@codemirror/commands'),
-    ]).then(([codeMirror, state, view, github, javascript, json, markdown, yaml, commands]) => ({
+      import('@codemirror/autocomplete'),
+    ]).then(([codeMirror, state, view, github, javascript, json, markdown, yaml, commands, autocomplete]) => ({
+      autocompletion: autocomplete.autocompletion,
       basicSetup: codeMirror.basicSetup,
       indentWithTab: commands.indentWithTab,
       keymap: view.keymap,
@@ -196,6 +215,32 @@ class CodeMirrorStringEditorControl implements StringEditorControl {
       parent: layoutRoot,
       extensions: [
         modules.basicSetup,
+        modules.autocompletion({
+          icons: false,
+          addToOptions: [
+            {
+              position: 20,
+              render: (completion, _state, view) => {
+                const icon = view.dom.ownerDocument.createElement('span')
+                const name = completion.type
+                  ?.split(/\s+/)
+                  .map((type) => completionIcons.get(type))
+                  .find((value) => value != null)
+                icon.className = `cm-symbolIcon ${name ?? 'i-codicon:symbol-misc'}`
+                icon.setAttribute('aria-hidden', 'true')
+                return icon
+              },
+            },
+          ],
+        }),
+        modules.EditorView.baseTheme({
+          '.cm-symbolIcon': {
+            width: '14px',
+            height: '14px',
+            marginRight: '6px',
+            verticalAlign: '-2px',
+          },
+        }),
         modules.keymap.of([modules.indentWithTab]),
         this.themeCompartment.of(createEditorTheme(modules, dark)),
         this.languageCompartment.of(createLanguageExtension(modules, this.language)),

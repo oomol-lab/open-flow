@@ -198,7 +198,7 @@
     },
     "task": {
       "chatText": "대화 텍스트",
-      "codeDirty": "자동 저장 대기 중…",
+      "codeDirty": "저장되지 않음",
       "codeFailed": "저장 실패",
       "codeSaved": "저장됨",
       "codeSaving": "저장 중…",
@@ -241,7 +241,7 @@
       "unavailable": "이 소스가 현재 노드보다 먼저 완료된다는 보장이 없거나 유형이 일치하지 않습니다."
     },
     "actions": {
-      "title": "Actions",
+      "title": "이 코드에서 호출할 수 있는 작업",
       "search": "Action 검색",
       "description": "이 코드에서 사용할 Action과 계정을 선택하세요.",
       "empty": "일치하는 Action이 없습니다.",
@@ -268,7 +268,9 @@
       "fullId": "전체 ID",
       "copy": "복사",
       "copied": "복사됨",
-      "copyError": "복사하지 못했습니다. 코드를 선택하여 직접 복사하세요."
+      "copyError": "복사하지 못했습니다. 코드를 선택하여 직접 복사하세요.",
+      "introDescription": "필요한 작업을 추가하고 {{context}}로 외부 앱을 호출하세요.",
+      "chooseAccounts": "계정 관리"
     }
   },
   "language": {

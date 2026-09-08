@@ -198,7 +198,7 @@
     },
     "task": {
       "chatText": "Texte de conversation",
-      "codeDirty": "En attente de sauvegarde…",
+      "codeDirty": "Non enregistré",
       "codeFailed": "Échec de l'enregistrement",
       "codeSaved": "Enregistré",
       "codeSaving": "Enregistrement…",
@@ -241,7 +241,7 @@
       "unavailable": "Cette source ne termine pas nécessairement avant ce nœud, ou son type est incompatible."
     },
     "actions": {
-      "title": "Actions",
+      "title": "Actions accessibles au code",
       "search": "Rechercher des actions",
       "description": "Choisissez les actions et les comptes autorisés pour ce code.",
       "empty": "Aucune action correspondante.",
@@ -268,7 +268,9 @@
       "fullId": "ID complet",
       "copy": "Copier",
       "copied": "Copié",
-      "copyError": "Échec de la copie. Sélectionnez le code pour le copier manuellement."
+      "copyError": "Échec de la copie. Sélectionnez le code pour le copier manuellement.",
+      "introDescription": "Ajoutez des actions au besoin pour appeler des applications externes via {{context}}.",
+      "chooseAccounts": "Gérer les comptes"
     }
   },
   "language": {
