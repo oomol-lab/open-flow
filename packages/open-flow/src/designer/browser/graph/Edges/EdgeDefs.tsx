@@ -1,10 +1,8 @@
-import type { JSX } from 'react/jsx-runtime'
-
 import { useMemo } from 'react'
 import { allPossibleEdgeGradients, edgeColors, gradientId } from '../../stores/edge/colors.ts'
 
 /** Renders edge gradient definitions at the Designer root. */
-export function EdgeDefs(): JSX.Element {
+export function EdgeDefs(): React.ReactElement {
   const gradients = useMemo(allPossibleEdgeGradients, [])
 
   const invisible: React.CSSProperties = {

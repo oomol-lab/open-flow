@@ -1,5 +1,3 @@
-import type { JSX } from 'react/jsx-runtime'
-
 import { createContext, useContext, useMemo } from 'react'
 
 export interface ThemeData {
@@ -15,7 +13,7 @@ export interface ThemeProviderProps {
 
 const ThemeContext = createContext<ThemeData | null>({ isDark: false })
 
-export function ThemeProvider({ children, dark }: ThemeProviderProps): JSX.Element {
+export function ThemeProvider({ children, dark }: ThemeProviderProps): React.ReactElement {
   const theme = useMemo(() => ({ isDark: dark }), [dark])
 
   return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>

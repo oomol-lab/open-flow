@@ -1,6 +1,5 @@
 import styles from './BasicEdge.module.scss'
 import type { EdgeProps } from '@xyflow/react'
-import type { JSX } from 'react/jsx-runtime'
 import type { RFEdge } from '../../base/rfHelpers.ts'
 
 import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react'
@@ -11,7 +10,7 @@ import { gradientToStroke } from '../../stores/edge/colors.ts'
 import { DEFAULT_HANDLE_KIND } from '../../stores/nodeHandle/handleKind.ts'
 import { useDesignerStore } from '../DesignerStoreContext.tsx'
 
-export function BasicEdge(props: EdgeProps<RFEdge>): JSX.Element {
+export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
   const edgeStore = props.data?.store
   const error = useVal(edgeStore?.$.error)
   const designerStore = useDesignerStore()

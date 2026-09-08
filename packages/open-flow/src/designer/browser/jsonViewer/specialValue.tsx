@@ -1,5 +1,4 @@
 import styles from './specialValue.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 
 import { useTranslate } from 'val-i18n-react'
 
@@ -8,7 +7,7 @@ export interface SpecialValueProps {
   value?: string
 }
 
-export const SpecialValue = ({ type, value }: SpecialValueProps): JSX.Element => {
+export const SpecialValue = ({ type, value }: SpecialValueProps): React.ReactElement => {
   const t = useTranslate()
   let title = type
   let icon = ''

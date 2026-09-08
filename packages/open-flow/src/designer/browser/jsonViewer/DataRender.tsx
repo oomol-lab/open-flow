@@ -1,5 +1,4 @@
 import styles from './JSONViewer.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 
 import { isArray, isBoolean, isPlainObject, isString } from '@wopjs/cast'
 import { cluster, isDate, isNumber } from 'radash'
@@ -301,7 +300,7 @@ function JsonPrimitiveValue({
 }
 
 // Adapted from https://github.com/AnyRoad/react-json-view-lite/blob/release/src/DataRenderer.tsx.
-export function DataRender(props: JsonRenderProps): JSX.Element {
+export function DataRender(props: JsonRenderProps): React.ReactElement {
   const value = props.value
   if (isArray(value)) {
     return <JsonArray {...props} />

@@ -1,7 +1,6 @@
 import styles from './schemaEditor.module.scss'
 import type { useStoreApi } from '@xyflow/react'
 import type { ErrorObject } from 'ajv'
-import type { JSX } from 'react/jsx-runtime'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { HandleRowProps, IHandleAction } from '../components/handleRow.tsx'
 import type { AnyOfConditionStore, AnyOfWidgetStore } from '../stores/schemaEditor/anyOfWidget.store.ts'
@@ -55,7 +54,7 @@ export interface SchemaEditorProps {
   onDelete?: () => void
 }
 
-export function SchemaEditor({ title, store, panelWidth$, reactFlowStore, validate, onRename, onClose, onDelete }: SchemaEditorProps): JSX.Element {
+export function SchemaEditor({ title, store, panelWidth$, reactFlowStore, validate, onRename, onClose, onDelete }: SchemaEditorProps): React.ReactElement {
   const t = useTranslate()
   const [sourceCode, setSourceCode] = useState(false)
 
@@ -211,7 +210,7 @@ export interface LowCodeEditorProps {
   onRename?: (name: string) => void
 }
 
-export function LowCodeEditor({ store, level, nameFactor = 1, valueFactor = 1, hideHandle, validate, onRename }: LowCodeEditorProps): JSX.Element {
+export function LowCodeEditor({ store, level, nameFactor = 1, valueFactor = 1, hideHandle, validate, onRename }: LowCodeEditorProps): React.ReactElement {
   const t = useTranslate()
   const { context } = store
 

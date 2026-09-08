@@ -1,5 +1,4 @@
 import styles from './NodeHead.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 import type { TFunction } from 'val-i18n'
 import type { ReadonlyVal } from 'value-enhancer'
 import type { DesignerStore } from '../../../stores/designer/designer.store.ts'
@@ -34,7 +33,7 @@ import { NodeStatusContent, NodeStatusIcon } from './NodeStatusLabel.tsx'
 import { TranslateIcon } from './TranslateIcon.tsx'
 import { useNodeStatus } from './useNodeStatus.ts'
 
-export function NodeHeadMoreMenu(): JSX.Element {
+export function NodeHeadMoreMenu(): React.ReactElement {
   const designerStore = useDesignerStore()
   const designerType = designerStore.designerType
   const subflowViewMode = useSubflowViewMode()
@@ -102,7 +101,7 @@ function InFlowDesigner({ designerStore }: SharedProps) {
   )
 }
 
-export function NodeSettingsPanelHost({ designerStore, nodeStore }: NodeFloatBarProps): JSX.Element | null {
+export function NodeSettingsPanelHost({ designerStore, nodeStore }: NodeFloatBarProps): React.ReactElement | null {
   const showSettings = useVal(nodeStore.$.showSettings)
   const editable = useVal(designerStore.$.editable)
   const reactFlowStore = useStoreApi()
@@ -162,7 +161,7 @@ export interface NodeHeadContextMenuProps {
   readonly children?: React.ReactNode
 }
 
-export function NodeHeadContextMenu({ designerStore, children }: NodeHeadContextMenuProps): JSX.Element {
+export function NodeHeadContextMenu({ designerStore, children }: NodeHeadContextMenuProps): React.ReactElement {
   const t = useTranslate()
   const getStaticDesignerContainer = useGetStaticPopupContainer()
   const getPopupContainer = getStaticDesignerContainer

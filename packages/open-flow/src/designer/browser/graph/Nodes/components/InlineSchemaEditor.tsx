@@ -1,4 +1,3 @@
-import type { JSX } from 'react/jsx-runtime'
 import type { Val } from 'value-enhancer'
 import type { InputHandleDef, OutputHandleDef } from '../../../../../schema/index.ts'
 import type { FieldPathKey } from '../../../stores/nodeHandle/fieldPath.ts'
@@ -22,7 +21,7 @@ export interface InlineSchemaEditorProps {
 }
 
 /** Edits restricted additional input and output definitions. */
-export function InlineSchemaEditor(props: InlineSchemaEditorProps): JSX.Element {
+export function InlineSchemaEditor(props: InlineSchemaEditorProps): React.ReactElement {
   const store = useMemo(() => createSchemaRowStore(props.def$, props.role, props.inout), [props.def$, props.role, props.inout])
   useEffect(() => () => store.dispose(), [])
 

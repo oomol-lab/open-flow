@@ -1,5 +1,4 @@
 import styles from './card.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 import type { Val } from 'value-enhancer'
 
 import { isDefined } from '@wopjs/cast'
@@ -46,7 +45,7 @@ export interface CardProps {
   readonly dragPosition?: number
 }
 
-export function NodeSectionActionButton({ action }: { readonly action: ICardAction }): JSX.Element {
+export function NodeSectionActionButton({ action }: { readonly action: ICardAction }): React.ReactElement {
   return (
     <DesignerTooltip placement="top" title={action.title}>
       <Button
@@ -68,7 +67,7 @@ export function NodeSectionActionButton({ action }: { readonly action: ICardActi
   )
 }
 
-export function Card(props: CardProps): JSX.Element {
+export function Card(props: CardProps): React.ReactElement {
   const storedCollapsed = useVal(props.collapsed$)
   const collapsed = props.forceCollapsed ?? storedCollapsed
   const nodeMiniMapPhase = useNodeMiniMapPhase()

@@ -1,5 +1,4 @@
 import styles from './handle.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 
 import { clsx } from 'clsx'
 import { createContext, useContext } from 'react'
@@ -24,7 +23,7 @@ export interface HandleProps {
   ariaHidden?: React.AriaAttributes['aria-hidden']
 }
 
-export function Handle(props: HandleProps): JSX.Element {
+export function Handle(props: HandleProps): React.ReactElement {
   const Component = useHandleContext()?.Handle ?? HandleImpl
 
   const position = props.position ?? (props.type === 'input' ? 'left' : 'right')
@@ -86,7 +85,7 @@ interface HandleContextProps {
  * <HandleContextProvider value={{ Handle }}><ReactFlow /></HasReactFlow>
  * ```
  */
-export function HandleContextProvider({ children, ...props }: HandleContextProps): JSX.Element {
+export function HandleContextProvider({ children, ...props }: HandleContextProps): React.ReactElement {
   return <HandleContext.Provider value={props}>{children}</HandleContext.Provider>
 }
 

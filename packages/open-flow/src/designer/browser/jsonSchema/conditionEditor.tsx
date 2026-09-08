@@ -1,6 +1,5 @@
 import styles from './conditionEditor.module.scss'
 import type { useStoreApi } from '@xyflow/react'
-import type { JSX } from 'react/jsx-runtime'
 import type { Val } from 'value-enhancer'
 import type { HandleName } from '../../../schema/index.ts'
 import type { HandleRowProps, IHandleAction } from '../components/handleRow.tsx'
@@ -72,7 +71,7 @@ export function ConditionEditor({
   onDragStart,
   onDragOver,
   addCondition,
-}: ConditionEditorProps): JSX.Element {
+}: ConditionEditorProps): React.ReactElement {
   const { context } = store
 
   const t = useTranslate()

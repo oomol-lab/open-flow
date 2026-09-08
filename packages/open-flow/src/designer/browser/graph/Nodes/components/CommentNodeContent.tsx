@@ -1,5 +1,4 @@
 import styles from './CommentNodeContent.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 import type { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 
 import { clsx } from 'clsx'
@@ -7,7 +6,7 @@ import { useLayoutEffect, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { NODE_HANDLE_CLASSNAME } from '../../../base/designer.ts'
 
-export function CommentNodeContent({ store }: { store: CommentNodeStore }): JSX.Element | null {
+export function CommentNodeContent({ store }: { store: CommentNodeStore }): React.ReactElement {
   const [div, setDiv] = useState<HTMLDivElement | null>(null)
   const preview = useVal(store.$.preview)
   const showCode = useVal(store.$.sourceCode)

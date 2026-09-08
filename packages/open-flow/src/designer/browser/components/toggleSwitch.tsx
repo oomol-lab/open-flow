@@ -1,5 +1,4 @@
 import styles from './toggleSwitch.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 import type { BooleanLabel } from './checkbox.tsx'
 
 import { clsx } from 'clsx'
@@ -36,7 +35,7 @@ function renderLabel(label: LabeledSwitchProps['label'], checked?: boolean) {
   return label
 }
 
-export function LabeledSwitch(props: LabeledSwitchProps): JSX.Element {
+export function LabeledSwitch(props: LabeledSwitchProps): React.ReactElement {
   const t = useTranslate()
   const isControlled = props.checked !== undefined
   const [internalChecked, setInternalChecked] = useState(props.defaultChecked ?? false)

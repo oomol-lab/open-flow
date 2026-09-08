@@ -1,6 +1,5 @@
 import styles from './NewHandleIndicator.module.scss'
 import type { ReactFlowState } from '@xyflow/react'
-import type { JSX } from 'react/jsx-runtime'
 
 import { isDefined } from '@wopjs/cast'
 import { useStore } from '@xyflow/react'
@@ -25,7 +24,7 @@ const selector = (state: ReactFlowState) => ({
   inProgress: state.connection.inProgress,
 })
 
-export function NewHandleIndicator(props: NewHandleIndicatorProps): JSX.Element {
+export function NewHandleIndicator(props: NewHandleIndicatorProps): React.ReactElement {
   const t = useTranslate()
   const ref = useRef<HTMLDivElement>(null)
   const state = useStore(selector, shallow)

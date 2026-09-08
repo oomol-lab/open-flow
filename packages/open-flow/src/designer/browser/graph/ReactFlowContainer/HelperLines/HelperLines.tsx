@@ -1,5 +1,4 @@
 import type { ReactFlowState } from '@xyflow/react'
-import type { JSX } from 'react/jsx-runtime'
 
 import { useStore } from '@xyflow/react'
 import { useEffect, useRef } from 'react'
@@ -25,7 +24,7 @@ export interface HelperLinesProps {
 }
 
 // Render helper lines on a canvas above the React Flow pane.
-export function HelperLines({ horizontal, vertical, strokeStyle = '#7d7fe9' }: HelperLinesProps): JSX.Element {
+export function HelperLines({ horizontal, vertical, strokeStyle = '#7d7fe9' }: HelperLinesProps): React.ReactElement {
   const { width, height, transform } = useStore(storeSelector)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)

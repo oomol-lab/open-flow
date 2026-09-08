@@ -1,5 +1,4 @@
 import styles from './FlowSettings.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 import type { Val } from 'value-enhancer'
 import type { NodeId } from '../../../../schema/index.ts'
 import type { IHandleAction } from '../../components/handleRow.tsx'
@@ -36,7 +35,7 @@ export interface FlowSettingsProps {
 
 const MIN_CONFIG_WIDTH = 365
 
-export function FlowSettings(props: FlowSettingsProps): JSX.Element {
+export function FlowSettings(props: FlowSettingsProps): React.ReactElement {
   const t = useTranslate()
 
   const containerRef = useRef<HTMLDivElement | null>(null)

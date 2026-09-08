@@ -1,6 +1,5 @@
 import styles from './NodeHeadBlockSettings.module.scss'
 import type { useStoreApi } from '@xyflow/react'
-import type { JSX } from 'react/jsx-runtime'
 import type { TFunction } from 'val-i18n'
 import type { Val } from 'value-enhancer'
 import type { HandleName } from '../../../../../schema/index.ts'
@@ -54,7 +53,7 @@ export interface NodeHeadBlockSettingsProps {
 
 const MIN_CONFIG_WIDTH = 400
 
-export function NodeHeadBlockSettings(props: NodeHeadBlockSettingsProps): JSX.Element {
+export function NodeHeadBlockSettings(props: NodeHeadBlockSettingsProps): React.ReactElement {
   const t = useTranslate()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const handleTrack = useHandleTrack(MIN_CONFIG_WIDTH, props.panelWidth$, containerRef, props.reactFlowStore)

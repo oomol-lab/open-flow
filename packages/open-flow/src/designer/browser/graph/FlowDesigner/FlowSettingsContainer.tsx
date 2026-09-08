@@ -1,5 +1,4 @@
 import styles from './FlowSettingsContainer.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 
 import { useVal } from 'use-value-enhancer'
 import { NodeMiniMapPhase, NodeMiniMapProvider } from '../../components/minimap.tsx'
@@ -8,7 +7,7 @@ import { FlowSettings } from './FlowSettings.tsx'
 
 export interface FlowSettingsContainerProps {}
 
-export function FlowSettingsContainer(_props: FlowSettingsContainerProps): JSX.Element {
+export function FlowSettingsContainer(_props: FlowSettingsContainerProps): React.ReactElement {
   const designerStore = useDesignerStore()
   const showSettings = useVal(designerStore.$$.showSettings)
 

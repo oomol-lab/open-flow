@@ -1,6 +1,5 @@
 import styles from './handleEditor.module.scss'
 import type { useStoreApi } from '@xyflow/react'
-import type { JSX } from 'react/jsx-runtime'
 import type { Val } from 'value-enhancer'
 import type { ColorType } from '../components/constants.ts'
 import type { IHandleAction } from '../components/handleRow.tsx'
@@ -119,7 +118,7 @@ export function HandleEditor({
   onDragOver,
   variable,
   showFormError = true,
-}: HandleEditorProps): JSX.Element {
+}: HandleEditorProps): React.ReactElement {
   const { context } = store
 
   const t = useTranslate()

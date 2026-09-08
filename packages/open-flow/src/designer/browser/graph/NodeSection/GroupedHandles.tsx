@@ -1,5 +1,4 @@
 import styles from './GroupedHandles.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 import type { InputSectionStore } from '../../stores/node/nodeSection/inputSection.store.ts'
 import type { OutputSectionStore } from '../../stores/node/nodeSection/outputSection.store.ts'
 import type { SubflowInputSectionStore } from '../../stores/node/nodeSection/subflowInputSection.store.ts'
@@ -32,7 +31,7 @@ export interface GroupedHandlesProps {
   readonly dnd: ReturnType<typeof useDragAndDrop>
 }
 
-export function GroupedHandles(props: GroupedHandlesProps): JSX.Element {
+export function GroupedHandles(props: GroupedHandlesProps): React.ReactElement {
   const t = useTranslate()
   const { isConditionNode, section, handles, dnd } = props
   const [ungrouped, groups, additionalGroup] = useMemo(() => getGroups(handles, isConditionNode), [handles, isConditionNode])

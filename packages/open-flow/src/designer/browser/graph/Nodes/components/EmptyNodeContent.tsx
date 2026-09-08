@@ -1,5 +1,4 @@
 import styles from './EmptyNodeContent.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 import type { TaskNodeStore } from '../../../stores/node/taskNode.store.ts'
 
 import { useMemo } from 'react'
@@ -19,7 +18,7 @@ export interface EmptyNodeContentProps {
   readonly store: TaskNodeStore | SubflowNodeStore
 }
 
-export function EmptyNodeContent(props: EmptyNodeContentProps): JSX.Element | null {
+export function EmptyNodeContent(props: EmptyNodeContentProps): React.ReactElement | null {
   const t = useTranslate()
   const isBlockDesigner = useDesignerType() === DESIGNER_TYPE.Block
   const isSubflowBlock = useSubflowViewMode() === SUBFLOW_VIEW_MODE.Block

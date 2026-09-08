@@ -1,5 +1,3 @@
-import type { JSX as ReactJSX } from 'react/jsx-runtime'
-
 declare module 'react/jsx-runtime' {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
@@ -20,6 +18,6 @@ export interface CssWrapperProps {
  * <CssWrapper css={{ '--foo': 'bar' }}>
  * ```
  */
-export function CssWrapper(props: CssWrapperProps): ReactJSX.Element {
+export function CssWrapper(props: CssWrapperProps): React.ReactElement {
   return <designer-css-wrapper style={{ display: 'contents', ...props.css }}>{props.children}</designer-css-wrapper>
 }

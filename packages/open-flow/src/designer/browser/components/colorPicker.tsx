@@ -1,5 +1,4 @@
 import styles from './colorPicker.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 import type { Instance as Color } from 'tinycolor2'
 import type { ColorType } from './constants.ts'
 
@@ -77,7 +76,7 @@ function stringify(color: string | Color, type?: ColorType): string {
 const DEFAULT_COLOR = '#7d7fe9'
 const DEFAULT_COLOR_INSTANCE = /*#__PURE__*/ tinycolor(DEFAULT_COLOR)
 
-export function ColorPicker(props: ColorPickerProps): JSX.Element {
+export function ColorPicker(props: ColorPickerProps): React.ReactElement {
   const t = useTranslate()
   const typeId = useId()
   const popoverId = useId()

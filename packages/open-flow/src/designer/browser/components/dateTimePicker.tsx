@@ -1,5 +1,4 @@
 import styles from './dateTimePicker.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 
 import { clsx } from 'clsx'
 import { useState } from 'react'
@@ -20,7 +19,7 @@ export interface DateTimePickerProps {
   isSuffix?: boolean
 }
 
-export function DateTimePicker(props: DateTimePickerProps): JSX.Element {
+export function DateTimePicker(props: DateTimePickerProps): React.ReactElement {
   const t = useTranslate()
   const showDate = props.showDate ?? true
   const showTime = props.showTime ?? false

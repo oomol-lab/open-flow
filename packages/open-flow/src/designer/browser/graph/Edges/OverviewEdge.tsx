@@ -1,6 +1,5 @@
 import styles from './OverviewEdge.module.scss'
 import type { EdgeProps, EdgeTypes } from '@xyflow/react'
-import type { JSX } from 'react/jsx-runtime'
 import type { OverviewRFEdge } from '../../stores/edge/overviewEdges.ts'
 
 import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react'
@@ -9,7 +8,7 @@ import { useTranslate } from 'val-i18n-react'
 import { ErrorCircle } from '../../components/errorCircle.tsx'
 import { OVERVIEW_EDGE_TYPE } from '../../stores/edge/overviewEdges.ts'
 
-export function OverviewEdge(props: EdgeProps<OverviewRFEdge>): JSX.Element {
+export function OverviewEdge(props: EdgeProps<OverviewRFEdge>): React.ReactElement {
   const t = useTranslate()
   const [path, labelX, labelY] = getBezierPath({
     sourceX: props.sourceX,

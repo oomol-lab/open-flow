@@ -1,5 +1,4 @@
 import styles from './handleRow.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 
 import { clsx } from 'clsx'
 import { useId } from 'react'
@@ -74,7 +73,7 @@ function renderAction(action: unknown, index: number): React.ReactNode {
   )
 }
 
-export function HandleRow(props: HandleRowProps): JSX.Element {
+export function HandleRow(props: HandleRowProps): React.ReactElement {
   const expandLabelId = useId()
   const expandLabelInValue = props.variant === 'value-only' || props.name == null
   const nodeMiniMapPhase = useNodeMiniMapPhase()

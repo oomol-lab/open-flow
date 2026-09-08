@@ -1,5 +1,4 @@
 import styles from './input2.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 import type { ComputeGet, ReadonlyVal, Val } from 'value-enhancer'
 import type { LocaleTextStore } from '../../../localization/common/localization.ts'
 import type { InputProps } from './input.tsx'
@@ -211,7 +210,7 @@ function TranslateButton({
   translateKey,
   translateKeyHint,
   translationFallback,
-}: TranslateButtonProps): JSX.Element {
+}: TranslateButtonProps): React.ReactElement {
   const t = useTranslate()
   const currentLang = useLang()
   const getPopupContainer = useGetStaticPopupContainer()

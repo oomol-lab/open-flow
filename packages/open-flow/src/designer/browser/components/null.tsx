@@ -1,6 +1,5 @@
 import styles from './null.module.scss'
-import type { JSX } from 'react/jsx-runtime'
 
-export function Null(): JSX.Element {
+export function Null(): React.ReactElement {
   return <span className={styles.null}>null</span>
 }

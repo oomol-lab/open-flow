@@ -1,4 +1,3 @@
-import type { JSX } from 'react/jsx-runtime'
 import type { DesignerStore } from '../../../stores/designer/designer.store.ts'
 import type { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 
@@ -12,7 +11,7 @@ interface CommentNodeActionsProps {
   readonly nodeStore: CommentNodeStore
 }
 
-export function CommentNodeActions({ designerStore, nodeStore }: CommentNodeActionsProps): JSX.Element | null {
+export function CommentNodeActions({ designerStore, nodeStore }: CommentNodeActionsProps): React.ReactElement | null {
   const t = useTranslate()
   const editable = useVal(designerStore.$.editable)
   const sourceCode = useVal(nodeStore.$.sourceCode)
