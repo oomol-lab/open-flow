@@ -1,7 +1,7 @@
 import type { JsonValue, RevisionContent } from '../src/flow/common/change.ts'
 
 import { describe, expect, it } from 'vitest'
-import { canonicalJsonBytes, digestBytes, encodeRevision } from '../src/flow/common/encoding.ts'
+import { canonicalJsonBytes, digestBytes, encodeRevision, decodeRevision, decodeRevisionContent, decodeFlowDocument } from '../src/flow/common/encoding.ts'
 
 const decoder = new TextDecoder()
 const port = { jsonSchema: { type: 'number' }, nullable: false } as const
@@ -252,5 +252,36 @@ describe('Flow Revision encoding', () => {
       },
       prompt: 'Approve request 1?',
     })
+  })
+})
+
+describe('Revision decoding', () => {
+  it('round trips canonical bytes without changing the digest', () => {
+    const bytes = encodeRevision(revision())
+    expect(decodeRevision(bytes)).toEqual(revision())
+    expect(encodeRevision(decodeRevision(bytes))).toEqual(bytes)
+    expect(decodeRevisionContent(revision())).toEqual(revision())
+    expect(decodeFlowDocument(revision().document)).toEqual(revision().document)
+  })
+
+  it.each([
+    { version: 2 },
+    { modelVersion: 2 },
+    { kind: 'other' },
+    { extra: true },
+    { modules: { bad: { name: 'Bad', imports: [3], source: '' } } },
+    { document: { ...revision().document, graph: { nodes: {}, edges: [{ source: 'a' }] } } },
+    { document: { ...revision().document, graph: { nodes: { bad: { kind: 'manual', name: 'Start', inputs: {} } }, edges: [] } } },
+  ])('rejects malformed or unsupported envelopes: %j', (patch) => {
+    const value = { ...JSON.parse(decoder.decode(encodeRevision(revision()))), ...patch }
+    expect(() => decodeRevision(new TextEncoder().encode(JSON.stringify(value)))).toThrow()
+  })
+
+  it('rejects invalid UTF-8, JSON, excessive nesting and non-JSON content', () => {
+    expect(() => decodeRevision(new Uint8Array([255]))).toThrow()
+    expect(() => decodeRevision(new TextEncoder().encode('{'))).toThrow()
+    expect(() => decodeRevision(new TextEncoder().encode('['.repeat(66) + '0' + ']'.repeat(66)))).toThrow(/depth/)
+    expect(() => decodeRevisionContent({ ...revision(), modules: undefined })).toThrow()
+    expect(() => decodeFlowDocument({ ...revision().document, unexpected: true })).toThrow()
   })
 })

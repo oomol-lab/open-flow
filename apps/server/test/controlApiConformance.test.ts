@@ -4,6 +4,7 @@ import type { ControlApiConformanceHarness } from '@oomol-lab/open-flow/control-
 import {
   connectorControlApiConformanceCases,
   controlApiConformanceCases,
+  controlRecoveryConformanceCases,
   publicationControlApiConformanceCases,
   triggerControlApiConformanceCases,
 } from '@oomol-lab/open-flow/control-api-conformance'
@@ -53,7 +54,7 @@ const connectorAction: ConnectorAction = {
   serviceName: 'Mail',
 }
 
-async function createHarness(start = false): Promise<ControlApiConformanceHarness> {
+async function createHarness(start = false): Promise<ControlApiConformanceHarness & { restart(): Promise<void> }> {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-control-conformance-'))
   const file = path.join(directory, 'open-flow.sqlite')
   const connector = createConnectorHost({
@@ -88,6 +89,11 @@ async function createHarness(start = false): Promise<ControlApiConformanceHarnes
   let service = await open()
   let app = createServerApp(service, options)
   return {
+    async restart() {
+      await closeService(service)
+      service = await open()
+      app = createServerApp(service, options)
+    },
     async dispose() {
       await closeService(service)
       await rm(directory, { force: true, recursive: true })
@@ -149,6 +155,19 @@ describe('Server P2 Trigger Control API conformance', () => {
 
 describe('Server P3 Connector Control API conformance', () => {
   for (const conformance of connectorControlApiConformanceCases) {
+    it(conformance.name, async () => {
+      const harness = await createHarness()
+      try {
+        await conformance.verify(harness)
+      } finally {
+        await harness.dispose()
+      }
+    })
+  }
+})
+
+describe('Server recovery conformance', () => {
+  for (const conformance of controlRecoveryConformanceCases) {
     it(conformance.name, async () => {
       const harness = await createHarness()
       try {

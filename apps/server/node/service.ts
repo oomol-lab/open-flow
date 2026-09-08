@@ -17,7 +17,7 @@ import type { PollState, RunAdmission, StoredCronTarget } from './trigger-store.
 import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-action'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId, validateTriggerSchedule } from '@oomol-lab/open-flow/cron-trigger'
-import { canonicalJsonBytes, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
+import { canonicalJsonBytes, decodeRevision, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { codeActions } from '@oomol-lab/open-flow/flow-semantics'
 import { matchesSchema, prepareFlow, triggerPayloadSchema, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { triggerDefinitions as providerTriggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
@@ -759,7 +759,7 @@ export class ServerService {
     const { content, triggerJson, ...target } = stored
     return {
       ...target,
-      revision: JSON.parse(content) as RevisionContent,
+      revision: decodeRevision(new TextEncoder().encode(content)),
       trigger: JSON.parse(triggerJson) as Extract<TriggerNode, { readonly kind: 'webhook' }>,
     }
   }
@@ -815,7 +815,7 @@ export class ServerService {
       if (revisionDigest != run.revisionDigest) {
         return yield* Effect.fail(new Error('Fixed Flow Revision digest does not match stored content.'))
       }
-      const revision = JSON.parse(run.content) as RevisionContent
+      const revision = decodeRevision(new TextEncoder().encode(run.content))
       const prepared = yield* Effect.tryPromise({
         try: () => prepareFlow(revision, run.engineContract),
         catch: (error) => error,
@@ -1037,7 +1037,7 @@ export class ServerService {
   #admitCron(target: StoredCronTarget, now: number): Effect.Effect<'admitted' | 'overloaded', unknown> {
     return Effect.gen({ self: this }, function* () {
       const fixed = yield* Effect.tryPromise({
-        try: () => validatedFlow(JSON.parse(target.content) as RevisionContent),
+        try: () => validatedFlow(decodeRevision(new TextEncoder().encode(target.content))),
         catch: (error) => error,
       })
       const trigger = fixed.prepared.graph.nodes[target.triggerNodeId]
@@ -1479,7 +1479,7 @@ export class ServerService {
     if (receipt == null) return
     const revision = this.#store.revision(receipt.flowId, receipt.revisionId)
     if (revision == null) return
-    const node = (JSON.parse(revision.content) as RevisionContent).document.graph.nodes[receipt.nodeId]
+    const node = decodeRevision(new TextEncoder().encode(revision.content)).document.graph.nodes[receipt.nodeId]
     if (node?.kind != 'wait' || !node.actions.some((action) => action == requested)) return
     if (receipt.action == null && (receipt.status != 'waiting' || receipt.expiresAt <= this.#clock())) return
     const retryAfter = admit(digest)
@@ -1508,7 +1508,7 @@ export class ServerService {
     if (receipt == null) return
     const revision = this.#store.revision(receipt.flowId, receipt.revisionId)
     if (revision == null) return
-    const node = (JSON.parse(revision.content) as RevisionContent).document.graph.nodes[receipt.nodeId]
+    const node = decodeRevision(new TextEncoder().encode(revision.content)).document.graph.nodes[receipt.nodeId]
     if (node?.kind != 'wait' || !node.actions.some((action) => action == requested)) return
     const retryAfter = admit(digest)
     if (retryAfter != null) return { retryAfter }

@@ -16,6 +16,8 @@ const execFileAsync = promisify(execFile)
 const packageRequire = createRequire(import.meta.url)
 const connectorActionEntryPath = 'src/connector/common/actionSchema.ts'
 const connectorProxyEntryPath = 'src/connector/common/proxy.ts'
+const controlRequestsEntryPath = 'src/control/common/requests.ts'
+const mcpEntryPath = 'src/control/common/mcp.ts'
 const controlApiEntryPath = 'src/control/common/api.ts'
 const controlApiConformanceEntryPath = 'src/control/common/conformance.ts'
 const controlApiErrorsEntryPath = 'src/control/common/errors.ts'
@@ -34,6 +36,7 @@ const runtimeContractEntryPath = 'src/execution/common/runtime.ts'
 const schedulerEntryPath = 'src/execution/common/scheduler.ts'
 const webhookTriggerEntryPath = 'src/trigger/common/webhook.ts'
 const localizationEntryPath = 'src/localization/common/languages.ts'
+const hostConformanceEntryPath = 'src/workbench/browser/runtime/hostConformance.ts'
 const workbenchEntryPath = 'src/workbench/browser/runtime/openFlowWorkbench.tsx'
 
 interface BuildBrowserPackageOptions {
@@ -47,6 +50,8 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   const commonOutputPath = path.join(options.packageRoot, 'dist/common')
   await buildRuntime(options, commonOutputPath, connectorProxyEntryPath, 'connector-proxy', true)
   await buildRuntime(options, commonOutputPath, connectorActionEntryPath, 'connector-action', false)
+  await buildRuntime(options, commonOutputPath, controlRequestsEntryPath, 'control-requests', false)
+  await buildRuntime(options, commonOutputPath, mcpEntryPath, 'mcp', false)
   await buildRuntime(options, commonOutputPath, controlApiEntryPath, 'control-api', false)
   await buildRuntime(options, commonOutputPath, controlApiConformanceEntryPath, 'control-api-conformance', false)
   await buildRuntime(options, commonOutputPath, runLifecycleEntryPath, 'run-lifecycle', false)
@@ -62,6 +67,7 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   await buildRuntime(options, commonOutputPath, webhookTriggerEntryPath, 'webhook-trigger', false)
   await buildRuntime(options, commonOutputPath, localizationEntryPath, 'localization', false)
   await buildRuntime(options, browserOutputPath, flowChangeEntryPath, 'flow-change', true)
+  await buildRuntime(options, browserOutputPath, hostConformanceEntryPath, 'host-conformance', false)
   await buildRuntime(options, browserOutputPath, flowAuthoringEntryPath, 'flow-authoring', false)
   await buildRuntime(options, browserOutputPath, workbenchEntryPath, 'workbench', false)
   await copyFile(path.join(options.sourceRoot, 'src/ui/browser/theme.css'), path.join(browserOutputPath, 'theme.css'))
@@ -169,6 +175,8 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         path.join(options.sourceRoot, 'src/browser-assets.d.ts'),
         path.join(options.sourceRoot, connectorActionEntryPath),
         path.join(options.sourceRoot, connectorProxyEntryPath),
+        path.join(options.sourceRoot, controlRequestsEntryPath),
+        path.join(options.sourceRoot, mcpEntryPath),
         path.join(options.sourceRoot, controlApiEntryPath),
         path.join(options.sourceRoot, controlApiConformanceEntryPath),
         path.join(options.sourceRoot, controlApiErrorsEntryPath),
@@ -187,6 +195,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         path.join(options.sourceRoot, localizationEntryPath),
         path.join(options.sourceRoot, flowAuthoringEntryPath),
         path.join(options.sourceRoot, flowChangeEntryPath),
+        path.join(options.sourceRoot, hostConformanceEntryPath),
         path.join(options.sourceRoot, workbenchEntryPath),
       ],
       { cwd: options.sourceRoot },
@@ -232,7 +241,9 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'./flowNotifications.ts'", "'./flow-notifications.js'")
     const controlApiConformanceDeclaration = await readFile(path.join(declarationRoot, 'control/common/conformance.d.ts'), 'utf8')
     const controlApiErrorsDeclaration = await readFile(path.join(declarationRoot, 'control/common/errors.d.ts'), 'utf8')
-    const flowEncodingDeclaration = await readFile(path.join(declarationRoot, 'flow/common/encoding.d.ts'), 'utf8')
+    const flowEncodingDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/encoding.d.ts'), 'utf8'))
+      .replaceAll("'./changeSchema.ts'", "'../browser/flow-change-schema.js'")
+      .replaceAll("'./json.ts'", "'./flow-json.js'")
     await Promise.all(
       ['semantics', 'graph', 'schema', 'modules'].map(async (name) => {
         const declaration = (await readFile(path.join(declarationRoot, `flow/common/${name}.d.ts`), 'utf8'))
@@ -279,6 +290,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(browserOutputPath, 'flow-authoring-node.d.ts'), flowAuthoringNodeDeclaration),
       writeFile(path.join(browserOutputPath, 'flow-change.d.ts'), flowChangeDeclaration),
       writeFile(path.join(browserOutputPath, 'flow-change-schema.d.ts'), flowChangeSchemaDeclaration),
+      writeFile(path.join(commonOutputPath, 'flow-json.d.ts'), await readFile(path.join(declarationRoot, 'flow/common/json.d.ts'), 'utf8')),
       writeFile(path.join(commonOutputPath, 'flow-encoding.d.ts'), flowEncodingDeclaration),
       writeFile(
         path.join(browserOutputPath, 'workbench.d.ts'),
@@ -286,6 +298,13 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
           .slice(workbenchStyleImport.length)
           .replaceAll("'./contract.ts'", "'./workbench-contract.js'")
           .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'"),
+      ),
+      writeFile(
+        path.join(browserOutputPath, 'host-conformance.d.ts'),
+        (await readFile(path.join(declarationRoot, 'workbench/browser/runtime/hostConformance.d.ts'), 'utf8')).replaceAll(
+          "'./contract.ts'",
+          "'./workbench-contract.js'",
+        ),
       ),
       writeFile(path.join(browserOutputPath, 'workbench-contract.d.ts'), workbenchContract),
       writeFile(path.join(browserOutputPath, 'flow-notifications.d.ts'), flowNotificationsDeclaration),
@@ -298,6 +317,26 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(commonOutputPath, 'scheduler.d.ts'), schedulerDeclaration),
       writeFile(path.join(commonOutputPath, 'connector-action.d.ts'), connectorActionDeclaration),
       writeFile(path.join(commonOutputPath, 'connector-proxy.d.ts'), connectorProxyDeclaration),
+      writeFile(
+        path.join(commonOutputPath, 'control-requests.d.ts'),
+        (await readFile(path.join(declarationRoot, 'control/common/requests.d.ts'), 'utf8')).replaceAll(
+          "'../../flow/common/change.ts'",
+          "'../browser/flow-change.js'",
+        ),
+      ),
+      writeFile(
+        path.join(commonOutputPath, 'mcp.d.ts'),
+        (await readFile(path.join(declarationRoot, 'control/common/mcp.d.ts'), 'utf8'))
+          .replaceAll("'./mcpConformance.ts'", "'./mcp-conformance.js'")
+          .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'"),
+      ),
+      writeFile(
+        path.join(commonOutputPath, 'mcp-conformance.d.ts'),
+        (await readFile(path.join(declarationRoot, 'control/common/mcpConformance.d.ts'), 'utf8')).replaceAll(
+          "'./conformance.ts'",
+          "'./control-api-conformance.js'",
+        ),
+      ),
       writeFile(path.join(commonOutputPath, 'control-api.d.ts'), controlApiDeclaration),
       writeFile(path.join(commonOutputPath, 'control-api-errors.d.ts'), controlApiErrorsDeclaration),
       writeFile(path.join(commonOutputPath, 'flow-notifications.d.ts'), flowNotificationsDeclaration),

@@ -1,6 +1,6 @@
 {
   "name": "@oomol-lab/open-flow",
-  "version": "0.1.0-beta.11",
+  "version": "0.1.0-beta.12",
   "description": "Portable contracts and shared browser runtime for Open Flow.",
   "keywords": [
     "ai",
@@ -43,7 +43,10 @@
     "./scheduler": "./src/execution/common/scheduler.ts",
     "./theme.css": "./src/ui/browser/theme.css",
     "./webhook-trigger": "./src/trigger/common/webhook.ts",
-    "./workbench": "./src/workbench/browser/runtime/openFlowWorkbench.tsx"
+    "./workbench": "./src/workbench/browser/runtime/openFlowWorkbench.tsx",
+    "./mcp": "./src/control/common/mcp.ts",
+    "./control-requests": "./src/control/common/requests.ts",
+    "./workbench-host-conformance": "./src/workbench/browser/runtime/hostConformance.ts"
   },
   "scripts": {
     "build": "bun scripts/build.ts",

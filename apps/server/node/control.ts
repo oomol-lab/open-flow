@@ -1,11 +1,10 @@
-import type { JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
-import type { FlowRunOptions } from '@oomol-lab/open-flow/scheduler'
 import type { Context, Next } from 'hono'
 import type { ControlService } from './control-service.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { decodeChangeOperations, resourceNameIssue, validVariableName } from '@oomol-lab/open-flow/flow-change'
+import { controlRequests } from '@oomol-lab/open-flow/control-requests'
+import { validVariableName } from '@oomol-lab/open-flow/flow-change'
 import { runStatuses } from '@oomol-lab/open-flow/run-lifecycle'
 import { Hono } from 'hono'
 import {
@@ -28,7 +27,6 @@ type InvalidCode =
   | typeof controlErrorCode.pageInvalidCursor
   | typeof controlErrorCode.runInvalid
   | typeof controlErrorCode.variableInvalid
-type RunInputs = NonNullable<FlowRunOptions['inputs']>
 
 const maxRequestBytes = 5 * 1024 * 1024
 const maxIdempotencyKeyLength = 256
@@ -60,9 +58,8 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.put('/variables/:name', async (context) => {
     query(context.req.raw, [], controlErrorCode.variableInvalid)
-    const body = await requestObject(context.req.raw, controlErrorCode.variableInvalid)
-    exact(body, ['value'], controlErrorCode.variableInvalid)
-    return response(200, service.putVariable(variableName(context.req.param('name')), variableValue(body.value)))
+    const body = await decodeRequest(context.req.raw, controlErrorCode.variableInvalid, controlRequests.putVariable)
+    return response(200, service.putVariable(variableName(context.req.param('name')), body.value))
   })
   app.delete('/variables/:name', (context) => {
     query(context.req.raw, [], controlErrorCode.variableInvalid)
@@ -93,10 +90,8 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.post('/flows', async (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
-    const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)
-    exact(body, ['name', 'version'], controlErrorCode.flowInvalid)
-    version(body.version, controlErrorCode.flowInvalid)
-    const name = resourceName(body.name)
+    const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.createFlow)
+    const name = body.name
     const created = await service.createFlow(context.get('actorId'), name, idempotencyKey(context.req.raw, controlErrorCode.flowInvalid))
     return response(created.created ? 201 : 200, created.flow)
   })
@@ -106,20 +101,13 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.put('/flows/:flowId/enabled', async (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
-    const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)
-    exact(body, ['enabled', 'expectedPublicationId', 'version'], controlErrorCode.flowInvalid)
-    version(body.version, controlErrorCode.flowInvalid)
-    if (typeof body.enabled != 'boolean' || typeof body.expectedPublicationId != 'string' || body.expectedPublicationId.length == 0) {
-      throw new ControlError(controlErrorCode.flowInvalid, 'Expected an enabled state and publication ID.')
-    }
+    const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.setEnabled)
     return response(200, service.setFlowEnabled(context.req.param('flowId'), body.expectedPublicationId, body.enabled))
   })
   app.patch('/flows/:flowId', async (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
-    const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)
-    exact(body, ['name', 'version'], controlErrorCode.flowInvalid)
-    version(body.version, controlErrorCode.flowInvalid)
-    return response(200, service.renameFlow(context.req.param('flowId'), resourceName(body.name)))
+    const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.renameFlow)
+    return response(200, service.renameFlow(context.req.param('flowId'), body.name))
   })
   app.delete('/flows/:flowId', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
@@ -134,22 +122,14 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.post('/flows/:flowId/draft/changes', async (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
-    const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)
-    exact(body, ['expectedRevisionId', 'operations', 'version'], controlErrorCode.flowInvalid)
-    version(body.version, controlErrorCode.flowInvalid)
-    let operations
-    try {
-      operations = decodeChangeOperations(body.operations)
-    } catch (error) {
-      throw new ControlError(controlErrorCode.flowInvalid, 'The Draft operation has an invalid structure.', { cause: error })
-    }
+    const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.changeDraft)
     return response(
       200,
       await service.changeDraft(
         context.get('actorId'),
         context.req.param('flowId'),
         text(body.expectedRevisionId, controlErrorCode.flowInvalid),
-        operations,
+        body.operations,
         idempotencyKey(context.req.raw, controlErrorCode.flowInvalid),
       ),
     )
@@ -196,9 +176,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.post('/connector/connections/:serviceId/page', async (context) => {
     const flowId = query(context.req.raw, ['flowId'], controlErrorCode.flowInvalid).get('flowId')
-    const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)
-    exact(body, ['version'], controlErrorCode.flowInvalid)
-    version(body.version, controlErrorCode.flowInvalid)
+    await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.versionOnly)
     return response(200, {
       url: service.connectorConnectionPage(
         connectorService(context.req.param('serviceId')),
@@ -259,48 +237,30 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   )
   app.get('/flows/:flowId/presentation', (context) => response(200, service.getPresentation(context.req.param('flowId'))))
   app.put('/flows/:flowId/presentation', async (context) => {
-    const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)
-    exact(body, ['expectedRevision', 'value', 'version'], controlErrorCode.flowInvalid)
-    version(body.version, controlErrorCode.flowInvalid)
-    return response(
-      200,
-      service.updatePresentation(
-        context.req.param('flowId'),
-        positiveInteger(body.expectedRevision, controlErrorCode.flowInvalid),
-        record(body.value, controlErrorCode.flowInvalid) as Readonly<Record<string, JsonValue>>,
-      ),
-    )
+    const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.updatePresentation)
+    return response(200, service.updatePresentation(context.req.param('flowId'), body.expectedRevision, body.value))
   })
   app.post('/flows/:flowId/revisions/:revisionId/check', async (context) => {
-    const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)
-    exact(body, ['engineContract', 'version'], controlErrorCode.flowInvalid)
-    version(body.version, controlErrorCode.flowInvalid)
+    const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.checkFlow)
     return response(
       200,
       await service.checkFlow(context.req.param('flowId'), context.req.param('revisionId'), text(body.engineContract, controlErrorCode.flowInvalid)),
     )
   })
   app.post('/flows/:flowId/revisions/:revisionId/publications', async (context) => {
-    const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)
-    exact(body, ['engineContract', 'expectedLivePublicationId', 'version'], controlErrorCode.flowInvalid)
-    version(body.version, controlErrorCode.flowInvalid)
-    if (body.expectedLivePublicationId !== null && (typeof body.expectedLivePublicationId != 'string' || body.expectedLivePublicationId.length == 0)) {
-      invalid(controlErrorCode.flowInvalid, 'Expected Live Publication is invalid.')
-    }
+    const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.publishFlow)
     const operation = await service.publishFlow(
       context.get('actorId'),
       context.req.param('flowId'),
       context.req.param('revisionId'),
       text(body.engineContract, controlErrorCode.flowInvalid),
-      body.expectedLivePublicationId as string | null,
+      body.expectedLivePublicationId,
       idempotencyKey(context.req.raw, controlErrorCode.flowInvalid),
     )
     return response(202, operation)
   })
   app.post('/flows/:flowId/publications/:publicationId/rollback', async (context) => {
-    const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)
-    exact(body, ['expectedLivePublicationId', 'version'], controlErrorCode.flowInvalid)
-    version(body.version, controlErrorCode.flowInvalid)
+    const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.rollbackFlow)
     const committed = await service.rollbackFlow(
       context.get('actorId'),
       context.req.param('flowId'),
@@ -311,29 +271,25 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     return response(committed.created ? 201 : 200, committed.publication)
   })
   app.post('/flows/:flowId/revisions/:revisionId/runs', async (context) => {
-    const body = await requestObject(context.req.raw, controlErrorCode.runInvalid)
-    exact(body, ['engineContract', 'inputs', 'trigger', 'version'], controlErrorCode.runInvalid)
-    version(body.version, controlErrorCode.runInvalid)
+    const body = await decodeRequest(context.req.raw, controlErrorCode.runInvalid, controlRequests.createDraftRun)
     const accepted = await service.createDraftRun(
       context.req.param('flowId'),
       context.req.param('revisionId'),
       text(body.engineContract, controlErrorCode.runInvalid),
-      record(body.inputs, controlErrorCode.runInvalid) as RunInputs,
+      body.inputs,
       idempotencyKey(context.req.raw, controlErrorCode.runInvalid),
-      body.trigger as NonNullable<FlowRunOptions['trigger']>,
+      body.trigger,
     )
     return response(accepted.created ? 202 : 200, accepted.run)
   })
 
   app.post('/runs', async (context) => {
-    const body = await requestObject(context.req.raw, controlErrorCode.runInvalid)
-    exact(body, ['inputs', 'publicationId', 'trigger', 'version'], controlErrorCode.runInvalid)
-    version(body.version, controlErrorCode.runInvalid)
+    const body = await decodeRequest(context.req.raw, controlErrorCode.runInvalid, controlRequests.createLiveRun)
     const accepted = await service.createLiveRun(
       text(body.publicationId, controlErrorCode.runInvalid),
-      record(body.inputs, controlErrorCode.runInvalid) as RunInputs,
+      body.inputs,
       idempotencyKey(context.req.raw, controlErrorCode.runInvalid),
-      body.trigger as NonNullable<FlowRunOptions['trigger']>,
+      body.trigger,
     )
     return response(accepted.created ? 202 : 200, accepted.run)
   })
@@ -368,12 +324,9 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     return response(200, service.cancelRun(context.req.param('runId')))
   })
   app.post('/runs/:runId/waits/:waitId/resolve', async (context) => {
-    const body = await requestObject(context.req.raw, controlErrorCode.runInvalid)
-    exact(body, ['action', 'version'], controlErrorCode.runInvalid)
-    version(body.version, controlErrorCode.runInvalid)
+    const body = await decodeRequest(context.req.raw, controlErrorCode.runInvalid, controlRequests.resolveWait)
     const action = body.action
-    if (action != 'approve' && action != 'continue' && action != 'reject') invalid(controlErrorCode.runInvalid, 'Wait action is invalid.')
-    return response(200, service.resolveRunWait(context.req.param('runId'), context.req.param('waitId'), action as WaitAction))
+    return response(200, service.resolveRunWait(context.req.param('runId'), context.req.param('waitId'), action))
   })
   return app
 }
@@ -388,9 +341,7 @@ function response(status: number, body: unknown): Response {
 
 async function versionOnly(request: Request, code: InvalidCode): Promise<void> {
   query(request, [], code)
-  const body = await requestObject(request, code)
-  exact(body, ['version'], code)
-  version(body.version, code)
+  await decodeRequest(request, code, controlRequests.versionOnly)
 }
 
 async function requestObject(request: Request, code: InvalidCode): Promise<Record<string, unknown>> {
@@ -423,15 +374,6 @@ function query(request: Request, allowed: readonly string[], code: InvalidCode):
   return parameters
 }
 
-function exact(value: Record<string, unknown>, keys: readonly string[], code: InvalidCode): void {
-  const actual = Object.keys(value)
-  if (actual.length != keys.length || actual.some((key) => !keys.includes(key))) invalid(code, 'Request fields are invalid.')
-}
-
-function version(value: unknown, code: InvalidCode): void {
-  if (value !== 1) invalid(code, 'Request version is invalid.')
-}
-
 function record(value: unknown, code: InvalidCode): Record<string, unknown> {
   if (value == null || typeof value != 'object' || Array.isArray(value)) invalid(code, 'Request value must be an object.')
   return value as Record<string, unknown>
@@ -442,23 +384,10 @@ function text(value: unknown, code: InvalidCode): string {
   return value
 }
 
-function resourceName(value: unknown): string {
-  const name = text(value, controlErrorCode.flowInvalid)
-  if (name != name.trim() || resourceNameIssue(name) != null) invalid(controlErrorCode.flowInvalid, 'Flow name is invalid.')
-  return name
-}
-
 function variableName(value: unknown): string {
   const name = text(value, controlErrorCode.variableInvalid)
   if (!validVariableName(name)) invalid(controlErrorCode.variableInvalid, 'Variable name is invalid.')
   return name
-}
-
-function variableValue(value: unknown): string {
-  if (typeof value != 'string' || encoder.encode(value).byteLength > 64 * 1024) {
-    invalid(controlErrorCode.variableInvalid, 'Variable value is invalid.')
-  }
-  return value
 }
 
 function connectorService(value: unknown): string {
@@ -501,4 +430,15 @@ function idempotencyKey(request: Request, code: InvalidCode): string {
 
 function invalid(code: InvalidCode, message: string): never {
   throw new ControlError(code, message)
+}
+
+async function decodeRequest<Value>(request: Request, code: InvalidCode, decode: (value: unknown) => Value): Promise<Value> {
+  const body = await requestObject(request, code)
+  try {
+    return decode(body)
+  } catch (error) {
+    throw new ControlError(code, decode == controlRequests.changeDraft ? 'The Draft operation has an invalid structure.' : 'Request fields are invalid.', {
+      cause: error,
+    })
+  }
 }

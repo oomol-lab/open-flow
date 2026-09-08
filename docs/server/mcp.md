@@ -121,3 +121,5 @@ mutation 内部发生无法确定结果的异常时返回 `flow.mutation-outcome
 - [MCP 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28)
 - [Streamable HTTP](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http)
 - [官方 TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
+
+工具参数、描述和 annotations 由 `@oomol-lab/open-flow/mcp` 的 `mcpTools` 统一提供。Server 直接注册这些 Standard Schema 定义，并运行同一入口导出的 `mcpConformanceCases`。部署边界及版本规则见[公共契约与版本演进](../control/contracts/compatibility.md)。

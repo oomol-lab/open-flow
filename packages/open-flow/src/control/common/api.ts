@@ -9,6 +9,8 @@ import type {
   WaitAction,
 } from '../../flow/common/change.ts'
 
+import { decodeRevisionContent } from '../../flow/common/encoding.ts'
+
 export type { JsonValue, TriggerKeySnapshot, WaitAction } from '../../flow/common/change.ts'
 export type { RunStatus } from '../../execution/common/runLifecycle.ts'
 export { controlErrorCode, controlErrorMetadata, type ControlErrorCode } from './errors.ts'
@@ -716,11 +718,11 @@ function revisionMetadata(value: unknown): RevisionMetadata {
 
 function draft(value: unknown): Draft {
   const source = record(value)
-  const content = record(source.content)
-  if (content.modelVersion != 1) return invalidResponse()
-  record(content.document)
-  record(content.modules)
-  return { ...revisionMetadata(source), content: source.content as RevisionContent }
+  try {
+    return { ...revisionMetadata(source), content: decodeRevisionContent(source.content) }
+  } catch {
+    return invalidResponse()
+  }
 }
 
 function presentation(value: unknown): Presentation {
