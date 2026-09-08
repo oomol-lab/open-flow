@@ -2,7 +2,7 @@ import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { RunAcceptance } from '@oomol-lab/open-flow/run-lifecycle'
 import type { DatabaseSync } from 'node:sqlite'
 
-import { insertTriggerActivity, pruneTriggerActivities } from './trigger-activity.ts'
+import { insertTriggerActivity, pruneTriggerActivities } from '../runtime/trigger-activity.ts'
 
 export type TriggerActivityKind =
   | 'delivery.failed'

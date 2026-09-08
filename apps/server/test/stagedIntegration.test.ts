@@ -1,5 +1,5 @@
 import type { TriggerNode } from '@oomol-lab/open-flow/flow-change'
-import type { ConnectorHost } from '../node/connector.ts'
+import type { ConnectorHost } from '../node/deployment/connector.ts'
 
 import { integrationDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -7,8 +7,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, expect, it } from 'vitest'
-import { createServerApp } from '../node/http.ts'
-import { ServerService } from '../node/service.ts'
+import { ServerService } from '../node/application/service.ts'
+import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService } from './serviceFixture.ts'
 

@@ -17,6 +17,7 @@ const connectorUnavailable = 'connector.unavailable'
 let nextId = 0
 
 async function runOutcome(prepared: PreparedFlow, options: Omit<FlowRunOptions, 'createId' | 'flowId'>) {
+  const { bindingValues, inputs, resume, trigger, ...rest } = options
   return await Effect.runPromise(
     scheduleFlow(prepared, {
       createId: () => `scheduler-${++nextId}`,
@@ -25,8 +26,8 @@ async function runOutcome(prepared: PreparedFlow, options: Omit<FlowRunOptions, 
         if (error instanceof TaskError) return { code: error.code, message: error.message }
         return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
       },
-      ...(options.resume == null ? { trigger: { nodeId: 'start', payload: {} } } : {}),
-      ...options,
+      ...rest,
+      ...(resume == null ? { bindingValues, inputs, trigger: trigger ?? { nodeId: 'start', payload: {} } } : { resume }),
     }),
   )
 }
@@ -393,8 +394,19 @@ describe('revision graph scheduler', () => {
     expect(invocations).toEqual([])
     expect(decodeFlowRunCheckpoint(JSON.parse(JSON.stringify(first.checkpoint)))).toEqual(first.checkpoint)
 
+    for (const launch of [{ bindingValues: { token: 'changed' } }, { inputs: {} }, { trigger: { nodeId: 'start', payload: {} } }]) {
+      const invalid = {
+        createId: () => 'unused',
+        flowId: 'main',
+        runId: 'run-wait',
+        invokeTask: () => Effect.fail(new Error('Invalid resume must not invoke a Task.')),
+        resume: { action: 'continue' as const, checkpoint: first.checkpoint },
+        ...launch,
+      }
+      // @ts-expect-error A resumed Run cannot accept new launch values.
+      await expect(Effect.runPromise(scheduleFlow(prepared, invalid))).rejects.toThrow('cannot accept launch inputs')
+    }
     const completed = await runOutcome(prepared, {
-      bindingValues: { token: 'changed' },
       emit: (event) => Effect.sync(() => void events.push(event)),
       invokeTask: (invocation) =>
         Effect.sync(() => {

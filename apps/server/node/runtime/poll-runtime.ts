@@ -2,10 +2,10 @@ import type { JsonValue, RevisionContent, TriggerNode } from '@oomol-lab/open-fl
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { PollContext, PollDefinition, PollResult } from '@oomol-lab/open-flow/poll-trigger'
 import type { Logger } from 'pino'
-import type { ConnectorHost } from './connector.ts'
-import type { PollCandidate } from './poll-store.ts'
-import type { Store } from './store.ts'
-import type { PollState, StoredPollTarget } from './trigger-store.ts'
+import type { ConnectorHost } from '../deployment/connector.ts'
+import type { PollCandidate } from '../storage/poll-store.ts'
+import type { Store } from '../storage/store.ts'
+import type { PollState, StoredPollTarget } from '../storage/trigger-store.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { scheduledTriggerOccurrenceId, nextTriggerScheduledAt } from '@oomol-lab/open-flow/cron-trigger'
@@ -23,9 +23,9 @@ import {
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as Semaphore from 'effect/Semaphore'
-import { ConnectorTaskError } from './connector.ts'
-import { ControlError, serverErrorCode } from './error.ts'
-import { errorKind } from './logger.ts'
+import { ConnectorTaskError } from '../deployment/connector.ts'
+import { ControlError, serverErrorCode } from '../error.ts'
+import { errorKind } from '../logger.ts'
 
 const encoder = new TextEncoder()
 const batchSize = 100

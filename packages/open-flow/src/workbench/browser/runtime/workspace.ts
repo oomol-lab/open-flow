@@ -355,7 +355,7 @@ function runProjection(
         break
       case 'node.progress': {
         const progress = event.payload.progress
-        if (typeof progress == 'number') nodes.set(nodeId, { ...current, progress, status: current?.status ?? 'running' })
+        nodes.set(nodeId, { ...current, progress, status: current?.status ?? 'running' })
         break
       }
       case 'node.completed':
@@ -377,10 +377,7 @@ function runProjection(
           ...current,
           runId: run.runId,
           status: current?.status ?? 'idle',
-          logs: [
-            ...(current?.logs ?? []),
-            { message: String(event.payload.message ?? ''), level: String(event.payload.level ?? 'info'), time: event.createdAt },
-          ],
+          logs: [...(current?.logs ?? []), { message: event.payload.message, level: event.payload.level, time: event.createdAt }],
         })
         break
       case 'node.artifact':
@@ -949,9 +946,9 @@ export function setFlowViewport(
 }
 
 export function eventSubject(event: RunEvent, t?: TFunction, nodeTitles?: ReadonlyMap<string, string>): string {
-  const title = event.payload.nodeTitle
+  const title = event.kind == 'node.started' ? event.payload.nodeTitle : undefined
   if (typeof title == 'string') return title
-  const executionId = event.payload.executionId
+  const executionId = 'executionId' in event.payload ? event.payload.executionId : undefined
   if (typeof executionId == 'string') {
     const executionTitle = nodeTitles?.get(executionId)
     if (executionTitle != null) return executionTitle

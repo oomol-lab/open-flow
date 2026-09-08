@@ -1,7 +1,7 @@
-import type { FlowPosition, PublicationPosition, RunPosition, TriggerActivityPosition } from './control-service.ts'
+import type { FlowPosition, PublicationPosition, RunPosition, TriggerActivityPosition } from '../application/control-service.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { ControlError } from './error.ts'
+import { ControlError } from '../error.ts'
 
 export function encodeFlowCursor(position: FlowPosition): string {
   return Buffer.from(JSON.stringify({ kind: 'flows', ...position })).toString('base64url')

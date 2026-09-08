@@ -6,13 +6,15 @@ export default defineConfig({
   test: {
     coverage: {
       include: [
-        'node/connector.ts',
-        'node/control-service.ts',
-        'node/integration-runtime.ts',
-        'node/isolated-vm.ts',
-        'node/service.ts',
-        'node/store.ts',
-        'node/trigger-store.ts',
+        'node/deployment/connector.ts',
+        'node/application/control-service.ts',
+        'node/runtime/integration-runtime.ts',
+        'node/runtime/isolated-vm.ts',
+        'node/application/service.ts',
+        'node/application/run.ts',
+        'node/application/publication.ts',
+        'node/storage/store.ts',
+        'node/storage/trigger-store.ts',
       ],
       provider: 'v8',
       reporter: ['text'],

@@ -8,11 +8,6 @@ import { Alert, AlertDescription, AlertTitle } from '../../../../ui/browser/aler
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Icon } from '../icons.tsx'
 
-function record(value: JsonValue | undefined): Readonly<Record<string, JsonValue>> | undefined {
-  if (value == null || typeof value != 'object' || Array.isArray(value)) return undefined
-  return value as Readonly<Record<string, JsonValue>>
-}
-
 function RunError({ code, message, children }: { readonly code: string; readonly message: string; readonly children?: ReactNode }): ReactElement {
   return (
     <Alert className="mt-2.5" variant="error">
@@ -52,7 +47,7 @@ export function eventHasDetails(event: RunEvent): boolean {
     event.kind == 'node.artifact' ||
     event.kind == 'node.failed' ||
     event.kind == 'node.log' ||
-    (event.kind == 'node.completed' && Object.keys(record(event.payload.outputs) ?? {}).length > 0)
+    (event.kind == 'node.completed' && Object.keys(event.payload.outputs).length > 0)
   )
 }
 
@@ -66,8 +61,8 @@ export function RunEventDetail({
   const t = useTranslate()
   switch (event.kind) {
     case 'node.completed': {
-      const outputs = record(event.payload.outputs)
-      if (outputs == null || Object.keys(outputs).length == 0) return null
+      const outputs = event.payload.outputs
+      if (Object.keys(outputs).length == 0) return null
       return (
         <EventDetail label={t('run.nodeOutput')}>
           <JsonValueView label={t('run.nodeOutput')} value={outputs} />
@@ -75,9 +70,9 @@ export function RunEventDetail({
       )
     }
     case 'node.log': {
-      const message = typeof event.payload.message == 'string' ? event.payload.message : ''
+      const message = event.payload.message
       return (
-        <EventDetail label={t('run.nodeLog', { level: typeof event.payload.level == 'string' ? event.payload.level : 'log' })}>
+        <EventDetail label={t('run.nodeLog', { level: event.payload.level })}>
           <pre className="run-event-message">{message}</pre>
         </EventDetail>
       )
@@ -85,14 +80,12 @@ export function RunEventDetail({
     case 'node.artifact':
       return (
         <EventDetail label={t('run.artifactMetadata')}>
-          <JsonValueView label={t('run.artifactMetadata')} value={event.payload.artifact ?? null} />
+          <JsonValueView label={t('run.artifactMetadata')} value={event.payload.artifact} />
           <p className="run-detail-note">{t('run.artifactUnavailable')}</p>
         </EventDetail>
       )
     case 'node.failed': {
-      const error = record(event.payload.error)
-      const code = typeof error?.code == 'string' ? error.code : 'node.failed'
-      const rawMessage = typeof error?.message == 'string' ? error.message : undefined
+      const { code, message: rawMessage } = event.payload.error
       const message =
         code == 'connector.connection-required'
           ? t('run.connectionRequired')
@@ -100,9 +93,7 @@ export function RunEventDetail({
             ? t('run.connectorUnconfigured')
             : code == 'connector.unavailable' && rawMessage == 'The Connector request could not be completed.'
               ? t('run.connectorUnavailable')
-              : rawMessage != null
-                ? rawMessage
-                : t('run.nodeFailed')
+              : rawMessage
       return (
         <EventDetail label={t('run.nodeError')}>
           <RunError code={code} message={message}>

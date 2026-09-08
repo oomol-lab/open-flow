@@ -13,7 +13,7 @@ import type {
 } from './trigger-store.ts'
 
 import { randomUUID } from 'node:crypto'
-import { insertTriggerActivity, pruneTriggerActivities } from './trigger-activity.ts'
+import { insertTriggerActivity, pruneTriggerActivities } from '../runtime/trigger-activity.ts'
 
 export interface PollCandidate {
   readonly bindingId: string

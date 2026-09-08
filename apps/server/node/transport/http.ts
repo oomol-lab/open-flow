@@ -1,8 +1,8 @@
 import type { JsonValue, TriggerNode, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { Logger } from 'pino'
+import type { OperatorSession } from '../deployment/operator.ts'
+import type { Settings } from '../deployment/settings.ts'
 import type { ResolveControlActor } from './control.ts'
-import type { OperatorSession } from './operator.ts'
-import type { Settings } from './settings.ts'
 
 import { serveStatic } from '@hono/node-server/serve-static'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
@@ -12,15 +12,15 @@ import { maximumWebhookBodyBytes, webhookEndpointId, webhookOccurrenceId } from 
 import { Hono } from 'hono'
 import { parseAccept } from 'hono/utils/accept'
 import { randomUUID } from 'node:crypto'
-import { createConfigApp } from './config.ts'
+import { ServerService } from '../application/service.ts'
+import { createConfigApp } from '../deployment/config.ts'
+import { createOperatorApp } from '../deployment/operator.ts'
+import { AcceptanceError, ControlError, serverErrorCode } from '../error.ts'
+import { errorKind, silentLogger } from '../logger.ts'
 import { createControlApp } from './control.ts'
-import { AcceptanceError, ControlError, serverErrorCode } from './error.ts'
 import { handleIntegration } from './integration.ts'
-import { errorKind, silentLogger } from './logger.ts'
 import { createMcpApp } from './mcp.ts'
-import { createOperatorApp } from './operator.ts'
 import { serverPaths } from './server-paths.ts'
-import { ServerService } from './service.ts'
 
 const defaultWebhookMethods = ['POST'] as const
 const nullBodyStatuses = new Set([204, 205, 304])

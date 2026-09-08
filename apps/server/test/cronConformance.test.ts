@@ -47,7 +47,7 @@ async function createHarness(fixture: CronConformanceFixture): Promise<CronConfo
   let now = Date.parse(fixture.publishedAt)
   const service = await openService(file, { clock: () => now })
   let revisionId = next('revision')
-  const published = await service.publishFlow({
+  const published = await service.publisher.publish({
     expectedLivePublicationId: null,
     flowId: 'main',
     idempotencyKey: next('publish'),
@@ -83,7 +83,7 @@ async function createHarness(fixture: CronConformanceFixture): Promise<CronConfo
     async republish(at, rules) {
       now = Date.parse(at)
       revisionId = next('revision')
-      const republished = await service.publishFlow({
+      const republished = await service.publisher.publish({
         expectedLivePublicationId: publicationId,
         flowId: 'main',
         idempotencyKey: next('publish'),
@@ -96,7 +96,7 @@ async function createHarness(fixture: CronConformanceFixture): Promise<CronConfo
     async retire(at) {
       now = Date.parse(at)
       revisionId = next('revision')
-      const retired = await service.publishFlow({
+      const retired = await service.publisher.publish({
         expectedLivePublicationId: publicationId,
         flowId: 'main',
         idempotencyKey: next('publish'),

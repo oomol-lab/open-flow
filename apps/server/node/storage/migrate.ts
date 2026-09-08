@@ -15,7 +15,7 @@ const migrationFiles = [
   '0011_run_trigger.sql',
   '0012_flow_enabled.sql',
 ] as const
-const migrationsDirectory = new URL('../migrations/', import.meta.url)
+const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 
 export function migrateDatabase(file: string): void {
   const database = new DatabaseSync(file)

@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 import UnoCSS from '@unocss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { serverPaths } from './node/server-paths.ts'
+import { serverPaths } from './node/transport/server-paths.ts'
 import { developmentBackendPlugin } from './scripts/dev.ts'
 
 const serverPathPattern = `^(?:${serverPaths.join('|')})(?:/|$)`

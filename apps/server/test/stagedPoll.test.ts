@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, expect, it } from 'vitest'
-import { ServerService } from '../node/service.ts'
+import { ServerService } from '../node/application/service.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService } from './serviceFixture.ts'
 

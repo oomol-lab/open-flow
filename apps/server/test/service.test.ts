@@ -10,9 +10,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createServerApp } from '../node/http.ts'
-import { ServerService } from '../node/service.ts'
-import { Store } from '../node/store.ts'
+import { ServerService } from '../node/application/service.ts'
+import { Store } from '../node/storage/store.ts'
+import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { childProcessId } from './processTree.ts'
 import { acceptRun, storeRevision } from './runFixture.ts'
@@ -333,7 +333,7 @@ describe('Server application service', () => {
       })
       if (accepted.kind != 'accepted') throw new Error('Initial Run acceptance conflicted.')
       expect(store.claim()?.runId).toBe(accepted.runId)
-      expect(store.start(accepted.runId, { kind: 'run.started', payload: {} })).toBe(true)
+      expect(store.start(accepted.runId, { kind: 'run.started', payload: { flowId: 'main', scopeId: 'scope' } })).toBe(true)
       const counts = database.prepare('SELECT event_count AS count, event_bytes AS bytes FROM runs WHERE run_id = ?')
       const before = counts.get(accepted.runId) as { count: number; bytes: number }
       const result = { message: '终态结果 🎉' }
@@ -363,7 +363,7 @@ describe('Server application service', () => {
       })
       if (accepted.kind != 'accepted') throw new Error('Initial Run acceptance conflicted.')
       expect(store.claim()?.runId).toBe(accepted.runId)
-      expect(store.start(accepted.runId, { kind: 'run.started', payload: {} })).toBe(true)
+      expect(store.start(accepted.runId, { kind: 'run.started', payload: { flowId: 'main', scopeId: 'scope' } })).toBe(true)
       const outputs = { first: 'a'.repeat(size), second: 'b'.repeat(size), empty: null }
       store.append(accepted.runId, {
         kind: 'node.completed',

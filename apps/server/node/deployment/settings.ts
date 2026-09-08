@@ -1,10 +1,10 @@
 import type { InvokeLlmTask } from '@oomol-lab/open-flow/runtime-contract'
 import type { Logger } from 'pino'
 
+import { silentLogger } from '../logger.ts'
+import { SettingsStore } from '../storage/settings-store.ts'
 import { ConnectorClient } from './connector.ts'
 import { createLlm, oomolLlm } from './llm.ts'
-import { silentLogger } from './logger.ts'
-import { SettingsStore } from './settings-store.ts'
 
 export class Settings {
   readonly #connectorConsoleOrigin?: string

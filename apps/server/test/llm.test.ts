@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createLlm, oomolLlm } from '../node/llm.ts'
+import { createLlm, oomolLlm } from '../node/deployment/llm.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 

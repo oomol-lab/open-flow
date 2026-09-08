@@ -11,6 +11,7 @@ export type RunOperation =
   | { readonly kind: 'start' }
   | { readonly kind: 'wait' }
   | { readonly kind: 'resolve' }
+  | { readonly kind: 'fail-start' | 'fail-resume' }
   | { readonly kind: 'commit'; readonly status: RunTerminalStatus }
 
 export type RunTransition =
@@ -67,6 +68,9 @@ export function transitionRun(status: RunStatus, operation: RunOperation): RunTr
       return status == 'running' ? { kind: 'waited', status: 'waiting' } : { kind: 'stale', status }
     case 'resolve':
       return status == 'waiting' ? { kind: 'resolved', status: 'queued' } : { kind: 'stale', status }
+    case 'fail-start':
+    case 'fail-resume':
+      return status == 'starting' ? { kind: 'committed', status: operation.kind == 'fail-start' ? 'failed' : 'indeterminate' } : { kind: 'stale', status }
     case 'commit':
       if (isRunTerminal(status)) return { kind: 'stale', status }
       if (operation.status == 'canceled' || status == 'running' || (operation.status == 'failed' && status == 'waiting')) {
@@ -89,6 +93,8 @@ export interface RunLifecycleHarness {
   accept(input: { readonly idempotencyKey: string; readonly requestDigest: string }): Promise<RunAcceptance>
   claim(runId: string): Promise<RunClaim>
   commit(runId: string, status: RunTerminalStatus): Promise<boolean>
+  failStarting(runId: string): Promise<boolean>
+  failResume(runId: string): Promise<boolean>
   observe(runId: string): Promise<RunObservation>
   resolve(runId: string): Promise<boolean>
   start(runId: string): Promise<RunStart>
@@ -113,6 +119,29 @@ async function accepted(harness: RunLifecycleHarness, idempotencyKey: string = '
 }
 
 export const runLifecycleConformanceCases: readonly RunLifecycleConformanceCase[] = [
+  {
+    name: 'rejects startup failures outside the start barrier and preserves their terminal',
+    async verify(harness) {
+      for (const operation of ['failStarting', 'failResume'] as const) {
+        const runId = await accepted(harness, operation)
+        equal(await harness[operation](runId), false, 'Failure before claim')
+        await harness.claim(runId)
+        equal(await harness.commit(runId, 'completed'), false, 'Completion before start')
+        equal(await harness[operation](runId), true, 'Startup failure')
+        const status = operation == 'failStarting' ? 'failed' : 'indeterminate'
+        equal(await harness.observe(runId), { status, terminalEvents: [status] }, 'Startup terminal')
+        equal(await harness[operation](runId), false, 'Repeated startup failure')
+        equal(await harness.start(runId), { kind: 'stale', status }, 'Start after failure')
+        equal(await harness.commit(runId, 'canceled'), false, 'Cancellation after failure')
+      }
+      const runId = await accepted(harness, 'running')
+      await harness.claim(runId)
+      await harness.start(runId)
+      equal(await harness.failStarting(runId), false, 'Startup failure after start')
+      equal(await harness.failResume(runId), false, 'Resume failure after start')
+      equal(await harness.observe(runId), { status: 'running', terminalEvents: [] }, 'Running observation')
+    },
+  },
   {
     name: 'pauses and resumes the same Run through the ordinary start barrier',
     async verify(harness) {

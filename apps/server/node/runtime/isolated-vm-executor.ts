@@ -572,17 +572,15 @@ function executeFlow(
   ) => Effect.Effect<CapabilityResult, Error>,
 ): Effect.Effect<FlowRunOutcome, Error> {
   if (!('flow' in request)) return Effect.fail(new IsolatedVmError('invalid-program', 'Flow Runtime invocation is incomplete.'))
-  const { flow } = request
-  return runFlow(flow.prepared, {
-    ...(flow.bindingValues == null ? {} : { bindingValues: flow.bindingValues }),
+  const { prepared, ...flow } = request.flow
+  return runFlow(prepared, {
+    ...flow,
     createId: randomUUID,
     emit: (event) => remote(call({ event, type: 'event' })).pipe(Effect.asVoid),
-    flowId: flow.flowId,
-    ...(flow.inputs == null ? {} : { inputs: flow.inputs }),
     invokeTask: (invocation) =>
       Effect.gen(function* () {
         if ('moduleId' in invocation) {
-          const program = createRuntimeProgram(flow.prepared, invocation.moduleId, isolatedVmEngineDigest)
+          const program = createRuntimeProgram(prepared, invocation.moduleId, isolatedVmEngineDigest)
           if (program == null) return yield* Effect.fail(new IsolatedVmError('invalid-program', 'Task Module is not part of the fixed Flow closure.'))
           const input = Object.assign({}, invocation.additionalInputs, invocation.input)
           return yield* Effect.scoped(
@@ -631,9 +629,6 @@ function executeFlow(
       code: typeof Reflect.get(Object(error), 'schedulerCode') == 'string' ? (Reflect.get(Object(error), 'schedulerCode') as string) : 'node.failed',
       message: normalizedError(error).message,
     }),
-    ...(flow.resume == null ? {} : { resume: flow.resume }),
-    runId: flow.runId,
-    ...(flow.trigger == null ? {} : { trigger: flow.trigger }),
   })
 }
 

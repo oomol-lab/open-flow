@@ -382,7 +382,14 @@ describe('agent command contract', () => {
         done: pages == 2,
         historyComplete: true,
         nextAfter: pages,
-        events: [{ createdAt: flow.createdAt, kind: pages == 1 ? 'run.started' : 'run.completed', sequence: pages, payload: {} }],
+        events: [
+          {
+            createdAt: flow.createdAt,
+            kind: pages == 1 ? 'run.started' : 'run.completed',
+            sequence: pages,
+            payload: pages == 1 ? { flowId: 'flow', scopeId: 'scope' } : { result: {} },
+          },
+        ],
       })
     }
     expect(await runCli(['runs', 'events', 'run-1', '--follow', '--json'], { request }, output.value)).toBe(0)

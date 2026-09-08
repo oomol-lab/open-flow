@@ -1,13 +1,13 @@
 import type { ConnectorAction, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
 import type { ConnectorCapability, JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
-import type { ConnectorHost } from '../node/connector.ts'
+import type { ConnectorHost } from '../node/deployment/connector.ts'
 
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ConnectorClient, ConnectorTaskError } from '../node/connector.ts'
-import { ServerService } from '../node/service.ts'
+import { ServerService } from '../node/application/service.ts'
+import { ConnectorClient, ConnectorTaskError } from '../node/deployment/connector.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { acceptRun, storeRevision } from './runFixture.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
@@ -368,7 +368,7 @@ describe('Server Connector host', () => {
     }
 
     await expect(
-      service.publishFlow({
+      service.publisher.publish({
         expectedLivePublicationId: null,
         flowId: 'main',
         idempotencyKey: 'unconnected-connector',
@@ -405,7 +405,7 @@ describe('Server Connector host', () => {
     }
 
     await expect(
-      service.publishFlow({
+      service.publisher.publish({
         expectedLivePublicationId: null,
         flowId: 'main',
         idempotencyKey: 'public-connector',

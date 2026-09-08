@@ -166,7 +166,7 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
       }
     }
 
-    if (type == 'node.cache-hit' || type == 'node.preview' || type == 'run.completed' || type == 'run.failed' || type == 'run.output') {
+    if (type == 'run.completed' || type == 'run.failed') {
       runId(event)
       return
     }

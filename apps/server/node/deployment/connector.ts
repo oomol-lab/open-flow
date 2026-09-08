@@ -6,7 +6,7 @@ import type { Logger } from 'pino'
 import { connectorActionPorts } from '@oomol-lab/open-flow/connector-action'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
-import { errorKind, silentLogger } from './logger.ts'
+import { errorKind, silentLogger } from '../logger.ts'
 
 const maxResponseBytes = 1024 * 1024
 const maxActionCatalogBytes = 8 * 1024 * 1024

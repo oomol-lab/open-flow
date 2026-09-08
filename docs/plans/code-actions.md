@@ -83,7 +83,7 @@ Draft 允许尚未完成账号绑定的声明。具体调用缺少默认且未�
 ## 实施前确认的基础与缺口
 
 - `packages/open-flow/src/flow/common/change.ts` 的 `ConnectorCapability` 已保存 Action 与 Connection，Inline Task 已有 `capabilities`。
-- `apps/server/node/isolated-vm-executor.ts` 已暴露 `context.connector(payload)`，`apps/server/node/service.ts` 已验证声明并调用 Connector host。
+- `apps/server/node/runtime/isolated-vm-executor.ts` 已暴露 `context.connector(payload)`，`apps/server/node/application/service.ts` 已验证声明并调用 Connector host。
 - `apps/server/test/connector.test.ts` 已覆盖声明后允许调用、未声明时拒绝及无效请求。
 - `packages/open-flow/src/types/index.ts` 的公开 `TaskContext` 尚未声明 Connector 能力，Workbench 尚未提供 Code Action 配置闭环。
 - Server 已读取 Connector 原始 alias 用于上游请求，但当前公共 Connection catalog 未投影 alias，需要补齐可选字段。

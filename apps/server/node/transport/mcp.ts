@@ -1,6 +1,6 @@
 import type { CallToolResult, ServerContext, StandardSchemaWithJSON } from '@modelcontextprotocol/server'
 import type { Logger } from 'pino'
-import type { ServerService } from './service.ts'
+import type { ServerService } from '../application/service.ts'
 
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
@@ -9,9 +9,9 @@ import { mcpTools, mcpProtocolVersion, mcpInstructions } from '@oomol-lab/open-f
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
-import manifest from '../package.json' with { type: 'json' }
+import manifest from '../../package.json' with { type: 'json' }
+import { ControlError } from '../error.ts'
 import { decodeFlowCursor, encodeFlowCursor } from './control-cursor.ts'
-import { ControlError } from './error.ts'
 
 export function createMcpApp(service: ServerService, authenticate: (request: Request) => Promise<string>, logger: Logger, shutdownSignal?: AbortSignal) {
   const app = new Hono()

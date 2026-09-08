@@ -302,7 +302,7 @@ function terminalOutputs(result: RunResult | undefined): JsonValue | undefined {
 
 function latestOutputs(events: readonly RunEvent[]): JsonValue | undefined {
   const event = events.findLast((candidate) => candidate.kind == 'node.completed' && eventHasDetails(candidate))
-  return event?.payload.outputs
+  return event?.kind == 'node.completed' ? event.payload.outputs : undefined
 }
 
 function eventSummary(event: RunEvent, t: TFunction): string {
@@ -318,8 +318,7 @@ function eventSummary(event: RunEvent, t: TFunction): string {
       return t('run.eventStarted')
     case 'run.progress':
     case 'node.progress': {
-      const progress = event.payload.progress
-      return typeof progress == 'number' ? t('run.eventProgress', { progress: Math.round(progress) }) : t('run.eventRecorded')
+      return t('run.eventProgress', { progress: Math.round(event.payload.progress) })
     }
     case 'node.artifact':
       return t('run.eventArtifact')
@@ -343,12 +342,13 @@ function eventSummary(event: RunEvent, t: TFunction): string {
 function nodeTitleIndex(events: readonly RunEvent[]): ReadonlyMap<string, string> {
   const titles = new Map<string, string>()
   for (const event of events) {
+    if (event.kind != 'node.started') continue
     const title = event.payload.nodeTitle
     if (typeof title != 'string') continue
     const executionId = event.payload.executionId
     const nodeId = event.payload.nodeId
-    if (typeof executionId == 'string') titles.set(executionId, title)
-    if (typeof nodeId == 'string') titles.set(nodeId, title)
+    titles.set(executionId, title)
+    titles.set(nodeId, title)
   }
   return titles
 }

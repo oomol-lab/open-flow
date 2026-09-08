@@ -266,22 +266,27 @@ export interface Run {
   readonly version: 1
 }
 
-interface RunDetailsBase extends Run {
+type RunDetailsBase = Omit<Run, 'status'> & {
   readonly closureDigest: string
   readonly engineContract: string
   readonly engineDigest: string
   readonly eventsExpiresAt?: string
   readonly modelVersion: number
   readonly revisionDigest: string
-  readonly waiting?: {
-    readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
-    readonly expiresAt: string
-    readonly nodeId: string
-    readonly prompt: string
-    readonly waitId: string
-    readonly waitingSince: string
-  }
-}
+} & (
+    | { readonly status: Exclude<RunStatus, 'waiting'>; readonly waiting?: never }
+    | {
+        readonly status: 'waiting'
+        readonly waiting: {
+          readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
+          readonly expiresAt: string
+          readonly nodeId: string
+          readonly prompt: string
+          readonly waitId: string
+          readonly waitingSince: string
+        }
+      }
+  )
 
 export type DraftRun = RunDetailsBase & { readonly source: 'draft' }
 export type LiveRun = RunDetailsBase & { readonly publicationId: string; readonly source: 'live' }
@@ -300,31 +305,8 @@ export interface RunPage {
   readonly version: 1
 }
 
-export type RunEventKind =
-  | 'node.artifact'
-  | 'node.completed'
-  | 'node.failed'
-  | 'node.log'
-  | 'node.progress'
-  | 'node.started'
-  | 'run.canceled'
-  | 'run.completed'
-  | 'run.events-truncated'
-  | 'run.failed'
-  | 'run.indeterminate'
-  | 'run.progress'
-  | 'run.queued'
-  | 'run.resolved'
-  | 'run.started'
-  | 'run.waiting'
-
-export interface RunEvent {
-  readonly createdAt: string
-  readonly kind: RunEventKind
-  readonly payload: Readonly<Record<string, JsonValue>>
-  readonly sequence: number
-  readonly sourceSequence?: number
-}
+export type RunEvent = Readonly<ReturnType<typeof decodeRunEvent>>
+export type RunEventKind = RunEvent['kind']
 
 export interface RunEvents {
   readonly done: boolean
@@ -931,7 +913,7 @@ function runDetails(value: unknown): RunDetails {
   const eventsExpiresAt = source.eventsExpiresAt
   if (eventsExpiresAt != null && typeof eventsExpiresAt != 'string') return invalidResponse()
   if (summary.status != 'waiting' && source.waiting !== undefined) return invalidResponse()
-  const waiting = summary.status == 'waiting' ? runWaiting(source.waiting) : undefined
+  const state = summary.status == 'waiting' ? { status: 'waiting' as const, waiting: runWaiting(source.waiting) } : { status: summary.status }
   const details = {
     ...summary,
     closureDigest: string(source.closureDigest),
@@ -940,7 +922,7 @@ function runDetails(value: unknown): RunDetails {
     ...(eventsExpiresAt == null ? {} : { eventsExpiresAt }),
     modelVersion: integer(source.modelVersion),
     revisionDigest: string(source.revisionDigest),
-    ...(waiting == null ? {} : { waiting }),
+    ...state,
   }
   switch (summary.source) {
     case 'draft':
@@ -971,39 +953,142 @@ function runPage(value: unknown): RunPage {
   }
 }
 
-const runEventKinds = new Set<RunEventKind>([
-  'node.artifact',
-  'node.completed',
-  'node.failed',
-  'node.log',
-  'node.progress',
-  'node.started',
-  'run.canceled',
-  'run.completed',
-  'run.events-truncated',
-  'run.failed',
-  'run.indeterminate',
-  'run.progress',
-  'run.queued',
-  'run.resolved',
-  'run.started',
-  'run.waiting',
-])
-
-function runEvent(value: unknown): RunEvent {
+export function decodeRunEvent(value: unknown) {
   const source = record(value)
-  const kind = source.kind
   const sequence = integer(source.sequence)
-  const sourceSequence = source.sourceSequence
-  if (typeof kind != 'string' || !runEventKinds.has(kind as RunEventKind) || sequence < 0) return invalidResponse()
-  if (sourceSequence != null && (!Number.isSafeInteger(sourceSequence) || (sourceSequence as number) < 0)) return invalidResponse()
-  return {
+  if (sequence < 0) return invalidResponse()
+  const base = {
     createdAt: string(source.createdAt),
-    kind: kind as RunEventKind,
-    payload: record(source.payload) as Readonly<Record<string, JsonValue>>,
     sequence,
-    ...(sourceSequence == null ? {} : { sourceSequence: sourceSequence as number }),
   }
+  const payload = record(source.payload)
+  const kind = source.kind
+  switch (kind) {
+    case 'run.queued':
+      return { ...base, kind, payload: {} } as const
+    case 'run.started':
+      return {
+        ...base,
+        kind,
+        payload: {
+          flowId: string(payload.flowId),
+          scopeId: string(payload.scopeId),
+          ...(payload.parentScopeId === undefined ? {} : { parentScopeId: string(payload.parentScopeId) }),
+        },
+      } as const
+    case 'run.progress':
+      return {
+        ...base,
+        kind,
+        payload: { flowId: string(payload.flowId), scopeId: string(payload.scopeId), progress: eventProgress(payload.progress) },
+      } as const
+    case 'run.waiting':
+      return {
+        ...base,
+        kind,
+        payload: {
+          expiresAt: string(payload.expiresAt),
+          nodeId: string(payload.nodeId),
+          waitId: string(payload.waitId),
+          waitingSince: string(payload.waitingSince),
+        },
+      } as const
+    case 'run.resolved': {
+      const action = payload.action
+      if (action !== 'approve' && action !== 'continue' && action !== 'reject') return invalidResponse()
+      return { ...base, kind, payload: { action, resolvedAt: string(payload.resolvedAt), waitId: string(payload.waitId) } } as const
+    }
+    case 'run.completed':
+    case 'run.canceled':
+    case 'run.failed':
+    case 'run.indeterminate':
+      return { ...base, kind, payload: { result: jsonValue(payload.result) } } as const
+    case 'run.events-truncated':
+      return { ...base, kind, payload: Object.fromEntries(Object.entries(payload).map(([key, item]) => [key, jsonValue(item)])) } as const
+    case 'node.started':
+    case 'node.completed':
+    case 'node.failed':
+    case 'node.log':
+    case 'node.progress':
+    case 'node.artifact': {
+      const node = {
+        flowId: string(payload.flowId),
+        scopeId: string(payload.scopeId),
+        nodeId: string(payload.nodeId),
+        executionId: string(payload.executionId),
+      }
+      switch (kind) {
+        case 'node.started': {
+          const nodeKind = payload.nodeKind
+          if (
+            nodeKind !== undefined &&
+            nodeKind !== 'condition' &&
+            nodeKind !== 'connector' &&
+            nodeKind !== 'javascript' &&
+            nodeKind !== 'llm' &&
+            nodeKind !== 'subflow' &&
+            nodeKind !== 'value' &&
+            nodeKind !== 'wait'
+          )
+            return invalidResponse()
+          return {
+            ...base,
+            kind,
+            payload: {
+              ...node,
+              ...(nodeKind === undefined ? {} : { nodeKind }),
+              ...(payload.nodeTitle === undefined ? {} : { nodeTitle: string(payload.nodeTitle) }),
+              ...(payload.operation === undefined ? {} : { operation: string(payload.operation) }),
+            },
+          } as const
+        }
+        case 'node.completed':
+          return {
+            ...base,
+            kind,
+            payload: { ...node, outputs: Object.fromEntries(Object.entries(record(payload.outputs)).map(([key, item]) => [key, jsonValue(item)])) },
+          } as const
+        case 'node.failed': {
+          const error = record(payload.error)
+          return { ...base, kind, payload: { ...node, error: { code: string(error.code), message: string(error.message) } } } as const
+        }
+        case 'node.log': {
+          const level = payload.level
+          if (level !== 'debug' && level !== 'info' && level !== 'warn' && level !== 'error') return invalidResponse()
+          return { ...base, kind, payload: { ...node, level, message: string(payload.message) } } as const
+        }
+        case 'node.progress':
+          return { ...base, kind, payload: { ...node, progress: eventProgress(payload.progress) } } as const
+        case 'node.artifact': {
+          const artifact = record(payload.artifact)
+          const size = integer(artifact.size)
+          const digest = string(artifact.digest)
+          if (artifact.kind != 'artifact' || size < 0 || !/^sha256:[0-9a-f]{64}$/.test(digest)) return invalidResponse()
+          return {
+            ...base,
+            kind,
+            payload: {
+              ...node,
+              artifact: {
+                kind: 'artifact',
+                id: string(artifact.id),
+                name: string(artifact.name),
+                size,
+                digest,
+                ...(artifact.mediaType === undefined ? {} : { mediaType: string(artifact.mediaType) }),
+              },
+            },
+          } as const
+        }
+      }
+    }
+    default:
+      return invalidResponse()
+  }
+}
+
+function eventProgress(value: unknown): number {
+  return typeof value == 'number' && Number.isFinite(value) && value >= 0 && value <= 100 ? value : invalidResponse()
 }
 
 function runEvents(value: unknown): RunEvents {
@@ -1017,7 +1102,7 @@ function runEvents(value: unknown): RunEvents {
   if (nextAfter < 0) return invalidResponse()
   return {
     done: source.done,
-    events: source.events.map(runEvent),
+    events: source.events.map(decodeRunEvent),
     ...(eventsExpiresAt == null ? {} : { eventsExpiresAt }),
     historyComplete: source.historyComplete,
     nextAfter,

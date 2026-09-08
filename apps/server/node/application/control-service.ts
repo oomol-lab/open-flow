@@ -25,19 +25,19 @@ import type {
 import type { ChangeOperation, JsonValue, RevisionContent, TriggerKeySnapshot, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
-import type { ConnectorHost } from './connector.ts'
-import type { PublicationAcceptance, StoredControlRun, StoredPresentation, StoredFlow, StoredFlowRevision, StoredPublication } from './store.ts'
-import type { StoredTriggerActivity, StoredTriggerBinding } from './trigger-store.ts'
+import type { ConnectorHost } from '../deployment/connector.ts'
+import type { PublicationAcceptance, StoredControlRun, StoredPresentation, StoredFlow, StoredFlowRevision, StoredPublication } from '../storage/store.ts'
+import type { StoredTriggerActivity, StoredTriggerBinding } from '../storage/trigger-store.ts'
 
-import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
+import { decodeRunEvent, controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { applyFlowChanges, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
 import { canonicalJsonBytes, decodeRevision, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { codeActions, flowClosure, prepareFlow, validateFlow, validateFlowInputs, validRunTrigger, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { randomUUID } from 'node:crypto'
-import { checkCodeActions, ConnectorTaskError } from './connector.ts'
-import { AcceptanceError, ControlError, serverErrorCode } from './error.ts'
-import { Store } from './store.ts'
+import { checkCodeActions, ConnectorTaskError } from '../deployment/connector.ts'
+import { AcceptanceError, ControlError, serverErrorCode } from '../error.ts'
+import { Store } from '../storage/store.ts'
 
 type RunInputs = NonNullable<FlowRunOptions['inputs']>
 type PublishInput = {
@@ -810,12 +810,14 @@ export class ControlService {
       throw new ControlError(controlErrorCode.runEventsExpired, 'The Run event history has expired.')
     }
     const stored = this.store.controlEvents(runId, after, limit)
-    const events = stored.map((event) => ({
-      createdAt: timestamp(event.createdAt),
-      kind: event.kind,
-      payload: event.kind == 'node.completed' && event.value !== undefined ? { ...event.payload, outputs: event.value } : event.payload,
-      sequence: event.sequence,
-    }))
+    const events = stored.map((event) =>
+      decodeRunEvent({
+        createdAt: timestamp(event.createdAt),
+        kind: event.kind,
+        payload: event.kind == 'node.completed' && event.value !== undefined ? { ...event.payload, outputs: event.value } : event.payload,
+        sequence: event.sequence,
+      }),
+    )
     return {
       done: terminal(current.status),
       events,
@@ -932,24 +934,55 @@ export class ControlService {
   }
 
   private runDetails(stored: StoredControlRun): RunDetails {
-    const details = runDetails(stored)
-    if (stored.status != 'waiting') return details
-    const receipt = this.store.activeWait(stored.runId)
-    if (receipt == null) throw new Error('Waiting Run is missing its active Wait receipt.')
-    const revision = this.store.revision(stored.flowId, stored.revisionId)
-    if (revision == null) throw new Error('Waiting Run is missing its fixed Revision.')
-    const node = revisionContent(revision).document.graph.nodes[receipt.nodeId]
-    if (node?.kind != 'wait') throw new Error('Waiting Run does not point to a fixed Wait node.')
-    return {
-      ...details,
-      waiting: {
-        actions: node.actions,
-        expiresAt: timestamp(receipt.expiresAt),
-        nodeId: receipt.nodeId,
-        prompt: node.prompt,
-        waitId: receipt.waitId,
-        waitingSince: timestamp(receipt.waitingSince),
-      },
+    const state = (() => {
+      if (stored.status == 'waiting') {
+        const receipt = this.store.activeWait(stored.runId)
+        if (receipt == null) throw new Error('Waiting Run is missing its active Wait receipt.')
+        const revision = this.store.revision(stored.flowId, stored.revisionId)
+        if (revision == null) throw new Error('Waiting Run is missing its fixed Revision.')
+        const node = revisionContent(revision).document.graph.nodes[receipt.nodeId]
+        if (node?.kind != 'wait') throw new Error('Waiting Run does not point to a fixed Wait node.')
+        return {
+          status: 'waiting' as const,
+          waiting: {
+            actions: node.actions,
+            expiresAt: timestamp(receipt.expiresAt),
+            nodeId: receipt.nodeId,
+            prompt: node.prompt,
+            waitId: receipt.waitId,
+            waitingSince: timestamp(receipt.waitingSince),
+          },
+        }
+      }
+      return { status: stored.status }
+    })()
+    const details = {
+      ...run(stored),
+      ...state,
+      closureDigest: stored.closureDigest,
+      engineContract: stored.engineContract,
+      engineDigest: stored.engineDigest,
+      ...(stored.eventsExpiresAt == null ? {} : { eventsExpiresAt: timestamp(stored.eventsExpiresAt) }),
+      modelVersion: stored.modelVersion,
+      revisionDigest: stored.revisionDigest,
+    }
+    switch (stored.source) {
+      case 'draft':
+        return { ...details, source: 'draft' }
+      case 'live':
+        if (stored.publicationId == null) throw new Error('Live Run is missing its Publication identity.')
+        return { ...details, publicationId: stored.publicationId, source: 'live' }
+      case 'trigger':
+        if (stored.occurrenceId == null || stored.publicationId == null || stored.triggerNodeId == null) {
+          throw new Error('Trigger Run is missing its admission identity.')
+        }
+        return {
+          ...details,
+          occurrenceId: stored.occurrenceId,
+          publicationId: stored.publicationId,
+          source: 'trigger',
+          triggerNodeId: stored.triggerNodeId,
+        }
     }
   }
 
@@ -1066,36 +1099,6 @@ function run(stored: StoredControlRun): Run {
     ...(stored.startedAt == null ? {} : { startedAt: timestamp(stored.startedAt) }),
     status: stored.status,
     version: 1,
-  }
-}
-
-function runDetails(stored: StoredControlRun): RunDetails {
-  const details = {
-    ...run(stored),
-    closureDigest: stored.closureDigest,
-    engineContract: stored.engineContract,
-    engineDigest: stored.engineDigest,
-    ...(stored.eventsExpiresAt == null ? {} : { eventsExpiresAt: timestamp(stored.eventsExpiresAt) }),
-    modelVersion: stored.modelVersion,
-    revisionDigest: stored.revisionDigest,
-  }
-  switch (stored.source) {
-    case 'draft':
-      return { ...details, source: 'draft' }
-    case 'live':
-      if (stored.publicationId == null) throw new Error('Live Run is missing its Publication identity.')
-      return { ...details, publicationId: stored.publicationId, source: 'live' }
-    case 'trigger':
-      if (stored.occurrenceId == null || stored.publicationId == null || stored.triggerNodeId == null) {
-        throw new Error('Trigger Run is missing its admission identity.')
-      }
-      return {
-        ...details,
-        occurrenceId: stored.occurrenceId,
-        publicationId: stored.publicationId,
-        source: 'trigger',
-        triggerNodeId: stored.triggerNodeId,
-      }
   }
 }
 

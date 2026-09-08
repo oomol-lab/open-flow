@@ -1,4 +1,5 @@
 import { dequal } from 'dequal/lite'
+import { decodeRunEvent } from './api.ts'
 
 export interface ControlApiConformanceHarness {
   readonly origin: string
@@ -590,6 +591,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
         'Waiting Run list',
       )
       const waitingEvents = await json(await request(harness, `/v1/runs/${runId}/events`), 200, 'Read waiting Run events')
+      for (const event of list(waitingEvents.events, 'Run events')) decodeRunEvent(event)
       equal(waitingEvents.done, false, 'Waiting events done')
       if (!list(waitingEvents.events, 'Waiting events').some((value) => record(value, 'Waiting event').kind == 'run.waiting')) {
         fail('Waiting Run must contain run.waiting.')
@@ -619,6 +621,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       equal(replay.resolutionAccepted, true, 'Replayed resolution')
       equal(replay.status, 'completed', 'Replayed terminal status')
       const completedEvents = await json(await request(harness, `/v1/runs/${runId}/events`), 200, 'Read resumed Run events')
+      for (const event of list(completedEvents.events, 'Run events')) decodeRunEvent(event)
       equal(
         list(completedEvents.events, 'Completed events').filter((value) => record(value, 'Completed event').kind == 'run.resolved').length,
         1,

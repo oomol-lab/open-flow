@@ -11,10 +11,10 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
+import { ServerService } from '../node/application/service.ts'
 import { serverErrorCode } from '../node/error.ts'
 import { createLogger } from '../node/logger.ts'
-import { ServerService } from '../node/service.ts'
-import { Store } from '../node/store.ts'
+import { Store } from '../node/storage/store.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
 
@@ -108,7 +108,7 @@ const connector = createConnectorHost({ listConnections: async () => [activeConn
 const publishedAt = Date.parse('2026-08-21T00:00:30.000Z')
 
 async function publish(service: ServerService, content = revision(), expectedLivePublicationId: string | null = null) {
-  const result = await service.publishFlow({
+  const result = await service.publisher.publish({
     expectedLivePublicationId,
     flowId: 'main',
     idempotencyKey: crypto.randomUUID(),

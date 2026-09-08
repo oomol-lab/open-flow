@@ -355,6 +355,29 @@ Run list 按 `createdAt`、`runId` 逆序稳定分页，`status=waiting` 可以�
 `after` 是已观察的最后 sequence，只返回更大的事件。terminal Run 最多有一个 terminal event。非 terminal Run 的 result 返回
 `run.not-terminal`；取消成功与重复取消分别返回 `cancelAccepted: true` 和 `false`。
 
+公共 `RunEvent` 按 `kind` 区分 payload；`decodeRunEvent` 与 Control client 复用同一 decoder，拒绝缺失或类型错误的必需字段。
+事件 envelope 为 `{ createdAt, kind, payload, sequence }`，`sequence` 是非负安全整数；不提供独立的 source sequence。
+平台字段按下表投影，用户 `outputs` 和 terminal `result` 内部保持自由 JSON。
+
+| kind                                                            | payload                                                                                 |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `run.queued`                                                    | `{}`                                                                                    |
+| `run.started`                                                   | `{ flowId, scopeId, parentScopeId? }`                                                   |
+| `run.progress`                                                  | `{ flowId, scopeId, progress }`                                                         |
+| `run.completed / run.canceled / run.failed / run.indeterminate` | `{ result: JsonValue }`                                                                 |
+| `run.events-truncated`                                          | JSON object；保留给事件明细截断通知。                                                   |
+| `node.started`                                                  | Node context，加可选的 `nodeKind`、`nodeTitle`、`operation`。                           |
+| `node.completed`                                                | Node context，加 `outputs: Record<string, JsonValue>`。                                 |
+| `node.failed`                                                   | Node context，加 `error: { code, message }`。                                           |
+| `node.log`                                                      | Node context，加 `level: 'debug' / 'info' / 'warn' / 'error'` 和 `message`。            |
+| `node.progress`                                                 | Node context，加 `progress`。                                                           |
+| `node.artifact`                                                 | Node context，加 `artifact: { kind: 'artifact', id, name, size, digest, mediaType? }`。 |
+
+Node context 固定为 `{ flowId, scopeId, nodeId, executionId }`，各 identity 为非空字符串。
+`progress` 为 0–100 的有限数值；Artifact `size` 为非负安全整数，`digest` 为 `sha256:` 加 64 位小写十六进制。
+`nodeKind` 为 `condition / connector / javascript / llm / subflow / value / wait`。
+Runtime projector 不接受旧的 `node.cache-hit`、`node.preview` 或 `run.output` 事件。
+
 Wait 进入和离开暂停状态分别追加事件：
 
 - `run.waiting` payload 为 `{ expiresAt, nodeId, waitId, waitingSince }`；
@@ -378,6 +401,17 @@ Wait 进入和离开暂停状态分别追加事件：
 同一 `waitId` 只有第一个合法、未过期的决议能把 Run 从 `waiting` 推进到 `queued`。同一 action 重放返回
 `resolutionAccepted: true`，竞争的另一 action 返回 `false`，两者都返回已经提交的 `action` 和 `resolvedAt`。不存在的 Wait 返回
 `run.wait-not-found`，不属于该 Wait 的 action 返回 `run.invalid`。Wait 到期后 Run 以 `run.wait-expired` 失败，不产生新的 Run。
+
+### Run lifecycle conformance
+
+`run-lifecycle` 的状态模型包含 `fail-start` 与 `fail-resume`：两者仅能在 `starting` 提交，分别产生 `failed` 与
+`indeterminate`。普通 `commit` 在 `running` 接受 terminal，在任意非 terminal 状态接受取消，并在 `waiting` 接受失败。
+已经提交的 terminal 不可覆盖。部署的 lifecycle conformance 必须操作真实权威 store，覆盖首次启动、Wait 恢复、启动失败、
+恢复失败、幂等准入与 terminal 竞争；不能以另一套测试专用持久化实现代替部署实现。
+
+公共 Scheduler 的 `RunLaunch` 为首次启动与 Wait 恢复的互斥联合。首次启动必须包含 `trigger`，可包含 `inputs` 和
+`bindingValues`；恢复只能包含 `resume: { action, checkpoint }`，不能重新提供这三项启动数据。`RunDetails` 在
+`status: 'waiting'` 时必须包含 `waiting`，其他状态不包含该字段；Run list 的摘要不包含等待详情。
 
 ## 6. Trigger 与 Connector
 

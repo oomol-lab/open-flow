@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { serverErrorCode } from './error.ts'
+import { serverErrorCode } from '../error.ts'
 import { Settings } from './settings.ts'
 
 const maxRequestBytes = 4 * 1024

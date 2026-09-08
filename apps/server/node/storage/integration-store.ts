@@ -9,7 +9,7 @@ import type {
   TriggerOccurrenceInput,
 } from './trigger-store.ts'
 
-import { insertTriggerActivity, pruneTriggerActivities } from './trigger-activity.ts'
+import { insertTriggerActivity, pruneTriggerActivities } from '../runtime/trigger-activity.ts'
 
 export interface IntegrationCandidate {
   readonly bindingId: string

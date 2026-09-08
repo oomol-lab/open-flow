@@ -420,24 +420,29 @@ describe('Canvas run records', () => {
   } as const
   const events: NonNullable<Parameters<typeof designerGraph>[8]> = [
     { sequence: 1, kind: 'run.started', createdAt: draft.createdAt, payload: { flowId: 'flow', scopeId: 'root' } },
-    { sequence: 2, kind: 'node.started', createdAt: '2026-09-05T01:00:01Z', payload: { flowId: 'flow', scopeId: 'root', nodeId: 'task' } },
+    {
+      sequence: 2,
+      kind: 'node.started',
+      createdAt: '2026-09-05T01:00:01Z',
+      payload: { flowId: 'flow', scopeId: 'root', executionId: 'task-job', nodeId: 'task' },
+    },
     {
       sequence: 3,
       kind: 'node.log',
       createdAt: '2026-09-05T01:00:02Z',
-      payload: { flowId: 'flow', scopeId: 'root', nodeId: 'task', level: 'info', message: 'Ready.' },
+      payload: { flowId: 'flow', scopeId: 'root', executionId: 'task-job', nodeId: 'task', level: 'info', message: 'Ready.' },
     },
     {
       sequence: 4,
       kind: 'node.completed',
       createdAt: '2026-09-05T01:00:03Z',
-      payload: { flowId: 'flow', scopeId: 'root', nodeId: 'task', outputs: { result: 42 } },
+      payload: { flowId: 'flow', scopeId: 'root', executionId: 'task-job', nodeId: 'task', outputs: { result: 42 } },
     },
     {
       sequence: 5,
       kind: 'node.completed',
       createdAt: '2026-09-05T01:00:04Z',
-      payload: { flowId: 'child', scopeId: 'child', nodeId: 'task', outputs: { result: 'nested' } },
+      payload: { flowId: 'child', scopeId: 'child', executionId: 'child-job', nodeId: 'task', outputs: { result: 'nested' } },
     },
   ]
   it('keeps output, logs and timing together for the selected root execution', () => {

@@ -14,12 +14,13 @@ await run([vitePath, 'build'])
 await run([
   'build',
   'node/main.ts',
-  'node/isolated-vm.ts',
-  'node/isolated-vm-executor.ts',
+  'node/runtime/isolated-vm.ts',
+  'node/runtime/isolated-vm-executor.ts',
   '--target=node',
   '--packages=bundle',
   '--external=isolated-vm',
   '--outdir=dist/server',
+  '--entry-naming=[name].[ext]',
 ])
 
 await Promise.all([

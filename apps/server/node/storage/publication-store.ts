@@ -3,7 +3,7 @@ import type { PublicationAcceptance, StoredFlow, StoredFlowRevision, StoredLive,
 
 import { randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
-import { AcceptanceError } from './error.ts'
+import { AcceptanceError } from '../error.ts'
 import { IntegrationStore } from './integration-store.ts'
 import { PollStore } from './poll-store.ts'
 

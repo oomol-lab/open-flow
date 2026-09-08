@@ -33,7 +33,7 @@ Flow 从数据驱动的执行模型改为显式执行依赖图：画布连线表
 - `flow/common/edgeChanges.ts`、`change.ts` 与 `workbench/browser/runtime/workspace.ts`：连接操作修改 input mapping，画布边从 mapping 推导。需要拆开连接操作和输入绑定操作。
 - `flow/common/semantics.ts`、`encoding.ts`：负责 validation、准备执行和编码；需统一新图的合法性、祖先引用、digest 与闭包语义。
 - `execution/common/scheduler.ts`：原先通过输入 buffer、重复 job 和 activeCounts 调度，checkpoint 保存队列及多次执行结果。需要换成一次执行的依赖调度和结果快照。
-- `execution/common/runtime.ts` 与 `apps/server/node/isolated-vm*.ts`：需要移除中途 output 的公共能力及宿主桥接。
+- `execution/common/runtime.ts` 与 `apps/server/node/runtime/isolated-vm*.ts`：需要移除中途 output 的公共能力及宿主桥接。
 - manifest/schema、Designer、Workbench、公共 authoring API 和 `packages/command`：消费同一底层模型，不能自行补造执行关系或维护另一套结果可用性规则。
 
 保留 Flow、Revision、Publication、Run、Trigger、Variable、Capability 与模块所有权。此次只修改为新图语义所必需的合同与实现。

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { describe, it } from 'vitest'
-import { createServerApp } from '../node/http.ts'
+import { createServerApp } from '../node/transport/http.ts'
 import { closeService, openService } from './serviceFixture.ts'
 
 let sequence = 0
@@ -47,7 +47,7 @@ async function createHarness(fixture: WebhookConformanceFixture): Promise<Webhoo
   const file = path.join(directory, 'open-flow.sqlite')
   const service = await openService(file)
   let revisionId = next('revision')
-  const published = await service.publishFlow({
+  const published = await service.publisher.publish({
     expectedLivePublicationId: null,
     flowId: 'main',
     idempotencyKey: next('publish'),
@@ -85,7 +85,7 @@ async function createHarness(fixture: WebhookConformanceFixture): Promise<Webhoo
       }
     },
     async republish() {
-      const republished = await service.publishFlow({
+      const republished = await service.publisher.publish({
         expectedLivePublicationId: publicationId,
         flowId: 'main',
         idempotencyKey: next('publish'),
@@ -100,7 +100,7 @@ async function createHarness(fixture: WebhookConformanceFixture): Promise<Webhoo
     },
     async retire() {
       revisionId = next('revision')
-      const retired = await service.publishFlow({
+      const retired = await service.publisher.publish({
         expectedLivePublicationId: publicationId,
         flowId: 'main',
         idempotencyKey: next('publish'),
