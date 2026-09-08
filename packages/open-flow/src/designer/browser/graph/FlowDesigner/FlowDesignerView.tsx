@@ -75,22 +75,28 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
     },
     [adapter],
   )
-  const onSelectionChange = useCallback<OnSelectionChangeFunc<RFNode<any>, RFEdge<any>>>(({ edges, nodes }) => {
-    const nodeIds = nodes.flatMap((node) => {
-      const store = node.data?.store as NodeStore | CommentNodeStore | undefined
-      return store == null ? [] : [store.nodeId]
-    })
-    const connection = edges[0]?.data?.store?.connection
-    const edge =
-      connection?.from.type == 'from_node' && connection.to.type == 'to_node'
-        ? toViewEdge(connection.from.source.node_id, connection.from.source.output_handle, connection.to.target.node_id, connection.to.target.input_handle)
-        : undefined
-    const selected = new Set(propsRef.current.selectedNodeIds)
-    const selectionChanged = nodeIds.length != selected.size || nodeIds.some((nodeId) => !selected.has(nodeId))
-    const edgeChanged = selectedEdge.current != edge?.id
-    selectedEdge.current = edge?.id
-    if (selectionChanged || edgeChanged) propsRef.current.onSelectionChange(nodeIds, edge)
-  }, [])
+  const onSelectionChange = useCallback<OnSelectionChangeFunc<RFNode<any>, RFEdge<any>>>(
+    ({ edges, nodes }) => {
+      // React Flow effects can report a snapshot from before the latest controlled selection.
+      const selectedNodes = adapter.store.$.rfNodes.value.filter((node) => node.selected)
+      if (nodes.length != selectedNodes.length || nodes.some((node) => !selectedNodes.some((selected) => selected.data?.store === node.data?.store))) return
+      const nodeIds = nodes.flatMap((node) => {
+        const store = node.data?.store as NodeStore | CommentNodeStore | undefined
+        return store == null ? [] : [store.nodeId]
+      })
+      const connection = edges[0]?.data?.store?.connection
+      const edge =
+        connection?.from.type == 'from_node' && connection.to.type == 'to_node'
+          ? toViewEdge(connection.from.source.node_id, connection.from.source.output_handle, connection.to.target.node_id, connection.to.target.input_handle)
+          : undefined
+      const selected = new Set(propsRef.current.selectedNodeIds)
+      const selectionChanged = nodeIds.length != selected.size || nodeIds.some((nodeId) => !selected.has(nodeId))
+      const edgeChanged = selectedEdge.current != edge?.id
+      selectedEdge.current = edge?.id
+      if (selectionChanged || edgeChanged) propsRef.current.onSelectionChange(nodeIds, edge)
+    },
+    [adapter],
+  )
   const isValidConnection = useCallback<IsValidConnection<RFEdge<any>>>((edge) => {
     if (edge.sourceHandle == null || edge.targetHandle == null) return true
     return (

@@ -1031,6 +1031,46 @@ describe('FlowDesignerView model synchronization', () => {
     view.props.flowDesignerStore.dispose()
   })
 
+  it('ignores a queued selection snapshot after controlled deselection and still accepts user selection', async () => {
+    const onSelectionChange = vi.fn()
+    const initial = props(model([source, task([])]), { onSelectionChange, selectedNodeIds: ['target'] })
+    const view = FlowDesignerView(initial) as React.ReactElement<FlowDesignerProps>
+    const store = view.props.flowDesignerStore
+    const previousSelection = store.$.rfNodes.value.filter((node) => node.selected)
+
+    const next = FlowDesignerView(props(initial.model, { onSelectionChange })) as React.ReactElement<FlowDesignerProps>
+    next.props.onSelectionChange?.({ edges: [], nodes: previousSelection })
+
+    expect(onSelectionChange).not.toHaveBeenCalled()
+    expect(store.$.rfNodes.value.every((node) => !node.selected)).toBe(true)
+
+    const node = store.$.nodes.get('target' as NodeId)!
+    await store.handleNodesChange([{ id: node.rfNodeId, selected: true, type: 'select' }])
+    next.props.onSelectionChange?.({ edges: [], nodes: [node.$.rfNode.value] })
+    expect(onSelectionChange).toHaveBeenCalledExactlyOnceWith(['target'], undefined)
+    store.dispose()
+  })
+
+  it.each(['mount', 'update'])('preserves host selection when React Flow reports its initial empty snapshot on %s', async (phase) => {
+    const onSelectionChange = vi.fn()
+    const value = model([task([])])
+    if (phase == 'update') FlowDesignerView(props(value, { onSelectionChange }))
+    const next = FlowDesignerView(props(value, { onSelectionChange, selectedNodeIds: ['target'] })) as React.ReactElement<FlowDesignerProps>
+    const store = next.props.flowDesignerStore
+
+    next.props.onSelectionChange?.({ edges: [], nodes: [] })
+    next.props.onSelectionChange?.({ edges: [], nodes: store.$.rfNodes.value.filter((node) => node.selected) })
+
+    expect(onSelectionChange).not.toHaveBeenCalled()
+    const node = store.$.nodes.get('target' as NodeId)!
+    expect(node.$.selected.value).toBe(true)
+
+    await store.handleNodesChange([{ id: node.rfNodeId, selected: false, type: 'select' }])
+    next.props.onSelectionChange?.({ edges: [], nodes: [] })
+    expect(onSelectionChange).toHaveBeenCalledExactlyOnceWith([], undefined)
+    store.dispose()
+  })
+
   it('selects a node after adding it', async () => {
     let next: FlowDesignerViewProps
     const onAddNode = vi.fn(async () => {
