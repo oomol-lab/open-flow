@@ -98,7 +98,7 @@ async function inputGroups(draft: Draft, language: ReadonlyVal<string>, triggerI
     .flatMap(([nodeId, node]) => {
       const resolved = revision.resolveNode(nodeId, node)
       if (resolved.kind == 'trigger') {
-        if (resolved.trigger.kind == 'manual') return []
+        if (resolved.trigger.kind == 'manual' || resolved.trigger.kind == 'cron') return []
         const editor = new FlowRunInputEditorStore([{ handle: 'payload', jsonSchema: triggerPayloadSchema(resolved.trigger), nullable: false }], language)
         editor.replaceValues({ payload: {} })
         return [{ editor, nodeId, title: resolved.trigger.name }]
@@ -269,7 +269,7 @@ export class RunRequestStore {
       for (const group of groups) group.editor.dispose()
       return 'unavailable'
     }
-    if (only != null && graph?.nodes[only.nodeId]?.kind == 'manual' && groups.length == 0) {
+    if (only != null && groups.length == 0) {
       return (await this.#start(source, flow, revisionId, { nodeId: only.nodeId, payload: {} }, {}, publicationId)) ? 'started' : 'unavailable'
     }
     const valid = compute((get) => only != null && groups.every((group) => get(group.editor.valid$)))

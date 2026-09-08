@@ -160,75 +160,67 @@
   }
 
   .run-input-content {
+    display: flex;
     min-height: 0;
     flex: 1;
-    padding: 16px;
+    flex-direction: column;
+    gap: 24px;
+    padding: 20px 16px;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
   }
 
+  .run-input-content > * {
+    flex-shrink: 0;
+  }
+
   .run-input-content > p {
-    max-width: 58ch;
-    margin: 0 0 16px;
-    padding: 10px 12px;
-    border: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius);
+    margin: 0;
     color: var(--ui-muted-foreground);
-    background: color-mix(in srgb, var(--ui-muted) 45%, transparent);
-    font-size: 11px;
-    line-height: 17px;
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .run-input-trigger {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 12px;
+    font-size: 12px;
+  }
+
+  .run-input-trigger > span {
+    flex: none;
+    color: var(--ui-muted-foreground);
+  }
+
+  .run-input-trigger > strong {
+    overflow-wrap: anywhere;
+    font-weight: 500;
   }
 
   .run-input-group {
-    border: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius);
-    background: var(--ui-card);
-  }
-
-  .run-input-group + .run-input-group {
-    margin-top: 12px;
+    min-width: 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--ui-border);
   }
 
   .run-input-group > header {
-    display: flex;
-    min-width: 0;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 0;
-    padding: 11px 13px;
-    border-bottom: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius) var(--ui-radius) 0 0;
-    background: color-mix(in srgb, var(--ui-muted) 38%, transparent);
+    margin-bottom: 16px;
+    font-size: 13px;
+    overflow-wrap: anywhere;
   }
 
-  .run-input-group > header > div {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 2px;
+  .run-input-group > header p {
+    margin: 6px 0 0;
+    color: var(--ui-muted-foreground);
+    font-size: 12px;
+    line-height: 18px;
   }
 
   .run-input-group > header strong {
-    overflow: hidden;
-    font-size: 12px;
     font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .run-input-group > header code {
-    overflow: hidden;
-    color: var(--ui-muted-foreground);
-    font-size: 10px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .run-input-group > .oo-designer-root {
-    padding: 14px;
-    border-radius: 0 0 var(--ui-radius) var(--ui-radius);
   }
 
   .run-input-panel > form > footer {

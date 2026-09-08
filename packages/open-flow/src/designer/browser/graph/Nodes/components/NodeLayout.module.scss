@@ -134,7 +134,7 @@
   padding-right: 18px;
 }
 
-.conditionBranch {
+.branchRow {
   grid-template-columns: subgrid;
   column-gap: inherit;
   display: grid;
@@ -146,7 +146,7 @@
   background: color-mix(in srgb, var(--node-background-color) 72%, transparent);
 }
 
-.conditionBranch .branchName {
+.branchRow .branchName {
   width: 100%;
   max-width: none;
   text-align: right;
@@ -207,11 +207,11 @@
   right: -9px;
 }
 
-.cardContainer .conditionBranch > .executionHandle {
+.cardContainer .branchRow > .executionHandle {
   right: -17px;
 }
 
-:global(.react-flow__node.selected) .cardContainer .conditionBranch > .executionHandle {
+:global(.react-flow__node.selected) .cardContainer .branchRow > .executionHandle {
   right: -18px;
 }
 

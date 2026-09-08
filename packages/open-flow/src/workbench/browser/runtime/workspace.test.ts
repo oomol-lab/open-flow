@@ -225,7 +225,7 @@ describe('Designer port projection', () => {
     expect(designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, undefined, waiting).nodes[0]).toMatchObject({ run: { status: 'waiting' } })
   })
 
-  it('projects missing Trigger config diagnostics onto their fields', () => {
+  it('keeps missing Trigger fields invalid while server diagnostics are refreshed', () => {
     const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
       actorId: 'actor',
       content: {
@@ -287,12 +287,29 @@ describe('Designer port projection', () => {
       },
     ]).nodes[0]
 
+    expect(designerGraph(draft, { kind: 'flow' }, {}, []).nodes[0]).toEqual(node)
+
     expect(node).toMatchObject({
       icon: providerIcon({ serviceId: 'github', serviceName: 'github' }),
       kind: 'trigger',
       presentation: {
         config: [expect.objectContaining({ invalid: true, name: 'owner' }), expect.objectContaining({ invalid: false, name: 'repo' })],
       },
+    })
+    const trigger = draft.content.document.graph.nodes.trigger
+    if (trigger?.kind != 'integration') throw new Error('Expected integration trigger.')
+    const filled = {
+      ...draft,
+      content: {
+        ...draft.content,
+        document: {
+          ...draft.content.document,
+          graph: { ...draft.content.document.graph, nodes: { trigger: { ...trigger, config: { ...trigger.config, owner: 'owner' } } } },
+        },
+      },
+    }
+    expect(designerGraph(filled, { kind: 'flow' }, {}, []).nodes[0]).toMatchObject({
+      presentation: { config: [expect.objectContaining({ invalid: false, name: 'owner' }), expect.objectContaining({ invalid: false, name: 'repo' })] },
     })
   })
 })

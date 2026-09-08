@@ -172,7 +172,6 @@ function eventCategory(event: RunEvent): EventCategory {
     case 'node.artifact':
       return 'artifact'
     case 'node.completed':
-    case 'node.skipped':
     case 'node.failed':
     case 'node.started':
     case 'run.canceled':
@@ -322,8 +321,6 @@ function eventSummary(event: RunEvent, t: TFunction): string {
       const progress = event.payload.progress
       return typeof progress == 'number' ? t('run.eventProgress', { progress: Math.round(progress) }) : t('run.eventRecorded')
     }
-    case 'node.skipped':
-      return t('run.eventSkipped')
     case 'node.artifact':
       return t('run.eventArtifact')
     case 'node.log':

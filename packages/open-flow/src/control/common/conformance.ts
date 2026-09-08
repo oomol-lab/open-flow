@@ -648,6 +648,48 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
 
 export const publicationControlApiConformanceCases: readonly ControlApiConformanceCase[] = [
   {
+    name: 'controls Live admission independently from publishing and Draft testing',
+    async verify(harness) {
+      const flow = await createFlow(harness, 'Enabled flow', 'enabled-flow')
+      const flowId = requiredString(flow.flowId, 'Flow id')
+      const revisionId = await addManualTrigger(harness, flowId, requiredString(flow.draftRevisionId, 'Draft id'))
+      const change = (enabled: boolean, expectedPublicationId: string) =>
+        request(harness, `/v1/flows/${flowId}/enabled`, {
+          method: 'PUT',
+          body: JSON.stringify({ enabled, expectedPublicationId, version: 1 }),
+        })
+      await error(await change(true, 'missing'), 409, 'flow.conflict', 'Cannot enable unpublished Flow')
+      const first = await completePublish(harness, await publishRequest(harness, flowId, revisionId, null, 'enable-first'), 202, 'Publish')
+      const publicationId = requiredString(first.publication.publicationId, 'Publication id')
+      const disabled = await json(await change(false, publicationId), 200, 'Disable')
+      equal(disabled.live, { enabled: false, publicationId, revisionId }, 'Disabled summary')
+      const page = await json(await request(harness, '/v1/flows'), 200, 'List disabled Flow')
+      equal(page.flows, [disabled], 'List includes Live state')
+      equal((await json(await request(harness, `/v1/flows/${flowId}/live`), 200, 'Disabled Live')).status, 'suspended', 'Disabled Live status')
+      await error(await liveRunRequest(harness, publicationId, 'disabled-run'), 412, 'live.conflict', 'Disabled Live rejects Run')
+      await json(
+        await request(harness, `/v1/flows/${flowId}/revisions/${revisionId}/runs`, {
+          method: 'POST',
+          headers: { 'idempotency-key': 'disabled-draft' },
+          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
+        }),
+        202,
+        'Disabled Flow permits Draft test',
+      )
+      const next = await completePublish(harness, await publishRequest(harness, flowId, revisionId, publicationId, 'enable-next'), 202, 'Publish disabled Flow')
+      const nextId = requiredString(next.publication.publicationId, 'Next Publication id')
+      equal(
+        record((await json(await request(harness, `/v1/flows/${flowId}`), 200, 'Read Flow')).live, 'Live').enabled,
+        false,
+        'Publish preserves disabled state',
+      )
+      await error(await change(true, publicationId), 409, 'flow.conflict', 'Stale switch rejects')
+      await json(await change(true, nextId), 200, 'Enable')
+      await json(await liveRunRequest(harness, nextId, 'enabled-run'), 202, 'Enabled Live accepts Run')
+    },
+  },
+
+  {
     name: 'publishes one immutable Flow with idempotent Live CAS',
     async verify(harness) {
       const flow = await createFlow(harness, 'Publication flow', 'publication-flow')
@@ -802,6 +844,19 @@ export const triggerControlApiConformanceCases: readonly ControlApiConformanceCa
       equal((await harness.request(new Request(endpointUrl, { method: 'POST' }))).status, 404, 'Paused callback')
       equal((await json(await state('resume'), 200, 'Resume Webhook')).operatorState, 'active', 'Resumed state')
       equal((await harness.request(new Request(endpointUrl, { method: 'POST' }))).status, 200, 'Resumed callback')
+      const enable = (enabled: boolean) =>
+        request(harness, `/v1/flows/${flowId}/enabled`, {
+          method: 'PUT',
+          body: JSON.stringify({ enabled, expectedPublicationId: publicationId, version: 1 }),
+        })
+      await json(await enable(false), 200, 'Disable Trigger Flow')
+      equal((await harness.request(new Request(endpointUrl, { method: 'POST' }))).status, 404, 'Disabled Flow blocks callback')
+      await json(await state('pause'), 200, 'Pause binding while Flow disabled')
+      await json(await enable(true), 200, 'Enable Trigger Flow')
+      equal((await harness.request(new Request(endpointUrl, { method: 'POST' }))).status, 404, 'Enabling preserves binding pause')
+      await json(await state('resume'), 200, 'Resume binding after enabling Flow')
+      equal((await harness.request(new Request(endpointUrl, { method: 'POST' }))).status, 200, 'Enabled Flow permits callback')
+
       const removed = await json(
         await changeRequest(harness, flowId, triggerRevisionId, [{ kind: 'graph.node.delete', nodeId: 'webhook', target: { kind: 'flow' } }]),
         200,

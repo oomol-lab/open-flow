@@ -88,9 +88,10 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ des
       nodeStore={cardStore}
       showError={showError}
       branches={branches?.map((branch) => {
-        const summary = conditionNode == null ? '' : conditionBranchSummary(conditionNode, branch, t)
+        const summary =
+          conditionNode != null ? conditionBranchSummary(conditionNode, branch, t) : modelNode?.kind == 'wait' ? t(`canvasCard.waitBranch.${branch}`) : ''
         return (
-          <div key={branch} className={clsx(styles.executionBranch, conditionNode != null && styles.conditionBranch)}>
+          <div key={branch} className={clsx(styles.executionBranch, styles.branchRow)}>
             {summary && (
               <span className={styles.branchRule} title={summary}>
                 {summary}

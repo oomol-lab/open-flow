@@ -346,7 +346,7 @@ export class TriggerStore {
           `SELECT 1 AS current
            FROM webhook_bindings AS bindings
            JOIN flow_live
-             ON flow_live.flow_id = bindings.flow_id
+             ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
             AND flow_live.publication_id = bindings.current_publication_id
            JOIN publications
              ON publications.publication_id = bindings.current_publication_id
@@ -398,7 +398,7 @@ export class TriggerStore {
           `SELECT 1 AS current
            FROM cron_bindings AS bindings
            JOIN flow_live
-             ON flow_live.flow_id = bindings.flow_id
+             ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
             AND flow_live.publication_id = bindings.current_publication_id
            JOIN publications
              ON publications.publication_id = bindings.current_publication_id
@@ -497,7 +497,7 @@ export class TriggerStore {
            revisions.content
          FROM cron_bindings AS bindings
          JOIN flow_live
-           ON flow_live.flow_id = bindings.flow_id
+           ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
           AND flow_live.publication_id = bindings.current_publication_id
          JOIN publications
            ON publications.publication_id = bindings.current_publication_id
@@ -519,7 +519,7 @@ export class TriggerStore {
         `SELECT MIN(bindings.next_at) AS nextAt
          FROM cron_bindings AS bindings
          JOIN flow_live
-           ON flow_live.flow_id = bindings.flow_id
+           ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
           AND flow_live.publication_id = bindings.current_publication_id
          WHERE bindings.trigger_json IS NOT NULL
            AND bindings.schedule_json IS NOT NULL
@@ -546,7 +546,7 @@ export class TriggerStore {
            revisions.content
          FROM webhook_bindings AS bindings
          JOIN flow_live
-           ON flow_live.flow_id = bindings.flow_id
+           ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
           AND flow_live.publication_id = bindings.current_publication_id
          JOIN publications
            ON publications.publication_id = bindings.current_publication_id
@@ -566,7 +566,7 @@ export class TriggerStore {
           `SELECT bindings.endpoint_id AS endpointId
            FROM webhook_bindings AS bindings
            JOIN flow_live
-             ON flow_live.flow_id = bindings.flow_id
+             ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
             AND flow_live.publication_id = bindings.current_publication_id
            WHERE bindings.flow_id = ? AND bindings.trigger_node_id = ?`,
         )

@@ -1,9 +1,9 @@
 .wrapper {
-  min-height: 96px;
+  min-height: 0;
 }
 
 .summary {
-  padding: 4px 14px 12px;
+  padding: 0 0 12px;
 }
 
 .meta {
@@ -32,6 +32,13 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.scheduleNote {
+  margin: 8px 0 0;
+  color: var(--ui-muted-foreground);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .scheduleRule {
@@ -75,9 +82,9 @@
 
 .configFields {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 8px;
-  margin-top: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 10px 12px;
+  margin-top: 10px;
 }
 
 .configField {
@@ -99,8 +106,39 @@
 .webhookEditor {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+}
+
+.webhookTest {
   margin-top: 6px;
+
+  p {
+    margin: 6px 0 0;
+    color: var(--ui-muted-foreground);
+    font-size: 11px;
+    line-height: 1.6;
+  }
+}
+
+.webhookAdvanced {
+  margin-top: 6px;
+  border-top: 1px solid var(--border-weak);
+
+  &[open] {
+    padding-bottom: 12px;
+  }
+
+  > summary {
+    padding: 12px 0;
+    color: var(--text-color);
+    font-size: 12px;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 1px solid var(--ui-ring);
+      outline-offset: -1px;
+    }
+  }
 }
 
 .webhookSectionHeader {
@@ -164,17 +202,11 @@
 }
 
 .webhookEmpty {
-  display: flex;
-  min-height: 32px;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed var(--border-weak);
-  border-radius: var(--widget-radius);
   color: var(--widget-secondary-font-color);
   font-size: 11px;
+  line-height: 1.5;
 }
 
-.webhookOptionsGrid,
 .webhookResponseGrid {
   display: grid;
   grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr);
@@ -227,16 +259,16 @@
 .payload {
   display: flex;
   align-items: center;
-  min-height: 44px;
-  padding: 0 14px;
+  min-height: 36px;
+  padding: 0;
   gap: 7px;
   border-top: 1px solid var(--widget-background-highlight-color);
-  background-color: var(--block-editor-item-background-color);
+  background: transparent;
 
   > code {
     overflow: hidden;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 400;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -259,32 +291,17 @@
   visibility: hidden;
 }
 
-.wrapper[data-trigger-kind='manual'] {
-  min-height: 0;
+.wrapper[data-trigger-kind='manual'] .schedule {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--widget-secondary-font-color);
 
-  .summary {
-    padding: 0 0 12px;
+  > strong {
+    font-weight: 400;
+    white-space: normal;
   }
+}
 
-  .schedule {
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--widget-secondary-font-color);
-
-    > strong {
-      font-weight: 400;
-      white-space: normal;
-    }
-  }
-
-  .payload {
-    min-height: 36px;
-    padding-inline: 0;
-    background: transparent;
-
-    > code {
-      font-size: 12px;
-      font-weight: 400;
-    }
-  }
+.wrapper[data-trigger-kind='webhook'] .summary {
+  padding-bottom: 0;
 }

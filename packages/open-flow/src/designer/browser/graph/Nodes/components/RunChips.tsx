@@ -87,11 +87,11 @@ export function ImagePreview({ images, run, title }: { readonly images: readonly
 export function RunChips({ run }: { readonly run: FlowDesignerViewNodeRun }) {
   const t = useTranslate()
   const elapsed = run.startedAt != null && run.finishedAt != null ? Date.parse(run.finishedAt) - Date.parse(run.startedAt) : undefined
-  const label = t(`canvasCard.status.${run.skipped ? 'skipped' : run.status}`)
+  const label = t(`canvasCard.status.${run.status}`)
   const progress =
     run.status == 'running' && run.progress != null && Number.isFinite(run.progress) ? ` · ${Math.round(Math.min(100, Math.max(0, run.progress)))}%` : ''
   const status = `${label}${progress}${elapsed != null && Number.isFinite(elapsed) && elapsed >= 0 ? ` · ${(elapsed / 1000).toFixed(1)} s` : ''}`
-  const state = run.skipped ? 'skipped' : run.status
+  const state = run.status
   const icon =
     state == 'running'
       ? 'i-codicon:loading'

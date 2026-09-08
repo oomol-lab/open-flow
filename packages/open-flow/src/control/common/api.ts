@@ -20,6 +20,8 @@ import { randomId } from './random.ts'
 export type ControlRequest = (path: string, init?: RequestInit) => Promise<Response>
 
 export interface Flow {
+  readonly live?: { readonly enabled: boolean; readonly publicationId: string; readonly revisionId: string }
+
   readonly createdAt: string
   readonly draftRevisionId: string
   readonly flowId: string
@@ -302,7 +304,6 @@ export type RunEventKind =
   | 'node.failed'
   | 'node.log'
   | 'node.progress'
-  | 'node.skipped'
   | 'node.started'
   | 'run.canceled'
   | 'run.completed'
@@ -653,7 +654,12 @@ function flow(value: unknown): Flow {
   const status = source.status
   if (source.version != 1) return invalidResponse()
   if (status != 'active' && status != 'retiring') return invalidResponse()
+  const target = source.live == null ? undefined : record(source.live)
+  if (target != null && typeof target.enabled != 'boolean') return invalidResponse()
   return {
+    ...(target == null
+      ? {}
+      : { live: { enabled: target.enabled as boolean, publicationId: string(target.publicationId), revisionId: string(target.revisionId) } }),
     createdAt: string(source.createdAt),
     draftRevisionId: string(source.draftRevisionId),
     flowId: string(source.flowId),
@@ -969,7 +975,6 @@ const runEventKinds = new Set<RunEventKind>([
   'node.failed',
   'node.log',
   'node.progress',
-  'node.skipped',
   'node.started',
   'run.canceled',
   'run.completed',
@@ -1372,6 +1377,15 @@ export class ControlClient {
       }),
     )
     return created.source == 'live' ? created : invalidResponse()
+  }
+
+  async setFlowEnabled(flowId: string, publicationId: string, enabled: boolean): Promise<Flow> {
+    return flow(
+      await this.request(`/v1/flows/${segment(flowId)}/enabled`, {
+        method: 'PUT',
+        body: JSON.stringify({ enabled, expectedPublicationId: publicationId, version: 1 }),
+      }),
+    )
   }
 
   async publishFlow(flowId: string, revisionId: string, expectedLivePublicationId: string | null, options: PublicationOptions = {}): Promise<PublishOperation> {

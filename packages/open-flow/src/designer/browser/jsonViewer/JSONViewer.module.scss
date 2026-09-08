@@ -49,28 +49,35 @@
 
 .inlineButton.expand-icon,
 .inlineButton.collapse-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  position: relative;
+  display: inline-block;
   width: 16px;
-  height: 18px;
-  vertical-align: text-bottom;
+  height: auto;
+  vertical-align: baseline;
   user-select: none;
   color: var(--json-muted, var(--ui-muted-foreground));
   cursor: pointer;
 
+  &::after {
+    // Give the empty button the same line box and baseline as the JSON text.
+    content: '\200b';
+  }
+
   &::before {
     content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
     width: 5px;
     height: 5px;
     border-right: 1.5px solid currentColor;
     border-bottom: 1.5px solid currentColor;
-    transform: rotate(-45deg);
+    transform: translate(-50%, -50%) rotate(-45deg);
   }
 }
 
 .inlineButton.collapse-icon::before {
-  transform: translateY(-2px) rotate(45deg);
+  transform: translate(-50%, calc(-50% - 1.5px)) rotate(45deg);
 }
 
 .collapsed-content {
@@ -84,10 +91,12 @@
   height: auto;
   padding: 0;
   border: 0;
+  outline: none;
   background: transparent;
   color: inherit;
   font: inherit;
   text-align: inherit;
+  vertical-align: baseline;
   border-radius: 3px;
 
   &:hover {

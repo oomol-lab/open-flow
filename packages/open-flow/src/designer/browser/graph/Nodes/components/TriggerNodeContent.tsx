@@ -482,6 +482,20 @@ function WebhookEditor({
 
   return (
     <div className={styles.webhookEditor}>
+      <span className={styles.webhookSectionTitle}>{t('trigger.webhookRequest')}</span>
+      <div className={styles.scheduleField}>
+        <label className={styles.scheduleLabel} htmlFor={methodsId}>
+          {t('trigger.webhookMethods')}
+        </label>
+        <Select<IBasicOption, true>
+          inputId={methodsId}
+          disabled={!editable}
+          isMulti
+          onChange={(options) => changeOptions('allowedMethods', options.length == 0 ? undefined : options.map((option) => option.value!))}
+          options={methodOptions}
+          value={methodOptions.filter((option) => (webhook.options.allowedMethods ?? ['POST']).includes(option.value!))}
+        />
+      </div>
       <div className={styles.webhookSectionHeader}>
         <span>{t('trigger.webhookPayloadFields')}</span>
         <button
@@ -523,136 +537,128 @@ function WebhookEditor({
         </>
       )}
 
-      <span className={styles.webhookSectionTitle}>{t('trigger.webhookRequest')}</span>
-      <div className={styles.webhookOptionsGrid}>
-        <div className={styles.scheduleField}>
-          <label className={styles.scheduleLabel} htmlFor={methodsId}>
-            {t('trigger.webhookMethods')}
-          </label>
-          <Select<IBasicOption, true>
-            inputId={methodsId}
-            disabled={!editable}
-            isMulti
-            onChange={(options) => changeOptions('allowedMethods', options.length == 0 ? undefined : options.map((option) => option.value!))}
-            options={methodOptions}
-            value={methodOptions.filter((option) => webhook.options.allowedMethods?.includes(option.value!))}
-          />
-        </div>
-        <div className={styles.scheduleField}>
-          <label className={styles.scheduleLabel} htmlFor={originsId}>
-            {t('trigger.webhookOrigins')}
-          </label>
-          <Input
-            id={originsId}
-            disabled={!editable}
-            onBlur={(input) => {
-              const origins = input.value
-                .split(',')
-                .map((origin) => origin.trim())
-                .filter(Boolean)
-              changeOptions('allowedOrigins', origins.length == 0 ? undefined : origins)
-            }}
-            placeholder="https://example.com"
-            value={webhook.options.allowedOrigins?.join(', ') ?? ''}
-          />
-        </div>
-      </div>
+      <section className={styles.webhookTest}>
+        <span className={styles.webhookSectionTitle}>{t('trigger.webhookTest')}</span>
+        <p>{t('trigger.webhookTestHint')}</p>
+      </section>
+      <details className={styles.webhookAdvanced}>
+        <summary>{t('trigger.webhookAdvanced')}</summary>
+        <div className={styles.webhookEditor}>
+          <div className={styles.scheduleField}>
+            <label className={styles.scheduleLabel} htmlFor={originsId}>
+              {t('trigger.webhookOrigins')}
+            </label>
+            <Input
+              id={originsId}
+              disabled={!editable}
+              onBlur={(input) => {
+                const origins = input.value
+                  .split(',')
+                  .map((origin) => origin.trim())
+                  .filter(Boolean)
+                changeOptions('allowedOrigins', origins.length == 0 ? undefined : origins)
+              }}
+              placeholder="https://example.com"
+              value={webhook.options.allowedOrigins?.join(', ') ?? ''}
+            />
+          </div>
+          <span className={styles.webhookSectionTitle}>{t('trigger.webhookResponse')}</span>
+          <div className={styles.webhookResponseGrid}>
+            <div className={styles.scheduleField}>
+              <label className={styles.scheduleLabel} htmlFor={statusId}>
+                {t('trigger.webhookStatus')}
+              </label>
+              <Input
+                id={statusId}
+                disabled={!editable}
+                min={200}
+                max={599}
+                onBlur={(input) => {
+                  const value = input.value.trim()
+                  if (value == '') changeOptions('responseStatusCode', undefined)
+                  else {
+                    const status = Number(value)
+                    if (Number.isInteger(status) && status >= 200 && status <= 599) changeOptions('responseStatusCode', status)
+                    else input.value = webhook.options.responseStatusCode?.toString() ?? ''
+                  }
+                }}
+                placeholder="200"
+                type="number"
+                value={webhook.options.responseStatusCode?.toString() ?? ''}
+              />
+            </div>
+            <div className={styles.webhookNoBody}>
+              <DesignerCheckbox
+                checked={webhook.options.noResponseBody ?? false}
+                disabled={!editable}
+                label={t('trigger.webhookNoResponseBody')}
+                onChange={(checked) => changeOptions('noResponseBody', checked ? true : undefined)}
+              />
+            </div>
+            <div className={styles.webhookResponseData}>
+              <label className={styles.scheduleLabel} htmlFor={responseId}>
+                {t('trigger.webhookResponseData')}
+              </label>
+              <Input
+                id={responseId}
+                disabled={!editable || webhook.options.noResponseBody}
+                height={44}
+                multiline
+                onBlur={(input) => changeOptions('responseData', input.value == '' ? undefined : input.value)}
+                value={webhook.options.responseData ?? ''}
+              />
+            </div>
+          </div>
 
-      <span className={styles.webhookSectionTitle}>{t('trigger.webhookResponse')}</span>
-      <div className={styles.webhookResponseGrid}>
-        <div className={styles.scheduleField}>
-          <label className={styles.scheduleLabel} htmlFor={statusId}>
-            {t('trigger.webhookStatus')}
-          </label>
-          <Input
-            id={statusId}
-            disabled={!editable}
-            min={200}
-            max={599}
-            onBlur={(input) => {
-              const value = input.value.trim()
-              if (value == '') changeOptions('responseStatusCode', undefined)
-              else {
-                const status = Number(value)
-                if (Number.isInteger(status) && status >= 200 && status <= 599) changeOptions('responseStatusCode', status)
-                else input.value = webhook.options.responseStatusCode?.toString() ?? ''
-              }
-            }}
-            placeholder="200"
-            type="number"
-            value={webhook.options.responseStatusCode?.toString() ?? ''}
-          />
+          <div className={styles.webhookSectionHeader}>
+            <span>{t('trigger.webhookHeaders')}</span>
+            <button
+              className={styles.webhookAddButton}
+              disabled={!editable}
+              onClick={() => changeHeaders({ ...headers, [nextHeaderName(headers)]: '' })}
+              type="button"
+            >
+              <i className="i-codicon:add" />
+              {t('trigger.webhookAddHeader')}
+            </button>
+          </div>
+          {Object.entries(headers).map(([name, value]) => (
+            <div className={styles.webhookHeaderRow} key={name}>
+              <Input
+                ariaLabel={t('trigger.webhookHeaderName')}
+                disabled={!editable}
+                onBlur={(input) => {
+                  const nextName = input.value.trim()
+                  if (nextName == '' || (nextName != name && Object.hasOwn(headers, nextName))) {
+                    input.value = name
+                    return
+                  }
+                  if (nextName != name) {
+                    const next = Object.fromEntries(Object.entries(headers).map(([key, headerValue]) => [key == name ? nextName : key, headerValue]))
+                    changeHeaders(next)
+                  }
+                }}
+                value={name}
+              />
+              <Input
+                ariaLabel={t('trigger.webhookHeaderValue')}
+                disabled={!editable}
+                onBlur={(input) => {
+                  if (input.value != value) changeHeaders({ ...headers, [name]: input.value })
+                }}
+                value={value}
+              />
+              <Button
+                disabled={!editable}
+                onClick={() => changeHeaders(Object.fromEntries(Object.entries(headers).filter(([key]) => key != name)))}
+                title={t('trigger.webhookDeleteHeader')}
+              >
+                <i className="i-codicon:trash" />
+              </Button>
+            </div>
+          ))}
         </div>
-        <div className={styles.webhookNoBody}>
-          <DesignerCheckbox
-            checked={webhook.options.noResponseBody ?? false}
-            disabled={!editable}
-            label={t('trigger.webhookNoResponseBody')}
-            onChange={(checked) => changeOptions('noResponseBody', checked ? true : undefined)}
-          />
-        </div>
-        <div className={styles.webhookResponseData}>
-          <label className={styles.scheduleLabel} htmlFor={responseId}>
-            {t('trigger.webhookResponseData')}
-          </label>
-          <Input
-            id={responseId}
-            disabled={!editable || webhook.options.noResponseBody}
-            height={44}
-            multiline
-            onBlur={(input) => changeOptions('responseData', input.value == '' ? undefined : input.value)}
-            value={webhook.options.responseData ?? ''}
-          />
-        </div>
-      </div>
-
-      <div className={styles.webhookSectionHeader}>
-        <span>{t('trigger.webhookHeaders')}</span>
-        <button
-          className={styles.webhookAddButton}
-          disabled={!editable}
-          onClick={() => changeHeaders({ ...headers, [nextHeaderName(headers)]: '' })}
-          type="button"
-        >
-          <i className="i-codicon:add" />
-          {t('trigger.webhookAddHeader')}
-        </button>
-      </div>
-      {Object.entries(headers).map(([name, value]) => (
-        <div className={styles.webhookHeaderRow} key={name}>
-          <Input
-            ariaLabel={t('trigger.webhookHeaderName')}
-            disabled={!editable}
-            onBlur={(input) => {
-              const nextName = input.value.trim()
-              if (nextName == '' || (nextName != name && Object.hasOwn(headers, nextName))) {
-                input.value = name
-                return
-              }
-              if (nextName != name) {
-                const next = Object.fromEntries(Object.entries(headers).map(([key, headerValue]) => [key == name ? nextName : key, headerValue]))
-                changeHeaders(next)
-              }
-            }}
-            value={name}
-          />
-          <Input
-            ariaLabel={t('trigger.webhookHeaderValue')}
-            disabled={!editable}
-            onBlur={(input) => {
-              if (input.value != value) changeHeaders({ ...headers, [name]: input.value })
-            }}
-            value={value}
-          />
-          <Button
-            disabled={!editable}
-            onClick={() => changeHeaders(Object.fromEntries(Object.entries(headers).filter(([key]) => key != name)))}
-            title={t('trigger.webhookDeleteHeader')}
-          >
-            <i className="i-codicon:trash" />
-          </Button>
-        </div>
-      ))}
+      </details>
     </div>
   )
 }
@@ -675,29 +681,32 @@ export const TriggerNodeContent: React.FC<TriggerNodeContentProps> = /* @__PURE_
   return (
     <div className={styles.wrapper} data-trigger-kind={presentation.kind}>
       <section className={styles.summary} aria-label={label}>
-        {presentation.kind != 'manual' && (
+        {presentation.kind != 'manual' && presentation.kind != 'webhook' && (
           <div className={styles.meta}>
             <span>{label}</span>
             {presentation.source != null && <span className={styles.source}>{presentation.source}</span>}
           </div>
         )}
-        <div className={styles.schedules}>
-          {presentation.schedules.length > 0 ? (
-            presentation.schedules.map((schedule, index) => (
-              <ScheduleRule
-                editable={scheduleEditable}
-                key={schedule.type == 'cron' ? `${schedule.expression}:${schedule.timezone}:${index}` : `${schedule.unit}:${schedule.value}:${index}`}
-                onChange={(nextSchedule) => store.changeSchedule?.(presentation.schedules.with(index, nextSchedule))}
-                schedule={schedule}
-              />
-            ))
-          ) : (
-            <div className={styles.schedule}>
-              <i className={emptyIcon(presentation.kind)} />
-              <strong>{emptySummary(presentation.kind, t)}</strong>
-            </div>
-          )}
-        </div>
+        {presentation.kind != 'webhook' && (
+          <div className={styles.schedules}>
+            {presentation.schedules.length > 0 ? (
+              presentation.schedules.map((schedule, index) => (
+                <ScheduleRule
+                  editable={scheduleEditable}
+                  key={schedule.type == 'cron' ? `${schedule.expression}:${schedule.timezone}:${index}` : `${schedule.unit}:${schedule.value}:${index}`}
+                  onChange={(nextSchedule) => store.changeSchedule?.(presentation.schedules.with(index, nextSchedule))}
+                  schedule={schedule}
+                />
+              ))
+            ) : (
+              <div className={styles.schedule}>
+                <i className={emptyIcon(presentation.kind)} />
+                <strong>{emptySummary(presentation.kind, t)}</strong>
+              </div>
+            )}
+          </div>
+        )}
+        {presentation.kind == 'cron' && <p className={styles.scheduleNote}>{t('trigger.scheduleTestHint')}</p>}
         {config.length > 0 && (
           <div className={styles.configuration}>
             <span className={styles.configurationTitle}>{t('trigger.configuration')}</span>
@@ -709,10 +718,7 @@ export const TriggerNodeContent: React.FC<TriggerNodeContentProps> = /* @__PURE_
           </div>
         )}
         {presentation.webhook != null && (
-          <div className={styles.configuration}>
-            <span className={styles.configurationTitle}>{t('trigger.configuration')}</span>
-            <WebhookEditor editable={webhookEditable} webhook={presentation.webhook} onChange={(webhook) => store.changeWebhook?.(webhook)} />
-          </div>
+          <WebhookEditor editable={webhookEditable} webhook={presentation.webhook} onChange={(webhook) => store.changeWebhook?.(webhook)} />
         )}
       </section>
       <div className={styles.payload}>

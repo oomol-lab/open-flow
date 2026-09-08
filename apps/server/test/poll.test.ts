@@ -120,6 +120,32 @@ async function publish(service: ServerService, content = revision(), expectedLiv
 }
 
 describe('Server Poll Trigger', () => {
+  it('does not call the provider while the published Flow is disabled', async () => {
+    const file = await databaseFile()
+    let calls = 0
+    const definition: PollDefinition = {
+      snapshot,
+      poll: async () => {
+        calls++
+        return { checkpoint: {}, events: [] }
+      },
+    }
+    const service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
+    const database = new DatabaseSync(file)
+    try {
+      await publish(service)
+      database.exec('UPDATE flow_live SET enabled = 0')
+      await service.tickPoll('2026-08-21T00:01:00.000Z')
+      expect(calls).toBe(0)
+      database.exec('UPDATE flow_live SET enabled = 1')
+      await service.tickPoll('2026-08-21T00:01:00.000Z')
+      expect(calls).toBe(1)
+    } finally {
+      database.close()
+      await closeService(service)
+    }
+  })
+
   it('aborts an in-flight Provider and Connector request when the service closes', async () => {
     const entered = Promise.withResolvers<void>()
     const canceled = Promise.withResolvers<void>()

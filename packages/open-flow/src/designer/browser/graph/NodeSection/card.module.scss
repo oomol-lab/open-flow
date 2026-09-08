@@ -124,13 +124,13 @@
   visibility: hidden;
 }
 
-.wrapper:is([data-section='inputs'], [data-section='outputs'], [data-section='conditions']) {
+.wrapper:is([data-section='inputs'], [data-section='outputs'], [data-section='conditions'], [data-section='value']) {
   margin: 0 12px;
   padding-block: 4px 8px;
   border-radius: 0;
   background: transparent;
 
-  + .wrapper:is([data-section='inputs'], [data-section='outputs'], [data-section='conditions']) {
+  + .wrapper:is([data-section='inputs'], [data-section='outputs'], [data-section='conditions'], [data-section='value']) {
     border-top: 1px solid var(--node-border-color);
   }
 
@@ -157,6 +157,6 @@
   overflow: visible;
 }
 
-:global([data-node-editor]) .wrapper:is([data-section='inputs'], [data-section='outputs'], [data-section='conditions']) {
+:global([data-node-editor]) .wrapper:is([data-section='inputs'], [data-section='outputs'], [data-section='conditions'], [data-section='value']) {
   margin-inline: 0;
 }

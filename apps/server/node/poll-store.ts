@@ -341,7 +341,7 @@ export class PollStore {
              AND (active_claim_id IS NULL OR active_lease_expires_at <= ?)
              AND EXISTS (
                SELECT 1 FROM flow_live
-               WHERE flow_id = poll_bindings.flow_id
+               WHERE enabled = 1 AND flow_id = poll_bindings.flow_id
                  AND publication_id = poll_bindings.current_publication_id
              )`,
         )
@@ -395,7 +395,7 @@ export class PollStore {
           `SELECT bindings.last_error_code AS lastErrorCode
            FROM poll_bindings AS bindings
            JOIN flow_live
-             ON flow_live.flow_id = bindings.flow_id
+             ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
             AND flow_live.publication_id = bindings.current_publication_id
            JOIN publications
              ON publications.publication_id = bindings.current_publication_id
@@ -598,7 +598,7 @@ export class PollStore {
            END AS next_at
            FROM poll_bindings AS bindings
            JOIN flow_live
-             ON flow_live.flow_id = bindings.flow_id
+             ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
             AND flow_live.publication_id = bindings.current_publication_id
            WHERE bindings.health IN ('healthy', 'initializing')
              AND bindings.operator_state = 'active'
@@ -648,7 +648,7 @@ export class PollStore {
                 revisions.content
          FROM poll_bindings AS bindings
          JOIN flow_live
-           ON flow_live.flow_id = bindings.flow_id
+           ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
           AND flow_live.publication_id = bindings.current_publication_id
          JOIN publications ON publications.publication_id = bindings.current_publication_id
          JOIN revisions ON revisions.revision_id = publications.revision_id
@@ -706,7 +706,7 @@ export class PollStore {
            revisions.content
          FROM poll_bindings AS bindings
          JOIN flow_live
-           ON flow_live.flow_id = bindings.flow_id
+           ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
           AND flow_live.publication_id = bindings.current_publication_id
          JOIN publications
            ON publications.publication_id = bindings.current_publication_id

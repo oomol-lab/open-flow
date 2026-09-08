@@ -39,6 +39,10 @@ export interface RunRecord {
 }
 
 export interface StoredFlow {
+  readonly liveEnabled: number | null
+  readonly publicationId: string | null
+  readonly publishedRevisionId: string | null
+
   readonly createRequestDigest: string
   readonly createdAt: number
   readonly draftRevisionId: string
@@ -224,12 +228,25 @@ export class Store {
     })
   }
 
+  setFlowEnabled(flowId: string, publicationId: string, enabled: boolean): StoredFlow | undefined {
+    return this.#transaction(() => {
+      const changed = this.#database
+        .prepare(`UPDATE flow_live SET enabled = ?
+        WHERE flow_id = ? AND publication_id = ?
+          AND EXISTS (SELECT 1 FROM flows WHERE flows.flow_id = flow_live.flow_id AND status = 'active')`)
+        .run(enabled ? 1 : 0, flowId, publicationId)
+      return changed.changes == 0 ? undefined : this.#flow(flowId)
+    })
+  }
+
   listFlows(
     limit: number,
     after?: { readonly createdAt: number; readonly flowId: string },
     includeTotal = false,
   ): { readonly flows: readonly StoredFlow[]; readonly total?: number } {
-    const columns = `create_request_digest AS createRequestDigest, created_at AS createdAt,
+    const columns = `(SELECT enabled FROM flow_live WHERE flow_live.flow_id = flows.flow_id) AS liveEnabled,
+                     (SELECT publication_id FROM flow_live WHERE flow_live.flow_id = flows.flow_id) AS publicationId,
+                     (SELECT publications.revision_id FROM flow_live JOIN publications USING (publication_id) WHERE flow_live.flow_id = flows.flow_id) AS publishedRevisionId, create_request_digest AS createRequestDigest, created_at AS createdAt,
                      draft_revision_id AS draftRevisionId, name, flow_id AS flowId, status, updated_at AS updatedAt`
     const flows =
       after == null
@@ -629,7 +646,7 @@ export class Store {
       if (flow == null) return { kind: 'not-found' }
       if (flow.status != 'active') return { kind: 'busy' }
       const target = this.publications.live(input.flowId)
-      if (target == null || target.publication.publicationId != input.expectedPublicationId) return { kind: 'live-conflict' }
+      if (flow.liveEnabled != 1 || target == null || target.publication.publicationId != input.expectedPublicationId) return { kind: 'live-conflict' }
       const publication = target.publication
       if (
         publication.revisionId != input.revisionId ||
@@ -1372,7 +1389,9 @@ export class Store {
   #flow(flowId: string): StoredFlow | undefined {
     return this.#database
       .prepare(
-        `SELECT create_request_digest AS createRequestDigest, created_at AS createdAt,
+        `SELECT (SELECT enabled FROM flow_live WHERE flow_live.flow_id = flows.flow_id) AS liveEnabled,
+                     (SELECT publication_id FROM flow_live WHERE flow_live.flow_id = flows.flow_id) AS publicationId,
+                     (SELECT publications.revision_id FROM flow_live JOIN publications USING (publication_id) WHERE flow_live.flow_id = flows.flow_id) AS publishedRevisionId, create_request_digest AS createRequestDigest, created_at AS createdAt,
                 draft_revision_id AS draftRevisionId, name, flow_id AS flowId,
                 status, updated_at AS updatedAt
          FROM flows WHERE flow_id = ?`,

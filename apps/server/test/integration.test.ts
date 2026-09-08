@@ -603,3 +603,40 @@ it.each(['request', 'service', 'deadline'] as const)('interrupts callback delive
     await Effect.runPromise(Scope.close(scope, Exit.void))
   }
 })
+
+it('rejects an Integration target captured before its Flow was disabled', async () => {
+  const file = await databaseFile()
+  const definition: IntegrationDefinition = {
+    initialState: { checkpoint: null, subscription: {} },
+    snapshot,
+    reconcile: async () => ({ outcome: 'ready' }),
+    receive: () => ({ outcome: 'event', dedupeKey: 'disabled', payload: { body: {}, deliveryId: 'disabled', event: 'test' } }),
+  }
+  const service = await openService(
+    file,
+    options(() => 0, [definition]),
+  )
+  const database = new DatabaseSync(file)
+  try {
+    await publish(service, 'ready', null)
+    await service.tickIntegration(new Date(0).toISOString())
+    const endpoint = service.integrationEndpoint('main', 'integration')
+    if (endpoint == null) throw new Error('Missing endpoint')
+    const target = service.integrationTarget(endpoint)
+    if (target == null) throw new Error('Missing target')
+    database.exec('UPDATE flow_live SET enabled = 0')
+    expect(service.integrationTarget(endpoint)).toBeUndefined()
+    const result = await service.receiveIntegrationTarget(target, {
+      headers: new Headers(),
+      method: 'POST',
+      payload: {},
+      query: new URLSearchParams(),
+      rawBody: new Uint8Array(),
+    })
+    expect(result.status).toBe(404)
+    expect(admissionCount(file)).toBe(0)
+  } finally {
+    database.close()
+    await closeService(service)
+  }
+})

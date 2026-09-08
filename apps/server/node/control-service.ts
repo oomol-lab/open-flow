@@ -264,6 +264,15 @@ export class ControlService {
     return flow(stored)
   }
 
+  setFlowEnabled(flowId: string, publicationId: string, enabled: boolean): Flow {
+    this.getFlow(flowId)
+    const stored = this.store.setFlowEnabled(flowId, publicationId, enabled)
+    if (stored == null) throw new ControlError(controlErrorCode.flowConflict, 'The published Flow changed or is retiring.')
+    this.triggersChanged()
+    this.flowCatalogChanged()
+    return flow(stored)
+  }
+
   renameFlow(flowId: string, name: string): Flow {
     const stored = this.store.renameFlow(flowId, name, this.clock())
     if (stored == null) notFound()
@@ -350,6 +359,7 @@ export class ControlService {
         return notFound()
       case 'committed':
         this.triggersChanged()
+        this.flowCatalogChanged()
         this.flowChanged({ kind: 'draft.changed', flowId, revisionId: stored.revision.revisionId, version: 1 })
         return { revision: revisionMetadata(stored.revision), version: 1 }
     }
@@ -375,7 +385,7 @@ export class ControlService {
       hasUnpublishedChanges: draftClosure.digest != stored.publication.closureDigest,
       publication: publication(stored.publication),
       revision: stored.revision,
-      status: liveStatus(currentFlow.status, stored.publication.engineContract),
+      status: currentFlow.live?.enabled == false ? 'suspended' : liveStatus(currentFlow.status, stored.publication.engineContract),
       version: 1,
     }
   }
@@ -500,7 +510,7 @@ export class ControlService {
         'Rollback for Provider Triggers is not supported until their resources can be prepared safely.',
       )
     }
-    return await this.commitPublication({
+    const result = await this.commitPublication({
       control: { actorId, operation: 'rollback', sourcePublicationId },
       engineContract: source.engineContract,
       expectedLivePublicationId,
@@ -510,6 +520,8 @@ export class ControlService {
       revisionDigest: revision.digest,
       revisionId: source.revisionId,
     })
+    if (result.created) this.flowCatalogChanged()
+    return result
   }
 
   getPresentation(flowId: string): Presentation {
@@ -966,6 +978,15 @@ function timestamp(value: number): string {
 
 function flow(stored: StoredFlow): Flow {
   return {
+    ...(stored.publicationId == null || stored.publishedRevisionId == null
+      ? {}
+      : {
+          live: {
+            enabled: stored.liveEnabled == 1,
+            publicationId: stored.publicationId,
+            revisionId: stored.publishedRevisionId,
+          },
+        }),
     createdAt: timestamp(stored.createdAt),
     draftRevisionId: stored.draftRevisionId,
     name: stored.name,

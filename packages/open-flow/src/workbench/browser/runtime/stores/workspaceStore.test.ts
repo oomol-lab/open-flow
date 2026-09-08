@@ -703,3 +703,38 @@ it('synchronizes and rechecks a newer Draft after the Flow stream reconnects', a
     store.dispose()
   }
 })
+
+it('saves queued positions and viewport through a catalog refresh and restores them on reopen', async () => {
+  const client = new WorkbenchClient(vi.fn())
+  const store = new WorkspaceStore(client, vi.fn())
+  let saved = editor.presentation as import('../api.ts').Presentation
+  vi.spyOn(client, 'getEditor').mockImplementation(async () => ({ ...editor, presentation: saved }))
+  vi.spyOn(client, 'listFlows').mockResolvedValue({ flows: [flow], version: 1 })
+  const first = Promise.withResolvers<void>()
+  const started = Promise.withResolvers<void>()
+  const update = vi.spyOn(client, 'updatePresentation').mockImplementation(async (_flowId, expected, value) => {
+    if (expected == 1) {
+      started.resolve()
+      await first.promise
+    }
+    expect(expected).toBe(saved.revision)
+    saved = { ...saved, revision: expected + 1, value }
+    return saved
+  })
+  try {
+    await store.selectFlow(flow.flowId)
+    const positions = store.moveNodes({ node: { x: 360, y: 180 } })
+    await started.promise
+    const viewport = store.moveViewport({ x: -150, y: 80, zoom: 0.7 })
+    await store.reloadFlows()
+    first.resolve()
+    await Promise.all([positions, viewport])
+    expect(update).toHaveBeenCalledTimes(2)
+    expect(saved.value).toMatchObject({ designer: { flow: { nodes: { node: { x: 360, y: 180 } }, viewport: { x: -150, y: 80, zoom: 0.7 } } } })
+    await store.selectFlow(flow.flowId)
+    expect(store.$.presentation.value?.value).toEqual(saved.value)
+  } finally {
+    first.resolve()
+    store.dispose()
+  }
+})

@@ -50,7 +50,6 @@ import { TriggerNodeStore } from '../../stores/node/triggerNode.store.ts'
 import { ValueNodeStore } from '../../stores/node/valueNode.store.ts'
 
 interface NodeValues {
-  readonly skipped: Val<boolean | undefined>
   readonly branches: Val<readonly string[] | undefined>
   readonly executionInput: Val<boolean>
   conditionCases?: Val<ConditionHandleDef[]>
@@ -389,7 +388,6 @@ export function createNodeEntry(
     return handles
   })
   const values: NodeValues = {
-    skipped: val(node.run?.skipped),
     branches: val<readonly string[] | undefined>(
       node.kind == 'condition'
         ? node.outputs.flatMap((port) => ('handle' in port ? [port.handle] : []))
@@ -479,7 +477,7 @@ export function createNodeEntry(
     ),
     outputs_def: values.outputDefs,
     inputs_from: values.inputsFrom,
-    ignore: values.skipped,
+    ignore: val(),
   }
 
   let store: NodeStore
@@ -719,7 +717,6 @@ export function updateNodeEntry(
   contentKey: string,
 ): SemanticNodeEntry {
   entry.values.applyingModel = true
-  entry.values.skipped.set(node.run?.skipped)
   entry.values.branches.set(
     node.kind == 'condition' || node.kind == 'wait' ? node.outputs.flatMap((port) => ('handle' in port ? [port.handle] : [])) : undefined,
   )

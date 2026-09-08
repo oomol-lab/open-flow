@@ -13,7 +13,6 @@ import { matchesSchema } from '../../flow/common/schema.ts'
 type ExecutableNode = Exclude<GraphNode, TriggerNode>
 
 export type SchedulerEvent =
-  | { readonly type: 'node.skipped'; readonly jobId: string; readonly nodeId: string; readonly runId: string }
   | {
       readonly flowId: string
       readonly parentJobId?: string
@@ -73,10 +72,12 @@ export type SchedulerEvent =
 
 export interface FlowRunResult {
   readonly kind: 'node-results'
-  readonly nodes: readonly (
-    | { readonly nodeId: string; readonly status: 'skipped' }
-    | { readonly nodeId: string; readonly status: 'completed'; readonly jobId: string; readonly outputs: Readonly<Record<string, JsonValue>> }
-  )[]
+  readonly nodes: readonly {
+    readonly nodeId: string
+    readonly status: 'completed'
+    readonly jobId: string
+    readonly outputs: Readonly<Record<string, JsonValue>>
+  }[]
 }
 
 export interface FlowRunCheckpoint {
@@ -608,8 +609,7 @@ function runGraph(
         if ((edges.length == 0 && target.kind == 'flow') || (edges.length > 0 && !edges.some(selected))) {
           skipped.add(nodeId)
           runNode(
-            Effect.gen(function* () {
-              yield* context.emit({ type: 'node.skipped', nodeId, jobId: context.createId(), runId })
+            Effect.sync(() => {
               for (const child of children.get(nodeId) ?? []) scheduleReady(child)
             }),
           )
@@ -793,9 +793,9 @@ function runGraph(
       }
       const result: FlowRunResult = {
         kind: 'node-results',
-        nodes: resultNodes.map((nodeId) => {
+        nodes: resultNodes.flatMap((nodeId) => {
           const saved = completed.get(nodeId)
-          return saved == null ? { nodeId, status: 'skipped' as const } : { nodeId, status: 'completed' as const, jobId: saved.jobId, outputs: saved.outputs }
+          return saved == null ? [] : [{ nodeId, status: 'completed' as const, jobId: saved.jobId, outputs: saved.outputs }]
         }),
       }
       yield* context.emit({ result, runId, type: 'run.completed' })

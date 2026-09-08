@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
 
-import { Children, isValidElement } from 'react'
+import { Children, isValidElement, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { NodeInspector } from './nodeInspector.tsx'
 
@@ -9,7 +9,7 @@ vi.mock('react', async (importOriginal) => ({
   useEffect: vi.fn(),
   useMemo: (create: () => unknown) => create(),
   useRef: (value: unknown) => ({ current: value }),
-  useState: (initial: unknown) => [typeof initial == 'function' ? initial() : initial, vi.fn()],
+  useState: vi.fn((initial: unknown) => [typeof initial == 'function' ? initial() : initial, vi.fn()]),
 }))
 
 vi.mock('val-i18n-react', async (importOriginal) => ({
@@ -39,7 +39,7 @@ function waitDefinition(node: unknown, revision: unknown, saveWait: ReturnType<t
     onChooseWaitNotification: vi.fn(),
     revision: view as never,
     selection: { id: 'wait', kind: 'wait', node } as never,
-    store: { saveWait } as never,
+    store: { $: { flowId: { value: 'flow' } }, saveWait } as never,
     target: { kind: 'flow' },
     theme: 'light',
     triggerAuthorizationPending: false,
@@ -70,6 +70,30 @@ describe('Wait Inspector', () => {
       notification: undefined,
       prompt: 'Continue?',
     })
+  })
+
+  it('saves the latest prompt on blur and preserves the node name', () => {
+    const saveWait = vi.fn().mockResolvedValue(true)
+    const definition = waitDefinition(
+      { actions: ['continue'], input: { handle: 'value', jsonSchema: {}, nullable: true }, inputs: {}, kind: 'wait', name: 'Renamed', prompt: 'Continue?' },
+      {},
+      saveWait,
+    )
+    const input = find(definition, (item) => (item.props as { readonly id?: string }).id == 'wait-wait-prompt')
+    if (input == null) throw new Error('Expected prompt.')
+    const blur = (input.props as { readonly onBlur: (event: { currentTarget: { value: string } }) => void }).onBlur
+    blur({ currentTarget: { value: 'Continue?' } })
+    expect(saveWait).not.toHaveBeenCalled()
+    blur({ currentTarget: { value: '  Review this request  ' } })
+    expect(saveWait).toHaveBeenCalledWith('wait', {
+      actions: ['continue'],
+      name: 'Renamed',
+      notification: undefined,
+      prompt: 'Review this request',
+    })
+    saveWait.mockClear()
+    blur({ currentTarget: { value: '  ' } })
+    expect(saveWait).not.toHaveBeenCalled()
   })
 
   it('removes a notification immediately', () => {
@@ -110,10 +134,10 @@ describe('Wait Inspector', () => {
   })
 })
 
-describe('Node name validation', () => {
-  it('marks a duplicate name invalid and prevents saving', () => {
+describe('Node timeout settings', () => {
+  it('saves timeout on blur, preserves the name, and rejects invalid values', () => {
     const saveNodeSettings = vi.fn()
-    const node = { inputs: {}, kind: 'value', name: 'Review', values: [] }
+    const node = { inputs: {}, kind: 'value', name: 'Review', timeoutMs: 100, values: [] }
     const revision = {
       graph: () => ({ nodes: { current: node, other: { inputs: {}, kind: 'value', name: 'Review', values: [] } } }),
       inputSources: () => [],
@@ -128,7 +152,7 @@ describe('Node name validation', () => {
       onChooseWaitNotification: vi.fn(),
       revision: revision as never,
       selection: { id: 'current', kind: 'value', node } as never,
-      store: { saveNodeSettings } as never,
+      store: { $: { flowId: { value: 'flow' } }, saveNodeSettings } as never,
       target: { kind: 'flow' },
       theme: 'light',
       triggerAuthorizationPending: false,
@@ -138,14 +162,46 @@ describe('Node name validation', () => {
     const settings = find(element, (item) => typeof item.type == 'function' && item.type.name == 'GeneralSettings')
     if (settings == null || typeof settings.type != 'function') throw new Error('Expected general settings.')
     const rendered = (settings.type as (props: unknown) => ReactElement)(settings.props)
-    const input = find(rendered, (item) => (item.props as { readonly id?: string }).id == 'node-current-name')
-    const form = find(rendered, (item) => item.type == 'form')
-    const save = find(rendered, (item) => item.type != 'form' && (item.props as { readonly type?: string }).type == 'submit')
-
-    expect(input?.props).toMatchObject({ 'aria-invalid': true })
-    expect(save?.props).toMatchObject({ disabled: true })
-    if (form == null) throw new Error('Expected settings form.')
-    ;(form.props as { readonly onSubmit: (event: { preventDefault(): void }) => void }).onSubmit({ preventDefault() {} })
+    const input = find(rendered, (item) => (item.props as { readonly id?: string }).id == 'node-current-timeout')
+    if (input == null) throw new Error('Expected timeout input.')
+    const blur = (input.props as { readonly onBlur: (event: { currentTarget: { value: string } }) => void }).onBlur
+    for (const value of ['100', '0', '-1', '1.5', 'Infinity']) blur({ currentTarget: { value } })
     expect(saveNodeSettings).not.toHaveBeenCalled()
+    blur({ currentTarget: { value: '200' } })
+    expect(saveNodeSettings).toHaveBeenLastCalledWith('current', { name: 'Review', timeoutMs: 200 })
+    blur({ currentTarget: { value: '' } })
+    expect(saveNodeSettings).toHaveBeenLastCalledWith('current', { name: 'Review' })
   })
+})
+
+it('keeps the previous diagnostic visible until revalidation finishes', () => {
+  const element = NodeInspector({
+    connectorAuthorizationPending: false,
+    connectorLoading: false,
+    connectors: {} as never,
+    diagnostics: [],
+    disabled: false,
+    onChooseWaitNotification: vi.fn(),
+    revision: {} as never,
+    selection: undefined,
+    store: { $: { flowId: { value: 'flow' } } } as never,
+    target: { kind: 'flow' },
+    theme: 'light',
+    triggerAuthorizationPending: false,
+    triggerConnectionLoading: false,
+    triggers: {} as never,
+  })
+  const item = find(element, (node) => typeof node.type == 'function' && node.type.name == 'Diagnostics')
+  if (item == null || typeof item.type != 'function') throw new Error('Expected diagnostics.')
+  const render = item.type as (props: unknown) => ReactElement | null
+  const previous = [{ code: 'trigger.config-incomplete', message: 'Missing events', path: '/document/graph/nodes/github', line: 1, column: 0 }]
+  const update = vi.fn()
+  vi.mocked(useState).mockReturnValueOnce([previous, update])
+  const pending = render({ diagnostics: [], pending: true })
+  expect(JSON.stringify(pending)).toContain('trigger.config-incomplete')
+  expect(update).not.toHaveBeenCalled()
+
+  vi.mocked(useState).mockReturnValueOnce([previous, update])
+  expect(render({ diagnostics: [], pending: false })).toBeNull()
+  expect(update).toHaveBeenCalledWith([])
 })

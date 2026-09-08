@@ -135,10 +135,23 @@
     "unpublishedChanges": "Modifications non publiées",
     "upToDate": "À jour",
     "updated": "Mis à jour",
-    "workflows": "Flux de travail"
+    "workflows": "Flux de travail",
+    "publication": "Publication",
+    "notPublished": "Non publié",
+    "isPublished": "Publié",
+    "enabledColumn": "Activation",
+    "enabled": "Activé",
+    "disabled": "Désactivé",
+    "enableFlow": "Activer {{name}}",
+    "publishFirst": "Publiez pour activer ce flux.",
+    "enabledHint": "Contrôle les nouvelles exécutions en production. Les tests du brouillon restent disponibles.",
+    "publish": "Publier",
+    "publishUpdate": "Publier la mise à jour",
+    "deleteDescription": "Le flux et son historique seront supprimés et les déclencheurs arrêtés. Cette action est irréversible."
   },
   "inspector": {
     "account": {
+      "required": "Connexion requise",
       "addConnection": "Ajouter une Connection",
       "authorizationPending": "Terminez l'autorisation sur la page Connection, puis revenez ici pour actualiser ce compte.",
       "chooseAccount": "Choisir un compte",
@@ -168,12 +181,8 @@
       "portDefinitions": "Saisissez des définitions de ports valides."
     },
     "node": {
-      "description": "Nom affiché et délai maximal",
-      "displayName": "Nom d'affichage",
-      "displayNamePlaceholder": "Utiliser le nom de la définition",
       "nameDuplicate": "Un nœud portant ce nom existe déjà dans ce graphe.",
       "nameEmpty": "Le nom du nœud ne peut pas être vide.",
-      "save": "Enregistrer le nœud",
       "timeout": "Délai d'expiration (ms)",
       "timeoutError": "Le délai d'expiration doit être un entier positif exprimé en millisecondes.",
       "title": "Paramètres du nœud"
@@ -195,7 +204,6 @@
       "codeSaving": "Enregistrement…",
       "connectorAction": "Action Connector",
       "definition": "Définition de la tâche",
-      "definitionDescription": "Nom et exécution",
       "discardCode": "Abandonner les modifications",
       "editorLoading": "Chargement de l'éditeur…",
       "editorUnavailable": "Impossible de charger l'éditeur de code.",
@@ -205,7 +213,6 @@
       "missing": "La tâche référencée n'existe pas.",
       "outputPorts": "Ports de sortie",
       "responseMode": "Mode de réponse",
-      "save": "Enregistrer la tâche",
       "source": "Source",
       "structuredJson": "JSON structuré",
       "retrySave": "Réessayer"
@@ -225,13 +232,7 @@
       "notificationUnavailable": "La notification est indisponible. Choisissez-la à nouveau.",
       "prompt": "Invite",
       "promptError": "L’invite doit contenir entre 1 et 1 000 caractères.",
-      "removeNotification": "Supprimer la notification",
-      "save": "Enregistrer"
-    },
-    "trigger": {
-      "description": "Description",
-      "save": "Enregistrer le Trigger",
-      "title": "Définition du Trigger"
+      "removeNotification": "Supprimer la notification"
     },
     "title": "Inspecteur",
     "sources": {
@@ -509,8 +510,7 @@
     "timelineEmpty": "Exécutez le Brouillon sélectionné pour inspecter sa chronologie et sa sortie.",
     "submitting": "Envoi de cette révision figée et création de son enregistrement d'exécution…",
     "waiting": "En attente du premier événement…",
-    "waitExpires": "Expire le {{date}}",
-    "eventSkipped": "Ignoré"
+    "waitExpires": "Expire le {{date}}"
   },
   "sidebar": {
     "createFirstFlow": "Créer un Flow",
@@ -628,8 +628,10 @@
     "title": "Problèmes"
   },
   "runInput": {
+    "triggerDataHint": "Saisissez des données de test dans les champs à droite, puis lancez l’exécution pour tester les nœuds suivants.",
+    "triggerData": "Données du déclencheur",
     "close": "Fermer les entrées d'exécution",
-    "description": "Fournissez une valeur pour chaque entrée non connectée. Les entrées ayant une connexion dans le graphe, une valeur statique ou une valeur par défaut ne sont pas affichées. Les valeurs saisies ici s’appliquent uniquement à cette exécution et ne sont pas enregistrées dans le Flow.",
+    "description": "Saisissez les données pour cette exécution. Le workflow ne sera pas modifié.",
     "invalid": "Définissez une valeur JSON valide pour chaque entrée listée avant d'exécuter.",
     "title": "Entrées d'exécution",
     "trigger": "Nœud de départ",

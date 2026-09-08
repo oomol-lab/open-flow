@@ -14,7 +14,7 @@ import { IconifyProvider } from '../../../designer/browser/icons/iconifyContext.
 import { nodeNameIssue } from '../../../flow/common/change.ts'
 import { ButtonGroup } from '../../../ui/browser/button-group.tsx'
 import { Button } from '../../../ui/browser/button.tsx'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '../../../ui/browser/dropdown-menu.tsx'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../ui/browser/dropdown-menu.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../ui/browser/empty.tsx'
 import { BlockLibrary, ContextPanel } from './designer/contextPanel.tsx'
 import { inspectorIcon, NodeInspector } from './designer/nodeInspector.tsx'
@@ -299,26 +299,34 @@ function Editor({
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     render={
-                      <Button size="icon-sm" aria-label={t('runInput.selectTrigger')} disabled={busy != null || runInputRequest != null}>
+                      <Button
+                        size="icon-sm"
+                        aria-label={t('runInput.selectTrigger')}
+                        disabled={busy != null || diagnostics?.valid == false || runInputRequest != null}
+                      >
                         <Icon name="chevron-down" />
                       </Button>
                     }
                   />
                   <DropdownMenuContent container={runMenuRoot} side="top" align="end" className="w-64 max-w-(--available-width)">
-                    <DropdownMenuRadioGroup value={selectedTrigger?.id ?? ''} onValueChange={setStartId}>
-                      {triggers.map((trigger) => (
-                        <DropdownMenuRadioItem key={trigger.id} value={trigger.id}>
-                          <span className="flex min-w-0 flex-1 flex-col">
-                            <span className="truncate" title={trigger.title}>
-                              {trigger.title}
-                            </span>
-                            {triggers.some((other) => other.id != trigger.id && other.title == trigger.title) && (
-                              <code className="truncate text-xs text-muted-foreground">{trigger.id}</code>
-                            )}
+                    {triggers.map((trigger) => (
+                      <DropdownMenuItem
+                        key={trigger.id}
+                        onClick={() => {
+                          setStartId(trigger.id)
+                          onRun(trigger.id)
+                        }}
+                      >
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="truncate" title={trigger.title}>
+                            {trigger.title}
                           </span>
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
+                          {triggers.some((other) => other.id != trigger.id && other.title == trigger.title) && (
+                            <code className="truncate text-xs text-muted-foreground">{trigger.id}</code>
+                          )}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -430,6 +438,7 @@ function Editor({
                 connectors={store.connectors}
                 connectorLoading={connectorActionLoading != null || connectorConnectionLoading != null}
                 diagnostics={inspectorDiagnostics}
+                diagnosticsPending={diagnostics == null}
                 focus={diagnosticFocus}
                 disabled={authoringDisabled}
                 onChooseWaitNotification={openNotification}

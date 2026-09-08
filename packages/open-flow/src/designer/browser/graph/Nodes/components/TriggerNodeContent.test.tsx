@@ -130,23 +130,23 @@ describe('TriggerNodeContent', () => {
     expect(markup.match(/data-invalid="true"/g)).toHaveLength(2)
   })
 
-  it('renders Webhook payload and HTTP options directly in the Trigger node', () => {
+  it.each([undefined, ['PUT']])('shows the effective Webhook request method for %j', (allowedMethods) => {
     const markup = renderTrigger(
       {
         kind: 'webhook',
         schedules: [],
         webhook: {
           inputs: [{ handle: 'event', jsonSchema: { type: 'object' }, nullable: false }],
-          options: { allowedMethods: ['POST'] },
+          options: { allowedMethods },
         },
       },
       'en',
     )
 
-    expect(markup).toContain('Payload fields')
+    expect(markup).toContain('Request data')
     expect(markup).toContain('value="event"')
     expect(markup).toContain('Allowed methods')
-    expect(markup).toContain('POST')
+    expect(markup).toContain(allowedMethods?.[0] ?? 'POST')
     expect(markup).toContain('Status code')
     expect(markup).not.toContain('Payload definition (JSON)')
     expect(markup).not.toContain('HTTP options (JSON)')

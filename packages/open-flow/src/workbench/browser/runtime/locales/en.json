@@ -135,10 +135,23 @@
     "unpublishedChanges": "Unpublished changes",
     "upToDate": "Up to date",
     "updated": "Updated",
-    "workflows": "Workflows"
+    "workflows": "Workflows",
+    "publication": "Publication",
+    "notPublished": "Not published",
+    "isPublished": "Published",
+    "enabledColumn": "Enabled",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "enableFlow": "Enable {{name}}",
+    "publishFirst": "Publish to enable this flow.",
+    "enabledHint": "Controls new live runs. Draft tests remain available.",
+    "publish": "Publish",
+    "publishUpdate": "Publish update",
+    "deleteDescription": "This deletes the flow and its run history and stops live triggers. This cannot be undone."
   },
   "inspector": {
     "account": {
+      "required": "Connection required",
       "addConnection": "Add connection",
       "authorizationPending": "Finish authorization in the Connection page, then return here to refresh this account.",
       "chooseAccount": "Choose an account",
@@ -168,12 +181,8 @@
       "portDefinitions": "Enter valid port definitions."
     },
     "node": {
-      "description": "Display name and timeout",
-      "displayName": "Display name",
-      "displayNamePlaceholder": "Use definition name",
       "nameDuplicate": "A node with this name already exists in this graph.",
       "nameEmpty": "Node name cannot be empty.",
-      "save": "Save node",
       "timeout": "Timeout (ms)",
       "timeoutError": "Timeout must be a positive integer in milliseconds.",
       "title": "Node settings"
@@ -195,7 +204,6 @@
       "codeSaving": "Saving…",
       "connectorAction": "Connector action",
       "definition": "Task definition",
-      "definitionDescription": "Name and execution",
       "discardCode": "Discard changes",
       "editorLoading": "Loading editor…",
       "editorUnavailable": "The code editor couldn’t be loaded.",
@@ -205,7 +213,6 @@
       "missing": "The referenced Task does not exist.",
       "outputPorts": "Output ports",
       "responseMode": "Response mode",
-      "save": "Save task",
       "source": "Source",
       "structuredJson": "Structured JSON",
       "retrySave": "Retry save"
@@ -225,13 +232,7 @@
       "notificationUnavailable": "The notification is unavailable. Choose it again.",
       "prompt": "Prompt",
       "promptError": "Prompt must contain 1 to 1,000 characters.",
-      "removeNotification": "Remove notification",
-      "save": "Save"
-    },
-    "trigger": {
-      "description": "Description",
-      "save": "Save Trigger",
-      "title": "Trigger definition"
+      "removeNotification": "Remove notification"
     },
     "title": "Inspector",
     "sources": {
@@ -509,8 +510,7 @@
     "timelineEmpty": "Run the selected Draft to inspect its timeline and output.",
     "submitting": "Submitting this fixed revision and creating its run record…",
     "waiting": "Waiting for the first event…",
-    "waitExpires": "Expires {{date}}",
-    "eventSkipped": "Skipped"
+    "waitExpires": "Expires {{date}}"
   },
   "sidebar": {
     "createFirstFlow": "Create Flow",
@@ -628,8 +628,10 @@
     "title": "Problems"
   },
   "runInput": {
+    "triggerDataHint": "Enter sample data in the fields on the right, then click Run to test the following nodes.",
+    "triggerData": "Trigger data",
     "close": "Close run inputs",
-    "description": "Provide a value for each unconnected input. Inputs with a graph connection, static value, or definition default are not shown. Values entered here apply only to this run and are not saved to the Flow.",
+    "description": "Enter data for this run. Your workflow will not be changed.",
     "invalid": "Set every listed input to a valid JSON value before running.",
     "title": "Run inputs",
     "trigger": "Start node",

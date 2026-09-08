@@ -77,7 +77,6 @@ export interface FlowDesignerViewNodeRun {
   readonly error?: unknown
   readonly logs?: readonly { readonly message: string; readonly level: string; readonly time: string }[]
   readonly artifacts?: readonly unknown[]
-  readonly skipped?: boolean
   readonly progress?: number
   readonly status: 'error' | 'idle' | 'running' | 'success' | 'waiting'
   readonly successCount?: number
@@ -346,6 +345,7 @@ export interface FlowDesignerViewProps {
 }
 
 export interface ViewCallbacks {
+  readonly onMoveNodes: FlowDesignerViewProps['onMoveNodes']
   readonly onAddNode: FlowDesignerViewProps['onAddNode']
   readonly onConnect: FlowDesignerViewProps['onConnect']
   readonly onChangeComment: FlowDesignerViewProps['onChangeComment']

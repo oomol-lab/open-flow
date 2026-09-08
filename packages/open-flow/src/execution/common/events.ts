@@ -5,7 +5,7 @@ export type ProjectedRunEvent =
       readonly value: unknown
     }
   | {
-      readonly kind: 'node.skipped' | 'node.artifact' | 'node.failed' | 'node.log' | 'node.progress' | 'node.started' | 'run.progress' | 'run.started'
+      readonly kind: 'node.artifact' | 'node.failed' | 'node.log' | 'node.progress' | 'node.started' | 'run.progress' | 'run.started'
       readonly payload: Readonly<Record<string, unknown>>
     }
 
@@ -172,7 +172,6 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
     }
 
     if (
-      type == 'node.skipped' ||
       type == 'node.started' ||
       type == 'node.progress' ||
       type == 'node.artifact' ||
@@ -222,8 +221,6 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
         case 'node.log':
           if (!['debug', 'info', 'warn', 'error'].includes(event.level as string)) throw new TypeError('Runtime node.log level is invalid.')
           return { kind: type, payload: { ...payload, level: event.level, message: message(event.message) } }
-        case 'node.skipped':
-          return { kind: type, payload }
         case 'node.failed':
           return { kind: type, payload: { ...payload, error: { code: nodeFailureCode(event.code, nodeFailureCodes), message: message(event.message) } } }
       }

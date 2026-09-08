@@ -68,7 +68,7 @@ Workbench 使用两个彼此独立的实时通知通道：
 - Flow catalog 通道只发送 `flows.changed`，用于重新读取顶层 Flow 列表；
 - 当前 Flow 通道发送该 Flow 的 `draft.changed`、`run.created` 和 `run.changed`。
 
-CLI、Workbench 或其他客户端通过 Control API 创建、改名或删除 Flow 时，部署必须使 catalog 通道可观察到变化。两个通道必须能独立连接、
+CLI、Workbench 或其他客户端通过 Control API 创建、改名、修改 Draft、发布、回滚、启停或删除 Flow 时，部署必须使 catalog 通道可观察到变化。两个通道必须能独立连接、
 断线和重连。宿主显式报告首次订阅就绪，客户端随后读取初始状态，并保留读取期间收到的 invalidation；首次连接失败不能无限阻塞加载，
 恢复连接或重连后客户端通过普通 Control API 恢复权威状态。通知只是 invalidation，不是 Revision、RunEvent、协作日志或消息队列。
 
@@ -114,6 +114,7 @@ Engine digest、资源限制和恢复属于部署实现；`isolated-vm` RuntimeH
 Flow 与每次 Subflow invocation 使用无环执行图。连线表示节点之间的执行依赖，输入映射独立声明数据来源；保存或删除执行边不会隐式创建或删除输入映射。
 每个节点在一次图调用内最多运行一次。节点等待全部直接前驱完成或跳过，在至少一条入边被选中时执行；Flow Run 必须固定一个 Trigger 起始节点，未连接入口的普通根节点跳过；Subflow 的普通根节点由调用启动，无依赖的分支可以并行。
 Condition 只选择首个匹配分支或 default，Wait 只选择已决议的 action；未选中的分支传播跳过状态。Trigger occurrence 只选择对应 Trigger，其他 Trigger 分支跳过。
+未执行节点的跳过状态仅属于内部调度和恢复，不创建节点执行身份、不产生公开节点事件，也不进入最终节点执行结果。
 
 节点输入只能引用本图中经执行边可达、且在当前节点执行路径上保证已完成的祖先 output。多个 source 表示互斥分支的备选值，每次执行必须恰有一个可用值，
 不能按值到达次数重复启动节点。Subflow 的输入和最终输出保持显式声明，不能越过图边界直接引用内部或外部节点。
@@ -160,6 +161,8 @@ Code Task 的 Action 声明属于 Revision，固定允许的 Action、Connection
 普通调用错误可以被代码捕获，取消、deadline 和资源限制不能因用户捕获错误而失效。
 
 ## 4. Publication、Connector 与 Trigger
+
+Flow 的线上启用状态独立于 Publication 和单个 Trigger 的暂停状态。停用阻断新的线上 Run 与所有生产 Trigger admission，保留已接受的 Run、发布版本与草稿测试能力；重新启用不能改写单个 Trigger 的暂停状态。首次发布默认启用，之后发布与回滚保留总开关状态。
 
 Publication 是 Flow 在固定 Revision 上的不可变成功记录。每个 Flow 独立拥有 Publication 历史和最多一个 Live pointer。Publish 在同步接受前固定
 Revision、closure、Engine、预期 Live 和必要 binding，并完成 validation 与非确定性 eligibility；之后由持久化 publish operation 表达

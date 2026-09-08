@@ -128,7 +128,7 @@ describe('Execution graph scheduling', () => {
     expect(prepared.kind).toBe('prepared')
     if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
     const calls: unknown[] = []
-    const skipped: string[] = []
+    const eventNodes: string[] = []
     let id = 0
     await Effect.runPromise(
       runFlow(prepared.flow, {
@@ -138,7 +138,7 @@ describe('Execution graph scheduling', () => {
         trigger: { nodeId: 'start', payload: {} },
         emit: (event) =>
           Effect.sync(() => {
-            if (event.type == 'node.skipped') skipped.push(event.nodeId)
+            if ('nodeId' in event) eventNodes.push(event.nodeId)
           }),
         invokeTask: (invocation) =>
           Effect.sync(() => {
@@ -148,7 +148,8 @@ describe('Execution graph scheduling', () => {
       }),
     )
     expect(calls).toEqual([{ input: input ? 1 : 2 }])
-    expect(skipped).toEqual([input ? 'no' : 'yes'])
+    expect(eventNodes).not.toContain(input ? 'no' : 'yes')
+    expect(eventNodes).toContain('join')
     const ambiguous = revision({
       ...graph,
       edges: [

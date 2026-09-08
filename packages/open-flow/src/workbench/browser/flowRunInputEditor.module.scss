@@ -9,8 +9,8 @@
   color: var(--ui-foreground);
   font-size: 13px;
   --base-font-size: 13px;
-  --widget-height: 32px;
-  --widget-radius: var(--ui-radius);
+  --widget-height: 22px;
+  --widget-radius: 3px;
   --fill-1: var(--ui-background);
   --fill-2: var(--ui-card);
   --fill-3: color-mix(in srgb, var(--ui-card) 72%, var(--ui-background));
@@ -58,12 +58,12 @@
   --widget-button-danger-hover-bg: color-mix(in srgb, var(--ui-destructive) 20%, transparent);
   --widget-null-color: var(--ui-primary);
   --widget-null-bg-color: color-mix(in srgb, var(--ui-primary) 12%, transparent);
-  --widget-border-color: var(--ui-input);
+  --widget-border-color: transparent;
   --widget-border-highlight-color: var(--ui-ring);
-  --widget-background: var(--ui-background);
+  --widget-background: var(--ui-muted);
   --widget-background-highlight-color: var(--ui-muted);
   --widget-background-mask-highlight-color: color-mix(in srgb, var(--ui-foreground) 10%, transparent);
-  --widget-input-background: var(--ui-background);
+  --widget-input-background: var(--ui-muted);
   --widget-input-selection-background-color: color-mix(in srgb, var(--ui-ring) 24%, transparent);
   --widget-switch-background-color: var(--ui-input);
   --widget-switch-border-color: transparent;
@@ -154,4 +154,37 @@
 
 .value {
   min-width: 0;
+
+  input[readonly] {
+    background: transparent;
+  }
+
+  input:not([readonly]):not([disabled]),
+  textarea:not([readonly]):not([disabled]) {
+    border-color: var(--ui-input);
+
+    &:focus-visible {
+      border-color: var(--ui-ring);
+    }
+  }
+}
+
+.trigger {
+  [data-slot='native-select'] {
+    padding-right: 28px;
+    box-shadow: none;
+
+    &:hover {
+      background: var(--ui-accent);
+    }
+
+    &:focus-visible {
+      border-color: var(--ui-ring);
+    }
+  }
+
+  [data-slot='native-select-icon'] {
+    width: 12px;
+    height: 12px;
+  }
 }

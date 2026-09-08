@@ -111,6 +111,7 @@
     "scheduleType": "排程類型",
     "scheduleUnit": "間隔單位",
     "scheduleWeeks": "週",
+    "scheduleTestHint": "草稿測試會立即執行一次；發佈後按排程自動執行。",
     "scheduleMissing": "尚未設定排程",
     "summaryCron": "排程",
     "summaryIntegration": "事件來源",
@@ -133,7 +134,10 @@
     "webhookNoResponseBody": "不回傳回應內容",
     "webhookNullable": "允許 null",
     "webhookOrigins": "允許的來源",
-    "webhookPayloadFields": "酬載欄位",
+    "webhookPayloadFields": "請求資料",
+    "webhookAdvanced": "進階設定",
+    "webhookTest": "草稿測試",
+    "webhookTestHint": "點擊執行，填寫模擬請求資料即可測試。發佈後可取得 Webhook 請求網址。",
     "webhookRequest": "請求",
     "webhookResponse": "回應",
     "webhookResponseData": "回應內容",
@@ -590,6 +594,7 @@
   "zoomIn": "放大",
   "zoomOut": "縮小",
   "canvasCard": {
+    "waitBranch": { "approve": "通過", "reject": "拒絕", "continue": "繼續" },
     "run": "執行",
     "result": "結果",
     "logs": "日誌 {{count}}",
@@ -606,8 +611,7 @@
       "running": "執行中",
       "success": "已完成",
       "error": "失敗",
-      "waiting": "等待處理",
-      "skipped": "已略過"
+      "waiting": "等待處理"
     },
     "kind": {
       "task": "任務",

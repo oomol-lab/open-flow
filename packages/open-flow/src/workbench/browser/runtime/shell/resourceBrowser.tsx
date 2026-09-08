@@ -4,18 +4,22 @@ import type { WorkbenchLanguage } from '../contract.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 import type { WorkspaceBusy } from '../stores/workspaceModel.ts'
 
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { resourceNameIssue, resourceNameMaxLength } from '../../../../flow/common/change.ts'
 import { uiLanguageNames, uiLanguages } from '../../../../localization/common/languages.ts'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../../ui/browser/dialog.tsx'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
+import { Field, FieldError, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
 import { Skeleton } from '../../../../ui/browser/skeleton.tsx'
+import { Switch } from '../../../../ui/browser/switch.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
 import { followWorkbenchLink } from '../navigationLink.ts'
@@ -59,10 +63,26 @@ interface FlowItemProps {
 }
 
 function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): ReactElement {
+  const [root, setRoot] = useState<HTMLDivElement | null>(null)
+  const more = useRef<HTMLButtonElement>(null)
+  const nameInput = useRef<HTMLInputElement>(null)
+  const cancelDelete = useRef<HTMLButtonElement>(null)
   const locale = useLang()
   const t = useTranslate()
-  const [mode, setMode] = useState<'actions' | 'delete' | 'idle' | 'rename'>('idle')
+  const [mode, setMode] = useState<'delete' | 'idle' | 'rename'>('idle')
   const [name, setName] = useState(flow.name)
+  const [pending, setPending] = useState<'publish' | 'enabled' | undefined>()
+  const changed = flow.live != null && flow.live.revisionId != flow.draftRevisionId
+
+  async function update(action: 'publish' | boolean): Promise<void> {
+    setPending(action == 'publish' ? 'publish' : 'enabled')
+    try {
+      if (action == 'publish') await store.workspace.publishFlow(flow)
+      else await store.workspace.setFlowEnabled(flow, action)
+    } finally {
+      setPending(undefined)
+    }
+  }
   const issue = resourceNameIssue(name)
 
   async function rename(event: FormEvent): Promise<void> {
@@ -76,7 +96,7 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
   }
 
   return (
-    <div className="resource-item-row">
+    <div className="resource-item-row" ref={setRoot}>
       <Button
         aria-disabled={flow.status == 'retiring'}
         className="resource-list-row flow-columns"
@@ -109,84 +129,128 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
           </span>
         </span>
         <time dateTime={flow.updatedAt}>{new Date(flow.updatedAt).toLocaleString(locale)}</time>
-        <span className={`resource-status ${flow.status == 'active' ? 'active' : 'warning'}`}>
-          <span aria-hidden="true" className={`status-dot ${flow.status == 'active' ? 'success' : 'running'}`} />
-          {t(flow.status == 'active' ? 'resource.active' : 'resource.retiring')}
+        <span className="resource-status">
+          {t(
+            flow.status == 'retiring'
+              ? 'resource.retiring'
+              : flow.live == null
+                ? 'resource.notPublished'
+                : changed
+                  ? 'resource.unpublishedChanges'
+                  : 'resource.isPublished',
+          )}
         </span>
       </Button>
-      {flow.status == 'active' && (
-        <Button
-          aria-expanded={mode != 'idle'}
-          aria-label={t('sidebar.flowActions', { name: flow.name })}
-          className={cn('resource-row-more', mode != 'idle' && 'active')}
-          disabled={busy != null}
-          onClick={() => setMode(mode == 'idle' ? 'actions' : 'idle')}
-          size="icon-sm"
-          variant="ghost"
-        >
-          <Icon name="more" />
-        </Button>
-      )}
-      {mode == 'actions' && (
-        <div className="resource-row-actions">
-          <Button
-            onClick={() => {
-              setName(flow.name)
-              setMode('rename')
-            }}
-            size="sm"
-            variant="outline"
-          >
-            {t('common.rename')}
-          </Button>
-          <Button onClick={() => setMode('delete')} size="sm" variant="destructive">
-            {t('common.delete')}
-          </Button>
-        </div>
-      )}
-      {mode == 'rename' && (
-        <form className="resource-row-form" onSubmit={(event) => void rename(event)}>
-          <Label htmlFor={`rename-flow-${flow.flowId}`}>{t('sidebar.renameFlow', { name: flow.name })}</Label>
-          <span className="resource-row-field">
-            <Input
-              autoComplete="off"
-              aria-invalid={name.length > 0 && issue != null}
-              autoFocus
-              id={`rename-flow-${flow.flowId}`}
-              name="flow-name"
-              onChange={(event) => setName(event.target.value)}
-              required
-              value={name}
+      <div className="resource-live-controls" aria-busy={pending != null}>
+        {flow.live == null ? (
+          <span className="resource-status" title={t('resource.publishFirst')}>
+            —
+          </span>
+        ) : (
+          <Label className="resource-enable" title={t('resource.enabledHint')}>
+            <Switch
+              aria-label={t('resource.enableFlow', { name: flow.name })}
+              checked={flow.live?.enabled ?? false}
+              disabled={flow.status != 'active' || flow.live == null || busy != null || pending != null}
+              onCheckedChange={(enabled) => void update(enabled)}
+              size="sm"
             />
-            {name.length > 0 && issue != null && (
-              <small className="resource-name-message error">{t(`resource.nameIssue.${issue}`, { max: resourceNameMaxLength })}</small>
-            )}
-          </span>
-          <div>
-            <Button onClick={() => setMode('idle')} size="sm" variant="outline">
-              {t('common.cancel')}
-            </Button>
-            <Button disabled={busy != null || issue != null} size="sm" type="submit">
-              {t('common.save')}
-            </Button>
-          </div>
-        </form>
+            <span>{t(flow.live?.enabled ? 'resource.enabled' : 'resource.disabled')}</span>
+          </Label>
+        )}
+        <Button
+          disabled={flow.status != 'active' || busy != null || pending != null || (flow.live != null && !changed)}
+          onClick={() => void update('publish')}
+          size="sm"
+          variant="outline"
+        >
+          {t(pending == 'publish' ? 'workspace.publishing' : flow.live == null ? 'resource.publish' : 'resource.publishUpdate')}
+        </Button>
+      </div>
+      {flow.status == 'active' && (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label={t('sidebar.flowActions', { name: flow.name })}
+            disabled={busy != null || pending != null}
+            render={
+              <Button className="resource-row-more" ref={more} size="icon-sm" variant="ghost">
+                <Icon name="more" />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end" className="min-w-36" container={root} finalFocus={mode == 'idle'}>
+            <DropdownMenuItem
+              onClick={() => {
+                setName(flow.name)
+                setMode('rename')
+              }}
+            >
+              {t('common.rename')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setMode('delete')} variant="destructive">
+              {t('common.delete')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
-      {mode == 'delete' && (
-        <div className="resource-row-confirm" role="group" aria-label={t('sidebar.deleteFlow', { name: flow.name })}>
-          <span>
-            <strong>{t('sidebar.deleteFlowConfirm', { name: flow.name })}</strong>
-          </span>
-          <div>
-            <Button onClick={() => setMode('idle')} size="sm" variant="outline">
-              {t('common.cancel')}
-            </Button>
-            <Button disabled={busy != null} onClick={() => void remove()} size="sm" variant="destructive">
+      <Dialog
+        open={mode == 'rename'}
+        onOpenChange={(open) => {
+          if (!open) setMode('idle')
+        }}
+      >
+        <DialogContent container={root} initialFocus={nameInput} finalFocus={more} closeLabel={t('common.cancel')}>
+          <form className="flex flex-col gap-4" onSubmit={(event) => void rename(event)}>
+            <DialogHeader>
+              <DialogTitle>{t('sidebar.renameFlow', { name: flow.name })}</DialogTitle>
+            </DialogHeader>
+            <Field data-invalid={name.length > 0 && issue != null}>
+              <FieldLabel htmlFor={`rename-flow-${flow.flowId}`}>{t('resource.flowName')}</FieldLabel>
+              <Input
+                autoComplete="off"
+                aria-invalid={name.length > 0 && issue != null}
+                aria-describedby={name.length > 0 && issue != null ? `rename-error-${flow.flowId}` : undefined}
+                id={`rename-flow-${flow.flowId}`}
+                name="flow-name"
+                onChange={(event) => setName(event.target.value)}
+                ref={nameInput}
+                required
+                value={name}
+              />
+              {name.length > 0 && issue != null && (
+                <FieldError id={`rename-error-${flow.flowId}`}>{t(`resource.nameIssue.${issue}`, { max: resourceNameMaxLength })}</FieldError>
+              )}
+            </Field>
+            <DialogFooter>
+              <DialogClose render={<Button variant="outline" />} type="button">
+                {t('common.cancel')}
+              </DialogClose>
+              <Button disabled={busy != null || issue != null} type="submit">
+                {t('common.save')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={mode == 'delete'}
+        onOpenChange={(open) => {
+          if (!open) setMode('idle')
+        }}
+      >
+        <DialogContent container={root} initialFocus={cancelDelete} finalFocus={more} showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>{t('sidebar.deleteFlowConfirm', { name: flow.name })}</DialogTitle>
+            <DialogDescription>{t('resource.deleteDescription')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button ref={cancelDelete} variant="outline" />}>{t('common.cancel')}</DialogClose>
+            <Button disabled={busy != null} onClick={() => void remove()} variant="destructive">
               {t(busy == 'flow' ? 'common.deleting' : 'common.delete')}
             </Button>
-          </div>
-        </div>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -305,7 +369,8 @@ export function FlowBrowser({
           <div aria-hidden="true" className="resource-list-columns flow-columns">
             <span>{t('resource.name')}</span>
             <span>{t('resource.updated')}</span>
-            <span>{t('resource.status')}</span>
+            <span>{t('resource.publication')}</span>
+            <span>{t('resource.enabledColumn')}</span>
           </div>
           <div className="resource-list">
             {loading ? (
