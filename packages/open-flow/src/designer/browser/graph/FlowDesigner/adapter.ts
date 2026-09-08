@@ -29,6 +29,8 @@ import { FLOW_RUN_STATUS } from '../../stores/designer/typings.ts'
 import { CommentNodeStore } from '../../stores/node/commentNode.store.ts'
 import { connectedOutputs, createCommentNodeEntry, createNodeEntry, updateCommentNodeEntry, updateNodeEntry } from './node.tsx'
 
+const DUPLICATE_OFFSET: FlowDesignerViewPosition = { x: 24, y: 24 }
+
 export function toViewEdge(source: string, sourceHandle: string, target: string, targetHandle: string): FlowDesignerViewEdge {
   return {
     id: JSON.stringify([source, sourceHandle, target, targetHandle]),
@@ -89,6 +91,7 @@ export class FlowDesignerViewAdapter {
   #modelViewport: FlowDesignerViewViewport | undefined
   #pendingDisconnects = new Map<string, FlowDesignerViewEdge>()
   #runStatus: Val<FlowRunStatus>
+  #selectedNodeIds = new Set<string>()
   #variableInputs: Val<
     ReadonlyMap<
       string,
@@ -207,13 +210,13 @@ export class FlowDesignerViewAdapter {
         }
       },
       onDuplicate: async (nodeIds, offset) => {
-        const positions = Object.fromEntries(
-          nodeIds.flatMap((nodeId) => {
-            const node = this.store.$.nodes.get(nodeId) ?? this.store.$.commentNodes?.get(nodeId)
-            return node == null ? [] : [[nodeId, node.$.position.value] as const]
-          }),
-        )
-        this.#callbacks.onDuplicate(nodeIds, offset, positions)
+        const copies = nodeIds.flatMap((nodeId) => {
+          const node = this.store.$.nodes.get(nodeId) ?? this.store.$.commentNodes?.get(nodeId)
+          return node == null ? [] : [node]
+        })
+        const positions = Object.fromEntries(copies.map((node) => [node.nodeId, node.$.position.value]))
+        if (copies.length == 0) return
+        this.#callbacks.onDuplicate(nodeIds, offset ?? DUPLICATE_OFFSET, positions)
       },
       onLayout: (positions) => this.#callbacks.onMoveNodes(positions),
       onPaste: (position) => this.#callbacks.onPaste(position),
@@ -269,12 +272,19 @@ export class FlowDesignerViewAdapter {
     for (const edge of edges) this.#callbacks.onDisconnect(edge)
   }
 
-  reconcile(model: FlowDesignerViewModel, editable: boolean, language: string, addItems: readonly FlowDesignerViewAddItem[]): void {
+  reconcile(
+    model: FlowDesignerViewModel,
+    editable: boolean,
+    language: string,
+    addItems: readonly FlowDesignerViewAddItem[],
+    selectedNodeIds: readonly string[],
+  ): void {
     this.#addItems = addItems
     const editableChanged = this.store.$.editable.value != editable
     if (editableChanged) this.store.$$.editable.set(editable)
     if (this.#language.value != language) this.#language.set(language)
     this.#syncModel(model)
+    this.#syncSelection(selectedNodeIds)
   }
 
   #menuItems(fromSource?: IFromSource): IAddNodeMenuItem[] {
@@ -385,5 +395,12 @@ export class FlowDesignerViewAdapter {
     }
     this.#entries = nextEntries
     this.#modelPositions = nextPositions
+  }
+
+  #syncSelection(nodeIds: readonly string[]): void {
+    const next = new Set(nodeIds)
+    if (next.size == this.#selectedNodeIds.size && [...next].every((nodeId) => this.#selectedNodeIds.has(nodeId))) return
+    this.#selectedNodeIds = next
+    for (const [nodeId, entry] of this.#entries) entry.store.$$.selected.set(next.has(nodeId))
   }
 }

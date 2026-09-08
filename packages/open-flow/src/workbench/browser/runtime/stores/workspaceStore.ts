@@ -71,6 +71,8 @@ import { PresentationChanges } from './presentationChanges.ts'
 import { errorNotice } from './workbenchNotice.ts'
 import { moduleEditorStatus, selectedModuleEditor, WorkspaceModel } from './workspaceModel.ts'
 
+const PASTE_OFFSET: Point = { x: 40, y: 40 }
+
 interface Clipboard {
   readonly comments: readonly {
     readonly content: string
@@ -470,7 +472,7 @@ export class WorkspaceStore {
     }
   }
 
-  public async pasteNodes(sourcePositions?: Readonly<Record<string, Point>>): Promise<void> {
+  public async pasteNodes(sourcePositions?: Readonly<Record<string, Point>>, offset: Point = PASTE_OFFSET): Promise<void> {
     if (!(await this.saveModuleEditor())) return
     const revision = this.$.revision.value
     const target = this.#model.value.target
@@ -483,14 +485,24 @@ export class WorkspaceStore {
     }))
     if (pasted.nodeIds.length == 0 && comments.length == 0) return
     const designerNodes = new Map(this.#designer().nodes.map((node) => [node.id, node]))
+    const added = new Set([...pasted.nodeIds, ...comments.map((comment) => comment.nodeId)])
+    const occupied = new Set([...designerNodes].filter(([nodeId]) => !added.has(nodeId)).map(([, node]) => `${node.position.x}\0${node.position.y}`))
+    const sources = [
+      ...pasted.sourceIds.map((sourceId) => sourcePositions?.[sourceId] ?? designerNodes.get(sourceId)?.position ?? { x: 80, y: 80 }),
+      ...comments.map((comment) => comment.position),
+    ]
+    let step = 1
+    if (offset.x != 0 || offset.y != 0) {
+      while (sources.some((source) => occupied.has(`${source.x + offset.x * step}\0${source.y + offset.y * step}`))) step += 1
+    }
     const positions = Object.fromEntries(
       pasted.sourceIds.map((sourceId, index) => {
         const source = sourcePositions?.[sourceId] ?? designerNodes.get(sourceId)?.position
         return [
           pasted.nodeIds[index]!,
           {
-            x: (source?.x ?? 80) + 40,
-            y: (source?.y ?? 80) + 40,
+            x: (source?.x ?? 80) + offset.x * step,
+            y: (source?.y ?? 80) + offset.y * step,
           },
         ]
       }),
@@ -500,7 +512,7 @@ export class WorkspaceStore {
       for (const comment of comments) {
         next = setComment(next, target, comment.nodeId, {
           content: comment.content,
-          position: { x: comment.position.x + 40, y: comment.position.y + 40 },
+          position: { x: comment.position.x + offset.x * step, y: comment.position.y + offset.y * step },
           title: this.#i18n.t('addNode.commentCopy', { title: comment.title }),
         })
       }
@@ -511,9 +523,9 @@ export class WorkspaceStore {
     await presentationChange
   }
 
-  public async duplicateSelectedNodes(positions?: Readonly<Record<string, Point>>): Promise<void> {
+  public async duplicateSelectedNodes(positions?: Readonly<Record<string, Point>>, offset?: Point): Promise<void> {
     this.copySelectedNodes()
-    await this.pasteNodes(positions)
+    await this.pasteNodes(positions, offset)
   }
 
   public async saveNodeSettings(nodeId: string, settings: NodeSettings): Promise<boolean> {

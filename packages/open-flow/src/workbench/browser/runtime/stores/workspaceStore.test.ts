@@ -375,6 +375,98 @@ describe('WorkspaceStore', () => {
     }
   })
 
+  it('places repeated duplicates on a short cascade', async () => {
+    const sourceDraft = {
+      ...draft,
+      content: {
+        ...draft.content,
+        document: {
+          ...draft.content.document,
+          graph: {
+            edges: [],
+            nodes: {
+              value: {
+                inputs: {},
+                kind: 'value',
+                name: 'Value',
+                values: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
+              },
+            },
+          },
+        },
+      },
+    } as const
+    let changes = 0
+    let copies = 0
+    let presentationRevision = 1
+    let presentation: Readonly<Record<string, unknown>> | undefined
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [flow], total: 1, version: 1 })
+      if (path == `/v1/flows/${flow.flowId}/editor`) return Response.json({ ...editor, draft: sourceDraft })
+      if (path == `/v1/flows/${flow.flowId}/draft/changes`) {
+        changes += 1
+        return Response.json({
+          revision: {
+            actorId: 'actor-1',
+            createdAt: timestamp,
+            digest: `digest-${changes + 1}`,
+            flowId: flow.flowId,
+            modelVersion: 1,
+            parentRevisionId: `revision-${changes}`,
+            revisionId: `revision-${changes + 1}`,
+            version: 1,
+          },
+          version: 1,
+        })
+      }
+      if (path == `/v1/flows/${flow.flowId}/presentation` && init?.method == 'PUT') {
+        const body = JSON.parse(String(init.body)) as { readonly value: Readonly<Record<string, unknown>> }
+        presentation = body.value
+        presentationRevision += 1
+        return Response.json({ revision: presentationRevision, updatedAt: timestamp, value: body.value, version: 1 })
+      }
+      if (path.endsWith('/check')) {
+        const revisionId = /revisions\/(revision-\d+)\/check$/.exec(path)?.[1] ?? sourceDraft.revisionId
+        return Response.json({
+          closureDigest: 'closure-1',
+          diagnostics: [],
+          engineContract: 'open-flow-engine/v2',
+          flowId: flow.flowId,
+          modelVersion: 1,
+          revisionDigest: revisionId.replace('revision', 'digest'),
+          revisionId,
+          valid: true,
+          version: 1,
+        })
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const store = new WorkspaceStore(new WorkbenchClient(request), vi.fn(), () => `copy-${++copies}`)
+
+    try {
+      await store.start(flow.flowId)
+      store.selectNodes(['value'])
+
+      await store.duplicateSelectedNodes({ value: { x: 100, y: 50 } }, { x: 24, y: 24 })
+      store.selectNodes(['value'])
+      await store.duplicateSelectedNodes({ value: { x: 100, y: 50 } }, { x: 24, y: 24 })
+
+      expect(store.$.selectedNodeIds.value).toEqual(['copy-2'])
+      expect(presentation).toMatchObject({
+        designer: {
+          flow: {
+            nodes: {
+              'copy-1': { x: 124, y: 74 },
+              'copy-2': { x: 148, y: 98 },
+            },
+          },
+        },
+      })
+    } finally {
+      store.dispose()
+    }
+  })
+
   it('enables publishing after adding a node to a published Flow', async () => {
     const publication = {
       actorId: 'actor-1',

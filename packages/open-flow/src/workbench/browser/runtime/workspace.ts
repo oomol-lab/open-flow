@@ -170,6 +170,13 @@ function savedPositions(
   return positions(current?.nodes)
 }
 
+function savedOrder(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): readonly string[] {
+  const positions = savedPositions(value, target)
+  const source = targetPresentation(value, target)?.order
+  const order = Array.isArray(source) ? source.flatMap((nodeId) => (typeof nodeId == 'string' && positions[nodeId] != null ? [nodeId] : [])) : []
+  return [...new Set([...order, ...Object.keys(positions)])]
+}
+
 function optionalViewport(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): DesignerViewport | undefined {
   const viewport = record(targetPresentation(value, target)?.viewport)
   const x = finite(viewport?.x)
@@ -806,6 +813,8 @@ export function designerGraph(
   for (const [nodeId, comment] of Object.entries(savedComments(presentation, target, positions)).toSorted(([left], [right]) => left.localeCompare(right))) {
     nodes.push({ ...comment, id: nodeId, kind: 'comment' })
   }
+  const order = new Map(savedOrder(presentation, target).map((nodeId, index) => [nodeId, index]))
+  nodes.sort((left, right) => (order.get(left.id) ?? -1) - (order.get(right.id) ?? -1))
   return {
     edges: edgeProjection.edges,
     nodes,
@@ -841,6 +850,7 @@ function normalizedTarget(value: Readonly<Record<string, JsonValue>>, target: De
     ...targetPresentation(value, target),
     viewport: { ...savedViewport(value, target) },
     nodes: savedPositions(value, target),
+    order: savedOrder(value, target),
   }
   delete normalized.layouts
   return normalized
@@ -863,13 +873,17 @@ export function setNodePositions(
   const designer = designerPresentation(value)
   const current = normalizedTarget(value, target)
   const nodes = record(current.nodes) ?? {}
+  const order = [...savedOrder(value, target)]
+  for (const nodeId of Object.keys(positions)) {
+    if (!order.includes(nodeId)) order.push(nodeId)
+  }
   const nextNodes: Record<string, JsonValue> = {
     ...nodes,
     ...Object.fromEntries(Object.entries(positions).map(([nodeId, position]) => [nodeId, { x: position.x, y: position.y }])),
   }
   return {
     ...value,
-    designer: replacePresentationTarget(designer, target, { ...current, nodes: nextNodes }),
+    designer: replacePresentationTarget(designer, target, { ...current, nodes: nextNodes, order }),
   }
 }
 
@@ -905,9 +919,10 @@ export function removeComments(
     delete comments[nodeId]
     delete nodes[nodeId]
   }
+  const order = savedOrder(value, target).filter((nodeId) => !nodeIds.has(nodeId))
   return {
     ...value,
-    designer: replacePresentationTarget(designer, target, { ...current, comments, nodes }),
+    designer: replacePresentationTarget(designer, target, { ...current, comments, nodes, order }),
   }
 }
 

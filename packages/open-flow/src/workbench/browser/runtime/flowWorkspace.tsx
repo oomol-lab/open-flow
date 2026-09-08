@@ -370,7 +370,7 @@ function Editor({
         onCopy={() => store.workspace.copySelectedNodes()}
         onDeleteEdge={(edge) => void store.workspace.disconnect(edge)}
         onDeleteNodes={() => void store.workspace.deleteSelectedNodes()}
-        onDuplicate={(positions) => void store.workspace.duplicateSelectedNodes(positions)}
+        onDuplicate={(positions, offset) => void store.workspace.duplicateSelectedNodes(positions, offset)}
         onMoveNodes={(positions) => void store.workspace.moveNodes(positions)}
         onMoveViewport={(viewport) => void store.workspace.moveViewport(viewport)}
         onOpenBlocks={openBlocks}

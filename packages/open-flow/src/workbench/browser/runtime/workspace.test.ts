@@ -325,11 +325,46 @@ describe('Designer presentation', () => {
         flow: {
           viewport: { x: 10, y: 20, zoom: 0.8 },
           nodes: { note: { x: 15, y: 25 }, task: { x: 30, y: 40 } },
+          order: ['note', 'task'],
           comments: { note: { title: 'Note', content: 'Body' } },
         },
       },
     })
     expect(setFlowViewport(moved, target, { x: 10, y: 20, zoom: 0.8 })).toBe(moved)
+  })
+
+  it('keeps later nodes above earlier nodes regardless of their IDs', () => {
+    const target = { kind: 'flow' } as const
+    const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+      actorId: 'actor',
+      content: {
+        document: {
+          bindings: {},
+          graph: {
+            edges: [],
+            nodes: {
+              'a-new': { inputs: {}, kind: 'value', name: 'New', values: [] },
+              'z-old': { inputs: {}, kind: 'value', name: 'Old', values: [] },
+            },
+          },
+          subflows: {},
+          tasks: {},
+        },
+        modelVersion: 1,
+        modules: {},
+      },
+      createdAt: '2026-09-08T00:00:00.000Z',
+      digest: 'digest',
+      flowId: 'flow',
+      modelVersion: 1,
+      parentRevisionId: null,
+      revisionId: 'revision',
+      version: 1,
+    }
+    const old = setNodePositions({}, target, { 'z-old': { x: 0, y: 0 } })
+    const current = setNodePositions(old, target, { 'a-new': { x: 24, y: 24 } })
+
+    expect(designerGraph(draft, target, current).nodes.map((node) => node.id)).toEqual(['z-old', 'a-new'])
   })
 
   it('keeps independent viewports for the root graph and a subflow', () => {

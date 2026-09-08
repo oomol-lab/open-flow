@@ -857,8 +857,6 @@ interface SelectionContextMenuProps {
   readonly duplicateNodes?: (manifestNodeIds?: NodeId[], offset?: XYPosition) => void
 }
 
-const DEFAULT_DUPLICATE_NODE_OFFSET: XYPosition = { x: 50, y: 50 }
-
 function SelectionContextMenu(props: SelectionContextMenuProps) {
   const items = useSelectionItems(props)
 
@@ -920,7 +918,7 @@ function useSelectionItems(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
       }
     }
     if (manifestNodeIds.length > 0 && props.duplicateNodes) {
-      props.duplicateNodes(manifestNodeIds, DEFAULT_DUPLICATE_NODE_OFFSET)
+      props.duplicateNodes(manifestNodeIds)
     }
     for (const commentNode of commentNodes) {
       commentNode.duplicateNode?.()

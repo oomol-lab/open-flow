@@ -68,7 +68,7 @@ interface Props {
   readonly onCopy: () => void
   readonly onDeleteEdge: (edge: DesignerEdge) => void
   readonly onDeleteNodes: () => void
-  readonly onDuplicate: (positions?: Readonly<Record<string, Point>>) => void
+  readonly onDuplicate: (positions?: Readonly<Record<string, Point>>, offset?: Point) => void
   readonly onMoveNodes: (positions: Readonly<Record<string, Point>>) => void
   readonly onMoveViewport: (viewport: DesignerViewport) => void
   readonly onOpenBlocks: (opener?: HTMLButtonElement) => void
@@ -563,9 +563,9 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
           onDeleteNodes()
         }}
         onDisconnect={(edge) => onDeleteEdge(edge)}
-        onDuplicate={(nodeIds, _offset, positions) => {
+        onDuplicate={(nodeIds, offset, positions) => {
           onSelectNodes(nodeIds)
-          onDuplicate(positions)
+          onDuplicate(positions, offset)
         }}
         onMoveNodes={onMoveNodes}
         onMoveViewport={onMoveViewport}
