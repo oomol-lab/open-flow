@@ -38,11 +38,13 @@ function readJson<T>(specifier: string): T {
 }
 
 function loadTwemoji(): IconifyJSONPackageExports {
+  const icons = readJson<IconifyJSON>('@iconify/json/json/twemoji.json')
+  if (icons.info == null) throw new Error('Twemoji collection is missing its info.')
   return {
-    chars: readJson<IconifyJSONPackageExports['chars']>('@iconify-json/twemoji/chars.json'),
-    icons: readJson<IconifyJSON>('@iconify-json/twemoji/icons.json'),
-    info: readJson<IconifyJSONPackageExports['info']>('@iconify-json/twemoji/info.json'),
-    metadata: readJson<IconifyJSONPackageExports['metadata']>('@iconify-json/twemoji/metadata.json'),
+    chars: icons.chars ?? {},
+    icons,
+    info: icons.info,
+    metadata: { categories: icons.categories },
   }
 }
 

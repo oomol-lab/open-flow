@@ -25,6 +25,13 @@ implementation history in Git. Do not reference unavailable repositories.
   upper clients. Do not compensate for an incomplete lower layer in a command, Workbench, or other
   client; a complete lower contract should leave upper layers with fewer states and bugs to handle.
 - Keep comments in plain English sentence style with terminal punctuation.
+- When adding or replacing UI icons, use the project skill
+  [iconify-icons](.agents/skills/iconify-icons/SKILL.md). Search local Iconify JSON and use the
+  existing UnoCSS integration instead of drawing custom icons.
+- Stories must render the real production components they exercise. Story-owned code may provide
+  fixtures, providers, layout, and event logging, but must not reproduce product DOM, styles,
+  control groups, or behavior. If a product UI cannot be rendered independently in a Story, extract
+  an independent production component first, then use it in both production and the Story.
 - Before changing frontend interaction involving Select, popup, portal, focus, or outside-click
   handling, read [`docs/authoring/frontend-ui.md`](docs/authoring/frontend-ui.md).
 - Do not launch or automate a browser for UI testing. Verify frontend changes with repository

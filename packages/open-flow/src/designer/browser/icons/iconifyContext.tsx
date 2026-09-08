@@ -30,7 +30,15 @@ const collectionLoads: Map<IconifyDataKey, Promise<IconifyJSONPackageExports>> =
 function loadCollectionData(collection: IconifyDataKey): Promise<IconifyJSONPackageExports> {
   let pending = collectionLoads.get(collection)
   if (!pending) {
-    const importCollection = collection == 'carbon' ? import('@iconify-json/carbon') : import('virtual:open-flow-twemoji').then((module) => module.default)
+    const importCollection =
+      collection == 'carbon'
+        ? import('@iconify/json/json/carbon.json').then(({ default: icons }) => ({
+            icons,
+            chars: {},
+            info: icons.info,
+            metadata: { categories: icons.categories },
+          }))
+        : import('virtual:open-flow-twemoji').then((module) => module.default)
     pending = importCollection.catch((error: unknown) => {
       collectionLoads.delete(collection)
       throw error

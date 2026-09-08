@@ -52,10 +52,12 @@ vi.mock('../../../../ui/browser/button.tsx', () => ({
   },
 }))
 
-function render(miniMapExpanded$: Val<boolean | undefined>, children?: ReactNode): string {
+function render(miniMapExpanded$: Val<boolean | undefined>, children?: ReactNode, leading?: ReactNode): string {
   return renderToStaticMarkup(
     <I18nProvider i18n={createI18n('en')}>
-      <CornerControls miniMapExpanded$={miniMapExpanded$}>{children}</CornerControls>
+      <CornerControls leading={leading} miniMapExpanded$={miniMapExpanded$}>
+        {children}
+      </CornerControls>
     </I18nProvider>,
   )
 }
@@ -100,6 +102,17 @@ describe('CornerControls', () => {
     const markup = render(val<boolean | undefined>(false), <button aria-label="Inspector" type="button" />)
 
     expect(captured.controls).toHaveLength(1)
+    expect(markup.indexOf('Mini map')).toBeLessThan(markup.indexOf('Inspector'))
+  })
+
+  it('places leading canvas tools before the MiniMap and host tools', () => {
+    const markup = render(
+      val<boolean | undefined>(false),
+      <button aria-label="Inspector" type="button" />,
+      <button aria-label="Interaction mode" type="button" />,
+    )
+
+    expect(markup.indexOf('Interaction mode')).toBeLessThan(markup.indexOf('Mini map'))
     expect(markup.indexOf('Mini map')).toBeLessThan(markup.indexOf('Inspector'))
   })
 })

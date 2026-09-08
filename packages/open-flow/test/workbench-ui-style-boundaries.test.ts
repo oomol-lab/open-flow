@@ -76,6 +76,17 @@ function contrastRatio(foreground: string, background: string): number {
   return (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
 }
 
+test('keeps development stories on production component boundaries', async () => {
+  for await (const path of glob('dev/**/*.{ts,tsx}', { cwd: packageRoot })) {
+    const source = await readFile(new URL(path, packageRoot), 'utf8')
+    assert.doesNotMatch(
+      source,
+      /from\s+['"][^'"]*src\/[^'"]+\.module\.(?:css|scss)['"]/,
+      `${path} imports a production component's private styles instead of rendering the component.`,
+    )
+  }
+})
+
 test('keeps browser control normalization below Workbench component utilities', async () => {
   const [uiStyles, workbenchStyles] = await Promise.all([
     readFile(new URL('src/ui/browser/styles.css', packageRoot), 'utf8'),

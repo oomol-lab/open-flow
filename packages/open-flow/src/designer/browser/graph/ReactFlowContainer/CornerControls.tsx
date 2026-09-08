@@ -11,6 +11,7 @@ import { cn } from '../../../../ui/browser/utils.ts'
 
 export interface CornerControlsProps {
   children?: React.ReactNode
+  leading?: React.ReactNode
   miniMapExpanded$?: Val<boolean | undefined>
 }
 
@@ -28,7 +29,7 @@ export function MiniMapToggleIcon({ expanded }: { readonly expanded: boolean }):
 export const CornerControls: React.FC<CornerControlsProps> = /* @__PURE__ */ memo(function (props: CornerControlsProps) {
   const t = useTranslate()
   const miniMapExpanded = useVal(props.miniMapExpanded$)
-  if (props.miniMapExpanded$ == null && props.children == null) return null
+  if (props.leading == null && props.miniMapExpanded$ == null && props.children == null) return null
 
   return (
     <>
@@ -40,6 +41,7 @@ export const CornerControls: React.FC<CornerControlsProps> = /* @__PURE__ */ mem
         showInteractive={false}
         showZoom={false}
       >
+        {props.leading}
         {props.miniMapExpanded$ != null && (
           <Button
             aria-label={t('miniMap')}

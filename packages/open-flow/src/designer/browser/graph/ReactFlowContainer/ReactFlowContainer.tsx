@@ -41,7 +41,6 @@ import type { GetPopupContainer } from './useGetPopupContainer.ts'
 import {
   Background,
   BackgroundVariant,
-  Panel,
   Handle,
   NodeToolbar,
   ReactFlow,
@@ -61,17 +60,9 @@ import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { combine, derive } from 'value-enhancer'
 import { shallowPlainObjectEqual } from '../../../../base/common/equality.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../../../../ui/browser/dropdown-menu.tsx'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { TooltipProvider } from '../../../../ui/browser/tooltip.tsx'
-import { cn } from '../../../../ui/browser/utils.ts'
 import { DESIGNER_CLASSNAME } from '../../base/designer.ts'
 import { getScriptletType, getSharedBlockPath, getTriggerType, isWithCommentType, isWithConditionType, isWithValueType } from '../../base/dragNDrop.ts'
 import { makeConnection, toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
@@ -86,6 +77,7 @@ import { EdgeDefs } from '../Edges/EdgeDefs.tsx'
 import { NodePlaceholder, NodePlaceholderQueue } from '../Nodes/useNodePlaceholder.ts'
 import { getPaneRect, PaneRectContext } from '../Nodes/usePaneRect.ts'
 import { getAddItemId } from './addItemDrag.ts'
+import { CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from './CanvasControls.tsx'
 import { ConnectionLine } from './ConnectingLine.tsx'
 import { CornerControls } from './CornerControls.tsx'
 import { HelperLines, useHelperLines } from './HelperLines/index.ts'
@@ -216,65 +208,7 @@ const selector = (s: ReactFlowState) => ({
   zoom: s.transform[2],
 })
 
-export function CanvasViewMenu({
-  interactiveMode$,
-  onRelayout,
-  showSettings$,
-}: Pick<ReactFlowContainerProps, 'interactiveMode$' | 'onRelayout' | 'showSettings$'>) {
-  const t = useTranslate()
-  const mode = useVal(interactiveMode$)
-  const showSettings = useVal(showSettings$)
-  const getPopupContainer = useGetStaticPopupContainer()
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button aria-label={t('view')} className={styles.viewMenuTrigger} size="default" title={t('view')} type="button" variant="ghost">
-            <i className="i-carbon:view" />
-            <span>{t('view')}</span>
-            <i className="i-codicon:chevron-down" />
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end" className="w-48" container={typeof document == 'undefined' ? undefined : getPopupContainer()} side="top">
-        {onRelayout != null && (
-          <>
-            <DropdownMenuItem onClick={onRelayout}>
-              <i className="i-custom:layout" />
-              <span>{t('optimize')}</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        )}
-        <DropdownMenuGroup>
-          <DropdownMenuItem onClick={() => interactiveMode$.set('mouse')}>
-            <i className="i-custom:mouse" />
-            <span className="flex-1">{t('interactiveMode.mouse')}</span>
-            <i className={mode == 'mouse' ? 'i-codicon:check' : 'invisible i-codicon:check'} />
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => interactiveMode$.set('touchpad')}>
-            <i className="i-custom:touchpad" />
-            <span className="flex-1">{t('interactiveMode.touchpad')}</span>
-            <i className={mode == 'touchpad' ? 'i-codicon:check' : 'invisible i-codicon:check'} />
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        {showSettings$ != null && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => showSettings$.set(showSettings !== true)}>
-              <i className="i-codicon:settings-gear" />
-              <span>{t(showSettings ? 'settingsPanel.hide' : 'settingsPanel.show')}</span>
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
 const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
-  const t = useTranslate()
   const rf = useReactFlow()
   const { minZoomReached, maxZoomReached, zoom } = useStore(selector, shallowPlainObjectEqual)
   const nodes = useNodes()
@@ -301,44 +235,31 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
   return (
     <>
       {props.dottedBackground && <Background id={bgId} color="var(--canvas-grid)" gap={GRID_GAP} variant={BackgroundVariant.Dots} />}
-      <Panel position="bottom-left" className={cn(styles.island, styles.dock, styles.viewDock)} data-canvas-control-scope>
-        <Button aria-label={t('zoomOut')} disabled={minZoomReached} onClick={() => rf.zoomOut()} size="icon" title={t('zoomOut')} type="button" variant="ghost">
-          <i className="i-codicon:zoom-out" />
-        </Button>
-        <Button className={styles.zoomValue} onClick={() => rf.zoomTo(1)} size="default" title={t('zoomReset')} type="button" variant="ghost">
-          {Math.round(zoom * 100)}%
-        </Button>
-        <Button aria-label={t('zoomIn')} disabled={maxZoomReached} onClick={() => rf.zoomIn()} size="icon" title={t('zoomIn')} type="button" variant="ghost">
-          <i className="i-codicon:zoom-in" />
-        </Button>
-        <Button
-          aria-label={t('fitView')}
-          onClick={() => {
-            props.onBeforeFitView?.()
-            // Wait for the node description height before fitting the view to avoid overlap.
-            setTimeout(() => {
-              rf.fitView({
-                ...fitViewOptions,
-                nodes: selectedNodes.length === 0 ? undefined : selectedNodes,
-              })
-              props.onFitView?.()
-            }, 100)
-          }}
-          size="icon"
-          title={t('fitView')}
-          type="button"
-          variant="ghost"
-        >
-          <i className="i-custom:screen" />
-        </Button>
-        <CanvasViewMenu interactiveMode$={props.interactiveMode$} onRelayout={relayout} showSettings$={props.showSettings$} />
-      </Panel>
-      {props.toolbar != null && (
-        <Panel position="bottom-center" className={cn(styles.island, styles.dock, styles.createDock)} data-canvas-control-scope>
-          <div className={styles.dockActions}>{props.toolbar}</div>
-        </Panel>
-      )}
-      <CornerControls miniMapExpanded$={props.miniMapExpanded$}>{props.cornerTools}</CornerControls>
+      <CanvasViewControls
+        maxZoomReached={maxZoomReached}
+        minZoomReached={minZoomReached}
+        onFitView={() => {
+          props.onBeforeFitView?.()
+          // Wait for the node description height before fitting the view to avoid overlap.
+          setTimeout(() => {
+            rf.fitView({
+              ...fitViewOptions,
+              nodes: selectedNodes.length === 0 ? undefined : selectedNodes,
+            })
+            props.onFitView?.()
+          }, 100)
+        }}
+        onRelayout={relayout}
+        onZoomIn={() => rf.zoomIn()}
+        onZoomOut={() => rf.zoomOut()}
+        onZoomReset={() => rf.zoomTo(1)}
+        showSettings$={props.showSettings$}
+        zoom={zoom}
+      />
+      {props.toolbar != null && <CanvasToolbar>{props.toolbar}</CanvasToolbar>}
+      <CornerControls leading={<CanvasInteractiveMode interactiveMode$={props.interactiveMode$} />} miniMapExpanded$={props.miniMapExpanded$}>
+        {props.cornerTools}
+      </CornerControls>
     </>
   )
 })

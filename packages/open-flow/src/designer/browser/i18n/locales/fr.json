@@ -313,7 +313,10 @@
   },
   "interactiveMode": {
     "mouse": "Adapté à la souris",
-    "touchpad": "Adapté au pavé tactile"
+    "mouseDescription": "Faites glisser le canevas avec le bouton gauche de la souris et zoomez avec la molette.",
+    "title": "Mode d’interaction",
+    "touchpad": "Adapté au pavé tactile",
+    "touchpadDescription": "Déplacez le canevas avec deux doigts et pincez ou écartez-les pour zoomer."
   },
   "jsonViewer": {
     "bin": "Binaire",

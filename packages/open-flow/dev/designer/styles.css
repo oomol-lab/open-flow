@@ -437,89 +437,12 @@ select {
 .run-control-story-stage {
   position: relative;
   min-width: 0;
-  min-height: 152px;
+  min-height: 220px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   background-color: var(--ui-background);
   background-image: radial-gradient(var(--ui-border) 0.7px, transparent 0.7px);
   background-size: 16px 16px;
-}
-.run-control-story-dock {
-  position: absolute;
-  bottom: 12px;
-}
-.run-control-story-view {
-  left: 12px;
-}
-.run-control-story-create {
-  left: 50%;
-  gap: 5px;
-  transform: translateX(-50%);
-}
-.run-control-story-zoom {
-  min-width: 48px;
-  padding-inline: 5px;
-  color: var(--ui-muted-foreground);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-.run-control-story-corner {
-  position: absolute;
-  z-index: 2;
-  top: 12px;
-  right: 12px;
-}
-.run-control-story-minimap {
-  position: absolute;
-  z-index: 1;
-  top: 64px;
-  right: 12px;
-  width: 88px;
-  height: 62px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
-  background: var(--ui-muted);
-}
-.run-control-story-minimap > span {
-  position: absolute;
-  width: 18px;
-  height: 7px;
-  border-radius: 2px;
-  background: var(--ui-muted-foreground);
-  opacity: 0.28;
-}
-.run-control-story-minimap > span:nth-child(1) {
-  top: 17px;
-  left: 15px;
-}
-.run-control-story-minimap > span:nth-child(2) {
-  top: 31px;
-  left: 35px;
-}
-.run-control-story-minimap > span:nth-child(3) {
-  top: 14px;
-  right: 11px;
-}
-.run-control-story-panel {
-  position: absolute;
-  z-index: 1;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  width: 148px;
-  flex-direction: column;
-  gap: 4px;
-  padding: 54px 12px 12px;
-  border-left: 1px solid var(--ui-border);
-  background: var(--ui-card);
-  font-size: 11px;
-}
-.run-control-story-panel > strong {
-  font-size: 12px;
-}
-.run-control-story-panel > span {
-  color: var(--ui-muted-foreground);
 }
 .run-control-story-inputs {
   display: grid;
@@ -558,14 +481,6 @@ select {
   }
   .run-control-story-stage {
     min-height: 224px;
-  }
-  .run-control-story-create {
-    left: 12px;
-    transform: none;
-  }
-  .run-control-story-view {
-    top: 12px;
-    bottom: auto;
   }
 }
 
