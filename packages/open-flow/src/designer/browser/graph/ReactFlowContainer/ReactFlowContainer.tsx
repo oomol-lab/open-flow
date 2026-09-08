@@ -671,6 +671,8 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           /* React Flow can leave the Meta key active after the browser releases it. */
           zoomActivationKeyCode={null}
           zoomOnDoubleClick={false}
+          /* Keep clicks valid until the default 1px drag threshold is exceeded. */
+          nodeClickDistance={1}
           selectionMode={SelectionMode.Partial}
           panOnDrag={isMouse ? PAN_ON_DRAG_MOUSE : PAN_ON_DRAG_TOUCHPAD}
           panOnScroll={!isMouse}
