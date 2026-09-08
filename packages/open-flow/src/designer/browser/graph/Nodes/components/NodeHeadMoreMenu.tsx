@@ -364,7 +364,7 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
   const floatBarItems = items.filter((item): item is ContextMenuActionItem => !!item)
 
   return (
-    <NodeToolbar className={styles.floatBar} offset={4 - 8 * zoom}>
+    <NodeToolbar className={styles.floatBar} offset={12 - 8 * zoom}>
       {nodeStore.display$ && <NodeStatus flowStatus$={designerStore.$.runStatus} display$={nodeStore.display$} />}
       {floatBarItems.map((item) => {
         const active = item.key === '$nodeSetting' && showSettings
