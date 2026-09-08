@@ -2,12 +2,22 @@ import type { JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions } from '@oomol-lab/open-flow/scheduler'
 import type { Context, Next } from 'hono'
-import type { ControlService, FlowPosition, PublicationPosition, RunPosition, TriggerActivityPosition } from './control-service.ts'
+import type { ControlService } from './control-service.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { decodeChangeOperations, resourceNameIssue, validVariableName } from '@oomol-lab/open-flow/flow-change'
 import { runStatuses } from '@oomol-lab/open-flow/run-lifecycle'
 import { Hono } from 'hono'
+import {
+  decodeFlowCursor,
+  decodeRunCursor,
+  decodePublicationCursor,
+  decodeTriggerActivityCursor,
+  encodeFlowCursor,
+  encodeRunCursor,
+  encodePublicationCursor,
+  encodeTriggerActivityCursor,
+} from './control-cursor.ts'
 import { ControlError } from './error.ts'
 
 export type ResolveControlActor = (request: Request) => Promise<string | undefined> | string | undefined
@@ -487,57 +497,6 @@ function idempotencyKey(request: Request, code: InvalidCode): string {
   const value = request.headers.get('idempotency-key')
   if (value == null || value.length == 0 || value.length > maxIdempotencyKeyLength) invalid(code, 'Idempotency-Key is invalid.')
   return value
-}
-
-function encodeFlowCursor(position: FlowPosition): string {
-  return Buffer.from(JSON.stringify({ kind: 'flows', ...position })).toString('base64url')
-}
-
-function encodeRunCursor(flowId: string, position: RunPosition): string {
-  return Buffer.from(JSON.stringify({ flowId, kind: 'runs', ...position })).toString('base64url')
-}
-
-function encodePublicationCursor(flowId: string, position: PublicationPosition): string {
-  return Buffer.from(JSON.stringify({ flowId, kind: 'publications', ...position })).toString('base64url')
-}
-
-function encodeTriggerActivityCursor(flowId: string, triggerNodeId: string, position: TriggerActivityPosition): string {
-  return Buffer.from(JSON.stringify({ flowId, kind: 'trigger-activities', triggerNodeId, ...position })).toString('base64url')
-}
-
-function decodeFlowCursor(value: string): FlowPosition {
-  const decoded = decodeCursor(value, 'flows', ['createdAt', 'flowId', 'kind'])
-  return { createdAt: decoded.createdAt as number, flowId: text(decoded.flowId, controlErrorCode.pageInvalidCursor) }
-}
-
-function decodeRunCursor(value: string, flowId: string): RunPosition {
-  const decoded = decodeCursor(value, 'runs', ['createdAt', 'flowId', 'kind', 'runId'])
-  if (decoded.flowId != flowId) invalid(controlErrorCode.pageInvalidCursor, 'Cursor is invalid.')
-  return { createdAt: decoded.createdAt as number, runId: text(decoded.runId, controlErrorCode.pageInvalidCursor) }
-}
-
-function decodePublicationCursor(value: string, flowId: string): PublicationPosition {
-  const decoded = decodeCursor(value, 'publications', ['createdAt', 'flowId', 'kind', 'publicationId'])
-  if (decoded.flowId != flowId) invalid(controlErrorCode.pageInvalidCursor, 'Cursor is invalid.')
-  return { createdAt: decoded.createdAt as number, publicationId: text(decoded.publicationId, controlErrorCode.pageInvalidCursor) }
-}
-
-function decodeTriggerActivityCursor(value: string, flowId: string, triggerNodeId: string): TriggerActivityPosition {
-  const decoded = decodeCursor(value, 'trigger-activities', ['activityId', 'createdAt', 'flowId', 'kind', 'triggerNodeId'])
-  if (decoded.flowId != flowId || decoded.triggerNodeId != triggerNodeId) invalid(controlErrorCode.pageInvalidCursor, 'Cursor is invalid.')
-  return { activityId: text(decoded.activityId, controlErrorCode.pageInvalidCursor), createdAt: decoded.createdAt as number }
-}
-
-function decodeCursor(value: string, kind: string, keys: readonly string[]): Record<string, unknown> {
-  try {
-    const decoded = record(JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as unknown, controlErrorCode.pageInvalidCursor)
-    exact(decoded, keys, controlErrorCode.pageInvalidCursor)
-    if (decoded.kind != kind || !Number.isSafeInteger(decoded.createdAt) || (decoded.createdAt as number) < 0) throw new Error()
-    return decoded
-  } catch (error) {
-    if (error instanceof ControlError) throw error
-    return invalid(controlErrorCode.pageInvalidCursor, 'Cursor is invalid.')
-  }
 }
 
 function invalid(code: InvalidCode, message: string): never {

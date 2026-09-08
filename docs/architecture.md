@@ -14,6 +14,9 @@ Workbench ─┐
 CLI ───────┘
 ```
 
+Server 同时提供 MCP Streamable HTTP 入口。MCP adapter 与 Control API adapter 共享 Server application service；认证主体、
+Flow 修改、幂等准入、持久化和执行语义由同一个部署负责，不能形成第二套 authoring 或 Run 状态机。
+
 ### Flow 与 Revision
 
 Flow 是部署生成的顶层产品资源和稳定 opaque identity，不从属于 Project。每个 Flow 独立拥有名称、生命周期、Draft head、Revision 历史、
@@ -87,7 +90,7 @@ RunEvent 明细可以按部署声明的 retention 到期，但唯一 terminal re
   authoring API、产品中立 Workbench runtime 和内层 UI。
 - `packages/command` 拥有 CLI 行为、Command Host boundary、Command Artifact 协议、确定性 archive 构建和发布。它只通过
   `packages/open-flow` 的公开 package entry 消费产品合同。
-- `apps/server` 拥有 Server application lifecycle、SQLite、HTTP adapter、本地调度、具体 `isolated-vm` host、同源 Workbench host 和 Docker 交付。
+- `apps/server` 拥有 Server application lifecycle、SQLite、HTTP adapter、本地调度、具体 `isolated-vm` host、MCP adapter、同源 Workbench host 和 Docker 交付。
 - 其他部署只拥有自己的基础设施接入、认证、application lifecycle、Capability mediation 和正式 Workbench 宿主。
 
 部署必须消费精确版本的公开 package artifact 并运行其中的 conformance cases，不能通过源码复制、deep import 或同步脚本保留公共实现的第二份

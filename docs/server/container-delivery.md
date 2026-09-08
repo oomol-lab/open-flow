@@ -2,7 +2,7 @@
 
 ## 1. 当前镜像边界
 
-`apps/server/Dockerfile` 只交付一个 Server Flow application 进程，包含同源 Workbench、Control API、Run runtime、Trigger runtime 和 SQLite migration。镜像不包含 Connector service、Connector 数据库或多进程 supervisor。
+`apps/server/Dockerfile` 只交付一个 Server Flow application 进程，包含同源 Workbench、Control API、MCP HTTP endpoint、Run runtime、Trigger runtime 和 SQLite migration。镜像不包含 Connector service、Connector 数据库或多进程 supervisor。
 
 Server 可以通过配置的 Connector runtime API 使用 Provider/Action catalog、获准 Connection、Action execution 和 Provider proxy。镜像仍不包含
 Connector service；具体 Provider transport、credential、Connection lifecycle 和管理界面不属于 Open Flow Server。未配置 Connector 时相关能力稳定
@@ -62,6 +62,8 @@ docker run --detach \
   --env-file .env.server \
   open-flow-server:dev
 ```
+
+MCP 与 Server 共用监听端口，通过 `/v1/mcp` 接入；使用现有 Operator 凭据逐请求认证。协议版本、工具与客户端示例见 [MCP 接入参考](mcp.md)。
 
 Workbench 和 API 位于 `http://127.0.0.1:3000`；登录后 `/variables` 提供该 deployment 的 Variable 管理面，`/settings` 提供外部 capability 管理面。最终镜像默认监听
 `0.0.0.0:3000`，以 root 用户运行，并把 SQLite 保存为 `/data/open-flow/open-flow.sqlite`。

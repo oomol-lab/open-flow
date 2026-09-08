@@ -17,6 +17,7 @@ import { createControlApp } from './control.ts'
 import { AcceptanceError, ControlError, serverErrorCode } from './error.ts'
 import { handleIntegration } from './integration.ts'
 import { errorKind, silentLogger } from './logger.ts'
+import { createMcpApp } from './mcp.ts'
 import { createOperatorApp } from './operator.ts'
 import { serverPaths } from './server-paths.ts'
 import { ServerService } from './service.ts'
@@ -161,6 +162,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     response.headers.set('cache-control', 'no-store')
     return method == 'HEAD' ? new Response(null, { headers: response.headers, status: response.status }) : response
   })
+  app.route('/v1/mcp', createMcpApp(service, authenticate, logger, options.shutdownSignal))
   app.route('/v1', createControlApp(service.control, resolveActor))
   if (options.settings != null)
     app.route(

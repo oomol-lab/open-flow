@@ -163,24 +163,24 @@ export class ControlService {
     return definition
   }
 
-  async listConnectorProviders(flowId?: string): Promise<readonly ConnectorProvider[]> {
-    return await this.#connectorRequest(flowId, (connector, teamId) => connector.listProviders(undefined, teamId))
+  async listConnectorProviders(flowId?: string, signal?: AbortSignal): Promise<readonly ConnectorProvider[]> {
+    return await this.#connectorRequest(flowId, (connector, teamId) => connector.listProviders(signal, teamId))
   }
 
   async listConnectorActions(serviceId?: string, flowId?: string): Promise<readonly ConnectorAction[]> {
     return await this.#connectorRequest(flowId, (connector, teamId) => connector.listActions(serviceId, undefined, teamId))
   }
 
-  async searchConnectorActions(query: string, flowId?: string): Promise<readonly ConnectorAction[]> {
-    return await this.#connectorRequest(flowId, (connector, teamId) => connector.searchActions(query, undefined, teamId))
+  async searchConnectorActions(query: string, flowId?: string, signal?: AbortSignal): Promise<readonly ConnectorAction[]> {
+    return await this.#connectorRequest(flowId, (connector, teamId) => connector.searchActions(query, signal, teamId))
   }
 
-  async getConnectorAction(actionId: string, flowId?: string): Promise<ConnectorAction> {
-    return await this.#connectorRequest(flowId, (connector, teamId) => connector.getAction(actionId, undefined, teamId))
+  async getConnectorAction(actionId: string, flowId?: string, signal?: AbortSignal): Promise<ConnectorAction> {
+    return await this.#connectorRequest(flowId, (connector, teamId) => connector.getAction(actionId, signal, teamId))
   }
 
-  async listConnectorConnections(serviceId: string, flowId?: string): Promise<readonly ConnectorConnection[]> {
-    return await this.#connectorRequest(flowId, (connector, teamId) => connector.listConnections(serviceId, undefined, teamId))
+  async listConnectorConnections(serviceId: string, flowId?: string, signal?: AbortSignal): Promise<readonly ConnectorConnection[]> {
+    return await this.#connectorRequest(flowId, (connector, teamId) => connector.listConnections(serviceId, signal, teamId))
   }
 
   connectorConnectionPage(serviceId: string, flowId?: string): string {
