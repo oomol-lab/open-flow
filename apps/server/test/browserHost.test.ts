@@ -1,5 +1,6 @@
 import type { FlowChangeEvent } from '@oomol-lab/open-flow/workbench'
 
+import { verifyWorkbenchHost } from '@oomol-lab/open-flow/workbench-host-conformance'
 import { afterEach, expect, it, vi } from 'vitest'
 import { createBrowserHost } from '../browser/host.ts'
 
@@ -276,4 +277,51 @@ it('cancels a pending stream read and releases its reader on stop', async () => 
   await vi.waitFor(() => expect(body.locked).toBe(false))
   expect(cancel).toHaveBeenCalledOnce()
   expect(signal?.aborted).toBe(true)
+})
+
+it('satisfies the public Workbench host lifecycle contract', async () => {
+  vi.useFakeTimers()
+  const pending: { resolve(response: Response): void; reject(error: Error): void; signal?: AbortSignal | null }[] = []
+  const streams: { controller: ReadableStreamDefaultController<Uint8Array>; signal?: AbortSignal | null }[] = []
+  vi.stubGlobal(
+    'fetch',
+    (_url: unknown, init?: RequestInit) =>
+      new Promise<Response>((resolve, reject) => {
+        pending.push({ resolve, reject, signal: init?.signal })
+      }),
+  )
+  try {
+    await verifyWorkbenchHost(createBrowserHost(vi.fn(), vi.fn()), {
+      async advance(milliseconds) {
+        await vi.advanceTimersByTimeAsync(milliseconds)
+      },
+      async fail() {
+        await vi.advanceTimersByTimeAsync(0)
+        for (const item of pending.splice(0)) item.reject(new Error('Offline'))
+        await vi.advanceTimersByTimeAsync(0)
+      },
+      async connect() {
+        await vi.advanceTimersByTimeAsync(0)
+        for (const item of pending.splice(0)) {
+          if (item.signal?.aborted) continue
+          item.resolve(
+            new Response(
+              new ReadableStream<Uint8Array>({
+                start(controller) {
+                  streams.push({ controller, signal: item.signal })
+                },
+              }),
+            ),
+          )
+        }
+        await vi.advanceTimersByTimeAsync(0)
+      },
+      async emit(event) {
+        for (const stream of streams) if (!stream.signal?.aborted) stream.controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`))
+        await vi.advanceTimersByTimeAsync(0)
+      },
+    })
+  } finally {
+    vi.useRealTimers()
+  }
 })

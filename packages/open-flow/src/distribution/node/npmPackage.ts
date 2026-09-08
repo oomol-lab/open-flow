@@ -42,6 +42,8 @@ function createManifest(version: string): object {
         types: './dist/common/connector-proxy.d.ts',
         import: './dist/common/connector-proxy.js',
       },
+      './mcp': { types: './dist/common/mcp.d.ts', import: './dist/common/mcp.js' },
+      './control-requests': { types: './dist/common/control-requests.d.ts', import: './dist/common/control-requests.js' },
       './control-api': {
         types: './dist/common/control-api.d.ts',
         import: './dist/common/control-api.js',
@@ -106,6 +108,7 @@ function createManifest(version: string): object {
         types: './dist/common/webhook-trigger.d.ts',
         import: './dist/common/webhook-trigger.js',
       },
+      './workbench-host-conformance': { types: './dist/browser/host-conformance.d.ts', import: './dist/browser/host-conformance.js' },
       './workbench': {
         types: './dist/browser/workbench.d.ts',
         import: './dist/browser/workbench.js',

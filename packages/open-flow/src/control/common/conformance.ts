@@ -180,6 +180,65 @@ function liveRunRequest(harness: ControlApiConformanceHarness, publicationId: st
 
 export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = [
   {
+    name: 'admits simultaneous retries as one Run and preserves its Trigger identity',
+    async verify(harness) {
+      const flow = await createFlow(harness, 'Concurrent Run', 'concurrent-run-flow')
+      const flowId = requiredString(flow.flowId, 'Flow ID')
+      const revisionId = await addManualTrigger(harness, flowId, requiredString(flow.draftRevisionId, 'Revision ID'))
+      const submit = (payload: unknown = {}) =>
+        request(harness, `/v1/flows/${flowId}/revisions/${revisionId}/runs`, {
+          method: 'POST',
+          headers: { 'idempotency-key': 'concurrent-run' },
+          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', payload }, version: 1 }),
+        })
+      const responses = await Promise.all([submit(), submit(), submit(), submit()])
+      equal(responses.map((response) => response.status).toSorted(), [200, 200, 200, 202], 'One Run is admitted')
+      const bodies = await Promise.all(responses.map((response) => response.json()))
+      const runId = requiredString(record(bodies[0], 'Run').runId, 'Run ID')
+      for (const body of bodies) equal(record(body, 'Run').runId, runId, 'Concurrent Run identity')
+      await error(await submit({ changed: true }), 409, 'run.conflict', 'Reject changed Trigger replay')
+      const runs = await json(await request(harness, `/v1/flows/${flowId}/runs`), 200, 'List admitted Runs')
+      equal(list(runs.runs, 'Runs').length, 1, 'No duplicate Run')
+    },
+  },
+  {
+    name: 'deduplicates simultaneous creation and lost-response retries',
+    async verify(harness) {
+      const responses = await Promise.all(Array.from({ length: 4 }, () => createFlowRequest(harness, 'Concurrent Flow', 'concurrent-create')))
+      equal(responses.map((response) => response.status).toSorted(), [200, 200, 200, 201], 'One creation commits')
+      const bodies = await Promise.all(responses.map((response) => response.json()))
+      for (const body of bodies) equal(body, bodies[0], 'Concurrent replay identity')
+      const retried = await json(await createFlowRequest(harness, 'Concurrent Flow', 'concurrent-create'), 200, 'Retry lost creation response')
+      equal(retried, bodies[0], 'Lost-response replay')
+      await error(await createFlowRequest(harness, 'Different Flow', 'concurrent-create'), 409, 'flow.conflict', 'Reject changed retry')
+    },
+  },
+  {
+    name: 'commits one concurrent Draft change and replays the winning key',
+    async verify(harness) {
+      const created = await createFlow(harness, 'Concurrent Draft', 'concurrent-draft')
+      const flowId = requiredString(created.flowId, 'Flow ID')
+      const revisionId = requiredString(created.draftRevisionId, 'Revision ID')
+      const responses = await Promise.all([
+        addValueNode(harness, flowId, revisionId, 'left', 'concurrent-left'),
+        addValueNode(harness, flowId, revisionId, 'right', 'concurrent-right'),
+      ])
+      equal(responses.map((response) => response.status).toSorted(), [200, 412], 'One Draft CAS commits')
+      const winner = responses.findIndex((response) => response.status == 200)
+      const committed = await json(responses[winner] ?? fail('Missing winning response'), 200, 'Winning Draft change')
+      await error(responses[1 - winner] ?? fail('Missing losing response'), 412, 'flow.revision-conflict', 'Losing Draft change')
+      const nodeId = winner == 0 ? 'left' : 'right'
+      equal(
+        await json(await addValueNode(harness, flowId, revisionId, nodeId, `concurrent-${nodeId}`), 200, 'Replay winning change'),
+        committed,
+        'Replay precedes stale Revision check',
+      )
+      const draft = await json(await request(harness, `/v1/flows/${flowId}/draft`), 200, 'Read authoritative Draft')
+      const nodes = record(record(record(draft.content, 'Content').document, 'Document').graph, 'Graph').nodes
+      equal(Object.keys(record(nodes, 'Nodes')), [nodeId], 'No partial losing edit')
+    },
+  },
+  {
     name: 'manages deployment Variables with stable limits and exact-case identity',
     async verify(harness) {
       equal(await json(await request(harness, '/v1/variables'), 200, 'List empty Variables'), { variables: [], version: 1 }, 'Empty Variables')
@@ -916,6 +975,34 @@ export const connectorControlApiConformanceCases: readonly ControlApiConformance
       await error(await request(harness, '/v1/connector/actions?q=%20%20'), 400, 'flow.invalid', 'Empty Connector query')
       await error(await request(harness, `/v1/connector/connections/${'a'.repeat(257)}`), 400, 'flow.invalid', 'Oversized Connector service')
       await error(await request(harness, '/v1/connector/actions/conformance.missing'), 404, 'connector.action-not-found', 'Missing Connector Action')
+    },
+  },
+]
+
+export const controlRecoveryConformanceCases: readonly {
+  readonly name: string
+  verify(harness: ControlApiConformanceHarness & { restart(): Promise<void> }): Promise<void>
+}[] = [
+  {
+    name: 'preserves committed mutations and idempotency receipts after restart',
+    async verify(harness) {
+      const created = await createFlow(harness, 'Recovery', 'recovery-create')
+      const flowId = requiredString(created.flowId, 'Flow ID')
+      const revisionId = requiredString(created.draftRevisionId, 'Revision ID')
+      const changed = await json(await addValueNode(harness, flowId, revisionId, 'marker', 'recovery-change'), 200, 'Commit change')
+      await harness.restart()
+      equal(
+        (await json(await createFlowRequest(harness, 'Recovery', 'recovery-create'), 200, 'Replay creation after restart')).flowId,
+        flowId,
+        'Durable creation identity',
+      )
+      equal(
+        await json(await addValueNode(harness, flowId, revisionId, 'marker', 'recovery-change'), 200, 'Replay change after restart'),
+        changed,
+        'Durable change receipt',
+      )
+      const draft = await json(await request(harness, `/v1/flows/${flowId}/draft`), 200, 'Recovered Draft')
+      equal(draft.revisionId, record(changed.revision, 'Revision').revisionId, 'Recovered head')
     },
   },
 ]

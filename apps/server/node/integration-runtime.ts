@@ -13,6 +13,7 @@ import type { ConnectorHost } from './connector.ts'
 import type { IntegrationCandidate } from './integration-store.ts'
 import type { IntegrationHealth, StoredIntegrationBinding, StoredIntegrationState, StoredIntegrationTarget } from './trigger-store.ts'
 
+import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import {
   integrationCallbackSecret,
@@ -189,7 +190,10 @@ export class IntegrationRuntime {
     },
   ): Effect.Effect<IntegrationResponse, unknown> {
     return Effect.gen({ self: this }, function* () {
-      const fixed = yield* Effect.tryPromise({ try: () => this.#validateFlow(JSON.parse(target.stored.content) as RevisionContent), catch: (error) => error })
+      const fixed = yield* Effect.tryPromise({
+        try: () => this.#validateFlow(decodeRevision(new TextEncoder().encode(target.stored.content))),
+        catch: (error) => error,
+      })
       const currentTrigger = fixed.prepared.graph.nodes[target.stored.triggerNodeId]
       if (
         fixed.revisionDigest != target.stored.revisionDigest ||

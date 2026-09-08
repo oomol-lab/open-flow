@@ -14,6 +14,7 @@ Workbench ─┐
 CLI ───────┘
 ```
 
+公共 package 拥有完整 Revision 解码、Control API 写请求和 MCP 工具定义；部署适配器复用这些契约，并运行对应的一致性测试。
 Server 同时提供 MCP Streamable HTTP 入口。MCP adapter 与 Control API adapter 共享 Server application service；认证主体、
 Flow 修改、幂等准入、持久化和执行语义由同一个部署负责，不能形成第二套 authoring 或 Run 状态机。
 

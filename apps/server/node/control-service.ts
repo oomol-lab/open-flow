@@ -31,7 +31,7 @@ import type { StoredTriggerActivity, StoredTriggerBinding } from './trigger-stor
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { applyFlowChanges, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
-import { canonicalJsonBytes, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
+import { canonicalJsonBytes, decodeRevision, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { codeActions, flowClosure, prepareFlow, validateFlow, validateFlowInputs, validRunTrigger, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { randomUUID } from 'node:crypto'
@@ -1002,7 +1002,7 @@ function variable(stored: { readonly name: string; readonly updatedAt: number; r
 }
 
 function revisionContent(stored: { readonly content: string }): RevisionContent {
-  return JSON.parse(stored.content) as RevisionContent
+  return decodeRevision(new TextEncoder().encode(stored.content))
 }
 
 function revisionMetadata(stored: StoredFlowRevision): Omit<Draft, 'content'> {

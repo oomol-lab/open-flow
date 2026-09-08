@@ -650,3 +650,5 @@ Run 取消、deadline、兄弟节点失败和节点退出沿既有执行生命�
 公开 `flow-change` 的 `changeOperationsSchema()` 返回 ChangeOperation 数组的 JSON Schema，传入 operation kind 时返回单个操作的独立 schema。
 `decodeChangeOperations()` 与该 schema 使用相同的字段定义，拒绝未知 kind、未知字段和不完整结构；Server 在 Draft change HTTP 边界调用它。
 结构校验不替代操作顺序、before 值、图语义或 Revision 并发校验。
+
+公共解码入口、版本兼容和部署一致性验证见[公共契约与版本演进](compatibility.md)。

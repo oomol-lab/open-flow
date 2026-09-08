@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
+import { mcpConformanceCases } from '@oomol-lab/open-flow/mcp'
 import { once } from 'node:events'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -400,3 +401,18 @@ it('serves a modern client through an HTTP proxy and accepts chunked JSON reques
   expect(response.status).toBe(200)
   expect(await response.json()).toMatchObject({ id: 10, result: { resultType: 'complete', tools: expect.any(Array) } })
 })
+
+for (const conformance of mcpConformanceCases) {
+  it(conformance.name, async () => {
+    const { origin } = await fixture()
+    await conformance.verify({
+      origin,
+      async dispose() {},
+      request(request) {
+        const headers = new Headers(request.headers)
+        headers.set('authorization', `Bearer ${token}`)
+        return fetch(new Request(request, { headers }))
+      },
+    })
+  })
+}

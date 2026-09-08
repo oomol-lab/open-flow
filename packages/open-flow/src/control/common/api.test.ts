@@ -286,7 +286,7 @@ const editor = {
     parentRevisionId: null,
     revisionId: flow.draftRevisionId,
     version: 1,
-    content: { document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {} }, modules: {}, modelVersion: 1 },
+    content: { document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} }, modules: {}, modelVersion: 1 },
   },
   live: { flowId: flow.flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 },
   presentation: { revision: 1, updatedAt: flow.updatedAt, value: { nodes: {} }, version: 1 },

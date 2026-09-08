@@ -1,6 +1,7 @@
-import type { ChangeOperation, JsonValue } from './change.ts'
+import type { ChangeOperation, FlowDocument, JsonValue, RevisionContent } from './change.ts'
 
 import { z } from 'zod'
+import { checkJsonDepth } from './json.ts'
 
 const text = z.string()
 const json = z.json()
@@ -138,8 +139,39 @@ const target = z.union([z.strictObject({ kind: z.literal('flow') }), z.strictObj
 const edge = z.strictObject({ source: text, target: text, sourceHandle: text.optional() })
 const at = { nodeId: text, target }
 const subflow = z.strictObject({ name: text, inputs: z.array(input), outputs: z.array(port.extend({ sources: z.array(z.union([nodeSource, flowSource])) })) })
+const graph = z.strictObject({ nodes: z.record(text, node), edges: z.array(edge) })
+const binding = z.strictObject({ kind: z.enum(['connection', 'variable']), target: text })
+const module = z.strictObject({ name: text, imports: strings, source: text })
+const document = z.strictObject({
+  bindings: z.record(text, binding),
+  graph,
+  subflows: z.record(text, subflow.extend({ graph })),
+  tasks: z.record(text, managed),
+})
+const revision = z.strictObject({ modelVersion: z.literal(1), document, modules: z.record(text, module) })
+const envelope = revision.extend({ kind: z.literal('open-flow-flow-revision'), version: z.literal(1) })
+
+export function decodeFlowDocument(value: unknown): FlowDocument {
+  checkJsonDepth(value)
+  document.parse(value)
+  return value as FlowDocument
+}
+
+export function decodeRevisionContent(value: unknown): RevisionContent {
+  checkJsonDepth(value)
+  revision.parse(value)
+  return value as RevisionContent
+}
+
+export function decodeRevisionEnvelope(value: unknown): RevisionContent {
+  checkJsonDepth(value)
+  envelope.parse(value)
+  const content = value as RevisionContent
+  return { modelVersion: content.modelVersion, document: content.document, modules: content.modules }
+}
+
 const shapes = {
-  'binding.create': { bindingId: text, binding: z.strictObject({ kind: z.enum(['connection', 'variable']), target: text }) },
+  'binding.create': { bindingId: text, binding },
   'binding.delete': { bindingId: text },
   'binding.target.set': { bindingId: text, before: text, value: text },
   'graph.edge.connect': { target, edge },
@@ -173,11 +205,11 @@ const shapes = {
   'graph.node.task.capabilities.set': { ...at, before: z.array(capability).optional(), value: z.array(capability).optional() },
   'graph.trigger.config.set': { nodeId: text, name: text, before: json.optional(), value: json.optional() },
   'graph.trigger.schedule.set': { nodeId: text, before: schedule, value: schedule },
-  'module.create': { moduleId: text, module: z.strictObject({ name: text, imports: strings, source: text }) },
+  'module.create': { moduleId: text, module },
   'module.delete': { moduleId: text },
   'module.rename': { moduleId: text, before: text, name: text },
   'module.source.replace': { moduleId: text, beforeImports: strings, beforeSource: text, imports: strings, source: text },
-  'subflow.create': { subflowId: text, subflow: subflow.extend({ graph: z.strictObject({ nodes: z.record(text, node), edges: z.array(edge) }) }) },
+  'subflow.create': { subflowId: text, subflow: subflow.extend({ graph }) },
   'subflow.definition.set': { subflowId: text, before: subflow, definition: subflow },
   'subflow.delete': { subflowId: text },
   'task.create': { taskId: text, task: managed },
@@ -192,6 +224,7 @@ const variants = new Map(
 const operations = z.array(z.union([...variants.values()])).min(1)
 
 export function decodeChangeOperations(value: unknown): readonly ChangeOperation[] {
+  checkJsonDepth(value)
   return z
     .array(z.unknown())
     .min(1)

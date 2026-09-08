@@ -17,9 +17,12 @@ import type {
   WebhookOptions,
 } from '@oomol-lab/open-flow/flow-change'
 
-const encoder = new TextEncoder()
+import { decodeRevisionEnvelope } from './changeSchema.ts'
+export { maxJsonDepth } from './json.ts'
 
-export const maxJsonDepth = 64
+export { decodeFlowDocument, decodeRevisionContent } from './changeSchema.ts'
+
+const encoder = new TextEncoder()
 
 function canonicalText(value: JsonValue): string {
   if (value == null || typeof value == 'boolean' || typeof value == 'string' || typeof value == 'number') return JSON.stringify(value)
@@ -300,4 +303,9 @@ function canonicalRevision(content: RevisionContent): JsonValue {
 
 export function encodeRevision(content: RevisionContent): Uint8Array {
   return canonicalJsonBytes(canonicalRevision(content))
+}
+
+export function decodeRevision(bytes: Uint8Array): RevisionContent {
+  const value: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+  return decodeRevisionEnvelope(value)
 }

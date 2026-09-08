@@ -9,6 +9,7 @@ import type { PollState, StoredPollTarget } from './trigger-store.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { scheduledTriggerOccurrenceId, nextTriggerScheduledAt } from '@oomol-lab/open-flow/cron-trigger'
+import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import {
   maximumPollCheckpointBytes,
@@ -92,7 +93,7 @@ export class PollRuntime {
     const target = this.#store.polls.pollTestTarget(flowId, triggerNodeId)
     if (target == null) throw new ControlError(controlErrorCode.triggerNotFound, 'The Trigger binding was not found.')
     try {
-      const revision = JSON.parse(target.content) as RevisionContent
+      const revision = decodeRevision(new TextEncoder().encode(target.content))
       const fixed = await this.#validatedFlow(revision)
       const trigger = fixed.prepared.graph.nodes[target.triggerNodeId]
       if (
@@ -304,7 +305,7 @@ export class PollRuntime {
       }
 
       yield* Effect.gen({ self: this }, function* () {
-        const revision = JSON.parse(target.content) as RevisionContent
+        const revision = decodeRevision(new TextEncoder().encode(target.content))
         const fixed = yield* Effect.tryPromise({ try: () => this.#validatedFlow(revision), catch: (error) => error })
         const trigger = fixed.prepared.graph.nodes[target.triggerNodeId]
         if (
