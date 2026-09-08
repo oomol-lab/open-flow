@@ -1,6 +1,7 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { spawn } from 'node:child_process'
 import { cp, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -200,7 +201,7 @@ it('closes the HTTP server and SQLite store on SIGTERM', async () => {
   await stop(app.child)
 })
 
-it('serves the compiled Workbench and authenticates the Control API in the real process', async () => {
+it('serves the compiled Workbench, MCP and Control API in the real process', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-server-process-'))
   const releaseDirectory = await mkdtemp(path.join(tmpdir(), 'open-flow-server-release-'))
   directories.push(directory, releaseDirectory)
@@ -220,6 +221,21 @@ it('serves the compiled Workbench and authenticates the Control API in the real 
   expect(asset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
   await asset.body?.cancel()
 
+  const mcp = new Client({ name: 'release-test', version: '1.0.0' }, { versionNegotiation: { mode: { pin: '2026-07-28' } } })
+  try {
+    await mcp.connect(
+      new StreamableHTTPClientTransport(new URL('/v1/mcp', app.origin), {
+        requestInit: { headers: { authorization: `Bearer ${operatorToken}` } },
+      }),
+    )
+    expect((await mcp.listTools()).tools.map((tool) => tool.name)).toContain('flow_create')
+    const created = await mcp.callTool({ name: 'flow_create', arguments: { name: 'Release MCP', idempotencyKey: 'release-mcp' } })
+    expect(created.isError).not.toBe(true)
+    expect(created.structuredContent).toMatchObject({ name: 'Release MCP' })
+  } finally {
+    await mcp.close()
+  }
+
   await expect(json(await fetch(`${app.origin}/auth/session`))).resolves.toEqual({
     authenticated: false,
     configured: true,
@@ -231,6 +247,6 @@ it('serves the compiled Workbench and authenticates the Control API in the real 
   const cookie = await operatorCookie(app.origin)
   const flows = await fetch(`${app.origin}/v1/flows`, { headers: { cookie } })
   expect(flows.status).toBe(200)
-  await expect(flows.json()).resolves.toMatchObject({ flows: [], version: 1 })
+  await expect(flows.json()).resolves.toMatchObject({ flows: [{ name: 'Release MCP' }], version: 1 })
   expectSuccessfulTermination(await terminate(app.child))
 })

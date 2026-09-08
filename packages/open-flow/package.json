@@ -1,6 +1,6 @@
 {
   "name": "@oomol-lab/open-flow",
-  "version": "0.1.0-beta.10",
+  "version": "0.1.0-beta.11",
   "description": "Portable contracts and shared browser runtime for Open Flow.",
   "keywords": [
     "ai",
@@ -157,7 +157,7 @@
     "vite": "8.2.1",
     "vitest": "^5.0.0",
     "yaml": "^2.9.0",
-    "zod": "4.4.3",
+    "zod": "4.5.4",
     "zustand": "^4.4.0"
   }
 }
