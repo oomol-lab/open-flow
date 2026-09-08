@@ -15,23 +15,28 @@
   cursor: pointer;
 }
 
-/* dark style */
 .basic-element-style {
-  line-height: 1.2;
-  margin: 0 11px;
+  margin: 0 0 0 32px;
   padding: 0;
+
+  > div + .bracket {
+    margin-left: 16px;
+  }
 }
 
 .container {
-  margin: 0 -10px;
   font-size: 12px;
-  // line-height: 1.2;
+  line-height: 1.7;
   white-space: pre-wrap;
   white-space: -moz-pre-wrap;
   white-space: -pre-wrap;
   white-space: -o-pre-wrap;
   word-break: break-word;
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+  > .basic-element-style {
+    margin: 0 1px;
+  }
 }
 
 .container-hide-top {
@@ -42,30 +47,30 @@
   }
 }
 
-.expand-icon {
-  position: relative;
-  padding-right: 5px;
+.inlineButton.expand-icon,
+.inlineButton.collapse-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 18px;
+  vertical-align: text-bottom;
   user-select: none;
-  // color: rgb(253, 246, 227);
-  color: var(--text-color);
+  color: var(--json-muted, var(--ui-muted-foreground));
   cursor: pointer;
 
   &::before {
-    content: '▸';
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
   }
 }
 
-.collapse-icon {
-  position: relative;
-  padding-right: 5px;
-  user-select: none;
-  // color: rgb(253, 246, 227);
-  color: var(--text-color);
-  cursor: pointer;
-
-  &::before {
-    content: '▾';
-  }
+.inlineButton.collapse-icon::before {
+  transform: translateY(-2px) rotate(45deg);
 }
 
 .collapsed-content {
@@ -83,6 +88,16 @@
   color: inherit;
   font: inherit;
   text-align: inherit;
+  border-radius: 3px;
+
+  &:hover {
+    background: var(--ui-muted);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--ui-ring);
+    outline-offset: -1px;
+  }
 }
 
 .compact-value {
@@ -129,23 +144,21 @@
 
 .bracket {
   padding-right: 5px;
-  // color: rgb(253, 246, 227);
-  color: var(--text-color);
+  color: var(--json-muted, var(--ui-muted-foreground));
   cursor: pointer;
 }
 
 .punctuation {
   padding-right: 5px;
-  // color: rgb(253, 246, 227);
-  color: var(--text-color);
+  color: var(--json-muted, var(--ui-muted-foreground));
 }
 
 .value-null {
-  color: var(--json-null, rgb(124, 208, 244));
+  color: var(--json-null, var(--ui-muted-foreground));
 }
 
 .value-undefined {
-  color: var(--json-null, rgb(124, 208, 244));
+  color: var(--json-null, var(--ui-muted-foreground));
 }
 
 .value-string {
