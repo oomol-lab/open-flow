@@ -135,10 +135,23 @@
     "unpublishedChanges": "未公開の変更あり",
     "upToDate": "本番と同一",
     "updated": "更新日時",
-    "workflows": "ワークフロー"
+    "workflows": "ワークフロー",
+    "publication": "公開状態",
+    "notPublished": "未公開",
+    "isPublished": "公開済み",
+    "enabledColumn": "有効状態",
+    "enabled": "有効",
+    "disabled": "無効",
+    "enableFlow": "{{name}} を有効にする",
+    "publishFirst": "公開後に有効にできます。",
+    "enabledHint": "新しい本番実行を制御します。下書きのテストは引き続き利用できます。",
+    "publish": "公開",
+    "publishUpdate": "更新を公開",
+    "deleteDescription": "フローと実行履歴を削除し、本番のトリガーを停止します。この操作は取り消せません。"
   },
   "inspector": {
     "account": {
+      "required": "接続が必要",
       "addConnection": "Connection を追加",
       "authorizationPending": "Connection ページで認証を完了してください。ここに戻ると、このアカウントが更新されます。",
       "chooseAccount": "アカウントを選択",
@@ -168,12 +181,8 @@
       "portDefinitions": "有効なポート定義を入力してください。"
     },
     "node": {
-      "description": "表示名とタイムアウト",
-      "displayName": "表示名",
-      "displayNamePlaceholder": "定義の名前を使用",
       "nameDuplicate": "このグラフには同じ名前のノードが既に存在します。",
       "nameEmpty": "ノード名を空にすることはできません。",
-      "save": "ノードを保存",
       "timeout": "タイムアウト（ミリ秒）",
       "timeoutError": "タイムアウトはミリ秒単位の正の整数で指定してください。",
       "title": "ノード設定"
@@ -195,7 +204,6 @@
       "codeSaving": "保存中…",
       "connectorAction": "Connector アクション",
       "definition": "タスク定義",
-      "definitionDescription": "名前と実行方法",
       "discardCode": "変更を破棄",
       "editorLoading": "エディターを読み込み中…",
       "editorUnavailable": "コードエディターを読み込めませんでした。",
@@ -205,7 +213,6 @@
       "missing": "参照しているタスクが存在しません。",
       "outputPorts": "出力ポート",
       "responseMode": "応答モード",
-      "save": "タスクを保存",
       "source": "ソースコード",
       "structuredJson": "構造化 JSON",
       "retrySave": "保存を再試行"
@@ -225,13 +232,7 @@
       "notificationUnavailable": "通知設定を利用できません。選択し直してください。",
       "prompt": "プロンプト",
       "promptError": "プロンプトは1〜1,000文字で入力してください。",
-      "removeNotification": "通知を削除",
-      "save": "保存"
-    },
-    "trigger": {
-      "description": "説明",
-      "save": "Trigger を保存",
-      "title": "Trigger 定義"
+      "removeNotification": "通知を削除"
     },
     "title": "インスペクター",
     "sources": {
@@ -509,8 +510,7 @@
     "timelineEmpty": "選択中のドラフトを実行すると、タイムラインと出力を確認できます。",
     "submitting": "この固定リビジョンを送信し、実行記録を作成しています…",
     "waiting": "最初のイベントを待っています…",
-    "waitExpires": "期限: {{date}}",
-    "eventSkipped": "スキップ済み"
+    "waitExpires": "期限: {{date}}"
   },
   "sidebar": {
     "createFirstFlow": "Flow を作成",
@@ -628,8 +628,10 @@
     "title": "問題"
   },
   "runInput": {
+    "triggerDataHint": "右側の入力欄にテストデータを入力し、実行をクリックして後続のノードをテストします。",
+    "triggerData": "トリガーデータ",
     "close": "実行入力を閉じる",
-    "description": "未接続の入力ごとに値を指定してください。グラフ接続、静的な値、定義のデフォルト値がある入力は表示されません。ここで入力した値は今回の実行にのみ使用され、Flow には保存されません。",
+    "description": "今回の実行に必要なデータを入力してください。ワークフローは変更されません。",
     "invalid": "実行する前に、表示されているすべての入力へ有効な JSON 値を設定してください。",
     "title": "実行入力",
     "trigger": "開始ノード",

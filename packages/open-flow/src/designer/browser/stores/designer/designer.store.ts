@@ -184,6 +184,7 @@ export interface DesignerStoreProps {
   readonly onOpenVariables?: () => void
   readonly onDisconnect?: (connections: Iterable<ManifestConnection>) => void
   readonly onDuplicate?: (nodeStores: NodeId[], offset?: XYPosition) => Promise<void>
+  readonly onLayout?: (positions: Readonly<Record<string, XYPosition>>) => void
   readonly onPaste?: (position: XYPosition) => void
   readonly provideAddNodeMenuItems?: (fromSource?: IFromSource) => IAddNodeMenuItem[] | undefined
   readonly provideAsyncAddNodeMenuItems?: (
@@ -256,6 +257,7 @@ export class DesignerStore {
   /** @internal */
   public readonly onDisconnect: DesignerStoreProps['onDisconnect']
   /** @internal */
+  public readonly onLayout: DesignerStoreProps['onLayout']
   public readonly onDuplicate: DesignerStoreProps['onDuplicate']
   /** @internal */
   public readonly onPaste: DesignerStoreProps['onPaste']
@@ -298,6 +300,7 @@ export class DesignerStore {
     this.onChangeInputVariable = props.onChangeInputVariable
     this.onOpenVariables = props.onOpenVariables
     this.onDisconnect = props.onDisconnect
+    this.onLayout = props.onLayout
     this.onDuplicate = props.onDuplicate
     this.onPaste = props.onPaste
     this.validateRenameNodeId = props.validateNodeId
@@ -578,6 +581,7 @@ export class DesignerStore {
 
     this.$.nodes.forEach(updateNodePosition)
     this.$.pseudoNodes?.forEach(updateNodePosition)
+    this.onLayout?.(Object.fromEntries(this.allLayoutNodes().map((node) => [node.nodeId, node.$.position.value])))
   }
 
   public duplicateNodes = async (manifestNodeIds?: NodeId[], offset?: XYPosition): Promise<void> => {

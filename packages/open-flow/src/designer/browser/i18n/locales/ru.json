@@ -111,6 +111,7 @@
     "scheduleType": "Тип расписания",
     "scheduleUnit": "Единица интервала",
     "scheduleWeeks": "Недели",
+    "scheduleTestHint": "Тест черновика запускается сразу и выполняется один раз. После публикации рабочий процесс запускается автоматически по расписанию.",
     "scheduleMissing": "Расписание не настроено",
     "summaryCron": "Расписание",
     "summaryIntegration": "Источник событий",
@@ -133,7 +134,10 @@
     "webhookNoResponseBody": "Без тела ответа",
     "webhookNullable": "Разрешить null",
     "webhookOrigins": "Разрешённые источники",
-    "webhookPayloadFields": "Поля полезной нагрузки",
+    "webhookPayloadFields": "Данные запроса",
+    "webhookAdvanced": "Дополнительные настройки",
+    "webhookTest": "Тест черновика",
+    "webhookTestHint": "Нажмите «Запустить» и введите тестовые данные запроса. После публикации можно получить URL Webhook.",
     "webhookRequest": "Запрос",
     "webhookResponse": "Ответ",
     "webhookResponseData": "Тело ответа",
@@ -590,6 +594,7 @@
   "zoomIn": "увеличить",
   "zoomOut": "уменьшить",
   "canvasCard": {
+    "waitBranch": { "approve": "Одобрено", "reject": "Отклонено", "continue": "Продолжить" },
     "run": "Запуск",
     "result": "Результат",
     "logs": "Журналы ({{count}})",
@@ -606,8 +611,7 @@
       "running": "Выполняется",
       "success": "Завершён",
       "error": "Ошибка",
-      "waiting": "Ожидание",
-      "skipped": "Пропущен"
+      "waiting": "Ожидание"
     },
     "kind": {
       "task": "Задача",

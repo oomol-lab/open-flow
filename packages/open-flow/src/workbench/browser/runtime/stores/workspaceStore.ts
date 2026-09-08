@@ -1,6 +1,6 @@
 import type { I18n } from 'val-i18n'
 import type { ConnectorCapability } from '../../../../flow/common/change.ts'
-import type { Settings as NodeSettings, TriggerSettings } from '../../../../flow/common/nodeChanges.ts'
+import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
 import type { WorkbenchClient, ConnectorAction, Draft, Flow, GraphNode, InputPort, JsonValue, Live, TriggerSchedule } from '../api.ts'
 import type { FlowChangeEvent } from '../contract.ts'
 import type { AddNodeOption } from '../designer/addNodeOptions.ts'
@@ -33,7 +33,6 @@ import {
   setConnectorConnection as changeConnectorConnection,
   setTriggerConnection as changeTriggerConnection,
   repairNodeNames,
-  updateTrigger,
   updateTriggerConfig,
   updateTriggerSchedule,
 } from '../../../../flow/common/nodeChanges.ts'
@@ -177,6 +176,14 @@ export class WorkspaceStore {
 
   public async reloadFlows(): Promise<void> {
     await this.#flows.reload()
+  }
+
+  public async setFlowEnabled(flow: Flow, enabled: boolean): Promise<void> {
+    await this.#flows.setEnabled(flow, enabled)
+  }
+
+  public async publishFlow(flow: Flow): Promise<void> {
+    await this.#flows.publish(flow)
   }
 
   public async loadMoreFlows(): Promise<void> {
@@ -650,14 +657,6 @@ export class WorkspaceStore {
     return changes != null && (await this.#changeDraft(changes)) != null
   }
 
-  public async saveTriggerSettings(triggerId: string, settings: TriggerSettings): Promise<boolean> {
-    const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target?.kind != 'flow') return false
-    const changes = updateTrigger(revision.revision.content, target, triggerId, settings)
-    return changes != null && (await this.#changeDraft(changes)) != null
-  }
-
   public async saveTriggerConfig(triggerId: string, name: string, value: JsonValue | undefined): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
@@ -895,7 +894,7 @@ export class WorkspaceStore {
     if (this.#disposed) return
     const flowId = this.#model.value.flowId
     const presentation = this.#model.value.presentation
-    if (flowId != null && presentation != null) await this.#presentationChanges.change(flowId, presentation, this.#flows.capture(), update)
+    if (flowId != null && presentation != null) await this.#presentationChanges.change(flowId, presentation, this.#draftSession.capture(), update)
   }
 
   async #checkTarget(): Promise<void> {

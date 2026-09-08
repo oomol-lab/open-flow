@@ -111,6 +111,7 @@
     "scheduleType": "Schedule type",
     "scheduleUnit": "Interval unit",
     "scheduleWeeks": "Weeks",
+    "scheduleTestHint": "Draft tests run once immediately. After publishing, the workflow runs on schedule.",
     "scheduleMissing": "No schedule configured",
     "summaryCron": "Schedule",
     "summaryIntegration": "Event source",
@@ -133,7 +134,10 @@
     "webhookNoResponseBody": "No response body",
     "webhookNullable": "Allow null",
     "webhookOrigins": "Allowed origins",
-    "webhookPayloadFields": "Payload fields",
+    "webhookPayloadFields": "Request data",
+    "webhookAdvanced": "Advanced settings",
+    "webhookTest": "Draft test",
+    "webhookTestHint": "Click Run and enter a sample payload to test. Publish the workflow to get its Webhook URL.",
     "webhookRequest": "Request",
     "webhookResponse": "Response",
     "webhookResponseData": "Response body",
@@ -590,6 +594,7 @@
   "zoomIn": "zoom in",
   "zoomOut": "zoom out",
   "canvasCard": {
+    "waitBranch": { "approve": "Approved", "reject": "Rejected", "continue": "Continue" },
     "run": "Run",
     "result": "Result",
     "logs": "Logs ({{count}})",
@@ -606,8 +611,7 @@
       "running": "Running",
       "success": "Completed",
       "error": "Failed",
-      "waiting": "Waiting",
-      "skipped": "Skipped"
+      "waiting": "Waiting"
     },
     "kind": {
       "task": "Task",

@@ -111,6 +111,7 @@
     "scheduleType": "计划类型",
     "scheduleUnit": "间隔单位",
     "scheduleWeeks": "周",
+    "scheduleTestHint": "草稿测试会立即执行一次；发布后按计划自动运行。",
     "scheduleMissing": "尚未配置计划",
     "summaryCron": "触发计划",
     "summaryIntegration": "事件来源",
@@ -133,7 +134,10 @@
     "webhookNoResponseBody": "不返回响应体",
     "webhookNullable": "允许 null",
     "webhookOrigins": "允许的来源",
-    "webhookPayloadFields": "载荷字段",
+    "webhookPayloadFields": "请求数据",
+    "webhookAdvanced": "高级设置",
+    "webhookTest": "草稿测试",
+    "webhookTestHint": "点击运行，填写模拟请求数据即可测试。发布后可获取 Webhook 请求地址。",
     "webhookRequest": "请求",
     "webhookResponse": "响应",
     "webhookResponseData": "响应内容",
@@ -590,6 +594,7 @@
   "zoomIn": "放大",
   "zoomOut": "缩小",
   "canvasCard": {
+    "waitBranch": { "approve": "通过", "reject": "拒绝", "continue": "继续" },
     "run": "运行",
     "result": "结果",
     "logs": "日志 {{count}}",
@@ -606,8 +611,7 @@
       "running": "运行中",
       "success": "已完成",
       "error": "失败",
-      "waiting": "等待处理",
-      "skipped": "已跳过"
+      "waiting": "等待处理"
     },
     "kind": {
       "task": "任务",

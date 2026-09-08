@@ -94,6 +94,16 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     query(context.req.raw, [], controlErrorCode.flowInvalid)
     return response(200, service.getFlow(context.req.param('flowId')))
   })
+  app.put('/flows/:flowId/enabled', async (context) => {
+    query(context.req.raw, [], controlErrorCode.flowInvalid)
+    const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)
+    exact(body, ['enabled', 'expectedPublicationId', 'version'], controlErrorCode.flowInvalid)
+    version(body.version, controlErrorCode.flowInvalid)
+    if (typeof body.enabled != 'boolean' || typeof body.expectedPublicationId != 'string' || body.expectedPublicationId.length == 0) {
+      throw new ControlError(controlErrorCode.flowInvalid, 'Expected an enabled state and publication ID.')
+    }
+    return response(200, service.setFlowEnabled(context.req.param('flowId'), body.expectedPublicationId, body.enabled))
+  })
   app.patch('/flows/:flowId', async (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
     const body = await requestObject(context.req.raw, controlErrorCode.flowInvalid)

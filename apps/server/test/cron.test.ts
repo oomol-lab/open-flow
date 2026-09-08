@@ -58,6 +58,32 @@ afterEach(async () => {
 })
 
 describe('Server Cron Trigger', () => {
+  it('keeps disabled schedules stopped across restart and resumes them when enabled', async () => {
+    const file = await databaseFile()
+    let service = await openService(file, { clock: () => Date.parse('2026-08-21T00:00:30.000Z') })
+    await service.publishFlow({
+      expectedLivePublicationId: null,
+      flowId: 'main',
+      idempotencyKey: 'disabled-cron',
+      revision: revision([{ type: 'every', unit: 'minute', value: 1 }]),
+      revisionId: 'revision-a',
+    })
+    const database = new DatabaseSync(file)
+    try {
+      database.exec('UPDATE flow_live SET enabled = 0')
+      await closeService(service)
+      service = await openService(file, { clock: () => Date.parse('2026-08-21T00:02:30.000Z') })
+      await service.tickCron()
+      expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 0 })
+      database.exec('UPDATE flow_live SET enabled = 1')
+      await service.tickCron()
+      expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 1 })
+    } finally {
+      database.close()
+      await closeService(service)
+    }
+  })
+
   it('rejects invalid schedules without moving Live or creating bindings', async () => {
     const file = await databaseFile()
     const service = await openService(file, { clock: () => Date.parse('2026-08-21T00:00:30.000Z') })

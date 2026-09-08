@@ -127,7 +127,7 @@
     "noFlowsDescription": "建立第一個 Flow。",
     "noMatchingDescription": "請換一個搜尋關鍵字。",
     "noMatchingFlows": "沒有符合的 Flow",
-    "retiring": "停用中",
+    "retiring": "刪除中",
     "retryLoadMore": "重試載入更多",
     "searchFlows": "搜尋 Flow…",
     "status": "狀態",
@@ -135,10 +135,23 @@
     "unpublishedChanges": "有未發布的變更",
     "upToDate": "已是最新",
     "updated": "更新時間",
-    "workflows": "工作流程"
+    "workflows": "工作流程",
+    "publication": "發佈狀態",
+    "notPublished": "未發佈",
+    "isPublished": "已發佈",
+    "enabledColumn": "啟用狀態",
+    "enabled": "已啟用",
+    "disabled": "已停用",
+    "enableFlow": "啟用 {{name}}",
+    "publishFirst": "發佈後可啟用此工作流程。",
+    "enabledHint": "控制新的線上執行，草稿測試仍可使用。",
+    "publish": "發佈",
+    "publishUpdate": "發佈更新",
+    "deleteDescription": "此操作將刪除工作流程及其執行記錄，並停止線上觸發，無法復原。"
   },
   "inspector": {
     "account": {
+      "required": "待連線",
       "addConnection": "新增 Connection",
       "authorizationPending": "請在 Connection 頁面完成授權，再回到這裡重新整理這個帳號。",
       "chooseAccount": "選擇帳號",
@@ -168,12 +181,8 @@
       "portDefinitions": "請輸入有效的埠定義。"
     },
     "node": {
-      "description": "顯示名稱與逾時",
-      "displayName": "顯示名稱",
-      "displayNamePlaceholder": "使用定義中的名稱",
       "nameDuplicate": "目前圖中已存在同名節點。",
       "nameEmpty": "節點名稱不能為空。",
-      "save": "儲存節點",
       "timeout": "逾時時間（毫秒）",
       "timeoutError": "逾時時間必須是以毫秒為單位的正整數。",
       "title": "節點設定"
@@ -195,7 +204,6 @@
       "codeSaving": "儲存中…",
       "connectorAction": "Connector 操作",
       "definition": "任務定義",
-      "definitionDescription": "名稱與執行方式",
       "discardCode": "放棄變更",
       "editorLoading": "正在載入編輯器…",
       "editorUnavailable": "無法載入程式碼編輯器。",
@@ -205,7 +213,6 @@
       "missing": "引用的任務不存在。",
       "outputPorts": "輸出埠",
       "responseMode": "回應模式",
-      "save": "儲存任務",
       "source": "原始碼",
       "structuredJson": "結構化 JSON",
       "retrySave": "重試儲存"
@@ -225,13 +232,7 @@
       "notificationUnavailable": "通知設定不可用，請重新選擇。",
       "prompt": "提示",
       "promptError": "提示必須包含 1 到 1,000 個字元。",
-      "removeNotification": "移除通知",
-      "save": "儲存"
-    },
-    "trigger": {
-      "description": "描述",
-      "save": "儲存 Trigger",
-      "title": "Trigger 定義"
+      "removeNotification": "移除通知"
     },
     "title": "檢查器",
     "sources": {
@@ -509,8 +510,7 @@
     "timelineEmpty": "執行選取的草稿後，就可以檢視它的時間軸與輸出。",
     "submitting": "正在提交這個固定修訂並建立執行紀錄…",
     "waiting": "正在等待第一個事件…",
-    "waitExpires": "到期時間：{{date}}",
-    "eventSkipped": "已略過"
+    "waitExpires": "到期時間：{{date}}"
   },
   "sidebar": {
     "createFirstFlow": "建立 Flow",
@@ -628,8 +628,10 @@
     "title": "問題"
   },
   "runInput": {
+    "triggerDataHint": "在右側輸入框填寫模擬資料，再點擊執行，測試後續節點。",
+    "triggerData": "觸發資料",
     "close": "關閉執行輸入",
-    "description": "請為每個未連接的輸入提供值。已有流程圖連線、靜態值或定義預設值的輸入不會顯示。在此填寫的值僅用於本次執行，不會儲存至 Flow。",
+    "description": "填寫本次執行需要的資料，不會修改工作流程。",
     "invalid": "執行前，請將列出的每個輸入都設為有效的 JSON 值。",
     "title": "執行輸入",
     "trigger": "起始節點",

@@ -37,6 +37,18 @@
   }
 
   @container open-flow-workbench (width <= 980px) {
+    .flow-columns {
+      grid-template-columns: minmax(0, 1fr) 104px;
+    }
+
+    .resource-list-columns.flow-columns {
+      grid-template-columns: minmax(0, 1fr) 104px 200px;
+    }
+
+    .flow-columns > :nth-child(2) {
+      display: none;
+    }
+
     .workspace-actions > .validation-state {
       display: none;
     }
@@ -102,19 +114,6 @@
 
     .resource-list-actions > [data-slot='input-group'] {
       flex: 1;
-    }
-
-    .resource-row-form {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 8px;
-    }
-
-    .flow-columns {
-      grid-template-columns: minmax(0, 1fr) 104px;
-    }
-
-    .flow-columns > :nth-child(2) {
-      display: none;
     }
 
     .resource-row-more {
@@ -302,9 +301,22 @@
   }
 
   @container open-flow-workbench (width <= 520px) {
-    .resource-row-confirm {
-      align-items: flex-start;
-      flex-direction: column;
+    .resource-item-row {
+      grid-template-columns: minmax(0, 1fr) 40px;
+    }
+
+    .resource-row-more {
+      grid-column: 2;
+    }
+
+    .resource-live-controls {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      padding: 0 16px 12px;
+    }
+
+    .resource-list-columns.flow-columns {
+      display: none;
     }
 
     .workspace-actions .publish-action {

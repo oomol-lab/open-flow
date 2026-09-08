@@ -111,6 +111,7 @@
     "scheduleType": "Type de planification",
     "scheduleUnit": "Unité d'intervalle",
     "scheduleWeeks": "Semaines",
+    "scheduleTestHint": "Le test du brouillon s’exécute immédiatement, une seule fois. Après publication, le workflow s’exécute selon le calendrier défini.",
     "scheduleMissing": "Aucune planification configurée",
     "summaryCron": "Planification",
     "summaryIntegration": "Source d'événement",
@@ -133,7 +134,10 @@
     "webhookNoResponseBody": "Aucun corps de réponse",
     "webhookNullable": "Autoriser null",
     "webhookOrigins": "Origines autorisées",
-    "webhookPayloadFields": "Champs de la charge utile",
+    "webhookPayloadFields": "Données de requête",
+    "webhookAdvanced": "Paramètres avancés",
+    "webhookTest": "Test du brouillon",
+    "webhookTestHint": "Cliquez sur Exécuter et saisissez des données de requête de test. Publiez le workflow pour obtenir son URL Webhook.",
     "webhookRequest": "Requête",
     "webhookResponse": "Réponse",
     "webhookResponseData": "Corps de la réponse",
@@ -590,6 +594,7 @@
   "zoomIn": "zoom avant",
   "zoomOut": "zoom arrière",
   "canvasCard": {
+    "waitBranch": { "approve": "Approuvé", "reject": "Refusé", "continue": "Continuer" },
     "run": "Exécution",
     "result": "Résultat",
     "logs": "Journaux ({{count}})",
@@ -606,8 +611,7 @@
       "running": "En cours",
       "success": "Terminé",
       "error": "Échec",
-      "waiting": "En attente",
-      "skipped": "Ignoré"
+      "waiting": "En attente"
     },
     "kind": {
       "task": "Tâche",

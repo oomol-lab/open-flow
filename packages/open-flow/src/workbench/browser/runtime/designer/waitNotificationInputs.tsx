@@ -13,6 +13,7 @@ export function WaitNotificationInputs({
   definitions,
   language,
   onChange,
+  onCommit,
   onValidChange,
   showErrors,
   theme,
@@ -21,6 +22,7 @@ export function WaitNotificationInputs({
   readonly definitions: readonly FlowRunInputDefinition[]
   readonly language: string
   readonly onChange: (values: Readonly<Record<string, JsonValue>>) => void
+  readonly onCommit: (values: Readonly<Record<string, JsonValue>>, valid: boolean) => void
   readonly onValidChange: (valid: boolean) => void
   readonly showErrors: boolean
   readonly theme: WorkbenchTheme
@@ -46,5 +48,9 @@ export function WaitNotificationInputs({
     [language$, store],
   )
 
-  return <FlowRunInputEditor showErrors={showErrors} store={store} theme={theme} />
+  return (
+    <div onBlur={() => onCommit(store.values() as Readonly<Record<string, JsonValue>>, store.valid$.value)}>
+      <FlowRunInputEditor showErrors={showErrors} store={store} theme={theme} />
+    </div>
+  )
 }

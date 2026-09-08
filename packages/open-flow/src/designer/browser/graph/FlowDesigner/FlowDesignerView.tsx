@@ -16,6 +16,7 @@ import { FlowDesigner } from './FlowDesigner.tsx'
 function callbacksFromProps(props: FlowDesignerViewProps): ViewCallbacks {
   return {
     onAddNode: props.onAddNode,
+    onMoveNodes: props.onMoveNodes,
     onChangeComment: props.onChangeComment,
     onChangeCondition: props.onChangeCondition,
     onChangeNodeDescription: props.onChangeNodeDescription,

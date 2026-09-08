@@ -1,6 +1,5 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { TriggerSettings } from '../../../../flow/common/nodeChanges.ts'
 import type { WorkbenchClient, ConnectorConnection, TriggerKeySnapshot } from '../api.ts'
 import type { WorkbenchHost } from '../contract.ts'
 import type { AddNodeOption } from '../designer/addNodeOptions.ts'
@@ -215,10 +214,6 @@ export class TriggerStore {
 
   public async setConnection(triggerId: string, connectionId: string): Promise<boolean> {
     return await this.#workspace.setTriggerConnection(triggerId, connectionId)
-  }
-
-  public async saveSettings(triggerId: string, settings: TriggerSettings): Promise<boolean> {
-    return await this.#workspace.saveTriggerSettings(triggerId, settings)
   }
 
   public async refreshAfterAuthorization(): Promise<void> {

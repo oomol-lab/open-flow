@@ -63,6 +63,7 @@ Flow 是顶层资源：
 
 ```ts
 interface Flow {
+  live?: { enabled: boolean; publicationId: string; revisionId: string }
   createdAt: string
   draftRevisionId: string
   flowId: string
@@ -82,6 +83,11 @@ interface FlowPage {
 
 `flowId` 由部署生成。删除请求把 Flow 推进到 `retiring`，此后 Draft mutation、Run、Publish、Rollback 和 Trigger admission fail closed。
 `total` 只在 `includeTotal=true` 时要求返回。
+
+Flow 的 `live` 在未发布时省略，存在时表示当前发布版本与总开关。列表与单个 Flow 返回相同投影；`revisionId` 与 `draftRevisionId` 可用于区分草稿版本是否更新。
+`PUT /v1/flows/:flowId/enabled` 接受 `{ enabled: boolean, expectedPublicationId: string, version: 1 }`，不接受其他字段或 query，成功返回 `200 Flow`。
+Flow 不存在返回 `404 flow.not-found`；未发布、Publication 已变化或 Flow 已进入 retiring 返回 `409 flow.conflict`。
+首次发布默认 enabled=true；发布与回滚保留 enabled。enabled=false 时 Live status 为 suspended，新的 Live Run 返回 `412 live.conflict`；草稿测试不受影响。
 
 ```ts
 interface RevisionMetadata {
@@ -534,12 +540,12 @@ Scheduler checkpoint 的精确对象为：
 `results` 保存已完成节点的最终 output，`skipped` 保存已跳过节点。checkpoint 不包含队列、活跃 invocation 或重复消费位置，总 JSON 大小不得超过 16 MiB。
 恢复必须验证精确字段、节点状态不冲突、结果符合声明、依赖完整且符合分支选择；当前 Wait 不能已经完成或跳过。
 
-`node.skipped` 表示节点因入边未被选中而跳过，不产生 `node.started` 或 `node.completed`。
+未进入执行路径的节点不创建 job 或 execution identity，也不产生节点事件；分支跳过状态只用于内部调度和 checkpoint 恢复。
 `node.completed` 仅在节点完整 output 校验成功后产生，payload 的 `outputs` 是按 handle 索引的完整最终结果对象，无输出时为 `{}`。
 每次节点 invocation 只产生一条完成事件，且先于下游节点的 `node.started`；不再产生逐 handle 的 `node.output`，也不支持运行中的中间 output。
 
-Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 保存执行图末端节点，按 node ID 排序。
-完成项为 `{ nodeId, status: 'completed', jobId, outputs }`，跳过项为 `{ nodeId, status: 'skipped' }`，不包含重复执行的 jobs 数组。
+Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保存已执行完成的图末端节点，按 node ID 排序。
+每项为 `{ nodeId, status: 'completed', jobId, outputs }`，不包含未执行节点或重复执行的 jobs 数组；没有已执行完成的末端节点时为 `[]`。
 
 ## 9. Code Action 合同
 

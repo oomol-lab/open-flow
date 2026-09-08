@@ -111,6 +111,7 @@
     "scheduleType": "スケジュール種別",
     "scheduleUnit": "間隔の単位",
     "scheduleWeeks": "週間",
+    "scheduleTestHint": "下書きのテストはすぐに1回実行されます。公開後はスケジュールに従って自動実行されます。",
     "scheduleMissing": "スケジュールが未設定です",
     "summaryCron": "実行スケジュール",
     "summaryIntegration": "イベントソース",
@@ -133,7 +134,10 @@
     "webhookNoResponseBody": "レスポンスボディなし",
     "webhookNullable": "null を許可",
     "webhookOrigins": "許可するオリジン",
-    "webhookPayloadFields": "ペイロードフィールド",
+    "webhookPayloadFields": "リクエストデータ",
+    "webhookAdvanced": "詳細設定",
+    "webhookTest": "下書きのテスト",
+    "webhookTestHint": "実行をクリックし、テスト用のリクエストデータを入力してください。公開後に Webhook URL を取得できます。",
     "webhookRequest": "リクエスト",
     "webhookResponse": "レスポンス",
     "webhookResponseData": "レスポンスボディ",
@@ -590,6 +594,7 @@
   "zoomIn": "拡大",
   "zoomOut": "縮小",
   "canvasCard": {
+    "waitBranch": { "approve": "承認", "reject": "拒否", "continue": "続行" },
     "run": "実行",
     "result": "結果",
     "logs": "ログ {{count}}",
@@ -606,8 +611,7 @@
       "running": "実行中",
       "success": "完了",
       "error": "失敗",
-      "waiting": "待機中",
-      "skipped": "スキップ"
+      "waiting": "待機中"
     },
     "kind": {
       "task": "タスク",

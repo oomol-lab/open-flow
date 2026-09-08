@@ -135,10 +135,23 @@
     "unpublishedChanges": "게시되지 않은 변경 사항",
     "upToDate": "최신 상태",
     "updated": "업데이트 시간",
-    "workflows": "워크플로"
+    "workflows": "워크플로",
+    "publication": "게시 상태",
+    "notPublished": "미게시",
+    "isPublished": "게시됨",
+    "enabledColumn": "활성 상태",
+    "enabled": "활성",
+    "disabled": "비활성",
+    "enableFlow": "{{name}} 활성화",
+    "publishFirst": "게시 후 활성화할 수 있습니다.",
+    "enabledHint": "새 프로덕션 실행을 제어합니다. 초안 테스트는 계속 사용할 수 있습니다.",
+    "publish": "게시",
+    "publishUpdate": "업데이트 게시",
+    "deleteDescription": "워크플로와 실행 기록을 삭제하고 프로덕션 트리거를 중지합니다. 이 작업은 되돌릴 수 없습니다."
   },
   "inspector": {
     "account": {
+      "required": "연결 필요",
       "addConnection": "Connection 추가",
       "authorizationPending": "Connection 페이지에서 인증을 마친 뒤 여기로 돌아와 이 계정을 새로 고치세요.",
       "chooseAccount": "계정 선택",
@@ -168,12 +181,8 @@
       "portDefinitions": "올바른 포트 정의를 입력하세요."
     },
     "node": {
-      "description": "표시 이름 및 시간 제한",
-      "displayName": "표시 이름",
-      "displayNamePlaceholder": "정의된 이름 사용",
       "nameDuplicate": "이 그래프에 같은 이름의 노드가 이미 있습니다.",
       "nameEmpty": "노드 이름은 비워 둘 수 없습니다.",
-      "save": "노드 저장",
       "timeout": "제한 시간(ms)",
       "timeoutError": "제한 시간은 밀리초 단위의 양의 정수여야 합니다.",
       "title": "노드 설정"
@@ -195,7 +204,6 @@
       "codeSaving": "저장 중…",
       "connectorAction": "Connector 액션",
       "definition": "태스크 정의",
-      "definitionDescription": "이름과 실행 방식",
       "discardCode": "변경 사항 버리기",
       "editorLoading": "편집기 불러오는 중…",
       "editorUnavailable": "코드 편집기를 불러오지 못했습니다.",
@@ -205,7 +213,6 @@
       "missing": "참조된 태스크가 존재하지 않습니다.",
       "outputPorts": "출력 포트",
       "responseMode": "응답 모드",
-      "save": "태스크 저장",
       "source": "소스",
       "structuredJson": "구조화된 JSON",
       "retrySave": "저장 재시도"
@@ -225,13 +232,7 @@
       "notificationUnavailable": "알림 구성을 사용할 수 없습니다. 다시 선택하세요.",
       "prompt": "프롬프트",
       "promptError": "프롬프트는 1~1,000자여야 합니다.",
-      "removeNotification": "알림 제거",
-      "save": "저장"
-    },
-    "trigger": {
-      "description": "설명",
-      "save": "Trigger 저장",
-      "title": "Trigger 정의"
+      "removeNotification": "알림 제거"
     },
     "title": "인스펙터",
     "sources": {
@@ -509,8 +510,7 @@
     "timelineEmpty": "선택한 초안을 실행하면 타임라인과 출력을 확인할 수 있습니다.",
     "submitting": "고정된 리비전을 제출하고 실행 기록을 만드는 중…",
     "waiting": "첫 이벤트를 기다리는 중…",
-    "waitExpires": "만료: {{date}}",
-    "eventSkipped": "건너뜀"
+    "waitExpires": "만료: {{date}}"
   },
   "sidebar": {
     "createFirstFlow": "Flow 만들기",
@@ -628,8 +628,10 @@
     "title": "문제"
   },
   "runInput": {
+    "triggerDataHint": "오른쪽 입력란에 테스트 데이터를 입력한 뒤 실행을 눌러 다음 노드를 테스트하세요.",
+    "triggerData": "트리거 데이터",
     "close": "실행 입력 닫기",
-    "description": "연결되지 않은 각 입력에 값을 지정하세요. 그래프 연결, 정적 값 또는 정의된 기본값이 있는 입력은 표시되지 않습니다. 여기에 입력한 값은 이번 실행에만 사용되며 Flow에 저장되지 않습니다.",
+    "description": "이번 실행에 필요한 데이터를 입력하세요. 워크플로는 변경되지 않습니다.",
     "invalid": "실행하기 전에 나열된 모든 입력에 유효한 JSON 값을 설정하세요.",
     "title": "실행 입력",
     "trigger": "시작 노드",

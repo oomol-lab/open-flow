@@ -324,7 +324,7 @@ export class IntegrationStore {
           `SELECT 1
            FROM integration_bindings AS bindings
            JOIN flow_live
-             ON flow_live.flow_id = bindings.flow_id
+             ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
             AND flow_live.publication_id = bindings.current_publication_id
            JOIN publications
              ON publications.publication_id = bindings.current_publication_id
@@ -522,7 +522,7 @@ export class IntegrationStore {
                 states.reconcile_at AS stateReconcileAt, states.updated_at AS stateUpdatedAt
          FROM integration_bindings AS bindings
          JOIN flow_live
-           ON flow_live.flow_id = bindings.flow_id
+           ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
           AND flow_live.publication_id = bindings.current_publication_id
          JOIN publications ON publications.publication_id = bindings.current_publication_id
          JOIN revisions ON revisions.revision_id = publications.revision_id

@@ -111,6 +111,7 @@
     "scheduleType": "일정 유형",
     "scheduleUnit": "간격 단위",
     "scheduleWeeks": "주",
+    "scheduleTestHint": "초안 테스트는 즉시 한 번 실행됩니다. 게시 후에는 설정한 일정에 따라 자동으로 실행됩니다.",
     "scheduleMissing": "설정된 일정이 없습니다",
     "summaryCron": "일정",
     "summaryIntegration": "이벤트 소스",
@@ -133,7 +134,10 @@
     "webhookNoResponseBody": "응답 본문 없음",
     "webhookNullable": "null 허용",
     "webhookOrigins": "허용 출처",
-    "webhookPayloadFields": "페이로드 필드",
+    "webhookPayloadFields": "요청 데이터",
+    "webhookAdvanced": "고급 설정",
+    "webhookTest": "초안 테스트",
+    "webhookTestHint": "실행을 클릭하고 테스트용 요청 데이터를 입력하세요. 게시 후 Webhook URL을 받을 수 있습니다.",
     "webhookRequest": "요청",
     "webhookResponse": "응답",
     "webhookResponseData": "응답 본문",
@@ -590,6 +594,7 @@
   "zoomIn": "확대",
   "zoomOut": "축소",
   "canvasCard": {
+    "waitBranch": { "approve": "승인", "reject": "거부", "continue": "계속" },
     "run": "실행",
     "result": "결과",
     "logs": "로그 {{count}}",
@@ -606,8 +611,7 @@
       "running": "실행 중",
       "success": "완료",
       "error": "실패",
-      "waiting": "대기 중",
-      "skipped": "건너뜀"
+      "waiting": "대기 중"
     },
     "kind": {
       "task": "작업",

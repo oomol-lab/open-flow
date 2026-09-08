@@ -1274,6 +1274,7 @@ export class ServerService {
       }
       switch (accepted.kind) {
         case 'published':
+          this.#notifyFlowCatalog()
           this.#logger.info(
             { category: 'publication.succeeded', operationId: target.operationId, publicationId: accepted.publicationId },
             'Publish operation succeeded.',

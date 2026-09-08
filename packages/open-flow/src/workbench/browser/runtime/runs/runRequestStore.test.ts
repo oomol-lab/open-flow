@@ -116,6 +116,63 @@ it('starts directly from the only manual trigger', async () => {
   }
 })
 
+function cronDraft(base: Draft): Draft {
+  return {
+    ...base,
+    content: {
+      ...base.content,
+      document: {
+        ...base.content.document,
+        graph: {
+          ...base.content.document.graph,
+          nodes: {
+            ...base.content.document.graph.nodes,
+            start: { kind: 'cron', name: 'Schedule', cronTimes: [{ type: 'every', unit: 'day', value: 1 }] },
+          },
+        },
+      },
+    },
+  }
+}
+
+it.each([false, true])('starts a cron test immediately with an explicit selection: %s', async (selected) => {
+  const { client, store } = harness()
+  const revision = cronDraft(entryDraft(selected))
+  try {
+    expect(await store.requestDraft(flow, revision, selected ? 'start' : undefined)).toBe('started')
+    expect(store.$.inputRequest.value).toBeUndefined()
+    expect(client.createDraftRun).toHaveBeenCalledExactlyOnceWith(
+      'flow',
+      'revision',
+      expect.objectContaining({ trigger: { nodeId: 'start', payload: {} }, inputs: {} }),
+    )
+    expect(client.createLiveRun).not.toHaveBeenCalled()
+  } finally {
+    store.dispose()
+  }
+})
+
+it('collects downstream inputs for a cron test without asking for a trigger payload', async () => {
+  const { client, store } = harness()
+  const revision = cronDraft(draft)
+  try {
+    expect(await store.requestDraft(flow, revision)).toBe('input')
+    expect(client.createDraftRun).not.toHaveBeenCalled()
+    expect(await store.confirmInputs()).toBe(false)
+    const groups = store.$.inputRequest.value?.groups ?? []
+    expect(groups.map((group) => group.nodeId)).toEqual(['task'])
+    groups[0]?.editor.replaceValues({ value: 'test' })
+    expect(await store.confirmInputs()).toBe(true)
+    expect(client.createDraftRun).toHaveBeenCalledExactlyOnceWith(
+      'flow',
+      'revision',
+      expect.objectContaining({ trigger: { nodeId: 'start', payload: {} }, inputs: { task: { value: 'test' } } }),
+    )
+  } finally {
+    store.dispose()
+  }
+})
+
 it('requires an explicit choice for multiple triggers and submits only the selected entry', async () => {
   const { client, store } = harness()
   try {

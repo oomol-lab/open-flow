@@ -1,3 +1,4 @@
+import inputStyles from '../../flowRunInputEditor.module.scss'
 import type { FormEvent, KeyboardEvent, ReactElement } from 'react'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { RunInputGroup, RunInputRequest, RunRequestStore } from './runRequestStore.ts'
@@ -19,14 +20,24 @@ interface Props {
   readonly theme: WorkbenchTheme
 }
 
-function InputGroup({ attempted, group, theme }: { readonly attempted: boolean; readonly group: RunInputGroup; readonly theme: WorkbenchTheme }): ReactElement {
+function InputGroup({
+  attempted,
+  group,
+  title,
+  hint,
+  theme,
+}: {
+  readonly attempted: boolean
+  readonly title: string
+  readonly hint?: string
+  readonly group: RunInputGroup
+  readonly theme: WorkbenchTheme
+}): ReactElement {
   return (
     <section className="run-input-group">
       <header>
-        <div>
-          <strong>{group.title}</strong>
-          <code>{group.nodeId}</code>
-        </div>
+        <strong>{title}</strong>
+        {hint != null && <p>{hint}</p>}
       </header>
       <FlowRunInputEditor store={group.editor} theme={theme} showErrors={attempted} />
     </section>
@@ -84,32 +95,46 @@ function Panel({ onStarted, request, store, theme }: Props & { readonly request:
         </header>
         <div className="run-input-content">
           <p id="run-input-description">{t('runInput.description')}</p>
-          <Field>
-            <FieldLabel htmlFor="run-trigger">{t('runInput.trigger')}</FieldLabel>
-            <NativeSelect
-              id="run-trigger"
-              disabled={starting}
-              value={request.triggerId ?? ''}
-              onChange={(event) => void store.selectTrigger(event.target.value)}
-            >
-              <NativeSelectOption value="" disabled>
-                {t('runInput.selectTrigger')}
-              </NativeSelectOption>
-              {request.triggers.map((trigger) => (
-                <NativeSelectOption key={trigger.nodeId} value={trigger.nodeId}>
-                  {trigger.title}
+          {request.triggers.length == 1 ? (
+            <div className="run-input-trigger">
+              <span>{t('runInput.trigger')}</span>
+              <strong>{request.triggers[0]?.title}</strong>
+            </div>
+          ) : (
+            <Field className={`oo-designer-root ${inputStyles.root} ${inputStyles.trigger}`}>
+              <FieldLabel htmlFor="run-trigger">{t('runInput.trigger')}</FieldLabel>
+              <NativeSelect
+                id="run-trigger"
+                disabled={starting}
+                value={request.triggerId ?? ''}
+                onChange={(event) => void store.selectTrigger(event.target.value)}
+              >
+                <NativeSelectOption value="" disabled>
+                  {t('runInput.selectTrigger')}
                 </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </Field>
+                {request.triggers.map((trigger) => (
+                  <NativeSelectOption key={trigger.nodeId} value={trigger.nodeId}>
+                    {trigger.title}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+          )}
           {request.attempted && !valid && (
-            <Alert className="mb-4" variant="destructive">
+            <Alert variant="destructive">
               <Icon name="alert" />
               <AlertDescription>{t('runInput.invalid')}</AlertDescription>
             </Alert>
           )}
           {request.groups.map((group) => (
-            <InputGroup attempted={request.attempted} group={group} key={group.nodeId} theme={theme} />
+            <InputGroup
+              attempted={request.attempted}
+              group={group}
+              key={group.nodeId}
+              title={group.nodeId == request.triggerId ? t('runInput.triggerData') : group.title}
+              hint={group.nodeId == request.triggerId ? t('runInput.triggerDataHint') : undefined}
+              theme={theme}
+            />
           ))}
         </div>
         <footer>

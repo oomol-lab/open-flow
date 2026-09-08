@@ -1203,6 +1203,23 @@ describe('FlowDesignerView model synchronization', () => {
     store.dispose()
   })
 
+  it('sends automatic and requested layout positions to the host for persistence', () => {
+    const onMoveNodes = vi.fn()
+    const view = FlowDesignerView(props(model([task([])]), { autoLayout: true, onMoveNodes })) as React.ReactElement<FlowDesignerProps>
+    const store = view.props.flowDesignerStore
+    const node = [...store.$.nodes.values()][0]
+    if (node == null) throw new Error('Expected a Task node.')
+    node.$$.rfNode.set({ ...node.$.rfNode.value, measured: { width: 420, height: 240 } })
+    store.completeLayout()
+    expect(onMoveNodes).toHaveBeenLastCalledWith({ [node.nodeId]: node.$.position.value })
+    node.$$.position.set({ x: 2000, y: 3000 })
+    store.onRelayout()
+    expect(node.$.position.value).not.toEqual({ x: 2000, y: 3000 })
+    expect(onMoveNodes).toHaveBeenCalledTimes(2)
+    expect(onMoveNodes).toHaveBeenLastCalledWith({ [node.nodeId]: node.$.position.value })
+    store.dispose()
+  })
+
   it('restores the viewport without replacing node positions', () => {
     const value: FlowDesignerViewModel = {
       edges: [],

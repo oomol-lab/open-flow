@@ -1,6 +1,5 @@
 import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
-import type { TriggerSettings } from '../../../../flow/common/nodeChanges.ts'
 import type { ConnectorAction, ConnectorConnection, Diagnostic, JsonValue } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
@@ -10,13 +9,12 @@ import type { TriggerStore } from '../stores/triggerStore.ts'
 import type { ModuleEditorStatus } from '../stores/workspaceModel.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 import type { DiagnosticFocus } from './diagnostics.ts'
-import type { DesignerTarget, SubflowSettings, TaskSettings } from './flowChanges.ts'
+import type { DesignerTarget, SubflowSettings } from './flowChanges.ts'
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { OverlayScrollbar } from '../../../../designer/browser/components/overlayScrollbar.tsx'
-import { nodeNameIssue } from '../../../../flow/common/change.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
@@ -54,13 +52,6 @@ function json(value: unknown): string {
   return JSON.stringify(value, null, 2)
 }
 
-function nodeNameError(revision: RevisionView, target: DesignerTarget, nodeId: string, name: string, t: TFunction): string | undefined {
-  const graph = revision.graph(target)
-  if (graph == null) return
-  const issue = nodeNameIssue(graph, nodeId, name)
-  return issue == null ? undefined : t(`inspector.node.${issue == 'empty' ? 'nameEmpty' : 'nameDuplicate'}`)
-}
-
 function arrayValue<Value extends readonly unknown[]>(value: string, label: string, t: TFunction): Value {
   const parsed = JSON.parse(value) as unknown
   if (!Array.isArray(parsed)) throw new TypeError(t('inspector.errors.portDefinitions', { label }))
@@ -80,8 +71,11 @@ function codeStatusLabel(status: ModuleEditorStatus, t: TFunction): string {
   }
 }
 
-function Diagnostics({ diagnostics }: { readonly diagnostics: readonly Diagnostic[] }): ReactElement | null {
+function Diagnostics({ diagnostics: incoming, pending }: { readonly diagnostics: readonly Diagnostic[]; readonly pending: boolean }): ReactElement | null {
   const t = useTranslate()
+  const [previous, setPrevious] = useState(incoming)
+  if (!pending && previous != incoming) setPrevious(incoming)
+  const diagnostics = pending ? previous : incoming
   if (diagnostics.length == 0) return null
   const incomplete = diagnostics.every((diagnostic) => diagnostic.code == 'trigger.config-incomplete')
   return (
@@ -205,29 +199,33 @@ function GeneralSettings({
   disabled,
   node,
   nodeId,
-  revision,
   store,
-  target,
 }: {
   readonly disabled: boolean
   readonly node: ResolvedNode['node']
   readonly nodeId: string
-  readonly revision: RevisionView
   readonly store: WorkspaceStore
-  readonly target: DesignerTarget
 }): ReactElement {
   const t = useTranslate()
-  const [name, setName] = useState(node.name ?? '')
   const [timeout, setTimeoutValue] = useState(node.timeoutMs == null ? '' : String(node.timeoutMs))
   const [error, setError] = useState<string>()
-  const fieldIdPrefix = `node-${nodeId}`
-  const nameError = nodeNameError(revision, target, nodeId, name, t)
+  const inputId = `node-${nodeId}-timeout`
 
   useEffect(() => {
-    setName(node.name ?? '')
     setTimeoutValue(node.timeoutMs == null ? '' : String(node.timeoutMs))
     setError(undefined)
-  }, [node])
+  }, [node.timeoutMs, nodeId])
+
+  function save(source: string): void {
+    const value = source.trim() == '' ? undefined : Number(source)
+    if (value != null && (!Number.isInteger(value) || value < 1)) {
+      setError(t('inspector.node.timeoutError'))
+      return
+    }
+    setError(undefined)
+    if (value == node.timeoutMs) return
+    void store.saveNodeSettings(nodeId, { name: node.name, ...(value == null ? {} : { timeoutMs: value }) })
+  }
 
   return (
     <details className="inspector-disclosure" data-inspector-section="node">
@@ -235,61 +233,25 @@ function GeneralSettings({
         <Icon name="chevron-down" size={14} />
         <span className="inspector-disclosure-summary">
           <strong>{t('inspector.node.title')}</strong>
-          <span>{t('inspector.node.description')}</span>
         </span>
       </summary>
-      <form
-        className="inspector-form inspector-disclosure-content"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (nameError != null) return
-          const timeoutValue = timeout == '' ? undefined : Number(timeout)
-          if (timeoutValue != null && (!Number.isInteger(timeoutValue) || timeoutValue < 1)) {
-            setError(t('inspector.node.timeoutError'))
-            return
-          }
-          setError(undefined)
-          void store.saveNodeSettings(nodeId, {
-            name: name.trim(),
-            ...(timeoutValue == null ? {} : { timeoutMs: timeoutValue }),
-          })
-        }}
-      >
-        <FieldGroup>
-          <Field data-invalid={nameError != null}>
-            <FieldLabel htmlFor={`${fieldIdPrefix}-name`}>{t('inspector.node.displayName')}</FieldLabel>
-            <Input
-              disabled={disabled}
-              aria-invalid={nameError != null}
-              id={`${fieldIdPrefix}-name`}
-              onChange={(event) => setName(event.target.value)}
-              placeholder={t('inspector.node.displayNamePlaceholder')}
-              value={name}
-            />
-            {nameError != null && <FieldError>{nameError}</FieldError>}
-          </Field>
-          <div className="field-pair">
-            <Field>
-              <FieldLabel htmlFor={`${fieldIdPrefix}-timeout`}>{t('inspector.node.timeout')}</FieldLabel>
-              <Input
-                disabled={disabled}
-                id={`${fieldIdPrefix}-timeout`}
-                min="1"
-                onChange={(event) => setTimeoutValue(event.target.value)}
-                placeholder={t('common.default')}
-                type="number"
-                value={timeout}
-              />
-            </Field>
-          </div>
+      <div className="inspector-disclosure-content node-settings">
+        <Field data-invalid={error != null}>
+          <FieldLabel htmlFor={inputId}>{t('inspector.node.timeout')}</FieldLabel>
+          <Input
+            aria-invalid={error != null}
+            disabled={disabled}
+            id={inputId}
+            min="1"
+            onChange={(event) => setTimeoutValue(event.target.value)}
+            onBlur={(event) => save(event.currentTarget.value)}
+            placeholder={t('common.default')}
+            type="number"
+            value={timeout}
+          />
           {error != null && <FieldError>{error}</FieldError>}
-        </FieldGroup>
-        <div className="form-actions">
-          <Button disabled={disabled || nameError != null} size="sm" type="submit" variant="secondary">
-            {t('inspector.node.save')}
-          </Button>
-        </div>
-      </form>
+        </Field>
+      </div>
     </details>
   )
 }
@@ -330,6 +292,7 @@ function ConnectorAccount({
     <section className={`inspector-section connection-state ${required ? 'required' : ''}`} data-inspector-section="account">
       <h3>
         <Icon name="connection" size={15} /> {t('inspector.account.title')}
+        {required && <span className="connection-status">{t('inspector.account.required')}</span>}
       </h3>
       {loading ? (
         <p>{t('inspector.account.loading')}</p>
@@ -353,7 +316,9 @@ function ConnectorAccount({
           <>
             {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
             <Field className="connection-field">
-              <FieldLabel htmlFor={`${fieldIdPrefix}-connection`}>{t('inspector.account.connection')}</FieldLabel>
+              <FieldLabel className="sr-only" htmlFor={`${fieldIdPrefix}-connection`}>
+                {t('inspector.account.connection')}
+              </FieldLabel>
               <NativeSelect
                 disabled={disabled}
                 id={`${fieldIdPrefix}-connection`}
@@ -371,24 +336,29 @@ function ConnectorAccount({
                 ))}
               </NativeSelect>
             </Field>
-            <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="sm" type="button" variant="secondary">
+            <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="xs" type="button" variant="ghost">
               <Icon data-icon="inline-start" name="plus" /> {t('inspector.account.addConnection')}
             </Button>
           </>
         ) : (
           <>
             {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
-            <p>{t('inspector.account.connectBeforeRun', { service: action.serviceName })}</p>
-            <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="sm" type="button">
-              {t('inspector.account.connectService', { service: action.serviceName })}
-            </Button>
+            <div className="connection-prompt">
+              <p>{t('inspector.account.connectBeforeRun', { service: action.serviceName })}</p>
+              <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="sm" type="button">
+                <Icon data-icon="inline-start" name="plus" />
+                {t('inspector.account.connectService', { service: action.serviceName })}
+              </Button>
+            </div>
           </>
         )
       ) : (
         <>
           {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
           <Field className="connection-field">
-            <FieldLabel htmlFor={`${fieldIdPrefix}-connection`}>{t('inspector.account.connection')}</FieldLabel>
+            <FieldLabel className="sr-only" htmlFor={`${fieldIdPrefix}-connection`}>
+              {t('inspector.account.connection')}
+            </FieldLabel>
             <NativeSelect
               disabled={disabled || available.length == 0}
               id={`${fieldIdPrefix}-connection`}
@@ -415,7 +385,7 @@ function ConnectorAccount({
           ) : (
             <p>{t(`inspector.account.status.${connection.status}`)}</p>
           )}
-          <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="sm" type="button" variant="secondary">
+          <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="xs" type="button" variant="ghost">
             <Icon data-icon="inline-start" name="plus" /> {t('inspector.account.addConnection')}
           </Button>
         </>
@@ -458,7 +428,6 @@ function WaitDefinition({
   const language = useLang()
   const t = useTranslate()
   const node = selection.node
-  const [name, setName] = useState(node.name ?? '')
   const [mode, setMode] = useState<'approval' | 'continue'>(node.actions.length == 1 ? 'continue' : 'approval')
   const [notificationTaskId, setNotificationTaskId] = useState(node.notification?.taskId ?? '')
   const [messageHandle, setMessageHandle] = useState(node.notification?.messageHandle ?? '')
@@ -466,7 +435,6 @@ function WaitDefinition({
   const [error, setError] = useState<string>()
   const [inputAttempted, setInputAttempted] = useState(false)
   const fieldIdPrefix = `wait-${selection.id}`
-  const nameError = nodeNameError(revision, { kind: 'flow' }, selection.id, name, t)
   const savedMode = node.actions.length == 1 ? 'continue' : 'approval'
   const notificationTask = notificationTaskId == '' ? undefined : revision.task(notificationTaskId)
   const notificationName = (connectorAction?.name ?? notificationTask?.name ?? '').replaceAll('_', ' ')
@@ -503,7 +471,6 @@ function WaitDefinition({
   const [inputsValid, setInputsValid] = useState(inputDefinitions.length == 0)
 
   useEffect(() => {
-    setName(node.name ?? '')
     setMode(node.actions.length == 1 ? 'continue' : 'approval')
     setNotificationTaskId(node.notification?.taskId ?? '')
     setMessageHandle(node.notification?.messageHandle ?? '')
@@ -519,20 +486,35 @@ function WaitDefinition({
 
   useEffect(() => setInputsValid(inputDefinitions.length == 0), [inputDefinitions])
 
-  const save = async (validateInputs = true, nextMode = mode, nextNotificationTaskId = notificationTaskId): Promise<boolean> => {
-    if (nameError != null) return false
-    const value = prompt.trim()
+  const save = async ({
+    validateInputs = true,
+    nextMode = mode,
+    taskId = notificationTaskId,
+    text = prompt,
+    handle = messageHandle,
+    values = notificationValues,
+    valid = inputsValid,
+  }: {
+    readonly validateInputs?: boolean
+    readonly nextMode?: 'approval' | 'continue'
+    readonly taskId?: string
+    readonly text?: string
+    readonly handle?: string
+    readonly values?: Readonly<Record<string, JsonValue>>
+    readonly valid?: boolean
+  } = {}): Promise<boolean> => {
+    const value = text.trim()
     if (value.length == 0 || [...value].length > 1_000) {
       setError(t('inspector.wait.promptError'))
       return false
     }
     let notification: typeof node.notification
-    if (nextNotificationTaskId != '') {
-      if (notificationTask?.executor.kind != 'connector' || !messageHandles.includes(messageHandle)) {
+    if (taskId != '') {
+      if (notificationTask?.executor.kind != 'connector' || !messageHandles.includes(handle)) {
         setError(t('inspector.wait.notificationUnavailable'))
         return false
       }
-      if (validateInputs && !inputsValid) {
+      if (validateInputs && !valid) {
         setInputAttempted(true)
         setError(t('inspector.wait.inputsInvalid'))
         return false
@@ -541,27 +523,27 @@ function WaitDefinition({
       notification = {
         inputs: {
           ...mappedInputs,
-          ...Object.fromEntries(Object.entries(notificationValues).map(([handle, input]) => [handle, { kind: 'value' as const, value: input }])),
+          ...Object.fromEntries(Object.entries(values).map(([key, input]) => [key, { kind: 'value' as const, value: input }])),
         },
-        messageHandle,
-        taskId: nextNotificationTaskId,
+        messageHandle: handle,
+        taskId,
       }
     }
     setError(undefined)
     return await store.saveWait(selection.id, {
       actions: nextMode == 'continue' ? ['continue'] : ['approve', 'reject'],
-      name: name.trim(),
+      name: node.name,
       notification,
       prompt: value,
     })
   }
 
   const chooseNotification = async (button: HTMLButtonElement): Promise<void> => {
-    if (name.trim() == (node.name ?? '') && prompt.trim() == node.prompt && mode == savedMode) {
+    if (prompt.trim() == node.prompt && mode == savedMode) {
       onChooseNotification(button)
       return
     }
-    if (await save(false)) onChooseNotification(button)
+    if (await save({ validateInputs: false })) onChooseNotification(button)
   }
 
   return (
@@ -575,20 +557,18 @@ function WaitDefinition({
         }}
       >
         <FieldGroup>
-          <Field data-invalid={nameError != null}>
-            <FieldLabel htmlFor={`${fieldIdPrefix}-name`}>{t('common.name')}</FieldLabel>
-            <Input
-              aria-invalid={nameError != null}
-              disabled={disabled}
-              id={`${fieldIdPrefix}-name`}
-              onChange={(event) => setName(event.target.value)}
-              value={name}
-            />
-            {nameError != null && <FieldError>{nameError}</FieldError>}
-          </Field>
           <Field>
             <FieldLabel htmlFor={`${fieldIdPrefix}-prompt`}>{t('inspector.wait.prompt')}</FieldLabel>
-            <Textarea disabled={disabled} id={`${fieldIdPrefix}-prompt`} onChange={(event) => setPrompt(event.target.value)} rows={3} value={prompt} />
+            <Textarea
+              disabled={disabled}
+              id={`${fieldIdPrefix}-prompt`}
+              onChange={(event) => setPrompt(event.target.value)}
+              onBlur={(event) => {
+                if (event.currentTarget.value.trim() != node.prompt) void save({ validateInputs: false, text: event.currentTarget.value })
+              }}
+              rows={3}
+              value={prompt}
+            />
           </Field>
           <Field>
             <FieldLabel>{t('inspector.wait.mode')}</FieldLabel>
@@ -600,7 +580,7 @@ function WaitDefinition({
                 const value = values.at(-1)
                 if (value == null || value == mode) return
                 setMode(value)
-                void save(false, value).then((saved) => {
+                void save({ validateInputs: false, nextMode: value }).then((saved) => {
                   if (!saved) setMode(savedMode)
                 })
               }}
@@ -616,7 +596,14 @@ function WaitDefinition({
           <Field>
             <FieldLabel>{t('inspector.wait.notificationTask')}</FieldLabel>
             {notificationTask == null ? (
-              <Button disabled={disabled} onClick={(event) => void chooseNotification(event.currentTarget)} size="sm" type="button" variant="secondary">
+              <Button
+                className="self-start"
+                disabled={disabled}
+                onClick={(event) => void chooseNotification(event.currentTarget)}
+                size="xs"
+                type="button"
+                variant="ghost"
+              >
                 <Icon data-icon="inline-start" name="plus" /> {t('inspector.wait.chooseNotification')}
               </Button>
             ) : (
@@ -630,7 +617,7 @@ function WaitDefinition({
                   aria-label={t('inspector.wait.removeNotification')}
                   disabled={disabled}
                   onClick={() => {
-                    void save(false, mode, '').then((saved) => {
+                    void save({ validateInputs: false, taskId: '' }).then((saved) => {
                       if (!saved) return
                       setNotificationTaskId('')
                       setMessageHandle('')
@@ -653,7 +640,10 @@ function WaitDefinition({
               <NativeSelect
                 disabled={disabled}
                 id={`${fieldIdPrefix}-message-handle`}
-                onChange={(event) => setMessageHandle(event.target.value)}
+                onChange={(event) => {
+                  setMessageHandle(event.target.value)
+                  void save({ validateInputs: false, handle: event.target.value })
+                }}
                 value={messageHandle}
               >
                 {messageHandles.map((handle) => (
@@ -674,6 +664,7 @@ function WaitDefinition({
                     key={`${notificationTaskId}:${messageHandle}`}
                     language={language}
                     onChange={setNotificationValues}
+                    onCommit={(values, valid) => void save({ values, valid })}
                     onValidChange={setInputsValid}
                     showErrors={inputAttempted}
                     theme={theme}
@@ -685,11 +676,6 @@ function WaitDefinition({
           )}
           {error != null && <FieldError>{error}</FieldError>}
         </FieldGroup>
-        <div className="form-actions">
-          <Button disabled={disabled || nameError != null} size="sm" type="submit" variant="secondary">
-            {t('inspector.wait.save')}
-          </Button>
-        </div>
       </form>
       {notificationTask?.executor.kind == 'connector' && connectorAction?.authenticated !== false && (
         <ConnectorAccount
@@ -715,13 +701,7 @@ function WaitDefinition({
 function TaskDefinition({
   children,
   connectorAction,
-  connectorActionError,
-  connectorAuthorizationPending,
-  connectorConnection,
-  connectorConnectionError,
-  activeConnectorConnections,
   connectors,
-  connectorLoading,
   disabled,
   focus,
   onSectionChange,
@@ -732,13 +712,7 @@ function TaskDefinition({
 }: {
   readonly children: ReactElement
   readonly connectorAction: ConnectorAction | undefined
-  readonly connectorActionError: string | undefined
-  readonly connectorAuthorizationPending: boolean
-  readonly connectorConnection: ConnectorConnection | undefined
-  readonly connectorConnectionError: string | undefined
-  readonly activeConnectorConnections: readonly ConnectorConnection[] | undefined
   readonly connectors: ConnectorStore
-  readonly connectorLoading: boolean
   readonly disabled: boolean
   readonly focus?: DiagnosticFocus
   readonly onSectionChange: (section: 'code' | 'settings') => void
@@ -749,24 +723,15 @@ function TaskDefinition({
 }): ReactElement | null {
   const actionCatalog = useVal(connectors.$.actions)
   const t = useTranslate()
-  const node = selection.node
-  const taskId = node.task == null ? node.taskId : undefined
   const task = selection.definition
   const module = selection.module
-  const [name, setName] = useState(task?.name ?? '')
-  const [llmMode, setLlmMode] = useState<'chat' | 'json'>(task != null && 'executor' in task && task.executor.kind == 'llm' ? task.executor.mode : 'chat')
   const fieldIdPrefix = `task-${selection.id}`
   const moduleDiagnostics = useVal(store.$.moduleDiagnostics)
   const moduleEditor = useVal(store.$.moduleEditor)
   const moduleLocation = focus?.section == 'module' ? focus.diagnostic : focus == null ? moduleDiagnostics[0] : undefined
 
-  useEffect(() => {
-    setName(task?.name ?? '')
-    setLlmMode(task != null && 'executor' in task && task.executor.kind == 'llm' ? task.executor.mode : 'chat')
-  }, [module, task])
-
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
-  const connector = 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
+  const llm = 'executor' in task && task.executor.kind == 'llm' ? task.executor : undefined
   const codeEditor =
     module != null && 'moduleId' in task && moduleEditor?.moduleId == task.moduleId ? (
       <form
@@ -821,97 +786,63 @@ function TaskDefinition({
   const settingsPanel = (
     <>
       {children}
-      <details className="inspector-disclosure" data-inspector-section="task">
-        <summary>
-          <Icon name="chevron-down" size={14} />
-          <span className="inspector-disclosure-summary">
-            <strong>{t('inspector.task.definition')}</strong>
-            <span>{t('inspector.task.definitionDescription')}</span>
-          </span>
-        </summary>
-        <form
-          className="inspector-form inspector-disclosure-content"
-          onSubmit={(event) => {
-            event.preventDefault()
-            let settings: TaskSettings
-            if ('moduleId' in task) {
-              settings = { kind: 'code', name: name.trim() }
-            } else if (task.executor.kind == 'llm') {
-              settings = { kind: 'llm', mode: llmMode, name: name.trim() }
-            } else {
-              settings = { kind: 'connector', name: name.trim() }
-            }
-            void store.saveTaskSettings(selection.id, settings)
-          }}
-        >
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor={`${fieldIdPrefix}-name`}>{t('common.name')}</FieldLabel>
-              <Input disabled={disabled} id={`${fieldIdPrefix}-name`} onChange={(event) => setName(event.target.value)} value={name} />
-            </Field>
-            {'executor' in task && task.executor.kind == 'llm' && (
-              <Field>
-                <FieldLabel htmlFor={`${fieldIdPrefix}-response-mode`}>{t('inspector.task.responseMode')}</FieldLabel>
-                <NativeSelect
-                  disabled={disabled}
-                  id={`${fieldIdPrefix}-response-mode`}
-                  onChange={(event) => setLlmMode(event.target.value as 'chat' | 'json')}
-                  value={llmMode}
-                >
-                  <NativeSelectOption value="chat">{t('inspector.task.chatText')}</NativeSelectOption>
-                  <NativeSelectOption value="json">{t('inspector.task.structuredJson')}</NativeSelectOption>
-                </NativeSelect>
-              </Field>
-            )}
-            {'executor' in task && task.executor.kind == 'connector' && (
-              <>
+      {'executor' in task && (
+        <details className="inspector-disclosure" data-inspector-section="task">
+          <summary>
+            <Icon name="chevron-down" size={14} />
+            <span className="inspector-disclosure-summary">
+              <strong>{t('inspector.task.definition')}</strong>
+            </span>
+          </summary>
+          <div className="inspector-disclosure-content node-settings">
+            <FieldGroup>
+              {llm != null && (
                 <Field>
-                  <FieldLabel>{t('inspector.task.connectorAction')}</FieldLabel>
-                  <FieldDescription className="reference-value">{connectorAction?.name ?? task.executor.action}</FieldDescription>
+                  <FieldLabel htmlFor={`${fieldIdPrefix}-response-mode`}>{t('inspector.task.responseMode')}</FieldLabel>
+                  <NativeSelect
+                    disabled={disabled}
+                    id={`${fieldIdPrefix}-response-mode`}
+                    onChange={(event) => {
+                      const mode = event.target.value
+                      if ((mode == 'chat' || mode == 'json') && mode != llm.mode) {
+                        void store.saveTaskSettings(selection.id, { kind: 'llm', mode, name: task.name })
+                      }
+                    }}
+                    value={llm.mode}
+                  >
+                    <NativeSelectOption value="chat">{t('inspector.task.chatText')}</NativeSelectOption>
+                    <NativeSelectOption value="json">{t('inspector.task.structuredJson')}</NativeSelectOption>
+                  </NativeSelect>
                 </Field>
-                <Field>
-                  <FieldLabel>{t('inspector.task.inputPorts')}</FieldLabel>
-                  <FieldDescription className="reference-value">
-                    {task.inputs.flatMap((port) => ('handle' in port ? [port.handle] : [])).join(', ') || t('common.none')}
-                  </FieldDescription>
-                </Field>
-                <Field>
-                  <FieldLabel>{t('inspector.task.outputPorts')}</FieldLabel>
-                  <FieldDescription className="reference-value">
-                    {task.outputs.flatMap((port) => ('handle' in port ? [port.handle] : [])).join(', ') || t('common.none')}
-                  </FieldDescription>
-                </Field>
-              </>
-            )}
-          </FieldGroup>
-          <div className="form-actions">
-            <Button disabled={disabled || name.trim() == ''} size="sm" type="submit" variant="secondary">
-              {t('inspector.task.save')}
-            </Button>
+              )}
+              {'executor' in task && task.executor.kind == 'connector' && (
+                <>
+                  <Field>
+                    <FieldLabel>{t('inspector.task.connectorAction')}</FieldLabel>
+                    <FieldDescription className="reference-value">{connectorAction?.name ?? task.executor.action}</FieldDescription>
+                  </Field>
+                  <Field>
+                    <FieldLabel>{t('inspector.task.inputPorts')}</FieldLabel>
+                    <FieldDescription className="reference-value">
+                      {task.inputs.flatMap((port) => ('handle' in port ? [port.handle] : [])).join(', ') || t('common.none')}
+                    </FieldDescription>
+                  </Field>
+                  <Field>
+                    <FieldLabel>{t('inspector.task.outputPorts')}</FieldLabel>
+                    <FieldDescription className="reference-value">
+                      {task.outputs.flatMap((port) => ('handle' in port ? [port.handle] : [])).join(', ') || t('common.none')}
+                    </FieldDescription>
+                  </Field>
+                </>
+              )}
+            </FieldGroup>
           </div>
-        </form>
-      </details>
+        </details>
+      )}
     </>
   )
   return (
     <>
-      {connector != null && taskId != null && connectorAction?.authenticated !== false && (
-        <ConnectorAccount
-          action={connectorAction}
-          actionError={connectorActionError}
-          actionId={connector.action}
-          activeConnections={activeConnectorConnections}
-          authorizationPending={connectorAuthorizationPending}
-          connection={connectorConnection}
-          connectionError={connectorConnectionError}
-          connectionId={connector.connectionId}
-          connectors={connectors}
-          disabled={disabled}
-          fieldIdPrefix={fieldIdPrefix}
-          loading={connectorLoading}
-          taskId={taskId}
-        />
-      )}
       {codeEditor == null ? (
         settingsPanel
       ) : (
@@ -1021,14 +952,13 @@ function SubflowDefinition({
   )
 }
 
-function TriggerDefinition({
+function TriggerConnection({
   activeConnections,
   authorizationPending,
   connection,
   connectionError,
   connectionLoading,
   disabled,
-  revision,
   selection,
   triggers,
 }: {
@@ -1038,25 +968,13 @@ function TriggerDefinition({
   readonly connectionError?: string
   readonly connectionLoading: boolean
   readonly disabled: boolean
-  readonly revision: RevisionView
   readonly selection: Extract<ResolvedSelection, { readonly kind: 'trigger' }>
   readonly triggers: TriggerStore
 }): ReactElement | null {
   const t = useTranslate()
   const trigger = selection.trigger
-  const [name, setName] = useState(trigger.name)
-  const [description, setDescription] = useState(trigger.description ?? '')
   const providerTrigger = trigger.kind == 'poll' || trigger.kind == 'integration' ? trigger : undefined
   const fieldIdPrefix = `trigger-${selection.id}`
-  const nameError = nodeNameError(revision, { kind: 'flow' }, selection.id, name, t)
-
-  useEffect(() => {
-    setName(trigger.name)
-    setDescription(trigger.description ?? '')
-  }, [trigger])
-
-  if (trigger.kind == 'manual' || trigger.kind == 'cron') return null
-
   const connectionSection =
     providerTrigger == null ? null : (
       <section className={`inspector-section connection-state ${connection?.status == 'active' ? '' : 'required'}`} data-inspector-section="account">
@@ -1084,7 +1002,9 @@ function TriggerDefinition({
         ) : (
           <>
             <Field className="connection-field">
-              <FieldLabel htmlFor={`${fieldIdPrefix}-connection`}>{t('inspector.account.connection')}</FieldLabel>
+              <FieldLabel className="sr-only" htmlFor={`${fieldIdPrefix}-connection`}>
+                {t('inspector.account.connection')}
+              </FieldLabel>
               <NativeSelect
                 disabled={disabled}
                 id={`${fieldIdPrefix}-connection`}
@@ -1104,7 +1024,7 @@ function TriggerDefinition({
                 ))}
               </NativeSelect>
             </Field>
-            <Button disabled={disabled} onClick={() => void triggers.connect(providerTrigger.definition.provider)} size="sm" type="button" variant="secondary">
+            <Button disabled={disabled} onClick={() => void triggers.connect(providerTrigger.definition.provider)} size="xs" type="button" variant="ghost">
               <Icon data-icon="inline-start" name="plus" /> {t('inspector.account.addConnection')}
             </Button>
           </>
@@ -1112,63 +1032,7 @@ function TriggerDefinition({
       </section>
     )
 
-  return (
-    <>
-      {connectionSection}
-      <form
-        className="inspector-section inspector-form"
-        data-inspector-section="trigger"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (nameError != null) return
-          const common = { ...(description.trim() == '' ? {} : { description: description.trim() }), name: name.trim() }
-          let settings: TriggerSettings
-          switch (trigger.kind) {
-            case 'webhook':
-              settings = { ...common, inputs: trigger.inputsDef, kind: trigger.kind, options: trigger.options ?? {} }
-              break
-            case 'poll': {
-              settings = {
-                ...common,
-                config: trigger.config,
-                kind: trigger.kind,
-                schedule: trigger.pollTimes,
-              }
-              break
-            }
-            case 'integration':
-              settings = { ...common, config: trigger.config, kind: trigger.kind }
-              break
-          }
-          void triggers.saveSettings(selection.id, settings)
-        }}
-      >
-        <h3>{t('inspector.trigger.title')}</h3>
-        <FieldGroup>
-          <Field data-invalid={nameError != null}>
-            <FieldLabel htmlFor={`${fieldIdPrefix}-name`}>{t('common.name')}</FieldLabel>
-            <Input
-              aria-invalid={nameError != null}
-              disabled={disabled}
-              id={`${fieldIdPrefix}-name`}
-              onChange={(event) => setName(event.target.value)}
-              value={name}
-            />
-            {nameError != null && <FieldError>{nameError}</FieldError>}
-          </Field>
-          <Field>
-            <FieldLabel htmlFor={`${fieldIdPrefix}-description`}>{t('inspector.trigger.description')}</FieldLabel>
-            <Input disabled={disabled} id={`${fieldIdPrefix}-description`} onChange={(event) => setDescription(event.target.value)} value={description} />
-          </Field>
-        </FieldGroup>
-        <div className="form-actions">
-          <Button disabled={disabled || nameError != null} size="sm" type="submit" variant="secondary">
-            {t('inspector.trigger.save')}
-          </Button>
-        </div>
-      </form>
-    </>
-  )
+  return connectionSection
 }
 
 interface Props {
@@ -1182,6 +1046,7 @@ interface Props {
   readonly connectors: ConnectorStore
   readonly connectorLoading: boolean
   readonly diagnostics: readonly Diagnostic[]
+  readonly diagnosticsPending?: boolean
   readonly disabled: boolean
   readonly focus?: DiagnosticFocus
   readonly onChooseWaitNotification: (button: HTMLButtonElement) => void
@@ -1209,6 +1074,7 @@ export function NodeInspector({
   connectors,
   connectorLoading,
   diagnostics,
+  diagnosticsPending = false,
   disabled,
   focus,
   onChooseWaitNotification,
@@ -1226,6 +1092,9 @@ export function NodeInspector({
 }: Props): ReactElement {
   const t = useTranslate()
   const content = useRef<HTMLDivElement>(null)
+  const task = selection?.kind == 'task' ? selection.definition : undefined
+  const connector = task != null && 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
+  const taskId = selection?.kind == 'task' && selection.node.task == null ? selection.node.taskId : undefined
   const locatedRequest = useRef<number>()
   const [taskSection, setTaskSection] = useState<'code' | 'settings'>(() => taskInspectorSection(focus?.section))
 
@@ -1252,7 +1121,36 @@ export function NodeInspector({
   return (
     <OverlayScrollbar className="inspector-scroll" defer={false} tabIndex={-1}>
       <div className="inspector-content" ref={content}>
-        <Diagnostics diagnostics={diagnostics} />
+        <Diagnostics key={JSON.stringify([store.$.flowId.value, target, selection?.id])} diagnostics={diagnostics} pending={diagnosticsPending} />
+        {selection?.kind == 'trigger' && (
+          <TriggerConnection
+            activeConnections={triggerActiveConnections}
+            authorizationPending={triggerAuthorizationPending}
+            connection={triggerConnection}
+            connectionError={triggerConnectionError}
+            connectionLoading={triggerConnectionLoading}
+            disabled={disabled}
+            selection={selection}
+            triggers={triggers}
+          />
+        )}
+        {connector != null && taskId != null && connectorAction?.authenticated !== false && (
+          <ConnectorAccount
+            action={connectorAction}
+            actionError={connectorActionError}
+            actionId={connector.action}
+            activeConnections={activeConnectorConnections}
+            authorizationPending={connectorAuthorizationPending}
+            connection={connectorConnection}
+            connectionError={connectorConnectionError}
+            connectionId={connector.connectionId}
+            connectors={connectors}
+            disabled={disabled}
+            fieldIdPrefix={`task-${selection?.id}`}
+            loading={connectorLoading}
+            taskId={taskId}
+          />
+        )}
         <div className="inspector-node-editor" ref={editorRef} />
         {selection != null && selection.kind != 'trigger' && (
           <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} />
@@ -1265,28 +1163,10 @@ export function NodeInspector({
           )
         ) : (
           <>
-            {selection.kind == 'trigger' ? (
-              <TriggerDefinition
-                activeConnections={triggerActiveConnections}
-                authorizationPending={triggerAuthorizationPending}
-                connection={triggerConnection}
-                connectionError={triggerConnectionError}
-                connectionLoading={triggerConnectionLoading}
-                disabled={disabled}
-                revision={revision}
-                selection={selection}
-                triggers={triggers}
-              />
-            ) : selection.kind == 'task' ? (
+            {selection.kind == 'trigger' ? null : selection.kind == 'task' ? (
               <TaskDefinition
                 connectorAction={connectorAction}
-                connectorActionError={connectorActionError}
-                connectorAuthorizationPending={connectorAuthorizationPending}
-                connectorConnection={connectorConnection}
-                connectorConnectionError={connectorConnectionError}
-                activeConnectorConnections={activeConnectorConnections}
                 connectors={connectors}
-                connectorLoading={connectorLoading}
                 disabled={disabled}
                 focus={focus}
                 onSectionChange={setTaskSection}
@@ -1295,7 +1175,7 @@ export function NodeInspector({
                 store={store}
                 theme={theme}
               >
-                <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} revision={revision} store={store} target={target} />
+                <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
               </TaskDefinition>
             ) : selection.kind == 'wait' ? (
               <WaitDefinition
@@ -1315,7 +1195,7 @@ export function NodeInspector({
                 theme={theme}
               />
             ) : (
-              <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} revision={revision} store={store} target={target} />
+              <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
             )}
             {selection.kind == 'subflow' && (
               <section className="inspector-section">

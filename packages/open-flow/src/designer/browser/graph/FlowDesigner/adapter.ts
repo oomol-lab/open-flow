@@ -215,6 +215,7 @@ export class FlowDesignerViewAdapter {
         )
         this.#callbacks.onDuplicate(nodeIds, offset, positions)
       },
+      onLayout: (positions) => this.#callbacks.onMoveNodes(positions),
       onPaste: (position) => this.#callbacks.onPaste(position),
       provideAddNodeMenuItems: (fromSource) => this.#menuItems(fromSource),
       provideAsyncAddNodeMenuItems: async (fromSource, searchTerm, signal) => {

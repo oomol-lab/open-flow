@@ -281,11 +281,8 @@ describe('revision graph scheduler', () => {
     })
 
     expect(invoked).toEqual(['capture'])
-    expect(result.nodes).toEqual([
-      { status: 'completed', jobId: expect.any(String), outputs: { event: { action: 'opened' } }, nodeId: 'capture' },
-      { status: 'skipped', nodeId: 'ignored' },
-    ])
-    expect(events.some((event) => 'nodeId' in event && (event.nodeId == 'incoming' || event.nodeId == 'scheduled'))).toBe(false)
+    expect(result.nodes).toEqual([{ status: 'completed', jobId: expect.any(String), outputs: { event: { action: 'opened' } }, nodeId: 'capture' }])
+    expect(events.filter((event) => 'nodeId' in event).every((event) => event.nodeId == 'capture')).toBe(true)
 
     invoked.length = 0
     const manual = await runFlow(prepared, {
@@ -297,10 +294,7 @@ describe('revision graph scheduler', () => {
       runId: 'run-manual',
     })
     expect(invoked).toEqual([])
-    expect(manual.nodes).toEqual([
-      { status: 'skipped', nodeId: 'capture' },
-      { status: 'skipped', nodeId: 'ignored' },
-    ])
+    expect(manual.nodes).toEqual([])
   })
 
   it('emits Value node outputs without invoking a Task', async () => {
@@ -667,13 +661,11 @@ describe('revision graph scheduler', () => {
     expect(invoked).toEqual(['source', 'double'])
     expect(result).toEqual({
       kind: 'node-results',
-      nodes: [
-        { status: 'skipped', nodeId: 'low' },
-        { status: 'completed', jobId: expect.any(String), outputs: { value: 14 }, nodeId: 'nested' },
-      ],
+      nodes: [{ status: 'completed', jobId: expect.any(String), outputs: { value: 14 }, nodeId: 'nested' }],
     })
     expect(events.filter((event) => event.type == 'run.started').map((event) => event.flowId)).toEqual(['main', 'double-flow'])
     expect(events).toContainEqual(expect.objectContaining({ nodeId: 'branch', type: 'node.completed', outputs: { high: 7 } }))
+    expect(events.some((event) => 'nodeId' in event && event.nodeId == 'low')).toBe(false)
   })
 
   it('passes a Subflow input directly to a Subflow output', async () => {

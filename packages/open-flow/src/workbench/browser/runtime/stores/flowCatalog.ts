@@ -1,9 +1,9 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { WorkbenchClient, Flow } from '../api.ts'
-import type { Current } from './latest.ts'
 import type { SetNotice } from './workbenchNotice.ts'
 
+import * as Effect from 'effect/Effect'
 import { derive, val } from 'value-enhancer'
 import { Latest } from './latest.ts'
 import { errorNotice } from './workbenchNotice.ts'
@@ -49,6 +49,8 @@ export class FlowCatalog {
   readonly #session = new Latest()
   readonly #setNotice: SetNotice
   readonly #state: Val<State> = val(initialState)
+  readonly #lifetime = new AbortController()
+  readonly #pending = new Set<string>()
   #disposed = false
   public readonly $: FlowCatalog$
 
@@ -74,13 +76,10 @@ export class FlowCatalog {
 
   public dispose(): void {
     this.#disposed = true
+    this.#lifetime.abort()
     this.#session.invalidate()
     for (const value of Object.values(this.$)) value.dispose()
     this.#state.dispose()
-  }
-
-  public capture(): Current {
-    return this.#session.capture()
   }
 
   public flow(flowId: string): Flow | undefined {
@@ -140,6 +139,53 @@ export class FlowCatalog {
       if (!current()) return
       this.#set({ loadingMore: false, loadMoreFailed: true })
       this.#setNotice(errorNotice(error, this.#i18n.t))
+    }
+  }
+
+  public async setEnabled(flow: Flow, enabled: boolean): Promise<void> {
+    if (flow.live == null || this.#pending.has(flow.flowId)) return
+    this.#pending.add(flow.flowId)
+    try {
+      const changed = await this.#client.setFlowEnabled(flow.flowId, flow.live.publicationId, enabled)
+      if (!this.#disposed) this.include(changed)
+    } catch (error) {
+      if (!this.#disposed) {
+        this.#setNotice(errorNotice(error, this.#i18n.t))
+        await this.reload()
+      }
+    } finally {
+      this.#pending.delete(flow.flowId)
+    }
+  }
+
+  public async publish(flow: Flow): Promise<void> {
+    if (this.#pending.has(flow.flowId)) return
+    this.#pending.add(flow.flowId)
+    try {
+      const initial = await this.#client.publishFlow(flow.flowId, flow.draftRevisionId, flow.live?.publicationId ?? null)
+      if (this.#disposed) return
+      const operation = await Effect.runPromise(
+        Effect.gen({ self: this }, function* () {
+          let current = initial
+          while (current.status == 'pending') {
+            yield* Effect.sleep(1000)
+            current = yield* Effect.tryPromise((signal) => this.#client.getPublishOperation(flow.flowId, current.operationId, signal))
+          }
+          return current
+        }),
+        { signal: this.#lifetime.signal },
+      )
+      if (this.#disposed) return
+      if (operation.status == 'failed') {
+        this.#setNotice({ kind: 'error', message: operation.issue.message })
+      } else {
+        this.#setNotice({ kind: 'success', message: this.#i18n.t('notice.published', { name: flow.name }) })
+      }
+      this.include(await this.#client.getFlow(flow.flowId))
+    } catch (error) {
+      if (!this.#disposed) this.#setNotice(errorNotice(error, this.#i18n.t))
+    } finally {
+      this.#pending.delete(flow.flowId)
     }
   }
 

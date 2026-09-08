@@ -13,6 +13,7 @@ const migrationFiles = [
   '0009_wait_runs.sql',
   '0010_wait_order.sql',
   '0011_run_trigger.sql',
+  '0012_flow_enabled.sql',
 ] as const
 const migrationsDirectory = new URL('../migrations/', import.meta.url)
 

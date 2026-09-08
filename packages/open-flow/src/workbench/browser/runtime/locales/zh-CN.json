@@ -127,7 +127,7 @@
     "noFlowsDescription": "创建第一个工作流。",
     "noMatchingDescription": "请尝试其他搜索词。",
     "noMatchingFlows": "没有匹配的工作流",
-    "retiring": "停用中",
+    "retiring": "删除中",
     "retryLoadMore": "重试加载更多",
     "searchFlows": "搜索工作流…",
     "status": "状态",
@@ -135,10 +135,23 @@
     "unpublishedChanges": "有未发布更改",
     "upToDate": "已同步线上",
     "updated": "最近更新",
-    "workflows": "工作流"
+    "workflows": "工作流",
+    "publication": "发布状态",
+    "notPublished": "未发布",
+    "isPublished": "已发布",
+    "enabledColumn": "启用状态",
+    "enabled": "已启用",
+    "disabled": "已停用",
+    "enableFlow": "启用 {{name}}",
+    "publishFirst": "发布后可启用此工作流。",
+    "enabledHint": "控制新的线上运行，草稿测试仍可使用。",
+    "publish": "发布",
+    "publishUpdate": "发布更新",
+    "deleteDescription": "此操作将删除工作流及其运行记录，并停止线上触发，无法撤销。"
   },
   "inspector": {
     "account": {
+      "required": "待连接",
       "addConnection": "添加连接",
       "authorizationPending": "请在 Connection 页面完成授权，返回这里后会刷新当前账号。",
       "chooseAccount": "选择账号",
@@ -168,12 +181,8 @@
       "portDefinitions": "请输入有效的端口定义。"
     },
     "node": {
-      "description": "显示名称与超时",
-      "displayName": "显示名称",
-      "displayNamePlaceholder": "使用定义中的名称",
       "nameDuplicate": "当前图中已存在同名节点。",
       "nameEmpty": "节点名称不能为空。",
-      "save": "保存节点",
       "timeout": "超时时间（毫秒）",
       "timeoutError": "超时时间必须是以毫秒为单位的正整数。",
       "title": "节点设置"
@@ -195,7 +204,6 @@
       "codeSaving": "保存中…",
       "connectorAction": "连接器操作",
       "definition": "任务定义",
-      "definitionDescription": "名称与执行方式",
       "discardCode": "放弃修改",
       "editorLoading": "正在加载编辑器…",
       "editorUnavailable": "代码编辑器加载失败。",
@@ -205,7 +213,6 @@
       "missing": "引用的任务不存在。",
       "outputPorts": "输出端口",
       "responseMode": "响应模式",
-      "save": "保存任务",
       "source": "源代码",
       "structuredJson": "结构化 JSON",
       "retrySave": "重试保存"
@@ -225,13 +232,7 @@
       "notificationUnavailable": "通知配置不可用，请重新选择。",
       "prompt": "提示",
       "promptError": "提示必须包含 1 到 1,000 个字符。",
-      "removeNotification": "移除通知",
-      "save": "保存"
-    },
-    "trigger": {
-      "description": "描述",
-      "save": "保存 Trigger",
-      "title": "Trigger 定义"
+      "removeNotification": "移除通知"
     },
     "title": "检查器",
     "sources": {
@@ -509,8 +510,7 @@
     "timelineEmpty": "运行当前选中的草稿后，可查看时间线和输出。",
     "submitting": "正在提交当前固定修订并创建运行记录…",
     "waiting": "正在等待第一个事件…",
-    "waitExpires": "到期时间：{{date}}",
-    "eventSkipped": "已跳过"
+    "waitExpires": "到期时间：{{date}}"
   },
   "sidebar": {
     "createFirstFlow": "创建 Flow",
@@ -628,8 +628,10 @@
     "title": "问题"
   },
   "runInput": {
+    "triggerDataHint": "在右侧输入框填写模拟数据，再点击运行，测试后续节点。",
+    "triggerData": "触发数据",
     "close": "关闭运行输入",
-    "description": "为每个未连接的输入提供值。已有图连接、静态值或定义默认值的输入不会显示。这里填写的值仅用于本次运行，不会保存到 Flow。",
+    "description": "填写本次运行需要的数据，不会修改工作流。",
     "invalid": "请为所有列出的输入设置有效的 JSON 值后再运行。",
     "title": "运行输入",
     "trigger": "起始节点",
