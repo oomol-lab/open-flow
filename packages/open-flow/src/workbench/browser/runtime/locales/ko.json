@@ -630,7 +630,13 @@
     "title": "문제"
   },
   "runInput": {
-    "triggerDataHint": "오른쪽 입력란에 테스트 데이터를 입력한 뒤 실행을 눌러 다음 노드를 테스트하세요.",
+    "editMissing": "테스트 데이터 입력",
+    "editReady": "저장된 테스트 데이터 편집",
+    "remembered": "테스트 데이터는 이 편집 세션 동안 유지되며 워크플로를 변경하지 않습니다.",
+    "startTest": "테스트 시작",
+    "testTrigger": "{{name}} 테스트",
+    "triggerCount": "시작 노드 {{count}}개",
+    "triggerDataHint": "이 Trigger의 샘플 데이터를 입력한 뒤 테스트를 시작하세요.",
     "triggerData": "트리거 데이터",
     "close": "실행 입력 닫기",
     "description": "이번 실행에 필요한 데이터를 입력하세요. 워크플로는 변경되지 않습니다.",

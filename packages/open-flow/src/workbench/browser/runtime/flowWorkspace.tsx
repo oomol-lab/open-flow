@@ -12,9 +12,7 @@ import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { IconifyProvider } from '../../../designer/browser/icons/iconifyContext.tsx'
 import { nodeNameIssue } from '../../../flow/common/change.ts'
-import { ButtonGroup } from '../../../ui/browser/button-group.tsx'
 import { Button } from '../../../ui/browser/button.tsx'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../ui/browser/dropdown-menu.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../ui/browser/empty.tsx'
 import { BlockLibrary, ContextPanel } from './designer/contextPanel.tsx'
 import { inspectorIcon, NodeInspector } from './designer/nodeInspector.tsx'
@@ -22,6 +20,7 @@ import { WorkbenchDesigner } from './designer/workbenchDesigner.tsx'
 import { Icon } from './icons.tsx'
 import { NavigationStore } from './navigation.ts'
 import { PublicationsView } from './publications/publicationsView.tsx'
+import { RunControl } from './runs/runControl.tsx'
 import { RunDrawer } from './runs/runDrawer.tsx'
 import { RunInputPanel } from './runs/runInputPanel.tsx'
 import { RunsView } from './runs/runsView.tsx'
@@ -132,6 +131,7 @@ function RunDrawerContainer({
 
 function Editor({
   onRun,
+  onRunStarted,
   onCloseRuns,
   onConfigureConnector,
   onToggleRuns,
@@ -141,6 +141,7 @@ function Editor({
   theme,
 }: {
   readonly onRun: (triggerId?: string) => void
+  readonly onRunStarted: () => void
   readonly onCloseRuns: () => void
   readonly onConfigureConnector?: (() => void) | undefined
   readonly onToggleRuns: () => void
@@ -152,13 +153,12 @@ function Editor({
   const t = useTranslate()
   const addNodeOptions = useVal(store.workspace.$.addNodeOptions)
   const [startId, setStartId] = useState<string>()
-  const [runMenuRoot, setRunMenuRoot] = useState<HTMLDivElement | null>(null)
   const diagnostics = useVal(store.$.diagnostics)
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   const busy = useVal(store.$.busy)
   const designer = useVal(store.$.designer)
   const triggers = designer.nodes.filter((node) => node.kind == 'trigger')
-  const selectedTrigger = triggers.find((node) => node.id == startId)
+  const selectedTrigger = triggers.find((node) => node.id == startId) ?? triggers[0]
   const diagnosticFocus = useVal(store.workspace.$.diagnosticFocus)
   const draft = useVal(store.workspace.$.draft)
   const inspectorDiagnostics = useVal(store.workspace.$.inspectorDiagnostics)
@@ -216,6 +216,10 @@ function Editor({
     opener.current = undefined
     setContextPanelMode('inspector')
   }, [diagnosticFocus])
+
+  useEffect(() => {
+    if (selectedDesignerNode?.kind == 'trigger') setStartId(selectedDesignerNode.id)
+  }, [selectedDesignerNode])
 
   const authoringDisabled = draft == null || (busy != null && busy != 'designer' && busy != 'run')
   const closeContextPanel = (focusTarget = opener.current): void => {
@@ -281,56 +285,26 @@ function Editor({
     >
       <WorkbenchDesigner
         runControl={
-          target?.kind == 'flow' && triggers.length > 0 ? (
-            <ButtonGroup ref={setRunMenuRoot} aria-label={t('workspace.run')}>
-              <Button
-                size="sm"
-                aria-controls="run-input-panel"
-                aria-expanded={runInputRequest != null}
-                disabled={busy != null || diagnostics?.valid == false || runInputRequest != null || (triggers.length > 1 && selectedTrigger == null)}
-                onClick={() => onRun(triggers.length > 1 ? selectedTrigger?.id : undefined)}
-                title={diagnostics?.valid == false ? t('workspace.fixIssuesToRun') : undefined}
-              >
-                <Icon data-icon="inline-start" name="play" />
-                {t(busy == 'run' ? 'workspace.starting' : 'workspace.run')}
-                {triggers.length > 1 && selectedTrigger != null && <span>{selectedTrigger.title}</span>}
-              </Button>
-              {triggers.length > 1 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={
-                      <Button
-                        size="icon-sm"
-                        aria-label={t('runInput.selectTrigger')}
-                        disabled={busy != null || diagnostics?.valid == false || runInputRequest != null}
-                      >
-                        <Icon name="chevron-down" />
-                      </Button>
-                    }
-                  />
-                  <DropdownMenuContent container={runMenuRoot} side="top" align="end" className="w-64 max-w-(--available-width)">
-                    {triggers.map((trigger) => (
-                      <DropdownMenuItem
-                        key={trigger.id}
-                        onClick={() => {
-                          setStartId(trigger.id)
-                          onRun(trigger.id)
-                        }}
-                      >
-                        <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="truncate" title={trigger.title}>
-                            {trigger.title}
-                          </span>
-                          {triggers.some((other) => other.id != trigger.id && other.title == trigger.title) && (
-                            <code className="truncate text-xs text-muted-foreground">{trigger.id}</code>
-                          )}
-                        </span>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </ButtonGroup>
+          target?.kind == 'flow' && draft != null && selectedTrigger != null ? (
+            <RunControl
+              disabled={diagnostics?.valid == false || (busy != null && busy != 'run')}
+              inputContent={<RunInputPanel onStarted={onRunStarted} store={store.runRequests} theme={theme} />}
+              inputOpen={runInputRequest?.triggerId == selectedTrigger.id}
+              inputStatus={store.runRequests.inputStatus(draft.flowId, draft, selectedTrigger.id)}
+              onInputOpenChange={(open) => {
+                if (open) void store.editDraftRunInputs(selectedTrigger.id)
+                else store.runRequests.dismissInputs()
+              }}
+              onRun={() => onRun(selectedTrigger.id)}
+              onSelectTrigger={(triggerId) => {
+                store.runRequests.dismissInputs()
+                setStartId(triggerId)
+              }}
+              selectedTriggerId={selectedTrigger.id}
+              starting={busy == 'run'}
+              title={diagnostics?.valid == false ? t('workspace.fixIssuesToRun') : undefined}
+              triggers={triggers.map((trigger) => ({ id: trigger.id, title: trigger.title }))}
+            />
           ) : undefined
         }
         inspectorContainer={inspectorContainer}
@@ -567,7 +541,6 @@ export default function FlowWorkspace({
           onHostAction={onHostAction}
           store={store}
         />
-        <RunInputPanel onStarted={revealRun} store={store.runRequests} theme={theme} />
         {view == 'design' && (workspaceLoading || draft == null) ? (
           <div aria-labelledby="workspace-tab-design" className="editor-grid context-panel-closed" id="workspace-panel-design" role="tabpanel" tabIndex={0}>
             <section aria-busy={!workspaceLoadFailed} className="canvas-panel workbench-designer">
@@ -598,6 +571,7 @@ export default function FlowWorkspace({
         ) : view == 'design' ? (
           <Editor
             onRun={(triggerId) => void run(triggerId)}
+            onRunStarted={revealRun}
             onCloseRuns={() => setRunDrawerVisible(false)}
             onConfigureConnector={onConfigureConnector}
             onToggleRuns={() => setRunDrawerOpen(!runDrawerOpen)}

@@ -630,7 +630,13 @@
     "title": "問題"
   },
   "runInput": {
-    "triggerDataHint": "在右側輸入框填寫模擬資料，再點擊執行，測試後續節點。",
+    "editMissing": "填寫測試資料",
+    "editReady": "修改已儲存的測試資料",
+    "remembered": "測試資料會在本次編輯工作階段中保留，不會修改工作流程。",
+    "startTest": "開始測試",
+    "testTrigger": "測試{{name}}",
+    "triggerCount": "共 {{count}} 個起始節點",
+    "triggerDataHint": "填寫這個 Trigger 的模擬資料，然後開始測試。",
     "triggerData": "觸發資料",
     "close": "關閉執行輸入",
     "description": "填寫本次執行需要的資料，不會修改工作流程。",

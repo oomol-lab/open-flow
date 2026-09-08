@@ -5,7 +5,6 @@ import type {
   FlowDesignerViewConditionChange,
   FlowDesignerViewInput,
   FlowDesignerViewAddItem,
-  FlowDesignerViewEdge,
   FlowDesignerViewOutput,
   FlowDesignerViewTriggerSchedule,
   FlowDesignerViewValue,
@@ -292,7 +291,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
     readonly position: Point
     readonly screenPosition?: Point
   }>()
-  const [selectedEdge, setSelectedEdge] = useState<DesignerEdge>()
   const [readyFocusNodeRequest, setReadyFocusNodeRequest] = useState(focusNodeRequest)
   const canvas = useRef<HTMLElement>(null)
   const inspectorOpenedAt = useRef(0)
@@ -362,7 +360,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
 
   useEffect(() => {
     targetGeneration.current++
-    setSelectedEdge(undefined)
     setAddNodeRequest(undefined)
     setAddItemRequest(undefined)
     pendingAdd.current?.(undefined)
@@ -481,36 +478,22 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         inspectorHeaderContainer={inspectorHeaderContainer}
         toolbar={
           <div className="designer-actions">
-            <Separator orientation="vertical" className="mx-1" />
             <Button
               aria-expanded={blocksOpen}
               disabled={disabled || target == null}
               onClick={(event) => onOpenBlocks(event.currentTarget)}
-              size="sm"
+              size="default"
               title={t('designer.openBlocks')}
               type="button"
               variant="ghost"
             >
               <Icon data-icon="inline-start" name="plus" /> {t('designer.addNode')}
             </Button>
-            {(selectedNodeIds.length > 0 || selectedEdge != null) && (
-              <Button
-                disabled={disabled}
-                onClick={() => {
-                  if (selectedNodeIds.length > 0) onDeleteNodes()
-                  else if (selectedEdge != null) onDeleteEdge(selectedEdge)
-                }}
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                {t('designer.delete')}
-              </Button>
-            )}
+            {(runControl != null || (needsTrigger && model.nodes.length > 0 && manualTrigger != null)) && <Separator orientation="vertical" className="mx-1" />}
             {runControl}
             {needsTrigger && model.nodes.length > 0 && manualTrigger != null && (
               <Button
-                size="sm"
+                size="default"
                 disabled={disabled}
                 onClick={() => void addRecommended(manualTrigger)}
                 title={t('designer.triggerDescription')}
@@ -520,18 +503,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
                 <Icon data-icon="inline-start" name="plus" /> {t('designer.addTriggerToRun')}
               </Button>
             )}
-            <Separator orientation="vertical" className="mx-1" />
-            <Button
-              aria-label={t('designer.toggleInspector')}
-              aria-expanded={inspectorOpen}
-              onClick={(event) => onToggleInspector(event.currentTarget)}
-              size="icon-sm"
-              title={t('designer.toggleInspector')}
-              type="button"
-              variant="ghost"
-            >
-              <Icon name="panel" />
-            </Button>
           </div>
         }
         onAddNode={async (itemId, position, connection) => {
@@ -578,10 +549,9 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
           return addItems(options)
         }}
         onOpenVariables={onOpenVariables}
-        onSelectionChange={(nodeIds, edge: FlowDesignerViewEdge | undefined) => {
+        onSelectionChange={(nodeIds) => {
           onSelectNodes(nodeIds)
           if (nodeIds.some((nodeId) => model.nodes.some((node) => node.id == nodeId && node.kind != 'comment'))) onOpenInspector()
-          setSelectedEdge((current) => (current?.id === edge?.id ? current : edge))
         }}
         selectedNodeIds={selectedNodeIds}
       />
@@ -591,6 +561,19 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
           kind: t(target?.kind == 'subflow' ? 'common.subflow' : 'common.flow'),
         })}
       </Badge>
+      <Button
+        aria-label={t('designer.toggleInspector')}
+        aria-expanded={inspectorOpen}
+        className="designer-overlay top-right"
+        disabled={target == null}
+        onClick={(event) => onToggleInspector(event.currentTarget)}
+        size="icon"
+        title={t('designer.toggleInspector')}
+        type="button"
+        variant="outline"
+      >
+        <Icon name="panel" />
+      </Button>
       {target != null && model.nodes.length == 0 && (
         <div className="canvas-empty">
           <span className="empty-icon">

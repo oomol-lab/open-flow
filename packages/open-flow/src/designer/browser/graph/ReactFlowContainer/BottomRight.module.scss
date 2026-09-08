@@ -1,20 +1,10 @@
-.interactionIcon,
-.miniMapIcon,
-.settingsIcon {
+.miniMapIcon {
   width: 1em;
   height: 1em;
 }
 
-.interactionIcon {
-  font-size: var(--canvas-control-icon-size);
-}
-
 .miniMapIcon {
   font-size: calc(var(--canvas-control-icon-size) - 1px);
-}
-
-.settingsIcon {
-  font-size: calc(var(--canvas-control-icon-size) - 2px);
 }
 
 .miniMap {
@@ -23,7 +13,9 @@
 }
 
 .miniMapToggle:global(.react-flow__panel) {
-  right: calc(200px - var(--canvas-control-container-size) - 4px);
-  bottom: auto;
-  top: calc(150px - var(--canvas-control-container-size) - 4px);
+  --canvas-control-container-size: 24px;
+
+  right: 4px;
+  bottom: calc(150px - var(--canvas-control-container-size) - 4px);
+  top: auto;
 }

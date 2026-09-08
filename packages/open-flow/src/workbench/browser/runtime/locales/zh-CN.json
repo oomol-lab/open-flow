@@ -630,7 +630,13 @@
     "title": "问题"
   },
   "runInput": {
-    "triggerDataHint": "在右侧输入框填写模拟数据，再点击运行，测试后续节点。",
+    "editMissing": "填写测试数据",
+    "editReady": "修改已保存的测试数据",
+    "remembered": "测试数据会在本次编辑会话中保留，不会修改工作流。",
+    "startTest": "开始测试",
+    "testTrigger": "测试{{name}}",
+    "triggerCount": "共 {{count}} 个起始节点",
+    "triggerDataHint": "填写这个 Trigger 的模拟数据，然后开始测试。",
     "triggerData": "触发数据",
     "close": "关闭运行输入",
     "description": "填写本次运行需要的数据，不会修改工作流。",

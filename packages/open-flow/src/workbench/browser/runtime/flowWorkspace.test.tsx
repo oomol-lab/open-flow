@@ -43,7 +43,7 @@ function renderWorkspace(busy?: string, withTrigger = true) {
     $: {
       busy: value(busy),
       diagnostics: value(undefined),
-      designer: value({ nodes: withTrigger ? [{ kind: 'trigger' }] : [], viewport: { x: 0, y: 0, zoom: 1 } }),
+      designer: value({ nodes: withTrigger ? [{ id: 'start', kind: 'trigger', title: 'Start' }] : [], viewport: { x: 0, y: 0, zoom: 1 } }),
       selectedDesignerNode: value(undefined),
     },
     connectors: {
@@ -59,11 +59,13 @@ function renderWorkspace(busy?: string, withTrigger = true) {
       },
     },
     addNode: vi.fn().mockResolvedValue('new-node'),
+    editDraftRunInputs: vi.fn().mockResolvedValue('input'),
     requestDraftRun: vi.fn().mockResolvedValue('started'),
     requestLiveRun: vi.fn().mockResolvedValue('started'),
     runRequests: {
       $: { submitting: value(undefined), inputRequest: value(undefined) },
       dismissInputs: vi.fn(),
+      inputStatus: vi.fn(() => 'none'),
     },
     runs: { $: { externalRunId: value(undefined) } },
     triggers: {
@@ -100,7 +102,7 @@ function renderWorkspace(busy?: string, withTrigger = true) {
     theme: 'light',
   })
   const main = element.props.children as ReactElement
-  const editor = (main.props.children as ReactElement[])[2]!
+  const editor = (main.props.children as ReactElement[])[1]!
   return { editor, navigation, store }
 }
 
@@ -112,11 +114,12 @@ describe('FlowWorkspace run drawer', () => {
   })
 
   it('opens the log panel after running from the canvas', async () => {
-    const { editor } = renderWorkspace()
+    const { editor, store } = renderWorkspace()
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
     const designer = (view.props.children as ReactElement[])[0]!
-    designer.props.runControl.props.children[0].props.onClick()
+    designer.props.runControl.props.onRun()
     await Promise.resolve()
+    expect(store.requestDraftRun).toHaveBeenCalledWith('start')
     expect(mocks.setVisible).toHaveBeenCalledWith(true)
     expect(mocks.setOpen).toHaveBeenCalledWith(true)
   })
@@ -141,6 +144,18 @@ describe('FlowWorkspace run drawer', () => {
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
     const designer = (view.props.children as ReactElement[])[0]!
     expect(designer.props.runControl).toBeUndefined()
+  })
+
+  it('switches the test trigger without navigating or starting a run', () => {
+    const { editor, navigation, store } = renderWorkspace()
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const designer = (view.props.children as ReactElement[])[0]!
+
+    designer.props.runControl.props.onSelectTrigger('another-trigger')
+
+    expect(store.runRequests.dismissInputs).toHaveBeenCalledOnce()
+    expect(store.requestDraftRun).not.toHaveBeenCalled()
+    expect(navigation.open).not.toHaveBeenCalled()
   })
 
   it('keeps the Designer editable while preparing a run', () => {

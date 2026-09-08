@@ -1352,6 +1352,34 @@ describe('Server application service', () => {
     })
   })
 
+  it('reports a stored Revision with a missing edge collection as invalid', async () => {
+    const file = await databaseFile()
+    const service = await openService(file)
+    const created = await service.control.createFlow('test', 'Legacy edges', 'legacy-edges')
+    const revision = service.control.getRevision(created.flow.flowId, created.flow.draftRevisionId)
+    const database = new DatabaseSync(file)
+    try {
+      database.prepare('UPDATE revisions SET content = ? WHERE revision_id = ?').run(
+        JSON.stringify({
+          ...revision.content,
+          document: {
+            ...revision.content.document,
+            graph: {
+              nodes: revision.content.document.graph.nodes,
+            },
+          },
+        }),
+        revision.revisionId,
+      )
+      await expect(service.control.checkFlow(revision.flowId, revision.revisionId, 'open-flow-engine/v2')).rejects.toMatchObject({
+        code: controlErrorCode.flowInvalid,
+        status: 400,
+      })
+    } finally {
+      database.close()
+    }
+  })
+
   it('resolves the current LLM host for each check and invocation', async () => {
     let llm: InvokeLlmTask | undefined
     const service = await openService(await databaseFile(), { capabilities: { llm: () => llm }, clock: Date.now })

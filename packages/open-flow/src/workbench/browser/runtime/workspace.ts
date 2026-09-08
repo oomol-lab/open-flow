@@ -425,14 +425,16 @@ function triggerDiagnosticCount(triggerId: string, diagnostics: readonly Diagnos
     .length
 }
 
-function projectEdges(
-  graph: { readonly edges: readonly { readonly source: string; readonly sourceHandle?: string; readonly target: string }[] },
-  nodeIds: ReadonlySet<string>,
-): EdgeProjection {
+function projectEdges(graph: { readonly edges?: unknown }, nodeIds: ReadonlySet<string>): EdgeProjection {
   const edges: DesignerEdge[] = []
   const dependencies = new Map([...nodeIds].map((id) => [id, new Set<string>()]))
   const dependents = new Map([...nodeIds].map((id) => [id, new Set<string>()]))
-  for (const edge of graph.edges) {
+  const sourceEdges = Array.isArray(graph.edges) ? graph.edges : []
+  for (const value of sourceEdges) {
+    if (value == null || typeof value != 'object' || Array.isArray(value)) continue
+    const edge = value as Readonly<Record<string, unknown>>
+    if (typeof edge.source != 'string' || typeof edge.target != 'string') continue
+    if (edge.sourceHandle != null && typeof edge.sourceHandle != 'string') continue
     if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) continue
     const sourceHandle = edge.sourceHandle == null ? '$out' : `$branch:${edge.sourceHandle}`
     const targetHandle = '$in'

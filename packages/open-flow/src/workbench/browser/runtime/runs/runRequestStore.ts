@@ -77,8 +77,7 @@ function nodeTitle(node: ResolvedNode): string {
   return node.id
 }
 
-async function inputGroups(draft: Draft, language: ReadonlyVal<string>, triggerId: string): Promise<readonly RunInputGroup[]> {
-  const { FlowRunInputEditorStore } = await import('../../flowRunInputEditorStore.ts')
+function inputSpecs(draft: Draft, triggerId: string) {
   const revision = revisionView(draft)
   const graph = revision.graph({ kind: 'flow' })
   if (graph == null) return []
@@ -99,9 +98,13 @@ async function inputGroups(draft: Draft, language: ReadonlyVal<string>, triggerI
       const resolved = revision.resolveNode(nodeId, node)
       if (resolved.kind == 'trigger') {
         if (resolved.trigger.kind == 'manual' || resolved.trigger.kind == 'cron') return []
-        const editor = new FlowRunInputEditorStore([{ handle: 'payload', jsonSchema: triggerPayloadSchema(resolved.trigger), nullable: false }], language)
-        editor.replaceValues({ payload: {} })
-        return [{ editor, nodeId, title: resolved.trigger.name }]
+        return [
+          {
+            definitions: [{ handle: 'payload', jsonSchema: triggerPayloadSchema(resolved.trigger), nullable: false }],
+            nodeId,
+            title: resolved.trigger.name,
+          },
+        ]
       }
       const definitions = Object.entries(inputPorts(resolved))
         .filter(([handle, port]) => resolved.node.inputs[handle] == null && !Object.hasOwn(port, 'value'))
@@ -109,8 +112,42 @@ async function inputGroups(draft: Draft, language: ReadonlyVal<string>, triggerI
         .map(([handle, port]) =>
           Object.assign({ handle, jsonSchema: port.jsonSchema, nullable: port.nullable }, port.description == null ? {} : { description: port.description }),
         )
-      return definitions.length == 0 ? [] : [{ editor: new FlowRunInputEditorStore(definitions, language), nodeId, title: nodeTitle(resolved) }]
+      return definitions.length == 0 ? [] : [{ definitions, nodeId, title: nodeTitle(resolved) }]
     })
+}
+
+function inputSignature(specs: ReturnType<typeof inputSpecs>): string {
+  return JSON.stringify(
+    specs.map((group) => [group.nodeId, group.definitions.map((definition) => [definition.handle, definition.jsonSchema, definition.nullable])]),
+  )
+}
+
+async function inputGroups(
+  specs: ReturnType<typeof inputSpecs>,
+  language: ReadonlyVal<string>,
+  triggerId: string,
+  values?: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+): Promise<readonly RunInputGroup[]> {
+  const { FlowRunInputEditorStore } = await import('../../flowRunInputEditorStore.ts')
+  return specs.map((group) => {
+    const editor = new FlowRunInputEditorStore(group.definitions, language)
+    if (group.nodeId == triggerId) editor.replaceValues({ payload: {} })
+    if (values?.[group.nodeId] != null) editor.replaceValues(values[group.nodeId])
+    return { editor, nodeId: group.nodeId, title: group.title }
+  })
+}
+
+function groupValues(groups: readonly RunInputGroup[]): Readonly<Record<string, Readonly<Record<string, unknown>>>> {
+  return Object.fromEntries(groups.map((group) => [group.nodeId, group.editor.values()]))
+}
+
+function runValues(groups: readonly RunInputGroup[], triggerId: string) {
+  return {
+    inputs: Object.fromEntries(groups.filter((group) => group.nodeId != triggerId).map((group) => [group.nodeId, group.editor.values()])) as Readonly<
+      Record<string, Readonly<Record<string, JsonValue>>>
+    >,
+    payload: (groups.find((group) => group.nodeId == triggerId)?.editor.values().payload ?? {}) as JsonValue,
+  }
 }
 
 export class RunRequestStore {
@@ -121,6 +158,14 @@ export class RunRequestStore {
   readonly #lifetime = new Latest()
   readonly #requests = new Latest()
   readonly #runs: Pick<RunStore, 'follow' | 'prepareStart'>
+  readonly #savedInputs = new Map<
+    string,
+    {
+      readonly signature: string
+      readonly valid: boolean
+      readonly values: Readonly<Record<string, Readonly<Record<string, unknown>>>>
+    }
+  >()
   readonly #setNotice: SetNotice
   readonly #state: Val<RequestState> = val(initialState)
   #attempt?: { readonly key: string; readonly signature: string }
@@ -161,6 +206,7 @@ export class RunRequestStore {
     this.#requests.invalidate()
     this.#attempt = undefined
     const request = this.#state.value.inputRequest
+    this.#rememberInputs(request)
     this.#state.set(initialState)
     this.#disposeInputRequest(request)
   }
@@ -175,6 +221,25 @@ export class RunRequestStore {
     } finally {
       if (current()) this.#set({ starting: false })
     }
+  }
+
+  public async editDraft(flow: Flow, draft: Draft, triggerId: string): Promise<RunRequestOutcome> {
+    const current = this.#requests.begin()
+    try {
+      return await this.#request('draft', flow, draft, draft.revisionId, current, undefined, triggerId, true)
+    } catch (error) {
+      if (current()) this.#setNotice(errorNotice(error, this.#i18n.t))
+      return 'unavailable'
+    } finally {
+      if (current()) this.#set({ starting: false })
+    }
+  }
+
+  public inputStatus(flowId: string, draft: Draft, triggerId: string): 'missing' | 'none' | 'ready' {
+    const specs = inputSpecs(draft, triggerId)
+    if (specs.length == 0) return 'none'
+    const saved = this.#savedInputs.get(this.#inputKey(flowId, triggerId))
+    return saved?.valid == true && saved.signature == inputSignature(specs) ? 'ready' : 'missing'
   }
 
   public async requestLive(flow: Flow): Promise<RunRequestOutcome> {
@@ -198,6 +263,7 @@ export class RunRequestStore {
 
   public dismissInputs(): void {
     const request = this.#state.value.inputRequest
+    this.#rememberInputs(request)
     this.#set({ inputRequest: undefined })
     this.#disposeInputRequest(request)
   }
@@ -209,10 +275,8 @@ export class RunRequestStore {
       this.#set({ inputRequest: { ...request, attempted: true } })
       return false
     }
-    const inputs = Object.fromEntries(
-      request.groups.filter((group) => group.nodeId != request.triggerId).map((group) => [group.nodeId, group.editor.values()]),
-    ) as Readonly<Record<string, Readonly<Record<string, JsonValue>>>>
-    const payload = (request.groups.find((group) => group.nodeId == request.triggerId)?.editor.values().payload ?? {}) as JsonValue
+    this.#rememberInputs(request)
+    const { inputs, payload } = runValues(request.groups, request.triggerId)
     const started = await this.#start(request.source, request.flow, request.revisionId, { nodeId: request.triggerId, payload }, inputs, request.publicationId)
     if (started && this.#state.value.inputRequest === request) this.dismissInputs()
     return started
@@ -222,9 +286,12 @@ export class RunRequestStore {
     const request = this.#state.value.inputRequest
     if (request == null || !request.triggers.some((trigger) => trigger.nodeId == triggerId)) return
     const current = this.#requests.begin()
+    this.#rememberInputs(request)
     this.#set({ starting: true })
     try {
-      const groups = await inputGroups(request.revision, this.#i18n.lang$, triggerId)
+      const specs = inputSpecs(request.revision, triggerId)
+      const saved = this.#savedInputs.get(this.#inputKey(request.flow.flowId, triggerId))
+      const groups = await inputGroups(specs, this.#i18n.lang$, triggerId, saved?.values)
       if (!current() || this.#state.value.inputRequest !== request) {
         for (const group of groups) group.editor.dispose()
         return
@@ -247,8 +314,10 @@ export class RunRequestStore {
     current: Current,
     publicationId?: string,
     triggerId?: string,
+    edit = false,
   ): Promise<RunRequestOutcome> {
     const previous = this.#state.value.inputRequest
+    this.#rememberInputs(previous)
     this.#set({ inputRequest: undefined, starting: true, submitting: undefined })
     this.#disposeInputRequest(previous)
     const graph = revisionView(revision).graph({ kind: 'flow' })
@@ -258,19 +327,29 @@ export class RunRequestStore {
       this.#setNotice({ kind: 'error', message: this.#i18n.t('runInput.noTrigger') })
       return 'unavailable'
     }
-    const only = triggerId == null ? (triggers.length == 1 ? triggers[0] : undefined) : triggers.find((trigger) => trigger.nodeId == triggerId)
+    const only = triggerId == null ? triggers[0] : triggers.find((trigger) => trigger.nodeId == triggerId)
     if (triggerId != null && only == null) {
       this.#set({ starting: false })
       this.#setNotice({ kind: 'error', message: this.#i18n.t('runInput.selectTrigger') })
       return 'unavailable'
     }
-    const groups = only == null ? [] : await inputGroups(revision, this.#i18n.lang$, only.nodeId)
+    const specs = only == null ? [] : inputSpecs(revision, only.nodeId)
+    const signature = inputSignature(specs)
+    const saved = only == null ? undefined : this.#savedInputs.get(this.#inputKey(flow.flowId, only.nodeId))
+    const groups = only == null ? [] : await inputGroups(specs, this.#i18n.lang$, only.nodeId, saved?.values)
     if (!current()) {
       for (const group of groups) group.editor.dispose()
       return 'unavailable'
     }
-    if (only != null && groups.length == 0) {
+    if (!edit && only != null && groups.length == 0) {
       return (await this.#start(source, flow, revisionId, { nodeId: only.nodeId, payload: {} }, {}, publicationId)) ? 'started' : 'unavailable'
+    }
+    if (!edit && only != null && saved?.valid == true && saved.signature == signature && groups.every((group) => group.editor.valid$.value)) {
+      const values = runValues(groups, only.nodeId)
+      for (const group of groups) group.editor.dispose()
+      return (await this.#start(source, flow, revisionId, { nodeId: only.nodeId, payload: values.payload }, values.inputs, publicationId))
+        ? 'started'
+        : 'unavailable'
     }
     const valid = compute((get) => only != null && groups.every((group) => get(group.editor.valid$)))
     this.#set({
@@ -334,6 +413,19 @@ export class RunRequestStore {
     if (request == null) return
     request.valid.dispose()
     for (const group of request.groups) group.editor.dispose()
+  }
+
+  #inputKey(flowId: string, triggerId: string): string {
+    return `${flowId}\u0000${triggerId}`
+  }
+
+  #rememberInputs(request: RunInputRequest | undefined): void {
+    if (request?.triggerId == null || request.groups.length == 0) return
+    this.#savedInputs.set(this.#inputKey(request.flow.flowId, request.triggerId), {
+      signature: inputSignature(inputSpecs(request.revision, request.triggerId)),
+      valid: request.valid.value,
+      values: groupValues(request.groups),
+    })
   }
 
   #set(patch: Partial<RequestState>): void {

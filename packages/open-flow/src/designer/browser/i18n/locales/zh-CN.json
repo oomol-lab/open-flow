@@ -593,6 +593,8 @@
   },
   "zoomIn": "放大",
   "zoomOut": "缩小",
+  "zoomReset": "重置缩放为 100%",
+  "view": "视图",
   "canvasCard": {
     "waitBranch": { "approve": "通过", "reject": "拒绝", "continue": "继续" },
     "run": "运行",

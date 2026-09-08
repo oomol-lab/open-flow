@@ -593,6 +593,8 @@
   },
   "zoomIn": "拡大",
   "zoomOut": "縮小",
+  "zoomReset": "ズームを100%にリセット",
+  "view": "表示",
   "canvasCard": {
     "waitBranch": { "approve": "承認", "reject": "拒否", "continue": "続行" },
     "run": "実行",

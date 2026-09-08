@@ -395,14 +395,14 @@ test('keeps responsive overlays aligned with the Workbench container and keyboar
   assert.match(diagnostics, /aria-busy=\{checking\}/)
   assert.match(diagnostics, /<span aria-live="polite">/)
   assert.match(runInput, /aria-busy=\{starting\}/)
-  assert.match(workspaceStyles, /\.diagnostics-panel:focus-visible,[\s\S]*?outline: 2px solid var\(--ui-ring\)/)
+  assert.match(workspaceStyles, /\.diagnostics-panel:focus-visible \{[\s\S]*?outline: 2px solid var\(--ui-ring\)/)
   assert.match(workspaceStyles, /overscroll-behavior: contain/)
   assert.match(contextPanelStyles, /\.context-panel:focus-visible[\s\S]*?outline: 2px solid var\(--ui-ring\)/)
   assert.match(contextPanelStyles, /overscroll-behavior: contain/)
   assert.match(responsiveStyles, /max-height: 100dvh/)
   assert.match(workspaceStyles, /grid-template-rows: 52px minmax\(0, 1fr\)/)
   assert.match(workspaceStyles, /\.diagnostics-panel \{[\s\S]*?top: 52px;/)
-  assert.match(workspaceStyles, /\.run-input-panel \{[\s\S]*?top: 52px;/)
+  assert.match(workspaceStyles, /\.run-input-popover > form \{[\s\S]*?max-height: min\(620px, calc\(100dvh - 96px\)\)/)
   for (const side of ['top', 'right', 'bottom', 'left']) assert.match(responsiveStyles, new RegExp(`padding-${side}: env\\(safe-area-inset-${side}\\)`))
 })
 
@@ -443,7 +443,7 @@ test('keeps the Run input editor on the product theme adapter', async () => {
   assert.match(editorStyles, /--widget-background: var\(--ui-muted\)/)
   assert.doesNotMatch(editorStyles, /var\(--(?:border-[12]|text-[1-5])\)/)
   assert.match(panel, /<FlowRunInputEditor store=\{group\.editor\} theme=\{theme\}/)
-  assert.match(workspace, /<RunInputPanel onStarted=\{revealRun\} store=\{store\.runRequests\} theme=\{theme\}/)
+  assert.match(workspace, /inputContent=\{<RunInputPanel onStarted=\{onRunStarted\} store=\{store\.runRequests\} theme=\{theme\} \/>\}/)
 })
 
 test('keeps concrete Designer theme modules behind the Designer theme adapter', async () => {
