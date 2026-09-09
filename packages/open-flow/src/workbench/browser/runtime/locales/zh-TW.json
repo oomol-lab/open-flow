@@ -741,7 +741,6 @@
     "execution": "執行方式",
     "auto": "自動執行",
     "confirm": "執行前確認",
-    "chooseExecution": "選擇執行方式",
     "executionHint": "選擇直接執行，或每次呼叫前由你確認。",
     "modelParameters": "參數由 Agent 根據任務填寫。",
     "parameters": "進階參數設定",

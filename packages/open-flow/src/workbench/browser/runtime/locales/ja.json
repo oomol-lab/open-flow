@@ -741,7 +741,6 @@
     "execution": "実行方法",
     "auto": "自動実行",
     "confirm": "実行前に確認",
-    "chooseExecution": "実行方法を選択",
     "executionHint": "そのまま実行するか、呼び出しごとに確認するかを選択します。",
     "modelParameters": "Agent がタスクに応じてパラメーターを入力します。",
     "parameters": "パラメーターの詳細設定",

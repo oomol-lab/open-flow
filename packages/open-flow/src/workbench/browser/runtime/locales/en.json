@@ -741,7 +741,6 @@
     "execution": "Execution",
     "auto": "Run automatically",
     "confirm": "Confirm before running",
-    "chooseExecution": "Choose how this tool runs",
     "executionHint": "Choose whether each call runs directly or waits for your confirmation.",
     "modelParameters": "The Agent fills the parameters from the task.",
     "parameters": "Advanced parameter settings",
