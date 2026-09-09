@@ -92,6 +92,7 @@ const conditionModel: FlowDesignerViewModel = {
     {
       id: 'invalid-input',
       kind: 'condition',
+      diagnostics: 1,
       title: 'Invalid input',
       position: { x: 0, y: 620 },
       inputs: [{ handle: 'count', jsonSchema: { type: 'number' }, value: 'not-a-number' }],
@@ -119,7 +120,6 @@ function ConditionStory({ dark, language, log }: { readonly dark: boolean; reado
           model={conditionModel}
           addItems={[]}
           selectedNodeIds={selected}
-          createSchemaEditor={() => () => undefined}
           onAddNode={() => undefined}
           onConnect={(edge) => log('edge.connect', edge)}
           onDisconnect={(edge) => log('edge.disconnect', edge)}
@@ -132,7 +132,6 @@ function ConditionStory({ dark, language, log }: { readonly dark: boolean; reado
             setSelected(ids)
             log('selection.change', edge ?? ids)
           }}
-          onChangeCondition={(node, value) => log('condition.change', { node, value })}
         />
       </div>
     </div>

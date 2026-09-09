@@ -2,15 +2,12 @@ import styles from './flowRunInputEditor.module.scss'
 import type { ReactElement } from 'react'
 import type { WorkbenchTheme } from './runtime/contract.ts'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useVal } from 'use-value-enhancer'
-import { I18nProvider } from 'val-i18n-react'
-import { GetPopupContainerContext } from '../../designer/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
-import { createI18n } from '../../designer/browser/i18n/i18n-loader.ts'
-import { HandleEditor } from '../../designer/browser/jsonSchema/handleEditor.tsx'
-import { HandleRowStore } from '../../designer/browser/stores/nodeHandle/handleRow.store.ts'
-import { ThemeProvider } from '../../designer/browser/theme/ThemeProvider.tsx'
-import { flowRunInputEditorState, FlowRunInputEditorStore } from './flowRunInputEditorStore.ts'
+import { I18nProvider, useTranslate } from 'val-i18n-react'
+import { ValueEditor } from '../../form/browser/valueEditor.tsx'
+import { FlowRunInputEditorStore } from './flowRunInputEditorStore.ts'
+import { createI18n } from './runtime/i18n.ts'
 
 export { FlowRunInputEditorStore } from './flowRunInputEditorStore.ts'
 export type { FlowRunInputDefinition } from './flowRunInputEditorStore.ts'
@@ -21,52 +18,54 @@ export function FlowRunInputEditor({
   store,
   theme,
 }: {
-  readonly labelledBy?: string
-  readonly showErrors?: boolean
   readonly store: FlowRunInputEditorStore
   readonly theme: WorkbenchTheme
+  readonly labelledBy?: string
+  readonly showErrors?: boolean
 }): ReactElement {
-  const state = flowRunInputEditorState(store)
-  const handles = useVal(state.inputs.section.$.handles)
-  const language = useVal(state.language)
-  const [root, setRoot] = useState<HTMLDivElement | null>(null)
+  const language = useVal(store.language)
   const i18n = useMemo(() => createI18n(language), [language])
-  const popupContainers = useMemo(
-    () => ({
-      default: () => root ?? document.body,
-      static: () => root ?? document.body,
-    }),
-    [root],
-  )
-
   useEffect(() => () => i18n.dispose(), [i18n])
-
   return (
-    <div className={`oo-designer-root ${styles.root}`} data-workbench-control-scope ref={setRoot}>
-      <GetPopupContainerContext.Provider value={popupContainers}>
-        <I18nProvider i18n={i18n}>
-          <ThemeProvider dark={theme == 'dark'} getPopupContainer={popupContainers.static}>
-            {handles.flatMap((handle) => {
-              if (!HandleRowStore.is(handle)) return []
-              const definition = state.definitions.find((candidate) => candidate.handle == handle.name)!
-              return [
-                <fieldset className={styles.field} key={handle.name} aria-labelledby={labelledBy}>
-                  {labelledBy == null && (
-                    <legend className={styles.legend}>
-                      <span>{handle.name}</span>
-                      {definition.nullable && <span className={styles.optional}>null</span>}
-                    </legend>
-                  )}
-                  {labelledBy == null && definition.description != null && <p className={styles.description}>{definition.description}</p>}
-                  <div className={styles.value}>
-                    <HandleEditor panelWidth$={state.panelWidth$} presentation="form" showFormError={showErrors} showSchemaSettings={false} store={handle} />
-                  </div>
-                </fieldset>,
-              ]
-            })}
-          </ThemeProvider>
-        </I18nProvider>
-      </GetPopupContainerContext.Provider>
-    </div>
+    <I18nProvider i18n={i18n}>
+      <div className={`open-flow-theme ${styles.root}`} data-theme={theme}>
+        <InputFields store={store} showErrors={showErrors} labelledBy={labelledBy} />
+      </div>
+    </I18nProvider>
+  )
+}
+
+function InputFields({ store, showErrors, labelledBy }: { store: FlowRunInputEditorStore; showErrors: boolean; labelledBy?: string }) {
+  const t = useTranslate()
+  const values = useVal(store.values$)
+  const issues = useVal(store.issues$)
+  return (
+    <>
+      {store.definitions.map((definition) => (
+        <fieldset className={styles.field} key={definition.handle} aria-labelledby={labelledBy}>
+          {labelledBy == null && (
+            <legend className={styles.legend}>
+              {definition.handle}
+              {definition.nullable && <span className={styles.optional}>null</span>}
+            </legend>
+          )}
+          {labelledBy == null && definition.description && <p className={styles.description}>{definition.description}</p>}
+          <ValueEditor
+            label={definition.handle}
+            path={`/${definition.handle.replaceAll('~', '~0').replaceAll('/', '~1')}`}
+            schema={definition.jsonSchema}
+            nullable={definition.nullable}
+            value={Object.hasOwn(values, definition.handle) ? values[definition.handle] : undefined}
+            onChange={(value) => store.setValue(definition.handle, value)}
+            onDraftIssue={store.setDraftIssue}
+          />
+          {showErrors && issues[definition.handle] && (
+            <p className={styles.error} role="alert">
+              {issues[definition.handle]!.message ?? t(`valueEditor.${issues[definition.handle]!.kind}`)}
+            </p>
+          )}
+        </fieldset>
+      ))}
+    </>
   )
 }

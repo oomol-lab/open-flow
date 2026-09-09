@@ -1,84 +1,11 @@
 import styles from './NodeStatusLabel.module.scss'
-import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { Viewport } from '../../../base/compare.ts'
-import type { FlowRunStatus } from '../../../stores/designer/typings.ts'
 import type { NodeStatus } from '../../../stores/node/constants.ts'
 
 import { isDefined } from '@wopjs/cast'
 import { clsx } from 'clsx'
-import { memo } from 'react'
-import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { Progress } from '../../../../../ui/browser/progress.tsx'
 import { NODE_STATUS } from '../../../stores/node/constants.ts'
-import { NodeTopLeftLabel } from './NodeTopLeftLabel.tsx'
-import { useNodeStatus } from './useNodeStatus.ts'
-
-export type NodeStatusLabelProps = {
-  skip$: Val<boolean | undefined>
-  nodeStatus$: ReadonlyVal<NodeStatus>
-  flowStatus$: ReadonlyVal<FlowRunStatus>
-  progress$?: ReadonlyVal<number | undefined>
-  successCount$?: ReadonlyVal<number | undefined>
-  viewport$: ReadonlyVal<Viewport | undefined>
-}
-
-export const NodeStatusLabel: React.FC<NodeStatusLabelProps> = /* @__PURE__ */ memo(
-  ({ skip$, nodeStatus$, flowStatus$, progress$, successCount$, viewport$ }) => {
-    const t = useTranslate()
-    const skip = useVal(skip$, true)
-    const progress = useVal(progress$, true)
-    const { status, count } = useNodeStatus(nodeStatus$, flowStatus$, successCount$)
-
-    if (skip) {
-      return (
-        <NodeTopLeftLabel viewport$={viewport$} as="button" onClick={() => skip$.set(!skip)}>
-          <span className="inline-flex items-center">
-            <i className={`${styles.icon} i-codicon:circle-slash`} />
-            {t('nodeStatus.skipped')}
-          </span>
-        </NodeTopLeftLabel>
-      )
-    }
-
-    switch (status) {
-      case NODE_STATUS.Success: {
-        return (
-          <NodeTopLeftLabel viewport$={viewport$}>
-            <NodeStatusIcon className={styles.icon} status={status} />
-            <NodeStatusContent status={status} combo={count} />
-          </NodeTopLeftLabel>
-        )
-      }
-      case NODE_STATUS.Error: {
-        return (
-          <NodeTopLeftLabel viewport$={viewport$}>
-            <NodeStatusIcon className={styles.icon} status={status} />
-            <NodeStatusContent status={status} combo={count} />
-          </NodeTopLeftLabel>
-        )
-      }
-      case NODE_STATUS.Running: {
-        return (
-          <NodeTopLeftLabel viewport$={viewport$}>
-            <NodeStatusIcon className={styles.icon} status={status} progress={progress} />
-            <NodeStatusContent status={status} progress={progress} />
-          </NodeTopLeftLabel>
-        )
-      }
-      case NODE_STATUS.Waiting: {
-        return (
-          <NodeTopLeftLabel viewport$={viewport$}>
-            <NodeStatusIcon className={styles.icon} status={status} />
-            <NodeStatusContent status={status} />
-          </NodeTopLeftLabel>
-        )
-      }
-    }
-
-    return null
-  },
-)
 
 export interface NodeStatusIconProps {
   status: NodeStatus

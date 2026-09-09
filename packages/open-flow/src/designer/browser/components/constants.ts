@@ -48,27 +48,3 @@ function getDayjsFormat(format: DateTimeFormat): string {
       return 'YYYY-MM-DDTHH:mm:ssZ'
   }
 }
-
-export const ColorTypes = ['RGB', 'HSV', 'HEX', 'HEX8'] as const
-
-export type ColorType = (typeof ColorTypes)[number]
-
-export function isColorType(value: unknown): value is ColorType {
-  return ColorTypes.includes(value as ColorType)
-}
-
-export function asColorType(value: unknown): ColorType {
-  return isColorType(value) ? value : defaultColorType
-}
-
-export interface ColorTypeOption extends IBasicOption {
-  value: ColorType
-}
-
-export const colorTypeOptions: ColorTypeOption[] = /*#__PURE__*/ ColorTypes.map((value) => ({ value }))
-
-export const defaultColorType: ColorType = 'HEX'
-
-export function optionOfColorType(type: ColorType): ColorTypeOption {
-  return colorTypeOptions.find((e) => e.value === type)!
-}

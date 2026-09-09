@@ -3,8 +3,8 @@ import styles from './range.module.scss'
 import { clsx } from 'clsx'
 import { forwardRef, useCallback, useRef, useState } from 'react'
 import { Button } from '../../../ui/browser/button.tsx'
+import { useIsMounted } from '../../../ui/browser/hooks.ts'
 import { Input } from '../../../ui/browser/input.tsx'
-import { useIsMounted } from '../base/react.ts'
 import { clamp } from '../base/trivial.ts'
 
 export interface RangeProps {

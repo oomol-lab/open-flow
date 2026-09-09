@@ -24,3 +24,23 @@ Switch light/dark mode in the toolbar to review both themes. Story URLs are shar
 Designer colors live in `src/designer/browser/styles/light.module.scss` and `dark.module.scss`; product colors live in `src/ui/browser/theme.css`. Edits to these files update the previews through Vite.
 
 Add production node boundary cases to `nodeStories.tsx`, layered card examples to `cards.tsx`, individual component scenarios to `stories.tsx`, component overviews to `overview.tsx`, and full graph samples to `workflow.tsx`. Keep scenarios deterministic and use the action logger instead of external services. Component stories render inside a real flow node so canvas scaling and popup placement use the same context as Designer. Standalone stories provide their own layout; workflow samples use `FlowDesignerView` and log authoring actions without saving or running a Flow. The Lab is a development tool and has no production build or package entry.
+
+**Run Inputs** (`?story=run-inputs`) exercises the production input form without a Designer provider. It covers required fields, open objects, arrays, enums, explicit null and invalid JSON drafts.
+
+`?story=node-library` 使用生产节点库，可切换正常、空列表、加载、错误和禁用状态，并检查搜索与动作记录。
+
+`?story=node-metadata` 使用生产节点描述字段，展示编辑、只读及失焦保存结果。
+
+`?story=value-node-editor` 使用生产值节点字段配置，展示结构化编辑、字段设置及只读状态。
+
+`?story=trigger-schedule` 使用生产触发计划编辑器，展示定时间隔、Cron、多条规则、只读和未配置状态。
+
+`?story=trigger-config` 使用生产服务触发器配置组件，展示 Schema 字段、多选、必填、默认值和只读状态。
+
+`?story=webhook-editor` 使用生产 Webhook 配置组件，展示请求字段、HTTP 方法、响应配置及只读切换。
+
+`?story=condition-editor` 使用生产条件分支编辑组件，展示表达式、命名出口、默认出口和只读切换。
+
+`?story=variable-picker` 使用生产变量选择器，展示搜索、正常、缺失、加载、空列表、不可用及只读状态。
+
+`?story=node-picker` 使用生产画布的新增节点菜单，覆盖分组、搜索、禁用项、服务动作二级选项，以及从执行端口拉线后创建节点的回调。点击底部 Add node 打开菜单；从任务左侧输入端拉到空白处可检查连接方向与不兼容项。样例只记录动作，不写入业务数据。

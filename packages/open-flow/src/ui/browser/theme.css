@@ -61,3 +61,430 @@
   --open-flow-input: #484848;
   --open-flow-ring: #747474;
 }
+
+/* Canvas surfaces preserve the approved node and floating-control palette.
+   Theme values are owned here; components select a surface and data-theme. */
+.open-flow-theme[data-surface='canvas'] {
+  --nearly-transparent: #00000001;
+  --white: #ffffff;
+  --black: #000000;
+
+  --base-font-size: 12px;
+  --icon-size: 20px;
+  --icon-font-size: 1.25em;
+  --widget-height: 22px;
+  --widget-radius: 3px;
+  --widget-tag-font-size: 11px;
+  --node-container-radius: 6px;
+  --node-effect-radius-number: 7;
+  --transition-time: 0.2s;
+  --canvas-control-container-size: 32px;
+  --canvas-control-icon-size: 16px;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  --font-monospace: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+
+  --scrollbar-color-hover: #797979b3;
+  --scrollbar-color: #79797966;
+
+  --accent-blue-1: #75beff;
+  --accent-blue-2: #40a6ff;
+  --accent-blue-3: #3399cc;
+  --accent-blue-4: #3794ff;
+  --accent-blue-5: #0097fb;
+  --accent-blue-6: #007acc;
+  --accent-blue-7: #0e639c;
+  --accent-blue-8: #264f78;
+  --accent-blue-9: #094771;
+  --accent-blue-10: #062f4a;
+  --accent-blue-11: #001f33;
+  --accent-red-1: #f14c4c;
+  --accent-red-2: #c74e39;
+  --accent-red-3: #ff0000;
+  --accent-red-4: #a31515;
+  --accent-green-1: #73c991;
+  --accent-green-2: #40c8ae;
+  --accent-green-3: #16825d;
+  --accent-green-4: #327e36;
+  --accent-green-5: #28632b;
+  --accent-purple-1: #6c6cc4;
+  --accent-purple-2: #b180d7;
+  --accent-purple-3: #bc3fbc;
+  --accent-purple-4: #68217a;
+  --accent-yellow-1: #d7ba7d;
+  --accent-yellow-2: #cca700;
+  --accent-yellow-3: #b89500;
+  --accent-yellow-4: #bf8803;
+  --accent-yellow-5: #ffff00;
+  --accent-orange-1: #cc6633;
+  --accent-orange-2: #ee9d28;
+  --accent-orange-3: #ea5c00;
+  --accent-gray-1: #e4e6f1;
+  --accent-gray-2: #5f6a79;
+  --accent-gray-3: #424750;
+
+  --seti-blue: #519aba;
+  --seti-green: #8dc149;
+  --seti-orange: #e37933;
+  --seti-pink: #f55385;
+  --seti-red: #cc3e44;
+  --seti-steel: #7494a3;
+  --seti-yellow: #cbcb41;
+  --seti-purple: #a074c4;
+  --seti-ignore: #41535b;
+  --seti-white: #d4d7d6;
+  --seti-gray: #6d8086;
+
+  --brand-1: #eeeeee;
+  --brand-2: #dddddd;
+  --brand-3: #c5c5c5;
+  --brand-4: #adadad;
+  --brand-5: #555555;
+  --brand-6: #4a4a4a;
+  --brand-7: #3d3d3d;
+  --brand-8: #303030;
+  --brand-9: #242424;
+
+  --success: #52c41a;
+  --warning: #faad14;
+  --error: #ff4d4f;
+
+  color-scheme: light;
+
+  --fill-1: #ffffff;
+  --fill-2: #fafafa;
+  --fill-3: #f6f6f6;
+  --fill-4: #eeeeee;
+  --fill-5: #e7e7e7;
+  --fill-6: #e3e3e3;
+  --fill-7: #dedede;
+  --border-1: #dedede;
+  --border-2: #d2d2d2;
+  --text-1: #858585;
+  --text-2: #6b6b6b;
+  --text-3: #6b6b6b;
+  --text-4: #242424;
+  --text-5: #242424;
+
+  --accent-soft: #ededed;
+  --accent-soft-hover: #e3e3e3;
+  --accent-foreground: #333333;
+  --canvas-grid: rgb(100 100 100 / 14%);
+  --node-shadow: none;
+  --node-selected-shadow: 0 0 0 2px rgb(70 70 70 / 12%), 0 2px 6px rgb(0 0 0 / 5%);
+  --node-error-selected-shadow: 0 0 0 2px rgb(204 62 68 / 14%), 0 2px 6px rgb(28 32 36 / 5%);
+  --floating-control-shadow: 0 1px 3px rgb(28 32 36 / 4%);
+
+  --background: var(--fill-1);
+  --foreground: var(--text-5);
+  --ui-background: var(--fill-1);
+  --ui-foreground: var(--text-5);
+  --ui-card: var(--widget-popup-background);
+  --ui-card-foreground: var(--widget-font-color);
+  --ui-popover: var(--widget-popup-background);
+  --ui-popover-foreground: var(--widget-font-color);
+  --ui-primary: var(--brand-highlight-color);
+  --ui-primary-foreground: var(--widget-font-highlight-color);
+  --ui-secondary: var(--fill-4);
+  --ui-secondary-foreground: var(--text-4);
+  --ui-muted: var(--fill-4);
+  --ui-muted-foreground: var(--text-2);
+  --ui-accent: var(--fill-5);
+  --ui-accent-foreground: var(--text-5);
+  --ui-destructive: var(--accent-red-1);
+  --ui-border: var(--border-2);
+  --ui-input: var(--border-2);
+  --ui-ring: var(--brand-highlight-color);
+  --ui-radius: 6px;
+
+  --brand-color: #3d3d3d;
+  --brand-highlight-color: #505050;
+  --brand-hover-color: color-mix(in srgb, var(--brand-highlight-color) 20%, transparent);
+
+  --node-background-color: var(--fill-1);
+  --node-border-color: var(--border-1);
+  --node-selected-border-color: var(--brand-highlight-color);
+  --node-head-background-color: var(--fill-3);
+  --node-head-background-highlight-color: var(--fill-4);
+
+  --widget-error-tag-background: #f36767;
+  --widget-error-tag-border-color: #ff0000;
+
+  --widget-shadow: #00000099;
+  --widget-font-color: var(--text-4);
+  --widget-font-readonly-color: var(--widget-font-color);
+  --widget-font-placeholder-color: var(--text-2);
+  --widget-font-highlight-color: var(--white);
+  --widget-font-disable-color: var(--text-2);
+  --widget-font-error-color: var(--widget-font-color);
+  --widget-secondary-font-color: var(--text-3);
+
+  --widget-font-danger-color: #000000cc;
+  --widget-button-danger-bg: #f851494d;
+  --widget-button-danger-hover-bg: #f8514989;
+  --widget-null-color: #0550ae;
+  --widget-null-bg-color: #79c0ff33;
+
+  --widget-border-color: var(--border-2);
+  --widget-border-highlight-color: #a3a3a3;
+  --widget-background: var(--fill-4);
+  --widget-background-highlight-color: var(--fill-5);
+  --widget-background-mask-highlight-color: rgba(0, 0, 0, 0.1);
+
+  --widget-input-background: var(--fill-3);
+  --widget-input-selection-background-color: #d1d2f3;
+  --widget-switch-background-color: var(--fill-7);
+  --widget-switch-border-color: transparent;
+  --widget-label-background: var(--fill-4);
+  --widget-active-background: var(--fill-6);
+
+  --widget-selector-selected-focused-bg: var(--brand-1);
+  --widget-selector-selected-bg: var(--brand-2);
+
+  --widget-popup-background: var(--fill-1);
+  --widget-range-background: var(--brand-color);
+
+  --widget-segmented-item-selected-bg: var(--fill-2);
+  --widget-segmented-item-hover-bg: var(--block-editor-item-background-color);
+  --widget-segmented-track-bg: var(--fill-3);
+  --widget-segmented-font-color: var(--text-strong);
+  --widget-segmented-inactive-color: var(--text-weak);
+
+  --widget-time-picker-active-bg: var(--brand-highlight-color);
+
+  --widget-success-progress-color: var(--accent-green-1);
+  --widget-error-progress-color: var(--accent-red-1);
+
+  --widget-error-color: #ff0000;
+  --widget-error-hover-color: #dd0000;
+  --widget-error-hover-background-color: #ff000020;
+  --widget-error-background: #da565cbd;
+  --widget-error-background-highlight-color: #ff9999;
+  --widget-error-input-border-color: #ff6666;
+  --widget-error-input-background: #ffe6e6;
+  --widget-error-tip-border: var(--widget-error-input-border-color);
+  --widget-error-tip-background: var(--widget-error-input-background);
+
+  --widget-warn-color: var(--warning);
+
+  --edge-color: #8b8d98;
+  --edge-linear-gradient-start: var(--edge-color);
+  --edge-linear-gradient-end: var(--edge-color);
+
+  --edge-string: #f9ae58;
+  --edge-json: #9ca0df;
+  --edge-primitive: #a3a3a3;
+  --edge-selected: var(--text-2);
+  --edge-bin: #00d6b9;
+  --edge-error: var(--seti-red);
+  --flow-bg: var(--fill-4);
+
+  --xy-controls-button-background-color: var(--ui-background);
+  --xy-controls-button-background-color-hover: var(--ui-muted);
+  --xy-controls-button-border-color: var(--ui-border);
+  --xy-controls-button-color: var(--ui-muted-foreground);
+  --xy-controls-button-color-hover: var(--ui-foreground);
+  --xy-controls-box-shadow: var(--floating-control-shadow);
+  --xy-minimap-background-color: var(--node-background-color);
+  --xy-minimap-mask-background-color: rgb(0 0 0 / 10%);
+  --xy-minimap-node-background-color: var(--widget-background);
+
+  --highlight-indicate-color: var(--brand-7);
+
+  --block-editor-item-background-color: var(--fill-3);
+
+  --table-head-color: var(--text-2);
+  --minimap-border-color: var(--border-2);
+
+  --contextmenu-shadow: #00000016;
+  --contextmenu-background: var(--fill-1);
+  --contextmenu-hover: var(--fill-5);
+
+  --text: var(--text-3);
+  --text-strong: var(--text-4);
+  --text-stronger: var(--text-5);
+  --text-weak: var(--text-1);
+  --text-weaker: var(--border-2);
+  --border-weak: var(--border-1);
+
+  --bubble-bg: var(--brand-1);
+  --bubble-border: var(--brand-4);
+
+  --pseudo-outline-color: var(--brand-3);
+
+  --comment-bg: #ede5d5;
+  --comment-head-bg: #e8d7b3;
+  --comment-border: #e8d7b3;
+  --comment-selected-border: #d7ac4c;
+  --comment-hover-bg: color-mix(in srgb, var(--comment-head-bg) 70%, #ffffff);
+  --comment-active-bg: color-mix(in srgb, var(--comment-head-bg) 93%, #000000);
+}
+
+.open-flow-theme[data-surface='canvas'][data-theme='dark'] {
+  color-scheme: dark;
+
+  --fill-1: #242424;
+  --fill-2: #1c1c1c;
+  --fill-3: #2b2b2b;
+  --fill-4: #303030;
+  --fill-5: #363636;
+  --fill-6: #3c3c3c;
+  --fill-7: #484848;
+  --border-1: #3c3c3c;
+  --border-2: #484848;
+  --text-1: #858585;
+  --text-2: #ababab;
+  --text-3: #ababab;
+  --text-4: #eeeeee;
+  --text-5: #eeeeee;
+
+  --accent-soft: #353535;
+  --accent-soft-hover: #424242;
+  --accent-foreground: #e0e0e0;
+  --canvas-grid: rgb(180 180 180 / 13%);
+  --node-shadow: none;
+  --node-selected-shadow: 0 0 0 2px rgb(190 190 190 / 16%), 0 2px 6px rgb(0 0 0 / 20%);
+  --node-error-selected-shadow: 0 0 0 2px rgb(204 62 68 / 24%), 0 2px 6px rgb(0 0 0 / 20%);
+  --floating-control-shadow: 0 1px 3px rgb(0 0 0 / 16%);
+
+  --brand-color: #cccccc;
+  --brand-highlight-color: #b8b8b8;
+  --brand-hover-color: color-mix(in srgb, var(--brand-highlight-color) 20%, transparent);
+  --ui-background: var(--fill-1);
+  --ui-foreground: var(--text-5);
+  --ui-card: var(--widget-popup-background);
+  --ui-card-foreground: var(--widget-font-color);
+  --ui-popover: var(--widget-popup-background);
+  --ui-popover-foreground: var(--widget-font-color);
+  --ui-primary: var(--brand-highlight-color);
+  --ui-primary-foreground: var(--widget-font-highlight-color);
+  --ui-secondary: var(--fill-4);
+  --ui-secondary-foreground: var(--text-4);
+  --ui-muted: var(--fill-4);
+  --ui-muted-foreground: var(--text-2);
+  --ui-accent: var(--fill-5);
+  --ui-accent-foreground: var(--text-5);
+  --ui-destructive: var(--accent-red-1);
+  --ui-border: var(--border-2);
+  --ui-input: var(--border-2);
+  --ui-ring: var(--brand-highlight-color);
+  --ui-radius: 6px;
+
+  --node-background-color: var(--fill-1);
+  --node-border-color: var(--border-1);
+  --node-selected-border-color: var(--brand-highlight-color);
+  --node-head-background-color: var(--fill-3);
+  --node-head-background-highlight-color: var(--fill-4);
+
+  --widget-error-tag-background: #641e1e;
+  --widget-error-tag-border-color: #c60000;
+
+  --widget-shadow: #00000099;
+  --widget-font-color: var(--text-4);
+  --widget-font-readonly-color: var(--widget-font-color);
+  --widget-font-placeholder-color: var(--text-2);
+  --widget-font-highlight-color: var(--white);
+  --widget-font-disable-color: var(--text-2);
+  --widget-font-error-color: var(--widget-font-color);
+  --widget-secondary-font-color: var(--text-3);
+
+  --widget-font-danger-color: #ffffffcc;
+  --widget-button-danger-bg: #f851494d;
+  --widget-button-danger-hover-bg: #f8514989;
+  --widget-null-color: #79c0ff;
+  --widget-null-bg-color: #79c0ff33;
+
+  --widget-border-color: var(--border-2);
+  --widget-border-highlight-color: #747474;
+  --widget-background: var(--fill-4);
+  --widget-background-highlight-color: var(--fill-5);
+  --widget-background-mask-highlight-color: #ffffff1a;
+
+  --widget-input-background: var(--fill-3);
+  --widget-input-selection-background-color: #2b4f77;
+  --widget-switch-background-color: var(--fill-7);
+  --widget-switch-border-color: transparent;
+  --widget-label-background: var(--fill-4);
+  --widget-active-background: var(--fill-6);
+
+  --widget-selector-selected-focused-bg: var(--brand-9);
+  --widget-selector-selected-bg: var(--brand-8);
+
+  --widget-popup-background: var(--fill-1);
+  --widget-range-background: var(--brand-highlight-color);
+
+  --widget-segmented-item-selected-bg: var(--fill-4);
+  --widget-segmented-item-hover-bg: var(--block-editor-item-background-color);
+  --widget-segmented-track-bg: var(--fill-3);
+  --widget-segmented-font-color: var(--text-strong);
+  --widget-segmented-inactive-color: var(--text-weak);
+
+  --widget-time-picker-active-bg: var(--brand-highlight-color);
+
+  --widget-success-progress-color: var(--accent-green-1);
+  --widget-error-progress-color: var(--accent-red-1);
+
+  --widget-error-color: #ff0000;
+  --widget-error-hover-color: #ff2222;
+  --widget-error-hover-background-color: #ff000040;
+  --widget-error-background: #7b2424;
+  --widget-error-background-highlight-color: #853b3c;
+  --widget-error-input-border-color: #761414;
+  --widget-error-input-background: #351717;
+  --widget-error-tip-border: var(--widget-error-input-border-color);
+  --widget-error-tip-background: var(--widget-error-input-background);
+
+  --widget-warn-color: var(--warning);
+
+  --edge-color: #696e77;
+  --edge-linear-gradient-start: var(--edge-color);
+  --edge-linear-gradient-end: var(--edge-color);
+
+  --edge-string: #f9ae58;
+  --edge-json: #9ca0df;
+  --edge-primitive: #737373;
+  --edge-selected: var(--text-2);
+  --edge-bin: #00d6b9;
+  --edge-error: var(--seti-red);
+  --flow-bg: var(--fill-2);
+
+  --xy-controls-button-background-color: var(--ui-background);
+  --xy-controls-button-background-color-hover: var(--ui-muted);
+  --xy-controls-button-border-color: var(--ui-border);
+  --xy-controls-button-color: var(--ui-muted-foreground);
+  --xy-controls-button-color-hover: var(--ui-foreground);
+  --xy-controls-box-shadow: var(--floating-control-shadow);
+  --xy-minimap-background-color: var(--node-background-color);
+  --xy-minimap-mask-background-color: rgb(0 0 0 / 10%);
+  --xy-minimap-node-background-color: var(--widget-background);
+
+  --highlight-indicate-color: var(--brand-1);
+
+  --block-editor-item-background-color: var(--fill-3);
+
+  --table-head-color: var(--text-2);
+  --minimap-border-color: var(--border-2);
+
+  --contextmenu-shadow: #0000005c;
+  --contextmenu-background: var(--fill-1);
+  --contextmenu-hover: var(--fill-5);
+
+  --text: var(--text-3);
+  --text-strong: var(--text-4);
+  --text-stronger: var(--text-5);
+  --text-weak: var(--text-2);
+  --text-weaker: var(--text-1);
+  --border-weak: var(--border-2);
+
+  --bubble-bg: var(--brand-7);
+  --bubble-border: var(--brand-3);
+
+  --pseudo-outline-color: var(--brand-7);
+
+  --comment-bg: #333029;
+  --comment-head-bg: #504837;
+  --comment-border: #635b49;
+  --comment-selected-border: #bba165;
+  --comment-hover-bg: color-mix(in srgb, var(--comment-head-bg) 89%, #ffffff);
+  --comment-active-bg: color-mix(in srgb, var(--comment-head-bg) 90%, #000000);
+}

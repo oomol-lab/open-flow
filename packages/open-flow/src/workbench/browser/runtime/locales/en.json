@@ -185,7 +185,11 @@
       "nameEmpty": "Node name cannot be empty.",
       "timeout": "Timeout (ms)",
       "timeoutError": "Timeout must be a positive integer in milliseconds.",
-      "title": "Node settings"
+      "title": "Node settings",
+      "description": "Purpose",
+      "describe": "Describe what this step does.",
+      "icon": "Icon",
+      "name": "Title"
     },
     "selectNode": "Select one Draft node to inspect and edit it.",
     "subflow": {
@@ -215,7 +219,8 @@
       "responseMode": "Response mode",
       "source": "Source",
       "structuredJson": "Structured JSON",
-      "retrySave": "Retry save"
+      "retrySave": "Retry save",
+      "additionalInputs": "Additional inputs"
     },
     "wait": {
       "approval": "Approve or reject",
@@ -275,10 +280,6 @@
   },
   "language": {
     "label": "Language"
-  },
-  "jsonViewer": {
-    "bin": "Binary",
-    "var": "Variable"
   },
   "notice": {
     "connectorUnconfigured": "Connector is not configured for this deployment.",
@@ -758,5 +759,104 @@
     "title": "Choose an action",
     "failed": "The action was not added. Try again.",
     "search": "Search apps or actions…"
+  },
+  "triggerSchedule": {
+    "scheduleType": "Schedule type",
+    "scheduleEvery": "Every",
+    "scheduleCron": "Cron",
+    "scheduleInterval": "Polling interval",
+    "scheduleUnit": "Interval unit",
+    "scheduleMinutes": "Minutes",
+    "scheduleHours": "Hours",
+    "scheduleDays": "Days",
+    "scheduleWeeks": "Weeks",
+    "scheduleMonths": "Months",
+    "scheduleExpression": "Cron expression",
+    "scheduleTimezone": "Time zone",
+    "scheduleMissing": "No schedule configured",
+    "scheduleTestHint": "Draft tests run once immediately. After publishing, the workflow runs on schedule."
+  },
+  "triggerConfig": {
+    "configuration": "Configuration",
+    "required": "Input required"
+  },
+  "webhookEditor": {
+    "webhookAddField": "Add field",
+    "webhookAddHeader": "Add header",
+    "webhookCustomType": "Custom schema",
+    "webhookDeleteField": "Delete payload field",
+    "webhookDeleteHeader": "Delete response header",
+    "webhookFieldName": "Field name",
+    "webhookFieldNameDuplicate": "Field names must be unique.",
+    "webhookFieldNameRequired": "Enter a field name.",
+    "webhookFieldType": "Type",
+    "webhookHeaderName": "Header name",
+    "webhookHeaders": "Response headers",
+    "webhookHeaderValue": "Header value",
+    "webhookMethods": "Allowed methods",
+    "webhookNoPayloadFields": "The request payload accepts an empty object.",
+    "webhookNoResponseBody": "No response body",
+    "webhookNullable": "Allow null",
+    "webhookOrigins": "Allowed origins",
+    "webhookPayloadFields": "Request data",
+    "webhookAdvanced": "Advanced settings",
+    "webhookTest": "Draft test",
+    "webhookTestHint": "Click Run and enter a sample payload to test. Publish the workflow to get its Webhook URL.",
+    "webhookRequest": "Request",
+    "webhookResponse": "Response",
+    "webhookResponseData": "Response body",
+    "webhookStatus": "Status code",
+    "webhookSummary": "When an HTTP request arrives",
+    "webhookDescription": "Receive a JSON object through a generated HTTP endpoint."
+  },
+  "triggerSummary": {
+    "manualSummary": "Click Run to start execution here.",
+    "integrationSummary": "When an event arrives"
+  },
+  "conditionEditor": {
+    "addCondition": "Add condition",
+    "configPanelTitle": "Config",
+    "default": "Default",
+    "defaultDescription": "Default case",
+    "defaultHelp": "Execute this case when no other conditions match",
+    "deleteCondition": "Delete condition",
+    "handleKeyTitle": "Handle",
+    "handleLogicalTitle": "Logical",
+    "inputHelp": "The first matched condition will output the data from the first input handle",
+    "label": "Case",
+    "logical": {
+      "AND": "AND",
+      "OR": "OR"
+    },
+    "operator": {
+      "!=": "≠",
+      "<": "<",
+      "<=": "≤",
+      "==": "=",
+      ">": ">",
+      ">=": "≥",
+      "contains": "contains",
+      "endsWith": "ends with",
+      "hasKey": "has key",
+      "hasValue": "has value",
+      "isEmpty": "is empty",
+      "isFalse": "is false",
+      "isNotEmpty": "is not empty",
+      "isNotNull": "is not null",
+      "isNull": "is null",
+      "isTrue": "is true",
+      "notContains": "not contains",
+      "notHasKey": "not has key",
+      "notHasValue": "not has value",
+      "startsWith": "starts with"
+    },
+    "title": "Condition Handles",
+    "toggleDefault": "Default condition"
+  },
+  "nodeInput": {
+    "literal": "Literal",
+    "variable": "Variable",
+    "mode": "Type",
+    "connected": "Connected to an upstream source. Use Input sources to change it."
   }
 }

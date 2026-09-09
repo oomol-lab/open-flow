@@ -30,6 +30,7 @@ function find(element: ReactElement, predicate: (item: ReactElement) => boolean)
 function waitDefinition(node: unknown, revision: unknown, saveWait: ReturnType<typeof vi.fn>): ReactElement {
   const view = { graph: () => ({ nodes: { wait: node } }), ...(revision as object) }
   const element = NodeInspector({
+    variables: { enabled: true, names: [], loaded: false, loading: false, onOpen: vi.fn() },
     activeConnectorConnections: [],
     connectorAuthorizationPending: false,
     connectorLoading: false,
@@ -143,6 +144,7 @@ describe('Node timeout settings', () => {
       inputSources: () => [],
     }
     const element = NodeInspector({
+      variables: { enabled: true, names: [], loaded: false, loading: false, onOpen: vi.fn() },
       activeConnectorConnections: [],
       connectorAuthorizationPending: false,
       connectorLoading: false,
@@ -176,6 +178,7 @@ describe('Node timeout settings', () => {
 
 it('keeps the previous diagnostic visible until revalidation finishes', () => {
   const element = NodeInspector({
+    variables: { enabled: true, names: [], loaded: false, loading: false, onOpen: vi.fn() },
     connectorAuthorizationPending: false,
     connectorLoading: false,
     connectors: {} as never,
@@ -204,4 +207,48 @@ it('keeps the previous diagnostic visible until revalidation finishes', () => {
   vi.mocked(useState).mockReturnValueOnce([previous, update])
   expect(render({ diagnostics: [], pending: false })).toBeNull()
   expect(update).toHaveBeenCalledWith([])
+})
+
+describe('Node input ownership', () => {
+  it.each(['condition', 'wait', 'subflow', 'task'] as const)('resolves %s variable bindings and sends edits directly to the workspace', (kind) => {
+    const setInputValue = vi.fn()
+    const setInputVariable = vi.fn()
+    const node = {
+      kind: 'condition',
+      name: 'Condition',
+      input: { handle: 'message', jsonSchema: { type: 'string' }, nullable: false },
+      inputs: { message: { kind: 'sources', sources: [{ kind: 'binding', bindingId: 'binding' }] } },
+      cases: [],
+    }
+    const element = NodeInspector({
+      variables: { enabled: true, names: ['API_TOKEN'], loaded: true, loading: false, onOpen: vi.fn() },
+      connectorAuthorizationPending: false,
+      connectorLoading: false,
+      connectors: {} as never,
+      diagnostics: [],
+      disabled: false,
+      onChooseWaitNotification: vi.fn(),
+      revision: { binding: () => ({ kind: 'variable', target: 'API_TOKEN' }) } as never,
+      selection: { id: 'condition', kind, node: { ...node, kind, actions: ['continue'] }, definition: { inputs: [node.input] } } as never,
+      store: { $: { flowId: { value: 'flow' } }, setInputValue, setInputVariable } as never,
+      target: { kind: 'flow' },
+      theme: 'light',
+      triggerAuthorizationPending: false,
+      triggerConnectionLoading: false,
+      triggers: {} as never,
+    })
+    const input = find(element, (item) => typeof item.type === 'function' && item.type.name === 'NodeInputs')
+    expect(input).toBeDefined()
+    const props = input!.props as {
+      entries: { variableName: string; connected: boolean }[]
+      onValue: (handle: string, value: unknown) => void
+      onVariable: (handle: string, name: string | undefined) => void
+    }
+    expect(props.entries[0]!.variableName).toBe('API_TOKEN')
+    expect(props.entries[0]!.connected).toBe(false)
+    props.onValue('message', null)
+    props.onVariable('message', undefined)
+    expect(setInputValue).toHaveBeenCalledWith('condition', 'message', null)
+    expect(setInputVariable).toHaveBeenCalledWith('condition', 'message', undefined)
+  })
 })

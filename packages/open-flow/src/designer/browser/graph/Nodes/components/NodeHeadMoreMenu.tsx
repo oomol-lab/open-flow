@@ -3,55 +3,29 @@ import type { TFunction } from 'val-i18n'
 import type { ReadonlyVal } from 'value-enhancer'
 import type { DesignerStore } from '../../../stores/designer/designer.store.ts'
 import type { FlowRunStatus } from '../../../stores/designer/typings.ts'
-import type { NodeStore, NodeStoreDisplay$ } from '../../../stores/node/node.store.ts'
 
-import { NodeToolbar, useStoreApi, useViewport } from '@xyflow/react'
-import { memo, useContext } from 'react'
+import { NodeToolbar, useViewport } from '@xyflow/react'
+import { memo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../../ui/browser/button.tsx'
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuTrigger } from '../../../../../ui/browser/context-menu.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../../../../ui/browser/dropdown-menu.tsx'
-import { coalesce, identity, toggle, toTrue } from '../../../base/trivial.ts'
+import { coalesce, toTrue } from '../../../base/trivial.ts'
 import { defaultTooltipClassName } from '../../../components/label.tsx'
 import { DesignerTooltip } from '../../../components/tooltip.tsx'
-import { iconOf } from '../../../jsonSchema/preset.ts'
-import { getNextLang } from '../../../stores/designer/l10n.ts'
-import { SUBFLOW_VIEW_MODE } from '../../../stores/designer/subflowDesigner.store.ts'
-import { DESIGNER_TYPE, FLOW_RUN_STATUS } from '../../../stores/designer/typings.ts'
 import { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 import { NODE_STATUS } from '../../../stores/node/constants.ts'
-import { ErrorNodeStore } from '../../../stores/node/errorNode.store.ts'
-import { SubflowNodeStore } from '../../../stores/node/subflowNode.store.ts'
-import { TaskNodeStore, toTaskNodeStore } from '../../../stores/node/taskNode.store.ts'
+import { NodeStore } from '../../../stores/node/node.store.ts'
 import { useDesignerStore } from '../../DesignerStoreContext.tsx'
-import { CanvasContext } from '../../FlowDesigner/CanvasContext.ts'
 import { useGetStaticPopupContainer } from '../../ReactFlowContainer/useGetPopupContainer.ts'
-import { useSubflowViewMode } from '../../SubflowDesigner/SubflowViewModeContext.ts'
 import { useNodeStore } from '../NodeStoreContext.tsx'
-import { NodeHeadBlockSettings } from './NodeHeadBlockSettings.tsx'
 import { NodeStatusContent, NodeStatusIcon } from './NodeStatusLabel.tsx'
-import { TranslateIcon } from './TranslateIcon.tsx'
 import { useNodeStatus } from './useNodeStatus.ts'
 
 export function NodeHeadMoreMenu(): React.ReactElement {
   const designerStore = useDesignerStore()
-  const designerType = designerStore.designerType
-  const subflowViewMode = useSubflowViewMode()
-  const isInBlock = designerType === DESIGNER_TYPE.Block || subflowViewMode === SUBFLOW_VIEW_MODE.Block
-
-  return isInBlock ? <InBlockDesigner designerStore={designerStore} /> : <InFlowDesigner designerStore={designerStore} />
-}
-
-// Node stores that can open a shared block Designer.
-type SharedBlockNodeStore = TaskNodeStore | SubflowNodeStore
-
-function isSharedBlockNodeStore(nodeStore: unknown): nodeStore is SharedBlockNodeStore {
-  return TaskNodeStore.is(nodeStore) || SubflowNodeStore.is(nodeStore)
-}
-
-function toSharedBlockNodeStore(nodeStore: unknown): SharedBlockNodeStore | undefined {
-  if (isSharedBlockNodeStore(nodeStore)) return nodeStore
+  return <InFlowDesigner designerStore={designerStore} />
 }
 
 interface SharedProps {
@@ -68,93 +42,26 @@ function InFlowDesigner({ designerStore }: SharedProps) {
   const getStaticDesignerContainer = useGetStaticPopupContainer()
   const getPopupContainer = getStaticDesignerContainer
   const nodeStore = useNodeStore()
-  const taskNodeStore = toTaskNodeStore(nodeStore)
-  const sharedBlockNodeStore = toSharedBlockNodeStore(nodeStore)
-  const runStatus = useVal(designerStore.$.runStatus)
   const editable = useVal(designerStore.$.editable)
 
-  const onOpenBlockDesigner = sharedBlockNodeStore?.openBlockDesigner
-  const onOpenSharedTaskSource = taskNodeStore?.openSharedTaskSource
-  const view = useContext(CanvasContext)
-  const onToggleSettings = view == null ? toggle(nodeStore.$$.showSettings) : undefined
-
   const onDelete = toTrue(editable) && (() => designerStore.deleteNodes([nodeStore]))
-  const items = getContextMenuItems({
+  const items = useNodeMenuItems({
     t,
     nodeStore,
-    runStatus,
-    onToggleSettings,
     onDelete,
-    onOpenSharedTaskSource,
-    onOpenBlockDesigner,
   })
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button aria-label={t('more')} size="icon-xs" title={t('more')} variant="ghost">
+          <Button className={styles.action} aria-label={t('more')} size="icon-xs" title={t('more')} variant="ghost">
             <i className="i-codicon:ellipsis" />
           </Button>
         }
       />
       <NodeHeadMenuContent getPopupContainer={getPopupContainer} items={items} />
     </DropdownMenu>
-  )
-}
-
-export function NodeSettingsPanelHost({ designerStore, nodeStore }: NodeFloatBarProps): React.ReactElement | null {
-  const showSettings = useVal(nodeStore.$.showSettings)
-  const editable = useVal(designerStore.$.editable)
-  const reactFlowStore = useStoreApi()
-
-  if (!showSettings) return null
-
-  const onDelete = toTrue(editable && designerStore.canDeleteNodes) && (() => designerStore.deleteNodes([nodeStore]))
-
-  return (
-    <div className={styles.blockSettings}>
-      <NodeHeadBlockSettings
-        isFlowDesigner={true}
-        reactFlowStore={reactFlowStore}
-        panelWidth$={designerStore.$$.settingsPanelWidth}
-        showSettings$={nodeStore.$$.showSettings}
-        onDelete={onDelete}
-      />
-    </div>
-  )
-}
-
-function InBlockDesigner({ designerStore }: SharedProps) {
-  const t = useTranslate()
-  const nodeStore = useNodeStore()
-  const showSettings = useVal(nodeStore.$$.showSettings)
-  const reactFlowStore = useStoreApi()
-
-  return (
-    <>
-      <Button
-        aria-label={t('nodeActions.nodeSetting')}
-        aria-pressed={showSettings}
-        onClick={toggle(nodeStore.$$.showSettings)}
-        size="icon-xs"
-        title={t('nodeActions.nodeSetting')}
-        variant={showSettings ? 'default' : 'ghost'}
-      >
-        <i className={iconOf('settings')} />
-      </Button>
-      {showSettings && (
-        <div className={styles.blockSettings}>
-          <NodeHeadBlockSettings
-            isFlowDesigner={false}
-            reactFlowStore={reactFlowStore}
-            panelWidth$={designerStore.$$.settingsPanelWidth}
-            showSettings$={nodeStore.$$.showSettings}
-            onDelete={nodeStore.remove}
-          />
-        </div>
-      )}
-    </>
   )
 }
 
@@ -168,27 +75,13 @@ export function NodeHeadContextMenu({ designerStore, children }: NodeHeadContext
   const getStaticDesignerContainer = useGetStaticPopupContainer()
   const getPopupContainer = getStaticDesignerContainer
   const nodeStore = useNodeStore()
-  const taskNodeStore = toTaskNodeStore(nodeStore)
-  const sharedBlockNodeStore = toSharedBlockNodeStore(nodeStore)
-  const runStatus = useVal(designerStore.$.runStatus)
   const editable = useVal(designerStore.$.editable)
-  const subflowViewMode = useSubflowViewMode()
-  const isInBlock = designerStore.designerType === DESIGNER_TYPE.Block || subflowViewMode === SUBFLOW_VIEW_MODE.Block
 
-  const onOpenBlockDesigner = sharedBlockNodeStore?.openBlockDesigner
-  const onOpenSharedTaskSource = taskNodeStore?.openSharedTaskSource
-  const view = useContext(CanvasContext)
-  const onToggleSettings = view == null ? toggle(nodeStore.$$.showSettings) : undefined
-
-  const onDelete = toTrue(editable && designerStore.canDeleteNodes && !isInBlock) && (() => designerStore.deleteNodes([nodeStore]))
-  const items = getContextMenuItems({
+  const onDelete = toTrue(editable && designerStore.canDeleteNodes) && (() => designerStore.deleteNodes([nodeStore]))
+  const items = useNodeMenuItems({
     t,
     nodeStore,
-    runStatus,
-    onToggleSettings,
     onDelete,
-    onOpenBlockDesigner,
-    onOpenSharedTaskSource,
   })
 
   return (
@@ -214,12 +107,7 @@ export function NodeHeadContextMenu({ designerStore, children }: NodeHeadContext
 interface Params {
   readonly t: TFunction
   readonly nodeStore: NodeStore | CommentNodeStore
-  readonly runStatus: FlowRunStatus
-  readonly includeExecuteWithCache?: true
-  readonly onToggleSettings?: () => void
   readonly onDelete?: () => void
-  readonly onOpenSharedTaskSource?: () => void
-  readonly onOpenBlockDesigner?: () => void
 }
 
 interface ContextMenuActionItem {
@@ -251,86 +139,23 @@ function NodeHeadMenuContent({ getPopupContainer, items }: { readonly getPopupCo
   )
 }
 
-function getContextMenuItems({
-  t,
-  nodeStore,
-  runStatus,
-  includeExecuteWithCache,
-  onToggleSettings,
-  onDelete,
-  onOpenBlockDesigner,
-  onOpenSharedTaskSource,
-}: Params): ContextMenuItem[] {
-  const skip = useVal(nodeStore.display$?.ignore)
-  const { duplicateNode, execute } = nodeStore
-  const isErrorNode = ErrorNodeStore.is(nodeStore)
-  const commentNode = CommentNodeStore.is(nodeStore) ? nodeStore : undefined
-  const commentLang = useVal(commentNode?.$.lang)
-  const translateKey = useVal(commentNode?.$.translateKey)
+function useNodeMenuItems({ t, nodeStore, onDelete }: Params): ContextMenuItem[] {
+  const skip = useVal(NodeStore.to(nodeStore)?.ignore)
+  const { duplicateNode } = nodeStore
 
   return coalesce<ContextMenuItem>([
-    identity(includeExecuteWithCache && execute) && {
-      label: t('nodeActions.execute'),
-      key: '$executeWithCache',
-      icon: <i className="i-codicon:play" />,
-      disabled: skip || runStatus !== FLOW_RUN_STATUS.Idle,
-      onClick: () => execute?.(true),
-    },
-    execute && {
-      label: t('nodeActions.executeWithoutCache'),
-      key: '$executeWithoutCache',
-      icon: <i className="i-codicon:run-all" />,
-      disabled: skip || runStatus !== FLOW_RUN_STATUS.Idle,
-      onClick: () => execute(false),
-    },
     duplicateNode && {
       label: t('nodeActions.duplicate'),
       key: '$duplicate',
       icon: <i className="i-codicon:copy" />,
       onClick: () => duplicateNode(),
     },
-    toTrue(!isErrorNode && !!nodeStore.display$) && {
+    toTrue(NodeStore.is(nodeStore)) && {
       label: skip ? t('nodeActions.skipDisable') : t('nodeActions.skipEnable'),
       key: '$skip',
       icon: <i className={skip ? 'i-carbon:view-off' : 'i-carbon:view'} />,
-      onClick: () => nodeStore.display$?.ignore.set(!skip),
+      onClick: () => NodeStore.to(nodeStore)?.ignore.set(!skip),
     },
-    onOpenSharedTaskSource && {
-      label: t('nodeActions.openSharedBlockCode'),
-      key: '$openSharedBlockCode',
-      icon: <i className="i-codicon:code" />,
-      onClick: onOpenSharedTaskSource,
-    },
-    onOpenBlockDesigner && {
-      label: t('nodeActions.configSharedBlock'),
-      key: '$configSharedBlock',
-      icon: <i className="i-codicon:layers" />,
-      onClick: onOpenBlockDesigner,
-    },
-    toTrue(!isErrorNode && !!onToggleSettings) && {
-      label: t('nodeActions.nodeSetting'),
-      key: '$nodeSetting',
-      icon: <i className={iconOf('settings')} />,
-      onClick: onToggleSettings,
-    },
-    commentNode?.$.translateKey &&
-      (translateKey != null
-        ? commentNode.toggleLanguage && {
-            label: t('nodeActions.toggleLanguage', { lang: t(`l10n.${getNextLang(commentLang)}`) }),
-            key: '$toggleLanguage',
-            icon: <TranslateIcon translateLang={commentLang} />,
-            onClick: () => {
-              commentNode.toggleLanguage!()
-            },
-          }
-        : commentNode.createTranslateKey && {
-            label: t('l10n.createKey'),
-            key: '$enableI18n',
-            icon: <i className="i-carbon:translate" />,
-            onClick: () => {
-              commentNode.createTranslateKey!()
-            },
-          }),
     onDelete && {
       label: t('nodeActions.delete'),
       key: '$delete',
@@ -344,41 +169,21 @@ function getContextMenuItems({
 export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(function NodeFloatBar({ designerStore, nodeStore }) {
   const t = useTranslate()
   const { zoom } = useViewport()
-  const taskNodeStore = toTaskNodeStore(nodeStore)
-  const runStatus = useVal(designerStore.$.runStatus)
-  const showSettings = useVal(nodeStore.$.showSettings)
   const getPopupContainer = useGetStaticPopupContainer()
 
-  const onOpenSharedTaskSource = taskNodeStore?.openSharedTaskSource
-  const view = useContext(CanvasContext)
-  const onToggleSettings = view == null ? toggle(nodeStore.$$.showSettings) : undefined
-
-  const items = getContextMenuItems({
+  const items = useNodeMenuItems({
     t,
     nodeStore,
-    runStatus,
-    includeExecuteWithCache: true,
-    onToggleSettings,
-    onOpenSharedTaskSource,
   })
   const floatBarItems = items.filter((item): item is ContextMenuActionItem => !!item)
 
   return (
     <NodeToolbar className={styles.floatBar} offset={12 - 8 * zoom}>
-      {nodeStore.display$ && <NodeStatus flowStatus$={designerStore.$.runStatus} display$={nodeStore.display$} />}
+      {NodeStore.is(nodeStore) && <NodeStatus flowStatus$={designerStore.$.runStatus} nodeStore={nodeStore} />}
       {floatBarItems.map((item) => {
-        const active = item.key === '$nodeSetting' && showSettings
         return (
           <DesignerTooltip getPopupContainer={getPopupContainer} key={item.key} placement="top" title={item.label}>
-            <Button
-              aria-label={item.label}
-              aria-pressed={active}
-              className={styles.floatBarButton}
-              disabled={item.disabled}
-              onClick={item.onClick}
-              size="icon"
-              variant={active ? 'default' : 'ghost'}
-            >
+            <Button aria-label={item.label} className={styles.floatBarButton} disabled={item.disabled} onClick={item.onClick} size="icon" variant="ghost">
               {item.icon}
             </Button>
           </DesignerTooltip>
@@ -390,13 +195,14 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
 
 interface NodeStatusProps {
   flowStatus$: ReadonlyVal<FlowRunStatus>
-  display$: NodeStoreDisplay$
+  nodeStore: NodeStore
 }
 
-function NodeStatus({ flowStatus$, display$ }: NodeStatusProps): React.ReactNode {
-  const skip = useVal(display$.ignore, true)
-  const progress = useVal(display$.progress, true)
-  const { status, count } = useNodeStatus(display$.status, flowStatus$, display$.successCount)
+function NodeStatus({ flowStatus$, nodeStore }: NodeStatusProps): React.ReactNode {
+  const skip = useVal(nodeStore.ignore, true)
+  const content = useVal(nodeStore.content$)
+  const progress = content.run?.progress
+  const { status, count } = useNodeStatus(content.run?.status ?? NODE_STATUS.Idle, flowStatus$, content.run?.successCount)
   const getPopupContainer = useGetStaticPopupContainer()
 
   if (skip) return

@@ -95,14 +95,6 @@ describe('Designer port projection', () => {
       { collapsed: true, group: 'Other' },
       expect.objectContaining({ handle: 'result-a' }),
     ])
-
-    const disabled = designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, undefined, undefined, [], [], false, false, false).nodes[0]
-    if (disabled == null || disabled.kind == 'comment') throw new Error('Expected a Task node.')
-    expect(disabled.inputs).toEqual([
-      { group: 'Request' },
-      expect.objectContaining({ handle: 'second', variableEnabled: false }),
-      expect.objectContaining({ handle: 'first', variableEnabled: false }),
-    ])
   })
 
   it('only requires a Connection for authenticated Connector Actions', () => {
@@ -176,7 +168,6 @@ describe('Designer port projection', () => {
     expect(publicNode).toMatchObject({
       additionalInputs: [{ handle: 'start', jsonSchema: {}, nullable: false }],
       diagnostics: 0,
-      editableAdditionalInputs: true,
       executorName: 'connector',
     })
     expect(authenticatedNode).toMatchObject({ diagnostics: 1, executorName: 'connection required' })
@@ -268,7 +259,7 @@ describe('Designer port projection', () => {
     expect(designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, undefined, waiting).nodes[0]).toMatchObject({ run: { status: 'waiting' } })
   })
 
-  it('keeps missing Trigger fields invalid while server diagnostics are refreshed', () => {
+  it('keeps trigger configuration editing outside the canvas projection', () => {
     const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
       actorId: 'actor',
       content: {
@@ -335,9 +326,7 @@ describe('Designer port projection', () => {
     expect(node).toMatchObject({
       icon: providerIcon({ serviceId: 'github', serviceName: 'github' }),
       kind: 'trigger',
-      presentation: {
-        config: [expect.objectContaining({ invalid: true, name: 'owner' }), expect.objectContaining({ invalid: false, name: 'repo' })],
-      },
+      presentation: { kind: 'integration', source: 'github' },
     })
     const trigger = draft.content.document.graph.nodes.trigger
     if (trigger?.kind != 'integration') throw new Error('Expected integration trigger.')
@@ -351,9 +340,8 @@ describe('Designer port projection', () => {
         },
       },
     }
-    expect(designerGraph(filled, { kind: 'flow' }, {}, []).nodes[0]).toMatchObject({
-      presentation: { config: [expect.objectContaining({ invalid: false, name: 'owner' }), expect.objectContaining({ invalid: false, name: 'repo' })] },
-    })
+    expect(designerGraph(filled, { kind: 'flow' }, {}, []).nodes[0]).toEqual(node)
+    expect(node).not.toHaveProperty('presentation.config')
   })
 })
 

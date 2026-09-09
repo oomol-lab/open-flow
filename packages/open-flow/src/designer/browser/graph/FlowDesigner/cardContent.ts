@@ -1,5 +1,6 @@
 import type { TFunction } from 'val-i18n'
-import type { FlowDesignerViewConditionCase, FlowDesignerViewConditionNode, FlowDesignerViewSemanticNode } from './model.ts'
+import type { FlowDesignerViewConditionCase, FlowDesignerViewConditionNode } from './model.ts'
+import type { NodeContent } from './nodeContent.ts'
 
 export function conditionCaseSummary(item: FlowDesignerViewConditionCase, t: TFunction): string {
   return item.expressions
@@ -10,13 +11,13 @@ export function conditionCaseSummary(item: FlowDesignerViewConditionCase, t: TFu
     .join(item.relation == 'all' ? ' ∧ ' : ' ∨ ')
 }
 
-export function conditionBranchSummary(node: FlowDesignerViewConditionNode, output: string, t: TFunction): string {
+export function conditionBranchSummary(node: Omit<FlowDesignerViewConditionNode, 'position'>, output: string, t: TFunction): string {
   const item = node.cases.find((candidate) => candidate.output == output)
   if (item != null) return conditionCaseSummary(item, t)
   return node.defaultOutput == output ? t('condition.default') : ''
 }
 
-export function nodeSummary(node: FlowDesignerViewSemanticNode, t: TFunction): string {
+export function nodeSummary(node: NodeContent, t: TFunction): string {
   if (node.kind == 'trigger') {
     const schedule = node.presentation?.schedules
       .map((item) =>

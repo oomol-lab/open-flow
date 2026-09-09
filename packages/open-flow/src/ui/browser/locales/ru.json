@@ -1,0 +1,46 @@
+{
+  "jsonViewer": {
+    "bin": "Двоичные данные",
+    "showLess": "Свернуть",
+    "showMore": "Развернуть"
+  },
+  "variablePicker": {
+    "variableUnavailableHelp": "Deployment Variables сейчас недоступны.",
+    "variableMissingHelp": "Deployment Variable {{name}} больше не существует.",
+    "variableUnavailable": "{{name}} (недоступна)",
+    "variableMissing": "{{name}} (отсутствует)",
+    "selectVariable": "Выбрать Variable",
+    "variablesLoading": "Загрузка Variables…",
+    "search": "Поиск",
+    "empty": "Нет подходящих переменных.",
+    "clear": "<не задано>"
+  },
+  "markdown": {
+    "videoBilibili": "Видеоплеер Bilibili",
+    "videoYouTube": "Видеоплеер YouTube"
+  },
+  "llmEditor": {
+    "addMessage": "Добавить сообщение",
+    "chooseModel": "Выбрать из списка моделей",
+    "customModel": "Своя модель…",
+    "defaultModel": "Модель по умолчанию",
+    "deleteMessage": "Удалить сообщение",
+    "maxTokens": "Максимум токенов",
+    "messageCount": "Сообщений: {{count}}",
+    "messageCountOne": "1 сообщение",
+    "messagePlaceholder": "Текст сообщения",
+    "loadingModels": "Загрузка моделей…",
+    "model": "Модель",
+    "modelOptions": "Параметры модели",
+    "moveMessageDown": "Переместить сообщение вниз",
+    "moveMessageUp": "Переместить сообщение вверх",
+    "role": {
+      "assistant": "Ассистент",
+      "system": "Система",
+      "user": "Пользователь"
+    },
+    "temperature": "Температура",
+    "topP": "Top P",
+    "messageRole": "Роль сообщения"
+  }
+}

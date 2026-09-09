@@ -4,8 +4,8 @@ import type { FlowDesignerViewNodeRun } from '../../FlowDesigner/model.ts'
 
 import { useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { collapseAllNested, JSONViewer } from '../../../../../ui/browser/json-viewer/index.ts'
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../../../../ui/browser/popover.tsx'
-import { collapseAllNested, JSONViewer } from '../../../jsonViewer/index.ts'
 import { useGetStaticPopupContainer } from '../../ReactFlowContainer/useGetPopupContainer.ts'
 
 function RecordChip({

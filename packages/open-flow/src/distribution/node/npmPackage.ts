@@ -113,6 +113,8 @@ function createManifest(version: string): object {
         types: './dist/browser/workbench.d.ts',
         import: './dist/browser/workbench.js',
       },
+      './ui': { types: './dist/browser/ui.d.ts', import: './dist/browser/ui.js' },
+      './ui.css': { types: './dist/browser/ui.css.d.ts', default: './dist/browser/ui.css' },
       './workbench.css': {
         types: './dist/browser/workbench.css.d.ts',
         default: './dist/browser/workbench.css',

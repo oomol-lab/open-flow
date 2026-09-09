@@ -1,0 +1,46 @@
+{
+  "jsonViewer": {
+    "bin": "二進位",
+    "showLess": "收合",
+    "showMore": "展開"
+  },
+  "variablePicker": {
+    "variableUnavailableHelp": "目前 deployment 暫不支援 Variable。",
+    "variableMissingHelp": "目前 deployment 中已不存在 Variable {{name}}。",
+    "variableUnavailable": "{{name}}（暫時無法使用）",
+    "variableMissing": "{{name}}（已遺失）",
+    "selectVariable": "選擇 Variable",
+    "variablesLoading": "正在載入 Variable…",
+    "search": "搜尋",
+    "empty": "沒有符合的變數。",
+    "clear": "<未設定>"
+  },
+  "markdown": {
+    "videoBilibili": "Bilibili 影片播放器",
+    "videoYouTube": "YouTube 影片播放器"
+  },
+  "llmEditor": {
+    "addMessage": "新增訊息",
+    "chooseModel": "從模型清單選擇",
+    "customModel": "自訂模型...",
+    "defaultModel": "預設模型",
+    "deleteMessage": "刪除訊息",
+    "maxTokens": "最大 Token 數",
+    "messageCount": "{{count}} 則訊息",
+    "messageCountOne": "1 則訊息",
+    "messagePlaceholder": "訊息內容",
+    "loadingModels": "正在載入模型...",
+    "model": "模型",
+    "modelOptions": "模型選項",
+    "moveMessageDown": "下移訊息",
+    "moveMessageUp": "上移訊息",
+    "role": {
+      "assistant": "助理",
+      "system": "系統",
+      "user": "使用者"
+    },
+    "temperature": "Temperature",
+    "topP": "Top P",
+    "messageRole": "訊息角色"
+  }
+}

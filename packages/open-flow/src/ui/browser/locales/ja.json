@@ -1,0 +1,46 @@
+{
+  "jsonViewer": {
+    "bin": "バイナリ",
+    "showLess": "折りたたむ",
+    "showMore": "展開"
+  },
+  "variablePicker": {
+    "variableUnavailableHelp": "Deployment Variable は現在利用できません。",
+    "variableMissingHelp": "Deployment Variable {{name}} は存在しません。",
+    "variableUnavailable": "{{name}}（現在利用できません）",
+    "variableMissing": "{{name}}（見つかりません）",
+    "selectVariable": "Variable を選択",
+    "variablesLoading": "Variable を読み込み中…",
+    "search": "検索",
+    "empty": "一致する変数がありません。",
+    "clear": "<未設定>"
+  },
+  "markdown": {
+    "videoBilibili": "Bilibili 動画プレーヤー",
+    "videoYouTube": "YouTube 動画プレーヤー"
+  },
+  "llmEditor": {
+    "addMessage": "メッセージを追加",
+    "chooseModel": "モデル一覧から選択",
+    "customModel": "カスタムモデル…",
+    "defaultModel": "デフォルトモデル",
+    "deleteMessage": "メッセージを削除",
+    "maxTokens": "最大 Token 数",
+    "messageCount": "メッセージ {{count}} 件",
+    "messageCountOne": "メッセージ 1 件",
+    "messagePlaceholder": "メッセージ本文",
+    "loadingModels": "モデルを読み込み中…",
+    "model": "モデル",
+    "modelOptions": "モデルオプション",
+    "moveMessageDown": "メッセージを下へ移動",
+    "moveMessageUp": "メッセージを上へ移動",
+    "role": {
+      "assistant": "アシスタント",
+      "system": "システム",
+      "user": "ユーザー"
+    },
+    "temperature": "Temperature",
+    "topP": "Top P",
+    "messageRole": "メッセージの役割"
+  }
+}

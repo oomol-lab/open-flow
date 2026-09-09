@@ -1,6 +1,7 @@
 import 'virtual:uno.css'
 import '../../styles/root.scss'
 import '../../../../ui/browser/styles.css'
+import '../../../../ui/browser/theme.css'
 import type { IsValidConnection, OnMoveEnd, OnNodeDrag, OnSelectionChangeFunc, Edge as RFEdge, Node as RFNode } from '@xyflow/react'
 import type { ReactElement } from 'react'
 import type { RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
@@ -9,93 +10,68 @@ import type { FlowDesignerViewPosition, FlowDesignerViewProps, ViewCallbacks } f
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
+import { DesignerStore } from '../../stores/designer/designer.store.ts'
 import { CommentNodeStore } from '../../stores/node/commentNode.store.ts'
-import { FlowDesignerViewAdapter, toViewEdge } from './adapter.ts'
 import { FlowDesigner } from './FlowDesigner.tsx'
+import { toViewEdge } from './model.ts'
 
 function callbacksFromProps(props: FlowDesignerViewProps): ViewCallbacks {
   return {
     onAddNode: props.onAddNode,
     onMoveNodes: props.onMoveNodes,
     onChangeComment: props.onChangeComment,
-    onChangeCondition: props.onChangeCondition,
-    onChangeNodeDescription: props.onChangeNodeDescription,
-    onChangeNodeIcon: props.onChangeNodeIcon,
-    onChangeNodeTitle: props.onChangeNodeTitle,
-    nodeTitleIssue: props.nodeTitleIssue,
-    onChangeInput: props.onChangeInput,
-    onChangeInputVariable: props.onChangeInputVariable,
-    onChangeTaskAdditionalInputs: props.onChangeTaskAdditionalInputs,
-    onChangeTaskPorts: props.onChangeTaskPorts,
-    onChangeTriggerConfig: props.onChangeTriggerConfig,
-    onChangeTriggerSchedule: props.onChangeTriggerSchedule,
-    onChangeWebhook: props.onChangeWebhook,
     onConnect: props.onConnect,
-    onChangeValue: props.onChangeValue,
     onDeleteNodes: props.onDeleteNodes,
     onDisconnect: props.onDisconnect,
     onDuplicate: props.onDuplicate,
     onPaste: props.onPaste,
     provideAddItems: props.provideAddItems,
-    onOpenVariables: props.onOpenVariables,
   }
 }
 
 export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
-  const adapter = useMemo(
-    () =>
-      new FlowDesignerViewAdapter(
-        props.model,
-        props.editable,
-        props.language ?? 'en',
-        props.addItems,
-        callbacksFromProps(props),
-        props.createSchemaEditor,
-        props.autoLayout,
-      ),
+  const store = useMemo(
+    () => new DesignerStore(props.model, props.editable, props.language ?? 'en', props.addItems, callbacksFromProps(props), props.autoLayout),
     [props.identity],
   )
-  const previousAdapter = useRef(adapter)
+  const previousStore = useRef(store)
   const propsRef = useRef(props)
   const selectedEdge = useRef<string>()
   propsRef.current = props
 
-  const onMoveEnd = useCallback<OnMoveEnd>((_, viewport) => propsRef.current.onMoveViewport(viewport), [adapter])
+  const onMoveEnd = useCallback<OnMoveEnd>((_, viewport) => propsRef.current.onMoveViewport(viewport), [store])
   const onNodeDragStop = useCallback<OnNodeDrag<RFNode<any>>>(
     (_, node, nodes) => {
       const moved = nodes.length > 0 ? nodes : [node]
       propsRef.current.onMoveNodes(
         Object.fromEntries(
           moved.flatMap((item) => {
-            const store = item.data?.store as NodeStore | CommentNodeStore | undefined
-            return store == null ? [] : [[store.nodeId, item.position]]
+            const nodeStore = item.data?.store as NodeStore | CommentNodeStore | undefined
+            return nodeStore == null ? [] : [[nodeStore.nodeId, item.position]]
           }),
         ),
       )
     },
-    [adapter],
+    [store],
   )
   const onSelectionChange = useCallback<OnSelectionChangeFunc<RFNode<any>, RFEdge<any>>>(
     ({ edges, nodes }) => {
       // React Flow effects can report a snapshot from before the latest controlled selection.
-      const selectedNodes = adapter.store.$.rfNodes.value.filter((node) => node.selected)
+      const selectedNodes = store.$.rfNodes.value.filter((node) => node.selected)
       if (nodes.length != selectedNodes.length || nodes.some((node) => !selectedNodes.some((selected) => selected.data?.store === node.data?.store))) return
       const nodeIds = nodes.flatMap((node) => {
-        const store = node.data?.store as NodeStore | CommentNodeStore | undefined
-        return store == null ? [] : [store.nodeId]
+        const nodeStore = node.data?.store as NodeStore | CommentNodeStore | undefined
+        return nodeStore == null ? [] : [nodeStore.nodeId]
       })
       const connection = edges[0]?.data?.store?.connection
-      const edge =
-        connection?.from.type == 'from_node' && connection.to.type == 'to_node'
-          ? toViewEdge(connection.from.source.node_id, connection.from.source.output_handle, connection.to.target.node_id, connection.to.target.input_handle)
-          : undefined
+      const edge = connection == null ? undefined : toViewEdge(connection.source, connection.sourceHandle, connection.target, connection.targetHandle)
       const selected = new Set(propsRef.current.selectedNodeIds)
       const selectionChanged = nodeIds.length != selected.size || nodeIds.some((nodeId) => !selected.has(nodeId))
       const edgeChanged = selectedEdge.current != edge?.id
       selectedEdge.current = edge?.id
       if (selectionChanged || edgeChanged) propsRef.current.onSelectionChange(nodeIds, edge)
     },
-    [adapter],
+    [store],
   )
   const isValidConnection = useCallback<IsValidConnection<RFEdge<any>>>((edge) => {
     if (edge.sourceHandle == null || edge.targetHandle == null) return true
@@ -108,29 +84,29 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
       }) ?? true
     )
   }, [])
-  const onDropAddItem = useCallback((itemId: string, position: FlowDesignerViewPosition) => adapter.addNode(itemId, position), [adapter])
+  const onDropAddItem = useCallback((itemId: string, position: FlowDesignerViewPosition) => store.addNode(itemId, position), [store])
 
   useEffect(() => {
-    const previous = previousAdapter.current
-    previousAdapter.current = adapter
-    if (previous !== adapter) previous.store.dispose()
-    return () => adapter.cancelPendingDisconnects()
-  }, [adapter])
-  useLayoutEffect(() => adapter.setCallbacks(callbacksFromProps(props)))
+    const previous = previousStore.current
+    previousStore.current = store
+    if (previous !== store) previous.dispose()
+    return store.cancelPendingDeletions
+  }, [store])
+  useLayoutEffect(() => store.setCallbacks(callbacksFromProps(props)))
   useLayoutEffect(() => {
-    adapter.reconcile(props.model, props.editable, props.language ?? 'en', props.addItems, props.selectedNodeIds)
-  }, [adapter, props.addItems, props.editable, props.language, props.model, props.selectedNodeIds])
+    store.reconcile(props.model, props.editable, props.language ?? 'en', props.addItems, props.selectedNodeIds)
+  }, [store, props.addItems, props.editable, props.language, props.model, props.selectedNodeIds])
   useEffect(() => {
     if (props.focusNodeRequest != null) {
       const reducedMotion =
         typeof window != 'undefined' && typeof window.matchMedia == 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      adapter.focusNode(props.focusNodeRequest.nodeId, reducedMotion ? 0 : 150)
+      store.focusNode(props.focusNodeRequest.nodeId, reducedMotion ? 0 : 150)
     }
-  }, [adapter, props.focusNodeRequest])
+  }, [store, props.focusNodeRequest])
 
   return (
     <FlowDesigner
-      view={props}
+      view={{ inspectorContainer: props.inspectorContainer, inspectorHeaderContainer: props.inspectorHeaderContainer, selectedNodeIds: props.selectedNodeIds }}
       cornerTools={props.cornerTools}
       toolbar={props.toolbar}
       addItemRequest={props.addItemRequest}
@@ -138,7 +114,7 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
       className={props.className}
       dark={props.dark ?? false}
       fitView={false}
-      flowDesignerStore={adapter.store}
+      flowDesignerStore={store}
       isValidConnection={isValidConnection}
       key={props.identity}
       layoutMotion={props.layoutMotion}

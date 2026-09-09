@@ -57,6 +57,13 @@ for (const expected of [
   'package/dist/browser/workbench-contract.d.ts',
   'package/dist/browser/theme.css',
   'package/dist/browser/theme.css.d.ts',
+  'package/dist/browser/ui.js',
+  'package/dist/browser/ui.d.ts',
+  'package/dist/browser/ui-input.d.ts',
+  'package/dist/browser/ui-label.d.ts',
+  'package/dist/browser/ui-textarea.d.ts',
+  'package/dist/browser/ui.css',
+  'package/dist/browser/ui.css.d.ts',
   'package/dist/browser/workbench.css',
   'package/dist/browser/workbench.css.d.ts',
   'package/dist/browser/workbench.d.ts',
@@ -235,6 +242,8 @@ assert.deepEqual(packedManifest.exports, {
     import: './dist/browser/workbench.js',
     types: './dist/browser/workbench.d.ts',
   },
+  './ui': { types: './dist/browser/ui.d.ts', import: './dist/browser/ui.js' },
+  './ui.css': { types: './dist/browser/ui.css.d.ts', default: './dist/browser/ui.css' },
   './workbench.css': {
     default: './dist/browser/workbench.css',
     types: './dist/browser/workbench.css.d.ts',
@@ -266,15 +275,13 @@ assert.ok(
 const workbenchStyleEntry = entries.find((entry) => entry.header.name == 'package/dist/browser/workbench.css')
 assert.ok(workbenchStyleEntry?.data)
 const workbenchStyle = new TextDecoder().decode(workbenchStyleEntry.data)
-assert.match(workbenchStyle, /:where\(\.open-flow-workbench,\.oo-designer-root\) \.hidden\{display:none\}/)
+assert.match(workbenchStyle, /:where\(\.open-flow-theme,\.open-flow-workbench,\.oo-designer-root\) \.hidden\{display:none\}/)
 assert.match(workbenchStyle, /\.sm\\:w-56\{[^}]*width:/)
 assert.ok(workbenchStyle.includes('.i-custom\\:mouse{'))
 assert.ok(workbenchStyle.includes('.bg-popover{background-color:var(--ui-popover)}'))
 assert.ok(workbenchStyle.includes('.bg-card{background-color:var(--ui-card)}'))
 assert.ok(workbenchStyle.includes('data-open\\:animate-in'))
 assert.ok(workbenchStyle.includes('aria-current\\:bg-muted'))
-assert.match(workbenchStyle, /\.justify-start\\!\{[^}]*justify-content:flex-start!important/)
-assert.match(workbenchStyle, /\.mb-\\\[2px\\\]\{[^}]*margin-bottom:2px/)
 for (const token of sharedUiTokens) assert.ok(workbenchStyle.includes(`${token}:`), `Missing ${token} from the published Workbench CSS.`)
 const themeStyleEntry = entries.find((entry) => entry.header.name == 'package/dist/browser/theme.css')
 assert.ok(themeStyleEntry?.data)
@@ -380,6 +387,10 @@ async function verifyConsumer(versions: { readonly react: string; readonly react
         "import { OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'",
         "import { createElement } from 'react'",
         "import '@oomol-lab/open-flow/workbench.css'",
+        "import { Input, Label, Textarea } from '@oomol-lab/open-flow/ui'",
+        "import '@oomol-lab/open-flow/ui.css'",
+        'const hostFields = <><Label htmlFor="host-input">Name</Label><Input id="host-input" value="name" onChange={(event) => event.target.value} /><Textarea defaultValue="value" /></>',
+        'void hostFields',
         "import '@oomol-lab/open-flow/theme.css'",
         'const connector: ConnectorProxy = { execute: async () => ({ data: {}, status: 200 }) }',
         "const connectorAction: ConnectorAction = { actionId: 'mail.send', authenticated: true, description: '', inputs: {}, name: 'send', outputs: {}, serviceId: 'mail', serviceName: 'Mail' }",

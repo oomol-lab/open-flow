@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 import { clsx } from 'clsx'
 import { Children } from 'react'
-import { isEmptyReactNode } from '../../../base/react.ts'
+import { isEmptyReactNode } from '../../../../../ui/browser/hooks.ts'
 
 export function CanvasCard({
   title,

@@ -6,7 +6,7 @@ import './styles.css'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { IconifyProvider } from '../../src/designer/browser/icons/iconifyContext.tsx'
+import { IconifyProvider } from '../../src/ui/browser/icons/iconifyContext.tsx'
 import { DesignerLab } from './lab.tsx'
 
 const root = document.getElementById('root')

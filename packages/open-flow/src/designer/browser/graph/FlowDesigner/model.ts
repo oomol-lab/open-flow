@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import type { GroupDividerDef } from '../../../../schema/index.ts'
-import type { CreateSchemaEditorFn } from '../../services/designerService.ts'
 
 export interface FlowDesignerViewSource {
   readonly nodeId: string
@@ -15,9 +14,6 @@ export interface FlowDesignerViewInput {
   readonly nullable?: boolean
   readonly sources?: readonly FlowDesignerViewSource[]
   readonly value?: unknown
-  readonly variable?: string
-  readonly variableCompatible?: boolean
-  readonly variableEnabled?: boolean
 }
 
 export interface FlowDesignerViewOutput {
@@ -63,12 +59,6 @@ export interface FlowDesignerViewConditionCase {
   readonly relation: 'all' | 'any'
 }
 
-export interface FlowDesignerViewConditionChange {
-  readonly cases: readonly FlowDesignerViewConditionCase[]
-  readonly defaultOutput?: string
-  readonly input: FlowDesignerViewInput
-}
-
 export interface FlowDesignerViewNodeRun {
   readonly runId?: string
   readonly startedAt?: string
@@ -99,18 +89,13 @@ interface FlowDesignerViewNodeBase {
   readonly inputs: readonly (FlowDesignerViewInput | GroupDividerDef)[]
   readonly outputs: readonly (FlowDesignerViewOutput | GroupDividerDef)[]
   readonly position: FlowDesignerViewPosition
-  readonly rawIcon?: string
-  readonly rawTitle?: string
   readonly run?: FlowDesignerViewNodeRun
-  readonly timeoutSeconds?: number
   readonly title: string
 }
 
 export interface FlowDesignerViewTaskNode extends FlowDesignerViewNodeBase {
   readonly tools?: readonly { readonly id: string; readonly icon: string; readonly label: string }[]
   readonly additionalInputs?: readonly FlowDesignerViewInput[]
-  readonly editableAdditionalInputs?: boolean
-  readonly editablePorts?: boolean
   readonly executorName?: string
   readonly kind: 'task'
   readonly reference: string
@@ -144,69 +129,10 @@ export type FlowDesignerViewTriggerSchedule =
       readonly value: number
     }
 
-interface FlowDesignerViewTriggerFieldBase {
-  readonly description?: string
-  readonly invalid?: boolean
-  readonly label: string
-  readonly name: string
-  readonly required: boolean
-  readonly source: string
-}
-
-export type FlowDesignerViewTriggerField =
-  | (FlowDesignerViewTriggerFieldBase & {
-      readonly kind: 'boolean' | 'integer' | 'number' | 'string'
-    })
-  | (FlowDesignerViewTriggerFieldBase & { readonly kind: 'json' })
-  | (FlowDesignerViewTriggerFieldBase & {
-      readonly kind: 'multi-select'
-      readonly options: readonly {
-        readonly label: string
-        readonly source: string
-        readonly value: unknown
-      }[]
-      readonly selected: readonly string[]
-    })
-  | (FlowDesignerViewTriggerFieldBase & {
-      readonly kind: 'select'
-      readonly options: readonly {
-        readonly label: string
-        readonly source: string
-        readonly value: unknown
-      }[]
-    })
-
 export interface FlowDesignerViewTriggerPresentation {
-  readonly config?: readonly FlowDesignerViewTriggerField[]
   readonly kind: 'cron' | 'integration' | 'manual' | 'poll' | 'webhook'
   readonly schedules: readonly FlowDesignerViewTriggerSchedule[]
   readonly source?: string
-  readonly webhook?: {
-    readonly inputs: readonly FlowDesignerViewWebhookInput[]
-    readonly options: FlowDesignerViewWebhookOptions
-  }
-}
-
-export interface FlowDesignerViewWebhookInput {
-  readonly description?: string
-  readonly handle: string
-  readonly jsonSchema?: unknown
-  readonly nullable: boolean
-  readonly value?: unknown
-}
-
-export interface FlowDesignerViewWebhookOptions {
-  readonly allowedMethods?: readonly string[]
-  readonly allowedOrigins?: readonly string[]
-  readonly noResponseBody?: boolean
-  readonly responseData?: string
-  readonly responseHeaders?: Readonly<Record<string, string>>
-  readonly responseStatusCode?: number
-}
-
-export interface FlowDesignerViewWebhook {
-  readonly inputs: readonly FlowDesignerViewWebhookInput[]
-  readonly options: FlowDesignerViewWebhookOptions
 }
 
 export interface FlowDesignerViewTriggerNode extends FlowDesignerViewNodeBase {
@@ -241,9 +167,6 @@ export interface FlowDesignerViewModel {
   readonly nodes: readonly FlowDesignerViewNode[]
   readonly runStatus?: 'idle' | 'running'
   readonly viewport: FlowDesignerViewViewport
-  readonly variableNames?: readonly string[]
-  readonly variableNamesLoaded?: boolean
-  readonly variableNamesLoading?: boolean
 }
 
 export interface FlowDesignerViewAddItem {
@@ -298,7 +221,6 @@ export interface FlowDesignerViewProps {
   readonly addItems: readonly FlowDesignerViewAddItem[]
   readonly autoLayout?: boolean
   readonly className?: string
-  readonly createSchemaEditor: CreateSchemaEditorFn
   readonly dark?: boolean
   readonly editable: boolean
   readonly focusNodeRequest?: {
@@ -317,23 +239,6 @@ export interface FlowDesignerViewProps {
   ) => Promise<string | undefined> | string | undefined
   readonly onConnect: (edge: Omit<FlowDesignerViewEdge, 'id'>) => void
   readonly onChangeComment?: (nodeId: string, value: { readonly content: string; readonly title: string }) => void
-  readonly onChangeCondition?: (nodeId: string, value: FlowDesignerViewConditionChange) => void
-  readonly onChangeNodeDescription?: (nodeId: string, description: string | undefined) => void
-  readonly onChangeNodeIcon?: (nodeId: string, icon: string | undefined) => void
-  readonly onChangeNodeTitle?: (nodeId: string, title: string | undefined) => void
-  readonly nodeTitleIssue?: (nodeId: string, title: string) => string | undefined
-  readonly onChangeInput?: (nodeId: string, handle: string, value: unknown) => void
-  readonly onChangeInputVariable?: (nodeId: string, handle: string, name: string | undefined) => void
-  readonly onChangeTaskAdditionalInputs?: (nodeId: string, inputs: readonly FlowDesignerViewInput[]) => void
-  readonly onChangeTaskPorts?: (
-    nodeId: string,
-    inputs: readonly (FlowDesignerViewInput | GroupDividerDef)[],
-    outputs: readonly (FlowDesignerViewOutput | GroupDividerDef)[],
-  ) => void
-  readonly onChangeTriggerConfig?: (triggerId: string, name: string, value: unknown | undefined) => void
-  readonly onChangeTriggerSchedule?: (triggerId: string, schedule: readonly FlowDesignerViewTriggerSchedule[]) => void
-  readonly onChangeWebhook?: (triggerId: string, webhook: FlowDesignerViewWebhook) => void
-  readonly onChangeValue?: (nodeId: string, values: readonly FlowDesignerViewValue[]) => void
   readonly onDeleteNodes: (nodeIds: readonly string[]) => void
   readonly onDisconnect: (edge: FlowDesignerViewEdge) => void
   readonly onDuplicate: (nodeIds: readonly string[], offset?: FlowDesignerViewPosition, positions?: Readonly<Record<string, FlowDesignerViewPosition>>) => void
@@ -342,7 +247,6 @@ export interface FlowDesignerViewProps {
   readonly onPaste: (position: FlowDesignerViewPosition) => void
   readonly onSelectionChange: (nodeIds: readonly string[], edge: FlowDesignerViewEdge | undefined) => void
   readonly provideAddItems?: (searchTerm: string, signal: AbortSignal) => Promise<readonly FlowDesignerViewAddItem[] | undefined>
-  readonly onOpenVariables?: () => void
   readonly selectedNodeIds: readonly string[]
 }
 
@@ -351,23 +255,19 @@ export interface ViewCallbacks {
   readonly onAddNode: FlowDesignerViewProps['onAddNode']
   readonly onConnect: FlowDesignerViewProps['onConnect']
   readonly onChangeComment: FlowDesignerViewProps['onChangeComment']
-  readonly onChangeCondition: FlowDesignerViewProps['onChangeCondition']
-  readonly onChangeNodeDescription: FlowDesignerViewProps['onChangeNodeDescription']
-  readonly onChangeNodeIcon: FlowDesignerViewProps['onChangeNodeIcon']
-  readonly onChangeNodeTitle: FlowDesignerViewProps['onChangeNodeTitle']
-  readonly nodeTitleIssue: FlowDesignerViewProps['nodeTitleIssue']
-  readonly onChangeInput: FlowDesignerViewProps['onChangeInput']
-  readonly onChangeInputVariable: FlowDesignerViewProps['onChangeInputVariable']
-  readonly onChangeTaskAdditionalInputs: FlowDesignerViewProps['onChangeTaskAdditionalInputs']
-  readonly onChangeTaskPorts: FlowDesignerViewProps['onChangeTaskPorts']
-  readonly onChangeTriggerConfig: FlowDesignerViewProps['onChangeTriggerConfig']
-  readonly onChangeTriggerSchedule: FlowDesignerViewProps['onChangeTriggerSchedule']
-  readonly onChangeWebhook: FlowDesignerViewProps['onChangeWebhook']
-  readonly onChangeValue: FlowDesignerViewProps['onChangeValue']
   readonly onDeleteNodes: FlowDesignerViewProps['onDeleteNodes']
   readonly onDisconnect: FlowDesignerViewProps['onDisconnect']
   readonly onDuplicate: FlowDesignerViewProps['onDuplicate']
   readonly onPaste: FlowDesignerViewProps['onPaste']
   readonly provideAddItems: FlowDesignerViewProps['provideAddItems']
-  readonly onOpenVariables: FlowDesignerViewProps['onOpenVariables']
+}
+
+export function toViewEdge(source: string, sourceHandle: string, target: string, targetHandle: string): FlowDesignerViewEdge {
+  return {
+    id: JSON.stringify([source, sourceHandle, target, targetHandle]),
+    source,
+    sourceHandle,
+    target,
+    targetHandle,
+  }
 }

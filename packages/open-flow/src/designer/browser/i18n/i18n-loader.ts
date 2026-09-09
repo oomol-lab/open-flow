@@ -1,7 +1,9 @@
 import type { Locale, Locales } from 'val-i18n'
+import type { UiLanguage } from '../../../localization/common/languages.ts'
 
 import { I18n } from 'val-i18n'
 import { defaultUiLanguage, resolveUiLanguage } from '../../../localization/common/languages.ts'
+import { uiLocales } from '../../../ui/browser/locales.ts'
 import en from './locales/en.json'
 import fr from './locales/fr.json'
 import ja from './locales/ja.json'
@@ -11,7 +13,7 @@ import zh_CN from './locales/zh-CN.json'
 import zh_TW from './locales/zh-TW.json'
 
 // Declared in `uiLanguages` order; `localeLangs` and the HMR block below both read back from here.
-const locales: Locales = {
+const featureLocales: Locales = {
   'en': en,
   'zh-CN': zh_CN,
   'zh-TW': zh_TW,
@@ -20,6 +22,10 @@ const locales: Locales = {
   'ru': ru,
   'fr': fr,
 }
+
+const locales: Locales = Object.fromEntries(
+  Object.entries(featureLocales).map(([language, locale]) => [language, { ...locale, ...uiLocales[language as UiLanguage] }]),
+)
 
 export const defaultLang: string = defaultUiLanguage
 
@@ -60,7 +66,7 @@ if (import.meta.hot) {
         const next: { [lang: string]: Locale } = { ...i18n.locales }
         localeLangs.forEach((lang, index) => {
           const locale = updated[index]?.default as Locale | undefined
-          if (locale) next[lang] = locale
+          if (locale) next[lang] = { ...locale, ...uiLocales[lang as UiLanguage] }
         })
         i18n.locales$.set(next)
       }

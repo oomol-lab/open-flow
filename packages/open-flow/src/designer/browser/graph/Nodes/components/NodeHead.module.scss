@@ -139,3 +139,12 @@
   color: var(--brand-highlight-color);
   background: color-mix(in srgb, var(--brand-highlight-color) 9%, var(--node-background-color));
 }
+
+.action {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  padding: 0;
+  font-size: var(--icon-font-size);
+  line-height: 1.5;
+  overflow: hidden;
+}

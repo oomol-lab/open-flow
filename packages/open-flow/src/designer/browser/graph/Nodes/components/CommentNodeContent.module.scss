@@ -1,5 +1,10 @@
-// .container {
-// }
+.body {
+  overflow: hidden;
+
+  :global([data-node-editor]) & {
+    overflow: visible;
+  }
+}
 
 :global(.oo-designer-node-minimap1) .sourceCode {
   visibility: hidden;

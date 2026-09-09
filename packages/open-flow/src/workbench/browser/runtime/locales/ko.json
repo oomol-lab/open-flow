@@ -185,7 +185,11 @@
       "nameEmpty": "노드 이름은 비워 둘 수 없습니다.",
       "timeout": "제한 시간(ms)",
       "timeoutError": "제한 시간은 밀리초 단위의 양의 정수여야 합니다.",
-      "title": "노드 설정"
+      "title": "노드 설정",
+      "description": "목적",
+      "describe": "이 단계의 목적을 설명하세요.",
+      "icon": "아이콘",
+      "name": "제목"
     },
     "selectNode": "확인하고 편집할 초안 노드를 하나 선택하세요.",
     "subflow": {
@@ -215,7 +219,8 @@
       "responseMode": "응답 모드",
       "source": "소스",
       "structuredJson": "구조화된 JSON",
-      "retrySave": "저장 재시도"
+      "retrySave": "저장 재시도",
+      "additionalInputs": "추가 입력"
     },
     "wait": {
       "approval": "승인 또는 거부",
@@ -275,10 +280,6 @@
   },
   "language": {
     "label": "언어"
-  },
-  "jsonViewer": {
-    "bin": "바이너리",
-    "var": "변수"
   },
   "notice": {
     "connectorUnconfigured": "이 배포에는 Connector가 구성되어 있지 않습니다.",
@@ -758,5 +759,104 @@
     "title": "앱 및 작업 선택",
     "failed": "작업을 추가하지 못했습니다. 다시 시도하세요.",
     "search": "앱 또는 작업 검색…"
+  },
+  "triggerSchedule": {
+    "scheduleType": "일정 유형",
+    "scheduleEvery": "주기",
+    "scheduleCron": "Cron",
+    "scheduleInterval": "폴링 간격",
+    "scheduleUnit": "간격 단위",
+    "scheduleMinutes": "분",
+    "scheduleHours": "시간",
+    "scheduleDays": "일",
+    "scheduleWeeks": "주",
+    "scheduleMonths": "개월",
+    "scheduleExpression": "Cron 표현식",
+    "scheduleTimezone": "시간대",
+    "scheduleMissing": "설정된 일정이 없습니다",
+    "scheduleTestHint": "초안 테스트는 즉시 한 번 실행됩니다. 게시 후에는 설정한 일정에 따라 자동으로 실행됩니다."
+  },
+  "triggerConfig": {
+    "configuration": "구성",
+    "required": "입력 필요"
+  },
+  "webhookEditor": {
+    "webhookAddField": "필드 추가",
+    "webhookAddHeader": "헤더 추가",
+    "webhookCustomType": "사용자 지정 스키마",
+    "webhookDeleteField": "페이로드 필드 삭제",
+    "webhookDeleteHeader": "응답 헤더 삭제",
+    "webhookFieldName": "필드 이름",
+    "webhookFieldNameDuplicate": "필드 이름은 중복될 수 없습니다.",
+    "webhookFieldNameRequired": "필드 이름을 입력하세요.",
+    "webhookFieldType": "타입",
+    "webhookHeaderName": "헤더 이름",
+    "webhookHeaders": "응답 헤더",
+    "webhookHeaderValue": "헤더 값",
+    "webhookMethods": "허용 메서드",
+    "webhookNoPayloadFields": "요청 페이로드는 빈 객체를 허용합니다.",
+    "webhookNoResponseBody": "응답 본문 없음",
+    "webhookNullable": "null 허용",
+    "webhookOrigins": "허용 출처",
+    "webhookPayloadFields": "요청 데이터",
+    "webhookAdvanced": "고급 설정",
+    "webhookTest": "초안 테스트",
+    "webhookTestHint": "실행을 클릭하고 테스트용 요청 데이터를 입력하세요. 게시 후 Webhook URL을 받을 수 있습니다.",
+    "webhookRequest": "요청",
+    "webhookResponse": "응답",
+    "webhookResponseData": "응답 본문",
+    "webhookStatus": "상태 코드",
+    "webhookSummary": "HTTP 요청이 도착하면 실행",
+    "webhookDescription": "생성된 HTTP 엔드포인트로 JSON 객체를 수신합니다."
+  },
+  "triggerSummary": {
+    "manualSummary": "실행을 클릭하면 여기에서 시작합니다.",
+    "integrationSummary": "이벤트가 도착하면 실행"
+  },
+  "conditionEditor": {
+    "addCondition": "조건 추가",
+    "configPanelTitle": "설정",
+    "default": "기본",
+    "defaultDescription": "기본 케이스",
+    "defaultHelp": "다른 조건이 하나도 일치하지 않을 때 이 케이스를 실행합니다",
+    "deleteCondition": "조건 삭제",
+    "handleKeyTitle": "Handle",
+    "handleLogicalTitle": "논리 연산",
+    "inputHelp": "가장 먼저 일치한 조건이 첫 번째 입력 Handle의 데이터를 출력합니다",
+    "label": "케이스",
+    "logical": {
+      "AND": "그리고 (AND)",
+      "OR": "또는 (OR)"
+    },
+    "operator": {
+      "!=": "≠",
+      "<": "<",
+      "<=": "≤",
+      "==": "=",
+      ">": ">",
+      ">=": "≥",
+      "contains": "포함",
+      "endsWith": "다음으로 끝남",
+      "hasKey": "키 있음",
+      "hasValue": "값 있음",
+      "isEmpty": "비어 있음",
+      "isFalse": "false임",
+      "isNotEmpty": "비어 있지 않음",
+      "isNotNull": "null 아님",
+      "isNull": "null임",
+      "isTrue": "true임",
+      "notContains": "포함 안 함",
+      "notHasKey": "키 없음",
+      "notHasValue": "값 없음",
+      "startsWith": "다음으로 시작함"
+    },
+    "title": "조건 Handle",
+    "toggleDefault": "기본 조건"
+  },
+  "nodeInput": {
+    "literal": "고정 값",
+    "variable": "Variable",
+    "mode": "타입",
+    "connected": "상위 입력 소스에 연결되어 있습니다. 입력 소스에서 변경할 수 있습니다."
   }
 }

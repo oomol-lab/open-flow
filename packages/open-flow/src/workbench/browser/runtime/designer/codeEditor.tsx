@@ -3,9 +3,9 @@ import type { WorkbenchTheme } from '../contract.ts'
 
 import { useEffect, useRef, useState } from 'react'
 import { val } from 'value-enhancer'
-import { CodeMirrorStringEditorFactory } from '../../codeMirrorStringEditor.ts'
+import { createCodeEditor } from '../../../../ui/browser/code-editor.ts'
 
-type Editor = Awaited<ReturnType<CodeMirrorStringEditorFactory['create']>>
+type Editor = Awaited<ReturnType<typeof createCodeEditor>>
 
 const editorTails = new Map<string, Promise<void>>()
 
@@ -43,6 +43,7 @@ interface Props {
 export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, location, onBlur, onChange, theme, typing, uri, value }: Props): ReactElement {
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<Editor>()
+  const darkMode = useRef<ReturnType<typeof val<boolean>>>()
   const syncing = useRef(false)
   const valueRef = useRef(value)
   const disabledRef = useRef(disabled)
@@ -62,10 +63,11 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
   useEffect(() => {
     const container = host.current!
     let current: Editor | undefined
-    let changeListener: { dispose(): void } | undefined
+    let changeListener: (() => void) | undefined
     let release: (() => void) | undefined
     let disposed = false
     const darkMode$ = val(theme == 'dark')
+    darkMode.current = darkMode$
     setFailed(false)
     setLoading(true)
     const extension = import('../../typeScriptSession.ts')
@@ -79,14 +81,18 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
           release = undefined
           return
         }
-        return new CodeMirrorStringEditorFactory({ darkMode$, extension }).create(container, uri, {
-          ariaLabel,
-          automaticLayout: true,
-          language: 'javascript',
-          readOnly: disabledRef.current,
-          value: valueRef.current,
-          wordWrap: 'on',
-        })
+        return createCodeEditor(
+          container,
+          uri,
+          {
+            ariaLabel,
+            language: 'javascript',
+            readOnly: disabledRef.current,
+            value: valueRef.current,
+            wordWrap: 'on',
+          },
+          { darkMode$, extension },
+        )
       })
       .then((created) => {
         if (created == null) return
@@ -98,9 +104,10 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
         }
         current = created
         editor.current = created
-        if (created.monacoEditor.getValue() != valueRef.current) created.monacoEditor.setValue(valueRef.current)
-        changeListener = created.monacoEditor.onDidChangeModelContent(() => {
-          if (!syncing.current) onChangeRef.current(created.monacoEditor.getValue())
+        created.updateOptions({ readOnly: disabledRef.current })
+        if (created.getValue() != valueRef.current) created.setValue(valueRef.current)
+        changeListener = created.onChange(() => {
+          if (!syncing.current) onChangeRef.current(created.getValue())
         })
         const position = locationRef.current
         if (position != null) created.revealPosition?.(position.line, position.column)
@@ -117,25 +124,30 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
     return () => {
       if (current != null) onBlurRef.current()
       disposed = true
-      changeListener?.dispose()
+      changeListener?.()
       current?.dispose()
       darkMode$.dispose()
+      if (darkMode.current === darkMode$) darkMode.current = undefined
       release?.()
       release = undefined
       if (editor.current === current) editor.current = undefined
     }
-  }, [ariaLabel, theme, uri])
+  }, [ariaLabel, uri])
+
+  useEffect(() => {
+    darkMode.current?.set(theme == 'dark')
+  }, [theme])
 
   useEffect(() => {
     const current = editor.current
-    if (current == null || current.monacoEditor.getValue() == value) return
+    if (current == null || current.getValue() == value) return
     syncing.current = true
-    current.monacoEditor.setValue(value)
+    current.setValue(value)
     syncing.current = false
   }, [value])
 
   useEffect(() => {
-    editor.current?.monacoEditor.updateOptions({ readOnly: disabled })
+    editor.current?.updateOptions({ readOnly: disabled })
   }, [disabled])
 
   useEffect(() => {

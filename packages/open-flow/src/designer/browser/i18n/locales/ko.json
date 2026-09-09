@@ -318,11 +318,6 @@
     "touchpad": "터치패드 최적화",
     "touchpadDescription": "두 손가락으로 캔버스를 이동하고 손가락을 오므리거나 벌려 확대하거나 축소합니다."
   },
-  "jsonViewer": {
-    "bin": "바이너리",
-    "showLess": "간략히 보기",
-    "showMore": "더 보기"
-  },
   "l10n": {
     "createKey": "번역 사용",
     "deleteKey": "번역 삭제",
@@ -369,29 +364,6 @@
   },
   "ok": "확인",
   "optimize": "레이아웃 정리",
-  "llmEditor": {
-    "addMessage": "메시지 추가",
-    "chooseModel": "모델 목록에서 선택",
-    "customModel": "사용자 지정 모델...",
-    "defaultModel": "기본 모델",
-    "deleteMessage": "메시지 삭제",
-    "maxTokens": "최대 Token 수",
-    "messageCount": "메시지 {{count}}개",
-    "messageCountOne": "메시지 1개",
-    "messagePlaceholder": "메시지 내용",
-    "loadingModels": "모델 불러오는 중...",
-    "model": "모델",
-    "modelOptions": "모델 옵션",
-    "moveMessageDown": "메시지 아래로 이동",
-    "moveMessageUp": "메시지 위로 이동",
-    "role": {
-      "assistant": "어시스턴트",
-      "system": "시스템",
-      "user": "사용자"
-    },
-    "temperature": "Temperature",
-    "topP": "Top P"
-  },
   "outputHandleEditor": {
     "addOutput": "출력 추가",
     "configPanelTitle": "출력 Handle 설정",
@@ -425,8 +397,6 @@
   },
   "preview": {
     "title": "미리 보기",
-    "videoBilibili": "Bilibili 동영상 플레이어",
-    "videoYouTube": "YouTube 동영상 플레이어",
     "table": {
       "footer": "전체 {{columns}}열, {{rows}}행"
     }

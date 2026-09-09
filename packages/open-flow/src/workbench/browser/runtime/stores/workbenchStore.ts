@@ -79,6 +79,10 @@ export class WorkbenchStore {
   readonly #externalRuns = new Latest()
   readonly #i18n: I18n
   readonly #notice: Val<Notice | undefined> = val()
+  public get variablesEnabled(): boolean {
+    return this.#variables
+  }
+
   readonly #variables: boolean
   readonly #variableNames = val<readonly string[]>([])
   readonly #variableNamesLoaded = val(false)
@@ -153,9 +157,6 @@ export class WorkbenchStore {
       const t = get(i18n.t$)
       const run = get(this.runs.$.run)
       const events = get(this.runs.$.events)
-      const variableNames = get(this.#variableNames)
-      const variableNamesLoaded = get(this.#variableNamesLoaded)
-      const variableNamesLoading = get(this.#variableNamesLoading)
       const key = target == null ? '' : target.kind == 'flow' ? 'flow' : `subflow:${target.id}`
       const inputs = [
         ...designerRevisionInputs(draft, target),
@@ -166,28 +167,11 @@ export class WorkbenchStore {
         t,
         run,
         events,
-        variableNames,
-        variableNamesLoaded,
-        variableNamesLoading,
         ...(run == null ? [] : [draft?.revisionId]),
       ]
       const cached = designerCache.get(key)
       if (cached != null && cached.inputs.length == inputs.length && cached.inputs.every((input, index) => input === inputs[index])) return cached.graph
-      const graph = designerGraph(
-        draft,
-        target,
-        presentation,
-        designerDiagnostics,
-        actions,
-        catalogs,
-        t,
-        run,
-        events,
-        variableNames,
-        variableNamesLoaded,
-        variableNamesLoading,
-        this.#variables,
-      )
+      const graph = designerGraph(draft, target, presentation, designerDiagnostics, actions, catalogs, t, run, events)
       designerCache.set(key, { graph, inputs })
       return graph
     })

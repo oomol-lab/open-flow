@@ -1,5 +1,6 @@
 import type { FormEvent, ReactElement, ReactNode } from 'react'
 
+import { Input } from '@oomol-lab/open-flow/ui'
 import { Children, isValidElement } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { SettingsPage } from '../browser/settings.tsx'
@@ -135,7 +136,7 @@ it.each([
   const props = form.props as { readonly onSubmit: (event: FormEvent) => void }
   props.onSubmit({ preventDefault: vi.fn() } as unknown as FormEvent)
   expect(fetcher).toHaveBeenCalledTimes(accepted ? 1 : 0)
-  const field = find(form, (element) => element.type == 'input' && element.props.type == 'password')
+  const field = find(form, (element) => element.type == Input && element.props.type == 'password')
   expect(field?.props['aria-invalid']).toBe(!accepted)
   await new Promise((resolve) => setTimeout(resolve, 0))
 })

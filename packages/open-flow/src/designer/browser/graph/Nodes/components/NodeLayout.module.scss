@@ -7,10 +7,6 @@
     // Keep descendant handle geometry stable while xyflow measures the new node.
     animation: node-enter 220ms cubic-bezier(0.22, 1, 0.36, 1);
   }
-
-  &.settingsOpen {
-    padding-right: 423px;
-  }
 }
 
 @keyframes node-enter {

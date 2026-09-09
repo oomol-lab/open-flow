@@ -318,11 +318,6 @@
     "touchpad": "Adapté au pavé tactile",
     "touchpadDescription": "Déplacez le canevas avec deux doigts et pincez ou écartez-les pour zoomer."
   },
-  "jsonViewer": {
-    "bin": "Binaire",
-    "showLess": "Réduire",
-    "showMore": "Afficher plus"
-  },
   "l10n": {
     "createKey": "Activer la traduction",
     "deleteKey": "Supprimer la traduction",
@@ -369,29 +364,6 @@
   },
   "ok": "OK",
   "optimize": "optimiser la disposition",
-  "llmEditor": {
-    "addMessage": "Ajouter un message",
-    "chooseModel": "Choisir dans la liste des modèles",
-    "customModel": "Modèle personnalisé...",
-    "defaultModel": "Modèle par défaut",
-    "deleteMessage": "Supprimer le message",
-    "maxTokens": "Tokens max",
-    "messageCount": "{{count}} messages",
-    "messageCountOne": "1 message",
-    "messagePlaceholder": "Contenu du message",
-    "loadingModels": "Chargement des modèles...",
-    "model": "Modèle",
-    "modelOptions": "Options du modèle",
-    "moveMessageDown": "Descendre le message",
-    "moveMessageUp": "Monter le message",
-    "role": {
-      "assistant": "Assistant",
-      "system": "Système",
-      "user": "Utilisateur"
-    },
-    "temperature": "Température",
-    "topP": "Top P"
-  },
   "outputHandleEditor": {
     "addOutput": "Ajouter une sortie",
     "configPanelTitle": "Configuration du Handle de sortie",
@@ -425,8 +397,6 @@
   },
   "preview": {
     "title": "Aperçu",
-    "videoBilibili": "Lecteur vidéo Bilibili",
-    "videoYouTube": "Lecteur vidéo YouTube",
     "table": {
       "footer": "{{columns}} colonnes, {{rows}} lignes au total"
     }

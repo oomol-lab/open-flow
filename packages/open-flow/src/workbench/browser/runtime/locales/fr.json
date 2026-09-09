@@ -185,7 +185,11 @@
       "nameEmpty": "Le nom du nœud ne peut pas être vide.",
       "timeout": "Délai d'expiration (ms)",
       "timeoutError": "Le délai d'expiration doit être un entier positif exprimé en millisecondes.",
-      "title": "Paramètres du nœud"
+      "title": "Paramètres du nœud",
+      "description": "Objectif",
+      "describe": "Décrivez le rôle de cette étape.",
+      "icon": "Icône",
+      "name": "Titre"
     },
     "selectNode": "Sélectionnez un nœud du Brouillon pour l'inspecter et le modifier.",
     "subflow": {
@@ -215,7 +219,8 @@
       "responseMode": "Mode de réponse",
       "source": "Source",
       "structuredJson": "JSON structuré",
-      "retrySave": "Réessayer"
+      "retrySave": "Réessayer",
+      "additionalInputs": "Entrées supplémentaires"
     },
     "wait": {
       "approval": "Approuver ou refuser",
@@ -275,10 +280,6 @@
   },
   "language": {
     "label": "Langue"
-  },
-  "jsonViewer": {
-    "bin": "Binaire",
-    "var": "Variable"
   },
   "notice": {
     "connectorUnconfigured": "Le Connector n’est pas configuré pour ce déploiement.",
@@ -758,5 +759,104 @@
     "title": "Choisir une application et une action",
     "failed": "L’action n’a pas été ajoutée. Réessayez.",
     "search": "Rechercher une application ou une action…"
+  },
+  "triggerSchedule": {
+    "scheduleType": "Type de planification",
+    "scheduleEvery": "Fréquence",
+    "scheduleCron": "Cron",
+    "scheduleInterval": "Intervalle d'interrogation",
+    "scheduleUnit": "Unité d'intervalle",
+    "scheduleMinutes": "Minutes",
+    "scheduleHours": "Heures",
+    "scheduleDays": "Jours",
+    "scheduleWeeks": "Semaines",
+    "scheduleMonths": "Mois",
+    "scheduleExpression": "Expression Cron",
+    "scheduleTimezone": "Fuseau horaire",
+    "scheduleMissing": "Aucune planification configurée",
+    "scheduleTestHint": "Le test du brouillon s’exécute immédiatement, une seule fois. Après publication, le workflow s’exécute selon le calendrier défini."
+  },
+  "triggerConfig": {
+    "configuration": "Configuration",
+    "required": "Entrée requise"
+  },
+  "webhookEditor": {
+    "webhookAddField": "Ajouter un champ",
+    "webhookAddHeader": "Ajouter un en-tête",
+    "webhookCustomType": "Schéma personnalisé",
+    "webhookDeleteField": "Supprimer le champ de charge utile",
+    "webhookDeleteHeader": "Supprimer l'en-tête de réponse",
+    "webhookFieldName": "Nom du champ",
+    "webhookFieldNameDuplicate": "Les noms de champ doivent être uniques.",
+    "webhookFieldNameRequired": "Saisissez un nom de champ.",
+    "webhookFieldType": "Type",
+    "webhookHeaderName": "Nom de l'en-tête",
+    "webhookHeaders": "En-têtes de réponse",
+    "webhookHeaderValue": "Valeur de l'en-tête",
+    "webhookMethods": "Méthodes autorisées",
+    "webhookNoPayloadFields": "La charge utile de la requête accepte un objet vide.",
+    "webhookNoResponseBody": "Aucun corps de réponse",
+    "webhookNullable": "Autoriser null",
+    "webhookOrigins": "Origines autorisées",
+    "webhookPayloadFields": "Données de requête",
+    "webhookAdvanced": "Paramètres avancés",
+    "webhookTest": "Test du brouillon",
+    "webhookTestHint": "Cliquez sur Exécuter et saisissez des données de requête de test. Publiez le workflow pour obtenir son URL Webhook.",
+    "webhookRequest": "Requête",
+    "webhookResponse": "Réponse",
+    "webhookResponseData": "Corps de la réponse",
+    "webhookStatus": "Code de statut",
+    "webhookSummary": "À la réception d'une requête HTTP",
+    "webhookDescription": "Recevoir un objet JSON via un point de terminaison HTTP généré."
+  },
+  "triggerSummary": {
+    "manualSummary": "Cliquez sur Exécuter pour démarrer ici.",
+    "integrationSummary": "À la réception d'un événement"
+  },
+  "conditionEditor": {
+    "addCondition": "Ajouter une condition",
+    "configPanelTitle": "Configuration",
+    "default": "Par défaut",
+    "defaultDescription": "Cas par défaut",
+    "defaultHelp": "Exécuter ce cas lorsqu'aucune autre condition ne correspond",
+    "deleteCondition": "Supprimer la condition",
+    "handleKeyTitle": "Handle",
+    "handleLogicalTitle": "Logique",
+    "inputHelp": "La première condition satisfaite renvoie les données du premier Handle d'entrée",
+    "label": "Cas",
+    "logical": {
+      "AND": "ET (AND)",
+      "OR": "OU (OR)"
+    },
+    "operator": {
+      "!=": "≠",
+      "<": "<",
+      "<=": "≤",
+      "==": "=",
+      ">": ">",
+      ">=": "≥",
+      "contains": "contient",
+      "endsWith": "se termine par",
+      "hasKey": "possède la clé",
+      "hasValue": "possède la valeur",
+      "isEmpty": "est vide",
+      "isFalse": "vaut false",
+      "isNotEmpty": "n'est pas vide",
+      "isNotNull": "n'est pas null",
+      "isNull": "est null",
+      "isTrue": "vaut true",
+      "notContains": "ne contient pas",
+      "notHasKey": "ne possède pas la clé",
+      "notHasValue": "ne possède pas la valeur",
+      "startsWith": "commence par"
+    },
+    "title": "Handles de condition",
+    "toggleDefault": "Condition par défaut"
+  },
+  "nodeInput": {
+    "literal": "Littéral",
+    "variable": "Variable",
+    "mode": "Type",
+    "connected": "Relié à une source en amont. Modifiez-la dans les sources d’entrée."
   }
 }

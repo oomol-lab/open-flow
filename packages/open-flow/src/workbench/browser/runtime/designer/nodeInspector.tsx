@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
-import type { ConnectorAction, ConnectorConnection, Diagnostic, JsonValue } from '../api.ts'
+import type { ConnectorAction, ConnectorConnection, Diagnostic, Group, InputPort, JsonValue } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from '../revisionView.ts'
@@ -10,15 +10,17 @@ import type { ModuleEditorStatus } from '../stores/workspaceModel.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 import type { DiagnosticFocus } from './diagnostics.ts'
 import type { DesignerTarget, SubflowSettings } from './flowChanges.ts'
+import type { NodeInputField } from './nodeInputs.tsx'
+import type { InputVariables } from './nodeInputValue.tsx'
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
-import { OverlayScrollbar } from '../../../../designer/browser/components/overlayScrollbar.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
+import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../../../../ui/browser/select.tsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
@@ -28,9 +30,17 @@ import { Icon } from '../icons.tsx'
 import { AgentSettings } from './agentSettings.tsx'
 import { CodeActions } from './codeActions.tsx'
 import { CodeEditor } from './codeEditor.tsx'
+import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
 import { codeTyping } from './flowChanges.ts'
+import { NodeDescription } from './nodeDescription.tsx'
+import { NodeInputs } from './nodeInputs.tsx'
 import { taskDiagnosticReady, taskInspectorSection } from './nodeInspectorBehavior.ts'
+import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
+import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
+import { TriggerScheduleEditor } from './triggerScheduleEditor.tsx'
+import { TriggerSummary } from './triggerSummary.tsx'
+import { WebhookEditor } from './webhookEditor.tsx'
 
 const InputValues = lazy(async () => {
   const module = await import('./inputValues.tsx')
@@ -771,9 +781,49 @@ function TaskDefinition({
         )}
       </form>
     ) : undefined
+  const editablePorts = selection.node.task != null || ('executor' in task && task.executor.kind == 'agent')
   const settingsPanel = (
     <>
       {children}
+      {editablePorts && (
+        <details className="inspector-disclosure">
+          <summary>{t('inspector.task.inputPorts')}</summary>
+          <PortDefinitionEditor
+            groups
+            values={task.inputs}
+            disabled={disabled}
+            onChange={(inputs) => {
+              void store.saveTaskPorts(selection.id, { inputs, outputs: task.outputs })
+            }}
+          />
+        </details>
+      )}
+      <details className="inspector-disclosure">
+        <summary>{t('inspector.task.outputPorts')}</summary>
+        <PortDefinitionEditor
+          groups
+          output
+          values={task.outputs}
+          disabled={disabled || !editablePorts}
+          onChange={(outputs) => {
+            if (editablePorts) void store.saveTaskPorts(selection.id, { inputs: task.inputs, outputs })
+          }}
+        />
+      </details>
+      {!editablePorts && (
+        <details className="inspector-disclosure">
+          <summary>{t('inspector.task.additionalInputs')}</summary>
+          <PortDefinitionEditor
+            values={selection.node.additionalInputs ?? []}
+            reservedNames={task.inputs.flatMap((port) => ('handle' in port ? [port.handle] : []))}
+            disabled={disabled}
+            onChange={(inputs) => {
+              void store.saveTaskAdditionalInputs(selection.id, inputs)
+            }}
+          />
+        </details>
+      )}
+
       {'executor' in task && task.executor.kind != 'agent' && (
         <details className="inspector-disclosure" data-inspector-section="task">
           <summary>
@@ -1024,6 +1074,7 @@ function TriggerConnection({
 }
 
 interface Props {
+  readonly variables: InputVariables
   readonly editorRef?: (element: HTMLDivElement | null) => void
   readonly connectorAction?: ConnectorAction
   readonly connectorActionError?: string
@@ -1052,6 +1103,7 @@ interface Props {
 }
 
 export function NodeInspector({
+  variables,
   editorRef,
   connectorAction,
   connectorActionError,
@@ -1081,6 +1133,7 @@ export function NodeInspector({
   const t = useTranslate()
   const content = useRef<HTMLDivElement>(null)
   const task = selection?.kind == 'task' ? selection.definition : undefined
+  const isAgent = task != null && 'executor' in task && task.executor.kind == 'agent'
   const connector = task != null && 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
   const taskId = selection?.kind == 'task' && selection.node.task == null ? selection.node.taskId : undefined
   const locatedRequest = useRef<number>()
@@ -1110,7 +1163,7 @@ export function NodeInspector({
   }, [focus, selection?.id, selection?.kind, taskSection])
 
   return (
-    <OverlayScrollbar className="inspector-scroll" defer={false} tabIndex={-1}>
+    <ScrollArea className="inspector-scroll" defer={false} tabIndex={-1}>
       <div className="inspector-content" ref={content}>
         <Diagnostics key={JSON.stringify([store.$.flowId.value, target, selection?.id])} diagnostics={diagnostics} pending={diagnosticsPending} />
         {selection?.kind == 'trigger' && (
@@ -1142,36 +1195,153 @@ export function NodeInspector({
             taskId={taskId}
           />
         )}
-        {selection?.kind == 'task' && selection.definition != null && 'executor' in selection.definition && selection.definition.executor.kind == 'agent' ? (
-          <>
-            <AgentSettings
-              key={JSON.stringify([store.$.flowId.value, selection.id])}
-              task={selection.definition}
-              nodeId={selection.id}
-              store={store}
-              connectors={connectors}
-              disabled={disabled}
-              theme={theme}
+        {selection?.kind == 'task' && selection.definition != null && 'executor' in selection.definition && selection.definition.executor.kind == 'agent' && (
+          <AgentSettings
+            key={JSON.stringify([store.$.flowId.value, selection.id])}
+            task={selection.definition}
+            nodeId={selection.id}
+            store={store}
+            connectors={connectors}
+            disabled={disabled}
+            theme={theme}
+          />
+        )}
+        {selection != null && (
+          <NodeDescription
+            key={`description:${selection.id}`}
+            value={selection.node.description}
+            disabled={disabled}
+            onSave={(description) => {
+              void store.saveNodeDescription(selection.id, description)
+            }}
+          />
+        )}
+        {selection?.kind === 'trigger' && (selection.trigger.kind === 'cron' || selection.trigger.kind === 'poll') && (
+          <TriggerScheduleEditor
+            key={`schedule:${selection.id}`}
+            schedules={selection.trigger.kind === 'cron' ? selection.trigger.cronTimes : selection.trigger.pollTimes}
+            disabled={disabled}
+            testHint={selection.trigger.kind === 'cron'}
+            onChange={(schedule) => {
+              void store.saveTriggerSchedule(selection.id, schedule)
+            }}
+          />
+        )}
+        {selection?.kind === 'trigger' && (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') && (
+          <TriggerConfigEditor
+            key={`config:${selection.id}`}
+            schema={selection.trigger.definition.configSchema}
+            config={selection.trigger.config}
+            disabled={disabled}
+            onChange={(name, value) => {
+              void store.saveTriggerConfig(selection.id, name, value)
+            }}
+          />
+        )}
+        {selection?.kind === 'trigger' && selection.trigger.kind === 'webhook' && (
+          <WebhookEditor
+            key={`webhook:${selection.id}`}
+            inputs={selection.trigger.inputsDef}
+            options={selection.trigger.options ?? {}}
+            disabled={disabled}
+            onChange={(settings) => {
+              void store.saveWebhook(selection.id, settings)
+            }}
+          />
+        )}
+        <div className="inspector-node-editor" ref={editorRef} />
+        {selection?.kind === 'trigger' && <TriggerSummary trigger={selection.trigger} />}
+        {(selection?.kind === 'condition' || selection?.kind === 'wait' || selection?.kind === 'subflow' || selection?.kind === 'task') &&
+          (() => {
+            const definitions: (InputPort | Group)[] =
+              selection.kind === 'task'
+                ? [...(selection.definition?.inputs ?? []), ...(selection.node.additionalInputs ?? [])]
+                : selection.kind === 'subflow'
+                  ? [...(selection.definition?.inputs ?? [])]
+                  : [selection.node.input]
+            const handles = new Set(definitions.flatMap((definition) => ('handle' in definition ? [definition.handle] : [])))
+            for (const handle of Object.keys(selection.node.inputs)) {
+              if (!handles.has(handle)) definitions.push({ handle, jsonSchema: {}, nullable: true })
+            }
+            const entries = definitions.map((definition): Group | NodeInputField => {
+              if ('group' in definition) return definition
+              const mapping = selection.node.inputs[definition.handle]
+              const source = mapping?.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
+              const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
+              return {
+                definition,
+                value: mapping?.kind === 'value' ? mapping.value : definition.value,
+                connected: mapping?.kind === 'sources' && binding?.kind !== 'variable',
+                variableName: binding?.kind === 'variable' ? binding.target : undefined,
+              }
+            })
+            const fields = (
+              <NodeInputs
+                key={`inputs:${selection.id}`}
+                entries={entries}
+                variables={variables}
+                disabled={disabled}
+                onValue={(handle, value) => {
+                  void store.setInputValue(selection.id, handle, value)
+                }}
+                onVariable={(handle, name) => {
+                  void store.setInputVariable(selection.id, handle, name)
+                }}
+              />
+            )
+            return isAgent ? (
+              <details className="inspector-disclosure">
+                <summary>
+                  <Icon name="chevron-down" size={14} />
+                  <span className="inspector-disclosure-summary">
+                    <strong>{t('agent.ports')}</strong>
+                    <span>{t('agent.portsHint')}</span>
+                  </span>
+                </summary>
+                {fields}
+                <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} />
+              </details>
+            ) : (
+              fields
+            )
+          })()}
+        {selection?.kind === 'condition' && (
+          <ConditionBranchesEditor
+            key={`condition:${selection.id}`}
+            value={selection.node}
+            disabled={disabled}
+            onChange={(settings) => {
+              void store.saveCondition(selection.id, settings)
+            }}
+          />
+        )}
+        {selection?.kind === 'value' && (
+          <PortDefinitionEditor
+            values={selection.node.values}
+            disabled={disabled}
+            onChange={(values) => {
+              void store.saveValue(selection.id, values)
+            }}
+          />
+        )}
+        {selection != null && selection.kind != 'trigger' && !isAgent && (
+          <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} />
+        )}
+        {(selection?.kind === 'subflow' || selection?.kind === 'wait') && (
+          <details className="inspector-disclosure">
+            <summary>{t('inspector.task.outputPorts')}</summary>
+            <PortDefinitionEditor
+              groups
+              output
+              disabled
+              values={
+                selection.kind === 'subflow'
+                  ? (selection.definition?.outputs ?? [])
+                  : selection.node.actions.map((handle) => ({ ...selection.node.input, handle }))
+              }
+              onChange={() => {}}
             />
-            <details className="inspector-disclosure">
-              <summary>
-                <Icon name="chevron-down" size={14} />
-                <span className="inspector-disclosure-summary">
-                  <strong>{t('agent.ports')}</strong>
-                  <span>{t('agent.portsHint')}</span>
-                </span>
-              </summary>
-              <div className="inspector-node-editor" ref={editorRef} />
-              <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} />
-            </details>
-          </>
-        ) : (
-          <>
-            <div className="inspector-node-editor" ref={editorRef} />
-            {selection != null && selection.kind != 'trigger' && (
-              <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} />
-            )}
-          </>
+          </details>
         )}
         {selection == null ? (
           target.kind == 'subflow' ? (
@@ -1224,6 +1394,6 @@ export function NodeInspector({
           </>
         )}
       </div>
-    </OverlayScrollbar>
+    </ScrollArea>
   )
 }

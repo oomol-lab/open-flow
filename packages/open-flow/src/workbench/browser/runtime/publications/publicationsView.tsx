@@ -7,10 +7,10 @@ import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 import { Fragment, useEffect, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
-import { collapseAllNested, JSONViewer } from '../../../../designer/browser/jsonViewer/index.ts'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
+import { collapseAllNested, JSONViewer } from '../../../../ui/browser/json-viewer/index.ts'
 import { Icon } from '../icons.tsx'
 
 function compactId(value: string): string {

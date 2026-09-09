@@ -1,0 +1,16 @@
+:where(.container) {
+  height: 100%;
+}
+
+.scrollbar {
+  box-sizing: border-box;
+  --os-size: 10px;
+  --os-padding-perpendicular: 2px;
+  --os-padding-axis: 2px;
+  --os-track-border-radius: 10px;
+  --os-handle-interactive-area-offset: 4px;
+  --os-handle-border-radius: 10px;
+  --os-handle-bg: light-dark(rgb(0 0 0 / 44%), rgb(255 255 255 / 44%));
+  --os-handle-bg-hover: light-dark(rgb(0 0 0 / 55%), rgb(255 255 255 / 55%));
+  --os-handle-bg-active: light-dark(rgb(0 0 0 / 66%), rgb(255 255 255 / 66%));
+}

@@ -85,7 +85,6 @@ export function CanvasViewControls({
   onZoomIn,
   onZoomOut,
   onZoomReset,
-  showSettings$,
   zoom,
 }: {
   readonly maxZoomReached: boolean
@@ -95,11 +94,9 @@ export function CanvasViewControls({
   readonly onZoomIn: () => void
   readonly onZoomOut: () => void
   readonly onZoomReset: () => void
-  readonly showSettings$?: Val<boolean>
   readonly zoom: number
 }) {
   const t = useTranslate()
-  const showSettings = useVal(showSettings$)
 
   return (
     <Panel position="bottom-left" className={cn(styles.island, styles.dock, styles.viewDock)} data-canvas-control-scope>
@@ -118,19 +115,6 @@ export function CanvasViewControls({
       {onRelayout != null && (
         <Button aria-label={t('optimize')} onClick={onRelayout} size="icon" title={t('optimize')} type="button" variant="ghost">
           <i className="i-custom:layout" />
-        </Button>
-      )}
-      {showSettings$ != null && (
-        <Button
-          aria-label={t(showSettings ? 'settingsPanel.hide' : 'settingsPanel.show')}
-          aria-expanded={showSettings === true}
-          onClick={() => showSettings$.set(showSettings !== true)}
-          size="icon"
-          title={t(showSettings ? 'settingsPanel.hide' : 'settingsPanel.show')}
-          type="button"
-          variant="ghost"
-        >
-          <i className="i-codicon:settings-gear" />
         </Button>
       )}
     </Panel>

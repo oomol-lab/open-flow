@@ -185,7 +185,11 @@
       "nameEmpty": "Имя узла не может быть пустым.",
       "timeout": "Время ожидания (мс)",
       "timeoutError": "Время ожидания должно быть положительным целым числом в миллисекундах.",
-      "title": "Настройки узла"
+      "title": "Настройки узла",
+      "description": "Назначение",
+      "describe": "Опишите назначение этого шага.",
+      "icon": "Значок",
+      "name": "Заголовок"
     },
     "selectNode": "Выберите один узел черновика, чтобы просмотреть и изменить его.",
     "subflow": {
@@ -215,7 +219,8 @@
       "responseMode": "Режим ответа",
       "source": "Исходный код",
       "structuredJson": "Структурированный JSON",
-      "retrySave": "Повторить сохранение"
+      "retrySave": "Повторить сохранение",
+      "additionalInputs": "Дополнительные входы"
     },
     "wait": {
       "approval": "Одобрить или отклонить",
@@ -275,10 +280,6 @@
   },
   "language": {
     "label": "Язык"
-  },
-  "jsonViewer": {
-    "bin": "Двоичные данные",
-    "var": "Переменная"
   },
   "notice": {
     "connectorUnconfigured": "Для этого развертывания Connector не настроен.",
@@ -758,5 +759,104 @@
     "title": "Выберите приложение и действие",
     "failed": "Не удалось добавить действие. Повторите попытку.",
     "search": "Поиск приложений и действий…"
+  },
+  "triggerSchedule": {
+    "scheduleType": "Тип расписания",
+    "scheduleEvery": "Каждые",
+    "scheduleCron": "Cron",
+    "scheduleInterval": "Интервал опроса",
+    "scheduleUnit": "Единица интервала",
+    "scheduleMinutes": "Минуты",
+    "scheduleHours": "Часы",
+    "scheduleDays": "Дни",
+    "scheduleWeeks": "Недели",
+    "scheduleMonths": "Месяцы",
+    "scheduleExpression": "Cron-выражение",
+    "scheduleTimezone": "Часовой пояс",
+    "scheduleMissing": "Расписание не настроено",
+    "scheduleTestHint": "Тест черновика запускается сразу и выполняется один раз. После публикации рабочий процесс запускается автоматически по расписанию."
+  },
+  "triggerConfig": {
+    "configuration": "Конфигурация",
+    "required": "Требуется вход"
+  },
+  "webhookEditor": {
+    "webhookAddField": "Добавить поле",
+    "webhookAddHeader": "Добавить заголовок",
+    "webhookCustomType": "Своя схема",
+    "webhookDeleteField": "Удалить поле полезной нагрузки",
+    "webhookDeleteHeader": "Удалить заголовок ответа",
+    "webhookFieldName": "Имя поля",
+    "webhookFieldNameDuplicate": "Имена полей не должны повторяться.",
+    "webhookFieldNameRequired": "Введите имя поля.",
+    "webhookFieldType": "Тип",
+    "webhookHeaderName": "Имя заголовка",
+    "webhookHeaders": "Заголовки ответа",
+    "webhookHeaderValue": "Значение заголовка",
+    "webhookMethods": "Разрешённые методы",
+    "webhookNoPayloadFields": "Полезная нагрузка запроса принимает пустой объект.",
+    "webhookNoResponseBody": "Без тела ответа",
+    "webhookNullable": "Разрешить null",
+    "webhookOrigins": "Разрешённые источники",
+    "webhookPayloadFields": "Данные запроса",
+    "webhookAdvanced": "Дополнительные настройки",
+    "webhookTest": "Тест черновика",
+    "webhookTestHint": "Нажмите «Запустить» и введите тестовые данные запроса. После публикации можно получить URL Webhook.",
+    "webhookRequest": "Запрос",
+    "webhookResponse": "Ответ",
+    "webhookResponseData": "Тело ответа",
+    "webhookStatus": "Код статуса",
+    "webhookSummary": "При получении HTTP-запроса",
+    "webhookDescription": "Получать JSON-объект через сгенерированный HTTP-адрес."
+  },
+  "triggerSummary": {
+    "manualSummary": "Нажмите «Запустить», чтобы начать с этого узла.",
+    "integrationSummary": "При получении события"
+  },
+  "conditionEditor": {
+    "addCondition": "Добавить условие",
+    "configPanelTitle": "Настройки",
+    "default": "По умолчанию",
+    "defaultDescription": "Ветка по умолчанию",
+    "defaultHelp": "Выполнять эту ветку, если ни одно другое условие не подошло",
+    "deleteCondition": "Удалить условие",
+    "handleKeyTitle": "Handle",
+    "handleLogicalTitle": "Логика",
+    "inputHelp": "Первое подошедшее условие выдаст данные из первого входного Handle",
+    "label": "Ветка",
+    "logical": {
+      "AND": "И (AND)",
+      "OR": "ИЛИ (OR)"
+    },
+    "operator": {
+      "!=": "≠",
+      "<": "<",
+      "<=": "≤",
+      "==": "=",
+      ">": ">",
+      ">=": "≥",
+      "contains": "содержит",
+      "endsWith": "заканчивается на",
+      "hasKey": "содержит ключ",
+      "hasValue": "содержит значение",
+      "isEmpty": "пусто",
+      "isFalse": "равно false",
+      "isNotEmpty": "не пусто",
+      "isNotNull": "не равно null",
+      "isNull": "равно null",
+      "isTrue": "равно true",
+      "notContains": "не содержит",
+      "notHasKey": "не содержит ключ",
+      "notHasValue": "не содержит значение",
+      "startsWith": "начинается с"
+    },
+    "title": "Handle условий",
+    "toggleDefault": "Условие по умолчанию"
+  },
+  "nodeInput": {
+    "literal": "Литерал",
+    "variable": "Variable",
+    "mode": "Тип",
+    "connected": "Подключён к источнику данных. Измените его в разделе источников входных данных."
   }
 }

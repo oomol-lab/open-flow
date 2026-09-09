@@ -1,5 +1,4 @@
 import type { DragEvent as ReactDragEvent, ReactElement, ReactNode, RefObject } from 'react'
-import type { IAddNodeMenuItem } from '../../../../designer/browser/stores/designer/designer.store.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
 import type { AddNodeOption } from './addNodeOptions.ts'
@@ -7,14 +6,13 @@ import type { AddNodeOption } from './addNodeOptions.ts'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Virtualizer } from 'virtua'
-import { useDebouncedValue } from '../../../../designer/browser/base/react.ts'
-import { OverlayScrollbar } from '../../../../designer/browser/components/overlayScrollbar.tsx'
-import { filterBlockPickerItems, useBlockPickerItems } from '../../../../designer/browser/graph/blockPicker.ts'
-import { setAddItemId } from '../../../../designer/browser/graph/ReactFlowContainer/addItemDrag.ts'
-import { DesignerIcon } from '../../../../designer/browser/icons/DesignerIcon.tsx'
-import { ThemeProvider } from '../../../../designer/browser/theme/ThemeProvider.tsx'
+import { setAddItemId } from '../../../../canvas/browser/addItemDrag.ts'
 import { Button, buttonVariants } from '../../../../ui/browser/button.tsx'
+import { filterCollectionItems, useCollectionItems } from '../../../../ui/browser/collectionSearch.ts'
+import { useDebouncedValue } from '../../../../ui/browser/hooks.ts'
+import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
+import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
@@ -22,6 +20,7 @@ import { indexAddNodeOptions } from './addNodeOptions.ts'
 import { cycleContextPanelFocus, observeContextPanelOverlay } from './contextPanelBehavior.ts'
 
 interface ContextPanelProps {
+  readonly heading?: ReactNode
   readonly headerRef?: (element: HTMLDivElement | null) => void
   readonly children: ReactNode
   readonly focusOnOpen: boolean
@@ -34,14 +33,31 @@ interface ContextPanelProps {
 interface LibraryItemProps {
   readonly disabled: boolean
   readonly draggable: boolean
-  readonly item: Exclude<IAddNodeMenuItem, { type: 'divider' }>
+  readonly item: LibraryNodeItem
   readonly onAdd: (itemId: string) => void
   readonly onDrag: (event: ReactDragEvent, itemId: string) => void
   readonly onLoadChoices: (itemId: string, signal: AbortSignal) => Promise<readonly LibraryChoice[] | undefined>
   readonly onOpenChange: (itemId: string, open: boolean) => void
 }
 
-type LibraryChoice = NonNullable<Exclude<IAddNodeMenuItem, { type: 'divider' }>['choices']>[number]
+interface LibraryChoice {
+  readonly data: string
+  readonly label: string
+  readonly description?: string
+}
+
+interface LibraryNodeItem {
+  readonly type: AddNodeOption['kind']
+  readonly data: string
+  readonly label: string
+  readonly description?: string
+  readonly detail?: string
+  readonly icon?: string
+  readonly disabled?: boolean
+  readonly choices?: readonly LibraryChoice[]
+}
+
+type LibraryMenuItem = LibraryNodeItem | { readonly type: 'divider'; readonly label: string; readonly detail?: string }
 
 interface BlockLibraryProps {
   readonly browseOptions: (signal: AbortSignal) => Promise<readonly AddNodeOption[] | undefined>
@@ -67,7 +83,7 @@ function useOverlayPanel(panel: RefObject<HTMLElement | null>): boolean {
   return overlay
 }
 
-export function ContextPanel({ children, focusOnOpen, headerRef, icon, onClose, theme, title }: ContextPanelProps): ReactElement {
+export function ContextPanel({ children, focusOnOpen, headerRef, heading, icon, onClose, theme, title }: ContextPanelProps): ReactElement {
   const t = useTranslate()
   const panel = useRef<HTMLElement>(null)
   const overlay = useOverlayPanel(panel)
@@ -115,66 +131,48 @@ export function ContextPanel({ children, focusOnOpen, headerRef, icon, onClose, 
   }, [onClose, overlay])
 
   return (
-    <ThemeProvider dark={theme == 'dark'}>
-      <>
-        <div aria-hidden="true" className="context-panel-backdrop" onClick={onClose} />
-        <aside
-          aria-labelledby={titleId}
-          aria-modal={overlay || undefined}
-          className="context-panel"
-          data-theme={theme}
-          ref={panel}
-          role={overlay ? 'dialog' : 'complementary'}
-          tabIndex={-1}
-        >
-          <header>
-            {headerRef == null ? (
-              <>
-                <span className="node-icon small">
-                  <Icon name={icon} size={16} />
-                </span>
-                <strong id={titleId}>{title}</strong>
-              </>
-            ) : (
-              <>
-                <span className="sr-only" id={titleId}>
-                  {title}
-                </span>
-                <div className="context-panel-node-heading" ref={headerRef} />
-              </>
-            )}
-            <Button aria-label={t('contextPanel.close')} onClick={onClose} size="icon-sm" type="button" variant="ghost">
-              <Icon name="close" />
-            </Button>
-          </header>
-          <div className="context-panel-content">{children}</div>
-        </aside>
-      </>
-    </ThemeProvider>
+    <>
+      <div aria-hidden="true" className="context-panel-backdrop" onClick={onClose} />
+      <aside
+        aria-labelledby={titleId}
+        aria-modal={overlay || undefined}
+        className="context-panel"
+        data-theme={theme}
+        ref={panel}
+        role={overlay ? 'dialog' : 'complementary'}
+        tabIndex={-1}
+      >
+        <header>
+          {headerRef == null ? (
+            <>
+              <span className="node-icon small">
+                <Icon name={icon} size={16} />
+              </span>
+              <strong id={titleId}>{title}</strong>
+            </>
+          ) : (
+            <>
+              <span className="sr-only" id={titleId}>
+                {title}
+              </span>
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                {heading}
+                <div className={heading == null ? 'context-panel-node-heading' : 'shrink-0'} ref={headerRef} />
+              </div>
+            </>
+          )}
+          <Button aria-label={t('contextPanel.close')} onClick={onClose} size="icon-sm" type="button" variant="ghost">
+            <Icon name="close" />
+          </Button>
+        </header>
+        <div className="context-panel-content">{children}</div>
+      </aside>
+    </>
   )
 }
 
-function optionType(option: AddNodeOption): Exclude<IAddNodeMenuItem, { type: 'divider' }>['type'] {
-  switch (option.kind) {
-    case 'agent':
-    case 'new-task':
-    case 'subflow':
-      return 'block'
-    case 'connector-group':
-      return 'connector'
-    case 'comment':
-    case 'condition':
-    case 'connector':
-    case 'llm':
-    case 'trigger':
-    case 'value':
-    case 'wait':
-      return option.kind
-  }
-}
-
-function menuItems(options: readonly AddNodeOption[]): IAddNodeMenuItem[] {
-  const items: IAddNodeMenuItem[] = []
+function menuItems(options: readonly AddNodeOption[]): LibraryMenuItem[] {
+  const items: LibraryMenuItem[] = []
   let group: string | undefined
   for (const option of options) {
     if (option.group != null && option.group != group) {
@@ -192,17 +190,20 @@ function menuItems(options: readonly AddNodeOption[]): IAddNodeMenuItem[] {
       detail: option.description,
       icon: option.icon,
       label: option.label,
-      type: optionType(option),
+      type: option.kind,
     })
   }
   return items
 }
 
-function fallbackIcon(item: Exclude<IAddNodeMenuItem, { type: 'divider' }>): IconName {
+function fallbackIcon(item: LibraryNodeItem): IconName {
   switch (item.type) {
+    case 'agent':
+      return 'llm'
     case 'condition':
       return 'condition'
     case 'connector':
+    case 'connector-group':
       return 'connection'
     case 'llm':
       return 'llm'
@@ -212,19 +213,19 @@ function fallbackIcon(item: Exclude<IAddNodeMenuItem, { type: 'divider' }>): Ico
       return 'value'
     case 'wait':
       return 'wait'
-    case 'block':
+    case 'new-task':
+    case 'subflow':
     case 'comment':
-    case 'scriptlet':
       return 'task'
   }
 }
 
-function LibraryRow({ item, trailing }: { readonly item: Exclude<IAddNodeMenuItem, { type: 'divider' }>; readonly trailing?: ReactNode }): ReactElement {
+function LibraryRow({ item, trailing }: { readonly item: LibraryNodeItem; readonly trailing?: ReactNode }): ReactElement {
   const fallback = <Icon name={fallbackIcon(item)} />
   return (
     <span className="block-library-row" title={item.detail ?? item.description ?? item.label}>
       <span className="block-library-row-icon">
-        <DesignerIcon className="block-library-row-glyph" fallback={fallback} src={item.icon} />
+        <ContentIcon className="block-library-row-glyph" fallback={fallback} src={item.icon} />
       </span>
       <span className="block-library-row-label">{item.label}</span>
       {item.description && <span className="block-library-row-description">{item.description}</span>}
@@ -419,7 +420,7 @@ export function BlockLibrary({
     return items
   }, [options, integrationGroup, triggerGroup, triggers])
   const provideAsyncItems = useCallback(
-    async (searchTerm: string, signal: AbortSignal): Promise<readonly IAddNodeMenuItem[] | undefined> => {
+    async (searchTerm: string, signal: AbortSignal): Promise<readonly LibraryMenuItem[] | undefined> => {
       setSettled(false)
       try {
         const nextOptions = await (searchTerm.trim() == '' ? browseOptions(signal) : searchOptions(searchTerm, signal))
@@ -441,7 +442,7 @@ export function BlockLibrary({
     },
     [provideChoices],
   )
-  const { error, items: catalogItems, retry } = useBlockPickerItems(localItems, filterQuery, provideAsyncItems)
+  const { error, items: catalogItems, retry } = useCollectionItems(localItems, filterQuery, provideAsyncItems)
   const loading = !settled
   const searching = filterQuery.trim() != ''
   const items = useMemo(() => {
@@ -456,7 +457,7 @@ export function BlockLibrary({
       if (heading != null) group[0] = { ...heading, detail: triggers }
       ordered.splice(end < 0 ? ordered.length : end, 0, ...group)
     }
-    const matches = filterBlockPickerItems('', ordered)
+    const matches = filterCollectionItems('', ordered)
     if (searching) return matches
     let hidden = false
     return matches.filter((item) => {
@@ -546,7 +547,7 @@ export function BlockLibrary({
       </Button>
     </span>
   ) : undefined
-  const hasConnectors = catalogItems.some((item) => item.type == 'connector')
+  const hasConnectors = catalogItems.some((item) => item.type == 'connector' || item.type == 'connector-group')
 
   const renderItem = (item: (typeof items)[number]): ReactElement => {
     const option = item.type == 'divider' || item.data == null ? undefined : resolve(item.data)
@@ -612,12 +613,7 @@ export function BlockLibrary({
           />
         </InputGroup>
       </div>
-      <OverlayScrollbar
-        className="block-library-list"
-        defer={false}
-        events={{ initialized: (instance) => setViewport(instance.elements().viewport) }}
-        tabIndex={-1}
-      >
+      <ScrollArea className="block-library-list" defer={false} events={{ initialized: (instance) => setViewport(instance.elements().viewport) }} tabIndex={-1}>
         {viewport == null ? (
           items.map(renderItem)
         ) : (
@@ -630,7 +626,7 @@ export function BlockLibrary({
         )}
         {!loading && !error && items.length == 0 && <div className="block-library-feedback">{t('contextPanel.empty')}</div>}
         <div aria-hidden="true" className="h-4" />
-      </OverlayScrollbar>
+      </ScrollArea>
     </div>
   )
 }

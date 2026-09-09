@@ -185,7 +185,11 @@
       "nameEmpty": "节点名称不能为空。",
       "timeout": "超时时间（毫秒）",
       "timeoutError": "超时时间必须是以毫秒为单位的正整数。",
-      "title": "节点设置"
+      "title": "节点设置",
+      "description": "用途说明",
+      "describe": "描述这一步要完成什么。",
+      "icon": "图标",
+      "name": "标题"
     },
     "selectNode": "选择一个草稿节点以查看和编辑。",
     "subflow": {
@@ -215,7 +219,8 @@
       "responseMode": "响应模式",
       "source": "源代码",
       "structuredJson": "结构化 JSON",
-      "retrySave": "重试保存"
+      "retrySave": "重试保存",
+      "additionalInputs": "附加输入"
     },
     "wait": {
       "approval": "通过或拒绝",
@@ -275,10 +280,6 @@
   },
   "language": {
     "label": "语言"
-  },
-  "jsonViewer": {
-    "bin": "二进制",
-    "var": "变量"
   },
   "notice": {
     "connectorUnconfigured": "当前部署尚未配置 Connector。",
@@ -758,5 +759,104 @@
     "title": "选择应用和动作",
     "failed": "未能添加此动作，请重试。",
     "search": "搜索应用或动作…"
+  },
+  "triggerSchedule": {
+    "scheduleType": "计划类型",
+    "scheduleEvery": "每隔",
+    "scheduleCron": "Cron",
+    "scheduleInterval": "轮询间隔",
+    "scheduleUnit": "间隔单位",
+    "scheduleMinutes": "分钟",
+    "scheduleHours": "小时",
+    "scheduleDays": "天",
+    "scheduleWeeks": "周",
+    "scheduleMonths": "个月",
+    "scheduleExpression": "Cron 表达式",
+    "scheduleTimezone": "时区",
+    "scheduleMissing": "尚未配置计划",
+    "scheduleTestHint": "草稿测试会立即执行一次；发布后按计划自动运行。"
+  },
+  "triggerConfig": {
+    "configuration": "配置",
+    "required": "需要输入"
+  },
+  "webhookEditor": {
+    "webhookAddField": "添加字段",
+    "webhookAddHeader": "添加响应头",
+    "webhookCustomType": "自定义结构",
+    "webhookDeleteField": "删除载荷字段",
+    "webhookDeleteHeader": "删除响应头",
+    "webhookFieldName": "字段名",
+    "webhookFieldNameDuplicate": "字段名不能重复。",
+    "webhookFieldNameRequired": "请输入字段名。",
+    "webhookFieldType": "类型",
+    "webhookHeaderName": "响应头名称",
+    "webhookHeaders": "响应头",
+    "webhookHeaderValue": "响应头值",
+    "webhookMethods": "允许的请求方法",
+    "webhookNoPayloadFields": "请求载荷接受空对象。",
+    "webhookNoResponseBody": "不返回响应体",
+    "webhookNullable": "允许 null",
+    "webhookOrigins": "允许的来源",
+    "webhookPayloadFields": "请求数据",
+    "webhookAdvanced": "高级设置",
+    "webhookTest": "草稿测试",
+    "webhookTestHint": "点击运行，填写模拟请求数据即可测试。发布后可获取 Webhook 请求地址。",
+    "webhookRequest": "请求",
+    "webhookResponse": "响应",
+    "webhookResponseData": "响应内容",
+    "webhookStatus": "状态码",
+    "webhookSummary": "收到 HTTP 请求时触发",
+    "webhookDescription": "通过部署后生成的 HTTP 地址接收 JSON 对象。"
+  },
+  "triggerSummary": {
+    "manualSummary": "点击运行，从这里开始执行。",
+    "integrationSummary": "事件到达时触发"
+  },
+  "conditionEditor": {
+    "addCondition": "添加条件",
+    "configPanelTitle": "配置",
+    "default": "默认",
+    "defaultDescription": "默认条件",
+    "defaultHelp": "当没有其他条件匹配时，执行此条件",
+    "deleteCondition": "删除条件",
+    "handleKeyTitle": "接口名",
+    "handleLogicalTitle": "组合逻辑",
+    "inputHelp": "匹配条件的输出接口会输出第一条输入接口的数据",
+    "label": "条件",
+    "logical": {
+      "AND": "且 (AND)",
+      "OR": "或 (OR)"
+    },
+    "operator": {
+      "!=": "≠",
+      "<": "<",
+      "<=": "≤",
+      "==": "=",
+      ">": ">",
+      ">=": "≥",
+      "contains": "包含",
+      "endsWith": "结尾是",
+      "hasKey": "包含键",
+      "hasValue": "包含值",
+      "isEmpty": "为空",
+      "isFalse": "为 false",
+      "isNotEmpty": "不为空",
+      "isNotNull": "不为 null",
+      "isNull": "为 null",
+      "isTrue": "为 true",
+      "notContains": "不包含",
+      "notHasKey": "不包含键",
+      "notHasValue": "不包含值",
+      "startsWith": "开头是"
+    },
+    "title": "条件输出接口",
+    "toggleDefault": "默认条件"
+  },
+  "nodeInput": {
+    "literal": "固定值",
+    "variable": "Variable",
+    "mode": "类型",
+    "connected": "已连接上游来源，可在输入来源中修改。"
   }
 }
