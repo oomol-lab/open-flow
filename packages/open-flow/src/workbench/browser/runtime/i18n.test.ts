@@ -52,6 +52,7 @@ describe('Workbench i18n', () => {
 
     expect(i18n.t('resource.flows')).toBe('工作流')
     expect(i18n.t('notice.created', { name: '演示' })).toBe('已创建 演示。')
+    expect(i18n.t('agent.assigned', { fields: 'to, cc' })).toBe('已指定参数：to, cc')
 
     i18n.dispose()
   })

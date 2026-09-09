@@ -41,7 +41,7 @@ Variable 是 deployment scope 配置，不属于任何 Flow。Flow Revision 只�
 不包含 value。Variable 删除不修改 Revision；需要该 name 的首次 Publish、Rollback 或 Run admission 必须在资源创建的权威 operation boundary
 内 fail closed，幂等重放必须先返回已经接受的资源。
 
-Run 开始时从一个 deployment store snapshot 解析固定 closure 实际使用的 Variable，并把同一份值注入根图和每次 Subflow invocation。平台不能把
+普通 Run 开始时从一个 deployment store snapshot 解析固定 closure 实际使用的 Variable，并把同一份值注入根图和每次 Subflow invocation。平台不能把
 解析值隐式写入 Revision、Publication、持久化 Run input 或 `node.started`；Flow 代码显式返回、记录、发送或抛出该值时，它仍可进入用户数据流、
 RunEvent、日志或外部系统。Variable 是 Operator 可读取的 deployment configuration，不是不可导出的 Secret Manager。
 
@@ -56,6 +56,9 @@ Connector runtime、Connector Console、显式 LLM 和 Integration callback 等�
 
 Store-managed 配置原子提交并在保存后用于新的 capability operation；已经开始的 operation 继续使用开始时取得的固定配置快照。Secret value 不通过读取 API、
 Workbench 或日志返回，但可恢复的外部 service credential 会进入 Server 数据卷、WAL 和备份的信任边界，不是不可导出的 Secret Manager。
+
+包含 Agent 的 Run 在准入事务中固定其执行 closure 所使用的 Variable 值与模型部署配置，首次执行和审批恢复均使用同一快照。
+模型 credential 属于部署私有持久化，不进入 Revision、公开 Run input 或运行事件。
 
 ### Scope、身份与通知
 
@@ -157,6 +160,20 @@ Run 的总执行预算。checkpoint 缺失、损坏或与固定 Wait 不一致�
 Approval 是 Wait 对 action 集合 `approve/reject` 的一种产品语义，不是独立执行节点或部署认证机制。部署内部的 Control API resolve 使用 Operator
 认证；外部通知可以携带只绑定一个 Wait 的 opaque capability。公开 hook 只提供 JSON inspection 和显式 POST action，不拥有 HTML 页面或特定消费端
 界面。一次 Wait 的所有 resolve 入口共享同一个 first-writer-wins 决议事实。
+各等待保留独立决议事实，后续等待和 Run terminal 不覆盖旧决议；这些事实不受 RunEvent retention 影响，随 Flow 物理删除清理。
+
+Agent 是根 Flow 中的 Managed Task，拥有显式输入、固定模型、Connector 工具与可选代码计算能力声明。模型不能改变工具 Action、Connection、固定参数或审批策略。
+Agent 的工具批次串行处理，批准或拒绝只处理该次固定调用。框架 continuation 属于部署私有数据；Run owner 原子提交 continuation、Scheduler
+状态、审批等待与通知 work，框架不拥有另一套 Run 状态机。并行分支的暂停统一收敛为单个可决议等待及其后续队列，恢复不重跑已完成节点。
+Agent 节点超时累计各次实际执行段，审批与排队不消耗节点预算；Run 总预算独立保留。执行结果不明时终止为不确定失败，不能让模型自动重试。
+
+Agent 临时代码属于此次 Run 的调用数据，不修改 Revision 或图结构。宿主只注入当前节点输入、明确值和当前 invocation 已取得的结果，
+每次计算使用独立隔离 realm，不授予 Connector、网络或其他业务 Capability。代码成功结果沿用工具结果持久化与恢复边界，
+不能通过重启或审批恢复重跑已完成计算；普通源码错误可由模型修正，取消、资源限制和宿主完整性失败仍终止 Agent。
+
+Agent 工具的完整结果属于 Run，由部署独立持久化，不依赖日志保留期。模型消息、日志和框架 continuation 使用结果引用与有界预览，
+不能通过复制完整正文传递恢复事实。宿主结果读取工具仅可访问当前 invocation 已取得的结果；Operator 通过同一 Run 读取权限查看和下载。
+恢复必须验证引用与完整性，不能通过重新调用外部工具补回缺失结果。结果随所属 Flow 的物理删除清理。
 
 Wait 通知复用固定 Revision 中显式选择的 Connector action。部署必须先持久化 `waiting` 和通知 work，再在事务外调用 Connector；外部调用至少一次，
 稳定 invocation identity 由 Connector 幂等处理。通知发送失败不能自动批准、拒绝或结束 Run。通知正文中的 capability 只以不可逆摘要进入持久化存储，

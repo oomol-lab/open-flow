@@ -47,6 +47,7 @@ export type AddNodeOption = AddNodeOptionBase &
         readonly kind: 'connector-group'
         readonly serviceId: string
       }
+    | { readonly kind: 'agent' }
     | { readonly kind: 'llm' }
     | { readonly kind: 'new-task' }
     | { readonly kind: 'subflow'; readonly referenceId: string }
@@ -81,6 +82,16 @@ function builtinOptions(t: TFunction): readonly AddNodeOption[] {
       kind: 'new-task',
       label: t('addNode.javascript'),
       outputs: [{ handle: 'result', jsonSchema: {} }],
+    },
+    {
+      description: t('agent.intro'),
+      group,
+      id: 'agent',
+      icon: ':carbon:machine-learning-model:',
+      inputs: [{ handle: 'input', jsonSchema: { type: 'string' } }],
+      outputs: [{ handle: 'output', jsonSchema: { type: 'string' } }],
+      kind: 'agent',
+      label: 'Agent',
     },
     {
       description: t('addNode.llmChatDescription'),
@@ -151,7 +162,7 @@ function builtinOptions(t: TFunction): readonly AddNodeOption[] {
 export function deriveAddNodeOptions(draft: Draft | undefined, target: DesignerTarget | undefined, t: TFunction): readonly AddNodeOption[] {
   if (draft == null || target == null) return []
   const options = builtinOptions(t)
-  if (target.kind != 'flow') return options
+  if (target.kind != 'flow') return options.filter((option) => option.kind != 'agent')
   const group = t('addNode.triggers')
   const triggers: readonly AddNodeOption[] = [
     {
@@ -217,6 +228,8 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, tar
       })
       return { kind: 'code', name }
     }
+    case 'agent':
+      return target.kind == 'flow' ? { kind: 'agent', name: 'Agent' } : undefined
     case 'llm': {
       const mode = option.id == 'llm:json' ? 'json' : 'chat'
       return {

@@ -147,6 +147,27 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
       write(runtime, args.json, { kind: 'run.wait', runId, run, nextAfter: after, timedOut: true, version: 1 }, `timeout\t${runId}\t${after}`)
       return 3
     }
+    case 'results': {
+      if (references.length < 1 || references.length > 2) throw new CliError('cli.invalid-arguments', 'Usage: oo flow runs results <run> [<after>]')
+      const page = await client.listRunResults(references[0]!, references[1])
+      write(runtime, args.json, { kind: 'run.results', ...page }, JSON.stringify(page))
+      return
+    }
+    case 'read-result': {
+      if (references.length < 2 || references.length > 4)
+        throw new CliError('cli.invalid-arguments', 'Usage: oo flow runs read-result <run> <result> [<pointer>] [<offset>]')
+      const offset = references[3] == null ? 0 : Number(references[3])
+      if (!Number.isSafeInteger(offset) || offset < 0) throw new CliError('cli.invalid-arguments', 'Result offset must be a non-negative integer.')
+      const page = await client.readRunResult(references[0]!, references[1]!, { pointer: references[2] ?? '', offset })
+      write(runtime, args.json, { kind: 'run.result-page', ...page }, JSON.stringify(page))
+      return
+    }
+    case 'download-result': {
+      requireCount(references, 2, 'oo flow runs download-result <run> <result>')
+      const content = await client.downloadRunResult(references[0]!, references[1]!)
+      runtime.stdout.write(await content.text())
+      return
+    }
     case 'result': {
       requireCount(references, 1, 'oo flow runs result <run> [--json]')
       const result = await client.getRunResult(references[0]!)
@@ -165,7 +186,7 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
       return
     }
     default:
-      throw new CliError('cli.invalid-arguments', 'Usage: oo flow runs <list|show|wait|resolve|events|result|cancel>')
+      throw new CliError('cli.invalid-arguments', 'Usage: oo flow runs <list|show|wait|resolve|events|result|results|read-result|download-result|cancel>')
   }
 }
 

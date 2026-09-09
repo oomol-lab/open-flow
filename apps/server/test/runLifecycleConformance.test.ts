@@ -99,15 +99,15 @@ for (const conformance of runLifecycleConformanceCases) {
               runId,
               {
                 kind: 'waiting',
-                wait: { ...wait, actions: ['continue'] },
-                checkpoint: { bindingValues: {}, inputs: {}, results: {}, skipped: [], version: 1, wait: { ...wait, value: null } },
+                wait: { ...wait, actions: ['continue'], prompt: 'Continue' },
+                checkpoint: { bindingValues: {}, inputs: {}, results: {}, skipped: [], version: 2, agents: {}, queue: [], wait: { ...wait, value: null } },
               },
               1_000,
             ) != null
           )
         },
         async resolve(runId) {
-          const result = store.resolveWait(runId, 'wait', 'continue', ['continue'])
+          const result = store.resolveWait(runId, 'wait', 'continue')
           return result.kind == 'resolved' && result.changed && result.resolutionAccepted
         },
       }

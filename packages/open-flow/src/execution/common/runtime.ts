@@ -41,6 +41,24 @@ export type LlmTaskResult =
 
 export type InvokeLlmTask = (invocation: LlmTaskInvocation) => Promise<LlmTaskResult>
 
+export interface AgentCheckpoint {
+  readonly state: JsonValue
+  readonly callId: string
+  readonly toolId: string
+  readonly input: Readonly<Record<string, JsonValue>>
+  readonly rounds: number
+  readonly version: 1
+}
+
+export type AgentResult = { readonly kind: 'completed'; readonly output: JsonValue } | { readonly kind: 'suspended'; readonly checkpoint: AgentCheckpoint }
+
+export interface AgentInvocation {
+  readonly input: Readonly<Record<string, JsonValue>>
+  readonly invocationId: string
+  readonly signal: AbortSignal
+  readonly resume?: { readonly action: 'approve' | 'reject'; readonly checkpoint: AgentCheckpoint }
+}
+
 export interface RuntimeInvocation {
   readonly capabilities?: readonly ConnectorCapability[]
   readonly capability: (call: RuntimeCapabilityCall) => Promise<RuntimeCapabilityResponse>

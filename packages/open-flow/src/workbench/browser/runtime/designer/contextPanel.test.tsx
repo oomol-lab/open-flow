@@ -49,6 +49,7 @@ describe('Context Panel', () => {
       <I18nProvider i18n={createI18n('en')}>
         <BlockLibrary
           browseOptions={async () => []}
+          searchOptions={async () => []}
           disabled={false}
           focusRequest={0}
           onAdd={async () => undefined}
@@ -96,6 +97,7 @@ describe('Context Panel', () => {
       <I18nProvider i18n={createI18n('en')}>
         <BlockLibrary
           browseOptions={async () => []}
+          searchOptions={async () => []}
           disabled={false}
           focusRequest={0}
           onAdd={async () => undefined}
@@ -115,6 +117,7 @@ describe('Context Panel', () => {
       <I18nProvider i18n={createI18n('en')}>
         <BlockLibrary
           browseOptions={async () => []}
+          searchOptions={async () => []}
           disabled={false}
           focusRequest={0}
           onAdd={async () => undefined}
@@ -125,7 +128,7 @@ describe('Context Panel', () => {
       </I18nProvider>,
     )
     expect(markup).toContain('Connector actions')
-    expect(markup).toContain('aria-expanded="false"')
+    expect(markup).toContain('aria-expanded="true"')
     expect(markup).toContain('role="status"')
     expect(markup).toContain('Loading catalog blocks')
   })
@@ -136,6 +139,7 @@ describe('Context Panel', () => {
         <ContextPanel focusOnOpen={false} icon="plus" onClose={() => undefined} theme="dark" title="Blocks">
           <BlockLibrary
             browseOptions={async () => []}
+            searchOptions={async () => []}
             disabled={false}
             focusRequest={0}
             onAdd={async () => undefined}

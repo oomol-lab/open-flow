@@ -4,9 +4,9 @@ import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { IntegrationDefinition } from '@oomol-lab/open-flow/integration-trigger'
 import type { PollDefinition } from '@oomol-lab/open-flow/poll-trigger'
 import type { ProviderTriggerDefinition } from '@oomol-lab/open-flow/provider-triggers'
-import type { InvokeLlmTask } from '@oomol-lab/open-flow/runtime-contract'
 import type { Logger } from 'pino'
 import type { ConnectorHost } from '../deployment/connector.ts'
+import type { LlmHost } from '../deployment/llm.ts'
 import type { IntegrationOptions, IntegrationResponse, IntegrationRuntimeState, IntegrationTarget } from '../runtime/integration-runtime.ts'
 import type { RunEvent, RunRecord } from '../storage/store.ts'
 import type { PollState, RunAdmission, StoredCronTarget } from '../storage/trigger-store.ts'
@@ -60,7 +60,7 @@ export interface ServerCapabilities {
   readonly connector?: () => ConnectorHost | undefined
   readonly connectorConsoleOrigin?: () => URL | undefined
   readonly integration?: () => IntegrationOptions | undefined
-  readonly llm?: () => InvokeLlmTask | undefined
+  readonly llm?: () => LlmHost | undefined
   readonly waitPublicOrigin?: () => URL | undefined
 }
 
@@ -170,7 +170,7 @@ export class ServerService {
   readonly #runningFlows = new Set<string>()
   readonly #resolveIntegration: () => IntegrationOptions | undefined
   readonly #executor: RunExecutor
-  readonly #resolveLlm: () => InvokeLlmTask | undefined
+  readonly #resolveLlm: () => LlmHost | undefined
   readonly #resolveWaitPublicOrigin: () => URL | undefined
   readonly #signals: Queue.Queue<Deferred.Deferred<void> | undefined>
   readonly #store: Store
@@ -266,6 +266,7 @@ export class ServerService {
       () => this.#signal(),
       () => this.#wakeMaintenance(),
       () => this.#notifyFlowCatalog(),
+      () => this.#resolveLlm()?.config != null,
     )
     this.control = new ControlService(
       store,
@@ -279,7 +280,7 @@ export class ServerService {
       (flowId, triggerNodeId) => this.#poll.test(flowId, triggerNodeId),
       () => this.#notifyFlowCatalog(),
       (event) => this.#notifyFlow(event),
-      () => this.#resolveLlm() != null,
+      (kind) => (kind == 'agent' ? this.#resolveLlm()?.config != null : this.#resolveLlm() != null),
       this.#resolveConnector,
       this.#resolveConnectorConsoleOrigin,
       this.#resolveWaitPublicOrigin,
@@ -303,7 +304,7 @@ export class ServerService {
         Effect.try({
           try: () => {
             migrateDatabase(databaseFile)
-            return new Store(databaseFile, now, runtime.runEventRetentionMs, runtime.maxPendingRuns)
+            return new Store(databaseFile, now, runtime.runEventRetentionMs, runtime.maxPendingRuns, () => capabilities.llm?.()?.config)
           },
           catch: (error) => (error instanceof Error ? error : new Error(String(error))),
         }),
@@ -882,17 +883,15 @@ export class ServerService {
     const digest = createHash('sha256').update(capability).digest('hex')
     const receipt = this.#store.waitByCapability(digest)
     if (receipt == null) return
-    const revision = this.#store.revision(receipt.flowId, receipt.revisionId)
-    if (revision == null) return
-    const node = decodeRevision(new TextEncoder().encode(revision.content)).document.graph.nodes[receipt.nodeId]
-    if (node?.kind != 'wait' || !node.actions.some((action) => action == requested)) return
+    const wait = this.#store.waitReceipt(receipt.runId, receipt.waitId)
+    if (wait == null || !wait.actions.some((action) => action == requested) || receipt.expiresAt <= this.#clock()) return
     if (receipt.action == null && (receipt.status != 'waiting' || receipt.expiresAt <= this.#clock())) return
     const retryAfter = admit(digest)
     if (retryAfter != null) return { retryAfter }
     if (receipt.action != null) {
-      return { action: receipt.action, expiresAt: new Date(receipt.expiresAt).toISOString(), prompt: node.prompt, state: 'resolved' }
+      return { action: receipt.action, expiresAt: new Date(receipt.expiresAt).toISOString(), prompt: wait.prompt, state: 'resolved' }
     }
-    return { action: requested, expiresAt: new Date(receipt.expiresAt).toISOString(), prompt: node.prompt, state: 'waiting' }
+    return { action: requested, expiresAt: new Date(receipt.expiresAt).toISOString(), prompt: wait.prompt, state: 'waiting' }
   }
 
   resolveWaitAction(
@@ -911,13 +910,11 @@ export class ServerService {
     const digest = createHash('sha256').update(capability).digest('hex')
     const receipt = this.#store.waitByCapability(digest)
     if (receipt == null) return
-    const revision = this.#store.revision(receipt.flowId, receipt.revisionId)
-    if (revision == null) return
-    const node = decodeRevision(new TextEncoder().encode(revision.content)).document.graph.nodes[receipt.nodeId]
-    if (node?.kind != 'wait' || !node.actions.some((action) => action == requested)) return
+    const wait = this.#store.waitReceipt(receipt.runId, receipt.waitId)
+    if (wait == null || !wait.actions.some((action) => action == requested) || receipt.expiresAt <= this.#clock()) return
     const retryAfter = admit(digest)
     if (retryAfter != null) return { retryAfter }
-    const result = this.#store.resolveWait(receipt.runId, receipt.waitId, requested, node.actions)
+    const result = this.#store.resolveWait(receipt.runId, receipt.waitId, requested)
     if (result.kind != 'resolved') return
     if (result.changed) {
       this.#runChanged(receipt.flowId, receipt.runId)

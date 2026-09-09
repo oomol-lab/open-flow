@@ -274,6 +274,8 @@
 
   .inspector-disclosure > summary {
     display: flex;
+    box-sizing: border-box;
+    min-width: 0;
     min-height: 48px;
     align-items: center;
     gap: 10px;
@@ -293,13 +295,14 @@
   .inspector-disclosure > summary > svg {
     flex: none;
     color: var(--ui-muted-foreground);
+    transform: rotate(-90deg);
     transition:
       color 140ms ease-out,
       transform 160ms ease-out;
   }
 
   .inspector-disclosure[open] > summary > svg {
-    transform: rotate(180deg);
+    transform: rotate(0deg);
   }
 
   .inspector-disclosure > summary:hover {
@@ -391,6 +394,7 @@
   }
 
   .node-settings,
+  .agent-form,
   .wait-form {
     [data-slot='field-group'] {
       gap: 16px;
@@ -441,6 +445,96 @@
       padding: 6px 8px;
       line-height: 1.5;
     }
+  }
+
+  .agent-form {
+    [data-slot='field-description'] {
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    fieldset {
+      display: flex;
+      min-width: 0;
+      margin: 0;
+      flex-direction: column;
+      gap: 14px;
+    }
+  }
+
+  .inspector-disclosure-compact {
+    min-width: 0;
+    border-bottom: 0;
+  }
+
+  .inspector-disclosure-compact > summary {
+    min-height: 32px;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: var(--ui-radius);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 20px;
+  }
+
+  .inspector-disclosure-compact > summary > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .inspector-disclosure-compact > .inspector-disclosure-content {
+    min-width: 0;
+    padding: 8px 8px 12px 30px;
+  }
+
+  .agent-prompt-source {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    [data-slot='native-select-wrapper'] {
+      flex: 1;
+      min-width: 120px;
+    }
+  }
+
+  .agent-parameter {
+    min-width: 0;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .agent-parameter-editor {
+    padding: 6px 8px 12px;
+  }
+
+  .agent-empty-value {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .agent-code-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .agent-tools {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .agent-tools > h3 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 20px;
   }
 
   .inspector-sources [data-slot='select-trigger'] {
@@ -650,8 +744,7 @@
     color: var(--ui-foreground);
   }
 
-  .code-action-toggle,
-  .code-action-result {
+  .code-action-toggle {
     flex: 1;
     justify-content: flex-start;
     min-width: 0;
@@ -821,25 +914,6 @@
 
   .code-action-default select:hover {
     border-color: var(--ui-border);
-  }
-
-  .code-action-search {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 8px 0;
-  }
-
-  .code-action-search input {
-    height: 30px;
-    font-size: 12px;
-  }
-
-  .code-action-results {
-    display: flex;
-    max-height: 200px;
-    overflow-y: auto;
-    flex-direction: column;
   }
 
   .code-action-details {

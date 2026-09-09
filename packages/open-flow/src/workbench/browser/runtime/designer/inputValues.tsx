@@ -9,8 +9,9 @@ import { val } from 'value-enhancer'
 import { FlowRunInputEditor } from '../../flowRunInputEditor.tsx'
 import { flowRunInputEditorState, FlowRunInputEditorStore } from '../../flowRunInputEditorStore.ts'
 
-export function WaitNotificationInputs({
+export function InputValues({
   definitions,
+  labelledBy,
   language,
   onChange,
   onCommit,
@@ -19,6 +20,7 @@ export function WaitNotificationInputs({
   theme,
   values,
 }: {
+  readonly labelledBy?: string
   readonly definitions: readonly FlowRunInputDefinition[]
   readonly language: string
   readonly onChange: (values: Readonly<Record<string, JsonValue>>) => void
@@ -50,7 +52,7 @@ export function WaitNotificationInputs({
 
   return (
     <div onBlur={() => onCommit(store.values() as Readonly<Record<string, JsonValue>>, store.valid$.value)}>
-      <FlowRunInputEditor showErrors={showErrors} store={store} theme={theme} />
+      <FlowRunInputEditor labelledBy={labelledBy} showErrors={showErrors} store={store} theme={theme} />
     </div>
   )
 }

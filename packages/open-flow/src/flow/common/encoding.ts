@@ -164,7 +164,7 @@ export function canonicalGraph(value: Graph): JsonValue {
 
 export function canonicalTask(task: FlowDocument['tasks'][string]): JsonValue {
   return {
-    executor: task.executor,
+    executor: task.executor as unknown as JsonValue,
     inputs: canonicalPorts(task.inputs),
     name: task.name,
     outputs: canonicalPorts(task.outputs),

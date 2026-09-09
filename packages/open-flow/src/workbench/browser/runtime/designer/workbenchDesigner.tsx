@@ -173,7 +173,8 @@ function addItems(options: readonly AddNodeOption[]): FlowDesignerViewAddItem[] 
     inputs: option.inputs,
     label: option.label,
     outputs: option.outputs,
-    type: option.kind == 'new-task' || option.kind == 'subflow' ? 'block' : option.kind == 'connector-group' ? 'connector' : option.kind,
+    type:
+      option.kind == 'agent' || option.kind == 'new-task' || option.kind == 'subflow' ? 'block' : option.kind == 'connector-group' ? 'connector' : option.kind,
   }))
 }
 

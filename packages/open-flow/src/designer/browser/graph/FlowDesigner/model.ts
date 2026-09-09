@@ -107,6 +107,7 @@ interface FlowDesignerViewNodeBase {
 }
 
 export interface FlowDesignerViewTaskNode extends FlowDesignerViewNodeBase {
+  readonly tools?: readonly { readonly id: string; readonly icon: string; readonly label: string }[]
   readonly additionalInputs?: readonly FlowDesignerViewInput[]
   readonly editableAdditionalInputs?: boolean
   readonly editablePorts?: boolean

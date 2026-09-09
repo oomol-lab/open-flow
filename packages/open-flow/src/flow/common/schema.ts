@@ -1,5 +1,7 @@
+import type { Schema, SchemaDraft } from '@cfworker/json-schema'
 import type { JsonValue, PortDefinition, TriggerNode } from './change.ts'
 
+import { Validator } from '@cfworker/json-schema'
 import { compareJSONSchema } from '../../manifest/common/schemaCompare.ts'
 export function triggerPayloadSchema(trigger: TriggerNode): JsonValue {
   if (trigger.kind == 'poll' || trigger.kind == 'integration') return trigger.definition.payloadSchema
@@ -34,82 +36,31 @@ export function schemaList(value: JsonValue | undefined): readonly JsonValue[] |
   return Array.isArray(value) ? value : undefined
 }
 
-function schemaTypeMatches(type: JsonValue | undefined, value: JsonValue): boolean {
-  if (Array.isArray(type)) return type.some((candidate) => schemaTypeMatches(candidate, value))
-  switch (type) {
-    case undefined:
-      return true
-    case 'null':
-      return value == null
-    case 'boolean':
-      return typeof value == 'boolean'
-    case 'integer':
-      return typeof value == 'number' && Number.isInteger(value)
-    case 'number':
-      return typeof value == 'number'
-    case 'string':
-      return typeof value == 'string'
-    case 'array':
-      return Array.isArray(value)
-    case 'object':
-      return value != null && typeof value == 'object' && !Array.isArray(value)
-    default:
-      return false
-  }
-}
+const validators = new WeakMap<object, Validator>()
 
 export function matchesSchema(value: JsonValue, schema: JsonValue): boolean {
   if (typeof schema == 'boolean') return schema
   const source = schemaObject(schema)
-  if (source == null) return false
-  const allOf = schemaList(source.allOf)
-  if (allOf != null && !allOf.every((candidate) => matchesSchema(value, candidate))) return false
-  const anyOf = schemaList(source.anyOf)
-  if (anyOf != null && !anyOf.some((candidate) => matchesSchema(value, candidate))) return false
-  const oneOf = schemaList(source.oneOf)
-  if (oneOf != null && oneOf.filter((candidate) => matchesSchema(value, candidate)).length != 1) return false
-  if (source.not != null && matchesSchema(value, source.not)) return false
-  if (source.const != null && !jsonEqual(value, source.const)) return false
-  const enumeration = schemaList(source.enum)
-  if (enumeration != null && !enumeration.some((candidate) => jsonEqual(value, candidate))) return false
-  if (!schemaTypeMatches(source.type, value)) return false
-  if (typeof value == 'string') {
-    if (typeof source.minLength == 'number' && value.length < source.minLength) return false
-    if (typeof source.maxLength == 'number' && value.length > source.maxLength) return false
-    if (typeof source.pattern == 'string') {
-      try {
-        if (!new RegExp(source.pattern, 'u').test(value)) return false
-      } catch {
-        return false
-      }
+  if (source == null || (source.properties != null && schemaObject(source.properties) == null)) return false
+  try {
+    let validator = validators.get(source)
+    if (validator == null) {
+      const declaration = typeof source.$schema == 'string' ? source.$schema : ''
+      const draft: SchemaDraft = declaration.includes('draft-04')
+        ? '4'
+        : declaration.includes('draft-07')
+          ? '7'
+          : declaration.includes('2020-12')
+            ? '2020-12'
+            : '2019-09'
+      // The validator attaches reference metadata, so it must not receive the Revision object.
+      validator = new Validator(structuredClone(source) as Schema, draft)
+      validators.set(source, validator)
     }
+    return validator.validate(value).valid
+  } catch {
+    return false
   }
-  if (typeof value == 'number') {
-    if (typeof source.minimum == 'number' && value < source.minimum) return false
-    if (typeof source.maximum == 'number' && value > source.maximum) return false
-    if (typeof source.exclusiveMinimum == 'number' && value <= source.exclusiveMinimum) return false
-    if (typeof source.exclusiveMaximum == 'number' && value >= source.exclusiveMaximum) return false
-  }
-  if (Array.isArray(value)) {
-    if (typeof source.minItems == 'number' && value.length < source.minItems) return false
-    if (typeof source.maxItems == 'number' && value.length > source.maxItems) return false
-    if (source.items != null && !value.every((item) => matchesSchema(item, source.items!))) return false
-  }
-  if (value != null && typeof value == 'object' && !Array.isArray(value)) {
-    const objectValue = value as Readonly<Record<string, JsonValue>>
-    const required = schemaList(source.required)
-    if (required != null && required.some((key) => typeof key != 'string' || !Object.hasOwn(objectValue, key))) return false
-    const properties = schemaObject(source.properties ?? {})
-    if (properties == null) return false
-    for (const [key, item] of Object.entries(objectValue)) {
-      const property = properties[key]
-      if (property != null) {
-        if (!matchesSchema(item, property)) return false
-      } else if (source.additionalProperties === false) return false
-      else if (source.additionalProperties != null && source.additionalProperties !== true && !matchesSchema(item, source.additionalProperties)) return false
-    }
-  }
-  return true
 }
 
 function schemaAssignable(sourceSchema: JsonValue, targetSchema: JsonValue, sourceNullable = false, targetNullable = false): boolean {

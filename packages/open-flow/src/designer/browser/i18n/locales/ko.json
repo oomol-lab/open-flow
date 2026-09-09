@@ -596,7 +596,11 @@
   "zoomReset": "확대/축소를 100%로 재설정",
   "view": "보기",
   "canvasCard": {
-    "waitBranch": { "approve": "승인", "reject": "거부", "continue": "계속" },
+    "waitBranch": {
+      "approve": "승인",
+      "reject": "거부",
+      "continue": "계속"
+    },
     "run": "실행",
     "result": "결과",
     "logs": "로그 {{count}}",
@@ -631,6 +635,7 @@
       "day": "일",
       "week": "주",
       "month": "개월"
-    }
+    },
+    "tools": "도구"
   }
 }

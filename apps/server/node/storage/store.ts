@@ -3,8 +3,11 @@ import type { JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { RunStatus, RunTerminalStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunCheckpoint, FlowRunOptions, FlowRunOutcome, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
+import type { LlmConfig } from '../deployment/llm.ts'
 import type { RunAdmission, TriggerOccurrenceInput } from './trigger-store.ts'
 
+import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
+import { flowDependencies, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { decodeFlowRunCheckpoint } from '@oomol-lab/open-flow/scheduler'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
@@ -14,6 +17,7 @@ import { isolatedVmEngineDigest } from '../runtime/isolated-vm.ts'
 import { IntegrationStore } from './integration-store.ts'
 import { PollStore } from './poll-store.ts'
 import { PublicationStore } from './publication-store.ts'
+import { ResultStore } from './result-store.ts'
 import { TriggerStore } from './trigger-store.ts'
 
 type RunInputs = NonNullable<FlowRunOptions['inputs']>
@@ -127,6 +131,8 @@ interface StoredRunRequest {
 }
 
 export interface StoredRun {
+  readonly bindingValues?: Readonly<Record<string, string>>
+  readonly llmConfig?: LlmConfig
   readonly connectorTeamId?: string
   readonly content: string
   readonly engineContract: string
@@ -151,17 +157,26 @@ const defaultMaxPendingRuns = 1_000
 const waitDurationMs = 7 * 24 * 60 * 60 * 1_000
 
 export class Store {
+  readonly results: ResultStore
   readonly integrations: IntegrationStore
   readonly polls: PollStore
   readonly publications: PublicationStore
   readonly triggers: TriggerStore
   readonly #clock: () => number
   readonly #database: DatabaseSync
+  readonly #llmConfig: () => LlmConfig | undefined
   readonly #maxPendingRuns: number
   readonly #runEventRetentionMs: number
 
-  constructor(file: string, clock: () => number = Date.now, runEventRetentionMs = defaultRunEventRetentionMs, maxPendingRuns = defaultMaxPendingRuns) {
+  constructor(
+    file: string,
+    clock: () => number = Date.now,
+    runEventRetentionMs = defaultRunEventRetentionMs,
+    maxPendingRuns = defaultMaxPendingRuns,
+    llmConfig: () => LlmConfig | undefined = () => undefined,
+  ) {
     if (!Number.isSafeInteger(maxPendingRuns) || maxPendingRuns <= 0) throw new TypeError('Maximum pending Runs must be a positive safe integer.')
+    this.#llmConfig = llmConfig
     this.#clock = clock
     this.#maxPendingRuns = maxPendingRuns
     this.#runEventRetentionMs = runEventRetentionMs
@@ -170,6 +185,7 @@ export class Store {
       PRAGMA journal_mode = WAL;
       PRAGMA synchronous = NORMAL;
     `)
+    this.results = new ResultStore(this.#database, (operation) => this.#transaction(operation))
     this.integrations = new IntegrationStore(
       this.#database,
       (operation) => this.#transaction(operation),
@@ -417,7 +433,9 @@ export class Store {
         this.#database.prepare('DELETE FROM events WHERE run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM wait_notifications WHERE run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM run_waits WHERE run_id = ?').run(runId)
+        this.#database.prepare('DELETE FROM wait_receipts WHERE run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM work WHERE run_id = ?').run(runId)
+        this.#database.prepare('DELETE FROM run_results WHERE run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM runs WHERE run_id = ?').run(runId)
       }
       return runs.length
@@ -713,7 +731,7 @@ export class Store {
       const row = this.#database
         .prepare(
           `SELECT revisions.content, runs.engine_contract AS engineContract, runs.engine_digest AS engineDigest,
-                  runs.connector_team_id AS connectorTeamId, runs.flow_id AS flowId, runs.inputs,
+                  runs.binding_values AS bindingValues, runs.llm_config AS llmConfig, runs.connector_team_id AS connectorTeamId, runs.flow_id AS flowId, runs.inputs,
                   runs.revision_digest AS revisionDigest, runs.run_id AS runId, runs.source,
                   run_waits.action AS waitAction, run_waits.checkpoint_json AS checkpointJson,
                   run_waits.remaining_ms AS remainingMs, run_waits.wait_id AS waitId,
@@ -724,6 +742,8 @@ export class Store {
            WHERE runs.run_id = ? AND runs.status = 'starting'`,
         )
         .get(claimed.runId) as {
+        readonly bindingValues: string | null
+        readonly llmConfig: string | null
         readonly connectorTeamId: string | null
         readonly content: string
         readonly engineContract: string
@@ -753,6 +773,8 @@ export class Store {
       }
       return {
         content: row.content,
+        ...(row.bindingValues == null ? {} : { bindingValues: JSON.parse(row.bindingValues) as Readonly<Record<string, string>> }),
+        ...(row.llmConfig == null ? {} : { llmConfig: JSON.parse(row.llmConfig) as LlmConfig }),
         connectorTeamId: row.connectorTeamId ?? undefined,
         engineContract: row.engineContract,
         engineDigest: row.engineDigest,
@@ -849,12 +871,12 @@ export class Store {
              run_id, wait_id, node_id, job_id, waiting_since, expires_at,
              checkpoint_json, checkpoint_version, checkpoint_digest, checkpoint_bytes,
              remaining_ms, action, resolved_at, capability_digest
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, NULL, NULL, ?)
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, 2, ?, ?, ?, NULL, NULL, ?)
            ON CONFLICT(run_id) DO UPDATE SET
              wait_id = excluded.wait_id, node_id = excluded.node_id, job_id = excluded.job_id,
              waiting_since = excluded.waiting_since,
              expires_at = excluded.expires_at, checkpoint_json = excluded.checkpoint_json,
-             checkpoint_version = 1, checkpoint_digest = excluded.checkpoint_digest,
+             checkpoint_version = 2, checkpoint_digest = excluded.checkpoint_digest,
              checkpoint_bytes = excluded.checkpoint_bytes, remaining_ms = excluded.remaining_ms,
              action = NULL, resolved_at = NULL, capability_digest = excluded.capability_digest`,
         )
@@ -869,6 +891,22 @@ export class Store {
           checkpointDigest,
           checkpointBytes,
           remainingMs,
+          capabilityDigest,
+        )
+      this.#database
+        .prepare(`INSERT INTO wait_receipts (
+        run_id, wait_id, node_id, job_id, actions, prompt, value, waiting_since, expires_at, capability_digest
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(
+          runId,
+          outcome.wait.waitId,
+          outcome.wait.nodeId,
+          outcome.wait.jobId,
+          JSON.stringify(outcome.wait.actions),
+          outcome.wait.prompt,
+          JSON.stringify(outcome.checkpoint.wait.value),
+          waitingSince,
+          expiresAt,
           capabilityDigest,
         )
       this.#database.prepare('DELETE FROM wait_notifications WHERE run_id = ?').run(runId)
@@ -914,48 +952,39 @@ export class Store {
     })
   }
 
-  activeWait(runId: string):
-    | {
-        readonly expiresAt: number
-        readonly nodeId: string
-        readonly waitId: string
-        readonly waitingSince: number
-      }
-    | undefined {
-    return this.#database
-      .prepare(
-        `SELECT run_waits.expires_at AS expiresAt, run_waits.node_id AS nodeId,
-                run_waits.wait_id AS waitId, run_waits.waiting_since AS waitingSince
-         FROM run_waits JOIN runs USING (run_id)
-         WHERE run_waits.run_id = ? AND runs.status = 'waiting'`,
-      )
-      .get(runId) as { readonly expiresAt: number; readonly nodeId: string; readonly waitId: string; readonly waitingSince: number } | undefined
+  activeWait(runId: string) {
+    const active = this.#database
+      .prepare(`SELECT wait_id AS waitId FROM run_waits JOIN runs USING (run_id)
+      WHERE run_id = ? AND runs.status = 'waiting'`)
+      .get(runId) as { readonly waitId: string } | undefined
+    return active == null ? undefined : this.waitReceipt(runId, active.waitId)
   }
 
-  waitReceipt(
-    runId: string,
-    waitId: string,
-  ):
-    | {
-        readonly expiresAt: number
-        readonly nodeId: string
-        readonly waitId: string
-        readonly waitingSince: number
-      }
-    | undefined {
-    return this.#database
-      .prepare(
-        `SELECT expires_at AS expiresAt, node_id AS nodeId, wait_id AS waitId, waiting_since AS waitingSince
-         FROM run_waits WHERE run_id = ? AND wait_id = ?`,
-      )
-      .get(runId, waitId) as { readonly expiresAt: number; readonly nodeId: string; readonly waitId: string; readonly waitingSince: number } | undefined
+  waitReceipt(runId: string, waitId: string) {
+    const row = this.#database
+      .prepare(`SELECT node_id AS nodeId, wait_id AS waitId,
+      waiting_since AS waitingSince, expires_at AS expiresAt, actions, prompt, value
+      FROM wait_receipts WHERE run_id = ? AND wait_id = ?`)
+      .get(runId, waitId) as
+      | {
+          readonly nodeId: string
+          readonly waitId: string
+          readonly waitingSince: number
+          readonly expiresAt: number
+          readonly actions: string
+          readonly prompt: string
+          readonly value: string
+        }
+      | undefined
+    return row == null
+      ? undefined
+      : { ...row, actions: JSON.parse(row.actions) as readonly ['continue'] | readonly ['approve', 'reject'], value: JSON.parse(row.value) as JsonValue }
   }
 
   resolveWait(
     runId: string,
     waitId: string,
     requested: WaitAction,
-    allowed: readonly WaitAction[],
   ):
     | { readonly kind: 'invalid-action' | 'not-found' }
     | {
@@ -969,16 +998,22 @@ export class Store {
     return this.#transaction(() => {
       const row = this.#database
         .prepare(
-          `SELECT run_waits.action, run_waits.expires_at AS expiresAt,
-                  run_waits.resolved_at AS resolvedAt, runs.status
-           FROM run_waits JOIN runs USING (run_id)
-           WHERE run_waits.run_id = ? AND run_waits.wait_id = ?`,
+          `SELECT wait_receipts.action, wait_receipts.actions, wait_receipts.expires_at AS expiresAt,
+                  wait_receipts.resolved_at AS resolvedAt, runs.status
+           FROM wait_receipts JOIN runs USING (run_id)
+           WHERE wait_receipts.run_id = ? AND wait_receipts.wait_id = ?`,
         )
         .get(runId, waitId) as
-        | { readonly action: WaitAction | null; readonly expiresAt: number; readonly resolvedAt: number | null; readonly status: RunStatus }
+        | {
+            readonly actions: string
+            readonly action: WaitAction | null
+            readonly expiresAt: number
+            readonly resolvedAt: number | null
+            readonly status: RunStatus
+          }
         | undefined
       if (row == null) return { kind: 'not-found' as const }
-      if (!allowed.includes(requested)) return { kind: 'invalid-action' as const }
+      if (!(JSON.parse(row.actions) as readonly WaitAction[]).includes(requested)) return { kind: 'invalid-action' as const }
       if (row.action != null && row.resolvedAt != null) {
         return {
           action: row.action,
@@ -989,7 +1024,7 @@ export class Store {
           status: row.status,
         }
       }
-      if (row.status != 'waiting') {
+      if (row.status != 'waiting' || this.activeWait(runId)?.waitId != waitId) {
         return { action: null, changed: false, kind: 'resolved' as const, resolutionAccepted: false, resolvedAt: null, status: row.status }
       }
       const resolvedAt = this.#clock()
@@ -1005,6 +1040,7 @@ export class Store {
       }
       this.#database.prepare("UPDATE runs SET status = 'queued' WHERE run_id = ? AND status = 'waiting'").run(runId)
       this.#database.prepare('UPDATE run_waits SET action = ?, resolved_at = ? WHERE run_id = ? AND action IS NULL').run(requested, resolvedAt, runId)
+      this.#database.prepare('UPDATE wait_receipts SET action = ?, resolved_at = ? WHERE run_id = ? AND wait_id = ?').run(requested, resolvedAt, runId, waitId)
       this.#database.prepare('DELETE FROM wait_notifications WHERE run_id = ?').run(runId)
       const payload = { action: requested, resolvedAt: new Date(resolvedAt).toISOString(), waitId }
       this.#insertEvent(runId, 'run.resolved', payload)
@@ -1184,12 +1220,12 @@ export class Store {
     | undefined {
     return this.#database
       .prepare(
-        `SELECT run_waits.action, run_waits.expires_at AS expiresAt, runs.flow_id AS flowId,
-                run_waits.node_id AS nodeId, run_waits.resolved_at AS resolvedAt,
+        `SELECT wait_receipts.action, wait_receipts.expires_at AS expiresAt, runs.flow_id AS flowId,
+                wait_receipts.node_id AS nodeId, wait_receipts.resolved_at AS resolvedAt,
                 runs.revision_id AS revisionId, runs.run_id AS runId, runs.status,
-                run_waits.wait_id AS waitId
-         FROM run_waits JOIN runs USING (run_id)
-         WHERE run_waits.capability_digest = ?`,
+                wait_receipts.wait_id AS waitId
+         FROM wait_receipts JOIN runs USING (run_id)
+         WHERE wait_receipts.capability_digest = ?`,
       )
       .get(digest) as
       | {
@@ -1516,13 +1552,30 @@ export class Store {
   }): string {
     const runId = randomUUID()
     const connectorTeamId = this.connectorTeam(input.flowId)
+    const row = this.#database
+      .prepare(`SELECT content FROM revisions WHERE revision_id = ? AND EXISTS (
+      SELECT 1 FROM json_each(revisions.content, '$.document.tasks') WHERE json_extract(value, '$.executor.kind') = 'agent'
+    )`)
+      .get(input.revisionId) as { readonly content: string } | undefined
+    let model: LlmConfig | undefined
+    let bindings: Readonly<Record<string, string>> | undefined
+    if (row != null) {
+      const revision = decodeRevision(encoder.encode(row.content))
+      const dependencies = flowDependencies(revision, input.source == 'draft' ? input.trigger.nodeId : undefined)
+      if ([...dependencies.tasks].some((id) => revision.document.tasks[id]?.executor.kind == 'agent')) {
+        model = this.#llmConfig()
+        const resolved = this.resolveVariables(variableBindings(revision, dependencies.inputBindings))
+        if (model == null || resolved == null) throw new AcceptanceError('flow-invalid', 'Agent model or Variable configuration is unavailable.')
+        bindings = resolved
+      }
+    }
     this.#database
       .prepare(
         `INSERT INTO runs (
            run_id, idempotency_key, request_digest, revision_id, revision_digest, flow_id,
            engine_contract, engine_digest, inputs, status, source, closure_digest,
-           model_version, created_at, publication_id, connector_team_id, trigger_node_id, trigger_payload
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?)`,
+           model_version, created_at, publication_id, connector_team_id, trigger_node_id, trigger_payload, llm_config, binding_values
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         runId,
@@ -1542,6 +1595,8 @@ export class Store {
         connectorTeamId ?? null,
         input.trigger.nodeId,
         JSON.stringify(input.trigger.payload),
+        JSON.stringify(model) ?? null,
+        JSON.stringify(bindings) ?? null,
       )
     this.#database.prepare('INSERT INTO work (run_id) VALUES (?)').run(runId)
     const payload = {}

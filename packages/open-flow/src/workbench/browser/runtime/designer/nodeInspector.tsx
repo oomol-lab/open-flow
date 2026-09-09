@@ -25,15 +25,16 @@ import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { ToggleGroup, ToggleGroupItem } from '../../../../ui/browser/toggle-group.tsx'
 import { contextName } from '../../typeScriptShadow.ts'
 import { Icon } from '../icons.tsx'
+import { AgentSettings } from './agentSettings.tsx'
 import { CodeActions } from './codeActions.tsx'
 import { CodeEditor } from './codeEditor.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
 import { codeTyping } from './flowChanges.ts'
 import { taskDiagnosticReady, taskInspectorSection } from './nodeInspectorBehavior.ts'
 
-const WaitNotificationInputs = lazy(async () => {
-  const module = await import('./waitNotificationInputs.tsx')
-  return { default: module.WaitNotificationInputs }
+const InputValues = lazy(async () => {
+  const module = await import('./inputValues.tsx')
+  return { default: module.InputValues }
 })
 
 export function inspectorIcon(node: ResolvedSelection | undefined, target: DesignerTarget): IconName {
@@ -43,7 +44,7 @@ export function inspectorIcon(node: ResolvedSelection | undefined, target: Desig
   if (node?.kind == 'wait') return 'wait'
   if (node?.kind == 'subflow' || (node == null && target.kind == 'subflow')) return 'subflow'
   if (node?.kind == 'task' && node.definition != null && 'executor' in node.definition) {
-    return node.definition.executor.kind == 'llm' ? 'llm' : 'connection'
+    return node.definition.executor.kind == 'connector' ? 'connection' : 'llm'
   }
   return 'task'
 }
@@ -659,7 +660,7 @@ function WaitDefinition({
               <FieldLabel>{t('inspector.wait.inputs')}</FieldLabel>
               <fieldset className="wait-notification-inputs" disabled={disabled}>
                 <Suspense fallback={<FieldDescription>{t('inspector.wait.inputsLoading')}</FieldDescription>}>
-                  <WaitNotificationInputs
+                  <InputValues
                     definitions={inputDefinitions}
                     key={`${notificationTaskId}:${messageHandle}`}
                     language={language}
@@ -788,7 +789,7 @@ function TaskDefinition({
   const settingsPanel = (
     <>
       {children}
-      {'executor' in task && (
+      {'executor' in task && task.executor.kind != 'agent' && (
         <details className="inspector-disclosure" data-inspector-section="task">
           <summary>
             <Icon name="chevron-down" size={14} />
@@ -1112,6 +1113,9 @@ export function NodeInspector({
     if (section == null) return
     locatedRequest.current = focus.requestId
     if (section instanceof HTMLDetailsElement) section.open = true
+    for (let parent = section.parentElement; parent != null && parent != content.current; parent = parent.parentElement) {
+      if (parent instanceof HTMLDetailsElement) parent.open = true
+    }
     section.scrollIntoView({ block: 'nearest' })
     section.classList.remove('diagnostic-located')
     void section.offsetWidth
@@ -1153,9 +1157,36 @@ export function NodeInspector({
             taskId={taskId}
           />
         )}
-        <div className="inspector-node-editor" ref={editorRef} />
-        {selection != null && selection.kind != 'trigger' && (
-          <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} />
+        {selection?.kind == 'task' && selection.definition != null && 'executor' in selection.definition && selection.definition.executor.kind == 'agent' ? (
+          <>
+            <AgentSettings
+              key={JSON.stringify([store.$.flowId.value, selection.id])}
+              task={selection.definition}
+              nodeId={selection.id}
+              store={store}
+              connectors={connectors}
+              disabled={disabled}
+              theme={theme}
+            />
+            <details className="inspector-disclosure">
+              <summary>
+                <Icon name="chevron-down" size={14} />
+                <span className="inspector-disclosure-summary">
+                  <strong>{t('agent.ports')}</strong>
+                  <span>{t('agent.portsHint')}</span>
+                </span>
+              </summary>
+              <div className="inspector-node-editor" ref={editorRef} />
+              <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} />
+            </details>
+          </>
+        ) : (
+          <>
+            <div className="inspector-node-editor" ref={editorRef} />
+            {selection != null && selection.kind != 'trigger' && (
+              <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} />
+            )}
+          </>
         )}
         {selection == null ? (
           target.kind == 'subflow' ? (

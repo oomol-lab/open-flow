@@ -1,4 +1,4 @@
-import type { ConnectorCapability } from '../../../../flow/common/change.ts'
+import type { AgentInput, AgentTool, ConnectorCapability, ManagedTaskDefinition } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
 import type {
   ChangeOperation,
@@ -21,6 +21,7 @@ import { dequal } from 'dequal/lite'
 import { applyFlowChanges as reduceFlowChanges, nextNodeName, normalizeNodeName } from '../../../../flow/common/change.ts'
 import {
   cleanVariableBindings,
+  createAgentTask,
   createCodeTask,
   createBuiltinTrigger,
   createCondition,
@@ -73,14 +74,15 @@ interface TaskSettingsBase {
 }
 
 export type TaskSettings =
+  | (TaskSettingsBase & { readonly kind: 'agent'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'code' })
   | (TaskSettingsBase & { readonly kind: 'connector' })
   | (TaskSettingsBase & { readonly kind: 'llm'; readonly mode: 'chat' | 'json' })
 
-export type CodeTaskPorts = Pick<TaskDefinition, 'inputs' | 'outputs'>
+export type TaskPorts = Pick<TaskDefinition, 'inputs' | 'outputs'>
 
 export function codeTyping(
-  ports: CodeTaskPorts,
+  ports: TaskPorts,
   capabilities: readonly ConnectorCapability[] = [],
   catalog: Readonly<Record<string, ConnectorAction>> = {},
 ): string {
@@ -121,7 +123,8 @@ export interface SubflowSettings {
 }
 
 export type AddNodeIntent =
-  | { readonly kind: 'code'; readonly name: string; readonly ports?: CodeTaskPorts }
+  | { readonly kind: 'agent'; readonly name: string }
+  | { readonly kind: 'code'; readonly name: string; readonly ports?: TaskPorts }
   | { readonly action: ConnectorAction; readonly kind: 'connector' }
   | { readonly kind: 'condition'; readonly name: string }
   | { readonly kind: 'manual'; readonly name: string }
@@ -149,6 +152,20 @@ function connectorTask(action: ConnectorAction): Extract<TaskDefinition, { reado
     inputs: Object.entries(action.inputs).map(([handle, port]) => Object.assign({ handle }, port)),
     name: action.name,
     outputs: Object.entries(action.outputs).map(([handle, port]) => Object.assign({ handle }, port)),
+  }
+}
+
+export function agentTool(action: ConnectorAction, approval: boolean, id: string): AgentTool {
+  return {
+    id,
+    name: `${action.actionId.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 48)}_${id.slice(0, 8)}`,
+    description: action.description,
+    action: action.actionId,
+    ...(action.defaultConnection == null ? {} : { connectionId: action.defaultConnection.connectionId }),
+    approval,
+    inputs: Object.entries(action.inputs).map(([handle, { value: _value, ...port }]) =>
+      Object.assign({ handle }, port, { source: { kind: 'model' as const } }),
+    ),
   }
 }
 
@@ -215,6 +232,9 @@ export function addNode(
   switch (intent.kind) {
     case 'code':
       changes = createCodeTask(target, { moduleId: nodeId, nodeId }, intent.name, undefined, intent.ports)
+      break
+    case 'agent':
+      changes = target.kind == 'flow' ? createAgentTask(target, { nodeId, taskId: identity() }, intent.name) : undefined
       break
     case 'llm':
       changes = createLlmTask(target, { nodeId, taskId: identity() }, intent.name, intent.mode, intent.outputDescription)
@@ -623,9 +643,13 @@ export function updateTask(revision: RevisionView, target: DesignerTarget, nodeI
   const node = revision.graph(target)?.nodes[nodeId]
   if (node?.kind != 'task') return
   switch (settings.kind) {
+    case 'agent': {
+      if (node.taskId == null || !dequal(revision.task(node.taskId), settings.before)) return
+      return [{ kind: 'task.agent.set', taskId: node.taskId, before: settings.before, value: settings.task }]
+    }
     case 'code': {
       if (node.task == null) return
-      return replaceCodeTaskPorts(revision, target, nodeId, { ...node.task, name: settings.name })
+      return replaceTaskPorts(revision, target, nodeId, { ...node.task, name: settings.name })
     }
     case 'llm': {
       if (node.task != null) return
@@ -647,11 +671,21 @@ export function updateTask(revision: RevisionView, target: DesignerTarget, nodeI
   }
 }
 
-export function updateCodeTaskPorts(revision: RevisionView, target: DesignerTarget, nodeId: string, ports: CodeTaskPorts): FlowChanges | undefined {
+export function updateTaskPorts(revision: RevisionView, target: DesignerTarget, nodeId: string, ports: TaskPorts): FlowChanges | undefined {
   const selection = revision.node(target, nodeId)
+  if (
+    selection?.kind == 'task' &&
+    selection.node.taskId != null &&
+    selection.definition != null &&
+    'executor' in selection.definition &&
+    selection.definition.executor.kind == 'agent'
+  ) {
+    const changes = replaceTaskPorts(revision, target, nodeId, { ...selection.definition, ...ports })
+    return changes == null ? undefined : cleanVariableBindings(revision.revision.content, changes)
+  }
   if (selection?.kind != 'task' || selection.node.task == null || selection.module == null) return
   if (dequal(selection.node.task.inputs, ports.inputs) && dequal(selection.node.task.outputs, ports.outputs)) return
-  const changes = replaceCodeTaskPorts(revision, target, nodeId, { ...selection.node.task, ...ports })
+  const changes = replaceTaskPorts(revision, target, nodeId, { ...selection.node.task, ...ports })
   if (changes == null) return
   return cleanVariableBindings(revision.revision.content, changes)
 }
@@ -753,17 +787,14 @@ function changedInputs(
   return changes
 }
 
-function replaceCodeTaskPorts(
-  revision: RevisionView,
-  target: DesignerTarget,
-  nodeId: string,
-  task: Extract<TaskDefinition, { readonly moduleId: string }>,
-): FlowChanges | undefined {
+function replaceTaskPorts(revision: RevisionView, target: DesignerTarget, nodeId: string, task: TaskDefinition): FlowChanges | undefined {
   const graph = revision.graph(target)
   const current = graph?.nodes[nodeId]
-  if (graph == null || current?.kind != 'task' || current.task == null) return
-  const inputRename = renamedPort(current.task.inputs, task.inputs)
-  const outputRename = renamedPort(current.task.outputs, task.outputs)
+  if (graph == null || current?.kind != 'task') return
+  const previous = current.task ?? revision.task(current.taskId)
+  if (previous == null) return
+  const inputRename = renamedPort(previous.inputs, task.inputs)
+  const outputRename = renamedPort(previous.outputs, task.outputs)
   const inputNames = new Set(task.inputs.flatMap((port) => ('handle' in port ? [port.handle] : [])))
   const outputNames = new Set(task.outputs.flatMap((port) => ('handle' in port ? [port.handle] : [])))
   const changes: ChangeOperation[] = []
@@ -801,7 +832,7 @@ function replaceCodeTaskPorts(
       else inputs[name] = { kind: 'sources', sources }
     }
 
-    if (currentNodeId == nodeId) {
+    if (currentNodeId == nodeId && current.task != null) {
       if (current.task.name != task.name) {
         changes.push({ before: current.task.name, kind: 'graph.node.task.name.set', nodeId, target, value: task.name })
       }
@@ -810,6 +841,34 @@ function replaceCodeTaskPorts(
       if (!dequal(before, value)) changes.push({ before, kind: 'graph.node.task.ports.set', nodeId, target, value })
     }
     changes.push(...changedInputs(node.inputs, inputs, target, currentNodeId))
+  }
+  if (current.task == null && 'executor' in task && task.executor.kind == 'agent' && 'executor' in previous) {
+    const config = task.executor
+    const source = <Value extends AgentInput>(
+      value: Value,
+    ): Value | { readonly kind: 'input'; readonly input: string } | { readonly kind: 'value'; readonly value: null } => {
+      if (value.kind != 'input') return value
+      if (inputRename != null && value.input == inputRename[0]) return { kind: 'input', input: inputRename[1] }
+      return inputNames.has(value.input) ? value : { kind: 'value', value: null }
+    }
+    const prompt = source(config.prompt)
+    const value = {
+      ...task,
+      executor: {
+        ...config,
+        prompt,
+        tools: config.tools.map((tool) => ({ ...tool, inputs: tool.inputs.map((port) => ({ ...port, source: source(port.source) })) })),
+        ...(config.notification == null
+          ? {}
+          : {
+              notification: {
+                ...config.notification,
+                inputs: Object.fromEntries(Object.entries(config.notification.inputs).map(([handle, binding]) => [handle, source(binding)])),
+              },
+            }),
+      },
+    }
+    if (!dequal(previous, value)) changes.unshift({ kind: 'task.agent.set', taskId: current.taskId, before: previous, value })
   }
   return changes
 }

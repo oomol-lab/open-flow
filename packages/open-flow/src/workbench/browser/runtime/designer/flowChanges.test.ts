@@ -5,13 +5,14 @@ import { setTriggerConnection } from '../../../../flow/common/nodeChanges.ts'
 import { revisionView } from '../revisionView.ts'
 import {
   addNode,
+  agentTool,
   applyFlowChanges,
   copyNodes,
   pasteNodes,
   setInputValue,
   setInputVariable,
   setWaitNotification,
-  updateCodeTaskPorts,
+  updateTaskPorts,
   updateCondition,
   updateTaskAdditionalInputs,
   updateWait,
@@ -97,7 +98,7 @@ describe('Code task port changes', () => {
     const task = current.content.document.graph.nodes.task
     if (task?.kind != 'task' || task.task == null) throw new Error('Expected code Task fixture.')
 
-    expect(updateCodeTaskPorts(revisionView(current), { kind: 'flow' }, 'task', task.task)).toBeUndefined()
+    expect(updateTaskPorts(revisionView(current), { kind: 'flow' }, 'task', task.task)).toBeUndefined()
   })
 
   it('uses the node ID for a new code module', () => {
@@ -158,7 +159,7 @@ describe('Code task port changes', () => {
       '',
     ].join('\n')
     const current = draft(source)
-    const changes = updateCodeTaskPorts(revisionView(current), { kind: 'flow' }, 'task', {
+    const changes = updateTaskPorts(revisionView(current), { kind: 'flow' }, 'task', {
       inputs: [{ group: 'Request' }, { handle: 'prompt', jsonSchema: { type: 'string' }, nullable: false }],
       outputs: [
         { group: 'Result', collapsed: true },
@@ -179,7 +180,7 @@ describe('Code task port changes', () => {
 
   it('does not recreate a removed generated metadata region', () => {
     const current = draft('export default (input) => ({ result: input.value })\n')
-    const changes = updateCodeTaskPorts(revisionView(current), { kind: 'flow' }, 'task', {
+    const changes = updateTaskPorts(revisionView(current), { kind: 'flow' }, 'task', {
       inputs: [{ handle: 'prompt', jsonSchema: { type: 'string' }, nullable: false }],
       outputs: [{ handle: 'count', jsonSchema: { type: 'number' }, nullable: false }],
     })
@@ -584,5 +585,90 @@ describe('Provider Trigger changes', () => {
     expect(applyFlowChanges(added, connected).content.document.bindings).toEqual({
       binding: { kind: 'connection', target: 'github-work' },
     })
+  })
+})
+
+describe('Agent input editing', () => {
+  it('keeps task, tool, notification, and node bindings aligned when an input is renamed', () => {
+    const base = draft('')
+    const port = { handle: 'request', jsonSchema: { type: 'string' }, nullable: false }
+    const output = { handle: 'output', jsonSchema: { type: 'string' }, nullable: false }
+    const current: Draft = {
+      ...base,
+      content: {
+        ...base.content,
+        document: {
+          ...base.content.document,
+          graph: { edges: [], nodes: { agent: { kind: 'task', taskId: 'agent', inputs: { request: { kind: 'value', value: 'Hello' } } } } },
+          tasks: {
+            agent: {
+              name: 'Agent',
+              inputs: [port],
+              outputs: [output],
+              executor: {
+                kind: 'agent',
+                model: 'test',
+                system: '',
+                maxRounds: 10,
+                prompt: { kind: 'input', input: 'request' },
+                tools: [
+                  {
+                    id: 'tool',
+                    name: 'send',
+                    action: 'mail.send',
+                    description: '',
+                    approval: true,
+                    inputs: [{ ...port, source: { kind: 'input', input: 'request' } }],
+                  },
+                ],
+                notification: { taskId: 'notice', messageHandle: 'text', inputs: { subject: { kind: 'input', input: 'request' } } },
+              },
+            },
+          },
+        },
+      },
+    }
+    const changes = updateTaskPorts(revisionView(current), { kind: 'flow' }, 'agent', { inputs: [{ ...port, handle: 'question' }], outputs: [output] })
+    if (changes == null) throw new Error('Expected Agent input changes.')
+    const changed = applyFlowChanges(current, changes)
+    expect(changed.content.document.graph.nodes.agent).toMatchObject({ inputs: { question: { kind: 'value', value: 'Hello' } } })
+    expect(changed.content.document.tasks.agent).toMatchObject({
+      executor: {
+        prompt: { kind: 'input', input: 'question' },
+        tools: [{ inputs: [{ source: { kind: 'input', input: 'question' } }] }],
+        notification: { inputs: { subject: { kind: 'input', input: 'question' } } },
+      },
+    })
+    const removed = updateTaskPorts(revisionView(changed), { kind: 'flow' }, 'agent', { inputs: [], outputs: [output] })
+    if (removed == null) throw new Error('Expected input removal.')
+    const result = applyFlowChanges(changed, removed)
+    expect(result.content.document.graph.nodes.agent).toMatchObject({ inputs: {} })
+    expect(result.content.document.tasks.agent).toMatchObject({ executor: { tools: [{ inputs: [{ source: { kind: 'value', value: null } }] }] } })
+  })
+})
+
+describe('Agent tool creation', () => {
+  it.each([false, true])('keeps the chosen approval policy (%s) and delegates new parameters explicitly', (approval) => {
+    const action = {
+      actionId: 'mail.send',
+      authenticated: true,
+      description: 'Send a message',
+      name: 'Send email',
+      serviceId: 'mail',
+      serviceName: 'Mail',
+      outputs: {},
+      inputs: {
+        to: { jsonSchema: { type: 'string' }, nullable: false, value: '' },
+        cc: { jsonSchema: { type: 'array', items: { type: 'string' } }, nullable: true, value: null },
+      },
+    }
+    const original = structuredClone(action)
+    const tool = agentTool(action, approval, 'unique-id')
+    expect(tool.approval).toBe(approval)
+    expect(tool.inputs).toEqual([
+      { handle: 'to', jsonSchema: { type: 'string' }, nullable: false, source: { kind: 'model' } },
+      { handle: 'cc', jsonSchema: { type: 'array', items: { type: 'string' } }, nullable: true, source: { kind: 'model' } },
+    ])
+    expect(action).toEqual(original)
   })
 })

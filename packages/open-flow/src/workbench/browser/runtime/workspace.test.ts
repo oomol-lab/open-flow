@@ -505,3 +505,60 @@ describe('Canvas run records', () => {
     expect(node).not.toHaveProperty('run')
   })
 })
+
+it('projects Agent tool icons with action labels and preserves separate actions from the same app', () => {
+  const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+    actorId: 'actor',
+    createdAt: '2026-09-09T00:00:00.000Z',
+    digest: 'digest',
+    flowId: 'flow',
+    modelVersion: 1,
+    parentRevisionId: null,
+    revisionId: 'revision',
+    version: 1,
+    content: {
+      modelVersion: 1,
+      modules: {},
+      document: {
+        bindings: {},
+        subflows: {},
+        tasks: {
+          agent: {
+            name: 'Agent',
+            inputs: [],
+            outputs: [{ handle: 'output', jsonSchema: { type: 'string' }, nullable: false }],
+            executor: {
+              kind: 'agent',
+              model: 'test',
+              prompt: { kind: 'value', value: 'Read mail' },
+              system: '',
+              maxRounds: 10,
+              tools: [
+                { id: 'fetch', name: 'fetch', description: 'Fetch mail', action: 'gmail.fetch_emails', approval: false, inputs: [] },
+                { id: 'send', name: 'send', description: 'Send mail', action: 'gmail.send_email', approval: true, inputs: [] },
+              ],
+            },
+          },
+        },
+        graph: { edges: [], nodes: { agent: { kind: 'task', taskId: 'agent', inputs: {} } } },
+      },
+    },
+  }
+  const first = designerGraph(draft, { kind: 'flow' }).nodes[0]
+  expect(first).toMatchObject({
+    tools: [
+      { id: 'fetch', label: 'gmail · fetch_emails', icon: providerIcon({ serviceId: 'gmail', serviceName: 'gmail' }) },
+      { id: 'send', label: 'gmail · send_email', icon: providerIcon({ serviceId: 'gmail', serviceName: 'gmail' }) },
+    ],
+  })
+  const agent = draft.content.document.tasks.agent!
+  if (agent.executor.kind != 'agent') throw new Error('Expected Agent.')
+  const removed = {
+    ...draft,
+    content: {
+      ...draft.content,
+      document: { ...draft.content.document, tasks: { agent: { ...agent, executor: { ...agent.executor, code: true, tools: [] } } } },
+    },
+  }
+  expect(designerGraph(removed, { kind: 'flow' }).nodes[0]).toMatchObject({ tools: [] })
+})

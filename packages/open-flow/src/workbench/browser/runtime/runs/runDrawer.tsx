@@ -16,6 +16,7 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Icon } from '../icons.tsx'
 import { eventSubject } from '../workspace.ts'
+import { groupEvents, toolRows, agentSummary, agentLog } from './runGroups.ts'
 import { downloadRunLog } from './runLogExport.ts'
 import { eventHasDetails, RunEventDetail, RunResultView } from './runOutput.tsx'
 import { canCancelRun } from './runStore.ts'
@@ -73,6 +74,7 @@ const timelineDetailHeight = 52
 const eventFollowThreshold = 32
 
 interface Props {
+  readonly tools?: ReactElement
   readonly cancelDisabled: boolean
   readonly canceling: boolean
   readonly events: readonly RunEvent[]
@@ -384,12 +386,15 @@ export function RunLog({
 }): ReactElement {
   const language = useLang()
   const t = useTranslate()
+  const [raw, setRaw] = useState(false)
   const eventList = useRef<OverlayScrollbarRef>(null)
   const followedRun = useRef<string>()
   const followEvents = useRef(true)
   const nodeTitles = useMemo(() => nodeTitleIndex(events), [events])
   const observation = eventObservation(events, historyComplete)
   const visibleEvents = filterEventsBy(events, filters)
+  const visible = new Set(visibleEvents.map((event) => event.sequence))
+  const groups = groupEvents(events).filter((group) => group.events.some((event) => visible.has(event.sequence)))
   const lastEventSequence = events.at(-1)?.sequence
   const outputs = terminalOutputs(result)
   const eventScrollbarEvents = useMemo<EventListeners>(
@@ -417,10 +422,15 @@ export function RunLog({
       const list = instance.elements().scrollOffsetElement
       list.scrollTop = list.scrollHeight
     }
-  }, [filters, historyComplete, lastEventSequence, result, run?.runId])
+  }, [filters, historyComplete, lastEventSequence, result, run?.runId, raw])
 
   return (
     <div className="run-log" tabIndex={0}>
+      <div className="flex justify-end px-2">
+        <Button aria-pressed={raw} onClick={() => setRaw(!raw)} size="sm" variant="ghost">
+          {t(raw ? 'run.groupedView' : 'run.rawView')}
+        </Button>
+      </div>
       {observationFailed && (
         <div className="run-observation-error" role="alert">
           <span>{t('run.observationFailed')}</span>
@@ -443,7 +453,126 @@ export function RunLog({
               </span>
             </li>
           )}
-          {visibleEvents.map((event) => {
+          {(raw ? visibleEvents.map((event) => ({ key: String(event.sequence), node: false, events: [event] })) : groups).map((group) => {
+            const event = group.events[0]!
+            if (group.node) {
+              const latest = group.events.findLast((item) => item.kind == 'node.log' || item.kind == 'node.progress')
+              const started = group.events.find((item) => item.kind == 'node.started')
+              const completedCalls = new Set(
+                group.events
+                  .map(agentLog)
+                  .filter((log) => log?.kind == 'tool' && log.status == 'completed')
+                  .map((log) => log?.callId),
+              ).size
+              const terminal = group.events.findLast((item) => item.kind == 'node.failed' || item.kind == 'node.completed')
+              const agent = group.events.some((item) => item.kind == 'node.started' && item.payload.nodeKind == 'agent')
+              const subject = eventSubject(event, t, nodeTitles)
+              const rows = toolRows(
+                group.events.filter((item) => visible.has(item.sequence)),
+                agent,
+              )
+              const elapsed = terminal == null || started == null ? undefined : Math.max(0, Date.parse(terminal.createdAt) - Date.parse(started.createdAt))
+              return (
+                <li className={`run-log-event ${terminal == null ? 'neutral' : eventTone(terminal)}`} key={group.key}>
+                  <span className="run-log-icon" title={terminal?.kind ?? event.kind}>
+                    <Icon name={terminal == null ? 'task' : eventIcon(terminal)} size={14} />
+                  </span>
+                  <time dateTime={event.createdAt}>{eventTime(event.createdAt, language)}</time>
+                  <div className="run-log-main">
+                    <div className="run-log-title">
+                      <strong>{subject}</strong>
+                      <span>
+                        {terminal != null
+                          ? eventSummary(terminal, t)
+                          : t(
+                              run?.status == 'waiting'
+                                ? 'run.statusWaiting'
+                                : run?.status == 'canceled'
+                                  ? 'run.statusCanceled'
+                                  : run?.status == 'failed' || run?.status == 'indeterminate'
+                                    ? 'run.statusIndeterminate'
+                                    : 'run.statusRunning',
+                            )}
+                      </span>
+                      {elapsed != null && <span>{(elapsed / 1000).toFixed(1)}s</span>}
+                      {eventNodes.has(event.sequence) && (
+                        <Button
+                          aria-label={t('run.locateNode', { name: subject })}
+                          className="run-log-locate"
+                          onClick={() => onLocateEvent(event.sequence)}
+                          size="icon-xs"
+                          variant="ghost"
+                        >
+                          <Icon name="fit" />
+                        </Button>
+                      )}
+                    </div>
+                    {terminal?.kind == 'node.failed' ? (
+                      <RunEventDetail event={terminal} onConfigureConnector={onConfigureConnector} />
+                    ) : (
+                      latest != null && (
+                        <p className="run-node-summary">
+                          {agent
+                            ? (agentSummary(latest, t) ?? eventSummary(latest, t))
+                            : latest.kind == 'node.log'
+                              ? latest.payload.message
+                              : eventSummary(latest, t)}
+                        </p>
+                      )
+                    )}
+                    {agent && completedCalls > 0 && <p className="run-node-summary">{t('run.agentCompletedCalls', { count: completedCalls })}</p>}
+                    <details className="run-steps">
+                      <summary>
+                        <Icon name="chevron-left" size={12} />
+                        {t('run.executionSteps', { count: rows.length })}
+                      </summary>
+                      <ol className="run-step-list">
+                        {rows.map((row) => {
+                          const last = row.at(-1)!
+                          const text = agent ? agentSummary(last, t) : undefined
+                          const start = row.find((item) => agentLog(item)?.status == 'started')
+                          const seconds =
+                            start == null || row.length < 2 ? undefined : Math.max(0, Date.parse(last.createdAt) - Date.parse(start.createdAt)) / 1000
+                          const heading = (
+                            <>
+                              <time dateTime={last.createdAt}>{eventTime(last.createdAt, language)}</time>
+                              <span className="run-step-text">
+                                {text ?? eventSummary(last, t)}
+                                {seconds != null && <span className="run-step-duration">{seconds.toFixed(1)}s</span>}
+                              </span>
+                            </>
+                          )
+                          return (
+                            <li className="run-step" key={row[0]!.sequence}>
+                              {text != null ? (
+                                <details className="run-step-details">
+                                  <summary className="run-step-line">
+                                    {heading}
+                                    <span className="run-step-toggle">
+                                      {t('run.eventDetails')}
+                                      <Icon name="chevron-left" size={12} />
+                                    </span>
+                                  </summary>
+                                  {row.map((item) => (
+                                    <RunEventDetail key={item.sequence} event={item} onConfigureConnector={onConfigureConnector} />
+                                  ))}
+                                </details>
+                              ) : (
+                                <>
+                                  <div className="run-step-line">{heading}</div>
+                                  <RunEventDetail event={last} onConfigureConnector={onConfigureConnector} />
+                                </>
+                              )}
+                            </li>
+                          )
+                        })}
+                      </ol>
+                    </details>
+                  </div>
+                </li>
+              )
+            }
+
             const subject = eventSubject(event, t, nodeTitles)
             const nodeId = eventNodes.get(event.sequence)
             return (
@@ -527,6 +656,7 @@ export function RunLog({
 }
 
 export function RunDrawer({
+  tools,
   cancelDisabled,
   canceling,
   events,
@@ -644,6 +774,7 @@ export function RunDrawer({
         <header className="run-header">
           <Badge variant="secondary">{t('run.timeline')}</Badge>
           <span className="run-header-spacer" />
+          {tools}
           <RunLogFilters
             container={drawer.current}
             events={events}

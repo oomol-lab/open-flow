@@ -553,12 +553,16 @@ Connection；客户端不能改用 Team ID、Connection owner 或其他外部 id
 - `POST` 才提交 action，成功时返回
   `{ action, resolutionAccepted, resolvedAt, state: 'waiting' | 'resolved' | 'unavailable', version: 1 }`。
 
-`POST` 服从与认证 resolve route 相同的 first-writer-wins 和幂等重放语义。capability、action、固定 Revision 或 active Wait 不匹配时返回
+`POST` 服从与认证 resolve route 相同的 first-writer-wins 和幂等重放语义。capability、action 或原等待记录不匹配，以及 capability 已到期时返回
 `404 wait-action.not-found`；其他方法返回 `405 wait-action.method-not-allowed` 并携带 `Allow: GET, HEAD, POST`。服务端只持久化
 capability 摘要；完整 capability 是 bearer credential，消费端不得把它作为普通可公开 URL 记录或转发。
 
 请求被限流时返回 `429 wait-action.rate-limited`，携带表示剩余等待秒数的 `Retry-After`；被限流的 `POST` 不提交决议。
 `HEAD` 的限流响应同样没有 response body。
+
+已决议等待的独立 receipt 随 Flow 删除清理，不受事件 retention 影响。进入下一个等待或 Run terminal 后，原 waitId
+仍返回胜出 action 与原 resolvedAt；相同决议 `resolutionAccepted: true`，相反决议为 `false`，均不再排队执行。
+未决议的取消或到期等待不生成决议事实。外部 capability 到期后不能因 receipt 保留而继续授权。
 
 ### Scheduler checkpoint 与节点事件
 
@@ -570,13 +574,17 @@ Scheduler checkpoint 的精确对象为：
   "inputs": {},
   "results": { "source": { "jobId": "job-1", "outputs": { "value": 42 } } },
   "skipped": [],
-  "version": 1,
+  "version": 2,
+  "agents": {},
+  "queue": [],
   "wait": { "jobId": "job-2", "nodeId": "approval", "value": 42, "waitId": "opaque-id" }
 }
 ```
 
 `inputs` 保存按 node ID 和 input handle 索引的启动输入，`bindingValues` 保存本次 Run 的 Variable binding 快照。
-`results` 保存已完成节点的最终 output，`skipped` 保存已跳过节点。checkpoint 不包含队列、活跃 invocation 或重复消费位置，总 JSON 大小不得超过 16 MiB。
+`results` 保存已完成节点的最终 output，`skipped` 保存已跳过节点。`wait` 是当前等待；`queue` 保存尚未激活的等待，字段与 `wait` 相同。`agents` 按 node ID 保存
+`{ invocationId, input, remainingMs?, checkpoint }`，其中 checkpoint 是 Agent continuation 合同。配置了节点 timeoutMs 时，
+remainingMs 必须为正且不得超过原上限。总 JSON 大小不得超过 16 MiB。
 恢复必须验证精确字段、节点状态不冲突、结果符合声明、依赖完整且符合分支选择；当前 Wait 不能已经完成或跳过。
 
 未进入执行路径的节点不创建 job 或 execution identity，也不产生节点事件；分支跳过状态只用于内部调度和 checkpoint 恢复。
@@ -691,3 +699,160 @@ Run 取消、deadline、兄弟节点失败和节点退出沿既有执行生命�
 结构校验不替代操作顺序、before 值、图语义或 Revision 并发校验。
 
 公共解码入口、版本兼容和部署一致性验证见[公共契约与版本演进](compatibility.md)。
+
+## 10. Agent Task
+
+Agent 使用 Managed Task：`executor.kind: "agent"`，只能由根 Flow 的 Task node 引用。Subflow 引用产生
+`agent.subflow-unsupported`；其他确定性配置错误产生 `agent.config-invalid`。
+
+```json
+{
+  "name": "Reply to customer",
+  "inputs": [{ "handle": "email", "nullable": false, "jsonSchema": { "type": "string" } }],
+  "outputs": [{ "handle": "output", "nullable": false, "jsonSchema": { "type": "string" } }],
+  "executor": {
+    "kind": "agent",
+    "model": "deepseek-v4-flash",
+    "system": "Help the customer. Report rejected calls accurately.",
+    "prompt": { "kind": "value", "value": "Write a reply to this customer." },
+    "maxRounds": 10,
+    "tools": [
+      {
+        "id": "send",
+        "name": "send_mail",
+        "description": "Send a reply to the customer.",
+        "action": "mail.send",
+        "connectionId": "work",
+        "approval": true,
+        "inputs": [
+          { "handle": "to", "nullable": false, "jsonSchema": { "type": "string" }, "source": { "kind": "input", "input": "email" } },
+          { "handle": "body", "nullable": false, "jsonSchema": { "type": "string" }, "source": { "kind": "model" } }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`model` 为部署模型网关的模型 ID；无 fallback。`maxRounds` 是 1–100 的整数，Connector 工具数最多 64；至少声明一个工具或启用 `code: true`。
+工具 `id` 非空且在 Task 内唯一；`name` 在 Task 内唯一并匹配 `[A-Za-z][A-Za-z0-9_-]{0,63}`。
+`read_result` 与 `run_code` 为保留名称。可选 `executor.code` 默认为 false，随 Revision 固定。
+Action 与 Connection 固定在 Revision；无需认证的 Action 可以省略 `connectionId`。工具输入不能再声明端口 `value`，
+只能通过 `source` 声明 `{ kind: "value", value }`、`{ kind: "input", input }` 或 `{ kind: "model" }`。
+`prompt` 只接受前两种来源，解析结果必须是字符串。
+
+工具输入与最终输出接受布尔 schema，以及下列 JSON Schema 写法：
+
+- 基础类型与取值：单个或数组形式的 `type`、`enum`、`const`。
+- 组合与条件：`allOf`、`anyOf`、`oneOf`、`not`、`if/then/else`。
+- 字符串与数值：`minLength/maxLength`、`pattern`、已知的 `format`、`minimum/maximum`、
+  `exclusiveMinimum/exclusiveMaximum`、`multipleOf`。
+- 对象：`properties`、`required`、schema 形式的 `additionalProperties`、`patternProperties`、
+  `propertyNames`、`minProperties/maxProperties`、`dependentRequired`、`dependentSchemas`、
+  `dependencies`、`unevaluatedProperties`。
+- 数组：schema 或元组形式的 `items`、`prefixItems`、`additionalItems`、`minItems/maxItems`、
+  `uniqueItems`、`contains`、`minContains/maxContains`、`unevaluatedItems`。
+- 引用：`$defs`、`definitions` 与当前参数 schema 内的 JSON Pointer `$ref`。支持声明 Draft 7、2019-09、
+  2020-12；未声明时按 2019-09 校验。Draft 7 的 `$ref` 忽略同级约束，较新版本保留同级约束。
+
+原始定义还接受 `description`、`title`、`default`、`examples`、`readOnly`、`writeOnly`、`deprecated`、
+`$comment`，并完整保留在 Revision 中。生成模型工具 schema 时保留 `description`、移除其他说明性元数据，
+展开本地引用并移除定义表和 dialect 声明；不会把 `default` 注入模型参数或覆盖固定值。
+展开限制为 4096 个 schema 节点、64 层深度。模型参数的递归引用、外部引用和 anchor 引用明确拒绝；
+固定参数及最终输出允许可解析的本地递归引用。未知关键词、未知 `format`、非法正则和不可解析的引用均报告配置错误，
+工具输入诊断包含具体原因及可用的嵌套路径。模型 provider 仍须接受生成的工具 schema，宿主不会删除验证约束来迎合 provider。
+
+只将模型生成字段暴露给 provider，全部字段必填；nullable 字段允许显式 null。
+合并参数后按原始 schema 校验，包括组合、格式和引用约束；未知字段或覆盖固定字段在实际调用前拒绝。
+校验不修改 Revision 中的 schema 或实际参数。
+
+最终输出恰为一个非 nullable 的 `output`。`type: "string"` 使用最终文本；其他 schema 要求最终文本可解码为 JSON，
+并验证整体输出后才提交节点完成。Agent 工具结果独立保存，模型只取得有界预览；框架与 Scheduler 的完整 checkpoint 上限为 16 MiB。
+
+可选 `executor.notification` 为 `{ taskId, messageHandle, inputs }`。`taskId` 引用 Connector Task；通知输入的 source
+只能是固定值或此次节点输入，消息字段由宿主填写。通知 Task 属于 closure，独立进行 Action、Connection 和公共通知 origin 检查。
+待审批的完整调用以 JSON 展示在 `RunDetails.waiting.prompt`，包含 `callId`、`toolId`、Action、可选 Connection 和完整 `input`。
+通知消息追加原等待的到期时间和决议链接。
+
+修改 Agent 使用 change operation `{ kind: "task.agent.set", taskId, before, value }`。
+`before` 与 `value` 是完整 Managed Task；前者必须与当前定义相等，后者必须仍为 Agent。
+语义无效配置可保存在 Draft，但 Run 与 Publish 必须通过 validation。
+
+### 执行与恢复
+
+Task callback 的 Agent 返回值为 `{ kind: "completed", output }` 或
+`{ kind: "suspended", checkpoint: { version: 1, callId, toolId, input, rounds, state } }`。
+`state` 是部署私有 JSON continuation，不能出现在 Revision 或公开事件中。恢复 Task invocation 携带
+`agent: { action: "approve" | "reject", checkpoint }`，保持原 `invocationId`、`jobId` 和 `runId`。
+
+Server 的首个 adapter 固定使用 Mastra 1.64.0，私有 continuation 带 `framework: "mastra/1.64.0"` 、结果引用 `{ resultId, digest }[]` 与全部 workflow snapshots。
+快照直接包含在 Run store 的同一等待事务中，不依赖另一个持久化框架数据库。工具调用身份由 invocation、模型轮数和
+provider tool-call ID 共同组成；相同参数不会合并。
+
+工具按当前模型批次中的次序串行执行，全部结果或拒绝事实齐全后才请求下一轮模型。节点 `timeoutMs` 累计所有 active segment，
+在 checkpoint 的节点记录中保存剩余预算；审批等待、队列等待与其他节点执行不消耗该节点预算。Run 总预算独立累计。
+超过模型轮数、超时、取消或资源限制不会作为可恢复工具错误交回模型。
+
+Connector 明确返回的 `invalid_input` 记录为 `connector.input-invalid`，不执行该业务调用并可交回模型。
+请求发出后无法确认执行结果时记录 `connector.indeterminate`，Run 以 `indeterminate` 和 `execution.terminal-unknown` 结束。
+节点错误保留请求超时、传输失败、响应格式或大小异常、上游失败等原因，以及已收到的 HTTP 状态；不透传上游原始响应正文。
+Agent 工具失败事件包含 `code` 和 `message`；`executed` 为 `true` 表示已确认返回成功结果，为 `false` 表示已确认拒绝执行，
+为 `null` 表示无法确认执行结果。
+已确认返回的工具结果在 JSON 校验、大小检查或记录阶段失败时终止 Agent，不能继续同批其他工具或再次请求模型。
+
+过程记录复用 `node.log`，`message` 为 JSON：模型记录 `{ kind: "model", round }`；工具记录包含
+`kind: "tool"`、`callId`、`toolId`、`status`（`started/completed/failed/approval/approved/rejected`），
+并按状态包含完整 input、output 或错误 code。失败记录的 `executed` 表示实际调用是否已成功返回。
+这些记录仅供观察，不能用于恢复或重放。
+
+### Agent 保存的工具结果
+
+Agent 保留的每份结果属于一个 Run 和一个 invocation。`resultId` 是 opaque identity，不是访问 capability。
+所有下列路由复用 Run 的认证和资源读取边界，结果与 Run 不匹配时返回 not-found。结果不随日志过期，随所属 Flow 物理删除清理。
+
+- `GET /v1/runs/:runId/results?after=<resultId>` 返回 `{ version: 1, runId, results, nextAfter? }`。
+  每页最多 50 项，按 resultId 升序；运行中新增结果后可从第一页刷新列表。
+- `GET /v1/runs/:runId/results/:resultId?pointer=&offset=0&limit=20` 返回 `{ version: 1, runId, result, page }`。
+  `pointer` 是最长 4096 字符的 JSON Pointer，默认根；`offset` 是非负整数；`limit` 是 1–100 的整数，用于对象或数组成员分页。
+  无效 pointer、越界 offset 或非法参数返回 `run.invalid`。
+- `GET /v1/runs/:runId/results/:resultId/content` 返回完整 JSON，使用 `application/json`、附件下载和 `no-store` 响应头。
+
+结果描述为 `{ resultId, callId, toolId, source, bytes, digest, createdAt }`。
+`source` 为 `{ kind: "connector", action }` 或 `{ kind: "code" }`，不通过工具名称推断来源。`bytes` 为保存的 JSON UTF-8 字节数，
+`digest` 为保存正文的 SHA-256 十六进制摘要，`createdAt` 为 ISO 时间戳。
+
+页面为 `{ pointer, type, complete, value?, length?, offset, nextOffset?, entries? }`。
+`type` 为 JSON 类型；小值以完整 `value` 返回。较大对象或数组返回 `entries`，每项包含
+`{ pointer, type, complete, value?, length? }`；未提供 value 的成员可通过它的 pointer 继续读取。
+字符串的 offset/nextOffset 按 Unicode code point 计数，value 为当前连续片段，单页文本按编码后大小限制。
+`complete: false` 表示不能把当前 value 或 entries 当作原始完整 JSON；nextOffset 存在时可以继续翻页。
+
+模型业务工具输出统一为 `{ kind: "stored-result", result, page }`。宿主预留工具名 `read_result`，输入为
+`{ resultId, pointer?, offset?, limit? }`，输出相同 envelope；只允许访问当前 invocation 已取得的结果。
+读取不执行外部 Action，不要求业务审批，仍消耗正常模型轮数和运行预算。
+模型历史预览被压缩时返回 `{ kind: "stored-result", result, previewOmitted: true }`，结果仍可读取。
+
+Server 动作响应保护上限为 32 MiB，单 Run 工具结果正文配额为 128 MiB；目录与 Proxy 限制独立。
+读取页保持在 16 KiB 内，预算内的值完整返回，不设单项 2 KiB 限制。对象和数组按页预算返回完整成员，
+放不下的成员留到下一页；单个成员超过页预算时只提供元信息，可通过其 pointer 继续读取。
+页面的 `complete: false` 不影响其中 `complete: true` 成员的完整性，无需逐项重读这些成员。
+模型历史和框架快照中保留的预览使用 128 KiB 总量预算，
+优先保留较新的预览，保留旧调用配对和结果引用。该字节预算不等于模型 tokenizer 或精确上下文窗口。
+成功结果必须先持久化再交给模型；存储或完整性失败不能作为可修正工具错误重试外部调用。
+
+### Agent 代码计算
+
+`executor.code: true` 注册内置工具 `run_code`，输入为 `{ code, inputs }`。
+`code` 是 default export 函数的 JavaScript ES module；函数只接收解析后的输入对象，返回 JSON 或 Promise<JSON>。
+`inputs` 的每个值为严格来源声明之一：`{ kind: "value", value }`、`{ kind: "input", input }` 或 `{ kind: "result", resultId }`。
+input 必须是当前 invocation 已有的节点输入；resultId 必须位于当前 invocation 的引用集合，且存储归属与 digest 校验通过。
+宿主读取完整数据后注入执行器，不经过模型消息。输出先持久化，再以 stored-result envelope 返回，并可作为后续计算的输入。
+
+每次执行使用独立 isolate，无节点 context、Connector 或网络权限，不允许第三方或其他 Flow 模块导入。
+输入总量与结果上限分别为 32 MiB，源码为 64 KiB，内存为 256 MiB，V8 执行调用 timeout 为 1 秒、单次墙钟为 5 秒，
+同时服从节点和 Run 的剩余预算。无效 JSON 输出（含 undefined、BigInt、非有限数、循环引用及非普通对象）返回明确错误。
+语法和普通执行错误可交回模型，修正提交计为新调用；取消、资源限制、执行器崩溃、结果丢失、完整性或存储失败终止 Agent。
+
+代码调用沿用 tool 日志结构，并包含 `source: { kind: "code" }`；输入保留源码和来源声明，输出保留结果引用。
+调用身份、成功结果复用与恢复沿用普通 Agent 工具语义。代码工具无需逐次审批，也不依赖部署 Connector；
+Agent 声明的业务工具和审批通知仍独立执行能力检查。

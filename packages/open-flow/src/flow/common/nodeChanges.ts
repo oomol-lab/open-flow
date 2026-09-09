@@ -160,6 +160,16 @@ export function createManagedTask(
   ]
 }
 
+export function createAgentTask(target: GraphTarget, identity: { readonly nodeId: string; readonly taskId: string }, name: string): readonly ChangeOperation[] {
+  if (target.kind != 'flow') throw new Error('Agent nodes are only supported in the root Flow.')
+  return createManagedTask(target, identity, {
+    name,
+    inputs: [{ handle: 'input', jsonSchema: { type: 'string' }, nullable: false, value: '' }],
+    outputs: [{ handle: 'output', jsonSchema: { type: 'string' }, nullable: false }],
+    executor: { kind: 'agent', model: 'deepseek-v4-flash', system: '', prompt: { kind: 'value', value: '' }, maxRounds: 10, tools: [] },
+  })
+}
+
 export function createLlmTask(
   target: GraphTarget,
   identity: { readonly nodeId: string; readonly taskId: string },

@@ -151,6 +151,32 @@ export interface ConditionNode extends GraphNodeBase {
 export type ManagedTaskExecutor =
   | { readonly kind: 'connector'; readonly action: string; readonly connectionId?: string }
   | { readonly kind: 'llm'; readonly mode: 'chat' | 'json' }
+  | {
+      readonly kind: 'agent'
+      readonly code?: boolean
+      readonly model: string
+      readonly prompt: Exclude<AgentInput, { readonly kind: 'model' }>
+      readonly system: string
+      readonly maxRounds: number
+      readonly tools: readonly AgentTool[]
+      readonly notification?: {
+        readonly taskId: string
+        readonly messageHandle: string
+        readonly inputs: Readonly<Record<string, Exclude<AgentInput, { readonly kind: 'model' }>>>
+      }
+    }
+
+export type AgentInput = { readonly kind: 'value'; readonly value: JsonValue } | { readonly kind: 'input'; readonly input: string } | { readonly kind: 'model' }
+
+export interface AgentTool {
+  readonly id: string
+  readonly name: string
+  readonly description: string
+  readonly action: string
+  readonly connectionId?: string
+  readonly approval: boolean
+  readonly inputs: readonly (InputPort & { readonly source: AgentInput })[]
+}
 
 export interface ConnectorCapability {
   readonly action: string
@@ -482,6 +508,7 @@ export type ChangeOperation =
   | { readonly kind: 'task.create'; readonly task: FlowDocument['tasks'][string]; readonly taskId: string }
   | { readonly before?: string; readonly kind: 'task.connector.connection.set'; readonly taskId: string; readonly value?: string }
   | { readonly kind: 'task.delete'; readonly taskId: string }
+  | { readonly before: ManagedTaskDefinition; readonly kind: 'task.agent.set'; readonly taskId: string; readonly value: ManagedTaskDefinition }
   | { readonly before: 'chat' | 'json'; readonly kind: 'task.llm.mode.set'; readonly taskId: string; readonly value: 'chat' | 'json' }
   | { readonly before: string; readonly kind: 'task.name.set'; readonly taskId: string; readonly value: string }
 
@@ -819,6 +846,13 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const tasks = { ...document.tasks }
         delete tasks[operation.taskId]
         document.tasks = tasks
+        break
+      }
+      case 'task.agent.set': {
+        const task = document.tasks[operation.taskId]
+        if (task?.executor.kind != 'agent' || operation.value.executor.kind != 'agent') invalid('The Agent Task does not exist.')
+        if (!dequal(task, operation.before)) invalid('The Agent Task changed before this operation was applied.')
+        document.tasks = { ...document.tasks, [operation.taskId]: operation.value }
         break
       }
       case 'task.llm.mode.set': {

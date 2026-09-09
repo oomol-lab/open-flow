@@ -596,7 +596,11 @@
   "zoomReset": "將縮放重設為 100%",
   "view": "檢視",
   "canvasCard": {
-    "waitBranch": { "approve": "通過", "reject": "拒絕", "continue": "繼續" },
+    "waitBranch": {
+      "approve": "通過",
+      "reject": "拒絕",
+      "continue": "繼續"
+    },
     "run": "執行",
     "result": "結果",
     "logs": "日誌 {{count}}",
@@ -631,6 +635,7 @@
       "day": "天",
       "week": "週",
       "month": "個月"
-    }
+    },
+    "tools": "工具"
   }
 }

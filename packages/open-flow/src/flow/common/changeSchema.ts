@@ -22,12 +22,34 @@ const capability = z.object({
   connections: z.array(z.object({ connectionId: text, alias: text.optional() })),
 })
 const inline = z.object({ ...ports, name: text, moduleId: text, capabilities: z.array(capability).optional() })
+const agentValue = z.union([z.object({ kind: z.literal('value'), value: json }), z.object({ kind: z.literal('input'), input: text })])
+const agentInput = z.union([agentValue, z.object({ kind: z.literal('model') })])
 const managed = z.object({
   ...ports,
   name: text,
   executor: z.union([
     z.object({ kind: z.literal('connector'), action: text, connectionId: text.optional() }),
     z.object({ kind: z.literal('llm'), mode: z.enum(['chat', 'json']) }),
+    z.object({
+      kind: z.literal('agent'),
+      code: z.boolean().optional(),
+      model: text,
+      prompt: agentValue,
+      system: text,
+      maxRounds: z.number(),
+      tools: z.array(
+        z.object({
+          id: text,
+          name: text,
+          description: text,
+          action: text,
+          connectionId: text.optional(),
+          approval: z.boolean(),
+          inputs: z.array(input.extend({ source: agentInput })),
+        }),
+      ),
+      notification: z.object({ taskId: text, messageHandle: text, inputs: z.record(text, agentValue) }).optional(),
+    }),
   ]),
 })
 const condition = {
@@ -212,6 +234,7 @@ const shapes = {
   'task.create': { taskId: text, task: managed },
   'task.delete': { taskId: text },
   'task.connector.connection.set': { taskId: text, before: text.optional(), value: text.optional() },
+  'task.agent.set': { taskId: text, before: managed, value: managed },
   'task.llm.mode.set': { taskId: text, before: z.enum(['chat', 'json']), value: z.enum(['chat', 'json']) },
   'task.name.set': { taskId: text, before: text, value: text },
 } satisfies Record<ChangeOperation['kind'], z.ZodRawShape | z.ZodType>

@@ -1,5 +1,5 @@
-import type { InvokeLlmTask } from '@oomol-lab/open-flow/runtime-contract'
 import type { Logger } from 'pino'
+import type { LlmHost } from './llm.ts'
 
 import { silentLogger } from '../logger.ts'
 import { SettingsStore } from '../storage/settings-store.ts'
@@ -12,7 +12,7 @@ export class Settings {
   readonly #connectorToken?: string
   readonly #environmentConnector?: ConnectorClient
   readonly #environmentIntegration?: { readonly callbackKey: string; readonly publicOrigin: string }
-  readonly #environmentLlm?: InvokeLlmTask
+  readonly #environmentLlm?: LlmHost
   readonly #environmentOrigin?: string
   readonly #logger: Logger
   readonly #store: SettingsStore
@@ -75,7 +75,7 @@ export class Settings {
       : { callbackKey: stored.integrationCallbackKey, publicOrigin: stored.integrationPublicOrigin }
   }
 
-  llm(): InvokeLlmTask | undefined {
+  llm(): LlmHost | undefined {
     if (this.#environmentLlm != null) return this.#environmentLlm
     const stored = this.#store.state()
     if (stored.llmOrigin != null && stored.llmToken != null) return createLlm(stored.llmOrigin, stored.llmToken)

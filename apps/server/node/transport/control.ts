@@ -2,6 +2,7 @@ import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { Context, Next } from 'hono'
 import type { ControlService } from '../application/control-service.ts'
 
+import { parseResultQuery } from '@oomol-lab/open-flow/control-api'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { controlRequests } from '@oomol-lab/open-flow/control-requests'
 import { validVariableName } from '@oomol-lab/open-flow/flow-change'
@@ -317,6 +318,35 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
         pageSize(parameters, controlErrorCode.runInvalid),
       ),
     )
+  })
+  app.get('/runs/:runId/results', (context) => {
+    const parameters = query(context.req.raw, ['after'], controlErrorCode.runInvalid)
+    return response(200, service.listRunResults(context.req.param('runId'), parameters.get('after') ?? undefined))
+  })
+  app.get('/runs/:runId/results/:resultId/content', (context) => {
+    const stored = service.runResultContent(context.req.param('runId'), context.req.param('resultId'))
+    return new Response(stored.content, {
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'content-disposition': `attachment; filename="${stored.result.resultId}.json"`,
+        'x-content-type-options': 'nosniff',
+        'cache-control': 'no-store',
+      },
+    })
+  })
+  app.get('/runs/:runId/results/:resultId', (context) => {
+    const parameters = query(context.req.raw, ['pointer', 'offset', 'limit'], controlErrorCode.runInvalid)
+    let parsed
+    try {
+      parsed = parseResultQuery({
+        ...(parameters.has('pointer') ? { pointer: parameters.get('pointer') } : {}),
+        ...(parameters.has('offset') ? { offset: Number(parameters.get('offset')) } : {}),
+        ...(parameters.has('limit') ? { limit: Number(parameters.get('limit')) } : {}),
+      })
+    } catch {
+      invalid(controlErrorCode.runInvalid, 'Invalid result page query.')
+    }
+    return response(200, service.readRunResult(context.req.param('runId'), context.req.param('resultId'), parsed))
   })
   app.get('/runs/:runId/result', (context) => response(200, service.getRunResult(context.req.param('runId'))))
   app.post('/runs/:runId/cancel', async (context) => {

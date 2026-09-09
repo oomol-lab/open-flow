@@ -6,6 +6,7 @@ import { useContext } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { NODE_HANDLE_CLASSNAME } from '../../../base/designer.ts'
+import { DesignerTooltip } from '../../../components/tooltip.tsx'
 import { DesignerIcon } from '../../../icons/DesignerIcon.tsx'
 import { NODE_TYPE } from '../../../stores/node/constants.ts'
 import { ErrorNodeStore, parseError } from '../../../stores/node/errorNode.store.ts'
@@ -27,12 +28,44 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
   const model = view?.model.nodes.find((node) => node.id == nodeStore.nodeId)
   const node = model?.kind == 'comment' ? undefined : model
   const summary = node ? nodeSummary(node, t) : description || message
+  const tools = node?.kind == 'task' ? node.tools : undefined
   const images = imageSources(node?.run?.outputs)
   const problem = showError ? t('nodeStatus.hasError') : node?.run?.status == 'error' ? t('canvasCard.status.error') : undefined
   const kind = node?.kind ?? (nodeStore.nodeType == NODE_TYPE.InputNode ? 'input' : nodeStore.nodeType == NODE_TYPE.OutputNode ? 'output' : 'task')
   const inline = node?.kind == 'trigger' && summary && !summary.includes('\n') && summary.length <= 48
   const subtitle = inline ? summary : node?.kind == 'task' ? node.executorName || t('canvasCard.kind.task') : t(`canvasCard.kind.${kind}`)
   const distinctSubtitle = subtitle.trim().toLocaleLowerCase() == title.trim().toLocaleLowerCase() ? undefined : subtitle
+  const toolContent = tools != null && tools.length > 0 && (
+    <div className={styles.tools}>
+      <span className={styles.toolsLabel}>{t('canvasCard.tools')}</span>
+      <div className={styles.toolItems}>
+        {tools.slice(0, 6).map((tool) => (
+          <DesignerTooltip key={tool.id} placement="top" title={tool.label}>
+            <span className={styles.tool} aria-label={tool.label} tabIndex={0}>
+              <DesignerIcon src={tool.icon} />
+            </span>
+          </DesignerTooltip>
+        ))}
+        {tools.length > 6 && (
+          <DesignerTooltip
+            placement="top"
+            title={
+              <div>
+                {tools.slice(6).map((tool) => (
+                  <div key={tool.id}>{tool.label}</div>
+                ))}
+              </div>
+            }
+          >
+            <span className={styles.moreTools} tabIndex={0}>
+              +{tools.length - 6}
+            </span>
+          </DesignerTooltip>
+        )}
+      </div>
+    </div>
+  )
+  const runContent = node?.run == null || node.run.status == 'idle' ? undefined : <RunChips run={node.run} />
   return (
     <div className={NODE_HANDLE_CLASSNAME}>
       <CanvasCard
@@ -42,7 +75,14 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
         selected={selected}
         problem={problem}
         branches={branches}
-        footer={node?.run == null || node.run.status == 'idle' ? undefined : <RunChips run={node.run} />}
+        footer={
+          toolContent || runContent ? (
+            <div className={styles.footer}>
+              {toolContent}
+              {runContent}
+            </div>
+          ) : undefined
+        }
         preview={node?.run && images.length > 0 ? <ImagePreview images={images} run={node.run} title={title} /> : undefined}
       >
         {!inline && summary && (

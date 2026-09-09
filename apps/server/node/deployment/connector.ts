@@ -9,6 +9,7 @@ import * as Effect from 'effect/Effect'
 import { errorKind, silentLogger } from '../logger.ts'
 
 const maxResponseBytes = 1024 * 1024
+const maxActionResponseBytes = 32 * 1024 * 1024
 const maxActionCatalogBytes = 8 * 1024 * 1024
 const catalogConcurrency = 16
 const readinessTimeoutMs = 1_000
@@ -48,7 +49,13 @@ export interface ConnectorHost {
   searchActions(query: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorAction[]>
 }
 
-export type ConnectorErrorCode = 'connector.action-not-found' | 'connector.connection-required' | 'connector.unavailable' | 'connector.unconfigured'
+export type ConnectorErrorCode =
+  | 'connector.input-invalid'
+  | 'connector.indeterminate'
+  | 'connector.action-not-found'
+  | 'connector.connection-required'
+  | 'connector.unavailable'
+  | 'connector.unconfigured'
 
 export class ConnectorTaskError extends Error {
   readonly code: ConnectorErrorCode
@@ -242,13 +249,22 @@ export class ConnectorClient implements ConnectorHost {
         method: 'POST',
       },
       signal,
-      { fields: { actionId: action, ...(connectionId == null ? {} : { connectionId }), invocationId }, teamId },
+      { fields: { actionId: action, ...(connectionId == null ? {} : { connectionId }), invocationId }, maximumResponseBytes: maxActionResponseBytes, teamId },
     )
     const response = actionResponse.value
-    if (!record(response)) throw unavailable()
+    if (!record(response))
+      throw new ConnectorTaskError(
+        'connector.indeterminate',
+        `Connector returned an invalid action response (HTTP ${actionResponse.status}). The action outcome is unknown.`,
+      )
     if (actionResponse.ok && response.success === true && Object.hasOwn(response, 'data')) return response.data as JsonValue
     if (response.errorCode === 'connection_not_allowed' || response.errorCode === 'connection_not_found') throw connectionRequired()
-    throw actionFailure(response)
+    const failure = actionFailure(response)
+    if (failure.code == 'connector.input-invalid') throw failure
+    throw new ConnectorTaskError(
+      'connector.indeterminate',
+      `Connector ${response.success === false ? 'reported an action failure' : 'returned an unexpected action response'} (HTTP ${actionResponse.status}). The action outcome is unknown.`,
+    )
   }
 
   async proxy(
@@ -379,7 +395,7 @@ export class ConnectorClient implements ConnectorHost {
       readonly origin?: URL
       readonly teamId?: string
     } = {},
-  ): Promise<{ readonly ok: boolean; readonly value: unknown }> {
+  ): Promise<{ readonly ok: boolean; readonly status: number; readonly value: unknown }> {
     const startedAt = performance.now()
     const timeout = AbortSignal.timeout(this.#timeoutMs)
     let status: number | undefined
@@ -410,7 +426,7 @@ export class ConnectorClient implements ConnectorHost {
           'Connector request failed.',
         )
       }
-      return { ok: response.ok, value }
+      return { ok: response.ok, status: response.status, value }
     } catch (error) {
       if (signal?.aborted) throw signal.reason
       let failure = 'transport'
@@ -430,6 +446,15 @@ export class ConnectorClient implements ConnectorHost {
         },
         'Connector request failed.',
       )
+      if (operation == 'action.execute') {
+        const reason =
+          failure == 'timeout'
+            ? `Connector request timed out after ${this.#timeoutMs} ms`
+            : error instanceof ConnectorTaskError
+              ? error.message
+              : 'Connector connection failed while sending the request or receiving its response'
+        throw new ConnectorTaskError('connector.indeterminate', `${reason}${status == null ? '' : ` (HTTP ${status})`}. The action outcome is unknown.`)
+      }
       if (error instanceof ConnectorTaskError) throw error
       throw unavailable()
     }
@@ -453,7 +478,7 @@ function actionFailure(response: Record<string, unknown>): ConnectorTaskError {
     })
     .slice(0, 8)
   const message = details.length == 0 ? 'The Connector Action input is invalid.' : `The Connector Action input is invalid. ${details.join(' ')}`
-  return new ConnectorTaskError('connector.unavailable', message)
+  return new ConnectorTaskError('connector.input-invalid', message)
 }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -465,7 +490,7 @@ async function readJson(
   limit: number,
   budget?: { readonly exhaust: (responseBytes: number) => ConnectorTaskError; readonly limit: number; used: number },
 ): Promise<unknown> {
-  if (response.body == null) throw unavailable()
+  if (response.body == null) throw unavailable('Connector response has no body')
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
   let bytes = 0
@@ -481,7 +506,7 @@ async function readJson(
       bytes += value.byteLength
       if (bytes > limit) {
         await reader.cancel()
-        throw unavailable()
+        throw unavailable(`Connector response exceeds the ${limit}-byte size limit`)
       }
       chunks.push(value)
     }
@@ -490,8 +515,8 @@ async function readJson(
   }
   try {
     return JSON.parse(responseDecoder.decode(Buffer.concat(chunks, bytes))) as unknown
-  } catch (error) {
-    throw unavailable(error instanceof Error ? error.message : String(error))
+  } catch {
+    throw unavailable('Connector response is not valid JSON')
   }
 }
 
@@ -603,8 +628,8 @@ function mapAction(
   let ports: ReturnType<typeof connectorActionPorts>
   try {
     ports = connectorActionPorts(action.inputSchema, action.outputSchema)
-  } catch (error) {
-    throw unavailable(error instanceof Error ? error.message : String(error))
+  } catch {
+    throw unavailable('Connector response is not valid JSON')
   }
   return {
     actionId: action.id,
