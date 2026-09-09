@@ -794,7 +794,9 @@ provider tool-call ID 共同组成；相同参数不会合并。
 在 checkpoint 的节点记录中保存剩余预算；审批等待、队列等待与其他节点执行不消耗该节点预算。Run 总预算独立累计。
 超过模型轮数、超时、取消或资源限制不会作为可恢复工具错误交回模型。
 
-Connector 明确返回的 `invalid_input` 记录为 `connector.input-invalid`，不执行该业务调用并可交回模型。
+Connector 明确返回 `success: false` 和 `errorCode: "invalid_input"` 时记录为 `connector.input-invalid`，按参数拒绝处理并可交回模型。
+该分类不依赖 `data` 的形状：Schema 校验错误数组中的诊断会保留，Provider 错误对象、空值或缺失详情使用通用参数错误提示。
+仅有 HTTP 400 而没有上述错误标识时，不视为可恢复参数错误。
 请求发出后无法确认执行结果时记录 `connector.indeterminate`，Run 以 `indeterminate` 和 `execution.terminal-unknown` 结束。
 节点错误保留请求超时、传输失败、响应格式或大小异常、上游失败等原因，以及已收到的 HTTP 状态；不透传上游原始响应正文。
 Agent 工具失败事件包含 `code` 和 `message`；`executed` 为 `true` 表示已确认返回成功结果，为 `false` 表示已确认拒绝执行，

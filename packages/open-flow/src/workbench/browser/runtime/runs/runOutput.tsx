@@ -72,6 +72,12 @@ export function RunEventDetail({
     }
     case 'node.log': {
       const log = agentLog(event)
+      if (log?.kind == 'model-tool' || log?.kind == 'model-step')
+        return (
+          <EventDetail label={t('run.eventDetails')}>
+            <JsonValueView label={t('run.eventDetails')} value={log as JsonValue} />
+          </EventDetail>
+        )
       const source = log?.source
       if (source != null && typeof source == 'object' && 'kind' in source && source.kind == 'code') {
         const input = log?.input

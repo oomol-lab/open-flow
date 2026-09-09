@@ -15,9 +15,9 @@ import { getDefaultValue, typeOfSchema } from '../../../../form/common/schemaWid
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel, FieldError, FieldDescription } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
-import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
 import { Switch } from '../../../../ui/browser/switch.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
+import { WorkbenchSelect } from '../shell/workbenchSelect.tsx'
 import { ActionPicker } from './actionPicker.tsx'
 import { AgentChanges } from './agentChanges.ts'
 import { agentTool } from './flowChanges.ts'
@@ -27,6 +27,8 @@ const InputValues = lazy(async () => {
 })
 
 function Source({
+  disabled,
+  portalRoot,
   source,
   port,
   inputs,
@@ -37,6 +39,8 @@ function Source({
   onCommit,
   labelledBy,
 }: {
+  readonly disabled: boolean
+  readonly portalRoot: HTMLElement | null
   readonly labelledBy?: string
   readonly source: AgentInput
   readonly port: InputPort
@@ -75,11 +79,13 @@ function Source({
   }, [source.kind, valid])
   return (
     <>
-      <NativeSelect
-        aria-label={t('agent.source')}
+      <WorkbenchSelect
+        size="sm"
+        variant="subtle"
+        ariaLabel={t('agent.source')}
         value={source.kind}
-        onChange={(event) => {
-          switch (event.target.value) {
+        onValueChange={(value) => {
+          switch (value) {
             case 'value':
               onChange({ kind: 'value', value: (port.value ?? getDefaultValue(typeOfSchema(port.jsonSchema), port.jsonSchema) ?? null) as JsonValue })
               break
@@ -91,24 +97,30 @@ function Source({
               break
           }
         }}
-      >
-        <NativeSelectOption value="value">{t('agent.fixed')}</NativeSelectOption>
-        <NativeSelectOption value="input" disabled={inputs.length == 0}>
-          {t('agent.nodeInput')}
-        </NativeSelectOption>
-        {model && <NativeSelectOption value="model">{t('agent.modelValue')}</NativeSelectOption>}
-      </NativeSelect>
+        disabled={disabled}
+        portalRoot={portalRoot}
+        className="w-full min-w-0"
+        options={[
+          { value: 'value', label: t('agent.fixed') },
+          { value: 'input', label: t('agent.nodeInput'), disabled: inputs.length == 0 },
+          ...(model ? [{ value: 'model', label: t('agent.modelValue') }] : []),
+        ]}
+      />
       {source.kind == 'input' && (
-        <NativeSelect aria-label={t('agent.inputName')} value={source.input} onChange={(event) => onChange({ kind: 'input', input: event.target.value })}>
-          {!inputs.some((input) => input.handle == source.input) && (
-            <NativeSelectOption value={source.input}>{source.input || t('agent.chooseInput')}</NativeSelectOption>
-          )}
-          {inputs.map((input) => (
-            <NativeSelectOption key={input.handle} value={input.handle}>
-              {input.handle}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        <WorkbenchSelect
+          size="sm"
+          variant="subtle"
+          ariaLabel={t('agent.inputName')}
+          value={source.input}
+          onValueChange={(value) => onChange({ kind: 'input', input: value })}
+          disabled={disabled}
+          portalRoot={portalRoot}
+          className="w-full min-w-0"
+          options={[
+            ...(!inputs.some((input) => input.handle == source.input) ? [{ value: source.input, label: source.input || t('agent.chooseInput') }] : []),
+            ...inputs.map((input) => ({ value: input.handle, label: input.handle })),
+          ]}
+        />
       )}
       {source.kind == 'value' && source.value === null && getDefaultValue(typeOfSchema(port.jsonSchema), port.jsonSchema) != null ? (
         <div className="agent-empty-value">
@@ -159,6 +171,7 @@ export function AgentSettings({
   readonly theme: WorkbenchTheme
 }): ReactElement | null {
   const t = useTranslate()
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null)
   const [config, renderConfig] = useState(task.executor)
   const [parameter, setParameter] = useState<string>()
   const [pendingTool, setPendingTool] = useState<ConnectorAction>()
@@ -239,6 +252,7 @@ export function AgentSettings({
   }
   return (
     <form
+      ref={setPortalRoot}
       className="inspector-section inspector-form agent-form"
       data-inspector-section="task"
       onSubmit={(event) => {
@@ -253,36 +267,43 @@ export function AgentSettings({
         <Field>
           <FieldLabel htmlFor={`${nodeId}-prompt`}>{t('agent.prompt')}</FieldLabel>
           <div className="agent-prompt-source">
-            <NativeSelect
-              aria-label={t('agent.source')}
+            <WorkbenchSelect
+              size="sm"
+              variant="subtle"
+              ariaLabel={t('agent.source')}
               value={config.prompt.kind}
-              onChange={(event) =>
+              onValueChange={(value) =>
                 setConfig({
                   ...config,
-                  prompt: event.target.value == 'input' ? { kind: 'input', input: inputs[0]?.handle ?? '' } : { kind: 'value', value: '' },
+                  prompt: value == 'input' ? { kind: 'input', input: inputs[0]?.handle ?? '' } : { kind: 'value', value: '' },
                 })
               }
-            >
-              <NativeSelectOption value="value">{t('agent.writePrompt')}</NativeSelectOption>
-              <NativeSelectOption value="input" disabled={inputs.length == 0}>
-                {t('agent.nodeInput')}
-              </NativeSelectOption>
-            </NativeSelect>
+              disabled={disabled}
+              portalRoot={portalRoot}
+              className="w-full min-w-0"
+              options={[
+                { value: 'value', label: t('agent.writePrompt') },
+                { value: 'input', label: t('agent.nodeInput'), disabled: inputs.length == 0 },
+              ]}
+            />
             {config.prompt.kind == 'input' && (
-              <NativeSelect
+              <WorkbenchSelect
+                size="sm"
+                variant="subtle"
                 id={`${nodeId}-prompt`}
                 value={config.prompt.input}
-                onChange={(event) => setConfig({ ...config, prompt: { kind: 'input', input: event.target.value } })}
-              >
-                {!inputs.some((port) => config.prompt.kind == 'input' && port.handle == config.prompt.input) && (
-                  <NativeSelectOption value={config.prompt.input}>{config.prompt.input || t('agent.chooseInput')}</NativeSelectOption>
-                )}
-                {inputs.map((port) => (
-                  <NativeSelectOption key={port.handle} value={port.handle}>
-                    {port.handle}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                onValueChange={(value) => setConfig({ ...config, prompt: { kind: 'input', input: value } })}
+                ariaLabel={t('agent.prompt')}
+                disabled={disabled}
+                portalRoot={portalRoot}
+                className="w-full min-w-0"
+                options={[
+                  ...(!inputs.some((port) => config.prompt.kind == 'input' && port.handle == config.prompt.input)
+                    ? [{ value: config.prompt.input, label: config.prompt.input || t('agent.chooseInput') }]
+                    : []),
+                  ...inputs.map((port) => ({ value: port.handle, label: port.handle })),
+                ]}
+              />
             )}
           </div>
           {config.prompt.kind == 'value' && (
@@ -315,24 +336,30 @@ export function AgentSettings({
                 {actions[tool.action]?.authenticated == true && (
                   <Field>
                     <FieldLabel>{t('agent.connection')}</FieldLabel>
-                    <NativeSelect
-                      aria-label={t('agent.connection')}
+                    <WorkbenchSelect
+                      size="sm"
+                      variant="subtle"
+                      ariaLabel={t('agent.connection')}
                       value={tool.connectionId ?? ''}
-                      onChange={(event) => {
+                      onValueChange={(value) => {
                         const { connectionId: _connection, ...rest } = tool
-                        replaceTool(event.target.value == '' ? rest : { ...rest, connectionId: event.target.value })
+                        replaceTool(value == '' ? rest : { ...rest, connectionId: value })
                       }}
-                    >
-                      <NativeSelectOption value="">{t('agent.chooseConnection')}</NativeSelectOption>
-                      {tool.connectionId != null && !catalogs[actions[tool.action]!.serviceId]?.byId.has(tool.connectionId) && (
-                        <NativeSelectOption value={tool.connectionId}>{tool.connectionId}</NativeSelectOption>
-                      )}
-                      {(catalogs[actions[tool.action]!.serviceId]?.all ?? []).map((connection) => (
-                        <NativeSelectOption key={connection.connectionId} value={connection.connectionId} disabled={connection.status != 'active'}>
-                          {connection.displayName}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
+                      disabled={disabled}
+                      portalRoot={portalRoot}
+                      className="w-full min-w-0"
+                      options={[
+                        { value: '', label: t('agent.chooseConnection') },
+                        ...(tool.connectionId != null && !catalogs[actions[tool.action]!.serviceId]?.byId.has(tool.connectionId)
+                          ? [{ value: tool.connectionId, label: tool.connectionId }]
+                          : []),
+                        ...(catalogs[actions[tool.action]!.serviceId]?.all ?? []).map((connection) => ({
+                          value: connection.connectionId,
+                          label: connection.displayName,
+                          disabled: connection.status != 'active',
+                        })),
+                      ]}
+                    />
                     <Button
                       type="button"
                       variant="ghost"
@@ -346,14 +373,21 @@ export function AgentSettings({
                 )}
                 <Field>
                   <FieldLabel htmlFor={`${tool.id}-approval`}>{t('agent.execution')}</FieldLabel>
-                  <NativeSelect
+                  <WorkbenchSelect
+                    size="sm"
+                    variant="subtle"
                     id={`${tool.id}-approval`}
                     value={tool.approval ? 'confirm' : 'auto'}
-                    onChange={(event) => replaceTool({ ...tool, approval: event.target.value == 'confirm' })}
-                  >
-                    <NativeSelectOption value="auto">{t('agent.auto')}</NativeSelectOption>
-                    <NativeSelectOption value="confirm">{t('agent.confirm')}</NativeSelectOption>
-                  </NativeSelect>
+                    onValueChange={(value) => replaceTool({ ...tool, approval: value == 'confirm' })}
+                    ariaLabel={t('agent.execution')}
+                    disabled={disabled}
+                    portalRoot={portalRoot}
+                    className="w-full min-w-0"
+                    options={[
+                      { value: 'auto', label: t('agent.auto') },
+                      { value: 'confirm', label: t('agent.confirm') },
+                    ]}
+                  />
                 </Field>
                 <FieldDescription>
                   {tool.inputs.some((port) => port.source.kind != 'model')
@@ -405,6 +439,8 @@ export function AgentSettings({
                             <Field id={`${id}-editor`} className="agent-parameter-editor">
                               <FieldDescription>{port.description}</FieldDescription>
                               <Source
+                                disabled={disabled}
+                                portalRoot={portalRoot}
                                 model
                                 labelledBy={`${tool.id}-${port.handle}-label`}
                                 port={port}
@@ -492,14 +528,21 @@ export function AgentSettings({
               </h3>
               <Field>
                 <FieldLabel htmlFor={`${nodeId}-new-approval`}>{t('agent.execution')}</FieldLabel>
-                <NativeSelect
+                <WorkbenchSelect
+                  size="sm"
+                  variant="subtle"
                   id={`${nodeId}-new-approval`}
                   value={approval ? 'confirm' : 'auto'}
-                  onChange={(event) => setApproval(event.target.value == 'confirm')}
-                >
-                  <NativeSelectOption value="auto">{t('agent.auto')}</NativeSelectOption>
-                  <NativeSelectOption value="confirm">{t('agent.confirm')}</NativeSelectOption>
-                </NativeSelect>
+                  onValueChange={(value) => setApproval(value == 'confirm')}
+                  ariaLabel={t('agent.execution')}
+                  disabled={disabled}
+                  portalRoot={portalRoot}
+                  className="w-full min-w-0"
+                  options={[
+                    { value: 'auto', label: t('agent.auto') },
+                    { value: 'confirm', label: t('agent.confirm') },
+                  ]}
+                />
                 <FieldDescription>{t('agent.executionHint')}</FieldDescription>
               </Field>
               <FieldDescription>{t('agent.newParameters')}</FieldDescription>
@@ -557,12 +600,14 @@ export function AgentSettings({
             </Field>
             <Field>
               <FieldLabel>{t('agent.notification')}</FieldLabel>
-              <NativeSelect
-                aria-label={t('agent.notification')}
+              <WorkbenchSelect
+                size="sm"
+                variant="subtle"
+                ariaLabel={t('agent.notification')}
                 value={config.notification?.taskId ?? ''}
-                onChange={(event) => {
+                onValueChange={(value) => {
                   const { notification: _notification, ...rest } = config
-                  const selected = revision.task(event.target.value)
+                  const selected = revision.task(value)
                   const message = selected?.inputs.find(
                     (port) =>
                       'handle' in port &&
@@ -571,50 +616,49 @@ export function AgentSettings({
                       'type' in port.jsonSchema &&
                       port.jsonSchema.type == 'string',
                   )
-                  if (event.target.value == '') setConfig(rest)
+                  if (value == '') setConfig(rest)
                   else
                     setConfig({
                       ...rest,
-                      notification: { taskId: event.target.value, messageHandle: message != null && 'handle' in message ? message.handle : '', inputs: {} },
+                      notification: { taskId: value, messageHandle: message != null && 'handle' in message ? message.handle : '', inputs: {} },
                     })
                 }}
-              >
-                <NativeSelectOption value="">{t('agent.noNotification')}</NativeSelectOption>
-                {notifications.map(([id, item]) => (
-                  <NativeSelectOption key={id} value={id}>
-                    {item.name}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                disabled={disabled}
+                portalRoot={portalRoot}
+                className="w-full min-w-0"
+                options={[{ value: '', label: t('agent.noNotification') }, ...notifications.map(([id, item]) => ({ value: id, label: item.name }))]}
+              />
               <FieldDescription>{t('agent.notificationHint')}</FieldDescription>
             </Field>
             {config.notification != null && notificationTask != null && (
               <>
                 <Field>
                   <FieldLabel>{t('agent.messageField')}</FieldLabel>
-                  <NativeSelect
-                    aria-label={t('agent.messageField')}
+                  <WorkbenchSelect
+                    size="sm"
+                    variant="subtle"
+                    ariaLabel={t('agent.messageField')}
                     value={config.notification.messageHandle}
-                    onChange={(event) => {
+                    onValueChange={(value) => {
                       if (config.notification == null) return
-                      setConfig({ ...config, notification: { ...config.notification, messageHandle: event.target.value } })
+                      setConfig({ ...config, notification: { ...config.notification, messageHandle: value } })
                     }}
-                  >
-                    <NativeSelectOption value="">{t('agent.chooseInput')}</NativeSelectOption>
-                    {notificationTask.inputs.flatMap((port) =>
-                      'handle' in port &&
-                      typeof port.jsonSchema == 'object' &&
-                      port.jsonSchema != null &&
-                      'type' in port.jsonSchema &&
-                      port.jsonSchema.type == 'string'
-                        ? [
-                            <NativeSelectOption key={port.handle} value={port.handle}>
-                              {port.handle}
-                            </NativeSelectOption>,
-                          ]
-                        : [],
-                    )}
-                  </NativeSelect>
+                    disabled={disabled}
+                    portalRoot={portalRoot}
+                    className="w-full min-w-0"
+                    options={[
+                      { value: '', label: t('agent.chooseInput') },
+                      ...notificationTask.inputs.flatMap((port) =>
+                        'handle' in port &&
+                        typeof port.jsonSchema == 'object' &&
+                        port.jsonSchema != null &&
+                        'type' in port.jsonSchema &&
+                        port.jsonSchema.type == 'string'
+                          ? [{ value: port.handle, label: port.handle }]
+                          : [],
+                      ),
+                    ]}
+                  />
                 </Field>
                 {notificationTask.inputs.flatMap((port) =>
                   !('handle' in port) || port.handle == config.notification?.messageHandle
@@ -623,6 +667,8 @@ export function AgentSettings({
                         <Field key={port.handle}>
                           <FieldLabel id={`notice-${port.handle}-label`}>{port.handle}</FieldLabel>
                           <Source
+                            disabled={disabled}
+                            portalRoot={portalRoot}
                             labelledBy={`notice-${port.handle}-label`}
                             model={false}
                             port={port}

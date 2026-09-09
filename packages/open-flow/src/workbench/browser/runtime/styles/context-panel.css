@@ -493,7 +493,7 @@
     flex-wrap: wrap;
     gap: 6px;
 
-    [data-slot='native-select-wrapper'] {
+    [data-slot='select-trigger'] {
       flex: 1;
       min-width: 120px;
     }

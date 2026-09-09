@@ -482,8 +482,8 @@ function actionNotFound(): ConnectorTaskError {
 }
 
 function actionFailure(response: Record<string, unknown>): ConnectorTaskError {
-  if (response.errorCode != 'invalid_input' || !Array.isArray(response.data)) return unavailable()
-  const details = response.data
+  if (response.success !== false || response.errorCode != 'invalid_input') return unavailable()
+  const details = (Array.isArray(response.data) ? response.data : [])
     .flatMap((value) => {
       const item = record(value) ? value : undefined
       return typeof item?.error == 'string' && item.error.length > 0 ? [item.error.slice(0, 300)] : []

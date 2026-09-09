@@ -793,6 +793,20 @@ describe('Server Connector client', () => {
     })
   })
 
+  it.each([{ status: 400, details: 'private-provider-detail' }, null, undefined])(
+    'recognizes explicit input rejection without a schema error array: %j',
+    async (data) => {
+      const origin = await startConnector((_request, response) => {
+        send(response, 400, { success: false, errorCode: 'invalid_input', message: 'credential=private-provider-secret', data })
+      })
+      const client = new ConnectorClient(origin, '')
+      await expect(client.execute('gmail.fetch_emails', undefined, { pageToken: 'null' }, 'call', AbortSignal.timeout(5000))).rejects.toMatchObject({
+        code: 'connector.input-invalid',
+        message: 'The Connector Action input is invalid.',
+      })
+    },
+  )
+
   it('executes only Connector Capabilities declared by the current inline Task', async () => {
     const calls: string[] = []
     const origin = await startConnector((request, response) => {
@@ -930,6 +944,7 @@ describe('Server Connector client', () => {
   })
 
   it.each([
+    [400, false, 'Connector reported an action failure (HTTP 400).'],
     [502, false, 'Connector reported an action failure (HTTP 502).'],
     [200, true, 'Connector returned an unexpected action response (HTTP 200).'],
   ])('preserves the HTTP %s failure reason without exposing the upstream body', async (status, succeeded, message) => {

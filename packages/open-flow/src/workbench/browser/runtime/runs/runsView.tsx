@@ -64,6 +64,7 @@ export function RunsView({
   const [narrow, setNarrow] = useState(false)
   const [narrowDetailOpen, setNarrowDetailOpen] = useState(false)
   const [tab, setTab] = useState<'output' | 'timeline'>('timeline')
+  const [raw, setRaw] = useState(false)
   const [filters, setFilters] = useState(() => initialRunLogFilters(eventFilter))
   const triggerRun = run?.source == 'trigger' && 'triggerNodeId' in run ? (run as TriggerRun) : undefined
   const triggerName =
@@ -216,6 +217,9 @@ export function RunsView({
                 </Tabs>
                 {tab == 'timeline' && (
                   <div className="run-toolbar-actions">
+                    <Button aria-pressed={raw} onClick={() => setRaw(!raw)} size="sm" variant="ghost">
+                      {t(raw ? 'run.groupedView' : 'run.rawView')}
+                    </Button>
                     <RunLogFilters
                       container={root.current}
                       events={events}
@@ -231,6 +235,7 @@ export function RunsView({
               {tab == 'timeline' ? (
                 <div aria-labelledby="run-history-timeline-tab" className="run-tab-panel" id="run-history-timeline-panel" role="tabpanel" tabIndex={0}>
                   <RunLog
+                    raw={raw}
                     events={events}
                     eventsExpiresAt={eventsExpiresAt}
                     eventNodes={eventNodes}

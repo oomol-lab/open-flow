@@ -35,6 +35,22 @@ export function agentLog(event: RunEvent): Record<string, unknown> | undefined {
     const log = value as Record<string, unknown>
     if (log.kind == 'model' && Number.isSafeInteger(log.round) && Number(log.round) > 0) return log
     if (
+      log.kind == 'model-step' &&
+      Number.isSafeInteger(log.round) &&
+      Number(log.round) > 0 &&
+      (typeof log.finishReason == 'string' || log.finishReason === null)
+    )
+      return log
+    if (
+      log.kind == 'model-tool' &&
+      Number.isSafeInteger(log.round) &&
+      Number(log.round) > 0 &&
+      typeof log.callId == 'string' &&
+      typeof log.toolName == 'string' &&
+      (log.status == 'requested' || log.status == 'failed')
+    )
+      return log
+    if (
       log.kind == 'tool' &&
       typeof log.callId == 'string' &&
       typeof log.toolId == 'string' &&
@@ -92,9 +108,24 @@ export function nodeSummary(events: readonly RunEvent[], visible: ReadonlySet<nu
 }
 
 export function agentSummary(event: RunEvent, t: TFunction): string | undefined {
+  if (event.kind == 'node.started' && event.payload.nodeKind == 'agent') return t('run.agentStarted')
   const log = agentLog(event)
   if (log == null) return
   if (log.kind == 'model') return t('run.agentRound', { round: Number(log.round) })
+  if (log.kind == 'model-tool') return t(log.status == 'requested' ? 'run.agentToolRequested' : 'run.agentToolRequestFailed', { action: String(log.toolName) })
+  if (log.kind == 'model-step') {
+    const reason =
+      log.finishReason == 'tool-calls'
+        ? t('run.agentFinishTools')
+        : log.finishReason == 'stop'
+          ? t('run.agentFinishAnswer')
+          : log.finishReason == 'length'
+            ? t('run.agentFinishLength')
+            : log.finishReason
+    return reason
+      ? t('run.agentRoundFinishedReason', { round: Number(log.round), reason: String(reason) })
+      : t('run.agentRoundFinished', { round: Number(log.round) })
+  }
   if (log.kind == 'result') return t('run.agentRead', { pointer: String(log.pointer || '/'), offset: Number(log.offset) })
   const output = log.output as { result?: { source?: { kind?: string; action?: string } } } | undefined
   const source = output?.result?.source ?? (log.source as { kind?: string; action?: string } | undefined)
