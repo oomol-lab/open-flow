@@ -1,10 +1,12 @@
-import type { CommandHost, Runtime, ParsedArguments } from './support.ts'
+import type { ParsedArguments } from './arguments.ts'
+import type { CommandHost, Runtime } from './support.ts'
 
 import { ApiError, ControlClient } from '@oomol-lab/open-flow/control-api'
+import { parseArguments } from './arguments.ts'
 import { commandExamples, commandHelp, commandOptions, commandSchema } from './commands.ts'
 import { flowCommand } from './flowCommands.ts'
 import { createI18n } from './i18n.ts'
-import { CliError, parseArguments, cloudError } from './support.ts'
+import { CliError, cloudError } from './support.ts'
 
 function help(runtime: Runtime, args: readonly string[]) {
   const path = args.filter((argument) => !argument.startsWith('-'))

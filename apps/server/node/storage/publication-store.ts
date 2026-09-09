@@ -24,6 +24,49 @@ const publishDeadlineMs = 30 * 60 * 1_000
 const publishRetentionMs = 24 * 60 * 60 * 1_000
 export const publishPending = new Error('Publish candidate activation is pending.')
 
+interface PublishInput {
+  readonly closureDigest: string
+  readonly content: string
+  readonly crons: readonly {
+    readonly nextAt: number
+    readonly scheduleJson: string
+    readonly triggerJson: string
+    readonly triggerNodeId: string
+  }[]
+  readonly expectedLivePublicationId: string | null
+  readonly engineContract: string
+  readonly flowId: string
+  readonly idempotencyKey: string
+  readonly integrations: readonly {
+    readonly connectionId: string
+    readonly reconcileAt: number
+    readonly triggerJson: string
+    readonly triggerNodeId: string
+  }[]
+  readonly metadata?:
+    | { readonly actorId: string; readonly modelVersion: number; readonly operation: 'publish' }
+    | {
+        readonly actorId: string
+        readonly modelVersion: number
+        readonly operation: 'rollback'
+        readonly sourcePublicationId: string
+      }
+  readonly operationId?: string
+  readonly polls: readonly {
+    readonly connectionId: string
+    readonly nextAt: number
+    readonly scheduleJson: string
+    readonly triggerJson: string
+    readonly triggerNodeId: string
+  }[]
+  readonly publishedAt: number
+  readonly requestDigest: string
+  readonly revisionDigest: string
+  readonly revisionId: string
+  readonly variableNames: readonly string[]
+  readonly webhooks: readonly { readonly triggerJson: string; readonly triggerNodeId: string }[]
+}
+
 export class PublicationStore {
   readonly #clock: () => number
   readonly #database: DatabaseSync
@@ -394,48 +437,7 @@ export class PublicationStore {
     return { created: false, kind: 'published', publicationId: existing.publicationId }
   }
 
-  publish(input: {
-    readonly closureDigest: string
-    readonly content: string
-    readonly crons: readonly {
-      readonly nextAt: number
-      readonly scheduleJson: string
-      readonly triggerJson: string
-      readonly triggerNodeId: string
-    }[]
-    readonly expectedLivePublicationId: string | null
-    readonly engineContract: string
-    readonly flowId: string
-    readonly idempotencyKey: string
-    readonly integrations: readonly {
-      readonly connectionId: string
-      readonly reconcileAt: number
-      readonly triggerJson: string
-      readonly triggerNodeId: string
-    }[]
-    readonly metadata?:
-      | { readonly actorId: string; readonly modelVersion: number; readonly operation: 'publish' }
-      | {
-          readonly actorId: string
-          readonly modelVersion: number
-          readonly operation: 'rollback'
-          readonly sourcePublicationId: string
-        }
-    readonly operationId?: string
-    readonly polls: readonly {
-      readonly connectionId: string
-      readonly nextAt: number
-      readonly scheduleJson: string
-      readonly triggerJson: string
-      readonly triggerNodeId: string
-    }[]
-    readonly publishedAt: number
-    readonly requestDigest: string
-    readonly revisionDigest: string
-    readonly revisionId: string
-    readonly variableNames: readonly string[]
-    readonly webhooks: readonly { readonly triggerJson: string; readonly triggerNodeId: string }[]
-  }): PublicationAcceptance {
+  publish(input: PublishInput): PublicationAcceptance {
     return this.#transaction(() => {
       const existing = this.replayPublication(input.flowId, input.idempotencyKey, input.requestDigest)
       if (existing != null) {
@@ -539,285 +541,10 @@ export class PublicationStore {
         )
         .run(input.flowId, publicationId, input.publishedAt)
 
-      const desired = new Map(input.webhooks.map((webhook) => [webhook.triggerNodeId, webhook.triggerJson]))
-      const bindings = this.#database
-        .prepare(
-          `SELECT endpoint_id AS endpointId, trigger_node_id AS triggerNodeId, current_publication_id AS currentPublicationId
-           FROM webhook_bindings WHERE flow_id = ?`,
-        )
-        .all(input.flowId) as {
-        readonly currentPublicationId: string | null
-        readonly endpointId: string
-        readonly triggerNodeId: string
-      }[]
-      for (const binding of bindings) {
-        const triggerJson = desired.get(binding.triggerNodeId)
-        if (triggerJson != null) {
-          this.#database
-            .prepare(
-              `UPDATE webhook_bindings
-               SET current_publication_id = ?, runtime_version = runtime_version + 1, trigger_json = ?, updated_at = ?
-               WHERE endpoint_id = ?`,
-            )
-            .run(publicationId, triggerJson, input.publishedAt, binding.endpointId)
-          desired.delete(binding.triggerNodeId)
-        } else if (binding.currentPublicationId != null) {
-          this.#database
-            .prepare(
-              `UPDATE webhook_bindings
-               SET current_publication_id = NULL, runtime_version = runtime_version + 1, trigger_json = NULL, updated_at = ?
-               WHERE endpoint_id = ?`,
-            )
-            .run(input.publishedAt, binding.endpointId)
-        }
-      }
-      for (const [triggerNodeId, triggerJson] of desired) {
-        this.#database
-          .prepare(
-            `INSERT INTO webhook_bindings (
-               endpoint_id, flow_id, trigger_node_id, current_publication_id, runtime_version, trigger_json, updated_at
-             ) VALUES (?, ?, ?, ?, 1, ?, ?)`,
-          )
-          .run(`endpoint_${randomUUID().replaceAll('-', '')}`, input.flowId, triggerNodeId, publicationId, triggerJson, input.publishedAt)
-      }
-
-      const desiredCrons = new Map(input.crons.map((cron) => [cron.triggerNodeId, cron]))
-      const cronBindings = this.#database
-        .prepare(
-          `SELECT binding_id AS bindingId, trigger_node_id AS triggerNodeId, current_publication_id AS currentPublicationId
-           FROM cron_bindings WHERE flow_id = ?`,
-        )
-        .all(input.flowId) as {
-        readonly bindingId: string
-        readonly currentPublicationId: string | null
-        readonly triggerNodeId: string
-      }[]
-      for (const binding of cronBindings) {
-        const cron = desiredCrons.get(binding.triggerNodeId)
-        if (cron != null) {
-          this.#database
-            .prepare(
-              `UPDATE cron_bindings
-               SET current_publication_id = ?, runtime_version = runtime_version + 1,
-                   trigger_json = ?, schedule_json = ?, next_at = ?, updated_at = ?
-               WHERE binding_id = ?`,
-            )
-            .run(publicationId, cron.triggerJson, cron.scheduleJson, cron.nextAt, input.publishedAt, binding.bindingId)
-          desiredCrons.delete(binding.triggerNodeId)
-        } else if (binding.currentPublicationId != null) {
-          this.#database
-            .prepare(
-              `UPDATE cron_bindings
-               SET current_publication_id = NULL, runtime_version = runtime_version + 1,
-                   trigger_json = NULL, schedule_json = NULL, next_at = NULL, updated_at = ?
-               WHERE binding_id = ?`,
-            )
-            .run(input.publishedAt, binding.bindingId)
-        }
-      }
-      for (const [triggerNodeId, cron] of desiredCrons) {
-        this.#database
-          .prepare(
-            `INSERT INTO cron_bindings (
-               binding_id, flow_id, trigger_node_id, current_publication_id,
-               runtime_version, trigger_json, schedule_json, next_at, updated_at
-             ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)`,
-          )
-          .run(
-            `binding_${randomUUID().replaceAll('-', '')}`,
-            input.flowId,
-            triggerNodeId,
-            publicationId,
-            cron.triggerJson,
-            cron.scheduleJson,
-            cron.nextAt,
-            input.publishedAt,
-          )
-      }
-
-      const desiredPolls = new Map(input.polls.map((poll) => [poll.triggerNodeId, poll]))
-      const pollBindings = this.#database
-        .prepare(
-          `SELECT binding_id AS bindingId, trigger_node_id AS triggerNodeId,
-                  current_publication_id AS currentPublicationId, trigger_json AS triggerJson,
-                  connection_id AS connectionId, health
-           FROM poll_bindings WHERE flow_id = ?`,
-        )
-        .all(input.flowId) as {
-        readonly bindingId: string
-        readonly connectionId: string | null
-        readonly currentPublicationId: string | null
-        readonly health: 'failed' | 'healthy' | 'initializing' | 'needs_reauth'
-        readonly triggerJson: string | null
-        readonly triggerNodeId: string
-      }[]
-      for (const binding of pollBindings) {
-        const poll = desiredPolls.get(binding.triggerNodeId)
-        if (poll != null) {
-          const unchanged = binding.triggerJson == poll.triggerJson && binding.connectionId == poll.connectionId
-          if (input.operationId != null && unchanged && binding.currentPublicationId == input.expectedLivePublicationId && binding.health == 'healthy') {
-            this.#database
-              .prepare(
-                `UPDATE poll_bindings
-                 SET current_publication_id = ?, runtime_version = runtime_version + 1,
-                     schedule_json = ?, next_at = ?, retry_at = NULL,
-                     continuation_root_id = NULL, continuation_page = 0,
-                     active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL,
-                     updated_at = ?
-                 WHERE binding_id = ?`,
-              )
-              .run(publicationId, poll.scheduleJson, poll.nextAt, input.publishedAt, binding.bindingId)
-          } else if (input.operationId != null) {
-            if (!this.#polls.activateCandidate(input.operationId, input.flowId, publicationId, poll, input.publishedAt)) {
-              throw publishPending
-            }
-          } else {
-            this.#database
-              .prepare(
-                `UPDATE poll_bindings
-                 SET current_publication_id = ?, runtime_version = runtime_version + 1,
-                     trigger_json = ?, connection_id = ?, schedule_json = ?, next_at = ?, retry_at = NULL,
-                     health = CASE WHEN ? = 1 THEN health ELSE 'initializing' END,
-                     checkpoint_json = CASE WHEN ? = 1 THEN checkpoint_json ELSE 'null' END,
-                     continuation_root_id = NULL, continuation_page = 0,
-                     active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL,
-                     updated_at = ?
-                 WHERE binding_id = ?`,
-              )
-              .run(
-                publicationId,
-                poll.triggerJson,
-                poll.connectionId,
-                poll.scheduleJson,
-                poll.nextAt,
-                unchanged ? 1 : 0,
-                unchanged ? 1 : 0,
-                input.publishedAt,
-                binding.bindingId,
-              )
-          }
-          desiredPolls.delete(binding.triggerNodeId)
-        } else if (binding.currentPublicationId != null) {
-          this.#database
-            .prepare(
-              `UPDATE poll_bindings
-               SET current_publication_id = NULL, runtime_version = runtime_version + 1,
-                   next_at = NULL, retry_at = NULL, continuation_root_id = NULL, continuation_page = 0,
-                   active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL,
-                   updated_at = ?
-               WHERE binding_id = ?`,
-            )
-            .run(input.publishedAt, binding.bindingId)
-        }
-      }
-      for (const [triggerNodeId, poll] of desiredPolls) {
-        if (input.operationId != null) {
-          if (!this.#polls.activateCandidate(input.operationId, input.flowId, publicationId, poll, input.publishedAt)) {
-            throw publishPending
-          }
-        } else {
-          this.#database
-            .prepare(
-              `INSERT INTO poll_bindings (
-                 binding_id, flow_id, trigger_node_id, current_publication_id,
-                 runtime_version, trigger_json, connection_id, schedule_json, next_at, health, updated_at
-               ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, 'initializing', ?)`,
-            )
-            .run(
-              `binding_${randomUUID().replaceAll('-', '')}`,
-              input.flowId,
-              triggerNodeId,
-              publicationId,
-              poll.triggerJson,
-              poll.connectionId,
-              poll.scheduleJson,
-              poll.nextAt,
-              input.publishedAt,
-            )
-        }
-      }
-
-      const desiredIntegrations = new Map(input.integrations.map((integration) => [integration.triggerNodeId, integration]))
-      const integrationBindings = this.#database
-        .prepare(
-          `SELECT binding_id AS bindingId, trigger_node_id AS triggerNodeId,
-                  current_publication_id AS currentPublicationId, trigger_json AS triggerJson,
-                  connection_id AS connectionId
-           FROM integration_bindings WHERE flow_id = ?`,
-        )
-        .all(input.flowId) as {
-        readonly bindingId: string
-        readonly connectionId: string
-        readonly currentPublicationId: string | null
-        readonly triggerJson: string
-        readonly triggerNodeId: string
-      }[]
-      for (const binding of integrationBindings) {
-        const integration = desiredIntegrations.get(binding.triggerNodeId)
-        if (integration != null) {
-          const unchanged = binding.triggerJson == integration.triggerJson && binding.connectionId == integration.connectionId
-          if (input.operationId != null && unchanged) {
-            this.#database
-              .prepare('UPDATE integration_bindings SET current_publication_id = ?, updated_at = ? WHERE binding_id = ?')
-              .run(publicationId, input.publishedAt, binding.bindingId)
-          } else {
-            this.#database
-              .prepare(
-                `UPDATE integration_bindings
-                 SET current_publication_id = ?, runtime_version = runtime_version + 1,
-                     trigger_json = ?, connection_id = ?, reconcile_at = ?, retry_at = NULL,
-                     health = CASE WHEN ? = 1 THEN health ELSE 'initializing' END,
-                     updated_at = ?
-                 WHERE binding_id = ?`,
-              )
-              .run(
-                publicationId,
-                integration.triggerJson,
-                integration.connectionId,
-                integration.reconcileAt,
-                unchanged ? 1 : 0,
-                input.publishedAt,
-                binding.bindingId,
-              )
-          }
-          desiredIntegrations.delete(binding.triggerNodeId)
-        } else if (binding.currentPublicationId != null) {
-          this.#database
-            .prepare(
-              `UPDATE integration_bindings
-               SET current_publication_id = NULL, runtime_version = runtime_version + 1,
-                   reconcile_at = ?, retry_at = NULL, updated_at = ?
-               WHERE binding_id = ?`,
-            )
-            .run(input.publishedAt, input.publishedAt, binding.bindingId)
-        }
-      }
-      for (const [triggerNodeId, integration] of desiredIntegrations) {
-        if (input.operationId != null) {
-          if (!this.#integrations.activateCandidate(input.operationId, input.flowId, publicationId, integration, input.publishedAt)) {
-            throw publishPending
-          }
-          continue
-        }
-        this.#database
-          .prepare(
-            `INSERT INTO integration_bindings (
-               binding_id, endpoint_id, flow_id, trigger_node_id,
-               current_publication_id, runtime_version, trigger_json, connection_id, health, reconcile_at, updated_at
-             ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 'initializing', ?, ?)`,
-          )
-          .run(
-            `binding_${randomUUID().replaceAll('-', '')}`,
-            `endpoint_${randomUUID().replaceAll('-', '')}`,
-            input.flowId,
-            triggerNodeId,
-            publicationId,
-            integration.triggerJson,
-            integration.connectionId,
-            integration.reconcileAt,
-            input.publishedAt,
-          )
-      }
+      this.#installWebhooks(input, publicationId)
+      this.#installCrons(input, publicationId)
+      this.#installPolls(input, publicationId)
+      this.#installIntegrations(input, publicationId)
       if (input.operationId != null) {
         this.#database
           .prepare(
@@ -828,6 +555,294 @@ export class PublicationStore {
       }
       return { created: true, kind: 'published', publicationId }
     })
+  }
+
+  #installWebhooks(input: PublishInput, publicationId: string): void {
+    const desired = new Map(input.webhooks.map((webhook) => [webhook.triggerNodeId, webhook.triggerJson]))
+    const bindings = this.#database
+      .prepare(
+        `SELECT endpoint_id AS endpointId, trigger_node_id AS triggerNodeId, current_publication_id AS currentPublicationId
+         FROM webhook_bindings WHERE flow_id = ?`,
+      )
+      .all(input.flowId) as {
+      readonly currentPublicationId: string | null
+      readonly endpointId: string
+      readonly triggerNodeId: string
+    }[]
+    for (const binding of bindings) {
+      const triggerJson = desired.get(binding.triggerNodeId)
+      if (triggerJson != null) {
+        this.#database
+          .prepare(
+            `UPDATE webhook_bindings
+             SET current_publication_id = ?, runtime_version = runtime_version + 1, trigger_json = ?, updated_at = ?
+             WHERE endpoint_id = ?`,
+          )
+          .run(publicationId, triggerJson, input.publishedAt, binding.endpointId)
+        desired.delete(binding.triggerNodeId)
+      } else if (binding.currentPublicationId != null) {
+        this.#database
+          .prepare(
+            `UPDATE webhook_bindings
+             SET current_publication_id = NULL, runtime_version = runtime_version + 1, trigger_json = NULL, updated_at = ?
+             WHERE endpoint_id = ?`,
+          )
+          .run(input.publishedAt, binding.endpointId)
+      }
+    }
+    for (const [triggerNodeId, triggerJson] of desired) {
+      this.#database
+        .prepare(
+          `INSERT INTO webhook_bindings (
+             endpoint_id, flow_id, trigger_node_id, current_publication_id, runtime_version, trigger_json, updated_at
+           ) VALUES (?, ?, ?, ?, 1, ?, ?)`,
+        )
+        .run(`endpoint_${randomUUID().replaceAll('-', '')}`, input.flowId, triggerNodeId, publicationId, triggerJson, input.publishedAt)
+    }
+  }
+
+  #installCrons(input: PublishInput, publicationId: string): void {
+    const desiredCrons = new Map(input.crons.map((cron) => [cron.triggerNodeId, cron]))
+    const cronBindings = this.#database
+      .prepare(
+        `SELECT binding_id AS bindingId, trigger_node_id AS triggerNodeId, current_publication_id AS currentPublicationId
+         FROM cron_bindings WHERE flow_id = ?`,
+      )
+      .all(input.flowId) as {
+      readonly bindingId: string
+      readonly currentPublicationId: string | null
+      readonly triggerNodeId: string
+    }[]
+    for (const binding of cronBindings) {
+      const cron = desiredCrons.get(binding.triggerNodeId)
+      if (cron != null) {
+        this.#database
+          .prepare(
+            `UPDATE cron_bindings
+             SET current_publication_id = ?, runtime_version = runtime_version + 1,
+                 trigger_json = ?, schedule_json = ?, next_at = ?, updated_at = ?
+             WHERE binding_id = ?`,
+          )
+          .run(publicationId, cron.triggerJson, cron.scheduleJson, cron.nextAt, input.publishedAt, binding.bindingId)
+        desiredCrons.delete(binding.triggerNodeId)
+      } else if (binding.currentPublicationId != null) {
+        this.#database
+          .prepare(
+            `UPDATE cron_bindings
+             SET current_publication_id = NULL, runtime_version = runtime_version + 1,
+                 trigger_json = NULL, schedule_json = NULL, next_at = NULL, updated_at = ?
+             WHERE binding_id = ?`,
+          )
+          .run(input.publishedAt, binding.bindingId)
+      }
+    }
+    for (const [triggerNodeId, cron] of desiredCrons) {
+      this.#database
+        .prepare(
+          `INSERT INTO cron_bindings (
+             binding_id, flow_id, trigger_node_id, current_publication_id,
+             runtime_version, trigger_json, schedule_json, next_at, updated_at
+           ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+        )
+        .run(
+          `binding_${randomUUID().replaceAll('-', '')}`,
+          input.flowId,
+          triggerNodeId,
+          publicationId,
+          cron.triggerJson,
+          cron.scheduleJson,
+          cron.nextAt,
+          input.publishedAt,
+        )
+    }
+  }
+
+  #installPolls(input: PublishInput, publicationId: string): void {
+    const desiredPolls = new Map(input.polls.map((poll) => [poll.triggerNodeId, poll]))
+    const pollBindings = this.#database
+      .prepare(
+        `SELECT binding_id AS bindingId, trigger_node_id AS triggerNodeId,
+                current_publication_id AS currentPublicationId, trigger_json AS triggerJson,
+                connection_id AS connectionId, health
+         FROM poll_bindings WHERE flow_id = ?`,
+      )
+      .all(input.flowId) as {
+      readonly bindingId: string
+      readonly connectionId: string | null
+      readonly currentPublicationId: string | null
+      readonly health: 'failed' | 'healthy' | 'initializing' | 'needs_reauth'
+      readonly triggerJson: string | null
+      readonly triggerNodeId: string
+    }[]
+    for (const binding of pollBindings) {
+      const poll = desiredPolls.get(binding.triggerNodeId)
+      if (poll != null) {
+        const unchanged = binding.triggerJson == poll.triggerJson && binding.connectionId == poll.connectionId
+        if (input.operationId != null && unchanged && binding.currentPublicationId == input.expectedLivePublicationId && binding.health == 'healthy') {
+          this.#database
+            .prepare(
+              `UPDATE poll_bindings
+               SET current_publication_id = ?, runtime_version = runtime_version + 1,
+                   schedule_json = ?, next_at = ?, retry_at = NULL,
+                   continuation_root_id = NULL, continuation_page = 0,
+                   active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL,
+                   updated_at = ?
+               WHERE binding_id = ?`,
+            )
+            .run(publicationId, poll.scheduleJson, poll.nextAt, input.publishedAt, binding.bindingId)
+        } else if (input.operationId != null) {
+          if (!this.#polls.activateCandidate(input.operationId, input.flowId, publicationId, poll, input.publishedAt)) {
+            throw publishPending
+          }
+        } else {
+          this.#database
+            .prepare(
+              `UPDATE poll_bindings
+               SET current_publication_id = ?, runtime_version = runtime_version + 1,
+                   trigger_json = ?, connection_id = ?, schedule_json = ?, next_at = ?, retry_at = NULL,
+                   health = CASE WHEN ? = 1 THEN health ELSE 'initializing' END,
+                   checkpoint_json = CASE WHEN ? = 1 THEN checkpoint_json ELSE 'null' END,
+                   continuation_root_id = NULL, continuation_page = 0,
+                   active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL,
+                   updated_at = ?
+               WHERE binding_id = ?`,
+            )
+            .run(
+              publicationId,
+              poll.triggerJson,
+              poll.connectionId,
+              poll.scheduleJson,
+              poll.nextAt,
+              unchanged ? 1 : 0,
+              unchanged ? 1 : 0,
+              input.publishedAt,
+              binding.bindingId,
+            )
+        }
+        desiredPolls.delete(binding.triggerNodeId)
+      } else if (binding.currentPublicationId != null) {
+        this.#database
+          .prepare(
+            `UPDATE poll_bindings
+             SET current_publication_id = NULL, runtime_version = runtime_version + 1,
+                 next_at = NULL, retry_at = NULL, continuation_root_id = NULL, continuation_page = 0,
+                 active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL,
+                 updated_at = ?
+             WHERE binding_id = ?`,
+          )
+          .run(input.publishedAt, binding.bindingId)
+      }
+    }
+    for (const [triggerNodeId, poll] of desiredPolls) {
+      if (input.operationId != null) {
+        if (!this.#polls.activateCandidate(input.operationId, input.flowId, publicationId, poll, input.publishedAt)) {
+          throw publishPending
+        }
+      } else {
+        this.#database
+          .prepare(
+            `INSERT INTO poll_bindings (
+               binding_id, flow_id, trigger_node_id, current_publication_id,
+               runtime_version, trigger_json, connection_id, schedule_json, next_at, health, updated_at
+             ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, 'initializing', ?)`,
+          )
+          .run(
+            `binding_${randomUUID().replaceAll('-', '')}`,
+            input.flowId,
+            triggerNodeId,
+            publicationId,
+            poll.triggerJson,
+            poll.connectionId,
+            poll.scheduleJson,
+            poll.nextAt,
+            input.publishedAt,
+          )
+      }
+    }
+  }
+
+  #installIntegrations(input: PublishInput, publicationId: string): void {
+    const desiredIntegrations = new Map(input.integrations.map((integration) => [integration.triggerNodeId, integration]))
+    const integrationBindings = this.#database
+      .prepare(
+        `SELECT binding_id AS bindingId, trigger_node_id AS triggerNodeId,
+                current_publication_id AS currentPublicationId, trigger_json AS triggerJson,
+                connection_id AS connectionId
+         FROM integration_bindings WHERE flow_id = ?`,
+      )
+      .all(input.flowId) as {
+      readonly bindingId: string
+      readonly connectionId: string
+      readonly currentPublicationId: string | null
+      readonly triggerJson: string
+      readonly triggerNodeId: string
+    }[]
+    for (const binding of integrationBindings) {
+      const integration = desiredIntegrations.get(binding.triggerNodeId)
+      if (integration != null) {
+        const unchanged = binding.triggerJson == integration.triggerJson && binding.connectionId == integration.connectionId
+        if (input.operationId != null && unchanged) {
+          this.#database
+            .prepare('UPDATE integration_bindings SET current_publication_id = ?, updated_at = ? WHERE binding_id = ?')
+            .run(publicationId, input.publishedAt, binding.bindingId)
+        } else {
+          this.#database
+            .prepare(
+              `UPDATE integration_bindings
+               SET current_publication_id = ?, runtime_version = runtime_version + 1,
+                   trigger_json = ?, connection_id = ?, reconcile_at = ?, retry_at = NULL,
+                   health = CASE WHEN ? = 1 THEN health ELSE 'initializing' END,
+                   updated_at = ?
+               WHERE binding_id = ?`,
+            )
+            .run(
+              publicationId,
+              integration.triggerJson,
+              integration.connectionId,
+              integration.reconcileAt,
+              unchanged ? 1 : 0,
+              input.publishedAt,
+              binding.bindingId,
+            )
+        }
+        desiredIntegrations.delete(binding.triggerNodeId)
+      } else if (binding.currentPublicationId != null) {
+        this.#database
+          .prepare(
+            `UPDATE integration_bindings
+             SET current_publication_id = NULL, runtime_version = runtime_version + 1,
+                 reconcile_at = ?, retry_at = NULL, updated_at = ?
+             WHERE binding_id = ?`,
+          )
+          .run(input.publishedAt, input.publishedAt, binding.bindingId)
+      }
+    }
+    for (const [triggerNodeId, integration] of desiredIntegrations) {
+      if (input.operationId != null) {
+        if (!this.#integrations.activateCandidate(input.operationId, input.flowId, publicationId, integration, input.publishedAt)) {
+          throw publishPending
+        }
+        continue
+      }
+      this.#database
+        .prepare(
+          `INSERT INTO integration_bindings (
+             binding_id, endpoint_id, flow_id, trigger_node_id,
+             current_publication_id, runtime_version, trigger_json, connection_id, health, reconcile_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 'initializing', ?, ?)`,
+        )
+        .run(
+          `binding_${randomUUID().replaceAll('-', '')}`,
+          `endpoint_${randomUUID().replaceAll('-', '')}`,
+          input.flowId,
+          triggerNodeId,
+          publicationId,
+          integration.triggerJson,
+          integration.connectionId,
+          integration.reconcileAt,
+          input.publishedAt,
+        )
+    }
   }
 
   #flow(flowId: string): StoredFlow | undefined {

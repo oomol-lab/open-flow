@@ -1,7 +1,7 @@
 import { createCodeTask } from '@oomol-lab/open-flow/flow-authoring'
 import { applyFlowChanges } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
-import { applySpec } from './support.ts'
+import { applySpec } from './applySpec.ts'
 
 describe('Flow apply Code Actions', () => {
   const capabilities = [{ kind: 'connector', action: 'example.echo', connections: [{ connectionId: 'work', alias: 'office' }], connectionId: 'work' }]
@@ -29,7 +29,7 @@ describe('Flow apply Code Actions', () => {
 })
 
 it('normalizes option syntax without rewriting values that resemble options', async () => {
-  const { parseArguments } = await import('./support.ts')
+  const { parseArguments } = await import('./arguments.ts')
   expect(parseArguments(['code', 'edit', 'flow', 'module', '--code', '--x=y']).code).toBe('--x=y')
   expect(parseArguments(['code', 'edit', 'flow', 'module', '--code=--x=y']).code).toBe('--x=y')
   expect(() => parseArguments(['list', '--json=true'])).toThrow(/does not accept a value/)

@@ -553,34 +553,8 @@ export class PublicationStore {
     this.#stopObservation()
     const fiber = Effect.runFork(
       Effect.gen({ self: this }, function* () {
-        let operation = initial
-        while (operation.status == 'pending') {
-          yield* Effect.sleep(publishPollMs)
-          if (!current()) return false
-          const result = yield* Effect.tryPromise({
-            try: (signal) => this.#client.getPublishOperation(target.flowId, operation.operationId, signal),
-            catch: (error) => error,
-          }).pipe(
-            Effect.match({
-              onFailure: (error) => ({ error }),
-              onSuccess: (value) => ({ value }),
-            }),
-          )
-          if (!current()) return false
-          if ('error' in result) {
-            const error = result.error
-            if (error instanceof ApiError && error.code == 'publication.operation-not-found') {
-              this.#preferences.setItem(this.#operationKey(target.flowId), '')
-              this.#setTarget(target, { operation: undefined, publishing: false })
-              this.#setNotice(errorNotice(error, this.#i18n.t))
-              return false
-            }
-            this.#setNotice(errorNotice(error, this.#i18n.t))
-            continue
-          }
-          operation = result.value
-          this.#setTarget(target, { operation })
-        }
+        const operation = yield* this.#pollOperation(target, initial, current)
+        if (operation == null) return false
         if (!current()) return false
         this.#attempt = undefined
         this.#setTarget(target, { operation, publishing: false })
@@ -610,6 +584,40 @@ export class PublicationStore {
     if (Exit.isSuccess(exit)) return exit.value
     if (Cause.hasInterruptsOnly(exit.cause)) return false
     throw Cause.squash(exit.cause)
+  }
+
+  #pollOperation(target: Target, initial: PublishOperation, current: () => boolean) {
+    return Effect.gen({ self: this }, function* () {
+      let operation = initial
+      while (operation.status == 'pending') {
+        yield* Effect.sleep(publishPollMs)
+        if (!current()) return undefined
+        const result = yield* Effect.tryPromise({
+          try: (signal) => this.#client.getPublishOperation(target.flowId, operation.operationId, signal),
+          catch: (error) => error,
+        }).pipe(
+          Effect.match({
+            onFailure: (error) => ({ error }),
+            onSuccess: (value) => ({ value }),
+          }),
+        )
+        if (!current()) return undefined
+        if ('error' in result) {
+          const error = result.error
+          if (error instanceof ApiError && error.code == 'publication.operation-not-found') {
+            this.#preferences.setItem(this.#operationKey(target.flowId), '')
+            this.#setTarget(target, { operation: undefined, publishing: false })
+            this.#setNotice(errorNotice(error, this.#i18n.t))
+            return undefined
+          }
+          this.#setNotice(errorNotice(error, this.#i18n.t))
+          continue
+        }
+        operation = result.value
+        this.#setTarget(target, { operation })
+      }
+      return operation
+    })
   }
 
   #stopObservation(): void {

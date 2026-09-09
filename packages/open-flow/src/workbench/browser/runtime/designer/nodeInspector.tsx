@@ -289,108 +289,93 @@ function ConnectorAccount({
   const t = useTranslate()
   const available = activeConnections ?? []
   const required = action?.authenticated == true && (connectionId == null || (activeConnections != null && connection?.status != 'active'))
+  let content: ReactElement
+  if (loading) {
+    content = <p>{t('inspector.account.loading')}</p>
+  } else if (actionError != null || action == null) {
+    content = (
+      <>
+        <p>{actionError ?? t('inspector.account.statusUnavailable', { action: actionId })}</p>
+        <Button disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
+          {t('inspector.account.retry')}
+        </Button>
+      </>
+    )
+  } else if (connectionError != null) {
+    content = (
+      <>
+        <p>{t('inspector.account.refreshFailed')}</p>
+        <p className="connection-detail">{connectionError}</p>
+        <Button disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
+          {t('inspector.account.retry')}
+        </Button>
+      </>
+    )
+  } else if (connectionId == null && available.length == 0) {
+    content = (
+      <>
+        {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
+        <div className="connection-prompt">
+          <p>{t('inspector.account.connectBeforeRun', { service: action.serviceName })}</p>
+          <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="sm" type="button">
+            <Icon data-icon="inline-start" name="plus" />
+            {t('inspector.account.connectService', { service: action.serviceName })}
+          </Button>
+        </div>
+      </>
+    )
+  } else {
+    let status: string | undefined
+    if (connectionId != null) {
+      if (connection == null) status = t('inspector.account.missing')
+      else if (connection.status == 'active') status = t('inspector.account.pinned')
+      else status = t(`inspector.account.status.${connection.status}`)
+    }
+    content = (
+      <>
+        {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
+        <Field className="connection-field">
+          <FieldLabel className="sr-only" htmlFor={`${fieldIdPrefix}-connection`}>
+            {t('inspector.account.connection')}
+          </FieldLabel>
+          <NativeSelect
+            disabled={disabled || available.length == 0}
+            id={`${fieldIdPrefix}-connection`}
+            onChange={(event) => void connectors.setConnection(taskId, event.target.value)}
+            value={connectionId ?? ''}
+          >
+            {connectionId == null && (
+              <NativeSelectOption disabled value="">
+                {t('inspector.account.chooseAccount')}
+              </NativeSelectOption>
+            )}
+            {connectionId != null && connection?.status != 'active' && (
+              <NativeSelectOption disabled value={connectionId}>
+                {connection?.displayName ?? connectionId} ({t('inspector.account.unavailable')})
+              </NativeSelectOption>
+            )}
+            {available.map((candidate) => (
+              <NativeSelectOption key={candidate.connectionId} value={candidate.connectionId}>
+                {candidate.displayName}
+                {candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
+        {status != null && <p>{status}</p>}
+        <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="xs" type="button" variant="ghost">
+          <Icon data-icon="inline-start" name="plus" /> {t('inspector.account.addConnection')}
+        </Button>
+      </>
+    )
+  }
   return (
     <section className={`inspector-section connection-state ${required ? 'required' : ''}`} data-inspector-section="account">
       <h3>
         <Icon name="connection" size={15} /> {t('inspector.account.title')}
         {required && <span className="connection-status">{t('inspector.account.required')}</span>}
       </h3>
-      {loading ? (
-        <p>{t('inspector.account.loading')}</p>
-      ) : actionError != null || action == null ? (
-        <>
-          <p>{actionError ?? t('inspector.account.statusUnavailable', { action: actionId })}</p>
-          <Button disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
-            {t('inspector.account.retry')}
-          </Button>
-        </>
-      ) : connectionError != null ? (
-        <>
-          <p>{t('inspector.account.refreshFailed')}</p>
-          <p className="connection-detail">{connectionError}</p>
-          <Button disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
-            {t('inspector.account.retry')}
-          </Button>
-        </>
-      ) : connectionId == null ? (
-        available.length > 0 ? (
-          <>
-            {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
-            <Field className="connection-field">
-              <FieldLabel className="sr-only" htmlFor={`${fieldIdPrefix}-connection`}>
-                {t('inspector.account.connection')}
-              </FieldLabel>
-              <NativeSelect
-                disabled={disabled}
-                id={`${fieldIdPrefix}-connection`}
-                onChange={(event) => void connectors.setConnection(taskId, event.target.value)}
-                value=""
-              >
-                <NativeSelectOption disabled value="">
-                  {t('inspector.account.chooseAccount')}
-                </NativeSelectOption>
-                {available.map((candidate) => (
-                  <NativeSelectOption key={candidate.connectionId} value={candidate.connectionId}>
-                    {candidate.displayName}
-                    {candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </Field>
-            <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="xs" type="button" variant="ghost">
-              <Icon data-icon="inline-start" name="plus" /> {t('inspector.account.addConnection')}
-            </Button>
-          </>
-        ) : (
-          <>
-            {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
-            <div className="connection-prompt">
-              <p>{t('inspector.account.connectBeforeRun', { service: action.serviceName })}</p>
-              <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="sm" type="button">
-                <Icon data-icon="inline-start" name="plus" />
-                {t('inspector.account.connectService', { service: action.serviceName })}
-              </Button>
-            </div>
-          </>
-        )
-      ) : (
-        <>
-          {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
-          <Field className="connection-field">
-            <FieldLabel className="sr-only" htmlFor={`${fieldIdPrefix}-connection`}>
-              {t('inspector.account.connection')}
-            </FieldLabel>
-            <NativeSelect
-              disabled={disabled || available.length == 0}
-              id={`${fieldIdPrefix}-connection`}
-              onChange={(event) => void connectors.setConnection(taskId, event.target.value)}
-              value={connectionId}
-            >
-              {connection?.status != 'active' && (
-                <NativeSelectOption disabled value={connectionId}>
-                  {connection?.displayName ?? connectionId} ({t('inspector.account.unavailable')})
-                </NativeSelectOption>
-              )}
-              {available.map((candidate) => (
-                <NativeSelectOption key={candidate.connectionId} value={candidate.connectionId}>
-                  {candidate.displayName}
-                  {candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </Field>
-          {connection == null ? (
-            <p>{t('inspector.account.missing')}</p>
-          ) : connection.status == 'active' ? (
-            <p>{t('inspector.account.pinned')}</p>
-          ) : (
-            <p>{t(`inspector.account.status.${connection.status}`)}</p>
-          )}
-          <Button disabled={disabled} onClick={() => void connectors.connect(action.serviceId)} size="xs" type="button" variant="ghost">
-            <Icon data-icon="inline-start" name="plus" /> {t('inspector.account.addConnection')}
-          </Button>
-        </>
-      )}
+      {content}
     </section>
   )
 }

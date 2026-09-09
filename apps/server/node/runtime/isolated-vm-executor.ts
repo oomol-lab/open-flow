@@ -476,7 +476,17 @@ async function execute(
   const ivm = (await import('isolated-vm')).default
   let isolate: IsolatedVM.Isolate | undefined
   let globals: ReturnType<typeof installGlobals> | undefined
-  let abort: (() => void) | undefined
+  let cancelTask: IsolatedVM.Reference<() => void> | undefined
+  const abort = (): void => {
+    if (!globals?.close()) return
+    try {
+      cancelTask?.applySync(undefined, [], { arguments: { copy: true } })
+    } finally {
+      cancelTask?.release()
+      cancelTask = undefined
+      if (isolate != null && !isolate.isDisposed) isolate.dispose()
+    }
+  }
   try {
     isolate = new ivm.Isolate({
       memoryLimit: request.limits.memoryMb,
@@ -486,24 +496,9 @@ async function execute(
     })
     const context = await isolate.createContext()
     globals = installGlobals(ivm, context, request, call, capabilities, log)
-    abort = (): void => {
-      if (!globals?.close()) return
-      if (isolate != null && !isolate.isDisposed) isolate.dispose()
-    }
     canceled.addEventListener('abort', abort, { once: true })
     const mainModule = await compileProgram(isolate, context, program, contract, request.limits.cpuMs, request.context)
-    const cancelTask = (await mainModule.namespace.get('cancelTask', { reference: true })) as IsolatedVM.Reference<() => void>
-    canceled.removeEventListener('abort', abort)
-    abort = (): void => {
-      if (!globals?.close()) return
-      try {
-        cancelTask.applySync(undefined, [], { arguments: { copy: true } })
-      } finally {
-        cancelTask.release()
-        if (isolate != null && !isolate.isDisposed) isolate.dispose()
-      }
-    }
-    canceled.addEventListener('abort', abort, { once: true })
+    cancelTask = (await mainModule.namespace.get('cancelTask', { reference: true })) as IsolatedVM.Reference<() => void>
     if (canceled.aborted) abort()
     const source = await invokeProgram(mainModule, request.input, request.limits.cpuMs)
     await globals.flush()
@@ -517,7 +512,7 @@ async function execute(
     const code = /memory|heap|timed out|timeout/i.test(message) ? 'limit-exceeded' : 'invalid-program'
     throw new IsolatedVmError(code, message)
   } finally {
-    if (abort != null) canceled.removeEventListener('abort', abort)
+    canceled.removeEventListener('abort', abort)
     globals?.close()
     if (isolate != null) {
       if (!isolate.isDisposed) isolate.dispose()

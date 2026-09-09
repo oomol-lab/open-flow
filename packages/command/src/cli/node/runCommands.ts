@@ -1,5 +1,6 @@
 import type { JsonValue, RunDetails } from '@oomol-lab/open-flow/control-api'
-import type { Runtime, ParsedArguments } from './support.ts'
+import type { ParsedArguments } from './arguments.ts'
+import type { Runtime } from './support.ts'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import {
