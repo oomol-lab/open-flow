@@ -104,3 +104,51 @@ it('decodes explicit result sources and rejects ambiguous code metadata', () => 
   expect(() => decodeResultRead({ ...value, result: { ...value.result, source: { kind: 'code', action: 'mail.send' } } })).toThrow()
   expect(() => decodeResultRead({ ...value, result: { ...value.result, source: { kind: 'connector' } } })).toThrow()
 })
+
+it('uses the requested budget for complete values and Unicode string pages', () => {
+  const text = '你😀\\"'.repeat(12000)
+  const value = { text }
+  expect(readResult(value).entries?.[0]?.complete).toBe(false)
+  expect(readResult(value, { maxBytes: 1024 * 1024 })).toMatchObject({ complete: true, value })
+  for (const maxBytes of [256, 15000, 64 * 1024]) {
+    let offset = 0
+    let actual = ''
+    do {
+      const page = readResult(value, { pointer: '/text', offset, maxBytes })
+      expect(new TextEncoder().encode(JSON.stringify(page)).byteLength).toBeLessThanOrEqual(maxBytes)
+      actual += page.value
+      if (page.nextOffset == null) break
+      expect(page.nextOffset).toBeGreaterThan(offset)
+      offset = page.nextOffset
+    } while (actual.length < text.length)
+    expect(actual).toBe(text)
+  }
+  expect(String(readResult(text, { maxBytes: 64 * 1024 }).value).length).toBeGreaterThan(String(readResult(text).value).length)
+})
+
+it('bounds complete members and escaped pointer metadata including the continuation', () => {
+  const key = '\\"你'.repeat(250)
+  const value = { [key]: Array.from({ length: 100 }, (_, id) => ({ id, text: 'a'.repeat(1000) })) }
+  const pointer = `/${key}`
+  for (const maxBytes of [15000, 64 * 1024]) {
+    let offset = 0
+    const actual = []
+    do {
+      const page = readResult(value, { pointer, offset, maxBytes })
+      expect(new TextEncoder().encode(JSON.stringify(page)).byteLength).toBeLessThanOrEqual(maxBytes)
+      for (const entry of page.entries ?? []) {
+        expect(entry.complete).toBe(true)
+        actual.push(entry.value)
+      }
+      if (page.nextOffset == null) break
+      offset = page.nextOffset
+    } while (offset < 100)
+    expect(actual).toEqual(value[key])
+  }
+})
+
+it('rejects invalid budgets and pages that cannot make progress', () => {
+  for (const maxBytes of [0, -1, 1.5, NaN, Infinity, 1024 * 1024 + 1]) expect(() => readResult('text', { maxBytes })).toThrow()
+  expect(() => readResult('long text', { maxBytes: 1 })).toThrow('byte budget')
+  expect(() => readResult({ x: 'long text' }, { maxBytes: 1 })).toThrow('preview limit')
+})

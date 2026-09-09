@@ -812,8 +812,11 @@ Agent 保留的每份结果属于一个 Run 和一个 invocation。`resultId` �
 
 - `GET /v1/runs/:runId/results?after=<resultId>` 返回 `{ version: 1, runId, results, nextAfter? }`。
   每页最多 50 项，按 resultId 升序；运行中新增结果后可从第一页刷新列表。
-- `GET /v1/runs/:runId/results/:resultId?pointer=&offset=0&limit=20` 返回 `{ version: 1, runId, result, page }`。
+- `GET /v1/runs/:runId/results/:resultId?pointer=&offset=0&limit=20&maxBytes=15000` 返回 `{ version: 1, runId, result, page }`。
   `pointer` 是最长 4096 字符的 JSON Pointer，默认根；`offset` 是非负整数；`limit` 是 1–100 的整数，用于对象或数组成员分页。
+  `maxBytes` 是 1–1,048,576 的整数，默认 15,000，限制 UTF-8 编码后的完整 `page` JSON，外层 result 元数据另计。
+  字符串按 Unicode code point 偏移分页，片段随页面预算变化，不再另设 8192 bytes 上限；预算无法容纳元数据与一个字符或成员时拒绝。
+  模型 `read_result` 只允许申请最多 65,536 bytes，默认仍为 15,000。
   无效 pointer、越界 offset 或非法参数返回 `run.invalid`。
 - `GET /v1/runs/:runId/results/:resultId/content` 返回完整 JSON，使用 `application/json`、附件下载和 `no-store` 响应头。
 
@@ -828,12 +831,12 @@ Agent 保留的每份结果属于一个 Run 和一个 invocation。`resultId` �
 `complete: false` 表示不能把当前 value 或 entries 当作原始完整 JSON；nextOffset 存在时可以继续翻页。
 
 模型业务工具输出统一为 `{ kind: "stored-result", result, page }`。宿主预留工具名 `read_result`，输入为
-`{ resultId, pointer?, offset?, limit? }`，输出相同 envelope；只允许访问当前 invocation 已取得的结果。
+`{ resultId, pointer?, offset?, limit?, maxBytes? }`，输出相同 envelope；只允许访问当前 invocation 已取得的结果。
 读取不执行外部 Action，不要求业务审批，仍消耗正常模型轮数和运行预算。
 模型历史预览被压缩时返回 `{ kind: "stored-result", result, previewOmitted: true }`，结果仍可读取。
 
 Server 动作响应保护上限为 32 MiB，单 Run 工具结果正文配额为 128 MiB；目录与 Proxy 限制独立。
-读取页保持在 16 KiB 内，预算内的值完整返回，不设单项 2 KiB 限制。对象和数组按页预算返回完整成员，
+读取页默认最多 15,000 bytes，显式 `maxBytes` 可调整；预算内的值完整返回，不设单项 2 KiB 限制。对象和数组按页预算返回完整成员，
 放不下的成员留到下一页；单个成员超过页预算时只提供元信息，可通过其 pointer 继续读取。
 页面的 `complete: false` 不影响其中 `complete: true` 成员的完整性，无需逐项重读这些成员。
 模型历史和框架快照中保留的预览使用 128 KiB 总量预算，
