@@ -1,4 +1,5 @@
-import type { CommandHost, Runtime, ParsedArguments } from './support.ts'
+import type { ParsedArguments } from './arguments.ts'
+import type { CommandHost, Runtime } from './support.ts'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { applyFlowCommand, codeCommand, edgeCommand, inspectFlowCommand, nodeCommand } from './authoringCommands.ts'

@@ -451,32 +451,17 @@ export class IntegrationRuntime {
         catch: (error) => error,
       })
       const endpointUrl = `${options.publicOrigin}/v1/integrations/${binding.endpointId}`
+      const callback = { callbackSecret, endpointUrl }
       let state = this.#store.integrations.integrationState(binding.bindingId)
-      let retiredPrevious = false
-      if (state != null && state.runtimeVersion != binding.runtimeVersion) {
-        const previousState = state
-        const previous = this.#trigger(previousState.triggerJson)
-        const outcome = yield* this.#invokeReconcile(previous.definition, binding.bindingId, previousState.connectionId, binding.flowId, {
-          active: false,
-          callbackSecret,
-          config: previous.trigger.config,
-          endpointUrl,
-          idempotencyKey: ['integration', binding.bindingId, previousState.runtimeVersion, 'retire'].join(':'),
-          now: new Date(now),
-          state: this.#stateContext(previousState, now),
-        })
-        if (outcome.outcome == 'pending') {
-          return yield* Effect.fail(new TransientIntegrationError('Previous Integration subscription is still retiring.'))
-        }
-        this.#store.integrations.deleteIntegrationState(binding.bindingId, previousState.runtimeVersion)
-        state = this.#store.integrations.integrationState(binding.bindingId)
-        if (state != null) return yield* Effect.fail(new TransientIntegrationError('Previous Integration subscription is still retiring.'))
-        retiredPrevious = true
+      const retiredPrevious = state != null && state.runtimeVersion != binding.runtimeVersion
+      if (retiredPrevious && state != null) {
+        yield* this.#retirePrevious(binding, state, callback, now)
+        state = undefined
       }
 
       const active = binding.currentPublicationId != null
-      const resolved = this.#trigger(binding.triggerJson)
       if (!active) {
+        const resolved = this.#trigger(binding.triggerJson)
         if (!retiredPrevious && (state != null || resolved.definition.initialState == null)) {
           const outcome = yield* this.#invokeReconcile(resolved.definition, binding.bindingId, binding.connectionId, binding.flowId, {
             active: false,
@@ -497,6 +482,44 @@ export class IntegrationRuntime {
         return
       }
 
+      yield* this.#activate(binding, state, callback, now)
+    }).pipe(Effect.catch((error) => Effect.sync(() => this.#failReconcile(binding, now, error))))
+  }
+
+  #retirePrevious(
+    binding: StoredIntegrationBinding,
+    previousState: StoredIntegrationState,
+    { callbackSecret, endpointUrl }: Pick<IntegrationReconcileContext, 'callbackSecret' | 'endpointUrl'>,
+    now: number,
+  ) {
+    return Effect.gen({ self: this }, function* () {
+      const previous = this.#trigger(previousState.triggerJson)
+      const outcome = yield* this.#invokeReconcile(previous.definition, binding.bindingId, previousState.connectionId, binding.flowId, {
+        active: false,
+        callbackSecret,
+        config: previous.trigger.config,
+        endpointUrl,
+        idempotencyKey: ['integration', binding.bindingId, previousState.runtimeVersion, 'retire'].join(':'),
+        now: new Date(now),
+        state: this.#stateContext(previousState, now),
+      })
+      if (outcome.outcome == 'pending') {
+        return yield* Effect.fail(new TransientIntegrationError('Previous Integration subscription is still retiring.'))
+      }
+      this.#store.integrations.deleteIntegrationState(binding.bindingId, previousState.runtimeVersion)
+      const state = this.#store.integrations.integrationState(binding.bindingId)
+      if (state != null) return yield* Effect.fail(new TransientIntegrationError('Previous Integration subscription is still retiring.'))
+    })
+  }
+
+  #activate(
+    binding: StoredIntegrationBinding,
+    state: StoredIntegrationState | undefined,
+    { callbackSecret, endpointUrl }: Pick<IntegrationReconcileContext, 'callbackSecret' | 'endpointUrl'>,
+    now: number,
+  ) {
+    return Effect.gen({ self: this }, function* () {
+      const resolved = this.#trigger(binding.triggerJson)
       if (state == null) {
         const initial = resolved.definition.initialState ?? { checkpoint: null, subscription: {} }
         this.#store.integrations.createIntegrationState(binding, initial.checkpoint, initial.subscription, now)
@@ -531,7 +554,7 @@ export class IntegrationRuntime {
           'Integration Trigger is healthy.',
         )
       }
-    }).pipe(Effect.catch((error) => Effect.sync(() => this.#failReconcile(binding, now, error))))
+    })
   }
 
   #failReconcile(binding: StoredIntegrationBinding, now: number, error: unknown): void {

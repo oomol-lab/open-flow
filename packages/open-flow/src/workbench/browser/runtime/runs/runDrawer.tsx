@@ -16,7 +16,7 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Icon } from '../icons.tsx'
 import { eventSubject } from '../workspace.ts'
-import { groupEvents, toolRows, agentSummary, agentLog } from './runGroups.ts'
+import { groupEvents, nodeSummary, agentSummary } from './runGroups.ts'
 import { downloadRunLog } from './runLogExport.ts'
 import { eventHasDetails, RunEventDetail, RunResultView } from './runOutput.tsx'
 import { canCancelRun } from './runStore.ts'
@@ -456,22 +456,8 @@ export function RunLog({
           {(raw ? visibleEvents.map((event) => ({ key: String(event.sequence), node: false, events: [event] })) : groups).map((group) => {
             const event = group.events[0]!
             if (group.node) {
-              const latest = group.events.findLast((item) => item.kind == 'node.log' || item.kind == 'node.progress')
-              const started = group.events.find((item) => item.kind == 'node.started')
-              const completedCalls = new Set(
-                group.events
-                  .map(agentLog)
-                  .filter((log) => log?.kind == 'tool' && log.status == 'completed')
-                  .map((log) => log?.callId),
-              ).size
-              const terminal = group.events.findLast((item) => item.kind == 'node.failed' || item.kind == 'node.completed')
-              const agent = group.events.some((item) => item.kind == 'node.started' && item.payload.nodeKind == 'agent')
+              const { latest, terminal, agent, completedCalls, elapsed, rows } = nodeSummary(group.events, visible)
               const subject = eventSubject(event, t, nodeTitles)
-              const rows = toolRows(
-                group.events.filter((item) => visible.has(item.sequence)),
-                agent,
-              )
-              const elapsed = terminal == null || started == null ? undefined : Math.max(0, Date.parse(terminal.createdAt) - Date.parse(started.createdAt))
               return (
                 <li className={`run-log-event ${terminal == null ? 'neutral' : eventTone(terminal)}`} key={group.key}>
                   <span className="run-log-icon" title={terminal?.kind ?? event.kind}>
@@ -527,12 +513,8 @@ export function RunLog({
                         {t('run.executionSteps', { count: rows.length })}
                       </summary>
                       <ol className="run-step-list">
-                        {rows.map((row) => {
-                          const last = row.at(-1)!
+                        {rows.map(({ events: row, last, seconds }) => {
                           const text = agent ? agentSummary(last, t) : undefined
-                          const start = row.find((item) => agentLog(item)?.status == 'started')
-                          const seconds =
-                            start == null || row.length < 2 ? undefined : Math.max(0, Date.parse(last.createdAt) - Date.parse(start.createdAt)) / 1000
                           const heading = (
                             <>
                               <time dateTime={last.createdAt}>{eventTime(last.createdAt, language)}</time>

@@ -217,15 +217,27 @@ export function graphOrder(graph: Graph): readonly string[] {
 const pathsByGraph = new WeakMap<
   Graph,
   {
-    readonly paths: Map<string, readonly Readonly<Record<string, string>>[]>
+    readonly paths: Map<string, readonly Route[]>
     readonly ancestors: Map<string, Set<string>>
   }
 >()
 
+// Each route fixes branch choices by node ID; $trigger identifies the selected trigger.
+// An absent key leaves that choice unrestricted, so {} covers every execution path.
+type Route = Readonly<Record<string, string>>
+
+function routeCovers(route: Route, target: Route): boolean {
+  return Object.entries(route).every(([key, value]) => target[key] == value)
+}
+
+function routesCompatible(left: Route, right: Route): boolean {
+  return Object.entries(left).every(([key, value]) => right[key] == null || right[key] == value)
+}
+
 function graphPaths(graph: Graph) {
   const cached = pathsByGraph.get(graph)
   if (cached != null) return cached
-  const paths = new Map<string, readonly Readonly<Record<string, string>>[]>()
+  const paths = new Map<string, readonly Route[]>()
   const ancestors = new Map<string, Set<string>>()
   const incoming = new Map<string, Graph['edges'][number][]>()
   for (const edge of graph.edges) {
@@ -237,15 +249,15 @@ function graphPaths(graph: Graph) {
     const node = graph.nodes[id]!
     const edges = incoming.get(id) ?? []
     const parents = new Set<string>()
-    const routes: Readonly<Record<string, string>>[] = []
+    const routes: Route[] = []
     for (const edge of edges) {
       parents.add(edge.source)
       for (const parent of ancestors.get(edge.source) ?? []) parents.add(parent)
       for (const route of paths.get(edge.source) ?? []) {
         const next = edge.sourceHandle == null ? route : { ...route, [edge.source]: edge.sourceHandle }
-        if (routes.some((known) => Object.entries(known).every(([key, value]) => next[key] == value))) continue
+        if (routes.some((known) => routeCovers(known, next))) continue
         for (let index = routes.length - 1; index >= 0; index--) {
-          if (Object.entries(next).every(([key, value]) => routes[index]![key] == value)) routes.splice(index, 1)
+          if (routeCovers(next, routes[index]!)) routes.splice(index, 1)
         }
         routes.push(next)
       }
@@ -265,12 +277,13 @@ function sourcePaths(graph: Graph, paths: ReturnType<typeof graphPaths>['paths']
   return node?.kind == 'condition' || node?.kind == 'wait' ? routes.map((route) => ({ ...route, [source.nodeId]: source.output })) : routes
 }
 
-function covers(routes: readonly Readonly<Record<string, string>>[], target: Readonly<Record<string, string>>, graph: Graph): boolean {
-  const possible = routes.filter((route) => Object.entries(route).every(([key, value]) => target[key] == null || target[key] == value))
-  if (possible.some((route) => Object.entries(route).every(([key, value]) => target[key] == value))) return true
+function covers(routes: readonly Route[], target: Route, graph: Graph): boolean {
+  const possible = routes.filter((route) => routesCompatible(route, target))
+  if (possible.some((route) => routeCovers(route, target))) return true
   const key = possible.flatMap((route) => Object.keys(route)).find((candidate) => target[candidate] == null)
   if (key == null) return false
   const node = graph.nodes[key]
+  // The empty choice represents a branch with no emitted output or no selected trigger.
   const choices =
     node?.kind == 'condition'
       ? [...node.cases.map((item) => item.output), node.defaultOutput ?? '']
@@ -288,21 +301,19 @@ function mappingAvailable(graph: Graph, target: string | undefined, mapping: Inp
   const sources = mapping.sources.map((source) => sourcePaths(graph, paths, source))
   const targetPaths = target == null ? [{}] : (paths.get(target) ?? [])
   if (!targetPaths.every((route) => covers(sources.flat(), route, graph))) return false
-  return sources.every((routes, index) =>
-    sources.slice(index + 1).every((other) =>
-      routes.every((left) =>
-        other.every((right) =>
-          targetPaths.every((targetRoute) => {
-            const values = { ...targetRoute, ...left }
-            return (
-              Object.entries(left).some(([key, value]) => targetRoute[key] != null && targetRoute[key] != value) ||
-              Object.entries(right).some(([key, value]) => values[key] != null && values[key] != value)
-            )
-          }),
-        ),
-      ),
-    ),
-  )
+  // Available sources must cover every target path and never overlap on the same path.
+  for (const [index, routes] of sources.entries()) {
+    for (const other of sources.slice(index + 1)) {
+      for (const left of routes) {
+        for (const targetRoute of targetPaths) {
+          if (!routesCompatible(left, targetRoute)) continue
+          const path = { ...targetRoute, ...left }
+          if (other.some((right) => routesCompatible(right, path))) return false
+        }
+      }
+    }
+  }
+  return true
 }
 
 export function availableOutputs(document: FlowDocument, graph: Graph, target: string, handle?: string): Readonly<Record<string, readonly string[]>> {

@@ -133,7 +133,7 @@ export class WorkspaceStore {
     this.#flows = new FlowCatalog(client, setNotice, i18n)
     this.#model = new WorkspaceModel(i18n, this.#flows)
     this.#draftChanges = new DraftChanges(client, setNotice, i18n, {
-      apply: (draft, preserveDiagnostics) => this.#applyProjectedDraft(draft, preserveDiagnostics),
+      apply: (draft, preserveDiagnostics) => this.#applyDraft(draft, 'local', preserveDiagnostics),
       beforeChange: (manageBusy) => {
         if (manageBusy) {
           this.#set({ busy: 'designer' })
@@ -146,7 +146,7 @@ export class WorkspaceStore {
       finishChanges: () => {
         if (!this.#disposed && this.#model.value.busy == 'designer') this.#set({ busy: undefined })
       },
-      headChanged: (flowId, revisionId) => this.#advanceFlowHead(flowId, revisionId),
+      headChanged: (flowId, revisionId) => this.#flows.advanceHead(flowId, revisionId),
       recover: (context) => this.#syncDraftHead(context, true),
     })
     this.#presentationChanges = new PresentationChanges(client, setNotice, (presentation) => this.#set({ presentation }), i18n)
@@ -713,7 +713,7 @@ export class WorkspaceStore {
     const base = pending?.base ?? this.#model.value.draft?.content.modules[editor.moduleId]
     if (base == null) return
     this.#moduleDrafts.set(editor.moduleId, { base, editor: { ...editor, phase: undefined, source } })
-    this.#set({})
+    this.#publishEditor()
   }
 
   public discardModuleChanges(): void {
@@ -733,7 +733,7 @@ export class WorkspaceStore {
     for (const pending of this.#moduleDrafts.values()) {
       if (pending.editor.phase == 'failed') pending.editor = { ...pending.editor, phase: undefined }
     }
-    this.#set({})
+    this.#publishEditor()
     return await this.#flushModules()
   }
 
@@ -755,7 +755,7 @@ export class WorkspaceStore {
       const [moduleId, pending] = entry
       const source = pending.editor.source
       pending.editor = { ...pending.editor, phase: 'saving' }
-      this.#set({})
+      this.#publishEditor()
       try {
         const imports = await moduleImports(source)
         if (this.#disposed || !current()) return false
@@ -785,7 +785,7 @@ export class WorkspaceStore {
         if (latest != null) latest.editor = { ...latest.editor, phase: 'failed' }
         this.#setNotice(errorNotice(error, this.#i18n.t))
       }
-      this.#set({})
+      this.#publishEditor()
     }
     return false
   }
@@ -880,21 +880,22 @@ export class WorkspaceStore {
     if (current()) void this.#checkTarget()
   }
 
-  #applyProjectedDraft(draft: Draft, preserveDiagnostics = false): RevisionView {
+  #applyDraft(draft: Draft, origin: 'local' | 'external', preserveDiagnostics = false): boolean {
     const previousDraft = this.#model.value.draft
     const { revision, selectedNodeIds, target } = this.#reconcileRevision(draft)
-    const currentEditor = this.#model.value.moduleEditor
+    const editor = this.#model.value.moduleEditor
+    const keepEditor = editor != null && (origin == 'external' || previousDraft != null) && moduleEditorStatus(previousDraft, editor) != 'saved'
+    let moduleEditor: ModuleEditorDraft | undefined
+    if (keepEditor) moduleEditor = origin == 'external' ? { ...editor, phase: 'failed' } : editor
+    else moduleEditor = selectedModuleEditor(revision, target, selectedNodeIds)
     this.#set({
       diagnostics: preserveDiagnostics ? this.#model.value.diagnostics : undefined,
       draft,
-      moduleEditor:
-        currentEditor != null && previousDraft != null && moduleEditorStatus(previousDraft, currentEditor) != 'saved'
-          ? currentEditor
-          : selectedModuleEditor(revision, target, selectedNodeIds),
+      moduleEditor,
       selectedNodeIds,
       target,
     })
-    return revision
+    return keepEditor
   }
 
   async #changePresentation(update: PresentationUpdate): Promise<void> {
@@ -971,25 +972,21 @@ export class WorkspaceStore {
       const committed = synced.draft
       if (committed.revisionId == base.revisionId) return true
 
-      const preserveDiagnostics = false
-      const preserveModuleEditor = this.#applyExternalDraft(committed, preserveDiagnostics)
-      this.#advanceFlowHead(context.flowId, committed.revisionId)
+      const draft = this.#draftChanges.replaceCommitted(committed)
+      const preserveModuleEditor = this.#applyDraft(draft, 'external')
+      this.#flows.advanceHead(context.flowId, committed.revisionId)
       if (notifyUpdate) {
         this.#setNotice({
           kind: preserveModuleEditor ? 'error' : 'success',
           message: this.#i18n.t(preserveModuleEditor ? 'notice.moduleUpdated' : 'notice.draftUpdated'),
         })
       }
-      if (!preserveDiagnostics) void this.#checkTarget()
+      void this.#checkTarget()
       return true
     } catch (error) {
       if (reportError && this.#isDraftChangeCurrent(context)) this.#setNotice(errorNotice(error, this.#i18n.t))
       return false
     }
-  }
-
-  #advanceFlowHead(flowId: string, revisionId: string): void {
-    this.#flows.advanceHead(flowId, revisionId)
   }
 
   #designer(): DesignerGraph {
@@ -1004,47 +1001,25 @@ export class WorkspaceStore {
     return { revision, selectedNodeIds, target }
   }
 
-  #applyExternalDraft(committed: Draft, preserveDiagnostics: boolean): boolean {
-    const draft = this.#draftChanges.replaceCommitted(committed)
-    const editor = this.#model.value.moduleEditor
-    const preserveModuleEditor = editor != null && moduleEditorStatus(this.#model.value.draft, editor) != 'saved'
-    const reconciled = this.#reconcileRevision(draft)
-    const target = reconciled.target
-    this.#set({
-      diagnostics: preserveDiagnostics ? this.#model.value.diagnostics : undefined,
-      draft,
-      moduleEditor: this.#moduleEditorAfterExternalDraft(reconciled.revision, target, reconciled.selectedNodeIds),
-      selectedNodeIds: reconciled.selectedNodeIds,
-      target,
-    })
-    return preserveModuleEditor
-  }
-
-  #moduleEditorAfterExternalDraft(
-    revision: RevisionView,
-    target: DesignerTarget | undefined,
-    selectedNodeIds: readonly string[],
-  ): ModuleEditorDraft | undefined {
-    const editor = this.#model.value.moduleEditor
-    if (editor == null || moduleEditorStatus(this.#model.value.draft, editor) == 'saved') {
-      return selectedModuleEditor(revision, target, selectedNodeIds)
-    }
-    return { ...editor, phase: 'failed' }
-  }
-
   #isDraftChangeCurrent(context: DraftChangeContext): boolean {
     return !this.#disposed && context.flowId == this.#model.value.flowId && context.current()
+  }
+
+  #editorState(editor: ModuleEditorDraft | undefined): Pick<WorkspaceState, 'moduleEditor' | 'moduleSaveStatus'> {
+    const moduleEditor = editor == null ? undefined : (this.#moduleDrafts.get(editor.moduleId)?.editor ?? editor)
+    let moduleSaveStatus: WorkspaceState['moduleSaveStatus']
+    if ([...this.#moduleDrafts.values()].some((pending) => pending.editor.phase == 'failed')) moduleSaveStatus = 'failed'
+    else if (this.#moduleDrafts.size > 0) moduleSaveStatus = 'saving'
+    return { moduleEditor, moduleSaveStatus }
+  }
+
+  #publishEditor(): void {
+    if (!this.#disposed) this.#model.set(this.#editorState(this.#model.value.moduleEditor))
   }
 
   #set(patch: Partial<WorkspaceState>): void {
     if (this.#disposed) return
     const editor = Object.hasOwn(patch, 'moduleEditor') ? patch.moduleEditor : this.#model.value.moduleEditor
-    const moduleEditor = editor == null ? undefined : (this.#moduleDrafts.get(editor.moduleId)?.editor ?? editor)
-    const moduleSaveStatus = [...this.#moduleDrafts.values()].some((pending) => pending.editor.phase == 'failed')
-      ? 'failed'
-      : this.#moduleDrafts.size > 0
-        ? 'saving'
-        : undefined
-    this.#model.set({ ...patch, moduleEditor, moduleSaveStatus })
+    this.#model.set({ ...patch, ...this.#editorState(editor) })
   }
 }

@@ -589,6 +589,42 @@ function validateCheckpoint(
   }
 }
 
+type NodeResult =
+  | { readonly kind: 'completed'; readonly outputs: Readonly<Record<string, JsonValue>> }
+  | { readonly kind: 'suspended'; readonly value: JsonValue; readonly agent: FlowRunCheckpoint['agents'][string] }
+
+function suspendGraph(
+  context: RunContext,
+  target: GraphTarget,
+  runId: string,
+  checkpoint: FlowRunCheckpoint,
+  notification: Extract<FlowRunOutcome, { readonly kind: 'waiting' }>['notification'],
+): Effect.Effect<FlowRunOutcome, Error> {
+  return Effect.gen(function* () {
+    const { jobId, nodeId, waitId, value } = checkpoint.wait
+    const node = target.graph.nodes[nodeId] as ExecutableNode
+    const encoded = JSON.stringify(checkpoint)
+    if (new TextEncoder().encode(encoded).byteLength > 16 * 1024 * 1024) {
+      const message = 'Flow Run checkpoint exceeds 16 MiB.'
+      yield* context.emit({ code: 'run.checkpoint-too-large', jobId, message, nodeId, runId, type: 'node.failed' })
+      yield* context.emit({ message, runId, type: 'run.failed' })
+      return yield* Effect.fail(new Error(`run.checkpoint-too-large: ${message}`))
+    }
+    return {
+      kind: 'waiting',
+      wait: {
+        actions: node.kind == 'wait' ? node.actions : ['approve', 'reject'],
+        prompt: node.kind == 'wait' ? node.prompt : JSON.stringify(value, null, 2),
+        jobId,
+        nodeId,
+        waitId,
+      },
+      ...(notification == null ? {} : { notification }),
+      checkpoint: decodeFlowRunCheckpoint(JSON.parse(encoded)),
+    }
+  })
+}
+
 function runGraph(
   context: RunContext,
   target: GraphTarget,
@@ -686,7 +722,7 @@ function runGraph(
         jobId: string,
         nodeInputs: Readonly<Record<string, JsonValue>>,
         resolution?: 'approve' | 'reject',
-      ): Effect.Effect<Readonly<Record<string, JsonValue>> | undefined, Error> => {
+      ): Effect.Effect<NodeResult, Error> => {
         const config = agentConfig(context.prepared, node)
         const saved = agents[nodeId]
         const remainingMs = saved?.remainingMs ?? node.timeoutMs
@@ -765,23 +801,18 @@ function runGraph(
                   const value = agentApproval(config, checkpoint, nodeInputs)
                   const left = remainingMs == null ? undefined : remainingMs - (performance.now() - startedAt)
                   if (left != null && left <= 0) throw new Error(`Node "${nodeId}" timed out.`)
-                  agents[nodeId] = {
-                    invocationId: saved?.invocationId ?? jobId,
-                    input: nodeInputs,
-                    ...(left == null ? {} : { remainingMs: left }),
-                    checkpoint,
-                  }
-                  pendingWaits.push({
-                    jobId,
-                    nodeId,
-                    waitId: context.createId(),
+                  return {
+                    kind: 'suspended' as const,
                     value,
-                  })
-                  suspending = true
-                  return undefined
+                    agent: {
+                      invocationId: saved?.invocationId ?? jobId,
+                      input: nodeInputs,
+                      ...(left == null ? {} : { remainingMs: left }),
+                      checkpoint,
+                    },
+                  }
                 }
                 outputs = { output: response.output }
-                delete agents[nodeId]
               } else outputs = outputRecord(result, nodeId)
               break
             }
@@ -789,7 +820,7 @@ function runGraph(
               return yield* Effect.fail(new Error('Wait jobs are handled by the Scheduler suspension boundary.'))
           }
           return yield* Effect.try({
-            try: () => validateOutputs(context.prepared, nodeId, node, outputs),
+            try: () => ({ kind: 'completed' as const, outputs: validateOutputs(context.prepared, nodeId, node, outputs) }),
             catch: (error) => (error instanceof Error ? error : new Error(String(error))),
           })
         })
@@ -801,6 +832,17 @@ function runGraph(
                 orElse: () => Effect.fail(new Error(`Node "${nodeId}" timed out.`)),
               }),
             )
+      }
+
+      const settleNode = (nodeId: string, jobId: string, result: NodeResult): Effect.Effect<void, Error> => {
+        if (result.kind == 'completed') {
+          delete agents[nodeId]
+          return commit(nodeId, jobId, result.outputs)
+        }
+        agents[nodeId] = result.agent
+        pendingWaits.push({ jobId, nodeId, waitId: context.createId(), value: result.value })
+        suspending = true
+        return Effect.void
       }
 
       const observe = (nodeId: string, jobId: string, effect: Effect.Effect<void, Error>) =>
@@ -863,10 +905,11 @@ function runGraph(
                 pendingWaits.push({ jobId, nodeId, waitId, value: nodeInputs[node.input.handle]! })
                 return
               }
-              const outputs = yield* executeNode(nodeId, node, jobId, nodeInputs)
-              if (outputs == null) return
-              yield* commit(nodeId, jobId, outputs)
-              for (const child of children.get(nodeId) ?? []) scheduleReady(child)
+              const result = yield* executeNode(nodeId, node, jobId, nodeInputs)
+              yield* settleNode(nodeId, jobId, result)
+              if (result.kind == 'completed') {
+                for (const child of children.get(nodeId) ?? []) scheduleReady(child)
+              }
             }),
           ),
         )
@@ -888,8 +931,8 @@ function runGraph(
               yield* commit(saved.nodeId, saved.jobId, validateOutputs(context.prepared, saved.nodeId, node, { [resume.action]: saved.value }))
             } else {
               if (resume.action == 'continue') return yield* Effect.fail(new Error('Agent requires approve or reject.'))
-              const outputs = yield* executeNode(saved.nodeId, node, saved.jobId, agents[saved.nodeId]!.input, resume.action)
-              if (outputs != null) yield* commit(saved.nodeId, saved.jobId, outputs)
+              const result = yield* executeNode(saved.nodeId, node, saved.jobId, agents[saved.nodeId]!.input, resume.action)
+              yield* settleNode(saved.nodeId, saved.jobId, result)
             }
           }),
         ).pipe(Effect.exit)
@@ -930,17 +973,6 @@ function runGraph(
               }
             : undefined
         if (agents[nodeId] != null) notification = agentNotice(context.prepared, node, agents[nodeId]!.input)
-        const waiting = {
-          kind: 'waiting' as const,
-          wait: {
-            actions: node.kind == 'wait' ? node.actions : (['approve', 'reject'] as const),
-            prompt: node.kind == 'wait' ? node.prompt : JSON.stringify(value, null, 2),
-            jobId,
-            nodeId,
-            waitId,
-          },
-          ...(notification == null ? {} : { notification }),
-        }
         const checkpointSource: FlowRunCheckpoint = {
           bindingValues: context.bindingValues,
           inputs: launch,
@@ -951,22 +983,7 @@ function runGraph(
           queue,
           wait: { jobId, nodeId, value, waitId },
         }
-        const encoded = JSON.stringify(checkpointSource)
-        if (new TextEncoder().encode(encoded).byteLength > 16 * 1024 * 1024) {
-          const message = 'Flow Run checkpoint exceeds 16 MiB.'
-          yield* context.emit({
-            code: 'run.checkpoint-too-large',
-            jobId,
-            message,
-            nodeId,
-            runId,
-            type: 'node.failed',
-          })
-          yield* context.emit({ message, runId, type: 'run.failed' })
-          return yield* Effect.fail(new Error(`run.checkpoint-too-large: ${message}`))
-        }
-        const checkpoint = decodeFlowRunCheckpoint(JSON.parse(encoded))
-        return { ...waiting, checkpoint }
+        return yield* suspendGraph(context, target, runId, checkpointSource, notification)
       }
       if (!order.every(settled)) return yield* Effect.fail(new Error('Execution graph contains unresolved dependencies.'))
       if (target.kind == 'subflow') {

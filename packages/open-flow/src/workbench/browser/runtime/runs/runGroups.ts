@@ -68,6 +68,29 @@ export function toolRows(events: readonly RunEvent[], agent: boolean): readonly 
   return rows
 }
 
+export function nodeSummary(events: readonly RunEvent[], visible: ReadonlySet<number>) {
+  const latest = events.findLast((event) => event.kind == 'node.log' || event.kind == 'node.progress')
+  const started = events.find((event) => event.kind == 'node.started')
+  const terminal = events.findLast((event) => event.kind == 'node.failed' || event.kind == 'node.completed')
+  const agent = events.some((event) => event.kind == 'node.started' && event.payload.nodeKind == 'agent')
+  const calls = new Set<unknown>()
+  for (const event of events) {
+    const log = agentLog(event)
+    if (log?.kind == 'tool' && log.status == 'completed') calls.add(log.callId)
+  }
+  const elapsed = terminal == null || started == null ? undefined : Math.max(0, Date.parse(terminal.createdAt) - Date.parse(started.createdAt))
+  const rows = toolRows(
+    events.filter((event) => visible.has(event.sequence)),
+    agent,
+  ).map((row) => {
+    const last = row.at(-1)!
+    const start = row.find((event) => agentLog(event)?.status == 'started')
+    const seconds = start == null || row.length < 2 ? undefined : Math.max(0, Date.parse(last.createdAt) - Date.parse(start.createdAt)) / 1000
+    return { events: row, last, seconds }
+  })
+  return { latest, terminal, agent, completedCalls: calls.size, elapsed, rows }
+}
+
 export function agentSummary(event: RunEvent, t: TFunction): string | undefined {
   const log = agentLog(event)
   if (log == null) return

@@ -630,7 +630,7 @@ export class Store {
       if (!this.#variablesExist(input.variableNames)) return { kind: 'binding-unresolved' }
       if (!this.#hasRunCapacity()) return { kind: 'overloaded' }
 
-      const runId = this.#insertRun({
+      const runId = this.#queueRun({
         ...input,
         source: 'draft',
       })
@@ -678,7 +678,7 @@ export class Store {
       if (!this.#variablesExist(input.variableNames)) return { kind: 'binding-unresolved' }
       if (!this.#hasRunCapacity()) return { kind: 'overloaded' }
 
-      const runId = this.#insertRun({
+      const runId = this.#queueRun({
         ...input,
         publicationId: publication.publicationId,
         source: 'live',
@@ -1509,7 +1509,7 @@ export class Store {
     if (!this.#hasRunCapacity()) return { kind: 'overloaded' }
 
     this.#ensureRevision(input)
-    const runId = this.#insertRun({
+    const runId = this.#queueRun({
       ...input,
       idempotencyKey: `trigger:${randomUUID()}`,
       inputs: {},
@@ -1537,7 +1537,23 @@ export class Store {
     }
   }
 
-  #insertRun(input: {
+  #agentSnapshot(revisionId: string, triggerId?: string): { model: LlmConfig; bindings: Readonly<Record<string, string>> } | undefined {
+    const row = this.#database
+      .prepare(`SELECT content FROM revisions WHERE revision_id = ? AND EXISTS (
+      SELECT 1 FROM json_each(revisions.content, '$.document.tasks') WHERE json_extract(value, '$.executor.kind') = 'agent'
+    )`)
+      .get(revisionId) as { readonly content: string } | undefined
+    if (row == null) return
+    const revision = decodeRevision(encoder.encode(row.content))
+    const dependencies = flowDependencies(revision, triggerId)
+    if (![...dependencies.tasks].some((id) => revision.document.tasks[id]?.executor.kind == 'agent')) return
+    const model = this.#llmConfig()
+    const bindings = this.resolveVariables(variableBindings(revision, dependencies.inputBindings))
+    if (model == null || bindings == null) throw new AcceptanceError('flow-invalid', 'Agent model or Variable configuration is unavailable.')
+    return { model, bindings }
+  }
+
+  #queueRun(input: {
     readonly closureDigest: string
     readonly flowId: string
     readonly idempotencyKey: string
@@ -1552,23 +1568,7 @@ export class Store {
   }): string {
     const runId = randomUUID()
     const connectorTeamId = this.connectorTeam(input.flowId)
-    const row = this.#database
-      .prepare(`SELECT content FROM revisions WHERE revision_id = ? AND EXISTS (
-      SELECT 1 FROM json_each(revisions.content, '$.document.tasks') WHERE json_extract(value, '$.executor.kind') = 'agent'
-    )`)
-      .get(input.revisionId) as { readonly content: string } | undefined
-    let model: LlmConfig | undefined
-    let bindings: Readonly<Record<string, string>> | undefined
-    if (row != null) {
-      const revision = decodeRevision(encoder.encode(row.content))
-      const dependencies = flowDependencies(revision, input.source == 'draft' ? input.trigger.nodeId : undefined)
-      if ([...dependencies.tasks].some((id) => revision.document.tasks[id]?.executor.kind == 'agent')) {
-        model = this.#llmConfig()
-        const resolved = this.resolveVariables(variableBindings(revision, dependencies.inputBindings))
-        if (model == null || resolved == null) throw new AcceptanceError('flow-invalid', 'Agent model or Variable configuration is unavailable.')
-        bindings = resolved
-      }
-    }
+    const snapshot = this.#agentSnapshot(input.revisionId, input.source == 'draft' ? input.trigger.nodeId : undefined)
     this.#database
       .prepare(
         `INSERT INTO runs (
@@ -1595,8 +1595,8 @@ export class Store {
         connectorTeamId ?? null,
         input.trigger.nodeId,
         JSON.stringify(input.trigger.payload),
-        JSON.stringify(model) ?? null,
-        JSON.stringify(bindings) ?? null,
+        JSON.stringify(snapshot?.model) ?? null,
+        JSON.stringify(snapshot?.bindings) ?? null,
       )
     this.#database.prepare('INSERT INTO work (run_id) VALUES (?)').run(runId)
     const payload = {}

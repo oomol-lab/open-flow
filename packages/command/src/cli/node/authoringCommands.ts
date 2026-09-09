@@ -1,6 +1,7 @@
 import type { ConnectorAction, Flow, TriggerKeySnapshot } from '@oomol-lab/open-flow/control-api'
 import type { TriggerNode } from '@oomol-lab/open-flow/flow-change'
-import type { Runtime, ParsedArguments, SemanticNode } from './support.ts'
+import type { ParsedArguments } from './arguments.ts'
+import type { Runtime, SemanticNode } from './support.ts'
 
 import { ApiError, ControlClient } from '@oomol-lab/open-flow/control-api'
 import {
@@ -22,6 +23,7 @@ import {
   updateSettings,
 } from '@oomol-lab/open-flow/flow-authoring'
 import { applyFlowChanges } from '@oomol-lab/open-flow/flow-change'
+import { applySpec } from './applySpec.ts'
 import {
   CliError,
   selectedDraftFlow,
@@ -41,7 +43,6 @@ import {
   nodeSummary,
   moduleText,
   argumentText,
-  applySpec,
   withInputValues,
   changeDraft,
 } from './support.ts'
