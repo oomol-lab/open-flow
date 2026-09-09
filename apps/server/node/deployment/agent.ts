@@ -1,5 +1,6 @@
 import type { MastraModelConfig } from '@mastra/core/llm'
 import type { ProcessInputStepArgs } from '@mastra/core/processors'
+import type { ChunkType, LLMStepResult } from '@mastra/core/stream'
 import type { WorkflowRunState } from '@mastra/core/workflows'
 import type { AgentTool, JsonValue, ManagedTaskDefinition } from '@oomol-lab/open-flow/flow-change'
 import type { AgentInvocation, AgentResult } from '@oomol-lab/open-flow/runtime-contract'
@@ -81,7 +82,7 @@ export async function executeAgent(
   const definition = new Agent({
     id: invocation.invocationId,
     name: task.name,
-    instructions: `${instructions}${config.code == true ? '\nUse run_code with result references for deterministic data processing instead of reading individual records. The code receives only its inputs and must return JSON.' : ''}\nTool results are saved by the host. Use page.value and page.entries directly: a value marked complete already contains all data at that pointer, including nested fields. Do not reread it. A page marked incomplete may still contain complete entries. Read only missing content needed for the task with read_result and result.resultId. Prefer reading an array page over reading its items one by one. To fetch more entries or string content, use nextOffset with the same pointer. Read a child pointer only if its value was omitted; if previewOmitted is true, retrieve only the needed paths. Stop reading once you have enough information to answer. Never repeat an external action merely to retrieve omitted result content.`,
+    instructions: `${instructions}${config.code == true ? '\nUse run_code with result references for deterministic data processing instead of reading individual records. The code receives only its inputs and must return JSON.' : ''}\nPreserve JSON types in tool arguments: use actual null for absent nullable values, never the string "null". Use pagination tokens only when returned by the tool; if no token is returned, keep it null.\nTool results are saved by the host. Use page.value and page.entries directly: a value marked complete already contains all data at that pointer, including nested fields. Do not reread it. A page marked incomplete may still contain complete entries. Read only missing content needed for the task with read_result and result.resultId. Prefer reading an array page over reading its items one by one. To fetch more entries or string content, use nextOffset with the same pointer. Read a child pointer only if its value was omitted; if previewOmitted is true, retrieve only the needed paths. Stop reading once you have enough information to answer. Never repeat an external action merely to retrieve omitted result content.`,
     model,
     tools,
   })
@@ -93,6 +94,35 @@ export async function executeAgent(
     maxRetries: 0,
     toolCallConcurrency: 1,
     abortSignal: signal,
+    onStepFinish: async (step: LLMStepResult<unknown>) => {
+      await report({
+        kind: 'model-step',
+        round: rounds,
+        finishReason: step.finishReason ?? null,
+        textLength: step.text.length,
+        toolCalls: step.toolCalls.map(({ payload }) => ({ callId: payload.toolCallId, toolName: payload.toolName })),
+        usage: { inputTokens: step.usage.inputTokens ?? null, outputTokens: step.usage.outputTokens ?? null },
+      })
+    },
+    onChunk: async (chunk: ChunkType | ChunkType<unknown>) => {
+      if (chunk.type != 'tool-call' && chunk.type != 'tool-error' && chunk.type != 'tool-result') return
+      let error: unknown
+      if (chunk.type == 'tool-error') error = chunk.payload.error
+      if (chunk.type == 'tool-result') {
+        const result = chunk.payload.result
+        if (!chunk.payload.isError && !(result != null && typeof result == 'object' && 'error' in result && result.error)) return
+        error = result
+      }
+      await report({
+        kind: 'model-tool',
+        round: rounds,
+        status: chunk.type == 'tool-call' ? 'requested' : 'failed',
+        callId: chunk.payload.toolCallId,
+        toolName: chunk.payload.toolName,
+        input: JSON.stringify(chunk.payload.args) ?? null,
+        ...(chunk.type == 'tool-call' ? {} : { error: error instanceof Error ? error.message : (JSON.stringify(error) ?? String(error)) }),
+      })
+    },
     prepareStep: async ({ messages }: ProcessInputStepArgs) => {
       signal.throwIfAborted()
       if (rounds >= config.maxRounds) {
@@ -121,9 +151,13 @@ export async function executeAgent(
   if (invocation.resume == null) {
     stream = await agent.stream(String(agentInput(config.prompt, invocation.input)), options)
   } else if (invocation.resume.action == 'approve') {
-    stream = await agent.approveToolCall({ ...options, toolCallId: providerId })
+    stream = await agent.approveToolCall<undefined>({ ...options, toolCallId: providerId })
   } else {
-    stream = await agent.declineToolCall({ ...options, toolCallId: providerId, reason: 'The reviewer rejected this call. Do not report it as executed.' })
+    stream = await agent.declineToolCall<undefined>({
+      ...options,
+      toolCallId: providerId,
+      reason: 'The reviewer rejected this call. Do not report it as executed.',
+    })
   }
   const result = await stream.getFullOutput().catch((error: unknown) => {
     throw fatal ?? error

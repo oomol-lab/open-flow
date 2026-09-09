@@ -23,7 +23,7 @@ import { IsolatedVmHost } from '../node/runtime/isolated-vm.ts'
 const codeHost = new IsolatedVmHost()
 afterAll(() => codeHost.close())
 import { executeAgent as runAgent } from '../node/deployment/agent.ts'
-import { ConnectorTaskError } from '../node/deployment/connector.ts'
+import { ConnectorClient, ConnectorTaskError } from '../node/deployment/connector.ts'
 
 const savedResults = new Map<string, { result: import('@oomol-lab/open-flow/control-api').ResultInfo; content: string }>()
 afterEach(() => savedResults.clear())
@@ -128,9 +128,93 @@ function checkpoint(result: AgentResult) {
   return JSON.parse(JSON.stringify(result.checkpoint)) as typeof result.checkpoint
 }
 
+it('logs rejected model tool calls before execution and the subsequent recovery', async () => {
+  const source = {
+    ...task,
+    executor: { ...task.executor, tools: task.executor.kind == 'agent' ? task.executor.tools.map((tool) => ({ ...tool, approval: false })) : [] },
+  } as ManagedTaskDefinition
+  const { model } = fixture([[{ id: 'invalid', input: '{"body":123}' }], [{ id: 'valid', input: '{"body":"hello"}' }], 'done'])
+  const events: Readonly<Record<string, JsonValue>>[] = []
+  const execute = vi.fn(async () => ({ sent: true }))
+
+  await expect(
+    executeAgent(source, invocation, model, execute, async (event) => {
+      events.push(event)
+    }),
+  ).resolves.toEqual({ kind: 'completed', output: 'done' })
+
+  expect(execute).toHaveBeenCalledTimes(1)
+  expect(events).toContainEqual(
+    expect.objectContaining({
+      kind: 'model-tool',
+      round: 1,
+      status: 'failed',
+      callId: 'invalid',
+      toolName: 'send',
+      error: expect.stringContaining('body: must be string'),
+    }),
+  )
+  expect(events).toContainEqual(expect.objectContaining({ kind: 'model-tool', round: 2, status: 'requested', callId: 'valid', input: '{"body":"hello"}' }))
+  expect(events.filter((event) => event.kind == 'model-step')).toEqual([
+    expect.objectContaining({ round: 1, finishReason: 'tool-calls' }),
+    expect.objectContaining({ round: 2, finishReason: 'tool-calls' }),
+    expect.objectContaining({ round: 3, finishReason: 'stop', textLength: 4 }),
+  ])
+})
+
 const invocation = { invocationId: 'invocation', input: {}, signal: new AbortController().signal }
 
 describe('Agent streaming adapter', () => {
+  it('lets the model correct a pagination token after a Connector input rejection', async () => {
+    if (task.executor.kind != 'agent') throw new Error('Expected Agent.')
+    const source: ManagedTaskDefinition = {
+      ...task,
+      executor: {
+        ...task.executor,
+        tools: [
+          {
+            id: 'fetch',
+            name: 'fetch',
+            description: 'Fetch mail',
+            action: 'gmail.fetch_emails',
+            approval: false,
+            inputs: [{ handle: 'pageToken', nullable: true, jsonSchema: { type: 'string' }, source: { kind: 'model' } }],
+          },
+        ],
+      },
+    }
+    const { model, prompts } = fixture([
+      [{ id: 'invalid', toolName: 'fetch', input: '{"pageToken":"null"}' }],
+      [{ id: 'corrected', toolName: 'fetch', input: '{"pageToken":null}' }],
+      'done',
+    ])
+    const inputs: unknown[] = []
+    vi.stubGlobal('fetch', async (_url: unknown, init: RequestInit) => {
+      const { input } = JSON.parse(String(init.body))
+      inputs.push(input)
+      return input.pageToken === null
+        ? Response.json({ success: true, data: { emails: [] } })
+        : Response.json({ success: false, errorCode: 'invalid_input', message: 'Invalid page token', data: { status: 400 } }, { status: 400 })
+    })
+    const connector = new ConnectorClient('https://connector.example', '')
+    const events: Readonly<Record<string, JsonValue>>[] = []
+    await expect(
+      executeAgent(
+        source,
+        invocation,
+        model,
+        (tool, input, callId, signal) => connector.execute(tool.action, undefined, input, callId, signal),
+        async (event) => {
+          events.push(event)
+        },
+      ),
+    ).resolves.toEqual({ kind: 'completed', output: 'done' })
+    expect(inputs).toEqual([{ pageToken: 'null' }, { pageToken: null }])
+    expect(JSON.stringify(prompts[1])).toContain('The Connector Action input is invalid.')
+    expect(events).toContainEqual(expect.objectContaining({ kind: 'tool', status: 'failed', code: 'connector.input-invalid', executed: false }))
+    expect(events.filter((event) => event.kind == 'tool' && event.status == 'completed')).toHaveLength(1)
+  })
+
   it('restores separate approvals in one batch without repeating tools or requesting the model early', async () => {
     const { model, prompts } = fixture([
       [

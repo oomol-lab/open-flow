@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { decodeRunEvent } from '../../../../control/common/api.ts'
-import { agentLog, groupEvents, nodeSummary, toolRows } from './runGroups.ts'
+import { createI18n } from '../i18n.ts'
+import { agentLog, agentSummary, groupEvents, nodeSummary, toolRows } from './runGroups.ts'
 
 function log(sequence: number, executionId: string, message: string, scopeId = 'root') {
   return decodeRunEvent({
@@ -56,6 +57,36 @@ describe('execution log grouping', () => {
     expect(filtered.rows[0]?.seconds).toBeUndefined()
   })
   it('leaves unrecognized and malformed logs as ordinary messages', () => {
-    for (const message of ['not json', 'null', '{"kind":"tool"}', '{"kind":"model","round":"x"}']) expect(agentLog(log(1, 'a', message))).toBeUndefined()
+    for (const message of [
+      'not json',
+      'null',
+      '{"kind":"tool"}',
+      '{"kind":"model","round":"x"}',
+      '{"kind":"model-step","round":1,"finishReason":{}}',
+      '{"kind":"model-tool","round":1,"status":"requested"}',
+    ])
+      expect(agentLog(log(1, 'a', message))).toBeUndefined()
+  })
+  it('explains model diagnostics while preserving unknown finish reasons and original details', () => {
+    const t = createI18n('zh-CN').t
+    const entries = [
+      { kind: 'model-tool', round: 1, status: 'requested', callId: 'one', toolName: 'gmail.fetch_emails', input: '{}' },
+      { kind: 'model-tool', round: 1, status: 'failed', callId: 'one', toolName: 'gmail.fetch_emails', error: 'Invalid arguments' },
+      ...['tool-calls', 'stop', 'length', 'provider-specific', null].map((finishReason) => ({ kind: 'model-step', round: 1, finishReason })),
+    ]
+    const events = entries.map((entry, index) => log(index + 1, 'a', JSON.stringify(entry)))
+    expect(events.map((event) => agentSummary(event, t))).toEqual([
+      '模型请求调用 gmail.fetch_emails',
+      'gmail.fetch_emails · 调用请求失败',
+      '第 1 轮结束 · 工具调用',
+      '第 1 轮结束 · 已返回回答',
+      '第 1 轮结束 · 输出达到长度上限',
+      '第 1 轮结束 · provider-specific',
+      '第 1 轮结束',
+    ])
+    expect(events.map(agentLog)).toEqual(entries)
+    const summary = nodeSummary(events, new Set(events.map((event) => event.sequence)))
+    expect(summary.completedCalls).toBe(0)
+    expect(summary.rows.map((row) => row.events)).toEqual(events.map((event) => [event]))
   })
 })

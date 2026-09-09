@@ -67,10 +67,6 @@ const maxHeight = 640
 const minCanvasHeight = 160
 const defaultHeight = 360
 const resizeStep = 24
-const timelineChromeHeight = 64
-const timelineEmptyHeight = 72
-const timelineEventHeight = 36
-const timelineDetailHeight = 52
 const eventFollowThreshold = 32
 
 interface Props {
@@ -356,6 +352,7 @@ function nodeTitleIndex(events: readonly RunEvent[]): ReadonlyMap<string, string
 }
 
 export function RunLog({
+  raw,
   events,
   eventsExpiresAt,
   eventNodes,
@@ -383,10 +380,10 @@ export function RunLog({
   | 'submitting'
 > & {
   readonly filters: readonly RunEventFilter[]
+  readonly raw: boolean
 }): ReactElement {
   const language = useLang()
   const t = useTranslate()
-  const [raw, setRaw] = useState(false)
   const eventList = useRef<ScrollAreaRef>(null)
   const followedRun = useRef<string>()
   const followEvents = useRef(true)
@@ -426,11 +423,6 @@ export function RunLog({
 
   return (
     <div className="run-log" tabIndex={0}>
-      <div className="flex justify-end px-2">
-        <Button aria-pressed={raw} onClick={() => setRaw(!raw)} size="sm" variant="ghost">
-          {t(raw ? 'run.groupedView' : 'run.rawView')}
-        </Button>
-      </div>
       {observationFailed && (
         <div className="run-observation-error" role="alert">
           <span>{t('run.observationFailed')}</span>
@@ -526,7 +518,7 @@ export function RunLog({
                           )
                           return (
                             <li className="run-step" key={row[0]!.sequence}>
-                              {text != null ? (
+                              {text != null && row.some(eventHasDetails) ? (
                                 <details className="run-step-details">
                                   <summary className="run-step-line">
                                     {heading}
@@ -664,23 +656,14 @@ export function RunDrawer({
   visible,
 }: Props): ReactElement | null {
   const t = useTranslate()
+  const [raw, setRaw] = useState(false)
   const drawer = useRef<HTMLElement>(null)
   const resize = useRef<{ height: number; pointerId: number; y: number }>()
   const [resized, setResized] = useState<{ height: number; runId: string | undefined }>()
   const [filters, setFilters] = useState<readonly RunEventFilter[]>(() => initialRunLogFilters(eventFilter))
   const summaryOutputs = terminalOutputs(result) ?? latestOutputs(events)
-  const timelineHeight = Math.max(
-    minHeight,
-    Math.min(
-      maxHeight,
-      timelineChromeHeight +
-        (events.length == 0 ? timelineEmptyHeight : events.length * timelineEventHeight) +
-        events.filter(eventHasDetails).length * timelineDetailHeight +
-        (eventObservation(events, historyComplete) == null ? 0 : timelineEventHeight),
-    ),
-  )
   const preferredHeight = resized != null && resized.runId == run?.runId ? resized.height : undefined
-  const height = preferredHeight ?? Math.max(defaultHeight, timelineHeight)
+  const height = preferredHeight ?? defaultHeight
 
   function availableHeight(): number {
     return Math.max(minHeight, Math.min(maxHeight, drawer.current!.parentElement!.clientHeight - minCanvasHeight))
@@ -757,6 +740,9 @@ export function RunDrawer({
           <Badge variant="secondary">{t('run.timeline')}</Badge>
           <span className="run-header-spacer" />
           {tools}
+          <Button aria-pressed={raw} onClick={() => setRaw(!raw)} size="sm" variant="ghost">
+            {t(raw ? 'run.groupedView' : 'run.rawView')}
+          </Button>
           <RunLogFilters
             container={drawer.current}
             events={events}
@@ -784,6 +770,7 @@ export function RunDrawer({
         <div className="run-content">
           {run != null && <ActiveWait onLocate={onLocateWait} onResolve={onResolve} resolvingAction={resolvingAction} run={run} />}
           <RunLog
+            raw={raw}
             events={events}
             eventsExpiresAt={eventsExpiresAt}
             eventNodes={eventNodes}

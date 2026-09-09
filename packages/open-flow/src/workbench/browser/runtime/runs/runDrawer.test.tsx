@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { createI18n } from '../i18n.ts'
 import { RunDrawer } from './runDrawer.tsx'
 
-function renderFailure(status: 'failed' | 'indeterminate'): string {
+function renderFailure(status: 'failed' | 'indeterminate', events: readonly RunEvent[] = []): string {
   const finishedAt = '2026-08-27T10:00:01.000Z'
   const run: Run = {
     createdAt: '2026-08-27T10:00:00.000Z',
@@ -32,7 +32,7 @@ function renderFailure(status: 'failed' | 'indeterminate'): string {
         canceling={false}
         eventFilter="all"
         eventNodes={new Map()}
-        events={[]}
+        events={events}
         eventsExpiresAt={undefined}
         historyComplete
         observationFailed={false}
@@ -56,6 +56,20 @@ function renderFailure(status: 'failed' | 'indeterminate'): string {
 }
 
 describe('RunDrawer terminal result', () => {
+  it('keeps the panel height stable as logs accumulate and places the view switch in the header', () => {
+    const events: RunEvent[] = Array.from({ length: 100 }, (_, sequence) => ({
+      sequence,
+      createdAt: '2026-08-27T10:00:00.000Z',
+      kind: 'node.log',
+      payload: { flowId: 'flow', scopeId: 'root', nodeId: 'node', executionId: 'execution', level: 'info', message: 'Log entry' },
+    }))
+    const empty = renderFailure('failed')
+    const populated = renderFailure('failed', events)
+    expect(empty.match(/class="run-drawer open"[^>]*style="([^"]+)"/)?.[1]).toBe('height:360px')
+    expect(populated.match(/class="run-drawer open"[^>]*style="([^"]+)"/)?.[1]).toBe('height:360px')
+    expect(populated.match(/<header class="run-header">[\s\S]*?<\/header>/)?.[0]).toContain('Raw events')
+  })
+
   it.each(['failed', 'indeterminate'] as const)('shows the final %s error', (status) => {
     const markup = renderFailure(status)
 

@@ -17,7 +17,9 @@ export function WorkbenchSelect({
   onValueChange,
   options,
   portalRoot,
+  size,
   value,
+  variant,
 }: {
   readonly ariaLabel: string
   readonly className?: string | undefined
@@ -26,7 +28,9 @@ export function WorkbenchSelect({
   readonly onValueChange: (value: string) => void
   readonly options: readonly WorkbenchSelectOption[]
   readonly portalRoot: HTMLElement | null
+  readonly size?: 'default' | 'sm'
   readonly value: string
+  readonly variant?: 'default' | 'subtle'
 }): ReactElement {
   return (
     <Select
@@ -36,7 +40,7 @@ export function WorkbenchSelect({
       }}
       value={value}
     >
-      <SelectTrigger aria-label={ariaLabel} className={cn('min-w-32', className)} id={id}>
+      <SelectTrigger aria-label={ariaLabel} className={cn('min-w-32', className)} id={id} size={size} variant={variant}>
         <SelectValue>{options.find((option) => option.value == value)?.label ?? value}</SelectValue>
       </SelectTrigger>
       <SelectContent align="end" alignItemWithTrigger={false} container={portalRoot}>
