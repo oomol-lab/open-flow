@@ -15,14 +15,8 @@ function isNodeRunningOrWaiting(nodeStatus: NodeStatus): boolean {
   return nodeStatus === NODE_STATUS.Running || nodeStatus === NODE_STATUS.Waiting
 }
 
-export function useNodeStatus(
-  nodeStatus$: ReadonlyVal<NodeStatus>,
-  flowStatus$: ReadonlyVal<FlowRunStatus>,
-  successCount$: ReadonlyVal<number | undefined> | undefined,
-): NodeStatusState {
-  const nodeStatus = useVal(nodeStatus$)
+export function useNodeStatus(nodeStatus: NodeStatus, flowStatus$: ReadonlyVal<FlowRunStatus>, successCount = 0): NodeStatusState {
   const flowStatus = useVal(flowStatus$)
-  const successCount = useVal(successCount$) ?? 0
 
   // A node returns to a stable state when its Flow stops.
   if (flowStatus === FLOW_RUN_STATUS.Idle && isNodeRunningOrWaiting(nodeStatus)) {

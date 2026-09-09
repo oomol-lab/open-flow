@@ -318,11 +318,6 @@
     "touchpad": "Для тачпада",
     "touchpadDescription": "Перемещайте холст двумя пальцами и масштабируйте жестом сведения или разведения."
   },
-  "jsonViewer": {
-    "bin": "Двоичные данные",
-    "showLess": "Свернуть",
-    "showMore": "Развернуть"
-  },
   "l10n": {
     "createKey": "Включить перевод",
     "deleteKey": "Удалить перевод",
@@ -369,29 +364,6 @@
   },
   "ok": "ОК",
   "optimize": "упорядочить схему",
-  "llmEditor": {
-    "addMessage": "Добавить сообщение",
-    "chooseModel": "Выбрать из списка моделей",
-    "customModel": "Своя модель…",
-    "defaultModel": "Модель по умолчанию",
-    "deleteMessage": "Удалить сообщение",
-    "maxTokens": "Максимум токенов",
-    "messageCount": "Сообщений: {{count}}",
-    "messageCountOne": "1 сообщение",
-    "messagePlaceholder": "Текст сообщения",
-    "loadingModels": "Загрузка моделей…",
-    "model": "Модель",
-    "modelOptions": "Параметры модели",
-    "moveMessageDown": "Переместить сообщение вниз",
-    "moveMessageUp": "Переместить сообщение вверх",
-    "role": {
-      "assistant": "Ассистент",
-      "system": "Система",
-      "user": "Пользователь"
-    },
-    "temperature": "Температура",
-    "topP": "Top P"
-  },
   "outputHandleEditor": {
     "addOutput": "Добавить выход",
     "configPanelTitle": "Настройки выходного Handle",
@@ -425,8 +397,6 @@
   },
   "preview": {
     "title": "Предпросмотр",
-    "videoBilibili": "Видеоплеер Bilibili",
-    "videoYouTube": "Видеоплеер YouTube",
     "table": {
       "footer": "Всего столбцов: {{columns}}, строк: {{rows}}"
     }

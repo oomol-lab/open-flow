@@ -41,10 +41,7 @@ body {
   flex: 1;
 }
 
-.server-button,
-.settings-page input,
-.variables-page input,
-.variables-page textarea {
+.server-button {
   color: inherit;
   font: inherit;
 }
@@ -81,10 +78,7 @@ body {
 }
 
 .server-button:focus-visible,
-.server-nav a:focus-visible,
-.settings-page input:focus-visible,
-.variables-page input:focus-visible,
-.variables-page textarea:focus-visible {
+.server-nav a:focus-visible {
   border-color: var(--ui-ring);
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-ring) 50%, transparent);
@@ -299,34 +293,6 @@ body {
 .variables-heading span {
   color: var(--ui-muted-foreground);
   font-size: 11px;
-}
-
-.variables-page input,
-.variables-page textarea {
-  border: 1px solid var(--ui-input);
-  border-radius: var(--ui-radius);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease;
-}
-
-.variables-page input {
-  height: 32px;
-}
-
-.variables-page input,
-.variables-page textarea {
-  padding: 6px 10px;
-}
-
-.variables-page input:disabled,
-.variables-page textarea:disabled {
-  cursor: not-allowed;
-  background: color-mix(in srgb, var(--ui-input) 50%, transparent);
-  opacity: 0.5;
 }
 
 .server-input-group {
@@ -620,24 +586,8 @@ body {
   font-weight: 600;
 }
 
-.settings-page input {
-  height: 32px;
-  padding: 6px 10px;
-  border: 1px solid var(--ui-input);
-  border-radius: var(--ui-radius);
-  background: transparent;
-  color: inherit;
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease;
-}
-
 .settings-form-actions {
   justify-content: flex-end;
-}
-
-.settings-form input[aria-invalid='true'] {
-  border-color: var(--ui-destructive);
 }
 
 .settings-form input[aria-invalid='true'] + .settings-hint {

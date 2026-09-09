@@ -3,7 +3,9 @@ import type { UiLanguage } from '../../../localization/common/languages.ts'
 import type { WorkbenchLanguage } from './contract.ts'
 
 import { I18n } from 'val-i18n'
+import { formLocales } from '../../../form/browser/locales.ts'
 import { defaultUiLanguage, resolveUiLanguage, uiLanguages } from '../../../localization/common/languages.ts'
+import { uiLocales } from '../../../ui/browser/locales.ts'
 import en from './locales/en.json'
 import fr from './locales/fr.json'
 import ja from './locales/ja.json'
@@ -22,7 +24,9 @@ const resources: Readonly<Record<UiLanguage, Locale>> = {
   'fr': fr,
 }
 
-export const locales: Locales = Object.fromEntries(uiLanguages.map((language) => [language, resources[language]]))
+export const locales: Locales = Object.fromEntries(
+  uiLanguages.map((language) => [language, { ...resources[language], ...uiLocales[language], ...formLocales[language] }]),
+)
 
 export function createI18n(initialLanguage: string = defaultUiLanguage): I18n {
   const language: WorkbenchLanguage = resolveUiLanguage([initialLanguage])

@@ -178,6 +178,9 @@ it('loads Variable names on demand and reuses them until invalidated', async () 
   const request = vi.fn(() => response.promise)
   const store = new WorkbenchStore(new WorkbenchClient(request), { getItem: () => null, setItem: () => {} }, () => 'identity')
   try {
+    const canvas = store.$.designer.value
+    const canvasUpdates = vi.fn()
+    const stop = store.$.designer.reaction(canvasUpdates, true)
     store.invalidateVariableNames()
     store.invalidateVariableNames()
     expect(request).not.toHaveBeenCalled()
@@ -197,6 +200,9 @@ it('loads Variable names on demand and reuses them until invalidated', async () 
     await store.refreshVariableNames()
     expect(request).toHaveBeenCalledTimes(2)
     expect(store.$.variableNames.value).toEqual([])
+    expect(store.$.designer.value).toBe(canvas)
+    expect(canvasUpdates).not.toHaveBeenCalled()
+    stop()
   } finally {
     store.dispose()
   }

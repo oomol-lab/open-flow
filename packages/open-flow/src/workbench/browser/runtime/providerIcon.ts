@@ -1,5 +1,5 @@
 import providerIconUrls from 'virtual:oomol-provider-icons'
-import { imageIcon } from '../../../designer/browser/icons/DesignerIcon.tsx'
+import { imageIcon } from '../../../ui/browser/icons/ContentIcon.tsx'
 
 export function providerIcon(
   provider: { readonly homepageUrl?: string; readonly icon?: string; readonly serviceId: string; readonly serviceName: string },

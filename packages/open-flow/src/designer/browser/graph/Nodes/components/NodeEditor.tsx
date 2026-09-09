@@ -1,25 +1,24 @@
 import styles from './NodeEditor.module.scss'
 import type { NodeId } from '../../../../../schema/index.ts'
+import type { FlowDesignerViewProps } from '../../FlowDesigner/model.ts'
 
-import { useContext, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useVal } from 'use-value-enhancer'
-import { useTranslate } from 'val-i18n-react'
-import { HandleContext } from '../../../components/handle.tsx'
-import { TranslationInput } from '../../../components/input2.tsx'
-import { NodeMiniMapPhase, NodeMiniMapProvider } from '../../../components/minimap.tsx'
-import { designerThemeClass } from '../../../theme/designerThemeClass.ts'
-import { useThemeData } from '../../../theme/ThemeProvider.tsx'
-import { ThemeProvider } from '../../../theme/ThemeProvider.tsx'
+import { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 import { useDesignerStore } from '../../DesignerStoreContext.tsx'
-import { CanvasContext } from '../../FlowDesigner/CanvasContext.ts'
 import { GetPopupContainerContext } from '../../ReactFlowContainer/useGetPopupContainer.ts'
 import { NodeStoreContext, useNodeStore } from '../NodeStoreContext.tsx'
-import { NodeBody } from './NodeBody.tsx'
+import { CommentNodeContent } from './CommentNodeContent.tsx'
 import { NodeHead } from './NodeHead.tsx'
 
-export function NodeEditorPortal() {
-  const view = useContext(CanvasContext)
+export function NodeEditorPortal({
+  view,
+  dark,
+}: {
+  dark: boolean
+  view?: Pick<FlowDesignerViewProps, 'selectedNodeIds' | 'inspectorContainer' | 'inspectorHeaderContainer'>
+}) {
   const store = useDesignerStore()
   const nodes = useVal(store.$.nodes.$)
   const comments = useVal(store.$.commentNodes?.$)
@@ -27,68 +26,46 @@ export function NodeEditorPortal() {
   const node = id == null ? undefined : (nodes.get(id) ?? comments?.get(id))
   if (node == null || view?.inspectorContainer == null) return null
   return createPortal(
-    <NodeMiniMapProvider value={NodeMiniMapPhase.None}>
-      <NodeStoreContext.Provider value={node}>
-        <NodeEditor key={node.nodeId} />
-      </NodeStoreContext.Provider>
-    </NodeMiniMapProvider>,
+    <NodeStoreContext.Provider value={node}>
+      <NodeEditor dark={dark} key={node.nodeId} inspectorHeaderContainer={view.inspectorHeaderContainer} />
+    </NodeStoreContext.Provider>,
     view.inspectorContainer,
   )
 }
 
-export function NodeEditor() {
-  const t = useTranslate()
+function NodeEditor({ inspectorHeaderContainer, dark }: Pick<FlowDesignerViewProps, 'inspectorHeaderContainer'> & { dark: boolean }) {
+  const node = useNodeStore()
   const root = useRef<HTMLDivElement>(null)
   const [heading, setHeading] = useState<HTMLDivElement | null>(null)
-  const view = useContext(CanvasContext)
-  const theme = useThemeData()
-  const store = useDesignerStore()
-  const node = useNodeStore()
-  const editable = useVal(store.$.editable)
   const popup = useMemo(() => ({ default: () => root.current ?? document.body, static: () => root.current ?? document.body }), [])
   return (
     <div
       ref={root}
-      className={`oo-designer-root nokey ${designerThemeClass(theme.isDark)} ${styles.editor}`}
-      data-theme={theme.isDark ? 'dark' : 'light'}
+      className={`oo-designer-root nokey open-flow-theme ${styles.editor}`}
+      data-surface="canvas"
+      data-theme={dark ? 'dark' : 'light'}
       data-node-editor
       onPointerDown={(event) => event.stopPropagation()}
     >
       <GetPopupContainerContext.Provider value={popup}>
-        <ThemeProvider dark={theme.isDark} getPopupContainer={popup.default}>
-          <HandleContext.Provider value={{ Handle: null }}>
-            {view?.inspectorHeaderContainer != null &&
-              createPortal(
-                <div
-                  ref={setHeading}
-                  className={`oo-designer-root nokey ${designerThemeClass(theme.isDark)} ${styles.heading}`}
-                  data-theme={theme.isDark ? 'dark' : 'light'}
-                  onPointerDown={(event) => event.stopPropagation()}
-                >
-                  {heading != null && (
-                    <GetPopupContainerContext.Provider value={{ default: () => heading, static: () => heading }}>
-                      <ThemeProvider dark={theme.isDark} getPopupContainer={() => heading}>
-                        <NodeHead />
-                      </ThemeProvider>
-                    </GetPopupContainerContext.Provider>
-                  )}
-                </div>,
-                view.inspectorHeaderContainer,
+        {inspectorHeaderContainer != null &&
+          createPortal(
+            <div
+              ref={setHeading}
+              className={`oo-designer-root nokey open-flow-theme ${styles.heading}`}
+              data-surface="canvas"
+              data-theme={dark ? 'dark' : 'light'}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              {heading != null && (
+                <GetPopupContainerContext.Provider value={{ default: () => heading, static: () => heading }}>
+                  <NodeHead actionsOnly={!CommentNodeStore.is(node)} />
+                </GetPopupContainerContext.Provider>
               )}
-            {node.display$ && (
-              <div className={styles.description}>
-                <span>{t('canvasCard.description')}</span>
-                <TranslationInput
-                  multiline
-                  rawValue$={editable ? node.manifest$?.description : undefined}
-                  displayValue$={node.display$.description}
-                  placeholder={t('canvasCard.describe')}
-                />
-              </div>
-            )}
-            <NodeBody />
-          </HandleContext.Provider>
-        </ThemeProvider>
+            </div>,
+            inspectorHeaderContainer,
+          )}
+        {CommentNodeStore.is(node) && <CommentNodeContent store={node} />}
       </GetPopupContainerContext.Provider>
     </div>
   )

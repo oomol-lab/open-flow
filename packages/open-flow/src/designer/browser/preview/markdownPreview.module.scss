@@ -22,11 +22,11 @@
   cursor: default;
 }
 
-:global(pre code.hljs) {
+.body :global(pre code.hljs) {
   padding: 0 !important;
 }
 
-:global(pre:has(code.language-mermaid > svg)) {
+.body :global(pre:has(code.language-mermaid > svg)) {
   text-align: center;
   background-color: transparent;
 }

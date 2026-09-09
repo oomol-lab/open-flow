@@ -4,6 +4,7 @@ import type { FormEvent, ReactElement } from 'react'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { validVariableName } from '@oomol-lab/open-flow/flow-change'
+import { Input, Label, Textarea } from '@oomol-lab/open-flow/ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslate } from 'val-i18n-react'
@@ -109,7 +110,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                   <circle cx="11" cy="11" r="6" />
                   <path d="m16 16 4 4" />
                 </svg>
-                <input
+                <Input
                   aria-label={t('variables.search')}
                   autoComplete="off"
                   name="variable-search"
@@ -153,8 +154,8 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
           </div>
           {editing != null && (
             <form className="variable-form" onSubmit={(event) => void save(event)}>
-              <label htmlFor="variable-name">{t('variables.name')}</label>
-              <input
+              <Label htmlFor="variable-name">{t('variables.name')}</Label>
+              <Input
                 aria-describedby={nameInvalid && name != '' ? 'variable-name-error' : undefined}
                 aria-invalid={nameInvalid && name != ''}
                 autoComplete="off"
@@ -171,8 +172,8 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                   {t(nameExists ? 'variables.nameExists' : 'variables.invalidName')}
                 </span>
               )}
-              <label htmlFor="variable-value">{t('variables.value')}</label>
-              <textarea
+              <Label htmlFor="variable-value">{t('variables.value')}</Label>
+              <Textarea
                 aria-describedby={valueTooLarge ? 'variable-value-error' : undefined}
                 aria-invalid={valueTooLarge}
                 autoComplete="off"

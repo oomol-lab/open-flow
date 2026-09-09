@@ -1,0 +1,46 @@
+{
+  "jsonViewer": {
+    "bin": "二进制",
+    "showLess": "收起",
+    "showMore": "展开"
+  },
+  "variablePicker": {
+    "variableUnavailableHelp": "当前 deployment 暂不支持 Variable。",
+    "variableMissingHelp": "当前 deployment 中已不存在 Variable {{name}}。",
+    "variableUnavailable": "{{name}}（暂不可用）",
+    "variableMissing": "{{name}}（已缺失）",
+    "selectVariable": "选择 Variable",
+    "variablesLoading": "正在加载 Variable…",
+    "search": "搜索",
+    "empty": "没有匹配的变量。",
+    "clear": "<未设值>"
+  },
+  "markdown": {
+    "videoBilibili": "Bilibili 视频播放器",
+    "videoYouTube": "YouTube 视频播放器"
+  },
+  "llmEditor": {
+    "addMessage": "添加消息",
+    "chooseModel": "从模型列表选择",
+    "customModel": "自定义模型...",
+    "defaultModel": "默认模型",
+    "deleteMessage": "删除消息",
+    "maxTokens": "最大 Token 数",
+    "messageCount": "{{count}} 条消息",
+    "messageCountOne": "1 条消息",
+    "messagePlaceholder": "消息内容",
+    "loadingModels": "正在加载模型...",
+    "model": "模型",
+    "modelOptions": "模型选项",
+    "moveMessageDown": "下移消息",
+    "moveMessageUp": "上移消息",
+    "role": {
+      "assistant": "助手",
+      "system": "系统",
+      "user": "用户"
+    },
+    "temperature": "Temperature",
+    "topP": "Top P",
+    "messageRole": "消息角色"
+  }
+}

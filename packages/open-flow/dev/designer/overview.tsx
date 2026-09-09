@@ -7,7 +7,6 @@ import { Input as DesignerInput } from '../../src/designer/browser/components/in
 import { Null } from '../../src/designer/browser/components/null.tsx'
 import { Range } from '../../src/designer/browser/components/range.tsx'
 import { LabeledSwitch } from '../../src/designer/browser/components/toggleSwitch.tsx'
-import { designerThemeClass } from '../../src/designer/browser/theme/designerThemeClass.ts'
 import { Alert, AlertDescription, AlertTitle } from '../../src/ui/browser/alert.tsx'
 import { Badge } from '../../src/ui/browser/badge.tsx'
 import { Button } from '../../src/ui/browser/button.tsx'
@@ -202,7 +201,7 @@ function Swatches({ groups }: { readonly groups: typeof designerTokens }) {
 function PaletteOverview({ dark }: { readonly dark: boolean }) {
   return (
     <div className="palette-overview">
-      <div className={`palette-panel oo-designer-root ${designerThemeClass(dark)}`} data-theme={dark ? 'dark' : 'light'}>
+      <div className={`palette-panel oo-designer-root open-flow-theme`} data-surface="canvas" data-theme={dark ? 'dark' : 'light'}>
         <h2>Designer · Canvas content</h2>
         <p>Nodes, ports, connections and compact editors.</p>
         <Swatches groups={designerTokens} />

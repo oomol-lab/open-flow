@@ -37,6 +37,7 @@ const schedulerEntryPath = 'src/execution/common/scheduler.ts'
 const webhookTriggerEntryPath = 'src/trigger/common/webhook.ts'
 const localizationEntryPath = 'src/localization/common/languages.ts'
 const hostConformanceEntryPath = 'src/workbench/browser/runtime/hostConformance.ts'
+const uiEntryPath = 'src/ui/browser/public.ts'
 const workbenchEntryPath = 'src/workbench/browser/runtime/openFlowWorkbench.tsx'
 
 interface BuildBrowserPackageOptions {
@@ -69,6 +70,7 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   await buildRuntime(options, browserOutputPath, flowChangeEntryPath, 'flow-change', true)
   await buildRuntime(options, browserOutputPath, hostConformanceEntryPath, 'host-conformance', false)
   await buildRuntime(options, browserOutputPath, flowAuthoringEntryPath, 'flow-authoring', false)
+  await buildRuntime(options, browserOutputPath, uiEntryPath, 'ui', false)
   await buildRuntime(options, browserOutputPath, workbenchEntryPath, 'workbench', false)
   await copyFile(path.join(options.sourceRoot, 'src/ui/browser/theme.css'), path.join(browserOutputPath, 'theme.css'))
   await writeDeclarations(options, browserOutputPath, commonOutputPath)
@@ -197,9 +199,20 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         path.join(options.sourceRoot, flowChangeEntryPath),
         path.join(options.sourceRoot, hostConformanceEntryPath),
         path.join(options.sourceRoot, workbenchEntryPath),
+        path.join(options.sourceRoot, uiEntryPath),
       ],
       { cwd: options.sourceRoot },
     )
+    await Promise.all(
+      ['input', 'label', 'textarea'].map(async (name) => {
+        await copyFile(path.join(declarationRoot, `ui/browser/${name}.d.ts`), path.join(browserOutputPath, `ui-${name}.d.ts`))
+      }),
+    )
+    await writeFile(
+      path.join(browserOutputPath, 'ui.d.ts'),
+      "export { Input } from './ui-input.js';\nexport { Label } from './ui-label.js';\nexport { Textarea } from './ui-textarea.js';\n",
+    )
+    await writeFile(path.join(browserOutputPath, 'ui.css.d.ts'), 'export {}\n')
     const workbenchDeclaration = await readFile(path.join(declarationRoot, 'workbench/browser/runtime/openFlowWorkbench.d.ts'), 'utf8')
     const workbenchStyleImport = "import './styles.css';\n"
     if (!workbenchDeclaration.startsWith(workbenchStyleImport)) throw new Error('Workbench declaration did not contain the expected style import.')

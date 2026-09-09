@@ -1,9 +1,48 @@
+// The compact canvas text editor owns its native field presentation.
+:where(.input) {
+  width: 100%;
+  color: inherit;
+  font: 1em / 1.5 var(--font-sans);
+  font-weight: inherit;
+  letter-spacing: inherit;
+  padding: 2px 0.375em;
+  border: 1px solid transparent;
+  outline: none;
+  vertical-align: middle;
+  height: var(--widget-height);
+  border-radius: var(--widget-radius);
+  background: var(--widget-background);
+  box-sizing: border-box;
+  text-overflow: ellipsis;
+  text-align: inherit;
+}
+:where(.input:hover) {
+  background-color: var(--widget-background-highlight-color);
+  transition-duration: 0s;
+}
+:where(.input:focus-visible) {
+  border-color: var(--brand-highlight-color);
+  background-color: var(--widget-input-background);
+}
+:where(.input:read-only) {
+  color: var(--widget-font-disable-color);
+}
+:where(.input:read-only:hover, .input:read-only:focus-visible) {
+  background: var(--widget-background);
+  border-color: var(--widget-background);
+}
+:where(.input:disabled) {
+  color: var(--widget-font-disable-color);
+  background: var(--widget-background);
+  cursor: default;
+}
+
 :where(.wrapper) {
   position: relative;
 }
 
 .multiline {
-  height: auto; // Reset `height: var(--widget-height)` from _base.scss.
+  height: auto;
   resize: none;
   field-sizing: content;
   box-sizing: border-box;

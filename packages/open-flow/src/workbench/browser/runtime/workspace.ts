@@ -6,7 +6,6 @@ import type {
   FlowDesignerViewNode,
   FlowDesignerViewNodeRun,
   FlowDesignerViewOutput,
-  FlowDesignerViewTriggerField,
   FlowDesignerViewTriggerNode,
 } from '../../../designer/browser/graph/FlowDesigner/model.ts'
 import type {
@@ -26,7 +25,7 @@ import type {
 import type { DesignerTarget } from './designer/flowChanges.ts'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionView.ts'
 
-import { triggerPayloadSchema, variableInputCompatible } from '../../../flow/common/schema.ts'
+import { triggerPayloadSchema } from '../../../flow/common/schema.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
 
@@ -92,7 +91,6 @@ interface NodeProjectionContext {
   readonly runNodes: ReadonlyMap<string, FlowDesignerViewNodeRun>
   readonly t: TFunction | undefined
   readonly target: DesignerTarget
-  readonly variables: boolean
 }
 
 export function connectionCatalog(connections: readonly ConnectorConnection[]): ConnectionCatalog {
@@ -479,7 +477,7 @@ function layoutNodes(
   return { depth, ordered }
 }
 
-function designerInputs(nodeId: string, node: GraphNode, ports: NodePorts, revision: RevisionView, variables: boolean): readonly FlowDesignerViewInput[] {
+function designerInputs(nodeId: string, node: GraphNode, ports: NodePorts): readonly FlowDesignerViewInput[] {
   if (!('inputs' in node)) return []
   const inputs: FlowDesignerViewInput[] = []
   for (const [handle, definition] of ports.inputs) {
@@ -497,16 +495,11 @@ function designerInputs(nodeId: string, node: GraphNode, ports: NodePorts, revis
         sources.push({ nodeId: sourceId, output })
       }
     }
-    const bindingSource = mapping?.kind == 'sources' && mapping.sources.length == 1 ? mapping.sources[0] : undefined
-    const binding = bindingSource?.kind == 'binding' ? revision.binding(bindingSource.bindingId) : undefined
     inputs.push({
       ...definition,
       handle,
       ...(mapping?.kind == 'value' ? { value: mapping.value } : {}),
       ...(sources.length > 0 ? { sources } : {}),
-      ...(binding?.kind == 'variable' ? { variable: binding.target } : {}),
-      variableCompatible: variableInputCompatible(definition.jsonSchema as JsonValue),
-      variableEnabled: variables,
     })
   }
   return inputs
@@ -554,71 +547,6 @@ function groupedOutputs(resolved: ResolvedNode, outputs: readonly FlowDesignerVi
   return result
 }
 
-function configSource(value: JsonValue | undefined): string {
-  return value === undefined ? '' : typeof value == 'string' ? value : JSON.stringify(value)
-}
-
-function triggerConfigFields(trigger: TriggerNode): readonly FlowDesignerViewTriggerField[] {
-  if (trigger.kind != 'integration' && trigger.kind != 'poll') return []
-  const schema = record(trigger.definition.configSchema)
-  const properties = record(schema?.properties)
-  const required = new Set(Array.isArray(schema?.required) ? schema.required.filter((value): value is string => typeof value == 'string') : [])
-  const fields: FlowDesignerViewTriggerField[] = []
-  for (const [name, candidate] of Object.entries(properties ?? {})) {
-    const field = record(candidate)
-    if (field == null) continue
-    const value = Object.hasOwn(trigger.config, name) ? trigger.config[name] : field.default
-    const base = {
-      ...(typeof field.description == 'string' ? { description: field.description } : {}),
-      invalid: required.has(name) && !Object.hasOwn(trigger.config, name),
-      label: typeof field.title == 'string' ? field.title : name,
-      name,
-      required: required.has(name),
-      source: configSource(value),
-    }
-    if (Array.isArray(field.enum)) {
-      fields.push({
-        ...base,
-        kind: 'select',
-        options: field.enum.map((option) => {
-          const source = configSource(option)
-          return { label: source, source, value: option }
-        }),
-      })
-      continue
-    }
-    const items = record(field.items)
-    if (field.type == 'array' && Array.isArray(items?.enum)) {
-      fields.push({
-        ...base,
-        kind: 'multi-select',
-        options: items.enum.map((option) => {
-          const source = configSource(option)
-          return { label: source, source, value: option }
-        }),
-        selected: Array.isArray(value) ? value.map(configSource) : [],
-      })
-      continue
-    }
-    switch (field.type) {
-      case 'boolean':
-      case 'integer':
-      case 'number':
-      case 'string':
-        fields.push({ ...base, kind: field.type })
-        break
-      default:
-        fields.push({ ...base, kind: 'json' })
-        break
-    }
-  }
-  return fields.toSorted(
-    (left, right) =>
-      Number(!left.required) - Number(!right.required) ||
-      Number(left.kind == 'json' || left.kind == 'multi-select') - Number(right.kind == 'json' || right.kind == 'multi-select'),
-  )
-}
-
 function triggerDesignerNode(triggerId: string, trigger: TriggerNode, position: Point, diagnostics: readonly Diagnostic[]): DesignerNode {
   let presentation: FlowDesignerViewTriggerNode['presentation']
   switch (trigger.kind) {
@@ -629,11 +557,10 @@ function triggerDesignerNode(triggerId: string, trigger: TriggerNode, position: 
       presentation = { kind: trigger.kind, schedules: trigger.cronTimes }
       break
     case 'integration':
-      presentation = { config: triggerConfigFields(trigger), kind: trigger.kind, schedules: [], source: trigger.definition.provider }
+      presentation = { kind: trigger.kind, schedules: [], source: trigger.definition.provider }
       break
     case 'poll':
       presentation = {
-        config: triggerConfigFields(trigger),
         kind: trigger.kind,
         schedules: trigger.pollTimes,
         source: trigger.definition.provider,
@@ -643,16 +570,6 @@ function triggerDesignerNode(triggerId: string, trigger: TriggerNode, position: 
       presentation = {
         kind: trigger.kind,
         schedules: [],
-        webhook: {
-          inputs: trigger.inputsDef.map((input) => ({
-            ...(input.description == null ? {} : { description: input.description }),
-            handle: input.handle,
-            jsonSchema: input.jsonSchema,
-            nullable: input.nullable ?? false,
-            ...(Object.hasOwn(input, 'value') ? { value: input.value } : {}),
-          })),
-          options: trigger.options ?? {},
-        },
       }
       break
   }
@@ -670,15 +587,13 @@ function triggerDesignerNode(triggerId: string, trigger: TriggerNode, position: 
     outputs: [{ handle: 'payload', jsonSchema: triggerPayloadSchema(trigger), nullable: false }],
     presentation,
     position,
-    rawIcon: trigger.icon,
-    rawTitle: trigger.name,
     title: trigger.name,
   }
 }
 
 function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: NodePorts, position: Point, context: NodeProjectionContext): DesignerNode {
   const node = resolved.node
-  const inputs = groupedInputs(resolved, designerInputs(nodeId, node, ports, context.revision, context.variables))
+  const inputs = groupedInputs(resolved, designerInputs(nodeId, node, ports))
   const outputs = groupedOutputs(resolved, designerOutputs(ports))
   const task = resolved.kind == 'task' ? resolved.definition : undefined
   const connector = task != null && 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
@@ -699,10 +614,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
     inputs,
     outputs,
     position,
-    rawIcon: node.icon,
-    rawTitle: node.name,
     ...(nodeRun == null ? {} : { run: nodeRun }),
-    timeoutSeconds: node.timeoutMs == null ? undefined : node.timeoutMs / 1000,
     title: nodeTitle(resolved, context.t),
   }
   switch (node.kind) {
@@ -730,8 +642,6 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
           const input = inputs.find((item) => 'handle' in item && item.handle == port.handle)
           return input == null || 'group' in input ? [] : [input]
         }),
-        editableAdditionalInputs: node.task == null && !(task != null && 'executor' in task && task.executor.kind == 'agent'),
-        editablePorts: node.task != null || (task != null && 'executor' in task && task.executor.kind == 'agent'),
         kind: node.kind,
         executorName: executorName(task, connectionRequired, context.t),
         ...(task != null && 'executor' in task && task.executor.kind == 'agent'
@@ -783,10 +693,6 @@ export function designerGraph(
   t?: TFunction,
   run?: Run | RunDetails,
   runEvents: readonly RunEvent[] = [],
-  variableNames: readonly string[] = [],
-  variableNamesLoaded = false,
-  variableNamesLoading = false,
-  variables = true,
 ): DesignerGraph {
   const revision = draft == null ? undefined : revisionView(draft)
   const graph = revision == null || target == null ? undefined : revision.graph(target)
@@ -808,7 +714,6 @@ export function designerGraph(
     runNodes: projectedRun.nodes,
     t,
     target,
-    variables,
   }
   const rows = new Map<number, number>()
   const nodes: DesignerNode[] = []
@@ -834,9 +739,6 @@ export function designerGraph(
     nodes,
     ...(projectedRun.status == null ? {} : { runStatus: projectedRun.status }),
     viewport: savedViewport(presentation, target),
-    variableNames,
-    variableNamesLoaded,
-    variableNamesLoading,
   }
 }
 

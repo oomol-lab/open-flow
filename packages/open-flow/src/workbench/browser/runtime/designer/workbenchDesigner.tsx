@@ -1,31 +1,15 @@
 import type { KeyboardEvent, PointerEvent, ReactElement, ReactNode } from 'react'
-import type { ReadonlyVal } from 'value-enhancer'
-import type { EditorDisposable } from '../../../../base/browser/stringEditor.ts'
-import type {
-  FlowDesignerViewConditionChange,
-  FlowDesignerViewInput,
-  FlowDesignerViewAddItem,
-  FlowDesignerViewOutput,
-  FlowDesignerViewTriggerSchedule,
-  FlowDesignerViewValue,
-  FlowDesignerViewWebhook,
-} from '../../../../designer/browser/graph/FlowDesigner/model.ts'
-import type { CreateSchemaEditorFn } from '../../../../designer/browser/services/designerService.ts'
-import type { GroupDividerDef } from '../../../../schema/index.ts'
-import type { ConditionOperator, JsonValue } from '../api.ts'
+import type { FlowDesignerViewAddItem } from '../../../../designer/browser/graph/FlowDesigner/model.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { DesignerEdge, DesignerGraph, DesignerViewport, Point } from '../workspace.ts'
 import type { AddNodeOption } from './addNodeOptions.ts'
-import type { ConditionSettings, DesignerTarget } from './flowChanges.ts'
-import type { WebhookSettings } from './flowChanges.ts'
+import type { DesignerTarget } from './flowChanges.ts'
 
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
-import { isWritable, val } from 'value-enhancer'
 import { FlowDesignerView } from '../../../../designer/browser/graph/FlowDesigner/FlowDesignerView.tsx'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { CodeMirrorStringEditorFactory } from '../../codeMirrorStringEditor.ts'
 import { Icon } from '../icons.tsx'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
 
@@ -46,23 +30,6 @@ interface Props {
   readonly onAddNode: (option: AddNodeOption, position: Point, connection?: (nodeId: string) => Omit<DesignerEdge, 'id'>) => Promise<string | undefined>
   readonly onConnect: (edge: Omit<DesignerEdge, 'id'>) => void
   readonly onChangeComment: (nodeId: string, value: { readonly content: string; readonly title: string }) => void
-  readonly onChangeCondition: (nodeId: string, value: ConditionSettings) => void
-  readonly onChangeNodeDescription: (nodeId: string, description: string | undefined) => void
-  readonly onChangeNodeIcon: (nodeId: string, icon: string | undefined) => void
-  readonly onChangeNodeTitle: (nodeId: string, title: string | undefined) => void
-  readonly nodeTitleIssue: (nodeId: string, title: string) => string | undefined
-  readonly onChangeInput: (nodeId: string, handle: string, value: JsonValue | undefined) => void
-  readonly onChangeInputVariable: (nodeId: string, handle: string, name: string | undefined) => void
-  readonly onChangeTaskAdditionalInputs: (nodeId: string, inputs: readonly FlowDesignerViewInput[]) => void
-  readonly onChangeTaskPorts: (
-    nodeId: string,
-    inputs: readonly (FlowDesignerViewInput | GroupDividerDef)[],
-    outputs: readonly (FlowDesignerViewOutput | GroupDividerDef)[],
-  ) => void
-  readonly onChangeTriggerConfig: (triggerId: string, name: string, value: JsonValue | undefined) => void
-  readonly onChangeTriggerSchedule: (triggerId: string, schedule: readonly FlowDesignerViewTriggerSchedule[]) => void
-  readonly onChangeWebhook: (triggerId: string, webhook: WebhookSettings) => void
-  readonly onChangeValue: (nodeId: string, values: readonly FlowDesignerViewValue[]) => void
   readonly onCopy: () => void
   readonly onDeleteEdge: (edge: DesignerEdge) => void
   readonly onDeleteNodes: () => void
@@ -71,7 +38,6 @@ interface Props {
   readonly onMoveViewport: (viewport: DesignerViewport) => void
   readonly onOpenBlocks: (opener?: HTMLButtonElement) => void
   readonly onOpenInspector: () => void
-  readonly onOpenVariables: () => void
   readonly onPaste: () => void
   readonly provideAddNodeOptions: (searchTerm: string, signal: AbortSignal) => Promise<readonly AddNodeOption[] | undefined>
   readonly onSelectNodes: (nodeIds: readonly string[]) => void
@@ -88,73 +54,6 @@ export interface WorkbenchDesignerHandle {
 
 const browseProviderTriggersId = 'workbench:browse-provider-triggers'
 const inspectorReflowDelay = 300
-
-function conditionOperator(operator: FlowDesignerViewConditionChange['cases'][number]['expressions'][number]['operator']): ConditionOperator {
-  switch (operator) {
-    case 'ends with':
-      return 'endsWith'
-    case 'has key':
-      return 'hasKey'
-    case 'has value':
-      return 'hasValue'
-    case 'is empty':
-      return 'isEmpty'
-    case 'is false':
-      return 'isFalse'
-    case 'is not empty':
-      return 'isNotEmpty'
-    case 'is not null':
-      return 'isNotNull'
-    case 'is null':
-      return 'isNull'
-    case 'is true':
-      return 'isTrue'
-    case 'not contains':
-      return 'notContains'
-    case 'not has key':
-      return 'notHasKey'
-    case 'not has value':
-      return 'notHasValue'
-    case 'starts with':
-      return 'startsWith'
-    case '!=':
-    case '<':
-    case '<=':
-    case '==':
-    case '>':
-    case '>=':
-    case 'contains':
-      return operator
-  }
-}
-
-function conditionSettings(value: FlowDesignerViewConditionChange): ConditionSettings {
-  return {
-    cases: value.cases.map((item) => ({
-      expressions: item.expressions.map((expression) =>
-        Object.assign(
-          {
-            input: expression.input,
-            operator: conditionOperator(expression.operator),
-          },
-          expression.value === undefined ? {} : { value: expression.value as JsonValue },
-        ),
-      ),
-      output: item.output,
-      relation: item.relation,
-    })),
-    ...(value.defaultOutput == null ? {} : { defaultOutput: value.defaultOutput }),
-    input: Object.assign(
-      {
-        ...(value.input.description == null ? {} : { description: value.input.description }),
-        handle: value.input.handle,
-        jsonSchema: (value.input.jsonSchema ?? {}) as JsonValue,
-        nullable: value.input.nullable ?? false,
-      },
-      value.input.defaultValue === undefined ? {} : { value: value.input.defaultValue as JsonValue },
-    ),
-  }
-}
 
 function addItems(options: readonly AddNodeOption[]): FlowDesignerViewAddItem[] {
   return options.map((option) => ({
@@ -183,51 +82,6 @@ function focusPanel(event: PointerEvent<HTMLElement>): void {
   event.currentTarget.focus({ preventScroll: true })
 }
 
-let schemaEditorId = 0
-
-function schemaEditor(darkMode$: ReadonlyVal<boolean>): CreateSchemaEditorFn {
-  const factory = new CodeMirrorStringEditorFactory({ darkMode$ })
-  return (container, schema$) => {
-    let disposed = false
-    let editor: Awaited<ReturnType<CodeMirrorStringEditorFactory['create']>> | undefined
-    let changeListener: EditorDisposable | undefined
-    let syncing = false
-    const stopValue = schema$.reaction((value) => {
-      if (editor == null || editor.monacoEditor.getValue() == value) return
-      syncing = true
-      editor.monacoEditor.setValue(value)
-      syncing = false
-    })
-    void factory
-      .create(container, `open-flow-schema:${schemaEditorId++}`, {
-        automaticLayout: true,
-        language: 'json',
-        readOnly: !isWritable(schema$),
-        value: schema$.value,
-        wordWrap: 'on',
-      })
-      .then((created) => {
-        if (disposed) {
-          created.dispose()
-          return
-        }
-        editor = created
-        if (isWritable(schema$)) {
-          changeListener = created.monacoEditor.onDidChangeModelContent(() => {
-            if (!syncing) schema$.set(created.monacoEditor.getValue())
-          })
-        }
-      })
-      .catch(() => undefined)
-    return () => {
-      disposed = true
-      stopValue()
-      changeListener?.dispose()
-      editor?.dispose()
-    }
-  }
-}
-
 export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(function WorkbenchDesigner(
   {
     addNodeOptions,
@@ -241,19 +95,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
     onAddNode,
     onConnect,
     onChangeComment,
-    onChangeCondition,
-    onChangeNodeDescription,
-    onChangeNodeIcon,
-    onChangeNodeTitle,
-    nodeTitleIssue,
-    onChangeInput,
-    onChangeInputVariable,
-    onChangeTaskAdditionalInputs,
-    onChangeTaskPorts,
-    onChangeTriggerConfig,
-    onChangeTriggerSchedule,
-    onChangeWebhook,
-    onChangeValue,
     onCopy,
     onDeleteEdge,
     onDeleteNodes,
@@ -262,7 +103,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
     onMoveViewport,
     onOpenBlocks,
     onOpenInspector,
-    onOpenVariables,
     onPaste,
     provideAddNodeOptions,
     onSelectNodes,
@@ -276,10 +116,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
 ): ReactElement {
   const language = useLang()
   const t = useTranslate()
-  const schemaDark$ = useMemo(() => val(theme == 'dark'), [])
-  const createSchemaEditor = useMemo(() => schemaEditor(schemaDark$), [schemaDark$])
-  schemaDark$.set(theme == 'dark')
-  useEffect(() => () => schemaDark$.dispose(), [schemaDark$])
   const [addNodeRequest, setAddNodeRequest] = useState<{
     readonly onComplete?: () => void
     readonly position: Point
@@ -466,7 +302,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         addNodeRequest={addNodeRequest}
         addItems={designerAddItems}
         className="workbench-designer-canvas"
-        createSchemaEditor={createSchemaEditor}
         dark={theme == 'dark'}
         editable={!disabled}
         focusNodeRequest={readyFocusNodeRequest}
@@ -529,19 +364,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         }}
         onConnect={onConnect}
         onChangeComment={onChangeComment}
-        onChangeCondition={(nodeId, value) => onChangeCondition(nodeId, conditionSettings(value))}
-        onChangeNodeDescription={onChangeNodeDescription}
-        onChangeNodeIcon={onChangeNodeIcon}
-        onChangeNodeTitle={onChangeNodeTitle}
-        nodeTitleIssue={nodeTitleIssue}
-        onChangeInput={(nodeId, handle, value) => onChangeInput(nodeId, handle, value as JsonValue | undefined)}
-        onChangeInputVariable={onChangeInputVariable}
-        onChangeTaskAdditionalInputs={onChangeTaskAdditionalInputs}
-        onChangeTaskPorts={onChangeTaskPorts}
-        onChangeTriggerConfig={(triggerId, name, value) => onChangeTriggerConfig(triggerId, name, value as JsonValue | undefined)}
-        onChangeTriggerSchedule={onChangeTriggerSchedule}
-        onChangeWebhook={(triggerId, webhook: FlowDesignerViewWebhook) => onChangeWebhook(triggerId, webhook as WebhookSettings)}
-        onChangeValue={onChangeValue}
         onDeleteNodes={(nodeIds) => {
           onSelectNodes(nodeIds)
           onDeleteNodes()
@@ -561,7 +383,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
           dynamicOptions.current = new Map(indexAddNodeOptions(options))
           return addItems(options)
         }}
-        onOpenVariables={onOpenVariables}
         onSelectionChange={(nodeIds) => {
           onSelectNodes(nodeIds)
           if (nodeIds.some((nodeId) => model.nodes.some((node) => node.id == nodeId && node.kind != 'comment'))) onOpenInspector()

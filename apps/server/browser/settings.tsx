@@ -1,5 +1,6 @@
 import type { FormEvent, ReactElement } from 'react'
 
+import { Input, Label } from '@oomol-lab/open-flow/ui'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslate } from 'val-i18n-react'
@@ -166,8 +167,8 @@ function SettingItem({
       </div>
       {editing ? (
         <form className="settings-form" onSubmit={save}>
-          <label htmlFor={`${endpoint}-origin`}>{originLabel}</label>
-          <input
+          <Label htmlFor={`${endpoint}-origin`}>{originLabel}</Label>
+          <Input
             autoComplete="url"
             autoFocus
             id={`${endpoint}-origin`}
@@ -179,8 +180,8 @@ function SettingItem({
           />
           {secretLabel != null && (
             <>
-              <label htmlFor={`${endpoint}-secret`}>{secretLabel}</label>
-              <input
+              <Label htmlFor={`${endpoint}-secret`}>{secretLabel}</Label>
+              <Input
                 aria-describedby={`${endpoint}-secret-hint`}
                 aria-invalid={secretTooShort && secret != ''}
                 autoComplete="new-password"

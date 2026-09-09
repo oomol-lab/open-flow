@@ -1,6 +1,7 @@
 import type { ControlClient, Variable } from '@oomol-lab/open-flow/control-api'
 import type { FormEvent, ReactElement, ReactNode } from 'react'
 
+import { Input } from '@oomol-lab/open-flow/ui'
 import { Children, isValidElement } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { VariablesPage } from '../browser/variables.tsx'
@@ -116,7 +117,7 @@ it.each([
   if (accepted) expect(putVariable).toHaveBeenCalledWith(name, 'replacement')
   else expect(putVariable).not.toHaveBeenCalled()
   if (editing == '' && name == 'TOKEN') {
-    const input = find(page, (item) => item.type == 'input' && item.props.id == 'variable-name')
+    const input = find(page, (item) => item.type == Input && item.props.id == 'variable-name')
     expect(input?.props['aria-invalid']).toBe(true)
     expect(find(page, (item) => item.props.children == 'variables.nameExists')).toBeDefined()
   }

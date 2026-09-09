@@ -427,34 +427,15 @@ test('keeps repeated feature selectors consolidated at their owner', async () =>
   assert.equal((runStyles.match(/  \.run-log-event \{/g) ?? []).length, 1)
 })
 
-test('keeps Run input values on the WorkbenchRunInputs public contract', async () => {
-  const [runInputs, editorStore] = await Promise.all([
-    readFile(new URL('src/workbench/browser/runInputs.ts', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/flowRunInputEditorStore.ts', packageRoot), 'utf8'),
-  ])
-
-  assert.match(runInputs, /public readonly inputValues\$: ReadonlyVal/)
-  assert.match(editorStore, /get\(inputs\.inputValues\$\)/)
-  assert.doesNotMatch(editorStore, /handleInputsFrom!/)
-})
-
-test('keeps the Run input editor on the product theme adapter', async () => {
-  const [editor, editorStyles, panel, workspace] = await Promise.all([
+test('keeps Run input editing independent of Designer and its theme adapters', async () => {
+  const [editor, editorStore, editorStyles] = await Promise.all([
     readFile(new URL('src/workbench/browser/flowRunInputEditor.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/flowRunInputEditorStore.ts', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/flowRunInputEditor.module.scss', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/runs/runInputPanel.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/flowWorkspace.tsx', packageRoot), 'utf8'),
   ])
-
-  assert.match(editor, /data-workbench-control-scope/)
-  assert.match(editor, /<ThemeProvider dark=\{theme == 'dark'\}/)
-  assert.doesNotMatch(editor, /designerThemeClass/)
-  assert.match(editorStyles, /--widget-height: 22px/)
-  assert.match(editorStyles, /--widget-radius: 3px/)
-  assert.match(editorStyles, /--widget-background: var\(--ui-muted\)/)
-  assert.doesNotMatch(editorStyles, /var\(--(?:border-[12]|text-[1-5])\)/)
-  assert.match(panel, /<FlowRunInputEditor store=\{group\.editor\} theme=\{theme\}/)
-  assert.match(workspace, /inputContent=\{<RunInputPanel onStarted=\{onRunStarted\} store=\{store\.runRequests\} theme=\{theme\} \/>\}/)
+  assert.doesNotMatch(editor + editorStore + editorStyles, /designer\/|ThemeProvider|HandleRowStore|InputSectionStore|--widget-/)
+  assert.match(editor, /<ValueEditor/)
+  assert.match(editor, /store\.values\$/)
 })
 
 test('keeps concrete Designer theme modules behind the Designer theme adapter', async () => {

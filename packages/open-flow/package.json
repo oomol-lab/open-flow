@@ -46,7 +46,9 @@
     "./workbench": "./src/workbench/browser/runtime/openFlowWorkbench.tsx",
     "./mcp": "./src/control/common/mcp.ts",
     "./control-requests": "./src/control/common/requests.ts",
-    "./workbench-host-conformance": "./src/workbench/browser/runtime/hostConformance.ts"
+    "./workbench-host-conformance": "./src/workbench/browser/runtime/hostConformance.ts",
+    "./ui": "./src/ui/browser/public.ts",
+    "./ui.css": "./src/ui/browser/styles.css"
   },
   "scripts": {
     "build": "bun scripts/build.ts",

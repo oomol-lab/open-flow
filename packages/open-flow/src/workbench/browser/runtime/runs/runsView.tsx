@@ -6,10 +6,10 @@ import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
-import { OverlayScrollbar } from '../../../../designer/browser/components/overlayScrollbar.tsx'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
+import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Tabs, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Icon } from '../icons.tsx'
 import { duration, initialRunLogFilters, RunLog, RunLogButton, RunLogFilters, runLabel, statusClass } from './runDrawer.tsx'
@@ -99,7 +99,7 @@ export function RunsView({
         <header className="run-list-header">
           <strong>{t('run.history')}</strong>
         </header>
-        <OverlayScrollbar className="run-list run-content-scroll" defer={false} tabIndex={-1}>
+        <ScrollArea className="run-list run-content-scroll" defer={false} tabIndex={-1}>
           {loading ? (
             <div className="run-list-empty">{t('run.loading')}</div>
           ) : loadFailed ? (
@@ -150,7 +150,7 @@ export function RunsView({
               </Button>
             ))
           )}
-        </OverlayScrollbar>
+        </ScrollArea>
         {nextCursor != null && (
           <Button className="mx-2 mb-2" disabled={loadingMore} onClick={() => void store.runs.loadMore()} size="lg" variant="outline">
             {t(loadingMore ? 'run.loadingMore' : loadMoreFailed ? 'run.retryLoadMore' : 'run.loadMore')}
@@ -258,9 +258,9 @@ export function RunsView({
                   {result == null ? (
                     <div className="run-empty">{t('run.outputPending')}</div>
                   ) : (
-                    <OverlayScrollbar className="run-output-scroll run-content-scroll" defer={false} tabIndex={-1}>
+                    <ScrollArea className="run-output-scroll run-content-scroll" defer={false} tabIndex={-1}>
                       <RunResultView result={result} />
-                    </OverlayScrollbar>
+                    </ScrollArea>
                   )}
                 </div>
               )}

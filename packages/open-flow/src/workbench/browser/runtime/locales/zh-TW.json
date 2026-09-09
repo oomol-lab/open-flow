@@ -185,7 +185,11 @@
       "nameEmpty": "節點名稱不能為空。",
       "timeout": "逾時時間（毫秒）",
       "timeoutError": "逾時時間必須是以毫秒為單位的正整數。",
-      "title": "節點設定"
+      "title": "節點設定",
+      "description": "用途說明",
+      "describe": "描述這個步驟要完成什麼。",
+      "icon": "圖示",
+      "name": "標題"
     },
     "selectNode": "選取一個草稿節點即可檢視並編輯它。",
     "subflow": {
@@ -215,7 +219,8 @@
       "responseMode": "回應模式",
       "source": "原始碼",
       "structuredJson": "結構化 JSON",
-      "retrySave": "重試儲存"
+      "retrySave": "重試儲存",
+      "additionalInputs": "附加輸入"
     },
     "wait": {
       "approval": "通過或拒絕",
@@ -275,10 +280,6 @@
   },
   "language": {
     "label": "語言"
-  },
-  "jsonViewer": {
-    "bin": "二進位",
-    "var": "變數"
   },
   "notice": {
     "connectorUnconfigured": "目前部署尚未設定 Connector。",
@@ -758,5 +759,104 @@
     "title": "選擇應用程式和動作",
     "failed": "未能新增此動作，請重試。",
     "search": "搜尋應用程式或動作…"
+  },
+  "triggerSchedule": {
+    "scheduleType": "排程類型",
+    "scheduleEvery": "每隔",
+    "scheduleCron": "Cron",
+    "scheduleInterval": "輪詢間隔",
+    "scheduleUnit": "間隔單位",
+    "scheduleMinutes": "分鐘",
+    "scheduleHours": "小時",
+    "scheduleDays": "天",
+    "scheduleWeeks": "週",
+    "scheduleMonths": "月",
+    "scheduleExpression": "Cron 運算式",
+    "scheduleTimezone": "時區",
+    "scheduleMissing": "尚未設定排程",
+    "scheduleTestHint": "草稿測試會立即執行一次；發佈後按排程自動執行。"
+  },
+  "triggerConfig": {
+    "configuration": "設定",
+    "required": "需要輸入"
+  },
+  "webhookEditor": {
+    "webhookAddField": "新增欄位",
+    "webhookAddHeader": "新增標頭",
+    "webhookCustomType": "自訂結構描述",
+    "webhookDeleteField": "刪除酬載欄位",
+    "webhookDeleteHeader": "刪除回應標頭",
+    "webhookFieldName": "欄位名稱",
+    "webhookFieldNameDuplicate": "欄位名稱不能重複。",
+    "webhookFieldNameRequired": "請輸入欄位名稱。",
+    "webhookFieldType": "類型",
+    "webhookHeaderName": "標頭名稱",
+    "webhookHeaders": "回應標頭",
+    "webhookHeaderValue": "標頭值",
+    "webhookMethods": "允許的請求方法",
+    "webhookNoPayloadFields": "請求酬載可以接受空物件。",
+    "webhookNoResponseBody": "不回傳回應內容",
+    "webhookNullable": "允許 null",
+    "webhookOrigins": "允許的來源",
+    "webhookPayloadFields": "請求資料",
+    "webhookAdvanced": "進階設定",
+    "webhookTest": "草稿測試",
+    "webhookTestHint": "點擊執行，填寫模擬請求資料即可測試。發佈後可取得 Webhook 請求網址。",
+    "webhookRequest": "請求",
+    "webhookResponse": "回應",
+    "webhookResponseData": "回應內容",
+    "webhookStatus": "狀態碼",
+    "webhookSummary": "收到 HTTP 請求時觸發",
+    "webhookDescription": "透過產生的 HTTP 端點接收 JSON 物件。"
+  },
+  "triggerSummary": {
+    "manualSummary": "點擊執行，從這裡開始。",
+    "integrationSummary": "事件送達時觸發"
+  },
+  "conditionEditor": {
+    "addCondition": "新增條件",
+    "configPanelTitle": "設定",
+    "default": "預設",
+    "defaultDescription": "預設條件",
+    "defaultHelp": "當沒有其他條件符合時，執行這個條件",
+    "deleteCondition": "刪除條件",
+    "handleKeyTitle": "Handle 名稱",
+    "handleLogicalTitle": "組合邏輯",
+    "inputHelp": "第一個符合的條件會輸出第一個輸入 Handle 的資料",
+    "label": "條件",
+    "logical": {
+      "AND": "且 (AND)",
+      "OR": "或 (OR)"
+    },
+    "operator": {
+      "!=": "≠",
+      "<": "<",
+      "<=": "≤",
+      "==": "=",
+      ">": ">",
+      ">=": "≥",
+      "contains": "包含",
+      "endsWith": "結尾是",
+      "hasKey": "包含鍵",
+      "hasValue": "包含值",
+      "isEmpty": "為空",
+      "isFalse": "為 false",
+      "isNotEmpty": "不為空",
+      "isNotNull": "不為 null",
+      "isNull": "為 null",
+      "isTrue": "為 true",
+      "notContains": "不包含",
+      "notHasKey": "不包含鍵",
+      "notHasValue": "不包含值",
+      "startsWith": "開頭是"
+    },
+    "title": "條件輸出 Handle",
+    "toggleDefault": "預設條件"
+  },
+  "nodeInput": {
+    "literal": "固定值",
+    "variable": "Variable",
+    "mode": "類型",
+    "connected": "已連接上游來源，可在輸入來源中修改。"
   }
 }

@@ -318,11 +318,6 @@
     "touchpad": "触控板友好",
     "touchpadDescription": "双指同向滑动拖动画布，双指捏合或张开缩放。"
   },
-  "jsonViewer": {
-    "bin": "二进制",
-    "showLess": "收起",
-    "showMore": "展开"
-  },
   "l10n": {
     "createKey": "添加翻译",
     "deleteKey": "删除翻译",
@@ -369,29 +364,6 @@
   },
   "ok": "确定",
   "optimize": "自动排版",
-  "llmEditor": {
-    "addMessage": "添加消息",
-    "chooseModel": "从模型列表选择",
-    "customModel": "自定义模型...",
-    "defaultModel": "默认模型",
-    "deleteMessage": "删除消息",
-    "maxTokens": "最大 Token 数",
-    "messageCount": "{{count}} 条消息",
-    "messageCountOne": "1 条消息",
-    "messagePlaceholder": "消息内容",
-    "loadingModels": "正在加载模型...",
-    "model": "模型",
-    "modelOptions": "模型选项",
-    "moveMessageDown": "下移消息",
-    "moveMessageUp": "上移消息",
-    "role": {
-      "assistant": "助手",
-      "system": "系统",
-      "user": "用户"
-    },
-    "temperature": "Temperature",
-    "topP": "Top P"
-  },
   "outputHandleEditor": {
     "addOutput": "添加输出接口",
     "configPanelTitle": "输出接口配置",
@@ -425,8 +397,6 @@
   },
   "preview": {
     "title": "预览",
-    "videoBilibili": "Bilibili 视频播放器",
-    "videoYouTube": "YouTube 视频播放器",
     "table": {
       "footer": "共 {{columns}} 列，{{rows}} 条记录"
     }

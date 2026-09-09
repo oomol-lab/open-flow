@@ -3,9 +3,9 @@ import type { JsonValue, RunEvent, RunResult } from '../api.ts'
 
 import { useLang, useTranslate } from 'val-i18n-react'
 import { controlErrorCode } from '../../../../control/common/errors.ts'
-import { collapseAllNested, JSONViewer } from '../../../../designer/browser/jsonViewer/index.ts'
 import { Alert, AlertDescription, AlertTitle } from '../../../../ui/browser/alert.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { collapseAllNested, JSONViewer } from '../../../../ui/browser/json-viewer/index.ts'
 import { Icon } from '../icons.tsx'
 import { agentLog } from './runGroups.ts'
 

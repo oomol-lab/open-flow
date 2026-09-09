@@ -1,0 +1,46 @@
+{
+  "jsonViewer": {
+    "bin": "Binary",
+    "showLess": "Show less",
+    "showMore": "Show more"
+  },
+  "variablePicker": {
+    "variableUnavailableHelp": "Deployment Variables are currently unavailable.",
+    "variableMissingHelp": "Deployment Variable {{name}} no longer exists.",
+    "variableUnavailable": "{{name}} (unavailable)",
+    "variableMissing": "{{name}} (missing)",
+    "selectVariable": "Choose Variable",
+    "variablesLoading": "Loading Variables…",
+    "search": "Search",
+    "empty": "No matching variables.",
+    "clear": "<unset>"
+  },
+  "markdown": {
+    "videoBilibili": "Bilibili video player",
+    "videoYouTube": "YouTube video player"
+  },
+  "llmEditor": {
+    "addMessage": "Add message",
+    "chooseModel": "Choose from model list",
+    "customModel": "Custom model...",
+    "defaultModel": "Default model",
+    "deleteMessage": "Delete message",
+    "maxTokens": "Max tokens",
+    "messageCount": "{{count}} messages",
+    "messageCountOne": "1 message",
+    "messagePlaceholder": "Message content",
+    "loadingModels": "Loading models...",
+    "model": "Model",
+    "modelOptions": "Model options",
+    "moveMessageDown": "Move message down",
+    "moveMessageUp": "Move message up",
+    "role": {
+      "assistant": "Assistant",
+      "system": "System",
+      "user": "User"
+    },
+    "temperature": "Temperature",
+    "topP": "Top P",
+    "messageRole": "Message role"
+  }
+}

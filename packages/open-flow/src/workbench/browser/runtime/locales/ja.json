@@ -185,7 +185,11 @@
       "nameEmpty": "ノード名を空にすることはできません。",
       "timeout": "タイムアウト（ミリ秒）",
       "timeoutError": "タイムアウトはミリ秒単位の正の整数で指定してください。",
-      "title": "ノード設定"
+      "title": "ノード設定",
+      "description": "目的",
+      "describe": "このステップの目的を記述します。",
+      "icon": "アイコン",
+      "name": "タイトル"
     },
     "selectNode": "ドラフトのノードを 1 つ選択すると、内容を確認して編集できます。",
     "subflow": {
@@ -215,7 +219,8 @@
       "responseMode": "応答モード",
       "source": "ソースコード",
       "structuredJson": "構造化 JSON",
-      "retrySave": "保存を再試行"
+      "retrySave": "保存を再試行",
+      "additionalInputs": "追加入力"
     },
     "wait": {
       "approval": "承認または拒否",
@@ -275,10 +280,6 @@
   },
   "language": {
     "label": "言語"
-  },
-  "jsonViewer": {
-    "bin": "バイナリ",
-    "var": "変数"
   },
   "notice": {
     "connectorUnconfigured": "このデプロイには Connector が設定されていません。",
@@ -758,5 +759,104 @@
     "title": "アプリとアクションを選択",
     "failed": "アクションを追加できませんでした。再試行してください。",
     "search": "アプリやアクションを検索…"
+  },
+  "triggerSchedule": {
+    "scheduleType": "スケジュール種別",
+    "scheduleEvery": "間隔",
+    "scheduleCron": "Cron",
+    "scheduleInterval": "ポーリング間隔",
+    "scheduleUnit": "間隔の単位",
+    "scheduleMinutes": "分",
+    "scheduleHours": "時間",
+    "scheduleDays": "日",
+    "scheduleWeeks": "週間",
+    "scheduleMonths": "か月",
+    "scheduleExpression": "Cron 式",
+    "scheduleTimezone": "タイムゾーン",
+    "scheduleMissing": "スケジュールが未設定です",
+    "scheduleTestHint": "下書きのテストはすぐに1回実行されます。公開後はスケジュールに従って自動実行されます。"
+  },
+  "triggerConfig": {
+    "configuration": "設定",
+    "required": "入力が必要"
+  },
+  "webhookEditor": {
+    "webhookAddField": "フィールドを追加",
+    "webhookAddHeader": "レスポンスヘッダーを追加",
+    "webhookCustomType": "カスタムスキーマ",
+    "webhookDeleteField": "ペイロードフィールドを削除",
+    "webhookDeleteHeader": "レスポンスヘッダーを削除",
+    "webhookFieldName": "フィールド名",
+    "webhookFieldNameDuplicate": "フィールド名は重複できません。",
+    "webhookFieldNameRequired": "フィールド名を入力してください。",
+    "webhookFieldType": "型",
+    "webhookHeaderName": "レスポンスヘッダー名",
+    "webhookHeaders": "レスポンスヘッダー",
+    "webhookHeaderValue": "レスポンスヘッダーの値",
+    "webhookMethods": "許可するメソッド",
+    "webhookNoPayloadFields": "リクエストペイロードは空のオブジェクトを受け付けます。",
+    "webhookNoResponseBody": "レスポンスボディなし",
+    "webhookNullable": "null を許可",
+    "webhookOrigins": "許可するオリジン",
+    "webhookPayloadFields": "リクエストデータ",
+    "webhookAdvanced": "詳細設定",
+    "webhookTest": "下書きのテスト",
+    "webhookTestHint": "実行をクリックし、テスト用のリクエストデータを入力してください。公開後に Webhook URL を取得できます。",
+    "webhookRequest": "リクエスト",
+    "webhookResponse": "レスポンス",
+    "webhookResponseData": "レスポンスボディ",
+    "webhookStatus": "ステータスコード",
+    "webhookSummary": "HTTP リクエストを受信したとき",
+    "webhookDescription": "生成された HTTP エンドポイントで JSON オブジェクトを受信します。"
+  },
+  "triggerSummary": {
+    "manualSummary": "実行をクリックすると、ここから開始します。",
+    "integrationSummary": "イベントを受信したとき"
+  },
+  "conditionEditor": {
+    "addCondition": "条件を追加",
+    "configPanelTitle": "設定",
+    "default": "デフォルト",
+    "defaultDescription": "デフォルトの条件",
+    "defaultHelp": "他のどの条件にも一致しない場合に、この分岐を実行します",
+    "deleteCondition": "条件を削除",
+    "handleKeyTitle": "Handle 名",
+    "handleLogicalTitle": "論理演算",
+    "inputHelp": "最初に一致した条件の出力 Handle が、1 番目の入力 Handle のデータを出力します",
+    "label": "条件",
+    "logical": {
+      "AND": "かつ (AND)",
+      "OR": "または (OR)"
+    },
+    "operator": {
+      "!=": "≠",
+      "<": "<",
+      "<=": "≤",
+      "==": "=",
+      ">": ">",
+      ">=": "≥",
+      "contains": "含む",
+      "endsWith": "で終わる",
+      "hasKey": "キーを含む",
+      "hasValue": "値を含む",
+      "isEmpty": "空である",
+      "isFalse": "false である",
+      "isNotEmpty": "空でない",
+      "isNotNull": "null でない",
+      "isNull": "null である",
+      "isTrue": "true である",
+      "notContains": "含まない",
+      "notHasKey": "キーを含まない",
+      "notHasValue": "値を含まない",
+      "startsWith": "で始まる"
+    },
+    "title": "条件の出力 Handle",
+    "toggleDefault": "デフォルトの条件"
+  },
+  "nodeInput": {
+    "literal": "固定値",
+    "variable": "Variable",
+    "mode": "型",
+    "connected": "上流の入力元に接続されています。入力元で変更できます。"
   }
 }

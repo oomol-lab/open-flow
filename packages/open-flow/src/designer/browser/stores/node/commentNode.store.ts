@@ -1,23 +1,19 @@
-import type { DisposableStore, Disposer } from '@wopjs/disposable'
+import type { DisposableStore } from '@wopjs/disposable'
 import type { XYPosition } from '@xyflow/react'
 import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { LocaleTextStore } from '../../../../localization/common/localization.ts'
 import type { NodeId } from '../../../../schema/index.ts'
 import type { Size } from '../../base/compare.ts'
 import type { RFNode, RFNodeId } from '../../base/rfHelpers.ts'
 import type { ToReadonly$Group } from '../../base/val.ts'
-import type { DesignerUIStore } from '../designer/designerUI.store.ts'
 import type { NodeType } from './constants.ts'
+import type { NodeInteraction } from './nodeInteraction.ts'
 
 import { disposableStore } from '@wopjs/disposable'
-import { attachSetter, compute, derive, setValue, val } from 'value-enhancer'
-import { isSameSize } from '../../base/compare.ts'
-import { DEFAULT_POSITION, NODE_HANDLE_CLASSNAME } from '../../base/designer.ts'
+import { val } from 'value-enhancer'
+import { NODE_HANDLE_CLASSNAME } from '../../base/designer.ts'
 import { toRFNodeId } from '../../base/rfHelpers.ts'
-import { fixTranslateKey, toUserTranslateKey, updatePartial } from '../../base/trivial.ts'
-import { getNextLang, getProperLocale$, localize } from '../designer/l10n.ts'
 import { NODE_TYPE } from './constants.ts'
-import { NodeUIStore } from './nodeUI.store.ts'
+import { createNodeInteraction } from './nodeInteraction.ts'
 
 const dragHandle = `.${NODE_HANDLE_CLASSNAME}`
 
@@ -28,31 +24,18 @@ export interface CommentNodeStore$$ {
   readonly title: Val<string | undefined>
   readonly content: Val<string | undefined>
   readonly sourceCode: Val<boolean>
-
-  // These fields align the NodeStore and CommentNodeStore union.
-  readonly showSettings: undefined
 }
 
 export interface CommentNodeStore$ extends ToReadonly$Group<CommentNodeStore$$> {
-  readonly lang: ReadonlyVal<string>
-  readonly preview: ReadonlyVal<React.ReactNode>
   readonly measured: ReadonlyVal<Partial<Size> | undefined>
-  // This value is available only when user locales are configured.
-  readonly translateKey?: ReadonlyVal<string | undefined>
 }
 
-type MountCodeEditorFn = (dom: HTMLDivElement, content$: Val<string | undefined>, lang$: ReadonlyVal<string>, userLocales?: LocaleTextStore) => Disposer | void
-
 export interface CommentNodeStoreProps {
-  // Each comment node can select its own display language.
-  readonly lang: Val<string>
-  readonly userLocales?: LocaleTextStore
-  readonly designerUIStore: DesignerUIStore
+  readonly position: XYPosition
+  readonly title?: string
+  readonly content?: string
   readonly duplicateNode?: (offset?: XYPosition | undefined) => void
-  // The content can be a `%key%` localization reference.
-  readonly mountCodeEditor: MountCodeEditorFn
-  readonly remove?: () => void
-  readonly preview: ReadonlyVal<React.ReactNode>
+  readonly onSaveContent: (content: string) => void
 }
 
 export class CommentNodeStore {
@@ -67,127 +50,44 @@ export class CommentNodeStore {
 
   public readonly rfNodeId: RFNodeId
 
-  public readonly uiStore: NodeUIStore
+  public readonly interaction: NodeInteraction
 
-  public readonly userLocales?: LocaleTextStore
   public readonly $$: CommentNodeStore$$
   public readonly $: CommentNodeStore$
   public readonly duplicateNode: CommentNodeStoreProps['duplicateNode']
-  public readonly mountCodeEditor: MountCodeEditorFn
-  public readonly remove?: () => void
-  public readonly toggleLanguage?: () => void
-  public readonly createTranslateKey?: () => void
+  public readonly saveContent: CommentNodeStoreProps['onSaveContent']
 
-  // These fields align the NodeStore and CommentNodeStore union.
-  public readonly manifest$: undefined
-  public readonly display$: undefined
-  public readonly execute: undefined
-
-  public constructor(nodeId: NodeId, { designerUIStore, ...props }: CommentNodeStoreProps) {
+  public constructor(nodeId: NodeId, props: CommentNodeStoreProps) {
     this.nodeId = nodeId
     this.rfNodeId = toRFNodeId(nodeId, this.nodeType)
     this.duplicateNode = props.duplicateNode
-    this.mountCodeEditor = props.mountCodeEditor
-    this.remove = props.remove
-    this.userLocales = props.userLocales
+    this.saveContent = props.onSaveContent
 
-    this.uiStore = this.dispose.add(new NodeUIStore(val(), designerUIStore.takeCommentNodeUIData(this.nodeId)))
-
-    const rfNodeData = Object.freeze({ store: this })
-    const ensureRFNode = (rfNode: Partial<RFNode> = {}): RFNode => {
-      rfNode.id = this.rfNodeId
-      rfNode.type = this.nodeType
-      rfNode.position = rfNode.position ?? DEFAULT_POSITION
-      rfNode.dragHandle = dragHandle
-      rfNode.data = rfNodeData
-      return rfNode as RFNode
-    }
-
-    const rfNode$ = this.dispose.add(attachSetter(derive(this.uiStore.$.rfNode, ensureRFNode), this.uiStore.$$.rfNode.set))
-
-    const selected$ = this.dispose.add(
-      attachSetter(
-        derive(rfNode$, (rfNode) => rfNode.selected),
-        updatePartial(rfNode$, 'selected'),
+    const interaction = (this.interaction = this.dispose.add(
+      createNodeInteraction(
+        {
+          id: this.rfNodeId,
+          type: this.nodeType,
+          position: props.position,
+          dragHandle,
+          data: Object.freeze({ store: this }),
+        },
+        350,
       ),
-    )
-
-    const measured$ = this.dispose.add(derive(rfNode$, (rfNode) => rfNode.measured, { equal: isSameSize }))
+    ))
 
     this.$$ = {
-      rfNode: rfNode$,
-      selected: selected$,
-      position: this.uiStore.position$,
-      title: this.uiStore.$$.title,
-      content: this.uiStore.$$.content,
-      sourceCode: val(false),
-      showSettings: void 0,
+      rfNode: interaction.rfNode,
+      selected: interaction.selected,
+      position: interaction.position,
+      title: this.dispose.add(val(props.title)),
+      content: this.dispose.add(val(props.content)),
+      sourceCode: this.dispose.add(val(false)),
     }
 
     this.$ = {
       ...this.$$,
-      title: this.dispose.add(
-        compute((get) => {
-          const raw = get(this.$$.title)
-          const translateKey = toUserTranslateKey(raw)
-          if (translateKey != null && props.userLocales) {
-            return localize(props.userLocales, props.lang, get, translateKey, raw)
-          }
-          return raw
-        }),
-      ),
-      content: this.dispose.add(
-        compute((get) => {
-          const raw = get(this.$$.content)
-          const translateKey = toUserTranslateKey(raw)
-          if (translateKey != null && props.userLocales) {
-            // "": Do not show '%key%' when content is empty.
-            return localize(props.userLocales, props.lang, get, translateKey, '')
-          }
-          return raw
-        }),
-      ),
-      preview: props.preview,
-      measured: measured$,
-      lang: this.dispose.add(props.lang.ref()),
-      translateKey: props.userLocales ? this.dispose.add(derive(this.$$.content, toUserTranslateKey)) : void 0,
-    }
-
-    if (props.userLocales) {
-      this.toggleLanguage = () => {
-        // Switching languages requires remounting the editor.
-        const wasShowingCode = this.$.sourceCode.value
-        this.$$.sourceCode.set(false)
-
-        setValue(props.lang, getNextLang(props.lang.value))
-
-        if (wasShowingCode) {
-          setTimeout(() => this.$$.sourceCode.set(true), 0)
-        }
-      }
-
-      this.createTranslateKey = () => {
-        const raw = this.$$.content.value || ''
-        let key = toUserTranslateKey(raw)
-        if (key != null) {
-          // Localization is already enabled for this content.
-          return
-        }
-
-        // Changing the localization key requires remounting the editor.
-        const wasShowingCode = this.$.sourceCode.value
-        this.$$.sourceCode.set(false)
-
-        const userLocales = props.userLocales!
-        const locale$ = getProperLocale$(userLocales, props.lang.value, raw)
-        key = fixTranslateKey(`comment:${this.nodeId}:content`, locale$.value)
-        locale$.set({ ...locale$.value, [key]: raw })
-        this.$$.content.set(`%${key}%`)
-
-        if (wasShowingCode) {
-          setTimeout(() => this.$$.sourceCode.set(true), 0)
-        }
-      }
+      measured: interaction.measured,
     }
   }
 

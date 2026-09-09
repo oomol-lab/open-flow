@@ -5,37 +5,28 @@ import type { HandleName } from '../../../../../schema/index.ts'
 import type { RFNodeId } from '../../../base/rfHelpers.ts'
 import type { HandleProps } from '../../../components/handle.tsx'
 import type { DesignerStore } from '../../../stores/designer/designer.store.ts'
-import type { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 
 import { useConnection, useNodeConnections, useStoreApi } from '@xyflow/react'
 import { clsx } from 'clsx'
-import { memo, useCallback, useContext, useRef } from 'react'
-import { useDerived, useVal } from 'use-value-enhancer'
+import { memo, useCallback, useRef } from 'react'
+import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { DEFAULT_POSITION } from '../../../base/designer.ts'
 import { toRFHandleName } from '../../../base/rfHelpers.ts'
 import { Handle } from '../../../components/handle.tsx'
 import { NodeMiniMapPhase, NodeMiniMapProvider, useNodeMiniMapPhase } from '../../../components/minimap.tsx'
-import { Running } from '../../../components/running.tsx'
 import { NODE_MINIMAP_PHASE1_CLASSNAME, NODE_MINIMAP_PHASE2_CLASSNAME } from '../../../stores/designer/nodeMiniMap.ts'
-import { SUBFLOW_VIEW_MODE } from '../../../stores/designer/subflowDesigner.store.ts'
-import { DESIGNER_TYPE } from '../../../stores/designer/typings.ts'
-import { DEFAULT_NODE_WIDTH, FITTING_VIEW_CLASSNAME, isManifestNodeType, isPseudoNodeType, MIN_NODE_WIDTH, NODE_TYPE } from '../../../stores/node/constants.ts'
+import { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
+import { DEFAULT_NODE_WIDTH, FITTING_VIEW_CLASSNAME, MIN_NODE_WIDTH, NODE_TYPE } from '../../../stores/node/constants.ts'
 import { NodeStore } from '../../../stores/node/node.store.ts'
-import { CanvasContext } from '../../FlowDesigner/CanvasContext.ts'
 import { conditionBranchSummary } from '../../FlowDesigner/cardContent.ts'
-import { useSubflowViewMode } from '../../SubflowDesigner/SubflowViewModeContext.ts'
 import { NodeStoreContext } from '../NodeStoreContext.tsx'
 import { CanvasNode } from './CanvasNode.tsx'
-import { NodeBody } from './NodeBody.tsx'
-import { NodeDescriptionPopup } from './NodeDescriptionPopup.tsx'
+import { CommentNodeContent } from './CommentNodeContent.tsx'
 import { NodeHead } from './NodeHead.tsx'
-import { NodeFloatBar, NodeHeadContextMenu, NodeSettingsPanelHost } from './NodeHeadMoreMenu.tsx'
+import { NodeFloatBar, NodeHeadContextMenu } from './NodeHeadMoreMenu.tsx'
 import { NodeMinimap } from './NodeMinimap.tsx'
 import { NodeOutline } from './NodeOutline.tsx'
-import { NodeProgress } from './NodeProgress.tsx'
-import { NodeStatusLabel } from './NodeStatusLabel.tsx'
-import { NodeTopLeftLabel } from './NodeTopLeftLabel.tsx'
 import { useShowNodeError } from './useShowNodeError.ts'
 
 export interface NodeLayoutProps {
@@ -49,33 +40,27 @@ const CARD_WIDTH = 320
 export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ designerStore, nodeStore, visible }) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const t = useTranslate()
-  const view = useContext(CanvasContext)
+  const modelNode = useVal(NodeStore.to(nodeStore)?.content$)
 
-  const branches = useVal(nodeStore.display$?.branches)
-  const executionInput = useVal(nodeStore.display$?.executionInput) ?? false
+  const branches =
+    modelNode?.kind == 'condition' || modelNode?.kind == 'wait' ? modelNode.outputs.flatMap((port) => ('handle' in port ? [port.handle] : [])) : undefined
+  const executionInput = modelNode != null && modelNode.kind != 'trigger'
   const editable = useVal(designerStore.$.editable)
-  const contentWidth$ = nodeStore.uiStore.$$.contentWidth
-  const { status, progress, showSettings } = nodeStore.display$ || {}
+  const contentWidth$ = nodeStore.interaction.contentWidth
   const selected = useVal(nodeStore.$.selected)
-  const skip = useVal(nodeStore.display$?.ignore)
+  const skip = useVal(NodeStore.to(nodeStore)?.ignore)
   const showError = useShowNodeError(nodeStore)
-  const isSubflowBlock = useSubflowViewMode() === SUBFLOW_VIEW_MODE.Block
-  const isInBlock = designerStore.designerType === DESIGNER_TYPE.Block || isSubflowBlock
-  const cardStore = !isInBlock && NodeStore.is(nodeStore) ? nodeStore : undefined
+  const cardStore = NodeStore.is(nodeStore) ? nodeStore : undefined
   const canvasMiniMapPhase = useNodeMiniMapPhase()
   const nodeMiniMapPhase = cardStore ? NodeMiniMapPhase.None : visible ? canvasMiniMapPhase : selected ? NodeMiniMapPhase.None : NodeMiniMapPhase.Phase2
 
   const handleTrack = useHandleTrack(nodeStore.rfNodeId, MIN_NODE_WIDTH, contentWidth$, containerRef, DEFAULT_NODE_WIDTH)
 
-  // Only apply the initial settings state to fitView so later node size calculations do not block canvas dragging.
   const initialized = useVal(designerStore.$.initialized)
   const animateEntry = useRef(initialized).current
-  // The initial fitView does not currently account for the settings panel width.
-  const settingsOpen = useDerived(showSettings, Boolean)
 
   const contentWidth = useVal(contentWidth$)
   const selectedOutlineColor = showError ? 'var(--edge-error)' : undefined
-  const modelNode = view?.model.nodes.find((node) => node.id == nodeStore.nodeId)
   const conditionNode = modelNode?.kind == 'condition' ? modelNode : undefined
 
   const containerStyle: CSSProperties = {
@@ -117,71 +102,32 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ des
           className={clsx(
             styles.outerContainer,
             animateEntry && styles.enter,
-            !initialized && settingsOpen && styles.settingsOpen,
             !initialized && FITTING_VIEW_CLASSNAME,
             nodeMiniMapPhase >= NodeMiniMapPhase.Phase1 && NODE_MINIMAP_PHASE1_CLASSNAME,
             nodeMiniMapPhase >= NodeMiniMapPhase.Phase2 && NODE_MINIMAP_PHASE2_CLASSNAME,
           )}
         >
           <div className={clsx(styles.offsetContainer, skip && styles.skipOuter)}>
-            {!isPseudoNodeType(nodeStore.nodeType) && !isInBlock && (
-              <>
-                <NodeFloatBar designerStore={designerStore} nodeStore={nodeStore} />
-                {!cardStore && <NodeSettingsPanelHost designerStore={designerStore} nodeStore={nodeStore} />}
-              </>
-            )}
-            {nodeMiniMapPhase >= NodeMiniMapPhase.Phase1 && nodeStore.nodeType == NODE_TYPE.InputNode && (
-              <NodeTopLeftLabel viewport$={designerStore.$.viewport}>
-                <i className="i-carbon:port-input mr-1" /> {t('inputHandleEditor.title')}
-              </NodeTopLeftLabel>
-            )}
-            {nodeMiniMapPhase >= NodeMiniMapPhase.Phase1 && nodeStore.nodeType == NODE_TYPE.OutputNode && (
-              <NodeTopLeftLabel viewport$={designerStore.$.viewport}>
-                <i className="i-carbon:port-output mr-1" /> {t('outputHandleEditor.title')}
-              </NodeTopLeftLabel>
-            )}
-            {!cardStore && !selected && status && nodeStore.display$ && (
-              <NodeStatusLabel
-                skip$={nodeStore.display$.ignore}
-                flowStatus$={designerStore.$.runStatus}
-                nodeStatus$={status}
-                progress$={progress}
-                successCount$={nodeStore.display$.successCount}
-                viewport$={designerStore.$.viewport}
-              />
-            )}
-            {!cardStore && status && <Running variant="gradient" status$={status} scale$={designerStore.$.scale} />}
+            <NodeFloatBar designerStore={designerStore} nodeStore={nodeStore} />
             <NodeMinimap />
             {!cardStore && <div data-pos="w" className={`${styles.resizeHandle} ${styles.resizeHandleW}`} onPointerDown={handleTrack} />}
             <main ref={containerRef} className={clsx(styles.container, cardStore && styles.cardContainer, skip && styles.skip)} style={containerStyle}>
               <div className={styles.executionHead}>
-                {card ? (
-                  isPseudoNodeType(nodeStore.nodeType) ? (
-                    card
-                  ) : (
-                    <NodeHeadContextMenu designerStore={designerStore}>{card}</NodeHeadContextMenu>
-                  )
-                ) : (
-                  <NodeHead />
-                )}
+                {card ? <NodeHeadContextMenu designerStore={designerStore}>{card}</NodeHeadContextMenu> : <NodeHead />}
                 {executionInput && <ExecutionHandle id={toRFHandleName('$in' as HandleName)} type="input" isConnectable={editable} />}
-                {!isPseudoNodeType(nodeStore.nodeType) && nodeStore.nodeType != NODE_TYPE.CommentNode && branches == null && (
+                {nodeStore.nodeType != NODE_TYPE.CommentNode && branches == null && (
                   <ExecutionHandle id={toRFHandleName('$out' as HandleName)} type="output" isConnectable={editable} />
                 )}
               </div>
               {!card && (
                 <>
-                  <NodeProgress progress$={progress} status$={status} />
-                  <NodeBody />
+                  {CommentNodeStore.is(nodeStore) && <CommentNodeContent store={nodeStore} />}
                   <NodeOutline />
                 </>
               )}
             </main>
             {!cardStore && <div data-pos="e" className={`${styles.resizeHandle} ${styles.resizeHandleE}`} onPointerDown={handleTrack} />}
           </div>
-          {!cardStore && nodeStore.manifest$ && isManifestNodeType(nodeStore.nodeType) && (
-            <NodeDescriptionPopup editable={editable} rawValue$={nodeStore.manifest$.description} displayValue$={nodeStore.display$.description} />
-          )}
         </div>
       </NodeStoreContext.Provider>
     </NodeMiniMapProvider>

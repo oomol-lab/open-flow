@@ -1,19 +1,15 @@
-import type { HandleName, NodeId } from '../../../../schema/index.ts'
-import type { ManifestConnection } from '../edge/typings.ts'
-import type { NodeStatus, NodeType } from '../node/constants.ts'
-import type { NodeStoreDisplay$ } from '../node/node.store.ts'
-import type { InteractiveMode } from './designer.store.ts'
+import type { reactiveMap } from 'value-enhancer/collections'
+import type { NodeId } from '../../../../schema/index.ts'
+import type { FlowDesignerViewEdge } from '../../graph/FlowDesigner/model.ts'
+import type { NodeContent } from '../../graph/FlowDesigner/nodeContent.ts'
+import type { NodeType } from '../node/constants.ts'
 
 import { val } from 'value-enhancer'
-import { reactiveMap } from 'value-enhancer/collections'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CommentNodeStore } from '../node/commentNode.store.ts'
-import { NODE_STATUS, NODE_TYPE } from '../node/constants.ts'
+import { NODE_TYPE } from '../node/constants.ts'
 import { NodeStore } from '../node/node.store.ts'
 import { DesignerStore } from './designer.store.ts'
-import { DesignerUIStore } from './designerUI.store.ts'
-import { createRFCommand } from './rfCommand.ts'
-import { DESIGNER_TYPE, FLOW_RUN_STATUS } from './typings.ts'
 
 interface TestSetup {
   readonly store: DesignerStore
@@ -22,47 +18,33 @@ interface TestSetup {
   dispose(): void
 }
 
-function createTestSetup(connections = val<readonly ManifestConnection[]>([])): TestSetup {
-  const nodes = reactiveMap<NodeId, NodeStore>()
-  const viewport = val<{ x: number; y: number; zoom: number } | undefined>()
-  const designerUIStore = new DesignerUIStore({ viewport, nodeStores: nodes })
-  const store = new DesignerStore(DESIGNER_TYPE.Flow, true, {
-    lang$: val('en'),
-    rfCommand: createRFCommand(nodes),
-    miniMapExpanded: val(),
-    interactiveMode: val<InteractiveMode>('mouse'),
-    viewport,
-    settingsPanelWidth: val(),
-    nodes,
-    connections,
-    runStatus: val(FLOW_RUN_STATUS.Idle),
-    designerUIStore,
-    showConfirmDialog: async () => true,
-    bindValidateConnection: () => {},
-    onAddNode: async () => undefined,
-    onDeleteNodes: () => {},
-    onConnect: vi.fn(),
-    onDisconnect: () => {},
-    onDuplicate: async () => {},
-  })
+function createTestSetup(connections = val<readonly FlowDesignerViewEdge[]>([]), autoLayout = true): TestSetup {
+  const store = new DesignerStore(
+    { nodes: [], edges: connections.value, viewport: { x: 0, y: 0, zoom: 1 } },
+    true,
+    'en',
+    [],
+    {
+      onAddNode: async () => undefined,
+      onDeleteNodes: () => {},
+      onConnect: vi.fn(),
+      onDisconnect: () => {},
+      onDuplicate: () => {},
+      onMoveNodes: () => {},
+      onPaste: () => {},
+      onChangeComment: undefined,
+      provideAddItems: undefined,
+    },
+    autoLayout,
+  )
+  const nodes = store.$$.nodes
   const createdNodes: NodeStore[] = []
   return {
     store,
     nodes,
     createNode(nodeId, nodeType = NODE_TYPE.TaskNode) {
-      const display$: NodeStoreDisplay$ = {
-        icon: val(),
-        title: val(),
-        description: val(),
-        status: val<NodeStatus>(NODE_STATUS.Idle),
-        progress: val(),
-        showSettings: val(),
-        ignore: val(),
-        sections: val([]),
-        inputs_def: val(),
-        outputs_def: val(),
-      }
-      const node = new NodeStore(nodeId, nodeType, { display$, designerUIStore })
+      const content$ = val<NodeContent>({ id: nodeId, kind: 'task', title: nodeId, reference: 'task', inputs: [], outputs: [] })
+      const node = new NodeStore(nodeId, nodeType, { content$, position: { x: 0, y: 0 } })
       createdNodes.push(node)
       return node
     },
@@ -90,7 +72,6 @@ describe('DesignerStore.waitNode', () => {
 
     await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined])
     expect(vi.getTimerCount()).toBe(0)
-    setup.nodes.set('first' as NodeId, setup.createNode('first' as NodeId))
     await vi.advanceTimersByTimeAsync(5000)
     expect(logError).not.toHaveBeenCalled()
     setup.dispose()
@@ -195,38 +176,16 @@ describe('DesignerStore graph projection', () => {
 })
 
 describe('DesignerStore layout', () => {
-  it('persists comment positions', () => {
-    const nodes = reactiveMap<NodeId, NodeStore>()
-    const comments = reactiveMap<NodeId, CommentNodeStore>()
-    const viewport = val<{ x: number; y: number; zoom: number } | undefined>()
-    const ui = new DesignerUIStore({ commentNodeStores: comments, nodeStores: nodes, viewport })
-    ui.loadDesignerUIData({ commentNodes: { note: { rfNode: { position: { x: 10, y: 20 } } } } })
-    const note = new CommentNodeStore('note' as NodeId, {
-      designerUIStore: ui,
-      lang: val('en'),
-      mountCodeEditor: () => undefined,
-      preview: val(null),
-    })
-    comments.set(note.nodeId, note)
-
+  it('updates comment positions independently of viewport state', () => {
+    const note = new CommentNodeStore('note' as NodeId, { position: { x: 10, y: 20 }, onSaveContent: () => undefined })
     note.$$.position.set({ x: 100, y: 200 })
-
     expect(note.$.position.value).toEqual({ x: 100, y: 200 })
-    expect(ui.toUIData()?.commentNodes?.['note' as NodeId]?.rfNode?.position).toEqual({ x: 100, y: 200 })
-    expect(ui.toUIData()?.viewport).toBeUndefined()
     note.dispose()
-    ui.dispose()
   })
 
-  it('persists positions and the current viewport', async () => {
+  it('tracks positions and the current viewport', async () => {
     const setup = createTestSetup()
-    setup.store.designerUIStore.loadDesignerUIData({
-      nodes: {
-        first: { rfNode: { position: { x: 0, y: 0 } } },
-        second: { rfNode: { position: { x: 150, y: 0 } } },
-      },
-      viewport: { x: 10, y: 20, zoom: 0.8 },
-    })
+
     const first = setup.createNode('first' as NodeId)
     const second = setup.createNode('second' as NodeId)
     setup.nodes.set(first.nodeId, first)
@@ -245,11 +204,7 @@ describe('DesignerStore layout', () => {
     expect(first.$.position.value).toEqual({ x: 40, y: 50 })
     expect(second.$.position.value).toEqual({ x: 300, y: 50 })
     expect(setup.store.$.viewport.value).toEqual({ x: 50, y: 60, zoom: 1.4 })
-    expect(setup.store.designerUIStore.toUIData()?.nodes).toMatchObject({
-      first: { rfNode: { position: { x: 40, y: 50 } } },
-      second: { rfNode: { position: { x: 300, y: 50 } } },
-    })
-    expect(setup.store.designerUIStore.toUIData()?.viewport).toEqual({ x: 50, y: 60, zoom: 1.4 })
+
     setup.dispose()
   })
 
@@ -266,10 +221,7 @@ describe('DesignerStore layout', () => {
     expect(setup.store.completeLayout()).toBe('relayout')
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(first.$.position.value).not.toEqual(second.$.position.value)
-    expect(setup.store.designerUIStore.toUIData()?.nodes).toMatchObject({
-      first: { rfNode: { position: first.$.position.value } },
-      second: { rfNode: { position: second.$.position.value } },
-    })
+
     setup.dispose()
   })
 
@@ -279,10 +231,13 @@ describe('DesignerStore layout', () => {
     const setup = createTestSetup(
       val([
         {
-          from: { type: 'from_node', source: { node_id: firstId, output_handle: 'output' as HandleName } },
-          to: { type: 'to_node', target: { node_id: secondId, input_handle: 'input' as HandleName } },
+          id: 'edge',
+          source: firstId,
+          sourceHandle: 'output',
+          target: secondId,
+          targetHandle: 'input',
         },
-      ] as readonly ManifestConnection[]),
+      ] as readonly FlowDesignerViewEdge[]),
     )
     const first = setup.createNode(firstId)
     const second = setup.createNode(secondId)
@@ -297,12 +252,9 @@ describe('DesignerStore layout', () => {
     setup.dispose()
   })
 
-  it('runs the normal graph layout when any layout node has no saved position', async () => {
+  it('does not repeat automatic layout after measurement completes', async () => {
     const setup = createTestSetup()
-    setup.store.designerUIStore.loadDesignerUIData({
-      commentNodes: { note: { rfNode: { position: { x: 10, y: 20 } } } },
-      nodes: { first: { rfNode: { position: { x: 30, y: 40 } } } },
-    })
+
     const first = setup.createNode('first' as NodeId)
     const second = setup.createNode('second' as NodeId)
     setup.nodes.set(first.nodeId, first)
@@ -313,6 +265,7 @@ describe('DesignerStore layout', () => {
 
     expect(setup.store.completeLayout()).toBe('relayout')
     expect(first.$.position.value).not.toEqual(second.$.position.value)
+    expect(setup.store.completeLayout()).toBe(true)
     setup.dispose()
   })
 
@@ -331,14 +284,10 @@ describe('DesignerStore layout', () => {
   })
 
   it('keeps newly added nodes and existing positions stable', async () => {
-    const setup = createTestSetup()
-    setup.store.designerUIStore.loadDesignerUIData({
-      nodes: {
-        first: { rfNode: { position: { x: 100, y: 200 } } },
-      },
-      viewport: { x: 10, y: 20, zoom: 0.8 },
-    })
+    const setup = createTestSetup(undefined, false)
+
     const first = setup.createNode('first' as NodeId)
+    first.$$.position.set({ x: 100, y: 200 })
     setup.nodes.set(first.nodeId, first)
     await new Promise((resolve) => setTimeout(resolve, 0))
 

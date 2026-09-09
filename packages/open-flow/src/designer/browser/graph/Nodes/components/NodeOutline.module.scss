@@ -17,12 +17,6 @@
   }
 }
 
-:global(.react-flow__node-input_node) .outline,
-:global(.react-flow__node-output_node) .outline {
-  outline-style: dashed;
-  outline-color: var(--pseudo-outline-color);
-}
-
 :global(.react-flow__node-comment_node) .outline {
   outline-color: var(--comment-border);
 }

@@ -1,10 +1,13 @@
 import type { Draft } from '../api.ts'
 
 import { describe, expect, it } from 'vitest'
-import { setTriggerConnection } from '../../../../flow/common/nodeChanges.ts'
+import { setTriggerConnection, updateTriggerSchedule } from '../../../../flow/common/nodeChanges.ts'
 import { revisionView } from '../revisionView.ts'
 import {
   addNode,
+  updateNodeDescription,
+  updateValue,
+  updateWebhook,
   agentTool,
   applyFlowChanges,
   copyNodes,
@@ -670,5 +673,119 @@ describe('Agent tool creation', () => {
       { handle: 'cc', jsonSchema: { type: 'array', items: { type: 'string' } }, nullable: true, source: { kind: 'model' } },
     ])
     expect(action).toEqual(original)
+  })
+})
+
+describe('node description ownership', () => {
+  it('writes and clears only the selected node description', () => {
+    const revision = revisionView(draft('export default () => ({})'))
+    const target = { kind: 'flow' } as const
+    expect(updateNodeDescription(revision, target, 'task', 'Details')).toEqual([
+      { kind: 'graph.node.field.set', target, nodeId: 'task', field: 'description', before: undefined, value: 'Details' },
+    ])
+    expect(updateNodeDescription(revision, target, 'task', undefined)).toEqual([])
+    expect(updateNodeDescription(revision, target, 'missing', 'Details')).toBeUndefined()
+    const base = draft('export default () => ({})')
+    const described = {
+      ...base,
+      content: {
+        ...base.content,
+        document: {
+          ...base.content.document,
+          graph: { ...base.content.document.graph, nodes: { task: { ...base.content.document.graph.nodes.task!, description: 'Details' } } },
+        },
+      },
+    }
+    expect(updateNodeDescription(revisionView(described), target, 'task', undefined)).toEqual([
+      { kind: 'graph.node.field.set', target, nodeId: 'task', field: 'description', before: 'Details', value: undefined },
+    ])
+  })
+})
+
+describe('Value node product editing', () => {
+  it('preserves schemas, explicit null and absent values through a field-list update', () => {
+    const base = draft('export default () => ({})')
+    const source = {
+      ...base,
+      content: {
+        ...base.content,
+        document: {
+          ...base.content.document,
+          graph: { ...base.content.document.graph, nodes: { literal: { kind: 'value' as const, name: 'Value', inputs: {}, values: [] } } },
+        },
+      },
+    }
+    const fields = [
+      { handle: 'unset', jsonSchema: false, nullable: false },
+      { handle: 'present', description: 'A nullable value', jsonSchema: { type: 'object' }, nullable: true, value: null },
+    ]
+    const changes = updateValue(revisionView(source), { kind: 'flow' }, 'literal', fields)!
+    const changed = applyFlowChanges(source, changes)
+    const node = changed.content.document.graph.nodes.literal
+    expect(node?.kind).toBe('value')
+    if (node?.kind !== 'value') throw new Error('Expected a Value node')
+    expect(node.values).toEqual(fields)
+    expect(Object.hasOwn(node.values[0]!, 'value')).toBe(false)
+    expect(updateValue(revisionView(changed), { kind: 'flow' }, 'literal', fields)).toEqual([])
+    expect(updateValue(revisionView(changed), { kind: 'flow' }, 'missing', fields)).toBeUndefined()
+  })
+})
+
+describe('Trigger schedule product editing', () => {
+  it('persists multiple rules without changing the trigger metadata and ignores no-op edits', () => {
+    const current = draft('export default {}')
+    const before = [{ type: 'every', unit: 'hour', value: 1 }] as const
+    const content = {
+      ...current.content,
+      document: {
+        ...current.content.document,
+        graph: { edges: [], nodes: { timer: { kind: 'cron' as const, name: 'Daily timer', description: 'Keep this description', cronTimes: before } } },
+      },
+    }
+    const schedules = [
+      { type: 'cron', expression: '0 9 * * *', timezone: 'Asia/Shanghai' },
+      { type: 'every', unit: 'day', value: 2 },
+    ] as const
+    const changes = updateTriggerSchedule(content, { kind: 'flow' }, 'timer', schedules)
+    expect(changes).toBeDefined()
+    const updated = applyFlowChanges({ ...current, content }, changes!)
+    expect(updated.content.document.graph.nodes.timer).toEqual({
+      kind: 'cron',
+      name: 'Daily timer',
+      description: 'Keep this description',
+      cronTimes: schedules,
+    })
+    expect(updateTriggerSchedule(updated.content, { kind: 'flow' }, 'timer', schedules)).toEqual([])
+    expect(updateTriggerSchedule(updated.content, { kind: 'flow' }, 'missing', schedules)).toBeUndefined()
+  })
+})
+
+describe('Webhook product editing', () => {
+  it('persists fields and HTTP options together, then clears options without changing metadata', () => {
+    const base = draft('export default {}')
+    const current = {
+      ...base,
+      content: {
+        ...base.content,
+        document: {
+          ...base.content.document,
+          graph: {
+            edges: [],
+            nodes: { hook: { kind: 'webhook' as const, name: 'Inbound', inputsDef: [] } },
+          },
+        },
+      },
+    }
+    const settings = {
+      inputs: [{ handle: 'event', jsonSchema: { type: 'object' }, nullable: false }],
+      options: { allowedMethods: ['PUT'], responseStatusCode: 202, responseHeaders: { 'X-Example': 'yes' } },
+    }
+    const changes = updateWebhook(revisionView(current), { kind: 'flow' }, 'hook', settings)
+    expect(changes).toBeDefined()
+    const updated = applyFlowChanges(current, changes!)
+    expect(updated.content.document.graph.nodes.hook).toEqual({ kind: 'webhook', name: 'Inbound', inputsDef: settings.inputs, options: settings.options })
+    expect(updateWebhook(revisionView(updated), { kind: 'flow' }, 'hook', settings)).toEqual([])
+    const cleared = applyFlowChanges(updated, updateWebhook(revisionView(updated), { kind: 'flow' }, 'hook', { inputs: settings.inputs, options: {} })!)
+    expect(cleared.content.document.graph.nodes.hook).toEqual({ kind: 'webhook', name: 'Inbound', inputsDef: settings.inputs })
   })
 })

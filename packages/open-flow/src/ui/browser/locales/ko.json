@@ -1,0 +1,46 @@
+{
+  "jsonViewer": {
+    "bin": "바이너리",
+    "showLess": "간략히 보기",
+    "showMore": "더 보기"
+  },
+  "variablePicker": {
+    "variableUnavailableHelp": "현재 deployment Variable을 사용할 수 없습니다.",
+    "variableMissingHelp": "현재 deployment에 Variable {{name}}이(가) 더 이상 없습니다.",
+    "variableUnavailable": "{{name}} (현재 사용할 수 없음)",
+    "variableMissing": "{{name}} (누락됨)",
+    "selectVariable": "Variable 선택",
+    "variablesLoading": "Variable 불러오는 중…",
+    "search": "검색",
+    "empty": "일치하는 변수가 없습니다.",
+    "clear": "<설정 안 됨>"
+  },
+  "markdown": {
+    "videoBilibili": "Bilibili 동영상 플레이어",
+    "videoYouTube": "YouTube 동영상 플레이어"
+  },
+  "llmEditor": {
+    "addMessage": "메시지 추가",
+    "chooseModel": "모델 목록에서 선택",
+    "customModel": "사용자 지정 모델...",
+    "defaultModel": "기본 모델",
+    "deleteMessage": "메시지 삭제",
+    "maxTokens": "최대 Token 수",
+    "messageCount": "메시지 {{count}}개",
+    "messageCountOne": "메시지 1개",
+    "messagePlaceholder": "메시지 내용",
+    "loadingModels": "모델 불러오는 중...",
+    "model": "모델",
+    "modelOptions": "모델 옵션",
+    "moveMessageDown": "메시지 아래로 이동",
+    "moveMessageUp": "메시지 위로 이동",
+    "role": {
+      "assistant": "어시스턴트",
+      "system": "시스템",
+      "user": "사용자"
+    },
+    "temperature": "Temperature",
+    "topP": "Top P",
+    "messageRole": "메시지 역할"
+  }
+}

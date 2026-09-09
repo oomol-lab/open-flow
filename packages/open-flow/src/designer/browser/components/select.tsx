@@ -25,10 +25,10 @@ import ReactSelect, { components, defaultTheme } from 'react-select'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { val } from 'value-enhancer'
+import { forwardRef2 } from '../../../ui/browser/hooks.ts'
 import { stopPropagation } from '../base/dom.ts'
-import { forwardRef2 } from '../base/react.ts'
 import { useGetStaticPopupContainer } from '../graph/ReactFlowContainer/useGetPopupContainer.ts'
-import { DesignerIcon } from '../icons/DesignerIcon.tsx'
+import { ContentIcon } from '../../../ui/browser/icons/ContentIcon.tsx'
 import { CssWrapper } from './cssWrapper.tsx'
 
 interface ExtraProps {
@@ -225,7 +225,7 @@ const customComponents = { DropdownIndicator, ClearIndicator, Menu, ValueContain
 const customStyles = { menu: (base: {}) => ({ ...base, width: 'var(--menu-width)' }) }
 
 function renderIcon(icon: React.ReactNode) {
-  if (typeof icon === 'string') return icon.startsWith('i-') ? <i className={icon} /> : <DesignerIcon src={icon} />
+  if (typeof icon === 'string') return icon.startsWith('i-') ? <i className={icon} /> : <ContentIcon src={icon} />
   return icon
 }
 

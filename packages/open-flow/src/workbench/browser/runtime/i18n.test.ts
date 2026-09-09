@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import formEnglish from '../../../form/browser/locales/en.json'
+import uiEnglish from '../../../ui/browser/locales/en.json'
 import { createI18n, locales } from './i18n.ts'
 import en from './locales/en.json'
 
@@ -16,7 +18,7 @@ function placeholders(message: string): string[] {
   return [...message.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].flatMap((match) => match[1] ?? []).toSorted()
 }
 
-const english = new Map(messages(en))
+const english = new Map(messages({ ...en, ...uiEnglish, ...formEnglish }))
 
 describe('Workbench i18n', () => {
   it('ships every supported language', () => {

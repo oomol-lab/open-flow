@@ -318,11 +318,6 @@
     "touchpad": "觸控板友善",
     "touchpadDescription": "雙指同向滑動拖動畫布，雙指捏合或張開縮放。"
   },
-  "jsonViewer": {
-    "bin": "二進位",
-    "showLess": "收合",
-    "showMore": "展開"
-  },
   "l10n": {
     "createKey": "啟用翻譯",
     "deleteKey": "刪除翻譯",
@@ -369,29 +364,6 @@
   },
   "ok": "確定",
   "optimize": "自動排版",
-  "llmEditor": {
-    "addMessage": "新增訊息",
-    "chooseModel": "從模型清單選擇",
-    "customModel": "自訂模型...",
-    "defaultModel": "預設模型",
-    "deleteMessage": "刪除訊息",
-    "maxTokens": "最大 Token 數",
-    "messageCount": "{{count}} 則訊息",
-    "messageCountOne": "1 則訊息",
-    "messagePlaceholder": "訊息內容",
-    "loadingModels": "正在載入模型...",
-    "model": "模型",
-    "modelOptions": "模型選項",
-    "moveMessageDown": "下移訊息",
-    "moveMessageUp": "上移訊息",
-    "role": {
-      "assistant": "助理",
-      "system": "系統",
-      "user": "使用者"
-    },
-    "temperature": "Temperature",
-    "topP": "Top P"
-  },
   "outputHandleEditor": {
     "addOutput": "新增輸出 Handle",
     "configPanelTitle": "輸出 Handle 設定",
@@ -425,8 +397,6 @@
   },
   "preview": {
     "title": "預覽",
-    "videoBilibili": "Bilibili 影片播放器",
-    "videoYouTube": "YouTube 影片播放器",
     "table": {
       "footer": "共 {{columns}} 欄、{{rows}} 列"
     }

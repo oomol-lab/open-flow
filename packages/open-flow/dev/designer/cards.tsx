@@ -9,7 +9,6 @@ import { CanvasCard } from '../../src/designer/browser/graph/Nodes/components/Ca
 import { RunChips } from '../../src/designer/browser/graph/Nodes/components/RunChips.tsx'
 import { GetPopupContainerContext } from '../../src/designer/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { createI18n } from '../../src/designer/browser/i18n/i18n-loader.ts'
-import { designerThemeClass } from '../../src/designer/browser/theme/designerThemeClass.ts'
 
 const completed: FlowDesignerViewNodeRun = {
   status: 'success',
@@ -51,7 +50,7 @@ function CardStage({ dark, language, children }: { readonly dark: boolean; reado
   const popup = useMemo(() => ({ default: () => root.current ?? document.body, static: () => root.current ?? document.body }), [])
   return (
     <I18nProvider i18n={i18n}>
-      <div ref={root} className={`oo-designer-root ${designerThemeClass(dark)} card-studies`} data-theme={dark ? 'dark' : 'light'}>
+      <div ref={root} className={`oo-designer-root open-flow-theme card-studies`} data-surface="canvas" data-theme={dark ? 'dark' : 'light'}>
         <GetPopupContainerContext.Provider value={popup}>{children}</GetPopupContainerContext.Provider>
       </div>
     </I18nProvider>

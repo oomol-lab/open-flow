@@ -1,102 +1,44 @@
 import type { DisposableStore } from '@wopjs/disposable'
-import type { AddEventListener } from '@wopjs/event'
 import type { Connection as _RFConnection, OnBeforeDelete, OnEdgesChange, OnNodesChange, Viewport, XYPosition } from '@xyflow/react'
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { ReactiveMap, ReadonlyReactiveMap } from 'value-enhancer/collections'
-import type { LocaleTextStore } from '../../../../localization/common/localization.ts'
-import type { HandleName, NodeId } from '../../../../schema/index.ts'
+import type { NodeId } from '../../../../schema/index.ts'
 import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { RFConnection, RFEdge, RFNode, RFNodeId } from '../../base/rfHelpers.ts'
 import type { ToReadonly$Group } from '../../base/val.ts'
-import type { TranslateKeyEvent, UserLocalesContext } from '../../components/userLocales.tsx'
+import type {
+  FlowDesignerViewAddItem,
+  FlowDesignerViewEdge,
+  FlowDesignerViewModel,
+  FlowDesignerViewPosition,
+  FlowDesignerViewViewport,
+  ViewCallbacks,
+} from '../../graph/FlowDesigner/model.ts'
+import type { NodeEntry } from '../../graph/FlowDesigner/node.tsx'
 import type { EdgeStore } from '../edge/edge.store.ts'
-import type { ManifestConnection } from '../edge/typings.ts'
-import type { ConnectorConnectionStore } from './connectorConnection.store.ts'
-import type { DesignerUIStore } from './designerUI.store.ts'
 import type { RFCommand } from './rfCommand.ts'
-import type { DesignerType, FlowRunStatus } from './typings.ts'
+import type { FlowRunStatus } from './typings.ts'
 
 import { graphlib, layout } from '@dagrejs/dagre'
-import { disposableStore } from '@wopjs/disposable'
-import { event } from '@wopjs/event'
+import { dispose, disposableStore } from '@wopjs/disposable'
 import { cluster } from 'radash'
 import { compute, derive, val } from 'value-enhancer'
-import { DESIGNER_CLASSNAME } from '../../base/designer.ts'
-import { dispatchEvent, isInside, isMac } from '../../base/dom.ts'
+import { reactiveMap } from 'value-enhancer/collections'
+import { isSameViewport } from '../../base/compare.ts'
+import { isInside, isMac } from '../../base/dom.ts'
 import { applyEdgeChanges, applyNodeChanges, getRFNodeType, RF_NODE_TYPE, toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
 import { coalesce, filterMap, Negative } from '../../base/trivial.ts'
+import { toViewEdge } from '../../graph/FlowDesigner/model.ts'
+import { createNodeEntry, createCommentNodeEntry, updateNodeEntry, updateCommentNodeEntry } from '../../graph/FlowDesigner/node.tsx'
 import { createI18n } from '../../i18n/index.ts'
+import { getRFEdgeId } from '../edge/edge.store.ts'
 import { deriveEdges } from '../edge/edges.ts'
 import { CommentNodeStore } from '../node/commentNode.store.ts'
 import { NodeStore } from '../node/node.store.ts'
-import { InputSectionStore } from '../node/nodeSection/inputSection.store.ts'
-import { OutputSectionStore } from '../node/nodeSection/outputSection.store.ts'
-import { SubflowNodeStore } from '../node/subflowNode.store.ts'
-import { HandleRowStore } from '../nodeHandle/handleRow.store.ts'
 import { NodeMiniMapPhase } from './nodeMiniMap.ts'
-
-export type IAddNodeMenuItem =
-  | {
-      type: AddNodeType
-      /**
-       * ```js
-       * { type: 'scriptlet', data: 'javascript' }
-       * { type: 'block', data: 'path/to/task.oo.yaml' }
-       * { type: 'value' }
-       * ```
-       */
-      data?: string
-      /** Prevents selection while keeping an unavailable or incompatible item visible. */
-      disabled?: boolean
-      /**
-       * `DesignerIcon` format, `:codicon:add:`, `path/to/icon.svg`.
-       */
-      icon?: string
-      /**
-       * Will be used for searching.
-       */
-      label: string
-      /**
-       * Will be used for searching, not displayed on the UI.
-       */
-      detail?: string
-      /**
-       * Will be used for searching, displayed at the right side of the label.
-       */
-      description?: string
-      /**
-       * Requires one explicit choice before adding the node.
-       */
-      choices?: readonly {
-        readonly data: string
-        readonly description?: string
-        readonly handles?: {
-          name: HandleName
-          json_schema?: unknown
-          description?: string
-        }[]
-        readonly label: string
-      }[]
-      /**
-       * If provided, selected handle will be connected.
-       * Otherwise only the node will be created.
-       */
-      handles?: {
-        name: HandleName
-        // Help generating the icon at the left side of the name.
-        json_schema?: unknown
-        // Displayed at the right side of the handle name.
-        description?: string
-      }[]
-    }
-  | { type: 'divider'; label: string; detail?: string }
-
-export interface IFromSource {
-  readonly nodeId: NodeId
-  readonly handle: HandleName
-  readonly side: 'left' | 'right'
-}
+import { createRFCommand } from './rfCommand.ts'
+import { FLOW_RUN_STATUS } from './typings.ts'
 
 export type InteractiveMode = 'mouse' | 'touchpad'
 
@@ -109,26 +51,21 @@ export interface DesignerStore$$ {
   readonly initialized: Val<boolean>
   readonly editable: Val<boolean>
 
-  readonly viewport: DesignerStoreProps['viewport']
-  readonly miniMapExpanded: DesignerStoreProps['miniMapExpanded']
+  readonly viewport: Val<Viewport | undefined>
+  readonly miniMapExpanded: Val<boolean | undefined>
   readonly interactiveMode: Val<InteractiveMode>
 
-  /** Nodes persisted in flow.oo.yaml, excluding virtual input and output nodes. */
+  /** Semantic nodes in the current product model. */
   readonly nodes: ReactiveMap<NodeId, NodeStore>
-  readonly pseudoNodes?: ReactiveMap<NodeId, NodeStore>
   readonly commentNodes?: ReactiveMap<NodeId, CommentNodeStore>
-
-  readonly showSettings: Val<boolean>
-  readonly settingsPanelWidth: Val<number | undefined>
 }
 
 export interface DesignerStore$ extends ToReadonly$Group<DesignerStore$$> {
   readonly initialized: ReadonlyVal<boolean>
   readonly nodes: ReadonlyReactiveMap<NodeId, NodeStore>
-  readonly pseudoNodes?: ReadonlyReactiveMap<NodeId, NodeStore>
   readonly edges: ReadonlyVal<EdgeStore[]>
 
-  /** Selected nodes excluding pseudo nodes and the flow node. */
+  /** Selected semantic nodes and comments. */
   readonly selectedNodes: ReadonlyVal<(NodeStore | CommentNodeStore)[]>
 
   readonly scale: ReadonlyVal<number>
@@ -139,196 +76,73 @@ export interface DesignerStore$ extends ToReadonly$Group<DesignerStore$$> {
   readonly runStatus: ReadonlyVal<FlowRunStatus>
 
   readonly nodeMiniMapPhase: ReadonlyVal<NodeMiniMapPhase>
-  readonly variableInputs: ReadonlyVal<ReadonlyMap<string, { readonly compatible: boolean; readonly enabled?: false; readonly name?: string }>>
-  readonly variableNames: ReadonlyVal<readonly string[]>
-  readonly variableNamesLoaded: ReadonlyVal<boolean>
-  readonly variableNamesLoading: ReadonlyVal<boolean>
-}
-
-export interface DesignerStoreProps {
-  readonly connections?: ReadonlyVal<readonly ManifestConnection[]>
-  readonly lang$: ReadonlyVal<string>
-  readonly userLocales?: LocaleTextStore
-  /** Makes every input and output section read-only for previews. */
-  readonly readonly?: boolean
-
-  readonly rfCommand: RFCommand
-  readonly miniMapExpanded: Val<boolean | undefined>
-  readonly interactiveMode: Val<InteractiveMode>
-  readonly viewport: Val<Viewport | undefined>
-  readonly settingsPanelWidth: Val<number | undefined>
-  readonly connectorConnections?: ConnectorConnectionStore
-  readonly nodes: ReactiveMap<NodeId, NodeStore>
-  readonly runStatus: ReadonlyVal<FlowRunStatus>
-  readonly designerUIStore: DesignerUIStore
-  readonly focused$?: ReadonlyVal<boolean>
-  readonly variableInputs?: ReadonlyVal<ReadonlyMap<string, { readonly compatible: boolean; readonly enabled?: false; readonly name?: string }>>
-  readonly variableNames?: ReadonlyVal<readonly string[]>
-  readonly variableNamesLoaded?: ReadonlyVal<boolean>
-  readonly variableNamesLoading?: ReadonlyVal<boolean>
-
-  readonly showConfirmDialog: (message: string) => Promise<boolean>
-
-  readonly bindValidateConnection?: (edgeStore: EdgeStore) => void
-
-  // For flow designer store.
-  readonly onAddNode?: (
-    type: AddNodeType,
-    blockName: string,
-    position: XYPosition,
-    connection?: (nodeId: NodeId) => RFConnection,
-  ) => Promise<NodeId | undefined>
-  readonly onDeleteNodes?: (toDeleteNodeStores: Iterable<NodeStore | CommentNodeStore>) => void
-  readonly onConnect?: (connection: ManifestConnection) => void
-  readonly onChangeInputVariable?: (nodeId: string, handle: string, name: string | undefined) => void
-  readonly onOpenVariables?: () => void
-  readonly onDisconnect?: (connections: Iterable<ManifestConnection>) => void
-  readonly onDuplicate?: (nodeStores: NodeId[], offset?: XYPosition) => Promise<void>
-  readonly onLayout?: (positions: Readonly<Record<string, XYPosition>>) => void
-  readonly onPaste?: (position: XYPosition) => void
-  readonly provideAddNodeMenuItems?: (fromSource?: IFromSource) => IAddNodeMenuItem[] | undefined
-  readonly provideAsyncAddNodeMenuItems?: (
-    fromSource: IFromSource | undefined,
-    searchTerm: string,
-    signal: AbortSignal,
-  ) => Promise<IAddNodeMenuItem[] | undefined>
-
-  // Rename node id (in flow designer) or task folder name (in block designer).
-  readonly validateNodeId?: (newName: NodeId, oldName: NodeId) => string | undefined
-  readonly onRenameNodeId?: (oldName: NodeId, newName: NodeId) => void
-
-  readonly validateDirName?: (newName: string, oldName: string) => string | undefined
-  readonly onRenameDirName?: (oldName: string, newName: string) => void
-
-  // For the subflow designer store.
-  readonly pseudoNodes?: ReactiveMap<NodeId, NodeStore>
-  readonly flowNode?: SubflowNodeStore
-
-  readonly commentNodes?: ReactiveMap<NodeId, CommentNodeStore>
-}
-
-export interface FlowDiagnostics {
-  readonly handleErrors: Array<{
-    node: string
-    nodeTitle?: string
-    handle: string
-    error: unknown
-  }>
-  readonly edgeErrors: Array<{
-    edge: string
-    error: unknown
-  }>
 }
 
 export class DesignerStore {
   public readonly lang$: ReadonlyVal<string>
   public readonly i18n: I18n
-  public readonly userLocales?: LocaleTextStore
-  public readonly designerType: DesignerType
 
-  public readonly focused$?: ReadonlyVal<boolean>
-  public readonly canDeleteNodes: boolean
+  public readonly canDeleteNodes = true
 
   public readonly dispose: DisposableStore = disposableStore()
-  public readonly onDidChangeTranslateKey: AddEventListener<TranslateKeyEvent>
 
   public readonly $: DesignerStore$
   public readonly $$: DesignerStore$$
 
-  public readonly pseudoNodes?: ReactiveMap<NodeId, NodeStore>
-  public readonly flowNode?: SubflowNodeStore
-
   public readonly rfCommand: RFCommand
-  public readonly designerUIStore: DesignerUIStore
-  public readonly connectorConnections: ConnectorConnectionStore | undefined
-
-  public readonly showConfirmDialog: DesignerStoreProps['showConfirmDialog']
-
-  /** @internal */
-  public readonly onAddNode: DesignerStoreProps['onAddNode']
-  /** @internal */
-  public readonly onDeleteNodes: DesignerStoreProps['onDeleteNodes']
-  /** @internal */
-  public readonly onConnect: DesignerStoreProps['onConnect']
-  /** @internal */
-  public readonly onChangeInputVariable: DesignerStoreProps['onChangeInputVariable']
-  /** @internal */
-  public readonly onOpenVariables: DesignerStoreProps['onOpenVariables']
-  /** @internal */
-  public readonly onDisconnect: DesignerStoreProps['onDisconnect']
-  /** @internal */
-  public readonly onLayout: DesignerStoreProps['onLayout']
-  public readonly onDuplicate: DesignerStoreProps['onDuplicate']
-  /** @internal */
-  public readonly onPaste: DesignerStoreProps['onPaste']
-  /** @internal */
-  public readonly validateRenameNodeId: DesignerStoreProps['validateNodeId']
-  /** @internal */
-  public readonly onRenameNodeId: DesignerStoreProps['onRenameNodeId']
-  /** @internal */
-  public readonly validateRenameDirName: DesignerStoreProps['validateDirName']
-  /** @internal */
-  public readonly onRenameDirName: DesignerStoreProps['onRenameDirName']
-  /** @internal */
-  public readonly provideAddNodeMenuItems: DesignerStoreProps['provideAddNodeMenuItems']
-  /** @internal */
-  public readonly provideAsyncAddNodeMenuItems: DesignerStoreProps['provideAsyncAddNodeMenuItems']
-
-  /** @internal */
-  public readonly userLocalesContext: UserLocalesContext
 
   private disposed = false
   private layoutMeasurementAttempts = 0
+  private layoutComplete: boolean
+  private deletionTimer: ReturnType<typeof setTimeout> | undefined
+  private readonly pendingNodeDeletes = new Set<NodeStore | CommentNodeStore>()
+  private readonly pendingDisconnects = new Map<string, FlowDesignerViewEdge>()
 
-  public constructor(type: DesignerType, editable: boolean, props: DesignerStoreProps) {
+  #connections: Val<readonly FlowDesignerViewEdge[]>
+  #addItems: readonly FlowDesignerViewAddItem[]
+  readonly #callbacks: ViewCallbacks
+  #entries = new Map<string, NodeEntry>()
+  #language: Val<string>
+  #modelPositions = new Map<string, FlowDesignerViewPosition>()
+  #modelViewport: FlowDesignerViewViewport | undefined
+  #runStatus: Val<FlowRunStatus>
+  #selectedNodeIds = new Set<string>()
+
+  public constructor(
+    model: FlowDesignerViewModel,
+    editable: boolean,
+    language: string,
+    addItems: readonly FlowDesignerViewAddItem[],
+    callbacks: ViewCallbacks,
+    autoLayout = false,
+  ) {
+    this.#addItems = addItems
+    this.#callbacks = callbacks
+    this.#language = this.dispose.add(val(language))
+    this.lang$ = this.#language
+    this.i18n = createI18n(language)
+    this.dispose.add(this.lang$.reaction((lang) => this.i18n.switchLang(lang)))
     this.dispose.add(() => {
       this.disposed = true
+      this.cancelPendingDeletions()
     })
-    this.rfCommand = this.dispose.add(props.rfCommand)
-    this.designerUIStore = this.dispose.add(props.designerUIStore)
-    this.connectorConnections = props.connectorConnections
-
-    this.focused$ = props.focused$ && this.dispose.add(props.focused$)
-    this.canDeleteNodes = props.onDeleteNodes != null
-
-    this.designerType = type
-    this.showConfirmDialog = props.showConfirmDialog
-
-    this.onAddNode = props.onAddNode
-    this.onDeleteNodes = props.onDeleteNodes
-    this.onConnect = props.onConnect
-    this.onChangeInputVariable = props.onChangeInputVariable
-    this.onOpenVariables = props.onOpenVariables
-    this.onDisconnect = props.onDisconnect
-    this.onLayout = props.onLayout
-    this.onDuplicate = props.onDuplicate
-    this.onPaste = props.onPaste
-    this.validateRenameNodeId = props.validateNodeId
-    this.onRenameNodeId = props.onRenameNodeId
-    this.validateRenameDirName = props.validateDirName
-    this.onRenameDirName = props.onRenameDirName
-    this.provideAddNodeMenuItems = props.provideAddNodeMenuItems
-    this.provideAsyncAddNodeMenuItems = props.provideAsyncAddNodeMenuItems
-
-    this.lang$ = props.lang$
-    this.i18n = createI18n(this.lang$.value)
-    this.userLocales = props.userLocales
-    this.dispose.add(this.lang$.reaction((lang) => this.i18n.switchLang(lang)))
-
-    const { nodes, pseudoNodes, commentNodes } = props
-    const edges = this.dispose.add(deriveEdges(props.connections ?? val<readonly ManifestConnection[]>([]), nodes))
+    const nodes = this.dispose.add(reactiveMap<NodeId, NodeStore>(null, { onDeleted: dispose }))
+    const commentNodes = this.dispose.add(reactiveMap<NodeId, CommentNodeStore>(null, { onDeleted: dispose }))
+    const viewport = this.dispose.add(val<FlowDesignerViewViewport | undefined>(model.viewport, { equal: isSameViewport }))
+    this.rfCommand = this.dispose.add(createRFCommand(nodes))
+    this.layoutComplete = !autoLayout
+    this.#runStatus = this.dispose.add(val<FlowRunStatus>(model.runStatus == 'running' ? FLOW_RUN_STATUS.Running : FLOW_RUN_STATUS.Idle))
+    this.#connections = this.dispose.add(val<readonly FlowDesignerViewEdge[]>([]))
+    const edges = this.dispose.add(deriveEdges(this.#connections, nodes))
     const rfEdges = this.dispose.add(compute((get) => coalesce(get(edges).map((edge) => get(edge.$.rfEdge)))))
     this.$$ = {
       initialized: this.dispose.add(val(false)),
       editable: this.dispose.add(val(editable)),
-      miniMapExpanded: this.dispose.add(props.miniMapExpanded),
-      viewport: this.dispose.add(props.viewport),
-      interactiveMode: this.dispose.add(props.interactiveMode),
+      miniMapExpanded: this.dispose.add(val<boolean | undefined>()),
+      viewport: viewport,
+      interactiveMode: this.dispose.add(val<InteractiveMode>('touchpad')),
       nodes,
-      pseudoNodes,
       commentNodes,
-      showSettings: this.dispose.add(val(false)),
-      settingsPanelWidth: this.dispose.add(props.settingsPanelWidth),
     }
 
     const rfNodes = this.dispose.add(compute((get) => [...(get(commentNodes?.$)?.values() ?? []), ...get(nodes.$).values()].map((node) => get(node.$.rfNode))))
@@ -338,8 +152,8 @@ export class DesignerStore {
       nodes,
       commentNodes,
       edges,
-      runStatus: this.dispose.add(props.runStatus),
-      scale: this.dispose.add(derive(props.viewport, (viewport) => 1 / (viewport?.zoom || 1))),
+      runStatus: this.#runStatus,
+      scale: this.dispose.add(derive(viewport, (currentViewport) => 1 / (currentViewport?.zoom || 1))),
       selectedNodes: this.dispose.add(
         compute((get) => {
           const nodeStores: (NodeStore | CommentNodeStore)[] = []
@@ -361,22 +175,13 @@ export class DesignerStore {
       rfNodes,
       rfEdges,
       nodeMiniMapPhase: this.dispose.add(val(NodeMiniMapPhase.None)),
-      variableInputs: this.dispose.add(props.variableInputs ?? val(new Map())),
-      variableNames: this.dispose.add(props.variableNames ?? val([])),
-      variableNamesLoaded: this.dispose.add(props.variableNamesLoaded ?? val(false)),
-      variableNamesLoading: this.dispose.add(props.variableNamesLoading ?? val(false)),
     }
-
-    this.onDidChangeTranslateKey = this.dispose.add(event())
-    this.userLocalesContext = {
-      userLocales: this.userLocales,
-      onDidChangeTranslateKey: this.onDidChangeTranslateKey,
-    }
+    this.#syncModel(model)
   }
 
   /** Initializes the shared layout after React Flow has measured the nodes. */
   public completeLayout = (): boolean | 'relayout' => {
-    if (this.designerUIStore.isActiveLayoutInitialized()) return true
+    if (this.layoutComplete) return true
     const nodes = this.allLayoutNodes()
     if (nodes.length === 0) return true
     for (const node of nodes) {
@@ -384,18 +189,18 @@ export class DesignerStore {
       if (!measured?.width || !measured.height) {
         if (this.layoutMeasurementAttempts++ < 5) return false
         this.layoutMeasurementAttempts = 0
-        this.designerUIStore.completeActiveLayout()
+        this.layoutComplete = true
         return true
       }
     }
     this.doRelayout()
     this.layoutMeasurementAttempts = 0
-    this.designerUIStore.completeActiveLayout()
+    this.layoutComplete = true
     return 'relayout'
   }
 
   private allLayoutNodes(): NodeStore[] {
-    return [...this.$.nodes.values(), ...(this.$.pseudoNodes?.values() ?? [])]
+    return [...this.$.nodes.values()]
   }
 
   /** Deletes nodes programmatically, such as from a menu action. */
@@ -413,23 +218,13 @@ export class DesignerStore {
    * Returning false cancels the deletion.
    * @internal
    */
-  public onBeforeDelete: OnBeforeDelete<RFNode, RFEdge> = async (toDelete): Promise<boolean> => {
-    if (this.$.editable.value && this.canDeleteNodes) {
-      const { nodes } = toDelete
-      if (nodes.length > 0) {
-        return this.confirmDeleteNodes(nodes.map((e) => e.data.store))
-      }
-      return true
-    } else {
-      return false
-    }
-  }
+  public onBeforeDelete: OnBeforeDelete<RFNode, RFEdge> = async (): Promise<boolean> => this.$.editable.value
 
   /**
    * @internal
    */
   public handleNodesChange: OnNodesChange<RFNode> = async (changes): Promise<void> => {
-    const toRemoveNodes = applyNodeChanges(changes, this.$.nodes, this.pseudoNodes, this.$.commentNodes, this.$$.editable)
+    const toRemoveNodes = applyNodeChanges(changes, this.$.nodes, this.$.commentNodes, this.$$.editable)
     if (toRemoveNodes) this.doRemoveNodes(toRemoveNodes)
   }
 
@@ -437,40 +232,12 @@ export class DesignerStore {
    * @internal
    */
   public handleEdgesChange: OnEdgesChange<RFEdge> = (changes): void => {
+    if (this.disposed) return
     const toRemoveEdges = applyEdgeChanges(changes, this.$.rfEdges.value, this.$.editable)
     if (toRemoveEdges?.size) {
-      this.onDisconnect?.(toRemoveEdges)
+      for (const connection of toRemoveEdges) this.pendingDisconnects.set(getRFEdgeId(connection), connection)
+      this.scheduleDeletions()
     }
-  }
-
-  private async confirmDeleteNodes(nodeStores: Iterable<NodeStore | CommentNodeStore>): Promise<boolean> {
-    const nodeTitles: string[] = []
-    for (const nodeStore of nodeStores) {
-      if (NodeStore.is(nodeStore)) {
-        nodeTitles.push(nodeStore.display$.title.value || nodeStore.nodeId)
-      } else if (CommentNodeStore.is(nodeStore)) {
-        nodeTitles.push(nodeStore.$.title.value || nodeStore.nodeId)
-      }
-    }
-    if (nodeTitles.length > 0) {
-      const { t } = this.i18n
-      const message = t('nodeActions.deleteConfirm', {
-        name: nodeTitles.join(', '),
-        shortcut: isMac ? 'Cmd + Shift + Delete' : 'Ctrl + Shift + Delete',
-      })
-      const result = await this.showConfirmDialog(message)
-      // The dialog consumes keyup, so replay it to restore XYFlow's keyboard state.
-      // https://github.com/xyflow/xyflow/blob/0f21ec2/packages/react/src/hooks/useKeyPress.ts#L103
-      // XYFlow calls target.closest(), so dispatch from document.documentElement.
-      dispatchEvent(document.documentElement, KeyboardEvent, 'keyup', {
-        key: 'Delete',
-      })
-      dispatchEvent(document.documentElement, KeyboardEvent, 'keyup', {
-        key: 'Backspace',
-      })
-      return result
-    }
-    return true
   }
 
   public onRFConnect = (rfConnection: _RFConnection): void => {
@@ -485,22 +252,12 @@ export class DesignerStore {
 
     const { source, target, sourceHandle, targetHandle } = rfConnection as RFConnection
 
-    this.onConnect?.({
-      from: { type: 'from_node', source: { node_id: toManifestNodeId(source), output_handle: toManifestHandleName(sourceHandle) } },
-      to: { type: 'to_node', target: { node_id: toManifestNodeId(target), input_handle: toManifestHandleName(targetHandle) } },
+    this.#callbacks.onConnect({
+      source: toManifestNodeId(source),
+      sourceHandle: toManifestHandleName(sourceHandle),
+      target: toManifestNodeId(target),
+      targetHandle: toManifestHandleName(targetHandle),
     })
-  }
-
-  /**
-   * If the document.activeElement is in Designer
-   */
-  public isDesignerActive(): boolean {
-    for (let node = document.activeElement; node; node = node.parentElement) {
-      if (node.classList.contains(DESIGNER_CLASSNAME)) {
-        return true
-      }
-    }
-    return false
   }
 
   public prepareDeselectNodesAndEdges(): () => void {
@@ -509,10 +266,6 @@ export class DesignerStore {
     for (const node of this.$.nodes.values()) {
       toDeselect.push(node)
     }
-    if (this.pseudoNodes)
-      for (const node of this.pseudoNodes.values()) {
-        toDeselect.push(node)
-      }
     if (this.$.commentNodes)
       for (const node of this.$.commentNodes.values()) {
         toDeselect.push(node)
@@ -528,7 +281,6 @@ export class DesignerStore {
 
   public onRelayout = (): void => {
     try {
-      this.closeAllSettingsPanel()
       this.doRelayout()
     } catch (e) {
       console.error(e)
@@ -580,8 +332,7 @@ export class DesignerStore {
     }
 
     this.$.nodes.forEach(updateNodePosition)
-    this.$.pseudoNodes?.forEach(updateNodePosition)
-    this.onLayout?.(Object.fromEntries(this.allLayoutNodes().map((node) => [node.nodeId, node.$.position.value])))
+    this.#callbacks.onMoveNodes(Object.fromEntries(this.allLayoutNodes().map((node) => [node.nodeId, node.$.position.value])))
   }
 
   public duplicateNodes = async (manifestNodeIds?: NodeId[], offset?: XYPosition): Promise<void> => {
@@ -621,95 +372,33 @@ export class DesignerStore {
     return () => document.removeEventListener('keydown', onKeyDown)
   }
 
-  protected doRemoveNodes(toRemoveNodes: Set<NodeStore | CommentNodeStore> | undefined): void {
-    if (toRemoveNodes?.size) {
-      // React Flow also emits edge deletions, so defer node deletion until edge data is updated.
-      if (this.onDeleteNodes) setTimeout(() => this.onDeleteNodes?.(toRemoveNodes), 0)
-      this.cleanupConnections(toRemoveNodes)
-    }
+  private doRemoveNodes(nodes: Set<NodeStore | CommentNodeStore> | undefined): void {
+    if (this.disposed || !nodes?.size) return
+    for (const node of nodes) this.pendingNodeDeletes.add(node)
+    this.scheduleDeletions()
   }
 
-  // Only persisted nodes, not input or output pseudo nodes, can be deleted.
-  private cleanupConnections(toRemoveNodes: Set<NodeStore | CommentNodeStore>) {
-    let toRemoveConnections: Set<ManifestConnection> | undefined
-
-    for (const edgeStore of this.$.edges.value) {
-      const { connection } = edgeStore
-
-      // Delete a connection when its source node is deleted.
-      if (connection.from.type === 'from_node') {
-        const nodeStore = this.$.nodes.get(connection.from.source.node_id)
-        if (nodeStore && toRemoveNodes.has(nodeStore)) {
-          ;(toRemoveConnections ??= new Set()).add(connection)
-        }
-      } else if (connection.from.type === 'from_flow') {
-        // The input pseudo node cannot be deleted.
-      } else {
-        // No other source variants are currently supported.
-      }
-
-      // Delete a connection when its target node is deleted.
-      if (connection.to.type === 'to_node') {
-        const nodeStore = this.$.nodes.get(connection.to.target.node_id)
-        if (nodeStore && toRemoveNodes.has(nodeStore)) {
-          ;(toRemoveConnections ??= new Set()).add(connection)
-        }
-      } else if (connection.to.type === 'to_flow') {
-        // The output pseudo node cannot be deleted.
-      } else {
-        // No other target variants are currently supported.
-      }
-    }
-
-    if (toRemoveConnections?.size) {
-      this.onDisconnect?.(toRemoveConnections)
-    }
+  /** React Flow emits node and edge removals separately for one user action. */
+  private scheduleDeletions(): void {
+    if (this.disposed || this.deletionTimer != null) return
+    this.deletionTimer = setTimeout(() => {
+      this.deletionTimer = undefined
+      const nodes = [...this.pendingNodeDeletes]
+      const nodeIds = new Set<string>(nodes.map((node) => node.nodeId))
+      const connections = [...this.pendingDisconnects.values()].filter(({ source, target }) => !nodeIds.has(source) && !nodeIds.has(target))
+      this.pendingNodeDeletes.clear()
+      this.pendingDisconnects.clear()
+      // The host owns removal of a node and all incident connections.
+      if (nodes.length) this.#callbacks.onDeleteNodes(nodes.map((node) => node.nodeId))
+      for (const edge of connections) this.#callbacks.onDisconnect(toViewEdge(edge.source, edge.sourceHandle, edge.target, edge.targetHandle))
+    }, 0)
   }
 
-  /** Returns UI-visible diagnostics for programmatic inspection. */
-  public getDiagnostics(): FlowDiagnostics {
-    const handleErrors: {
-      node: string
-      nodeTitle?: string
-      handle: string
-      error: unknown
-    }[] = []
-
-    const addHandleError = (node: NodeStore, row: HandleRowStore) => {
-      handleErrors.push({
-        node: node.nodeId,
-        nodeTitle: node.display$.title.value,
-        handle: row.name,
-        error: row.error$.value,
-      })
-    }
-
-    const { nodes, edges } = this.$
-    for (const node of nodes.values()) {
-      for (const section of node.display$.sections.value) {
-        if (InputSectionStore.is(section) || OutputSectionStore.is(section)) {
-          for (const row of section.$.handles.value) {
-            if (HandleRowStore.is(row) && row.error$.value) addHandleError(node, row)
-          }
-        }
-      }
-    }
-
-    const edgeErrors: {
-      edge: string
-      error: unknown
-    }[] = []
-
-    for (const edge of edges.value) {
-      if (edge.$.error.value) {
-        edgeErrors.push({
-          edge: edge.edgeId,
-          error: edge.$.error.value,
-        })
-      }
-    }
-
-    return { handleErrors, edgeErrors }
+  public cancelPendingDeletions = (): void => {
+    if (this.deletionTimer != null) clearTimeout(this.deletionTimer)
+    this.deletionTimer = undefined
+    this.pendingNodeDeletes.clear()
+    this.pendingDisconnects.clear()
   }
 
   /**
@@ -718,20 +407,6 @@ export class DesignerStore {
    */
   public onInit = (): void => {
     this.$$.initialized.set(true)
-  }
-
-  /**
-   * Closes every settings panel before fitting the view.
-   * @internal
-   */
-  public onFitView = (): void => {
-    this.closeAllSettingsPanel()
-  }
-
-  public closeAllSettingsPanel(): void {
-    for (const node of this.$.nodes.values()) {
-      node.display$.showSettings.set(void 0)
-    }
   }
 
   /**
@@ -768,4 +443,140 @@ export class DesignerStore {
       })
     })
   }
+
+  setCallbacks(callbacks: ViewCallbacks): void {
+    Object.assign(this.#callbacks, callbacks)
+  }
+
+  focusNode(nodeId: string, duration: number): void {
+    this.rfCommand.send('focusNode', nodeId as NodeId, { duration })
+  }
+
+  async addNode(
+    itemId: string,
+    position: FlowDesignerViewPosition,
+    connection?: (nodeId: string) => Omit<FlowDesignerViewEdge, 'id'>,
+  ): Promise<string | undefined> {
+    const nodeId = await (connection == null ? this.#callbacks.onAddNode(itemId, position) : this.#callbacks.onAddNode(itemId, position, connection))
+    if (nodeId == null) return
+    void this.#selectNode(nodeId)
+    return nodeId
+  }
+
+  async #selectNode(nodeId: string): Promise<void> {
+    const node = await this.waitNode(nodeId as NodeId)
+    if (node == null) return
+    for (const entry of this.#entries.values()) entry.store.$$.selected.set(entry.store === node)
+  }
+
+  reconcile(
+    model: FlowDesignerViewModel,
+    editable: boolean,
+    language: string,
+    addItems: readonly FlowDesignerViewAddItem[],
+    selectedNodeIds: readonly string[],
+  ): void {
+    this.#addItems = addItems
+    const editableChanged = this.$.editable.value != editable
+    if (editableChanged) this.$$.editable.set(editable)
+    if (this.#language.value != language) this.#language.set(language)
+    this.#syncModel(model)
+    this.#syncSelection(selectedNodeIds)
+  }
+
+  #syncModel(model: FlowDesignerViewModel): void {
+    const runStatus = model.runStatus == 'running' ? FLOW_RUN_STATUS.Running : FLOW_RUN_STATUS.Idle
+    if (this.#runStatus.value != runStatus) this.#runStatus.set(runStatus)
+    if (
+      this.#modelViewport == null ||
+      this.#modelViewport.x != model.viewport.x ||
+      this.#modelViewport.y != model.viewport.y ||
+      this.#modelViewport.zoom != model.viewport.zoom
+    ) {
+      this.$$.viewport.set(model.viewport)
+      this.#modelViewport = { ...model.viewport }
+    }
+    this.#connections.set(model.edges)
+    const nextEntries = new Map<string, NodeEntry>()
+    const nextComments = new Map<NodeId, CommentNodeStore>()
+    const nextStores = new Map<NodeId, NodeStore>()
+    const nextPositions = new Map<string, FlowDesignerViewPosition>()
+
+    for (const node of model.nodes) {
+      const { position, ...content } = node
+      const contentKey = JSON.stringify(content)
+      let entry = this.#entries.get(node.id)
+      if (entry?.kind != node.kind) entry = undefined
+      if (node.kind == 'comment') {
+        if (entry?.kind != 'comment') {
+          entry = createCommentNodeEntry(node, contentKey, this, this.#callbacks)
+        } else {
+          if (entry.contentKey != contentKey) entry = updateCommentNodeEntry(entry, node, contentKey)
+          const previousPosition = this.#modelPositions.get(node.id)
+          if (previousPosition == null || previousPosition.x != position.x || previousPosition.y != position.y) entry.store.$$.position.set(position)
+        }
+        nextComments.set(node.id as NodeId, entry.store)
+      } else if (entry == null) {
+        entry = createNodeEntry(node, contentKey, this)
+      } else {
+        if (entry.kind == 'comment') throw new Error('Unexpected Comment node entry.')
+        if (entry.contentKey != contentKey) entry = updateNodeEntry(entry, node, contentKey)
+        const previousPosition = this.#modelPositions.get(node.id)
+        if (previousPosition == null || previousPosition.x != position.x || previousPosition.y != position.y) entry.store.$$.position.set(position)
+      }
+      nextEntries.set(node.id, entry)
+      if (entry.kind != 'comment') nextStores.set(node.id as NodeId, entry.store)
+      nextPositions.set(node.id, position)
+    }
+
+    if (nextStores.size != this.$.nodes.size || [...nextStores].some(([nodeId, store]) => this.$.nodes.get(nodeId) !== store)) {
+      this.$$.nodes.replace(nextStores)
+    }
+    if (nextComments.size != this.$.commentNodes!.size || [...nextComments].some(([nodeId, store]) => this.$.commentNodes!.get(nodeId) !== store)) {
+      this.$$.commentNodes!.replace(nextComments)
+    }
+    this.#entries = nextEntries
+    this.#modelPositions = nextPositions
+  }
+
+  #syncSelection(nodeIds: readonly string[]): void {
+    const next = new Set(nodeIds)
+    if (next.size == this.#selectedNodeIds.size && [...next].every((nodeId) => this.#selectedNodeIds.has(nodeId))) return
+    this.#selectedNodeIds = next
+    for (const [nodeId, entry] of this.#entries) entry.store.$$.selected.set(next.has(nodeId))
+  }
+  public onAddNode = async (
+    _type: AddNodeType,
+    itemId: string,
+    position: XYPosition,
+    connection?: (nodeId: NodeId) => RFConnection,
+  ): Promise<NodeId | undefined> =>
+    (await this.addNode(
+      itemId,
+      position,
+      connection == null
+        ? undefined
+        : (nodeId) => {
+            const edge = connection(nodeId as NodeId)
+            return {
+              source: toManifestNodeId(edge.source),
+              sourceHandle: toManifestHandleName(edge.sourceHandle),
+              target: toManifestNodeId(edge.target),
+              targetHandle: toManifestHandleName(edge.targetHandle),
+            }
+          },
+    )) as NodeId | undefined
+
+  public onDuplicate = async (nodeIds: NodeId[], offset?: XYPosition): Promise<void> => {
+    const copies = nodeIds.flatMap((nodeId) => {
+      const node = this.$.nodes.get(nodeId) ?? this.$.commentNodes?.get(nodeId)
+      return node == null ? [] : [node]
+    })
+    if (!copies.length) return
+    this.#callbacks.onDuplicate(nodeIds, offset ?? { x: 24, y: 24 }, Object.fromEntries(copies.map((node) => [node.nodeId, node.$.position.value])))
+  }
+  public onPaste = (position: XYPosition): void => this.#callbacks.onPaste(position)
+  public provideAddNodeMenuItems = (): readonly FlowDesignerViewAddItem[] => this.#addItems
+  public provideAsyncAddNodeMenuItems = (searchTerm: string, signal: AbortSignal): Promise<readonly FlowDesignerViewAddItem[] | undefined> =>
+    this.#callbacks.provideAddItems?.(searchTerm, signal) ?? Promise.resolve(undefined)
 }

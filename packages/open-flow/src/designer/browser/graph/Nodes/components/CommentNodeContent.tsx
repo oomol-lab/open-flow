@@ -2,26 +2,38 @@ import styles from './CommentNodeContent.module.scss'
 import type { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 
 import { clsx } from 'clsx'
-import { useLayoutEffect, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
+import { useTranslate } from 'val-i18n-react'
+import { Textarea } from '../../../../../ui/browser/textarea.tsx'
 import { NODE_HANDLE_CLASSNAME } from '../../../base/designer.ts'
+import { MarkdownPreview } from '../../../preview/markdownPreview.tsx'
+import { useDesignerStore } from '../../DesignerStoreContext.tsx'
 
-export function CommentNodeContent({ store }: { store: CommentNodeStore }): React.ReactElement {
-  const [div, setDiv] = useState<HTMLDivElement | null>(null)
-  const preview = useVal(store.$.preview)
+export function CommentNodeContent({ store }: { store: CommentNodeStore }): JSX.Element | null {
+  const t = useTranslate()
   const showCode = useVal(store.$.sourceCode)
-
-  useLayoutEffect(() => {
-    if (div) {
-      const unmount = store.mountCodeEditor(div, store.$$.content, store.$.lang, store.userLocales)
-
-      return () => {
-        if (unmount) setTimeout(() => unmount(), 0)
-      }
-    }
-  }, [div, store])
+  const content = useVal(store.$$.content)
+  const editable = useVal(useDesignerStore().$.editable)
 
   return (
-    <div className={clsx(styles.container, showCode && styles.sourceCode, !showCode && NODE_HANDLE_CLASSNAME)}>{showCode ? <div ref={setDiv} /> : preview}</div>
+    <div className={`${styles.body} nopan`}>
+      <div className={clsx(styles.container, showCode && styles.sourceCode, !showCode && NODE_HANDLE_CLASSNAME)}>
+        {showCode ? (
+          <Textarea
+            aria-label={t('comment.source')}
+            autoFocus
+            disabled={!editable}
+            className="min-h-30 resize-y rounded-none border-0 bg-transparent p-3 text-inherit shadow-none focus-visible:ring-0"
+            value={content ?? ''}
+            onChange={(event) => store.$$.content.set(event.target.value)}
+            onBlur={(event) => {
+              if (editable) store.saveContent(event.target.value)
+            }}
+          />
+        ) : (
+          <MarkdownPreview content={content ?? ''} dark={false} draggable onDoubleClick={store.togglePreview} />
+        )}
+      </div>
+    </div>
   )
 }

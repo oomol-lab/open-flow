@@ -1,17 +1,14 @@
 import type { ConnectionLineComponentProps } from '@xyflow/react'
-import type { OutputHandleDef } from '../../../../schema/index.ts'
-import type { InputHandleDef } from '../../../../schema/interface.d.ts'
 import type { RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
 import type { HandleKind } from '../../components/handle.tsx'
-import type { GroupedInputHandleDef, GroupedOutputHandleDef } from '../../stores/node/constants.ts'
 
 import { getSmoothStepPath } from '@xyflow/react'
 import { useMemo } from 'react'
 import { toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
+import { getHandleKind } from '../../components/handleKind.ts'
 import { gradientToStroke } from '../../stores/edge/colors.ts'
-import { ErrorNodeStore } from '../../stores/node/errorNode.store.ts'
-import { getHandleKind } from '../../stores/nodeHandle/handleKind.ts'
 import { useDesignerStore } from '../DesignerStoreContext.tsx'
+import { portSchema } from '../FlowDesigner/nodeContent.ts'
 
 export const ConnectionLine: React.FC<ConnectionLineComponentProps> = ({
   fromX,
@@ -52,12 +49,8 @@ export const ConnectionLine: React.FC<ConnectionLineComponentProps> = ({
     const handleName = toManifestHandleName(rfFromHandle.id as RFHandleName)
 
     const nodeStore = designerStore.$.nodes.get(nodeId)
-    if (ErrorNodeStore.is(nodeStore)) return 'error'
 
-    const defs: GroupedOutputHandleDef[] | undefined = nodeStore?.display$.outputs_def.value
-    const def = defs?.find((candidate): candidate is OutputHandleDef => candidate.handle === handleName)
-
-    const handleKind = getHandleKind(def?.json_schema)
+    const handleKind = getHandleKind(portSchema(nodeStore?.content$.value, 'output', handleName))
 
     return handleKind
   }, [designerStore, rfFromNode?.id, rfFromHandle?.id])
@@ -70,12 +63,8 @@ export const ConnectionLine: React.FC<ConnectionLineComponentProps> = ({
     const handleName = toManifestHandleName(toRFHandle)
 
     const nodeStore = designerStore.$.nodes.get(nodeId)
-    if (ErrorNodeStore.is(nodeStore)) return 'error'
 
-    const defs: GroupedInputHandleDef[] | undefined = nodeStore?.display$.inputs_def.value
-    const def = defs?.find((candidate): candidate is InputHandleDef => candidate.handle === handleName)
-
-    const handleKind = getHandleKind(def?.json_schema)
+    const handleKind = getHandleKind(portSchema(nodeStore?.content$.value, 'input', handleName))
 
     return handleKind
   }, [designerStore, rfToNode?.id, rfToHandle?.id])

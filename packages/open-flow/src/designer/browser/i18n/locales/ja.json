@@ -318,11 +318,6 @@
     "touchpad": "タッチパッド操作向け",
     "touchpadDescription": "2 本指でキャンバスを移動し、ピンチ操作でズームします。"
   },
-  "jsonViewer": {
-    "bin": "バイナリ",
-    "showLess": "折りたたむ",
-    "showMore": "展開"
-  },
   "l10n": {
     "createKey": "翻訳を追加",
     "deleteKey": "翻訳を削除",
@@ -369,29 +364,6 @@
   },
   "ok": "OK",
   "optimize": "自動レイアウト",
-  "llmEditor": {
-    "addMessage": "メッセージを追加",
-    "chooseModel": "モデル一覧から選択",
-    "customModel": "カスタムモデル…",
-    "defaultModel": "デフォルトモデル",
-    "deleteMessage": "メッセージを削除",
-    "maxTokens": "最大 Token 数",
-    "messageCount": "メッセージ {{count}} 件",
-    "messageCountOne": "メッセージ 1 件",
-    "messagePlaceholder": "メッセージ本文",
-    "loadingModels": "モデルを読み込み中…",
-    "model": "モデル",
-    "modelOptions": "モデルオプション",
-    "moveMessageDown": "メッセージを下へ移動",
-    "moveMessageUp": "メッセージを上へ移動",
-    "role": {
-      "assistant": "アシスタント",
-      "system": "システム",
-      "user": "ユーザー"
-    },
-    "temperature": "Temperature",
-    "topP": "Top P"
-  },
   "outputHandleEditor": {
     "addOutput": "出力 Handle を追加",
     "configPanelTitle": "出力 Handle 設定",
@@ -425,8 +397,6 @@
   },
   "preview": {
     "title": "プレビュー",
-    "videoBilibili": "Bilibili 動画プレーヤー",
-    "videoYouTube": "YouTube 動画プレーヤー",
     "table": {
       "footer": "全 {{columns}} 列、{{rows}} 行"
     }

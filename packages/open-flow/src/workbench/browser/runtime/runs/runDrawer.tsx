@@ -1,19 +1,19 @@
 import type { EventListeners } from 'overlayscrollbars'
 import type { KeyboardEvent, PointerEvent, ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
-import type { OverlayScrollbarRef } from '../../../../designer/browser/components/overlayScrollbar.tsx'
+import type { ScrollAreaRef } from '../../../../ui/browser/scroll-area.tsx'
 import type { JsonValue, Run, RunDetails, RunEvent, RunResult, WaitAction } from '../api.ts'
 import type { IconName } from '../icons.tsx'
 import type { RunEventFilter } from './runStore.ts'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
-import { OverlayScrollbar } from '../../../../designer/browser/components/overlayScrollbar.tsx'
-import { collapseAllNested, CompactValue, JSONViewer } from '../../../../designer/browser/jsonViewer/index.ts'
 import { Alert, AlertDescription, AlertTitle } from '../../../../ui/browser/alert.tsx'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
+import { collapseAllNested, CompactValue, JSONViewer } from '../../../../ui/browser/json-viewer/index.ts'
+import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Icon } from '../icons.tsx'
 import { eventSubject } from '../workspace.ts'
 import { groupEvents, nodeSummary, agentSummary } from './runGroups.ts'
@@ -387,7 +387,7 @@ export function RunLog({
   const language = useLang()
   const t = useTranslate()
   const [raw, setRaw] = useState(false)
-  const eventList = useRef<OverlayScrollbarRef>(null)
+  const eventList = useRef<ScrollAreaRef>(null)
   const followedRun = useRef<string>()
   const followEvents = useRef(true)
   const nodeTitles = useMemo(() => nodeTitleIndex(events), [events])
@@ -439,7 +439,7 @@ export function RunLog({
           </Button>
         </div>
       )}
-      <OverlayScrollbar className="run-log-scroll run-content-scroll" defer={false} events={eventScrollbarEvents} ref={eventList} tabIndex={-1}>
+      <ScrollArea className="run-log-scroll run-content-scroll" defer={false} events={eventScrollbarEvents} ref={eventList} tabIndex={-1}>
         <ol className="run-log-list">
           {observation != null && (
             <li aria-live="polite" className="run-log-notice">
@@ -632,7 +632,7 @@ export function RunLog({
             <li className="run-log-empty">{t('run.noFilteredEvents')}</li>
           ) : null}
         </ol>
-      </OverlayScrollbar>
+      </ScrollArea>
     </div>
   )
 }

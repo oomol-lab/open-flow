@@ -1,20 +1,17 @@
 import type { ReactElement } from 'react'
-import type { FlowDesignerViewInput, FlowDesignerViewOutput } from '../../../designer/browser/graph/FlowDesigner/model.ts'
-import type { GroupDividerDef } from '../../../schema/index.ts'
-import type { InputPort, JsonValue } from './api.ts'
 import type { WorkbenchLocation, WorkbenchTheme } from './contract.ts'
 import type { AddNodeOption } from './designer/addNodeOptions.ts'
-import type { TaskPorts } from './designer/flowChanges.ts'
 import type { WorkbenchDesignerHandle } from './designer/workbenchDesigner.tsx'
 
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
-import { IconifyProvider } from '../../../designer/browser/icons/iconifyContext.tsx'
 import { nodeNameIssue } from '../../../flow/common/change.ts'
 import { Button } from '../../../ui/browser/button.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../ui/browser/empty.tsx'
+import { IconifyProvider } from '../../../ui/browser/icons/iconifyContext.tsx'
 import { BlockLibrary, ContextPanel } from './designer/contextPanel.tsx'
+import { NodeHeading } from './designer/nodeHeading.tsx'
 import { inspectorIcon, NodeInspector } from './designer/nodeInspector.tsx'
 import { WorkbenchDesigner } from './designer/workbenchDesigner.tsx'
 import { Icon } from './icons.tsx'
@@ -29,46 +26,6 @@ import { WorkspaceHeader } from './shell/workspaceHeader.tsx'
 import { WorkbenchStore } from './stores/workbenchStore.ts'
 
 type ContextPanelMode = 'blocks' | 'inspector' | 'notification' | undefined
-
-function taskPorts(inputs: readonly (FlowDesignerViewInput | GroupDividerDef)[], outputs: readonly (FlowDesignerViewOutput | GroupDividerDef)[]): TaskPorts {
-  return {
-    inputs: inputs.map((input) =>
-      'group' in input
-        ? input
-        : Object.assign(
-            {
-              handle: input.handle,
-              ...(input.description == null ? {} : { description: input.description }),
-              jsonSchema: (input.jsonSchema ?? {}) as JsonValue,
-              nullable: input.nullable ?? false,
-            },
-            input.defaultValue === undefined ? {} : { value: input.defaultValue as JsonValue },
-          ),
-    ),
-    outputs: outputs.map((output) =>
-      'group' in output
-        ? output
-        : Object.assign(
-            { handle: output.handle, jsonSchema: (output.jsonSchema ?? {}) as JsonValue, nullable: output.nullable ?? false },
-            output.description == null ? {} : { description: output.description },
-          ),
-    ),
-  }
-}
-
-function additionalTaskInputs(inputs: readonly FlowDesignerViewInput[]): readonly InputPort[] {
-  return inputs.map((input) =>
-    Object.assign(
-      {
-        handle: input.handle,
-        jsonSchema: (input.jsonSchema ?? {}) as JsonValue,
-        nullable: input.nullable ?? false,
-      },
-      input.description == null ? {} : { description: input.description },
-      input.defaultValue === undefined ? {} : { value: input.defaultValue as JsonValue },
-    ),
-  )
-}
 
 function RunDrawerContainer({
   onClose,
@@ -156,6 +113,9 @@ function Editor({
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   const busy = useVal(store.$.busy)
   const designer = useVal(store.$.designer)
+  const variableNames = useVal(store.$.variableNames)
+  const variableNamesLoaded = useVal(store.$.variableNamesLoaded)
+  const variableNamesLoading = useVal(store.$.variableNamesLoading)
   const triggers = designer.nodes.filter((node) => node.kind == 'trigger')
   const selectedTrigger = triggers.find((node) => node.id == startId) ?? triggers[0]
   const diagnosticFocus = useVal(store.workspace.$.diagnosticFocus)
@@ -320,25 +280,6 @@ function Editor({
         }}
         onConnect={(edge) => void store.workspace.connect(edge)}
         onChangeComment={(nodeId, value) => void store.workspace.saveComment(nodeId, value)}
-        onChangeCondition={(nodeId, value) => void store.workspace.saveCondition(nodeId, value)}
-        onChangeNodeDescription={(nodeId, description) => void store.workspace.saveNodeDescription(nodeId, description)}
-        onChangeNodeIcon={(nodeId, icon) => void store.workspace.saveNodeIcon(nodeId, icon)}
-        onChangeNodeTitle={(nodeId, title) => void store.workspace.saveNodeTitle(nodeId, title)}
-        nodeTitleIssue={(nodeId, title) => {
-          if (revision == null || target == null) return
-          const graph = revision.graph(target)
-          if (graph == null) return
-          const issue = nodeNameIssue(graph, nodeId, title)
-          return issue == null ? undefined : t(`inspector.node.${issue == 'empty' ? 'nameEmpty' : 'nameDuplicate'}`)
-        }}
-        onChangeInput={(nodeId, handle, value) => void store.workspace.setInputValue(nodeId, handle, value)}
-        onChangeInputVariable={(nodeId, handle, name) => void store.workspace.setInputVariable(nodeId, handle, name)}
-        onChangeTaskAdditionalInputs={(nodeId, inputs) => void store.workspace.saveTaskAdditionalInputs(nodeId, additionalTaskInputs(inputs))}
-        onChangeTaskPorts={(nodeId, inputs, outputs) => void store.workspace.saveTaskPorts(nodeId, taskPorts(inputs, outputs))}
-        onChangeTriggerConfig={(triggerId, name, value) => void store.workspace.saveTriggerConfig(triggerId, name, value)}
-        onChangeTriggerSchedule={(triggerId, schedule) => void store.workspace.saveTriggerSchedule(triggerId, schedule)}
-        onChangeWebhook={(triggerId, webhook) => void store.workspace.saveWebhook(triggerId, webhook)}
-        onChangeValue={(nodeId, values) => void store.workspace.saveValue(nodeId, values)}
         onCopy={() => store.workspace.copySelectedNodes()}
         onDeleteEdge={(edge) => void store.workspace.disconnect(edge)}
         onDeleteNodes={() => void store.workspace.deleteSelectedNodes()}
@@ -347,7 +288,6 @@ function Editor({
         onMoveViewport={(viewport) => void store.workspace.moveViewport(viewport)}
         onOpenBlocks={openBlocks}
         onOpenInspector={openInspector}
-        onOpenVariables={() => void store.refreshVariableNames()}
         onPaste={() => void store.workspace.pasteNodes()}
         provideAddNodeOptions={store.provideAddNodeOptions}
         onSelectNodes={(nodeIds) => store.selectNodes(nodeIds)}
@@ -359,6 +299,30 @@ function Editor({
       />
       {contextPanelVisible && (
         <ContextPanel
+          heading={
+            contextPanelMode === 'inspector' && selection != null ? (
+              <NodeHeading
+                key={selection.id}
+                title={selection.node.name ?? selectedDesignerNode?.title ?? ''}
+                icon={selectedDesignerNode != null && 'icon' in selectedDesignerNode ? selectedDesignerNode.icon : undefined}
+                disabled={authoringDisabled}
+                fallback={<Icon name={inspectorIcon(selection, target)} />}
+                onRename={(name) => {
+                  void store.workspace.saveNodeTitle(selection.id, name)
+                }}
+                onIconChange={(icon) => {
+                  void store.workspace.saveNodeIcon(selection.id, icon)
+                }}
+                validate={(name) => {
+                  if (revision == null || target == null) return
+                  const graph = revision.graph(target)
+                  if (graph == null) return
+                  const issue = nodeNameIssue(graph, selection.id, name)
+                  return issue == null ? undefined : t(`inspector.node.${issue === 'empty' ? 'nameEmpty' : 'nameDuplicate'}`)
+                }}
+              />
+            ) : undefined
+          }
           headerRef={contextPanelMode == 'inspector' && selectedDesignerNode != null ? setInspectorHeaderContainer : undefined}
           focusOnOpen={contextPanelMode == 'inspector' && focusInspectorOnOpen.current}
           icon={contextPanelMode == 'blocks' ? 'plus' : contextPanelMode == 'notification' ? 'connection' : inspectorIcon(selection, target)}
@@ -403,6 +367,15 @@ function Editor({
           ) : (
             revision != null && (
               <NodeInspector
+                variables={{
+                  enabled: store.variablesEnabled,
+                  names: variableNames,
+                  loaded: variableNamesLoaded,
+                  loading: variableNamesLoading,
+                  onOpen: () => {
+                    void store.refreshVariableNames()
+                  },
+                }}
                 editorRef={setInspectorContainer}
                 connectorAction={connectorAction}
                 connectorActionError={connectorActionError}

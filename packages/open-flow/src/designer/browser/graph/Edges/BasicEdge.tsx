@@ -6,8 +6,8 @@ import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, Position, useInternalNo
 import { useId, useMemo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { ErrorCircle } from '../../components/errorCircle.tsx'
+import { DEFAULT_HANDLE_KIND } from '../../components/handleKind.ts'
 import { gradientToStroke } from '../../stores/edge/colors.ts'
-import { DEFAULT_HANDLE_KIND } from '../../stores/nodeHandle/handleKind.ts'
 import { useDesignerStore } from '../DesignerStoreContext.tsx'
 import { EDGE_GAP, getTurnY } from './route.ts'
 

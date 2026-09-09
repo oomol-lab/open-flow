@@ -1,5 +1,3 @@
-import darkTheme from '../../styles/dark.module.scss'
-import lightTheme from '../../styles/light.module.scss'
 import nodeHeadStyles from '../Nodes/components/NodeHead.module.scss'
 import styles from './ReactFlowContainer.module.scss'
 import './ReactFlowContainer.scss'
@@ -33,9 +31,8 @@ import type { HandleName, NodeId } from '../../../../schema/index.ts'
 import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { PartialConnection, RFConnection, RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
 import type { HandleImpl } from '../../components/handle.tsx'
-import type { IAddNodeMenuItem, IFromSource, InteractiveMode, RFGraph } from '../../stores/designer/designer.store.ts'
-import type { NodeType } from '../../stores/node/constants.ts'
-import type { NodeStore } from '../../stores/node/node.store.ts'
+import type { InteractiveMode, RFGraph } from '../../stores/designer/designer.store.ts'
+import type { FlowDesignerViewAddItem } from '../FlowDesigner/model.ts'
 import type { GetPopupContainer } from './useGetPopupContainer.ts'
 
 import {
@@ -59,6 +56,7 @@ import { useVal } from 'use-value-enhancer'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { combine, derive } from 'value-enhancer'
 import { shallowPlainObjectEqual } from '../../../../base/common/equality.ts'
+import { getAddItemId } from '../../../../canvas/browser/addItemDrag.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
@@ -70,13 +68,12 @@ import { coalesce, toTrue } from '../../base/trivial.ts'
 import { HandleContextProvider } from '../../components/handle.tsx'
 import { DesignerTooltip } from '../../components/tooltip.tsx'
 import { CommentNodeStore } from '../../stores/node/commentNode.store.ts'
-import { FITTING_VIEW_CLASSNAME, isPseudoNodeType } from '../../stores/node/constants.ts'
-import { ThemeProvider } from '../../theme/index.ts'
+import { FITTING_VIEW_CLASSNAME } from '../../stores/node/constants.ts'
+import { NodeStore } from '../../stores/node/node.store.ts'
 import { BlockQuickPickPanel } from '../BlockQuickPickPanel.tsx'
 import { EdgeDefs } from '../Edges/EdgeDefs.tsx'
 import { NodePlaceholder, NodePlaceholderQueue } from '../Nodes/useNodePlaceholder.ts'
 import { getPaneRect, PaneRectContext } from '../Nodes/usePaneRect.ts'
-import { getAddItemId } from './addItemDrag.ts'
 import { CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from './CanvasControls.tsx'
 import { ConnectionLine } from './ConnectingLine.tsx'
 import { CornerControls } from './CornerControls.tsx'
@@ -118,7 +115,6 @@ export interface ReactFlowContainerProps {
   viewport$: Val<Viewport | undefined>
   focused$?: ReadonlyVal<boolean>
   canDeleteNodes?: boolean
-  showSettings$?: Val<boolean>
   onBeforeDelete: OnBeforeDelete<RFNode<any>, RFEdge<any>>
   onNodesChange: OnNodesChange<RFNode<any>>
   onEdgesChange: OnEdgesChange<RFEdge<any>>
@@ -153,8 +149,8 @@ export interface ReactFlowContainerProps {
   onInstance?: (rf: ReactFlowInstance) => () => void
   onInit?: OnInit<RFNode<any>, RFEdge<any>>
   onPaste?: (position: XYPosition) => void
-  provideAddNodeMenuItems?: (fromSource?: IFromSource) => IAddNodeMenuItem[] | undefined
-  provideAsyncAddNodeMenuItems?: (fromSource: IFromSource | undefined, searchTerm: string, signal: AbortSignal) => Promise<IAddNodeMenuItem[] | undefined>
+  provideAddNodeMenuItems?: () => readonly FlowDesignerViewAddItem[] | undefined
+  provideAsyncAddNodeMenuItems?: (searchTerm: string, signal: AbortSignal) => Promise<readonly FlowDesignerViewAddItem[] | undefined>
   fitView?: boolean
   fitViewOptions?: FitViewOptions
   layoutMotion?: boolean
@@ -175,21 +171,20 @@ export const ReactFlowContainer: React.FC<ReactFlowContainerProps> = (props: Rea
 
   return (
     <div
-      className={clsx(props.className, 'oo-designer-root', styles.container, props.dark ? darkTheme.theme : lightTheme.theme)}
+      className={clsx(props.className, 'oo-designer-root', styles.container, 'open-flow-theme')}
+      data-surface="canvas"
       data-theme={props.dark ? 'dark' : 'light'}
       ref={wrapperRef}
     >
       <GetPopupContainerContext.Provider value={context}>
         <I18nProvider i18n={props.i18n}>
           <TooltipProvider delay={300}>
-            <ThemeProvider dark={props.dark} getPopupContainer={context.default}>
-              <ReactFlowProvider>
-                <HandleContextProvider Handle={Handle as HandleImpl}>
-                  <EdgeDefs />
-                  <ReactFlowContainerInner {...props} />
-                </HandleContextProvider>
-              </ReactFlowProvider>
-            </ThemeProvider>
+            <ReactFlowProvider>
+              <HandleContextProvider Handle={Handle as HandleImpl}>
+                <EdgeDefs />
+                <ReactFlowContainerInner {...props} />
+              </HandleContextProvider>
+            </ReactFlowProvider>
           </TooltipProvider>
         </I18nProvider>
       </GetPopupContainerContext.Provider>
@@ -199,7 +194,7 @@ export const ReactFlowContainer: React.FC<ReactFlowContainerProps> = (props: Rea
 
 type FlowControlsProps = Pick<
   ReactFlowContainerProps,
-  'cornerTools' | 'toolbar' | 'miniMapExpanded$' | 'interactiveMode$' | 'showSettings$' | 'onRelayout' | 'onFitView' | 'dottedBackground' | 'layoutMotion'
+  'cornerTools' | 'toolbar' | 'miniMapExpanded$' | 'interactiveMode$' | 'onRelayout' | 'onFitView' | 'dottedBackground' | 'layoutMotion'
 > & { onBeforeFitView?: () => void }
 
 const selector = (s: ReactFlowState) => ({
@@ -253,7 +248,6 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
         onZoomIn={() => rf.zoomIn()}
         onZoomOut={() => rf.zoomOut()}
         onZoomReset={() => rf.zoomTo(1)}
-        showSettings$={props.showSettings$}
         zoom={zoom}
       />
       {props.toolbar != null && <CanvasToolbar>{props.toolbar}</CanvasToolbar>}
@@ -276,7 +270,7 @@ interface SelectionContextMenuData {
 
 interface BlockQuickPickPanelData {
   readonly position: XYPosition
-  readonly fromSource?: IFromSource
+  readonly fromSource?: ConnectionSource
   readonly connection?: PartialConnection
 }
 
@@ -657,7 +651,6 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           <FlowControls
             cornerTools={props.cornerTools}
             toolbar={props.toolbar}
-            showSettings$={props.showSettings$}
             miniMapExpanded$={props.miniMapExpanded$}
             interactiveMode$={props.interactiveMode$}
             layoutMotion={props.layoutMotion}
@@ -863,10 +856,10 @@ function SelectionFloatBar(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
 
 function useSelectionItems(props: Pick<SelectionContextMenuProps, 'nodes' | 'onDelete' | 'duplicateNodes'>): ContextMenuItem[] {
   const t = useTranslate()
-  const nodes = useMemo(() => props.nodes.filter((node) => node.data.store && !isPseudoNodeType(node.type as NodeType)), [props.nodes])
+  const nodes = useMemo(() => props.nodes.filter((node) => node.data.store), [props.nodes])
   const hasDuplicate = nodes.every((node) => node.data.store?.duplicateNode)
   const skipState$ = useMemo(() => {
-    const ignore$ = nodes.flatMap((node) => (node.data.store?.display$ ? [node.data.store.display$.ignore] : []))
+    const ignore$ = nodes.flatMap((node) => (NodeStore.is(node.data.store) ? [node.data.store.ignore] : []))
     return combine(ignore$, (values): [boolean, boolean] => [values.length > 0, values.every(Boolean)])
   }, [nodes])
   const [hasSkip, skip] = useVal(skipState$)
@@ -899,7 +892,7 @@ function useSelectionItems(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
     const newSkip = !skip
     for (const rfNode of nodes) {
       const node = rfNode.data.store
-      node?.display$?.ignore.set(newSkip)
+      NodeStore.to(node)?.ignore.set(newSkip)
     }
   }, [nodes, skip])
 
@@ -959,9 +952,15 @@ function PaneContextMenu(props: PaneContextMenuProps) {
   )
 }
 
+interface ConnectionSource {
+  readonly nodeId: NodeId
+  readonly handle: HandleName
+  readonly side: 'left' | 'right'
+}
+
 interface BlockQuickPickPanelPopoverProps {
   readonly position: XYPosition
-  readonly fromSource?: IFromSource
+  readonly fromSource?: ConnectionSource
   readonly connection?: PartialConnection
   readonly onClose: () => void
   readonly provideItems: ReactFlowContainerProps['provideAddNodeMenuItems']
@@ -974,26 +973,16 @@ interface BlockQuickPickPanelPopoverProps {
 function BlockQuickPickPanelPopover(props: BlockQuickPickPanelPopoverProps) {
   const getContextMenuContainer = useGetStaticPopupContainer()
   const addingNode = useRef(false)
-  const items = useMemo(() => props.provideItems?.(props.fromSource) || [], [props.provideItems, props.fromSource])
-  const provideAsyncItems = useMemo(() => {
-    if (props.provideAsyncItems == null) return
-    const provider = props.provideAsyncItems
-    const fromSource = props.fromSource
-    return (searchTerm: string, signal: AbortSignal) => provider(fromSource, searchTerm, signal)
-  }, [props.fromSource, props.provideAsyncItems])
+  const items = useMemo(() => props.provideItems?.() || [], [props.provideItems])
 
-  const onClick = async (item: IAddNodeMenuItem, data?: string, handle?: HandleName) => {
-    if (item.type === 'divider' || addingNode.current) return
+  const onClick = async (item: FlowDesignerViewAddItem, id: string) => {
+    if (addingNode.current) return
     addingNode.current = true
     props.onClose()
     try {
-      const connect = props.connection != null && handle != null ? (nodeId: NodeId) => makeConnection(props.connection!, nodeId, handle) : undefined
-      await props.onAddNode(
-        item.type,
-        data ?? item.data ?? '',
-        props.fromSource?.side === 'left' ? { x: props.position.x - 250, y: props.position.y } : props.position,
-        connect,
-      )
+      const handle = (props.fromSource?.side === 'left' ? '$out' : '$in') as HandleName
+      const connect = props.connection != null ? (nodeId: NodeId) => makeConnection(props.connection!, nodeId, handle) : undefined
+      await props.onAddNode(item.type, id, props.fromSource?.side === 'left' ? { x: props.position.x - 250, y: props.position.y } : props.position, connect)
     } catch (error) {
       console.error('Failed to add node.', error)
     } finally {
@@ -1022,7 +1011,13 @@ function BlockQuickPickPanelPopover(props: BlockQuickPickPanelPopoverProps) {
         side="bottom"
         sideOffset={0}
       >
-        <BlockQuickPickPanel items={items} provideAsyncItems={provideAsyncItems} onClick={onClick} hideDescription />
+        <BlockQuickPickPanel
+          items={items}
+          provideAsyncItems={props.provideAsyncItems}
+          onClick={onClick}
+          connectionSide={props.fromSource?.side}
+          hideDescription
+        />
       </PopoverContent>
     </Popover>
   )

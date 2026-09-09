@@ -1,3 +1,4 @@
+import styles from './NodeHead.module.scss'
 import type { DesignerStore } from '../../../stores/designer/designer.store.ts'
 import type { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 
@@ -20,7 +21,14 @@ export function CommentNodeActions({ designerStore, nodeStore }: CommentNodeActi
 
   return (
     <DesignerTooltip placement="bottom" title={sourceCode ? t('comment.preview') : t('comment.source')}>
-      <Button disabled={!editable} onClick={nodeStore.togglePreview} size="icon-xs" variant="ghost">
+      <Button
+        className={styles.action}
+        aria-label={sourceCode ? t('comment.preview') : t('comment.source')}
+        disabled={!editable}
+        onClick={nodeStore.togglePreview}
+        size="icon-xs"
+        variant="ghost"
+      >
         <i className={sourceCode ? 'i-codicon:wand' : 'i-codicon:go-to-file'} />
       </Button>
     </DesignerTooltip>

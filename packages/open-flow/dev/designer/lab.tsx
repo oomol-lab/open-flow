@@ -9,15 +9,25 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { GetPopupContainerContext } from '../../src/designer/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { createI18n } from '../../src/designer/browser/i18n/i18n-loader.ts'
-import { designerThemeClass } from '../../src/designer/browser/theme/designerThemeClass.ts'
-import { ThemeProvider } from '../../src/designer/browser/theme/ThemeProvider.tsx'
 import { defaultUiLanguage, uiLanguageNames, uiLanguages } from '../../src/localization/common/languages.ts'
 import { TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
 import { CodeEditor } from '../../src/workbench/browser/runtime/designer/codeEditor.tsx'
 import { cardStories } from './cards.tsx'
+import { conditionEditorStory } from './conditionEditor.tsx'
+import { formStory } from './form.tsx'
+import { libraryStory } from './library.tsx'
+import { llmStory } from './llm.tsx'
+import { markdownStory } from './markdown.tsx'
+import { metadataStory } from './metadata.tsx'
+import { nodeInputStory } from './nodeInput.tsx'
 import { nodeStories } from './nodeStories.tsx'
 import { overviewStories } from './overview.tsx'
+import { scheduleStory } from './schedule.tsx'
 import { stories } from './stories.tsx'
+import { triggerConfigStory } from './triggerConfig.tsx'
+import { additionalInputsStory, groupedInputsStory, outputPortsStory, valueNodeStory } from './valueNode.tsx'
+import { variablesStory } from './variables.tsx'
+import { webhookStory } from './webhook.tsx'
 import { workflowStories } from './workflow.tsx'
 
 type ThemeMode = 'dark' | 'light' | 'system'
@@ -60,7 +70,29 @@ const codeEditorStory: DesignerStory = {
   title: 'Code Editor',
 }
 
-const labStories: readonly DesignerStory[] = [...nodeStories, ...cardStories, ...workflowStories, ...stories, codeEditorStory, ...overviewStories]
+const labStories: readonly DesignerStory[] = [
+  ...nodeStories,
+  ...cardStories,
+  ...workflowStories,
+  ...stories,
+  formStory,
+  libraryStory,
+  llmStory,
+  metadataStory,
+  markdownStory,
+  scheduleStory,
+  triggerConfigStory,
+  webhookStory,
+  conditionEditorStory,
+  variablesStory,
+  nodeInputStory,
+  valueNodeStory,
+  additionalInputsStory,
+  groupedInputsStory,
+  outputPortsStory,
+  codeEditorStory,
+  ...overviewStories,
+]
 
 function initialStory(): DesignerStory {
   const requested = new URLSearchParams(location.search).get('story')
@@ -213,27 +245,25 @@ function StoryStage({ children, dark, i18n }: { readonly children: React.ReactNo
 
   return (
     <div className="stage-frame" ref={stageRef}>
-      <div className={`oo-designer-root ${designerThemeClass(dark)} stage-theme`} data-theme={dark ? 'dark' : 'light'}>
+      <div className={`oo-designer-root open-flow-theme stage-theme`} data-surface="canvas" data-theme={dark ? 'dark' : 'light'}>
         <div className="stage-static-root" ref={staticRef} />
         <GetPopupContainerContext.Provider value={context}>
           <I18nProvider i18n={i18n}>
             <TooltipProvider delay={250}>
-              <ThemeProvider dark={dark} getPopupContainer={getStaticPopupContainer}>
-                <ReactFlow
-                  colorMode={dark ? 'dark' : 'light'}
-                  edges={[]}
-                  fitView
-                  fitViewOptions={{ maxZoom: 1, padding: 0.12 }}
-                  maxZoom={3}
-                  minZoom={0.1}
-                  nodeTypes={nodeTypes}
-                  nodes={nodes}
-                  proOptions={{ hideAttribution: true }}
-                >
-                  <Background gap={20} size={1} />
-                  <Controls showInteractive={false} />
-                </ReactFlow>
-              </ThemeProvider>
+              <ReactFlow
+                colorMode={dark ? 'dark' : 'light'}
+                edges={[]}
+                fitView
+                fitViewOptions={{ maxZoom: 1, padding: 0.12 }}
+                maxZoom={3}
+                minZoom={0.1}
+                nodeTypes={nodeTypes}
+                nodes={nodes}
+                proOptions={{ hideAttribution: true }}
+              >
+                <Background gap={20} size={1} />
+                <Controls showInteractive={false} />
+              </ReactFlow>
             </TooltipProvider>
           </I18nProvider>
         </GetPopupContainerContext.Provider>

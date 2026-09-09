@@ -119,9 +119,10 @@ function notify(notification: WorkbenchNotification | undefined): void {
 }
 
 function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
-  const [route, setRoute] = useState(() => parseRoute(window.location.pathname))
-  const [settingsOpen, setSettingsOpen] = useState(window.location.pathname == '/settings')
-  const [variablesOpen, setVariablesOpen] = useState(window.location.pathname == '/variables')
+  const [pathname, setPathname] = useState(() => window.location.pathname)
+  const route = useMemo(() => parseRoute(pathname), [pathname])
+  const settingsOpen = pathname == '/settings'
+  const variablesOpen = pathname == '/variables'
   const [session, setSession] = useState<Session>({ kind: 'checking' })
   const [token, setToken] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -212,9 +213,7 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   }, [loadTeams, session.kind])
   useEffect(() => {
     const restore = (): void => {
-      setSettingsOpen(window.location.pathname == '/settings')
-      setVariablesOpen(window.location.pathname == '/variables')
-      setRoute(parseRoute(window.location.pathname))
+      setPathname(window.location.pathname)
     }
     window.addEventListener('popstate', restore)
     return () => window.removeEventListener('popstate', restore)
@@ -222,16 +221,12 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   function navigate(next: WorkbenchLocation, options: WorkbenchNavigationOptions): void {
     const path = routePath(next)
     if (path != window.location.pathname) window.history[options.replace ? 'replaceState' : 'pushState'](null, '', path)
-    setRoute(next)
-    setSettingsOpen(false)
-    setVariablesOpen(false)
+    setPathname(path)
   }
 
   function openPage(path: '/' | '/settings' | '/variables'): void {
     if (path != window.location.pathname) window.history.pushState(null, '', path)
-    setSettingsOpen(path == '/settings')
-    setVariablesOpen(path == '/variables')
-    if (path == '/') setRoute({ view: 'design' })
+    setPathname(path)
   }
 
   function followPage(event: MouseEvent<HTMLAnchorElement>, path: '/' | '/settings' | '/variables'): void {

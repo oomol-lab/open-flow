@@ -318,11 +318,6 @@
     "touchpad": "Touchpad-friendly",
     "touchpadDescription": "Scroll with two fingers to move the canvas, and pinch or spread to zoom."
   },
-  "jsonViewer": {
-    "bin": "Binary",
-    "showLess": "Show less",
-    "showMore": "Show more"
-  },
   "l10n": {
     "createKey": "Enable translation",
     "deleteKey": "Delete translation",
@@ -369,29 +364,6 @@
   },
   "ok": "OK",
   "optimize": "optimize layout",
-  "llmEditor": {
-    "addMessage": "Add message",
-    "chooseModel": "Choose from model list",
-    "customModel": "Custom model...",
-    "defaultModel": "Default model",
-    "deleteMessage": "Delete message",
-    "maxTokens": "Max tokens",
-    "messageCount": "{{count}} messages",
-    "messageCountOne": "1 message",
-    "messagePlaceholder": "Message content",
-    "loadingModels": "Loading models...",
-    "model": "Model",
-    "modelOptions": "Model options",
-    "moveMessageDown": "Move message down",
-    "moveMessageUp": "Move message up",
-    "role": {
-      "assistant": "Assistant",
-      "system": "System",
-      "user": "User"
-    },
-    "temperature": "Temperature",
-    "topP": "Top P"
-  },
   "outputHandleEditor": {
     "addOutput": "Add Output",
     "configPanelTitle": "Output Handle Config",
@@ -425,8 +397,6 @@
   },
   "preview": {
     "title": "Preview",
-    "videoBilibili": "Bilibili video player",
-    "videoYouTube": "YouTube video player",
     "table": {
       "footer": "Total {{columns}} columns, {{rows}} rows"
     }
