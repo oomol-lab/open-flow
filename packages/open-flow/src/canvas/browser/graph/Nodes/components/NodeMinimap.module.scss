@@ -1,0 +1,33 @@
+.wrapper {
+  position: absolute;
+  display: flex;
+  flex-flow: column nowrap;
+  inset: -1px;
+  z-index: 999;
+  font-size: calc(1.25rem * var(--open-flow-canvas-scale, 1));
+  border-radius: calc(2px * var(--open-flow-canvas-scale, 1));
+  overflow: clip;
+  cursor: grab;
+
+  visibility: hidden;
+  :global(.open-flow-canvas-node-minimap1) & {
+    visibility: visible;
+  }
+
+  :global(.open-flow-canvas-node-minimap2) & {
+    font-size: calc(0.75rem * var(--open-flow-canvas-scale, 1));
+  }
+}
+
+// .title {
+//   flex: 1;
+//   font-weight: normal;
+//   margin: 0;
+//   padding: 24px;
+//   font-size: inherit;
+//   visibility: hidden;
+
+//   :global(.open-flow-canvas-node-minimap2) & {
+//     visibility: visible;
+//   }
+// }

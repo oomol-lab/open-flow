@@ -1,10 +1,10 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { Group, InputPort } from '../../src/workbench/browser/runtime/api.ts'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
-import { PortDefinitionEditor } from '../../src/workbench/browser/runtime/designer/portDefinitionEditor.tsx'
+import { PortDefinitionEditor } from '../../src/workbench/browser/runtime/editor/portDefinitionEditor.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 
 function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; language: UiLanguage; log: LogAction; reservedNames?: readonly string[] }) {
@@ -35,7 +35,7 @@ function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; lan
     </I18nProvider>
   )
 }
-export const valueNodeStory: DesignerStory = {
+export const valueNodeStory: FrontendStory = {
   id: 'value-node-editor',
   title: 'Value Node Editor',
   group: 'Workbench',
@@ -43,7 +43,7 @@ export const valueNodeStory: DesignerStory = {
   render: (log, dark, language) => <ValueStory log={log} dark={dark} language={language} />,
 }
 
-export const additionalInputsStory: DesignerStory = {
+export const additionalInputsStory: FrontendStory = {
   id: 'additional-inputs',
   title: 'Additional Inputs',
   group: 'Workbench',
@@ -79,7 +79,7 @@ function GroupedInputsStory({ dark, language, log, output = false }: { dark: boo
     </I18nProvider>
   )
 }
-export const groupedInputsStory: DesignerStory = {
+export const groupedInputsStory: FrontendStory = {
   id: 'grouped-inputs',
   title: 'Grouped Inputs',
   group: 'Workbench',
@@ -87,7 +87,7 @@ export const groupedInputsStory: DesignerStory = {
   render: (log, dark, language) => <GroupedInputsStory log={log} dark={dark} language={language} />,
 }
 
-export const outputPortsStory: DesignerStory = {
+export const outputPortsStory: FrontendStory = {
   id: 'output-ports',
   title: 'Output Ports',
   group: 'Workbench',

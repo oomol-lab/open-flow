@@ -9,6 +9,7 @@ import type {
 import type { FormEvent, MouseEvent, ReactElement } from 'react'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
+import { Button } from '@oomol-lab/open-flow/ui'
 import { OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Toaster, toast } from 'sonner'
@@ -396,9 +397,9 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
               </a>
             </nav>
             <div className="server-nav-actions">
-              <button className="server-button server-button-ghost server-sign-out" onClick={() => void signOut()} type="button">
+              <Button variant="ghost" size="sm" onClick={() => void signOut()} type="button">
                 {t('session.signOut')}
-              </button>
+              </Button>
             </div>
           </header>
           <div className="workbench-frame">

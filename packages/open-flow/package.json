@@ -134,7 +134,6 @@
     "react-colorful": "^5.8.0",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
-    "react-select": "^5.10.2",
     "react-shorten": "^1.1.5",
     "react-simple-code-editor": "^0.14.1",
     "rehype-highlight": "^7.0.2",

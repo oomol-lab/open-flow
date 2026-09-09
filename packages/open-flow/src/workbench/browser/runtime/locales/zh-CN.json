@@ -69,7 +69,7 @@
     "executorConnector": "连接器",
     "executorJavaScript": "JavaScript",
     "executorLlm": "LLM",
-    "flowDesigner": "Flow 设计器",
+    "flowCanvas": "Flow 设计器",
     "openBlocks": "浏览节点",
     "quickSearchHint": "按 A 快速搜索。",
     "toggleInspector": "切换检查器",

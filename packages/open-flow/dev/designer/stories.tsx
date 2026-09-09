@@ -1,18 +1,17 @@
 import type { ReactNode } from 'react'
-import type { DesignerOption } from '../../src/designer/browser/components/select.tsx'
+import type { DateFormat } from '../../src/form/common/dateValue.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 
 import { ReactFlowProvider } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { val } from 'value-enhancer'
-import { DateTimePicker } from '../../src/designer/browser/components/dateTimePicker.tsx'
-import { DesignerCombobox } from '../../src/designer/browser/components/select.tsx'
-import { DesignerTooltip } from '../../src/designer/browser/components/tooltip.tsx'
-import { CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from '../../src/designer/browser/graph/ReactFlowContainer/CanvasControls.tsx'
-import { CornerControls } from '../../src/designer/browser/graph/ReactFlowContainer/CornerControls.tsx'
-import { GetPopupContainerContext, useGetStaticPopupContainer } from '../../src/designer/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
-import { createI18n as createDesignerI18n } from '../../src/designer/browser/i18n/i18n-loader.ts'
+import { CanvasTooltip } from '../../src/canvas/browser/components/tooltip.tsx'
+import { CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CanvasControls.tsx'
+import { CornerControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CornerControls.tsx'
+import { GetPopupContainerContext, useGetStaticPopupContainer } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
+import { createI18n as createDesignerI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
+import { DateEditor } from '../../src/form/browser/dateEditor.tsx'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuTrigger } from '../../src/ui/browser/context-menu.tsx'
 import {
@@ -27,6 +26,7 @@ import {
 } from '../../src/ui/browser/dropdown-menu.tsx'
 import { Field as UiField, FieldLabel } from '../../src/ui/browser/field.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../src/ui/browser/popover.tsx'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../../src/ui/browser/select.tsx'
 import { Textarea } from '../../src/ui/browser/textarea.tsx'
 import { createI18n as createWorkbenchI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { Icon } from '../../src/workbench/browser/runtime/icons.tsx'
@@ -34,7 +34,7 @@ import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.
 
 export type LogAction = (name: string, value?: unknown) => void
 
-export interface DesignerStory {
+export interface FrontendStory {
   readonly group: string
   readonly id: string
   readonly render: (log: LogAction, dark: boolean, language: UiLanguage) => ReactNode
@@ -42,97 +42,117 @@ export interface DesignerStory {
   readonly title: string
 }
 
-const basicOptions: readonly DesignerOption[] = [
-  { icon: 'i-codicon:code', label: 'String', value: 'string' },
-  { icon: 'i-codicon:symbol-property', label: 'Number', value: 'number' },
-  { icon: 'i-codicon:check', label: 'Boolean', value: 'boolean' },
-  { isDisabled: true, label: 'Disabled option', value: 'disabled' },
+const basicOptions = [
+  { label: 'String', value: 'string' },
+  { label: 'Number', value: 'number' },
+  { label: 'Boolean', value: 'boolean' },
+  { label: 'Disabled option', value: 'disabled', disabled: true },
 ]
 
-const groupedOptions = [
-  { label: 'Primitive', value: 'primitive', options: basicOptions },
-  {
-    label: 'Structured',
-    value: 'structured',
-    options: [
-      { icon: 'i-codicon:package', label: 'Object', value: 'object' },
-      { icon: 'i-codicon:layers', label: 'Array with an intentionally long label', value: 'array' },
-    ],
-  },
-]
+function SelectOptions({ grouped = false }: { grouped?: boolean }) {
+  return (
+    <>
+      <SelectGroup>
+        {grouped && <SelectLabel>Primitive</SelectLabel>}
+        {basicOptions.map((option) => (
+          <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectGroup>
+      {grouped && (
+        <SelectGroup>
+          <SelectLabel>Structured</SelectLabel>
+          <SelectItem value="object">Object</SelectItem>
+          <SelectItem value="array">Array with an intentionally long label</SelectItem>
+        </SelectGroup>
+      )}
+    </>
+  )
+}
 
 function SelectStory({ log }: { readonly log: LogAction }) {
-  const [value, setValue] = useState<DesignerOption | null>(basicOptions[0]!)
+  const container = useGetStaticPopupContainer()()
   return (
     <StoryColumn>
-      <Field label="Default">
-        <DesignerCombobox
-          options={basicOptions}
-          value={value}
-          isClearable
-          onChange={(next) => {
-            setValue(next)
-            log('select.change', next)
-          }}
-        />
-      </Field>
-      <Field label="Grouped">
-        <DesignerCombobox options={groupedOptions} labelInMenu="Hover a group to inspect its submenu" onChange={(next) => log('grouped.change', next)} />
-      </Field>
-      <Field label="Danger">
-        <DesignerCombobox options={basicOptions} variant="danger" value={basicOptions[1]} />
-      </Field>
-      <Field label="Disabled">
-        <DesignerCombobox disabled options={basicOptions} value={basicOptions[2]} />
-      </Field>
+      {['Default', 'Grouped', 'Invalid', 'Disabled', 'Empty'].map((label) => (
+        <Field key={label} label={label}>
+          <Select
+            items={[...basicOptions, { label: 'Object', value: 'object' }, { label: 'Array with an intentionally long label', value: 'array' }]}
+            defaultValue={label === 'Empty' ? null : 'string'}
+            disabled={label === 'Disabled'}
+            onValueChange={(next) => log(`${label.toLowerCase()}.change`, next)}
+          >
+            <SelectTrigger aria-label={label} aria-invalid={label === 'Invalid'}>
+              <SelectValue placeholder="Choose a type" />
+            </SelectTrigger>
+            <SelectContent container={container}>
+              <SelectOptions grouped={label === 'Grouped'} />
+            </SelectContent>
+          </Select>
+        </Field>
+      ))}
     </StoryColumn>
   )
 }
 
 function MultiSelectStory({ log }: { readonly log: LogAction }) {
-  const [value, setValue] = useState<readonly DesignerOption[]>([basicOptions[0]!, basicOptions[1]!])
+  const container = useGetStaticPopupContainer()()
   return (
     <StoryColumn>
       <Field label="Multiple values">
-        <DesignerCombobox
-          isMulti
-          isClearable
-          options={basicOptions}
-          value={value}
-          onChange={(next) => {
-            setValue(next)
-            log('multi.change', next)
-          }}
-        />
+        <Select items={basicOptions} multiple defaultValue={['string', 'number']} onValueChange={(next) => log('multi.change', next)}>
+          <SelectTrigger aria-label="Multiple values">
+            <SelectValue placeholder="Choose types" />
+          </SelectTrigger>
+          <SelectContent container={container}>
+            <SelectOptions />
+          </SelectContent>
+        </Select>
       </Field>
     </StoryColumn>
   )
 }
 
-function DateTimeStory({ log }: { readonly log: LogAction }) {
-  const [date, setDate] = useState<Date | null>(new Date(2026, 8, 3, 9, 30))
+function DateSample({
+  log,
+  label,
+  format,
+  initialValue,
+  disabled = false,
+}: {
+  log: LogAction
+  label: string
+  format: DateFormat
+  initialValue: string
+  disabled?: boolean
+}) {
+  const [value, setValue] = useState<unknown>(initialValue)
   return (
-    <StoryColumn>
-      <Field label="Date">
-        <DateTimePicker
-          isClearable
-          value={date}
-          onChange={(next) => {
-            setDate(next)
-            log('date.change', next)
-          }}
-        />
-      </Field>
-      <Field label="Date and time">
-        <DateTimePicker showDate showTime defaultValue={new Date(2026, 8, 3, 9, 30)} isClearable onChange={(next) => log('datetime.change', next)} />
-      </Field>
-      <Field label="Time">
-        <DateTimePicker showDate={false} showTime defaultValue={new Date(2026, 8, 3, 9, 30)} onChange={(next) => log('time.change', next)} />
-      </Field>
-      <Field label="Disabled">
-        <DateTimePicker disabled value={new Date(2026, 8, 3, 9, 30)} />
-      </Field>
-    </StoryColumn>
+    <Field label={label}>
+      <DateEditor
+        label={label}
+        format={format}
+        value={value}
+        disabled={disabled}
+        onChange={(next) => {
+          setValue(next)
+          log(`${format}.change`, next)
+        }}
+      />
+    </Field>
+  )
+}
+
+function DateTimeStory({ log }: { readonly log: LogAction }) {
+  return (
+    <div className="story-column story-dates">
+      <DateSample log={log} label="Date" format="date" initialValue="2026-09-03" />
+      <DateSample log={log} label="Date and time" format="date-time" initialValue="2026-09-03T09:30:00+08:00" />
+      <DateSample log={log} label="Time" format="time" initialValue="09:30:00+08:00" />
+      <DateSample log={log} label="Empty date" format="date" initialValue="" />
+      <DateSample log={log} label="Disabled" format="date" initialValue="2026-09-03" disabled />
+    </div>
   )
 }
 
@@ -163,9 +183,9 @@ function PopupStory({ log }: { readonly log: LogAction }) {
         <PopoverTrigger render={<Button>Popover</Button>} />
         <PopoverContent container={container}>Popup content rendered in the selected container.</PopoverContent>
       </Popover>
-      <DesignerTooltip getPopupContainer={() => container} title="Designer tooltip">
+      <CanvasTooltip getPopupContainer={() => container} title="Designer tooltip">
         <Button>Tooltip</Button>
-      </DesignerTooltip>
+      </CanvasTooltip>
     </div>
   )
 }
@@ -350,7 +370,7 @@ function Field({ children, label }: { readonly children: ReactNode; readonly lab
   )
 }
 
-export const stories: readonly DesignerStory[] = [
+export const stories: readonly FrontendStory[] = [
   { group: 'Controls', id: 'select', render: (log) => <SelectStory log={log} />, title: 'Select' },
   { group: 'Controls', id: 'multi-select', render: (log) => <MultiSelectStory log={log} />, title: 'Multi Select' },
   { group: 'Controls', id: 'date-time', render: (log) => <DateTimeStory log={log} />, title: 'Date & Time' },

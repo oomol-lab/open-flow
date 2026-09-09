@@ -1,4 +1,4 @@
-import type { DiagnosticItem } from '../designer/diagnostics.ts'
+import type { DiagnosticItem } from '../editor/diagnostics.ts'
 
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'

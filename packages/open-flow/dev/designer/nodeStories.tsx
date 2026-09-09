@@ -1,16 +1,16 @@
-import type { FlowDesignerViewModel } from '../../src/designer/browser/graph/FlowDesigner/model.ts'
+import type { FlowCanvasViewModel } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useState } from 'react'
+import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
-import { FlowDesignerView } from '../../src/designer/browser/graph/FlowDesigner/FlowDesignerView.tsx'
 
 const longInput = 'customer_lifetime_value_across_all_completed_orders'
 const longOutput = 'matched_customers_with_complete_enterprise_profiles'
 const longFallback = 'customers_requiring_manual_profile_review'
 
-const conditionModel: FlowDesignerViewModel = {
+const conditionModel: FlowCanvasViewModel = {
   edges: [],
   viewport: { x: 46, y: 72, zoom: 0.82 },
   nodes: [
@@ -112,7 +112,7 @@ function ConditionStory({ dark, language, log }: { readonly dark: boolean; reado
         <span>Condition nodes · empty, single, multiple, invalid input and overflowing branch labels.</span>
       </div>
       <div className="workflow-canvas">
-        <FlowDesignerView
+        <FlowCanvasView
           ignoredNodeIds={ignoredNodeIds}
           onIgnoreNodes={onIgnoreNodes}
           identity="lab:node-cases:condition"
@@ -142,7 +142,7 @@ function ConditionStory({ dark, language, log }: { readonly dark: boolean; reado
   )
 }
 
-export const nodeStories: readonly DesignerStory[] = [
+export const nodeStories: readonly FrontendStory[] = [
   {
     group: 'Node Cases',
     id: 'node-condition',

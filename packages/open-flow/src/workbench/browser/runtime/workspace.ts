@@ -1,13 +1,14 @@
 import type { TFunction } from 'val-i18n'
 import type {
-  FlowDesignerViewConditionOperator,
-  FlowDesignerViewInput,
-  FlowDesignerViewModel,
-  FlowDesignerViewNode,
-  FlowDesignerViewNodeRun,
-  FlowDesignerViewOutput,
-  FlowDesignerViewTriggerNode,
-} from '../../../designer/browser/graph/FlowDesigner/model.ts'
+  FlowCanvasViewConditionOperator,
+  FlowCanvasViewInput,
+  FlowCanvasViewModel,
+  FlowCanvasViewNode,
+  FlowCanvasViewNodeRun,
+  FlowCanvasViewOutput,
+  FlowCanvasViewTriggerNode,
+} from '../../../canvas/browser/graph/FlowCanvas/model.ts'
+import type { GraphTarget } from '../../../flow/common/change.ts'
 import type {
   ConnectorAction,
   ConnectorConnection,
@@ -22,7 +23,6 @@ import type {
   TaskDefinition,
   TriggerNode,
 } from './api.ts'
-import type { DesignerTarget } from './designer/flowChanges.ts'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionView.ts'
 
 import { triggerPayloadSchema } from '../../../flow/common/schema.ts'
@@ -38,7 +38,7 @@ export interface DesignerViewport extends Point {
   readonly zoom: number
 }
 
-export type DesignerNode = FlowDesignerViewNode
+export type DesignerNode = FlowCanvasViewNode
 
 export interface DesignerEdge {
   readonly id: string
@@ -48,7 +48,7 @@ export interface DesignerEdge {
   readonly targetHandle: string
 }
 
-export interface DesignerGraph extends FlowDesignerViewModel {
+export interface DesignerGraph extends FlowCanvasViewModel {
   readonly edges: readonly DesignerEdge[]
   readonly nodes: readonly DesignerNode[]
   readonly viewport: DesignerViewport
@@ -68,8 +68,8 @@ export interface DesignerComment {
 }
 
 interface NodePorts {
-  readonly inputs: Map<string, Omit<FlowDesignerViewInput, 'handle' | 'sources' | 'value'>>
-  readonly outputs: Map<string, Omit<FlowDesignerViewOutput, 'handle'>>
+  readonly inputs: Map<string, Omit<FlowCanvasViewInput, 'handle' | 'sources' | 'value'>>
+  readonly outputs: Map<string, Omit<FlowCanvasViewOutput, 'handle'>>
 }
 
 interface EdgeProjection {
@@ -88,9 +88,9 @@ interface NodeProjectionContext {
   readonly connectorActions: Readonly<Record<string, ConnectorAction>>
   readonly diagnostics: readonly Diagnostic[]
   readonly revision: RevisionView
-  readonly runNodes: ReadonlyMap<string, FlowDesignerViewNodeRun>
+  readonly runNodes: ReadonlyMap<string, FlowCanvasViewNodeRun>
   readonly t: TFunction | undefined
-  readonly target: DesignerTarget
+  readonly target: GraphTarget
 }
 
 export function connectionCatalog(connections: readonly ConnectorConnection[]): ConnectionCatalog {
@@ -144,16 +144,13 @@ function finite(value: JsonValue | undefined): number | undefined {
   return typeof value == 'number' && Number.isFinite(value) ? value : undefined
 }
 
-export function targetPresentation(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): Readonly<Record<string, JsonValue>> | undefined {
+export function targetPresentation(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): Readonly<Record<string, JsonValue>> | undefined {
   const designer = record(value.designer)
   if (designer?.version != 1) return undefined
   return presentationTarget(designer, target)
 }
 
-function savedPositions(
-  value: Readonly<Record<string, JsonValue>>,
-  target: DesignerTarget,
-): Readonly<Record<string, { readonly x: number; readonly y: number }>> {
+function savedPositions(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): Readonly<Record<string, { readonly x: number; readonly y: number }>> {
   const current = targetPresentation(value, target)
   const positions = (source: JsonValue | undefined): Readonly<Record<string, { readonly x: number; readonly y: number }>> => {
     return Object.fromEntries(
@@ -168,14 +165,14 @@ function savedPositions(
   return positions(current?.nodes)
 }
 
-function savedOrder(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): readonly string[] {
+function savedOrder(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): readonly string[] {
   const positions = savedPositions(value, target)
   const source = targetPresentation(value, target)?.order
   const order = Array.isArray(source) ? source.flatMap((nodeId) => (typeof nodeId == 'string' && positions[nodeId] != null ? [nodeId] : [])) : []
   return [...new Set([...order, ...Object.keys(positions)])]
 }
 
-function optionalViewport(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): DesignerViewport | undefined {
+function optionalViewport(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): DesignerViewport | undefined {
   const viewport = record(targetPresentation(value, target)?.viewport)
   const x = finite(viewport?.x)
   const y = finite(viewport?.y)
@@ -183,13 +180,13 @@ function optionalViewport(value: Readonly<Record<string, JsonValue>>, target: De
   return x == null || y == null || zoom == null || zoom <= 0 ? undefined : { x, y, zoom }
 }
 
-function savedViewport(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): DesignerViewport {
+function savedViewport(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): DesignerViewport {
   return optionalViewport(value, target) ?? { x: 0, y: 0, zoom: 1 }
 }
 
 function savedComments(
   value: Readonly<Record<string, JsonValue>>,
-  target: DesignerTarget,
+  target: GraphTarget,
   positions: Readonly<Record<string, Point>>,
 ): Readonly<Record<string, DesignerComment>> {
   const comments = record(targetPresentation(value, target)?.comments) ?? {}
@@ -211,8 +208,8 @@ function nodePorts(node: ResolvedSelection): NodePorts {
   if (node.kind == 'trigger') {
     return { inputs: new Map(), outputs: new Map([['payload', { jsonSchema: triggerPayloadSchema(node.trigger), nullable: false }]]) }
   }
-  const inputs = new Map<string, Omit<FlowDesignerViewInput, 'handle' | 'sources' | 'value'>>(Object.keys(node.node.inputs).map((handle) => [handle, {}]))
-  const outputs = new Map<string, Omit<FlowDesignerViewOutput, 'handle'>>()
+  const inputs = new Map<string, Omit<FlowCanvasViewInput, 'handle' | 'sources' | 'value'>>(Object.keys(node.node.inputs).map((handle) => [handle, {}]))
+  const outputs = new Map<string, Omit<FlowCanvasViewOutput, 'handle'>>()
   switch (node.kind) {
     case 'condition': {
       const definition = {
@@ -275,7 +272,7 @@ function nodePorts(node: ResolvedSelection): NodePorts {
   return { inputs, outputs }
 }
 
-function conditionOperator(operator: import('./api.ts').ConditionOperator): FlowDesignerViewConditionOperator {
+function conditionOperator(operator: import('./api.ts').ConditionOperator): FlowCanvasViewConditionOperator {
   switch (operator) {
     case 'endsWith':
       return 'ends with'
@@ -314,7 +311,7 @@ function conditionOperator(operator: import('./api.ts').ConditionOperator): Flow
   }
 }
 
-function nodeDiagnosticCount(target: DesignerTarget, node: ResolvedNode, diagnostics: readonly Diagnostic[]): number {
+function nodeDiagnosticCount(target: GraphTarget, node: ResolvedNode, diagnostics: readonly Diagnostic[]): number {
   const graphPath = target.kind == 'flow' ? `/document/graph/nodes/${node.id}` : `/document/subflows/${target.id}/graph/nodes/${node.id}`
   const paths = [graphPath]
   if (node.kind == 'task') {
@@ -330,13 +327,13 @@ function nodeDiagnosticCount(target: DesignerTarget, node: ResolvedNode, diagnos
 
 function runProjection(
   revision: RevisionView,
-  target: DesignerTarget,
+  target: GraphTarget,
   run: Run | RunDetails | undefined,
   events: readonly RunEvent[],
-): { readonly nodes: ReadonlyMap<string, FlowDesignerViewNodeRun>; readonly status?: 'idle' | 'running' } {
+): { readonly nodes: ReadonlyMap<string, FlowCanvasViewNodeRun>; readonly status?: 'idle' | 'running' } {
   if (target.kind != 'flow' || run?.flowId != revision.revision.flowId || run.revisionId != revision.revision.revisionId) return { nodes: new Map() }
   const active = run.status == 'queued' || run.status == 'starting' || run.status == 'running' || run.status == 'waiting'
-  const nodes = new Map<string, FlowDesignerViewNodeRun>()
+  const nodes = new Map<string, FlowCanvasViewNodeRun>()
   if (run.status == 'waiting' && 'waiting' in run && run.waiting != null) {
     nodes.set(run.waiting.nodeId, { runId: run.runId, status: 'waiting' })
   }
@@ -477,9 +474,9 @@ function layoutNodes(
   return { depth, ordered }
 }
 
-function designerInputs(nodeId: string, node: GraphNode, ports: NodePorts): readonly FlowDesignerViewInput[] {
+function designerInputs(nodeId: string, node: GraphNode, ports: NodePorts): readonly FlowCanvasViewInput[] {
   if (!('inputs' in node)) return []
-  const inputs: FlowDesignerViewInput[] = []
+  const inputs: FlowCanvasViewInput[] = []
   for (const [handle, definition] of ports.inputs) {
     const mapping = node.inputs[handle]
     const sources: { readonly nodeId: string; readonly output: string }[] = []
@@ -505,14 +502,14 @@ function designerInputs(nodeId: string, node: GraphNode, ports: NodePorts): read
   return inputs
 }
 
-function designerOutputs(ports: NodePorts): readonly FlowDesignerViewOutput[] {
+function designerOutputs(ports: NodePorts): readonly FlowCanvasViewOutput[] {
   return [...ports.outputs].map(([handle, definition]) => Object.assign({ handle }, definition))
 }
 
-function groupedInputs(resolved: ResolvedNode, inputs: readonly FlowDesignerViewInput[]): readonly (FlowDesignerViewInput | Group)[] {
+function groupedInputs(resolved: ResolvedNode, inputs: readonly FlowCanvasViewInput[]): readonly (FlowCanvasViewInput | Group)[] {
   if (resolved.kind != 'task' || resolved.definition == null) return inputs
   const ports = new Map(inputs.map((input) => [input.handle, input]))
-  const result: (FlowDesignerViewInput | Group)[] = []
+  const result: (FlowCanvasViewInput | Group)[] = []
   for (const item of resolved.definition.inputs) {
     if (!('handle' in item)) {
       result.push(item)
@@ -528,10 +525,10 @@ function groupedInputs(resolved: ResolvedNode, inputs: readonly FlowDesignerView
   return result
 }
 
-function groupedOutputs(resolved: ResolvedNode, outputs: readonly FlowDesignerViewOutput[]): readonly (FlowDesignerViewOutput | Group)[] {
+function groupedOutputs(resolved: ResolvedNode, outputs: readonly FlowCanvasViewOutput[]): readonly (FlowCanvasViewOutput | Group)[] {
   if (resolved.kind != 'task' || resolved.definition == null) return outputs
   const ports = new Map(outputs.map((output) => [output.handle, output]))
-  const result: (FlowDesignerViewOutput | Group)[] = []
+  const result: (FlowCanvasViewOutput | Group)[] = []
   for (const item of resolved.definition.outputs) {
     if (!('handle' in item)) {
       result.push(item)
@@ -548,7 +545,7 @@ function groupedOutputs(resolved: ResolvedNode, outputs: readonly FlowDesignerVi
 }
 
 function triggerDesignerNode(triggerId: string, trigger: TriggerNode, position: Point, diagnostics: readonly Diagnostic[]): DesignerNode {
-  let presentation: FlowDesignerViewTriggerNode['presentation']
+  let presentation: FlowCanvasViewTriggerNode['presentation']
   switch (trigger.kind) {
     case 'manual':
       presentation = { kind: trigger.kind, schedules: [] }
@@ -685,7 +682,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
 
 export function designerGraph(
   draft: Draft | undefined,
-  target: DesignerTarget | undefined,
+  target: GraphTarget | undefined,
   presentation: Readonly<Record<string, JsonValue>> = {},
   diagnostics: readonly Diagnostic[] = [],
   connectorActions: Readonly<Record<string, ConnectorAction>> = {},
@@ -747,13 +744,13 @@ function designerPresentation(value: Readonly<Record<string, JsonValue>>): Reado
   return designer?.version == 1 ? designer : { version: 1 }
 }
 
-function presentationTarget(designer: Readonly<Record<string, JsonValue>>, target: DesignerTarget): Readonly<Record<string, JsonValue>> | undefined {
+function presentationTarget(designer: Readonly<Record<string, JsonValue>>, target: GraphTarget): Readonly<Record<string, JsonValue>> | undefined {
   return target.kind == 'flow' ? record(designer.flow) : record(record(designer.subflows)?.[target.id])
 }
 
 function replacePresentationTarget(
   designer: Readonly<Record<string, JsonValue>>,
-  target: DesignerTarget,
+  target: GraphTarget,
   value: Readonly<Record<string, JsonValue>>,
 ): Readonly<Record<string, JsonValue>> {
   if (target.kind == 'flow') return { ...designer, flow: value, version: 1 }
@@ -761,7 +758,7 @@ function replacePresentationTarget(
   return { ...designer, subflows: { ...subflows, [target.id]: value }, version: 1 }
 }
 
-function normalizedTarget(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): Record<string, JsonValue> {
+function normalizedTarget(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): Record<string, JsonValue> {
   const normalized: Record<string, JsonValue> = {
     ...targetPresentation(value, target),
     viewport: { ...savedViewport(value, target) },
@@ -774,7 +771,7 @@ function normalizedTarget(value: Readonly<Record<string, JsonValue>>, target: De
 
 export function setNodePosition(
   value: Readonly<Record<string, JsonValue>>,
-  target: DesignerTarget,
+  target: GraphTarget,
   nodeId: string,
   position: Point,
 ): Readonly<Record<string, JsonValue>> {
@@ -783,7 +780,7 @@ export function setNodePosition(
 
 export function setNodePositions(
   value: Readonly<Record<string, JsonValue>>,
-  target: DesignerTarget,
+  target: GraphTarget,
   positions: Readonly<Record<string, Point>>,
 ): Readonly<Record<string, JsonValue>> {
   const designer = designerPresentation(value)
@@ -805,7 +802,7 @@ export function setNodePositions(
 
 export function setComment(
   value: Readonly<Record<string, JsonValue>>,
-  target: DesignerTarget,
+  target: GraphTarget,
   nodeId: string,
   comment: DesignerComment,
 ): Readonly<Record<string, JsonValue>> {
@@ -824,7 +821,7 @@ export function setComment(
 
 export function removeComments(
   value: Readonly<Record<string, JsonValue>>,
-  target: DesignerTarget,
+  target: GraphTarget,
   nodeIds: ReadonlySet<string>,
 ): Readonly<Record<string, JsonValue>> {
   const designer = designerPresentation(value)
@@ -842,13 +839,13 @@ export function removeComments(
   }
 }
 
-export function commentIds(value: Readonly<Record<string, JsonValue>>, target: DesignerTarget): ReadonlySet<string> {
+export function commentIds(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): ReadonlySet<string> {
   return new Set(Object.keys(record(targetPresentation(value, target)?.comments) ?? {}))
 }
 
 export function setFlowViewport(
   value: Readonly<Record<string, JsonValue>>,
-  target: DesignerTarget,
+  target: GraphTarget,
   viewport: DesignerViewport,
 ): Readonly<Record<string, JsonValue>> {
   const currentViewport = optionalViewport(value, target)

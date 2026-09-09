@@ -275,7 +275,7 @@ assert.ok(
 const workbenchStyleEntry = entries.find((entry) => entry.header.name == 'package/dist/browser/workbench.css')
 assert.ok(workbenchStyleEntry?.data)
 const workbenchStyle = new TextDecoder().decode(workbenchStyleEntry.data)
-assert.match(workbenchStyle, /:where\(\.open-flow-theme,\.open-flow-workbench,\.oo-designer-root\) \.hidden\{display:none\}/)
+assert.match(workbenchStyle, /:where\(\.open-flow-theme,\.open-flow-workbench,\.open-flow-canvas-root\) \.hidden\{display:none\}/)
 assert.match(workbenchStyle, /\.sm\\:w-56\{[^}]*width:/)
 assert.ok(workbenchStyle.includes('.i-custom\\:mouse{'))
 assert.ok(workbenchStyle.includes('.bg-popover{background-color:var(--ui-popover)}'))
@@ -323,11 +323,6 @@ await Promise.all(
     { react: '19.2.0', reactDomTypes: '19.2.3', reactTypes: '19.2.2' },
   ].map(verifyConsumer),
 )
-
-for (const sourcePath of ['src/designer/browser/scriptletTemplates/typescript.txt']) {
-  const source = await readFile(path.join(rootPath, sourcePath), 'utf8')
-  assert.equal(hasRuntimePackageImport(source, sourcePath), false, `${sourcePath} imports the package at runtime.`)
-}
 
 console.log('Verified the public npm package contract, Browser runtime exports, and React 18/19 consumers.')
 
@@ -387,9 +382,9 @@ async function verifyConsumer(versions: { readonly react: string; readonly react
         "import { OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'",
         "import { createElement } from 'react'",
         "import '@oomol-lab/open-flow/workbench.css'",
-        "import { Input, Label, Textarea } from '@oomol-lab/open-flow/ui'",
+        "import { Button, Input, Label, Textarea } from '@oomol-lab/open-flow/ui'",
         "import '@oomol-lab/open-flow/ui.css'",
-        'const hostFields = <><Label htmlFor="host-input">Name</Label><Input id="host-input" value="name" onChange={(event) => event.target.value} /><Textarea defaultValue="value" /></>',
+        'const hostFields = <><Label htmlFor="host-input">Name</Label><Input id="host-input" value="name" onChange={(event) => event.target.value} /><Textarea defaultValue="value" /><Button variant="outline" size="sm" type="submit">Save</Button></>',
         'void hostFields',
         "import '@oomol-lab/open-flow/theme.css'",
         'const connector: ConnectorProxy = { execute: async () => ({ data: {}, status: 200 }) }',
@@ -492,16 +487,6 @@ async function verifyConsumer(versions: { readonly react: string; readonly react
   } finally {
     await rm(directory, { force: true, recursive: true })
   }
-}
-
-function hasRuntimePackageImport(source: string, sourcePath: string): boolean {
-  const program = parse(source, { plugins: ['typescript'], sourceFilename: sourcePath, sourceType: 'module' }).program
-  return program.body.some((statement) => {
-    if (statement.type != 'ImportDeclaration' || statement.source.value != '@oomol-lab/open-flow') return false
-    if (statement.importKind == 'type') return false
-    if (statement.specifiers.length == 0) return true
-    return statement.specifiers.some((specifier) => specifier.type != 'ImportSpecifier' || specifier.importKind != 'type')
-  })
 }
 
 function assertNoReactRequire(source: string, sourcePath: string): void {

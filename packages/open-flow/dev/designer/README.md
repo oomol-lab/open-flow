@@ -1,6 +1,6 @@
-# Designer Lab
+# Open Flow Lab
 
-Run the local-only Designer component playground from the repository root:
+Run the local-only frontend component playground from the repository root:
 
 ```bash
 bun run dev:designer
@@ -15,17 +15,17 @@ The **Node Cases** group collects production canvas nodes under boundary inputs.
 The **Theme Preview** group also contains:
 
 - **Node states**: idle, selected, waiting, running, success and error nodes together.
-- **Node controls**: compact inputs, switches, checkboxes, ranges, selects, dates, buttons and popups.
+- **Node controls**: compact inputs, switches, checkboxes, selects, dates, buttons and popups.
 - **Workbench controls**: shared buttons, inputs, choices, badges and feedback in the product theme.
-- **Theme palette**: Designer and product color tokens side by side, using the actual CSS variables.
+- **Theme palette**: Canvas and product color tokens side by side, using the actual CSS variables.
 
 Switch light/dark mode in the toolbar to review both themes. Story URLs are shareable locally with `?story=node-condition`, `?story=canvas-cards`, `?story=workflow`, `?story=node-states`, `?story=node-controls`, `?story=product-controls` or `?story=palette`. Sample content stays in English; the language picker changes the actual components' translations.
 
-Designer colors live in `src/designer/browser/styles/light.module.scss` and `dark.module.scss`; product colors live in `src/ui/browser/theme.css`. Edits to these files update the previews through Vite.
+Canvas and product colors share `src/ui/browser/theme.css`. Edits update both previews through Vite.
 
-Add production node boundary cases to `nodeStories.tsx`, layered card examples to `cards.tsx`, individual component scenarios to `stories.tsx`, component overviews to `overview.tsx`, and full graph samples to `workflow.tsx`. Keep scenarios deterministic and use the action logger instead of external services. Component stories render inside a real flow node so canvas scaling and popup placement use the same context as Designer. Standalone stories provide their own layout; workflow samples use `FlowDesignerView` and log authoring actions without saving or running a Flow. The Lab is a development tool and has no production build or package entry.
+Add production node boundary cases to `nodeStories.tsx`, layered card examples to `cards.tsx`, individual component scenarios to `stories.tsx`, component overviews to `overview.tsx`, and full graph samples to `workflow.tsx`. Keep scenarios deterministic and use the action logger instead of external services. Component stories render inside a real flow node so canvas scaling and popup placement use the same context as the production canvas. Standalone stories provide their own layout; workflow samples use `FlowCanvasView` and log authoring actions without saving or running a Flow. The Lab is a development tool and has no production build or package entry.
 
-**Run Inputs** (`?story=run-inputs`) exercises the production input form without a Designer provider. It covers required fields, open objects, arrays, enums, explicit null and invalid JSON drafts.
+**Run Inputs** (`?story=run-inputs`) exercises the production input form without a canvas provider. It covers required fields, open objects, arrays, enums, explicit null and invalid JSON drafts.
 
 `?story=node-library` 使用生产节点库，可切换正常、空列表、加载、错误和禁用状态，并检查搜索与动作记录。
 
@@ -44,3 +44,5 @@ Add production node boundary cases to `nodeStories.tsx`, layered card examples t
 `?story=variable-picker` 使用生产变量选择器，展示搜索、正常、缺失、加载、空列表、不可用及只读状态。
 
 `?story=node-picker` 使用生产画布的新增节点菜单，覆盖分组、搜索、禁用项、服务动作二级选项，以及从执行端口拉线后创建节点的回调。点击底部 Add node 打开菜单；从任务左侧输入端拉到空白处可检查连接方向与不兼容项。样例只记录动作，不写入业务数据。
+
+`?story=agent-tools` uses production AgentSettings, WorkspaceStore and ConnectorStore. Its HTTP fixture provides tools and active/expired accounts, and applies draft changes with the production reducer. It covers parameter sources, approval, validation and read-only controls without external requests.

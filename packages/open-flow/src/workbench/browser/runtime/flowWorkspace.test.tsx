@@ -29,7 +29,7 @@ vi.mock('val-i18n-react', async (importOriginal) => ({
   useTranslate: () => (key: string) => key,
 }))
 
-vi.mock('./designer/workbenchDesigner.tsx', () => ({ WorkbenchDesigner: () => null }))
+vi.mock('./editor/workbenchCanvas.tsx', () => ({ WorkbenchCanvas: () => null }))
 
 const value = <T,>(current: T): { readonly value: T } => ({ value: current })
 

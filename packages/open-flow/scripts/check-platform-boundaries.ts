@@ -20,7 +20,7 @@ const platformDomains: Set<string> = new Set([
   'base',
   'build',
   'compiler',
-  'designer',
+  'canvas',
   'execution',
   'file-picker',
   'localization',
@@ -117,7 +117,7 @@ function cloudWorkbenchOwnershipViolations(root: string, sourceFile: SourceFile)
   const index = fileName.indexOf(marker)
   if (index < 0 || /\.(?:spec|test)\.[cm]?[jt]sx?$/.test(fileName)) return []
   const relative = fileName.slice(index + marker.length)
-  const allowedChangeOwner = relative == 'api.ts' || relative == 'designer/flowChanges.ts'
+  const allowedChangeOwner = relative == 'api.ts' || relative == 'editor/flowChanges.ts'
   const allowedDocumentReader = relative == 'revisionView.ts'
   const violations: BoundaryViolation[] = []
   const report = (pattern: RegExp, message: string): void => {

@@ -16,14 +16,12 @@ test('keeps Icon Picker controls named and stateful', async () => {
   expect(source).toMatch(/aria-label=\{icon\}/)
 })
 
-test('keeps labels and JSON expansion on semantic controls', async () => {
-  const [label, jsonViewer, jsonViewerStyles] = await Promise.all([
-    readFile('src/designer/browser/components/label.tsx', 'utf8'),
+test('keeps JSON expansion on semantic controls', async () => {
+  const [jsonViewer, jsonViewerStyles] = await Promise.all([
     readFile('src/ui/browser/json-viewer/DataRender.tsx', 'utf8'),
     readFile('src/ui/browser/json-viewer/JSONViewer.module.scss', 'utf8'),
   ])
 
-  expect(label).not.toMatch(/onClick/)
   expect(jsonViewer).not.toMatch(/<(?:span|div)[^>]*onClick=/)
   expect(jsonViewer).toMatch(/<button[\s\S]*?aria-label=\{ariaLabel\}/)
   expect(jsonViewer).not.toMatch(/role="button"/)
@@ -31,9 +29,9 @@ test('keeps labels and JSON expansion on semantic controls', async () => {
   expect(jsonViewerStyles).not.toMatch(/span\[role='button'\]/)
 })
 
-test('keeps every native Designer button safe inside forms', async () => {
+test('keeps every native canvas button safe inside forms', async () => {
   const missingType: string[] = []
-  for await (const path of glob('src/designer/browser/**/*.tsx')) {
+  for await (const path of glob('src/canvas/browser/**/*.tsx')) {
     const source = await readFile(path, 'utf8')
     const ast = parse(source, { plugins: ['jsx', 'typescript'], sourceFilename: path, sourceType: 'module' })
     traverse(ast, {

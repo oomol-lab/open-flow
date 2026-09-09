@@ -210,6 +210,13 @@ select {
   display: grid;
   gap: 14px;
 }
+.story-dates {
+  width: 480px;
+}
+.story-dates .story-field > div {
+  display: grid;
+  gap: 4px;
+}
 .story-field {
   display: grid;
   grid-template-columns: 100px minmax(0, 1fr);

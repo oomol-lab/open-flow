@@ -69,7 +69,7 @@
     "executorConnector": "Connector",
     "executorJavaScript": "JavaScript",
     "executorLlm": "LLM",
-    "flowDesigner": "Designer de Flow",
+    "flowCanvas": "Designer de Flow",
     "openBlocks": "Parcourir les blocs",
     "quickSearchHint": "Appuyez sur A pour la recherche rapide.",
     "toggleInspector": "Afficher ou masquer l'inspecteur",

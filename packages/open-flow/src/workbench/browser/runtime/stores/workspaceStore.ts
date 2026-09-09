@@ -1,21 +1,21 @@
 import type { I18n } from 'val-i18n'
+import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { ConnectorCapability } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
 import type { WorkbenchClient, ConnectorAction, Draft, Flow, GraphNode, InputPort, JsonValue, Live, TriggerSchedule } from '../api.ts'
 import type { FlowChangeEvent } from '../contract.ts'
-import type { AddNodeOption } from '../designer/addNodeOptions.ts'
-import type { DiagnosticItem } from '../designer/diagnostics.ts'
+import type { AddNodeOption } from '../editor/addNodeOptions.ts'
+import type { DiagnosticItem } from '../editor/diagnostics.ts'
 import type {
   ConditionSettings,
   TaskPorts,
-  DesignerTarget,
   NodeClipboard,
   FlowChanges,
   SubflowSettings,
   TaskSettings,
   ValueSettings,
   WebhookSettings,
-} from '../designer/flowChanges.ts'
+} from '../editor/flowChanges.ts'
 import type { RevisionView } from '../revisionView.ts'
 import type { DesignerEdge, DesignerGraph, DesignerViewport, Point } from '../workspace.ts'
 import type { DraftChangeContext } from './draftChanges.ts'
@@ -37,7 +37,7 @@ import {
   updateTriggerSchedule,
 } from '../../../../flow/common/nodeChanges.ts'
 import { ApiError } from '../api.ts'
-import { addNodeIntent } from '../designer/addNodeOptions.ts'
+import { addNodeIntent } from '../editor/addNodeOptions.ts'
 import {
   addNode as addFlowNode,
   applyFlowChanges,
@@ -60,7 +60,7 @@ import {
   updateValue,
   updateWait,
   updateWebhook,
-} from '../designer/flowChanges.ts'
+} from '../editor/flowChanges.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
 import { commentIds, designerGraph, removeComments, setComment, setFlowViewport, setNodePositions } from '../workspace.ts'
@@ -86,10 +86,10 @@ interface Clipboard {
 interface ReconciledRevision {
   readonly revision: RevisionView
   readonly selectedNodeIds: readonly string[]
-  readonly target?: DesignerTarget
+  readonly target?: GraphTarget
 }
 
-function reconcileTarget(revision: RevisionView, target: DesignerTarget | undefined): DesignerTarget | undefined {
+function reconcileTarget(revision: RevisionView, target: GraphTarget | undefined): GraphTarget | undefined {
   if (target == null) return
   return target.kind == 'flow' || revision.subflow(target.id) != null ? target : { kind: 'flow' }
 }
@@ -268,7 +268,7 @@ export class WorkspaceStore {
     return true
   }
 
-  public selectTarget(target: DesignerTarget | undefined): boolean {
+  public selectTarget(target: GraphTarget | undefined): boolean {
     void this.#flushModules()
     this.#set({
       diagnosticFocus: undefined,
@@ -834,7 +834,7 @@ export class WorkspaceStore {
     return true
   }
 
-  async #addComment(target: DesignerTarget, nodeId: string, position: Point): Promise<string | undefined> {
+  async #addComment(target: GraphTarget, nodeId: string, position: Point): Promise<string | undefined> {
     const number = Math.max(
       0,
       ...this.#designer().nodes.flatMap((node) => {

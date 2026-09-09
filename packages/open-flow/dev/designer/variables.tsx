@@ -1,5 +1,5 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
@@ -51,7 +51,7 @@ function VariablesStory({ dark, language, log }: { dark: boolean; language: UiLa
     </I18nProvider>
   )
 }
-export const variablesStory: DesignerStory = {
+export const variablesStory: FrontendStory = {
   group: 'Workbench',
   id: 'variable-picker',
   title: 'Variable Picker',

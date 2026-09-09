@@ -1,10 +1,10 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { AddNodeOption } from '../../src/workbench/browser/runtime/designer/addNodeOptions.ts'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { AddNodeOption } from '../../src/workbench/browser/runtime/editor/addNodeOptions.ts'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useCallback, useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
-import { BlockLibrary, ContextPanel } from '../../src/workbench/browser/runtime/designer/contextPanel.tsx'
+import { BlockLibrary, ContextPanel } from '../../src/workbench/browser/runtime/editor/contextPanel.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 
 const options: readonly AddNodeOption[] = [
@@ -78,7 +78,7 @@ function LibraryStory({ dark, language, log }: { dark: boolean; language: UiLang
   )
 }
 
-export const libraryStory: DesignerStory = {
+export const libraryStory: FrontendStory = {
   group: 'Workbench',
   id: 'node-library',
   title: 'Node Library',

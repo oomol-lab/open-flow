@@ -69,7 +69,7 @@
     "executorConnector": "connector",
     "executorJavaScript": "javascript",
     "executorLlm": "llm",
-    "flowDesigner": "Flow Designer",
+    "flowCanvas": "Flow Designer",
     "openBlocks": "Browse blocks",
     "quickSearchHint": "Press A for quick search.",
     "toggleInspector": "Toggle inspector",

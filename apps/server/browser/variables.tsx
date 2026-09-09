@@ -4,7 +4,7 @@ import type { FormEvent, ReactElement } from 'react'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { validVariableName } from '@oomol-lab/open-flow/flow-change'
-import { Input, Label, Textarea } from '@oomol-lab/open-flow/ui'
+import { Button, Input, Label, Textarea } from '@oomol-lab/open-flow/ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslate } from 'val-i18n-react'
@@ -106,7 +106,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
             </div>
             <div className="variables-actions">
               <div className="server-input-group">
-                <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} viewBox="0 0 24 24">
                   <circle cx="11" cy="11" r="6" />
                   <path d="m16 16 4 4" />
                 </svg>
@@ -120,22 +120,24 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                   value={filter}
                 />
               </div>
-              <button
+              <Button
                 aria-label={t('variables.refresh')}
-                className="server-button server-button-icon server-button-outline"
+                variant="outline"
+                size="icon"
                 disabled={loading || pending}
                 onClick={() => void load()}
                 title={t('variables.refresh')}
                 type="button"
               >
-                <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} viewBox="0 0 24 24">
                   <path d="M20 6v5h-5" />
                   <path d="M4 18v-5h5" />
                   <path d="M6.1 9a7 7 0 0 1 11.7-2.6L20 11M4 13l2.2 4.6A7 7 0 0 0 17.9 15" />
                 </svg>
-              </button>
-              <button
-                className="server-button server-button-primary"
+              </Button>
+              <Button
+                variant="default"
+                size="default"
                 disabled={loading || failed || pending || variables.length >= maxCount}
                 onClick={() => {
                   setEditing('')
@@ -145,11 +147,11 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                 }}
                 type="button"
               >
-                <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+                <svg aria-hidden="true" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} viewBox="0 0 24 24">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
                 {t('variables.create')}
-              </button>
+              </Button>
             </div>
           </div>
           {editing != null && (
@@ -190,12 +192,12 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                 </span>
               )}
               <div className="variable-form-actions">
-                <button className="server-button server-button-outline" disabled={pending} onClick={() => setEditing(undefined)} type="button">
+                <Button variant="outline" size="default" disabled={pending} onClick={() => setEditing(undefined)} type="button">
                   {t('variables.cancel')}
-                </button>
-                <button className="server-button server-button-primary" disabled={loading || failed || pending || nameInvalid || valueTooLarge} type="submit">
+                </Button>
+                <Button variant="default" size="default" disabled={loading || failed || pending || nameInvalid || valueTooLarge} type="submit">
                   {t('variables.save')}
-                </button>
+                </Button>
               </div>
             </form>
           )}
@@ -222,9 +224,9 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                 </span>
                 <strong>{t('variables.loadFailed')}</strong>
                 <span>{t('variables.description')}</span>
-                <button className="server-button server-button-outline" onClick={() => void load()} type="button">
+                <Button variant="outline" size="default" onClick={() => void load()} type="button">
                   {t('variables.retry')}
-                </button>
+                </Button>
               </div>
             ) : visible.length == 0 ? (
               <div className="variables-state">
@@ -234,8 +236,9 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                 <strong>{t(filter.trim() == '' ? 'variables.empty' : 'variables.noMatch')}</strong>
                 <span>{t('variables.description')}</span>
                 {filter.trim() == '' && (
-                  <button
-                    className="server-button server-button-outline"
+                  <Button
+                    variant="outline"
+                    size="default"
                     disabled={pending || variables.length >= maxCount}
                     onClick={() => {
                       setEditing('')
@@ -246,7 +249,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                     type="button"
                   >
                     {t('variables.create')}
-                  </button>
+                  </Button>
                 )}
               </div>
             ) : (
@@ -259,27 +262,18 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                     {removing == variable.name ? (
                       <span className="variable-confirm">
                         {t('variables.deleteConfirm', { name: variable.name })}
-                        <button
-                          className="server-button server-button-sm server-button-outline"
-                          disabled={pending}
-                          onClick={() => setRemoving(undefined)}
-                          type="button"
-                        >
+                        <Button variant="outline" size="sm" disabled={pending} onClick={() => setRemoving(undefined)} type="button">
                           {t('variables.cancel')}
-                        </button>
-                        <button
-                          className="server-button server-button-destructive server-button-sm"
-                          disabled={pending}
-                          onClick={() => void remove(variable.name)}
-                          type="button"
-                        >
+                        </Button>
+                        <Button variant="destructive" size="sm" disabled={pending} onClick={() => void remove(variable.name)} type="button">
                           {t('variables.delete')}
-                        </button>
+                        </Button>
                       </span>
                     ) : (
                       <>
-                        <button
-                          className="server-button server-button-outline server-button-sm"
+                        <Button
+                          variant="outline"
+                          size="sm"
                           disabled={pending}
                           onClick={() => {
                             setEditing(variable.name)
@@ -290,15 +284,10 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                           type="button"
                         >
                           {t('variables.edit')}
-                        </button>
-                        <button
-                          className="server-button server-button-destructive server-button-sm"
-                          disabled={pending}
-                          onClick={() => setRemoving(variable.name)}
-                          type="button"
-                        >
+                        </Button>
+                        <Button variant="destructive" size="sm" disabled={pending} onClick={() => setRemoving(variable.name)} type="button">
                           {t('variables.delete')}
-                        </button>
+                        </Button>
                       </>
                     )}
                   </div>

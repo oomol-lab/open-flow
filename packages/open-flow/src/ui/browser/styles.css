@@ -5,28 +5,27 @@
 @import 'tailwindcss/utilities.css' layer(utilities);
 @import 'tw-animate-css';
 @source './';
-@source '../../designer/browser';
 @source '../../canvas/browser';
 @source '../../form/browser';
 @source '../../workbench/browser';
 
 @layer base {
-  :where(.open-flow-theme, .open-flow-workbench, .oo-designer-root),
-  :where(.open-flow-theme, .open-flow-workbench, .oo-designer-root) *,
-  :where(.open-flow-theme, .open-flow-workbench, .oo-designer-root) ::before,
-  :where(.open-flow-theme, .open-flow-workbench, .oo-designer-root) ::after {
+  :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root),
+  :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) *,
+  :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) ::before,
+  :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) ::after {
     box-sizing: border-box;
   }
 
-  :where(.open-flow-theme, .open-flow-workbench, .oo-designer-root) button,
-  :where(.open-flow-theme, .open-flow-workbench, .oo-designer-root) input,
-  :where(.open-flow-theme, .open-flow-workbench, .oo-designer-root) select,
-  :where(.open-flow-theme, .open-flow-workbench, .oo-designer-root) textarea {
+  :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) button,
+  :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) input,
+  :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) select,
+  :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) textarea {
     color: inherit;
     font: inherit;
   }
 
-  :where(.open-flow-theme, .open-flow-workbench, .oo-designer-root) button {
+  :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) button {
     appearance: none;
     padding: 0;
     border: 0 solid;
@@ -34,8 +33,8 @@
     background-image: none;
   }
 
-  :where(.open-flow-theme, .open-flow-workbench, .oo-designer-root) button:not(:disabled),
-  :where(.open-flow-theme, .open-flow-workbench, .oo-designer-root) [role='button']:not([aria-disabled='true']) {
+  :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) button:not(:disabled),
+  :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) [role='button']:not([aria-disabled='true']) {
     cursor: pointer;
   }
 }

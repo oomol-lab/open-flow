@@ -1,10 +1,10 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { JsonValue } from '../../src/workbench/browser/runtime/api.ts'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
-import { TriggerConfigEditor } from '../../src/workbench/browser/runtime/designer/triggerConfigEditor.tsx'
+import { TriggerConfigEditor } from '../../src/workbench/browser/runtime/editor/triggerConfigEditor.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 
 const schema = {
@@ -45,7 +45,7 @@ function ConfigStory({ dark, language, log }: { dark: boolean; language: UiLangu
     </I18nProvider>
   )
 }
-export const triggerConfigStory: DesignerStory = {
+export const triggerConfigStory: FrontendStory = {
   group: 'Workbench',
   id: 'trigger-config',
   title: 'Trigger Configuration',

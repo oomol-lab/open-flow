@@ -24,7 +24,7 @@
     outline-offset: -2px;
   }
 
-  .workbench-designer-canvas {
+  .workbench-canvas-canvas {
     --xy-controls-button-background-color: var(--ui-background);
     --xy-controls-button-background-color-hover: var(--ui-muted);
     --xy-controls-button-border-color: var(--ui-border);

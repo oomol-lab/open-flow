@@ -1,15 +1,15 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
+import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { Diagnostic, Draft, Flow, FlowCheck, Live, Presentation } from '../api.ts'
-import type { AddNodeOption } from '../designer/addNodeOptions.ts'
-import type { DiagnosticFocus, DiagnosticItem } from '../designer/diagnostics.ts'
-import type { DesignerTarget } from '../designer/flowChanges.ts'
+import type { AddNodeOption } from '../editor/addNodeOptions.ts'
+import type { DiagnosticFocus, DiagnosticItem } from '../editor/diagnostics.ts'
 import type { ResolvedSelection, RevisionView } from '../revisionView.ts'
 import type { FlowCatalog } from './flowCatalog.ts'
 
 import { compute, derive, val } from 'value-enhancer'
-import { deriveAddNodeOptions } from '../designer/addNodeOptions.ts'
-import { diagnosticItems, deriveInspectorDiagnostics } from '../designer/diagnostics.ts'
+import { deriveAddNodeOptions } from '../editor/addNodeOptions.ts'
+import { diagnosticItems, deriveInspectorDiagnostics } from '../editor/diagnostics.ts'
 import { revisionView } from '../revisionView.ts'
 
 export type WorkspaceBusy = 'designer' | 'flow' | 'resource'
@@ -46,14 +46,14 @@ export interface WorkspaceState {
   readonly nodeFocus?: NodeFocus
   readonly presentation?: Presentation
   readonly selectedNodeIds: readonly string[]
-  readonly target?: DesignerTarget
+  readonly target?: GraphTarget
   readonly workspaceLoadFailed: boolean
   readonly workspaceLoading: boolean
 }
 
 interface RevisionContext {
   readonly revision?: RevisionView
-  readonly target?: DesignerTarget
+  readonly target?: GraphTarget
 }
 
 export interface Workspace$ {
@@ -83,7 +83,7 @@ export interface Workspace$ {
   readonly selection: ReadonlyVal<ResolvedSelection | undefined>
   readonly selectedNodeIds: ReadonlyVal<readonly string[]>
   readonly status: ReadonlyVal<WorkspaceStatus>
-  readonly target: ReadonlyVal<DesignerTarget | undefined>
+  readonly target: ReadonlyVal<GraphTarget | undefined>
   readonly targetFlow: ReadonlyVal<Flow | undefined>
   readonly targetName: ReadonlyVal<string | undefined>
   readonly workspaceLoadFailed: ReadonlyVal<boolean>
@@ -114,7 +114,7 @@ export function moduleEditorStatus(draft: Draft | undefined, editor: ModuleEdito
 
 export function selectedModuleEditor(
   revision: RevisionView | undefined,
-  target: DesignerTarget | undefined,
+  target: GraphTarget | undefined,
   nodeIds: readonly string[],
 ): ModuleEditorDraft | undefined {
   if (revision == null || target == null || nodeIds.length != 1) return

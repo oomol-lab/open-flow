@@ -1,10 +1,10 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
-import { NodeDescription } from '../../src/workbench/browser/runtime/designer/nodeDescription.tsx'
-import { NodeHeading } from '../../src/workbench/browser/runtime/designer/nodeHeading.tsx'
+import { NodeDescription } from '../../src/workbench/browser/runtime/editor/nodeDescription.tsx'
+import { NodeHeading } from '../../src/workbench/browser/runtime/editor/nodeHeading.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 
 function MetadataStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
@@ -47,7 +47,7 @@ function MetadataStory({ dark, language, log }: { dark: boolean; language: UiLan
   )
 }
 
-export const metadataStory: DesignerStory = {
+export const metadataStory: FrontendStory = {
   group: 'Workbench',
   id: 'node-metadata',
   title: 'Node Metadata',

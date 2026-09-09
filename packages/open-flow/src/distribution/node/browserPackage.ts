@@ -208,10 +208,13 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         await copyFile(path.join(declarationRoot, `ui/browser/${name}.d.ts`), path.join(browserOutputPath, `ui-${name}.d.ts`))
       }),
     )
-    await writeFile(
-      path.join(browserOutputPath, 'ui.d.ts'),
-      "export { Input } from './ui-input.js';\nexport { Label } from './ui-label.js';\nexport { Textarea } from './ui-textarea.js';\n",
-    )
+    const uiDeclaration = (await readFile(path.join(declarationRoot, 'ui/browser/public.d.ts'), 'utf8'))
+      .replaceAll("import './theme.css';", '')
+      .replaceAll("import './styles.css';", '')
+      .replaceAll("'./input.tsx'", "'./ui-input.js'")
+      .replaceAll("'./label.tsx'", "'./ui-label.js'")
+      .replaceAll("'./textarea.tsx'", "'./ui-textarea.js'")
+    await writeFile(path.join(browserOutputPath, 'ui.d.ts'), uiDeclaration)
     await writeFile(path.join(browserOutputPath, 'ui.css.d.ts'), 'export {}\n')
     const workbenchDeclaration = await readFile(path.join(declarationRoot, 'workbench/browser/runtime/openFlowWorkbench.d.ts'), 'utf8')
     const workbenchStyleImport = "import './styles.css';\n"

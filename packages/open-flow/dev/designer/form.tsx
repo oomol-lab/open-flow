@@ -1,5 +1,5 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { DesignerStory } from './stories.tsx'
+import type { FrontendStory } from './stories.tsx'
 
 import { useEffect, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -77,7 +77,7 @@ function FormStory({ dark, language }: { dark: boolean; language: UiLanguage }) 
   )
 }
 
-export const formStory: DesignerStory = {
+export const formStory: FrontendStory = {
   group: 'Workbench',
   id: 'run-inputs',
   title: 'Run Inputs',

@@ -1,11 +1,11 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { ConditionSettings } from '../../src/workbench/browser/runtime/designer/flowChanges.ts'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { ConditionSettings } from '../../src/workbench/browser/runtime/editor/flowChanges.ts'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { Checkbox } from '../../src/ui/browser/checkbox.tsx'
-import { ConditionBranchesEditor } from '../../src/workbench/browser/runtime/designer/conditionBranchesEditor.tsx'
+import { ConditionBranchesEditor } from '../../src/workbench/browser/runtime/editor/conditionBranchesEditor.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 function ConditionEditorStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
@@ -37,7 +37,7 @@ function ConditionEditorStory({ dark, language, log }: { dark: boolean; language
     </I18nProvider>
   )
 }
-export const conditionEditorStory: DesignerStory = {
+export const conditionEditorStory: FrontendStory = {
   group: 'Workbench',
   id: 'condition-editor',
   title: 'Condition Editor',

@@ -1,12 +1,12 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { WebhookSettings } from '../../src/workbench/browser/runtime/designer/flowChanges.ts'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { WebhookSettings } from '../../src/workbench/browser/runtime/editor/flowChanges.ts'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { Checkbox } from '../../src/ui/browser/checkbox.tsx'
-import { TriggerSummary } from '../../src/workbench/browser/runtime/designer/triggerSummary.tsx'
-import { WebhookEditor } from '../../src/workbench/browser/runtime/designer/webhookEditor.tsx'
+import { TriggerSummary } from '../../src/workbench/browser/runtime/editor/triggerSummary.tsx'
+import { WebhookEditor } from '../../src/workbench/browser/runtime/editor/webhookEditor.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 
 function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
@@ -36,7 +36,7 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
     </I18nProvider>
   )
 }
-export const webhookStory: DesignerStory = {
+export const webhookStory: FrontendStory = {
   group: 'Workbench',
   id: 'webhook-editor',
   title: 'Webhook Editor',

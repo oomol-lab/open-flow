@@ -1,6 +1,6 @@
 import type { FormEvent, ReactElement } from 'react'
 
-import { Input, Label } from '@oomol-lab/open-flow/ui'
+import { Button, Input, Label } from '@oomol-lab/open-flow/ui'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslate } from 'val-i18n-react'
@@ -142,26 +142,27 @@ function SettingItem({
               (removing ? (
                 <>
                   <span>{t('settings.deleteConfirm')}</span>
-                  <button className="server-button server-button-sm server-button-outline" disabled={pending} onClick={() => setRemoving(false)} type="button">
+                  <Button variant="outline" size="sm" disabled={pending} onClick={() => setRemoving(false)} type="button">
                     {t('settings.cancel')}
-                  </button>
-                  <button
-                    className="server-button server-button-sm server-button-destructive"
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
                     disabled={pending}
                     onClick={() => void request('DELETE', { expectedRevision: revision, version: 1 })}
                     type="button"
                   >
                     {t('settings.delete')}
-                  </button>
+                  </Button>
                 </>
               ) : (
-                <button className="server-button server-button-sm server-button-destructive" onClick={() => setRemoving(true)} type="button">
+                <Button variant="destructive" size="sm" onClick={() => setRemoving(true)} type="button">
                   {t('settings.delete')}
-                </button>
+                </Button>
               ))}
-            <button className="server-button server-button-sm server-button-outline" onClick={edit} type="button">
+            <Button variant="outline" size="sm" onClick={edit} type="button">
               {t(configured ? 'settings.edit' : 'settings.configure')}
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -197,16 +198,17 @@ function SettingItem({
             </>
           )}
           <div className="settings-form-actions">
-            <button className="server-button server-button-outline" disabled={pending} onClick={() => setEditing(false)} type="button">
+            <Button variant="outline" size="default" disabled={pending} onClick={() => setEditing(false)} type="button">
               {t('settings.cancel')}
-            </button>
-            <button
-              className="server-button server-button-primary"
+            </Button>
+            <Button
+              variant="default"
+              size="default"
               disabled={pending || draftOrigin.length == 0 || (secretLabel != null && secretRequired && secret.length == 0) || secretTooShort}
               type="submit"
             >
               {t('settings.save')}
-            </button>
+            </Button>
           </div>
         </form>
       ) : configured ? (
@@ -284,8 +286,9 @@ export function SettingsPage({
             <div className="settings-state" role={failed ? 'alert' : undefined}>
               <span>{t(failed ? 'settings.loadFailed' : 'settings.loading')}</span>
               {failed && (
-                <button
-                  className="server-button server-button-outline"
+                <Button
+                  variant="outline"
+                  size="default"
                   onClick={() => {
                     setLoading(true)
                     void load()
@@ -293,7 +296,7 @@ export function SettingsPage({
                   type="button"
                 >
                   {t('settings.retry')}
-                </button>
+                </Button>
               )}
             </div>
           </section>
