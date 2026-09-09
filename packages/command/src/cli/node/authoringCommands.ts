@@ -9,6 +9,7 @@ import {
   createBuiltinTrigger,
   createCodeTask,
   createCondition,
+  createAgentTask,
   createLlmTask,
   createManagedTask,
   createProviderTrigger,
@@ -309,7 +310,7 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
       if (nodeReference == null || extra.length != 1) {
         throw new CliError(
           'cli.invalid-arguments',
-          'Usage: oo flow node add <flow> <code|condition|llm-chat|llm-json|value> <name> [--code <javascript|@file|->] [--json]',
+          'Usage: oo flow node add <flow> <agent|code|condition|llm-chat|llm-json|value> <name> [--code <javascript|@file|->] [--json]',
         )
       }
       const name = extra[0]!.trim()
@@ -334,6 +335,13 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
           if (args.code != null) throw new CliError('cli.invalid-arguments', '--code is only valid when adding a Code Node.')
           operations = createCondition(selected.target, nodeId, name)
           break
+        case 'agent': {
+          if (args.code != null) throw new CliError('cli.invalid-arguments', '--code is only valid when adding a Code Node.')
+          const taskId = authoringId(args, 'task')
+          identity = { taskId }
+          operations = createAgentTask(selected.target, { nodeId, taskId }, name)
+          break
+        }
         case 'llm-chat':
         case 'llm-json':
           if (args.code != null) throw new CliError('cli.invalid-arguments', '--code is only valid when adding a Code Node.')
@@ -579,6 +587,14 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
             identity: { kind: node.kind, name: node.name, nodeId, reference },
             operations: createCondition(selected.target, nodeId, node.name),
           }
+        case 'agent': {
+          if (selected.target.kind != 'flow') throw new CliError('flow.apply-invalid', 'Agent nodes are only supported in the root Flow.')
+          const taskId = authoringId(args, `task:${reference}`)
+          return {
+            identity: { kind: node.kind, name: node.task.name, nodeId, reference, taskId },
+            operations: createManagedTask(selected.target, { nodeId, taskId }, node.task),
+          }
+        }
         case 'llm-chat':
         case 'llm-json': {
           const taskId = authoringId(args, `task:${reference}`)

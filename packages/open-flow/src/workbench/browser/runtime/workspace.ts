@@ -134,7 +134,7 @@ function nodeIcon(node: ResolvedNode): string | undefined {
   if (node.kind != 'task') return undefined
   const task = node.definition
   if (task == null || 'moduleId' in task) return undefined
-  return task.executor.kind == 'llm' ? ':carbon:machine-learning-model:' : ':carbon:connection-signal:'
+  return task.executor.kind == 'connector' ? ':carbon:connection-signal:' : ':carbon:machine-learning-model:'
 }
 
 function record(value: JsonValue | undefined): Readonly<Record<string, JsonValue>> | undefined {
@@ -402,6 +402,7 @@ function executorName(task: TaskDefinition | undefined, connectionRequired: bool
   if (task == null) return
   if ('moduleId' in task) return t?.('designer.executorJavaScript') ?? 'javascript'
   if (connectionRequired) return t?.('designer.executorConnectionRequired') ?? 'connection required'
+  if (task.executor.kind == 'agent') return 'Agent'
   return task.executor.kind == 'llm' ? (t?.('designer.executorLlm') ?? 'llm') : (t?.('designer.executorConnector') ?? 'connector')
 }
 
@@ -729,10 +730,24 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
           const input = inputs.find((item) => 'handle' in item && item.handle == port.handle)
           return input == null || 'group' in input ? [] : [input]
         }),
-        editableAdditionalInputs: node.task == null,
-        editablePorts: node.task != null,
+        editableAdditionalInputs: node.task == null && !(task != null && 'executor' in task && task.executor.kind == 'agent'),
+        editablePorts: node.task != null || (task != null && 'executor' in task && task.executor.kind == 'agent'),
         kind: node.kind,
         executorName: executorName(task, connectionRequired, context.t),
+        ...(task != null && 'executor' in task && task.executor.kind == 'agent'
+          ? {
+              tools: task.executor.tools.map((tool) => {
+                const action = context.connectorActions[tool.action]
+                const serviceId = action?.serviceId ?? tool.action.split('.')[0]!
+                const serviceName = action?.serviceName ?? serviceId
+                return {
+                  id: tool.id,
+                  icon: providerIcon(action ?? { serviceId, serviceName }),
+                  label: `${serviceName} · ${action?.name ?? tool.action.slice(tool.action.indexOf('.') + 1)}`,
+                }
+              }),
+            }
+          : {}),
         reference: node.task != null ? node.task.moduleId : node.taskId,
       }
     case 'value':

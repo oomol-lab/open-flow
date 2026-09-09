@@ -23,6 +23,7 @@ export interface DiagnosticFocus extends DiagnosticLocation {
 }
 
 export function diagnosticMessage(diagnostic: Diagnostic, t: TFunction): string {
+  if (diagnostic.code == 'agent.config-invalid' && diagnostic.message == 'Declare between 1 and 64 Agent tools.') return t('agent.toolsRequired')
   const variant = diagnostic.values?.variant
   const key = `diagnostics.messages.${diagnostic.code}${typeof variant == 'string' ? `.${variant}` : ''}`
   const translated = t(key, diagnostic.values)
@@ -87,7 +88,7 @@ function location(revision: RevisionView | undefined, target: DesignerTarget | u
     const suffix = taskMatch[2]!
     return {
       nodeId,
-      section: suffix.startsWith('/executor') ? 'account' : 'task',
+      section: revision.task(taskMatch[1]!)?.executor.kind == 'agent' ? 'task' : suffix.startsWith('/executor') ? 'account' : 'task',
     }
   }
 

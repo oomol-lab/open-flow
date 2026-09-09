@@ -629,3 +629,36 @@ it('preserves identity when the initial wait lookup itself times out', async () 
   expect(await runCli(['runs', 'wait', 'run-1', '--timeout=10', '--json'], { request }, output.value)).toBe(3)
   expect(JSON.parse(output.stdout())).toMatchObject({ runId: 'run-1', timedOut: true })
 })
+
+it('reads and downloads saved results through the public API', async () => {
+  const result = {
+    resultId: 'result',
+    callId: 'call',
+    toolId: 'tool',
+    source: { kind: 'connector', action: 'mail.fetch' },
+    bytes: 11,
+    digest: 'a'.repeat(64),
+    createdAt: flow.createdAt,
+  }
+  const routes: string[] = []
+  const host = {
+    request: async (route: string) => {
+      routes.push(route)
+      if (route.endsWith('/content')) return new Response('{"ok":true}')
+      if (route.endsWith('/results')) return Response.json({ version: 1, runId: 'run', results: [result] })
+      return Response.json({ version: 1, runId: 'run', result, page: { pointer: '/ok', type: 'boolean', complete: true, value: true, offset: 0 } })
+    },
+  }
+  for (const command of [
+    ['runs', 'results', 'run', '--json'],
+    ['runs', 'read-result', 'run', 'result', '/ok', '0', '--json'],
+    ['runs', 'download-result', 'run', 'result'],
+  ]) {
+    const io = runtime()
+    expect(await runCli(command, host, io.value)).toBe(0)
+    expect(io.stderr()).toBe('')
+    if (command[1] == 'download-result') expect(io.stdout()).toBe('{"ok":true}')
+    else expect(JSON.parse(io.stdout()).runId).toBe('run')
+  }
+  expect(routes).toEqual(['/v1/runs/run/results', '/v1/runs/run/results/result?pointer=%2Fok&offset=0', '/v1/runs/run/results/result/content'])
+})

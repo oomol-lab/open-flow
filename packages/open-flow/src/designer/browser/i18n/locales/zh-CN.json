@@ -596,7 +596,11 @@
   "zoomReset": "重置缩放为 100%",
   "view": "视图",
   "canvasCard": {
-    "waitBranch": { "approve": "通过", "reject": "拒绝", "continue": "继续" },
+    "waitBranch": {
+      "approve": "通过",
+      "reject": "拒绝",
+      "continue": "继续"
+    },
     "run": "运行",
     "result": "结果",
     "logs": "日志 {{count}}",
@@ -631,6 +635,7 @@
       "day": "天",
       "week": "周",
       "month": "个月"
-    }
+    },
+    "tools": "工具"
   }
 }

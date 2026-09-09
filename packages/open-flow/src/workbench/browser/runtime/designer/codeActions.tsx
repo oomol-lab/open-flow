@@ -4,16 +4,16 @@ import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 
 import { Check, ChevronDown, Code2, Copy, Plus, RefreshCw, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { OverlayScrollbar } from '../../../../designer/browser/components/overlayScrollbar.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
 import { Field, FieldLabel, FieldError } from '../../../../ui/browser/field.tsx'
-import { Input } from '../../../../ui/browser/input.tsx'
 import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
 import { ToggleGroup, ToggleGroupItem } from '../../../../ui/browser/toggle-group.tsx'
+import { ActionPicker } from './actionPicker.tsx'
 
 function property(name: string): string {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) ? `.${name}` : `[${JSON.stringify(name)}]`
@@ -47,20 +47,11 @@ export function CodeActions({
     const timer = setTimeout(() => setCopied(undefined), 2000)
     return () => clearTimeout(timer)
   }, [copied])
-  const [adding, setAdding] = useState(false)
   const [expanded, setExpanded] = useState<string>()
   const [accountPicker, setAccountPicker] = useState<string>()
-  const searchInput = useRef<HTMLInputElement>(null)
-  const addButton = useRef<HTMLButtonElement>(null)
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<readonly string[]>([])
   const [error, setError] = useState<string>()
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [refresh, setRefresh] = useState(0)
-  useEffect(() => {
-    if (adding) searchInput.current?.focus()
-  }, [adding])
 
   const actionIds = capabilities.map((item) => item.action).join(',')
   const services = [
@@ -72,30 +63,6 @@ export function CodeActions({
   ]
     .toSorted()
     .join(',')
-
-  useEffect(() => {
-    const controller = new AbortController()
-    setResults([])
-    if (!adding || query.trim() == '') return () => controller.abort()
-    setLoading(true)
-    const timer = setTimeout(() => {
-      void connectors
-        .provideAddNodeOptions(query, controller.signal)
-        .then((options) => {
-          if (!controller.signal.aborted) setResults((options ?? []).flatMap((option) => (option.kind == 'connector' ? [option.connector.actionId] : [])))
-        })
-        .catch((cause: unknown) => {
-          if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause))
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setLoading(false)
-        })
-    }, 200)
-    return () => {
-      clearTimeout(timer)
-      controller.abort()
-    }
-  }, [connectors, flowId, nodeId, query, adding])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -113,9 +80,6 @@ export function CodeActions({
     setSaving(true)
     try {
       if (await store.saveCodeActions(nodeId, value)) {
-        setAdding(false)
-        setQuery('')
-        if (adding) addButton.current?.focus()
         return true
       }
       return false
@@ -129,101 +93,35 @@ export function CodeActions({
   const locked = disabled || saving
   return (
     <OverlayScrollbar className="code-action-panel" defer={false} tabIndex={-1}>
-      <section aria-label={t('inspector.actions.title')} aria-busy={saving || loading}>
+      <section aria-label={t('inspector.actions.title')} aria-busy={saving}>
         <div className="code-action-toolbar">
           <span className="code-action-caption">
             {t('inspector.actions.title')}
             {capabilities.length > 0 && <span className="code-action-count">{capabilities.length}</span>}
           </span>
-          <Button
-            ref={addButton}
-            type="button"
-            size="xs"
-            variant={capabilities.length == 0 && !adding ? 'outline' : 'ghost'}
+          <ActionPicker
+            connectors={connectors}
             disabled={locked}
-            aria-expanded={adding}
-            aria-controls={`actions-search-${nodeId}`}
-            onClick={() => setAdding(!adding)}
-          >
-            {adding ? <X /> : <Plus />}
-            {t(adding ? 'inspector.actions.cancel' : 'inspector.actions.add')}
-          </Button>
+            label={t('inspector.actions.add')}
+            exclude={capabilities.map((item) => item.action)}
+            onSelect={async (action) => {
+              const connection = action.defaultConnection
+              const saved = await save([
+                ...capabilities,
+                {
+                  kind: 'connector',
+                  action: action.actionId,
+                  connections:
+                    connection == null ? [] : [{ connectionId: connection.connectionId, ...(connection.alias == null ? {} : { alias: connection.alias }) }],
+                  ...(connection == null ? {} : { connectionId: connection.connectionId }),
+                },
+              ])
+              if (saved) setExpanded(action.authenticated && connection == null ? action.actionId : undefined)
+              return saved
+            }}
+          />
         </div>
-        {capabilities.length == 0 && !adding && (
-          <p className="code-action-description">{t('inspector.actions.introDescription', { context: `${context}.actions` })}</p>
-        )}
-        {adding && (
-          <div className="code-action-search" id={`actions-search-${nodeId}`}>
-            <Input
-              ref={searchInput}
-              aria-label={t('inspector.actions.search')}
-              placeholder={t('inspector.actions.search')}
-              disabled={locked}
-              value={query}
-              onKeyDown={(event) => {
-                if (event.key == 'Escape') {
-                  event.stopPropagation()
-                  setAdding(false)
-                  setQuery('')
-                  addButton.current?.focus()
-                }
-              }}
-              onChange={(event) => {
-                setQuery(event.target.value)
-                setLoading(false)
-                setError(undefined)
-              }}
-            />
-            {query.trim() == '' && <p className="code-action-hint">{t('inspector.actions.description')}</p>}
-            {loading && (
-              <p className="code-action-hint" role="status">
-                {t('inspector.actions.loading')}
-              </p>
-            )}
-            {query.trim() != '' && !loading && results.length == 0 && (
-              <p className="code-action-hint" role="status">
-                {t('inspector.actions.empty')}
-              </p>
-            )}
-            <div className="code-action-results">
-              {results
-                .filter((id) => !capabilities.some((item) => item.action == id))
-                .map((id) => (
-                  <Button
-                    key={id}
-                    type="button"
-                    variant="ghost"
-                    className="code-action-result"
-                    disabled={locked}
-                    onClick={async () => {
-                      const connection = actions[id]?.defaultConnection
-                      const saved = await save([
-                        ...capabilities,
-                        {
-                          kind: 'connector',
-                          action: id,
-                          connections:
-                            connection == null
-                              ? []
-                              : [{ connectionId: connection.connectionId, ...(connection.alias == null ? {} : { alias: connection.alias }) }],
-                          ...(connection == null ? {} : { connectionId: connection.connectionId }),
-                        },
-                      ])
-                      if (saved) {
-                        setExpanded(actions[id]?.authenticated == true && connection == null ? id : undefined)
-                      }
-                    }}
-                  >
-                    <span className="code-action-name">
-                      <span>{actions[id]?.name ?? id}</span>
-                      <code>{id}</code>
-                    </span>
-                    <Plus />
-                  </Button>
-                ))}
-            </div>
-          </div>
-        )}
+        {capabilities.length == 0 && <p className="code-action-description">{t('inspector.actions.introDescription', { context: `${context}.actions` })}</p>}
         {capabilities.map((declaration) => {
           const service = declaration.action.slice(0, declaration.action.indexOf('.'))
           const action = actions[declaration.action]

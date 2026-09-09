@@ -7,6 +7,7 @@ import { collapseAllNested, JSONViewer } from '../../../../designer/browser/json
 import { Alert, AlertDescription, AlertTitle } from '../../../../ui/browser/alert.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Icon } from '../icons.tsx'
+import { agentLog } from './runGroups.ts'
 
 function RunError({ code, message, children }: { readonly code: string; readonly message: string; readonly children?: ReactNode }): ReactElement {
   return (
@@ -70,6 +71,33 @@ export function RunEventDetail({
       )
     }
     case 'node.log': {
+      const log = agentLog(event)
+      const source = log?.source
+      if (source != null && typeof source == 'object' && 'kind' in source && source.kind == 'code') {
+        const input = log?.input
+        if (input != null && typeof input == 'object' && 'code' in input && typeof input.code == 'string') {
+          return (
+            <EventDetail label={t('agent.code')}>
+              <pre className="run-event-message" translate="no">
+                {input.code}
+              </pre>
+              {'inputs' in input && <JsonValueView label={t('agent.source')} value={input.inputs as JsonValue} />}
+            </EventDetail>
+          )
+        }
+        if (log?.status == 'completed' && log.output != null)
+          return (
+            <EventDetail label={t('run.nodeOutput')}>
+              <JsonValueView label={t('run.nodeOutput')} value={log.output as JsonValue} />
+            </EventDetail>
+          )
+        if (log?.status == 'failed' && typeof log.message == 'string')
+          return (
+            <EventDetail label={t('agent.code')}>
+              <RunError code={String(log.code)} message={log.message} />
+            </EventDetail>
+          )
+      }
       const message = event.payload.message
       return (
         <EventDetail label={t('run.nodeLog', { level: event.payload.level })}>

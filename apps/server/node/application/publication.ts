@@ -11,7 +11,7 @@ import type { PublicationAcceptance, Store } from '../storage/store.ts'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { nextTriggerScheduledAt, validateTriggerSchedule } from '@oomol-lab/open-flow/cron-trigger'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
-import { codeActions } from '@oomol-lab/open-flow/flow-semantics'
+import { agentActions, codeActions } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { checkCodeActions, ConnectorTaskError } from '../deployment/connector.ts'
 import { AcceptanceError, ControlError } from '../error.ts'
@@ -40,6 +40,7 @@ export class Publisher {
   readonly #store: Store
   readonly #integration: IntegrationRuntime
   readonly #poll: PollRuntime
+  readonly #agentAvailable: () => boolean
   readonly #resolveConnector: () => ConnectorHost | undefined
   readonly #resolveWaitPublicOrigin: () => URL | undefined
   readonly #clock: () => number
@@ -71,7 +72,9 @@ export class Publisher {
     signal: () => void,
     wakeMaintenance: () => void,
     notifyFlowCatalog: () => void,
+    agentAvailable: () => boolean,
   ) {
+    this.#agentAvailable = agentAvailable
     this.#store = store
     this.#integration = integration
     this.#poll = poll
@@ -130,12 +133,18 @@ export class Publisher {
 
   async #publication(input: PublishFlowInput): Promise<Parameters<PublicationStore['publish']>[0]> {
     const fixed = await this.#validatedFlow(input.revision)
-    await checkCodeActions(codeActions(fixed.prepared), this.#resolveConnector(), this.#store.connectorTeam(input.flowId))
+    if (Object.values(fixed.prepared.tasks).some((task) => task.executor.kind == 'agent') && !this.#agentAvailable())
+      throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
+    await checkCodeActions([...codeActions(fixed.prepared), ...agentActions(fixed.prepared)], this.#resolveConnector(), this.#store.connectorTeam(input.flowId))
     const engineContract = input.engineContract ?? currentEngineContract
     if (input.revisionDigest != null && input.revisionDigest != fixed.revisionDigest) {
       throw new AcceptanceError('revision-conflict', 'The fixed Revision digest does not match its content.')
     }
-    if (Object.values(fixed.prepared.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) && this.#resolveWaitPublicOrigin() == null) {
+    if (
+      (Object.values(fixed.prepared.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) ||
+        Object.values(fixed.prepared.tasks).some((task) => task.executor.kind == 'agent' && task.executor.notification != null)) &&
+      this.#resolveWaitPublicOrigin() == null
+    ) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
     }
     const requestDigest = await this.#publicationRequestDigest(input, fixed.revisionDigest)

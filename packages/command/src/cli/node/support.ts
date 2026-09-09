@@ -18,6 +18,7 @@ import type {
   GraphNode,
   InputPort,
   InputPortDefinition,
+  ManagedTaskDefinition,
   PortDefinition,
   RevisionContent,
   TriggerNode,
@@ -105,6 +106,7 @@ type ApplyNode =
       readonly name: string
       readonly output?: PortDefinition
     }
+  | { readonly kind: 'agent'; readonly task: ManagedTaskDefinition }
   | { readonly kind: 'condition' | 'value'; readonly name: string }
 
 interface ApplyEdge {
@@ -773,6 +775,18 @@ export function applySpec(source: string): ApplySpec {
               ...(node.outputs == null ? {} : { outputs: applyPortDefinitions(node.outputs, `nodes.${reference}.outputs`, false) }),
             },
           ] as const
+        }
+        case 'agent': {
+          applyKeys(node, ['kind', 'task'], `nodes.${reference}`)
+          let operation
+          try {
+            ;[operation] = decodeChangeOperations([{ kind: 'task.create', taskId: reference, task: node.task }])
+          } catch (error) {
+            throw new CliError('flow.apply-invalid', `nodes.${reference}.task: ${error instanceof Error ? error.message : String(error)}`)
+          }
+          if (operation?.kind != 'task.create' || operation.task.executor.kind != 'agent')
+            throw new CliError('flow.apply-invalid', 'Agent configuration is required.')
+          return [reference, { kind, task: operation.task }] as const
         }
         case 'llm-chat':
         case 'llm-json': {

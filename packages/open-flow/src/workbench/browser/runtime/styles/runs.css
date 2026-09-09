@@ -228,6 +228,119 @@
     color: var(--ui-muted-foreground);
   }
 
+  .run-node-summary {
+    display: -webkit-box;
+    margin: 2px 0;
+    overflow: hidden;
+    color: var(--ui-muted-foreground);
+    font-size: 11px;
+    line-height: 18px;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .run-steps {
+    margin: 4px 0;
+    font-size: 12px;
+    line-height: 20px;
+  }
+
+  .run-steps > summary,
+  .run-step-details > summary {
+    list-style: none;
+    cursor: pointer;
+    border-radius: var(--ui-radius);
+  }
+
+  .run-steps > summary::-webkit-details-marker,
+  .run-step-details > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .run-steps > summary {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: fit-content;
+    padding: 2px 4px;
+    color: var(--ui-muted-foreground);
+  }
+
+  .run-steps > summary:hover,
+  .run-step-details > summary:hover {
+    background: var(--ui-accent);
+  }
+
+  .run-steps summary:focus-visible {
+    outline: 2px solid var(--ui-ring);
+    outline-offset: -2px;
+  }
+
+  .run-steps > summary > svg,
+  .run-step-toggle > svg {
+    flex: none;
+    transform: rotate(180deg);
+  }
+
+  .run-steps[open] > summary > svg,
+  .run-step-details[open] > summary .run-step-toggle > svg {
+    transform: rotate(-90deg);
+  }
+
+  .run-step-list {
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .run-step {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .run-step-line {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 6px;
+    font-size: 12px;
+    line-height: 20px;
+  }
+
+  .run-step-line > time {
+    color: var(--ui-muted-foreground);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .run-step-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .run-step-duration {
+    margin-left: 8px;
+    color: var(--ui-muted-foreground);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .run-step-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--ui-muted-foreground);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
   .run-log-locate {
     flex: none;
     margin-left: 3px;

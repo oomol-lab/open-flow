@@ -34,3 +34,34 @@ it('normalizes option syntax without rewriting values that resemble options', as
   expect(parseArguments(['code', 'edit', 'flow', 'module', '--code=--x=y']).code).toBe('--x=y')
   expect(() => parseArguments(['list', '--json=true'])).toThrow(/does not accept a value/)
 })
+
+it('preserves an Agent declaration through the Command apply boundary', () => {
+  const task = {
+    name: 'Agent',
+    inputs: [],
+    outputs: [{ handle: 'output', nullable: false, jsonSchema: { type: 'string' } }],
+    executor: {
+      kind: 'agent',
+      model: 'fixture',
+      system: 'Help.',
+      prompt: { kind: 'value', value: 'Find a record.' },
+      maxRounds: 4,
+      tools: [
+        {
+          id: 'find',
+          name: 'find',
+          action: 'records.find',
+          connectionId: 'work',
+          description: 'Find a record.',
+          approval: true,
+          inputs: [{ handle: 'query', nullable: false, jsonSchema: { type: 'string' }, source: { kind: 'model' } }],
+        },
+      ],
+    },
+  }
+  const spec = applySpec(JSON.stringify({ version: 1, nodes: { agent: { kind: 'agent', task } } }))
+  expect(spec.nodes.agent).toEqual({ kind: 'agent', task })
+  expect(() =>
+    applySpec(JSON.stringify({ version: 1, nodes: { agent: { kind: 'agent', task: { ...task, executor: { kind: 'llm', mode: 'chat' } } } } })),
+  ).toThrow(/Agent configuration/)
+})

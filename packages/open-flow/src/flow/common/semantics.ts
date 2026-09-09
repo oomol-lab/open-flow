@@ -3,6 +3,7 @@ import type { RuntimeProgram } from '../../execution/common/runtime.ts'
 import type { ConnectorCapability, FlowDocument, Graph, InputMapping, JsonValue, RevisionContent } from './change.ts'
 
 import { findEngineContract } from '../../execution/common/engineContract.ts'
+import { agentConfigIssues } from './agent.ts'
 import { decodeConnectorCapabilities } from './change.ts'
 import { canonicalGraph, canonicalJsonBytes, canonicalModule, canonicalOutputs, canonicalPorts, canonicalTask, digestBytes } from './encoding.ts'
 import { nodeInputPorts, validateFlowGraph } from './graph.ts'
@@ -11,6 +12,7 @@ import { hasRetiredRef, matchesSchema, triggerPayloadSchema } from './schema.ts'
 export { availableOutputs, graphOrder, nodeInputPorts } from './graph.ts'
 export { validateModules } from './modules.ts'
 export { matchesSchema, triggerPayloadSchema, variableInputCompatible } from './schema.ts'
+export { agentInput, agentToolInput, agentToolSchema } from './agent.ts'
 
 export interface SemanticClosure {
   readonly dependencies: {
@@ -29,7 +31,8 @@ function entries<T>(value: Readonly<Record<string, T>>): readonly (readonly [str
     .map((key) => [key, value[key]!] as const)
 }
 
-export function flowDependencies(content: RevisionContent): SemanticClosure['dependencies'] {
+export function flowDependencies(content: RevisionContent, triggerId?: string): SemanticClosure['dependencies'] {
+  if (triggerId != null) return flowDependencies(runRevision(content, triggerId))
   const bindings = new Set<string>()
   const inputBindings = new Set<string>()
   const modules = new Set<string>()
@@ -70,7 +73,11 @@ export function flowDependencies(content: RevisionContent): SemanticClosure['dep
           break
         case 'task':
           if (node.task != null) visitModule(node.task.moduleId)
-          else tasks.add(node.taskId)
+          else {
+            tasks.add(node.taskId)
+            const executor = content.document.tasks[node.taskId]?.executor
+            if (executor?.kind == 'agent' && executor.notification != null) tasks.add(executor.notification.taskId)
+          }
           break
         case 'value':
           break
@@ -239,6 +246,23 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
   for (const taskId of [...closure.dependencies.tasks].toSorted()) {
     const task = revision.document.tasks[taskId]
     if (task == null) continue
+    for (const message of agentConfigIssues(task, revision.document.tasks)) {
+      checked.diagnostics.push({ code: 'agent.config-invalid', column: 0, line: 1, message, path: `/document/tasks/${taskId}/executor` })
+    }
+    if (task.executor.kind == 'agent') {
+      for (const subflowId of closure.dependencies.subflows) {
+        for (const [nodeId, node] of Object.entries(revision.document.subflows[subflowId]?.graph.nodes ?? {})) {
+          if (node.kind == 'task' && node.taskId == taskId)
+            checked.diagnostics.push({
+              code: 'agent.subflow-unsupported',
+              column: 0,
+              line: 1,
+              message: 'Agent Tasks are only supported in the root Flow.',
+              path: `/document/subflows/${subflowId}/graph/nodes/${nodeId}`,
+            })
+        }
+      }
+    }
     if (task.executor.kind == 'connector' && task.executor.action.length == 0) {
       checked.diagnostics.push({
         code: 'task.connector-incomplete',
@@ -357,6 +381,18 @@ export function createRuntimeProgram(prepared: PreparedFlow, entryModuleId: stri
     entryModuleId,
     modules: prepared.modules,
   }
+}
+
+export function agentActions(flow: Pick<PreparedFlow, 'tasks'>): readonly ConnectorCapability[] {
+  return Object.values(flow.tasks).flatMap((task) => {
+    if (task.executor.kind != 'agent') return []
+    const notice = task.executor.notification == null ? undefined : flow.tasks[task.executor.notification.taskId]?.executor
+    return [...task.executor.tools, ...(notice?.kind == 'connector' ? [notice] : [])].map((tool) => ({
+      kind: 'connector' as const,
+      action: tool.action,
+      connections: tool.connectionId == null ? [] : [{ connectionId: tool.connectionId }],
+    }))
+  })
 }
 
 export function codeActions(flow: Pick<PreparedFlow, 'graph' | 'subflows'>): readonly ConnectorCapability[] {

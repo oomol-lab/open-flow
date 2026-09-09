@@ -596,7 +596,11 @@
   "zoomReset": "Reset zoom to 100%",
   "view": "View",
   "canvasCard": {
-    "waitBranch": { "approve": "Approved", "reject": "Rejected", "continue": "Continue" },
+    "waitBranch": {
+      "approve": "Approved",
+      "reject": "Rejected",
+      "continue": "Continue"
+    },
     "run": "Run",
     "result": "Result",
     "logs": "Logs ({{count}})",
@@ -631,6 +635,7 @@
       "day": "days",
       "week": "weeks",
       "month": "months"
-    }
+    },
+    "tools": "Tools"
   }
 }

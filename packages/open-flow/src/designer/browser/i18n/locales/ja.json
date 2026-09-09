@@ -596,7 +596,11 @@
   "zoomReset": "ズームを100%にリセット",
   "view": "表示",
   "canvasCard": {
-    "waitBranch": { "approve": "承認", "reject": "拒否", "continue": "続行" },
+    "waitBranch": {
+      "approve": "承認",
+      "reject": "拒否",
+      "continue": "続行"
+    },
     "run": "実行",
     "result": "結果",
     "logs": "ログ {{count}}",
@@ -631,6 +635,7 @@
       "day": "日",
       "week": "週",
       "month": "か月"
-    }
+    },
+    "tools": "ツール"
   }
 }

@@ -1,19 +1,22 @@
 import type { ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
-import type { InvokeLlmTask, RuntimeCapabilityCall, RuntimeCapabilityResponse } from '@oomol-lab/open-flow/runtime-contract'
+import type { RuntimeCapabilityCall, RuntimeCapabilityResponse } from '@oomol-lab/open-flow/runtime-contract'
 import type { FlowRunOutcome, FlowRunResult, RunLaunch, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
 import type { Logger } from 'pino'
 import type { ConnectorHost } from '../deployment/connector.ts'
+import type { LlmHost } from '../deployment/llm.ts'
 import type { Store, StoredRun } from '../storage/store.ts'
 
 import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-action'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { decodeRevision, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
-import { codeActions, prepareFlow, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
+import { agentActions, codeActions, prepareFlow, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { createEventProjector } from '@oomol-lab/open-flow/run-events'
 import { resolveAction } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
+import { executeCode } from '../deployment/agent-code.ts'
+import { executeAgent } from '../deployment/agent.ts'
 import { checkCodeActions, ConnectorTaskError } from '../deployment/connector.ts'
 import { errorKind } from '../logger.ts'
 import { isolatedVmEngineDigest, IsolatedVmHost } from '../runtime/isolated-vm.ts'
@@ -23,6 +26,8 @@ const nodeFailureCodes: ReadonlySet<string> = new Set([
   'capability.denied',
   'capability.invalid',
   'connector.connection-required',
+  'connector.input-invalid',
+  'connector.indeterminate',
   'connector.unavailable',
   'connector.unconfigured',
   'llm.output-invalid',
@@ -46,7 +51,7 @@ export class RunExecutor {
   readonly #store: Store
   readonly #isolatedVm: IsolatedVmHost
   readonly #resolveConnector: () => ConnectorHost | undefined
-  readonly #resolveLlm: () => InvokeLlmTask | undefined
+  readonly #resolveLlm: () => LlmHost | undefined
   readonly #resolveWaitPublicOrigin: () => URL | undefined
   readonly #runTimeoutMs: number
   readonly #logger: Logger
@@ -57,7 +62,7 @@ export class RunExecutor {
     store: Store,
     isolatedVm: IsolatedVmHost,
     resolveConnector: () => ConnectorHost | undefined,
-    resolveLlm: () => InvokeLlmTask | undefined,
+    resolveLlm: () => LlmHost | undefined,
     resolveWaitPublicOrigin: () => URL | undefined,
     runTimeoutMs: number,
     logger: Logger,
@@ -114,7 +119,8 @@ export class RunExecutor {
         return yield* Effect.fail(new Error(`Fixed Flow Revision can no longer be prepared: ${prepared.kind}.`))
       }
       yield* Effect.tryPromise({
-        try: (signal) => checkCodeActions(codeActions(prepared.flow), this.#resolveConnector(), run.connectorTeamId, signal),
+        try: (signal) =>
+          checkCodeActions([...codeActions(prepared.flow), ...agentActions(prepared.flow)], this.#resolveConnector(), run.connectorTeamId, signal),
         catch: (error) => error,
       })
       const projectEvent = createEventProjector(run.runId, nodeFailureCodes)
@@ -126,7 +132,13 @@ export class RunExecutor {
         const resume = run.resume
         const saved = resume.checkpoint.wait
         const wait = prepared.flow.graph.nodes[saved.nodeId]
-        if (wait?.kind != 'wait' || !wait.actions.some((action) => action == resume.action)) {
+        const actions =
+          wait?.kind == 'wait'
+            ? wait.actions
+            : wait?.kind == 'task' && wait.taskId != null && prepared.flow.tasks[wait.taskId]?.executor.kind == 'agent'
+              ? ['approve', 'reject']
+              : []
+        if (!actions.some((action) => action == resume.action)) {
           return yield* Effect.fail(new Error('Stored Wait resolution does not match the fixed Flow Revision.'))
         }
         return {
@@ -137,7 +149,10 @@ export class RunExecutor {
           started,
         }
       }
-      const bindingValues = this.#store.resolveVariables(variableBindings(revision, prepared.validation.closure.dependencies.inputBindings))
+      if (Object.values(prepared.flow.tasks).some((task) => task.executor.kind == 'agent') && run.bindingValues == null)
+        return yield* Effect.fail(new Error('The fixed Agent Variable snapshot is unavailable.'))
+      const bindingValues =
+        run.bindingValues ?? this.#store.resolveVariables(variableBindings(revision, prepared.validation.closure.dependencies.inputBindings))
       if (bindingValues == null) return { kind: 'binding-unresolved' as const }
       return { bindingValues, flow: prepared.flow, kind: 'prepared' as const, projectEvent, started }
     })
@@ -211,6 +226,7 @@ export class RunExecutor {
 
       const timeoutReason = new Error('Run exceeded its execution deadline.')
       let timedOut = false
+      let indeterminate = false
       let launch: RunLaunch
       if (run.resume != null) launch = { resume: run.resume }
       else {
@@ -232,7 +248,20 @@ export class RunExecutor {
           ...launch,
           invokeTask: (invocation) => {
             if (!('taskId' in invocation)) throw new Error('Runtime Executor returned a Code Task to the Host.')
-            return this.#invokeTask(flow, invocation, run.connectorTeamId)
+            return this.#invokeTask(flow, invocation, run, async (data) => {
+              const event = await projectEvent({
+                type: 'node.log',
+                runId: invocation.runId,
+                jobId: invocation.jobId,
+                nodeId: invocation.nodeId,
+                level: 'info',
+                message: JSON.stringify(data),
+              })
+              if (event != null) this.#store.append(run.runId, event)
+            }).catch((error: unknown) => {
+              if (error instanceof ConnectorTaskError && error.code == 'connector.indeterminate') indeterminate = true
+              throw error
+            })
           },
           projectFailure: (error) => {
             if (error instanceof ConnectorTaskError) return { code: error.code, message: error.message }
@@ -250,8 +279,11 @@ export class RunExecutor {
               }).pipe(Effect.andThen(Effect.fail(timeoutReason))),
           }),
           Effect.matchEffect({
-            onFailure: (error) => Effect.sync(() => this.#failRun(run, startedAt, timedOut, error)),
-            onSuccess: (output) => Effect.sync(() => this.#commitOutcome(run, flow, startedAt, budgetMs, output)),
+            onFailure: (error) => Effect.sync(() => this.#failRun(run, startedAt, timedOut, error, indeterminate)),
+            onSuccess: (output) =>
+              Effect.try({ try: () => this.#commitOutcome(run, flow, startedAt, budgetMs, output), catch: (error) => error }).pipe(
+                Effect.catch((error) => Effect.sync(() => this.#failRun(run, startedAt, false, error))),
+              ),
           }),
         )
     })
@@ -272,10 +304,9 @@ export class RunExecutor {
           }
         | undefined
       if (output.notification != null) {
-        const wait = flow.graph.nodes[output.wait.nodeId]
         const task = flow.tasks[output.notification.taskId]
         const publicOrigin = this.#resolveWaitPublicOrigin()
-        if (wait?.kind != 'wait' || task == null || task.executor.kind != 'connector' || publicOrigin == null) {
+        if (task == null || task.executor.kind != 'connector' || publicOrigin == null) {
           this.#failRun(run, startedAt, false, new Error('Wait notification is unavailable.'))
           return
         }
@@ -287,7 +318,7 @@ export class RunExecutor {
             output.notification.input,
           ),
           messageHandle: output.notification.messageHandle,
-          prompt: wait.prompt,
+          prompt: output.wait.prompt,
           publicOrigin: publicOrigin.href,
           taskId: output.notification.taskId,
         }
@@ -304,11 +335,13 @@ export class RunExecutor {
     this.#completeRun(run, startedAt, output)
   }
 
-  #failRun(run: StoredRun, startedAt: number, timedOut: boolean, error: unknown): void {
-    const result = timedOut
-      ? { error: { code: 'run.timeout', message: 'The Run exceeded its execution deadline.' } }
-      : { error: { code: 'run.failed', message: 'The Flow could not be completed.' } }
-    if (!this.#store.commit(run.runId, 'failed', result)) return
+  #failRun(run: StoredRun, startedAt: number, timedOut: boolean, error: unknown, indeterminate = false): void {
+    const result = indeterminate
+      ? { error: { code: 'execution.terminal-unknown', message: 'A Connector action outcome is unknown.' } }
+      : timedOut
+        ? { error: { code: 'run.timeout', message: 'The Run exceeded its execution deadline.' } }
+        : { error: { code: 'run.failed', message: 'The Flow could not be completed.' } }
+    if (!this.#store.commit(run.runId, indeterminate ? 'indeterminate' : 'failed', result)) return
     this.#runChanged(run.flowId, run.runId)
     this.#logger.error(
       {
@@ -334,11 +367,45 @@ export class RunExecutor {
   async #invokeTask(
     prepared: PreparedFlow,
     invocation: Extract<TaskInvocation, { readonly taskId: string }> & { readonly signal: AbortSignal },
-    teamId?: string,
-  ): Promise<JsonValue> {
+    run: StoredRun,
+    report: (event: Readonly<Record<string, JsonValue>>) => Promise<void>,
+  ): Promise<unknown> {
+    const teamId = run.connectorTeamId
     const task = prepared.tasks[invocation.taskId]!
     const executor = task.executor
     switch (executor.kind) {
+      case 'agent': {
+        const model = run.llmConfig
+        if (model == null) throw new TaskHostError('llm.unavailable', 'The fixed Agent model configuration is unavailable.')
+        const connector = this.#resolveConnector()
+        return executeAgent(
+          task,
+          {
+            input: invocation.input,
+            invocationId: invocation.invocationId,
+            signal: invocation.signal,
+            ...(invocation.agent == null ? {} : { resume: invocation.agent }),
+          },
+          { providerId: 'gateway', modelId: executor.model, url: new URL('v1/', model.origin).href, apiKey: model.token },
+          async (tool, input, callId, signal) => {
+            if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
+            await checkCodeActions(
+              [{ kind: 'connector', action: tool.action, connections: tool.connectionId == null ? [] : [{ connectionId: tool.connectionId }] }],
+              connector,
+              teamId,
+              signal,
+            )
+            return connector.execute(tool.action, tool.connectionId, normalizeConnectorRuntimeInputs(tool.inputs, input), callId, signal, teamId)
+          },
+          report,
+          {
+            find: (callId, tool, input) => this.#store.results.find(run.runId, invocation.invocationId, callId, tool, input),
+            save: (callId, tool, input, output) => this.#store.results.put(run.runId, invocation.invocationId, callId, tool, input, output),
+            get: (resultId) => this.#store.results.get(run.runId, resultId, invocation.invocationId),
+          },
+          (code, input, callId, signal) => executeCode(this.#isolatedVm, code, input, callId, signal),
+        )
+      }
       case 'connector':
         const connector = this.#resolveConnector()
         if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')

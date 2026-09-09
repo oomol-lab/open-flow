@@ -257,3 +257,5 @@ Designer Label 只负责表单标签与 tooltip，不提供通用 `onClick`。If
 Workbench Host 通过必需的 `hrefFor(WorkbenchLocation)` 拥有 URL 序列化。Flow 与 Breadcrumb 使用 Base UI Button `render={<a href />}` 和
 `nativeButton={false}` 输出真实链接；普通主键点击由 `followWorkbenchLink` 拦截后走 NavigationStore，modified click、非主键和已处理事件保留浏览器默认行为。不要把
 URL-changing action 回退为只有 `onClick` 的 Button。
+
+应用和动作选择复用 Workbench 的 `BlockLibrary` 目录、搜索与结果列表。Agent 工具和 Code 动作通过 `ActionPicker` 打开同一选择面板；画布和 Wait 通知在上下文面板中使用同一列表。调用方只负责选中后的配置与保存，以及场景需要的动作筛选。浏览应用、搜索动作和加载应用动作必须沿用 ConnectorStore 的 Flow 作用域与取消语义，不在节点表单中另建搜索结果 UI。

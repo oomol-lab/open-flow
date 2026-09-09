@@ -1,3 +1,16 @@
+import type { ResultQuery } from './results.ts'
+
+import { decodeResultList, decodeResultRead } from './results.ts'
+export {
+  readResult,
+  parseResultQuery,
+  decodeResultList,
+  decodeResultRead,
+  type ResultCall,
+  type ResultInfo,
+  type ResultPage,
+  type ResultQuery,
+} from './results.ts'
 import type { RunStatus } from '../../execution/common/runLifecycle.ts'
 import type {
   ChangeOperation,
@@ -1026,6 +1039,7 @@ export function decodeRunEvent(value: unknown) {
             nodeKind !== 'connector' &&
             nodeKind !== 'javascript' &&
             nodeKind !== 'llm' &&
+            nodeKind !== 'agent' &&
             nodeKind !== 'subflow' &&
             nodeKind !== 'value' &&
             nodeKind !== 'wait'
@@ -1520,6 +1534,19 @@ export class ControlClient {
     return runEvents(await this.request(`/v1/runs/${segment(runId)}/events${query}`, { signal }))
   }
 
+  async listRunResults(runId: string, after?: string, signal?: AbortSignal): Promise<ReturnType<typeof decodeResultList>> {
+    return decodeResultList(await this.request(`/v1/runs/${segment(runId)}/results${after == null ? '' : `?after=${encodeURIComponent(after)}`}`, { signal }))
+  }
+
+  async readRunResult(runId: string, resultId: string, options: ResultQuery = {}, signal?: AbortSignal): Promise<ReturnType<typeof decodeResultRead>> {
+    const parameters = new URLSearchParams(Object.entries(options).map(([key, value]) => [key, String(value)]))
+    return decodeResultRead(await this.request(`/v1/runs/${segment(runId)}/results/${segment(resultId)}?${parameters}`, { signal }))
+  }
+
+  async downloadRunResult(runId: string, resultId: string, signal?: AbortSignal): Promise<Blob> {
+    return (await this.response(`/v1/runs/${segment(runId)}/results/${segment(resultId)}/content`, { signal })).blob()
+  }
+
   async getRunResult(runId: string, signal?: AbortSignal): Promise<RunResult> {
     return runResult(await this.request(`/v1/runs/${segment(runId)}/result`, { signal }))
   }
@@ -1565,17 +1592,17 @@ export class ControlClient {
     return source.actions.map(connectorAction)
   }
 
-  protected async request<Value = unknown>(path: string, init: RequestInit = {}): Promise<Value> {
+  private async response(path: string, init: RequestInit): Promise<Response> {
     const headers = new Headers(init.headers)
     if (init.body != null) headers.set('content-type', 'application/json')
     const response = await this.requestControl(path, { ...init, headers })
-    let value: unknown
-    try {
-      value = await response.json()
-    } catch {
-      return invalidResponse()
-    }
     if (!response.ok) {
+      let value: unknown
+      try {
+        value = await response.json()
+      } catch {
+        return invalidResponse()
+      }
       const error = record(value).error
       const source = error == null ? undefined : record(error)
       throw new ApiError(
@@ -1584,6 +1611,15 @@ export class ControlClient {
         typeof source?.message == 'string' ? source.message : `Request failed with status ${response.status}.`,
       )
     }
-    return value as Value
+    return response
+  }
+
+  protected async request<Value = unknown>(path: string, init: RequestInit = {}): Promise<Value> {
+    const response = await this.response(path, init)
+    try {
+      return (await response.json()) as Value
+    } catch {
+      return invalidResponse()
+    }
   }
 }

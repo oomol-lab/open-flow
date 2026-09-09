@@ -238,6 +238,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'../../execution/common/runLifecycle.ts'", "'./run-lifecycle.js'")
       .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
       .replaceAll("'./errors.ts'", "'./control-api-errors.js'")
+      .replaceAll("'./results.ts'", "'./run-results.js'")
       .replaceAll("'./flowNotifications.ts'", "'./flow-notifications.js'")
     const controlApiConformanceDeclaration = await readFile(path.join(declarationRoot, 'control/common/conformance.d.ts'), 'utf8')
     const controlApiErrorsDeclaration = await readFile(path.join(declarationRoot, 'control/common/errors.d.ts'), 'utf8')
@@ -245,7 +246,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'./changeSchema.ts'", "'../browser/flow-change-schema.js'")
       .replaceAll("'./json.ts'", "'./flow-json.js'")
     await Promise.all(
-      ['semantics', 'graph', 'schema', 'modules'].map(async (name) => {
+      ['agent', 'semantics', 'graph', 'schema', 'modules'].map(async (name) => {
         const declaration = (await readFile(path.join(declarationRoot, `flow/common/${name}.d.ts`), 'utf8'))
           .replaceAll("'../../execution/common/engineContract.ts'", "'./engine-contract.js'")
           .replaceAll("'../../execution/common/runtime.ts'", "'./runtime-contract.js'")
@@ -254,6 +255,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
           .replaceAll("'./graph.ts'", "'./flow-graph.js'")
           .replaceAll("'./schema.ts'", "'./flow-schema.js'")
           .replaceAll("'./modules.ts'", "'./flow-modules.js'")
+          .replaceAll("'./agent.ts'", "'./flow-agent.js'")
         await writeFile(path.join(commonOutputPath, `flow-${name}.d.ts`), declaration)
       }),
     )
@@ -264,6 +266,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
       .replaceAll("'./engineContract.ts'", "'./engine-contract.js'")
     const schedulerDeclaration = (await readFile(path.join(declarationRoot, 'execution/common/scheduler.d.ts'), 'utf8'))
+      .replaceAll("'./runtime.ts'", "'./runtime-contract.js'")
       .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
       .replaceAll("'../../flow/common/semantics.ts'", "'./flow-semantics.js'")
     const cronTriggerDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/cron.d.ts'), 'utf8')).replaceAll(
@@ -338,6 +341,13 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         ),
       ),
       writeFile(path.join(commonOutputPath, 'control-api.d.ts'), controlApiDeclaration),
+      writeFile(
+        path.join(commonOutputPath, 'run-results.d.ts'),
+        (await readFile(path.join(declarationRoot, 'control/common/results.d.ts'), 'utf8')).replaceAll(
+          "'../../flow/common/change.ts'",
+          "'../browser/flow-change.js'",
+        ),
+      ),
       writeFile(path.join(commonOutputPath, 'control-api-errors.d.ts'), controlApiErrorsDeclaration),
       writeFile(path.join(commonOutputPath, 'flow-notifications.d.ts'), flowNotificationsDeclaration),
       writeFile(path.join(commonOutputPath, 'control-api-conformance.d.ts'), controlApiConformanceDeclaration),

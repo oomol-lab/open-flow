@@ -1,9 +1,16 @@
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { InvokeLlmTask, LlmTaskResult } from '@oomol-lab/open-flow/runtime-contract'
 
+export interface LlmConfig {
+  readonly origin: string
+  readonly token: string
+}
+
+export type LlmHost = InvokeLlmTask & { readonly config?: LlmConfig }
+
 const defaultModel = 'oomol-chat'
 
-export function createLlm(origin: string, token: string): InvokeLlmTask {
+export function createLlm(origin: string, token: string): LlmHost {
   const url = new URL(origin)
   const loopback = url.hostname == '127.0.0.1' || url.hostname == '::1' || url.hostname == '[::1]' || url.hostname == 'localhost'
   if (
@@ -17,10 +24,10 @@ export function createLlm(origin: string, token: string): InvokeLlmTask {
     throw new Error('OPEN_FLOW_LLM_ORIGIN must be an HTTPS origin without credentials, a path, query, or fragment, except on loopback.')
   }
   if (token.length == 0) throw new Error('OPEN_FLOW_LLM_TOKEN must not be empty.')
-  return invokeLlm(new URL('v1/', url), token)
+  return Object.assign(invokeLlm(new URL('v1/', url), token), { config: { origin: url.origin, token } })
 }
 
-export function oomolLlm(connectorOrigin: string | undefined, token: string | undefined): InvokeLlmTask | undefined {
+export function oomolLlm(connectorOrigin: string | undefined, token: string | undefined): LlmHost | undefined {
   if (connectorOrigin == null || token == null || token.length == 0) return
   const connector = new URL(connectorOrigin)
   if (connector.hostname != 'connector.oomol.com' && connector.hostname != 'connector.oomol.dev') return

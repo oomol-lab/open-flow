@@ -1,3 +1,4 @@
+import type { ResultQuery } from '@oomol-lab/open-flow/control-api'
 import type {
   ConnectorAction,
   ConnectorConnection,
@@ -29,10 +30,20 @@ import type { ConnectorHost } from '../deployment/connector.ts'
 import type { PublicationAcceptance, StoredControlRun, StoredPresentation, StoredFlow, StoredFlowRevision, StoredPublication } from '../storage/store.ts'
 import type { StoredTriggerActivity, StoredTriggerBinding } from '../storage/trigger-store.ts'
 
+import { readResult } from '@oomol-lab/open-flow/control-api'
 import { decodeRunEvent, controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { applyFlowChanges, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
 import { canonicalJsonBytes, decodeRevision, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
-import { codeActions, flowClosure, prepareFlow, validateFlow, validateFlowInputs, validRunTrigger, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
+import {
+  agentActions,
+  codeActions,
+  flowClosure,
+  prepareFlow,
+  validateFlow,
+  validateFlowInputs,
+  validRunTrigger,
+  variableBindings,
+} from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { randomUUID } from 'node:crypto'
 import { checkCodeActions, ConnectorTaskError } from '../deployment/connector.ts'
@@ -79,7 +90,7 @@ export class ControlService {
   private readonly clock: () => number
   private readonly flowCatalogChanged: () => void
   private readonly flowChanged: (event: FlowChangeEvent) => void
-  private readonly llmAvailable: () => boolean
+  private readonly llmAvailable: (kind?: 'agent') => boolean
   private readonly publish: (input: PublishInput) => Promise<PublicationAcceptance>
   private readonly resolveConnector: () => ConnectorHost | undefined
   private readonly resolveConnectorConsoleOrigin: () => URL | undefined
@@ -103,7 +114,7 @@ export class ControlService {
     testPollTrigger: (flowId: string, triggerNodeId: string) => Promise<PollTriggerTestResult>,
     flowCatalogChanged: () => void,
     flowChanged: (event: FlowChangeEvent) => void,
-    llmAvailable: () => boolean,
+    llmAvailable: (kind?: 'agent') => boolean,
     resolveConnector: () => ConnectorHost | undefined,
     resolveConnectorConsoleOrigin: () => URL | undefined,
     resolveWaitPublicOrigin: () => URL | undefined,
@@ -556,23 +567,20 @@ export class ControlService {
     } catch (error) {
       throw new ControlError(controlErrorCode.flowInvalid, 'The stored Flow Revision is not structurally valid.', { cause: error })
     }
-    const llmDiagnostics = this.llmAvailable()
-      ? []
-      : [...checked.closure.dependencies.tasks].toSorted().flatMap((taskId) => {
-          const task = content.document.tasks[taskId]
-          return task?.executor.kind == 'llm'
-            ? [
-                {
-                  code: 'llm.unconfigured',
-                  column: 0,
-                  line: 0,
-                  message: 'LLM is not configured for this deployment. Configure OPEN_FLOW_LLM_ORIGIN and OPEN_FLOW_LLM_TOKEN.',
-                  path: `/document/tasks/${taskId}/executor`,
-                  values: {},
-                },
-              ]
-            : []
-        })
+    const llmDiagnostics = [...checked.closure.dependencies.tasks].toSorted().flatMap((taskId) => {
+      const kind = content.document.tasks[taskId]?.executor.kind
+      if ((kind != 'llm' && kind != 'agent') || this.llmAvailable(kind == 'agent' ? 'agent' : undefined)) return []
+      return [
+        {
+          code: 'llm.unconfigured',
+          column: 0,
+          line: 0,
+          message: 'LLM is not configured for this deployment. Configure OPEN_FLOW_LLM_ORIGIN and OPEN_FLOW_LLM_TOKEN.',
+          path: `/document/tasks/${taskId}/executor`,
+          values: {},
+        },
+      ]
+    })
     return {
       closureDigest: checked.closure.digest,
       diagnostics: [...checked.diagnostics, ...llmDiagnostics],
@@ -617,10 +625,16 @@ export class ControlService {
       case 'prepared':
         break
     }
-    if (Object.values(fixed.flow.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) && this.resolveWaitPublicOrigin() == null) {
+    if (
+      (Object.values(fixed.flow.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) ||
+        Object.values(fixed.flow.tasks).some((task) => task.executor.kind == 'agent' && task.executor.notification != null)) &&
+      this.resolveWaitPublicOrigin() == null
+    ) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
     }
-    await checkCodeActions(codeActions(fixed.flow), this.resolveConnector(), this.store.connectorTeam(flowId))
+    if (Object.values(fixed.flow.tasks).some((task) => task.executor.kind == 'agent') && !this.llmAvailable('agent'))
+      throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
+    await checkCodeActions([...codeActions(fixed.flow), ...agentActions(fixed.flow)], this.resolveConnector(), this.store.connectorTeam(flowId))
     if (validateFlowInputs(content, inputs) != 'valid') throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
     const accepted = this.store.acceptControlRun({
       closureDigest: fixed.flow.closureDigest,
@@ -698,7 +712,11 @@ export class ControlService {
       case 'prepared':
         break
     }
-    if (Object.values(fixed.flow.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) && this.resolveWaitPublicOrigin() == null) {
+    if (
+      (Object.values(fixed.flow.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) ||
+        Object.values(fixed.flow.tasks).some((task) => task.executor.kind == 'agent' && task.executor.notification != null)) &&
+      this.resolveWaitPublicOrigin() == null
+    ) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
     }
     if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and payload.')
@@ -707,7 +725,9 @@ export class ControlService {
     if (fixed.flow.closureDigest != livePublication.closureDigest || content.modelVersion != livePublication.modelVersion) {
       throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Flow does not match the Publication.')
     }
-    await checkCodeActions(codeActions(fixed.flow), this.resolveConnector(), this.store.connectorTeam(flowId))
+    if (Object.values(fixed.flow.tasks).some((task) => task.executor.kind == 'agent') && !this.llmAvailable('agent'))
+      throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
+    await checkCodeActions([...codeActions(fixed.flow), ...agentActions(fixed.flow)], this.resolveConnector(), this.store.connectorTeam(flowId))
     const accepted = this.store.acceptLiveControlRun({
       closureDigest: livePublication.closureDigest,
       expectedPublicationId: livePublication.publicationId,
@@ -764,11 +784,7 @@ export class ControlService {
     const stored = this.requireRun(runId)
     const receipt = this.store.waitReceipt(runId, waitId)
     if (receipt == null) throw new ControlError(controlErrorCode.runWaitNotFound, 'The active Wait was not found.')
-    const revision = this.store.revision(stored.flowId, stored.revisionId)
-    if (revision == null) throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Revision is unavailable.')
-    const node = revisionContent(revision).document.graph.nodes[receipt.nodeId]
-    if (node?.kind != 'wait') throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Wait node is unavailable.')
-    const result = this.store.resolveWait(runId, waitId, action, node.actions)
+    const result = this.store.resolveWait(runId, waitId, action)
     switch (result.kind) {
       case 'invalid-action':
         throw new ControlError(controlErrorCode.runInvalid, 'The Wait action is invalid.')
@@ -832,6 +848,27 @@ export class ControlService {
       runId,
       version: 1,
     }
+  }
+
+  listRunResults(runId: string, after?: string) {
+    this.requireRun(runId)
+    return { version: 1 as const, runId, ...this.store.results.list(runId, after) }
+  }
+
+  readRunResult(runId: string, resultId: string, query: ResultQuery) {
+    const stored = this.runResultContent(runId, resultId)
+    try {
+      return { version: 1 as const, runId, result: stored.result, page: readResult(JSON.parse(stored.content) as JsonValue, query) }
+    } catch (error) {
+      throw new ControlError(controlErrorCode.runInvalid, error instanceof Error ? error.message : 'Invalid result page.')
+    }
+  }
+
+  runResultContent(runId: string, resultId: string) {
+    this.requireRun(runId)
+    const stored = this.store.results.get(runId, resultId)
+    if (stored == null) notFound()
+    return stored
   }
 
   getRunResult(runId: string): RunResult {
@@ -943,17 +980,13 @@ export class ControlService {
       if (stored.status == 'waiting') {
         const receipt = this.store.activeWait(stored.runId)
         if (receipt == null) throw new Error('Waiting Run is missing its active Wait receipt.')
-        const revision = this.store.revision(stored.flowId, stored.revisionId)
-        if (revision == null) throw new Error('Waiting Run is missing its fixed Revision.')
-        const node = revisionContent(revision).document.graph.nodes[receipt.nodeId]
-        if (node?.kind != 'wait') throw new Error('Waiting Run does not point to a fixed Wait node.')
         return {
           status: 'waiting' as const,
           waiting: {
-            actions: node.actions,
+            actions: receipt.actions,
             expiresAt: timestamp(receipt.expiresAt),
             nodeId: receipt.nodeId,
-            prompt: node.prompt,
+            prompt: receipt.prompt,
             waitId: receipt.waitId,
             waitingSince: timestamp(receipt.waitingSince),
           },

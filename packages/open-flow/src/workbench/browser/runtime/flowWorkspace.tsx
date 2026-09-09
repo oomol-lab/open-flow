@@ -4,7 +4,7 @@ import type { GroupDividerDef } from '../../../schema/index.ts'
 import type { InputPort, JsonValue } from './api.ts'
 import type { WorkbenchLocation, WorkbenchTheme } from './contract.ts'
 import type { AddNodeOption } from './designer/addNodeOptions.ts'
-import type { CodeTaskPorts } from './designer/flowChanges.ts'
+import type { TaskPorts } from './designer/flowChanges.ts'
 import type { WorkbenchDesignerHandle } from './designer/workbenchDesigner.tsx'
 
 import { useEffect, useRef, useState } from 'react'
@@ -23,16 +23,14 @@ import { PublicationsView } from './publications/publicationsView.tsx'
 import { RunControl } from './runs/runControl.tsx'
 import { RunDrawer } from './runs/runDrawer.tsx'
 import { RunInputPanel } from './runs/runInputPanel.tsx'
+import { RunResults } from './runs/runResults.tsx'
 import { RunsView } from './runs/runsView.tsx'
 import { WorkspaceHeader } from './shell/workspaceHeader.tsx'
 import { WorkbenchStore } from './stores/workbenchStore.ts'
 
 type ContextPanelMode = 'blocks' | 'inspector' | 'notification' | undefined
 
-function codeTaskPorts(
-  inputs: readonly (FlowDesignerViewInput | GroupDividerDef)[],
-  outputs: readonly (FlowDesignerViewOutput | GroupDividerDef)[],
-): CodeTaskPorts {
+function taskPorts(inputs: readonly (FlowDesignerViewInput | GroupDividerDef)[], outputs: readonly (FlowDesignerViewOutput | GroupDividerDef)[]): TaskPorts {
   return {
     inputs: inputs.map((input) =>
       'group' in input
@@ -100,6 +98,7 @@ function RunDrawerContainer({
   const submitting = useVal(store.runRequests.$.submitting)
   return (
     <RunDrawer
+      tools={run == null ? undefined : <RunResults key={run.runId} runId={run.runId} client={store.results} />}
       cancelDisabled={cancelingRunId != null}
       canceling={cancelingRunId == run?.runId}
       eventFilter={eventFilter}
@@ -335,7 +334,7 @@ function Editor({
         onChangeInput={(nodeId, handle, value) => void store.workspace.setInputValue(nodeId, handle, value)}
         onChangeInputVariable={(nodeId, handle, name) => void store.workspace.setInputVariable(nodeId, handle, name)}
         onChangeTaskAdditionalInputs={(nodeId, inputs) => void store.workspace.saveTaskAdditionalInputs(nodeId, additionalTaskInputs(inputs))}
-        onChangeTaskPorts={(nodeId, inputs, outputs) => void store.workspace.saveCodeTaskPorts(nodeId, codeTaskPorts(inputs, outputs))}
+        onChangeTaskPorts={(nodeId, inputs, outputs) => void store.workspace.saveTaskPorts(nodeId, taskPorts(inputs, outputs))}
         onChangeTriggerConfig={(triggerId, name, value) => void store.workspace.saveTriggerConfig(triggerId, name, value)}
         onChangeTriggerSchedule={(triggerId, schedule) => void store.workspace.saveTriggerSchedule(triggerId, schedule)}
         onChangeWebhook={(triggerId, webhook) => void store.workspace.saveWebhook(triggerId, webhook)}
@@ -376,6 +375,7 @@ function Editor({
           {contextPanelMode == 'blocks' ? (
             <BlockLibrary
               browseOptions={store.browseAddNodeOptions}
+              searchOptions={store.provideAddNodeOptions}
               disabled={authoringDisabled}
               focusRequest={blocksFocusRequest}
               onAdd={addFromBlocks}
@@ -386,11 +386,13 @@ function Editor({
           ) : contextPanelMode == 'notification' ? (
             <BlockLibrary
               browseOptions={store.connectors.browseAddNodeOptions}
+              searchOptions={async (query, signal) =>
+                (await store.connectors.provideAddNodeOptions(query, signal))?.filter((option) => option.kind == 'connector' && option.inputs.length > 0)
+              }
               disabled={authoringDisabled}
               draggable={false}
               focusRequest={blocksFocusRequest}
               onAdd={setNotification}
-              onRegisterDragOption={() => {}}
               options={[]}
               provideChoices={async (optionId, signal) =>
                 (await store.connectors.provideAddNodeOptionChoices(optionId, signal))?.filter(

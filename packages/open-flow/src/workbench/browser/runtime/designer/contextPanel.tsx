@@ -45,11 +45,12 @@ type LibraryChoice = NonNullable<Exclude<IAddNodeMenuItem, { type: 'divider' }>[
 
 interface BlockLibraryProps {
   readonly browseOptions: (signal: AbortSignal) => Promise<readonly AddNodeOption[] | undefined>
+  readonly searchOptions: (query: string, signal: AbortSignal) => Promise<readonly AddNodeOption[] | undefined>
   readonly disabled: boolean
   readonly draggable?: boolean
   readonly focusRequest: number
   readonly onAdd: (option: AddNodeOption) => Promise<string | undefined>
-  readonly onRegisterDragOption: (option: AddNodeOption) => void
+  readonly onRegisterDragOption?: (option: AddNodeOption) => void
   readonly options: readonly AddNodeOption[]
   readonly provideChoices: (optionId: string, signal: AbortSignal) => Promise<readonly AddNodeOption[] | undefined>
 }
@@ -155,6 +156,7 @@ export function ContextPanel({ children, focusOnOpen, headerRef, icon, onClose, 
 
 function optionType(option: AddNodeOption): Exclude<IAddNodeMenuItem, { type: 'divider' }>['type'] {
   switch (option.kind) {
+    case 'agent':
     case 'new-task':
     case 'subflow':
       return 'block'
@@ -390,8 +392,10 @@ export function BlockLibrary({
   onRegisterDragOption,
   options,
   provideChoices,
+  searchOptions,
 }: BlockLibraryProps): ReactElement {
   const t = useTranslate()
+  const searchLabel = options.length == 0 ? t('actionPicker.search') : t('contextPanel.search')
   const search = useRef<HTMLInputElement>(null)
   const active = useRef(true)
   const dynamicOptions = useRef<ReadonlyMap<string, AddNodeOption>>(new Map())
@@ -400,7 +404,7 @@ export function BlockLibrary({
   const filterQuery = useDebouncedValue(query, 100)
   const [adding, setAdding] = useState(false)
   const [settled, setSettled] = useState(false)
-  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(() => new Set())
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(() => new Set(options.length == 0 ? [t('addNode.connectorActions')] : []))
   const [openItems, setOpenItems] = useState<ReadonlySet<string>>(() => new Set())
   const staticOptions = useMemo(() => indexAddNodeOptions(options), [options])
   const integrationGroup = t('addNode.connectorActions')
@@ -415,10 +419,10 @@ export function BlockLibrary({
     return items
   }, [options, integrationGroup, triggerGroup, triggers])
   const provideAsyncItems = useCallback(
-    async (_searchTerm: string, signal: AbortSignal): Promise<readonly IAddNodeMenuItem[] | undefined> => {
+    async (searchTerm: string, signal: AbortSignal): Promise<readonly IAddNodeMenuItem[] | undefined> => {
       setSettled(false)
       try {
-        const nextOptions = await browseOptions(signal)
+        const nextOptions = await (searchTerm.trim() == '' ? browseOptions(signal) : searchOptions(searchTerm, signal))
         if (signal.aborted || nextOptions == null) return
         dynamicOptions.current = indexAddNodeOptions(nextOptions)
         return menuItems(nextOptions)
@@ -426,7 +430,7 @@ export function BlockLibrary({
         if (!signal.aborted) setSettled(true)
       }
     },
-    [browseOptions],
+    [browseOptions, searchOptions],
   )
   const loadChoices = useCallback(
     async (itemId: string, signal: AbortSignal): Promise<readonly LibraryChoice[] | undefined> => {
@@ -437,7 +441,7 @@ export function BlockLibrary({
     },
     [provideChoices],
   )
-  const { error, items: catalogItems, retry } = useBlockPickerItems(localItems, '', provideAsyncItems)
+  const { error, items: catalogItems, retry } = useBlockPickerItems(localItems, filterQuery, provideAsyncItems)
   const loading = !settled
   const searching = filterQuery.trim() != ''
   const items = useMemo(() => {
@@ -452,7 +456,7 @@ export function BlockLibrary({
       if (heading != null) group[0] = { ...heading, detail: triggers }
       ordered.splice(end < 0 ? ordered.length : end, 0, ...group)
     }
-    const matches = filterBlockPickerItems(filterQuery, ordered)
+    const matches = filterBlockPickerItems('', ordered)
     if (searching) return matches
     let hidden = false
     return matches.filter((item) => {
@@ -462,7 +466,7 @@ export function BlockLibrary({
       }
       return !hidden
     })
-  }, [catalogItems, filterQuery, integrationGroup, triggerGroup, triggers, openGroups, searching])
+  }, [catalogItems, integrationGroup, triggerGroup, triggers, openGroups, searching])
   const keptItems = useMemo(() => {
     const indexes: number[] = []
     for (let index = 0; index < items.length; index++) {
@@ -518,7 +522,7 @@ export function BlockLibrary({
   const drag = (event: ReactDragEvent, itemId: string): void => {
     const option = resolve(itemId)
     if (option == null || busy) return
-    onRegisterDragOption(option)
+    onRegisterDragOption?.(option)
     setAddItemId(event.dataTransfer, itemId)
   }
 
@@ -594,14 +598,15 @@ export function BlockLibrary({
     <div aria-busy={adding || loading} className="block-library">
       <div className="mx-3.5 mb-2 mt-3 flex-none">
         <InputGroup>
-          <span className="sr-only">{t('contextPanel.search')}</span>
+          <span className="sr-only">{searchLabel}</span>
           <InputGroupAddon>
             <Icon name="search" size={15} />
           </InputGroupAddon>
           <InputGroupInput
-            aria-label={t('contextPanel.search')}
+            aria-label={searchLabel}
+            autoComplete="off"
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('contextPanel.searchPlaceholder')}
+            placeholder={searchLabel}
             ref={search}
             value={query}
           />

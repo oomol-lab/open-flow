@@ -14,6 +14,8 @@ const migrationFiles = [
   '0010_wait_order.sql',
   '0011_run_trigger.sql',
   '0012_flow_enabled.sql',
+  '0013_agent_runs.sql',
+  '0014_run_results.sql',
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 

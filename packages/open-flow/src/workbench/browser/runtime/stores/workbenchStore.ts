@@ -74,6 +74,7 @@ const blockedExternalPages: Pick<WorkbenchHost, 'openExternalPage'> = {
 }
 
 export class WorkbenchStore {
+  readonly results: Pick<WorkbenchClient, 'listRunResults' | 'readRunResult' | 'downloadRunResult'>
   readonly #client: WorkbenchClient
   readonly #externalRuns = new Latest()
   readonly #i18n: I18n
@@ -103,6 +104,7 @@ export class WorkbenchStore {
     variables = true,
   ) {
     this.#client = client
+    this.results = client
     this.#i18n = i18n
     this.#variables = variables
     const setNotice = (notice: Notice | undefined): void => {

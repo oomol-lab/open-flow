@@ -596,7 +596,11 @@
   "zoomReset": "Сбросить масштаб до 100%",
   "view": "Вид",
   "canvasCard": {
-    "waitBranch": { "approve": "Одобрено", "reject": "Отклонено", "continue": "Продолжить" },
+    "waitBranch": {
+      "approve": "Одобрено",
+      "reject": "Отклонено",
+      "continue": "Продолжить"
+    },
     "run": "Запуск",
     "result": "Результат",
     "logs": "Журналы ({{count}})",
@@ -631,6 +635,7 @@
       "day": "дн.",
       "week": "нед.",
       "month": "мес."
-    }
+    },
+    "tools": "Инструменты"
   }
 }

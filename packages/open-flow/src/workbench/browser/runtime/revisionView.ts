@@ -15,7 +15,7 @@ import type {
 } from './api.ts'
 
 import { availableOutputs, nodeInputPorts } from '../../../flow/common/graph.ts'
-import { codeActions } from '../../../flow/common/semantics.ts'
+import { agentActions, codeActions } from '../../../flow/common/semantics.ts'
 
 type SubflowDefinition = FlowDocument['subflows'][string]
 
@@ -60,7 +60,7 @@ export class RevisionView {
     this.#modules = revision.content.modules
     const connectorActionIds = new Set<string>()
     for (const task of Object.values(this.#document.tasks)) if (task.executor.kind == 'connector') connectorActionIds.add(task.executor.action)
-    for (const declaration of codeActions(this.#document)) connectorActionIds.add(declaration.action)
+    for (const declaration of [...codeActions(this.#document), ...agentActions(this.#document)]) connectorActionIds.add(declaration.action)
     this.connectorActionIds = connectorActionIds
   }
 

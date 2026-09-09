@@ -58,6 +58,17 @@ Draft 编辑结果统一包含 `changed`、`revisionId`；真正提交的变更�
 Apply 的提交成功与校验结果分开：`changed: true` 表示变更已接受，`valid: false` 表示仍有诊断，`valid: null` 表示后续 check 不可用。
 已接受的 Apply 返回 0，Agent 应在运行前处理 `valid` 或显式调用 `check`。不要因为 check 失败而用新 key 重复创建节点。
 
+## Agent 节点
+
+`node add --kind agent` 创建可继续配置的 Agent 草稿。完整配置通过 `task.agent.set` 原子更新，`before` 是读取到的完整 Task；模型、任务说明、工具与参数来源属于同一个配置。使用 `oo flow schema task.agent.set --json` 查看操作结构。
+
+快速建图形式也接受 `nodes.<id> = { "kind": "agent", "task": <完整 ManagedTaskDefinition> }`，其中 `task.executor.kind` 必须为 `agent`。它保留显式工具定义与账号，不重新解释当前 Connector 目录。精确字段、参数约束与审批语义见 [Agent Task 合同](../control/contracts/control-api.md#10-agent-task)。
+
+`task.executor.code: true` 启用 JavaScript 代码计算，允许 `tools: []`；这类 Agent 无需 Connector 部署。
+代码只处理当前输入和已取得的结果，不修改 Flow 或获得业务工具权限。结果列表的 `source.kind` 区分 `code` 与 `connector`，后者提供 `source.action`。
+
+Agent 审批沿用 Run 的等待查询与决议命令。每次以当前 `waitId` 提交 `approve` 或 `reject`；历史等待的重复决议返回原事实，不会批准下一次工具调用。
+
 ## Connector 作用域
 
 `connector list/search/show/connections --flow FLOW_ID` 按该 Flow 的 Team 查询。Connector 添加、修改及 Apply 中的 Action 与 Connection 查询自动使用目标 Flow。
@@ -93,3 +104,17 @@ Run 固定一个 Trigger。图中仅有一个 Manual Trigger 时自动选择，�
 | 3      | 等待超时，或查询的发布操作仍 pending。底层操作继续进行。                  |
 
 `node set --timeout` 仍设置节点的执行时限，与上述 CLI 等待预算属于不同命令语境。
+
+### 查看 Agent 工具结果
+
+完整工具结果独立于运行日志保存。列表返回 `resultId`，读取支持 JSON Pointer 与分页，下载输出原始 JSON，可使用 shell 重定向保存：
+
+```bash
+oo flow runs results RUN_ID --json
+oo flow runs read-result RUN_ID RESULT_ID /emails 0 --json
+oo flow runs download-result RUN_ID RESULT_ID > result.json
+```
+
+列表存在 `nextAfter` 时，将其作为 `runs results RUN_ID NEXT_AFTER` 的最后一个参数继续读取。
+页面存在 `nextOffset` 时，用该值替换 `read-result` 的 offset。对于长字符串，offset 按 Unicode code point 计数。
+这些命令读取已有结果，不会重新调用外部工具。

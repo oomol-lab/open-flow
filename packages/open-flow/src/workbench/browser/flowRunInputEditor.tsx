@@ -16,10 +16,12 @@ export { FlowRunInputEditorStore } from './flowRunInputEditorStore.ts'
 export type { FlowRunInputDefinition } from './flowRunInputEditorStore.ts'
 
 export function FlowRunInputEditor({
+  labelledBy,
   showErrors = false,
   store,
   theme,
 }: {
+  readonly labelledBy?: string
   readonly showErrors?: boolean
   readonly store: FlowRunInputEditorStore
   readonly theme: WorkbenchTheme
@@ -48,12 +50,14 @@ export function FlowRunInputEditor({
               if (!HandleRowStore.is(handle)) return []
               const definition = state.definitions.find((candidate) => candidate.handle == handle.name)!
               return [
-                <fieldset className={styles.field} key={handle.name}>
-                  <legend className={styles.legend}>
-                    <span>{handle.name}</span>
-                    {definition.nullable && <span className={styles.optional}>null</span>}
-                  </legend>
-                  {definition.description != null && <p className={styles.description}>{definition.description}</p>}
+                <fieldset className={styles.field} key={handle.name} aria-labelledby={labelledBy}>
+                  {labelledBy == null && (
+                    <legend className={styles.legend}>
+                      <span>{handle.name}</span>
+                      {definition.nullable && <span className={styles.optional}>null</span>}
+                    </legend>
+                  )}
+                  {labelledBy == null && definition.description != null && <p className={styles.description}>{definition.description}</p>}
                   <div className={styles.value}>
                     <HandleEditor panelWidth$={state.panelWidth$} presentation="form" showFormError={showErrors} showSchemaSettings={false} store={handle} />
                   </div>

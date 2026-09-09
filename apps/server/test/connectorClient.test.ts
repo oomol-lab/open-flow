@@ -786,7 +786,7 @@ describe('Server Connector client', () => {
     expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({
       payload: {
         error: {
-          code: 'connector.unavailable',
+          code: 'connector.input-invalid',
           message: 'The Connector Action input is invalid. Property "tags" does not match schema. Instance type "null" is invalid. Expected "array".',
         },
       },
@@ -929,17 +929,57 @@ describe('Server Connector client', () => {
     })
   })
 
+  it.each([
+    [502, false, 'Connector reported an action failure (HTTP 502).'],
+    [200, true, 'Connector returned an unexpected action response (HTTP 200).'],
+  ])('preserves the HTTP %s failure reason without exposing the upstream body', async (status, succeeded, message) => {
+    const origin = await startConnector((_request, response) => {
+      send(response, status, { success: succeeded, message: 'credential=private-provider-secret' })
+    })
+    const client = new ConnectorClient(origin, '')
+    await expect(client.execute('mail.send', undefined, {}, 'call', AbortSignal.timeout(5000))).rejects.toMatchObject({
+      code: 'connector.indeterminate',
+      message: `${message} The action outcome is unknown.`,
+    })
+  })
+
+  it('reports invalid JSON without copying response content into the error', async () => {
+    const origin = await startConnector((_request, response) => {
+      response.writeHead(502)
+      response.end('credential=private-provider-secret')
+    })
+    const client = new ConnectorClient(origin, '')
+    await expect(client.execute('mail.send', undefined, {}, 'call', AbortSignal.timeout(5000))).rejects.toMatchObject({
+      code: 'connector.indeterminate',
+      message: 'Connector response is not valid JSON (HTTP 502). The action outcome is unknown.',
+    })
+  })
+
+  it('reports an action request timeout without claiming the action did not execute', async () => {
+    const origin = await startConnector(() => {})
+    const client = new ConnectorClient(origin, '', 25)
+    await expect(client.execute('mail.send', undefined, {}, 'call', AbortSignal.timeout(5000))).rejects.toMatchObject({
+      code: 'connector.indeterminate',
+      message: 'Connector request timed out after 25 ms. The action outcome is unknown.',
+    })
+  })
+
   it('rejects an oversized Connector response', async () => {
     const origin = await startConnector((request, response) => {
       if (request.url == '/v1/apps') return send(response, 200, { data: [app], success: true })
-      send(response, 200, { data: { value: 'x'.repeat(1024 * 1024) }, success: true })
+      send(response, 200, { data: { value: 'x'.repeat(32 * 1024 * 1024) }, success: true })
     })
     const { service } = await startService(origin)
     const runId = await run(service)
 
-    expect(service.run(runId)?.status).toBe('failed')
+    expect(service.run(runId)?.status).toBe('indeterminate')
     expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({
-      payload: { error: { code: 'connector.unavailable', message: 'The Connector request could not be completed.' } },
+      payload: {
+        error: {
+          code: 'connector.indeterminate',
+          message: 'Connector response exceeds the 33554432-byte size limit (HTTP 200). The action outcome is unknown.',
+        },
+      },
     })
   })
 })

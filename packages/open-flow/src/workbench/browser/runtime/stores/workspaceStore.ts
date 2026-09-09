@@ -7,7 +7,7 @@ import type { AddNodeOption } from '../designer/addNodeOptions.ts'
 import type { DiagnosticItem } from '../designer/diagnostics.ts'
 import type {
   ConditionSettings,
-  CodeTaskPorts,
+  TaskPorts,
   DesignerTarget,
   NodeClipboard,
   FlowChanges,
@@ -49,7 +49,7 @@ import {
   setInputValue as changeInputValue,
   setWaitNotification,
   updateCondition,
-  updateCodeTaskPorts,
+  updateTaskPorts,
   updateTaskAdditionalInputs,
   updateNodeDescription,
   updateNodeIcon,
@@ -644,11 +644,11 @@ export class WorkspaceStore {
     return changes == null || (await this.#changeDraft(changes)) != null
   }
 
-  public async saveCodeTaskPorts(nodeId: string, ports: CodeTaskPorts): Promise<boolean> {
+  public async saveTaskPorts(nodeId: string, ports: TaskPorts): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null) return false
-    const changes = updateCodeTaskPorts(revision, target, nodeId, ports)
+    const changes = updateTaskPorts(revision, target, nodeId, ports)
     return changes != null && (await this.#changeDraft(changes)) != null
   }
 
