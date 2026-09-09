@@ -25,6 +25,7 @@ function createTestSetup(connections = val<readonly FlowDesignerViewEdge[]>([]),
     'en',
     [],
     {
+      onIgnoreNodes: () => {},
       onAddNode: async () => undefined,
       onDeleteNodes: () => {},
       onConnect: vi.fn(),
@@ -44,7 +45,7 @@ function createTestSetup(connections = val<readonly FlowDesignerViewEdge[]>([]),
     nodes,
     createNode(nodeId, nodeType = NODE_TYPE.TaskNode) {
       const content$ = val<NodeContent>({ id: nodeId, kind: 'task', title: nodeId, reference: 'task', inputs: [], outputs: [] })
-      const node = new NodeStore(nodeId, nodeType, { content$, position: { x: 0, y: 0 } })
+      const node = new NodeStore(nodeId, nodeType, { ignoredNodeIds: val([]), content$, position: { x: 0, y: 0 } })
       createdNodes.push(node)
       return node
     },

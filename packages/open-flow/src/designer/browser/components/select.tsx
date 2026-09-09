@@ -26,9 +26,9 @@ import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { val } from 'value-enhancer'
 import { forwardRef2 } from '../../../ui/browser/hooks.ts'
+import { ContentIcon } from '../../../ui/browser/icons/ContentIcon.tsx'
 import { stopPropagation } from '../base/dom.ts'
 import { useGetStaticPopupContainer } from '../graph/ReactFlowContainer/useGetPopupContainer.ts'
-import { ContentIcon } from '../../../ui/browser/icons/ContentIcon.tsx'
 import { CssWrapper } from './cssWrapper.tsx'
 
 interface ExtraProps {

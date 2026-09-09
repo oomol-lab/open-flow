@@ -8,9 +8,9 @@ import { NodeToolbar, useViewport } from '@xyflow/react'
 import { memo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
+import { NodeActions } from '../../../../../canvas/browser/nodeActions.tsx'
 import { Button } from '../../../../../ui/browser/button.tsx'
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuTrigger } from '../../../../../ui/browser/context-menu.tsx'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../../../../ui/browser/dropdown-menu.tsx'
 import { coalesce, toTrue } from '../../../base/trivial.ts'
 import { defaultTooltipClassName } from '../../../components/label.tsx'
 import { DesignerTooltip } from '../../../components/tooltip.tsx'
@@ -38,30 +38,22 @@ export interface NodeFloatBarProps {
 }
 
 function InFlowDesigner({ designerStore }: SharedProps) {
-  const t = useTranslate()
-  const getStaticDesignerContainer = useGetStaticPopupContainer()
-  const getPopupContainer = getStaticDesignerContainer
+  const container = useGetStaticPopupContainer()
   const nodeStore = useNodeStore()
   const editable = useVal(designerStore.$.editable)
-
-  const onDelete = toTrue(editable) && (() => designerStore.deleteNodes([nodeStore]))
-  const items = useNodeMenuItems({
-    t,
-    nodeStore,
-    onDelete,
-  })
-
+  const semantic = NodeStore.to(nodeStore)
+  const ignored = useVal(semantic?.ignore)
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button className={styles.action} aria-label={t('more')} size="icon-xs" title={t('more')} variant="ghost">
-            <i className="i-codicon:ellipsis" />
-          </Button>
-        }
-      />
-      <NodeHeadMenuContent getPopupContainer={getPopupContainer} items={items} />
-    </DropdownMenu>
+    <NodeActions
+      className={styles.action}
+      contentClassName={styles.menu}
+      container={container()}
+      align="start"
+      ignored={ignored ?? false}
+      onIgnore={semantic?.setIgnored}
+      onDuplicate={nodeStore.duplicateNode}
+      onDelete={editable ? () => designerStore.deleteNodes([nodeStore]) : undefined}
+    />
   )
 }
 
@@ -121,24 +113,6 @@ interface ContextMenuActionItem {
 
 type ContextMenuItem = ContextMenuActionItem | false | undefined
 
-function NodeHeadMenuContent({ getPopupContainer, items }: { readonly getPopupContainer: () => HTMLElement; readonly items: ContextMenuItem[] }) {
-  return (
-    <DropdownMenuContent align="start" className={styles.menu} container={getPopupContainer()} side="bottom" sideOffset={0}>
-      <DropdownMenuGroup>
-        {items.map(
-          (item) =>
-            item && (
-              <DropdownMenuItem key={item.key} disabled={item.disabled} onClick={item.onClick} variant={item.danger ? 'destructive' : 'default'}>
-                {item.icon}
-                {item.label}
-              </DropdownMenuItem>
-            ),
-        )}
-      </DropdownMenuGroup>
-    </DropdownMenuContent>
-  )
-}
-
 function useNodeMenuItems({ t, nodeStore, onDelete }: Params): ContextMenuItem[] {
   const skip = useVal(NodeStore.to(nodeStore)?.ignore)
   const { duplicateNode } = nodeStore
@@ -154,7 +128,7 @@ function useNodeMenuItems({ t, nodeStore, onDelete }: Params): ContextMenuItem[]
       label: skip ? t('nodeActions.skipDisable') : t('nodeActions.skipEnable'),
       key: '$skip',
       icon: <i className={skip ? 'i-carbon:view-off' : 'i-carbon:view'} />,
-      onClick: () => NodeStore.to(nodeStore)?.ignore.set(!skip),
+      onClick: () => NodeStore.to(nodeStore)?.setIgnored(!skip),
     },
     onDelete && {
       label: t('nodeActions.delete'),

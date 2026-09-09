@@ -276,6 +276,12 @@
       "copyError": "コピーできませんでした。コードを選択して手動でコピーしてください。",
       "introDescription": "必要に応じてアクションを追加し、{{context}} から外部アプリを呼び出せます。",
       "chooseAccounts": "アカウントを管理"
+    },
+    "comment": {
+      "source": "ソースを表示",
+      "preview": "プレビュー",
+      "duplicate": "複製",
+      "delete": "削除"
     }
   },
   "language": {

@@ -1,7 +1,6 @@
 import type { IsValidConnection, OnMoveEnd, OnNodeDrag, OnSelectionChangeFunc, Edge as RFEdge, Node as RFNode } from '@xyflow/react'
 import type { DesignerStore } from '../../stores/designer/designer.store.ts'
 import type { ReactFlowContainerProps } from '../ReactFlowContainer/ReactFlowContainer.tsx'
-import type { FlowDesignerViewProps } from './model.ts'
 
 import { useEffect } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -9,13 +8,11 @@ import { NodeMiniMapProvider } from '../../components/minimap.tsx'
 import { fitViewOptions } from '../BlockDesigner/constants.ts'
 import { EDGE_TYPES, NODE_TYPES } from '../constants.tsx'
 import { DesignerStoreProvider } from '../DesignerStoreContext.tsx'
-import { NodeEditorPortal } from '../Nodes/components/NodeEditor.tsx'
 import { ReactFlowContainer } from '../ReactFlowContainer/ReactFlowContainer.tsx'
 
 export interface FlowDesignerProps {
   cornerTools?: React.ReactNode
   toolbar?: React.ReactNode
-  view?: Pick<FlowDesignerViewProps, 'inspectorContainer' | 'inspectorHeaderContainer' | 'selectedNodeIds'>
   flowDesignerStore: DesignerStore
   dark: boolean
   fitView?: boolean
@@ -32,7 +29,6 @@ export interface FlowDesignerProps {
 
 export const FlowDesigner: React.FC<FlowDesignerProps> = ({
   flowDesignerStore,
-  view,
   cornerTools,
   toolbar,
   dark,
@@ -94,9 +90,7 @@ export const FlowDesigner: React.FC<FlowDesignerProps> = ({
           provideAsyncAddNodeMenuItems={flowDesignerStore.provideAsyncAddNodeMenuItems}
           waitNode={flowDesignerStore.waitNode}
           duplicateNodes={flowDesignerStore.duplicateNodes}
-        >
-          <NodeEditorPortal view={view} dark={dark} />
-        </ReactFlowContainer>
+        ></ReactFlowContainer>
       </NodeMiniMapProvider>
     </DesignerStoreProvider>
   )

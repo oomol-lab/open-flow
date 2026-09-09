@@ -9,7 +9,7 @@ import type { NodeType } from './constants.ts'
 import type { NodeInteraction } from './nodeInteraction.ts'
 
 import { disposableStore } from '@wopjs/disposable'
-import { derive, val } from 'value-enhancer'
+import { derive } from 'value-enhancer'
 import { NODE_HANDLE_CLASSNAME } from '../../base/designer.ts'
 import { toRFNodeId } from '../../base/rfHelpers.ts'
 import { createNodeInteraction } from './nodeInteraction.ts'
@@ -28,6 +28,8 @@ export type NodeStore$ = ToReadonly$Group<NodeStore$$> & {
 }
 
 export interface NodeStoreProps {
+  readonly ignoredNodeIds: ReadonlyVal<readonly string[]>
+  readonly onIgnore?: (ignored: boolean) => void
   /** NodeStore owns these values. */
   readonly content$: Val<NodeContent>
 
@@ -47,7 +49,8 @@ export class NodeStore {
   public readonly dispose: DisposableStore = disposableStore()
 
   public readonly content$: ReadonlyVal<NodeContent>
-  public readonly ignore = this.dispose.add(val<boolean | undefined>())
+  public readonly ignore: ReadonlyVal<boolean>
+  public readonly setIgnored: (ignored: boolean) => void
   public readonly duplicateNode: ((offset?: XYPosition) => void) | undefined
 
   public readonly nodeType: NodeType
@@ -61,6 +64,8 @@ export class NodeStore {
   public readonly $: NodeStore$
 
   public constructor(nodeId: NodeId, nodeType: NodeType, props: NodeStoreProps) {
+    this.ignore = this.dispose.add(derive(props.ignoredNodeIds, (ids) => ids.includes(nodeId)))
+    this.setIgnored = (ignored) => props.onIgnore?.(ignored)
     this.nodeId = nodeId
     this.nodeType = nodeType
     this.rfNodeId = toRFNodeId(nodeId, nodeType)

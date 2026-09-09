@@ -11,8 +11,11 @@ import type { DesignerStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
+import { NodeActions } from '../../src/canvas/browser/nodeActions.tsx'
+import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
 import { FlowDesignerView } from '../../src/designer/browser/graph/FlowDesigner/FlowDesignerView.tsx'
 import { Button } from '../../src/ui/browser/button.tsx'
+import { CommentInspector } from '../../src/workbench/browser/runtime/designer/commentInspector.tsx'
 import { NodeDescription } from '../../src/workbench/browser/runtime/designer/nodeDescription.tsx'
 import { NodeInputs } from '../../src/workbench/browser/runtime/designer/nodeInputs.tsx'
 import { PortDefinitionEditor } from '../../src/workbench/browser/runtime/designer/portDefinitionEditor.tsx'
@@ -252,8 +255,7 @@ function WorkflowStory({
   const i18n = useMemo(() => createI18n(language), [language])
   const [version, setVersion] = useState(0)
   const [addNodeRequest, setAddNodeRequest] = useState<FlowDesignerViewProps['addNodeRequest']>()
-  const [inspectorHeaderContainer, setInspectorHeaderContainer] = useState<HTMLElement | null>(null)
-  const [inspectorContainer, setInspectorContainer] = useState<HTMLElement | null>(null)
+  const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(String(version))
   const [selected, setSelected] = useState<readonly string[]>([model == states ? 'selected' : 'task'])
   const selectedNode = model.nodes.find((node) => node.id === selected[0])
   return (
@@ -276,6 +278,8 @@ function WorkflowStory({
         <div className={`workflow-study-grid ${model == states ? 'workflow-study-states' : ''}`}>
           <div className="workflow-canvas">
             <FlowDesignerView
+              ignoredNodeIds={ignoredNodeIds}
+              onIgnoreNodes={onIgnoreNodes}
               key={version}
               identity={`lab:${model == states ? 'states' : 'workflow'}:${version}`}
               autoLayout={false}
@@ -284,8 +288,6 @@ function WorkflowStory({
               layoutMotion={false}
               editable
               model={model}
-              inspectorContainer={model == states ? undefined : inspectorContainer}
-              inspectorHeaderContainer={inspectorHeader ? inspectorHeaderContainer : undefined}
               toolbar={
                 <>
                   {picker && (
@@ -321,8 +323,26 @@ function WorkflowStory({
           </div>
           {model != states && (
             <aside className="workflow-study-inspector open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'}>
-              {inspectorHeader && <div ref={setInspectorHeaderContainer} />}
-              <div ref={setInspectorContainer} />
+              {inspectorHeader && selectedNode != null && selectedNode.kind != 'comment' && (
+                <NodeActions
+                  ignored={ignoredNodeIds.includes(selectedNode.id)}
+                  onIgnore={(ignored) => onIgnoreNodes([selectedNode.id], ignored)}
+                  onDuplicate={selectedNode.kind == 'trigger' ? undefined : () => log('node.duplicate', [selectedNode.id])}
+                  onDelete={() => log('node.delete', [selectedNode.id])}
+                />
+              )}
+              {selectedNode?.kind === 'comment' && (
+                <CommentInspector
+                  key={`${version}:${selectedNode.id}`}
+                  title={selectedNode.title}
+                  content={selectedNode.content ?? ''}
+                  dark={dark}
+                  disabled={false}
+                  onSave={(value) => log('comment.change', { node: selectedNode.id, value })}
+                  onDuplicate={() => log('node.duplicate', [selectedNode.id])}
+                  onDelete={() => log('node.delete', [selectedNode.id])}
+                />
+              )}
               {selectedNode != null && selectedNode.kind !== 'comment' && (
                 <WorkflowInspector key={`${version}:${selectedNode.id}`} node={selectedNode} log={log} />
               )}

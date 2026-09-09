@@ -892,7 +892,7 @@ function useSelectionItems(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
     const newSkip = !skip
     for (const rfNode of nodes) {
       const node = rfNode.data.store
-      NodeStore.to(node)?.ignore.set(newSkip)
+      NodeStore.to(node)?.setIgnored(newSkip)
     }
   }, [nodes, skip])
 

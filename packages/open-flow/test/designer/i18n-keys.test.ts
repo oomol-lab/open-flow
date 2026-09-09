@@ -34,21 +34,26 @@ function placeholdersOf(message: string): readonly string[] {
   return [...new Set([...message.matchAll(placeholderPattern)].map((match) => match[1]!))].toSorted()
 }
 
-async function loadBundle(name: string, dir: string, sources: string): Promise<LocaleBundle> {
+async function loadBundle(name: string, dirs: readonly string[], sources: string): Promise<LocaleBundle> {
   const locales = new Map<string, LocaleMap>()
   for (const lang of uiLanguageTags) {
-    locales.set(lang, flattenLocale(JSON.parse(await readFile(`${dir}/${lang}.json`, 'utf8'))))
+    const parts = await Promise.all(dirs.map(async (dir) => JSON.parse(await readFile(`${dir}/${lang}.json`, 'utf8'))))
+    locales.set(lang, flattenLocale(Object.assign({}, ...parts)))
   }
   return { locales, name, sources }
 }
 
+const shared = 'src/ui/browser/locales'
+const form = 'src/form/browser/locales'
 const bundles: readonly LocaleBundle[] = [
-  await loadBundle('designer', 'src/designer/browser/i18n/locales', 'src/designer/browser/**/*.{ts,tsx}'),
-  await loadBundle('IconPicker', 'src/designer/browser/icons/IconPicker/locales', 'src/designer/browser/icons/IconPicker/**/*.{ts,tsx}'),
-  await loadBundle('workbench', 'src/workbench/browser/runtime/locales', 'src/workbench/browser/runtime/**/*.{ts,tsx}'),
+  await loadBundle('designer', ['src/designer/browser/i18n/locales', shared], 'src/designer/browser/**/*.{ts,tsx}'),
+  await loadBundle('IconPicker', ['src/ui/browser/icons/picker/locales'], 'src/ui/browser/icons/picker/**/*.{ts,tsx}'),
+  await loadBundle('workbench', ['src/workbench/browser/runtime/locales', shared, form], 'src/workbench/browser/**/*.{ts,tsx}'),
+  await loadBundle('shared UI', [shared], 'src/{ui,canvas}/browser/**/*.{ts,tsx}'),
+  await loadBundle('form', [shared, form], 'src/form/browser/**/*.{ts,tsx}'),
 ]
 
-const iconPickerPath = '/icons/IconPicker/'
+const iconPickerPath = '/icons/picker/'
 
 describe.each(bundles)('$name translations', ({ locales, name, sources }) => {
   const en = locales.get('en')!
@@ -87,7 +92,7 @@ describe.each(bundles)('$name translations', ({ locales, name, sources }) => {
     for await (const file of glob(sources)) {
       // The IconPicker carries its own bundle, so the designer scan leaves those keys to it.
       // glob 返回平台原生路径分隔符，先统一后再判断语言包边界。
-      if (name == 'designer' && file.replaceAll('\\', '/').includes(iconPickerPath)) continue
+      if (name != 'IconPicker' && file.replaceAll('\\', '/').includes(iconPickerPath)) continue
       const source = await readFile(file, 'utf8')
       for (const match of source.matchAll(keyPattern)) {
         const key = match[2]!

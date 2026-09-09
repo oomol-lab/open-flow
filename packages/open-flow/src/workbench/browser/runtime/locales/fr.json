@@ -276,6 +276,12 @@
       "copyError": "Échec de la copie. Sélectionnez le code pour le copier manuellement.",
       "introDescription": "Ajoutez des actions au besoin pour appeler des applications externes via {{context}}.",
       "chooseAccounts": "Gérer les comptes"
+    },
+    "comment": {
+      "source": "Afficher la source",
+      "preview": "Aperçu",
+      "duplicate": "Dupliquer",
+      "delete": "Supprimer"
     }
   },
   "language": {

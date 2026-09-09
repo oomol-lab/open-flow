@@ -203,8 +203,8 @@ export interface FlowDesignerViewEdge {
 }
 
 export interface FlowDesignerViewProps {
-  readonly inspectorContainer?: HTMLElement | null
-  readonly inspectorHeaderContainer?: HTMLElement | null
+  readonly ignoredNodeIds: readonly string[]
+  readonly onIgnoreNodes: (nodeIds: readonly string[], ignored: boolean) => void
   readonly cornerTools?: ReactNode
   readonly toolbar?: ReactNode
   readonly addNodeRequest?: {
@@ -251,6 +251,7 @@ export interface FlowDesignerViewProps {
 }
 
 export interface ViewCallbacks {
+  readonly onIgnoreNodes: FlowDesignerViewProps['onIgnoreNodes']
   readonly onMoveNodes: FlowDesignerViewProps['onMoveNodes']
   readonly onAddNode: FlowDesignerViewProps['onAddNode']
   readonly onConnect: FlowDesignerViewProps['onConnect']

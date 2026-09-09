@@ -6,6 +6,7 @@
 @import 'tw-animate-css';
 @source './';
 @source '../../designer/browser';
+@source '../../canvas/browser';
 @source '../../form/browser';
 @source '../../workbench/browser';
 

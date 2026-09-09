@@ -42,5 +42,21 @@
     "temperature": "Temperature",
     "topP": "Top P",
     "messageRole": "Message role"
+  },
+  "nodeActions": {
+    "configSharedBlock": "Shared Block config",
+    "delete": "Delete",
+    "deleteConfirm": "Are you sure to delete {{name}} ?\n{{shortcut}} to delete directly",
+    "duplicate": "Duplicate",
+    "execute": "Execute",
+    "executeWithoutCache": "No-cache execution",
+    "nodeSetting": "Node Settings",
+    "openSharedBlockCode": "Task Block code",
+    "skipDisable": "Enable this node",
+    "skipDisableAll": "Enable selected nodes",
+    "skipEnable": "Ignore this node",
+    "skipEnableAll": "Ignore selected nodes",
+    "toggleLanguage": "Switch to {{lang}}",
+    "more": "More actions"
   }
 }

@@ -276,6 +276,12 @@
       "copyError": "Copy failed. Select the code and copy it manually.",
       "introDescription": "Add actions as needed to call external apps through {{context}}.",
       "chooseAccounts": "Manage accounts"
+    },
+    "comment": {
+      "source": "View source",
+      "preview": "Preview",
+      "duplicate": "Duplicate",
+      "delete": "Delete"
     }
   },
   "language": {

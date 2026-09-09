@@ -3,6 +3,7 @@ import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { DesignerStory, LogAction } from './stories.tsx'
 
 import { useState } from 'react'
+import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
 import { FlowDesignerView } from '../../src/designer/browser/graph/FlowDesigner/FlowDesignerView.tsx'
 
 const longInput = 'customer_lifetime_value_across_all_completed_orders'
@@ -103,6 +104,7 @@ const conditionModel: FlowDesignerViewModel = {
 }
 
 function ConditionStory({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
+  const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes('condition')
   const [selected, setSelected] = useState<readonly string[]>([])
   return (
     <div className="workflow-story">
@@ -111,6 +113,8 @@ function ConditionStory({ dark, language, log }: { readonly dark: boolean; reado
       </div>
       <div className="workflow-canvas">
         <FlowDesignerView
+          ignoredNodeIds={ignoredNodeIds}
+          onIgnoreNodes={onIgnoreNodes}
           identity="lab:node-cases:condition"
           autoLayout={false}
           dark={dark}

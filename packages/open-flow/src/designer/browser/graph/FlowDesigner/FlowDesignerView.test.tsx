@@ -113,6 +113,8 @@ function props(value: FlowDesignerViewModel, overrides: Partial<FlowDesignerView
   return {
     addItems: [],
     editable: true,
+    ignoredNodeIds: [],
+    onIgnoreNodes: () => {},
     identity: 'flow:main',
     model: value,
     onAddNode: () => undefined,
@@ -149,6 +151,25 @@ describe('FlowDesignerView model synchronization', () => {
     hooks.memoDependencies = undefined
     hooks.refIndex = 0
     hooks.refs = []
+  })
+
+  it('reads ignored state from the owner and sends changes without mutating the graph', () => {
+    const graph = model([task([])])
+    const onIgnoreNodes = vi.fn()
+    const initial = props(graph, { onIgnoreNodes })
+    const view = FlowDesignerView(initial) as React.ReactElement<FlowDesignerProps>
+    const store = view.props.flowDesignerStore
+    const node = store.$.nodes.get('target' as NodeId)!
+    node.setIgnored(true)
+    expect(onIgnoreNodes).toHaveBeenCalledWith(['target'], true)
+    expect(node.ignore.value).toBe(false)
+    FlowDesignerView({ ...initial, ignoredNodeIds: ['target'] })
+    expect(node.ignore.value).toBe(true)
+    expect(store.$.nodes.get('target' as NodeId)).toBe(node)
+    expect(graph.nodes[0]).not.toHaveProperty('ignored')
+    FlowDesignerView(initial)
+    expect(node.ignore.value).toBe(false)
+    store.dispose()
   })
 
   it('decodes React Flow connection identifiers once at the canvas boundary', () => {

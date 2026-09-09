@@ -21,7 +21,7 @@ import { cycleContextPanelFocus, observeContextPanelOverlay } from './contextPan
 
 interface ContextPanelProps {
   readonly heading?: ReactNode
-  readonly headerRef?: (element: HTMLDivElement | null) => void
+  readonly actions?: ReactNode
   readonly children: ReactNode
   readonly focusOnOpen: boolean
   readonly icon: IconName
@@ -83,7 +83,7 @@ function useOverlayPanel(panel: RefObject<HTMLElement | null>): boolean {
   return overlay
 }
 
-export function ContextPanel({ children, focusOnOpen, headerRef, heading, icon, onClose, theme, title }: ContextPanelProps): ReactElement {
+export function ContextPanel({ children, focusOnOpen, actions, heading, icon, onClose, theme, title }: ContextPanelProps): ReactElement {
   const t = useTranslate()
   const panel = useRef<HTMLElement>(null)
   const overlay = useOverlayPanel(panel)
@@ -143,7 +143,7 @@ export function ContextPanel({ children, focusOnOpen, headerRef, heading, icon, 
         tabIndex={-1}
       >
         <header>
-          {headerRef == null ? (
+          {heading == null ? (
             <>
               <span className="node-icon small">
                 <Icon name={icon} size={16} />
@@ -155,12 +155,10 @@ export function ContextPanel({ children, focusOnOpen, headerRef, heading, icon, 
               <span className="sr-only" id={titleId}>
                 {title}
               </span>
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                {heading}
-                <div className={heading == null ? 'context-panel-node-heading' : 'shrink-0'} ref={headerRef} />
-              </div>
+              <div className="flex min-w-0 flex-1 items-center gap-2">{heading}</div>
             </>
           )}
+          {actions}
           <Button aria-label={t('contextPanel.close')} onClick={onClose} size="icon-sm" type="button" variant="ghost">
             <Icon name="close" />
           </Button>

@@ -8,7 +8,7 @@ const sourceRoot = path.resolve(import.meta.dirname, '../../..')
 
 async function readBrowserSources(): Promise<{ code: string; id: string }> {
   const files: string[] = []
-  for await (const file of glob('src/{designer,form,ui,workbench}/browser/**/*.{ts,tsx}', { cwd: sourceRoot })) files.push(file)
+  for await (const file of glob('src/{canvas,designer,form,ui,workbench}/browser/**/*.{ts,tsx}', { cwd: sourceRoot })) files.push(file)
   files.sort()
   const sources = await Promise.all(files.map((file) => readFile(path.join(sourceRoot, file), 'utf8')))
   return { code: sources.join('\n'), id: 'open-flow-browser-sources.tsx' }
