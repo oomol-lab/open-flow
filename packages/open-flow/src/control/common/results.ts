@@ -57,11 +57,18 @@ export interface ResultQuery {
   readonly pointer?: string
   readonly offset?: number
   readonly limit?: number
+  readonly maxBytes?: number
 }
 const querySchema = z.strictObject({
   pointer: z.string().max(4096).default(''),
   offset: z.number().int().nonnegative().default(0),
   limit: z.number().int().min(1).max(100).default(20),
+  maxBytes: z
+    .number()
+    .int()
+    .min(1)
+    .max(1024 * 1024)
+    .default(15000),
 })
 const listSchema = z.strictObject({ version: z.literal(1), runId: z.string(), results: z.array(result), nextAfter: z.string().optional() })
 const readSchema = z.strictObject({ version: z.literal(1), runId: z.string(), result, page })
@@ -97,7 +104,7 @@ function describe(item: JsonValue, path: string): ResultEntry {
 }
 
 export function readResult(value: JsonValue, query: ResultQuery = {}): ResultPage {
-  const { pointer, offset, limit } = parseResultQuery(query)
+  const { pointer, offset, limit, maxBytes } = parseResultQuery(query)
   let selected = value
   if (pointer != '') {
     if (!pointer.startsWith('/')) throw new Error('Result pointer must be a JSON Pointer.')
@@ -113,25 +120,26 @@ export function readResult(value: JsonValue, query: ResultQuery = {}): ResultPag
   }
   const description = describe(selected, pointer)
   const whole = { ...description, complete: true, offset, value: selected }
-  if (offset == 0 && (query.limit == null || description.length == null || description.length <= limit) && bytes(whole) <= 15000) return whole
+  if (offset == 0 && (query.limit == null || description.length == null || description.length <= limit) && bytes(whole) <= maxBytes) return whole
   const root = description
   if (typeof selected == 'string') {
     let length = 0
+    for (const _ of selected) length++
+    if (offset >= length) throw new Error('Result offset is out of range.')
+    const budget = maxBytes - bytes({ ...root, length, offset, value: '', nextOffset: length })
     let used = 0
     let text = ''
-    let full = false
+    let end = offset
+    let position = 0
     for (const char of selected) {
-      if (length >= offset && !full) {
-        if (used + bytes(char) - 2 > 8192) full = true
-        else {
-          text += char
-          used += bytes(char) - 2
-        }
-      }
-      length++
+      if (position++ < offset) continue
+      const size = bytes(char) - 2
+      if (used + size > budget) break
+      text += char
+      used += size
+      end++
     }
-    if (offset >= length) throw new Error('Result offset is out of range.')
-    const end = offset + [...text].length
+    if (end == offset) throw new Error('Result byte budget cannot fit a string character and page metadata.')
     return { ...root, complete: offset == 0 && end == length, length, offset, value: text, ...(end < length ? { nextOffset: end } : {}) }
   }
   if (selected == null || typeof selected != 'object') throw new Error('Result cannot be paged.')
@@ -143,8 +151,8 @@ export function readResult(value: JsonValue, query: ResultQuery = {}): ResultPag
     const item = Array.isArray(selected) ? selected[Number(key)]! : (selected as Readonly<Record<string, JsonValue>>)[key]!
     const metadata = describe(item, path)
     const full = { ...metadata, complete: true, value: item }
-    const next = bytes({ ...root, offset, entries: [full] }) <= 15000 ? full : metadata
-    if (bytes({ ...root, offset, entries: [...entries, next] }) > 15000) break
+    const next = bytes({ ...root, offset, entries: [full], nextOffset: keys.length }) <= maxBytes ? full : metadata
+    if (bytes({ ...root, offset, entries: [...entries, next], nextOffset: keys.length }) > maxBytes) break
     entries.push(next)
   }
   if (entries.length == 0) throw new Error('Result property name exceeds the preview limit. Download the full result.')

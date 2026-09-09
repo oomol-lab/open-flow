@@ -136,12 +136,18 @@ export function createAgentTools(config: Extract<ManagedTaskExecutor, { readonly
   const readTool = createTool({
     id: 'read_result',
     description:
-      'Read only missing content needed for the task from a saved tool result, without repeating the external action. Values marked complete are already available; do not read their pointers again. For arrays, read the array pointer to get multiple full items per page, then use nextOffset with the same pointer if more items are needed. Read an individual item only when its content was omitted. Missing preview content is not missing data.',
+      'Read only missing content needed for the task from a saved tool result, without repeating the external action. Values marked complete are already available; do not read their pointers again. For arrays, read the array pointer to get multiple full items per page, then use nextOffset with the same pointer if more items are needed. Read an individual item only when its content was omitted. Missing preview content is not missing data. Pages default to 15000 bytes; request maxBytes up to 65536 only when more content is needed.',
     inputSchema: z.object({
       resultId: z.string(),
       pointer: z.string().max(4096).default(''),
       offset: z.number().int().nonnegative().default(0),
       limit: z.number().int().min(1).max(100).default(20),
+      maxBytes: z
+        .number()
+        .int()
+        .min(1)
+        .max(64 * 1024)
+        .default(15000),
     }),
     execute: async ({ resultId, ...query }) => {
       signal.throwIfAborted()

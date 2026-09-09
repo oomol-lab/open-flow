@@ -335,13 +335,14 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     })
   })
   app.get('/runs/:runId/results/:resultId', (context) => {
-    const parameters = query(context.req.raw, ['pointer', 'offset', 'limit'], controlErrorCode.runInvalid)
+    const parameters = query(context.req.raw, ['pointer', 'offset', 'limit', 'maxBytes'], controlErrorCode.runInvalid)
     let parsed
     try {
       parsed = parseResultQuery({
         ...(parameters.has('pointer') ? { pointer: parameters.get('pointer') } : {}),
         ...(parameters.has('offset') ? { offset: Number(parameters.get('offset')) } : {}),
         ...(parameters.has('limit') ? { limit: Number(parameters.get('limit')) } : {}),
+        ...(parameters.has('maxBytes') ? { maxBytes: Number(parameters.get('maxBytes')) } : {}),
       })
     } catch {
       invalid(controlErrorCode.runInvalid, 'Invalid result page query.')
