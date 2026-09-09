@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react')>()),
   useEffect: vi.fn(),
+  useCallback: (callback: unknown) => callback,
   useRef: vi.fn(() => ({ current: undefined })),
   useState: vi.fn(() => (mocks.stateCall++ == 0 ? [false, mocks.setVisible] : [false, mocks.setOpen])),
 }))
@@ -42,6 +43,9 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false) {
   const store = {
     $: {
       busy: value(busy),
+      variableNames: value([]),
+      variableNamesLoaded: value(false),
+      variableNamesLoading: value(false),
       diagnostics: value(invalid ? { valid: false, diagnostics: [{ code: 'trigger.connection-missing' }] } : undefined),
       designer: value({ nodes: withTrigger ? [{ id: 'start', kind: 'trigger', title: 'Start' }] : [], viewport: { x: 0, y: 0, zoom: 1 } }),
       selectedDesignerNode: value(undefined),

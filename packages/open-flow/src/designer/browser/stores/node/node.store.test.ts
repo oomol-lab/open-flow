@@ -10,7 +10,7 @@ const content: NodeContent = { id: 'node', kind: 'task', title: 'Task', referenc
 
 function setup() {
   const content$ = val<NodeContent>(content)
-  const node = new NodeStore('node' as NodeId, NODE_TYPE.TaskNode, { content$, position: { x: 0, y: 0 } })
+  const node = new NodeStore('node' as NodeId, NODE_TYPE.TaskNode, { ignoredNodeIds: val([]), content$, position: { x: 0, y: 0 } })
   return { node, content$ }
 }
 

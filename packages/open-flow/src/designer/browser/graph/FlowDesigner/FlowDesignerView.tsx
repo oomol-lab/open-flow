@@ -17,6 +17,7 @@ import { toViewEdge } from './model.ts'
 
 function callbacksFromProps(props: FlowDesignerViewProps): ViewCallbacks {
   return {
+    onIgnoreNodes: props.onIgnoreNodes,
     onAddNode: props.onAddNode,
     onMoveNodes: props.onMoveNodes,
     onChangeComment: props.onChangeComment,
@@ -94,8 +95,8 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
   }, [store])
   useLayoutEffect(() => store.setCallbacks(callbacksFromProps(props)))
   useLayoutEffect(() => {
-    store.reconcile(props.model, props.editable, props.language ?? 'en', props.addItems, props.selectedNodeIds)
-  }, [store, props.addItems, props.editable, props.language, props.model, props.selectedNodeIds])
+    store.reconcile(props.model, props.editable, props.language ?? 'en', props.addItems, props.selectedNodeIds, props.ignoredNodeIds)
+  }, [store, props.addItems, props.editable, props.language, props.model, props.selectedNodeIds, props.ignoredNodeIds])
   useEffect(() => {
     if (props.focusNodeRequest != null) {
       const reducedMotion =
@@ -106,7 +107,6 @@ export function FlowDesignerView(props: FlowDesignerViewProps): ReactElement {
 
   return (
     <FlowDesigner
-      view={{ inspectorContainer: props.inspectorContainer, inspectorHeaderContainer: props.inspectorHeaderContainer, selectedNodeIds: props.selectedNodeIds }}
       cornerTools={props.cornerTools}
       toolbar={props.toolbar}
       addItemRequest={props.addItemRequest}

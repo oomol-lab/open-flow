@@ -1,32 +1,13 @@
+import type { WidgetType } from '../../../form/common/schemaWidget.ts'
 /* @unocss-include */
-
 import type { JsonSchema } from './types.ts'
 
 import { isArray } from '@wopjs/cast'
-import { asArray, filterMap, isFunction, Negative, toArray, toPlainObject } from '../base/trivial.ts'
-import { asDateTimeFormat, formatDate, isDateTimeFormat } from '../components/constants.ts'
+import { ContentMediaType, isWidgetType, typeOfSchema, ui_options, ui_widget } from '../../../form/common/schemaWidget.ts'
+import { filterMap, Negative, toArray, toPlainObject } from '../base/trivial.ts'
+export { ContentMediaType, getDefaultValue, isWidgetType, typeOfSchema, ui_options, ui_widget, type WidgetType } from '../../../form/common/schemaWidget.ts'
 
 type UnoIconLiteral = `i-${string}:${string}`
-
-export type WidgetType =
-  | 'string'
-  | 'number'
-  | 'boolean'
-  | 'integer'
-  | 'color'
-  | 'text'
-  | 'object'
-  | 'array'
-  | 'select'
-  | 'multiSelect'
-  | 'date'
-  | 'any'
-  | 'anyOf'
-  | 'allOf'
-  | 'oneOf'
-  | 'binary'
-  | 'literal'
-  | 'null'
 
 export interface WidgetTypeOption {
   icon: UnoIconLiteral
@@ -61,8 +42,6 @@ const WIDGET_TYPE_OPTIONS: Readonly<Record<WidgetType, WidgetTypeOption>> = {
   literal: { icon: 'i-carbon:code', value: 'literal', label: 'Literal' },
   null: { icon: 'i-carbon:null-sign', value: 'null', label: 'Null' },
 }
-
-export const isWidgetType = (type: string): type is WidgetType => Object.hasOwn(WIDGET_TYPE_OPTIONS, type)
 
 export interface AdditionalIcons {
   close: UnoIconLiteral
@@ -153,13 +132,6 @@ export const widgetSelectOptions = (t: (key: string) => string, predicate: (type
 
 const isWidgetTypeOptionGroup = (opt: WidgetTypeOption | WidgetTypeOptionGroup): opt is WidgetTypeOptionGroup => 'options' in opt
 
-export const ui_widget = 'ui:widget'
-export const ui_options = 'ui:options'
-
-export const ContentMediaType = {
-  binary: 'oomol/bin',
-}
-
 // Use getBaseSchema to clone one of these default JSON Schemas.
 const BaseSchema: Record<WidgetType, JsonSchema> = {
   // Binary values do not have a literal value editor.
@@ -236,72 +208,6 @@ export function getDefaultSchemaForNewHandle(
 
 export function getDefaultValueForNewHandle(): unknown {
   return undefined
-}
-
-const DefaultValue: Record<WidgetType, unknown> = {
-  null: null,
-  boolean: false,
-  integer: 0,
-  number: 0,
-  string: '',
-  color: '#7d7fe9',
-  select: (schema: unknown) => {
-    const v = asArray((schema as JsonSchema | null)?.enum)?.[0]
-    return v === undefined ? null : v
-  },
-  multiSelect: [],
-  date: (schema: unknown) => formatDate(new Date(), asDateTimeFormat((schema as JsonSchema | null)?.format)),
-  text: '',
-  any: void 0,
-  object: {},
-  array: [],
-  anyOf: void 0,
-  allOf: void 0,
-  oneOf: void 0,
-  binary: void 0,
-  literal: (schema: unknown) => (schema as JsonSchema | null)?.const,
-}
-
-export function getDefaultValue(type: WidgetType, schema?: unknown): unknown {
-  const v = DefaultValue[type]
-  return isFunction(v) ? v(schema) : v
-}
-
-export function typeOfSchema(source: unknown): WidgetType {
-  const schema = source as JsonSchema | null
-
-  if (!schema) return 'any'
-
-  switch (schema.contentMediaType) {
-    case BaseSchema.binary.contentMediaType:
-      return 'binary'
-  }
-
-  if (schema[ui_widget]) {
-    if (isWidgetType(schema[ui_widget])) return schema[ui_widget]
-  }
-
-  if (schema.anyOf) return 'anyOf'
-  if (schema.oneOf) return 'oneOf'
-  if (schema.allOf) return 'any'
-
-  if (Object.hasOwn(schema, 'const')) return 'literal'
-  if (schema.enum) return 'select'
-
-  switch (schema.type) {
-    case 'null':
-    case 'boolean':
-    case 'integer':
-    case 'number':
-    case 'object':
-      return schema.type
-    case 'array':
-      return schema.uniqueItems ? 'multiSelect' : 'array'
-    case 'string':
-      return isDateTimeFormat(schema.format) ? 'date' : 'string'
-    default:
-      return 'any'
-  }
 }
 
 export function isAny(schemaType: WidgetType): boolean {

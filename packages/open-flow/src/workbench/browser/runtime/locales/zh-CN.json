@@ -276,6 +276,12 @@
       "copyError": "复制失败，请选中示例代码手动复制。",
       "introDescription": "按需添加动作，通过 {{context}} 调用外部应用。",
       "chooseAccounts": "管理账号"
+    },
+    "comment": {
+      "source": "显示源文本",
+      "preview": "预览",
+      "duplicate": "克隆",
+      "delete": "删除"
     }
   },
   "language": {

@@ -36,7 +36,11 @@ function MarkdownStory({ dark, language }: { dark: boolean; language: UiLanguage
   const [text, setText] = useState(sample)
   return (
     <I18nProvider i18n={i18n}>
-      <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div
+        className="open-flow-workbench open-flow-theme"
+        data-theme={dark ? 'dark' : 'light'}
+        style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}
+      >
         <Textarea aria-label="Markdown source" value={text} onChange={(event) => setText(event.target.value)} />
         <MarkdownContent dark={dark} text={text} mermaid />
       </div>

@@ -14,8 +14,8 @@ import { Icon } from '../icons.tsx'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
 
 interface Props {
-  readonly inspectorContainer?: HTMLElement | null
-  readonly inspectorHeaderContainer?: HTMLElement | null
+  readonly ignoredNodeIds: readonly string[]
+  readonly onIgnoreNodes: (nodeIds: readonly string[], ignored: boolean) => void
   readonly runControl?: ReactNode
   readonly addNodeOptions: readonly AddNodeOption[]
   readonly blocksOpen: boolean
@@ -89,8 +89,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
     disabled,
     focusNodeRequest,
     inspectorOpen,
-    inspectorContainer,
-    inspectorHeaderContainer,
     model,
     onAddNode,
     onConnect,
@@ -107,6 +105,8 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
     provideAddNodeOptions,
     onSelectNodes,
     onToggleInspector,
+    ignoredNodeIds,
+    onIgnoreNodes,
     runControl,
     selectedNodeIds,
     target,
@@ -298,6 +298,8 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
       tabIndex={0}
     >
       <FlowDesignerView
+        ignoredNodeIds={ignoredNodeIds}
+        onIgnoreNodes={onIgnoreNodes}
         addItemRequest={addItemRequest}
         addNodeRequest={addNodeRequest}
         addItems={designerAddItems}
@@ -309,8 +311,6 @@ export const WorkbenchDesigner = forwardRef<WorkbenchDesignerHandle, Props>(func
         isValidConnection={isValidConnection}
         language={language}
         model={model}
-        inspectorContainer={inspectorContainer}
-        inspectorHeaderContainer={inspectorHeaderContainer}
         cornerTools={
           <Button
             aria-label={t('designer.toggleInspector')}

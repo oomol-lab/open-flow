@@ -42,5 +42,21 @@
     "temperature": "Temperature",
     "topP": "Top P",
     "messageRole": "メッセージの役割"
+  },
+  "nodeActions": {
+    "configSharedBlock": "共有ブロックの設定",
+    "delete": "削除",
+    "deleteConfirm": "{{name}} を削除しますか？\n{{shortcut}} で直接削除できます",
+    "duplicate": "複製",
+    "execute": "実行",
+    "executeWithoutCache": "キャッシュなしで実行",
+    "nodeSetting": "ノード設定",
+    "openSharedBlockCode": "タスクブロックのコードを開く",
+    "skipDisable": "このノードの無視を解除",
+    "skipDisableAll": "選択したノードの無視を解除",
+    "skipEnable": "このノードを無視",
+    "skipEnableAll": "選択したノードを無視",
+    "toggleLanguage": "{{lang}} に切り替え",
+    "more": "その他の操作"
   }
 }

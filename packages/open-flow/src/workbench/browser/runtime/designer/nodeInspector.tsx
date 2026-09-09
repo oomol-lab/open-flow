@@ -1075,7 +1075,6 @@ function TriggerConnection({
 
 interface Props {
   readonly variables: InputVariables
-  readonly editorRef?: (element: HTMLDivElement | null) => void
   readonly connectorAction?: ConnectorAction
   readonly connectorActionError?: string
   readonly connectorAuthorizationPending: boolean
@@ -1104,7 +1103,6 @@ interface Props {
 
 export function NodeInspector({
   variables,
-  editorRef,
   connectorAction,
   connectorActionError,
   connectorAuthorizationPending,
@@ -1249,7 +1247,6 @@ export function NodeInspector({
             }}
           />
         )}
-        <div className="inspector-node-editor" ref={editorRef} />
         {selection?.kind === 'trigger' && <TriggerSummary trigger={selection.trigger} />}
         {(selection?.kind === 'condition' || selection?.kind === 'wait' || selection?.kind === 'subflow' || selection?.kind === 'task') &&
           (() => {

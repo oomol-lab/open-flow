@@ -76,6 +76,8 @@ export function createNodeEntry(node: FlowDesignerViewSemanticNode, contentKey: 
     wait: NODE_TYPE.TaskNode,
   } as const
   const store = new NodeStore(node.id as NodeId, types[node.kind], {
+    ignoredNodeIds: designerStore.ignoredNodeIds,
+    onIgnore: (ignored) => designerStore.ignoreNodes([node.id], ignored),
     content$,
     position: node.position,
     duplicateNode: node.kind == 'trigger' ? undefined : duplicateNode,

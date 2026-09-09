@@ -85,6 +85,10 @@ export class DesignerStore {
   public readonly canDeleteNodes = true
 
   public readonly dispose: DisposableStore = disposableStore()
+  public readonly ignoredNodeIds = this.dispose.add(val<readonly string[]>([]))
+  public readonly ignoreNodes = (nodeIds: readonly string[], ignored: boolean): void => {
+    this.#callbacks.onIgnoreNodes(nodeIds, ignored)
+  }
 
   public readonly $: DesignerStore$
   public readonly $$: DesignerStore$$
@@ -475,11 +479,13 @@ export class DesignerStore {
     language: string,
     addItems: readonly FlowDesignerViewAddItem[],
     selectedNodeIds: readonly string[],
+    ignoredNodeIds: readonly string[] = [],
   ): void {
     this.#addItems = addItems
     const editableChanged = this.$.editable.value != editable
     if (editableChanged) this.$$.editable.set(editable)
     if (this.#language.value != language) this.#language.set(language)
+    this.ignoredNodeIds.set(ignoredNodeIds)
     this.#syncModel(model)
     this.#syncSelection(selectedNodeIds)
   }

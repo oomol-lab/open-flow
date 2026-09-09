@@ -6,10 +6,13 @@ import type { WorkbenchDesignerHandle } from './designer/workbenchDesigner.tsx'
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
+import { NodeActions } from '../../../canvas/browser/nodeActions.tsx'
+import { useIgnoredNodes } from '../../../canvas/browser/useIgnoredNodes.ts'
 import { nodeNameIssue } from '../../../flow/common/change.ts'
 import { Button } from '../../../ui/browser/button.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../ui/browser/empty.tsx'
 import { IconifyProvider } from '../../../ui/browser/icons/iconifyContext.tsx'
+import { CommentInspector } from './designer/commentInspector.tsx'
 import { BlockLibrary, ContextPanel } from './designer/contextPanel.tsx'
 import { NodeHeading } from './designer/nodeHeading.tsx'
 import { inspectorIcon, NodeInspector } from './designer/nodeInspector.tsx'
@@ -128,6 +131,7 @@ function Editor({
   const selection = useVal(store.workspace.$.selection)
   const selectedNodeIds = useVal(store.workspace.$.selectedNodeIds)
   const target = useVal(store.workspace.$.target)
+  const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(`${flowId}:${target?.kind}:${target?.kind == 'subflow' ? target.id : ''}`)
   const targetName = useVal(store.workspace.$.targetName)
   const connectorAction = useVal(store.connectors.$.selectedAction)
   const connectorActionError = useVal(store.connectors.$.selectedActionError)
@@ -156,8 +160,6 @@ function Editor({
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [store])
 
-  const [inspectorContainer, setInspectorContainer] = useState<HTMLDivElement | null>(null)
-  const [inspectorHeaderContainer, setInspectorHeaderContainer] = useState<HTMLDivElement | null>(null)
   const focusInspectorOnOpen = useRef(false)
   const opener = useRef<HTMLElement>()
 
@@ -243,6 +245,8 @@ function Editor({
       tabIndex={0}
     >
       <WorkbenchDesigner
+        ignoredNodeIds={ignoredNodeIds}
+        onIgnoreNodes={onIgnoreNodes}
         runControl={
           target?.kind == 'flow' && draft != null && selectedTrigger != null ? (
             <RunControl
@@ -265,8 +269,6 @@ function Editor({
             />
           ) : undefined
         }
-        inspectorContainer={inspectorContainer}
-        inspectorHeaderContainer={inspectorHeaderContainer}
         addNodeOptions={addNodeOptions}
         blocksOpen={contextPanelVisible && contextPanelMode == 'blocks'}
         disabled={authoringDisabled}
@@ -323,7 +325,16 @@ function Editor({
               />
             ) : undefined
           }
-          headerRef={contextPanelMode == 'inspector' && selectedDesignerNode != null ? setInspectorHeaderContainer : undefined}
+          actions={
+            contextPanelMode == 'inspector' && selectedDesignerNode != null && selectedDesignerNode.kind != 'comment' ? (
+              <NodeActions
+                ignored={ignoredNodeIds.includes(selectedDesignerNode.id)}
+                onIgnore={(ignored) => onIgnoreNodes([selectedDesignerNode.id], ignored)}
+                onDuplicate={selectedDesignerNode.kind == 'trigger' ? undefined : () => void store.workspace.duplicateSelectedNodes()}
+                onDelete={authoringDisabled ? undefined : () => void store.workspace.deleteSelectedNodes()}
+              />
+            ) : undefined
+          }
           focusOnOpen={contextPanelMode == 'inspector' && focusInspectorOnOpen.current}
           icon={contextPanelMode == 'blocks' ? 'plus' : contextPanelMode == 'notification' ? 'connection' : inspectorIcon(selection, target)}
           onClose={() => (contextPanelMode == 'notification' ? setContextPanelMode('inspector') : closeContextPanel())}
@@ -364,6 +375,17 @@ function Editor({
                 )
               }
             />
+          ) : selectedDesignerNode?.kind == 'comment' ? (
+            <CommentInspector
+              key={selectedDesignerNode.id}
+              title={selectedDesignerNode.title}
+              content={selectedDesignerNode.content ?? ''}
+              disabled={authoringDisabled}
+              dark={theme == 'dark'}
+              onSave={(comment) => void store.workspace.saveComment(selectedDesignerNode.id, comment)}
+              onDuplicate={() => void store.workspace.duplicateSelectedNodes()}
+              onDelete={() => void store.workspace.deleteSelectedNodes()}
+            />
           ) : (
             revision != null && (
               <NodeInspector
@@ -376,7 +398,6 @@ function Editor({
                     void store.refreshVariableNames()
                   },
                 }}
-                editorRef={setInspectorContainer}
                 connectorAction={connectorAction}
                 connectorActionError={connectorActionError}
                 connectorAuthorizationPending={connectorAuthorizationPending}

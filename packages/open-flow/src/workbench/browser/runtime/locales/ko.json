@@ -276,6 +276,12 @@
       "copyError": "복사하지 못했습니다. 코드를 선택하여 직접 복사하세요.",
       "introDescription": "필요한 작업을 추가하고 {{context}}로 외부 앱을 호출하세요.",
       "chooseAccounts": "계정 관리"
+    },
+    "comment": {
+      "source": "원본 보기",
+      "preview": "미리 보기",
+      "duplicate": "복제",
+      "delete": "삭제"
     }
   },
   "language": {

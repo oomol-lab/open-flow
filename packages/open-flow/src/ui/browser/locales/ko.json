@@ -42,5 +42,21 @@
     "temperature": "Temperature",
     "topP": "Top P",
     "messageRole": "메시지 역할"
+  },
+  "nodeActions": {
+    "configSharedBlock": "공유 블록 설정",
+    "delete": "삭제",
+    "deleteConfirm": "{{name}} 노드를 삭제하시겠습니까?\n{{shortcut}} 키를 누르면 바로 삭제됩니다",
+    "duplicate": "복제",
+    "execute": "실행",
+    "executeWithoutCache": "캐시 없이 실행",
+    "nodeSetting": "노드 설정",
+    "openSharedBlockCode": "태스크 블록 코드",
+    "skipDisable": "이 노드 무시 해제",
+    "skipDisableAll": "선택한 노드 무시 해제",
+    "skipEnable": "이 노드 무시",
+    "skipEnableAll": "선택한 노드 무시",
+    "toggleLanguage": "{{lang}}로 전환",
+    "more": "추가 작업"
   }
 }

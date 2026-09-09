@@ -336,21 +336,6 @@
   "more": "更多操作",
   "ms": "毫秒",
   "s": "秒",
-  "nodeActions": {
-    "configSharedBlock": "共享區塊設定",
-    "delete": "刪除",
-    "deleteConfirm": "確定要刪除 {{name}} 嗎？\n按 {{shortcut}} 可直接刪除",
-    "duplicate": "建立副本",
-    "execute": "執行",
-    "executeWithoutCache": "無快取執行",
-    "nodeSetting": "節點設定",
-    "openSharedBlockCode": "任務區塊程式碼",
-    "skipDisable": "取消忽略此節點",
-    "skipDisableAll": "取消忽略選取的節點",
-    "skipEnable": "忽略此節點",
-    "skipEnableAll": "忽略選取的節點",
-    "toggleLanguage": "切換為{{lang}}"
-  },
   "nodeContent": {
     "addDescription": "新增描述"
   },

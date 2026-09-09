@@ -94,7 +94,7 @@ test('keeps browser control normalization below Workbench component utilities', 
   ])
 
   assert.match(uiStyles, /@layer theme, base, utilities;/)
-  assert.match(uiStyles, /@layer base \{[\s\S]*?:where\(\.open-flow-workbench, \.oo-designer-root\) button/)
+  assert.match(uiStyles, /@layer base \{[\s\S]*?:where\(\.open-flow-theme, \.open-flow-workbench, \.oo-designer-root\) button/)
   assert.match(uiStyles, /border: 0 solid;/)
   assert.doesNotMatch(workbenchStyles, /\n  button,\n  input,\n  select,\n  textarea \{/)
   assert.doesNotMatch(workbenchStyles, /\n  button \{\n    border: 0;/)
@@ -191,15 +191,13 @@ test('keeps the public session gate on shared form primitives', async () => {
   assert.doesNotMatch(source, /session-(?:gate|form|error)/)
 })
 
-test('keeps Designer node controls in the compact root normalization', async () => {
+test('keeps canvas root styling from overriding control appearance', async () => {
   const [designerRootStyles, toggleGroup] = await Promise.all([
     readFile(new URL('src/designer/browser/styles/root.scss', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/toggle-group.tsx', packageRoot), 'utf8'),
   ])
 
-  assert.match(designerRootStyles, /button:not\(\[data-canvas-control-scope\] button\)/)
-  assert.match(designerRootStyles, /:not\(\.react-flow__controls button\)/)
-  assert.doesNotMatch(designerRootStyles, /button:not\(\[data-slot\]\)/)
+  assert.doesNotMatch(designerRootStyles, /button|textarea|select\s*\{|--widget-height|appearance:/)
   assert.match(toggleGroup, /group-data-\[spacing=0\]\/toggle-group:rounded-none/)
   assert.match(toggleGroup, /data-\[spacing=0\]:first:rounded/)
   assert.match(toggleGroup, /data-\[spacing=0\]:last:rounded/)
@@ -378,7 +376,7 @@ test('keeps Workbench feedback on semantic theme surfaces', async () => {
   assert.doesNotMatch(contextPanelStyles, /#fef2f2|#991b1b|#fffbeb|#92400e|#b45309|#fed7aa|#fff7ed|#9a3412|#b91c1c/)
   assert.doesNotMatch(statusStyles, /#a1a1aa/)
   assert.doesNotMatch(responsiveStyles, /#fef2f2|#fecaca/)
-  const darkJson = runStyles.match(/&\[data-theme='dark'\] \.run-json \{([\s\S]*?)\}/)?.[1]
+  const darkJson = runStyles.match(/&\[data-theme=['"]dark['"]\] \.run-json \{([\s\S]*?)\}/)?.[1]
   assert.ok(darkJson)
   for (const color of Object.values(declarations(darkJson, '--json-'))) {
     assert.match(color, /^#[\da-f]{6}$/i)
@@ -438,62 +436,34 @@ test('keeps Run input editing independent of Designer and its theme adapters', a
   assert.match(editor, /store\.values\$/)
 })
 
-test('keeps concrete Designer theme modules behind the Designer theme adapter', async () => {
-  const workbenchSources: string[] = []
-  for await (const path of glob('src/workbench/browser/**/*.{ts,tsx}', { cwd: packageRoot })) {
-    workbenchSources.push(await readFile(new URL(path, packageRoot), 'utf8'))
+test('keeps shared controls and Workbench independent of canvas theme adapters', async () => {
+  const sources: string[] = []
+  for await (const path of glob('src/{ui,form,workbench}/browser/**/*.{ts,tsx}', { cwd: packageRoot })) {
+    sources.push(await readFile(new URL(path, packageRoot), 'utf8'))
   }
-  const adapter = await readFile(new URL('src/designer/browser/theme/designerThemeClass.ts', packageRoot), 'utf8')
-
-  assert.doesNotMatch(workbenchSources.join('\n'), /designer\/browser\/styles\/(?:dark|light)\.module\.scss/)
-  assert.doesNotMatch(workbenchSources.join('\n'), /designerThemeClass/)
-  assert.match(adapter, /styles\/dark\.module\.scss/)
-  assert.match(adapter, /styles\/light\.module\.scss/)
+  assert.doesNotMatch(sources.join('\n'), /designerThemeClass|designer\/browser\/styles\/(?:dark|light)\.module\.scss|NodeEditorPortal/)
 })
 
-test('maps canvas chrome through React Flow theme variables', async () => {
-  const themes = await Promise.all([
-    readFile(new URL('src/designer/browser/styles/light.module.scss', packageRoot), 'utf8'),
-    readFile(new URL('src/designer/browser/styles/dark.module.scss', packageRoot), 'utf8'),
-  ])
-
-  for (const theme of themes) {
-    assert.match(theme, /--xy-controls-button-background-color: var\(--ui-background\)/)
-    assert.match(theme, /--xy-controls-button-border-color: var\(--ui-border\)/)
-    assert.match(theme, /--xy-minimap-background-color: var\(--node-background-color\)/)
-    assert.doesNotMatch(theme, /--rf-(?:controls|button|minimap)/)
-  }
-})
-
-test('keeps the product theme contract separate from the Designer theme', async () => {
+test('owns product and canvas surface tokens in one theme entry', async () => {
   const uiPaths: URL[] = []
   for await (const path of glob('src/ui/browser/**/*.{ts,tsx,css}', { cwd: packageRoot })) uiPaths.push(new URL(path, packageRoot))
-  const [uiSources, productTheme, workbench, light, dark, workbenchRoot, reactFlowStyles] = await Promise.all([
+  const [uiSources, theme, workbench] = await Promise.all([
     Promise.all(uiPaths.map((path) => readFile(path, 'utf8'))),
     readFile(new URL('src/ui/browser/theme.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/tokens.css', packageRoot), 'utf8'),
-    readFile(new URL('src/designer/browser/styles/light.module.scss', packageRoot), 'utf8'),
-    readFile(new URL('src/designer/browser/styles/dark.module.scss', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/openFlowWorkbench.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/designer/browser/graph/ReactFlowContainer/ReactFlowContainer.scss', packageRoot), 'utf8'),
   ])
-
   assert.deepEqual(referencedTokens(uiSources.join('\n'), '--ui-'), sharedUiTokens)
-  assert.deepEqual(Object.keys(declarations(productTheme, '--ui-')).toSorted(), sharedUiTokens)
-  for (const [owner, source] of Object.entries({ light, dark })) {
-    assert.deepEqual(Object.keys(declarations(source, '--ui-')).toSorted(), sharedUiTokens, `${owner} does not implement the shared UI token contract.`)
+  assert.deepEqual(Object.keys(declarations(theme, '--ui-')).toSorted(), sharedUiTokens)
+  const canvasSurfaces = [...theme.matchAll(/\.open-flow-theme\[data-surface=['"]canvas['"]\](?:\[data-theme=['"]dark['"]\])?\s*\{([^}]+)\}/g)]
+  assert.equal(canvasSurfaces.length, 2)
+  for (const [, surface] of canvasSurfaces) {
+    assert.deepEqual(Object.keys(declarations(surface!, '--ui-')).toSorted(), sharedUiTokens)
+    assert.deepEqual(declarations(surface!, '--xy-'), reactFlowThemeContract)
   }
-  assert.match(productTheme, /\.open-flow-theme\s*\{[^{}]*--open-flow-background: #[\da-f]{6};/)
-  assert.match(productTheme, /\.open-flow-theme\[data-theme='dark'\]/)
-  assert.match(productTheme, /--ui-background: var\(--open-flow-background\);/)
-  assert.doesNotMatch(uiSources.join('\n'), /var\(--radius-(?:sm|md|lg)\)/)
-  for (const theme of [light, dark]) assert.match(theme, /--ui-radius: 6px;/)
+  assert.match(theme, /\.open-flow-theme\[data-theme=['"]dark['"]\]/)
+  assert.match(theme, /--ui-background: var\(--open-flow-background\);/)
   assert.doesNotMatch(workbench, /--ui-[\w-]+\s*:/)
-  assert.doesNotMatch(workbench, /--(?:canvas|surface|subtle|border|input|text|muted|primary|primary-foreground|focus|danger):/)
-  assert.match(workbenchRoot, /className="open-flow-theme open-flow-workbench"/)
-  assert.match(reactFlowStyles, /:where\(\.react-flow__controls, \[data-canvas-control-scope\]\)/)
-  assert.match(reactFlowStyles, /--ui-background: var\(--open-flow-background, var\(--fill-1\)\);/)
-  assert.doesNotMatch(reactFlowStyles, /\.oo-designer-root\s*\{\s*--ui-background:/)
+  assert.doesNotMatch(theme, /--rf-/)
 })
 
 test('keeps Workbench feature styles on the shared semantic theme', async () => {
@@ -508,16 +478,4 @@ test('keeps Workbench feature styles on the shared semantic theme', async () => 
   )
   assert.doesNotMatch(sources.join('\n'), /calc\(var\(--ui-radius\)/)
   assert.doesNotMatch(sources.join('\n'), /!important/)
-})
-
-test('keeps React Flow canvas chrome on one theme mapping', async () => {
-  const themes = await Promise.all([
-    readFile(new URL('src/designer/browser/styles/light.module.scss', packageRoot), 'utf8'),
-    readFile(new URL('src/designer/browser/styles/dark.module.scss', packageRoot), 'utf8'),
-  ])
-
-  for (const theme of themes) {
-    assert.deepEqual(declarations(theme, '--xy-'), reactFlowThemeContract)
-    assert.doesNotMatch(theme, /--rf-/)
-  }
 })

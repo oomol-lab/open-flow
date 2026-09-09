@@ -336,21 +336,6 @@
   "more": "Plus d'actions",
   "ms": "ms",
   "s": "s",
-  "nodeActions": {
-    "configSharedBlock": "Configuration du bloc partagé",
-    "delete": "Supprimer",
-    "deleteConfirm": "Voulez-vous vraiment supprimer {{name}} ?\n{{shortcut}} pour supprimer directement",
-    "duplicate": "Dupliquer",
-    "execute": "Exécuter",
-    "executeWithoutCache": "Exécution sans cache",
-    "nodeSetting": "Paramètres du nœud",
-    "openSharedBlockCode": "Code du bloc de tâche",
-    "skipDisable": "Activer ce nœud",
-    "skipDisableAll": "Activer les nœuds sélectionnés",
-    "skipEnable": "Ignorer ce nœud",
-    "skipEnableAll": "Ignorer les nœuds sélectionnés",
-    "toggleLanguage": "Passer en {{lang}}"
-  },
   "nodeContent": {
     "addDescription": "Ajouter une description"
   },

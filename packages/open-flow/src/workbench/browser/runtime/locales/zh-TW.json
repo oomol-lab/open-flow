@@ -276,6 +276,12 @@
       "copyError": "複製失敗，請選取範例程式碼手動複製。",
       "introDescription": "依需求新增動作，透過 {{context}} 呼叫外部應用程式。",
       "chooseAccounts": "管理帳號"
+    },
+    "comment": {
+      "source": "檢視原始文字",
+      "preview": "預覽",
+      "duplicate": "建立副本",
+      "delete": "刪除"
     }
   },
   "language": {

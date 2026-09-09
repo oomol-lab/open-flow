@@ -42,5 +42,21 @@
     "temperature": "Temperature",
     "topP": "Top P",
     "messageRole": "消息角色"
+  },
+  "nodeActions": {
+    "configSharedBlock": "配置共享区块",
+    "delete": "删除",
+    "deleteConfirm": "确定删除 {{name}} 吗？\n{{shortcut}} 可直接删除",
+    "duplicate": "克隆",
+    "execute": "执行",
+    "executeWithoutCache": "无缓存执行",
+    "nodeSetting": "节点配置",
+    "openSharedBlockCode": "打开任务区块代码",
+    "skipDisable": "取消忽略此节点",
+    "skipDisableAll": "取消忽略选中节点",
+    "skipEnable": "忽略此节点",
+    "skipEnableAll": "忽略选中节点",
+    "toggleLanguage": "切换为{{lang}}",
+    "more": "更多操作"
   }
 }

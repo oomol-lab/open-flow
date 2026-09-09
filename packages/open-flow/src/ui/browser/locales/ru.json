@@ -42,5 +42,21 @@
     "temperature": "Температура",
     "topP": "Top P",
     "messageRole": "Роль сообщения"
+  },
+  "nodeActions": {
+    "configSharedBlock": "Настройки общего блока",
+    "delete": "Удалить",
+    "deleteConfirm": "Удалить {{name}}?\n{{shortcut}} — удалить сразу",
+    "duplicate": "Дублировать",
+    "execute": "Выполнить",
+    "executeWithoutCache": "Выполнить без кеша",
+    "nodeSetting": "Настройки узла",
+    "openSharedBlockCode": "Код блока задачи",
+    "skipDisable": "Не игнорировать этот узел",
+    "skipDisableAll": "Не игнорировать выбранные узлы",
+    "skipEnable": "Игнорировать этот узел",
+    "skipEnableAll": "Игнорировать выбранные узлы",
+    "toggleLanguage": "Переключить на {{lang}}",
+    "more": "Другие действия"
   }
 }
