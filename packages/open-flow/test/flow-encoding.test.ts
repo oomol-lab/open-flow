@@ -264,6 +264,32 @@ describe('Revision decoding', () => {
     expect(decodeFlowDocument(revision().document)).toEqual(revision().document)
   })
 
+  it('defaults missing legacy graph edges without mutating the input', () => {
+    const content = revision()
+    const legacy = JSON.parse(decoder.decode(encodeRevision(content)))
+    delete legacy.document.graph.edges
+    delete legacy.document.subflows.child.graph.edges
+
+    expect(decodeFlowDocument(legacy.document)).toEqual(content.document)
+    expect(decodeRevisionContent(legacy)).toEqual(content)
+    const decoded = decodeRevision(new TextEncoder().encode(JSON.stringify(legacy)))
+    expect(decoded).toEqual(content)
+    expect(encodeRevision(decoded)).toEqual(encodeRevision(content))
+    expect(legacy.document.graph).not.toHaveProperty('edges')
+    expect(legacy.document.subflows.child.graph).not.toHaveProperty('edges')
+  })
+
+  it.each([null, {}, 'invalid', [{ source: 'a' }]])('rejects malformed graph edges: %j', (edges) => {
+    const content = revision()
+    expect(() => decodeFlowDocument({ ...content.document, graph: { ...content.document.graph, edges } })).toThrow()
+    expect(() =>
+      decodeFlowDocument({
+        ...content.document,
+        subflows: { child: { ...content.document.subflows.child, graph: { nodes: {}, edges } } },
+      }),
+    ).toThrow()
+  })
+
   it('ignores unknown fields before validation and canonical encoding', () => {
     const content = {
       modelVersion: 1,
@@ -303,6 +329,6 @@ describe('Revision decoding', () => {
     expect(() => decodeRevision(new TextEncoder().encode('{'))).toThrow()
     expect(() => decodeRevision(new TextEncoder().encode('['.repeat(66) + '0' + ']'.repeat(66)))).toThrow(/depth/)
     expect(() => decodeRevisionContent({ ...revision(), modules: undefined })).toThrow()
-    expect(() => decodeFlowDocument({ ...revision().document, graph: { nodes: {} } })).toThrow()
+    expect(() => decodeFlowDocument({ ...revision().document, graph: { edges: [] } })).toThrow()
   })
 })

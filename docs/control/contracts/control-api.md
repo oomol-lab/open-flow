@@ -157,6 +157,7 @@ interface Presentation {
 ### 执行图与输入来源
 
 Revision 的根图和每个 Subflow graph 必须包含 `nodes` 和 `edges`；没有执行边时显式保存 `edges: []`。
+为兼容旧 Draft，解码时将缺失的 `edges` 补为 `[]`；显式提供的 `edges` 仍须通过数组及边结构校验。
 执行边使用 `{ source: nodeId, target: nodeId, sourceHandle?: branch }`。普通节点不得设置 `sourceHandle`；Condition 和 Wait 必须指定已声明的分支或 action。
 边不含目标 input handle。重复边、缺失端点、指向 Trigger 的边和环不能通过 validation。边集合按规范顺序参与 Revision digest。
 
