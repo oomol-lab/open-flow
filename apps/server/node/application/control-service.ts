@@ -24,6 +24,7 @@ import type {
   Variable,
 } from '@oomol-lab/open-flow/control-api'
 import type { ChangeOperation, JsonValue, RevisionContent, TriggerKeySnapshot, WaitAction } from '@oomol-lab/open-flow/flow-change'
+import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
 import type { ConnectorHost } from '../deployment/connector.ts'
@@ -603,38 +604,15 @@ export class ControlService {
     trigger: TriggerSeed,
   ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
     const requestDigest = await digestBytes(canonicalJsonBytes({ engineContract, flowId, inputs, trigger: { ...trigger }, kind: 'draft', revisionId }))
-    const existing = this.store.runRequest(idempotencyKey)
-    if (existing != null) {
-      if (existing.requestDigest != requestDigest || existing.source != 'draft') {
-        throw new ControlError(controlErrorCode.runConflict, 'The idempotency key refers to another Run request.')
-      }
-      if (existing.status == 'queued' || existing.status == 'starting') this.wake()
-      return { created: false, run: this.runDetails(this.requireRun(existing.runId)) }
-    }
+    const existing = this.replayRun(idempotencyKey, requestDigest, 'draft')
+    if (existing != null) return existing
     if (engineContract != currentEngineContract) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
     const stored = this.store.revision(flowId, revisionId)
     if (stored == null) notFound()
     const content = revisionContent(stored)
     if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and payload.')
-    const fixed = await prepareFlow(content, engineContract, trigger.nodeId)
-    switch (fixed.kind) {
-      case 'engine-unsupported':
-        throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
-      case 'flow-invalid':
-        throw new ControlError(controlErrorCode.flowInvalid, 'The Flow is invalid.')
-      case 'prepared':
-        break
-    }
-    if (
-      (Object.values(fixed.flow.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) ||
-        Object.values(fixed.flow.tasks).some((task) => task.executor.kind == 'agent' && task.executor.notification != null)) &&
-      this.resolveWaitPublicOrigin() == null
-    ) {
-      throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
-    }
-    if (Object.values(fixed.flow.tasks).some((task) => task.executor.kind == 'agent') && !this.llmAvailable('agent'))
-      throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
-    await checkCodeActions([...codeActions(fixed.flow), ...agentActions(fixed.flow)], this.resolveConnector(), this.store.connectorTeam(flowId))
+    const fixed = await this.prepareRun(content, engineContract, trigger.nodeId)
+    await this.checkRunActions(fixed.flow, flowId)
     if (validateFlowInputs(content, inputs) != 'valid') throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
     const accepted = this.store.acceptControlRun({
       closureDigest: fixed.flow.closureDigest,
@@ -648,25 +626,7 @@ export class ControlService {
       revisionId,
       variableNames: Object.values(variableBindings(content, fixed.validation.closure.dependencies.inputBindings)),
     })
-    switch (accepted.kind) {
-      case 'binding-unresolved':
-        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required Variable is unresolved.')
-      case 'busy':
-        throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
-      case 'conflict':
-        throw new ControlError(controlErrorCode.runConflict, 'The idempotency key refers to another Run request.')
-      case 'not-found':
-        return notFound()
-      case 'overloaded':
-        throw new ControlError(controlErrorCode.runOverloaded, 'The deployment has reached its pending Run limit.')
-      case 'accepted': {
-        if (accepted.created) {
-          this.flowChanged({ flowId, kind: 'run.created', runId: accepted.runId, version: 1 })
-          this.wake()
-        }
-        return { created: accepted.created, run: this.runDetails(this.requireRun(accepted.runId)) }
-      }
-    }
+    return this.acceptedRun(flowId, accepted)
   }
 
   async createLiveRun(
@@ -676,14 +636,8 @@ export class ControlService {
     trigger: TriggerSeed,
   ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
     const requestDigest = await digestBytes(canonicalJsonBytes({ inputs, trigger: { ...trigger }, kind: 'live', publicationId }))
-    const existing = this.store.runRequest(idempotencyKey)
-    if (existing != null) {
-      if (existing.requestDigest != requestDigest || existing.source != 'live') {
-        throw new ControlError(controlErrorCode.runConflict, 'The idempotency key refers to another Run request.')
-      }
-      if (existing.status == 'queued' || existing.status == 'starting') this.wake()
-      return { created: false, run: this.runDetails(this.requireRun(existing.runId)) }
-    }
+    const existing = this.replayRun(idempotencyKey, requestDigest, 'live')
+    if (existing != null) return existing
 
     const livePublication = this.store.publications.publicationById(publicationId)
     if (livePublication == null) throw new ControlError(controlErrorCode.publicationNotFound, 'The Publication was not found.')
@@ -703,31 +657,14 @@ export class ControlService {
       throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Revision does not match the Publication.')
     }
     const content = revisionContent(stored)
-    const fixed = await prepareFlow(content, livePublication.engineContract)
-    switch (fixed.kind) {
-      case 'engine-unsupported':
-        throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
-      case 'flow-invalid':
-        throw new ControlError(controlErrorCode.flowInvalid, 'The Flow is invalid.')
-      case 'prepared':
-        break
-    }
-    if (
-      (Object.values(fixed.flow.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) ||
-        Object.values(fixed.flow.tasks).some((task) => task.executor.kind == 'agent' && task.executor.notification != null)) &&
-      this.resolveWaitPublicOrigin() == null
-    ) {
-      throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
-    }
+    const fixed = await this.prepareRun(content, livePublication.engineContract)
     if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and payload.')
     const inputsValid = validateFlowInputs(content, inputs) == 'valid'
     if (!inputsValid) throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
     if (fixed.flow.closureDigest != livePublication.closureDigest || content.modelVersion != livePublication.modelVersion) {
       throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Flow does not match the Publication.')
     }
-    if (Object.values(fixed.flow.tasks).some((task) => task.executor.kind == 'agent') && !this.llmAvailable('agent'))
-      throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
-    await checkCodeActions([...codeActions(fixed.flow), ...agentActions(fixed.flow)], this.resolveConnector(), this.store.connectorTeam(flowId))
+    await this.checkRunActions(fixed.flow, flowId)
     const accepted = this.store.acceptLiveControlRun({
       closureDigest: livePublication.closureDigest,
       expectedPublicationId: livePublication.publicationId,
@@ -741,27 +678,7 @@ export class ControlService {
       revisionId: livePublication.revisionId,
       variableNames: Object.values(variableBindings(content, fixed.validation.closure.dependencies.inputBindings)),
     })
-    switch (accepted.kind) {
-      case 'binding-unresolved':
-        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required Variable is unresolved.')
-      case 'busy':
-        throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
-      case 'conflict':
-        throw new ControlError(controlErrorCode.runConflict, 'The idempotency key refers to another Run request.')
-      case 'live-conflict':
-        throw new ControlError(controlErrorCode.liveConflict, 'The Publication is no longer the current Live target.')
-      case 'not-found':
-        return notFound()
-      case 'overloaded':
-        throw new ControlError(controlErrorCode.runOverloaded, 'The deployment has reached its pending Run limit.')
-      case 'accepted': {
-        if (accepted.created) {
-          this.flowChanged({ flowId, kind: 'run.created', runId: accepted.runId, version: 1 })
-          this.wake()
-        }
-        return { created: accepted.created, run: this.runDetails(this.requireRun(accepted.runId)) }
-      }
-    }
+    return this.acceptedRun(flowId, accepted)
   }
 
   getRun(runId: string): RunDetails {
@@ -900,6 +817,66 @@ export class ControlService {
       this.flowChanged({ flowId: canceled.run.flowId, kind: 'run.changed', runId, version: 1 })
     }
     return { cancelAccepted: canceled.accepted, runId, status: terminalStatus(canceled.run.status), version: 1 }
+  }
+
+  private replayRun(idempotencyKey: string, requestDigest: string, source: 'draft' | 'live') {
+    const existing = this.store.runRequest(idempotencyKey)
+    if (existing == null) return
+    if (existing.requestDigest != requestDigest || existing.source != source) {
+      throw new ControlError(controlErrorCode.runConflict, 'The idempotency key refers to another Run request.')
+    }
+    if (existing.status == 'queued' || existing.status == 'starting') this.wake()
+    return { created: false, run: this.runDetails(this.requireRun(existing.runId)) }
+  }
+
+  private async prepareRun(content: RevisionContent, engineContract: string, triggerId?: string) {
+    const fixed = await prepareFlow(content, engineContract, triggerId)
+    switch (fixed.kind) {
+      case 'engine-unsupported':
+        throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
+      case 'flow-invalid':
+        throw new ControlError(controlErrorCode.flowInvalid, 'The Flow is invalid.')
+      case 'prepared':
+        break
+    }
+    if (
+      (Object.values(fixed.flow.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) ||
+        Object.values(fixed.flow.tasks).some((task) => task.executor.kind == 'agent' && task.executor.notification != null)) &&
+      this.resolveWaitPublicOrigin() == null
+    ) {
+      throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
+    }
+    return fixed
+  }
+
+  private async checkRunActions(prepared: PreparedFlow, flowId: string): Promise<void> {
+    if (Object.values(prepared.tasks).some((task) => task.executor.kind == 'agent') && !this.llmAvailable('agent'))
+      throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
+    await checkCodeActions([...codeActions(prepared), ...agentActions(prepared)], this.resolveConnector(), this.store.connectorTeam(flowId))
+  }
+
+  private acceptedRun(flowId: string, accepted: ReturnType<Store['acceptLiveControlRun']>) {
+    switch (accepted.kind) {
+      case 'binding-unresolved':
+        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required Variable is unresolved.')
+      case 'busy':
+        throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
+      case 'conflict':
+        throw new ControlError(controlErrorCode.runConflict, 'The idempotency key refers to another Run request.')
+      case 'live-conflict':
+        throw new ControlError(controlErrorCode.liveConflict, 'The Publication is no longer the current Live target.')
+      case 'not-found':
+        return notFound()
+      case 'overloaded':
+        throw new ControlError(controlErrorCode.runOverloaded, 'The deployment has reached its pending Run limit.')
+      case 'accepted': {
+        if (accepted.created) {
+          this.flowChanged({ flowId, kind: 'run.created', runId: accepted.runId, version: 1 })
+          this.wake()
+        }
+        return { created: accepted.created, run: this.runDetails(this.requireRun(accepted.runId)) }
+      }
+    }
   }
 
   private async commitPublication(input: PublishInput): Promise<{ readonly created: boolean; readonly publication: Publication }> {

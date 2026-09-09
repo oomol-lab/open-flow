@@ -949,10 +949,36 @@ describe('Server Connector client', () => {
       response.end('credential=private-provider-secret')
     })
     const client = new ConnectorClient(origin, '')
+    await expect(client.listProviders()).rejects.toMatchObject({
+      code: 'connector.unavailable',
+      message: 'Connector response is not valid JSON',
+    })
     await expect(client.execute('mail.send', undefined, {}, 'call', AbortSignal.timeout(5000))).rejects.toMatchObject({
       code: 'connector.indeterminate',
       message: 'Connector response is not valid JSON (HTTP 502). The action outcome is unknown.',
     })
+  })
+
+  it.each(['action', 'discovery'] as const)('preserves caller cancellation during an in-flight %s request', async (operation) => {
+    const started = Promise.withResolvers<void>()
+    vi.stubGlobal(
+      'fetch',
+      (_input: unknown, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          const signal = init.signal
+          if (signal == null) throw new Error('Missing request signal.')
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+          started.resolve()
+        }),
+    )
+    const client = new ConnectorClient('https://connector.example', '')
+    const controller = new AbortController()
+    const reason = new Error('Caller canceled.')
+    const pending = operation == 'action' ? client.execute('mail.send', undefined, {}, 'call', controller.signal) : client.listProviders(controller.signal)
+    const rejected = expect(pending).rejects.toBe(reason)
+    await started.promise
+    controller.abort(reason)
+    await rejected
   })
 
   it('reports an action request timeout without claiming the action did not execute', async () => {
