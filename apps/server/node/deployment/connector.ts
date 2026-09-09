@@ -67,6 +67,18 @@ export class ConnectorTaskError extends Error {
   }
 }
 
+class RequestError extends ConnectorTaskError {
+  readonly reason: string
+  readonly status: number | undefined
+
+  constructor(cause: ConnectorTaskError, reason: string, status: number | undefined) {
+    super(cause.code, cause.message)
+    this.cause = cause
+    this.reason = reason
+    this.status = status
+  }
+}
+
 export class ConnectorClient implements ConnectorHost {
   readonly #logger: Logger
   readonly #origin: URL
@@ -250,7 +262,14 @@ export class ConnectorClient implements ConnectorHost {
       },
       signal,
       { fields: { actionId: action, ...(connectionId == null ? {} : { connectionId }), invocationId }, maximumResponseBytes: maxActionResponseBytes, teamId },
-    )
+    ).catch((error: unknown) => {
+      if (signal.aborted) throw signal.reason
+      if (!(error instanceof RequestError)) throw error
+      throw new ConnectorTaskError(
+        'connector.indeterminate',
+        `${error.reason}${error.status == null ? '' : ` (HTTP ${error.status})`}. The action outcome is unknown.`,
+      )
+    })
     const response = actionResponse.value
     if (!record(response))
       throw new ConnectorTaskError(
@@ -446,17 +465,10 @@ export class ConnectorClient implements ConnectorHost {
         },
         'Connector request failed.',
       )
-      if (operation == 'action.execute') {
-        const reason =
-          failure == 'timeout'
-            ? `Connector request timed out after ${this.#timeoutMs} ms`
-            : error instanceof ConnectorTaskError
-              ? error.message
-              : 'Connector connection failed while sending the request or receiving its response'
-        throw new ConnectorTaskError('connector.indeterminate', `${reason}${status == null ? '' : ` (HTTP ${status})`}. The action outcome is unknown.`)
-      }
-      if (error instanceof ConnectorTaskError) throw error
-      throw unavailable()
+      let reason = 'Connector connection failed while sending the request or receiving its response'
+      if (failure == 'timeout') reason = `Connector request timed out after ${this.#timeoutMs} ms`
+      else if (error instanceof ConnectorTaskError) reason = error.message
+      throw new RequestError(error instanceof ConnectorTaskError ? error : unavailable(), reason, status)
     }
   }
 }
