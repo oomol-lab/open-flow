@@ -69,7 +69,7 @@
     "executorConnector": "Connector",
     "executorJavaScript": "JavaScript",
     "executorLlm": "LLM",
-    "flowDesigner": "Flow 디자이너",
+    "flowCanvas": "Flow 디자이너",
     "openBlocks": "블록 찾아보기",
     "quickSearchHint": "A 키를 누르면 빠른 검색이 열립니다.",
     "toggleInspector": "인스펙터 표시 전환",

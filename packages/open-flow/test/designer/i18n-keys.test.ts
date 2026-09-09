@@ -46,10 +46,10 @@ async function loadBundle(name: string, dirs: readonly string[], sources: string
 const shared = 'src/ui/browser/locales'
 const form = 'src/form/browser/locales'
 const bundles: readonly LocaleBundle[] = [
-  await loadBundle('designer', ['src/designer/browser/i18n/locales', shared], 'src/designer/browser/**/*.{ts,tsx}'),
+  await loadBundle('canvas', ['src/canvas/browser/i18n/locales', shared], 'src/canvas/browser/**/*.{ts,tsx}'),
   await loadBundle('IconPicker', ['src/ui/browser/icons/picker/locales'], 'src/ui/browser/icons/picker/**/*.{ts,tsx}'),
   await loadBundle('workbench', ['src/workbench/browser/runtime/locales', shared, form], 'src/workbench/browser/**/*.{ts,tsx}'),
-  await loadBundle('shared UI', [shared], 'src/{ui,canvas}/browser/**/*.{ts,tsx}'),
+  await loadBundle('shared UI', [shared], 'src/ui/browser/**/*.{ts,tsx}'),
   await loadBundle('form', [shared, form], 'src/form/browser/**/*.{ts,tsx}'),
 ]
 
@@ -90,7 +90,7 @@ describe.each(bundles)('$name translations', ({ locales, name, sources }) => {
     const missing = new Set<string>()
 
     for await (const file of glob(sources)) {
-      // The IconPicker carries its own bundle, so the designer scan leaves those keys to it.
+      // The IconPicker carries its own bundle, so the canvas scan leaves those keys to it.
       // glob 返回平台原生路径分隔符，先统一后再判断语言包边界。
       if (name != 'IconPicker' && file.replaceAll('\\', '/').includes(iconPickerPath)) continue
       const source = await readFile(file, 'utf8')

@@ -4,7 +4,7 @@ import type { ConnectorCapability } from '../../flow/common/change.ts'
 import { createSystem, createVirtualTypeScriptEnvironment } from '@typescript/vfs'
 import ts from 'typescript-lsp'
 import { describe, expect, it } from 'vitest'
-import { codeTyping } from './runtime/designer/flowChanges.ts'
+import { codeTyping } from './runtime/editor/flowChanges.ts'
 import { contextName, ShadowDocument } from './typeScriptShadow.ts'
 
 const libraries = import.meta.glob<string>('../../../node_modules/typescript-lsp/lib/lib.*.d.ts', { eager: true, query: '?raw', import: 'default' })

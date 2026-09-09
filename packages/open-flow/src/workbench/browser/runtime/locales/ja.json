@@ -69,7 +69,7 @@
     "executorConnector": "Connector",
     "executorJavaScript": "JavaScript",
     "executorLlm": "LLM",
-    "flowDesigner": "Flow デザイナー",
+    "flowCanvas": "Flow デザイナー",
     "openBlocks": "ノードを参照",
     "quickSearchHint": "A キーでクイック検索できます。",
     "toggleInspector": "インスペクターを切り替え",

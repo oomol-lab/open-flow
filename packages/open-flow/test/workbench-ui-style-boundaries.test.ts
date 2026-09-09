@@ -94,7 +94,7 @@ test('keeps browser control normalization below Workbench component utilities', 
   ])
 
   assert.match(uiStyles, /@layer theme, base, utilities;/)
-  assert.match(uiStyles, /@layer base \{[\s\S]*?:where\(\.open-flow-theme, \.open-flow-workbench, \.oo-designer-root\) button/)
+  assert.match(uiStyles, /@layer base \{[\s\S]*?:where\(\.open-flow-theme, \.open-flow-workbench, \.open-flow-canvas-root\) button/)
   assert.match(uiStyles, /border: 0 solid;/)
   assert.doesNotMatch(workbenchStyles, /\n  button,\n  input,\n  select,\n  textarea \{/)
   assert.doesNotMatch(workbenchStyles, /\n  button \{\n    border: 0;/)
@@ -193,7 +193,7 @@ test('keeps the public session gate on shared form primitives', async () => {
 
 test('keeps canvas root styling from overriding control appearance', async () => {
   const [designerRootStyles, toggleGroup] = await Promise.all([
-    readFile(new URL('src/designer/browser/styles/root.scss', packageRoot), 'utf8'),
+    readFile(new URL('src/canvas/browser/styles/root.scss', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/toggle-group.tsx', packageRoot), 'utf8'),
   ])
 
@@ -210,7 +210,7 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
     diagnostics,
     resourceBrowser,
     runInputPanel,
-    workbenchDesigner,
+    workbenchCanvas,
     contextPanel,
     runDrawer,
     runs,
@@ -227,8 +227,8 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
     readFile(new URL('src/workbench/browser/runtime/shell/diagnosticsPanel.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/shell/resourceBrowser.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/runs/runInputPanel.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/designer/workbenchDesigner.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/designer/contextPanel.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/editor/workbenchCanvas.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/editor/contextPanel.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/runs/runDrawer.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/runs/runsView.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/publications/publicationsView.tsx', packageRoot), 'utf8'),
@@ -250,7 +250,7 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
   assert.doesNotMatch(resourceBrowser, /rounded-none|border-0/)
   assert.match(runInputPanel, /<Alert variant="destructive">/)
   assert.doesNotMatch(runInputPanel, /run-input-error/)
-  assert.match(workbenchDesigner, /recommendedOptions\.map[\s\S]*?size="sm"[\s\S]*?variant="outline"/)
+  assert.match(workbenchCanvas, /recommendedOptions\.map[\s\S]*?size="sm"[\s\S]*?variant="outline"/)
   assert.match(contextPanel, /<InputGroup>/)
   assert.match(contextPanel, /buttonVariants\(\{ variant: 'ghost' \}\)/)
   assert.doesNotMatch(contextPanel, /block-library-search/)
@@ -277,7 +277,7 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
   assert.doesNotMatch(canvasStyles, /\.designer-delete-action/)
   assert.doesNotMatch(canvasStyles, /\.canvas-empty-recommendations \[data-slot='button'\]/)
   assert.doesNotMatch(contextPanelStyles, /\.block-library-search/)
-  assert.doesNotMatch(contextPanelStyles, /oo-designer-picker/)
+  assert.doesNotMatch(contextPanelStyles, /open-flow-canvas-picker/)
   assert.doesNotMatch(contextPanelStyles, /\.block-library \[data-slot='button'\]:hover/)
   assert.doesNotMatch(contextPanelStyles, /\.inspector-form input:not/)
   assert.doesNotMatch(runStyles, /\.run-list-item\.active|\.run-load-more/)
@@ -387,8 +387,8 @@ test('keeps Workbench feedback on semantic theme surfaces', async () => {
 
 test('keeps responsive overlays aligned with the Workbench container and keyboard state', async () => {
   const [contextPanel, contextPanelBehavior, diagnostics, runInput, workspaceStyles, contextPanelStyles, responsiveStyles] = await Promise.all([
-    readFile(new URL('src/workbench/browser/runtime/designer/contextPanel.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/designer/contextPanelBehavior.ts', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/editor/contextPanel.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/editor/contextPanelBehavior.ts', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/shell/diagnosticsPanel.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/runs/runInputPanel.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/workspace.css', packageRoot), 'utf8'),

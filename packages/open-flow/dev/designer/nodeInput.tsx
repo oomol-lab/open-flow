@@ -1,10 +1,10 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { InputMapping } from '../../src/workbench/browser/runtime/api.ts'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
-import { NodeInputValue } from '../../src/workbench/browser/runtime/designer/nodeInputValue.tsx'
+import { NodeInputValue } from '../../src/workbench/browser/runtime/editor/nodeInputValue.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
@@ -51,7 +51,7 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
     </I18nProvider>
   )
 }
-export const nodeInputStory: DesignerStory = {
+export const nodeInputStory: FrontendStory = {
   group: 'Workbench',
   id: 'node-input',
   title: 'Node Input',

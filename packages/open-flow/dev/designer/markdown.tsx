@@ -1,5 +1,5 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { DesignerStory } from './stories.tsx'
+import type { FrontendStory } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
@@ -48,7 +48,7 @@ function MarkdownStory({ dark, language }: { dark: boolean; language: UiLanguage
   )
 }
 
-export const markdownStory: DesignerStory = {
+export const markdownStory: FrontendStory = {
   group: 'Controls',
   id: 'markdown',
   title: 'Markdown',

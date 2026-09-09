@@ -69,7 +69,7 @@
     "executorConnector": "Connector",
     "executorJavaScript": "JavaScript",
     "executorLlm": "LLM",
-    "flowDesigner": "Конструктор Flow",
+    "flowCanvas": "Конструктор Flow",
     "openBlocks": "Обзор узлов",
     "quickSearchHint": "Нажмите A для быстрого поиска.",
     "toggleInspector": "Переключить инспектор",

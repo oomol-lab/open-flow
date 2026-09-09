@@ -4,7 +4,13 @@ import type { ValueEditorProps } from './valueEditor.tsx'
 import { Input } from '../../ui/browser/input.tsx'
 import { datePickerChange, datePickerValue } from '../common/dateValue.ts'
 
-export function DateEditor({ value, onChange, label, disabled, format }: ValueEditorProps & { format: DateFormat }) {
+export function DateEditor({
+  value,
+  onChange,
+  label,
+  disabled,
+  format,
+}: Pick<ValueEditorProps, 'value' | 'onChange' | 'label' | 'disabled'> & { format: DateFormat }) {
   return (
     <>
       <Input aria-label={label} disabled={disabled} value={typeof value === 'string' ? value : ''} onChange={(event) => onChange(event.target.value)} />

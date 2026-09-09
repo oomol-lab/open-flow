@@ -1,16 +1,16 @@
 import type { ReactNode } from 'react'
-import type { FlowDesignerViewNodeRun } from '../../src/designer/browser/graph/FlowDesigner/model.ts'
+import type { FlowCanvasViewNodeRun } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { DesignerStory } from './stories.tsx'
+import type { FrontendStory } from './stories.tsx'
 
 import { useRef, useMemo } from 'react'
 import { I18nProvider } from 'val-i18n-react'
-import { CanvasCard } from '../../src/designer/browser/graph/Nodes/components/CanvasCard.tsx'
-import { RunChips } from '../../src/designer/browser/graph/Nodes/components/RunChips.tsx'
-import { GetPopupContainerContext } from '../../src/designer/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
-import { createI18n } from '../../src/designer/browser/i18n/i18n-loader.ts'
+import { CanvasCard } from '../../src/canvas/browser/graph/Nodes/components/CanvasCard.tsx'
+import { RunChips } from '../../src/canvas/browser/graph/Nodes/components/RunChips.tsx'
+import { GetPopupContainerContext } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
+import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
 
-const completed: FlowDesignerViewNodeRun = {
+const completed: FlowCanvasViewNodeRun = {
   status: 'success',
   runId: 'lab-run-042',
   startedAt: '2026-09-05T01:00:00Z',
@@ -50,14 +50,14 @@ function CardStage({ dark, language, children }: { readonly dark: boolean; reado
   const popup = useMemo(() => ({ default: () => root.current ?? document.body, static: () => root.current ?? document.body }), [])
   return (
     <I18nProvider i18n={i18n}>
-      <div ref={root} className={`oo-designer-root open-flow-theme card-studies`} data-surface="canvas" data-theme={dark ? 'dark' : 'light'}>
+      <div ref={root} className={`open-flow-canvas-root open-flow-theme card-studies`} data-surface="canvas" data-theme={dark ? 'dark' : 'light'}>
         <GetPopupContainerContext.Provider value={popup}>{children}</GetPopupContainerContext.Provider>
       </div>
     </I18nProvider>
   )
 }
 
-export const cardStories: readonly DesignerStory[] = [
+export const cardStories: readonly FrontendStory[] = [
   {
     group: 'Canvas',
     id: 'canvas-cards',

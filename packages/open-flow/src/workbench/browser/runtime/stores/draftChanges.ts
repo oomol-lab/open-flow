@@ -1,13 +1,13 @@
 import type { I18n } from 'val-i18n'
 import type { WorkbenchClient, Draft, FlowCheck } from '../api.ts'
-import type { FlowChanges } from '../designer/flowChanges.ts'
+import type { FlowChanges } from '../editor/flowChanges.ts'
 import type { Current } from './latest.ts'
 import type { SetNotice } from './workbenchNotice.ts'
 
 import { randomId } from '../../../../control/common/random.ts'
 import { FlowChangeError } from '../../../../flow/common/change.ts'
 import { ApiError } from '../api.ts'
-import { applyFlowChanges } from '../designer/flowChanges.ts'
+import { applyFlowChanges } from '../editor/flowChanges.ts'
 import { errorNotice } from './workbenchNotice.ts'
 
 export interface DraftChangeContext {

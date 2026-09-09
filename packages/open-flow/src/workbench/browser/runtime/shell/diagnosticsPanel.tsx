@@ -1,6 +1,6 @@
 import type { KeyboardEvent, ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
-import type { DiagnosticItem, DiagnosticScope } from '../designer/diagnostics.ts'
+import type { DiagnosticItem, DiagnosticScope } from '../editor/diagnostics.ts'
 
 import { useEffect, useRef } from 'react'
 import { useTranslate } from 'val-i18n-react'
@@ -8,7 +8,7 @@ import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
 import { Skeleton } from '../../../../ui/browser/skeleton.tsx'
-import { diagnosticMessage } from '../designer/diagnostics.ts'
+import { diagnosticMessage } from '../editor/diagnostics.ts'
 import { Icon } from '../icons.tsx'
 
 interface Props {

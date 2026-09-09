@@ -1,0 +1,166 @@
+.container {
+  padding: 0 4px;
+  background-color: var(--node-head-background-color);
+  overflow: hidden;
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+
+  :global(.open-flow-canvas-node-minimap1) & {
+    visibility: hidden;
+  }
+
+  :global(.react-flow__node-input_node) &,
+  :global(.react-flow__node-output_node) & {
+    display: none;
+  }
+
+  :global(.react-flow__node-comment_node) & {
+    background-color: var(--comment-head-bg);
+
+    :where(button:has(> i)) {
+      color: var(--text-3);
+    }
+
+    :where(button:hover) {
+      background-color: var(--comment-hover-bg);
+    }
+
+    :where(button:active) {
+      background-color: var(--comment-active-bg);
+    }
+  }
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  margin-right: 0.25em;
+  font-size: 13px;
+  font-weight: 600;
+
+  > input {
+    background-color: transparent;
+
+    &:focus-visible:not([aria-invalid='true']) {
+      border-color: transparent;
+    }
+  }
+}
+
+.connection {
+  flex: 0 1 40%;
+  max-width: 180px;
+  padding: 0 4px;
+  font-size: 90%;
+}
+
+.menu {
+  padding: 4px;
+  border-radius: 4px;
+  background: var(--widget-popup-background);
+  box-shadow: 0 2px 16px var(--contextmenu-shadow);
+  font-size: var(--base-font-size);
+  white-space: nowrap;
+
+  :global([data-slot$='menu-item']) {
+    border-radius: var(--widget-radius);
+    font-size: var(--base-font-size);
+  }
+}
+
+.menuButton {
+  display: flex;
+  align-items: flex-start;
+}
+
+.commentIcon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--icon-font-size);
+  pointer-events: none;
+}
+
+.errorIcon {
+  @extend .commentIcon;
+  color: var(--accent-red-1);
+  pointer-events: auto;
+}
+
+.blockSettings {
+  align-self: flex-start;
+  position: absolute;
+  left: 100%;
+  margin-left: 13px;
+  width: 400px;
+}
+
+.floatBar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--node-border-color);
+  border-radius: 10px;
+  background: var(--fill-3);
+  color: var(--ui-muted-foreground);
+  box-shadow: var(--floating-control-shadow);
+  --icon-font-size: 16px;
+  --icon-size: 32px;
+}
+
+.floatBarButton {
+  border-radius: var(--ui-radius);
+  font-size: var(--icon-font-size);
+}
+
+.floatBarStatus {
+  @extend .floatBarButton;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+}
+
+.nodeIcon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--brand-highlight-color);
+  background: color-mix(in srgb, var(--brand-highlight-color) 9%, var(--node-background-color));
+}
+
+.action {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  padding: 0;
+  font-size: var(--icon-font-size);
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+.statusTooltip {
+  max-width: 250px;
+  padding: 0.3em 0.5em;
+  border-radius: var(--widget-radius);
+  border: 1px solid var(--node-border-color);
+  background: var(--node-background-color);
+  pointer-events: none;
+  color: var(--widget-font-color);
+  font-size: var(--base-font-size);
+  box-shadow: none;
+
+  [data-slot='tooltip-arrow'] {
+    display: none;
+  }
+}

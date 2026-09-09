@@ -1,23 +1,20 @@
 import type { ReactNode } from 'react'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
-import { DesignerCheckbox } from '../../src/designer/browser/components/checkbox.tsx'
-import { Input as DesignerInput } from '../../src/designer/browser/components/input.tsx'
-import { Null } from '../../src/designer/browser/components/null.tsx'
-import { Range } from '../../src/designer/browser/components/range.tsx'
-import { LabeledSwitch } from '../../src/designer/browser/components/toggleSwitch.tsx'
+import { Input as CanvasInput } from '../../src/canvas/browser/components/input.tsx'
 import { Alert, AlertDescription, AlertTitle } from '../../src/ui/browser/alert.tsx'
 import { Badge } from '../../src/ui/browser/badge.tsx'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { Checkbox } from '../../src/ui/browser/checkbox.tsx'
 import { Input } from '../../src/ui/browser/input.tsx'
+import { Label } from '../../src/ui/browser/label.tsx'
 import { Progress } from '../../src/ui/browser/progress.tsx'
 import { Switch } from '../../src/ui/browser/switch.tsx'
 import { Textarea } from '../../src/ui/browser/textarea.tsx'
 import { stories } from './stories.tsx'
 
-const designerTokens = [
+const canvasTokens = [
   {
     title: 'Canvas & nodes',
     tokens: ['--flow-bg', '--node-background-color', '--node-head-background-color', '--node-border-color', '--node-selected-border-color'],
@@ -83,25 +80,37 @@ function ControlOverview({ log, dark, language }: { readonly log: LogAction; rea
   return (
     <div className="overview-controls">
       <Sample title="Text & validation">
-        <DesignerInput ariaLabel="Default input" value="Workflow input" onChange={(value) => log('input.change', value)} />
-        <DesignerInput ariaLabel="Empty input" placeholder="Placeholder" />
-        <DesignerInput ariaLabel="Invalid input" ariaInvalid warning="A valid value is required." value="Invalid value" />
-        <DesignerInput ariaLabel="Read-only input" readOnly value="Read-only value" />
-        <DesignerInput ariaLabel="Disabled input" disabled value="Disabled value" />
-        <DesignerInput ariaLabel="Multiline input" multiline value={'Summarize the records.\nReturn a short Markdown digest.'} />
+        <CanvasInput ariaLabel="Default input" value="Workflow input" onChange={(value) => log('input.change', value)} />
+        <CanvasInput ariaLabel="Empty input" placeholder="Placeholder" />
+        <CanvasInput ariaLabel="Invalid input" ariaInvalid warning="A valid value is required." value="Invalid value" />
+        <CanvasInput ariaLabel="Read-only input" readOnly value="Read-only value" />
+        <CanvasInput ariaLabel="Disabled input" disabled value="Disabled value" />
+        <CanvasInput ariaLabel="Multiline input" multiline value={'Summarize the records.\nReturn a short Markdown digest.'} />
       </Sample>
-      <Sample title="Boolean & numeric values">
-        <LabeledSwitch label="Enabled" defaultChecked onChange={(value) => log('switch.change', value)} />
-        <LabeledSwitch label="Off" onChange={(value) => log('switch.change', value)} />
-        <LabeledSwitch label="Disabled" defaultChecked disabled />
-        <DesignerCheckbox label="Checked" defaultChecked onChange={(value) => log('checkbox.change', value)} />
-        <DesignerCheckbox label="Unchecked" onChange={(value) => log('checkbox.change', value)} />
-        <DesignerCheckbox label="Disabled" defaultChecked disabled />
-        <Range label="Temperature" min={0} max={1} step={0.1} defaultValue={0.7} onChange={(value) => log('range.change', value)} />
-        <Range label="Disabled" min={0} max={100} defaultValue={40} disabled />
-        <div>
-          Nullable value <Null />
-        </div>
+      <Sample title="Boolean values">
+        {['Enabled', 'Off', 'Disabled'].map((label, index) => (
+          <div key={label} className="flex items-center gap-2">
+            <Switch
+              id={`node-switch-${index}`}
+              size="sm"
+              defaultChecked={index !== 1}
+              disabled={index === 2}
+              onCheckedChange={(value) => log('switch.change', value)}
+            />
+            <Label htmlFor={`node-switch-${index}`}>{label}</Label>
+          </div>
+        ))}
+        {['Checked', 'Unchecked', 'Disabled'].map((label, index) => (
+          <div key={label} className="flex items-center gap-2">
+            <Checkbox
+              id={`node-checkbox-${index}`}
+              defaultChecked={index !== 1}
+              disabled={index === 2}
+              onCheckedChange={(value) => log('checkbox.change', value)}
+            />
+            <Label htmlFor={`node-checkbox-${index}`}>{label}</Label>
+          </div>
+        ))}
       </Sample>
       {stories
         .filter((story) => ['select', 'multi-select', 'date-time', 'popup'].includes(story.id))
@@ -178,7 +187,7 @@ function ProductOverview({ log }: { readonly log: LogAction }) {
   )
 }
 
-function Swatches({ groups }: { readonly groups: typeof designerTokens }) {
+function Swatches({ groups }: { readonly groups: typeof canvasTokens }) {
   return (
     <>
       {groups.map((group) => (
@@ -201,10 +210,10 @@ function Swatches({ groups }: { readonly groups: typeof designerTokens }) {
 function PaletteOverview({ dark }: { readonly dark: boolean }) {
   return (
     <div className="palette-overview">
-      <div className={`palette-panel oo-designer-root open-flow-theme`} data-surface="canvas" data-theme={dark ? 'dark' : 'light'}>
+      <div className={`palette-panel open-flow-canvas-root open-flow-theme`} data-surface="canvas" data-theme={dark ? 'dark' : 'light'}>
         <h2>Designer · Canvas content</h2>
         <p>Nodes, ports, connections and compact editors.</p>
-        <Swatches groups={designerTokens} />
+        <Swatches groups={canvasTokens} />
       </div>
       <div className="palette-panel open-flow-workbench">
         <h2>Product · Workbench & canvas controls</h2>
@@ -215,7 +224,7 @@ function PaletteOverview({ dark }: { readonly dark: boolean }) {
   )
 }
 
-export const overviewStories: readonly DesignerStory[] = [
+export const overviewStories: readonly FrontendStory[] = [
   {
     group: 'Theme Preview',
     id: 'node-controls',

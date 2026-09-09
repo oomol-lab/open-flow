@@ -1,0 +1,105 @@
+.wrapper {
+  width: 16px;
+  height: 16px;
+  position: absolute;
+  // Extend beyond the node container.
+  z-index: 50;
+  visibility: visible;
+}
+
+.left {
+  margin-top: 2px;
+  left: -8px;
+
+  :global(.react-flow__node.selected) & {
+    left: -9px;
+  }
+
+  .handle {
+    --angle: 270deg;
+  }
+}
+
+.right {
+  right: -8px;
+
+  :global(.react-flow__node.selected) & {
+    right: -9px;
+  }
+
+  .handle {
+    --angle: 90deg;
+  }
+}
+
+.handle.handle {
+  top: unset;
+  width: 100%;
+  height: 100%;
+  border: none;
+  transform: unset;
+  z-index: 100;
+
+  --border-color: var(--handle-border-color, var(--node-outline-color, var(--node-border-color)));
+  --surface-color: var(--handle-background-color, var(--node-background-color));
+  background: linear-gradient(var(--angle, 270deg), var(--surface-color) 0%, var(--surface-color) 50%, var(--border-color) 50%, var(--border-color) 100%);
+  border-radius: 50%;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    background-color: var(--surface-color);
+    border-radius: 50%;
+  }
+
+  :global(.react-flow__node.selected) &::before {
+    inset: 2px;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    background-color: var(--bg, var(--widget-background));
+    border-radius: 50%;
+  }
+
+  &:hover::after {
+    filter: brightness(0.9);
+
+    :global(.open-flow-canvas.dark) & {
+      filter: brightness(1.1);
+    }
+  }
+
+  &.active::after {
+    background-color: var(--brand-highlight-color);
+  }
+
+  &.hasData::after {
+    box-shadow: 0px 0px 6px var(--highlight-indicate-color);
+  }
+}
+
+:global(.react-flow__node-input_node) .handle,
+:global(.react-flow__node-output_node) .handle {
+  --border-color: var(--handle-border-color, var(--pseudo-outline-color));
+}
+
+:global(.react-flow__node.selectable.selected) .handle {
+  --border-color: var(--handle-border-color, var(--node-selected-border-color));
+}
+
+.disabled {
+  pointer-events: none;
+
+  > :global(.react-flow__handle) {
+    pointer-events: none;
+  }
+}
+
+.pointerDown {
+  cursor: not-allowed;
+  pointer-events: auto;
+}

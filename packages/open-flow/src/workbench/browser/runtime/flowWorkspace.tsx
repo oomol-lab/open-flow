@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { WorkbenchLocation, WorkbenchTheme } from './contract.ts'
-import type { AddNodeOption } from './designer/addNodeOptions.ts'
-import type { WorkbenchDesignerHandle } from './designer/workbenchDesigner.tsx'
+import type { AddNodeOption } from './editor/addNodeOptions.ts'
+import type { WorkbenchCanvasHandle } from './editor/workbenchCanvas.tsx'
 
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -12,11 +12,11 @@ import { nodeNameIssue } from '../../../flow/common/change.ts'
 import { Button } from '../../../ui/browser/button.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../ui/browser/empty.tsx'
 import { IconifyProvider } from '../../../ui/browser/icons/iconifyContext.tsx'
-import { CommentInspector } from './designer/commentInspector.tsx'
-import { BlockLibrary, ContextPanel } from './designer/contextPanel.tsx'
-import { NodeHeading } from './designer/nodeHeading.tsx'
-import { inspectorIcon, NodeInspector } from './designer/nodeInspector.tsx'
-import { WorkbenchDesigner } from './designer/workbenchDesigner.tsx'
+import { CommentInspector } from './editor/commentInspector.tsx'
+import { BlockLibrary, ContextPanel } from './editor/contextPanel.tsx'
+import { NodeHeading } from './editor/nodeHeading.tsx'
+import { inspectorIcon, NodeInspector } from './editor/nodeInspector.tsx'
+import { WorkbenchCanvas } from './editor/workbenchCanvas.tsx'
 import { Icon } from './icons.tsx'
 import { NavigationStore } from './navigation.ts'
 import { PublicationsView } from './publications/publicationsView.tsx'
@@ -149,7 +149,7 @@ function Editor({
   const [contextPanelMode, setContextPanelMode] = useState<ContextPanelMode>()
   const [blocksFocusRequest, setBlocksFocusRequest] = useState(0)
   const blockAddCount = useRef(0)
-  const designerRef = useRef<WorkbenchDesignerHandle>(null)
+  const designerRef = useRef<WorkbenchCanvasHandle>(null)
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent): void => {
       if (!store.workspace.hasUnsavedCode) return
@@ -244,7 +244,7 @@ function Editor({
       role="tabpanel"
       tabIndex={0}
     >
-      <WorkbenchDesigner
+      <WorkbenchCanvas
         ignoredNodeIds={ignoredNodeIds}
         onIgnoreNodes={onIgnoreNodes}
         runControl={
@@ -538,7 +538,7 @@ export default function FlowWorkspace({
         />
         {view == 'design' && (workspaceLoading || draft == null) ? (
           <div aria-labelledby="workspace-tab-design" className="editor-grid context-panel-closed" id="workspace-panel-design" role="tabpanel" tabIndex={0}>
-            <section aria-busy={!workspaceLoadFailed} className="canvas-panel workbench-designer">
+            <section aria-busy={!workspaceLoadFailed} className="canvas-panel workbench-canvas">
               {workspaceLoadFailed ? (
                 <Empty className="h-full rounded-none border-0" role="alert">
                   <EmptyHeader>

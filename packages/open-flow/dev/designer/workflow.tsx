@@ -1,27 +1,22 @@
-import type {
-  FlowDesignerViewAddItem,
-  FlowDesignerViewModel,
-  FlowDesignerViewNode,
-  FlowDesignerViewProps,
-} from '../../src/designer/browser/graph/FlowDesigner/model.ts'
+import type { FlowCanvasViewAddItem, FlowCanvasViewModel, FlowCanvasViewNode, FlowCanvasViewProps } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { Group, InputPort, JsonValue } from '../../src/workbench/browser/runtime/api.ts'
-import type { NodeInputField } from '../../src/workbench/browser/runtime/designer/nodeInputs.tsx'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { NodeInputField } from '../../src/workbench/browser/runtime/editor/nodeInputs.tsx'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
+import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { NodeActions } from '../../src/canvas/browser/nodeActions.tsx'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
-import { FlowDesignerView } from '../../src/designer/browser/graph/FlowDesigner/FlowDesignerView.tsx'
 import { Button } from '../../src/ui/browser/button.tsx'
-import { CommentInspector } from '../../src/workbench/browser/runtime/designer/commentInspector.tsx'
-import { NodeDescription } from '../../src/workbench/browser/runtime/designer/nodeDescription.tsx'
-import { NodeInputs } from '../../src/workbench/browser/runtime/designer/nodeInputs.tsx'
-import { PortDefinitionEditor } from '../../src/workbench/browser/runtime/designer/portDefinitionEditor.tsx'
+import { CommentInspector } from '../../src/workbench/browser/runtime/editor/commentInspector.tsx'
+import { NodeDescription } from '../../src/workbench/browser/runtime/editor/nodeDescription.tsx'
+import { NodeInputs } from '../../src/workbench/browser/runtime/editor/nodeInputs.tsx'
+import { PortDefinitionEditor } from '../../src/workbench/browser/runtime/editor/portDefinitionEditor.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 
-const pickerCatalog: readonly FlowDesignerViewAddItem[] = [
+const pickerCatalog: readonly FlowCanvasViewAddItem[] = [
   { id: 'javascript', type: 'scriptlet', label: 'JavaScript', description: 'Run a script.', group: 'Blocks', inputs: [], outputs: [] },
   { id: 'condition', type: 'condition', label: 'Condition', group: 'Blocks', inputs: [], outputs: [] },
   { id: 'unavailable', type: 'block', label: 'Unavailable task', disabled: true, group: 'Blocks', inputs: [], outputs: [] },
@@ -53,7 +48,7 @@ const statePositions = Object.fromEntries(
   ['idle', 'selected', 'waiting', 'running', 'success', 'error'].map((id, index) => [id, { x: (index % 3) * 400, y: Math.floor(index / 3) * 240 }]),
 )
 
-const workflow: FlowDesignerViewModel = {
+const workflow: FlowCanvasViewModel = {
   viewport: workflowViewport,
   edges: [
     { id: 'trigger-task', source: 'trigger', sourceHandle: '$out', target: 'task', targetHandle: '$in' },
@@ -140,7 +135,7 @@ const workflow: FlowDesignerViewModel = {
   ],
 }
 
-const states: FlowDesignerViewModel = {
+const states: FlowCanvasViewModel = {
   viewport: stateViewport,
   runStatus: 'running',
   edges: [],
@@ -167,7 +162,7 @@ const states: FlowDesignerViewModel = {
   })),
 }
 
-function WorkflowInspector({ node, log }: { node: Exclude<FlowDesignerViewNode, { kind: 'comment' }>; log: LogAction }) {
+function WorkflowInspector({ node, log }: { node: Exclude<FlowCanvasViewNode, { kind: 'comment' }>; log: LogAction }) {
   const [description, setDescription] = useState(node.description)
   const [entries, setEntries] = useState<readonly (Group | NodeInputField)[]>(() =>
     node.inputs.map((input) =>
@@ -248,13 +243,13 @@ function WorkflowStory({
   readonly dark: boolean
   readonly language: UiLanguage
   readonly log: LogAction
-  readonly model: FlowDesignerViewModel
+  readonly model: FlowCanvasViewModel
   readonly inspectorHeader?: boolean
   readonly picker?: boolean
 }) {
   const i18n = useMemo(() => createI18n(language), [language])
   const [version, setVersion] = useState(0)
-  const [addNodeRequest, setAddNodeRequest] = useState<FlowDesignerViewProps['addNodeRequest']>()
+  const [addNodeRequest, setAddNodeRequest] = useState<FlowCanvasViewProps['addNodeRequest']>()
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(String(version))
   const [selected, setSelected] = useState<readonly string[]>([model == states ? 'selected' : 'task'])
   const selectedNode = model.nodes.find((node) => node.id === selected[0])
@@ -277,7 +272,7 @@ function WorkflowStory({
         </div>
         <div className={`workflow-study-grid ${model == states ? 'workflow-study-states' : ''}`}>
           <div className="workflow-canvas">
-            <FlowDesignerView
+            <FlowCanvasView
               ignoredNodeIds={ignoredNodeIds}
               onIgnoreNodes={onIgnoreNodes}
               key={version}
@@ -354,7 +349,7 @@ function WorkflowStory({
   )
 }
 
-export const workflowStories: readonly DesignerStory[] = [
+export const workflowStories: readonly FrontendStory[] = [
   {
     group: 'Theme Preview',
     id: 'workflow',

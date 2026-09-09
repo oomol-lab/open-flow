@@ -1,0 +1,15 @@
+.body {
+  overflow: hidden;
+
+  :global([data-node-editor]) & {
+    overflow: visible;
+  }
+}
+
+:global(.open-flow-canvas-node-minimap1) .sourceCode {
+  visibility: hidden;
+}
+
+:global([data-theme='dark']) .body :global(.open-flow-markdown-light) {
+  color: var(--widget-font-color);
+}

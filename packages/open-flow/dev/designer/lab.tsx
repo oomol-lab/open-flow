@@ -1,17 +1,18 @@
 import type { Node, NodeProps } from '@xyflow/react'
 import type { ReactNode } from 'react'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { Background, Controls, ReactFlow } from '@xyflow/react'
 import { Monitor, Moon, Sun } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
-import { GetPopupContainerContext } from '../../src/designer/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
-import { createI18n } from '../../src/designer/browser/i18n/i18n-loader.ts'
+import { GetPopupContainerContext } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
+import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
 import { defaultUiLanguage, uiLanguageNames, uiLanguages } from '../../src/localization/common/languages.ts'
 import { TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
-import { CodeEditor } from '../../src/workbench/browser/runtime/designer/codeEditor.tsx'
+import { CodeEditor } from '../../src/workbench/browser/runtime/editor/codeEditor.tsx'
+import { agentStory } from './agent.tsx'
 import { cardStories } from './cards.tsx'
 import { conditionEditorStory } from './conditionEditor.tsx'
 import { formStory } from './form.tsx'
@@ -62,7 +63,7 @@ const codeEditorSource = `export default async function (inputs, context) {
 }
 `
 
-const codeEditorStory: DesignerStory = {
+const codeEditorStory: FrontendStory = {
   group: 'Workbench',
   id: 'code-editor',
   render: (log, dark) => <CodeEditorStory dark={dark} log={log} />,
@@ -70,13 +71,14 @@ const codeEditorStory: DesignerStory = {
   title: 'Code Editor',
 }
 
-const labStories: readonly DesignerStory[] = [
+const labStories: readonly FrontendStory[] = [
   ...nodeStories,
   ...cardStories,
   ...workflowStories,
   ...stories,
   formStory,
   libraryStory,
+  agentStory,
   llmStory,
   metadataStory,
   markdownStory,
@@ -94,14 +96,14 @@ const labStories: readonly DesignerStory[] = [
   ...overviewStories,
 ]
 
-function initialStory(): DesignerStory {
+function initialStory(): FrontendStory {
   const requested = new URLSearchParams(location.search).get('story')
   const story = labStories.find((item) => item.id == requested) ?? labStories.find((item) => item.id == 'canvas-cards') ?? labStories[0]
-  if (!story) throw new Error('Designer Lab has no stories.')
+  if (!story) throw new Error('Open Flow Lab has no stories.')
   return story
 }
 
-export function DesignerLab() {
+export function FrontendLab() {
   const [storyId, setStoryId] = useState(() => initialStory().id)
   const story = labStories.find((entry) => entry.id == storyId) ?? initialStory()
   const [theme, setTheme] = useState<ThemeMode>('system')
@@ -120,7 +122,7 @@ export function DesignerLab() {
     document.documentElement.lang = language
   }, [language])
   const log: LogAction = (name, value) => setAction({ message: `${name}${value === undefined ? '' : ` ${print(value)}`}` })
-  const selectStory = (next: DesignerStory) => {
+  const selectStory = (next: FrontendStory) => {
     setStoryId(next.id)
     const url = new URL(location.href)
     url.searchParams.set('story', next.id)
@@ -131,7 +133,7 @@ export function DesignerLab() {
     <div className="lab-shell open-flow-theme" data-theme={dark ? 'dark' : 'light'}>
       <aside className="lab-sidebar">
         <div className="lab-brand">
-          <strong>Designer Lab</strong>
+          <strong>Open Flow Lab</strong>
         </div>
         {[...new Set(labStories.map((entry) => entry.group))].map((group) => (
           <section key={group}>
@@ -245,7 +247,7 @@ function StoryStage({ children, dark, i18n }: { readonly children: React.ReactNo
 
   return (
     <div className="stage-frame" ref={stageRef}>
-      <div className={`oo-designer-root open-flow-theme stage-theme`} data-surface="canvas" data-theme={dark ? 'dark' : 'light'}>
+      <div className={`open-flow-canvas-root open-flow-theme stage-theme`} data-surface="canvas" data-theme={dark ? 'dark' : 'light'}>
         <div className="stage-static-root" ref={staticRef} />
         <GetPopupContainerContext.Provider value={context}>
           <I18nProvider i18n={i18n}>

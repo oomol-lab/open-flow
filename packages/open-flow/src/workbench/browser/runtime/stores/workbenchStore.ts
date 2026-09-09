@@ -1,10 +1,10 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
+import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { WorkbenchClient, Draft, FlowCheck, Run, RunEvent } from '../api.ts'
 import type { FlowChangeEvent, WorkbenchHost, WorkbenchPreferences } from '../contract.ts'
-import type { AddNodeOption } from '../designer/addNodeOptions.ts'
-import type { DiagnosticItem } from '../designer/diagnostics.ts'
-import type { DesignerTarget } from '../designer/flowChanges.ts'
+import type { AddNodeOption } from '../editor/addNodeOptions.ts'
+import type { DiagnosticItem } from '../editor/diagnostics.ts'
 import type { DesignerEdge, DesignerNode, DesignerGraph, Point } from '../workspace.ts'
 import type { Notice } from './workbenchNotice.ts'
 import type { WorkspaceBusy } from './workspaceModel.ts'
@@ -12,7 +12,7 @@ import type { WorkspaceBusy } from './workspaceModel.ts'
 import { compute, derive, val } from 'value-enhancer'
 import { randomId } from '../../../../control/common/random.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
-import { diagnosticItems } from '../designer/diagnostics.ts'
+import { diagnosticItems } from '../editor/diagnostics.ts'
 import { createI18n } from '../i18n.ts'
 import { PublicationStore } from '../publications/publicationStore.ts'
 import { revisionView } from '../revisionView.ts'
@@ -45,13 +45,13 @@ function indexNodes(designer: DesignerGraph): ReadonlyMap<string, DesignerNode> 
   return new Map(designer.nodes.map((node) => [node.id, node]))
 }
 
-function designerRevisionInputs(draft: Draft | undefined, target: DesignerTarget | undefined): readonly unknown[] {
+function designerRevisionInputs(draft: Draft | undefined, target: GraphTarget | undefined): readonly unknown[] {
   return draft == null || target == null ? [] : revisionView(draft).designerInputs(target)
 }
 
 function indexRunEventNodes(
   draft: Draft | undefined,
-  target: DesignerTarget | undefined,
+  target: GraphTarget | undefined,
   run: Run | undefined,
   events: readonly RunEvent[],
   nodes: ReadonlyMap<string, DesignerNode>,

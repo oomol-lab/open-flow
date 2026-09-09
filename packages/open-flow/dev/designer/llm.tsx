@@ -1,10 +1,10 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { JsonValue } from '../../src/workbench/browser/runtime/api.ts'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
-import { NodeInputValue } from '../../src/workbench/browser/runtime/designer/nodeInputValue.tsx'
+import { NodeInputValue } from '../../src/workbench/browser/runtime/editor/nodeInputValue.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 
 function LlmStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
@@ -57,7 +57,7 @@ function LlmStory({ dark, language, log }: { dark: boolean; language: UiLanguage
     </I18nProvider>
   )
 }
-export const llmStory: DesignerStory = {
+export const llmStory: FrontendStory = {
   group: 'Workbench',
   id: 'llm-inputs',
   title: 'LLM Inputs',

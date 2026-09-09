@@ -1,11 +1,11 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { TriggerSchedule } from '../../src/workbench/browser/runtime/api.ts'
-import type { DesignerStory, LogAction } from './stories.tsx'
+import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
-import { TriggerScheduleEditor } from '../../src/workbench/browser/runtime/designer/triggerScheduleEditor.tsx'
-import { TriggerSummary } from '../../src/workbench/browser/runtime/designer/triggerSummary.tsx'
+import { TriggerScheduleEditor } from '../../src/workbench/browser/runtime/editor/triggerScheduleEditor.tsx'
+import { TriggerSummary } from '../../src/workbench/browser/runtime/editor/triggerSummary.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 
 function ScheduleStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
@@ -38,7 +38,7 @@ function ScheduleStory({ dark, language, log }: { dark: boolean; language: UiLan
   )
 }
 
-export const scheduleStory: DesignerStory = {
+export const scheduleStory: FrontendStory = {
   group: 'Workbench',
   id: 'trigger-schedule',
   title: 'Trigger Schedule',
