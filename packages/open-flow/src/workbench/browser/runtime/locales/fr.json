@@ -741,7 +741,6 @@
     "execution": "Mode d’exécution",
     "auto": "Exécuter automatiquement",
     "confirm": "Confirmer avant d’exécuter",
-    "chooseExecution": "Choisir le mode d’exécution",
     "executionHint": "Choisissez une exécution directe ou une confirmation à chaque appel.",
     "modelParameters": "L’Agent remplit les paramètres selon la tâche.",
     "parameters": "Paramètres avancés",

@@ -162,7 +162,7 @@ export function AgentSettings({
   const [config, renderConfig] = useState(task.executor)
   const [parameter, setParameter] = useState<string>()
   const [pendingTool, setPendingTool] = useState<ConnectorAction>()
-  const [approval, setApproval] = useState<boolean>()
+  const [approval, setApproval] = useState(false)
   const [saveError, setSaveError] = useState<string>()
   const [flowId] = useState(store.$.flowId.value)
   const [changes] = useState(
@@ -235,7 +235,7 @@ export function AgentSettings({
   const addTool = (action: ConnectorAction, confirm: boolean): void => {
     setConfig({ ...config, tools: [...config.tools, agentTool(action, confirm, crypto.randomUUID())] })
     setPendingTool(undefined)
-    setApproval(undefined)
+    setApproval(false)
   }
   return (
     <form
@@ -481,7 +481,7 @@ export function AgentSettings({
               label={t('agent.addTool')}
               onSelect={async (action) => {
                 setPendingTool(action)
-                setApproval(undefined)
+                setApproval(false)
                 return true
               }}
             />
@@ -494,12 +494,9 @@ export function AgentSettings({
                 <FieldLabel htmlFor={`${nodeId}-new-approval`}>{t('agent.execution')}</FieldLabel>
                 <NativeSelect
                   id={`${nodeId}-new-approval`}
-                  value={approval == null ? '' : approval ? 'confirm' : 'auto'}
-                  onChange={(event) => setApproval(event.target.value == '' ? undefined : event.target.value == 'confirm')}
+                  value={approval ? 'confirm' : 'auto'}
+                  onChange={(event) => setApproval(event.target.value == 'confirm')}
                 >
-                  <NativeSelectOption value="" disabled>
-                    {t('agent.chooseExecution')}
-                  </NativeSelectOption>
                   <NativeSelectOption value="auto">{t('agent.auto')}</NativeSelectOption>
                   <NativeSelectOption value="confirm">{t('agent.confirm')}</NativeSelectOption>
                 </NativeSelect>
@@ -507,14 +504,7 @@ export function AgentSettings({
               </Field>
               <FieldDescription>{t('agent.newParameters')}</FieldDescription>
               <div className="form-actions">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={approval == null}
-                  onClick={() => {
-                    if (approval != null) addTool(pendingTool, approval)
-                  }}
-                >
+                <Button type="button" size="sm" onClick={() => addTool(pendingTool, approval)}>
                   {t('agent.addTool')}
                 </Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => setPendingTool(undefined)}>
