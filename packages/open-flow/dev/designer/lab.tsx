@@ -11,6 +11,7 @@ import { Input } from '../../src/ui/browser/input.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
 import { StoryActions, StoryActionsProvider } from './storyActions.tsx'
 import { labStories } from './storyCatalog.tsx'
+import { StorySidebarLayout } from './storySidebar.tsx'
 import { StoryStage } from './storyStage.tsx'
 
 type ThemeMode = 'system' | 'light' | 'dark'
@@ -240,17 +241,19 @@ export function FrontendLab() {
             {story.description && <StoryDescription text={story.description} />}
             <StoryActions />
           </header>
-          <div className="lab-story-body">
-            {story.standalone ? (
-              <div className="standalone-stage" key={story.id}>
-                {story.render(log, dark, language)}
-              </div>
-            ) : (
-              <StoryStage dark={dark} i18n={i18n} key={story.id}>
-                {story.render(log, dark, language)}
-              </StoryStage>
-            )}
-          </div>
+          <StorySidebarLayout>
+            <div className="lab-story-body">
+              {story.standalone ? (
+                <div className="standalone-stage" key={story.id}>
+                  {story.render(log, dark, language)}
+                </div>
+              ) : (
+                <StoryStage dark={dark} i18n={i18n} key={story.id}>
+                  {story.render(log, dark, language)}
+                </StoryStage>
+              )}
+            </div>
+          </StorySidebarLayout>
           <footer className="lab-status" role="status" title={status}>
             {status}
           </footer>

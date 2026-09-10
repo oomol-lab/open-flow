@@ -55,7 +55,7 @@ Add production node boundary cases to `nodeStories.tsx`, layered card examples t
 
 Each `Trigger [name]` group contains **Node states**, **Run menu states**, and **Sidebar display & edit**. The four groups are Manual, Schedule, Webhook, and Provider. Provider opens representative Integration and Poll cases, including long enums, event arrays, nested payloads, missing configuration and account failures. Its selector exposes every registered provider without repeating their stories in the sidebar. Provider schemas and names come directly from the production registry; the Vite plugin sends only definition snapshots to the browser.
 
-Run panels are laid out open in the page, with empty, ready, invalid, starting and disabled cases. Manual and Schedule also show direct execution and downstream input requests. Sidebar cases use the full production `NodeInspector` with local transport responses and the production change reducer. Display, editing, missing configuration and account errors are separate visible samples; Webhook advanced settings start expanded. Node cases cover selection, diagnostics, execution states and long content.
+Run panels are laid out open in the page, with empty, ready, invalid, starting and disabled cases. Manual and Schedule also show direct execution and downstream input requests. Sidebar cases use the full production `NodeInspector` with local transport responses and the production change reducer. Display, editing, missing configuration and account errors are separate visible samples; Webhook advanced settings start expanded. Node cases cover selection, diagnostics, execution states and long content. Select one node to view its exact sample configuration in the read-only production inspector beside the canvas; one sample is selected on entry.
 
 Examples: `?story=trigger-webhook-nodes`, `?story=trigger-webhook-run`, `?story=trigger-webhook-sidebar`, and `?story=trigger-provider-run`. The generic `run-control-states` story remains a control-layout study with placeholder input content; provider-specific visual acceptance belongs in the Provider gallery. A selected provider is shareable through `?story=trigger-provider-run&provider=github-on-repo-event`.
 
@@ -79,3 +79,9 @@ Story 可通过可选的 `description` 配置说明文字，由 Lab 统一显示
 - **Canvas operations** (`?story=canvas-history`)：交互画布支持混合删除恢复、复制粘贴、移动、快捷键和文本焦点隔离；说明栏的 Hold saves / Release saves 控制模拟传输。
 - **Button states** (`?story=canvas-history-controls`)：并排展示空历史、可撤销、可重做、保存中及失败状态；说明栏的 Finish save 完成保存，失败样例可重试同步。
 - **Keyboard scope** (`?story=canvas-history-keyboard`)：两个独立编辑器覆盖焦点控件移除、文本编辑、对话框及宿主区域的快捷键隔离。
+
+## Story sidebar
+
+The Lab reserves an optional rounded sidebar beside the content frame, inside the Story card beneath its shared header. Use `useStorySidebar(content)` from `storySidebar.tsx` and include its returned portal in the Story's JSX. The portal preserves the caller's React providers and lifetime; selection and data remain owned by the Story. Pass `null` to hide the sidebar. Stories with multiple canvases must choose one active sidebar content, as the Provider trigger gallery does. The shell owns sidebar width, scrolling, rounded frame, and the gap beside the content frame. Story content fills this sidebar directly without another card or outer padding.
+
+Drag the centered three-dot handle in the 8px gap to resize the sidebar. Focus the handle to use Left/Right (Shift for larger steps), Home/End for width limits, or double-click to restore the default width. The sidebar stays within 60% of the available panel space.
