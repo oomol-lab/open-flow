@@ -3,7 +3,7 @@ import type { JsonValue } from '../../flow/common/change.ts'
 import { z } from 'zod'
 import { runStatuses } from '../../execution/common/runLifecycle.ts'
 import { resourceNameIssue } from '../../flow/common/change.ts'
-import { resultQuerySchema } from './results.ts'
+import { resultQuerySchema } from './resultQuery.ts'
 
 export const mcpProtocolVersion = '2026-07-28'
 const json: z.ZodType<JsonValue> = z.json()
