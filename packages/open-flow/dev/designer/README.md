@@ -14,6 +14,8 @@ The default **Cards · Content & records** gallery uses the production card, exe
 
 The **Nodes** section collects production canvas nodes under boundary inputs. Its **Condition / Node States** story covers empty, single and multiple cases, plus long rule labels, long output labels and both sides overflowing together.
 
+**Value / Node States** (`?story=node-value`) displays empty, primitive, structured, nullable, long-content and invalid values using the production canvas. The toolbar provides read-only and reset actions; canvas actions are logged.
+
 The **Theme Preview** group also contains:
 
 - **Node states**: idle, selected, waiting, running, success and error nodes together.

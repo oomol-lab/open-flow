@@ -182,6 +182,16 @@ body {
   }
 }
 
+.lab-search {
+  flex: none;
+  padding: 4px calc(var(--lab-column-gap) + 4px) 8px 4px;
+}
+.lab-search-empty {
+  margin: 0;
+  padding: 12px;
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+}
 .lab-navigation {
   flex: 1;
   min-height: 0;
