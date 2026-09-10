@@ -12,6 +12,7 @@ import { nodeNameIssue } from '../../../flow/common/change.ts'
 import { Button } from '../../../ui/browser/button.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../ui/browser/empty.tsx'
 import { IconifyProvider } from '../../../ui/browser/icons/iconifyContext.tsx'
+import { CanvasHistoryScope } from './editor/canvasHistoryScope.tsx'
 import { CommentInspector } from './editor/commentInspector.tsx'
 import { BlockLibrary, ContextPanel } from './editor/contextPanel.tsx'
 import { NodeHeading } from './editor/nodeHeading.tsx'
@@ -237,8 +238,17 @@ function Editor({
 
   const contextPanelVisible = contextPanelMode != null && target != null && (contextPanelMode == 'blocks' || revision != null)
 
+  const historyControls = {
+    state: history,
+    onUndo: () => void store.workspace.undo(),
+    onRedo: () => void store.workspace.redo(),
+    onRetry: () => void store.workspace.retryHistorySync(),
+  }
+
   return (
-    <div
+    <CanvasHistoryScope
+      history={historyControls}
+      disabled={authoringDisabled || target == null}
       aria-labelledby="workspace-tab-design"
       className={`editor-grid ${contextPanelVisible ? '' : 'context-panel-closed'}`}
       id="workspace-panel-design"
@@ -246,12 +256,7 @@ function Editor({
       tabIndex={0}
     >
       <WorkbenchCanvas
-        history={{
-          state: history,
-          onUndo: () => void store.workspace.undo(),
-          onRedo: () => void store.workspace.redo(),
-          onRetry: () => void store.workspace.retryHistorySync(),
-        }}
+        history={historyControls}
         ignoredNodeIds={ignoredNodeIds}
         onIgnoreNodes={onIgnoreNodes}
         runControl={
@@ -442,7 +447,7 @@ function Editor({
         store={store}
         visible={runDrawerVisible}
       />
-    </div>
+    </CanvasHistoryScope>
   )
 }
 

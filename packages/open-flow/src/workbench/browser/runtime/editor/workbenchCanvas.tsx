@@ -8,7 +8,6 @@ import type { CanvasHistoryControlsProps } from './canvasHistoryControls.tsx'
 
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
-import { isMac } from '../../../../canvas/browser/base/dom.ts'
 import { CanvasTooltip } from '../../../../canvas/browser/components/tooltip.tsx'
 import { FlowCanvasView } from '../../../../canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { Badge } from '../../../../ui/browser/badge.tsx'
@@ -279,14 +278,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     if (event.target instanceof Element && event.target.closest('[contenteditable="true"], [role="dialog"], .nokey')) return
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return
     const modifier = event.metaKey || event.ctrlKey
-    if (modifier && (event.key.toLowerCase() == 'z' || (!isMac && event.key.toLowerCase() == 'y'))) {
-      event.preventDefault()
-      const redo = event.shiftKey || event.key.toLowerCase() == 'y'
-      if (redo ? history?.state.canRedo : history?.state.canUndo) {
-        if (redo) history?.onRedo()
-        else history?.onUndo()
-      }
-    } else if (!modifier && event.key.toLocaleLowerCase() == 'a') {
+    if (!modifier && event.key.toLocaleLowerCase() == 'a') {
       event.preventDefault()
       openAddNode()
     } else if (modifier && event.key.toLocaleLowerCase() == 'c' && selectedNodeIds.length > 0) {
@@ -370,6 +362,8 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         }}
         onDisconnect={(edge) => onDeleteEdge(edge)}
         onDuplicate={(nodeIds, offset, positions) => {
+          // Cloning changes selection and unmounts the focused node toolbar.
+          canvas.current?.focus({ preventScroll: true })
           onSelectNodes(nodeIds)
           onDuplicate(positions, offset)
         }}
@@ -453,7 +447,7 @@ export function WorkbenchCanvasActions({
       <CanvasTooltip placement="top" title={t('designer.openBlocks')}>
         <Button
           aria-expanded={blocksOpen}
-          className="text-[13px]"
+          className="pr-3 text-[13px]"
           disabled={disabled}
           onClick={(event) => onOpenBlocks(event.currentTarget)}
           size="default"
@@ -466,7 +460,7 @@ export function WorkbenchCanvasActions({
       {runControl}
       {onAddTrigger != null && (
         <CanvasTooltip placement="top" title={t('designer.triggerDescription')}>
-          <Button className="text-[13px]" size="default" disabled={disabled} onClick={onAddTrigger} type="button" variant="outline">
+          <Button className="text-[13px]" size="default" disabled={disabled} onClick={onAddTrigger} type="button" variant="default">
             <Icon data-icon="inline-start" name="plus" /> {t('designer.addTriggerToRun')}
           </Button>
         </CanvasTooltip>

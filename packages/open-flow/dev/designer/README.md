@@ -74,5 +74,8 @@ Story 可通过可选的 `description` 配置说明文字，由 Lab 统一显示
 
 说明文字单行省略，只有截断时才提供悬停和键盘聚焦的全文 Tooltip。
 
-`?story=canvas-history` 使用生产 WorkspaceStore、WorkbenchCanvas 和 Flow reducer，展示空历史、可撤销、可重做、保存中及失败状态。
-下方交互画布支持混合删除恢复、复制粘贴、移动、快捷键和文本焦点隔离；Hold saves / Release saves 控制模拟传输，失败样例可重试同步。
+**Undo & Redo** 目录使用生产 WorkspaceStore、WorkbenchCanvas 和 Flow reducer，包含三个 Story：
+
+- **Canvas operations** (`?story=canvas-history`)：交互画布支持混合删除恢复、复制粘贴、移动、快捷键和文本焦点隔离；说明栏的 Hold saves / Release saves 控制模拟传输。
+- **Button states** (`?story=canvas-history-controls`)：并排展示空历史、可撤销、可重做、保存中及失败状态；说明栏的 Finish save 完成保存，失败样例可重试同步。
+- **Keyboard scope** (`?story=canvas-history-keyboard`)：两个独立编辑器覆盖焦点控件移除、文本编辑、对话框及宿主区域的快捷键隔离。

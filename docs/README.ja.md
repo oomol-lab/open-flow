@@ -238,7 +238,7 @@ bun run build
 - [プロダクトとアーキテクチャの境界](architecture.md)
 - [Control API](control/contracts/control-api.md)
 - [Command Artifact の配布契約](distribution/command-artifact.md)
-- [Workbench と Designer のフロントエンドに関する注意](authoring/frontend-ui.md)
+- [Workbench と Designer のフロントエンドに関する注意](../.agents/skills/frontend-ui/SKILL.md)
 - [Server のデプロイ](server/container-delivery.md)
 - [Docker イメージ (GHCR)](server/docker-ghcr/README.ja.md)
 - [Fly.io へのデプロイ](server/fly-io/README.ja.md)

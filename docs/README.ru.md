@@ -271,7 +271,7 @@ bun run build
 - [Границы продукта и архитектуры](architecture.md)
 - [Control API](control/contracts/control-api.md)
 - [Дистрибуция Command Artifact](distribution/command-artifact.md)
-- [Заметки по frontend Workbench и Designer](authoring/frontend-ui.md)
+- [Заметки по frontend Workbench и Designer](../.agents/skills/frontend-ui/SKILL.md)
 - [Развёртывание Server](server/container-delivery.md)
 - [Docker-образ в GHCR](server/docker-ghcr/README.ru.md)
 - [Развёртывание на Fly.io](server/fly-io/README.ru.md)

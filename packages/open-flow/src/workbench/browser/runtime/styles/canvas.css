@@ -48,7 +48,7 @@
   .designer-actions {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 2px;
   }
 
   .node-icon {

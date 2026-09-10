@@ -1,6 +1,6 @@
 # 前端架构重构记录
 
-首轮核心迁移已完成。本文件将迁移期间的重复日志压缩为结果摘要；当前边界以 [前端集成原则](../authoring/frontend-ui.md) 为准，本轮收尾及剩余工作见 [后续清单](frontend-refactor-followups.md)。历史实现名不构成当前约束。
+首轮核心迁移已完成。本文件将迁移期间的重复日志压缩为结果摘要；当前边界以 [前端集成原则](../../.agents/skills/frontend-ui/SKILL.md) 为准，本轮收尾及剩余工作见 [后续清单](frontend-refactor-followups.md)。历史实现名不构成当前约束。
 
 ## 已对齐要求
 

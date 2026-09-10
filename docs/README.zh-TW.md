@@ -233,7 +233,7 @@ SQLite volume 復原。不要在儲存庫根目錄直接執行 `bun test`，它�
 - [產品與架構邊界](architecture.md)
 - [Control API](control/contracts/control-api.md)
 - [Command Artifact 發布合約](distribution/command-artifact.md)
-- [Workbench 與 Designer 前端注意事項](authoring/frontend-ui.md)
+- [Workbench 與 Designer 前端注意事項](../.agents/skills/frontend-ui/SKILL.md)
 - [Server 部署](server/container-delivery.md)
 - [Docker 映像 (GHCR)](server/docker-ghcr/README.zh-TW.md)
 - [Fly.io 部署](server/fly-io/README.zh-TW.md)
