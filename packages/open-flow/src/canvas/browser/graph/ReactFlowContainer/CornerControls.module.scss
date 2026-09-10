@@ -11,20 +11,21 @@
     0 6px 18px rgb(0 0 0 / 5%);
 }
 
-.surface.surface > [data-slot='button'][aria-expanded='true'] {
+.surface.surface > [data-size][aria-expanded='true'] {
   color: var(--ui-muted-foreground);
   background: transparent;
 }
 
-.surface.surface > [data-slot='button'][aria-expanded='true']:hover {
+.surface.surface > [data-size][aria-expanded='true']:is(:hover, :focus-visible) {
   color: var(--ui-foreground);
   background: var(--ui-muted);
 }
 
 .surface [data-corner-icon] {
-  width: 1em;
-  height: 1em;
-  font-size: var(--canvas-control-icon-size);
+  width: 18px;
+  height: 18px;
+  flex: none;
+  font-size: 18px;
 }
 
 .corner.corner:global(.react-flow__panel) {

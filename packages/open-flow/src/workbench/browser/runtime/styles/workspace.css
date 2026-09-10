@@ -123,7 +123,6 @@
   }
 
   .run-control-group {
-    overflow: hidden;
     color: var(--ui-primary-foreground);
     border-radius: var(--ui-radius);
     background: var(--ui-primary);
@@ -139,6 +138,16 @@
     border-radius: 0;
     background: transparent;
     box-shadow: none;
+  }
+
+  .run-control-group > button:first-of-type {
+    border-start-start-radius: inherit;
+    border-end-start-radius: inherit;
+  }
+
+  .run-control-group > button:last-of-type {
+    border-start-end-radius: inherit;
+    border-end-end-radius: inherit;
   }
 
   .run-control-group :is(.run-control-main, .run-control-segment):hover,

@@ -1,8 +1,6 @@
 import styles from './NodeHead.module.scss'
 import type { TFunction } from 'val-i18n'
-import type { ReadonlyVal } from 'value-enhancer'
 import type { CanvasStore } from '../../../stores/canvas/canvas.store.ts'
-import type { FlowRunStatus } from '../../../stores/canvas/typings.ts'
 
 import { NodeToolbar, useViewport } from '@xyflow/react'
 import { memo } from 'react'
@@ -14,13 +12,10 @@ import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, Con
 import { coalesce, toTrue } from '../../../base/trivial.ts'
 import { CanvasTooltip } from '../../../components/tooltip.tsx'
 import { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
-import { NODE_STATUS } from '../../../stores/node/constants.ts'
 import { NodeStore } from '../../../stores/node/node.store.ts'
 import { useCanvasStore } from '../../CanvasStoreContext.tsx'
 import { useGetStaticPopupContainer } from '../../ReactFlowContainer/useGetPopupContainer.ts'
 import { useNodeStore } from '../NodeStoreContext.tsx'
-import { NodeStatusContent, NodeStatusIcon } from './NodeStatusLabel.tsx'
-import { useNodeStatus } from './useNodeStatus.ts'
 
 export function NodeHeadMoreMenu(): React.ReactElement {
   const canvasStore = useCanvasStore()
@@ -153,8 +148,7 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
   const floatBarItems = items.filter((item): item is ContextMenuActionItem => !!item)
 
   return (
-    <NodeToolbar className={styles.floatBar} offset={12 - 8 * zoom}>
-      {NodeStore.is(nodeStore) && <NodeStatus flowStatus$={canvasStore.$.runStatus} nodeStore={nodeStore} />}
+    <NodeToolbar data-tooltip-toolbar className={styles.floatBar} offset={12 - 8 * zoom}>
       {floatBarItems.map((item) => {
         return (
           <CanvasTooltip
@@ -180,37 +174,3 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
     </NodeToolbar>
   )
 })
-
-interface NodeStatusProps {
-  flowStatus$: ReadonlyVal<FlowRunStatus>
-  nodeStore: NodeStore
-}
-
-function NodeStatus({ flowStatus$, nodeStore }: NodeStatusProps): React.ReactNode {
-  const skip = useVal(nodeStore.ignore, true)
-  const content = useVal(nodeStore.content$)
-  const progress = content.run?.progress
-  const { status, count } = useNodeStatus(content.run?.status ?? NODE_STATUS.Idle, flowStatus$, content.run?.successCount)
-  const getPopupContainer = useGetStaticPopupContainer()
-
-  if (skip) return
-
-  switch (status) {
-    case NODE_STATUS.Success:
-    case NODE_STATUS.Error:
-    case NODE_STATUS.Running:
-    case NODE_STATUS.Waiting:
-      return (
-        <CanvasTooltip
-          className={styles.statusTooltip}
-          placement="top"
-          getPopupContainer={getPopupContainer}
-          title={<NodeStatusContent status={status} progress={progress} combo={count} />}
-        >
-          <span className={styles.floatBarStatus}>
-            <NodeStatusIcon status={status} progress={progress} loaderSize={18} />
-          </span>
-        </CanvasTooltip>
-      )
-  }
-}

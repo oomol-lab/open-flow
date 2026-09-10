@@ -835,7 +835,7 @@ function SelectionFloatBar(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
   if (props.nodes.length < 2) return null
 
   return (
-    <NodeToolbar className={nodeHeadStyles.floatBar} isVisible nodeId={props.nodes.map((node) => node.id)} offset={12 - 8 * zoom}>
+    <NodeToolbar data-tooltip-toolbar className={nodeHeadStyles.floatBar} isVisible nodeId={props.nodes.map((node) => node.id)} offset={12 - 8 * zoom}>
       {items
         .filter((item) => item.key !== '$delete' || props.editable)
         .map((item) => (

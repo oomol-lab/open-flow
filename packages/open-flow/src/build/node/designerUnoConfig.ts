@@ -1,3 +1,5 @@
+import type { IconifyJSON } from '@iconify/types'
+
 import { presetIcons } from '@unocss/preset-icons'
 import { defineConfig } from '@unocss/vite'
 import { glob, readFile } from 'node:fs/promises'
@@ -28,8 +30,18 @@ export default defineConfig({
       warn: true,
       collectionsNodeResolvePath: sourceRoot,
       collections: {
-        file: fileIcons,
-        custom: {
+        'lucide-light': async () => {
+          const collection: IconifyJSON = JSON.parse(await readFile(path.join(sourceRoot, 'node_modules/@iconify/json/json/lucide.json'), 'utf8'))
+          return {
+            ...collection,
+            prefix: 'lucide-light',
+            icons: Object.fromEntries(
+              Object.entries(collection.icons).map(([name, icon]) => [name, { ...icon, body: icon.body.replaceAll('stroke-width="2"', 'stroke-width="1.5"') }]),
+            ),
+          }
+        },
+        'file': fileIcons,
+        'custom': {
           mouse: `<svg viewBox="0 0 16 22" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M6.5 3V3.5C6.5 4.05228 6.94772 4.5 7.5 4.5V5H7C4.79086 5 3 6.79086 3 9V15C3 17.2091 4.79086 19 7 19H9C11.2091 19 13 17.2091 13 15V9C13 6.79086 11.2091 5 9 5H8.5V4.5C8.5 3.94772 8.05228 3.5 7.5 3.5V3H6.5ZM8.5 12V8H7.5V12H8.5ZM7 6H9C10.6569 6 12 7.34315 12 9V15C12 16.6569 10.6569 18 9 18H7C5.34315 18 4 16.6569 4 15V9C4 7.34315 5.34315 6 7 6Z" fill="currentColor"/></svg>`,
           touchpad: `<svg viewBox="0 0 22 22" fill="none"><path d="M13 13.5H9V14.5H13V13.5Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M4 7C4 5.89543 4.89543 5 6 5H16C17.1046 5 18 5.89543 18 7V15C18 16.1046 17.1046 17 16 17H6C4.89543 17 4 16.1046 4 15V7ZM6 6H16C16.5523 6 17 6.44772 17 7V15C17 15.5523 16.5523 16 16 16H6C5.44772 16 5 15.5523 5 15V7C5 6.44772 5.44772 6 6 6Z" fill="currentColor"/></svg>`,
           screen: `<svg viewBox="0 0 20 18" fill="none"><rect x="3" y="3" width="14" height="12" rx="1.5" stroke="currentColor" stroke-linejoin="bevel"/><path d="M5.98661 9.53347L8.11994 11.6668L7.42661 12.3601L4.43994 9.37347V8.68014L7.42661 5.64014L8.11994 6.3868L5.98661 8.52014H14.0133L11.8799 6.3868L12.5733 5.64014L15.5599 8.68014V9.37347L12.5733 12.3601L11.8799 11.6668L14.0133 9.53347H5.98661Z" fill="currentColor"/></svg>`,

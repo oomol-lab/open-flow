@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 
 import { useId, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { CanvasTooltip } from '../../../../canvas/browser/components/tooltip.tsx'
 import { defaultTriggerIcon } from '../../../../canvas/browser/graph/Nodes/components/constants.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import {
@@ -53,37 +54,33 @@ export function RunControl({
   return (
     <div className="run-control-shell" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} ref={setPopupContainer}>
       <div aria-label={triggerLabel} className="run-control-group" role="group">
-        <Button
-          aria-controls={inputStatus == 'none' ? undefined : 'run-input-popover'}
-          aria-expanded={inputStatus == 'none' ? undefined : inputOpen}
-          className="run-control-main text-[13px]"
-          disabled={disabled || starting}
-          onClick={onRun}
-          size="default"
-          title={title ?? triggerLabel}
-          type="button"
-        >
-          {starting ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" name="play" />}
-          <span className="max-w-40 truncate">{starting ? t('workspace.starting') : triggerLabel}</span>
-        </Button>
+        <CanvasTooltip placement="top" title={title ?? triggerLabel} getPopupContainer={() => popupContainer || document.body}>
+          <Button
+            aria-controls={inputStatus == 'none' ? undefined : 'run-input-popover'}
+            aria-expanded={inputStatus == 'none' ? undefined : inputOpen}
+            className="run-control-main text-[13px]"
+            disabled={disabled || starting}
+            onClick={onRun}
+            size="default"
+            type="button"
+          >
+            {starting ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" name="play" />}
+            <span className="max-w-40 truncate">{starting ? t('workspace.starting') : triggerLabel}</span>
+          </Button>
+        </CanvasTooltip>
         {inputStatus != 'none' && (
           <Popover onOpenChange={(open) => onInputOpenChange(open)} open={inputOpen} triggerId={inputOpen ? inputTriggerId : null}>
-            <PopoverTrigger
-              id={inputTriggerId}
-              render={
-                <Button
-                  aria-label={inputLabel}
-                  className="run-control-segment relative"
-                  disabled={disabled || starting}
-                  size="icon"
-                  title={inputLabel}
-                  type="button"
-                >
-                  <Icon name="task" />
-                  <span aria-hidden="true" className={`run-input-state status-dot ${inputStatus == 'ready' ? 'success' : 'running'}`} />
-                </Button>
-              }
-            />
+            <CanvasTooltip placement="top" title={inputLabel} getPopupContainer={() => popupContainer || document.body}>
+              <PopoverTrigger
+                id={inputTriggerId}
+                render={
+                  <Button aria-label={inputLabel} className="run-control-segment relative" disabled={disabled || starting} size="icon" type="button">
+                    <Icon name="task" />
+                    <span aria-hidden="true" className={`run-input-state status-dot ${inputStatus == 'ready' ? 'success' : 'running'}`} />
+                  </Button>
+                }
+              />
+            </CanvasTooltip>
             {inputContent != null && (
               <PopoverContent
                 align="end"
@@ -101,20 +98,15 @@ export function RunControl({
         )}
         {triggers.length > 1 && (
           <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  aria-label={t('runInput.selectTrigger')}
-                  className="run-control-segment"
-                  disabled={disabled || starting}
-                  size="icon"
-                  title={t('runInput.selectTrigger')}
-                  type="button"
-                >
-                  <Icon name="chevron-down" />
-                </Button>
-              }
-            />
+            <CanvasTooltip placement="top" title={t('runInput.selectTrigger')} getPopupContainer={() => popupContainer || document.body}>
+              <DropdownMenuTrigger
+                render={
+                  <Button aria-label={t('runInput.selectTrigger')} className="run-control-segment" disabled={disabled || starting} size="icon" type="button">
+                    <Icon name="chevron-down" />
+                  </Button>
+                }
+              />
+            </CanvasTooltip>
             <DropdownMenuContent align="end" className="w-64 max-w-(--available-width) p-1.5" container={popupContainer} side="top" sideOffset={10}>
               <DropdownMenuGroup>
                 <DropdownMenuLabel className="px-2 pt-1 pb-1.5 font-normal">{t('runInput.trigger')}</DropdownMenuLabel>

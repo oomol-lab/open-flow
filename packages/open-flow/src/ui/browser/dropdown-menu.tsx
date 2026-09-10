@@ -29,7 +29,10 @@ function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
   return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
 }
 
-function DropdownMenuTrigger({ handle: providedHandle, id: providedId, onClick, onMouseDown, ...props }: MenuPrimitive.Trigger.Props) {
+const DropdownMenuTrigger = React.forwardRef<HTMLButtonElement, MenuPrimitive.Trigger.Props>(function DropdownMenuTrigger(
+  { handle: providedHandle, id: providedId, onClick, onMouseDown, ...props },
+  ref,
+) {
   const rootHandle = React.useContext(DropdownMenuHandle)
   const generatedId = React.useId()
   const handle = providedHandle ?? rootHandle
@@ -37,6 +40,7 @@ function DropdownMenuTrigger({ handle: providedHandle, id: providedId, onClick, 
 
   return (
     <MenuPrimitive.Trigger
+      ref={ref}
       data-slot="dropdown-menu-trigger"
       handle={handle ?? undefined}
       id={id}
@@ -53,7 +57,7 @@ function DropdownMenuTrigger({ handle: providedHandle, id: providedId, onClick, 
       {...props}
     />
   )
-}
+})
 
 function DropdownMenuContent({
   align = 'start',

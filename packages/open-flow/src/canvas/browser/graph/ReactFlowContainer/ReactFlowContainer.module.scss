@@ -132,13 +132,26 @@
     0 12px 36px rgb(0 0 0 / 9%);
 }
 
+.island.island > [data-size] {
+  color: var(--ui-muted-foreground);
+
+  &:is(:hover, :focus-visible) {
+    color: var(--ui-foreground);
+  }
+}
+
 .dock {
   margin-bottom: 22px;
   max-width: calc(100% - 32px);
 }
 
 .viewDock {
-  font-size: var(--canvas-control-icon-size);
+  > [data-size] > i {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    font-size: 18px;
+  }
 }
 
 .createDock {
@@ -154,21 +167,11 @@
 }
 
 .interactiveModeTrigger {
-  padding-inline: 6px;
-
   > [data-mode-icon] {
     width: 18px;
     height: 18px;
     flex: none;
     font-size: 18px;
-  }
-
-  > [data-mode-chevron] {
-    width: 10px;
-    height: 10px;
-    flex: none;
-    color: var(--ui-muted-foreground);
-    font-size: 10px;
   }
 }
 
@@ -202,9 +205,14 @@
   }
 
   > i {
+    color: var(--ui-muted-foreground);
     width: 28px;
     height: 28px;
     font-size: 28px;
+  }
+
+  &:is(:hover, :focus-visible, [aria-checked='true']) > i {
+    color: var(--ui-foreground);
   }
 
   > strong {

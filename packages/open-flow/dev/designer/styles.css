@@ -74,29 +74,27 @@ select {
   overscroll-behavior: contain;
 }
 .lab-nav-section-label {
-  padding: 8px 10px;
+  padding: 4px 10px 6px;
   color: var(--lab-text-muted);
   font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.8px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
 }
 .lab-nav-group + .lab-nav-section-label {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--lab-border);
+  margin-top: 20px;
 }
 .lab-nav-group {
-  margin: 2px 0;
+  margin: 0;
 }
 .lab-nav-group > summary {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
-  padding: 8px 10px;
+  min-height: 32px;
+  padding: 6px 10px;
   border-radius: 7px;
-  color: var(--lab-text-muted);
+  color: var(--lab-text);
   cursor: pointer;
   list-style: none;
   font-size: 13px;
@@ -112,13 +110,14 @@ select {
 }
 .lab-nav-group[data-active] > summary {
   color: var(--lab-text);
-  font-weight: 600;
+  font-weight: 500;
 }
 .lab-nav-chevron {
   flex: none;
   width: 5px;
   height: 5px;
   margin-right: 2px;
+  color: var(--lab-text-muted);
   border-right: 1px solid currentColor;
   border-bottom: 1px solid currentColor;
   transform: rotate(-45deg);
@@ -142,6 +141,7 @@ select {
   font-weight: 400;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  opacity: 0.7;
 }
 .lab-nav-items {
   position: relative;
@@ -206,7 +206,7 @@ select {
   flex: none;
   width: 14px;
   height: 14px;
-  color: inherit;
+  color: var(--lab-text-muted);
 }
 .lab-story-heading > strong {
   display: flex;
