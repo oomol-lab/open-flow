@@ -25,6 +25,7 @@ import type {
 } from './api.ts'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionView.ts'
 
+import { dequal } from 'dequal/lite'
 import { triggerPayloadSchema } from '../../../flow/common/schema.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
@@ -872,4 +873,57 @@ export function eventSubject(event: RunEvent, t?: TFunction, nodeTitles?: Readon
   const nodeId = event.payload.nodeId
   if (typeof nodeId == 'string') return nodeTitles?.get(nodeId) ?? nodeId
   return event.kind.startsWith('run.') ? (t?.('run.flowSubject') ?? 'Flow run') : (t?.('run.nodeSubject') ?? 'Node')
+}
+
+/** Only changed node presentation is retained; viewport navigation is never restored. */
+export interface CanvasPresentationChange {
+  readonly before: Readonly<Record<string, JsonValue>>
+  readonly after: Readonly<Record<string, JsonValue>>
+  readonly nodeIds: readonly string[]
+  readonly beforeOrder: readonly string[]
+  readonly afterOrder: readonly string[]
+}
+
+export function canvasPresentationChange(
+  before: Readonly<Record<string, JsonValue>>,
+  after: Readonly<Record<string, JsonValue>>,
+  target: GraphTarget,
+): CanvasPresentationChange {
+  const first = normalizedTarget(before, target)
+  const last = normalizedTarget(after, target)
+  const nodeIds = new Set<string>()
+  for (const field of ['nodes', 'comments']) {
+    const previous = record(first[field]) ?? {}
+    const next = record(last[field]) ?? {}
+    for (const id of new Set([...Object.keys(previous), ...Object.keys(next)])) {
+      if (!dequal(previous[id], next[id])) nodeIds.add(id)
+    }
+  }
+  const select = (value: Record<string, JsonValue>): Record<string, JsonValue> =>
+    Object.fromEntries(
+      ['nodes', 'comments'].map((field) => [field, Object.fromEntries(Object.entries(record(value[field]) ?? {}).filter(([id]) => nodeIds.has(id)))]),
+    )
+  return { before: select(first), after: select(last), nodeIds: [...nodeIds], beforeOrder: savedOrder(before, target), afterOrder: savedOrder(after, target) }
+}
+
+export function restoreCanvasPresentation(
+  value: Readonly<Record<string, JsonValue>>,
+  target: GraphTarget,
+  change: CanvasPresentationChange,
+  redo: boolean,
+): Readonly<Record<string, JsonValue>> {
+  if (change.nodeIds.length == 0) return value
+  const current = normalizedTarget(value, target)
+  const saved = redo ? change.after : change.before
+  for (const field of ['nodes', 'comments']) {
+    const next = { ...record(current[field]) }
+    const source = record(saved[field]) ?? {}
+    for (const id of change.nodeIds) {
+      if (source[id] == null) delete next[id]
+      else next[id] = source[id]!
+    }
+    current[field] = next
+  }
+  current.order = [...(redo ? change.afterOrder : change.beforeOrder)]
+  return { ...value, designer: replacePresentationTarget(designerPresentation(value), target, current) }
 }

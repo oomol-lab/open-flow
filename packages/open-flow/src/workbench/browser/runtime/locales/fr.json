@@ -872,5 +872,25 @@
     "variable": "Variable",
     "mode": "Type",
     "connected": "Relié à une source en amont. Modifiez-la dans les sources d’entrée."
+  },
+  "history": {
+    "undo": "Annuler",
+    "redo": "Rétablir",
+    "add": "Ajouter {{count}} nœuds",
+    "delete": "Supprimer {{count}} nœuds",
+    "paste": "Coller {{count}} nœuds",
+    "connect": "Connecter les nœuds",
+    "disconnect": "Déconnecter les nœuds",
+    "move": "Déplacer {{count}} nœuds",
+    "cleared": "L’historique du canevas a été effacé après la modification du contenu.",
+    "tooLarge": "Cette action dépasse la capacité de l’historique et ne peut pas être annulée.",
+    "external": "L’historique du canevas a été effacé après une mise à jour externe.",
+    "resynced": "L’enregistrement n’a pas abouti. L’historique a été effacé et l’état enregistré a été rechargé. Certaines modifications ont pu être enregistrées.",
+    "syncFailed": "Impossible de recharger l’état enregistré. L’annulation est désactivée. Relancez la synchronisation.",
+    "retry": "Relancer la synchronisation",
+    "addOne": "Ajouter 1 nœuds",
+    "deleteOne": "Supprimer 1 nœuds",
+    "pasteOne": "Coller 1 nœuds",
+    "moveOne": "Déplacer 1 nœuds"
   }
 }

@@ -872,5 +872,25 @@
     "variable": "Variable",
     "mode": "類型",
     "connected": "已連接上游來源，可在輸入來源中修改。"
+  },
+  "history": {
+    "undo": "復原",
+    "redo": "重做",
+    "add": "新增 {{count}} 個節點",
+    "delete": "刪除 {{count}} 個節點",
+    "paste": "貼上 {{count}} 個節點",
+    "connect": "連接節點",
+    "disconnect": "中斷連線",
+    "move": "移動 {{count}} 個節點",
+    "cleared": "內容已修改，畫布操作歷史已清空。",
+    "tooLarge": "本次操作超出歷史容量限制，無法復原。",
+    "external": "偵測到外部更新，畫布操作歷史已清空。",
+    "resynced": "儲存未完成，操作歷史已清空並重新載入實際儲存狀態。部分修改可能已儲存。",
+    "syncFailed": "無法重新載入儲存狀態，復原已停用。請重試同步。",
+    "retry": "重試同步",
+    "addOne": "新增 1 個節點",
+    "deleteOne": "刪除 1 個節點",
+    "pasteOne": "貼上 1 個節點",
+    "moveOne": "移動 1 個節點"
   }
 }

@@ -7,6 +7,7 @@ import { cardStories } from './cards.tsx'
 import { commentPropertiesStory } from './commentProperties.tsx'
 import { conditionEditorStory } from './conditionEditor.tsx'
 import { formStory } from './form.tsx'
+import { historyStory } from './history.tsx'
 import { libraryStory } from './library.tsx'
 import { llmStory } from './llm.tsx'
 import { markdownStory } from './markdown.tsx'
@@ -50,6 +51,7 @@ const codeEditorStory: FrontendStory = {
 }
 
 export const labStories: readonly FrontendStory[] = [
+  historyStory,
   ...nodeStories,
   commentPropertiesStory,
   ...triggerStories,

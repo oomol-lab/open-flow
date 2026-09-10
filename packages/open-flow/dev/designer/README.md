@@ -71,3 +71,6 @@ Story 可通过可选的 `description` 配置说明文字，由 Lab 统一显示
 示例辅助按钮通过 `useStoryActions([{ label, onClick, disabled? }])` 声明（从 `./storyActions.tsx` 导入），每个 Story 由一个组件注册。回调和状态留在 Story 中，Lab 统一在说明栏右侧渲染按钮。画布自身的运行、缩放和节点操作仍属于被展示组件。
 
 说明文字单行省略，只有截断时才提供悬停和键盘聚焦的全文 Tooltip。
+
+`?story=canvas-history` 使用生产 WorkspaceStore、WorkbenchCanvas 和 Flow reducer，展示空历史、可撤销、可重做、保存中及失败状态。
+下方交互画布支持混合删除恢复、复制粘贴、移动、快捷键和文本焦点隔离；Hold saves / Release saves 控制模拟传输，失败样例可重试同步。
