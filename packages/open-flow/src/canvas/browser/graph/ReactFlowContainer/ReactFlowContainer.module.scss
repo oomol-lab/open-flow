@@ -173,46 +173,49 @@
 }
 
 .interactiveModePanel.interactiveModePanel {
-  width: min(520px, calc(100cqw - 32px));
-  padding: 24px;
+  width: min(360px, calc(100cqw - 32px));
+  padding: 10px;
 }
 
 .interactiveModeChoices.interactiveModeChoices {
   display: grid;
   width: 100%;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
 .interactiveModeChoice.interactiveModeChoice {
   width: 100%;
   height: auto;
-  min-height: 176px;
+  min-height: 140px;
   flex-direction: column;
-  gap: 10px;
-  padding: 20px;
+  gap: 8px;
+  padding: 16px 12px;
+  border-radius: var(--ui-radius);
   text-align: center;
   white-space: normal;
 
   &[aria-checked='true'] {
     border-color: var(--ui-primary);
-    background: color-mix(in oklch, var(--ui-primary) 10%, transparent);
-    color: var(--ui-primary);
+    background: var(--ui-secondary);
+    color: var(--ui-foreground);
   }
 
   > i {
-    width: 48px;
-    height: 48px;
-    font-size: 48px;
+    width: 28px;
+    height: 28px;
+    font-size: 28px;
   }
 
   > strong {
-    font-size: 16px;
-    line-height: 1.25;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.5;
   }
 
   > span {
     color: var(--ui-muted-foreground);
+    font-size: 12px;
     font-weight: 400;
     line-height: 1.5;
   }
@@ -239,15 +242,11 @@
     display: none;
   }
 
-  .interactiveModePanel {
-    padding: 18px;
-  }
-
-  .interactiveModeChoices {
+  .interactiveModeChoices.interactiveModeChoices {
     grid-template-columns: 1fr;
   }
 
-  .interactiveModeChoice {
-    min-height: 132px;
+  .interactiveModeChoice.interactiveModeChoice {
+    min-height: 120px;
   }
 }
