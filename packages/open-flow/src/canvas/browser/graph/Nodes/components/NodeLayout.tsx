@@ -69,6 +69,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const card = cardStore ? (
     <CanvasNode
       nodeStore={cardStore}
+      compact={canvasMiniMapPhase !== NodeMiniMapPhase.None}
       showError={showError}
       branches={branches?.map((branch) => {
         const summary =

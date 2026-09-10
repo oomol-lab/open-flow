@@ -36,7 +36,7 @@ import { getRFEdgeId } from '../edge/edge.store.ts'
 import { deriveEdges } from '../edge/edges.ts'
 import { CommentNodeStore } from '../node/commentNode.store.ts'
 import { NodeStore } from '../node/node.store.ts'
-import { NodeMiniMapPhase } from './nodeMiniMap.ts'
+import { getNodeMinimap, NodeMiniMapPhase } from './nodeMiniMap.ts'
 import { createRFCommand } from './rfCommand.ts'
 import { FLOW_RUN_STATUS } from './typings.ts'
 
@@ -186,7 +186,7 @@ export class CanvasStore {
       ),
       rfNodes,
       rfEdges,
-      nodeMiniMapPhase: this.dispose.add(val(NodeMiniMapPhase.None)),
+      nodeMiniMapPhase: this.dispose.add(compute((get) => getNodeMinimap(get(nodes.$).size + get(commentNodes.$).size, get(viewport)?.zoom ?? 1))),
     }
     this.#syncModel(model)
   }

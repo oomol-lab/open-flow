@@ -385,6 +385,10 @@ function NodeContentStory({
   const [model, setModel] = useState(initialModel)
   const [generation, setGeneration] = useState(0)
   useStoryActions([
+    {
+      label: 'Toggle all content',
+      onClick: () => setModel((value) => ({ ...value, nodes: value.nodes.map((node) => ({ ...node, contentHidden: !node.contentHidden })) })),
+    },
     { label: editable ? 'Switch to read-only' : 'Enable editing', onClick: () => setEditable((value) => !value) },
     {
       label: 'Reset samples',
@@ -439,7 +443,7 @@ function NodeContentStory({
 }
 
 const contentModel: FlowCanvasViewModel = {
-  edges: [],
+  edges: [{ id: 'schedule-values', source: 'schedule', sourceHandle: '$out', target: 'values', targetHandle: '$in' }],
   viewport: { x: 46, y: 76, zoom: 0.65 },
   nodes: [
     {
@@ -468,7 +472,7 @@ const contentModel: FlowCanvasViewModel = {
       outputs: [],
       position: { x: 760, y: 0 },
       reference: 'sample',
-      description: 'Summarize the latest report.',
+      description: 'Summarize the latest report.\nInclude findings, sources and follow-up actions.',
       tools: [{ id: 'search', label: 'Search', icon: ':lucide:search:' }],
       run: { status: 'success' },
     },
@@ -487,13 +491,73 @@ const contentModel: FlowCanvasViewModel = {
   ],
 }
 
+function NodeZoomStory({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
+  const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes('zoom')
+  const [selected, setSelected] = useState<readonly string[]>([])
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, padding: 16, height: '100%' }}>
+      {[0.5, 0.35, 0.18].map((zoom) => (
+        <section key={zoom} style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', minHeight: 440 }}>
+          <h3>
+            {Math.round(zoom * 100)}% · {zoom >= 0.4 ? 'Full content' : 'Icon + title'}
+          </h3>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <FlowCanvasView
+              identity={`lab:node-zoom:${zoom}`}
+              editable
+              ignoredNodeIds={ignoredNodeIds}
+              onIgnoreNodes={onIgnoreNodes}
+              addItems={[]}
+              selectedNodeIds={selected}
+              onSelectionChange={setSelected}
+              onAddNode={() => undefined}
+              onConnect={(edge) => log('edge.connect', edge)}
+              onDisconnect={(edge) => log('edge.disconnect', edge)}
+              onDeleteNodes={(ids) => log('node.delete', ids)}
+              onDuplicate={(ids) => log('node.duplicate', ids)}
+              onPaste={(position) => log('canvas.paste', position)}
+              onMoveNodes={(positions) => log('node.move', positions)}
+              autoLayout={false}
+              layoutMotion={false}
+              dark={dark}
+              language={language}
+              model={{
+                ...contentModel,
+                viewport: { x: 24, y: 32, zoom },
+                nodes: contentModel.nodes
+                  .filter((node) => node.kind !== 'comment')
+                  .map((node, index) =>
+                    Object.assign({}, node, {
+                      title: node.id === 'empty' ? 'A long node title that truncates to a single line' : node.title,
+                      diagnostics: node.id === 'empty' ? 1 : undefined,
+                      position: { x: 0, y: [0, 150, 300, 540, 710][index]! },
+                    }),
+                  ),
+              }}
+              onMoveViewport={(viewport) => log('canvas.move', viewport)}
+            />
+          </div>
+        </section>
+      ))}
+    </div>
+  )
+}
+
 export const nodeStories: readonly FrontendStory[] = [
+  {
+    group: 'Canvas',
+    id: 'node-zoom',
+    title: 'Node zoom',
+    description: 'Full and simplified nodes at 50%, 35% and 18%. Zoom across 40% to inspect stable card sizes and branch ports.',
+    standalone: true,
+    render: (log, dark, language) => <NodeZoomStory dark={dark} language={language} log={log} />,
+  },
   {
     group: 'Canvas',
     id: 'node-content',
     title: 'Node content',
     description:
-      'Collapse content before Delete. Schedule, Value, Task and Comment support it; empty nodes and Condition do not. Run status and branches remain visible.',
+      'Compare height transitions with Toggle all content or each node toolbar. Read-only, empty and Condition nodes omit the collapse action. Run status and branches remain visible.',
     standalone: true,
     render: (log, dark, language) => <NodeContentStory dark={dark} language={language} log={log} initialModel={contentModel} initialSelection="schedule" />,
   },

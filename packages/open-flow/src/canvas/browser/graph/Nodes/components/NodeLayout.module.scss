@@ -172,6 +172,7 @@
 }
 
 .executionHandle.executionHandle {
+  visibility: visible;
   top: calc(50% - 8px);
   margin-top: 0;
   --bg: var(--edge-primitive);
