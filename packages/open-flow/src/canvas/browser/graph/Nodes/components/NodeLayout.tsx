@@ -8,7 +8,7 @@ import type { CanvasStore } from '../../../stores/canvas/canvas.store.ts'
 
 import { useConnection, useNodeConnections, useStoreApi } from '@xyflow/react'
 import { clsx } from 'clsx'
-import { memo, useCallback, useRef } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { DEFAULT_POSITION } from '../../../base/canvas.ts'
@@ -46,6 +46,8 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const editable = useVal(canvasStore.$.editable)
   const contentWidth$ = nodeStore.interaction.contentWidth
   const selected = useVal(nodeStore.$.selected)
+  const [hovered, setHovered] = useState(false)
+  const hintRequested = (hovered || selected === true) && visible
   const skip = useVal(NodeStore.to(nodeStore)?.ignore)
   const showError = useShowNodeError(nodeStore)
   const cardStore = NodeStore.is(nodeStore) ? nodeStore : undefined
@@ -87,7 +89,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
               </span>
             )}
             <span className={styles.branchName}>{branch}</span>
-            <ExecutionHandle id={toRFHandleName(`$branch:${branch}` as HandleName)} type="output" isConnectable={editable} />
+            <ExecutionHandle id={toRFHandleName(`$branch:${branch}` as HandleName)} type="output" isConnectable={editable} hintRequested={hintRequested} />
           </div>
         )
       })}
@@ -110,16 +112,26 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
             <NodeFloatBar canvasStore={canvasStore} nodeStore={nodeStore} />
             <NodeMinimap />
             {!cardStore && <div data-pos="w" className={`${styles.resizeHandle} ${styles.resizeHandleW}`} onPointerDown={handleTrack} />}
-            <main ref={containerRef} className={clsx(styles.container, styles.cardContainer, skip && styles.skip)} style={containerStyle}>
+            <main
+              onPointerEnter={(event) => {
+                if (event.pointerType !== 'touch') setHovered(true)
+              }}
+              onPointerLeave={() => setHovered(false)}
+              ref={containerRef}
+              className={clsx(styles.container, styles.cardContainer, skip && styles.skip)}
+              style={containerStyle}
+            >
               <div className={styles.executionHead}>
                 {card ? (
                   <NodeHeadContextMenu canvasStore={canvasStore}>{card}</NodeHeadContextMenu>
                 ) : CommentNodeStore.is(nodeStore) ? (
                   <CommentCard store={nodeStore} />
                 ) : null}
-                {executionInput && <ExecutionHandle id={toRFHandleName('$in' as HandleName)} type="input" isConnectable={editable} />}
+                {executionInput && (
+                  <ExecutionHandle id={toRFHandleName('$in' as HandleName)} type="input" isConnectable={editable} hintRequested={hintRequested} />
+                )}
                 {nodeStore.nodeType != NODE_TYPE.CommentNode && branches == null && (
-                  <ExecutionHandle id={toRFHandleName('$out' as HandleName)} type="output" isConnectable={editable} />
+                  <ExecutionHandle id={toRFHandleName('$out' as HandleName)} type="output" isConnectable={editable} hintRequested={hintRequested} />
                 )}
               </div>
             </main>
@@ -131,17 +143,49 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   )
 })
 
-function ExecutionHandle({ id, type, isConnectable }: Pick<HandleProps, 'id' | 'type' | 'isConnectable'>) {
+function ExecutionHandle({ id, type, isConnectable, hintRequested }: Pick<HandleProps, 'id' | 'type' | 'isConnectable'> & { hintRequested: boolean }) {
   const handleType = type == 'input' ? 'target' : 'source'
-  const connections = useNodeConnections({ handleType, handleId: id })
+  // Any connection on this side makes all of its ports visible and suppresses hints.
+  const sideConnections = useNodeConnections({ handleType })
   const connecting = useConnection((connection) => connection.inProgress && connection.fromHandle.type != handleType)
+  const inProgress = useConnection((connection) => connection.inProgress)
+  const canHint = isConnectable && sideConnections.length === 0 && !inProgress
+  const showHint = hintRequested && canHint
+  const [hintMounted, setHintMounted] = useState(false)
+  const [hintFinished, setHintFinished] = useState(false)
+  useEffect(() => {
+    if (!showHint) {
+      const timer = window.setTimeout(() => setHintMounted(false), 320)
+      return () => window.clearTimeout(timer)
+    }
+    setHintMounted(false)
+    setHintFinished(false)
+    const appear = window.setTimeout(() => setHintMounted(true), 3000)
+    // Twelve 800ms rounds, then fade while the movement continues.
+    const fade = window.setTimeout(() => setHintFinished(true), 3000 + 12 * 800)
+    const remove = window.setTimeout(() => setHintMounted(false), 3000 + 12 * 800 + 320)
+    return () => {
+      window.clearTimeout(appear)
+      window.clearTimeout(fade)
+      window.clearTimeout(remove)
+    }
+  }, [showHint])
   return (
     <Handle
       id={id}
       type={type}
       isConnectable={isConnectable}
-      className={clsx(styles.executionHandle, connections.length > 0 && styles.connected, isConnectable && connecting && styles.connecting)}
-    />
+      className={clsx(styles.executionHandle, sideConnections.length > 0 && styles.connected, isConnectable && connecting && styles.connecting)}
+    >
+      {canHint && hintMounted && (
+        <span
+          aria-hidden="true"
+          className={clsx(styles.connectionHint, type === 'input' && styles.inputHint, (!showHint || hintFinished) && styles.hintLeaving)}
+        >
+          <i className={type === 'input' ? 'i-lucide:chevron-left' : 'i-lucide:chevron-right'} />
+        </span>
+      )}
+    </Handle>
   )
 }
 

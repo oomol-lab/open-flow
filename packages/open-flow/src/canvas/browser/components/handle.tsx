@@ -18,6 +18,7 @@ export interface HandleProps {
   kind?: HandleKind
   disabled?: boolean
   isConnectable?: boolean
+  children?: React.ReactNode
   onPointerDown?: React.PointerEventHandler<HTMLDivElement>
   tabIndex?: number
   ariaHidden?: React.AriaAttributes['aria-hidden']
@@ -51,6 +52,7 @@ export function Handle(props: HandleProps): React.ReactElement | null {
         tabIndex={props.tabIndex}
         aria-hidden={props.ariaHidden}
       />
+      {props.children}
     </div>
   )
 }
