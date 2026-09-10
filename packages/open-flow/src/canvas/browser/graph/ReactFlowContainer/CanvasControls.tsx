@@ -11,10 +11,16 @@ import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/
 import { cn } from '../../../../ui/browser/utils.ts'
 import { useGetStaticPopupContainer } from './useGetPopupContainer.ts'
 
-export function CanvasInteractiveMode({ interactiveMode$ }: { readonly interactiveMode$: Val<InteractiveMode> }) {
+export function CanvasInteractiveMode({
+  interactiveMode$,
+  defaultOpen = false,
+}: {
+  readonly interactiveMode$: Val<InteractiveMode>
+  readonly defaultOpen?: boolean
+}) {
   const t = useTranslate()
   const mode = useVal(interactiveMode$)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const getPopupContainer = useGetStaticPopupContainer()
 
   return (
@@ -37,6 +43,7 @@ export function CanvasInteractiveMode({ interactiveMode$ }: { readonly interacti
       <PopoverContent
         align="end"
         className={styles.interactiveModePanel}
+        data-canvas-control-scope
         container={typeof document == 'undefined' ? undefined : getPopupContainer()}
         side="bottom"
       >

@@ -256,6 +256,49 @@ function CanvasChromeStory({
   )
 }
 
+function InteractionModeStory({ dark, language }: { readonly dark: boolean; readonly language: UiLanguage }) {
+  const i18n = useMemo(() => createDesignerI18n(language), [language])
+  const mouse$ = useMemo(() => val<'mouse' | 'touchpad'>('mouse'), [])
+  const touchpad$ = useMemo(() => val<'mouse' | 'touchpad'>('touchpad'), [])
+  useEffect(() => () => i18n.dispose(), [i18n])
+  return (
+    <I18nProvider i18n={i18n}>
+      <div
+        className="open-flow-workbench open-flow-canvas-root open-flow-theme"
+        data-surface="canvas"
+        data-theme={dark ? 'dark' : 'light'}
+        style={{ display: 'grid', width: '100%', alignSelf: 'start', gap: 24, padding: 24, gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}
+      >
+        {(
+          [
+            ['Mouse selected', mouse$],
+            ['Touchpad selected', touchpad$],
+          ] as const
+        ).map(([label, mode]) => (
+          <InteractionModeSample key={label} label={label} mode={mode} />
+        ))}
+      </div>
+    </I18nProvider>
+  )
+}
+
+function InteractionModeSample({ label, mode }: { readonly label: string; readonly mode: ReturnType<typeof val<'mouse' | 'touchpad'>> }) {
+  const [container, setContainer] = useState<HTMLDivElement | null>(null)
+  const popup = useMemo(() => ({ default: () => container || document.body, static: () => container || document.body }), [container])
+  return (
+    <div style={{ position: 'relative', minHeight: 256, containerType: 'inline-size' }} ref={setContainer}>
+      <div className="mb-4 text-sm text-muted-foreground">{label}</div>
+      {container && (
+        <GetPopupContainerContext.Provider value={popup}>
+          <div className="flex justify-end">
+            <CanvasInteractiveMode defaultOpen interactiveMode$={mode} />
+          </div>
+        </GetPopupContainerContext.Provider>
+      )}
+    </div>
+  )
+}
+
 function RunControlSample({
   defaultOpen = false,
   disabled = false,
@@ -374,6 +417,13 @@ function Field({ children, label }: { readonly children: ReactNode; readonly lab
 }
 
 export const stories: readonly FrontendStory[] = [
+  {
+    group: 'Canvas',
+    id: 'interaction-mode',
+    render: (_log, dark, language) => <InteractionModeStory dark={dark} language={language} />,
+    standalone: true,
+    title: 'Interaction Mode',
+  },
   { group: 'Controls', id: 'select', render: (log) => <SelectStory log={log} />, title: 'Select' },
   { group: 'Controls', id: 'multi-select', render: (log) => <MultiSelectStory log={log} />, title: 'Multi Select' },
   { group: 'Controls', id: 'date-time', render: (log) => <DateTimeStory log={log} />, title: 'Date & Time' },
