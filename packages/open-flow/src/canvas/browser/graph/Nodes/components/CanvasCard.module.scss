@@ -1,7 +1,8 @@
 .card {
-  // Tone and state resolve one stroke; border, selection ring and shadow consume it.
+  // Tone and state share a stroke; elevation stays neutral.
   --card-stroke: var(--node-border-color);
   --card-selection-stroke: var(--node-selected-border-color);
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 3%), 0 4px 12px rgb(0 0 0 / 3%);
   position: relative;
   width: 100%;
   padding: 8px;
@@ -9,9 +10,7 @@
   border-radius: 20px;
   background: var(--fill-3);
   color: var(--text-4);
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 3%),
-    0 4px 12px rgb(0 0 0 / 3%);
+  box-shadow: var(--card-shadow);
 }
 
 .comment {
@@ -29,7 +28,7 @@
   --card-stroke: var(--card-selection-stroke);
   box-shadow:
     0 0 0 1px var(--card-stroke),
-    0 8px 24px color-mix(in srgb, var(--card-stroke) 16%, transparent);
+    var(--card-shadow);
 }
 
 .problem {
