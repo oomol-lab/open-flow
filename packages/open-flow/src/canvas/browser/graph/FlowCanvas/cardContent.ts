@@ -17,16 +17,7 @@ export function conditionBranchSummary(node: Omit<FlowCanvasViewConditionNode, '
   return node.defaultOutput == output ? t('condition.default') : ''
 }
 
-export function nodeSummary(node: NodeContent, t: TFunction): string {
-  if (node.kind == 'trigger') {
-    const schedule = node.presentation?.schedules
-      .map((item) =>
-        item.type == 'cron' ? `${item.expression} · ${item.timezone}` : t('canvasCard.every', { value: item.value, unit: t(`canvasCard.units.${item.unit}`) }),
-      )
-      .join('\n')
-    if (schedule) return schedule
-    return node.description?.trim() || ''
-  }
+export function nodeSummary(node: NodeContent): string {
   if (node.kind == 'condition') {
     return node.description?.trim() || ''
   }

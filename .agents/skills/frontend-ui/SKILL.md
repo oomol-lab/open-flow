@@ -59,6 +59,13 @@ result without requiring numerically equal padding. Keep spacing between peer co
 and make optical adjustments inside the control. Reuse shared sizing conventions; do not turn a
 local pixel adjustment into a universal value.
 
+For compact canvas node content, consider the Condition row padding as a starting point:
+`5px 14px 5px 12px` (top, right, bottom, left). Schedule content uses the same padding;
+its rules within one panel have a separate `12px` row gap. These are recommended reference
+values, not requirements. Adjust for typography, content, and visual balance in Lab.
+Treat row gaps and outer padding independently so increasing space between rows does not
+unnecessarily enlarge the top and bottom edges of a single-row panel.
+
 ## Standalone Value Forms
 
 `src/form` owns controlled JSON value editing and Schema validation without depending on canvas

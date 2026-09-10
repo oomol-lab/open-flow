@@ -68,7 +68,9 @@
     font-size: 14px;
     font-weight: 600;
     line-height: 20px;
-    overflow-wrap: anywhere;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   > span {
     font-size: 11px;

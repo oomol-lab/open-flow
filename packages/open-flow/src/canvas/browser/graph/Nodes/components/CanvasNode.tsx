@@ -3,27 +3,31 @@ import type { ReactNode } from 'react'
 import type { NodeStore } from '../../../stores/node/node.store.ts'
 
 import { useVal } from 'use-value-enhancer'
-import { useTranslate } from 'val-i18n-react'
+import { useLang, useTranslate } from 'val-i18n-react'
 import { ContentIcon } from '../../../../../ui/browser/icons/ContentIcon.tsx'
 import { NODE_HANDLE_CLASSNAME } from '../../../base/canvas.ts'
 import { CanvasTooltip } from '../../../components/tooltip.tsx'
 import { imageSources, nodeSummary } from '../../FlowCanvas/cardContent.ts'
+import { cronDescription, cronLabel } from '../../FlowCanvas/cronDescription.ts'
+import { timeZoneLabel } from '../../FlowCanvas/timeZoneLabel.ts'
 import { CanvasCard } from './CanvasCard.tsx'
 import { iconForNodeType } from './constants.ts'
 import { RunChips, ImagePreview } from './RunChips.tsx'
 
 export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeStore: NodeStore; readonly showError: boolean; readonly branches?: ReactNode }) {
   const t = useTranslate()
+  const language = useLang()
   const selected = useVal(nodeStore.$.selected)
   const node = useVal(nodeStore.content$)
   const title = node.title
   const icon = node.icon ?? (node.kind == 'wait' ? ':carbon:time:' : undefined)
   const tools = node.kind == 'task' ? node.tools : undefined
-  const summary = nodeSummary(node, t)
+  const summary = nodeSummary(node)
+  const schedules = node.kind == 'trigger' ? node.presentation?.schedules : undefined
   const images = imageSources(node?.run?.outputs)
   const problem = showError ? t('nodeStatus.hasError') : node?.run?.status == 'error' ? t('canvasCard.status.error') : undefined
   const kind = node?.kind ?? 'task'
-  const inline = node?.kind == 'trigger' && summary && !summary.includes('\n') && summary.length <= 48
+  const inline = node?.kind == 'trigger' && !schedules?.length && summary && !summary.includes('\n') && summary.length <= 48
   const subtitle = inline ? summary : node?.kind == 'task' ? node.executorName || t('canvasCard.kind.task') : t(`canvasCard.kind.${kind}`)
   const distinctSubtitle = subtitle.trim().toLocaleLowerCase() == title.trim().toLocaleLowerCase() ? undefined : subtitle
   const toolContent = tools != null && tools.length > 0 && (
@@ -74,7 +78,51 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
             </div>
           ) : undefined
         }
-        preview={node?.run && images.length > 0 ? <ImagePreview images={images} run={node.run} title={title} /> : undefined}
+        preview={
+          (Boolean(schedules?.length) || (node?.run != null && images.length > 0)) && (
+            <>
+              {schedules != null && schedules.length > 0 && (
+                <ul className={styles.schedules}>
+                  {schedules.map((schedule, index) => {
+                    const description = schedule.type === 'cron' ? cronDescription(schedule.expression, language) : undefined
+                    return (
+                      <li key={index}>
+                        {schedule.type == 'cron' ? (
+                          <>
+                            <CanvasTooltip
+                              placement="top"
+                              sideOffset={12}
+                              title={
+                                <div>
+                                  <div>{description}</div>
+                                  {description !== schedule.expression && <code>{schedule.expression}</code>}
+                                </div>
+                              }
+                            >
+                              <span className={styles.scheduleText} tabIndex={0}>
+                                {cronLabel(schedule.expression, language, t)}
+                              </span>
+                            </CanvasTooltip>
+                            <CanvasTooltip placement="top" sideOffset={12} title={<code>{schedule.timezone}</code>}>
+                              <span className={styles.timezone} tabIndex={0}>
+                                <bdi dir="ltr">{timeZoneLabel(schedule.timezone, t)}</bdi>
+                              </span>
+                            </CanvasTooltip>
+                          </>
+                        ) : (
+                          <span className={`${styles.interval} ${styles.scheduleText}`}>
+                            {t('canvasCard.every', { value: schedule.value, unit: t(`canvasCard.shortUnits.${schedule.unit}`) })}
+                          </span>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+              {node?.run && images.length > 0 && <ImagePreview images={images} run={node.run} title={title} />}
+            </>
+          )
+        }
       >
         {!inline && summary && (
           <p className={styles.summary} title={summary}>

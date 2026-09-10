@@ -594,6 +594,38 @@
       "week": "週",
       "month": "か月"
     },
-    "tools": "ツール"
+    "tools": "ツール",
+    "scheduleDaily": "毎日",
+    "scheduleMonthEnd": "月末",
+    "scheduleDays": "毎月{{days}}日",
+    "shortUnits": {
+      "minute": "分",
+      "hour": "時間",
+      "day": "日",
+      "week": "週",
+      "month": "か月"
+    },
+    "scheduleRange": "{{start}}から{{end}}まで"
+  },
+  "timeZoneNames": {
+    "Asia/Shanghai": "上海",
+    "Asia/Taipei": "台北",
+    "Asia/Hong_Kong": "香港",
+    "Asia/Tokyo": "東京",
+    "Asia/Seoul": "ソウル",
+    "Asia/Singapore": "シンガポール",
+    "Asia/Kolkata": "コルカタ",
+    "Asia/Dubai": "ドバイ",
+    "America/New_York": "ニューヨーク",
+    "America/Los_Angeles": "ロサンゼルス",
+    "America/Chicago": "シカゴ",
+    "America/Argentina/Buenos_Aires": "ブエノスアイレス",
+    "America/Sao_Paulo": "サンパウロ",
+    "Europe/London": "ロンドン",
+    "Europe/Paris": "パリ",
+    "Europe/Berlin": "ベルリン",
+    "Europe/Moscow": "モスクワ",
+    "Australia/Sydney": "シドニー",
+    "Pacific/Auckland": "オークランド"
   }
 }

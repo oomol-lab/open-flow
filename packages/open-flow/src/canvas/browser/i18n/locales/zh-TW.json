@@ -594,6 +594,38 @@
       "week": "週",
       "month": "個月"
     },
-    "tools": "工具"
+    "tools": "工具",
+    "scheduleDaily": "每天",
+    "scheduleMonthEnd": "月底",
+    "scheduleDays": "每月 {{days}} 日",
+    "shortUnits": {
+      "minute": "分鐘",
+      "hour": "小時",
+      "day": "天",
+      "week": "週",
+      "month": "個月"
+    },
+    "scheduleRange": "{{start}}至{{end}}"
+  },
+  "timeZoneNames": {
+    "Asia/Shanghai": "上海",
+    "Asia/Taipei": "台北",
+    "Asia/Hong_Kong": "香港",
+    "Asia/Tokyo": "東京",
+    "Asia/Seoul": "首爾",
+    "Asia/Singapore": "新加坡",
+    "Asia/Kolkata": "加爾各答",
+    "Asia/Dubai": "杜拜",
+    "America/New_York": "紐約",
+    "America/Los_Angeles": "洛杉磯",
+    "America/Chicago": "芝加哥",
+    "America/Argentina/Buenos_Aires": "布宜諾斯艾利斯",
+    "America/Sao_Paulo": "聖保羅",
+    "Europe/London": "倫敦",
+    "Europe/Paris": "巴黎",
+    "Europe/Berlin": "柏林",
+    "Europe/Moscow": "莫斯科",
+    "Australia/Sydney": "雪梨",
+    "Pacific/Auckland": "奧克蘭"
   }
 }
