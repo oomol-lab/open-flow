@@ -275,9 +275,9 @@
   justify-content: center;
   position: absolute;
   left: 20px;
-  top: 1px;
-  width: 14px;
-  height: 14px;
+  top: 0;
+  width: 16px;
+  height: 16px;
   color: var(--execution-port-color);
   opacity: 0;
   pointer-events: none;
@@ -289,6 +289,11 @@
   }
 }
 
+// Match the port's active color while its hit target is hovered.
+.executionHandle > :global(.react-flow__handle):hover ~ .connectionHint {
+  color: var(--execution-port-active-color);
+}
+
 .inputHint {
   --hint-nudge: -2px;
   left: auto;
@@ -297,7 +302,7 @@
 
 // The component ends the sequence after twelve rounds; keep moving through the fade.
 .connectionHint {
-  opacity: 0.65;
+  opacity: 1;
   transition: opacity 320ms ease-out;
 
   @starting-style {
