@@ -10,7 +10,7 @@ The default **Cards · Content & records** gallery uses the production card, exe
 
 **Workflow components** shows the single execution canvas with a bottom command dock and a sidebar for the selected node. It includes Task, Trigger, Condition, Value, Subflow and Comment nodes, grouped inputs and Variable bindings. **Reset samples** restores the sample layout and selection.
 
-The **Node Cases** group collects production canvas nodes under boundary inputs. Its **Condition** story covers empty, single and multiple cases, plus long rule labels, long output labels and both sides overflowing together.
+The **Nodes** section collects production canvas nodes under boundary inputs. Its **Condition / Node States** story covers empty, single and multiple cases, plus long rule labels, long output labels and both sides overflowing together.
 
 The **Theme Preview** group also contains:
 
@@ -46,3 +46,15 @@ Add production node boundary cases to `nodeStories.tsx`, layered card examples t
 `?story=node-picker` 使用生产画布的新增节点菜单，覆盖分组、搜索、禁用项、服务动作二级选项，以及从执行端口拉线后创建节点的回调。点击底部 Add node 打开菜单；从任务左侧输入端拉到空白处可检查连接方向与不兼容项。样例只记录动作，不写入业务数据。
 
 `?story=agent-tools` uses production AgentSettings, WorkspaceStore and ConnectorStore. Its HTTP fixture provides tools and active/expired accounts, and applies draft changes with the production reducer. It covers parameter sources, approval, validation and read-only controls without external requests.
+
+## Trigger galleries
+
+Each `Trigger [name]` group contains **Node states**, **Run menu states**, and **Sidebar display & edit**. The four groups are Manual, Schedule, Webhook, and Provider. Provider opens representative Integration and Poll cases, including long enums, event arrays, nested payloads, missing configuration and account failures. Its selector exposes every registered provider without repeating their stories in the sidebar. Provider schemas and names come directly from the production registry; the Vite plugin sends only definition snapshots to the browser.
+
+Run panels are laid out open in the page, with empty, ready, invalid, starting and disabled cases. Manual and Schedule also show direct execution and downstream input requests. Sidebar cases use the full production `NodeInspector` with local transport responses and the production change reducer. Display, editing, missing configuration and account errors are separate visible samples; Webhook advanced settings start expanded. Node cases cover selection, diagnostics, execution states and long content.
+
+Examples: `?story=trigger-webhook-nodes`, `?story=trigger-webhook-run`, `?story=trigger-webhook-sidebar`, and `?story=trigger-provider-run`. The generic `run-control-states` story remains a control-layout study with placeholder input content; provider-specific visual acceptance belongs in the Provider gallery. A selected provider is shareable through `?story=trigger-provider-run&provider=github-on-repo-event`.
+
+The sidebar uses collapsible groups with story links underneath. The current group opens and scrolls into view when entering a story directly. Multiple groups can stay open for comparison; each group can also be collapsed with the keyboard. The top bar shows the current group and story.
+
+Directory icons are configured in `storyGroupIcons` in `lab.tsx`, using complete literal UnoCSS classes such as `i-carbon:flow`. `StoryGroup.icon` is optional; directories without an icon remain text-only. Individual stories and page headings do not own icons. The Lab UnoCSS configuration scans its source files and scopes the generated utilities to `.lab-shell`.

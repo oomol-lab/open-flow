@@ -430,6 +430,7 @@ export function WorkbenchCanvasActions({
     <div className="designer-actions">
       <Button
         aria-expanded={blocksOpen}
+        className="text-[13px]"
         disabled={disabled}
         onClick={(event) => onOpenBlocks(event.currentTarget)}
         size="default"
@@ -441,7 +442,15 @@ export function WorkbenchCanvasActions({
       </Button>
       {runControl}
       {onAddTrigger != null && (
-        <Button size="default" disabled={disabled} onClick={onAddTrigger} title={t('designer.triggerDescription')} type="button" variant="outline">
+        <Button
+          className="text-[13px]"
+          size="default"
+          disabled={disabled}
+          onClick={onAddTrigger}
+          title={t('designer.triggerDescription')}
+          type="button"
+          variant="outline"
+        >
           <Icon data-icon="inline-start" name="plus" /> {t('designer.addTriggerToRun')}
         </Button>
       )}

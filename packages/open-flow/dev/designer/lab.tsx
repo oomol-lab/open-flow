@@ -5,7 +5,7 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { Background, Controls, ReactFlow } from '@xyflow/react'
 import { Monitor, Moon, Sun } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { GetPopupContainerContext } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
@@ -26,6 +26,7 @@ import { overviewStories } from './overview.tsx'
 import { scheduleStory } from './schedule.tsx'
 import { stories } from './stories.tsx'
 import { triggerConfigStory } from './triggerConfig.tsx'
+import { triggerStories } from './triggerStories.tsx'
 import { additionalInputsStory, groupedInputsStory, outputPortsStory, valueNodeStory } from './valueNode.tsx'
 import { variablesStory } from './variables.tsx'
 import { webhookStory } from './webhook.tsx'
@@ -73,6 +74,7 @@ const codeEditorStory: FrontendStory = {
 
 const labStories: readonly FrontendStory[] = [
   ...nodeStories,
+  ...triggerStories,
   ...cardStories,
   ...workflowStories,
   ...stories,
@@ -95,6 +97,84 @@ const labStories: readonly FrontendStory[] = [
   codeEditorStory,
   ...overviewStories,
 ]
+
+// Directory icons belong to navigation metadata, not individual stories.
+const storyGroupIcons: Readonly<Record<string, `i-${string}`>> = {
+  'Node Condition': 'i-carbon:flow',
+  'Canvas': 'i-carbon:template',
+  'Theme Preview': 'i-carbon:color-palette',
+  'Workbench': 'i-carbon:settings-adjust',
+  'Controls': 'i-carbon:settings',
+  'Popup': 'i-carbon:overflow-menu-horizontal',
+  'Trigger Manual': 'i-carbon:play',
+  'Trigger Schedule': 'i-carbon:event-schedule',
+  'Trigger Webhook': 'i-carbon:webhook',
+}
+
+const storyGroups = [...new Set(labStories.map((entry) => entry.group))].map((name) => ({
+  name,
+  icon: storyGroupIcons[name] ?? (name.startsWith('Trigger ') ? 'i-carbon:flash' : undefined),
+  entries: labStories.filter((entry) => entry.group === name),
+}))
+
+function StoryGroup({
+  icon,
+  name,
+  entries,
+  selected,
+  onSelect,
+}: {
+  readonly icon?: `i-${string}`
+  readonly name: string
+  readonly entries: readonly FrontendStory[]
+  readonly selected: FrontendStory
+  readonly onSelect: (story: FrontendStory) => void
+}) {
+  const active = selected.group === name
+  const label = name.replace(/^(?:Trigger|Node) /, '')
+  const [open, setOpen] = useState(active)
+  const id = useId()
+  const currentLink = useRef<HTMLAnchorElement>(null)
+  useEffect(() => {
+    if (active) setOpen(true)
+  }, [active, selected.id])
+  useEffect(() => {
+    if (!active || !open) return
+    const frame = requestAnimationFrame(() => currentLink.current?.scrollIntoView({ block: 'nearest' }))
+    return () => cancelAnimationFrame(frame)
+  }, [active, open, selected.id])
+  return (
+    <details className="lab-nav-group" data-active={active || undefined} open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary aria-controls={id}>
+        <span className="lab-nav-chevron" aria-hidden="true" />
+        {icon && <i aria-hidden="true" className={`lab-nav-icon ${icon}`} />}
+        <span className="lab-nav-group-name" title={label}>
+          {label}
+        </span>
+        <span className="lab-nav-count" aria-hidden="true">
+          {entries.length}
+        </span>
+      </summary>
+      <div className="lab-nav-items" id={id}>
+        {entries.map((entry) => (
+          <a
+            aria-current={entry.id === selected.id ? 'page' : undefined}
+            href={`?story=${encodeURIComponent(entry.id)}`}
+            key={entry.id}
+            ref={entry.id === selected.id ? currentLink : undefined}
+            onClick={(event) => {
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+              event.preventDefault()
+              onSelect(entry)
+            }}
+          >
+            <span>{entry.title === 'Sidebar display & edit' ? 'Sidebar' : entry.title}</span>
+          </a>
+        ))}
+      </div>
+    </details>
+  )
+}
 
 function initialStory(): FrontendStory {
   const requested = new URLSearchParams(location.search).get('story')
@@ -133,24 +213,34 @@ export function FrontendLab() {
     <div className="lab-shell open-flow-theme" data-theme={dark ? 'dark' : 'light'}>
       <aside className="lab-sidebar">
         <div className="lab-brand">
-          <strong>Open Flow Lab</strong>
+          <strong>Open Flow</strong>
+          <span className="lab-brand-badge">Lab</span>
         </div>
-        {[...new Set(labStories.map((entry) => entry.group))].map((group) => (
-          <section key={group}>
-            <h2>{group}</h2>
-            {labStories
-              .filter((entry) => entry.group == group)
-              .map((entry) => (
-                <button className={entry.id == story.id ? 'active' : ''} key={entry.id} onClick={() => selectStory(entry)}>
-                  {entry.title}
-                </button>
-              ))}
-          </section>
-        ))}
+        <nav className="lab-navigation" aria-label="Stories">
+          <div className="lab-nav-section-label">Components</div>
+          {storyGroups
+            .filter((group) => !/^(?:Trigger|Node) /.test(group.name))
+            .map((group) => (
+              <StoryGroup key={group.name} {...group} selected={story} onSelect={selectStory} />
+            ))}
+          <div className="lab-nav-section-label">Nodes</div>
+          {storyGroups
+            .filter((group) => group.name.startsWith('Node '))
+            .map((group) => (
+              <StoryGroup key={group.name} {...group} selected={story} onSelect={selectStory} />
+            ))}
+          <div className="lab-nav-section-label">Triggers</div>
+          {storyGroups
+            .filter((group) => group.name.startsWith('Trigger '))
+            .map((group) => (
+              <StoryGroup key={group.name} {...group} selected={story} onSelect={selectStory} />
+            ))}
+        </nav>
       </aside>
       <main className="lab-main">
         <header className="lab-toolbar">
-          <div>
+          <div className="lab-story-heading">
+            <span title={story.group}>{story.group.replace(/^Node /, 'Nodes / ')}</span>
             <strong>{story.title}</strong>
           </div>
           <div aria-label="Theme" className="toolbar-segment toolbar-icons">
