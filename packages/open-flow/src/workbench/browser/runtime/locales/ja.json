@@ -674,7 +674,7 @@
     "editReady": "保存済みのテストデータを編集",
     "remembered": "テストデータはこの編集セッション中に保持され、ワークフローは変更されません。",
     "startTest": "テストを開始",
-    "testTrigger": "{{name}}をテスト",
+    "testTrigger": "テスト {{name}}",
     "triggerCount": "開始ノード {{count}} 件",
     "triggerDataHint": "この Trigger のサンプルデータを入力して、テストを開始します。",
     "triggerData": "トリガーデータ",

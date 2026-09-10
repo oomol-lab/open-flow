@@ -326,32 +326,13 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           </Button>
         }
         toolbar={
-          <div className="designer-actions">
-            <Button
-              aria-expanded={blocksOpen}
-              disabled={disabled || target == null}
-              onClick={(event) => onOpenBlocks(event.currentTarget)}
-              size="default"
-              title={t('designer.openBlocks')}
-              type="button"
-              variant="ghost"
-            >
-              <Icon data-icon="inline-start" name="plus" /> {t('designer.addNode')}
-            </Button>
-            {runControl}
-            {needsTrigger && model.nodes.length > 0 && manualTrigger != null && (
-              <Button
-                size="default"
-                disabled={disabled}
-                onClick={() => void addRecommended(manualTrigger)}
-                title={t('designer.triggerDescription')}
-                type="button"
-                variant="outline"
-              >
-                <Icon data-icon="inline-start" name="plus" /> {t('designer.addTriggerToRun')}
-              </Button>
-            )}
-          </div>
+          <WorkbenchCanvasActions
+            blocksOpen={blocksOpen}
+            disabled={disabled || target == null}
+            onOpenBlocks={onOpenBlocks}
+            runControl={runControl}
+            onAddTrigger={needsTrigger && model.nodes.length > 0 && manualTrigger != null ? () => void addRecommended(manualTrigger) : undefined}
+          />
         }
         onAddNode={async (itemId, position, connection) => {
           if (itemId == browseProviderTriggersId) {
@@ -430,3 +411,40 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     </section>
   )
 })
+
+export function WorkbenchCanvasActions({
+  blocksOpen,
+  disabled,
+  onOpenBlocks,
+  runControl,
+  onAddTrigger,
+}: {
+  readonly blocksOpen: boolean
+  readonly disabled: boolean
+  readonly onOpenBlocks: (opener: HTMLButtonElement) => void
+  readonly runControl?: ReactNode
+  readonly onAddTrigger?: () => void
+}): ReactElement {
+  const t = useTranslate()
+  return (
+    <div className="designer-actions">
+      <Button
+        aria-expanded={blocksOpen}
+        disabled={disabled}
+        onClick={(event) => onOpenBlocks(event.currentTarget)}
+        size="default"
+        title={t('designer.openBlocks')}
+        type="button"
+        variant="ghost"
+      >
+        <Icon data-icon="inline-start" name="plus" /> {t('designer.addNode')}
+      </Button>
+      {runControl}
+      {onAddTrigger != null && (
+        <Button size="default" disabled={disabled} onClick={onAddTrigger} title={t('designer.triggerDescription')} type="button" variant="outline">
+          <Icon data-icon="inline-start" name="plus" /> {t('designer.addTriggerToRun')}
+        </Button>
+      )}
+    </div>
+  )
+}

@@ -153,6 +153,10 @@
     font-weight: 600;
   }
 
+  .run-control-main:only-child {
+    padding-inline-end: 16px;
+  }
+
   .run-control-group .run-control-segment {
     width: 32px;
   }

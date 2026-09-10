@@ -14,7 +14,9 @@ import { CommentInspector } from '../../src/workbench/browser/runtime/editor/com
 import { NodeDescription } from '../../src/workbench/browser/runtime/editor/nodeDescription.tsx'
 import { NodeInputs } from '../../src/workbench/browser/runtime/editor/nodeInputs.tsx'
 import { PortDefinitionEditor } from '../../src/workbench/browser/runtime/editor/portDefinitionEditor.tsx'
+import { WorkbenchCanvasActions } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
+import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
 
 const pickerCatalog: readonly FlowCanvasViewAddItem[] = [
   { id: 'javascript', type: 'scriptlet', label: 'JavaScript', description: 'Run a script.', group: 'Blocks', inputs: [], outputs: [] },
@@ -248,6 +250,8 @@ function WorkflowStory({
   readonly picker?: boolean
 }) {
   const i18n = useMemo(() => createI18n(language), [language])
+  const triggers = model.nodes.filter((node) => node.kind === 'trigger')
+  const [selectedTriggerId, setSelectedTriggerId] = useState(triggers[0]?.id ?? '')
   const [version, setVersion] = useState(0)
   const [addNodeRequest, setAddNodeRequest] = useState<FlowCanvasViewProps['addNodeRequest']>()
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(String(version))
@@ -271,7 +275,7 @@ function WorkflowStory({
           </Button>
         </div>
         <div className={`workflow-study-grid ${model == states ? 'workflow-study-states' : ''}`}>
-          <div className="workflow-canvas">
+          <div className="workflow-canvas open-flow-workbench">
             <FlowCanvasView
               ignoredNodeIds={ignoredNodeIds}
               onIgnoreNodes={onIgnoreNodes}
@@ -284,18 +288,28 @@ function WorkflowStory({
               editable
               model={model}
               toolbar={
-                <>
-                  {picker && (
-                    <Button size="sm" onClick={() => setAddNodeRequest({ position: { x: 100, y: 100 }, onComplete: () => setAddNodeRequest(undefined) })}>
-                      Add node
-                    </Button>
-                  )}
-                  <Button size="sm" onClick={() => log('run.request')}>
-                    Run sample
-                  </Button>
-                </>
+                <WorkbenchCanvasActions
+                  blocksOpen={addNodeRequest != null}
+                  disabled={false}
+                  onOpenBlocks={() => setAddNodeRequest({ position: { x: 100, y: 100 }, onComplete: () => setAddNodeRequest(undefined) })}
+                  runControl={
+                    triggers.length > 0 ? (
+                      <RunControl
+                        disabled={false}
+                        inputOpen={false}
+                        inputStatus="none"
+                        onInputOpenChange={(open) => log('run.inputs', open)}
+                        onRun={() => log('run.request', selectedTriggerId)}
+                        onSelectTrigger={setSelectedTriggerId}
+                        selectedTriggerId={selectedTriggerId}
+                        starting={false}
+                        triggers={triggers}
+                      />
+                    ) : undefined
+                  }
+                />
               }
-              addItems={picker ? pickerCatalog : []}
+              addItems={pickerCatalog}
               addNodeRequest={addNodeRequest}
               selectedNodeIds={selected}
               onAddNode={(item, position, connection) => {

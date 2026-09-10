@@ -28,8 +28,8 @@ import { Field as UiField, FieldLabel } from '../../src/ui/browser/field.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../src/ui/browser/popover.tsx'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../../src/ui/browser/select.tsx'
 import { Textarea } from '../../src/ui/browser/textarea.tsx'
+import { WorkbenchCanvasActions } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
 import { createI18n as createWorkbenchI18n } from '../../src/workbench/browser/runtime/i18n.ts'
-import { Icon } from '../../src/workbench/browser/runtime/icons.tsx'
 import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
 
 export type LogAction = (name: string, value?: unknown) => void
@@ -286,44 +286,46 @@ function RunControlSample({
         <span>{inputStatus == 'none' ? 'No test data' : inputStatus == 'ready' ? 'Test data ready' : 'Test data required'}</span>
       </div>
       <CanvasChromeStory language={language} log={log} miniMapOpen={miniMapOpen}>
-        <>
-          <Button size="default" type="button" variant="ghost">
-            <Icon data-icon="inline-start" name="plus" /> Add node
-          </Button>
-          <RunControl
-            disabled={disabled}
-            inputContent={
-              <div className="run-control-story-inputs">
-                <header>
-                  <strong>Test data</strong>
-                  <span>{triggers.find((trigger) => trigger.id == selectedTriggerId)?.title}</span>
-                </header>
-                <UiField>
-                  <FieldLabel htmlFor={`story-payload-${label}`}>payload</FieldLabel>
-                  <Textarea defaultValue={'{\n  "event": "created"\n}'} id={`story-payload-${label}`} rows={4} />
-                </UiField>
-                <Button onClick={() => log('run-control.start', selectedTriggerId)} size="sm">
-                  Start test
-                </Button>
-              </div>
-            }
-            inputOpen={inputOpen}
-            inputStatus={inputStatus}
-            onInputOpenChange={(open) => {
-              setInputOpen(open)
-              log('run-control.inputs', open)
-            }}
-            onRun={() => log('run-control.run', selectedTriggerId)}
-            onSelectTrigger={(triggerId) => {
-              setInputOpen(false)
-              setSelectedTriggerId(triggerId)
-              log('run-control.trigger', triggerId)
-            }}
-            selectedTriggerId={selectedTriggerId}
-            starting={starting}
-            triggers={triggers}
-          />
-        </>
+        <WorkbenchCanvasActions
+          blocksOpen={false}
+          disabled={disabled}
+          onOpenBlocks={() => log('blocks.open')}
+          runControl={
+            <RunControl
+              disabled={disabled}
+              inputContent={
+                <div className="run-control-story-inputs">
+                  <header>
+                    <strong>Test data</strong>
+                    <span>{triggers.find((trigger) => trigger.id == selectedTriggerId)?.title}</span>
+                  </header>
+                  <UiField>
+                    <FieldLabel htmlFor={`story-payload-${label}`}>payload</FieldLabel>
+                    <Textarea defaultValue={'{\n  "event": "created"\n}'} id={`story-payload-${label}`} rows={4} />
+                  </UiField>
+                  <Button onClick={() => log('run-control.start', selectedTriggerId)} size="sm">
+                    Start test
+                  </Button>
+                </div>
+              }
+              inputOpen={inputOpen}
+              inputStatus={inputStatus}
+              onInputOpenChange={(open) => {
+                setInputOpen(open)
+                log('run-control.inputs', open)
+              }}
+              onRun={() => log('run-control.run', selectedTriggerId)}
+              onSelectTrigger={(triggerId) => {
+                setInputOpen(false)
+                setSelectedTriggerId(triggerId)
+                log('run-control.trigger', triggerId)
+              }}
+              selectedTriggerId={selectedTriggerId}
+              starting={starting}
+              triggers={triggers}
+            />
+          }
+        />
       </CanvasChromeStory>
     </section>
   )
