@@ -20,7 +20,12 @@ import { designerGraph } from '../../src/workbench/browser/runtime/workspace.ts'
 import { triggerDraft, triggerFixtures } from './triggerFixtures.ts'
 import { createTriggerSession } from './triggerSession.ts'
 
-type StoryProps = { fixture: TriggerFixture; dark: boolean; language: UiLanguage; log: LogAction }
+type StoryProps = {
+  fixture: TriggerFixture
+  dark: boolean
+  language: UiLanguage
+  log: LogAction
+}
 function Gallery({ children, dark, language }: { children: ReactNode; dark: boolean; language: UiLanguage }) {
   const i18n = useMemo(() => createI18n(language), [language])
   useEffect(() => () => i18n.dispose(), [i18n])
@@ -39,9 +44,17 @@ function NodeStory({ fixture, dark, language, log }: StoryProps) {
   const [selected, setSelected] = useState<readonly string[]>(['selected'])
   const model = useMemo<FlowCanvasViewModel>(() => {
     const schedules = trigger.kind === 'cron' ? trigger.cronTimes : trigger.kind === 'poll' ? trigger.pollTimes : []
-    const base = designerGraph(triggerDraft(trigger).draft, { kind: 'flow' }).nodes.find((node) => node.kind === 'trigger')!
+    const base = designerGraph(triggerDraft(trigger).draft, {
+      kind: 'flow',
+    }).nodes.find((node) => node.kind === 'trigger')!
     const source = base.kind === 'trigger' ? base.presentation?.source : undefined
-    const cases: readonly { id: string; title: string; status?: FlowCanvasViewNodeRun['status']; diagnostics?: number; description?: string }[] = [
+    const cases: readonly {
+      id: string
+      title: string
+      status?: FlowCanvasViewNodeRun['status']
+      diagnostics?: number
+      description?: string
+    }[] = [
       { id: 'idle', title: 'Idle' },
       { id: 'selected', title: 'Selected' },
       { id: 'unconfigured', title: 'Unconfigured', diagnostics: 1 },
@@ -54,7 +67,11 @@ function NodeStory({ fixture, dark, language, log }: StoryProps) {
         title: `${trigger.name} · Orders received from all regional stores requiring manual review`,
         description: 'A long description of the trigger and the events it receives, to inspect wrapping and card height.',
       },
-      { id: 'description', title: 'With description', description: trigger.description ?? 'Starts this workflow with a test event.' },
+      {
+        id: 'description',
+        title: 'With description',
+        description: trigger.description ?? 'Starts this workflow with a test event.',
+      },
     ]
     return {
       edges: [],
@@ -69,7 +86,11 @@ function NodeStory({ fixture, dark, language, log }: StoryProps) {
           outputs: base.outputs,
           position: { x: (index % 3) * 420, y: Math.floor(index / 3) * 210 },
           diagnostics: entry.diagnostics,
-          presentation: { kind: trigger.kind, schedules: entry.id === 'unconfigured' ? [] : schedules, source },
+          presentation: {
+            kind: trigger.kind,
+            schedules: entry.id === 'unconfigured' ? [] : schedules,
+            source,
+          },
           run: entry.status
             ? {
                 status: entry.status,
@@ -83,9 +104,6 @@ function NodeStory({ fixture, dark, language, log }: StoryProps) {
   }, [fixture, trigger])
   return (
     <div className="workflow-story">
-      <div className="overview-toolbar open-flow-workbench">
-        <span>{trigger.name} · node states, configuration and long content</span>
-      </div>
       <div className="workflow-canvas">
         <FlowCanvasView
           identity={`lab:trigger:${fixture.id}`}
@@ -116,7 +134,10 @@ function NodeStory({ fixture, dark, language, log }: StoryProps) {
 
 type RunState = 'empty' | 'ready' | 'invalid' | 'starting' | 'direct' | 'disabled'
 function RunSample({ fixture, dark, language, log, state, downstream = false }: StoryProps & { state: RunState; downstream?: boolean }) {
-  const [resource, setResource] = useState<{ store: RunRequestStore; inputs: ReturnType<typeof triggerDraft> }>()
+  const [resource, setResource] = useState<{
+    store: RunRequestStore
+    inputs: ReturnType<typeof triggerDraft>
+  }>()
   const logRef = useRef(log)
   logRef.current = log
   useEffect(() => {
@@ -227,12 +248,6 @@ function RunStory(props: StoryProps) {
   const direct = props.fixture.trigger.kind === 'manual' || props.fixture.trigger.kind === 'cron'
   return (
     <Gallery {...props}>
-      <p className="trigger-gallery-note">
-        {props.fixture.trigger.name} · Run input panels are open side by side.{' '}
-        {direct
-          ? 'This trigger runs directly; input panels below belong to a reachable node requiring a message.'
-          : 'Payload fields use this trigger’s production schema.'}
-      </p>
       <div className="trigger-case-grid">
         {direct && <RunSample {...props} state="direct" />}
         {(['empty', 'ready', 'invalid', 'starting'] as const).map((state) => (
@@ -287,7 +302,13 @@ function SidebarSample({ fixture, dark, language, log, state }: StoryProps & { s
         </header>
         {session && revision && (
           <NodeInspector
-            variables={{ enabled: false, loaded: true, loading: false, names: [], onOpen: () => {} }}
+            variables={{
+              enabled: false,
+              loaded: true,
+              loading: false,
+              names: [],
+              onOpen: () => {},
+            }}
             connectorAuthorizationPending={false}
             connectorLoading={false}
             connectors={session.connectors}
@@ -318,7 +339,6 @@ function SidebarStory(props: StoryProps) {
     : ['display', 'edit', props.fixture.trigger.kind === 'manual' ? 'description' : 'unconfigured']
   return (
     <Gallery {...props}>
-      <p className="trigger-gallery-note">{props.fixture.trigger.name} · Production node inspector. Edits stay in this Lab session.</p>
       <div className="trigger-case-grid">
         {states.map((state) => (
           <SidebarSample key={state} {...props} state={state} />
@@ -389,11 +409,6 @@ function ProviderStory({ view, ...props }: Omit<StoryProps, 'fixture'> & { reado
           </div>
         ) : (
           <Gallery {...props}>
-            <p className="trigger-gallery-note">
-              {view === 'run'
-                ? 'GitHub: object payload and validation · Gmail: event arrays · Google Drive: nested event data'
-                : 'GitHub: long event choices and account states · Gmail: polling schedule and optional filters'}
-            </p>
             <div className="trigger-case-grid">
               {view === 'run' ? (
                 <>
@@ -430,6 +445,7 @@ export const triggerStories: readonly FrontendStory[] = [
         group: `Trigger ${fixture.trigger.name}`,
         id: `trigger-${fixture.id}-nodes`,
         title: 'Node states',
+        description: `${fixture.trigger.name} · Node states, configuration and long content.`,
         standalone: true,
         render: (log, dark, language) => <NodeStory fixture={fixture} log={log} dark={dark} language={language} />,
       },
@@ -437,6 +453,7 @@ export const triggerStories: readonly FrontendStory[] = [
         group: `Trigger ${fixture.trigger.name}`,
         id: `trigger-${fixture.id}-run`,
         title: 'Run menu states',
+        description: `${fixture.trigger.name} · Run panels shown side by side. Manual and scheduled triggers run directly; their input samples use a downstream node.`,
         standalone: true,
         render: (log, dark, language) => <RunStory fixture={fixture} log={log} dark={dark} language={language} />,
       },
@@ -444,6 +461,7 @@ export const triggerStories: readonly FrontendStory[] = [
         group: `Trigger ${fixture.trigger.name}`,
         id: `trigger-${fixture.id}-sidebar`,
         title: 'Sidebar display & edit',
+        description: `${fixture.trigger.name} · Node properties in display and edit states. Changes stay in this Lab session.`,
         standalone: true,
         render: (log, dark, language) => <SidebarStory fixture={fixture} log={log} dark={dark} language={language} />,
       },
@@ -451,6 +469,12 @@ export const triggerStories: readonly FrontendStory[] = [
   ...(['nodes', 'run', 'sidebar'] as const).map(
     (view): FrontendStory => ({
       group: 'Trigger Provider',
+      description:
+        view === 'nodes'
+          ? 'Provider trigger states and configuration.'
+          : view === 'run'
+            ? 'Provider payloads, validation and run states.'
+            : 'Provider properties, account states and optional configuration.',
       id: `trigger-provider-${view}`,
       title: view === 'nodes' ? 'Node states' : view === 'run' ? 'Run menu states' : 'Sidebar display & edit',
       standalone: true,
