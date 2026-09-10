@@ -24,6 +24,7 @@ export interface CommentNodeStore$$ {
   readonly title: Val<string | undefined>
   readonly content: Val<string | undefined>
   readonly sourceCode: Val<boolean>
+  readonly contentHidden: Val<boolean>
 }
 
 export interface CommentNodeStore$ extends ToReadonly$Group<CommentNodeStore$$> {
@@ -32,6 +33,7 @@ export interface CommentNodeStore$ extends ToReadonly$Group<CommentNodeStore$$> 
 }
 
 export interface CommentNodeStoreProps {
+  readonly contentHidden?: boolean
   readonly position: XYPosition
   readonly title?: string
   readonly content?: string
@@ -84,6 +86,7 @@ export class CommentNodeStore {
       title: this.dispose.add(val(props.title)),
       content: this.dispose.add(val(props.content)),
       sourceCode: this.dispose.add(val(false)),
+      contentHidden: this.dispose.add(val(props.contentHidden ?? false)),
     }
 
     this.$ = {

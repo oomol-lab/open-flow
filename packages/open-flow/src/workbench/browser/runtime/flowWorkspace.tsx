@@ -293,6 +293,7 @@ function Editor({
           return nodeId
         }}
         onConnect={(edge) => void store.workspace.connect(edge)}
+        onChangeNodeContentHidden={(nodeId, hidden) => void store.workspace.saveNodeContentHidden(nodeId, hidden)}
         onChangeComment={(nodeId, value) => void store.workspace.saveComment(nodeId, value)}
         onCopy={() => store.workspace.copySelectedNodes()}
         onDeleteEdge={(edge) => void store.workspace.disconnect(edge)}

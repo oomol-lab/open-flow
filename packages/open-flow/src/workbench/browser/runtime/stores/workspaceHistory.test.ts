@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { applyFlowChanges } from '../../../../flow/common/change.ts'
 import { createCodeTask, createValue } from '../../../../flow/common/nodeChanges.ts'
 import { ApiError, WorkbenchClient } from '../api.ts'
-import { setComment, setNodePositions } from '../workspace.ts'
+import { designerGraph, setComment, setNodePositions } from '../workspace.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
 
 const target = { kind: 'flow' } as const
@@ -286,4 +286,68 @@ describe('Workspace canvas history', () => {
     expect(await loading).toBe(false)
     expect(getEditor).toHaveBeenCalledTimes(1)
   })
+})
+
+describe('Node content presentation', () => {
+  it('persists visibility across reopening without changing the draft and restores shown content', async () => {
+    const { store, saved, change } = await session()
+    const contentNode = () => designerGraph(store.$.draft.value, target, store.$.presentation.value?.value).nodes.find((node) => node.id == 'value')
+    try {
+      const draft = saved().draft
+      expect(contentNode()).toMatchObject({ kind: 'value', contentHidden: false })
+      await store.saveNodeContentHidden('value', true)
+      await store.moveNodes({ value: { x: 60, y: 100 } })
+      await store.selectFlow('flow')
+      expect(contentNode()).toMatchObject({ contentHidden: true, position: { x: 60, y: 100 } })
+      expect(saved().draft).toEqual(draft)
+      expect(change).not.toHaveBeenCalled()
+      await store.saveNodeContentHidden('value', false)
+      await store.selectFlow('flow')
+      expect(contentNode()).toMatchObject({ contentHidden: false })
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('copies visibility and restores it through deletion undo and redo', async () => {
+    const { store, saved } = await session()
+    try {
+      await store.saveNodeContentHidden('value', true)
+      store.selectNodes(['value'])
+      await store.duplicateSelectedNodes()
+      const copy = store.$.selectedNodeIds.value[0]!
+      expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.find((node) => node.id == copy)).toMatchObject({ contentHidden: true })
+      await store.deleteSelectedNodes()
+      const hidden = (saved().presentation.value.designer as { flow: { hiddenNodeContent: Record<string, boolean> } }).flow.hiddenNodeContent
+      expect(hidden[copy]).toBeUndefined()
+      await store.undo()
+      expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.find((node) => node.id == copy)).toMatchObject({ contentHidden: true })
+      await store.redo()
+      expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.some((node) => node.id == copy)).toBe(false)
+    } finally {
+      store.dispose()
+    }
+  })
+})
+
+it('persists generic task and comment visibility, including copying comments', async () => {
+  const { store, saved, change } = await session()
+  try {
+    await store.saveNodeContentHidden('code', true)
+    await store.saveNodeContentHidden('note', true)
+    await store.selectFlow('flow')
+    const nodes = designerGraph(store.$.draft.value, target, store.$.presentation.value?.value).nodes
+    expect(nodes.find((node) => node.id == 'code')).toMatchObject({ contentHidden: true })
+    expect(nodes.find((node) => node.id == 'note')).toMatchObject({ contentHidden: true })
+    expect(change).not.toHaveBeenCalled()
+    store.selectNodes(['note'])
+    await store.duplicateSelectedNodes()
+    const copy = store.$.selectedNodeIds.value[0]!
+    expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.find((node) => node.id == copy)).toMatchObject({
+      kind: 'comment',
+      contentHidden: true,
+    })
+  } finally {
+    store.dispose()
+  }
 })

@@ -7,7 +7,7 @@ import { useLang, useTranslate } from 'val-i18n-react'
 import { ContentIcon } from '../../../../../ui/browser/icons/ContentIcon.tsx'
 import { NODE_HANDLE_CLASSNAME } from '../../../base/canvas.ts'
 import { CanvasTooltip } from '../../../components/tooltip.tsx'
-import { imageSources, nodeSummary } from '../../FlowCanvas/cardContent.ts'
+import { nodeCardContent } from '../../FlowCanvas/cardContent.ts'
 import { cronDescription, cronLabel } from '../../FlowCanvas/cronDescription.ts'
 import { timeZoneLabel } from '../../FlowCanvas/timeZoneLabel.ts'
 import { CanvasCard } from './CanvasCard.tsx'
@@ -23,17 +23,12 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
   const node = useVal(nodeStore.content$)
   const title = node.title
   const icon = node.icon ?? (node.kind == 'wait' ? ':carbon:time:' : undefined)
-  const tools = node.kind == 'task' ? node.tools : undefined
-  const values = node.kind == 'value' ? node.values.filter((item) => item.value !== undefined) : []
-  const summary = values.length > 0 ? '' : nodeSummary(node)
-  const schedules = node.kind == 'trigger' ? node.presentation?.schedules : undefined
-  const images = imageSources(node?.run?.outputs)
+  const { values, summary, schedules, images, tools, inline, hidden } = nodeCardContent(node)
   const problem = showError ? t('nodeStatus.hasError') : node?.run?.status == 'error' ? t('canvasCard.status.error') : undefined
   const kind = node?.kind ?? 'task'
-  const inline = node?.kind == 'trigger' && !schedules?.length && summary && !summary.includes('\n') && summary.length <= 48
   const subtitle = inline ? summary : node?.kind == 'task' ? node.executorName || t('canvasCard.kind.task') : t(`canvasCard.kind.${kind}`)
   const distinctSubtitle = subtitle.trim().toLocaleLowerCase() == title.trim().toLocaleLowerCase() ? undefined : subtitle
-  const toolContent = tools != null && tools.length > 0 && (
+  const toolContent = !hidden && tools != null && tools.length > 0 && (
     <div className={styles.tools}>
       <span className={styles.toolsLabel}>{t('canvasCard.tools')}</span>
       <div className={styles.toolItems}>
@@ -82,6 +77,7 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
           ) : undefined
         }
         preview={
+          !hidden &&
           (values.length > 0 || Boolean(schedules?.length) || (node?.run != null && images.length > 0)) && (
             <>
               {schedules != null && schedules.length > 0 && (
@@ -143,7 +139,7 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
           )
         }
       >
-        {!inline && summary && (
+        {!hidden && !inline && summary && (
           <p className={styles.summary} title={summary}>
             {summary}
           </p>

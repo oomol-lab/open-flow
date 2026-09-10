@@ -704,6 +704,7 @@ export function designerGraph(
   const edgeProjection = projectEdges(graph, nodeIds)
   const layout = layoutNodes(nodeIds, edgeProjection.dependencies, edgeProjection.dependents)
   const positions = savedPositions(presentation, target)
+  const hiddenNodeContent = record(targetPresentation(presentation, target)?.hiddenNodeContent)
   const context: NodeProjectionContext = {
     connectionCatalogs,
     connectorActions,
@@ -722,13 +723,22 @@ export function designerGraph(
     const position = positions[nodeId] ?? { x: 80 + column * 500, y: 80 + row * 240 }
     const resolved = definitions.get(nodeId)!
     if (resolved.kind == 'trigger') {
-      nodes.push(triggerDesignerNode(nodeId, resolved.trigger, position, diagnostics))
+      nodes.push({
+        ...triggerDesignerNode(nodeId, resolved.trigger, position, diagnostics),
+        contentHidden: hiddenNodeContent?.[nodeId] === true,
+      })
       continue
     }
-    nodes.push(semanticDesignerNode(nodeId, resolved, ports.get(nodeId)!, position, context))
+    const node = semanticDesignerNode(nodeId, resolved, ports.get(nodeId)!, position, context)
+    nodes.push({ ...node, contentHidden: hiddenNodeContent?.[nodeId] === true })
   }
   for (const [nodeId, comment] of Object.entries(savedComments(presentation, target, positions)).toSorted(([left], [right]) => left.localeCompare(right))) {
-    nodes.push({ ...comment, id: nodeId, kind: 'comment' })
+    nodes.push({
+      ...comment,
+      id: nodeId,
+      kind: 'comment',
+      contentHidden: hiddenNodeContent?.[nodeId] === true,
+    })
   }
   const order = new Map(savedOrder(presentation, target).map((nodeId, index) => [nodeId, index]))
   nodes.sort((left, right) => (order.get(left.id) ?? -1) - (order.get(right.id) ?? -1))
@@ -798,6 +808,23 @@ export function setNodePositions(
   return {
     ...value,
     designer: replacePresentationTarget(designer, target, { ...current, nodes: nextNodes, order }),
+  }
+}
+
+export function setNodeContentHidden(
+  value: Readonly<Record<string, JsonValue>>,
+  target: GraphTarget,
+  nodeId: string,
+  hidden: boolean,
+): Readonly<Record<string, JsonValue>> {
+  if ((record(targetPresentation(value, target)?.hiddenNodeContent)?.[nodeId] === true) === hidden) return value
+  const current = normalizedTarget(value, target)
+  const hiddenNodeContent = { ...record(current.hiddenNodeContent) }
+  if (hidden) hiddenNodeContent[nodeId] = true
+  else delete hiddenNodeContent[nodeId]
+  return {
+    ...value,
+    designer: replacePresentationTarget(designerPresentation(value), target, { ...current, hiddenNodeContent }),
   }
 }
 
@@ -892,7 +919,7 @@ export function canvasPresentationChange(
   const first = normalizedTarget(before, target)
   const last = normalizedTarget(after, target)
   const nodeIds = new Set<string>()
-  for (const field of ['nodes', 'comments']) {
+  for (const field of ['nodes', 'comments', 'hiddenNodeContent']) {
     const previous = record(first[field]) ?? {}
     const next = record(last[field]) ?? {}
     for (const id of new Set([...Object.keys(previous), ...Object.keys(next)])) {
@@ -901,7 +928,10 @@ export function canvasPresentationChange(
   }
   const select = (value: Record<string, JsonValue>): Record<string, JsonValue> =>
     Object.fromEntries(
-      ['nodes', 'comments'].map((field) => [field, Object.fromEntries(Object.entries(record(value[field]) ?? {}).filter(([id]) => nodeIds.has(id)))]),
+      ['nodes', 'comments', 'hiddenNodeContent'].map((field) => [
+        field,
+        Object.fromEntries(Object.entries(record(value[field]) ?? {}).filter(([id]) => nodeIds.has(id))),
+      ]),
     )
   return { before: select(first), after: select(last), nodeIds: [...nodeIds], beforeOrder: savedOrder(before, target), afterOrder: savedOrder(after, target) }
 }
@@ -915,7 +945,7 @@ export function restoreCanvasPresentation(
   if (change.nodeIds.length == 0) return value
   const current = normalizedTarget(value, target)
   const saved = redo ? change.after : change.before
-  for (const field of ['nodes', 'comments']) {
+  for (const field of ['nodes', 'comments', 'hiddenNodeContent']) {
     const next = { ...record(current[field]) }
     const source = record(saved[field]) ?? {}
     for (const id of change.nodeIds) {

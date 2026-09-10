@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { providerIcon } from './providerIcon.ts'
-import { designerGraph, setComment, setFlowViewport, setNodePositions } from './workspace.ts'
+import { designerGraph, setComment, setFlowViewport, setNodePositions, setNodeContentHidden, targetPresentation } from './workspace.ts'
 
 describe('Designer port projection', () => {
   it('ignores malformed remote edges instead of throwing', () => {
@@ -549,4 +549,19 @@ it('projects Agent tool icons with action labels and preserves separate actions 
     },
   }
   expect(designerGraph(removed, { kind: 'flow' }).nodes[0]).toMatchObject({ tools: [] })
+})
+
+describe('Value content visibility scope', () => {
+  it('isolates matching node IDs in flow and subflow presentations and preserves unrelated settings', () => {
+    const flow = { kind: 'flow' } as const
+    const subflow = { kind: 'subflow', id: 'nested' } as const
+    const initial = { custom: 'preserved' }
+    const hidden = setNodeContentHidden(initial, flow, 'value', true)
+    const bothHidden = setNodeContentHidden(hidden, subflow, 'value', true)
+    const shown = setNodeContentHidden(bothHidden, flow, 'value', false)
+    expect(targetPresentation(shown, flow)?.hiddenNodeContent).toEqual({})
+    expect(targetPresentation(shown, subflow)?.hiddenNodeContent).toEqual({ value: true })
+    expect(shown.custom).toBe('preserved')
+    expect(setNodeContentHidden(initial, flow, 'value', false)).toBe(initial)
+  })
 })

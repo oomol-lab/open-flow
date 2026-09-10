@@ -15,6 +15,8 @@ export function CommentCard({ store }: { readonly store: CommentNodeStore }) {
   const canvasStore = useCanvasStore()
   const title = useVal(store.$.title) ?? ''
   const selected = useVal(store.$.selected)
+  const hidden = useVal(store.$.contentHidden)
+  const editing = useVal(store.$.sourceCode)
   const editable = useVal(canvasStore.$.editable)
   return (
     <div
@@ -38,7 +40,7 @@ export function CommentCard({ store }: { readonly store: CommentNodeStore }) {
         icon={<i className="i-codicon:note" />}
         selected={selected}
         actions={<CommentNodeActions canvasStore={canvasStore} nodeStore={store} />}
-        preview={<CommentNodeContent store={store} />}
+        preview={(!hidden || editing) && <CommentNodeContent store={store} />}
       />
     </div>
   )

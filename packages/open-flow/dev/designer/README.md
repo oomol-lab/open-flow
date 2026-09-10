@@ -14,7 +14,7 @@ The default **Cards · Content & records** gallery uses the production card, exe
 
 The **Nodes** section collects production canvas nodes under boundary inputs. Its **Condition / Node States** story covers empty, single and multiple cases, plus long rule labels, long output labels and both sides overflowing together.
 
-**Value / Node States** (`?story=node-value`) displays empty, primitive, structured, nullable, long-content and invalid values using the production canvas. The toolbar provides read-only and reset actions; canvas actions are logged.
+**Value / Node States** (`?story=node-value`) displays hidden, empty, primitive, structured, nullable, long-content and invalid values using the production canvas. The node toolbar places the content visibility toggle immediately before Delete, only when the node has collapsible content. The story toolbar provides read-only and reset actions; canvas actions are logged.
 
 The **Theme Preview** group also contains:
 
@@ -85,3 +85,5 @@ Story 可通过可选的 `description` 配置说明文字，由 Lab 统一显示
 The Lab reserves an optional rounded sidebar beside the content frame, inside the Story card beneath its shared header. Use `useStorySidebar(content)` from `storySidebar.tsx` and include its returned portal in the Story's JSX. The portal preserves the caller's React providers and lifetime; selection and data remain owned by the Story. Pass `null` to hide the sidebar. Stories with multiple canvases must choose one active sidebar content, as the Provider trigger gallery does. The shell owns sidebar width, scrolling, rounded frame, and the gap beside the content frame. Story content fills this sidebar directly without another card or outer padding.
 
 Drag the centered three-dot handle in the 8px gap to resize the sidebar. Focus the handle to use Left/Right (Shift for larger steps), Home/End for width limits, or double-click to restore the default width. The sidebar stays within 60% of the available panel space.
+
+**Canvas / Node content** (`?story=node-content`) compares collapsible Schedule, Value, Task and Comment content with empty nodes and Condition. Collapse preserves run status and branches.

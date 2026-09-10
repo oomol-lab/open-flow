@@ -14,6 +14,7 @@ import { CanvasTooltip } from '../../../components/tooltip.tsx'
 import { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 import { NodeStore } from '../../../stores/node/node.store.ts'
 import { useCanvasStore } from '../../CanvasStoreContext.tsx'
+import { nodeCardContent } from '../../FlowCanvas/cardContent.ts'
 import { useGetStaticPopupContainer } from '../../ReactFlowContainer/useGetPopupContainer.ts'
 import { useNodeStore } from '../NodeStoreContext.tsx'
 
@@ -97,6 +98,7 @@ interface Params {
 }
 
 interface ContextMenuActionItem {
+  readonly expanded?: boolean
   readonly danger?: boolean
   readonly disabled?: boolean
   readonly icon?: React.ReactNode
@@ -145,7 +147,25 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
     nodeStore,
     onDelete: editable && canvasStore.canDeleteNodes ? () => canvasStore.deleteNodes([nodeStore]) : undefined,
   })
+  const content = useVal(NodeStore.to(nodeStore)?.content$)
+  const comment = CommentNodeStore.is(nodeStore) ? nodeStore : undefined
+  const commentBody = useVal(comment?.$.content)
+  const commentHidden = useVal(comment?.$.contentHidden)
+  const commentEditing = useVal(comment?.$.sourceCode)
+  const collapsible = content != null ? nodeCardContent(content).collapsible : !!commentBody?.trim()
+  const hidden = content?.contentHidden ?? commentHidden ?? false
   const floatBarItems = items.filter((item): item is ContextMenuActionItem => !!item)
+  if (collapsible) {
+    const deleteIndex = floatBarItems.findIndex((item) => item.key == '$delete')
+    floatBarItems.splice(deleteIndex < 0 ? floatBarItems.length : deleteIndex, 0, {
+      key: '$content',
+      label: t(hidden ? 'nodeContent.show' : 'nodeContent.hide'),
+      expanded: !hidden,
+      disabled: !editable || commentEditing || !canvasStore.canChangeNodeContentHidden,
+      icon: <i aria-hidden="true" className={hidden ? 'i-lucide-light:panel-top-open' : 'i-lucide-light:panel-top-close'} />,
+      onClick: () => canvasStore.changeNodeContentHidden(nodeStore.nodeId, !hidden),
+    })
+  }
 
   return (
     <NodeToolbar data-tooltip-toolbar className={styles.floatBar} offset={12 - 8 * zoom}>
@@ -159,12 +179,13 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
           >
             <Button
               aria-label={item.label}
+              aria-expanded={item.expanded}
               className={styles.floatBarButton}
               data-danger={item.danger || undefined}
               disabled={item.disabled}
               onClick={item.onClick}
               size="icon"
-              variant="ghost"
+              variant={item.expanded == null ? 'ghost' : 'disclosure'}
             >
               {item.icon}
             </Button>

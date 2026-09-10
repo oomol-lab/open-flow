@@ -627,5 +627,9 @@
     "Europe/Moscow": "莫斯科",
     "Australia/Sydney": "雪梨",
     "Pacific/Auckland": "奧克蘭"
+  },
+  "nodeContent": {
+    "show": "顯示內容",
+    "hide": "隱藏內容"
   }
 }

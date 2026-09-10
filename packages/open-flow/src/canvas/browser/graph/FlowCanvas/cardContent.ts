@@ -59,3 +59,15 @@ export function imageSources(value: unknown): string[] {
   visit(value, 0)
   return [...result]
 }
+
+/** The same body projection owns both rendering and the collapse affordance. */
+export function nodeCardContent(node: NodeContent) {
+  const values = node.kind == 'value' ? node.values.filter((item) => item.value !== undefined) : []
+  const summary = values.length > 0 ? '' : nodeSummary(node)
+  const schedules = node.kind == 'trigger' ? node.presentation?.schedules : undefined
+  const images = imageSources(node.run?.outputs)
+  const tools = node.kind == 'task' ? node.tools : undefined
+  const inline = node.kind == 'trigger' && !schedules?.length && !!summary && !summary.includes('\n') && summary.length <= 48
+  const collapsible = node.kind != 'condition' && (values.length > 0 || !!schedules?.length || images.length > 0 || !!tools?.length || (!inline && !!summary))
+  return { values, summary, schedules, images, tools, inline, collapsible, hidden: collapsible && node.contentHidden === true }
+}
