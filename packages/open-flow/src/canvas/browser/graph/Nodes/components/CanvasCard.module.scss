@@ -140,6 +140,7 @@
 
 // Zoom changes only paint visibility; retained details keep card and port geometry.
 .compactIdentity {
+  container: compact-node-identity / size;
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -184,5 +185,16 @@
 
   > .compactIdentity {
     visibility: visible;
+  }
+}
+
+// Query the overlay's content height, leaving the retained card layout untouched.
+@container compact-node-identity (min-height: 72px) {
+  .compactIdentity strong {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }

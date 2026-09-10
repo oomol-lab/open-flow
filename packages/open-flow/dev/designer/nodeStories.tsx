@@ -491,6 +491,13 @@ const contentModel: FlowCanvasViewModel = {
   ],
 }
 
+const zoomTitles: Readonly<Record<string, string>> = {
+  schedule: 'Scheduled customer report',
+  values: '汇总本周客户订单并生成待审核的分析报告',
+  task: 'customer_activity_summary_for_the_current_reporting_period',
+  empty: 'A long node title that truncates to a single line',
+}
+
 function NodeZoomStory({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes('zoom')
   const [selected, setSelected] = useState<readonly string[]>([])
@@ -528,7 +535,7 @@ function NodeZoomStory({ dark, language, log }: { readonly dark: boolean; readon
                   .filter((node) => node.kind !== 'comment')
                   .map((node, index) =>
                     Object.assign({}, node, {
-                      title: node.id === 'empty' ? 'A long node title that truncates to a single line' : node.title,
+                      title: zoomTitles[node.id] ?? node.title,
                       diagnostics: node.id === 'empty' ? 1 : undefined,
                       position: { x: 0, y: [0, 150, 300, 540, 710][index]! },
                     }),
@@ -548,7 +555,7 @@ export const nodeStories: readonly FrontendStory[] = [
     group: 'Canvas',
     id: 'node-zoom',
     title: 'Node zoom',
-    description: 'Full and simplified nodes at 50%, 35% and 18%. Zoom across 40% to inspect stable card sizes and branch ports.',
+    description: 'Compare full and simplified nodes. Tall cards clamp titles to two lines; short cards retain one line. Includes Chinese and unbroken titles.',
     standalone: true,
     render: (log, dark, language) => <NodeZoomStory dark={dark} language={language} log={log} />,
   },
