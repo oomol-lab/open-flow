@@ -15,8 +15,17 @@ export function CommentCard({ store }: { readonly store: CommentNodeStore }) {
   const canvasStore = useCanvasStore()
   const title = useVal(store.$.title) ?? ''
   const selected = useVal(store.$.selected)
+  const editable = useVal(canvasStore.$.editable)
   return (
-    <div className={NODE_HANDLE_CLASSNAME}>
+    <div
+      className={NODE_HANDLE_CLASSNAME}
+      onDoubleClick={(event) => {
+        if (!editable || !(event.target instanceof Element)) return
+        if (event.target.closest('input, textarea, button, a, select, [role="checkbox"], [contenteditable="true"]')) return
+        event.stopPropagation()
+        store.$$.sourceCode.set(true)
+      }}
+    >
       <CanvasCard
         tone="comment"
         title={title}

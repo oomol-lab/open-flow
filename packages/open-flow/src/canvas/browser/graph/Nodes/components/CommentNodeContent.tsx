@@ -3,7 +3,7 @@ import type { Components } from 'react-markdown'
 import type { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 
 import { clsx } from 'clsx'
-import { useContext } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { Checkbox } from '../../../../../ui/browser/checkbox.tsx'
@@ -19,35 +19,54 @@ const markdownComponents: Components = {
 export function CommentNodeContent({ store }: { store: CommentNodeStore }): JSX.Element | null {
   const t = useTranslate()
   const dark = useContext(CanvasDarkContext)
-  const showCode = useVal(store.$.sourceCode)
+  const sourceCode = useVal(store.$.sourceCode)
+  const empty = useVal(store.$.empty)
   const content = useVal(store.$$.content)
   const editable = useVal(useCanvasStore().$.editable)
+  const selected = useVal(store.$.selected)
+  const showCode = editable && (sourceCode || (empty && selected))
+  const previousSelected = useRef(selected)
+  const restorePreview = useRef(false)
+  const textarea = useRef<HTMLTextAreaElement>(null)
+  const [composing, setComposing] = useState(false)
+
+  useEffect(() => {
+    if (previousSelected.current && !selected) restorePreview.current = true
+    previousSelected.current = selected
+    if (selected) restorePreview.current = false
+    // Keep the editor mounted until the IME has delivered its final text.
+    if (!restorePreview.current || composing) return
+    restorePreview.current = false
+    if (store.$.sourceCode.value) {
+      if (editable) store.saveContent(textarea.current?.value ?? store.$.content.value ?? '')
+      store.$$.sourceCode.set(false)
+    }
+  }, [selected, composing, editable, store])
 
   return (
     <div className={`${styles.body} nopan`}>
       <div className={clsx(styles.container, showCode && styles.sourceCode, !showCode && NODE_HANDLE_CLASSNAME)}>
         {showCode ? (
           <Textarea
+            ref={textarea}
             aria-label={t('comment.source')}
-            autoFocus
+            autoFocus={sourceCode || (empty && !!selected)}
+            onFocus={() => store.$$.sourceCode.set(true)}
             disabled={!editable}
             className="min-h-30 resize-y rounded-none border-0 bg-transparent p-0 text-inherit shadow-none focus-visible:ring-0"
             value={content ?? ''}
+            onCompositionStart={() => setComposing(true)}
+            onCompositionEnd={(event) => {
+              store.$$.content.set(event.currentTarget.value)
+              setComposing(false)
+            }}
             onChange={(event) => store.$$.content.set(event.target.value)}
             onBlur={(event) => {
-              if (editable) store.saveContent(event.target.value)
+              if (editable && !composing) store.saveContent(event.target.value)
             }}
           />
         ) : (
-          <MarkdownPreview
-            components={markdownComponents}
-            unstyled
-            contentClassName={styles.markdown}
-            content={content ?? ''}
-            dark={dark}
-            draggable
-            onDoubleClick={store.togglePreview}
-          />
+          <MarkdownPreview components={markdownComponents} unstyled contentClassName={styles.markdown} content={content ?? ''} dark={dark} draggable />
         )}
       </div>
     </div>

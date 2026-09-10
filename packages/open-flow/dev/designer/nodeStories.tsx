@@ -5,6 +5,7 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 import { useState } from 'react'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
+import { Button } from '../../src/ui/browser/button.tsx'
 
 const longInput = 'customer_lifetime_value_across_all_completed_orders'
 const longOutput = 'matched_customers_with_complete_enterprise_profiles'
@@ -178,9 +179,28 @@ function CommentStory({ dark, language, log }: { readonly dark: boolean; readonl
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes('comment')
   const [model, setModel] = useState(commentModel)
   const [selected, setSelected] = useState<readonly string[]>(['notes'])
+  const [editable, setEditable] = useState(true)
   return (
     <div className="workflow-story">
       <div className="overview-toolbar open-flow-workbench">
+        <Button variant="outline" onClick={() => setSelected(['notes'])}>
+          Single selection
+        </Button>
+        <Button variant="outline" onClick={() => setSelected(['notes', 'long'])}>
+          Multiple selection
+        </Button>
+        <Button variant="outline" onClick={() => setEditable((value) => !value)}>
+          {editable ? 'Switch to read-only' : 'Enable editing'}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setModel(commentModel)
+            setSelected(['notes'])
+          }}
+        >
+          Reset nodes
+        </Button>
         <span>Comment cards · warm note surfaces, selected, long title, Markdown typography, tables and empty note. Use the source button to edit.</span>
       </div>
       <div className="workflow-canvas">
@@ -190,7 +210,11 @@ function CommentStory({ dark, language, log }: { readonly dark: boolean; readonl
           onAddNode={() => undefined}
           onConnect={(edge) => log('edge.connect', edge)}
           onDisconnect={(edge) => log('edge.disconnect', edge)}
-          onDeleteNodes={(ids) => log('node.delete', ids)}
+          onDeleteNodes={(ids) => {
+            setModel((current) => ({ ...current, nodes: current.nodes.filter((node) => !ids.includes(node.id)) }))
+            setSelected((current) => current.filter((id) => !ids.includes(id)))
+            log('node.delete', ids)
+          }}
           onPaste={(position) => log('canvas.paste', position)}
           onMoveNodes={(positions) => log('node.move', positions)}
           onMoveViewport={(viewport) => log('canvas.move', viewport)}
@@ -199,7 +223,7 @@ function CommentStory({ dark, language, log }: { readonly dark: boolean; readonl
           dark={dark}
           language={language}
           layoutMotion={false}
-          editable
+          editable={editable}
           model={model}
           addItems={[]}
           selectedNodeIds={selected}

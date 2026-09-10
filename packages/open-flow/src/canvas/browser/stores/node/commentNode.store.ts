@@ -9,7 +9,7 @@ import type { NodeType } from './constants.ts'
 import type { NodeInteraction } from './nodeInteraction.ts'
 
 import { disposableStore } from '@wopjs/disposable'
-import { val } from 'value-enhancer'
+import { derive, val } from 'value-enhancer'
 import { NODE_HANDLE_CLASSNAME } from '../../base/canvas.ts'
 import { toRFNodeId } from '../../base/rfHelpers.ts'
 import { NODE_TYPE } from './constants.ts'
@@ -27,6 +27,7 @@ export interface CommentNodeStore$$ {
 }
 
 export interface CommentNodeStore$ extends ToReadonly$Group<CommentNodeStore$$> {
+  readonly empty: ReadonlyVal<boolean>
   readonly measured: ReadonlyVal<Partial<Size> | undefined>
 }
 
@@ -87,6 +88,7 @@ export class CommentNodeStore {
 
     this.$ = {
       ...this.$$,
+      empty: this.dispose.add(derive(this.$$.content, (content) => !content?.trim())),
       measured: interaction.measured,
     }
   }
