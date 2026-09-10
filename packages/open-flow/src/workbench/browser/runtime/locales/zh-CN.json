@@ -674,7 +674,7 @@
     "editReady": "修改已保存的测试数据",
     "remembered": "测试数据会在本次编辑会话中保留，不会修改工作流。",
     "startTest": "开始测试",
-    "testTrigger": "测试{{name}}",
+    "testTrigger": "测试 {{name}}",
     "triggerCount": "共 {{count}} 个起始节点",
     "triggerDataHint": "填写这个 Trigger 的模拟数据，然后开始测试。",
     "triggerData": "触发数据",

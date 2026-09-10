@@ -674,7 +674,7 @@
     "editReady": "저장된 테스트 데이터 편집",
     "remembered": "테스트 데이터는 이 편집 세션 동안 유지되며 워크플로를 변경하지 않습니다.",
     "startTest": "테스트 시작",
-    "testTrigger": "{{name}} 테스트",
+    "testTrigger": "테스트 {{name}}",
     "triggerCount": "시작 노드 {{count}}개",
     "triggerDataHint": "이 Trigger의 샘플 데이터를 입력한 뒤 테스트를 시작하세요.",
     "triggerData": "트리거 데이터",

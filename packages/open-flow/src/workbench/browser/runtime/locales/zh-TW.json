@@ -674,7 +674,7 @@
     "editReady": "修改已儲存的測試資料",
     "remembered": "測試資料會在本次編輯工作階段中保留，不會修改工作流程。",
     "startTest": "開始測試",
-    "testTrigger": "測試{{name}}",
+    "testTrigger": "測試 {{name}}",
     "triggerCount": "共 {{count}} 個起始節點",
     "triggerDataHint": "填寫這個 Trigger 的模擬資料，然後開始測試。",
     "triggerData": "觸發資料",
