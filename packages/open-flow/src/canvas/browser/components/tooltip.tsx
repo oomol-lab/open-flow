@@ -29,6 +29,7 @@ export function CanvasTooltip({
   getPopupContainer,
   open,
   placement,
+  sideOffset,
   title,
 }: {
   readonly className?: string
@@ -36,6 +37,7 @@ export function CanvasTooltip({
   readonly getPopupContainer?: () => HTMLElement
   readonly open?: boolean
   readonly placement?: TooltipPlacement
+  readonly sideOffset?: number
   readonly title?: React.ReactNode
 }): React.ReactElement {
   const getStaticPopupContainer = useGetStaticPopupContainer()
@@ -49,7 +51,11 @@ export function CanvasTooltip({
         className={className}
         container={typeof document == 'undefined' ? undefined : (getPopupContainer?.() ?? getStaticPopupContainer())}
         side={side(placement)}
+        align={
+          placement?.endsWith('Left') || placement?.endsWith('Top') ? 'start' : placement?.endsWith('Right') || placement?.endsWith('Bottom') ? 'end' : 'center'
+        }
         sideOffset={({ side: resolvedSide }) => {
+          if (sideOffset !== undefined) return sideOffset
           const trigger = triggerRef.current
           const toolbar = trigger?.closest('[data-tooltip-toolbar], .react-flow__controls')
           if (!trigger || !toolbar) return 4

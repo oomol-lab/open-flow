@@ -594,6 +594,38 @@
       "week": "нед.",
       "month": "мес."
     },
-    "tools": "Инструменты"
+    "tools": "Инструменты",
+    "scheduleDaily": "Ежедневно",
+    "scheduleMonthEnd": "Конец месяца",
+    "scheduleDays": "Дни {{days}}",
+    "shortUnits": {
+      "minute": "мин",
+      "hour": "ч",
+      "day": "дн",
+      "week": "нед",
+      "month": "мес"
+    },
+    "scheduleRange": "{{start}} по {{end}}"
+  },
+  "timeZoneNames": {
+    "Asia/Shanghai": "Шанхай",
+    "Asia/Taipei": "Тайбэй",
+    "Asia/Hong_Kong": "Гонконг",
+    "Asia/Tokyo": "Токио",
+    "Asia/Seoul": "Сеул",
+    "Asia/Singapore": "Сингапур",
+    "Asia/Kolkata": "Калькутта",
+    "Asia/Dubai": "Дубай",
+    "America/New_York": "Нью-Йорк",
+    "America/Los_Angeles": "Лос-Анджелес",
+    "America/Chicago": "Чикаго",
+    "America/Argentina/Buenos_Aires": "Буэнос-Айрес",
+    "America/Sao_Paulo": "Сан-Паулу",
+    "Europe/London": "Лондон",
+    "Europe/Paris": "Париж",
+    "Europe/Berlin": "Берлин",
+    "Europe/Moscow": "Москва",
+    "Australia/Sydney": "Сидней",
+    "Pacific/Auckland": "Окленд"
   }
 }

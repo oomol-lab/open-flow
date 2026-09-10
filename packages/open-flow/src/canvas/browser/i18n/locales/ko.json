@@ -594,6 +594,38 @@
       "week": "주",
       "month": "개월"
     },
-    "tools": "도구"
+    "tools": "도구",
+    "scheduleDaily": "매일",
+    "scheduleMonthEnd": "월말",
+    "scheduleDays": "매월 {{days}}일",
+    "shortUnits": {
+      "minute": "분",
+      "hour": "시간",
+      "day": "일",
+      "week": "주",
+      "month": "개월"
+    },
+    "scheduleRange": "{{start}}부터 {{end}}까지"
+  },
+  "timeZoneNames": {
+    "Asia/Shanghai": "상하이",
+    "Asia/Taipei": "타이베이",
+    "Asia/Hong_Kong": "홍콩",
+    "Asia/Tokyo": "도쿄",
+    "Asia/Seoul": "서울",
+    "Asia/Singapore": "싱가포르",
+    "Asia/Kolkata": "콜카타",
+    "Asia/Dubai": "두바이",
+    "America/New_York": "뉴욕",
+    "America/Los_Angeles": "로스앤젤레스",
+    "America/Chicago": "시카고",
+    "America/Argentina/Buenos_Aires": "부에노스아이레스",
+    "America/Sao_Paulo": "상파울루",
+    "Europe/London": "런던",
+    "Europe/Paris": "파리",
+    "Europe/Berlin": "베를린",
+    "Europe/Moscow": "모스크바",
+    "Australia/Sydney": "시드니",
+    "Pacific/Auckland": "오클랜드"
   }
 }

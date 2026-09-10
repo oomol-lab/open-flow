@@ -63,7 +63,7 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
       {
         id: 'long',
         title: `${trigger.name} · Orders received from all regional stores requiring manual review`,
-        description: 'A long description of the trigger and the events it receives, to inspect wrapping and card height.',
+        description: 'Inspect single-line title truncation and wrapping of this longer trigger description.',
       },
       {
         id: 'description',
@@ -73,7 +73,34 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
       ...(trigger.kind === 'cron'
         ? [
             { id: 'cron', title: 'Cron', schedules: [{ type: 'cron', expression: '0 9 * * *', timezone: 'Asia/Shanghai' }] as const },
-            { id: 'multiple', title: 'Multiple schedules', schedules: trigger.cronTimes },
+            {
+              id: 'readable',
+              title: 'Readable schedules',
+              schedules: ['0 9 * * 1-5', '*/15 * * * *', '0 9 L * *'].map((expression) => ({ type: 'cron' as const, expression, timezone: 'Asia/Shanghai' })),
+            },
+            {
+              id: 'fallback',
+              title: 'Original expressions',
+              schedules: ['0 9 1 * MON', '0 9 * * 5#L', 'invalid'].map((expression) => ({
+                type: 'cron' as const,
+                expression,
+                timezone: 'America/Argentina/Buenos_Aires',
+              })),
+            },
+            {
+              id: 'overflow',
+              title: 'Long rule and timezone',
+              schedules: [
+                { type: 'cron' as const, expression: '0,5,10,15,20,25,30,35,40,45,50,55 9-17 * * MON-FRI', timezone: 'America/Argentina/ComodRivadavia' },
+                { type: 'cron' as const, expression: '0,10,20,30,40,50 9,12,15,18 * * MON-FRI', timezone: 'Unknown/An exceptionally long timezone name' },
+              ],
+            },
+            { id: 'multiple', title: 'Multiple schedules', description: 'Refresh regional reports.', schedules: trigger.cronTimes },
+            {
+              id: 'many',
+              title: 'Many schedules',
+              schedules: [9, 12, 15, 18, 21].map((hour) => ({ type: 'cron' as const, expression: `0 ${hour} * * *`, timezone: 'Asia/Shanghai' })),
+            },
           ]
         : []),
     ]
@@ -97,7 +124,7 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
         const base = designerGraph(triggerDraft(sample).draft, { kind: 'flow' }).nodes.find((node) => node.kind === 'trigger')!
         return Object.assign({}, base, {
           id: entry.id,
-          position: { x: (index % 3) * 420, y: Math.floor(index / 3) * 210 },
+          position: { x: (index % 3) * 420, y: Math.floor(index / 3) * (trigger.kind === 'cron' ? 320 : 210) },
           diagnostics: entry.diagnostics,
           run: entry.status
             ? {

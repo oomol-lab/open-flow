@@ -594,6 +594,38 @@
       "week": "weeks",
       "month": "months"
     },
-    "tools": "Tools"
+    "tools": "Tools",
+    "scheduleDaily": "Every day",
+    "scheduleMonthEnd": "Month end",
+    "scheduleDays": "Days {{days}}",
+    "shortUnits": {
+      "minute": "min",
+      "hour": "hr",
+      "day": "day",
+      "week": "wk",
+      "month": "mo"
+    },
+    "scheduleRange": "{{start}} to {{end}}"
+  },
+  "timeZoneNames": {
+    "Asia/Shanghai": "Shanghai",
+    "Asia/Taipei": "Taipei",
+    "Asia/Hong_Kong": "Hong Kong",
+    "Asia/Tokyo": "Tokyo",
+    "Asia/Seoul": "Seoul",
+    "Asia/Singapore": "Singapore",
+    "Asia/Kolkata": "Kolkata",
+    "Asia/Dubai": "Dubai",
+    "America/New_York": "New York",
+    "America/Los_Angeles": "Los Angeles",
+    "America/Chicago": "Chicago",
+    "America/Argentina/Buenos_Aires": "Buenos Aires",
+    "America/Sao_Paulo": "São Paulo",
+    "Europe/London": "London",
+    "Europe/Paris": "Paris",
+    "Europe/Berlin": "Berlin",
+    "Europe/Moscow": "Moscow",
+    "Australia/Sydney": "Sydney",
+    "Pacific/Auckland": "Auckland"
   }
 }
