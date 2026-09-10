@@ -82,6 +82,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false) {
       },
     },
     workspace: {
+      history$: value({ canUndo: false, canRedo: false, applying: false, failed: false }),
       $: {
         addNodeOptions: value([]),
         diagnosticFocus: value(undefined),

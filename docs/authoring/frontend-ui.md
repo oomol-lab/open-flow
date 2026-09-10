@@ -67,3 +67,12 @@ React Flow `ControlButton` 不转发 DOM ref，不能直接用于依赖 ref 的 
 共享代码编辑器位于 `src/ui/browser/code-editor.ts`，直接封装 CodeMirror。
 Workbench 负责 TypeScript 会话、保存与错误提示，编辑器直接使用共享 CodeMirror 实现。
 主题变更更新现有编辑器配置，以保留选择与撤销历史。
+
+## 画布操作历史
+
+Workbench 的 WorkspaceStore 拥有当前画布的撤销／重做历史；画布仅触发操作并呈现可用状态。
+公共 Flow 变更层生成反向操作，恢复通过正常保存通道创建新 Revision，不回退 Draft head。
+一次画布动作涉及的 Draft 与 Presentation 修改共用一条历史，保存全部完成后才可撤销。
+历史覆盖节点增删、粘贴、连线、移动和布局，不包含 viewport、选择或文本编辑器自身的历史。
+配置、标题、评论正文和代码修改会清空画布历史；切换画布、刷新和外部更新也会清空。
+保存失败后清空历史并重新读取实际状态，不保证两个保存通道原子提交，不自动补偿部分成功。

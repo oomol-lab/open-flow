@@ -1,4 +1,5 @@
 import type { I18n } from 'val-i18n'
+import type { ReadonlyVal } from 'value-enhancer'
 import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { ConnectorCapability } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
@@ -18,14 +19,17 @@ import type {
 } from '../editor/flowChanges.ts'
 import type { RevisionView } from '../revisionView.ts'
 import type { DesignerEdge, DesignerGraph, DesignerViewport, Point } from '../workspace.ts'
+import type { CanvasAction } from './canvasHistory.ts'
 import type { DraftChangeContext } from './draftChanges.ts'
 import type { PresentationUpdate } from './presentationChanges.ts'
 import type { SetNotice } from './workbenchNotice.ts'
 import type { ModuleEditorDraft, Workspace$, WorkspaceState } from './workspaceModel.ts'
 
+import { dequal } from 'dequal/lite'
 import { controlErrorCode } from '../../../../control/common/errors.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { connect as connectFlowNodes, disconnect as disconnectFlowNodes } from '../../../../flow/common/edgeChanges.ts'
+import { inverseFlowChanges } from '../../../../flow/common/inverseChanges.ts'
 import { imports as moduleImports, replaceSource as replaceModuleSource } from '../../../../flow/common/moduleChanges.ts'
 import {
   setCodeActions,
@@ -63,7 +67,9 @@ import {
 } from '../editor/flowChanges.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
+import { canvasPresentationChange, restoreCanvasPresentation } from '../workspace.ts'
 import { commentIds, designerGraph, removeComments, setComment, setFlowViewport, setNodePositions } from '../workspace.ts'
+import { CanvasHistory } from './canvasHistory.ts'
 import { DraftChanges } from './draftChanges.ts'
 import { FlowCatalog } from './flowCatalog.ts'
 import { Latest } from './latest.ts'
@@ -106,6 +112,9 @@ export class WorkspaceStore {
   readonly #setNotice: SetNotice
   readonly #model: WorkspaceModel
   readonly #moduleDrafts = new Map<string, { editor: ModuleEditorDraft; base: Draft['content']['modules'][string] }>()
+  readonly #history = new CanvasHistory()
+  public readonly history$: ReadonlyVal<CanvasHistory['state$']['value']> = this.#history.state$
+  #historyRecovery?: Promise<void>
   #moduleSave?: Promise<boolean>
   #clipboard?: Clipboard
   #diagnosticFocusId = 0
@@ -147,7 +156,10 @@ export class WorkspaceStore {
         if (!this.#disposed && this.#model.value.busy == 'designer') this.#set({ busy: undefined })
       },
       headChanged: (flowId, revisionId) => this.#flows.advanceHead(flowId, revisionId),
-      recover: (context) => this.#syncDraftHead(context, true),
+      recover: (context) => {
+        void this.retryHistorySync()
+        return this.#syncDraftHead(context, true)
+      },
     })
     this.#presentationChanges = new PresentationChanges(client, setNotice, (presentation) => this.#set({ presentation }), i18n)
     this.$ = this.#model.$
@@ -159,6 +171,7 @@ export class WorkspaceStore {
     this.#presentationChanges.dispose()
     this.#stopCatalogWatch?.()
     this.#stopFlowWatch?.()
+    this.history$.dispose()
     this.#model.dispose()
     this.#flows.dispose()
   }
@@ -191,7 +204,11 @@ export class WorkspaceStore {
   }
 
   public async selectFlow(flowId: string | undefined): Promise<boolean> {
-    if (!(await this.saveModuleEditor())) return false
+    if (this.#history.applying) return false
+    if (!(await this.saveModuleEditor()) || this.#disposed) return false
+    this.#history.clear()
+    this.#history.failed = false
+    this.#history.publish()
     const current = this.#draftSession.begin()
     this.#draftChanges.reset()
     this.#presentationChanges.reset()
@@ -269,6 +286,8 @@ export class WorkspaceStore {
   }
 
   public selectTarget(target: GraphTarget | undefined): boolean {
+    if (this.#history.applying) return false
+    if (!dequal(target, this.#model.value.target)) this.#history.clear()
     void this.#flushModules()
     this.#set({
       diagnosticFocus: undefined,
@@ -399,11 +418,7 @@ export class WorkspaceStore {
               ...(edge.sourceHandle.startsWith('$branch:') ? { sourceHandle: edge.sourceHandle.slice(8) } : {}),
             }),
           ]
-    const change = this.#changeDraft(changes)
-    this.selectNodes([nodeId])
-    const move = this.moveNodes({ [nodeId]: position })
-    if ((await change) == null) return
-    await move
+    if (!(await this.#canvasChange('add', 1, changes, (value) => setNodePositions(value, target, { [nodeId]: position }), [nodeId]))) return
     if (this.#disposed) return
     this.#set({ nodeFocus: { nodeId, requestId: ++this.#nodeFocusId } })
     return nodeId
@@ -418,7 +433,7 @@ export class WorkspaceStore {
       target: edge.target,
       ...(edge.sourceHandle.startsWith('$branch:') ? { sourceHandle: edge.sourceHandle.slice(8) } : {}),
     })
-    if (changes.length > 0) await this.#changeDraft(changes)
+    if (changes.length > 0) await this.#canvasChange('connect', 1, changes)
   }
 
   public async disconnect(edge: DesignerEdge): Promise<void> {
@@ -430,7 +445,7 @@ export class WorkspaceStore {
       target: edge.target,
       ...(edge.sourceHandle.startsWith('$branch:') ? { sourceHandle: edge.sourceHandle.slice(8) } : {}),
     })
-    if (changes.length > 0) await this.#changeDraft(changes)
+    if (changes.length > 0) await this.#canvasChange('disconnect', 1, changes)
   }
 
   public async deleteSelectedNodes(): Promise<void> {
@@ -441,11 +456,13 @@ export class WorkspaceStore {
     const comments = commentIds(this.#model.value.presentation?.value ?? {}, target)
     const commentNodes = new Set(this.#model.value.selectedNodeIds.filter((nodeId) => comments.has(nodeId)))
     const changes = deleteSelection(revision, target, this.#model.value.selectedNodeIds)
-    const draftChange = changes.length == 0 ? undefined : this.#changeDraft(changes)
-    const presentationChange = commentNodes.size == 0 ? undefined : this.#changePresentation((value) => removeComments(value, target, commentNodes))
-    this.selectNodes([])
-    if (draftChange != null && (await draftChange) == null) return
-    await presentationChange
+    await this.#canvasChange(
+      'delete',
+      this.#model.value.selectedNodeIds.length,
+      changes,
+      commentNodes.size == 0 ? undefined : (value) => removeComments(value, target, commentNodes),
+      [],
+    )
   }
 
   public copySelectedNodes(): void {
@@ -476,7 +493,6 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null || this.#clipboard == null) return
     const pasted = pasteNodes(revision, target, this.#clipboard.nodes, this.#identity)
-    const draftChange = pasted.changes.length == 0 ? undefined : this.#changeDraft(pasted.changes)
     const comments = this.#clipboard.comments.map((comment) => ({
       ...comment,
       nodeId: this.#identity(),
@@ -505,20 +521,23 @@ export class WorkspaceStore {
         ]
       }),
     )
-    const presentationChange = this.#changePresentation((value) => {
-      let next = setNodePositions(value, target, positions)
-      for (const comment of comments) {
-        next = setComment(next, target, comment.nodeId, {
-          content: comment.content,
-          position: { x: comment.position.x + offset.x * step, y: comment.position.y + offset.y * step },
-          title: this.#i18n.t('addNode.commentCopy', { title: comment.title }),
-        })
-      }
-      return next
-    })
-    this.selectNodes([...pasted.nodeIds, ...comments.map((comment) => comment.nodeId)])
-    if (draftChange != null && (await draftChange) == null) return
-    await presentationChange
+    await this.#canvasChange(
+      'paste',
+      added.size,
+      pasted.changes,
+      (value) => {
+        let next = setNodePositions(value, target, positions)
+        for (const comment of comments) {
+          next = setComment(next, target, comment.nodeId, {
+            content: comment.content,
+            position: { x: comment.position.x + offset.x * step, y: comment.position.y + offset.y * step },
+            title: this.#i18n.t('addNode.commentCopy', { title: comment.title }),
+          })
+        }
+        return next
+      },
+      [...pasted.nodeIds, ...comments.map((comment) => comment.nodeId)],
+    )
   }
 
   public async duplicateSelectedNodes(positions?: Readonly<Record<string, Point>>, offset?: Point): Promise<void> {
@@ -708,7 +727,8 @@ export class WorkspaceStore {
 
   public updateModuleSource(source: string): void {
     const editor = this.#model.value.moduleEditor
-    if (editor == null || editor.source == source) return
+    if (this.#history.applying || this.#history.failed || editor == null || editor.source == source) return
+    this.#clearHistoryForEdit()
     const pending = this.#moduleDrafts.get(editor.moduleId)
     const base = pending?.base ?? this.#model.value.draft?.content.modules[editor.moduleId]
     if (base == null) return
@@ -793,13 +813,13 @@ export class WorkspaceStore {
   public async moveNodes(positions: Readonly<Record<string, Point>>): Promise<void> {
     const target = this.#model.value.target
     if (target == null) return
-    await this.#changePresentation((value) => setNodePositions(value, target, positions))
+    await this.#canvasChange('move', Object.keys(positions).length, [], (value) => setNodePositions(value, target, positions))
   }
 
   public async moveViewport(viewport: DesignerViewport): Promise<void> {
     const target = this.#model.value.target
     if (target == null) return
-    await this.#changePresentation((value) => setFlowViewport(value, target, viewport))
+    await this.#changePresentation((value) => setFlowViewport(value, target, viewport), true)
   }
 
   public async check(): Promise<void> {
@@ -843,25 +863,42 @@ export class WorkspaceStore {
         return match == null ? [] : [Number(match[1])]
       }),
     )
-    const change = this.#changePresentation((value) =>
-      setComment(value, target, nodeId, {
-        content: '',
-        position,
-        title: this.#i18n.t('addNode.commentName', { number: number + 1 }),
-      }),
+    const change = this.#canvasChange(
+      'add',
+      1,
+      [],
+      (value) =>
+        setComment(value, target, nodeId, {
+          content: '',
+          position,
+          title: this.#i18n.t('addNode.commentName', { number: number + 1 }),
+        }),
+      [nodeId],
     )
-    this.selectNodes([nodeId])
-    await change
-    if (this.#disposed) return
+    if (!(await change) || this.#disposed) return
     return nodeId
   }
 
-  async #changeDraft(changes: FlowChanges, manageBusy = true): Promise<Draft | undefined> {
+  async #changeDraft(changes: FlowChanges, manageBusy = true, historyOwned = false): Promise<Draft | undefined> {
+    if (this.#disposed || ((this.#history.applying || this.#history.failed) && !historyOwned)) return
     const flowId = this.#model.value.flowId
     const draft = this.#model.value.draft
     if (flowId == null || draft == null) return
-    if (changes.length == 0) return draft
-    return await this.#draftChanges.change({ current: this.#draftSession.capture(), flowId }, draft, changes, manageBusy)
+    if (changes.length == 0 || dequal(applyFlowChanges(draft, changes).content, draft.content)) return draft
+    const cleared = !historyOwned && this.#history.clear()
+    const current = this.#draftSession.capture()
+    this.#history.pending++
+    this.#history.publish()
+    try {
+      const saved = this.#draftChanges.change({ current, flowId }, draft, changes, manageBusy)
+      if (cleared) this.#setNotice({ kind: 'success', message: this.#i18n.t('history.cleared') })
+      const result = await saved
+      if (result == null && current()) void this.retryHistorySync()
+      return result
+    } finally {
+      this.#history.pending--
+      if (!this.#disposed) this.#history.publish()
+    }
   }
 
   async #repairDraftNodeNames(current: () => boolean): Promise<void> {
@@ -898,11 +935,136 @@ export class WorkspaceStore {
     return keepEditor
   }
 
-  async #changePresentation(update: PresentationUpdate): Promise<void> {
-    if (this.#disposed) return
+  async #changePresentation(update: PresentationUpdate, historyOwned = false): Promise<boolean> {
+    if (this.#disposed || ((this.#history.applying || this.#history.failed) && !historyOwned)) return false
     const flowId = this.#model.value.flowId
     const presentation = this.#model.value.presentation
-    if (flowId != null && presentation != null) await this.#presentationChanges.change(flowId, presentation, this.#draftSession.capture(), update)
+    if (flowId == null || presentation == null) return false
+    if (dequal(update(presentation.value), presentation.value)) return true
+    if (!historyOwned) this.#clearHistoryForEdit()
+    const current = this.#draftSession.capture()
+    this.#history.pending++
+    this.#history.publish()
+    try {
+      const result = await this.#presentationChanges.change(flowId, presentation, current, update)
+      if (!result && current()) void this.retryHistorySync()
+      return result
+    } finally {
+      this.#history.pending--
+      if (!this.#disposed) this.#history.publish()
+    }
+  }
+
+  #clearHistoryForEdit(): void {
+    if (this.#history.clear()) this.#setNotice({ kind: 'success', message: this.#i18n.t('history.cleared') })
+  }
+
+  async #canvasChange(
+    action: CanvasAction,
+    count: number,
+    changes: FlowChanges,
+    update?: PresentationUpdate,
+    selection = this.#model.value.selectedNodeIds,
+  ): Promise<boolean> {
+    if (this.#disposed || this.#history.applying || this.#history.failed) return false
+    const { draft, target, presentation, selectedNodeIds } = this.#model.value
+    if (draft == null || target == null || presentation == null) return false
+    const next = update?.(presentation.value) ?? presentation.value
+    const presentationChange = canvasPresentationChange(presentation.value, next, target)
+    if (dequal(applyFlowChanges(draft, changes).content, draft.content) && presentationChange.nodeIds.length == 0) return true
+    const generation = this.#history.generation
+    const inverse = inverseFlowChanges(draft.content, changes)
+    this.#history.pending++
+    const retained = this.#history.record({
+      action,
+      count,
+      target,
+      forward: changes,
+      inverse,
+      presentation: presentationChange,
+      beforeSelection: selectedNodeIds,
+      afterSelection: selection,
+    })
+    try {
+      const change = changes.length == 0 ? Promise.resolve(draft) : this.#changeDraft(changes, true, true)
+      const layout = update == null ? Promise.resolve(true) : this.#changePresentation(update, true)
+      this.selectNodes(selection)
+      if (!retained) this.#setNotice({ kind: 'success', message: this.#i18n.t('history.tooLarge') })
+      const [saved, positioned] = await Promise.all([change, layout])
+      return saved != null && positioned && (!retained || generation == this.#history.generation)
+    } catch (error) {
+      this.#setNotice(errorNotice(error, this.#i18n.t))
+      void this.retryHistorySync()
+      return false
+    } finally {
+      this.#history.pending--
+      if (!this.#disposed) this.#history.publish()
+    }
+  }
+
+  public async undo(): Promise<void> {
+    await this.#restoreHistory(false)
+  }
+  public async redo(): Promise<void> {
+    await this.#restoreHistory(true)
+  }
+
+  async #restoreHistory(redo: boolean): Promise<void> {
+    const state = this.history$.value
+    if (!(redo ? state.canRedo : state.canUndo)) return
+    const entry = redo ? state.redo : state.undo
+    if (entry == null) return
+    const generation = this.#history.generation
+    this.#history.applying = true
+    this.#history.publish()
+    try {
+      const [draft, presentation] = await Promise.all([
+        this.#changeDraft(redo ? entry.forward : entry.inverse, true, true),
+        this.#changePresentation((value) => restoreCanvasPresentation(value, entry.target, entry.presentation, redo), true),
+      ])
+      if (draft != null && presentation && generation == this.#history.generation) {
+        this.selectNodes(redo ? entry.afterSelection : entry.beforeSelection)
+        this.#history.complete(redo)
+      }
+    } catch (error) {
+      this.#setNotice(errorNotice(error, this.#i18n.t))
+      void this.retryHistorySync()
+    } finally {
+      this.#history.applying = false
+      if (!this.#disposed) this.#history.publish()
+    }
+  }
+
+  public async retryHistorySync(): Promise<void> {
+    if (this.#disposed || this.#historyRecovery != null) return this.#historyRecovery
+    const flowId = this.#model.value.flowId
+    if (flowId == null) return
+    const current = this.#draftSession.capture()
+    this.#history.failed = true
+    this.#history.clear()
+    const recovery = async () => {
+      await Promise.allSettled([this.#draftChanges.settled(), this.#presentationChanges.settled()])
+      if (!current() || this.#disposed) return
+      try {
+        const { draft, presentation } = await this.#client.getEditor(flowId)
+        if (!current() || this.#disposed) return
+        this.#draftChanges.reset(draft)
+        this.#presentationChanges.reset(presentation)
+        this.#applyDraft(draft, 'external')
+        this.#set({ presentation })
+        this.#flows.advanceHead(flowId, draft.revisionId)
+        this.#history.failed = false
+        this.#setNotice({ kind: 'error', message: this.#i18n.t('history.resynced') })
+        void this.#checkTarget()
+      } catch {
+        if (current() && !this.#disposed) this.#setNotice({ kind: 'error', message: this.#i18n.t('history.syncFailed') })
+      }
+    }
+    this.#historyRecovery = recovery().finally(() => {
+      this.#historyRecovery = undefined
+      if (!this.#disposed) this.#history.publish()
+    })
+    return this.#historyRecovery
   }
 
   async #checkTarget(): Promise<void> {
@@ -972,6 +1134,7 @@ export class WorkspaceStore {
       const committed = synced.draft
       if (committed.revisionId == base.revisionId) return true
 
+      if (this.#history.clear()) this.#setNotice({ kind: 'success', message: this.#i18n.t('history.external') })
       const draft = this.#draftChanges.replaceCommitted(committed)
       const preserveModuleEditor = this.#applyDraft(draft, 'external')
       this.#flows.advanceHead(context.flowId, committed.revisionId)

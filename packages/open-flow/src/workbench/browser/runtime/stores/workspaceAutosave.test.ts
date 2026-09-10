@@ -176,6 +176,9 @@ describe('code autosave', () => {
       revisionId: 'remote',
       content: { ...revision().content, modules: { ...revision().content.modules, a: { ...module, source: remoteSource } } },
     }
+    const editor = await client.getEditor('flow')
+    // Both reload endpoints observe the same external commit.
+    vi.spyOn(client, 'getEditor').mockResolvedValue({ ...editor, draft: remote })
     vi.spyOn(client, 'syncDraft').mockResolvedValue({ draft: remote, kind: 'snapshot', version: 1 })
     commit.mockResolvedValueOnce(Response.json({ error: { code: 'flow.revision-conflict', message: 'Conflict' }, version: 1 }, { status: 409 }))
     try {

@@ -21,7 +21,10 @@ body {
   grid-template-columns: 240px minmax(0, 1fr);
   grid-template-rows: 48px minmax(0, 1fr);
   column-gap: var(--lab-column-gap);
-  background: var(--ui-background);
+  background: #fefefe;
+}
+[data-theme='dark'] .lab-shell {
+  background: #2a2a2a;
 }
 .lab-header {
   grid-column: 1 / -1;
@@ -97,8 +100,11 @@ body {
 .lab-content {
   border-radius: 12px;
   background: var(--ui-card);
-  outline: 1px solid var(--ui-border);
-  box-shadow: var(--shadow-sm);
+  outline: 1px solid color-mix(in srgb, var(--ui-border) 45%, transparent);
+  /* Fluent 2 shadow16: https://fluent2.microsoft.design/elevation */
+  box-shadow:
+    0 0 2px rgb(0 0 0 / 12%),
+    0 8px 16px rgb(0 0 0 / 14%);
 }
 .lab-sidebar {
   display: flex;

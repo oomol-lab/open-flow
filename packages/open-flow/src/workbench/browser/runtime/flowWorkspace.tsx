@@ -115,6 +115,7 @@ function Editor({
   const diagnostics = useVal(store.$.diagnostics)
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   const busy = useVal(store.$.busy)
+  const history = useVal(store.workspace.history$)
   const designer = useVal(store.$.designer)
   const variableNames = useVal(store.$.variableNames)
   const variableNamesLoaded = useVal(store.$.variableNamesLoaded)
@@ -182,7 +183,7 @@ function Editor({
     if (selectedDesignerNode?.kind == 'trigger') setStartId(selectedDesignerNode.id)
   }, [selectedDesignerNode])
 
-  const authoringDisabled = draft == null || (busy != null && busy != 'designer' && busy != 'run')
+  const authoringDisabled = draft == null || history.applying || history.failed || (busy != null && busy != 'designer' && busy != 'run')
   const closeContextPanel = (focusTarget = opener.current): void => {
     setContextPanelMode(undefined)
     focusInspectorOnOpen.current = false
@@ -245,6 +246,12 @@ function Editor({
       tabIndex={0}
     >
       <WorkbenchCanvas
+        history={{
+          state: history,
+          onUndo: () => void store.workspace.undo(),
+          onRedo: () => void store.workspace.redo(),
+          onRetry: () => void store.workspace.retryHistorySync(),
+        }}
         ignoredNodeIds={ignoredNodeIds}
         onIgnoreNodes={onIgnoreNodes}
         runControl={

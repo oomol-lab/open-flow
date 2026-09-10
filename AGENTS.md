@@ -40,6 +40,16 @@ sample data. Group related node, menu, and sidebar cases so missing or inconsist
 easy to spot. Every second-level Lab navigation directory must have an UnoCSS Iconify icon.
 Assign icons to directory metadata, not individual story titles.
 
+Put story-level explanations in the Story's optional `description`; the Lab shell renders them
+in the shared header. Keep descriptions concise and avoid repeating them in the story body.
+Component titles and sample labels remain with the examples they describe.
+
+Register sample helper buttons through `useStoryActions([{ label, onClick, disabled? }])` from
+`packages/open-flow/dev/designer/storyActions.tsx`, with one registering component per Story.
+Keep callbacks and state in the Story; the Lab shell renders these actions beside the description.
+Use this for helpers such as resetting samples or controlling simulated responses. Production
+controls under review, including canvas run, zoom, and node actions, stay in their components.
+
 Agents maintain related Lab stories as part of component changes without separate approval,
 including adding missing states, updating examples, and organizing entries within established
 categories. Confirm broad directory reorganizations, removal of still-useful coverage, or changes

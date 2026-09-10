@@ -4,17 +4,21 @@ import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { DesignerEdge, DesignerGraph, DesignerViewport, Point } from '../workspace.ts'
 import type { AddNodeOption } from './addNodeOptions.ts'
+import type { CanvasHistoryControlsProps } from './canvasHistoryControls.tsx'
 
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
+import { isMac } from '../../../../canvas/browser/base/dom.ts'
 import { CanvasTooltip } from '../../../../canvas/browser/components/tooltip.tsx'
 import { FlowCanvasView } from '../../../../canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Icon } from '../icons.tsx'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
+import { CanvasHistoryControls } from './canvasHistoryControls.tsx'
 
 interface Props {
+  readonly history?: CanvasHistoryControlsProps
   readonly ignoredNodeIds: readonly string[]
   readonly onIgnoreNodes: (nodeIds: readonly string[], ignored: boolean) => void
   readonly runControl?: ReactNode
@@ -86,6 +90,7 @@ function focusPanel(event: PointerEvent<HTMLElement>): void {
 export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function WorkbenchCanvas(
   {
     addNodeOptions,
+    history,
     blocksOpen,
     disabled,
     focusNodeRequest,
@@ -274,7 +279,14 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     if (event.target instanceof Element && event.target.closest('[contenteditable="true"], [role="dialog"], .nokey')) return
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return
     const modifier = event.metaKey || event.ctrlKey
-    if (!modifier && event.key.toLocaleLowerCase() == 'a') {
+    if (modifier && (event.key.toLowerCase() == 'z' || (!isMac && event.key.toLowerCase() == 'y'))) {
+      event.preventDefault()
+      const redo = event.shiftKey || event.key.toLowerCase() == 'y'
+      if (redo ? history?.state.canRedo : history?.state.canUndo) {
+        if (redo) history?.onRedo()
+        else history?.onUndo()
+      }
+    } else if (!modifier && event.key.toLocaleLowerCase() == 'a') {
       event.preventDefault()
       openAddNode()
     } else if (modifier && event.key.toLocaleLowerCase() == 'c' && selectedNodeIds.length > 0) {
@@ -317,6 +329,21 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         }
         toolbar={
           <WorkbenchCanvasActions
+            history={
+              history == null
+                ? undefined
+                : {
+                    ...history,
+                    onUndo: () => {
+                      history.onUndo()
+                      canvas.current?.focus({ preventScroll: true })
+                    },
+                    onRedo: () => {
+                      history.onRedo()
+                      canvas.current?.focus({ preventScroll: true })
+                    },
+                  }
+            }
             blocksOpen={blocksOpen}
             disabled={disabled || target == null}
             onOpenBlocks={onOpenBlocks}
@@ -403,12 +430,14 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
 })
 
 export function WorkbenchCanvasActions({
+  history,
   blocksOpen,
   disabled,
   onOpenBlocks,
   runControl,
   onAddTrigger,
 }: {
+  readonly history?: CanvasHistoryControlsProps
   readonly blocksOpen: boolean
   readonly disabled: boolean
   readonly onOpenBlocks: (opener: HTMLButtonElement) => void
@@ -418,6 +447,7 @@ export function WorkbenchCanvasActions({
   const t = useTranslate()
   return (
     <div className="designer-actions">
+      {history != null && <CanvasHistoryControls {...history} disabled={disabled} />}
       <CanvasTooltip placement="top" title={t('designer.openBlocks')}>
         <Button
           aria-expanded={blocksOpen}

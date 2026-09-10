@@ -3,6 +3,7 @@ import type { WorkbenchClient, JsonValue, Presentation } from '../api.ts'
 import type { Current } from './latest.ts'
 import type { SetNotice } from './workbenchNotice.ts'
 
+import { dequal } from 'dequal/lite'
 import { ApiError } from '../api.ts'
 import { errorNotice } from './workbenchNotice.ts'
 
@@ -41,25 +42,32 @@ export class PresentationChanges {
     this.#pending = []
   }
 
-  public async change(flowId: string, presentation: Presentation, current: Current, update: PresentationUpdate): Promise<void> {
-    if (this.#disposed || this.#committed == null) return
+  public async settled(): Promise<void> {
+    await this.#changes
+  }
+
+  public async change(flowId: string, presentation: Presentation, current: Current, update: PresentationUpdate): Promise<boolean> {
+    if (this.#disposed || this.#committed == null) return false
     const value = update(presentation.value)
-    if (value === presentation.value) return
+    if (dequal(value, presentation.value)) return true
     const pending = { current, flowId, update }
     this.#pending.push(pending)
     this.#setPresentation({ ...presentation, value })
+    let success = false
     this.#changes = this.#changes.then(async () => {
       if (this.#disposed || !current()) return
       const committed = this.#committed!
       const nextValue = update(committed.value)
-      if (nextValue === committed.value) {
+      if (dequal(nextValue, committed.value)) {
         this.#finish(pending, committed)
+        success = true
         return
       }
       try {
         const saved = await this.#client.updatePresentation(flowId, committed.revision, nextValue)
         if (this.#disposed || !current()) return
         this.#finish(pending, saved)
+        success = true
       } catch (error) {
         if (this.#disposed || !current()) return
         if (error instanceof ApiError && error.code == 'flow.presentation-conflict') {
@@ -72,6 +80,7 @@ export class PresentationChanges {
               message: this.#i18n.t('notice.layoutConflict'),
             })
           } catch (reloadError) {
+            if (!this.#disposed && current()) this.#finish(pending, committed)
             if (!this.#disposed && current()) this.#setNotice(errorNotice(reloadError, this.#i18n.t))
           }
         } else {
@@ -81,6 +90,7 @@ export class PresentationChanges {
       }
     })
     await this.#changes
+    return success
   }
 
   #finish(pending: PendingChange, committed: Presentation): void {

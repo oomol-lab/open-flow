@@ -106,6 +106,10 @@ export class DraftChanges {
     return this.#pending.reduce((current, pending) => applyFlowChanges(current, pending.changes), draft)
   }
 
+  public async settled(): Promise<void> {
+    await this.#queue
+  }
+
   public enqueue(task: () => Promise<void>): Promise<void> {
     const queued = this.#queue.then(task)
     this.#queue = queued
@@ -131,7 +135,10 @@ export class DraftChanges {
       return this.#commit(pending)
     })
     pending.result = change
-    this.#queue = change.then(() => undefined)
+    this.#queue = change.then(
+      () => undefined,
+      () => undefined,
+    )
     try {
       return await change
     } finally {

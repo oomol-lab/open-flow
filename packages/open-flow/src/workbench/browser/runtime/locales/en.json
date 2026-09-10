@@ -872,5 +872,25 @@
     "variable": "Variable",
     "mode": "Type",
     "connected": "Connected to an upstream source. Use Input sources to change it."
+  },
+  "history": {
+    "undo": "Undo",
+    "redo": "Redo",
+    "add": "Add {{count}} nodes",
+    "delete": "Delete {{count}} nodes",
+    "paste": "Paste {{count}} nodes",
+    "connect": "Connect nodes",
+    "disconnect": "Disconnect nodes",
+    "move": "Move {{count}} nodes",
+    "cleared": "Canvas history cleared after content editing.",
+    "tooLarge": "This action exceeds the history limit and cannot be undone.",
+    "external": "Canvas history cleared after an external update.",
+    "resynced": "Saving did not complete. Canvas history was cleared and the saved state has been reloaded. Some changes may have been saved.",
+    "syncFailed": "Could not reload the saved state. Undo is disabled. Retry synchronization.",
+    "retry": "Retry synchronization",
+    "addOne": "Add 1 node",
+    "deleteOne": "Delete 1 node",
+    "pasteOne": "Paste 1 node",
+    "moveOne": "Move 1 node"
   }
 }

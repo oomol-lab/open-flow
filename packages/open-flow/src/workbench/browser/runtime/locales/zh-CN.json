@@ -872,5 +872,25 @@
     "variable": "Variable",
     "mode": "类型",
     "connected": "已连接上游来源，可在输入来源中修改。"
+  },
+  "history": {
+    "undo": "撤销",
+    "redo": "重做",
+    "add": "新增 {{count}} 个节点",
+    "delete": "删除 {{count}} 个节点",
+    "paste": "粘贴 {{count}} 个节点",
+    "connect": "连接节点",
+    "disconnect": "断开连线",
+    "move": "移动 {{count}} 个节点",
+    "cleared": "内容已修改，画布操作历史已清空。",
+    "tooLarge": "本次操作超出历史容量限制，无法撤销。",
+    "external": "检测到外部更新，画布操作历史已清空。",
+    "resynced": "保存未完成，操作历史已清空并重新载入实际保存状态。部分修改可能已保存。",
+    "syncFailed": "无法重新载入保存状态，撤销已禁用。请重试同步。",
+    "retry": "重试同步",
+    "addOne": "新增 1 个节点",
+    "deleteOne": "删除 1 个节点",
+    "pasteOne": "粘贴 1 个节点",
+    "moveOne": "移动 1 个节点"
   }
 }
