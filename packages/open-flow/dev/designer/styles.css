@@ -291,6 +291,12 @@
   color: var(--ui-foreground);
   background: var(--ui-background);
 }
+.trigger-node-properties > .trigger-gallery {
+  height: auto;
+  overflow: visible;
+  padding: 0;
+  background: transparent;
+}
 .trigger-case-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr));
@@ -327,7 +333,8 @@
   border-bottom: 1px solid var(--ui-border);
   font-size: 13px;
 }
-.trigger-sidebar .inspector-scroll {
+.trigger-sidebar .inspector-scroll,
+.trigger-sidebar-content .inspector-scroll {
   height: auto;
 }
 @media (max-width: 900px) {

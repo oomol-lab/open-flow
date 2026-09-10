@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { FlowCanvasViewModel, FlowCanvasViewNodeRun } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
-import type { TriggerNode } from '../../src/flow/common/change.ts'
+import type { TriggerNode, TriggerSchedule } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { DraftRun } from '../../src/workbench/browser/runtime/api.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
@@ -11,12 +11,14 @@ import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '../../src/ui/browser/empty.tsx'
 import { NodeInspector } from '../../src/workbench/browser/runtime/editor/nodeInspector.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
 import { RunInputPanel } from '../../src/workbench/browser/runtime/runs/runInputPanel.tsx'
 import { RunRequestStore } from '../../src/workbench/browser/runtime/runs/runRequestStore.ts'
 import { designerGraph } from '../../src/workbench/browser/runtime/workspace.ts'
+import { useStorySidebar } from './storySidebar.tsx'
 import { triggerDraft, triggerFixtures } from './triggerFixtures.ts'
 import { createTriggerSession } from './triggerSession.ts'
 
@@ -38,26 +40,22 @@ function Gallery({ children, dark, language }: { children: ReactNode; dark: bool
   )
 }
 
-function NodeStory({ fixture, dark, language, log }: StoryProps) {
+function NodeStory({ fixture, dark, language, log, active = true, onActivate }: StoryProps & { active?: boolean; onActivate?: () => void }) {
   const { trigger } = fixture
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(fixture.id)
   const [selected, setSelected] = useState<readonly string[]>(['selected'])
-  const model = useMemo<FlowCanvasViewModel>(() => {
-    const schedules = trigger.kind === 'cron' ? trigger.cronTimes : trigger.kind === 'poll' ? trigger.pollTimes : []
-    const base = designerGraph(triggerDraft(trigger).draft, {
-      kind: 'flow',
-    }).nodes.find((node) => node.kind === 'trigger')!
-    const source = base.kind === 'trigger' ? base.presentation?.source : undefined
+  const { model: canvasModel, samples: triggerSamples } = useMemo(() => {
     const cases: readonly {
       id: string
       title: string
       status?: FlowCanvasViewNodeRun['status']
       diagnostics?: number
       description?: string
+      schedules?: readonly TriggerSchedule[]
     }[] = [
       { id: 'idle', title: 'Idle' },
       { id: 'selected', title: 'Selected' },
-      { id: 'unconfigured', title: 'Unconfigured', diagnostics: 1 },
+      { id: 'unconfigured', title: 'Unconfigured', diagnostics: 1, schedules: [] },
       { id: 'waiting', title: 'Waiting', status: 'waiting' },
       { id: 'running', title: 'Running', status: 'running' },
       { id: 'success', title: 'Success', status: 'success' },
@@ -72,25 +70,35 @@ function NodeStory({ fixture, dark, language, log }: StoryProps) {
         title: 'With description',
         description: trigger.description ?? 'Starts this workflow with a test event.',
       },
+      ...(trigger.kind === 'cron'
+        ? [
+            { id: 'cron', title: 'Cron', schedules: [{ type: 'cron', expression: '0 9 * * *', timezone: 'Asia/Shanghai' }] as const },
+            { id: 'multiple', title: 'Multiple schedules', schedules: trigger.cronTimes },
+          ]
+        : []),
     ]
-    return {
+    const samples = new Map<string, TriggerFixture>()
+    const model: FlowCanvasViewModel = {
       edges: [],
-      viewport: { x: 36, y: 60, zoom: 0.75 },
-      nodes: cases.map((entry, index) =>
-        Object.assign({}, base, {
-          id: entry.id,
-          kind: 'trigger',
-          title: entry.id === 'long' ? entry.title : `${entry.title} · ${trigger.name}`,
+      viewport: { x: 36, y: 60, zoom: 0.5 },
+      nodes: cases.map((entry, index) => {
+        let sample: TriggerNode = {
+          ...trigger,
+          name: entry.id === 'long' ? entry.title : `${entry.title} · ${trigger.name}`,
           description: entry.description,
-          inputs: [],
-          outputs: base.outputs,
+        }
+        if (sample.kind === 'cron') sample = { ...sample, cronTimes: entry.schedules ?? [{ type: 'every', unit: 'hour', value: 1 }] }
+        else if (sample.kind === 'poll' && entry.schedules) sample = { ...sample, pollTimes: entry.schedules }
+        if (entry.id === 'unconfigured') {
+          if (sample.kind === 'poll' || sample.kind === 'integration') sample = { ...sample, config: {} }
+          else if (sample.kind === 'webhook') sample = { ...sample, inputsDef: [], options: {} }
+        }
+        samples.set(entry.id, { id: `${fixture.id}-${entry.id}`, trigger: sample, payload: fixture.payload })
+        const base = designerGraph(triggerDraft(sample).draft, { kind: 'flow' }).nodes.find((node) => node.kind === 'trigger')!
+        return Object.assign({}, base, {
+          id: entry.id,
           position: { x: (index % 3) * 420, y: Math.floor(index / 3) * 210 },
           diagnostics: entry.diagnostics,
-          presentation: {
-            kind: trigger.kind,
-            schedules: entry.id === 'unconfigured' ? [] : schedules,
-            source,
-          },
           run: entry.status
             ? {
                 status: entry.status,
@@ -98,26 +106,48 @@ function NodeStory({ fixture, dark, language, log }: StoryProps) {
                 outputs: entry.status === 'success' ? { payload: fixture.payload } : undefined,
               }
             : undefined,
-        }),
-      ),
+        })
+      }),
     }
+    return { model, samples }
   }, [fixture, trigger])
+  const inspected = selected.length === 1 ? triggerSamples.get(selected[0]!) : undefined
+  const sidebar = useStorySidebar(
+    !active ? null : inspected ? (
+      <div className="trigger-node-properties">
+        <Gallery dark={dark} language={language}>
+          <SidebarSample key={inspected.id} fixture={inspected} dark={dark} language={language} log={log} state="display" framed={false} />
+        </Gallery>
+      </div>
+    ) : (
+      <Empty className="h-full rounded-none border-0">
+        <EmptyHeader>
+          <EmptyTitle>Select a node</EmptyTitle>
+          <EmptyDescription>View its configuration in this sidebar.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    ),
+  )
   return (
     <div className="workflow-story">
+      {sidebar}
       <div className="workflow-canvas">
         <FlowCanvasView
           identity={`lab:trigger:${fixture.id}`}
-          model={model}
+          model={canvasModel}
           dark={dark}
           language={language}
           editable
           autoLayout={false}
           layoutMotion={false}
           addItems={[]}
-          selectedNodeIds={selected}
+          selectedNodeIds={active ? selected : []}
           ignoredNodeIds={ignoredNodeIds}
           onIgnoreNodes={onIgnoreNodes}
-          onSelectionChange={setSelected}
+          onSelectionChange={(ids) => {
+            setSelected(ids)
+            if (ids.length > 0 || active) onActivate?.()
+          }}
           onAddNode={() => undefined}
           onConnect={(value) => log('edge.connect', value)}
           onDisconnect={(value) => log('edge.disconnect', value)}
@@ -260,7 +290,7 @@ function RunStory(props: StoryProps) {
 }
 
 type SidebarState = 'display' | 'edit' | 'unconfigured' | 'connection-error' | 'description'
-function SidebarSample({ fixture, dark, language, log, state }: StoryProps & { state: SidebarState }) {
+function SidebarSample({ fixture, dark, language, log, state, framed = true }: StoryProps & { state: SidebarState; framed?: boolean }) {
   const [session, setSession] = useState<ReturnType<typeof createTriggerSession>>()
   const sidebar = useRef<HTMLElement>(null)
   const logRef = useRef(log)
@@ -295,8 +325,8 @@ function SidebarSample({ fixture, dark, language, log, state }: StoryProps & { s
   }, [revision, fixture])
   return (
     <section className="trigger-case">
-      <h3>{state.replaceAll('-', ' ')}</h3>
-      <aside className="trigger-sidebar inspector" ref={sidebar}>
+      {framed && <h3>{state.replaceAll('-', ' ')}</h3>}
+      <aside className={framed ? 'trigger-sidebar inspector' : 'trigger-sidebar-content inspector'} ref={sidebar}>
         <header className="trigger-sidebar-heading">
           <strong>{fixture.trigger.name}</strong>
         </header>
@@ -357,6 +387,7 @@ type ProviderView = 'nodes' | 'run' | 'sidebar'
 function ProviderStory({ view, ...props }: Omit<StoryProps, 'fixture'> & { readonly view: ProviderView }) {
   const [providerId, setProviderId] = useState(() => new URLSearchParams(location.search).get('provider') ?? '')
   const fixture = providerFixtures.find((entry) => entry.id === providerId)
+  const [activeFixtureId, setActiveFixtureId] = useState(integrationExample.id)
   return (
     <div className="provider-story">
       <div className="provider-story-toolbar">
@@ -403,7 +434,7 @@ function ProviderStory({ view, ...props }: Omit<StoryProps, 'fixture'> & { reado
           <div className="provider-node-cases">
             {[integrationExample, pollExample].map((entry) => (
               <section key={entry.id}>
-                <NodeStory {...props} fixture={entry} />
+                <NodeStory {...props} fixture={entry} active={activeFixtureId === entry.id} onActivate={() => setActiveFixtureId(entry.id)} />
               </section>
             ))}
           </div>

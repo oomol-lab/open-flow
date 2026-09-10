@@ -135,7 +135,6 @@ body {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  margin: 8px;
   border-radius: 8px;
   outline: 1px solid var(--ui-border);
   background: var(--ui-background);
@@ -359,4 +358,91 @@ body {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+}
+
+.lab-story-layout {
+  flex: 1;
+  margin: 8px;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.lab-story-layout:has(> .lab-story-sidebar:not(:empty)) {
+  grid-template-columns: minmax(0, 1fr) 8px var(--lab-story-sidebar-width);
+}
+.lab-story-resizer {
+  display: none;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  border-radius: 4px;
+  color: var(--ui-muted-foreground);
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+.lab-story-layout:has(> .lab-story-sidebar:not(:empty)) > .lab-story-resizer {
+  display: flex;
+}
+.lab-story-resizer > span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow:
+    0 -5px currentColor,
+    0 5px currentColor;
+  opacity: 0.45;
+  transition: opacity 160ms ease;
+}
+.lab-story-resizer:hover,
+.lab-story-resizer:hover > span {
+  transition-delay: 500ms;
+}
+.lab-story-resizer:focus-visible,
+.lab-story-resizer:focus-visible > span,
+.lab-story-layout[data-resizing] > .lab-story-resizer,
+.lab-story-layout[data-resizing] > .lab-story-resizer > span {
+  transition-delay: 0s;
+}
+.lab-story-resizer:hover,
+.lab-story-resizer:focus-visible,
+.lab-story-layout[data-resizing] > .lab-story-resizer {
+  background: color-mix(in srgb, var(--ui-primary) 12%, transparent);
+  color: var(--ui-primary);
+}
+.lab-story-resizer:hover > span,
+.lab-story-resizer:focus-visible > span,
+.lab-story-layout[data-resizing] > .lab-story-resizer > span {
+  opacity: 1;
+}
+.lab-story-resizer:focus-visible {
+  outline: 2px solid var(--ui-ring);
+  outline-offset: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lab-story-resizer,
+  .lab-story-resizer > span {
+    transition-duration: 0s;
+  }
+}
+.lab-story-layout[data-resizing],
+.lab-story-layout[data-resizing] * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+.lab-story-sidebar {
+  min-width: 0;
+  min-height: 0;
+  border-radius: 8px;
+  outline: 1px solid var(--ui-border);
+  background: var(--ui-popover);
+  overflow: auto;
+}
+.lab-story-sidebar:empty {
+  display: none;
 }
