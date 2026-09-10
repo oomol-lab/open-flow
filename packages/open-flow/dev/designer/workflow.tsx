@@ -414,7 +414,7 @@ export const workflowStories: readonly FrontendStory[] = [
     id: 'node-picker',
     title: 'Canvas Node Picker',
     description:
-      'Hover or select a node: unconnected ports show arrows that nudge twelve times at a steady pace, then fade out and unmount. Leave and deselect to remove them; a connected side keeps all its ports visible without arrows. Read-only and connecting states hide arrows.',
+      'Hover a node: unconnected ports show arrows that nudge twelve times at a steady pace, then fade out and unmount. Selection alone does not trigger arrows; after hover triggers them, hovering or selection keeps the sequence alive. Leave and deselect to remove them; a connected side keeps all its ports visible without arrows. Read-only and connecting states hide arrows.',
     standalone: true,
     render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={workflow} picker />,
   },
