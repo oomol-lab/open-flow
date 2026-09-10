@@ -1,6 +1,7 @@
 import type { JsonValue } from '../../flow/common/change.ts'
 
 import { z } from 'zod'
+import { resultQuerySchema } from './resultQuery.ts'
 
 const json: z.ZodType<JsonValue> = z.json()
 const entry = z.strictObject({
@@ -59,17 +60,6 @@ export interface ResultQuery {
   readonly limit?: number
   readonly maxBytes?: number
 }
-export const resultQuerySchema = z.strictObject({
-  pointer: z.string().max(4096).default(''),
-  offset: z.number().int().nonnegative().default(0),
-  limit: z.number().int().min(1).max(100).default(20),
-  maxBytes: z
-    .number()
-    .int()
-    .min(1)
-    .max(1024 * 1024)
-    .default(15000),
-})
 const listSchema = z.strictObject({ version: z.literal(1), runId: z.string(), results: z.array(result), nextAfter: z.string().optional() })
 const readSchema = z.strictObject({ version: z.literal(1), runId: z.string(), result, page })
 export function parseResultQuery(value: unknown): Required<ResultQuery> {
