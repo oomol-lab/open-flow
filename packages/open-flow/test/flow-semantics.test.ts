@@ -1,7 +1,7 @@
 import type { JsonValue, RevisionContent as RevisionFixture } from '../src/flow/common/change.ts'
 
 import { describe, expect, it } from 'vitest'
-import { currentEngineContract, findEngineContract } from '../src/execution/common/runtime.ts'
+import { currentEngineContract, nodejsEngineContract, findEngineContract } from '../src/execution/common/runtime.ts'
 import { validateModules } from '../src/flow/common/modules.ts'
 import { matchesSchema } from '../src/flow/common/schema.ts'
 import { createRuntimeProgram, flowDependencies, prepareFlow, validateFlow, validateFlowInputs } from '../src/flow/common/semantics.ts'
@@ -164,6 +164,22 @@ describe('Schema value matching', () => {
 })
 
 describe('Flow semantics', () => {
+  it('accepts only the Node compatibility contract builtins without adding them to the user closure', () => {
+    const compatible = findEngineContract(nodejsEngineContract)!
+    const source = revision(`import { Buffer } from 'node:buffer'; import path from 'path'; import fs from 'node:fs/promises';
+export default () => Buffer.from(path.join('/tmp', 'file'));`)
+    expect(validateModules(source, ['module-main'], compatible)).toEqual([])
+    expect(validate(source, ['module-main']).map((diagnostic) => diagnostic.code)).toEqual([
+      'module.unsupported-import',
+      'module.unsupported-import',
+      'module.unsupported-import',
+    ])
+    for (const specifier of ['node:child_process', 'node:net', 'npm:buffer', 'some-package', 'engine/compat.mjs']) {
+      expect(validateModules(revision(`import value from '${specifier}'; export default () => value;`), ['module-main'], compatible)).toEqual([
+        expect.objectContaining({ code: 'module.unsupported-import' }),
+      ])
+    }
+  })
   it('accepts declared static Flow imports and the unprivileged Platform Library', () => {
     const source = revision(
       `import { value } from "./module-helper.mjs"

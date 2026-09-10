@@ -208,6 +208,7 @@ export function validateModuleGraph(
     if (result == null) continue
     const sourceImports = new Set<string>()
     for (const imported of result.imports) {
+      if (engine.builtinModules?.has(imported.specifier)) continue
       if (imported.specifier == engine.platformModule) {
         for (const name of imported.imported) {
           if (engine.platformExports.has(name)) continue
