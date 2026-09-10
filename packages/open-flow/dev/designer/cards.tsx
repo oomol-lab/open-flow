@@ -80,7 +80,7 @@ export const cardStories: readonly FrontendStory[] = [
                 selected={state.selected}
                 problem={state.problem}
               >
-                Selection ring and shadow follow the border color, including errors.
+                Selection rings follow the border color. Shadows stay subtle and neutral.
               </CanvasCard>
             )),
           )}
