@@ -47,7 +47,12 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const contentWidth$ = nodeStore.interaction.contentWidth
   const selected = useVal(nodeStore.$.selected)
   const [hovered, setHovered] = useState(false)
-  const hintRequested = (hovered || selected === true) && visible
+  const [hintTriggered, setHintTriggered] = useState(false)
+  // Hover starts a hint session; selection can only keep that session alive.
+  const hintRequested = hintTriggered && (hovered || selected === true) && visible
+  useEffect(() => {
+    if (!hovered && !selected) setHintTriggered(false)
+  }, [hovered, selected])
   const skip = useVal(NodeStore.to(nodeStore)?.ignore)
   const showError = useShowNodeError(nodeStore)
   const cardStore = NodeStore.is(nodeStore) ? nodeStore : undefined
@@ -114,7 +119,10 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
             {!cardStore && <div data-pos="w" className={`${styles.resizeHandle} ${styles.resizeHandleW}`} onPointerDown={handleTrack} />}
             <main
               onPointerEnter={(event) => {
-                if (event.pointerType !== 'touch') setHovered(true)
+                if (event.pointerType !== 'touch') {
+                  setHovered(true)
+                  setHintTriggered(true)
+                }
               }}
               onPointerLeave={() => setHovered(false)}
               ref={containerRef}
