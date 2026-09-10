@@ -10,13 +10,23 @@ import { CanvasTooltip } from '../../../components/tooltip.tsx'
 import { nodeCardContent } from '../../FlowCanvas/cardContent.ts'
 import { cronDescription, cronLabel } from '../../FlowCanvas/cronDescription.ts'
 import { timeZoneLabel } from '../../FlowCanvas/timeZoneLabel.ts'
-import { CanvasCard } from './CanvasCard.tsx'
+import { CanvasCard, CardCollapse } from './CanvasCard.tsx'
 import { iconForNodeType } from './constants.ts'
 import { NodeContentRows } from './NodeContentRows.tsx'
 import { RunChips, ImagePreview } from './RunChips.tsx'
 import { ValuePreview } from './ValuePreview.tsx'
 
-export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeStore: NodeStore; readonly showError: boolean; readonly branches?: ReactNode }) {
+export function CanvasNode({
+  nodeStore,
+  showError,
+  branches,
+  compact = false,
+}: {
+  readonly nodeStore: NodeStore
+  readonly showError: boolean
+  readonly branches?: ReactNode
+  readonly compact?: boolean
+}) {
   const t = useTranslate()
   const language = useLang()
   const selected = useVal(nodeStore.$.selected)
@@ -28,7 +38,7 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
   const kind = node?.kind ?? 'task'
   const subtitle = inline ? summary : node?.kind == 'task' ? node.executorName || t('canvasCard.kind.task') : t(`canvasCard.kind.${kind}`)
   const distinctSubtitle = subtitle.trim().toLocaleLowerCase() == title.trim().toLocaleLowerCase() ? undefined : subtitle
-  const toolContent = !hidden && tools != null && tools.length > 0 && (
+  const toolContent = tools != null && tools.length > 0 && (
     <div className={styles.tools}>
       <span className={styles.toolsLabel}>{t('canvasCard.tools')}</span>
       <div className={styles.toolItems}>
@@ -62,6 +72,9 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
   return (
     <div className={NODE_HANDLE_CLASSNAME}>
       <CanvasCard
+        compact={compact}
+        contentHidden={hidden}
+        footerHidden={hidden && !runContent}
         title={title}
         icon={<ContentIcon src={icon} fallback={<i className={iconForNodeType(nodeStore.nodeType)} />} />}
         subtitle={distinctSubtitle}
@@ -71,13 +84,19 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
         footer={
           toolContent || runContent ? (
             <div className={styles.footer}>
-              {toolContent}
+              {toolContent &&
+                (runContent ? (
+                  <CardCollapse hidden={hidden}>
+                    <div className={styles.toolsAboveRun}>{toolContent}</div>
+                  </CardCollapse>
+                ) : (
+                  toolContent
+                ))}
               {runContent}
             </div>
           ) : undefined
         }
         preview={
-          !hidden &&
           (values.length > 0 || Boolean(schedules?.length) || (node?.run != null && images.length > 0)) && (
             <>
               {schedules != null && schedules.length > 0 && (
@@ -139,7 +158,7 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
           )
         }
       >
-        {!hidden && !inline && summary && (
+        {!inline && summary && (
           <p className={styles.summary} title={summary}>
             {summary}
           </p>

@@ -10,7 +10,10 @@
 .footer {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+}
+
+.toolsAboveRun {
+  padding-bottom: 6px;
 }
 
 .tools {

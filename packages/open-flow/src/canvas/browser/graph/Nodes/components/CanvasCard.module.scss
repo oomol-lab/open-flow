@@ -105,7 +105,7 @@
   border-top: 1px solid color-mix(in srgb, var(--node-border-color) 60%, transparent);
 }
 
-.preview + .footer {
+.afterPreview {
   margin-top: 4px;
   border-top: 0;
 }
@@ -115,4 +115,74 @@
   column-gap: 12px;
   display: grid;
   margin: 0 -8px;
+}
+
+.collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 200ms ease;
+
+  &[data-hidden='true'] {
+    grid-template-rows: 0fr;
+  }
+}
+
+.collapseInner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collapse {
+    transition: none;
+  }
+}
+
+// Zoom changes only paint visibility; retained details keep card and port geometry.
+.compactIdentity {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  visibility: hidden;
+  pointer-events: none;
+
+  .icon {
+    width: 36px;
+    height: 36px;
+    font-size: 32px;
+
+    > :where(img, svg) {
+      width: 32px;
+      height: 32px;
+    }
+  }
+
+  .warning {
+    font-size: 24px;
+  }
+
+  strong {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 36px;
+  }
+}
+
+.compact {
+  > :not(.compactIdentity) {
+    visibility: hidden;
+  }
+
+  > .compactIdentity {
+    visibility: visible;
+  }
 }

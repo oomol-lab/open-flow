@@ -44,6 +44,7 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
   const { trigger } = fixture
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(fixture.id)
   const [selected, setSelected] = useState<readonly string[]>(['selected'])
+  const [hiddenContent, setHiddenContent] = useState<Readonly<Record<string, boolean>>>({})
   const { model: canvasModel, samples: triggerSamples } = useMemo(() => {
     const cases: readonly {
       id: string
@@ -138,6 +139,10 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
     }
     return { model, samples }
   }, [fixture, trigger])
+  const model = useMemo(
+    () => ({ ...canvasModel, nodes: canvasModel.nodes.map((node) => ({ ...node, contentHidden: hiddenContent[`${fixture.id}:${node.id}`] ?? false })) }),
+    [canvasModel, fixture.id, hiddenContent],
+  )
   const inspected = selected.length === 1 ? triggerSamples.get(selected[0]!) : undefined
   const sidebar = useStorySidebar(
     !active ? null : inspected ? (
@@ -161,7 +166,11 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
       <div className="workflow-canvas">
         <FlowCanvasView
           identity={`lab:trigger:${fixture.id}`}
-          model={canvasModel}
+          model={model}
+          onChangeNodeContentHidden={(nodeId, hidden) => {
+            setHiddenContent((value) => ({ ...value, [`${fixture.id}:${nodeId}`]: hidden }))
+            log('node.contentHidden', { nodeId, hidden })
+          }}
           dark={dark}
           language={language}
           editable

@@ -40,7 +40,8 @@ export function CommentCard({ store }: { readonly store: CommentNodeStore }) {
         icon={<i className="i-codicon:note" />}
         selected={selected}
         actions={<CommentNodeActions canvasStore={canvasStore} nodeStore={store} />}
-        preview={(!hidden || editing) && <CommentNodeContent store={store} />}
+        contentHidden={hidden && !editing}
+        preview={<CommentNodeContent store={store} />}
       />
     </div>
   )

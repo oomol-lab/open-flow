@@ -155,13 +155,12 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
   const collapsible = content != null ? nodeCardContent(content).collapsible : !!commentBody?.trim()
   const hidden = content?.contentHidden ?? commentHidden ?? false
   const floatBarItems = items.filter((item): item is ContextMenuActionItem => !!item)
-  if (collapsible) {
+  if (collapsible && editable && !commentEditing && canvasStore.canChangeNodeContentHidden) {
     const deleteIndex = floatBarItems.findIndex((item) => item.key == '$delete')
     floatBarItems.splice(deleteIndex < 0 ? floatBarItems.length : deleteIndex, 0, {
       key: '$content',
       label: t(hidden ? 'nodeContent.show' : 'nodeContent.hide'),
       expanded: !hidden,
-      disabled: !editable || commentEditing || !canvasStore.canChangeNodeContentHidden,
       icon: <i aria-hidden="true" className={hidden ? 'i-lucide-light:panel-top-open' : 'i-lucide-light:panel-top-close'} />,
       onClick: () => canvasStore.changeNodeContentHidden(nodeStore.nodeId, !hidden),
     })
