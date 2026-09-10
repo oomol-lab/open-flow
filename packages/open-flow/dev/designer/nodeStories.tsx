@@ -287,7 +287,13 @@ function CommentStory({ dark, language, log }: { readonly dark: boolean; readonl
   )
 }
 
-const valueSamples: readonly Pick<FlowCanvasViewValueNode, 'id' | 'title' | 'values' | 'diagnostics'>[] = [
+const valueSamples: readonly Pick<FlowCanvasViewValueNode, 'id' | 'title' | 'values' | 'diagnostics' | 'contentHidden'>[] = [
+  {
+    id: 'hidden',
+    title: 'Hidden content',
+    contentHidden: true,
+    values: [{ handle: 'message', value: 'Reveal this saved value with the toolbar.' }],
+  },
   { id: 'empty', title: 'No values', values: [] },
   {
     id: 'primitives',
@@ -346,11 +352,12 @@ const valueSamples: readonly Pick<FlowCanvasViewValueNode, 'id' | 'title' | 'val
 
 const valueModel: FlowCanvasViewModel = {
   edges: [],
-  viewport: { x: 46, y: 36, zoom: 0.65 },
+  viewport: { x: 46, y: 70, zoom: 0.65 },
   nodes: valueSamples.map((sample, index) => ({
     id: sample.id,
     title: sample.title,
     values: sample.values,
+    contentHidden: sample.contentHidden,
     diagnostics: sample.diagnostics,
     kind: 'value',
     inputs: [],
@@ -359,18 +366,32 @@ const valueModel: FlowCanvasViewModel = {
   })),
 }
 
-function ValueNodeStory({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
-  const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes('value')
-  const [selected, setSelected] = useState<readonly string[]>(['primitives'])
+function NodeContentStory({
+  dark,
+  language,
+  log,
+  initialModel = valueModel,
+  initialSelection = 'primitives',
+}: {
+  readonly dark: boolean
+  readonly language: UiLanguage
+  readonly log: LogAction
+  readonly initialModel?: FlowCanvasViewModel
+  readonly initialSelection?: string
+}) {
+  const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(initialSelection)
+  const [selected, setSelected] = useState<readonly string[]>([initialSelection])
   const [editable, setEditable] = useState(true)
+  const [model, setModel] = useState(initialModel)
   const [generation, setGeneration] = useState(0)
   useStoryActions([
     { label: editable ? 'Switch to read-only' : 'Enable editing', onClick: () => setEditable((value) => !value) },
     {
       label: 'Reset samples',
       onClick: () => {
-        setSelected(['primitives'])
+        setSelected([initialSelection])
         setEditable(true)
+        setModel(initialModel)
         onIgnoreNodes(ignoredNodeIds, false)
         setGeneration((value) => value + 1)
       },
@@ -387,7 +408,14 @@ function ValueNodeStory({ dark, language, log }: { readonly dark: boolean; reado
           dark={dark}
           language={language}
           editable={editable}
-          model={valueModel}
+          model={model}
+          onChangeNodeContentHidden={(nodeId, hidden) => {
+            setModel((value) => ({
+              ...value,
+              nodes: value.nodes.map((node) => (node.id == nodeId ? { ...node, contentHidden: hidden } : node)),
+            }))
+            log('node.contentHidden', { nodeId, hidden })
+          }}
           addItems={[]}
           ignoredNodeIds={ignoredNodeIds}
           onIgnoreNodes={onIgnoreNodes}
@@ -410,7 +438,65 @@ function ValueNodeStory({ dark, language, log }: { readonly dark: boolean; reado
   )
 }
 
+const contentModel: FlowCanvasViewModel = {
+  edges: [],
+  viewport: { x: 46, y: 76, zoom: 0.65 },
+  nodes: [
+    {
+      id: 'schedule',
+      kind: 'trigger',
+      title: 'Schedule content',
+      inputs: [],
+      outputs: [],
+      position: { x: 0, y: 0 },
+      presentation: { kind: 'cron', schedules: [{ type: 'every', value: 30, unit: 'minute' }] },
+    },
+    {
+      id: 'values',
+      kind: 'value',
+      title: 'Value content',
+      inputs: [],
+      outputs: [],
+      position: { x: 380, y: 0 },
+      values: [{ handle: 'message', value: 'Hello, Open Flow' }],
+    },
+    {
+      id: 'task',
+      kind: 'task',
+      title: 'Task content',
+      inputs: [],
+      outputs: [],
+      position: { x: 760, y: 0 },
+      reference: 'sample',
+      description: 'Summarize the latest report.',
+      tools: [{ id: 'search', label: 'Search', icon: ':lucide:search:' }],
+      run: { status: 'success' },
+    },
+    {
+      id: 'condition',
+      kind: 'condition',
+      title: 'Condition · not collapsible',
+      description: 'Keep the branch rule visible.',
+      inputs: [],
+      outputs: [{ handle: 'matched' }],
+      position: { x: 0, y: 280 },
+      cases: [{ output: 'matched', relation: 'all', expressions: [{ input: 'count', operator: '>', value: 0 }] }],
+    },
+    { id: 'empty', kind: 'value', title: 'Empty · no collapse action', inputs: [], outputs: [], position: { x: 380, y: 280 }, values: [] },
+    { id: 'comment', kind: 'comment', title: 'Comment content', content: 'Keep the **report** concise.', position: { x: 760, y: 280 } },
+  ],
+}
+
 export const nodeStories: readonly FrontendStory[] = [
+  {
+    group: 'Canvas',
+    id: 'node-content',
+    title: 'Node content',
+    description:
+      'Collapse content before Delete. Schedule, Value, Task and Comment support it; empty nodes and Condition do not. Run status and branches remain visible.',
+    standalone: true,
+    render: (log, dark, language) => <NodeContentStory dark={dark} language={language} log={log} initialModel={contentModel} initialSelection="schedule" />,
+  },
   {
     group: 'Node Value',
     id: 'node-value',
@@ -418,7 +504,7 @@ export const nodeStories: readonly FrontendStory[] = [
       'Value rows · Left-aligned keys and right-aligned values, with empty, structured, nullable, overflowing and invalid samples. Canvas actions are logged.',
     title: 'Node States',
     standalone: true,
-    render: (log, dark, language) => <ValueNodeStory dark={dark} language={language} log={log} />,
+    render: (log, dark, language) => <NodeContentStory dark={dark} language={language} log={log} />,
   },
   {
     group: 'Node Comment',

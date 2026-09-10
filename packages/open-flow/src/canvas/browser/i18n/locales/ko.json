@@ -627,5 +627,9 @@
     "Europe/Moscow": "모스크바",
     "Australia/Sydney": "시드니",
     "Pacific/Auckland": "오클랜드"
+  },
+  "nodeContent": {
+    "show": "내용 표시",
+    "hide": "내용 숨기기"
   }
 }

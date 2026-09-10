@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createI18n } from '../../i18n/i18n-loader.ts'
-import { conditionBranchSummary, imageSources, nodeSummary } from './cardContent.ts'
+import { conditionBranchSummary, imageSources, nodeCardContent, nodeSummary } from './cardContent.ts'
 
 const base = { id: 'node', title: 'Schedule', position: { x: 0, y: 0 }, inputs: [], outputs: [] }
 
@@ -71,5 +71,34 @@ describe('Canvas content', () => {
     const value: Record<string, unknown> = { mediaType: 'image/png', url: 'javascript:alert(1)', local: 'file:///tmp/image.png', relative: '/image.png' }
     value.self = value
     expect(imageSources(value)).toEqual([])
+  })
+})
+
+describe('Collapsible card content', () => {
+  it('offers collapse for actual body content and keeps it available while hidden', () => {
+    for (const node of [
+      { ...base, kind: 'value' as const, values: [{ handle: 'zero', value: 0 }] },
+      { ...base, kind: 'value' as const, values: [{ handle: 'null', value: null }] },
+      { ...base, kind: 'trigger' as const, presentation: { kind: 'cron' as const, schedules: [{ type: 'every' as const, value: 1, unit: 'day' as const }] } },
+      { ...base, kind: 'task' as const, reference: 'task', description: 'Task description' },
+      { ...base, kind: 'task' as const, reference: 'task', tools: [{ id: 'search', label: 'Search', icon: ':lucide:search:' }] },
+      { ...base, kind: 'subflow' as const, reference: 'sub', description: 'Subflow description' },
+      { ...base, kind: 'wait' as const, notice: { text: 'Approve the report' } },
+      { ...base, kind: 'task' as const, reference: 'task', run: { status: 'success' as const, outputs: { image: 'https://example.com/image.png' } } },
+    ]) {
+      expect(nodeCardContent(node)).toMatchObject({ collapsible: true, hidden: false })
+      expect(nodeCardContent({ ...node, contentHidden: true })).toMatchObject({ collapsible: true, hidden: true })
+    }
+  })
+
+  it('excludes empty bodies, header-only triggers, run status and all Condition content', () => {
+    for (const node of [
+      { ...base, kind: 'value' as const, values: [{ handle: 'unset' }] },
+      { ...base, kind: 'task' as const, reference: 'task', description: '  ', run: { status: 'success' as const } },
+      { ...base, kind: 'trigger' as const, description: 'Manual trigger' },
+      { ...base, kind: 'condition' as const, cases: [], description: 'Keep all branches visible' },
+    ]) {
+      expect(nodeCardContent({ ...node, contentHidden: true })).toMatchObject({ collapsible: false, hidden: false })
+    }
   })
 })

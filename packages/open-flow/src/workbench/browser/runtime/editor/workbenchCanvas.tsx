@@ -33,6 +33,7 @@ interface Props {
   readonly model: DesignerGraph
   readonly onAddNode: (option: AddNodeOption, position: Point, connection?: (nodeId: string) => Omit<DesignerEdge, 'id'>) => Promise<string | undefined>
   readonly onConnect: (edge: Omit<DesignerEdge, 'id'>) => void
+  readonly onChangeNodeContentHidden?: (nodeId: string, hidden: boolean) => void
   readonly onChangeComment: (nodeId: string, value: { readonly content: string; readonly title: string }) => void
   readonly onCopy: () => void
   readonly onDeleteEdge: (edge: DesignerEdge) => void
@@ -97,6 +98,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     model,
     onAddNode,
     onConnect,
+    onChangeNodeContentHidden,
     onChangeComment,
     onCopy,
     onDeleteEdge,
@@ -353,6 +355,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           return await onAddNode(option, position, connection)
         }}
         onConnect={onConnect}
+        onChangeNodeContentHidden={onChangeNodeContentHidden}
         onChangeComment={onChangeComment}
         onDeleteNodes={(nodeIds) => {
           // Move focus off the toolbar before deleting its node and unmounting the button.

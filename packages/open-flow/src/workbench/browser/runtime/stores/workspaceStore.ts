@@ -68,7 +68,7 @@ import {
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
 import { canvasPresentationChange, restoreCanvasPresentation } from '../workspace.ts'
-import { commentIds, designerGraph, removeComments, setComment, setFlowViewport, setNodePositions } from '../workspace.ts'
+import { commentIds, designerGraph, removeComments, setComment, setFlowViewport, setNodePositions, setNodeContentHidden } from '../workspace.ts'
 import { CanvasHistory } from './canvasHistory.ts'
 import { DraftChanges } from './draftChanges.ts'
 import { FlowCatalog } from './flowCatalog.ts'
@@ -80,6 +80,7 @@ import { moduleEditorStatus, selectedModuleEditor, WorkspaceModel } from './work
 const PASTE_OFFSET: Point = { x: 40, y: 40 }
 
 interface Clipboard {
+  readonly hiddenNodeIds: readonly string[]
   readonly comments: readonly {
     readonly content: string
     readonly position: Point
@@ -453,6 +454,7 @@ export class WorkspaceStore {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null || this.#model.value.selectedNodeIds.length == 0) return
+    const selectedNodeIds = [...this.#model.value.selectedNodeIds]
     const comments = commentIds(this.#model.value.presentation?.value ?? {}, target)
     const commentNodes = new Set(this.#model.value.selectedNodeIds.filter((nodeId) => comments.has(nodeId)))
     const changes = deleteSelection(revision, target, this.#model.value.selectedNodeIds)
@@ -460,7 +462,11 @@ export class WorkspaceStore {
       'delete',
       this.#model.value.selectedNodeIds.length,
       changes,
-      commentNodes.size == 0 ? undefined : (value) => removeComments(value, target, commentNodes),
+      (value) => {
+        let next = commentNodes.size == 0 ? value : removeComments(value, target, commentNodes)
+        for (const nodeId of selectedNodeIds) next = setNodeContentHidden(next, target, nodeId, false)
+        return next
+      },
       [],
     )
   }
@@ -471,6 +477,7 @@ export class WorkspaceStore {
     if (revision == null || target == null || this.#model.value.selectedNodeIds.length == 0) return
     const selected = new Set(this.#model.value.selectedNodeIds)
     this.#clipboard = {
+      hiddenNodeIds: this.#designer().nodes.flatMap((node) => (node.contentHidden && selected.has(node.id) ? [node.id] : [])),
       comments: this.#designer().nodes.flatMap((node) =>
         node.kind == 'comment' && selected.has(node.id)
           ? [
@@ -492,6 +499,7 @@ export class WorkspaceStore {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null || this.#clipboard == null) return
+    const hiddenNodeIds = new Set(this.#clipboard.hiddenNodeIds)
     const pasted = pasteNodes(revision, target, this.#clipboard.nodes, this.#identity)
     const comments = this.#clipboard.comments.map((comment) => ({
       ...comment,
@@ -527,7 +535,11 @@ export class WorkspaceStore {
       pasted.changes,
       (value) => {
         let next = setNodePositions(value, target, positions)
+        for (const [index, sourceId] of pasted.sourceIds.entries()) {
+          if (hiddenNodeIds.has(sourceId)) next = setNodeContentHidden(next, target, pasted.nodeIds[index]!, true)
+        }
         for (const comment of comments) {
+          if (hiddenNodeIds.has(comment.sourceId)) next = setNodeContentHidden(next, target, comment.nodeId, true)
           next = setComment(next, target, comment.nodeId, {
             content: comment.content,
             position: { x: comment.position.x + offset.x * step, y: comment.position.y + offset.y * step },
@@ -637,6 +649,13 @@ export class WorkspaceStore {
     const revision = this.$.revision.value
     const changes = revision == null ? undefined : setWaitNotification(revision, nodeId, action, this.#identity())
     return changes != null && (await this.#changeDraft(changes)) != null
+  }
+
+  public async saveNodeContentHidden(nodeId: string, hidden: boolean): Promise<void> {
+    const target = this.#model.value.target
+    const node = this.#designer().nodes.find((candidate) => candidate.id == nodeId)
+    if (target == null || node == null || node.kind == 'condition') return
+    await this.#changePresentation((value) => setNodeContentHidden(value, target, nodeId, hidden))
   }
 
   public async saveComment(nodeId: string, comment: { readonly content: string; readonly title: string }): Promise<void> {

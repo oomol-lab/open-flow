@@ -90,6 +90,14 @@ export class CanvasStore {
     this.#callbacks.onIgnoreNodes(nodeIds, ignored)
   }
 
+  public get canChangeNodeContentHidden(): boolean {
+    return this.#callbacks.onChangeNodeContentHidden != null
+  }
+
+  public readonly changeNodeContentHidden = (nodeId: string, hidden: boolean): void => {
+    if (this.$.editable.value) this.#callbacks.onChangeNodeContentHidden?.(nodeId, hidden)
+  }
+
   public readonly $: CanvasStore$
   public readonly $$: CanvasStore$$
 

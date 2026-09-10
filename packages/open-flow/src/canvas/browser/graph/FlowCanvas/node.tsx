@@ -35,6 +35,7 @@ export function createCommentNodeEntry(
   const store = new CommentNodeStore(node.id as NodeId, {
     title: node.title,
     content: node.content,
+    contentHidden: node.contentHidden,
     position: node.position,
     duplicateNode: (offset) => canvasStore.onDuplicate?.([node.id as NodeId], offset),
     onSaveContent: (content) => callbacks.onChangeComment?.(node.id, { content, title: store.$$.title.value ?? 'Comment' }),
@@ -60,6 +61,7 @@ export function createCommentNodeEntry(
 
 export function updateCommentNodeEntry(entry: CommentNodeEntry, node: FlowCanvasViewCommentNode, contentKey: string): CommentNodeEntry {
   entry.store.$$.content.set(node.content)
+  entry.store.$$.contentHidden.set(node.contentHidden ?? false)
   entry.setTitle(node.title)
   return { ...entry, contentKey }
 }

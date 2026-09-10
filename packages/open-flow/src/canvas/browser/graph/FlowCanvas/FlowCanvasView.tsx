@@ -20,6 +20,7 @@ function callbacksFromProps(props: FlowCanvasViewProps): ViewCallbacks {
     onIgnoreNodes: props.onIgnoreNodes,
     onAddNode: props.onAddNode,
     onMoveNodes: props.onMoveNodes,
+    onChangeNodeContentHidden: props.onChangeNodeContentHidden,
     onChangeComment: props.onChangeComment,
     onConnect: props.onConnect,
     onDeleteNodes: props.onDeleteNodes,

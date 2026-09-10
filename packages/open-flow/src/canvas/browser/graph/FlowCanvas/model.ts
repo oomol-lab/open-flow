@@ -82,6 +82,7 @@ export interface FlowCanvasViewViewport extends FlowCanvasViewPosition {
 }
 
 interface FlowCanvasViewNodeBase {
+  readonly contentHidden?: boolean
   readonly description?: string
   readonly diagnostics?: number
   readonly icon?: string
@@ -141,6 +142,7 @@ export interface FlowCanvasViewTriggerNode extends FlowCanvasViewNodeBase {
 }
 
 export interface FlowCanvasViewCommentNode {
+  readonly contentHidden?: boolean
   readonly content: string
   readonly id: string
   readonly kind: 'comment'
@@ -238,6 +240,7 @@ export interface FlowCanvasViewProps {
     connection?: (nodeId: string) => Omit<FlowCanvasViewEdge, 'id'>,
   ) => Promise<string | undefined> | string | undefined
   readonly onConnect: (edge: Omit<FlowCanvasViewEdge, 'id'>) => void
+  readonly onChangeNodeContentHidden?: (nodeId: string, hidden: boolean) => void
   readonly onChangeComment?: (nodeId: string, value: { readonly content: string; readonly title: string }) => void
   readonly onDeleteNodes: (nodeIds: readonly string[]) => void
   readonly onDisconnect: (edge: FlowCanvasViewEdge) => void
@@ -255,6 +258,7 @@ export interface ViewCallbacks {
   readonly onMoveNodes: FlowCanvasViewProps['onMoveNodes']
   readonly onAddNode: FlowCanvasViewProps['onAddNode']
   readonly onConnect: FlowCanvasViewProps['onConnect']
+  readonly onChangeNodeContentHidden?: FlowCanvasViewProps['onChangeNodeContentHidden']
   readonly onChangeComment: FlowCanvasViewProps['onChangeComment']
   readonly onDeleteNodes: FlowCanvasViewProps['onDeleteNodes']
   readonly onDisconnect: FlowCanvasViewProps['onDisconnect']
