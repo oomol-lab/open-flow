@@ -37,7 +37,13 @@ Lab stories support design alignment between people and AI and fast visual inspe
 meaningful states side by side with clear labels; menus and panels under review should be visible
 on entry without repeated clicks. Use real component and Trigger definitions with deterministic
 sample data. Group related node, menu, and sidebar cases so missing or inconsistent designs are
-easy to spot.
+easy to spot. Every second-level Lab navigation directory must have an UnoCSS Iconify icon.
+Assign icons to directory metadata, not individual story titles.
+
+Agents maintain related Lab stories as part of component changes without separate approval,
+including adding missing states, updating examples, and organizing entries within established
+categories. Confirm broad directory reorganizations, removal of still-useful coverage, or changes
+to the design verification scope with the user unless already authorized by the task.
 
 Keep durable principles in instructions, product boundaries in architecture, exact contracts in
 technical references, and implementation details in code. Historical plans provide context, not
@@ -49,6 +55,11 @@ Evidence must support the claimed outcome. Choose verification by the affected b
 and risk, not by a fixed ritual. During iteration, resolve the current uncertainty with focused
 checks. Before delivery, ensure the combined evidence covers the final change and its consequences.
 Reuse valid results; broaden checks when the impact or remaining uncertainty warrants it.
+
+For component appearance or interaction changes, use Lab as the preferred surface for visual
+verification. Reuse or update the relevant stories to inspect affected states together; add missing
+cases when needed. Supplement Lab checks with the actual product page when correctness depends on
+integration, layout context, or a complete user flow that the stories do not cover.
 
 Browser acceptance is appropriate when rendering or real interaction is material to correctness
 and other evidence is insufficient. Clear, low-risk edits and non-UI work do not warrant it by default.

@@ -142,7 +142,90 @@ function ConditionStory({ dark, language, log }: { readonly dark: boolean; reado
   )
 }
 
+const commentModel: FlowCanvasViewModel = {
+  edges: [],
+  viewport: { x: 32, y: 60, zoom: 0.75 },
+  nodes: [
+    {
+      id: 'notes',
+      kind: 'comment',
+      title: 'Review notes',
+      position: { x: 0, y: 0 },
+      content:
+        '### Workflow palette\nInspect each step and its execution dependencies.\n\n- Select a node to inspect it.\n- Edit its configuration in the sidebar.\n- Review the output before continuing.',
+    },
+    {
+      id: 'long',
+      kind: 'comment',
+      title: 'A longer comment title with review context',
+      position: { x: 400, y: 0 },
+      content:
+        '### Release checklist\n\n- [x] Review inputs\n- [ ] Verify output\n\nUse `report.total` for the final count.\n\n```json\n{ "status": "ready", "count": 128 }\n```\n\n[Review documentation](https://example.com)',
+    },
+    { id: 'empty', kind: 'comment', title: 'Empty note', position: { x: 0, y: 380 }, content: '' },
+    {
+      id: 'formatting',
+      kind: 'comment',
+      title: 'Markdown formatting',
+      position: { x: 800, y: 0 },
+      content:
+        '# Heading one\n\n## Heading two\n\n### Heading three\n\n**Strong text**, *emphasis* and ~~removed text~~.\n\n> Keep the output concise.\n\n1. Read the input\n2. Review the result\n   - Check nested details\n\n| Field | Value |\n| --- | --- |\n| Status | Ready |\n| Count | 128 |\n\n---\n\nLong token: `customer_activity_summary_for_the_current_reporting_period`',
+    },
+  ],
+}
+
+function CommentStory({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
+  const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes('comment')
+  const [model, setModel] = useState(commentModel)
+  const [selected, setSelected] = useState<readonly string[]>(['notes'])
+  return (
+    <div className="workflow-story">
+      <div className="overview-toolbar open-flow-workbench">
+        <span>Comment cards · warm note surfaces, selected, long title, Markdown typography, tables and empty note. Use the source button to edit.</span>
+      </div>
+      <div className="workflow-canvas">
+        <FlowCanvasView
+          ignoredNodeIds={ignoredNodeIds}
+          onIgnoreNodes={onIgnoreNodes}
+          onAddNode={() => undefined}
+          onConnect={(edge) => log('edge.connect', edge)}
+          onDisconnect={(edge) => log('edge.disconnect', edge)}
+          onDeleteNodes={(ids) => log('node.delete', ids)}
+          onPaste={(position) => log('canvas.paste', position)}
+          onMoveNodes={(positions) => log('node.move', positions)}
+          onMoveViewport={(viewport) => log('canvas.move', viewport)}
+          identity="lab:node-cases:comment"
+          autoLayout={false}
+          dark={dark}
+          language={language}
+          layoutMotion={false}
+          editable
+          model={model}
+          addItems={[]}
+          selectedNodeIds={selected}
+          onSelectionChange={setSelected}
+          onDuplicate={(ids) => log('node.duplicate', ids)}
+          onChangeComment={(id, value) => {
+            setModel((current) => ({
+              ...current,
+              nodes: current.nodes.map((node) => (node.id === id && node.kind === 'comment' ? { ...node, ...value } : node)),
+            }))
+            log('comment.change', { id, value })
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
 export const nodeStories: readonly FrontendStory[] = [
+  {
+    group: 'Node Comment',
+    id: 'node-comment',
+    title: 'Node States',
+    standalone: true,
+    render: (log, dark, language) => <CommentStory dark={dark} language={language} log={log} />,
+  },
   {
     group: 'Node Condition',
     id: 'node-condition',

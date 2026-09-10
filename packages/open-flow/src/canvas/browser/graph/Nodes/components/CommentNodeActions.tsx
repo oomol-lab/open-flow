@@ -1,4 +1,3 @@
-import styles from './NodeHead.module.scss'
 import type { CanvasStore } from '../../../stores/canvas/canvas.store.ts'
 import type { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 
@@ -20,16 +19,16 @@ export function CommentNodeActions({ canvasStore, nodeStore }: CommentNodeAction
   if (!editable) return null
 
   return (
-    <CanvasTooltip placement="bottom" title={sourceCode ? t('comment.preview') : t('comment.source')}>
+    <CanvasTooltip placement="top" title={sourceCode ? t('comment.preview') : t('comment.source')}>
       <Button
-        className={styles.action}
+        className="text-[var(--text-2)] hover:bg-[color-mix(in_srgb,currentColor_8%,transparent)] hover:text-[var(--text-4)] dark:hover:bg-[color-mix(in_srgb,currentColor_8%,transparent)]"
         aria-label={sourceCode ? t('comment.preview') : t('comment.source')}
         disabled={!editable}
         onClick={nodeStore.togglePreview}
-        size="icon-xs"
+        size="icon-sm"
         variant="ghost"
       >
-        <i className={sourceCode ? 'i-codicon:wand' : 'i-codicon:go-to-file'} />
+        <i aria-hidden="true" style={{ fontSize: 18 }} className={sourceCode ? 'i-codicon:eye' : 'i-codicon:code'} />
       </Button>
     </CanvasTooltip>
   )

@@ -7,6 +7,8 @@ import { isEmptyReactNode } from '../../../../../ui/browser/hooks.ts'
 
 export function CanvasCard({
   title,
+  tone,
+  titleContent,
   icon,
   subtitle,
   children,
@@ -17,6 +19,8 @@ export function CanvasCard({
   problem,
   selected,
 }: {
+  readonly tone?: 'comment'
+  readonly titleContent?: ReactNode
   readonly title: string
   readonly icon?: ReactNode
   readonly subtitle?: string
@@ -30,11 +34,11 @@ export function CanvasCard({
 }) {
   const hasContent = Children.toArray(children).some((child) => typeof child != 'string' || child.trim().length > 0)
   return (
-    <article className={clsx(styles.card, selected && styles.selected, problem && styles.problem)}>
+    <article className={clsx(styles.card, tone === 'comment' && styles.comment, selected && styles.selected, problem && styles.problem)}>
       <header className={styles.header}>
         <span className={styles.icon}>{icon}</span>
         <div className={styles.identity}>
-          <strong title={title}>{title}</strong>
+          <strong title={title}>{titleContent ?? title}</strong>
           {subtitle && <span>{subtitle}</span>}
         </div>
         {problem && (

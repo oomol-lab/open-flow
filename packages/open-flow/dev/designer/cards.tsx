@@ -60,6 +60,36 @@ function CardStage({ dark, language, children }: { readonly dark: boolean; reado
 export const cardStories: readonly FrontendStory[] = [
   {
     group: 'Canvas',
+    id: 'canvas-card-states',
+    title: 'Cards · Borders & shadows',
+    standalone: true,
+    render: (_log, dark, language) => (
+      <CardStage dark={dark} language={language}>
+        <div className="card-studies-grid">
+          {([undefined, 'comment'] as const).flatMap((tone) =>
+            [
+              { label: 'Default', selected: false, problem: undefined },
+              { label: 'Selected', selected: true, problem: undefined },
+              { label: 'Error', selected: false, problem: 'Review the configuration.' },
+              { label: 'Selected + error', selected: true, problem: 'Review the configuration.' },
+            ].map((state) => (
+              <CanvasCard
+                key={`${tone}-${state.label}`}
+                title={`${tone ?? 'Neutral'} · ${state.label}`}
+                tone={tone}
+                selected={state.selected}
+                problem={state.problem}
+              >
+                Selection ring and shadow follow the border color, including errors.
+              </CanvasCard>
+            )),
+          )}
+        </div>
+      </CardStage>
+    ),
+  },
+  {
+    group: 'Canvas',
     id: 'canvas-cards',
     title: 'Cards · Content & records',
     standalone: true,
