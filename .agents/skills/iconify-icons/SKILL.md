@@ -22,15 +22,19 @@ For example, run from `packages/open-flow`:
 
 ```sh
 bun -e '
-const data = await Bun.file("node_modules/@iconify/json/json/carbon.json").json();
+const data = await Bun.file("node_modules/@iconify/json/json/lucide.json").json();
 for (const name of [...Object.keys(data.icons), ...Object.keys(data.aliases ?? {})]) {
   if (/flow|connection|minimap/i.test(name)) console.log(`i-${data.prefix}:${name}`);
 }
 '
 ```
 
-Prefer the collection used by nearby controls, then broaden to other installed
-collections if needed. Try related English keywords when an exact search is sparse.
+Prefer Lucide for new or replaced UI icons, using its rounded outlines and consistent
+stroke weight. Search other installed collections only when Lucide has no suitable
+icon or the user specifies another collection. Keep icons within the same control
+group visually consistent in stroke weight, proportions, and apparent size; nearby
+legacy icons do not override the Lucide preference. Try related English keywords
+when an exact search is sparse.
 Read only the selected candidates and their alias parents for SVG inspection; use
 `@iconify/utils` to resolve aliases when rendering previews locally. Compare stroke
 weight, proportions, and appearance at the intended size, not just icon names.
@@ -41,7 +45,7 @@ Choose verification using the [repository verification principles](../../../AGEN
 Use the collection prefix and exact icon key to form a complete class:
 
 ```tsx
-<i aria-hidden="true" className="i-carbon:flow-connection" />
+<i aria-hidden="true" className="i-lucide:workflow" />
 ```
 
 Write the complete class literally in source so UnoCSS can discover it. Do not

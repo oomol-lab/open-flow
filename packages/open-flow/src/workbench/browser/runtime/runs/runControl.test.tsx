@@ -6,7 +6,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { createI18n } from '../i18n.ts'
 import { RunControl } from './runControl.tsx'
 
-const captured = vi.hoisted(() => ({ items: [] as ButtonHTMLAttributes<HTMLButtonElement>[] }))
+const captured = vi.hoisted(() => ({
+  items: [] as ButtonHTMLAttributes<HTMLButtonElement>[],
+  onValueChange: undefined as ((value: string) => void) | undefined,
+}))
 
 vi.mock('../../../../ui/browser/dropdown-menu.tsx', async () => {
   const { createContext, useContext } = await import('react')
@@ -16,7 +19,11 @@ vi.mock('../../../../ui/browser/dropdown-menu.tsx', async () => {
     DropdownMenu: ({ children }: HTMLAttributes<HTMLDivElement>) => <>{children}</>,
     DropdownMenuContent: ({ children }: HTMLAttributes<HTMLDivElement>) => <div>{children}</div>,
     DropdownMenuGroup: ({ children }: HTMLAttributes<HTMLDivElement>) => <MenuGroupContext.Provider value>{children}</MenuGroupContext.Provider>,
-    DropdownMenuItem: (props: ButtonHTMLAttributes<HTMLButtonElement>) => {
+    DropdownMenuRadioGroup: ({ children, onValueChange }: HTMLAttributes<HTMLDivElement> & { onValueChange: (value: string) => void }) => {
+      captured.onValueChange = onValueChange
+      return <div>{children}</div>
+    },
+    DropdownMenuRadioItem: (props: ButtonHTMLAttributes<HTMLButtonElement>) => {
       captured.items.push(props)
       return <div>{props.children}</div>
     },
@@ -52,10 +59,11 @@ describe('RunControl', () => {
       </I18nProvider>,
     )
 
-    expect(markup).toContain('2 start nodes')
+    expect(markup).toContain('Start node')
     expect(captured.items).toHaveLength(2)
 
-    captured.items[1]?.onClick?.({} as never)
+    expect(captured.items[1]?.value).toBe('cron')
+    captured.onValueChange?.('cron')
     expect(onSelectTrigger).toHaveBeenCalledWith('cron')
   })
 })

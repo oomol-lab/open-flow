@@ -9,6 +9,7 @@ import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
+import { CanvasTooltip } from '../../components/tooltip.tsx'
 import { useGetStaticPopupContainer } from './useGetPopupContainer.ts'
 
 export function CanvasInteractiveMode({
@@ -25,27 +26,22 @@ export function CanvasInteractiveMode({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <Button
-            aria-label={t('interactiveMode.title')}
-            className={styles.interactiveModeTrigger}
-            size="default"
-            title={t('interactiveMode.title')}
-            type="button"
-            variant="ghost"
-          >
-            <i className={mode == 'mouse' ? 'i-custom:mouse' : 'i-custom:touchpad'} data-mode-icon />
-            <i className="i-codicon:chevron-down" data-icon="inline-end" data-mode-chevron />
-          </Button>
-        }
-      />
+      <CanvasTooltip placement="bottom" title={t('interactiveMode.title')}>
+        <PopoverTrigger
+          render={
+            <Button aria-label={t('interactiveMode.title')} className={styles.interactiveModeTrigger} size="icon" type="button" variant="ghost">
+              <i className={mode == 'mouse' ? 'i-lucide-light:mouse' : 'i-lucide-light:touchpad'} data-mode-icon />
+            </Button>
+          }
+        />
+      </CanvasTooltip>
       <PopoverContent
         align="end"
         className={styles.interactiveModePanel}
         data-canvas-control-scope
         container={typeof document == 'undefined' ? undefined : getPopupContainer()}
         side="bottom"
+        sideOffset={14}
       >
         <div aria-label={t('interactiveMode.title')} className={styles.interactiveModeChoices} role="radiogroup">
           <Button
@@ -59,7 +55,7 @@ export function CanvasInteractiveMode({
             type="button"
             variant="outline"
           >
-            <i className="i-custom:mouse" />
+            <i aria-hidden="true" className="i-lucide-light:mouse" />
             <strong>{t('interactiveMode.mouse')}</strong>
             <span>{t('interactiveMode.mouseDescription')}</span>
           </Button>
@@ -74,7 +70,7 @@ export function CanvasInteractiveMode({
             type="button"
             variant="outline"
           >
-            <i className="i-custom:touchpad" />
+            <i aria-hidden="true" className="i-lucide-light:touchpad" />
             <strong>{t('interactiveMode.touchpad')}</strong>
             <span>{t('interactiveMode.touchpadDescription')}</span>
           </Button>
@@ -106,23 +102,33 @@ export function CanvasViewControls({
   const t = useTranslate()
 
   return (
-    <Panel position="bottom-left" className={cn(styles.island, styles.dock, styles.viewDock)} data-canvas-control-scope>
-      <Button aria-label={t('zoomOut')} disabled={minZoomReached} onClick={onZoomOut} size="icon" title={t('zoomOut')} type="button" variant="ghost">
-        <i className="i-codicon:zoom-out" />
-      </Button>
-      <Button className={styles.zoomValue} onClick={onZoomReset} size="default" title={t('zoomReset')} type="button" variant="ghost">
-        {Math.round(zoom * 100)}%
-      </Button>
-      <Button aria-label={t('zoomIn')} disabled={maxZoomReached} onClick={onZoomIn} size="icon" title={t('zoomIn')} type="button" variant="ghost">
-        <i className="i-codicon:zoom-in" />
-      </Button>
-      <Button aria-label={t('fitView')} onClick={onFitView} size="icon" title={t('fitView')} type="button" variant="ghost">
-        <i className="i-custom:screen" />
-      </Button>
-      {onRelayout != null && (
-        <Button aria-label={t('optimize')} onClick={onRelayout} size="icon" title={t('optimize')} type="button" variant="ghost">
-          <i className="i-custom:layout" />
+    <Panel position="bottom-left" className={cn(styles.island, styles.dock, styles.viewDock)} data-canvas-control-scope data-tooltip-toolbar>
+      <CanvasTooltip placement="top" title={t('zoomOut')}>
+        <Button aria-label={t('zoomOut')} disabled={minZoomReached} onClick={onZoomOut} size="icon" type="button" variant="ghost">
+          <i className="i-lucide-light:zoom-out" />
         </Button>
+      </CanvasTooltip>
+      <CanvasTooltip placement="top" title={t('zoomReset')}>
+        <Button aria-label={t('zoomReset')} className={styles.zoomValue} onClick={onZoomReset} size="default" type="button" variant="ghost">
+          {Math.round(zoom * 100)}%
+        </Button>
+      </CanvasTooltip>
+      <CanvasTooltip placement="top" title={t('zoomIn')}>
+        <Button aria-label={t('zoomIn')} disabled={maxZoomReached} onClick={onZoomIn} size="icon" type="button" variant="ghost">
+          <i className="i-lucide-light:zoom-in" />
+        </Button>
+      </CanvasTooltip>
+      <CanvasTooltip placement="top" title={t('fitView')}>
+        <Button aria-label={t('fitView')} onClick={onFitView} size="icon" type="button" variant="ghost">
+          <i className="i-lucide-light:scan" />
+        </Button>
+      </CanvasTooltip>
+      {onRelayout != null && (
+        <CanvasTooltip placement="top" title={t('optimize')}>
+          <Button aria-label={t('optimize')} onClick={onRelayout} size="icon" type="button" variant="ghost">
+            <i className="i-lucide-light:layout-grid" />
+          </Button>
+        </CanvasTooltip>
       )}
     </Panel>
   )
@@ -130,7 +136,7 @@ export function CanvasViewControls({
 
 export function CanvasToolbar({ children }: { readonly children: React.ReactNode }) {
   return (
-    <Panel position="bottom-center" className={cn(styles.island, styles.dock, styles.createDock)} data-canvas-control-scope>
+    <Panel position="bottom-center" className={cn(styles.island, styles.dock, styles.createDock)} data-canvas-control-scope data-tooltip-toolbar>
       <div className={styles.dockActions}>{children}</div>
     </Panel>
   )

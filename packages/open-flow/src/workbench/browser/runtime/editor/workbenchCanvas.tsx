@@ -7,6 +7,7 @@ import type { AddNodeOption } from './addNodeOptions.ts'
 
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
+import { CanvasTooltip } from '../../../../canvas/browser/components/tooltip.tsx'
 import { FlowCanvasView } from '../../../../canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
@@ -312,18 +313,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         language={language}
         model={model}
         cornerTools={
-          <Button
-            aria-label={t('designer.toggleInspector')}
-            aria-expanded={inspectorOpen}
-            disabled={target == null}
-            onClick={(event) => onToggleInspector(event.currentTarget)}
-            size="icon"
-            title={t('designer.toggleInspector')}
-            type="button"
-            variant="ghost"
-          >
-            <i className={inspectorOpen ? 'i-carbon:right-panel-close' : 'i-carbon:right-panel-open'} data-corner-icon />
-          </Button>
+          <WorkbenchInspectorToggle label={t('designer.toggleInspector')} open={inspectorOpen} disabled={target == null} onToggle={onToggleInspector} />
         }
         toolbar={
           <WorkbenchCanvasActions
@@ -428,32 +418,55 @@ export function WorkbenchCanvasActions({
   const t = useTranslate()
   return (
     <div className="designer-actions">
+      <CanvasTooltip placement="top" title={t('designer.openBlocks')}>
+        <Button
+          aria-expanded={blocksOpen}
+          className="text-[13px]"
+          disabled={disabled}
+          onClick={(event) => onOpenBlocks(event.currentTarget)}
+          size="default"
+          type="button"
+          variant="ghost"
+        >
+          <Icon data-icon="inline-start" name="plus" /> {t('designer.addNode')}
+        </Button>
+      </CanvasTooltip>
+      {runControl}
+      {onAddTrigger != null && (
+        <CanvasTooltip placement="top" title={t('designer.triggerDescription')}>
+          <Button className="text-[13px]" size="default" disabled={disabled} onClick={onAddTrigger} type="button" variant="outline">
+            <Icon data-icon="inline-start" name="plus" /> {t('designer.addTriggerToRun')}
+          </Button>
+        </CanvasTooltip>
+      )}
+    </div>
+  )
+}
+
+export function WorkbenchInspectorToggle({
+  label,
+  open,
+  disabled = false,
+  onToggle,
+}: {
+  readonly label: string
+  readonly open: boolean
+  readonly disabled?: boolean
+  readonly onToggle: (opener: HTMLButtonElement) => void
+}) {
+  return (
+    <CanvasTooltip placement="bottom" title={label}>
       <Button
-        aria-expanded={blocksOpen}
-        className="text-[13px]"
+        aria-label={label}
+        aria-expanded={open}
         disabled={disabled}
-        onClick={(event) => onOpenBlocks(event.currentTarget)}
-        size="default"
-        title={t('designer.openBlocks')}
+        onClick={(event) => onToggle(event.currentTarget)}
+        size="icon"
         type="button"
         variant="ghost"
       >
-        <Icon data-icon="inline-start" name="plus" /> {t('designer.addNode')}
+        <i aria-hidden="true" className={open ? 'i-lucide-light:panel-right-close' : 'i-lucide-light:panel-right-open'} data-corner-icon />
       </Button>
-      {runControl}
-      {onAddTrigger != null && (
-        <Button
-          className="text-[13px]"
-          size="default"
-          disabled={disabled}
-          onClick={onAddTrigger}
-          title={t('designer.triggerDescription')}
-          type="button"
-          variant="outline"
-        >
-          <Icon data-icon="inline-start" name="plus" /> {t('designer.addTriggerToRun')}
-        </Button>
-      )}
-    </div>
+    </CanvasTooltip>
   )
 }

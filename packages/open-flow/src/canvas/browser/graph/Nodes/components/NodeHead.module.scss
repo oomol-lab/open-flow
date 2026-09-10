@@ -125,16 +125,6 @@
   }
 }
 
-.floatBarStatus {
-  @extend .floatBarButton;
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  width: 32px;
-  height: 32px;
-  font-size: 18px;
-}
-
 .nodeIcon {
   flex: none;
   display: grid;
@@ -153,20 +143,4 @@
   font-size: var(--icon-font-size);
   line-height: 1.5;
   overflow: hidden;
-}
-
-.statusTooltip {
-  max-width: 250px;
-  padding: 0.3em 0.5em;
-  border-radius: var(--widget-radius);
-  border: 1px solid var(--node-border-color);
-  background: var(--node-background-color);
-  pointer-events: none;
-  color: var(--widget-font-color);
-  font-size: var(--base-font-size);
-  box-shadow: none;
-
-  [data-slot='tooltip-arrow'] {
-    display: none;
-  }
 }

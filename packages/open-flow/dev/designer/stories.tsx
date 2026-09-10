@@ -28,7 +28,7 @@ import { Field as UiField, FieldLabel } from '../../src/ui/browser/field.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../src/ui/browser/popover.tsx'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../../src/ui/browser/select.tsx'
 import { Textarea } from '../../src/ui/browser/textarea.tsx'
-import { WorkbenchCanvasActions } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
+import { WorkbenchCanvasActions, WorkbenchInspectorToggle } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
 import { createI18n as createWorkbenchI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
 
@@ -221,6 +221,7 @@ function CanvasChromeStory({
   const i18n = useMemo(() => createDesignerI18n(language), [language])
   const interactiveMode$ = useMemo(() => val<'mouse' | 'touchpad'>('touchpad'), [])
   const miniMapExpanded$ = useMemo(() => val<boolean | undefined>(miniMapOpen), [])
+  const [inspectorOpen, setInspectorOpen] = useState(false)
   const stageRef = useRef<HTMLDivElement>(null)
   const popup = useMemo(
     () => ({
@@ -237,7 +238,9 @@ function CanvasChromeStory({
       <div className="run-control-story-stage" data-canvas-control-scope ref={stageRef}>
         <ReactFlowProvider>
           <I18nProvider i18n={i18n}>
-            <CornerControls leading={<CanvasInteractiveMode interactiveMode$={interactiveMode$} />} miniMapExpanded$={miniMapExpanded$} />
+            <CornerControls leading={<CanvasInteractiveMode interactiveMode$={interactiveMode$} />} miniMapExpanded$={miniMapExpanded$}>
+              <WorkbenchInspectorToggle label="Toggle inspector" open={inspectorOpen} onToggle={() => setInspectorOpen((open) => !open)} />
+            </CornerControls>
             <CanvasViewControls
               maxZoomReached={false}
               minZoomReached={false}
