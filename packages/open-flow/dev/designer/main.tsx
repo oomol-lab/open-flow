@@ -3,6 +3,7 @@ import '../../src/ui/browser/styles.css'
 import '../../src/canvas/browser/styles/root.scss'
 import '../../src/workbench/browser/runtime/styles.css'
 import './styles.css'
+import './lab.css'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

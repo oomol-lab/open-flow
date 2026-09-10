@@ -91,15 +91,11 @@ export const cardStories: readonly FrontendStory[] = [
   {
     group: 'Canvas',
     id: 'canvas-cards',
+    description: 'Identity, plain text and framed previews. Empty content takes no space. Open results and logs from the status row.',
     title: 'Cards · Content & records',
     standalone: true,
     render: (_log, dark, language) => (
       <CardStage dark={dark} language={language}>
-        <header className="card-studies-heading">
-          <span>OPEN FLOW / CANVAS</span>
-          <h1>Content comes first.</h1>
-          <p>Identity, plain text and framed previews. Empty content takes no space. Open results and logs from the status row.</p>
-        </header>
         <div className="card-studies-grid">
           <CanvasCard title="Receive an order" subtitle="Webhook" icon={<i className="i-carbon:webhook" />} />
           <CanvasCard title="Normalize order data" subtitle="JavaScript" icon={<i className="i-carbon:code" />} />

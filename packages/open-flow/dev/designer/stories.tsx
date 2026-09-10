@@ -40,6 +40,7 @@ export interface FrontendStory {
   readonly render: (log: LogAction, dark: boolean, language: UiLanguage) => ReactNode
   readonly standalone?: boolean
   readonly title: string
+  readonly description?: string
 }
 
 const basicOptions = [
@@ -78,7 +79,14 @@ function SelectStory({ log }: { readonly log: LogAction }) {
       {['Default', 'Grouped', 'Invalid', 'Disabled', 'Empty'].map((label) => (
         <Field key={label} label={label}>
           <Select
-            items={[...basicOptions, { label: 'Object', value: 'object' }, { label: 'Array with an intentionally long label', value: 'array' }]}
+            items={[
+              ...basicOptions,
+              { label: 'Object', value: 'object' },
+              {
+                label: 'Array with an intentionally long label',
+                value: 'array',
+              },
+            ]}
             defaultValue={label === 'Empty' ? null : 'string'}
             disabled={label === 'Disabled'}
             onValueChange={(next) => log(`${label.toLowerCase()}.change`, next)}
@@ -270,7 +278,14 @@ function InteractionModeStory({ dark, language }: { readonly dark: boolean; read
         className="open-flow-workbench open-flow-canvas-root open-flow-theme"
         data-surface="canvas"
         data-theme={dark ? 'dark' : 'light'}
-        style={{ display: 'grid', width: '100%', alignSelf: 'start', gap: 24, padding: 24, gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}
+        style={{
+          display: 'grid',
+          width: '100%',
+          alignSelf: 'start',
+          gap: 24,
+          padding: 24,
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+        }}
       >
         {(
           [
@@ -287,9 +302,22 @@ function InteractionModeStory({ dark, language }: { readonly dark: boolean; read
 
 function InteractionModeSample({ label, mode }: { readonly label: string; readonly mode: ReturnType<typeof val<'mouse' | 'touchpad'>> }) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
-  const popup = useMemo(() => ({ default: () => container || document.body, static: () => container || document.body }), [container])
+  const popup = useMemo(
+    () => ({
+      default: () => container || document.body,
+      static: () => container || document.body,
+    }),
+    [container],
+  )
   return (
-    <div style={{ position: 'relative', minHeight: 256, containerType: 'inline-size' }} ref={setContainer}>
+    <div
+      style={{
+        position: 'relative',
+        minHeight: 256,
+        containerType: 'inline-size',
+      }}
+      ref={setContainer}
+    >
       <div className="mb-4 text-sm text-muted-foreground">{label}</div>
       {container && (
         <GetPopupContainerContext.Provider value={popup}>
@@ -321,7 +349,11 @@ function RunControlSample({
   readonly log: LogAction
   readonly miniMapOpen?: boolean
   readonly starting?: boolean
-  readonly triggers: readonly { readonly id: string; readonly title: string; readonly icon?: string }[]
+  readonly triggers: readonly {
+    readonly id: string
+    readonly title: string
+    readonly icon?: string
+  }[]
 }) {
   const [inputOpen, setInputOpen] = useState(defaultOpen)
   const [selectedTriggerId, setSelectedTriggerId] = useState(triggers[0]!.id)
@@ -389,10 +421,6 @@ function RunControlStory({ dark, language, log }: { readonly dark: boolean; read
   return (
     <I18nProvider i18n={i18n}>
       <div className="run-control-stories open-flow-workbench" data-theme={dark ? 'dark' : 'light'}>
-        <header>
-          <strong>Run control states</strong>
-          <p>Run controls are rendered inside the production canvas toolbar alongside the production canvas chrome.</p>
-        </header>
         <div className="run-control-story-grid">
           <RunControlSample inputStatus="none" language={language} label="Direct run" log={log} triggers={one} />
           <RunControlSample defaultOpen inputStatus="missing" language={language} label="Input required" log={log} triggers={[multiple[1]!]} />
@@ -427,14 +455,40 @@ export const stories: readonly FrontendStory[] = [
     standalone: true,
     title: 'Interaction Mode',
   },
-  { group: 'Controls', id: 'select', render: (log) => <SelectStory log={log} />, title: 'Select' },
-  { group: 'Controls', id: 'multi-select', render: (log) => <MultiSelectStory log={log} />, title: 'Multi Select' },
-  { group: 'Controls', id: 'date-time', render: (log) => <DateTimeStory log={log} />, title: 'Date & Time' },
-  { group: 'Popup', id: 'popup', render: (log) => <PopupStory log={log} />, title: 'Dropdown, Popover & Tooltip' },
-  { group: 'Popup', id: 'context-menu', render: (log) => <ContextMenuStory log={log} />, title: 'Context Menu' },
+  {
+    group: 'Controls',
+    id: 'select',
+    render: (log) => <SelectStory log={log} />,
+    title: 'Select',
+  },
+  {
+    group: 'Controls',
+    id: 'multi-select',
+    render: (log) => <MultiSelectStory log={log} />,
+    title: 'Multi Select',
+  },
+  {
+    group: 'Controls',
+    id: 'date-time',
+    render: (log) => <DateTimeStory log={log} />,
+    title: 'Date & Time',
+  },
+  {
+    group: 'Popup',
+    id: 'popup',
+    render: (log) => <PopupStory log={log} />,
+    title: 'Dropdown, Popover & Tooltip',
+  },
+  {
+    group: 'Popup',
+    id: 'context-menu',
+    render: (log) => <ContextMenuStory log={log} />,
+    title: 'Context Menu',
+  },
   {
     group: 'Workbench',
     id: 'run-control-states',
+    description: 'Run controls inside the canvas toolbar, with input, validation and execution states.',
     render: (log, dark, language) => <RunControlStory dark={dark} language={language} log={log} />,
     standalone: true,
     title: 'Run Control States',

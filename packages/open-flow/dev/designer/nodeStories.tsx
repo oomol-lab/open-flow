@@ -5,7 +5,7 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 import { useState } from 'react'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
-import { Button } from '../../src/ui/browser/button.tsx'
+import { useStoryActions } from './storyActions.tsx'
 
 const longInput = 'customer_lifetime_value_across_all_completed_orders'
 const longOutput = 'matched_customers_with_complete_enterprise_profiles'
@@ -31,7 +31,13 @@ const conditionModel: FlowCanvasViewModel = {
       position: { x: 380, y: 0 },
       inputs: [{ handle: 'count', jsonSchema: { type: 'number' }, value: 1 }],
       outputs: [{ handle: 'matched', jsonSchema: { type: 'number' } }],
-      cases: [{ expressions: [{ input: 'count', operator: '>', value: 0 }], output: 'matched', relation: 'all' }],
+      cases: [
+        {
+          expressions: [{ input: 'count', operator: '>', value: 0 }],
+          output: 'matched',
+          relation: 'all',
+        },
+      ],
     },
     {
       id: 'multiple',
@@ -46,9 +52,21 @@ const conditionModel: FlowCanvasViewModel = {
         { handle: 'fallback', jsonSchema: { type: 'number' } },
       ],
       cases: [
-        { expressions: [{ input: 'score', operator: '>=', value: 90 }], output: 'priority', relation: 'all' },
-        { expressions: [{ input: 'score', operator: '>=', value: 70 }], output: 'qualified', relation: 'all' },
-        { expressions: [{ input: 'score', operator: '>=', value: 50 }], output: 'review', relation: 'all' },
+        {
+          expressions: [{ input: 'score', operator: '>=', value: 90 }],
+          output: 'priority',
+          relation: 'all',
+        },
+        {
+          expressions: [{ input: 'score', operator: '>=', value: 70 }],
+          output: 'qualified',
+          relation: 'all',
+        },
+        {
+          expressions: [{ input: 'score', operator: '>=', value: 50 }],
+          output: 'review',
+          relation: 'all',
+        },
       ],
       defaultOutput: 'fallback',
     },
@@ -62,7 +80,13 @@ const conditionModel: FlowCanvasViewModel = {
         { handle: 'matched', jsonSchema: { type: 'number' } },
         { handle: 'fallback', jsonSchema: { type: 'number' } },
       ],
-      cases: [{ expressions: [{ input: longInput, operator: '>=', value: 1000000 }], output: 'matched', relation: 'all' }],
+      cases: [
+        {
+          expressions: [{ input: longInput, operator: '>=', value: 1000000 }],
+          output: 'matched',
+          relation: 'all',
+        },
+      ],
       defaultOutput: 'fallback',
     },
     {
@@ -75,7 +99,13 @@ const conditionModel: FlowCanvasViewModel = {
         { handle: longOutput, jsonSchema: { type: 'string' } },
         { handle: 'fallback', jsonSchema: { type: 'string' } },
       ],
-      cases: [{ expressions: [{ input: 'status', operator: '==', value: 'ready' }], output: longOutput, relation: 'all' }],
+      cases: [
+        {
+          expressions: [{ input: 'status', operator: '==', value: 'ready' }],
+          output: longOutput,
+          relation: 'all',
+        },
+      ],
       defaultOutput: 'fallback',
     },
     {
@@ -88,7 +118,13 @@ const conditionModel: FlowCanvasViewModel = {
         { handle: longOutput, jsonSchema: { type: 'number' } },
         { handle: longFallback, jsonSchema: { type: 'number' } },
       ],
-      cases: [{ expressions: [{ input: longInput, operator: '>=', value: 1000000 }], output: longOutput, relation: 'all' }],
+      cases: [
+        {
+          expressions: [{ input: longInput, operator: '>=', value: 1000000 }],
+          output: longOutput,
+          relation: 'all',
+        },
+      ],
       defaultOutput: longFallback,
     },
     {
@@ -97,9 +133,21 @@ const conditionModel: FlowCanvasViewModel = {
       diagnostics: 1,
       title: 'Invalid input',
       position: { x: 0, y: 620 },
-      inputs: [{ handle: 'count', jsonSchema: { type: 'number' }, value: 'not-a-number' }],
+      inputs: [
+        {
+          handle: 'count',
+          jsonSchema: { type: 'number' },
+          value: 'not-a-number',
+        },
+      ],
       outputs: [{ handle: 'matched', jsonSchema: { type: 'number' } }],
-      cases: [{ expressions: [{ input: 'count', operator: '>', value: 0 }], output: 'matched', relation: 'all' }],
+      cases: [
+        {
+          expressions: [{ input: 'count', operator: '>', value: 0 }],
+          output: 'matched',
+          relation: 'all',
+        },
+      ],
     },
   ],
 }
@@ -109,9 +157,6 @@ function ConditionStory({ dark, language, log }: { readonly dark: boolean; reado
   const [selected, setSelected] = useState<readonly string[]>([])
   return (
     <div className="workflow-story">
-      <div className="overview-toolbar open-flow-workbench">
-        <span>Condition nodes · empty, single, multiple, invalid input and overflowing branch labels.</span>
-      </div>
       <div className="workflow-canvas">
         <FlowCanvasView
           ignoredNodeIds={ignoredNodeIds}
@@ -163,7 +208,13 @@ const commentModel: FlowCanvasViewModel = {
       content:
         '### Release checklist\n\n- [x] Review inputs\n- [ ] Verify output\n\nUse `report.total` for the final count.\n\n```json\n{ "status": "ready", "count": 128 }\n```\n\n[Review documentation](https://example.com)',
     },
-    { id: 'empty', kind: 'comment', title: 'Empty note', position: { x: 0, y: 380 }, content: '' },
+    {
+      id: 'empty',
+      kind: 'comment',
+      title: 'Empty note',
+      position: { x: 0, y: 380 },
+      content: '',
+    },
     {
       id: 'formatting',
       kind: 'comment',
@@ -180,29 +231,20 @@ function CommentStory({ dark, language, log }: { readonly dark: boolean; readonl
   const [model, setModel] = useState(commentModel)
   const [selected, setSelected] = useState<readonly string[]>(['notes'])
   const [editable, setEditable] = useState(true)
+  useStoryActions([
+    { label: 'Single selection', onClick: () => setSelected(['notes']) },
+    { label: 'Multiple selection', onClick: () => setSelected(['notes', 'long']) },
+    { label: editable ? 'Switch to read-only' : 'Enable editing', onClick: () => setEditable((value) => !value) },
+    {
+      label: 'Reset nodes',
+      onClick: () => {
+        setModel(commentModel)
+        setSelected(['notes'])
+      },
+    },
+  ])
   return (
     <div className="workflow-story">
-      <div className="overview-toolbar open-flow-workbench">
-        <Button variant="outline" onClick={() => setSelected(['notes'])}>
-          Single selection
-        </Button>
-        <Button variant="outline" onClick={() => setSelected(['notes', 'long'])}>
-          Multiple selection
-        </Button>
-        <Button variant="outline" onClick={() => setEditable((value) => !value)}>
-          {editable ? 'Switch to read-only' : 'Enable editing'}
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setModel(commentModel)
-            setSelected(['notes'])
-          }}
-        >
-          Reset nodes
-        </Button>
-        <span>Comment cards · warm note surfaces, selected, long title, Markdown typography, tables and empty note. Use the source button to edit.</span>
-      </div>
       <div className="workflow-canvas">
         <FlowCanvasView
           ignoredNodeIds={ignoredNodeIds}
@@ -211,7 +253,10 @@ function CommentStory({ dark, language, log }: { readonly dark: boolean; readonl
           onConnect={(edge) => log('edge.connect', edge)}
           onDisconnect={(edge) => log('edge.disconnect', edge)}
           onDeleteNodes={(ids) => {
-            setModel((current) => ({ ...current, nodes: current.nodes.filter((node) => !ids.includes(node.id)) }))
+            setModel((current) => ({
+              ...current,
+              nodes: current.nodes.filter((node) => !ids.includes(node.id)),
+            }))
             setSelected((current) => current.filter((id) => !ids.includes(id)))
             log('node.delete', ids)
           }}
@@ -246,6 +291,7 @@ export const nodeStories: readonly FrontendStory[] = [
   {
     group: 'Node Comment',
     id: 'node-comment',
+    description: 'Comment cards · Selection, long titles, Markdown, tables and empty content. Use the source button to edit.',
     title: 'Node States',
     standalone: true,
     render: (log, dark, language) => <CommentStory dark={dark} language={language} log={log} />,
@@ -253,6 +299,7 @@ export const nodeStories: readonly FrontendStory[] = [
   {
     group: 'Node Condition',
     id: 'node-condition',
+    description: 'Condition nodes · Empty, single, multiple, invalid input and overflowing branch labels.',
     title: 'Node States',
     standalone: true,
     render: (log, dark, language) => <ConditionStory dark={dark} language={language} log={log} />,

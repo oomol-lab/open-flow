@@ -1,102 +1,23 @@
-import type { Node, NodeProps } from '@xyflow/react'
-import type { ReactNode } from 'react'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
-import { Background, Controls, ReactFlow } from '@xyflow/react'
 import { Monitor, Moon, Sun } from 'lucide-react'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { I18nProvider } from 'val-i18n-react'
-import { GetPopupContainerContext } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
 import { defaultUiLanguage, uiLanguageNames, uiLanguages } from '../../src/localization/common/languages.ts'
-import { TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
-import { CodeEditor } from '../../src/workbench/browser/runtime/editor/codeEditor.tsx'
-import { agentStory } from './agent.tsx'
-import { cardStories } from './cards.tsx'
-import { conditionEditorStory } from './conditionEditor.tsx'
-import { formStory } from './form.tsx'
-import { libraryStory } from './library.tsx'
-import { llmStory } from './llm.tsx'
-import { markdownStory } from './markdown.tsx'
-import { metadataStory } from './metadata.tsx'
-import { nodeInputStory } from './nodeInput.tsx'
-import { nodeStories } from './nodeStories.tsx'
-import { overviewStories } from './overview.tsx'
-import { scheduleStory } from './schedule.tsx'
-import { stories } from './stories.tsx'
-import { triggerConfigStory } from './triggerConfig.tsx'
-import { triggerStories } from './triggerStories.tsx'
-import { additionalInputsStory, groupedInputsStory, outputPortsStory, valueNodeStory } from './valueNode.tsx'
-import { variablesStory } from './variables.tsx'
-import { webhookStory } from './webhook.tsx'
-import { workflowStories } from './workflow.tsx'
+import { Button } from '../../src/ui/browser/button.tsx'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '../../src/ui/browser/dropdown-menu.tsx'
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
+import { StoryActions, StoryActionsProvider } from './storyActions.tsx'
+import { labStories } from './storyCatalog.tsx'
+import { StoryStage } from './storyStage.tsx'
 
-type ThemeMode = 'dark' | 'light' | 'system'
-
-interface ActionEntry {
-  readonly message: string
-}
-
-interface StoryNodeData extends Record<string, unknown> {
-  readonly content: ReactNode
-}
-
-type StoryNode = Node<StoryNodeData, 'story'>
-
-const nodeTypes = { story: StoryNodeView }
-
-const codeEditorTyping = `/**
- * @typedef {{
- *   value: string;
- * }} Inputs;
- * @typedef {{
- *   result: string;
- * }} Outputs;
- */
-`
-
-const codeEditorSource = `export default async function (inputs, context) {
-  await context.reportProgress(20)
-  const response = await context.fetch("https://example.com")
-  const text = await response.text()
-  return { result: inputs.value + text }
-}
-`
-
-const codeEditorStory: FrontendStory = {
-  group: 'Workbench',
-  id: 'code-editor',
-  render: (log, dark) => <CodeEditorStory dark={dark} log={log} />,
-  standalone: true,
-  title: 'Code Editor',
-}
-
-const labStories: readonly FrontendStory[] = [
-  ...nodeStories,
-  ...triggerStories,
-  ...cardStories,
-  ...workflowStories,
-  ...stories,
-  formStory,
-  libraryStory,
-  agentStory,
-  llmStory,
-  metadataStory,
-  markdownStory,
-  scheduleStory,
-  triggerConfigStory,
-  webhookStory,
-  conditionEditorStory,
-  variablesStory,
-  nodeInputStory,
-  valueNodeStory,
-  additionalInputsStory,
-  groupedInputsStory,
-  outputPortsStory,
-  codeEditorStory,
-  ...overviewStories,
-]
+type ThemeMode = 'system' | 'light' | 'dark'
+const themeOptions = [
+  { value: 'system', label: 'Follow system', icon: Monitor },
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+] as const
 
 // Directory icons belong to navigation metadata, not individual stories.
 const storyGroupIcons: Readonly<Record<string, `i-${string}`>> = {
@@ -116,6 +37,21 @@ const storyGroups = [...new Set(labStories.map((entry) => entry.group))].map((na
   icon: storyGroupIcons[name] ?? (name.startsWith('Trigger ') ? 'i-carbon:flash' : undefined),
   entries: labStories.filter((entry) => entry.group === name),
 }))
+
+const storySections = [
+  {
+    name: 'Components',
+    groups: storyGroups.filter((group) => !/^(?:Trigger|Node) /.test(group.name)),
+  },
+  {
+    name: 'Nodes',
+    groups: storyGroups.filter((group) => group.name.startsWith('Node ')),
+  },
+  {
+    name: 'Triggers',
+    groups: storyGroups.filter((group) => group.name.startsWith('Trigger ')),
+  },
+]
 
 function StoryGroup({
   icon = 'i-carbon:folder',
@@ -176,209 +112,190 @@ function StoryGroup({
   )
 }
 
-function initialStory(): FrontendStory {
-  const requested = new URLSearchParams(location.search).get('story')
-  const story = labStories.find((item) => item.id == requested) ?? labStories.find((item) => item.id == 'canvas-cards') ?? labStories[0]
-  if (!story) throw new Error('Open Flow Lab has no stories.')
-  return story
+function storyFromUrl() {
+  const id = new URLSearchParams(location.search).get('story')
+  return labStories.find((story) => story.id === id) ?? labStories.find((story) => story.id === 'canvas-cards') ?? labStories[0]!
 }
 
 export function FrontendLab() {
-  const [storyId, setStoryId] = useState(() => initialStory().id)
-  const story = labStories.find((entry) => entry.id == storyId) ?? initialStory()
+  const [storyId, setStoryId] = useState(() => storyFromUrl().id)
+  const story = labStories.find((entry) => entry.id === storyId) ?? storyFromUrl()
   const [theme, setTheme] = useState<ThemeMode>('system')
   const [systemDark, setSystemDark] = useState(() => matchMedia('(prefers-color-scheme: dark)').matches)
   const [language, setLanguage] = useState<UiLanguage>(defaultUiLanguage)
-  const [action, setAction] = useState<ActionEntry | null>(null)
-  const dark = theme == 'system' ? systemDark : theme == 'dark'
+  const [status, setStatus] = useState('Ready')
+  const dark = theme === 'system' ? systemDark : theme === 'dark'
   const i18n = useMemo(() => createI18n(language), [language])
-  useEffect(() => {
-    const query = matchMedia('(prefers-color-scheme: dark)')
-    const update = () => setSystemDark(query.matches)
-    query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
-  useEffect(() => {
+  const currentSection = storySections.find((section) => section.groups.some((group) => group.name === story.group))!
+  const path = [currentSection.name, story.group.replace(/^(?:Node|Trigger) /, ''), story.title]
+
+  useLayoutEffect(() => {
+    // The document owns the Lab theme, including shared menus portaled to body.
+    document.body.dataset.theme = dark ? 'dark' : 'light'
     document.documentElement.lang = language
-  }, [language])
-  const log: LogAction = (name, value) => setAction({ message: `${name}${value === undefined ? '' : ` ${print(value)}`}` })
+  }, [dark, language])
+
+  useEffect(() => {
+    const media = matchMedia('(prefers-color-scheme: dark)')
+    const update = () => setSystemDark(media.matches)
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    const update = () => setStoryId(storyFromUrl().id)
+    window.addEventListener('popstate', update)
+    return () => window.removeEventListener('popstate', update)
+  }, [])
+
   const selectStory = (next: FrontendStory) => {
     setStoryId(next.id)
+    setStatus('Ready')
     const url = new URL(location.href)
     url.searchParams.set('story', next.id)
     history.replaceState(null, '', url)
   }
+  const log: LogAction = (name, value) => {
+    let detail = ''
+    if (value !== undefined) {
+      try {
+        detail = JSON.stringify(value)
+      } catch {
+        detail = String(value)
+      }
+    }
+    setStatus(detail ? `${name} ${detail}` : name)
+  }
 
   return (
-    <div className="lab-shell open-flow-theme" data-theme={dark ? 'dark' : 'light'}>
+    <div className="lab-shell">
+      <header className="lab-header">
+        <h1 className="lab-brand">
+          Open Flow <span>Lab</span>
+        </h1>
+        <nav className="lab-path" aria-label="Breadcrumb" title={path.join(' / ')}>
+          <ol>
+            {path.map((label, index) => (
+              <li key={index} aria-current={index === path.length - 1 ? 'page' : undefined}>
+                <span>{label}</span>
+              </li>
+            ))}
+          </ol>
+        </nav>
+        <LabPreferences theme={theme} onThemeChange={setTheme} language={language} onLanguageChange={setLanguage} />
+      </header>
       <aside className="lab-sidebar">
-        <div className="lab-brand">
-          <strong>Open Flow</strong>
-          <span className="lab-brand-badge">Lab</span>
-        </div>
         <nav className="lab-navigation" aria-label="Stories">
-          <div className="lab-nav-section-label">Components</div>
-          {storyGroups
-            .filter((group) => !/^(?:Trigger|Node) /.test(group.name))
-            .map((group) => (
-              <StoryGroup key={group.name} {...group} selected={story} onSelect={selectStory} />
-            ))}
-          <div className="lab-nav-section-label">Nodes</div>
-          {storyGroups
-            .filter((group) => group.name.startsWith('Node '))
-            .map((group) => (
-              <StoryGroup key={group.name} {...group} selected={story} onSelect={selectStory} />
-            ))}
-          <div className="lab-nav-section-label">Triggers</div>
-          {storyGroups
-            .filter((group) => group.name.startsWith('Trigger '))
-            .map((group) => (
-              <StoryGroup key={group.name} {...group} selected={story} onSelect={selectStory} />
-            ))}
+          {storySections.map((section) => (
+            <div key={section.name} className="lab-nav-section">
+              <div className="lab-nav-section-label">{section.name}</div>
+              {section.groups.map((group) => (
+                <StoryGroup key={group.name} {...group} selected={story} onSelect={selectStory} />
+              ))}
+            </div>
+          ))}
         </nav>
       </aside>
-      <main className="lab-main">
-        <header className="lab-toolbar">
-          <div className="lab-story-heading">
-            <span title={story.group}>{story.group.replace(/^Node /, 'Nodes / ')}</span>
-            <strong>{story.title}</strong>
+      <StoryActionsProvider key={story.id}>
+        <main className="lab-content" aria-label={story.title}>
+          <header className="lab-story-header">
+            {story.description && <StoryDescription text={story.description} />}
+            <StoryActions />
+          </header>
+          <div className="lab-story-body">
+            {story.standalone ? (
+              <div className="standalone-stage" key={story.id}>
+                {story.render(log, dark, language)}
+              </div>
+            ) : (
+              <StoryStage dark={dark} i18n={i18n} key={story.id}>
+                {story.render(log, dark, language)}
+              </StoryStage>
+            )}
           </div>
-          <div aria-label="Theme" className="toolbar-segment toolbar-icons">
-            <ToolbarButton active={theme == 'system'} label="System theme" onClick={() => setTheme('system')}>
-              <Monitor />
-            </ToolbarButton>
-            <ToolbarButton active={theme == 'light'} label="Light theme" onClick={() => setTheme('light')}>
-              <Sun />
-            </ToolbarButton>
-            <ToolbarButton active={theme == 'dark'} label="Dark theme" onClick={() => setTheme('dark')}>
-              <Moon />
-            </ToolbarButton>
-          </div>
-          <div className="toolbar-segment">
-            <select aria-label="Language" onChange={(event) => setLanguage(event.target.value as UiLanguage)} value={language}>
-              {uiLanguages.map((entry) => (
-                <option key={entry} value={entry}>
-                  {uiLanguageNames[entry]}
-                </option>
-              ))}
-            </select>
-          </div>
-        </header>
-        <div className="lab-workspace">
-          {story.standalone ? (
-            <div className="standalone-stage" key={story.id}>
-              {story.render(log, dark, language)}
-            </div>
-          ) : (
-            <StoryStage dark={dark} i18n={i18n} key={story.id}>
-              {story.render(log, dark, language)}
-            </StoryStage>
-          )}
-        </div>
-        <div className="lab-status" role="status">
-          {action?.message ?? 'Ready'}
-        </div>
-      </main>
+          <footer className="lab-status" role="status" title={status}>
+            {status}
+          </footer>
+        </main>
+      </StoryActionsProvider>
     </div>
   )
 }
 
-function CodeEditorStory({ dark, log }: { readonly dark: boolean; readonly log: LogAction }) {
-  const [value, setValue] = useState(codeEditorSource)
-  return (
-    <div className="code-editor-story open-flow-workbench" data-theme={dark ? 'dark' : 'light'}>
-      <CodeEditor
-        ariaLabel="JavaScript source"
-        disabled={false}
-        errorLabel="Code editor unavailable"
-        loadingLabel="Loading code editor"
-        onBlur={() => log('code.blur', { length: value.length })}
-        onChange={(source) => {
-          setValue(source)
-          log('code.change', { length: source.length })
-        }}
-        theme={dark ? 'dark' : 'light'}
-        typing={codeEditorTyping}
-        uri="file:///modules/designer-lab.js"
-        value={value}
-      />
-    </div>
-  )
-}
-
-function ToolbarButton({
-  active,
-  children,
-  label,
-  onClick,
+function LabPreferences({
+  theme,
+  onThemeChange,
+  language,
+  onLanguageChange,
 }: {
-  readonly active: boolean
-  readonly children: React.ReactNode
-  readonly label: string
-  readonly onClick: () => void
+  theme: ThemeMode
+  onThemeChange: (theme: ThemeMode) => void
+  language: UiLanguage
+  onLanguageChange: (language: UiLanguage) => void
 }) {
+  const currentTheme = themeOptions.find((option) => option.value === theme)!
+  const ThemeIcon = currentTheme.icon
   return (
-    <button aria-label={label} aria-pressed={active} onClick={onClick} title={label} type="button">
-      {children}
-    </button>
-  )
-}
-
-function StoryStage({ children, dark, i18n }: { readonly children: React.ReactNode; readonly dark: boolean; readonly i18n: ReturnType<typeof createI18n> }) {
-  const stageRef = useRef<HTMLDivElement>(null)
-  const staticRef = useRef<HTMLDivElement>(null)
-  const getFlowPopupContainer = () => stageRef.current?.querySelector<HTMLElement>('.react-flow__viewport') || stageRef.current || document.body
-  const getStaticPopupContainer = () => staticRef.current || document.body
-  const context = useMemo(() => ({ default: getFlowPopupContainer, static: getStaticPopupContainer }), [])
-  const nodes = useMemo<StoryNode[]>(
-    () => [{ id: 'story', type: 'story', position: { x: 80, y: 60 }, data: { content: children }, draggable: false, selectable: true }],
-    [children],
-  )
-
-  return (
-    <div className="stage-frame" ref={stageRef}>
-      <div className={`open-flow-canvas-root open-flow-theme stage-theme`} data-surface="canvas" data-theme={dark ? 'dark' : 'light'}>
-        <div className="stage-static-root" ref={staticRef} />
-        <GetPopupContainerContext.Provider value={context}>
-          <I18nProvider i18n={i18n}>
-            <TooltipProvider delay={250}>
-              <ReactFlow
-                colorMode={dark ? 'dark' : 'light'}
-                edges={[]}
-                fitView
-                fitViewOptions={{ maxZoom: 1, padding: 0.12 }}
-                maxZoom={3}
-                minZoom={0.1}
-                nodeTypes={nodeTypes}
-                nodes={nodes}
-                proOptions={{ hideAttribution: true }}
-              >
-                <Background gap={20} size={1} />
-                <Controls showInteractive={false} />
-              </ReactFlow>
-            </TooltipProvider>
-          </I18nProvider>
-        </GetPopupContainerContext.Provider>
-      </div>
+    <div className="lab-preferences">
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger
+          render={<Button variant="ghost" size="icon-sm" />}
+          aria-label={`Theme: ${currentTheme.label}`}
+          title={`Theme: ${currentTheme.label}`}
+        >
+          <ThemeIcon />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-40">
+          <DropdownMenuRadioGroup value={theme} onValueChange={(value) => onThemeChange(value as ThemeMode)}>
+            {themeOptions.map(({ value, label, icon: Icon }) => (
+              <DropdownMenuRadioItem key={value} value={value} closeOnClick>
+                <Icon />
+                {label}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="sm" />} aria-label={`Language: ${uiLanguageNames[language]}`}>
+          {uiLanguageNames[language]}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-40">
+          <DropdownMenuRadioGroup value={language} onValueChange={(value) => onLanguageChange(value as UiLanguage)}>
+            {uiLanguages.map((value) => (
+              <DropdownMenuRadioItem key={value} value={value} closeOnClick>
+                {uiLanguageNames[value]}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }
 
-function StoryNodeView({ data }: NodeProps<StoryNode>) {
+function StoryDescription({ text }: { readonly text: string }) {
+  const element = useRef<HTMLButtonElement>(null)
+  const [truncated, setTruncated] = useState(false)
+  useLayoutEffect(() => {
+    const node = element.current
+    if (!node) return
+    const measure = () => setTruncated(node.scrollWidth > node.clientWidth)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [text])
   return (
-    <div className="story-node-outer">
-      <main className="story-node-container">
-        <div className="story-node-body nopan">{data.content}</div>
-      </main>
-    </div>
+    <TooltipProvider delay={400}>
+      <Tooltip disabled={!truncated}>
+        <TooltipTrigger ref={element} className="lab-story-description" tabIndex={truncated ? 0 : -1} aria-label={text}>
+          {text}
+        </TooltipTrigger>
+        <TooltipContent side="bottom" align="start" className="max-w-lg whitespace-normal break-words">
+          {text}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
-}
-
-function print(value: unknown): string {
-  if (value instanceof Date) return value.toISOString()
-  try {
-    return JSON.stringify(value)
-  } catch {
-    return String(value)
-  }
 }
