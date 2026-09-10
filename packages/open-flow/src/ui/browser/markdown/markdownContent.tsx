@@ -125,13 +125,14 @@ function inPlaceEditVideoLink(node: Extract<RewriteNode, { type: 'element' }>, u
 
 export interface MarkdownContentProps {
   dark: boolean
+  unstyled?: boolean
   text?: string
   className?: string
   components?: Components
   mermaid?: boolean
 }
 
-const MarkdownContent: FC<MarkdownContentProps> = /* @__PURE__ */ memo(function MarkdownContent({ dark, text, className = '', components, mermaid }) {
+const MarkdownContent: FC<MarkdownContentProps> = /* @__PURE__ */ memo(function MarkdownContent({ dark, unstyled, text, className = '', components, mermaid }) {
   const t = useTranslate()
   const rehypePlugins = useMemo(() => createRehypePlugins(t), [t])
   const ref = useRef<HTMLDivElement>(null)
@@ -168,7 +169,7 @@ const MarkdownContent: FC<MarkdownContentProps> = /* @__PURE__ */ memo(function 
     return null
   }
   return (
-    <div ref={ref} className={`open-flow-markdown-${dark ? 'dark' : 'light'} ${className}`}>
+    <div ref={ref} className={`${unstyled ? '' : `open-flow-markdown-${dark ? 'dark' : 'light'}`} ${className}`}>
       <ReactMarkdown rehypePlugins={rehypePlugins} remarkPlugins={remarkPlugins} components={components}>
         {text}
       </ReactMarkdown>

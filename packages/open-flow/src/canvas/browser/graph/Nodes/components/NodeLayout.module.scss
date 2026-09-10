@@ -44,10 +44,6 @@
   :global(.react-flow__node.selectable.selected) & {
     box-shadow: var(--node-selected-shadow);
   }
-
-  :global(.react-flow__node-comment_node) & {
-    background: var(--comment-bg);
-  }
 }
 
 .cardContainer {

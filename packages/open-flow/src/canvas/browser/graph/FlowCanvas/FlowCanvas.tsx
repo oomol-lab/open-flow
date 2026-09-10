@@ -49,7 +49,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   useEffect(flowCanvasStore.setupForceDelete, [])
 
   return (
-    <CanvasStoreProvider value={flowCanvasStore}>
+    <CanvasStoreProvider value={flowCanvasStore} dark={dark}>
       <NodeMiniMapProvider value={nodeMiniMapPhase}>
         <ReactFlowContainer
           cornerTools={cornerTools}

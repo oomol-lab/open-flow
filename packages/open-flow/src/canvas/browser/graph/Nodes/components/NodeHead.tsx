@@ -1,42 +1,12 @@
 import styles from './NodeHead.module.scss'
+import type { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 
-import { memo, useState } from 'react'
+import { useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
-import { NODE_HANDLE_CLASSNAME } from '../../../base/canvas.ts'
 import { Input } from '../../../components/input.tsx'
-import { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
-import { useCanvasStore } from '../../CanvasStoreContext.tsx'
-import { useNodeStore } from '../NodeStoreContext.tsx'
-import { CommentNodeActions } from './CommentNodeActions.tsx'
-import { NodeHeadContextMenu, NodeHeadMoreMenu } from './NodeHeadMoreMenu.tsx'
 
-export const NodeHead = /* @__PURE__ */ memo(function NodeHead({ actionsOnly = false }: { actionsOnly?: boolean }) {
-  const nodeStore = useNodeStore()
-  const canvasStore = useCanvasStore()
-
-  const isCommentNode = CommentNodeStore.is(nodeStore)
-  const hasMoreMenu = !isCommentNode || !!nodeStore.duplicateNode
-
-  return (
-    <header className={`${styles.container} ${NODE_HANDLE_CLASSNAME}`}>
-      {!actionsOnly && CommentNodeStore.is(nodeStore) && (
-        <span className={styles.commentIcon}>
-          <i className="i-codicon:note" />
-        </span>
-      )}
-      {!actionsOnly && CommentNodeStore.is(nodeStore) && (
-        <NodeHeadContextMenu canvasStore={canvasStore}>
-          <CommentTitle store={nodeStore} />
-        </NodeHeadContextMenu>
-      )}
-      {CommentNodeStore.is(nodeStore) && <CommentNodeActions canvasStore={canvasStore} nodeStore={nodeStore} />}
-      {hasMoreMenu && <NodeHeadMoreMenu />}
-    </header>
-  )
-})
-
-function CommentTitle({ store }: { readonly store: CommentNodeStore }) {
+export function CommentTitle({ store }: { readonly store: CommentNodeStore }) {
   const t = useTranslate()
   const title = useVal(store.$.title)
   const [focused, setFocused] = useState(false)

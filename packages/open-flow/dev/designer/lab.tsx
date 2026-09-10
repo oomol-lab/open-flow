@@ -118,7 +118,7 @@ const storyGroups = [...new Set(labStories.map((entry) => entry.group))].map((na
 }))
 
 function StoryGroup({
-  icon,
+  icon = 'i-carbon:folder',
   name,
   entries,
   selected,
@@ -147,7 +147,7 @@ function StoryGroup({
     <details className="lab-nav-group" data-active={active || undefined} open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary aria-controls={id}>
         <span className="lab-nav-chevron" aria-hidden="true" />
-        {icon && <i aria-hidden="true" className={`lab-nav-icon ${icon}`} />}
+        <i aria-hidden="true" className={`lab-nav-icon ${icon}`} />
         <span className="lab-nav-group-name" title={label}>
           {label}
         </span>

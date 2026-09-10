@@ -1,8 +1,11 @@
 .card {
+  // Tone and state resolve one stroke; border, selection ring and shadow consume it.
+  --card-stroke: var(--node-border-color);
+  --card-selection-stroke: var(--node-selected-border-color);
   position: relative;
   width: 100%;
   padding: 8px;
-  border: 1px solid var(--node-border-color);
+  border: 1px solid var(--card-stroke);
   border-radius: 20px;
   background: var(--fill-3);
   color: var(--text-4);
@@ -11,15 +14,26 @@
     0 4px 12px rgb(0 0 0 / 3%);
 }
 
+.comment {
+  --card-stroke: var(--comment-border);
+  --card-selection-stroke: var(--comment-selected-border);
+  background: var(--comment-bg);
+}
+
+.comment .preview {
+  background: color-mix(in srgb, var(--comment-bg) 55%, var(--node-background-color));
+  border-color: color-mix(in srgb, var(--comment-border) 45%, transparent);
+}
+
 .selected {
-  border-color: var(--node-selected-border-color);
+  --card-stroke: var(--card-selection-stroke);
   box-shadow:
-    0 0 0 1px var(--node-selected-border-color),
-    0 8px 24px rgb(0 0 0 / 6%);
+    0 0 0 1px var(--card-stroke),
+    0 8px 24px color-mix(in srgb, var(--card-stroke) 16%, transparent);
 }
 
 .problem {
-  border-color: var(--accent-red-1);
+  --card-stroke: var(--accent-red-1);
 }
 
 .header {

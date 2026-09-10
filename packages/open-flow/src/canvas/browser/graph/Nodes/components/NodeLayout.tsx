@@ -22,11 +22,9 @@ import { NodeStore } from '../../../stores/node/node.store.ts'
 import { conditionBranchSummary } from '../../FlowCanvas/cardContent.ts'
 import { NodeStoreContext } from '../NodeStoreContext.tsx'
 import { CanvasNode } from './CanvasNode.tsx'
-import { CommentNodeContent } from './CommentNodeContent.tsx'
-import { NodeHead } from './NodeHead.tsx'
+import { CommentCard } from './CommentCard.tsx'
 import { NodeFloatBar, NodeHeadContextMenu } from './NodeHeadMoreMenu.tsx'
 import { NodeMinimap } from './NodeMinimap.tsx'
-import { NodeOutline } from './NodeOutline.tsx'
 import { useShowNodeError } from './useShowNodeError.ts'
 
 export interface NodeLayoutProps {
@@ -111,20 +109,18 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
             <NodeFloatBar canvasStore={canvasStore} nodeStore={nodeStore} />
             <NodeMinimap />
             {!cardStore && <div data-pos="w" className={`${styles.resizeHandle} ${styles.resizeHandleW}`} onPointerDown={handleTrack} />}
-            <main ref={containerRef} className={clsx(styles.container, cardStore && styles.cardContainer, skip && styles.skip)} style={containerStyle}>
+            <main ref={containerRef} className={clsx(styles.container, styles.cardContainer, skip && styles.skip)} style={containerStyle}>
               <div className={styles.executionHead}>
-                {card ? <NodeHeadContextMenu canvasStore={canvasStore}>{card}</NodeHeadContextMenu> : <NodeHead />}
+                {card ? (
+                  <NodeHeadContextMenu canvasStore={canvasStore}>{card}</NodeHeadContextMenu>
+                ) : CommentNodeStore.is(nodeStore) ? (
+                  <CommentCard store={nodeStore} />
+                ) : null}
                 {executionInput && <ExecutionHandle id={toRFHandleName('$in' as HandleName)} type="input" isConnectable={editable} />}
                 {nodeStore.nodeType != NODE_TYPE.CommentNode && branches == null && (
                   <ExecutionHandle id={toRFHandleName('$out' as HandleName)} type="output" isConnectable={editable} />
                 )}
               </div>
-              {!card && (
-                <>
-                  {CommentNodeStore.is(nodeStore) && <CommentNodeContent store={nodeStore} />}
-                  <NodeOutline />
-                </>
-              )}
             </main>
             {!cardStore && <div data-pos="e" className={`${styles.resizeHandle} ${styles.resizeHandleE}`} onPointerDown={handleTrack} />}
           </div>
