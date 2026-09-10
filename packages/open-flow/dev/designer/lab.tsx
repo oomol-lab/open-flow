@@ -1,7 +1,7 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
-import { Monitor, Moon, Sun } from 'lucide-react'
+import { Moon, Sun } from 'lucide-react'
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
 import { defaultUiLanguage, uiLanguageNames, uiLanguages } from '../../src/localization/common/languages.ts'
@@ -16,10 +16,14 @@ import { StoryStage } from './storyStage.tsx'
 
 type ThemeMode = 'system' | 'light' | 'dark'
 const themeOptions = [
-  { value: 'system', label: 'Follow system', icon: Monitor },
+  { value: 'system', label: 'Auto', icon: AutoThemeIcon },
   { value: 'light', label: 'Light', icon: Sun },
   { value: 'dark', label: 'Dark', icon: Moon },
 ] as const
+
+function AutoThemeIcon() {
+  return <i aria-hidden="true" className="i-lucide:sun-moon shrink-0" style={{ width: 16, height: 16 }} />
+}
 
 // Directory icons belong to navigation metadata, not individual stories.
 const storyGroupIcons: Readonly<Record<string, `i-${string}`>> = {
@@ -286,7 +290,7 @@ function LabPreferences({
         >
           <ThemeIcon />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-40">
+        <DropdownMenuContent align="end" className="lab-theme-menu min-w-40">
           <DropdownMenuRadioGroup value={theme} onValueChange={(value) => onThemeChange(value as ThemeMode)}>
             {themeOptions.map(({ value, label, icon: Icon }) => (
               <DropdownMenuRadioItem key={value} value={value} closeOnClick>

@@ -296,6 +296,8 @@ const valueSamples: readonly Pick<FlowCanvasViewValueNode, 'id' | 'title' | 'val
       { handle: 'message', jsonSchema: { type: 'string' }, value: 'Hello, Open Flow' },
       { handle: 'count', jsonSchema: { type: 'number' }, value: 0 },
       { handle: 'enabled', jsonSchema: { type: 'boolean' }, value: false },
+      { handle: 'environment', jsonSchema: { type: 'string' }, value: 'production' },
+      { handle: 'retries', jsonSchema: { type: 'number' }, value: 3 },
     ],
   },
   {
@@ -326,6 +328,15 @@ const valueSamples: readonly Pick<FlowCanvasViewValueNode, 'id' | 'title' | 'val
     ],
   },
   {
+    id: 'large',
+    title: 'Large object and long array',
+    values: [
+      { handle: 'fields', value: Object.fromEntries(Array.from({ length: 80 }, (_, index) => [`field_${index}`, `Value ${index}`])) },
+      { handle: 'records', value: Array.from({ length: 120 }, (_, index) => ({ id: index, active: index % 2 === 0 })) },
+      { handle: 'text', value: 'A long paragraph for inspecting scrollable string details.\n'.repeat(40) },
+    ],
+  },
+  {
     id: 'invalid',
     title: 'Invalid number',
     diagnostics: 1,
@@ -335,7 +346,7 @@ const valueSamples: readonly Pick<FlowCanvasViewValueNode, 'id' | 'title' | 'val
 
 const valueModel: FlowCanvasViewModel = {
   edges: [],
-  viewport: { x: 46, y: 72, zoom: 0.82 },
+  viewport: { x: 46, y: 36, zoom: 0.65 },
   nodes: valueSamples.map((sample, index) => ({
     id: sample.id,
     title: sample.title,
@@ -344,7 +355,7 @@ const valueModel: FlowCanvasViewModel = {
     kind: 'value',
     inputs: [],
     outputs: sample.values,
-    position: { x: (index % 3) * 380, y: Math.floor(index / 3) * 340 },
+    position: { x: (index % 3) * 380, y: Math.floor(index / 3) * 280 },
   })),
 }
 
@@ -403,7 +414,8 @@ export const nodeStories: readonly FrontendStory[] = [
   {
     group: 'Node Value',
     id: 'node-value',
-    description: 'Value nodes · Empty, primitive, structured, nullable, long content and invalid values. Canvas actions are logged.',
+    description:
+      'Value rows · Left-aligned keys and right-aligned values, with empty, structured, nullable, overflowing and invalid samples. Canvas actions are logged.',
     title: 'Node States',
     standalone: true,
     render: (log, dark, language) => <ValueNodeStory dark={dark} language={language} log={log} />,

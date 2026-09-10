@@ -58,38 +58,6 @@
   object-fit: contain;
 }
 
-.schedules {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 40%);
-  gap: 0 16px;
-  list-style: none;
-  margin: 0;
-  padding: 5px 14px 5px 12px;
-  color: var(--text-2);
-  font-size: 12px;
-  line-height: 20px;
-
-  > li {
-    display: grid;
-    grid-template-columns: subgrid;
-    grid-column: 1 / -1;
-    align-items: baseline;
-    overflow-wrap: anywhere;
-
-    + li {
-      margin-top: 6px;
-      padding-top: 6px;
-      border-top: 1px solid color-mix(in srgb, var(--node-border-color) 12%, transparent);
-    }
-  }
-
-  [tabindex]:focus-visible {
-    outline: 2px solid var(--node-selected-border-color);
-    outline-offset: 2px;
-    border-radius: 2px;
-  }
-}
-
 .interval {
   grid-column: 1 / -1;
 }
@@ -110,4 +78,13 @@
   text-align: right;
   color: var(--text-2);
   font-size: 11px;
+}
+
+.valueKey {
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
