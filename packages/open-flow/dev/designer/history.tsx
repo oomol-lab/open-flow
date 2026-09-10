@@ -9,12 +9,15 @@ import { I18nProvider } from 'val-i18n-react'
 import { applyFlowChanges } from '../../src/flow/common/change.ts'
 import { createCodeTask, createValue } from '../../src/flow/common/nodeChanges.ts'
 import { Button } from '../../src/ui/browser/button.tsx'
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '../../src/ui/browser/dialog.tsx'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { CanvasHistoryControls } from '../../src/workbench/browser/runtime/editor/canvasHistoryControls.tsx'
+import { CanvasHistoryScope } from '../../src/workbench/browser/runtime/editor/canvasHistoryScope.tsx'
 import { WorkbenchCanvas } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { WorkspaceStore } from '../../src/workbench/browser/runtime/stores/workspaceStore.ts'
 import { designerGraph, setComment, setNodePositions, setFlowViewport } from '../../src/workbench/browser/runtime/workspace.ts'
+import { useStoryActions } from './storyActions.tsx'
 
 const target = { kind: 'flow' } as const
 const modes = ['Empty', 'Undo', 'Redo', 'Saving', 'Failed'] as const
@@ -138,12 +141,14 @@ function HistorySample({
   log,
   mode,
   interactive = false,
+  keyboardOnly = false,
   dark,
 }: {
   language: UiLanguage
   log: LogAction
   mode: (typeof modes)[number]
   interactive?: boolean
+  keyboardOnly?: boolean
   dark: boolean
 }) {
   const logRef = useRef(log)
@@ -166,18 +171,20 @@ function HistorySample({
       next.dispose()
     }
   }, [language, mode])
-  return session == null ? null : <HistorySession session={session} dark={dark} interactive={interactive} mode={mode} />
+  return session == null ? null : <HistorySession session={session} dark={dark} interactive={interactive} keyboardOnly={keyboardOnly} mode={mode} />
 }
 
 function HistorySession({
   session,
   dark,
   interactive,
+  keyboardOnly,
   mode,
 }: {
   session: ReturnType<typeof createSession>
   dark: boolean
   interactive: boolean
+  keyboardOnly: boolean
   mode: string
 }) {
   const { store, i18n } = session
@@ -196,24 +203,59 @@ function HistorySession({
       void store.retryHistorySync()
     },
   }
+  const [actionVisible, setActionVisible] = useState(true)
   const model = designerGraph(draft, target, presentation?.value, [], {}, {}, i18n.t)
   return (
     <I18nProvider i18n={i18n}>
-      {interactive ? (
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', width: '100%' }}>
-          <div className="flex gap-2 p-2">
-            <Button variant="outline" onClick={() => store.selectNodes(['code', 'note'])}>
-              Select code + comment
+      {keyboardOnly ? (
+        <CanvasHistoryScope
+          history={controls}
+          disabled={draft == null || history.applying || history.failed}
+          className="flex flex-col gap-4 rounded-lg border p-4"
+        >
+          <CanvasHistoryControls {...controls} />
+          <Button variant="outline">Inspector action</Button>
+          {actionVisible && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                store.selectNodes(['code'])
+                void store.duplicateSelectedNodes()
+                setActionVisible(false)
+              }}
+            >
+              Clone and remove focused action
             </Button>
-            <Button variant="outline" disabled={history.failed || history.applying} onClick={() => void store.saveNodeTitle('code', 'Edited transform')}>
-              Edit title (clear history)
-            </Button>
-            <Button variant="outline" onClick={() => session.hold()}>
-              Hold saves
-            </Button>
-            <Button variant="outline" onClick={() => session.release()}>
-              Release saves
-            </Button>
+          )}
+          <input aria-label="Native text editor" placeholder="Native text undo" className="rounded border p-2" />
+          <div role="textbox" contentEditable suppressContentEditableWarning aria-label="Rich text editor" className="rounded border p-2">
+            Editable text
+          </div>
+          <Button
+            variant="outline"
+            onKeyDown={(event) => {
+              if (event.key.toLowerCase() == 'z') event.preventDefault()
+            }}
+          >
+            Consumes undo shortcut
+          </Button>
+          <Dialog>
+            <DialogTrigger render={<Button variant="outline" />}>Open dialog</DialogTrigger>
+            <DialogContent>
+              <DialogTitle>Dialog keyboard isolation</DialogTitle>
+              <Button variant="outline">Dialog action</Button>
+            </DialogContent>
+          </Dialog>
+          <output aria-label="Node count">Nodes: {model.nodes.length}</output>
+        </CanvasHistoryScope>
+      ) : interactive ? (
+        <CanvasHistoryScope
+          history={controls}
+          disabled={draft == null || history.applying || history.failed}
+          style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', width: '100%' }}
+        >
+          <HistoryCanvasActions session={session} />
+          <div className="p-2">
             <input aria-label="Text undo isolation" placeholder="Text undo stays here" className="border rounded px-2" />
           </div>
           <div className="editor-grid context-panel-closed" style={{ flex: 1, minHeight: 0 }}>
@@ -246,26 +288,55 @@ function HistorySession({
               provideAddNodeOptions={async () => options}
             />
           </div>
-        </div>
+        </CanvasHistoryScope>
       ) : (
         <div className="rounded-lg border border-border p-3 flex flex-col gap-2">
           <strong>{mode}</strong>
           <CanvasHistoryControls {...controls} />
-          {mode == 'Saving' && (
-            <Button variant="ghost" onClick={() => session.release()}>
-              Finish save
-            </Button>
-          )}
+          {mode == 'Saving' && <HistorySaveAction session={session} />}
         </div>
       )}
     </I18nProvider>
   )
 }
 
+function HistoryCanvasActions({ session }: { session: ReturnType<typeof createSession> }) {
+  const { store } = session
+  const history = useVal(store.history$)
+  useStoryActions([
+    { label: 'Select code + comment', onClick: () => store.selectNodes(['code', 'note']) },
+    { label: 'Edit title (clear history)', disabled: history.failed || history.applying, onClick: () => void store.saveNodeTitle('code', 'Edited transform') },
+    { label: 'Hold saves', onClick: () => session.hold() },
+    { label: 'Release saves', onClick: () => session.release() },
+  ])
+  return null
+}
+
+function HistorySaveAction({ session }: { session: ReturnType<typeof createSession> }) {
+  useStoryActions([{ label: 'Finish save', onClick: () => session.release() }])
+  return null
+}
+
+export const historyControlsStory: FrontendStory = {
+  group: 'Undo & Redo',
+  id: 'canvas-history-controls',
+  title: 'Button states',
+  description: 'Empty, undo, redo, saving, and failed states. Finish the held save or retry the failed sample.',
+  standalone: true,
+  render: (log, dark, language) => (
+    <div className="open-flow-workbench open-flow-theme grid w-full grid-cols-5 gap-3 p-3" data-theme={dark ? 'dark' : 'light'}>
+      {modes.map((mode) => (
+        <HistorySample key={mode} mode={mode} language={language} log={log} dark={dark} />
+      ))}
+    </div>
+  ),
+}
+
 export const historyStory: FrontendStory = {
-  group: 'Canvas',
+  group: 'Undo & Redo',
   id: 'canvas-history',
-  title: 'Undo & Redo',
+  title: 'Canvas operations',
+  description: 'Clone a node or selection, then undo and redo with keyboard shortcuts without clicking the canvas again.',
   standalone: true,
   render: (log, dark, language) => (
     <div
@@ -273,12 +344,37 @@ export const historyStory: FrontendStory = {
       style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
       data-theme={dark ? 'dark' : 'light'}
     >
-      <div className="grid grid-cols-5 gap-3 p-3">
-        {modes.map((mode) => (
-          <HistorySample key={mode} mode={mode} language={language} log={log} dark={dark} />
-        ))}
-      </div>
       <HistorySample mode="Empty" interactive language={language} log={log} dark={dark} />
     </div>
   ),
+}
+
+function HistoryKeyboardStory({ log, dark, language }: { log: LogAction; dark: boolean; language: UiLanguage }) {
+  const [generation, setGeneration] = useState(0)
+  useStoryActions([{ label: 'Reset samples', onClick: () => setGeneration((value) => value + 1) }])
+  return (
+    <div
+      className="open-flow-workbench open-flow-theme gap-4 p-4"
+      style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', width: '100%' }}
+      data-theme={dark ? 'dark' : 'light'}
+      key={generation}
+    >
+      {['Editor A', 'Editor B'].map((label) => (
+        <section key={label} aria-label={label} className="flex flex-col gap-3">
+          <strong>{label}</strong>
+          <HistorySample mode="Undo" keyboardOnly language={language} log={log} dark={dark} />
+        </section>
+      ))}
+      <Button variant="outline">Host action outside editors</Button>
+    </div>
+  )
+}
+
+export const historyKeyboardStory: FrontendStory = {
+  group: 'Undo & Redo',
+  id: 'canvas-history-keyboard',
+  title: 'Keyboard scope',
+  standalone: true,
+  description: 'Two independent editors exercise removed controls, inspector focus, text undo, dialogs, and host isolation.',
+  render: (log, dark, language) => <HistoryKeyboardStory log={log} dark={dark} language={language} />,
 }

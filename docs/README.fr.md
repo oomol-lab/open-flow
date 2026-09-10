@@ -278,7 +278,7 @@ Commencez par l'[index de la documentation](README.md). Les références les plu
 - [Limites du produit et de l'architecture](architecture.md)
 - [Control API](control/contracts/control-api.md)
 - [Distribution du Command Artifact](distribution/command-artifact.md)
-- [Notes sur le frontend du Workbench et du Designer](authoring/frontend-ui.md)
+- [Notes sur le frontend du Workbench et du Designer](../.agents/skills/frontend-ui/SKILL.md)
 - [Déploiement du Server](server/container-delivery.md)
 - [Image Docker sur GHCR](server/docker-ghcr/README.fr.md)
 - [Déploiement sur Fly.io](server/fly-io/README.fr.md)

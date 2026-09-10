@@ -33,6 +33,9 @@ behavior rather than preserving it speculatively.
 Shared behavior belongs in shared production code. Features compose it rather than duplicate it.
 Tests and Stories exercise the real behavior; their fixtures must not become parallel implementations.
 
+Before implementing or reviewing frontend components, appearance, layout, or interactions, read and
+use the project [frontend-ui skill](.agents/skills/frontend-ui/SKILL.md).
+
 Lab stories support design alignment between people and AI and fast visual inspection. Lay out
 meaningful states side by side with clear labels; menus and panels under review should be visible
 on entry without repeated clicks. Use real component and Trigger definitions with deterministic
@@ -81,6 +84,5 @@ gaps honestly, and satisfy required CI before merging.
 Consult only references relevant to the task:
 
 - [Architecture](docs/architecture.md): product contracts, persistence, execution, and ownership.
-- [Frontend](docs/authoring/frontend-ui.md): shared UI and Designer integration boundaries.
 - [Iconify skill](.agents/skills/iconify-icons/SKILL.md): UI icon selection and integration.
 - [Contributing](CONTRIBUTING.md): environment, check commands, and contribution requirements.

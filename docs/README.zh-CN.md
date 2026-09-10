@@ -235,7 +235,7 @@ SQLite volume 恢复。不要在仓库根目录直接运行 `bun test`，它会�
 - [产品与架构边界](architecture.md)
 - [Control API](control/contracts/control-api.md)
 - [Command Artifact 分发合同](distribution/command-artifact.md)
-- [Workbench 与 Designer 前端注意事项](authoring/frontend-ui.md)
+- [Workbench 与 Designer 前端注意事项](../.agents/skills/frontend-ui/SKILL.md)
 - [Server 部署](server/container-delivery.md)
 - [Docker 镜像 (GHCR)](server/docker-ghcr/README.zh-CN.md)
 - [Fly.io 部署](server/fly-io/README.zh-CN.md)

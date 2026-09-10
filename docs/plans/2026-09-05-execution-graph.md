@@ -147,7 +147,7 @@ validation 检查来源节点与 handle 存在、类型匹配、作用域正确�
 2. 更新输入来源编辑器，提供有效祖先的 handle 选择、来源展示和无效绑定修复。
 3. 删除 concurrency 配置、context.outputs 编辑器提示和旧脚本模板；更新运行结果与跳过状态展示。
 4. 更新 Command、公有 authoring API 消费端、导入导出、示例和对应帮助。
-5. 修改 Select、popup、portal、focus 等交互前读取 `docs/authoring/frontend-ui.md`。只使用仓库测试、检查和构建验证 UI，不启动或自动化浏览器。
+5. 修改 Select、popup、portal、focus 等交互前读取 `.agents/skills/frontend-ui/SKILL.md`。只使用仓库测试、检查和构建验证 UI，不启动或自动化浏览器。
 
 阶段出口：人和 Agent 都能完整创建及修改新图；没有旧数据连线或隐式调度入口。
 

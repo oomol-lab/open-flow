@@ -367,6 +367,19 @@ function RunControlSample({
         <WorkbenchCanvasActions
           blocksOpen={false}
           disabled={disabled}
+          history={{
+            state: {
+              canUndo: true,
+              canRedo: true,
+              applying: false,
+              failed: false,
+              undo: undefined,
+              redo: undefined,
+            },
+            onUndo: () => log('history.undo'),
+            onRedo: () => log('history.redo'),
+            onRetry: () => log('history.retry'),
+          }}
           onOpenBlocks={() => log('blocks.open')}
           runControl={
             <RunControl

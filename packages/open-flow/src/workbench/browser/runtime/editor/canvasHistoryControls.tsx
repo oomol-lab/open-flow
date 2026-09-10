@@ -16,7 +16,7 @@ export interface CanvasHistoryControlsProps {
 export function CanvasHistoryControls({ state, onUndo, onRedo, onRetry, disabled }: CanvasHistoryControlsProps) {
   const t = useTranslate()
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="designer-actions">
       {(['undo', 'redo'] as const).map((direction) => {
         const entry = state[direction]
         const name = t(`history.${direction}`)

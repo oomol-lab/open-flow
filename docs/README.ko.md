@@ -252,7 +252,7 @@ bun run build
 - [제품 및 아키텍처 경계](architecture.md)
 - [Control API](control/contracts/control-api.md)
 - [Command Artifact 배포 계약](distribution/command-artifact.md)
-- [Workbench 및 Designer 프런트엔드 참고 사항](authoring/frontend-ui.md)
+- [Workbench 및 Designer 프런트엔드 참고 사항](../.agents/skills/frontend-ui/SKILL.md)
 - [Server 배포](server/container-delivery.md)
 - [GHCR의 Docker 이미지](server/docker-ghcr/README.ko.md)
 - [Fly.io 배포](server/fly-io/README.ko.md)

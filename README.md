@@ -280,7 +280,7 @@ Start with the [documentation index](docs/README.md). The most useful references
 - [Product and architecture boundaries](docs/architecture.md)
 - [Control API](docs/control/contracts/control-api.md)
 - [Command Artifact distribution](docs/distribution/command-artifact.md)
-- [Workbench and Designer frontend notes](docs/authoring/frontend-ui.md)
+- [Workbench and Designer frontend notes](.agents/skills/frontend-ui/SKILL.md)
 - [Server deployment](docs/server/container-delivery.md)
 - [Docker image on GHCR](docs/server/docker-ghcr/README.md)
 - [Fly.io deployment](docs/server/fly-io/README.md)

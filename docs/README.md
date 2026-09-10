@@ -9,7 +9,7 @@ Open Flow 提供公共产品合同、Workbench runtime、CLI runtime 与完整 S
 - [产品与架构边界](architecture.md)
 - [Control API P0 / P1 / P2 / P3 合同](control/contracts/control-api.md)
 - [Command Artifact v2 分发合同](distribution/command-artifact.md)
-- [Workbench 与 Designer 前端注意事项](authoring/frontend-ui.md)
+- [Workbench 与 Designer 前端注意事项](../.agents/skills/frontend-ui/SKILL.md)
 
 ## Server 实施参考
 
