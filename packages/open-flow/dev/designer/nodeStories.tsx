@@ -1,4 +1,4 @@
-import type { FlowCanvasViewModel } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
+import type { FlowCanvasViewModel, FlowCanvasViewValueNode } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
@@ -287,7 +287,127 @@ function CommentStory({ dark, language, log }: { readonly dark: boolean; readonl
   )
 }
 
+const valueSamples: readonly Pick<FlowCanvasViewValueNode, 'id' | 'title' | 'values' | 'diagnostics'>[] = [
+  { id: 'empty', title: 'No values', values: [] },
+  {
+    id: 'primitives',
+    title: 'String, number and boolean',
+    values: [
+      { handle: 'message', jsonSchema: { type: 'string' }, value: 'Hello, Open Flow' },
+      { handle: 'count', jsonSchema: { type: 'number' }, value: 0 },
+      { handle: 'enabled', jsonSchema: { type: 'boolean' }, value: false },
+    ],
+  },
+  {
+    id: 'structured',
+    title: 'Object and array',
+    values: [
+      { handle: 'customer', jsonSchema: { type: 'object' }, value: { name: 'Ada', preferences: { language: 'en' } } },
+      { handle: 'tags', jsonSchema: { type: 'array', items: { type: 'string' } }, value: ['review', 'ready'] },
+    ],
+  },
+  {
+    id: 'nullable',
+    title: 'Null and empty string',
+    values: [
+      { handle: 'optional', jsonSchema: { type: 'string' }, nullable: true, value: null },
+      { handle: 'message', jsonSchema: { type: 'string' }, value: '' },
+    ],
+  },
+  {
+    id: 'long',
+    title: 'Long field name and multiline content',
+    values: [
+      {
+        handle: 'customer_activity_summary_for_the_current_reporting_period',
+        jsonSchema: { type: 'string' },
+        value: 'A detailed customer activity summary with a long line to inspect wrapping and truncation.\nOrders reviewed: 128\nStatus: Ready for review',
+      },
+    ],
+  },
+  {
+    id: 'invalid',
+    title: 'Invalid number',
+    diagnostics: 1,
+    values: [{ handle: 'count', jsonSchema: { type: 'number' }, value: 'not-a-number' }],
+  },
+]
+
+const valueModel: FlowCanvasViewModel = {
+  edges: [],
+  viewport: { x: 46, y: 72, zoom: 0.82 },
+  nodes: valueSamples.map((sample, index) => ({
+    id: sample.id,
+    title: sample.title,
+    values: sample.values,
+    diagnostics: sample.diagnostics,
+    kind: 'value',
+    inputs: [],
+    outputs: sample.values,
+    position: { x: (index % 3) * 380, y: Math.floor(index / 3) * 340 },
+  })),
+}
+
+function ValueNodeStory({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
+  const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes('value')
+  const [selected, setSelected] = useState<readonly string[]>(['primitives'])
+  const [editable, setEditable] = useState(true)
+  const [generation, setGeneration] = useState(0)
+  useStoryActions([
+    { label: editable ? 'Switch to read-only' : 'Enable editing', onClick: () => setEditable((value) => !value) },
+    {
+      label: 'Reset samples',
+      onClick: () => {
+        setSelected(['primitives'])
+        setEditable(true)
+        onIgnoreNodes(ignoredNodeIds, false)
+        setGeneration((value) => value + 1)
+      },
+    },
+  ])
+  return (
+    <div className="workflow-story">
+      <div className="workflow-canvas">
+        <FlowCanvasView
+          key={generation}
+          identity="lab:node-cases:value"
+          autoLayout={false}
+          layoutMotion={false}
+          dark={dark}
+          language={language}
+          editable={editable}
+          model={valueModel}
+          addItems={[]}
+          ignoredNodeIds={ignoredNodeIds}
+          onIgnoreNodes={onIgnoreNodes}
+          selectedNodeIds={selected}
+          onSelectionChange={(ids) => {
+            setSelected(ids)
+            log('selection.change', ids)
+          }}
+          onAddNode={() => undefined}
+          onConnect={(edge) => log('edge.connect', edge)}
+          onDisconnect={(edge) => log('edge.disconnect', edge)}
+          onDeleteNodes={(ids) => log('node.delete', ids)}
+          onDuplicate={(ids) => log('node.duplicate', ids)}
+          onPaste={(position) => log('canvas.paste', position)}
+          onMoveNodes={(positions) => log('node.move', positions)}
+          onMoveViewport={(viewport) => log('canvas.move', viewport)}
+        />
+      </div>
+    </div>
+  )
+}
+
 export const nodeStories: readonly FrontendStory[] = [
+  {
+    group: 'Node Value',
+    id: 'node-value',
+    description: 'Value nodes · Empty, primitive, structured, nullable, long content and invalid values. Canvas actions are logged.',
+    title: 'Node States',
+    standalone: true,
+    render: (log, dark, language) => <ValueNodeStory dark={dark} language={language} log={log} />,
+  },
   {
     group: 'Node Comment',
     id: 'node-comment',

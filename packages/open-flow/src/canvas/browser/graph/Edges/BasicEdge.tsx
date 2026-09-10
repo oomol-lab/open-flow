@@ -1,15 +1,14 @@
 import styles from './BasicEdge.module.scss'
-import type { EdgeProps, Rect } from '@xyflow/react'
+import type { EdgeProps } from '@xyflow/react'
 import type { RFEdge } from '../../base/rfHelpers.ts'
 
-import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, Position, useInternalNode } from '@xyflow/react'
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, Position } from '@xyflow/react'
 import { useId, useMemo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { ErrorCircle } from '../../components/errorCircle.tsx'
 import { DEFAULT_HANDLE_KIND } from '../../components/handleKind.ts'
 import { gradientToStroke } from '../../stores/edge/colors.ts'
 import { useCanvasStore } from '../CanvasStoreContext.tsx'
-import { EDGE_GAP, getTurnY } from './route.ts'
 
 export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
   const arrowId = useId().replaceAll(':', '')
@@ -17,34 +16,19 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
   const error = useVal(edgeStore?.$.error)
   const canvasStore = useCanvasStore()
   const scale = useVal(canvasStore.$.scale)
-  const sourceNode = useInternalNode(props.source)
-  const targetNode = useInternalNode(props.target)
 
   // Leave space between the arrow tip and the target port in every direction.
   const gap = 3
   const targetX = props.targetX + (props.targetPosition == Position.Left ? -gap : props.targetPosition == Position.Right ? gap : 0)
   const targetY = props.targetY + (props.targetPosition == Position.Top ? -gap : props.targetPosition == Position.Bottom ? gap : 0)
-  const sourceRect: Rect | undefined = sourceNode && {
-    ...sourceNode.internals.positionAbsolute,
-    width: sourceNode.measured.width ?? 0,
-    height: sourceNode.measured.height ?? 0,
-  }
-  const targetRect: Rect | undefined = targetNode && {
-    ...targetNode.internals.positionAbsolute,
-    width: targetNode.measured.width ?? 0,
-    height: targetNode.measured.height ?? 0,
-  }
 
-  const [path, labelX, labelY] = getSmoothStepPath({
+  const [path, labelX, labelY] = getBezierPath({
     sourceX: props.sourceX,
     sourceY: props.sourceY,
     sourcePosition: props.sourcePosition,
     targetX,
     targetY,
     targetPosition: props.targetPosition,
-    borderRadius: 20,
-    centerY: getTurnY(props, sourceRect, targetRect),
-    offset: EDGE_GAP,
   })
 
   const selected = useVal(edgeStore?.$.selected)

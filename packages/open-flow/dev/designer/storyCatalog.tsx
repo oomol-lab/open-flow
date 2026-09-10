@@ -6,6 +6,7 @@ import { agentStory } from './agent.tsx'
 import { cardStories } from './cards.tsx'
 import { commentPropertiesStory } from './commentProperties.tsx'
 import { conditionEditorStory } from './conditionEditor.tsx'
+import { connectionPathsStory } from './connectionPaths.tsx'
 import { formStory } from './form.tsx'
 import { historyStory } from './history.tsx'
 import { libraryStory } from './library.tsx'
@@ -57,6 +58,7 @@ export const labStories: readonly FrontendStory[] = [
   ...triggerStories,
   ...cardStories,
   ...workflowStories,
+  connectionPathsStory,
   ...stories,
   formStory,
   libraryStory,

@@ -363,6 +363,8 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         onConnect={onConnect}
         onChangeComment={onChangeComment}
         onDeleteNodes={(nodeIds) => {
+          // Move focus off the toolbar before deleting its node and unmounting the button.
+          canvas.current?.focus({ preventScroll: true })
           onSelectNodes(nodeIds)
           onDeleteNodes()
         }}

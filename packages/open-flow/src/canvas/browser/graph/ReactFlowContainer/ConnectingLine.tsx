@@ -2,7 +2,7 @@ import type { ConnectionLineComponentProps } from '@xyflow/react'
 import type { RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
 import type { HandleKind } from '../../components/handle.tsx'
 
-import { getSmoothStepPath } from '@xyflow/react'
+import { getBezierPath } from '@xyflow/react'
 import { useMemo } from 'react'
 import { toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
 import { getHandleKind } from '../../components/handleKind.ts'
@@ -25,15 +25,13 @@ export const ConnectionLine: React.FC<ConnectionLineComponentProps> = ({
 }: ConnectionLineComponentProps) => {
   const canvasStore = useCanvasStore()
 
-  const [edgePath] = getSmoothStepPath({
+  const [edgePath] = getBezierPath({
     sourceX: fromX,
     sourceY: fromY,
     sourcePosition: fromPosition,
     targetX: toX,
     targetY: toY,
     targetPosition: toPosition,
-    borderRadius: 20,
-    offset: 32,
   })
 
   const isStartOutputHandle = rfStartHandle?.type !== 'target'

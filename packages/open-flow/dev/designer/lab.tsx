@@ -7,6 +7,7 @@ import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
 import { defaultUiLanguage, uiLanguageNames, uiLanguages } from '../../src/localization/common/languages.ts'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '../../src/ui/browser/dropdown-menu.tsx'
+import { Input } from '../../src/ui/browser/input.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
 import { StoryActions, StoryActionsProvider } from './storyActions.tsx'
 import { labStories } from './storyCatalog.tsx'
@@ -21,6 +22,7 @@ const themeOptions = [
 
 // Directory icons belong to navigation metadata, not individual stories.
 const storyGroupIcons: Readonly<Record<string, `i-${string}`>> = {
+  'Node Value': 'i-lucide:variable',
   'Node Condition': 'i-carbon:flow',
   'Canvas': 'i-carbon:template',
   'Theme Preview': 'i-carbon:color-palette',
@@ -59,21 +61,26 @@ function StoryGroup({
   entries,
   selected,
   onSelect,
+  search,
 }: {
   readonly icon?: `i-${string}`
   readonly name: string
   readonly entries: readonly FrontendStory[]
   readonly selected: FrontendStory
   readonly onSelect: (story: FrontendStory) => void
+  readonly search: string
 }) {
   const active = selected.group === name
   const label = name.replace(/^(?:Trigger|Node) /, '')
-  const [open, setOpen] = useState(active)
+  const [open, setOpen] = useState(active || Boolean(search))
   const id = useId()
   const currentLink = useRef<HTMLAnchorElement>(null)
   useEffect(() => {
     if (active) setOpen(true)
   }, [active, selected.id])
+  useEffect(() => {
+    if (search) setOpen(true)
+  }, [search])
   useEffect(() => {
     if (!active || !open) return
     const frame = requestAnimationFrame(() => currentLink.current?.scrollIntoView({ block: 'nearest' }))
@@ -118,6 +125,19 @@ function storyFromUrl() {
 }
 
 export function FrontendLab() {
+  const [search, setSearch] = useState('')
+  const query = search.trim().toLowerCase()
+  const visibleSections = storySections
+    .map((section) => ({
+      ...section,
+      groups: section.groups
+        .map((group) => ({
+          ...group,
+          entries: group.entries.filter((entry) => `${section.name} ${group.name} ${entry.title} ${entry.id}`.toLowerCase().includes(query)),
+        }))
+        .filter((group) => group.entries.length > 0),
+    }))
+    .filter((section) => section.groups.length > 0)
   const [storyId, setStoryId] = useState(() => storyFromUrl().id)
   const story = labStories.find((entry) => entry.id === storyId) ?? storyFromUrl()
   const [theme, setTheme] = useState<ThemeMode>('system')
@@ -185,12 +205,29 @@ export function FrontendLab() {
         <LabPreferences theme={theme} onThemeChange={setTheme} language={language} onLanguageChange={setLanguage} />
       </header>
       <aside className="lab-sidebar">
+        <div className="lab-search">
+          <Input
+            type="search"
+            aria-label="Search stories"
+            placeholder="Search stories…"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setSearch('')
+            }}
+          />
+        </div>
         <nav className="lab-navigation" aria-label="Stories">
-          {storySections.map((section) => (
+          {visibleSections.length === 0 && (
+            <p className="lab-search-empty" role="status">
+              No stories found.
+            </p>
+          )}
+          {visibleSections.map((section) => (
             <div key={section.name} className="lab-nav-section">
               <div className="lab-nav-section-label">{section.name}</div>
               {section.groups.map((group) => (
-                <StoryGroup key={group.name} {...group} selected={story} onSelect={selectStory} />
+                <StoryGroup key={group.name} {...group} selected={story} onSelect={selectStory} search={query} />
               ))}
             </div>
           ))}
