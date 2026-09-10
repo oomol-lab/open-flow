@@ -308,14 +308,17 @@ function WorkflowStory({
   const triggers = model.nodes.filter((node) => node.kind === 'trigger')
   const [selectedTriggerId, setSelectedTriggerId] = useState(triggers[0]?.id ?? '')
   const [version, setVersion] = useState(0)
+  const [editable, setEditable] = useState(true)
   const [addNodeRequest, setAddNodeRequest] = useState<FlowCanvasViewProps['addNodeRequest']>()
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(String(version))
   const [selected, setSelected] = useState<readonly string[]>([initialSelectedNodeId])
   useStoryActions([
+    { label: editable ? 'Switch to read-only' : 'Enable editing', onClick: () => setEditable((value) => !value) },
     {
       label: 'Reset samples',
       onClick: () => {
         setSelected([initialSelectedNodeId])
+        setEditable(true)
         setVersion((value) => value + 1)
         log('samples.reset')
       },
@@ -334,7 +337,7 @@ function WorkflowStory({
             dark={dark}
             language={language}
             layoutMotion={false}
-            editable
+            editable={editable}
             model={model}
             toolbar={
               <WorkbenchCanvasActions
@@ -410,7 +413,8 @@ export const workflowStories: readonly FrontendStory[] = [
     group: 'Workbench',
     id: 'node-picker',
     title: 'Canvas Node Picker',
-    description: 'Select nodes to compare outlines and execution states. Interactions appear in the status below.',
+    description:
+      'Hover or select a node: unconnected ports show arrows that nudge twelve times at a steady pace, then fade out and unmount. Leave and deselect to remove them; a connected side keeps all its ports visible without arrows. Read-only and connecting states hide arrows.',
     standalone: true,
     render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={workflow} picker />,
   },

@@ -47,7 +47,7 @@
 }
 
 .cardContainer {
-  --execution-port-opacity: 0;
+  --execution-port-opacity: 1;
   --execution-port-color: var(--edge-primitive);
   --execution-port-active-color: var(--text-3);
 
@@ -265,4 +265,67 @@
 .cardContainer .executionHandle.connected,
 .cardContainer .executionHandle.connecting {
   --execution-port-opacity: 1;
+}
+
+.connectionHint {
+  --hint-nudge: 2px;
+  // Center the icon independently of the branch row’s text baseline.
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  left: 20px;
+  top: 1px;
+  width: 14px;
+  height: 14px;
+  color: var(--execution-port-color);
+  opacity: 0;
+  pointer-events: none;
+
+  > i {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.inputHint {
+  --hint-nudge: -2px;
+  left: auto;
+  right: 20px;
+}
+
+// The component ends the sequence after twelve rounds; keep moving through the fade.
+.connectionHint {
+  opacity: 0.65;
+  transition: opacity 320ms ease-out;
+
+  @starting-style {
+    opacity: 0;
+  }
+
+  &.hintLeaving {
+    opacity: 0;
+    transition-duration: 320ms;
+  }
+
+  > i {
+    animation: connection-hint-nudge 800ms ease-in-out infinite;
+  }
+}
+
+@keyframes connection-hint-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(var(--hint-nudge));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connectionHint > i {
+    animation: none;
+  }
 }
