@@ -145,12 +145,26 @@
   max-width: calc(100% - 32px);
 }
 
+.island.compactIsland {
+  padding: 3px;
+  border-radius: 10px;
+
+  > [data-size] {
+    height: 28px;
+    border-radius: 6px;
+  }
+
+  > [data-size='icon'] {
+    width: 28px;
+  }
+}
+
 .viewDock {
   > [data-size] > i {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     flex: none;
-    font-size: 18px;
+    font-size: 16px;
   }
 }
 
@@ -159,7 +173,7 @@
 }
 
 .zoomValue {
-  min-width: 48px;
+  min-width: 40px;
   padding-inline: 5px;
   color: var(--ui-muted-foreground);
   font-size: 11px;
@@ -168,10 +182,10 @@
 
 .interactiveModeTrigger {
   > [data-mode-icon] {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     flex: none;
-    font-size: 18px;
+    font-size: 16px;
   }
 }
 

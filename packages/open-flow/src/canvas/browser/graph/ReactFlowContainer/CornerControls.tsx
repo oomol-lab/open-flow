@@ -28,7 +28,7 @@ export const CornerControls: React.FC<CornerControlsProps> = /* @__PURE__ */ mem
   return (
     <>
       <Controls
-        className={cn(containerStyles.island, styles.surface, styles.corner)}
+        className={cn(containerStyles.island, containerStyles.compactIsland, styles.surface, styles.corner)}
         orientation="horizontal"
         position="top-right"
         showFitView={false}
