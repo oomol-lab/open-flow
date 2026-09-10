@@ -118,6 +118,11 @@
 .floatBarButton {
   border-radius: var(--ui-radius);
   font-size: var(--icon-font-size);
+
+  &[data-danger]:is(:hover, :focus-visible) {
+    color: var(--ui-destructive);
+    background-color: color-mix(in srgb, var(--ui-destructive) 10%, transparent);
+  }
 }
 
 .floatBarStatus {

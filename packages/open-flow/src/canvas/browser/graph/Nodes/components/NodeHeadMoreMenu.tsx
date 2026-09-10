@@ -144,9 +144,11 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
   const { zoom } = useViewport()
   const getPopupContainer = useGetStaticPopupContainer()
 
+  const editable = useVal(canvasStore.$.editable)
   const items = useNodeMenuItems({
     t,
     nodeStore,
+    onDelete: editable && canvasStore.canDeleteNodes ? () => canvasStore.deleteNodes([nodeStore]) : undefined,
   })
   const floatBarItems = items.filter((item): item is ContextMenuActionItem => !!item)
 
@@ -155,8 +157,21 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
       {NodeStore.is(nodeStore) && <NodeStatus flowStatus$={canvasStore.$.runStatus} nodeStore={nodeStore} />}
       {floatBarItems.map((item) => {
         return (
-          <CanvasTooltip getPopupContainer={getPopupContainer} key={item.key} placement="top" title={item.label}>
-            <Button aria-label={item.label} className={styles.floatBarButton} disabled={item.disabled} onClick={item.onClick} size="icon" variant="ghost">
+          <CanvasTooltip
+            getPopupContainer={getPopupContainer}
+            key={item.key}
+            placement="top"
+            title={item.danger ? `${item.label} (Backspace / Delete)` : item.label}
+          >
+            <Button
+              aria-label={item.label}
+              className={styles.floatBarButton}
+              data-danger={item.danger || undefined}
+              disabled={item.disabled}
+              onClick={item.onClick}
+              size="icon"
+              variant="ghost"
+            >
               {item.icon}
             </Button>
           </CanvasTooltip>

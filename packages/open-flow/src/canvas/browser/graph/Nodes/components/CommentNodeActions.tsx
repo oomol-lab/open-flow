@@ -16,7 +16,9 @@ export function CommentNodeActions({ canvasStore, nodeStore }: CommentNodeAction
   const editable = useVal(canvasStore.$.editable)
   const sourceCode = useVal(nodeStore.$.sourceCode)
 
-  if (!editable) return null
+  const empty = useVal(nodeStore.$.empty)
+
+  if (!editable || empty) return null
 
   return (
     <CanvasTooltip placement="top" title={sourceCode ? t('comment.preview') : t('comment.source')}>

@@ -647,7 +647,9 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           connectionLineComponent={ConnectionLine}
           aria-readonly={!editable}
         >
-          {(props.canDeleteNodes ?? true) && <SelectionFloatBar nodes={selectedNodes} onDelete={deleteSelectedNodes} duplicateNodes={props.duplicateNodes} />}
+          {(props.canDeleteNodes ?? true) && (
+            <SelectionFloatBar editable={!!editable} nodes={selectedNodes} onDelete={deleteSelectedNodes} duplicateNodes={props.duplicateNodes} />
+          )}
           <FlowControls
             cornerTools={props.cornerTools}
             toolbar={props.toolbar}
@@ -826,7 +828,7 @@ function SelectionContextMenu(props: SelectionContextMenuProps) {
   return <ContextMenu items={items} onClose={props.onClose} position={props.position} />
 }
 
-function SelectionFloatBar(props: Pick<SelectionContextMenuProps, 'nodes' | 'onDelete' | 'duplicateNodes'>) {
+function SelectionFloatBar(props: Pick<SelectionContextMenuProps, 'nodes' | 'onDelete' | 'duplicateNodes'> & { readonly editable: boolean }) {
   const items = useSelectionItems(props)
   const { zoom } = useViewport()
 
@@ -835,12 +837,13 @@ function SelectionFloatBar(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
   return (
     <NodeToolbar className={nodeHeadStyles.floatBar} isVisible nodeId={props.nodes.map((node) => node.id)} offset={12 - 8 * zoom}>
       {items
-        .filter((item) => item.key != '$delete')
+        .filter((item) => item.key !== '$delete' || props.editable)
         .map((item) => (
-          <CanvasTooltip key={item.key} placement="top" title={item.label}>
+          <CanvasTooltip key={item.key} placement="top" title={item.key === '$delete' ? `${item.label} (Backspace / Delete)` : item.label}>
             <Button
               aria-label={item.label}
               className={nodeHeadStyles.floatBarButton}
+              data-danger={item.key === '$delete' || undefined}
               disabled={item.disabled}
               onClick={item.onClick}
               size="icon"
