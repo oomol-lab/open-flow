@@ -1,11 +1,69 @@
 import type { CodeModule, ConnectorCapability, JsonValue } from '../../flow/common/change.ts'
 
 import { dequal } from 'dequal/lite'
-import { currentEngineContract } from './engineContract.ts'
+import { currentEngineContract, nodejsEngineContract } from './engineContract.ts'
 
-export { currentEngineContract, findEngineContract, type EngineContract } from './engineContract.ts'
+export { currentEngineContract, nodejsEngineContract, findEngineContract, type EngineContract } from './engineContract.ts'
 
 export type RuntimeModule = Pick<CodeModule, 'imports' | 'source'>
+
+export const nodejsRuntimeConformanceCases: readonly RuntimeConformanceCase[] = [
+  {
+    name: 'supports Node builtin imports and asynchronous virtual file operations',
+    async verify(harness) {
+      const value = await harness.invoke({
+        capability: async () => ({ body: null, status: 403 }),
+        input: null,
+        invocationId: 'nodejs-files',
+        program: {
+          ...program(
+            harness,
+            `import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer'; import path from 'node:path'; import fs from 'node:fs/promises';
+export default async () => {
+  const file = path.join('/tmp', 'conformance.txt');
+  await fs.writeFile(file, Buffer.from('你好'));
+  const text = await fs.readFile(file, 'utf8');
+  assert.equal(text, '你好');
+  await fs.unlink(file);
+  return { text, bytes: Buffer.byteLength(text) };
+}`,
+          ),
+          engineContract: nodejsEngineContract,
+        },
+      })
+      equal(value, { text: '你好', bytes: 6 }, 'Node virtual files')
+    },
+  },
+  {
+    name: 'preserves abort reasons and cancels Promise timers',
+    async verify(harness) {
+      const value = await harness.invoke({
+        capability: async () => ({ body: null, status: 403 }),
+        input: null,
+        invocationId: 'nodejs-abort',
+        program: {
+          ...program(
+            harness,
+            `import { setTimeout } from 'node:timers/promises';
+export default async () => {
+  const controller = new AbortController(); const reason = { message: 'stop' };
+  const combined = AbortSignal.any([controller.signal]);
+  const pending = setTimeout(60000, 'late', { signal: combined });
+  controller.abort(reason); controller.abort('ignored');
+  let thrown; try { combined.throwIfAborted(); } catch (error) { thrown = error; }
+  try { await pending; return false; } catch (error) {
+    return { sameReason: combined.reason === reason && thrown === reason, name: error.name };
+  }
+}`,
+          ),
+          engineContract: nodejsEngineContract,
+        },
+      })
+      equal(value, { sameReason: true, name: 'AbortError' }, 'Node cancellation')
+    },
+  },
+]
 
 export interface RuntimeProgram {
   readonly engineContract: string

@@ -179,7 +179,8 @@ Wait 通知复用固定 Revision 中显式选择的 Connector action。部署必
 稳定 invocation identity 由 Connector 幂等处理。通知发送失败不能自动批准、拒绝或结束 Run。通知正文中的 capability 只以不可逆摘要进入持久化存储，
 完整 URL 属于 bearer credential；公开 origin 是部署 capability 配置，不进入 Flow Revision。
 
-用户代码只在隔离 realm 中获得目标 closure、固定 platform module 和当前 Task invocation 明确声明的窄 Capability。Capability host 必须校验当前
+用户代码只在隔离 realm 中获得目标 closure、固定 platform module、所选 Engine Contract 声明的内置模块和当前 Task invocation 明确声明的窄 Capability。内置模块不授予宿主存储、身份或外部访问权限。
+部署只声明自己实现的 Engine Contract；Node 兼容合同的内存文件系统属于单次 Task invocation，不在 Task 之间共享或持久化。Capability host 必须校验当前
 Flow、Run、Task、invocation、binding 和 Run 状态；Task 或 Run 结束后旧 Capability 必须 fail closed。
 
 Code Task 的 Action 声明属于 Revision，固定允许的 Action、Connection 集合和可选默认账号。分层属性与完整 Action ID 索引共享同一调用合同；
