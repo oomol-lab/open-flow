@@ -144,9 +144,9 @@ function ConditionStory({ dark, language, log }: { readonly dark: boolean; reado
 
 export const nodeStories: readonly FrontendStory[] = [
   {
-    group: 'Node Cases',
+    group: 'Node Condition',
     id: 'node-condition',
-    title: 'Condition',
+    title: 'Node States',
     standalone: true,
     render: (log, dark, language) => <ConditionStory dark={dark} language={language} log={log} />,
   },

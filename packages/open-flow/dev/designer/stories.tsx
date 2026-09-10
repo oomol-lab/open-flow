@@ -275,7 +275,7 @@ function RunControlSample({
   readonly log: LogAction
   readonly miniMapOpen?: boolean
   readonly starting?: boolean
-  readonly triggers: readonly { readonly id: string; readonly title: string }[]
+  readonly triggers: readonly { readonly id: string; readonly title: string; readonly icon?: string }[]
 }) {
   const [inputOpen, setInputOpen] = useState(defaultOpen)
   const [selectedTriggerId, setSelectedTriggerId] = useState(triggers[0]!.id)
@@ -334,10 +334,11 @@ function RunControlSample({
 function RunControlStory({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
   const i18n = useMemo(() => createWorkbenchI18n(language), [language])
   useEffect(() => () => i18n.dispose(), [i18n])
-  const one = [{ id: 'schedule', title: 'Daily schedule' }]
+  const one = [{ id: 'schedule', title: 'Daily schedule', icon: ':carbon:time:' }]
   const multiple = [
-    { id: 'schedule', title: 'Daily schedule' },
-    { id: 'webhook', title: 'Order webhook' },
+    { id: 'schedule', title: 'Daily schedule', icon: ':carbon:time:' },
+    { id: 'webhook', title: 'Order webhook', icon: ':carbon:webhook:' },
+    { id: 'manual', title: 'Manual trigger', icon: ':carbon:play:' },
   ]
   return (
     <I18nProvider i18n={i18n}>

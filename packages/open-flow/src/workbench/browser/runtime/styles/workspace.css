@@ -150,7 +150,7 @@
   .run-control-main {
     min-width: 0;
     padding-inline: 10px 9px;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .run-control-main:only-child {

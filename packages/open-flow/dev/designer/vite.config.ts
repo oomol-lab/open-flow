@@ -7,11 +7,36 @@ import { generateScopedName } from '../../src/build/node/cssModules.ts'
 import designerUnoConfig from '../../src/build/node/designerUnoConfig.ts'
 import { providerIconsPlugin } from '../../src/build/node/providerIcons.ts'
 import { twemojiCollectionPlugin } from '../../src/build/node/twemojiCollection.ts'
+import { triggerDefinitions } from '../../src/trigger/providers/definitions.ts'
 
 export default defineConfig({
   root: import.meta.dirname,
   css: { modules: { generateScopedName } },
-  plugins: [providerIconsPlugin({ iconUrls: {} }), twemojiCollectionPlugin(), tailwindcss(), UnoCSS(designerUnoConfig), react()],
+  plugins: [
+    {
+      name: 'lab-trigger-snapshots',
+      resolveId: (id) => (id === 'virtual:lab-trigger-snapshots' ? '\0virtual:lab-trigger-snapshots' : undefined),
+      load: (id) =>
+        id === '\0virtual:lab-trigger-snapshots' ? `export default ${JSON.stringify(triggerDefinitions.map(({ snapshot }) => snapshot))}` : undefined,
+    },
+    providerIconsPlugin({ iconUrls: {} }),
+    twemojiCollectionPlugin(),
+    tailwindcss(),
+    UnoCSS({
+      ...designerUnoConfig,
+      content: {
+        ...designerUnoConfig.content,
+        filesystem: [path.resolve(import.meta.dirname, '**/*.{ts,tsx}')],
+      },
+      // Lab navigation and its preview surfaces share the same static icon utilities.
+      postprocess: [
+        (utility) => {
+          utility.selector = `.lab-shell ${utility.selector}`
+        },
+      ],
+    }),
+    react(),
+  ],
   resolve: { alias: { '@lab': path.resolve(import.meta.dirname) } },
   server: { open: false },
 })

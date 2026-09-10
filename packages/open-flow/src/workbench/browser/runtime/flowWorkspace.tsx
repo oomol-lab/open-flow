@@ -265,7 +265,7 @@ function Editor({
               }}
               selectedTriggerId={selectedTrigger.id}
               starting={busy == 'run'}
-              triggers={triggers.map((trigger) => ({ id: trigger.id, title: trigger.title }))}
+              triggers={triggers}
             />
           ) : undefined
         }

@@ -2,15 +2,18 @@ import type { ReactElement, ReactNode } from 'react'
 
 import { useId, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { defaultTriggerIcon } from '../../../../canvas/browser/graph/Nodes/components/constants.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
-  DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '../../../../ui/browser/dropdown-menu.tsx'
+import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { Icon } from '../icons.tsx'
@@ -38,7 +41,7 @@ export function RunControl({
   readonly selectedTriggerId: string
   readonly starting: boolean
   readonly title?: string
-  readonly triggers: readonly { readonly id: string; readonly title: string }[]
+  readonly triggers: readonly { readonly id: string; readonly title: string; readonly icon?: string }[]
 }): ReactElement {
   const t = useTranslate()
   const inputTriggerId = useId()
@@ -53,7 +56,7 @@ export function RunControl({
         <Button
           aria-controls={inputStatus == 'none' ? undefined : 'run-input-popover'}
           aria-expanded={inputStatus == 'none' ? undefined : inputOpen}
-          className="run-control-main"
+          className="run-control-main text-[13px]"
           disabled={disabled || starting}
           onClick={onRun}
           size="default"
@@ -112,20 +115,36 @@ export function RunControl({
                 </Button>
               }
             />
-            <DropdownMenuContent align="end" className="w-64 max-w-(--available-width)" container={popupContainer} side="top">
+            <DropdownMenuContent align="end" className="w-64 max-w-(--available-width) p-1.5" container={popupContainer} side="top" sideOffset={10}>
               <DropdownMenuGroup>
-                <DropdownMenuLabel>{t('runInput.triggerCount', { count: triggers.length })}</DropdownMenuLabel>
-                {triggers.map((trigger) => (
-                  <DropdownMenuItem key={trigger.id} onClick={() => onSelectTrigger(trigger.id)}>
-                    <Icon className={trigger.id == selected.id ? '' : 'invisible'} name="check" />
-                    <span className="min-w-0 flex-1 truncate" title={trigger.title}>
-                      {trigger.title}
-                    </span>
-                    {triggers.some((other) => other.id != trigger.id && other.title == trigger.title) && (
-                      <code className="truncate text-xs text-muted-foreground">{trigger.id}</code>
-                    )}
-                  </DropdownMenuItem>
-                ))}
+                <DropdownMenuLabel className="px-2 pt-1 pb-1.5 font-normal">{t('runInput.trigger')}</DropdownMenuLabel>
+                <DropdownMenuRadioGroup className="space-y-0.5" onValueChange={onSelectTrigger} value={selected.id}>
+                  {triggers.map((trigger) => (
+                    <DropdownMenuRadioItem
+                      className="min-h-8 gap-2 py-1.5 pr-8 pl-2 focus:bg-muted data-checked:bg-accent/60"
+                      closeOnClick
+                      key={trigger.id}
+                      value={trigger.id}
+                    >
+                      <span aria-hidden="true" className="flex size-4 shrink-0 items-center justify-center text-base text-muted-foreground">
+                        <ContentIcon src={trigger.icon} fallback={<i className={defaultTriggerIcon} />} />
+                      </span>
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span
+                          className={`line-clamp-2 text-[13px] whitespace-normal wrap-anywhere ${trigger.id == selected.id ? 'font-medium' : 'font-normal'}`}
+                          title={trigger.title}
+                        >
+                          {trigger.title}
+                        </span>
+                        {triggers.some((other) => other.id != trigger.id && other.title == trigger.title) && (
+                          <code className="truncate text-xs text-muted-foreground" title={trigger.id}>
+                            {trigger.id}
+                          </code>
+                        )}
+                      </span>
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>

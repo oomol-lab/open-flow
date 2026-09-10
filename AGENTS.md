@@ -33,6 +33,12 @@ behavior rather than preserving it speculatively.
 Shared behavior belongs in shared production code. Features compose it rather than duplicate it.
 Tests and Stories exercise the real behavior; their fixtures must not become parallel implementations.
 
+Lab stories support design alignment between people and AI and fast visual inspection. Lay out
+meaningful states side by side with clear labels; menus and panels under review should be visible
+on entry without repeated clicks. Use real component and Trigger definitions with deterministic
+sample data. Group related node, menu, and sidebar cases so missing or inconsistent designs are
+easy to spot.
+
 Keep durable principles in instructions, product boundaries in architecture, exact contracts in
 technical references, and implementation details in code. Historical plans provide context, not
 current policy. A local fix should not become a permanent universal rule.
