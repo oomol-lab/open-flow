@@ -102,7 +102,12 @@ export function CanvasViewControls({
   const t = useTranslate()
 
   return (
-    <Panel position="bottom-left" className={cn(styles.island, styles.dock, styles.viewDock)} data-canvas-control-scope data-tooltip-toolbar>
+    <Panel
+      position="bottom-left"
+      className={cn(styles.island, styles.compactIsland, styles.dock, styles.viewDock)}
+      data-canvas-control-scope
+      data-tooltip-toolbar
+    >
       <CanvasTooltip placement="top" title={t('zoomOut')}>
         <Button aria-label={t('zoomOut')} disabled={minZoomReached} onClick={onZoomOut} size="icon" type="button" variant="ghost">
           <i className="i-lucide-light:zoom-out" />
