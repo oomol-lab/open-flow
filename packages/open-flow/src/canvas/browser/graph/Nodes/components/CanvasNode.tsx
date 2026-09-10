@@ -12,7 +12,9 @@ import { cronDescription, cronLabel } from '../../FlowCanvas/cronDescription.ts'
 import { timeZoneLabel } from '../../FlowCanvas/timeZoneLabel.ts'
 import { CanvasCard } from './CanvasCard.tsx'
 import { iconForNodeType } from './constants.ts'
+import { NodeContentRows } from './NodeContentRows.tsx'
 import { RunChips, ImagePreview } from './RunChips.tsx'
+import { ValuePreview } from './ValuePreview.tsx'
 
 export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeStore: NodeStore; readonly showError: boolean; readonly branches?: ReactNode }) {
   const t = useTranslate()
@@ -22,7 +24,8 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
   const title = node.title
   const icon = node.icon ?? (node.kind == 'wait' ? ':carbon:time:' : undefined)
   const tools = node.kind == 'task' ? node.tools : undefined
-  const summary = nodeSummary(node)
+  const values = node.kind == 'value' ? node.values.filter((item) => item.value !== undefined) : []
+  const summary = values.length > 0 ? '' : nodeSummary(node)
   const schedules = node.kind == 'trigger' ? node.presentation?.schedules : undefined
   const images = imageSources(node?.run?.outputs)
   const problem = showError ? t('nodeStatus.hasError') : node?.run?.status == 'error' ? t('canvasCard.status.error') : undefined
@@ -79,10 +82,10 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
           ) : undefined
         }
         preview={
-          (Boolean(schedules?.length) || (node?.run != null && images.length > 0)) && (
+          (values.length > 0 || Boolean(schedules?.length) || (node?.run != null && images.length > 0)) && (
             <>
               {schedules != null && schedules.length > 0 && (
-                <ul className={styles.schedules}>
+                <NodeContentRows>
                   {schedules.map((schedule, index) => {
                     const description = schedule.type === 'cron' ? cronDescription(schedule.expression, language) : undefined
                     return (
@@ -117,7 +120,23 @@ export function CanvasNode({ nodeStore, showError, branches }: { readonly nodeSt
                       </li>
                     )
                   })}
-                </ul>
+                </NodeContentRows>
+              )}
+              {values.length > 0 && (
+                <NodeContentRows>
+                  {values.map((item) => {
+                    return (
+                      <li key={item.handle}>
+                        <CanvasTooltip placement="top" sideOffset={12} title={item.handle}>
+                          <span className={styles.valueKey} tabIndex={0}>
+                            {item.handle}
+                          </span>
+                        </CanvasTooltip>
+                        <ValuePreview name={item.handle} value={item.value} />
+                      </li>
+                    )
+                  })}
+                </NodeContentRows>
               )}
               {node?.run && images.length > 0 && <ImagePreview images={images} run={node.run} title={title} />}
             </>

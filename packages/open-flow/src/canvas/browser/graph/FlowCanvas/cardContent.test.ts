@@ -11,7 +11,7 @@ describe('Canvas content', () => {
     expect(nodeSummary({ ...base, kind: 'value', values: [] })).toBe('')
     expect(nodeSummary({ ...base, kind: 'subflow', reference: 'prepare' })).toBe('')
   })
-  it('shows actual values including false, zero and null while omitting unset values', () => {
+  it('keeps the value description separate from its structured content', () => {
     expect(
       nodeSummary({
         ...base,
@@ -19,7 +19,7 @@ describe('Canvas content', () => {
         description: 'Old values',
         values: [{ handle: 'limit', value: 0 }, { handle: 'enabled', value: false }, { handle: 'fallback', value: null }, { handle: 'unset' }],
       }),
-    ).toBe('limit: 0\nenabled: false\nfallback: null')
+    ).toBe('Old values')
   })
   it('keeps authored purpose and waiting notices without adding type explanations', () => {
     expect(nodeSummary({ ...base, kind: 'task', reference: 'normalize', description: '  Normalize order dates.  ' })).toBe('Normalize order dates.')

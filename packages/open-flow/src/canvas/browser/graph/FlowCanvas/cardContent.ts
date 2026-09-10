@@ -22,21 +22,6 @@ export function nodeSummary(node: NodeContent): string {
     return node.description?.trim() || ''
   }
   if (node.kind == 'wait') return node.description?.trim() || node.notice?.text.trim() || ''
-  if (node.kind == 'value') {
-    return (
-      node.values
-        .filter((item) => item.value !== undefined)
-        .slice(0, 4)
-        .map((item) => {
-          const value = typeof item.value == 'string' && item.value.trim() ? item.value : JSON.stringify(item.value)
-          const text = value ?? ''
-          return `${item.handle}: ${text.length > 100 ? `${text.slice(0, 100)}…` : text}`
-        })
-        .join('\n') ||
-      node.description?.trim() ||
-      ''
-    )
-  }
   return node.description?.trim() || ''
 }
 

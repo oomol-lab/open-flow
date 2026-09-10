@@ -1,0 +1,41 @@
+.trigger {
+  justify-self: end;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+
+  &:hover,
+  &[data-popup-open] {
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+  }
+}
+
+.popup.popup {
+  padding: 0;
+  width: max-content;
+  max-width: min(400px, calc(100vw - 32px));
+  max-height: min(420px, 60dvh, var(--available-height));
+  overflow: hidden;
+}
+
+.content {
+  min-height: 0;
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+
+.json {
+  padding: 10px;
+}

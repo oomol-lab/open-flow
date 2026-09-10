@@ -28,10 +28,10 @@ export default defineConfig({
         ...designerUnoConfig.content,
         filesystem: [path.resolve(import.meta.dirname, '**/*.{ts,tsx}')],
       },
-      // Lab navigation and its preview surfaces share the same static icon utilities.
+      // Include the theme menu because its portal sits outside the Lab shell.
       postprocess: [
         (utility) => {
-          utility.selector = `.lab-shell ${utility.selector}`
+          utility.selector = `.lab-shell ${utility.selector}, .lab-theme-menu ${utility.selector}`
         },
       ],
     }),
