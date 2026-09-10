@@ -320,7 +320,7 @@ function LabPreferences({
 }
 
 function StoryDescription({ text }: { readonly text: string }) {
-  const element = useRef<HTMLButtonElement>(null)
+  const element = useRef<HTMLSpanElement>(null)
   const [truncated, setTruncated] = useState(false)
   useLayoutEffect(() => {
     const node = element.current
@@ -334,7 +334,7 @@ function StoryDescription({ text }: { readonly text: string }) {
   return (
     <TooltipProvider delay={400}>
       <Tooltip disabled={!truncated}>
-        <TooltipTrigger ref={element} className="lab-story-description" tabIndex={truncated ? 0 : -1} aria-label={text}>
+        <TooltipTrigger render={<span ref={element} />} className="lab-story-description" tabIndex={truncated ? 0 : -1}>
           {text}
         </TooltipTrigger>
         <TooltipContent side="bottom" align="start" className="max-w-lg whitespace-normal break-words">
