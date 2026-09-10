@@ -65,47 +65,66 @@ try {
 
 ## 4. 工具与操作流程
 
-| 工具                    | 输入要点                                                       | 结果                             |
-| ----------------------- | -------------------------------------------------------------- | -------------------------------- |
-| `flow_list`             | `cursor?`、`limit?`                                            | Flow 列表和 `nextCursor?`        |
-| `flow_get`              | `flowId`                                                       | Flow、完整 Draft、Live           |
-| `flow_schema`           | `kind?`                                                        | change operations schema 与示例  |
-| `flow_create`           | `name`、`idempotencyKey`、`teamId?`                            | Flow，包含初始 `draftRevisionId` |
-| `flow_apply`            | `flowId`、`expectedRevisionId`、`idempotencyKey`、`operations` | 新 Revision identity             |
-| `flow_check`            | `flowId`、`revisionId`                                         | 固定 Revision 的 diagnostics     |
-| `flow_run`              | `source`、固定版本、`trigger`、`inputs?`、`idempotencyKey`     | 已接受的 Run                     |
-| `run_get`               | `runId`                                                        | 状态与 waiting 信息              |
-| `run_events`            | `runId`、`after?`、`limit?`                                    | 事件页与 `nextAfter`             |
-| `run_result`            | `runId`                                                        | 终态结果                         |
-| `run_cancel`            | `runId`                                                        | 取消是否被接受及权威状态         |
-| `connector_teams`       | 无                                                             | 部署的 Team 选择信息             |
-| `connector_list`        | `flowId?`                                                      | Connector providers              |
-| `connector_search`      | `query`、`flowId?`                                             | Actions                          |
-| `connector_get`         | `actionId`、`flowId?`                                          | Action 端口与连接要求            |
-| `connector_connections` | `serviceId`、`flowId?`                                         | Connection 列表                  |
-| `trigger_list`          | 无                                                             | Provider Trigger keys            |
-| `trigger_get`           | `key`                                                          | Provider Trigger 定义            |
+| 工具                    | 输入要点                                                              | 结果                                             |
+| ----------------------- | --------------------------------------------------------------------- | ------------------------------------------------ |
+| `flow_list`             | `cursor?`、`limit?`                                                   | Flow 列表和 `nextCursor?`                        |
+| `flow_get`              | `flowId`                                                              | Flow、完整 Draft、Live                           |
+| `flow_schema`           | `kind?`                                                               | change operations schema 与示例                  |
+| `flow_create`           | `name`、`idempotencyKey`、`teamId?`                                   | Flow，包含初始 `draftRevisionId`                 |
+| `flow_apply`            | `flowId`、`expectedRevisionId`、`idempotencyKey`、`operations`        | 新 Revision identity                             |
+| `flow_check`            | `flowId`、`revisionId`                                                | 固定 Revision 的 diagnostics                     |
+| `flow_publish`          | `flowId`、`revisionId`、`expectedLivePublicationId`、`idempotencyKey` | 发布操作，包含 `operationId` 和状态              |
+| `flow_publish_status`   | `flowId`、`operationId`                                               | 发布操作的状态、成功的 Publication ID 或失败原因 |
+| `flow_set_enabled`      | `flowId`、`expectedPublicationId`、`enabled`                          | 更新后的 Flow 与 Live 启用状态                   |
+| `flow_run`              | `source`、固定版本、`trigger`、`inputs?`、`idempotencyKey`            | 已接受的 Run                                     |
+| `run_list`              | `flowId`、`status?`、`cursor?`、`limit?`                              | Run 列表和 `nextCursor?`                         |
+| `run_get`               | `runId`                                                               | 状态与 waiting 信息                              |
+| `run_events`            | `runId`、`after?`、`limit?`                                           | 事件页与 `nextAfter`                             |
+| `run_result`            | `runId`                                                               | 终态结果                                         |
+| `run_results`           | `runId`、`after?`                                                     | Agent 工具结果元数据和 `nextAfter?`              |
+| `run_result_read`       | `runId`、`resultId`、`pointer?`、`offset?`、`limit?`、`maxBytes?`     | 工具结果元数据和有界内容页                       |
+| `run_resolve_wait`      | `runId`、`waitId`、`action`                                           | 决议是否被接受、权威 action 和 Run 状态          |
+| `run_cancel`            | `runId`                                                               | 取消是否被接受及权威状态                         |
+| `connector_teams`       | 无                                                                    | 部署的 Team 选择信息                             |
+| `connector_list`        | `flowId?`                                                             | Connector providers                              |
+| `connector_search`      | `query`、`flowId?`                                                    | Actions                                          |
+| `connector_get`         | `actionId`、`flowId?`                                                 | Action 端口与连接要求                            |
+| `connector_connections` | `serviceId`、`flowId?`                                                | Connection 列表                                  |
+| `trigger_list`          | 无                                                                    | Provider Trigger keys                            |
+| `trigger_get`           | `key`                                                                 | Provider Trigger 定义                            |
 
-所有工具拒绝未声明的顶层参数。`limit` 范围 1–100，默认 50；事件 `after` 默认 0。
-Flow 分页游标与 Control API 相同，事件 retention 和终态结果规则也相同。
+所有工具拒绝未声明的顶层参数。Flow、Run 列表和事件的 `limit` 范围 1–100，默认 50；事件 `after` 默认 0。
+Flow、Run 分页游标与 Control API 相同；Run cursor 绑定 Flow。`run_list.status` 支持 `queued`、`starting`、`running`、`waiting`、
+`completed`、`failed`、`canceled`、`indeterminate`。事件 retention 和终态结果规则与 Control API 相同。
+
+`run_results` 每页最多 50 项，将 `nextAfter` 原样用作下一页的 `after`。`run_result_read` 与 Control API 共用结果查询规则：
+`pointer` 默认为空字符串（根值），最长 4096 字符；`offset` 默认 0；`limit` 默认 20，范围 1–100；`maxBytes` 默认 15000，范围 1–1048576。
+内容页的 `nextOffset` 用于同一 pointer 的后续读取；`complete: true` 的 value 已包含该路径的完整值。结果只能在所属 Run 下读取，
+无需等待 Run 终态；它们与 `run_result` 的终态结果不同，也不依赖事件保留期。
 
 典型步骤：
 
 1. 通过 `flow_list`、`flow_get` 定位 Flow；创建时调用 `flow_create`。OOMOL Connector 部署可先通过 `connector_teams` 选择具体 Team。
 2. 调用 `flow_schema`，按公共 change operations 定义提交 `flow_apply`。节点 title 非空且在图内唯一；ID 显式指定。
 3. 新 Flow 没有 Trigger，需显式添加 Manual 或其他 Trigger。编辑返回新 Revision，用该 identity 调用 `flow_check`。
-4. Draft Run 使用 `source: "draft"`、`flowId`、`revisionId`；Live Run 使用 `source: "live"`、`publicationId`。
+4. 上线时调用 `flow_publish`，固定 `flowId`、`revisionId`，并传入从 `flow_get` 观察到的 `expectedLivePublicationId`；首次发布传 `null`。
+   轮询 `flow_publish_status`，`pending` 表示仍在进行，`succeeded` 才确认发布成功，`failed` 返回 `issue`。
+   用 `flow_set_enabled` 控制已发布 Flow 的启停；`expectedPublicationId` 防止误操作已被替换的 Live。
+5. Draft Run 使用 `source: "draft"`、`flowId`、`revisionId`；Live Run 使用 `source: "live"`、`publicationId`。
    两种 source 的版本字段不能混用。`trigger` 必须包含 `nodeId` 和 `payload`；`inputs` 是 node ID 到输入值的映射，默认 `{}`。
-5. `flow_run` 返回 `runId`。查询 `run_get`，终态后调用 `run_result`；`waiting` 会返回 Wait identity 和允许的 actions，不自动批准。
+6. `flow_run` 返回 `runId`；也可以通过 `run_list` 找到已有运行。查询 `run_get`，终态后调用 `run_result`。
+   `waiting` 返回 Wait identity 和允许的 actions；通过显式 `run_resolve_wait` 提交 `approve`、`reject` 或 `continue` 中的合法动作，不自动批准。
+   一次 Wait 的首次决议生效，检查 `resolutionAccepted` 与返回的权威 `action`；恢复后继续查询同一个 Run，不重新调用 `flow_run`。
+7. 需要检查 Agent 工具原始结果时，用 `run_results` 找到 `resultId`，再用 `run_result_read` 按路径和页读取。
 
-当前不提供发布、回滚、删除 Flow、部署配置写入或 Wait 决议工具。这些操作继续通过现有客户端完成。
+当前不提供发布历史与回滚、删除或重命名 Flow、部署 Variable 管理、实际 Trigger 管理和 Presentation 工具。这些操作继续通过现有客户端完成。
 
 ## 5. 冲突、重试与取消
 
 工具业务失败返回 `isError: true`，结构化结果包含 `error.code`、`message` 和适用的 HTTP `status`。
 协议错误由 MCP SDK 返回 JSON-RPC error。未知内部错误不向客户端暴露异常堆栈。
 
-`flow_create`、`flow_apply` 和 `flow_run` 必须显式提供非空且最多 256 字符的 `idempotencyKey`。
+`flow_create`、`flow_apply`、`flow_publish` 和 `flow_run` 必须显式提供非空且最多 256 字符的 `idempotencyKey`。
 同一 mutation 重试必须保持 key 和参数一致；更换 key 表示一次新操作，可能执行第二次 Run。
 MCP JSON-RPC request ID 与业务幂等 key 是不同身份。
 
@@ -115,6 +134,8 @@ mutation 内部发生无法确定结果的异常时返回 `flow.mutation-outcome
 
 请求取消会传播给该请求中的 Connector 查询；Server 关闭会中止正在进行的 MCP 请求。
 已接受的 Run 独立于 MCP 连接继续执行。显式取消使用 `run_cancel`，完成与取消竞争时以部署返回的权威状态为准。
+`flow_set_enabled` 不取消已接受的 Run。`run_resolve_wait` 使用固定 Wait identity 保留决议，同一动作重试不会重复恢复，
+不同动作的后续请求返回已有决议；这两个工具不接受 `idempotencyKey`。
 
 ## 6. 规范来源
 

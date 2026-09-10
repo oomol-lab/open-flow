@@ -1,6 +1,7 @@
 import type { ControlApiConformanceCase, ControlApiConformanceHarness } from './conformance.ts'
 
 import { dequal } from 'dequal/lite'
+import { ControlClient } from './api.ts'
 import { mcpProtocolVersion, mcpTools } from './mcp.ts'
 
 function assert(value: unknown, message: string): asserts value {
@@ -58,6 +59,44 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
         const { $schema: __, ...received } = actual.inputSchema
         assert(dequal(received, schema), `${name} input schema differs.`)
       }
+    },
+  },
+  {
+    name: 'shares Run pagination, status filters and cancellation between MCP and REST',
+    async verify(harness) {
+      const client = new ControlClient((url, init) => harness.request(new Request(new URL(url, harness.origin), init)))
+      const flow = await client.createFlow('MCP Run listing')
+      const changed = await client.changeDraft(flow.flowId, flow.draftRevisionId, [
+        { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
+      ])
+      const args = {
+        source: 'draft',
+        flowId: flow.flowId,
+        revisionId: changed.revision.revisionId,
+        trigger: { nodeId: 'start', payload: {} },
+      }
+      const runs: string[] = []
+      for (let index = 0; index < 2; index++) {
+        const accepted = await rpc(harness, 'tools/call', { name: 'flow_run', arguments: { ...args, idempotencyKey: crypto.randomUUID() } })
+        const run = accepted.structuredContent as Record<string, unknown>
+        assert(typeof run.runId == 'string', 'MCP must return an accepted Run ID.')
+        runs.push(run.runId)
+      }
+      const first = await rpc(harness, 'tools/call', { name: 'run_list', arguments: { flowId: flow.flowId, limit: 1 } })
+      const page = first.structuredContent as { runs: { runId: string }[]; nextCursor: string }
+      assert(page.runs.length == 1 && typeof page.nextCursor == 'string', 'Run listing must paginate.')
+      const rest = await client.listRuns(flow.flowId, { cursor: page.nextCursor, limit: 1 })
+      assert(rest.runs.length == 1 && rest.runs[0]?.runId != page.runs[0]?.runId, 'REST must continue the MCP Run cursor without duplicates.')
+      const restFirst = await client.listRuns(flow.flowId, { limit: 1 })
+      const next = await rpc(harness, 'tools/call', { name: 'run_list', arguments: { flowId: flow.flowId, cursor: restFirst.nextCursor, limit: 1 } })
+      assert(dequal(next.structuredContent, rest), 'MCP must continue the REST Run cursor.')
+      await rpc(harness, 'tools/call', { name: 'run_cancel', arguments: { runId: runs[0] } })
+      const filtered = await rpc(harness, 'tools/call', { name: 'run_list', arguments: { flowId: flow.flowId, status: 'canceled' } })
+      assert(dequal(filtered.structuredContent, await client.listRuns(flow.flowId, { status: 'canceled' })), 'MCP and REST status filters differ.')
+      const other = await client.createFlow('Other Run scope')
+      const invalid = await rpc(harness, 'tools/call', { name: 'run_list', arguments: { flowId: other.flowId, cursor: page.nextCursor } })
+      assert(invalid.isError == true, 'Run cursors must reject a different Flow scope.')
+      assert((invalid.structuredContent as { error: { code: string } }).error.code == 'page.invalid-cursor', 'Run cursor error must match REST.')
     },
   },
   {

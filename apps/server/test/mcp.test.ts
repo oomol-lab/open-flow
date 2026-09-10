@@ -10,6 +10,7 @@ import { expect, it, onTestFinished, vi } from 'vitest'
 import * as z from 'zod'
 import { OperatorSession } from '../node/deployment/operator.ts'
 import { OperatorStore } from '../node/storage/operator-store.ts'
+import { Store } from '../node/storage/store.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
@@ -58,7 +59,7 @@ async function fixture(options: Parameters<typeof openService>[1] = {}) {
     headers.set('authorization', `Bearer ${token}`)
     return fetch(new URL(url, origin), { ...init, headers })
   })
-  return { app, call, client, connect, control, endpoint, origin, service, shutdown }
+  return { app, call, client, connect, control, endpoint, file, origin, service, shutdown }
 }
 
 it('serves discovery and an atomic authoring, validation and execution workflow over HTTP', async () => {
@@ -200,6 +201,111 @@ it('keeps admitted Runs across client disconnects and exposes Wait and cancellat
   expect((await other.callTool({ name: 'run_result', arguments: { runId: run.runId } })).structuredContent).toMatchObject({ status: 'canceled' })
 })
 
+it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait with %s and preserves its first decision', async (action) => {
+  const { call, client, control, service } = await fixture()
+  const flow = await control.createFlow(`Wait ${action}`)
+  const actions = action == 'continue' ? (['continue'] as const) : (['approve', 'reject'] as const)
+  const changed = await call('flow_apply', {
+    flowId: flow.flowId,
+    expectedRevisionId: flow.draftRevisionId,
+    idempotencyKey: 'resolve-edit',
+    operations: [
+      start,
+      {
+        kind: 'graph.node.create',
+        target: { kind: 'flow' },
+        nodeId: 'wait',
+        node: {
+          kind: 'wait',
+          name: 'Wait',
+          actions,
+          prompt: 'Continue?',
+          input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+          inputs: { value: { kind: 'value', value: 42 } },
+        },
+      },
+      { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'start', target: 'wait' } },
+    ],
+  })
+  const run = await call('flow_run', {
+    source: 'draft',
+    flowId: flow.flowId,
+    revisionId: z.object({ revisionId: z.string() }).parse(changed.revision).revisionId,
+    trigger: { nodeId: 'start', payload: {} },
+    idempotencyKey: 'resolve-run',
+  })
+  const runId = z.string().parse(run.runId)
+  await startService(service)
+  await expect.poll(async () => (await control.getRun(runId)).status).toBe('waiting')
+  const waiting = (await control.getRun(runId)).waiting!
+  const args = { runId, waitId: waiting.waitId, action }
+  const invalid = await client.callTool({ name: 'run_resolve_wait', arguments: { ...args, action: action == 'continue' ? 'approve' : 'continue' } })
+  expect(invalid.structuredContent).toMatchObject({ error: { code: 'run.invalid' } })
+  expect((await control.getRun(runId)).status).toBe('waiting')
+  const decision = await call('run_resolve_wait', args)
+  expect(decision).toMatchObject({ action, resolutionAccepted: true, runId, waitId: waiting.waitId })
+  await expect.poll(async () => (await control.getRun(runId)).status).toBe('completed')
+  expect(await call('run_resolve_wait', args)).toMatchObject({ action, resolutionAccepted: true, resolvedAt: decision.resolvedAt })
+  if (action != 'continue') {
+    expect(await call('run_resolve_wait', { ...args, action: action == 'approve' ? 'reject' : 'approve' })).toMatchObject({
+      action,
+      resolutionAccepted: false,
+      resolvedAt: decision.resolvedAt,
+    })
+  }
+  expect((await control.listRuns(flow.flowId)).runs).toHaveLength(1)
+})
+
+it('pages stored tool results through MCP and REST and isolates results by Run', async () => {
+  const { call, client, control, file } = await fixture()
+  const flow = await control.createFlow('Stored results')
+  const changed = await call('flow_apply', {
+    flowId: flow.flowId,
+    expectedRevisionId: flow.draftRevisionId,
+    idempotencyKey: 'results-edit',
+    operations: [start],
+  })
+  const args = {
+    source: 'draft',
+    flowId: flow.flowId,
+    revisionId: z.object({ revisionId: z.string() }).parse(changed.revision).revisionId,
+    trigger: { nodeId: 'start', payload: {} },
+  }
+  const runId = z.string().parse((await call('flow_run', { ...args, idempotencyKey: 'results-run' })).runId)
+  const store = new Store(file)
+  let resultId: string
+  try {
+    expect(store.claim()?.runId).toBe(runId)
+    expect(store.start(runId, { kind: 'run.started', payload: { flowId: flow.flowId, scopeId: runId } })).toBe(true)
+    resultId = store.results.put(runId, 'agent', 'data', { id: 'fetch', kind: 'connector', action: 'data.fetch' }, {}, { rows: [10, 20, 30] }).resultId
+    for (let index = 0; index < 50; index++) store.results.put(runId, 'agent', `code-${index}`, { id: 'run_code', kind: 'code' }, {}, index)
+  } finally {
+    store.close()
+  }
+  const first = await call('run_results', { runId })
+  expect(first.results).toHaveLength(50)
+  expect(first).toEqual(await control.listRunResults(runId))
+  const after = z.string().parse(first.nextAfter)
+  expect(await call('run_results', { runId, after })).toEqual(await control.listRunResults(runId, after))
+  expect((await call('run_results', { runId, after })).results).toHaveLength(1)
+  const query = { pointer: '/rows', limit: 1, maxBytes: 1000 }
+  const page = await call('run_result_read', { runId, resultId, ...query })
+  expect(page).toEqual(await control.readRunResult(runId, resultId, query))
+  expect(page.page).toMatchObject({ nextOffset: 1, entries: [{ value: 10 }] })
+  expect(await call('run_result_read', { runId, resultId, ...query, offset: 1 })).toMatchObject({ page: { nextOffset: 2, entries: [{ value: 20 }] } })
+  expect(await call('run_result_read', { runId, resultId, pointer: '/rows/2' })).toMatchObject({ page: { complete: true, value: 30 } })
+  for (const invalidQuery of [{ pointer: '/missing' }, { pointer: '/~2' }, { offset: -1 }, { limit: 101 }, { maxBytes: 1048577 }]) {
+    expect((await client.callTool({ name: 'run_result_read', arguments: { runId, resultId, ...invalidQuery } })).isError).toBe(true)
+  }
+  const other = await call('flow_run', { ...args, idempotencyKey: 'other-results-run' })
+  expect(await call('run_results', { runId: other.runId })).toMatchObject({ results: [] })
+  expect((await client.callTool({ name: 'run_result_read', arguments: { runId: other.runId, resultId } })).structuredContent).toMatchObject({
+    error: { code: 'flow.not-found' },
+  })
+  await call('run_cancel', { runId })
+  expect(await call('run_result_read', { runId, resultId, pointer: '/rows/0' })).toMatchObject({ page: { value: 10 } })
+})
+
 it('enforces authentication, Origin, request limits and the modern HTTP protocol', async () => {
   const { endpoint, origin, shutdown } = await fixture()
   const body = JSON.stringify({
@@ -290,10 +396,21 @@ it('executes fixed Live code revisions and keeps old Run retries stable after re
     ],
   })
   const revisionId = z.object({ revisionId: z.string() }).parse(edit.revision).revisionId
-  const operation = await control.publishFlow(flowId, revisionId, null)
+  const publishArgs = { flowId, revisionId, expectedLivePublicationId: null, idempotencyKey: 'live-publish' }
+  const operation = await call('flow_publish', publishArgs)
+  expect(await call('flow_publish', publishArgs)).toEqual(operation)
   await service.tickMaintenance()
-  const publication = await control.getPublishOperation(flowId, operation.operationId)
+  const publication = await call('flow_publish_status', { flowId, operationId: operation.operationId })
+  expect(publication).toEqual(await control.getPublishOperation(flowId, z.string().parse(operation.operationId)))
   if (publication.status != 'succeeded') throw new Error('Publication did not succeed.')
+  expect(await call('flow_publish', publishArgs)).toEqual(publication)
+  expect(await call('flow_set_enabled', { flowId, expectedPublicationId: publication.publicationId, enabled: false })).toMatchObject({
+    live: { enabled: false },
+  })
+  expect((await control.getLive(flowId)).status).toBe('suspended')
+  expect(await call('flow_set_enabled', { flowId, expectedPublicationId: publication.publicationId, enabled: true })).toMatchObject({
+    live: { enabled: true },
+  })
   const args = { source: 'live', publicationId: publication.publicationId, trigger: { nodeId: 'start', payload: {} }, idempotencyKey: 'live-run' }
   const run = await call('flow_run', args)
   await startService(service)
@@ -314,10 +431,24 @@ it('executes fixed Live code revisions and keeps old Run retries stable after re
       },
     ],
   })
-  const second = await control.publishFlow(flowId, z.object({ revisionId: z.string() }).parse(changed.revision).revisionId, publication.publicationId)
+  const nextRevisionId = z.object({ revisionId: z.string() }).parse(changed.revision).revisionId
+  expect((await client.callTool({ name: 'flow_publish', arguments: { ...publishArgs, revisionId: nextRevisionId } })).structuredContent).toMatchObject({
+    error: { code: 'publication.conflict' },
+  })
+  const second = await call('flow_publish', {
+    flowId,
+    revisionId: nextRevisionId,
+    expectedLivePublicationId: publication.publicationId,
+    idempotencyKey: 'second-publish',
+  })
   await service.tickMaintenance()
-  const published = await control.getPublishOperation(flowId, second.operationId)
+  const published = await call('flow_publish_status', { flowId, operationId: second.operationId })
   if (published.status != 'succeeded') throw new Error('Second publication did not succeed.')
+  expect(
+    (await client.callTool({ name: 'flow_set_enabled', arguments: { flowId, expectedPublicationId: publication.publicationId, enabled: false } }))
+      .structuredContent,
+  ).toMatchObject({ error: { code: 'flow.conflict' } })
+  expect((await control.getLive(flowId)).status).toBe('runnable')
   expect(await call('flow_run', args)).toMatchObject({ runId: run.runId, status: 'completed' })
   const stale = await client.callTool({ name: 'flow_run', arguments: { ...args, idempotencyKey: 'stale-run' } })
   expect(stale.structuredContent).toMatchObject({ error: { code: 'live.conflict' } })

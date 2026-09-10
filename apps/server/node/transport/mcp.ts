@@ -11,7 +11,7 @@ import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import manifest from '../../package.json' with { type: 'json' }
 import { ControlError } from '../error.ts'
-import { decodeFlowCursor, encodeFlowCursor } from './control-cursor.ts'
+import { decodeFlowCursor, decodeRunCursor, encodeFlowCursor, encodeRunCursor } from './control-cursor.ts'
 
 export function createMcpApp(service: ServerService, authenticate: (request: Request) => Promise<string>, logger: Logger, shutdownSignal?: AbortSignal) {
   const app = new Hono()
@@ -128,6 +128,13 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
     return await control.changeDraft(actorId, flowId, expectedRevisionId, changes, idempotencyKey)
   })
   register('flow_check', mcpTools.flow_check, ({ flowId, revisionId }) => control.checkFlow(flowId, revisionId, currentEngineContract))
+  register('flow_publish', mcpTools.flow_publish, ({ flowId, revisionId, expectedLivePublicationId, idempotencyKey }) =>
+    control.publishFlow(actorId, flowId, revisionId, currentEngineContract, expectedLivePublicationId, idempotencyKey),
+  )
+  register('flow_publish_status', mcpTools.flow_publish_status, ({ flowId, operationId }) => control.getPublishOperation(flowId, operationId))
+  register('flow_set_enabled', mcpTools.flow_set_enabled, ({ flowId, expectedPublicationId, enabled }) =>
+    control.setFlowEnabled(flowId, expectedPublicationId, enabled),
+  )
   register('flow_run', mcpTools.flow_run, async ({ source, flowId, revisionId, publicationId, trigger, inputs, idempotencyKey }) => {
     if (source == 'draft') {
       if (flowId == null || revisionId == null || publicationId != null)
@@ -138,9 +145,19 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
       throw new ControlError(controlErrorCode.runInvalid, 'Live requires publicationId, without flowId or revisionId.')
     return (await control.createLiveRun(publicationId, inputs, idempotencyKey, trigger)).run
   })
+  register('run_list', mcpTools.run_list, ({ flowId, status, cursor, limit }) => {
+    const { next, page } = control.listRuns(flowId, limit, {
+      ...(status == null ? {} : { status }),
+      ...(cursor == null ? {} : { after: decodeRunCursor(cursor, flowId) }),
+    })
+    return { ...page, ...(next == null ? {} : { nextCursor: encodeRunCursor(flowId, next) }) }
+  })
   register('run_get', mcpTools.run_get, ({ runId }) => control.getRun(runId))
   register('run_events', mcpTools.run_events, ({ runId, after, limit }) => control.getRunEvents(runId, after, limit))
   register('run_result', mcpTools.run_result, ({ runId }) => control.getRunResult(runId))
+  register('run_results', mcpTools.run_results, ({ runId, after }) => control.listRunResults(runId, after))
+  register('run_result_read', mcpTools.run_result_read, ({ runId, resultId, ...query }) => control.readRunResult(runId, resultId, query))
+  register('run_resolve_wait', mcpTools.run_resolve_wait, ({ runId, waitId, action }) => control.resolveRunWait(runId, waitId, action))
   register('run_cancel', mcpTools.run_cancel, ({ runId }) => control.cancelRun(runId))
   register('connector_teams', mcpTools.connector_teams, (_, context) => service.connectorTeams(context.mcpReq.signal))
   register('connector_list', mcpTools.connector_list, async ({ flowId }, context) => ({

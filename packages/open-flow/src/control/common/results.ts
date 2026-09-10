@@ -59,7 +59,7 @@ export interface ResultQuery {
   readonly limit?: number
   readonly maxBytes?: number
 }
-const querySchema = z.strictObject({
+export const resultQuerySchema = z.strictObject({
   pointer: z.string().max(4096).default(''),
   offset: z.number().int().nonnegative().default(0),
   limit: z.number().int().min(1).max(100).default(20),
@@ -73,7 +73,7 @@ const querySchema = z.strictObject({
 const listSchema = z.strictObject({ version: z.literal(1), runId: z.string(), results: z.array(result), nextAfter: z.string().optional() })
 const readSchema = z.strictObject({ version: z.literal(1), runId: z.string(), result, page })
 export function parseResultQuery(value: unknown): Required<ResultQuery> {
-  return querySchema.parse(value)
+  return resultQuerySchema.parse(value)
 }
 export function decodeResultList(value: unknown): {
   readonly version: 1

@@ -1,7 +1,9 @@
 import type { JsonValue } from '../../flow/common/change.ts'
 
 import { z } from 'zod'
+import { runStatuses } from '../../execution/common/runLifecycle.ts'
 import { resourceNameIssue } from '../../flow/common/change.ts'
+import { resultQuerySchema } from './results.ts'
 
 export const mcpProtocolVersion = '2026-07-28'
 const json: z.ZodType<JsonValue> = z.json()
@@ -9,12 +11,14 @@ const id = z.string().min(1)
 const mutationKey = id.max(256).describe('Stable identity for this mutation. Retry with the same key and identical arguments, even after a lost response.')
 const pageLimit = z.int().min(1).max(100).default(50)
 const flow = id.describe('Exact Flow ID returned by flow_list or flow_create.')
-const run = id.describe('Exact Run ID returned by flow_run.')
+const run = id.describe('Exact Run ID returned by flow_run or run_list.')
 export const mcpInstructions =
   'Use flow_list and flow_get to inspect a Flow. Use flow_schema to learn atomic edit operations, then flow_apply with the observed expectedRevisionId and a stable idempotencyKey. ' +
   'Use flow_check before flow_run. Select an explicit Trigger node ID and fixed revision or publication. A new Flow has no Trigger until you add one. ' +
-  'flow_run returns an accepted Run, not its final result. Poll run_get and use run_result after terminal. A waiting Run requires an explicit action outside these tools. ' +
-  'Retry mutations only with identical arguments and the same idempotencyKey; a new key can execute the Flow again. Cancel a Run explicitly with run_cancel. ' +
+  'Use flow_publish to publish a fixed Revision, then poll flow_publish_status until succeeded or failed. Use flow_set_enabled to enable or disable the observed Live publication. ' +
+  'flow_run returns an accepted Run, not its final result. Find Runs with run_list, poll run_get and use run_result after terminal. Resolve a waiting Run only with an explicit run_resolve_wait action allowed by run_get. ' +
+  'Use run_results and run_result_read to inspect stored Agent tool results; these are separate from the terminal Run result. ' +
+  'Retry flow_create, flow_apply, flow_publish and flow_run only with identical arguments and the same idempotencyKey; a new key can execute the Flow again. Other mutations use the same resource identity and arguments when retrying. Cancel a Run explicitly with run_cancel. ' +
   'Use nextCursor and nextAfter to read subsequent pages. Connector-backed deployments may require a Team; inspect connector_teams before creating a Flow.'
 
 function tool<Args>(description: string, schema: z.ZodType<Args>, readOnly: boolean) {
@@ -80,6 +84,21 @@ export const mcpTools = {
     z.strictObject({ flowId: flow, revisionId: id }),
     true,
   ),
+  flow_publish: tool(
+    'Publish a fixed Revision. Supply the observed Live publication ID, or null for the first publication, and a stable idempotencyKey. Returns an operation; poll flow_publish_status for success or failure.',
+    z.strictObject({ flowId: flow, revisionId: id, expectedLivePublicationId: id.nullable(), idempotencyKey: mutationKey }),
+    false,
+  ),
+  flow_publish_status: tool(
+    'Read a publish operation. Only succeeded confirms publication; failed includes the failure details. Keep polling while pending.',
+    z.strictObject({ flowId: flow, operationId: id }),
+    true,
+  ),
+  flow_set_enabled: tool(
+    'Enable or disable a published Flow. Supply expectedPublicationId from flow_get; a changed Live publication is a conflict. This does not cancel accepted Runs; use run_cancel for those.',
+    z.strictObject({ flowId: flow, expectedPublicationId: id, enabled: z.boolean() }),
+    false,
+  ),
   flow_run: tool(
     'Start a Run and return its runId. For draft supply flowId and revisionId; for live supply publicationId. Always fix the source, Trigger and idempotencyKey. Poll run_get for completion.',
     z.strictObject({
@@ -92,6 +111,11 @@ export const mcpTools = {
       idempotencyKey: mutationKey,
     }),
     false,
+  ),
+  run_list: tool(
+    'List Runs for a Flow, optionally filtered by status. Continue with nextCursor; cursors are compatible with the Control API.',
+    z.strictObject({ flowId: flow, status: z.enum(runStatuses).optional(), cursor: id.optional(), limit: pageLimit }),
+    true,
   ),
   run_get: tool(
     'Read Run status, including waiting details and allowed actions. Completed, failed, canceled and indeterminate are terminal.',
@@ -107,6 +131,21 @@ export const mcpTools = {
     'Read the terminal result. A queued, running or waiting Run returns run.not-terminal; inspect run_get first.',
     z.strictObject({ runId: run }),
     true,
+  ),
+  run_results: tool(
+    'List stored Agent tool result metadata for a Run, including Connector and code results. Continue with nextAfter as after. Use run_result_read to inspect content.',
+    z.strictObject({ runId: run, after: id.optional() }),
+    true,
+  ),
+  run_result_read: tool(
+    'Read a bounded page of a stored Agent tool result. Select a JSON Pointer with pointer and continue with nextOffset as offset at the same pointer. A complete value contains all data at that pointer.',
+    resultQuerySchema.extend({ runId: run, resultId: id }),
+    true,
+  ),
+  run_resolve_wait: tool(
+    'Explicitly resolve the waitId observed in run_get with one of its allowed actions. The first decision wins; inspect resolutionAccepted and action. Resume the same Run and poll run_get; do not create a replacement Run.',
+    z.strictObject({ runId: run, waitId: id, action: z.enum(['approve', 'continue', 'reject']) }),
+    false,
   ),
   run_cancel: tool(
     'Explicitly cancel a Run. Inspect cancelAccepted and the authoritative status; completion can win the race.',
