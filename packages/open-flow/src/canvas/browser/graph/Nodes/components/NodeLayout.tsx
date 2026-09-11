@@ -46,20 +46,20 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const editable = useVal(canvasStore.$.editable)
   const contentWidth$ = nodeStore.interaction.contentWidth
   const selected = useVal(nodeStore.$.selected)
+  const showError = useShowNodeError(nodeStore)
   const [hovered, setHovered] = useState(false)
   const [hintTriggered, setHintTriggered] = useState(false)
   // Only uninterrupted hover starts a hint session; selection can preserve it after the delay.
-  const hintRequested = hintTriggered && (hovered || selected === true) && visible
+  const hintRequested = !showError && hintTriggered && (hovered || selected === true) && visible
   useEffect(() => {
-    if (!hovered) return
+    if (!hovered || showError) return
     const timer = window.setTimeout(() => setHintTriggered(true), 2000)
     return () => window.clearTimeout(timer)
-  }, [hovered])
+  }, [hovered, showError])
   useEffect(() => {
-    if (!hovered && !selected) setHintTriggered(false)
-  }, [hovered, selected])
+    if (showError || (!hovered && !selected)) setHintTriggered(false)
+  }, [hovered, selected, showError])
   const skip = useVal(NodeStore.to(nodeStore)?.ignore)
-  const showError = useShowNodeError(nodeStore)
   const cardStore = NodeStore.is(nodeStore) ? nodeStore : undefined
   const canvasMiniMapPhase = useNodeMiniMapPhase()
   const nodeMiniMapPhase = cardStore ? NodeMiniMapPhase.None : visible ? canvasMiniMapPhase : selected ? NodeMiniMapPhase.None : NodeMiniMapPhase.Phase2

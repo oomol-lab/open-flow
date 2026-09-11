@@ -64,3 +64,15 @@
   --radius-md: var(--ui-radius);
   --radius-lg: calc(var(--ui-radius) + 2px);
 }
+
+/* Cover the existing border with one ring; no border-color fade or gap on focus. */
+@utility text-field-focus {
+  outline: 2px solid var(--ui-ring);
+  outline-offset: -1px;
+  box-shadow: none;
+  transition-property: color, background-color;
+}
+
+.open-flow-code-editor.cm-editor.cm-focused {
+  @apply text-field-focus;
+}

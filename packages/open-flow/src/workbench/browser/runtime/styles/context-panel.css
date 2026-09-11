@@ -425,7 +425,7 @@
         background: var(--ui-accent);
       }
 
-      &:focus-visible {
+      &[data-slot='native-select']:focus-visible {
         border-color: var(--ui-ring);
       }
 
@@ -695,8 +695,7 @@
     font-size: 11px;
   }
 
-  .code-action-panel
-    :is([data-slot='button'], [data-slot='input'], [data-slot='checkbox'], [data-slot='native-select'], [data-slot='toggle-group-item']):focus-visible {
+  .code-action-panel :is([data-slot='button'], [data-slot='checkbox'], [data-slot='native-select'], [data-slot='toggle-group-item']):focus-visible {
     border-color: var(--ui-ring);
     box-shadow: inset 0 0 0 1px var(--ui-ring);
   }
@@ -979,9 +978,6 @@
     border: 1px solid var(--ui-border);
     border-radius: var(--ui-radius);
     background: color-mix(in srgb, var(--ui-background) 88%, var(--ui-card));
-    transition:
-      border-color 140ms ease-out,
-      box-shadow 140ms ease-out;
   }
 
   .code-tab .code-section {
@@ -997,11 +993,6 @@
 
   .code-actions {
     flex: none;
-  }
-
-  .code-editor:focus-within {
-    border-color: var(--ui-ring);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-ring) 24%, transparent);
   }
 
   .code-editor-host,

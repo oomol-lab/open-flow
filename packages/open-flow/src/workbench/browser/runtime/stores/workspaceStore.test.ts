@@ -104,9 +104,9 @@ describe('WorkspaceStore', () => {
 
       expect(store.$.draft.value?.revisionId).toBe('revision-2')
       expect(store.$.draft.value?.content.document.graph.nodes.b?.name).toBe('Review (2)')
-      expect(store.$.draft.value?.content.document.graph.nodes.c?.name).toBe('Value')
+      expect(store.$.draft.value?.content.document.graph.nodes.c?.name).toBe('Fixed Values')
       expect(operations).toEqual([
-        expect.objectContaining({ field: 'name', kind: 'graph.node.field.set', nodeId: 'c', value: 'Value' }),
+        expect.objectContaining({ field: 'name', kind: 'graph.node.field.set', nodeId: 'c', value: 'Fixed Values' }),
         expect.objectContaining({ field: 'name', kind: 'graph.node.field.set', nodeId: 'b', value: 'Review (2)' }),
       ])
     } finally {

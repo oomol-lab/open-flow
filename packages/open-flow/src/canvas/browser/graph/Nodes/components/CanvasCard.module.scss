@@ -13,6 +13,24 @@
   box-shadow: var(--card-shadow);
 }
 
+.value {
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+  border-radius: 12px;
+
+  .header {
+    min-height: 46px;
+    padding: 4px 10px;
+  }
+
+  .identity {
+    gap: 1px;
+  }
+
+  .preview {
+    border-radius: 6px;
+  }
+}
+
 .comment {
   --card-stroke: var(--comment-border);
   --card-selection-stroke: var(--comment-selected-border);

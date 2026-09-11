@@ -72,6 +72,7 @@ export function CanvasNode({
   return (
     <div className={NODE_HANDLE_CLASSNAME}>
       <CanvasCard
+        tone={kind === 'value' ? 'value' : undefined}
         compact={compact}
         contentHidden={hidden}
         footerHidden={hidden && !runContent}

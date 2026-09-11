@@ -353,17 +353,31 @@ const valueSamples: readonly Pick<FlowCanvasViewValueNode, 'id' | 'title' | 'val
 const valueModel: FlowCanvasViewModel = {
   edges: [],
   viewport: { x: 46, y: 70, zoom: 0.65 },
-  nodes: valueSamples.map((sample, index) => ({
-    id: sample.id,
-    title: sample.title,
-    values: sample.values,
-    contentHidden: sample.contentHidden,
-    diagnostics: sample.diagnostics,
-    kind: 'value',
-    inputs: [],
-    outputs: sample.values,
-    position: { x: (index % 3) * 380, y: Math.floor(index / 3) * 280 },
-  })),
+  nodes: [
+    ...valueSamples.map(
+      (sample, index): FlowCanvasViewValueNode => ({
+        id: sample.id,
+        title: sample.title,
+        values: sample.values,
+        contentHidden: sample.contentHidden,
+        diagnostics: sample.diagnostics,
+        kind: 'value',
+        inputs: [],
+        outputs: sample.values,
+        position: { x: (index % 3) * 380, y: Math.floor(index / 3) * 280 },
+      }),
+    ),
+    {
+      id: 'task-reference',
+      kind: 'task',
+      reference: 'sample',
+      title: 'Task · Visual reference',
+      executorName: 'JavaScript',
+      inputs: [],
+      outputs: [],
+      position: { x: 760, y: 560 },
+    },
+  ],
 }
 
 function NodeContentStory({
@@ -458,7 +472,7 @@ const contentModel: FlowCanvasViewModel = {
     {
       id: 'values',
       kind: 'value',
-      title: 'Value content',
+      title: 'Fixed values content',
       inputs: [],
       outputs: [],
       position: { x: 380, y: 0 },
@@ -569,10 +583,9 @@ export const nodeStories: readonly FrontendStory[] = [
     render: (log, dark, language) => <NodeContentStory dark={dark} language={language} log={log} initialModel={contentModel} initialSelection="schedule" />,
   },
   {
-    group: 'Node Value',
+    group: 'Fixed Values',
     id: 'node-value',
-    description:
-      'Value rows · Left-aligned keys and right-aligned values, with empty, structured, nullable, overflowing and invalid samples. Tab through keys and value previews to inspect compact keyboard focus. Canvas actions are logged.',
+    description: 'Fixed value cards · Collapsed, empty, structured and invalid states, with a Task reference for comparing density and elevation.',
     title: 'Node States',
     standalone: true,
     render: (log, dark, language) => <NodeContentStory dark={dark} language={language} log={log} />,
@@ -588,7 +601,8 @@ export const nodeStories: readonly FrontendStory[] = [
   {
     group: 'Node Condition',
     id: 'node-condition',
-    description: 'Condition nodes · Empty, single, multiple, invalid input and overflowing branch labels.',
+    description:
+      'Condition nodes · Empty, single, multiple, invalid input and overflowing branch labels. Hover for two seconds to see connection hints; Invalid input suppresses them.',
     title: 'Node States',
     standalone: true,
     render: (log, dark, language) => <ConditionStory dark={dark} language={language} log={log} />,

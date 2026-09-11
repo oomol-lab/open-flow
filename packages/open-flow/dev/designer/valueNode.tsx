@@ -37,7 +37,7 @@ function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; lan
 }
 export const valueNodeStory: FrontendStory = {
   id: 'value-node-editor',
-  title: 'Value Node Editor',
+  title: 'Fixed Values Editor',
   group: 'Workbench',
   standalone: true,
   render: (log, dark, language) => <ValueStory log={log} dark={dark} language={language} />,

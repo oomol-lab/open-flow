@@ -25,7 +25,7 @@ export function CanvasCard({
   readonly compact?: boolean
   readonly contentHidden?: boolean
   readonly footerHidden?: boolean
-  readonly tone?: 'comment'
+  readonly tone?: 'comment' | 'value'
   readonly titleContent?: ReactNode
   readonly title: string
   readonly icon?: ReactNode
@@ -40,9 +40,7 @@ export function CanvasCard({
 }) {
   const hasContent = Children.toArray(children).some((child) => typeof child != 'string' || child.trim().length > 0)
   return (
-    <article
-      className={clsx(styles.card, compact && styles.compact, tone === 'comment' && styles.comment, selected && styles.selected, problem && styles.problem)}
-    >
+    <article className={clsx(styles.card, compact && styles.compact, tone && styles[tone], selected && styles.selected, problem && styles.problem)}>
       <div className={styles.compactIdentity}>
         <span className={styles.icon}>{icon}</span>
         <strong title={title}>{title}</strong>
