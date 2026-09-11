@@ -1,6 +1,6 @@
 import type { Logger } from 'pino'
 import type { IntegrationRuntime } from '../runtime/integration-runtime.ts'
-import type { PollRuntime } from '../runtime/poll-runtime.ts'
+import type { ListenerRuntime } from '../runtime/listener-runtime.ts'
 import type { Store } from '../storage/store.ts'
 import type { CronDriver } from './cron-driver.ts'
 import type { Maintenance } from './maintenance.ts'
@@ -28,7 +28,7 @@ export class Supervisor {
   readonly #logger: Logger
   readonly #maintenance: Maintenance
   readonly #maxConcurrentRuns: number
-  readonly #poll: PollRuntime
+  readonly #listeners: ListenerRuntime
   readonly #runningFlows = new Set<string>()
   readonly #signals: Queue.Queue<Deferred.Deferred<void> | undefined>
   readonly #store: Store
@@ -46,7 +46,7 @@ export class Supervisor {
     maxConcurrentRuns: number,
     cron: CronDriver,
     integration: IntegrationRuntime,
-    poll: PollRuntime,
+    listeners: ListenerRuntime,
     maintenance: Maintenance,
     clock: () => number,
   ) {
@@ -57,7 +57,7 @@ export class Supervisor {
     this.#logger = logger
     this.#maintenance = maintenance
     this.#maxConcurrentRuns = maxConcurrentRuns
-    this.#poll = poll
+    this.#listeners = listeners
     this.#signals = signals
     this.#store = store
     this.#tasks = tasks
@@ -138,9 +138,9 @@ export class Supervisor {
       if (!FiberMap.hasUnsafe(this.#tasks, 'integration') && integrationAt != null && integrationAt <= now) {
         yield* this.#startTask('integration', 'trigger.integration.loop.failed', this.#integration.tick(new Date(now).toISOString()))
       }
-      const pollAt = this.#store.polls.nextPollAt()
-      if (!FiberMap.hasUnsafe(this.#tasks, 'poll') && pollAt != null && pollAt <= now) {
-        yield* this.#startTask('poll', 'trigger.poll.loop.failed', this.#poll.tick(new Date(now).toISOString()))
+      const listenerAt = this.#listeners.nextAt()
+      if (!FiberMap.hasUnsafe(this.#tasks, 'listener') && listenerAt != null && listenerAt <= now) {
+        yield* this.#startTask('listener', 'trigger.listener.loop.failed', this.#listeners.tick(new Date(now).toISOString()))
       }
       if (!FiberMap.hasUnsafe(this.#tasks, 'maintenance') && this.#maintenance.nextAt() <= now) {
         yield* this.#startTask('maintenance', 'maintenance.loop.failed', this.#maintenance.run(new Date(now).toISOString()))
@@ -197,8 +197,8 @@ export class Supervisor {
       const nextAt = this.#store.integrations.nextIntegrationAt()
       if (nextAt != null) deadlines.push(nextAt)
     }
-    if (!FiberMap.hasUnsafe(this.#tasks, 'poll')) {
-      const nextAt = this.#store.polls.nextPollAt()
+    if (!FiberMap.hasUnsafe(this.#tasks, 'listener')) {
+      const nextAt = this.#listeners.nextAt()
       if (nextAt != null) deadlines.push(nextAt)
     }
     return deadlines.length == 0 ? maxTimerDelayMs : Math.max(0, Math.min(Math.min(...deadlines) - now, maxTimerDelayMs))

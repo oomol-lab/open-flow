@@ -135,10 +135,10 @@ describe('Server Poll Trigger', () => {
     try {
       await publish(service)
       database.exec('UPDATE flow_live SET enabled = 0')
-      await service.tickPoll('2026-08-21T00:01:00.000Z')
+      await service.tickListeners('2026-08-21T00:01:00.000Z')
       expect(calls).toBe(0)
       database.exec('UPDATE flow_live SET enabled = 1')
-      await service.tickPoll('2026-08-21T00:01:00.000Z')
+      await service.tickListeners('2026-08-21T00:01:00.000Z')
       expect(calls).toBe(1)
     } finally {
       database.close()
@@ -224,7 +224,7 @@ describe('Server Poll Trigger', () => {
             triggerDefinitions: [definition],
           })
           yield* Effect.tryPromise({ try: () => publish(service), catch: (error) => error })
-          const ticking = service.tickPoll('2026-08-21T00:01:00.000Z')
+          const ticking = service.tickListeners('2026-08-21T00:01:00.000Z')
           yield* Effect.promise(() => entered.promise)
 
           yield* clock.adjust(30_000)
@@ -269,7 +269,7 @@ describe('Server Poll Trigger', () => {
         { kind: 'graph.node.create', node: content.document.graph.nodes.poll!, nodeId: 'poll', target: { kind: 'flow' } },
       ])
       await service.control.publishFlow('operator', created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v2', null, 'poll-control-publication')
-      await service.tickPoll()
+      await service.tickListeners()
       await service.tickMaintenance()
       const before = service.pollState(created.flow.flowId, 'poll')
 
@@ -333,7 +333,7 @@ describe('Server Poll Trigger', () => {
         { kind: 'graph.node.create', node: revision().document.graph.nodes.poll!, nodeId: 'poll', target: { kind: 'flow' } },
       ])
       await service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v2', null, 'poll-preview-publication')
-      await service.tickPoll()
+      await service.tickListeners()
       await service.tickMaintenance()
       const before = service.pollState(flowId, 'poll')
       expect(before).toMatchObject({ checkpoint: { cursor: 'baseline' }, health: 'healthy' })
@@ -361,15 +361,15 @@ describe('Server Poll Trigger', () => {
     let service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
     await publish(service)
 
-    await service.tickPoll('2026-08-21T00:01:00.000Z')
+    await service.tickListeners('2026-08-21T00:01:00.000Z')
     expect(calls).toBe(2)
     expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: { page: 1 }, health: 'initializing' })
     await closeService(service)
 
     service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
-    await service.tickPoll('2026-08-21T00:01:00.000Z')
+    await service.tickListeners('2026-08-21T00:01:00.000Z')
     expect(calls).toBe(2)
-    await service.tickPoll('2026-08-21T00:01:01.000Z')
+    await service.tickListeners('2026-08-21T00:01:01.000Z')
     expect(calls).toBe(3)
     expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: { page: 2 }, health: 'healthy' })
     await closeService(service)
@@ -391,7 +391,7 @@ describe('Server Poll Trigger', () => {
     })
     await publish(service)
 
-    await service.tickPoll('2026-08-21T00:01:00.000Z')
+    await service.tickListeners('2026-08-21T00:01:00.000Z')
 
     expect(calls).toBe(100)
     expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: { page: 100 }, health: 'initializing' })
@@ -415,7 +415,7 @@ describe('Server Poll Trigger', () => {
     })
     await publish(service)
 
-    await service.tickPoll('2026-08-21T00:01:00.000Z')
+    await service.tickListeners('2026-08-21T00:01:00.000Z')
 
     expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: null, health: 'needs_reauth' })
     const database = new DatabaseSync(file, { readOnly: true })
@@ -443,11 +443,11 @@ describe('Server Poll Trigger', () => {
     const service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
     await publish(service)
 
-    await service.tickPoll('2026-08-21T00:01:00.000Z')
+    await service.tickListeners('2026-08-21T00:01:00.000Z')
     expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: null, health: 'healthy' })
-    await service.tickPoll('2026-08-21T00:02:00.000Z')
+    await service.tickListeners('2026-08-21T00:02:00.000Z')
     expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: null, health: 'failed' })
-    await service.tickPoll('2026-08-21T00:03:00.000Z')
+    await service.tickListeners('2026-08-21T00:03:00.000Z')
     expect(calls).toBe(2)
 
     const database = new DatabaseSync(file, { readOnly: true })
@@ -472,12 +472,12 @@ describe('Server Poll Trigger', () => {
     const service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
     try {
       const first = await publish(service)
-      await service.tickPoll('2026-08-21T00:01:00.000Z')
+      await service.tickListeners('2026-08-21T00:01:00.000Z')
       const changed = revision()
       Object.assign(changed.document.graph.nodes.poll!, { name: 'Renamed', description: 'New description', icon: 'new-icon' })
       await publish(service, changed, first)
       expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: { cursor: 1 }, health: 'healthy' })
-      await service.tickPoll('2026-08-21T00:02:00.000Z')
+      await service.tickListeners('2026-08-21T00:02:00.000Z')
       expect(checkpoints).toEqual([null, { cursor: 1 }])
     } finally {
       await closeService(service)
@@ -498,7 +498,7 @@ describe('Server Poll Trigger', () => {
     let now = Date.parse('2026-08-21T00:00:30.000Z')
     const service = await openService(file, { capabilities: { connector: () => connector }, clock: () => now, triggerDefinitions: [definition] })
     const publicationId = await publish(service)
-    const ticking = service.tickPoll('2026-08-21T00:01:00.000Z')
+    const ticking = service.tickListeners('2026-08-21T00:01:00.000Z')
     await entered.promise
 
     now = Date.parse('2026-08-21T00:01:01.000Z')

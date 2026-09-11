@@ -22,7 +22,6 @@ import {
   maximumIntegrationDeliveryPages,
   PermanentIntegrationError,
   TransientIntegrationError,
-  validateListenerPage,
 } from '@oomol-lab/open-flow/integration-trigger'
 import * as Effect from 'effect/Effect'
 import * as Semaphore from 'effect/Semaphore'
@@ -716,90 +715,7 @@ export class IntegrationRuntime {
           yield* this.#reconcile(binding, now)
         }
       }
-      for (let page = 0; page < batchSize; page += 1) {
-        const lease = this.#store.integrations.claimListener(now, reconcileTimeoutMs * 2)
-        if (lease == null) break
-        yield* this.#readListener(lease, now)
-      }
     })
-  }
-
-  #readListener(lease: import('../storage/integration-store.ts').ListenerLease & { readonly endpointId: string }, now: number): Effect.Effect<void> {
-    return Effect.gen({ self: this }, function* () {
-      const target = this.#store.integrations.integrationTarget(lease.endpointId)
-      if (target == null || target.state == null || target.runtimeVersion != lease.runtimeVersion) {
-        this.#store.integrations.retryListener(lease, now + retryMs)
-        return
-      }
-      const { definition, trigger } = this.#trigger(target.triggerJson)
-      const source = definition.listener
-      if (source == null) return yield* Effect.fail(new PermanentIntegrationError('Listener source is unavailable.'))
-      const page = yield* Effect.tryPromise({
-        try: async (signal) => {
-          const result = await source.read({
-            checkpoint: JSON.parse(target.state!.checkpointJson) as JsonValue,
-            config: trigger.config,
-            connector: this.#connectorProxy(definition, target.bindingId, target.connectionId, target.flowId, signal),
-            now: new Date(now),
-            signal,
-          })
-          signal.throwIfAborted()
-          validateListenerPage(result)
-          if ((result.hasMore || result.payload != null) && isDeepStrictEqual(result.checkpoint, JSON.parse(target.state!.checkpointJson))) {
-            throw new PermanentIntegrationError('Listener continuation must advance the checkpoint.')
-          }
-          return result
-        },
-        catch: (error) => error,
-      })
-      let event: { occurrenceId: string; payload: JsonValue; requestDigest: string } | undefined
-      if (page.payload != null) {
-        const occurrenceId = yield* Effect.tryPromise({
-          try: () => integrationOccurrenceId(target.bindingId, target.runtimeVersion, definition.snapshot.key, page.dedupeKey),
-          catch: (error) => error,
-        })
-        const requestDigest = yield* Effect.tryPromise({
-          try: () =>
-            digestBytes(
-              canonicalJsonBytes({
-                bindingId: target.bindingId,
-                occurrenceId,
-                payload: page.payload,
-                publicationId: target.currentPublicationId,
-                revisionDigest: target.revisionDigest,
-                runtimeVersion: target.runtimeVersion,
-              }),
-            ),
-          catch: (error) => error,
-        })
-        event = { occurrenceId, payload: page.payload, requestDigest }
-      }
-      const completed = this.#store.integrations.finishListenerPage(
-        lease,
-        target,
-        JSON.stringify(page.checkpoint),
-        page.hasMore ? now : now + source.intervalMs,
-        this.#clock(),
-        event,
-      )
-      if (completed == null || (completed != 'advanced' && completed.kind != 'accepted')) {
-        this.#store.integrations.retryListener(lease, now + retryMs)
-      } else if (completed != 'advanced' && completed.kind == 'accepted' && completed.created) {
-        this.#runCreated(target.flowId, completed.runId)
-        this.#wake()
-      }
-    }).pipe(
-      Effect.timeoutOrElse({
-        duration: reconcileTimeoutMs,
-        orElse: () => Effect.fail(new TransientIntegrationError('Listener scan exceeded its execution deadline.')),
-      }),
-      Effect.catch((error) =>
-        Effect.sync(() => {
-          this.#store.integrations.retryListener(lease, now + retryMs, failure(error) ?? 'failed')
-          this.#logger.warn({ category: 'trigger.listener.retrying', bindingId: lease.bindingId, ...errorKind(error) }, 'Listener scan will be retried.')
-        }),
-      ),
-    )
   }
 
   #trigger(triggerJson: string): {

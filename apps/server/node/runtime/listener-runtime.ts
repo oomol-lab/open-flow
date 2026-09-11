@@ -1,8 +1,10 @@
 import type { JsonValue, RevisionContent, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
+import type { IntegrationDefinition, ListenerReadContext } from '@oomol-lab/open-flow/integration-trigger'
 import type { PollContext, PollDefinition, PollResult } from '@oomol-lab/open-flow/poll-trigger'
 import type { Logger } from 'pino'
 import type { ConnectorHost } from '../deployment/connector.ts'
+import type { ListenerLease } from '../storage/integration-store.ts'
 import type { PollCandidate } from '../storage/poll-store.ts'
 import type { Store } from '../storage/store.ts'
 import type { PollState, StoredPollTarget } from '../storage/trigger-store.ts'
@@ -11,6 +13,13 @@ import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { scheduledTriggerOccurrenceId, nextTriggerScheduledAt } from '@oomol-lab/open-flow/cron-trigger'
 import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
+import {
+  integrationOccurrenceId,
+  IntegrationConnectionError,
+  PermanentIntegrationError,
+  TransientIntegrationError,
+  validateListenerPage,
+} from '@oomol-lab/open-flow/integration-trigger'
 import {
   maximumPollCheckpointBytes,
   maximumPollEventsPerPage,
@@ -36,10 +45,11 @@ const retryMs = 1_000
 const timeoutMs = 30_000
 const admissionRetryMs = 1_000
 
-export class PollRuntime {
+export class ListenerRuntime {
   readonly #clock: () => number
   readonly #clockService: Clock.Clock
   readonly #definitions: ReadonlyMap<string, PollDefinition>
+  readonly #integrations: ReadonlyMap<string, IntegrationDefinition>
   readonly #lock: Semaphore.Semaphore
   readonly #logger: Logger
   readonly #resolveConnector: () => ConnectorHost | undefined
@@ -60,6 +70,7 @@ export class PollRuntime {
     clockService: Clock.Clock,
     lock: Semaphore.Semaphore,
     definitions: readonly PollDefinition[],
+    integrations: readonly IntegrationDefinition[],
     validatedFlow: (revision: RevisionContent) => Promise<{
       readonly content: string
       readonly prepared: PreparedFlow
@@ -74,7 +85,8 @@ export class PollRuntime {
     this.#clockService = clockService
     this.#definitions = new Map(definitions.map((definition) => [definition.snapshot.key, definition]))
     this.#lock = lock
-    this.#logger = logger.child({ component: 'poll' })
+    this.#integrations = new Map(integrations.map((definition) => [definition.snapshot.key, definition]))
+    this.#logger = logger.child({ component: 'listener' })
     this.#resolveConnector = resolveConnector
     this.#runCreated = runCreated
     this.#signal = signal
@@ -134,29 +146,38 @@ export class PollRuntime {
     return this.#lock.withPermit(
       Effect.gen({ self: this }, function* () {
         const now = Date.parse(at)
-        if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Poll tick time must be an ISO timestamp.'))
-        while (true) {
-          const candidates = this.#store.polls.dueCandidates(now, batchSize)
-          if (candidates.length == 0) break
-          for (const candidate of candidates) yield* this.#baseline(candidate, now)
-        }
-        let pages = 0
-        while (pages < batchSize) {
-          const targets = this.#store.polls.duePoll(now, batchSize - pages)
-          if (targets.length == 0) break
-          pages += targets.length
-          for (const target of targets) {
-            const scheduledAt = new Date(target.nextAt).toISOString()
-            const occurrenceId = yield* Effect.tryPromise({
-              try: () => scheduledTriggerOccurrenceId(target.bindingId, target.runtimeVersion, scheduledAt),
-              catch: (error) => error,
-            })
-            yield* this.#poll(target, occurrenceId, now)
+        if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Listener tick time must be an ISO timestamp.'))
+        let pollTurn = true
+        for (let page = 0; page < batchSize; page += 1) {
+          const candidate = this.#store.polls.dueCandidates(now, 1)[0]
+          const target = candidate == null ? this.#store.polls.duePoll(now, 1)[0] : undefined
+          const listenerAt = this.#store.integrations.nextListenerAt()
+          if ((candidate != null || target != null) && (pollTurn || listenerAt == null || listenerAt > now)) {
+            if (candidate != null) yield* this.#baseline(candidate, now)
+            else if (target != null) {
+              const scheduledAt = new Date(target.nextAt).toISOString()
+              const occurrenceId = yield* Effect.tryPromise({
+                try: () => scheduledTriggerOccurrenceId(target.bindingId, target.runtimeVersion, scheduledAt),
+                catch: (error) => error,
+              })
+              yield* this.#poll(target, occurrenceId, now)
+            }
+            pollTurn = false
+          } else {
+            const lease = this.#store.integrations.claimListener(now, leaseMs)
+            if (lease == null) break
+            yield* this.#readListener(lease, now)
+            pollTurn = true
           }
         }
         this.#signal()
       }),
     )
+  }
+
+  nextAt(): number | undefined {
+    const deadlines = [this.#store.polls.nextPollAt(), this.#store.integrations.nextListenerAt()].filter((value) => value != null)
+    return deadlines.length == 0 ? undefined : Math.min(...deadlines)
   }
 
   process(input: { readonly bindingId: string; readonly occurredAt: string; readonly occurrenceId: string; readonly runtimeVersion: number }): Promise<void> {
@@ -191,18 +212,38 @@ export class PollRuntime {
     context: Omit<PollContext, 'connector' | 'signal'>,
   ): Effect.Effect<PollResult, unknown> {
     return Effect.gen({ self: this }, function* () {
-      const connector = this.#resolveConnector()
-      if (connector == null) {
-        return yield* Effect.fail(new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.'))
+      const result = yield* this.#readPage(
+        target,
+        definition.snapshot.provider,
+        (input) => definition.poll(input),
+        context,
+        new TransientPollError('Poll Provider exceeded its execution deadline.'),
+      )
+      if (result.events.length > maximumPollEventsPerPage) {
+        return yield* Effect.fail(new PermanentPollError(`Poll page exceeds ${maximumPollEventsPerPage} events.`))
       }
-      const result = yield* Effect.tryPromise({
-        try: (signal) =>
-          definition.poll({
+      return result
+    })
+  }
+
+  #readPage<Result>(
+    target: Pick<StoredPollTarget, 'bindingId' | 'connectionId' | 'flowId'>,
+    provider: string,
+    read: (context: ListenerReadContext) => Promise<Result>,
+    context: Omit<ListenerReadContext, 'connector' | 'signal'>,
+    timeoutError: Error,
+  ): Effect.Effect<Result, unknown> {
+    return Effect.gen({ self: this }, function* () {
+      const connector = this.#resolveConnector()
+      if (connector == null) return yield* Effect.fail(new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.'))
+      return yield* Effect.tryPromise({
+        try: async (signal) => {
+          const result = await read({
             ...context,
             connector: {
               execute: (request, requestSignal) =>
                 connector.proxy(
-                  definition.snapshot.provider,
+                  provider,
                   target.connectionId,
                   target.bindingId,
                   request,
@@ -211,19 +252,92 @@ export class PollRuntime {
                 ),
             },
             signal,
-          }),
+          })
+          signal.throwIfAborted()
+          return result
+        },
         catch: (error) => error,
-      }).pipe(
-        Effect.timeoutOrElse({
-          duration: timeoutMs,
-          orElse: () => Effect.fail(new TransientPollError('Poll Provider exceeded its execution deadline.')),
-        }),
-      )
-      if (result.events.length > maximumPollEventsPerPage) {
-        return yield* Effect.fail(new PermanentPollError(`Poll page exceeds ${maximumPollEventsPerPage} events.`))
-      }
-      return result
+      }).pipe(Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.fail(timeoutError) }))
     })
+  }
+
+  #readListener(lease: ListenerLease & { readonly endpointId: string }, now: number): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const target = this.#store.integrations.integrationTarget(lease.endpointId)
+      if (target == null || target.state == null || target.runtimeVersion != lease.runtimeVersion) {
+        this.#store.integrations.retryListener(lease, now + retryMs)
+        return
+      }
+      const trigger = JSON.parse(target.triggerJson) as TriggerNode
+      if (trigger.kind != 'integration') return yield* Effect.fail(new PermanentIntegrationError('Fixed Integration Trigger is invalid.'))
+      const definition = this.#integrations.get(trigger.definition.key)
+      if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion)
+        return yield* Effect.fail(new PermanentIntegrationError('Fixed Integration Trigger definition is not available.'))
+      const source = definition.listener
+      if (source == null) return yield* Effect.fail(new PermanentIntegrationError('Listener source is unavailable.'))
+      const checkpoint = JSON.parse(target.state.checkpointJson) as JsonValue
+      const page = yield* this.#readPage(
+        target,
+        definition.snapshot.provider,
+        async (context) => {
+          const result = await source.read(context)
+          validateListenerPage(result)
+          if ((result.hasMore || result.payload != null) && isDeepStrictEqual(result.checkpoint, checkpoint)) {
+            throw new PermanentIntegrationError('Listener continuation must advance the checkpoint.')
+          }
+          return result
+        },
+        { checkpoint, config: trigger.config, now: new Date(now) },
+        new TransientIntegrationError('Listener scan exceeded its execution deadline.'),
+      )
+      let event: { occurrenceId: string; payload: JsonValue; requestDigest: string } | undefined
+      if (page.payload != null) {
+        const occurrenceId = yield* Effect.tryPromise({
+          try: () => integrationOccurrenceId(target.bindingId, target.runtimeVersion, definition.snapshot.key, page.dedupeKey),
+          catch: (error) => error,
+        })
+        const requestDigest = yield* Effect.tryPromise({
+          try: () =>
+            digestBytes(
+              canonicalJsonBytes({
+                bindingId: target.bindingId,
+                occurrenceId,
+                payload: page.payload,
+                publicationId: target.currentPublicationId,
+                revisionDigest: target.revisionDigest,
+                runtimeVersion: target.runtimeVersion,
+              }),
+            ),
+          catch: (error) => error,
+        })
+        event = { occurrenceId, payload: page.payload, requestDigest }
+      }
+      const completed = this.#store.integrations.finishListenerPage(
+        lease,
+        target,
+        JSON.stringify(page.checkpoint),
+        page.hasMore ? now : now + source.intervalMs,
+        this.#clock(),
+        event,
+      )
+      if (completed == null || (completed != 'advanced' && completed.kind != 'accepted')) {
+        this.#store.integrations.retryListener(lease, now + retryMs)
+      } else if (completed != 'advanced' && completed.kind == 'accepted' && completed.created) {
+        this.#runCreated(target.flowId, completed.runId)
+        this.#signal()
+      }
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: timeoutMs,
+        orElse: () => Effect.fail(new TransientIntegrationError('Listener scan exceeded its execution deadline.')),
+      }),
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          this.#store.integrations.retryListener(lease, now + retryMs, listenerFailure(error))
+          this.#logger.warn({ category: 'trigger.listener.retrying', bindingId: lease.bindingId, ...errorKind(error) }, 'Listener scan will be retried.')
+        }),
+      ),
+    )
   }
 
   #baseline(candidate: PollCandidate, now: number): Effect.Effect<void> {
@@ -445,4 +559,12 @@ function failure(error: unknown): Extract<PollState['health'], 'failed' | 'needs
     if (current instanceof PermanentPollError) return 'failed'
     if (current instanceof ConnectorTaskError && current.code == 'connector.connection-required') return 'needs_reauth'
   }
+}
+
+function listenerFailure(error: unknown): 'failed' | 'needs_reauth' {
+  for (let current: unknown = error; current instanceof Error; current = current.cause) {
+    if (current instanceof IntegrationConnectionError || (current instanceof ConnectorTaskError && current.code == 'connector.connection-required'))
+      return 'needs_reauth'
+  }
+  return 'failed'
 }

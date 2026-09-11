@@ -1,5 +1,6 @@
 import type { JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { IntegrationDefinition } from '@oomol-lab/open-flow/integration-trigger'
+import type { PollDefinition } from '@oomol-lab/open-flow/poll-trigger'
 import type { DestinationStream, Logger } from 'pino'
 import type { ServerServiceOptions } from '../node/application/service.ts'
 
@@ -674,6 +675,104 @@ describe('Server change listener', () => {
     }
   }
 
+  it('services both readers during Poll continuation and resumes their persisted progress after restart', async () => {
+    const file = await databaseFile()
+    let now = 0
+    let continuing = false
+    const reads: { kind: 'poll' | 'listener'; checkpoint: JsonValue }[] = []
+    const definition = listener(async ({ checkpoint }) => {
+      reads.push({ kind: 'listener', checkpoint })
+      return { checkpoint: Number(checkpoint) + 1, dedupeKey: String(checkpoint), hasMore: continuing, payload: null }
+    })
+    const poll: PollDefinition = {
+      snapshot: {
+        configSchema: { type: 'object' },
+        definitionVersion: 1,
+        description: 'Poll reader',
+        displayName: 'Poll reader',
+        key: 'test.poll',
+        name: 'poll',
+        provider: 'test',
+        type: 'poll',
+        payloadSchema: { type: 'object' },
+      },
+      async poll({ checkpoint }) {
+        reads.push({ kind: 'poll', checkpoint })
+        return { checkpoint: Number(checkpoint) + 1, events: [], hasMore: continuing }
+      },
+    }
+    const open = () => openService(file, { ...options(() => now, [definition]), triggerDefinitions: [definition, poll] })
+    let service = await open()
+    try {
+      await publishListener(service, file)
+      await service.publisher.publish({
+        expectedLivePublicationId: null,
+        flowId: 'poll-flow',
+        idempotencyKey: next('publish'),
+        revisionId: next('revision'),
+        revision: {
+          modelVersion: 1,
+          modules: {},
+          document: {
+            bindings: { connection: { kind: 'connection', target: 'connection-main' } },
+            tasks: {},
+            subflows: {},
+            graph: {
+              edges: [],
+              nodes: {
+                poll: {
+                  kind: 'poll',
+                  name: 'Poll reader',
+                  bindingId: 'connection',
+                  config: {},
+                  definition: poll.snapshot,
+                  pollTimes: [{ type: 'every', unit: 'minute', value: 1 }],
+                },
+              },
+            },
+          },
+        },
+      })
+      await service.tickIntegration()
+      now = 60_000
+      await service.tickListeners()
+      reads.length = 0
+      continuing = true
+      now = 120_000
+      await service.tickListeners()
+      expect(reads.some(({ kind }) => kind == 'poll')).toBe(true)
+      expect(reads.some(({ kind }) => kind == 'listener')).toBe(true)
+      expect(reads.slice(0, 4).map(({ kind }) => kind)).toEqual(['poll', 'listener', 'poll', 'listener'])
+      const pollState = service.pollState('poll-flow', 'poll')!
+      const listenerState = service.integrationState('main', 'integration')!
+      expect(Number(pollState.checkpoint)).toBeGreaterThan(1)
+      expect(Number(listenerState.checkpoint)).toBeGreaterThan(2)
+      await closeService(service)
+      service = await open()
+      expect(service.pollState('poll-flow', 'poll')).toEqual(pollState)
+      expect(service.integrationState('main', 'integration')).toEqual(listenerState)
+      reads.length = 0
+      continuing = false
+      await service.tickListeners()
+      expect(reads).toEqual([
+        { kind: 'poll', checkpoint: pollState.checkpoint },
+        { kind: 'listener', checkpoint: listenerState.checkpoint },
+      ])
+      expect(service.pollState('poll-flow', 'poll')).toMatchObject({
+        bindingId: pollState.bindingId,
+        runtimeVersion: pollState.runtimeVersion,
+        checkpoint: Number(pollState.checkpoint) + 1,
+      })
+      expect(service.integrationState('main', 'integration')).toMatchObject({
+        bindingId: listenerState.bindingId,
+        runtimeVersion: listenerState.runtimeVersion,
+        checkpoint: Number(listenerState.checkpoint) + 1,
+      })
+    } finally {
+      await closeService(service)
+    }
+  })
+
   it('drains continuation pages without callbacks and resumes periodic scans after restart', async () => {
     const file = await databaseFile()
     let now = 0
@@ -871,9 +970,14 @@ describe('Server change listener', () => {
     }
   })
 
-  it('rejects an invalid continuation without advancing its cursor', async () => {
+  it.each(['stalled', 'malformed'] as const)('rejects a %s page without advancing its cursor', async (mode) => {
     const file = await databaseFile()
-    const definition = listener(async ({ checkpoint }) => ({ checkpoint, hasMore: true, payload: null, dedupeKey: 'invalid' }))
+    const definition = listener(async ({ checkpoint }) => ({
+      checkpoint: mode == 'stalled' ? checkpoint : Number(checkpoint) + 1,
+      hasMore: mode == 'stalled',
+      payload: null,
+      dedupeKey: mode == 'stalled' ? 'invalid' : '',
+    }))
     const service = await openService(
       file,
       options(() => 0, [definition]),
