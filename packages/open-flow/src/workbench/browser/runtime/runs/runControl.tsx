@@ -80,7 +80,7 @@ export function RunControl({
           >
             {starting ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" name="play" />}
             <span className="run-control-label" style={{ width: labelWidth }}>
-              <span className="inline-block w-max max-w-40 truncate align-middle" ref={labelRef}>
+              <span className="block w-max max-w-40 truncate" ref={labelRef}>
                 {label}
               </span>
             </span>
