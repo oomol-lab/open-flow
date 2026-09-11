@@ -15,3 +15,14 @@ export const Button: ForwardRefExoticComponent<ButtonProps & RefAttributes<HTMLB
 export { Input } from './input.tsx'
 export { Label } from './label.tsx'
 export { Textarea } from './textarea.tsx'
+/** Shared Sonner presentation for hosts and the component Lab. */
+export const notificationToasterProps = {
+  className: 'open-flow-notifications',
+  closeButton: true,
+  expand: false,
+  gap: 8,
+  mobileOffset: { top: 56, left: 12, right: 12 },
+  offset: { top: 56, left: 16, right: 16 },
+  position: 'top-center',
+  visibleToasts: 3,
+} as const

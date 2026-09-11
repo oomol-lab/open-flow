@@ -1,28 +1,21 @@
-import type {
-  OpenFlowWorkbenchProps,
-  WorkbenchLanguage,
-  WorkbenchLocation,
-  WorkbenchNavigationOptions,
-  WorkbenchNotification,
-  WorkbenchTheme,
-} from '@oomol-lab/open-flow/workbench'
+import type { OpenFlowWorkbenchProps, WorkbenchLanguage, WorkbenchLocation, WorkbenchNavigationOptions, WorkbenchTheme } from '@oomol-lab/open-flow/workbench'
 import type { FormEvent, MouseEvent, ReactElement } from 'react'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
-import { Button } from '@oomol-lab/open-flow/ui'
+import { Button, notificationToasterProps } from '@oomol-lab/open-flow/ui'
 import { OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Toaster, toast } from 'sonner'
+import { Toaster } from 'sonner'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { createBrowserHost } from './host.ts'
 import { createI18n } from './i18n.ts'
 import { idempotencyKey } from './idempotency.ts'
 import { initialLanguage, languagePreference } from './language.ts'
+import { notify } from './notifications.ts'
 import { parseRoute, routePath } from './route.ts'
 import { SettingsPage } from './settings.tsx'
 import { VariablesPage } from './variables.tsx'
 
-const notificationId = 'open-flow-workbench'
 const preferencePrefix = 'open-flow.workbench.server.'
 interface Props {
   readonly language: WorkbenchLanguage
@@ -107,16 +100,6 @@ function connectorTeams(value: unknown):
     teams.push({ id: team.id, name: team.name, systemCreated: team.systemCreated })
   }
   return { bindings, enabled: true, teams, version: 1 }
-}
-
-function notify(notification: WorkbenchNotification | undefined): void {
-  if (notification == null) {
-    toast.dismiss(notificationId)
-    return
-  }
-  const options = { duration: notification.kind == 'error' ? 8000 : 4000, id: notificationId }
-  if (notification.kind == 'error') toast.error(notification.message, options)
-  else toast.success(notification.message, options)
 }
 
 function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
@@ -470,11 +453,8 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
         />
       )}
       <Toaster
-        closeButton
+        {...notificationToasterProps}
         containerAriaLabel={t('shell.notifications')}
-        offset={{ right: 12, top: 50 }}
-        position="top-right"
-        richColors
         theme={theme}
         toastOptions={{ closeButtonAriaLabel: t('shell.closeNotification') }}
       />

@@ -91,9 +91,6 @@ export class EdgeStore {
               muted: hasNonValueNode(connection, targetNodeStore$, get) || isFromSkippedNode,
             }
           }
-          if (node?.nodeType === NODE_TYPE.TriggerNode) {
-            return { dashed: true, muted: isFromSkippedNode }
-          }
           if (isFromSkippedNode) {
             return { muted: true }
           }
