@@ -2,6 +2,7 @@ import type { ConnectorProxyResult } from '../../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent } from '../../common/poll.ts'
 
+import { canonicalJsonBytes, digestBytes } from '../../../flow/common/encoding.ts'
 import { PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 type Change = 'created' | 'deleted' | 'updated'
@@ -127,7 +128,7 @@ export const oneDriveItemChanged: PollDefinition = {
     const events: PollEvent[] = []
     let filtered = 0
     for (const [id, item] of items) {
-      const result = evaluate(id, item, config, new Date(checkpoint.lastPolledAt))
+      const result = await evaluate(id, item, config, checkpoint)
       if (result == 'structural') continue
       if (result == 'filtered') filtered += 1
       else events.push(result)
@@ -215,15 +216,15 @@ async function changedItems(
   }
 }
 
-function evaluate(id: string, item: Item, config: Config, lastPoll: Date): PollEvent | 'filtered' | 'structural' {
+async function evaluate(id: string, item: Item, config: Config, checkpoint: Checkpoint): Promise<PollEvent | 'filtered' | 'structural'> {
   if (item.root != null) return 'structural'
   const itemType = type(item)
   if (itemType == null) return 'structural'
-  const change = item.deleted != null ? 'deleted' : createdAfter(item.createdDateTime, lastPoll) ? 'created' : 'updated'
+  const change = item.deleted != null ? 'deleted' : createdAfter(item.createdDateTime, new Date(checkpoint.lastPolledAt)) ? 'created' : 'updated'
   if (!config.events.includes(change) || !config.itemTypes.includes(itemType)) return 'filtered'
   if (config.parentFolderId.length > 0 && item.parentReference?.id !== config.parentFolderId) return 'filtered'
   if (config.itemId.length > 0 && id !== config.itemId) return 'filtered'
-  return event(id, item, change, itemType)
+  return await event(id, item, change, itemType, checkpoint.deltaToken)
 }
 
 function type(item: Item): ItemType | null {
@@ -232,9 +233,11 @@ function type(item: Item): ItemType | null {
   return item.deleted != null ? 'file' : null
 }
 
-function event(id: string, item: Item, change: Change, itemType: ItemType): PollEvent {
+async function event(id: string, item: Item, change: Change, itemType: ItemType, deltaToken: string): Promise<PollEvent> {
+  // Continuation pages share a deletion identity, but later delta cycles must not.
   return {
-    dedupeKey: item.deleted != null ? `${id}:deleted` : `${id}:${item.eTag ?? item.lastModifiedDateTime}`,
+    dedupeKey:
+      item.deleted != null ? await digestBytes(canonicalJsonBytes(['one-drive-deleted', deltaToken, id])) : `${id}:${item.eTag ?? item.lastModifiedDateTime}`,
     payload: {
       changeType: change,
       createdDateTime: item.createdDateTime ?? item.fileSystemInfo?.createdDateTime ?? null,
