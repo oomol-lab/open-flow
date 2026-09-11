@@ -48,8 +48,13 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const selected = useVal(nodeStore.$.selected)
   const [hovered, setHovered] = useState(false)
   const [hintTriggered, setHintTriggered] = useState(false)
-  // Hover starts a hint session; selection can only keep that session alive.
+  // Only uninterrupted hover starts a hint session; selection can preserve it after the delay.
   const hintRequested = hintTriggered && (hovered || selected === true) && visible
+  useEffect(() => {
+    if (!hovered) return
+    const timer = window.setTimeout(() => setHintTriggered(true), 2000)
+    return () => window.clearTimeout(timer)
+  }, [hovered])
   useEffect(() => {
     if (!hovered && !selected) setHintTriggered(false)
   }, [hovered, selected])
@@ -121,7 +126,6 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
               onPointerEnter={(event) => {
                 if (event.pointerType !== 'touch') {
                   setHovered(true)
-                  setHintTriggered(true)
                 }
               }}
               onPointerLeave={() => setHovered(false)}
@@ -166,14 +170,12 @@ function ExecutionHandle({ id, type, isConnectable, hintRequested }: Pick<Handle
       const timer = window.setTimeout(() => setHintMounted(false), 320)
       return () => window.clearTimeout(timer)
     }
-    setHintMounted(false)
+    setHintMounted(true)
     setHintFinished(false)
-    const appear = window.setTimeout(() => setHintMounted(true), 3000)
-    // Twelve 800ms rounds, then fade while the movement continues.
-    const fade = window.setTimeout(() => setHintFinished(true), 3000 + 12 * 800)
-    const remove = window.setTimeout(() => setHintMounted(false), 3000 + 12 * 800 + 320)
+    // Ten 800ms rounds, then fade while the movement continues.
+    const fade = window.setTimeout(() => setHintFinished(true), 10 * 800)
+    const remove = window.setTimeout(() => setHintMounted(false), 10 * 800 + 320)
     return () => {
-      window.clearTimeout(appear)
       window.clearTimeout(fade)
       window.clearTimeout(remove)
     }
