@@ -45,8 +45,8 @@ Variable 是 deployment scope 配置，不属于任何 Flow。Flow Revision 只�
 解析值隐式写入 Revision、Publication、持久化 Run input 或 `node.started`；Flow 代码显式返回、记录、发送或抛出该值时，它仍可进入用户数据流、
 RunEvent、日志或外部系统。Variable 是 Operator 可读取的 deployment configuration，不是不可导出的 Secret Manager。
 
-旧 Project schema、Project API 和 Project 数据不属于当前产品合同。部署发现旧的未发布 schema 时直接重建当前 Flow schema，不迁移或保留旧
-Project、Flow、Publication、Run 或 authoring history。
+旧 Project schema 与 Project API 不属于当前产品合同。升级必须保留已有数据，支持的 schema 通过显式迁移转换；发现尚无转换路径的旧 schema 时，
+应停止升级并保留原始数据库，不得在启动过程中隐式重建或删除数据。
 
 ### Deployment capability settings
 

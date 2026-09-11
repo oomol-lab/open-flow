@@ -345,3 +345,22 @@ PR 状态字段依据 [GitHub Get a pull request](https://docs.github.com/en/res
 - 进一步只读核实：旧 Cloud 开发 tenant 中有 1 个 Project、44 个 Project Revision；旧 Server standalone 中有 6 个 Project Revision。
   其中包含旧字典式端口、无显式执行边的数据流图，不能通过改表名或修改 envelope kind 变成当前可执行 Revision。
   这些原库继续保留，尚未实施语义转换；其他适用 Poll 定义的迁移和旧路径退出也仍待完成。
+
+- 已发布公共包 `0.1.0-beta.20`，提交 `be58cc6a`，发布流程与 npm 包消费验证通过。
+  发布分支公共包 1182 项、CLI 90 项、Server 417 项测试通过；原工作区包含其他存储修改的 Server 共 419 项通过。
+- 闭源 Cloud、Executor、Workbench 已精确升级 beta.20，根目录 check、test、build 通过。
+  当前工作区 Cloud 452 项、Workbench 18 项测试通过，其中新增的发布测试验证 D1 保留 checkpoint、订阅和 pending generation，且不创建候选订阅 work。
+  本轮未部署服务，未对原始数据库执行迁移。
+
+### 9.8 旧 Server Project 草稿转换
+
+- 新增显式离线导入工具 `apps/server/scripts/migrate-project.ts`。使用 SQLite backup API 先保存包含 WAL 提交的完整旧库，
+  再将支持的当前草稿写入独立的当前 schema 数据库；输出目录必须是新目录，原始数据库不改写。
+- 支持无旧绑定、managed task、subflow 的空图或单 Trigger / 单执行链图，转换字典式端口与执行边，保留模块源码与 Flow ID。
+  新 Revision 具有独立 identity，并通过当前 decoder 和完整 Flow validation。未知字段、并行分支、多前驱与损坏 digest 明确拒绝。
+- 已实际转换旧 standalone 当前草稿：1 个 Flow 成功，0 个草稿被阻断，未创建 Live 或外部订阅。
+  输出位于 `apps/server/.open-flow-dev/project-migration-20260911/`；逐表比较确认备份的 23 张表、603 行记录与原库一致，目标 integrity check 为 ok。
+- 历史 Revision、Publication、Run、订阅、监听进度、Presentation 与部署设置仅完整保存在旧库备份，未转为新引擎可执行记录。
+  这属于当前草稿导入，不代表完整部署迁移；Cloud D1/R2 的转换、其他适用 Poll 定义迁移及旧执行路径退出仍未完成。
+- 根目录 check 与 Server 424 项测试通过，包含 WAL 备份、正常转换、部分拒绝、损坏 digest、重复内容的身份隔离与拒绝覆盖目录。
+  操作与边界见 [旧 Project 草稿导入](../project-draft-import.md)。
