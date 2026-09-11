@@ -6,11 +6,11 @@ product
 
 ## Users
 
-Developers and Agent users who author local workflow projects in YAML and TypeScript, inspect and edit the same workflows visually, and run them through one shared execution model.
+Developers and Agent users who author Flows through the Control API, inspect and edit the same Flows visually in the Workbench, and run them on one selected deployment.
 
 ## Product Purpose
 
-Open Flow makes workflow source equally usable by humans and Agents. The Workbench keeps project files as the source of truth while making graph structure, configuration, execution, and diagnostics directly understandable and editable.
+Open Flow makes workflow structure equally usable by humans and Agents. The deployment owns the authoritative Draft and Revision state while the Workbench makes graph structure, configuration, execution, and diagnostics directly understandable and editable.
 
 ## Brand Personality
 
@@ -26,7 +26,7 @@ Do not resemble a generic SaaS dashboard, a playful no-code canvas that hides so
 - Prefer familiar tool interactions over novel presentation.
 - Make validation and compatibility failures actionable.
 - Preserve useful information density without visual noise.
-- Distinguish local authoring state from external service and deployment state.
+- Distinguish Flow authoring state from deployment configuration and external service state.
 
 ## Accessibility & Inclusion
 

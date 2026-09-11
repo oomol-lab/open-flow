@@ -2,7 +2,8 @@ Open Flow
 Copyright 2024-2026 OOMOL contributors
 
 This distribution includes third-party open source software.
-Licenses for dependencies included in generated bundles are provided in dist/LICENSE.md.
+Licenses for dependencies included in generated bundles ship with each generated distribution
+(`licenses.md` in the npm package, `LICENSE.md` in the Command Artifact).
 
 FileIcons
 Copyright (c) 2018 Koen Lageveen

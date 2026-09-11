@@ -97,7 +97,7 @@ Use the same Open Flow product and Workbench through any supported path.
   node progress and outputs, and follow the complete event history of every Run.
 - **Publish long-running automation.** Start Flows manually or from Cron schedules, Webhooks,
   polling sources, and Provider events.
-- **Keep operational state together.** Projects, immutable Revisions, Publications, Live versions,
+- **Keep operational state together.** Flows, immutable Revisions, Publications, Live versions,
   Runs, and Trigger state belong to one selected deployment instead of being split across local
   files and hidden services.
 - **Run untrusted code safely.** The Server executes every code Task in a fresh V8 isolate inside a
@@ -142,7 +142,7 @@ flowchart LR
   CLI["oo flow CLI"] -->|"Control API"| Server
   Server -. "optional" .-> Connector["Connector runtime"]
   Connector --> Providers["Third-party Providers"]
-  Server --> Store["SQLite: Projects, Revisions, Publications, Runs"]
+  Server --> Store["SQLite: Flows, Revisions, Publications, Runs"]
   Server --> Triggers["Trigger scheduler: Cron, Webhook, Poll, Integration"]
   Server --> Runtime["Isolated JavaScript runtime"]
 ```
@@ -173,11 +173,11 @@ docker run --rm \
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000) and sign in with the value of
 `OPEN_FLOW_TOKEN`. The same value works as a Bearer token for machine clients of the Control API.
-Projects and Run history are persisted in the `open-flow-data` Docker volume.
+Flows and Run history are persisted in the `open-flow-data` Docker volume.
 
 To skip the build, pull the prebuilt multi-arch image `ghcr.io/oomol-lab/open-flow` or start it
-with the `docker-compose.yml` at the repository root. Tags (`latest`, release versions, `tip`, and
-commit hashes) and upgrade steps are in the [Docker image guide](docs/server/docker-ghcr/README.md).
+with the `docker-compose.yml` at the repository root. Tags (`latest` and release versions) and
+upgrade steps are in the [Docker image guide](docs/server/docker-ghcr/README.md).
 
 The Server is useful without external services. Connector-backed Actions, Provider Triggers, and
 LLM Tasks fail closed until the corresponding host capability is configured; nothing falls back to
@@ -251,9 +251,10 @@ bun run dev
 ```
 
 Open the development Workbench at
-[http://localhost:5174](http://localhost:5174). Its API requests are proxied to the Server at
-`http://127.0.0.1:3001`. Development uses `http://localhost:3000` as the Connector origin by default;
-set `OPEN_FLOW_CONNECTOR_ORIGIN` to override it. The Connector token remains optional.
+[http://localhost:5174](http://localhost:5174). Its Control API requests are proxied to the
+development backend port (`OPEN_FLOW_PORT`, default `3001`; the proxy target is passed to Vite as
+`OPEN_FLOW_DEV_API_ORIGIN`). Connector-backed Actions stay unavailable until
+`OPEN_FLOW_CONNECTOR_ORIGIN` is configured. The Connector token remains optional.
 
 The first development run creates an operator token at
 `apps/server/.open-flow-dev/operator-token`. Later runs reuse it, so restarting the development

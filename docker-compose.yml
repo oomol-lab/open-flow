@@ -6,9 +6,10 @@
 # Environment variables: docs/server/container-delivery.md
 services:
   open-flow:
-    # OPEN_FLOW_IMAGE_TAG selects the tag. `tip` is the default while Open Flow is
-    # in beta, because `latest` only appears with the first stable release.
-    image: ghcr.io/oomol-lab/open-flow:${OPEN_FLOW_IMAGE_TAG:-tip}
+    # OPEN_FLOW_IMAGE_TAG selects the tag. `latest` appears with the first stable
+    # release; while Open Flow is in beta, set a release tag explicitly, for
+    # example OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1.
+    image: ghcr.io/oomol-lab/open-flow:${OPEN_FLOW_IMAGE_TAG:-latest}
     ports:
       - '3000:3000'
     volumes:
@@ -26,6 +27,7 @@ services:
       OPEN_FLOW_LLM_TOKEN:
       OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN:
       OPEN_FLOW_INTEGRATION_CALLBACK_KEY:
+      OPEN_FLOW_PUBLIC_ORIGIN:
       OPEN_FLOW_RUN_EVENT_RETENTION_DAYS:
       OPEN_FLOW_MAX_PENDING_RUNS:
       OPEN_FLOW_MAX_CONCURRENT_RUNS:

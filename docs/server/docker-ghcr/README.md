@@ -20,22 +20,18 @@ repeated here.
 | --------------- | ------------------------------------------------------ | -------------------------------------------------------------- |
 | `latest`        | the newest stable release                              | you want the current stable Server                             |
 | `<release-tag>` | a specific release such as `v0.1.0-beta.1` (immutable) | you deploy to production and want a pinned, reproducible build |
-| `tip`           | the latest commit on `main`                            | you want to try changes that are not released yet              |
-| `<short-sha>`   | a specific `main` commit (immutable)                   | you want to pin an exact pre-release build                     |
 
-Every GitHub Release publishes its tag. A stable release also moves `latest`; a pre-release does
-not, so `latest` never points at a beta. Every push to `main` publishes `tip` and the short commit
-hash. A tag published by a newer build replaces the older one under the same name, so `latest` and
-`tip` move while release tags and commit hashes stay fixed.
+Images are published only for GitHub Releases. A stable release also moves `latest`; a pre-release
+does not, so `latest` never points at a beta.
 
-Open Flow is in beta: `latest` appears with the first stable release, so until then use `tip` or a beta release tag such as `v0.1.0-beta.1`. For production, pin a release tag instead of `latest`.
+Open Flow is in beta: `latest` appears with the first stable release, so until then use a beta release tag such as `v0.1.0-beta.1`. For production, pin a release tag instead of `latest`.
 
 ## Pull
 
 The image is public, so no sign-in is required:
 
 ```bash
-docker pull ghcr.io/oomol-lab/open-flow:tip
+docker pull ghcr.io/oomol-lab/open-flow:v0.1.0-beta.1   # or another release tag
 ```
 
 If you get an `unauthorized` or `denied` error, sign in with a GitHub token that has the
@@ -67,7 +63,7 @@ docker run -d \
   -p 3000:3000 \
   -v open-flow-data:/data/open-flow \
   -e OPEN_FLOW_TOKEN="$OPEN_FLOW_TOKEN" \
-  ghcr.io/oomol-lab/open-flow:tip
+  ghcr.io/oomol-lab/open-flow:v0.1.0-beta.1
 ```
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000) and sign in with the token. If you omit
@@ -91,7 +87,7 @@ docker compose up -d
 docker compose logs -f open-flow
 ```
 
-To run a specific tag, export `OPEN_FLOW_IMAGE_TAG` in the shell before every compose command, including the upgrade commands below, so a pinned release does not fall back to `tip`: `export OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1`.
+To run a specific tag, export `OPEN_FLOW_IMAGE_TAG` in the shell before every compose command, including the upgrade commands below: `export OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1`. The shipped compose file defaults to `latest`, which appears with the first stable release, so beta users must set this variable.
 
 ### Build From Source
 

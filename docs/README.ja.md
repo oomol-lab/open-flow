@@ -84,7 +84,7 @@ Agent が作成するのは、使い捨てのローカル設定ではなく、�
 - **ビジュアルで設計し、必要なときにコードを追加する。** キャンバス上で型付きノードを組み合わせ、カスタム JavaScript には Code Task を使います。コードはフォーム項目に隠されず、常に見える状態に保たれます。
 - **実行とデバッグを一か所で。** 実行前に入力と Flow の構造を検証し、各ノードの進行状況と出力を確認し、すべての Run の完全なイベント履歴を追跡できます。
 - **長時間動作する自動化を公開する。** Flow は手動で開始できるほか、Cron スケジュール、Webhook、ポーリングソース、Provider のイベントから起動できます。
-- **運用状態をまとめて管理する。** Project、不変の Revision、Publication、Live バージョン、Run、Trigger の状態は、ローカルファイルと隠れたサービスに
+- **運用状態をまとめて管理する。** Flow、不変の Revision、Publication、Live バージョン、Run、Trigger の状態は、ローカルファイルと隠れたサービスに
   分散することなく、選択された一つのデプロイメントに属します。
 - **信頼できないコードを安全に実行する。** Server は、長時間稼働する Executor プロセス内で、コードの Task ごとに新しい V8 isolate を作成し、
   その Task が宣言した Capability だけを公開します。
@@ -122,7 +122,7 @@ flowchart LR
   CLI["oo flow CLI"] -->|"Control API"| Server
   Server -. "任意" .-> Connector["Connector ランタイム"]
   Connector --> Providers["サードパーティ Provider"]
-  Server --> Store["SQLite：Project、Revision、Publication、Run"]
+  Server --> Store["SQLite：Flow、Revision、Publication、Run"]
   Server --> Triggers["Trigger スケジューラ：Cron、Webhook、Poll、Integration"]
   Server --> Runtime["分離された JavaScript ランタイム"]
 ```
@@ -149,10 +149,10 @@ docker run --rm \
 ```
 
 [http://127.0.0.1:3000](http://127.0.0.1:3000) を開き、`OPEN_FLOW_TOKEN` の値でサインインします。同じ値は、Control API を利用するマシンクライアントの
-Bearer Token としても使えます。Project と Run の履歴は `open-flow-data` Docker volume に永続化されます。
+Bearer Token としても使えます。Flow と Run の履歴は `open-flow-data` Docker volume に永続化されます。
 
 ビルドを省略するには、ビルド済みのマルチアーキテクチャイメージ `ghcr.io/oomol-lab/open-flow` を pull するか、リポジトリルートの
-`docker-compose.yml` で起動してください。Tag (`latest`、Release バージョン、`tip`、コミットハッシュ) とアップグレード手順は
+`docker-compose.yml` で起動してください。Tag (`latest`、Release バージョン) とアップグレード手順は
 [Docker イメージガイド](server/docker-ghcr/README.ja.md) を参照してください。
 
 Server は外部サービスなしでも利用できます。Connector を利用する Action、Provider Trigger、LLM Task は、対応するホストの Capability が設定されるまで
@@ -192,7 +192,7 @@ OpenConnector と Open Flow を一緒に起動し、runtime token を作成し�
 ## 一つのプロダクト、ポータブルなデプロイメント
 
 Workbench と CLI は、特定のデータベースやクラウドランタイムに依存するのではなく、バージョン管理された Control API で通信します。デプロイメントが実行と
-永続化を所有し、クライアントは第二のローカル Project 形式を作ったり、暗黙のうちに別のバックエンドへ切り替えたりしません。
+永続化を所有し、クライアントは第二のローカルなワークフロー形式を作ったり、暗黙のうちに別のバックエンドへ切り替えたりしません。
 
 このリポジトリには次が含まれます。
 
@@ -214,7 +214,7 @@ bun install --frozen-lockfile
 bun run dev
 ```
 
-開発用の Workbench は [http://127.0.0.1:5173](http://127.0.0.1:5173) で開きます。その API リクエストは `http://127.0.0.1:3000` の Server にプロキシされます。
+開発用の Workbench は [http://localhost:5174](http://localhost:5174) で開きます。Control API リクエストは開発用バックエンドのポート (`OPEN_FLOW_PORT`、既定値 `3001`) にプロキシされます。プロキシ先は Vite に `OPEN_FLOW_DEV_API_ORIGIN` として渡されます。Connector を利用する Action は `OPEN_FLOW_CONNECTOR_ORIGIN` を設定するまで利用できません。Connector Token は引き続き任意です。
 
 初回の開発実行時に、オペレーター Token が `apps/server/.open-flow-dev/operator-token` に作成されます。以降の実行ではこの Token が再利用されるため、
 開発サーバーを再起動しても現在の Workbench セッションは無効になりません。明示的な Token を使いたい場合は `OPEN_FLOW_TOKEN` を設定してください。

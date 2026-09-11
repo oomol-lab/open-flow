@@ -83,7 +83,7 @@ Agent 建立的是所選 Open Flow 部署中的真實 Draft，而不是用完即
 - **視覺化設計，需要時加入程式碼。** 在畫布上組合類型化節點，並使用 Code Task 撰寫自訂 JavaScript。程式碼始終清晰可見，不會隱藏在表單欄位中。
 - **執行和偵錯在同一處。** 執行前檢查輸入和 Flow 結構，執行時查看每個節點的進度、輸出和完整事件記錄。
 - **發布為長期執行的自動化。** Flow 可以手動啟動，也可以由 Cron、Webhook、輪詢資料來源或 Provider Event 觸發。
-- **執行狀態集中管理。** Project、不可變的 Revision、Publication、Live 版本、Run 和 Trigger 狀態都由目前的部署管理，不會散落在本機檔案和隱藏服務中。
+- **執行狀態集中管理。** Flow、不可變的 Revision、Publication、Live 版本、Run 和 Trigger 狀態都由目前的部署管理，不會散落在本機檔案和隱藏服務中。
 - **安全地執行使用者程式碼。** Server 在常駐的 Executor 程序中為每次程式碼 Task 呼叫建立全新的 V8 isolate，只開放該 Task 明確宣告的 Capability。
 - **自由選擇執行環境。** 可以直接使用 OOMOL Hosted，也可以透過 Docker 在自己的基礎設施上執行儲存庫內建的 Server。
 
@@ -119,7 +119,7 @@ flowchart LR
   CLI["oo flow CLI"] -->|"Control API"| Server
   Server -. "選用" .-> Connector["Connector 執行環境"]
   Connector --> Providers["第三方 Provider"]
-  Server --> Store["SQLite：Project、Revision、Publication、Run"]
+  Server --> Store["SQLite：Flow、Revision、Publication、Run"]
   Server --> Triggers["Trigger 排程：Cron、Webhook、Poll、Integration"]
   Server --> Runtime["隔離的 JavaScript 執行環境"]
 ```
@@ -146,10 +146,10 @@ docker run --rm \
 ```
 
 開啟 [http://127.0.0.1:3000](http://127.0.0.1:3000)，使用 `OPEN_FLOW_TOKEN` 的值登入。同一個值也可以作為 Control API 的 Bearer Token
-供機器用戶端使用。Project 和 Run 歷史會儲存在 `open-flow-data` Docker volume 中。
+供機器用戶端使用。Flow 和 Run 歷史會儲存在 `open-flow-data` Docker volume 中。
 
 如果不想自行建置，可以直接拉取預先建置的多架構映像 `ghcr.io/oomol-lab/open-flow`，或用儲存庫根目錄的 `docker-compose.yml` 啟動。
-Tag 方案 (`latest`、Release 版本、`tip` 和 commit hash) 與升級步驟請參閱 [Docker 映像文件](server/docker-ghcr/README.zh-TW.md)。
+Tag 方案 (`latest` 和 Release 版本) 與升級步驟請參閱 [Docker 映像文件](server/docker-ghcr/README.zh-TW.md)。
 
 不接外部服務時，Server 仍然可以獨立使用。Connector Action、Provider Trigger 和 LLM Task 在沒有設定對應 Host Capability
 時會拒絕執行，不會退回到來源不明的服務。
@@ -187,7 +187,7 @@ runtime origin 是 Server 存取 Connector 的位址，console origin 是使用�
 ## 一套產品，多種部署
 
 Workbench 和 CLI 透過有版本的 Control API 運作，不依賴特定資料庫或雲端執行環境。部署端負責執行和持久化；用戶端不會建立第二套本機
-Project 格式，也不會在請求失敗時暗中切換後端。
+工作流程格式，也不會在請求失敗時暗中切換後端。
 
 儲存庫主要包含：
 
@@ -209,8 +209,7 @@ bun install --frozen-lockfile
 bun run dev
 ```
 
-開發環境的 Workbench 位於 [http://127.0.0.1:5173](http://127.0.0.1:5173)，API 請求會代理到
-`http://127.0.0.1:3000` 上的 Server。
+開發環境的 Workbench 位於 [http://localhost:5174](http://localhost:5174)，Control API 請求會代理到開發後端埠（`OPEN_FLOW_PORT`，預設 `3001`；代理目標透過 `OPEN_FLOW_DEV_API_ORIGIN` 傳給 Vite）。在設定 `OPEN_FLOW_CONNECTOR_ORIGIN` 之前，Connector Action 無法使用；Connector token 仍然為選用。
 
 第一次啟動開發環境時，Server 會把管理員 Token 寫入 `apps/server/.open-flow-dev/operator-token`，後續啟動繼續使用同一個
 Token，因此重新啟動開發服務不會讓目前的 Workbench 登入狀態失效。如果需要指定 Token，可以設定 `OPEN_FLOW_TOKEN`。

@@ -92,7 +92,7 @@ Agent создаёт настоящий Draft в выбранном deployment O
   Run.
 - **Публикуйте долгоживущую автоматизацию.** Запускайте Flow вручную либо по расписанию Cron, через
   Webhook, источники polling и события Provider.
-- **Держите операционное состояние вместе.** Project, неизменяемые Revision, Publication, версии
+- **Держите операционное состояние вместе.** Flow, неизменяемые Revision, Publication, версии
   Live, Run и состояние Trigger принадлежат одному выбранному deployment, а не разбросаны между
   локальными файлами и скрытыми сервисами.
 - **Безопасно выполняйте недоверенный код.** Server выполняет каждый кодовый Task в новом V8 isolate
@@ -136,7 +136,7 @@ flowchart LR
   CLI["oo flow CLI"] -->|"Control API"| Server
   Server -. "опционально" .-> Connector["Среда выполнения Connector"]
   Connector --> Providers["Сторонние Provider"]
-  Server --> Store["SQLite: Project, Revision, Publication, Run"]
+  Server --> Store["SQLite: Flow, Revision, Publication, Run"]
   Server --> Triggers["Планировщик Trigger: Cron, Webhook, Poll, Integration"]
   Server --> Runtime["Изолированная среда выполнения JavaScript"]
 ```
@@ -168,10 +168,10 @@ docker run --rm \
 
 Откройте [http://127.0.0.1:3000](http://127.0.0.1:3000) и войдите, указав значение
 `OPEN_FLOW_TOKEN`. То же значение работает как Bearer token для машинных клиентов Control API.
-Project и история Run сохраняются в Docker volume `open-flow-data`.
+Flow и история Run сохраняются в Docker volume `open-flow-data`.
 
 Чтобы пропустить сборку, загрузите готовый мультиархитектурный образ `ghcr.io/oomol-lab/open-flow` или запустите его через
-`docker-compose.yml` в корне репозитория. Теги (`latest`, версии Release, `tip` и хеши коммитов) и шаги обновления описаны в
+`docker-compose.yml` в корне репозитория. Теги (`latest` и версии Release) и шаги обновления описаны в
 [руководстве по Docker-образу](server/docker-ghcr/README.ru.md).
 
 Server полезен и без внешних сервисов. Action на базе Connector, Trigger от Provider и LLM Task
@@ -242,8 +242,10 @@ bun install --frozen-lockfile
 bun run dev
 ```
 
-Откройте Workbench для разработки по адресу [http://127.0.0.1:5173](http://127.0.0.1:5173). Его
-API-запросы проксируются на Server по адресу `http://127.0.0.1:3000`.
+Откройте Workbench для разработки по адресу [http://localhost:5174](http://localhost:5174). Запросы
+Control API проксируются на порт backend для разработки (`OPEN_FLOW_PORT`, по умолчанию `3001`);
+цель прокси передаётся в Vite как `OPEN_FLOW_DEV_API_ORIGIN`. Action на базе Connector остаются
+недоступны, пока не задан `OPEN_FLOW_CONNECTOR_ORIGIN`. Токен Connector по-прежнему необязателен.
 
 При первом запуске в режиме разработки создаётся токен оператора в
 `apps/server/.open-flow-dev/operator-token`. Последующие запуски используют его повторно, поэтому

@@ -18,21 +18,18 @@ SQLite migration을 포함한 하나의 Server 프로세스입니다. 구성, �
 | --------------- | ---------------------------------------- | --------------------------------------------------------- |
 | `latest`        | 최신 안정 Release                        | 현재 안정 버전 Server가 필요할 때                         |
 | `<release-tag>` | `v0.1.0-beta.1` 같은 특정 Release (불변) | 프로덕션에 배포하며 고정되고 재현 가능한 빌드가 필요할 때 |
-| `tip`           | `main`의 최신 커밋                       | 아직 릴리스되지 않은 변경을 시험하고 싶을 때              |
-| `<short-sha>`   | `main`의 특정 커밋 (불변)                | 특정 프리릴리스 빌드에 고정하고 싶을 때                   |
 
 모든 GitHub Release는 자신의 tag를 게시합니다. 안정 Release는 `latest`도 이동시키지만 pre-release는 그렇지 않으므로 `latest`는 beta를
-가리키지 않습니다. `main`에 push할 때마다 `tip`과 짧은 커밋 해시가 게시됩니다. 같은 이름의 tag는 더 새로운 빌드로 교체되므로 `latest`와
-`tip`은 이동하고, Release tag와 커밋 해시는 고정됩니다.
+가리키지 않습니다.
 
-Open Flow는 beta 단계입니다. `latest`는 첫 안정 Release와 함께 생기므로 그 전에는 `tip`이나 `v0.1.0-beta.1` 같은 beta Release tag를 사용하세요. 프로덕션에서는 `latest` 대신 Release tag에 고정하세요.
+Open Flow는 beta 단계입니다. `latest`는 첫 안정 Release와 함께 생기므로 그 전에는 `v0.1.0-beta.1` 같은 beta Release tag를 사용하세요. 프로덕션에서는 `latest` 대신 Release tag에 고정하세요.
 
 ## Pull
 
 이미지는 공개되어 있어 로그인이 필요 없습니다:
 
 ```bash
-docker pull ghcr.io/oomol-lab/open-flow:tip
+docker pull ghcr.io/oomol-lab/open-flow:v0.1.0-beta.1   # 다른 Release tag도 가능
 ```
 
 `unauthorized` 또는 `denied` 오류가 나면 `read:packages` scope가 있는 GitHub token으로 로그인하세요:
@@ -61,7 +58,7 @@ docker run -d \
   -p 3000:3000 \
   -v open-flow-data:/data/open-flow \
   -e OPEN_FLOW_TOKEN="$OPEN_FLOW_TOKEN" \
-  ghcr.io/oomol-lab/open-flow:tip
+  ghcr.io/oomol-lab/open-flow:v0.1.0-beta.1
 ```
 
 [http://127.0.0.1:3000](http://127.0.0.1:3000)을 열고 그 token으로 로그인합니다. `OPEN_FLOW_TOKEN`을 생략하면 첫 시작 시 로그에 일회성
@@ -81,7 +78,7 @@ docker compose up -d
 docker compose logs -f open-flow
 ```
 
-특정 tag를 실행하려면 아래 업그레이드 명령을 포함한 모든 compose 명령 전에 셸에서 `OPEN_FLOW_IMAGE_TAG`를 export하세요. 그렇지 않으면 고정한 Release가 `tip`으로 되돌아갑니다. 예: `export OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1`.
+특정 tag를 실행하려면 아래 업그레이드 명령을 포함한 모든 compose 명령 전에 셸에서 `OPEN_FLOW_IMAGE_TAG`를 export하세요: `export OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1`. 함께 제공되는 compose 파일은 기본값으로 `latest`를 사용하지만 `latest`는 첫 안정 Release와 함께만 나타나므로, beta 기간에는 이 변수를 반드시 설정하세요.
 
 ### 소스에서 빌드
 
