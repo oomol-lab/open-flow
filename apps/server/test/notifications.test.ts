@@ -41,3 +41,15 @@ it('forgets manually dismissed notices', () => {
   notify(undefined)
   expect(toast.dismiss).not.toHaveBeenCalled()
 })
+
+it('forgets a notification when its Undo action dismisses it', () => {
+  vi.mocked(toast.success).mockReturnValueOnce(6)
+  const run = vi.fn(async () => {})
+  notify({ kind: 'success', message: 'Node deleted.', undo: { label: 'Undo', run } })
+  const action = vi.mocked(toast.success).mock.calls[0]?.[1]?.action
+  if (action == null || typeof action != 'object' || !('onClick' in action)) throw new Error('Expected Undo action')
+  action.onClick({} as Parameters<typeof action.onClick>[0])
+  expect(run).toHaveBeenCalledOnce()
+  notify(undefined)
+  expect(toast.dismiss).not.toHaveBeenCalled()
+})

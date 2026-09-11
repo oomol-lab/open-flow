@@ -190,18 +190,25 @@ function HistorySample({
       language,
       (name, value) => logRef.current(name, value),
       (notice) => {
-        if (!interactive || notice == null) return
+        if (!interactive) return
         const options = {
           toasterId,
           action:
             notice.undo == null
               ? undefined
-              : { label: <NotificationUndoLabel>{notice.undo.label}</NotificationUndoLabel>, onClick: () => void notice.undo?.run() },
+              : {
+                  label: <NotificationUndoLabel>{notice.undo.label}</NotificationUndoLabel>,
+                  onClick: () => {
+                    toastIds.delete(toastId)
+                    void notice.undo?.run()
+                  },
+                },
           duration: notice.kind == 'error' ? 8000 : 4000,
           onDismiss: ({ id }: { id: string | number }) => toastIds.delete(id),
           onAutoClose: ({ id }: { id: string | number }) => toastIds.delete(id),
         }
-        toastIds.add(notice.kind == 'error' ? toast.error(notice.message, options) : toast.success(notice.message, options))
+        const toastId: string | number = notice.kind == 'error' ? toast.error(notice.message, options) : toast.success(notice.message, options)
+        toastIds.add(toastId)
       },
     )
     let disposed = false

@@ -18,12 +18,15 @@ export function notify(notification: WorkbenchNotification | undefined): void {
         ? undefined
         : {
             label: createElement(NotificationUndoLabel, null, notification.undo.label),
-            onClick: () => void notification.undo?.run(),
+            onClick: () => {
+              notificationIds.delete(id)
+              void notification.undo?.run()
+            },
           },
     duration: notification.kind == 'error' ? 8000 : 4000,
     onDismiss: ({ id }: { id: string | number }) => notificationIds.delete(id),
     onAutoClose: ({ id }: { id: string | number }) => notificationIds.delete(id),
   }
-  const id = notification.kind == 'error' ? toast.error(notification.message, options) : toast.success(notification.message, options)
+  const id: string | number = notification.kind == 'error' ? toast.error(notification.message, options) : toast.success(notification.message, options)
   notificationIds.add(id)
 }

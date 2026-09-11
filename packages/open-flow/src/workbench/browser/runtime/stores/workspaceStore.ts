@@ -147,7 +147,6 @@ export class WorkspaceStore {
       beforeChange: (manageBusy) => {
         if (manageBusy) {
           this.#set({ busy: 'designer' })
-          this.#setNotice(undefined)
         }
       },
       check: () => void this.#checkTarget(),
@@ -321,7 +320,6 @@ export class WorkspaceStore {
   public async createFlow(name: string, create?: (name: string) => Promise<string>): Promise<Flow | undefined> {
     if (!(await this.saveModuleEditor())) return
     this.#set({ busy: 'flow' })
-    this.#setNotice(undefined)
     try {
       if (create == null) return await this.#flows.create(name)
       const flow = await this.#client.getFlow(await create(name))
@@ -339,7 +337,6 @@ export class WorkspaceStore {
     const flow = this.#flows.flow(flowId)
     if (flow == null || flow.status == 'retiring') return false
     this.#set({ busy: 'flow' })
-    this.#setNotice(undefined)
     try {
       await this.#client.deleteFlow(flowId)
       if (this.#disposed) return false
@@ -359,7 +356,6 @@ export class WorkspaceStore {
     if (this.#model.value.draft == null) return false
     const id = this.#identity()
     this.#set({ busy: 'resource' })
-    this.#setNotice(undefined)
     const changed = await this.#changeDraft(createFlowResource(id, name), false)
     this.#set({ busy: undefined })
     if (changed == null) return false
@@ -377,7 +373,6 @@ export class WorkspaceStore {
     if (flow == null || nextName.length == 0) return false
     if (flow.name == nextName) return true
     this.#set({ busy: 'flow' })
-    this.#setNotice(undefined)
     let changed: Flow | undefined
     try {
       changed = await this.#client.renameFlow(flowId, nextName)

@@ -187,7 +187,6 @@ export class RunStore {
     }
     this.#selection.invalidate()
     this.#stopObservation()
-    this.#setNotice(undefined)
     const cancelingRunId = selectedRun(state)?.flowId == flowId ? state.cancelingRunId : undefined
     if (state.cancelingRunId != null && cancelingRunId == null) this.#cancellation.invalidate()
     this.#state.set({
@@ -277,7 +276,6 @@ export class RunStore {
     const run = selectedRun(this.#state.value)
     if (!canCancelRun(run) || this.#state.value.cancelingRunId != null || this.#state.value.resolvingAction != null) return
     const current = this.#cancellation.begin()
-    this.#setNotice(undefined)
     this.#set({ cancelingRunId: run.runId })
     try {
       const cancellation = await this.#client.cancelRun(run.runId)
@@ -309,7 +307,6 @@ export class RunStore {
       !waiting.actions.some((candidate) => candidate == action)
     )
       return
-    this.#setNotice(undefined)
     this.#set({ resolvingAction: action })
     try {
       const resolution = await this.#client.resolveRunWait(run.runId, waiting.waitId, action)
