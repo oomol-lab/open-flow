@@ -162,6 +162,18 @@
     font-weight: 500;
   }
 
+  .run-control-label {
+    min-width: 0;
+    overflow: hidden;
+    transition: width 180ms ease-in-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .run-control-label {
+      transition: none;
+    }
+  }
+
   .run-control-main:only-child {
     padding-inline-end: 16px;
   }
