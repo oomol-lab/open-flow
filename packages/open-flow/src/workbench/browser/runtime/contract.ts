@@ -18,6 +18,11 @@ export interface WorkbenchNotification {
 }
 
 export interface WorkbenchHost {
+  /** A stable deployment identity enables persistent Trigger metadata caching. */
+  readonly triggerCatalogCache?: {
+    readonly namespace: string
+    readonly storage?: { getItem(key: string): string | null; setItem(key: string, value: string): void }
+  }
   notify(notification: WorkbenchNotification | undefined): void
   openExternalPage(resolveUrl: () => Promise<string>): Promise<boolean>
   request(input: RequestInfo | URL, init?: RequestInit): Promise<Response>

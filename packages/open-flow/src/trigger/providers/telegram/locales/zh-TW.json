@@ -1,0 +1,6 @@
+{
+  "telegram.on_update": {
+    "displayName": "Telegram: 機器人更新",
+    "description": "在已連線的 Telegram 機器人收到所選更新時觸發。"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "shopify.on_shop_event": {
+    "displayName": "Shopify: 商店事件",
+    "description": "在已连接商店发生所选 Shopify webhook 主题对应的事件时触发。"
+  }
+}

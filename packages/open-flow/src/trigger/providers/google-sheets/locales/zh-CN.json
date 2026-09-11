@@ -1,0 +1,6 @@
+{
+  "googlesheets.on_row_added": {
+    "displayName": "Google Sheets: 新增行",
+    "description": "轮询工作表，在上次已知的末行下方追加新行时，为每个新行触发一次。"
+  }
+}

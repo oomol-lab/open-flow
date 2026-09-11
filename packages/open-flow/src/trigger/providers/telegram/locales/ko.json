@@ -1,0 +1,6 @@
+{
+  "telegram.on_update": {
+    "displayName": "Telegram: 봇 업데이트",
+    "description": "연결된 Telegram 봇이 선택한 업데이트를 받으면 실행합니다."
+  }
+}

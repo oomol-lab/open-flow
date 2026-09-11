@@ -1,0 +1,6 @@
+{
+  "notion.on_database_page_event": {
+    "displayName": "Notion: データベースページの追加・更新",
+    "description": "Notion データベースを定期的に確認し、ページの追加や既存ページの編集を検出すると実行します。"
+  }
+}

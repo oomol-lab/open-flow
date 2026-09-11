@@ -18,7 +18,7 @@ const workbenchStyleImports = [
   "@import './styles/responsive.css';",
 ] as const
 
-const sharedUiTokens = [
+const surfaceUiTokens = [
   '--ui-accent',
   '--ui-accent-foreground',
   '--ui-background',
@@ -39,6 +39,9 @@ const sharedUiTokens = [
   '--ui-secondary',
   '--ui-secondary-foreground',
 ] as const
+
+const inheritedUiTokens = ['--ui-font-size'] as const
+const sharedUiTokens = [...surfaceUiTokens, ...inheritedUiTokens].toSorted()
 
 const reactFlowThemeContract = {
   '--xy-controls-box-shadow': 'var(--floating-control-shadow)',
@@ -454,10 +457,13 @@ test('owns product and canvas surface tokens in one theme entry', async () => {
   ])
   assert.deepEqual(referencedTokens(uiSources.join('\n'), '--ui-'), sharedUiTokens)
   assert.deepEqual(Object.keys(declarations(theme, '--ui-')).toSorted(), sharedUiTokens)
+  const inheritedTheme = theme.match(/:root,\s*\.open-flow-theme\s*\{([^}]+)\}/)
+  assert.ok(inheritedTheme, 'Shared inherited tokens must be available to root and themed surfaces.')
+  assert.deepEqual(Object.keys(declarations(inheritedTheme[1]!, '--ui-')).toSorted(), inheritedUiTokens)
   const canvasSurfaces = [...theme.matchAll(/\.open-flow-theme\[data-surface=['"]canvas['"]\](?:\[data-theme=['"]dark['"]\])?\s*\{([^}]+)\}/g)]
   assert.equal(canvasSurfaces.length, 2)
   for (const [, surface] of canvasSurfaces) {
-    assert.deepEqual(Object.keys(declarations(surface!, '--ui-')).toSorted(), sharedUiTokens)
+    assert.deepEqual(Object.keys(declarations(surface!, '--ui-')).toSorted(), surfaceUiTokens)
     assert.deepEqual(declarations(surface!, '--xy-'), reactFlowThemeContract)
   }
   assert.match(theme, /\.open-flow-theme\[data-theme=['"]dark['"]\]/)

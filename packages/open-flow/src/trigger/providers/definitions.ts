@@ -55,3 +55,5 @@ export const integrationDefinitions: readonly IntegrationDefinition[] = triggerD
 )
 
 export type { TriggerConfigOption, TriggerConfigOptionsContext } from '../common/configOptions.ts'
+
+export { localizeTrigger } from './localization.ts'

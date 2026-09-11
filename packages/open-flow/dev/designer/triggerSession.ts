@@ -1,5 +1,6 @@
 import type { ChangeOperation, RevisionContent, TriggerNode } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
+import type { WorkbenchHost } from '../../src/workbench/browser/runtime/contract.ts'
 import type { LogAction } from './stories.tsx'
 
 import { applyFlowChanges } from '../../src/flow/common/change.ts'
@@ -11,7 +12,17 @@ import { WorkspaceStore } from '../../src/workbench/browser/runtime/stores/works
 import { triggerDraft } from './triggerFixtures.ts'
 
 // Only local HTTP responses are fixtures. Editing and persistence use the production reducer/store.
-export function createTriggerSession(trigger: TriggerNode, language: UiLanguage, log: LogAction, nodeId: string, create = false) {
+export function createTriggerSession(
+  trigger: TriggerNode,
+  language: UiLanguage,
+  log: LogAction,
+  nodeId: string,
+  create = false,
+  catalog?: {
+    request: (url: URL, init?: RequestInit) => Promise<Response>
+    cache: WorkbenchHost['triggerCatalogCache']
+  },
+) {
   const i18n = createI18n(language)
   const { flow, draft } = triggerDraft(trigger)
   const { content: initialContent, ...revisionMetadata } = draft
@@ -34,6 +45,7 @@ export function createTriggerSession(trigger: TriggerNode, language: UiLanguage,
   const account = { connectionId: 'lab-account', serviceId, displayName: 'Design team', isDefault: true, status: 'active' as const }
   const client = new WorkbenchClient(async (path, init) => {
     const url = new URL(path instanceof Request ? path.url : path, 'https://lab.invalid')
+    if (url.pathname === '/v1/trigger-keys/catalog' && catalog != null) return catalog.request(url, init)
     if (url.pathname === '/v1/flows') return Response.json({ flows: [flow], total: 1, version: 1 })
     if (url.pathname.endsWith('/editor'))
       return Response.json({
@@ -87,6 +99,7 @@ export function createTriggerSession(trigger: TriggerNode, language: UiLanguage,
   })
   const notice = (value: unknown) => log('trigger.notice', value)
   const host = {
+    triggerCatalogCache: catalog?.cache,
     openExternalPage: async () => {
       log('trigger.connect')
       return false

@@ -193,7 +193,8 @@
     "loadFailed": "Connector 액션을 불러오지 못했습니다.",
     "paste": "붙여넣기",
     "retry": "다시 시도",
-    "search": "검색"
+    "search": "검색",
+    "catalogRefreshFailed": "트리거 목록을 새로 고치지 못했습니다. 캐시된 결과는 계속 사용할 수 있습니다."
   },
   "copy": "복사",
   "close": "닫기",

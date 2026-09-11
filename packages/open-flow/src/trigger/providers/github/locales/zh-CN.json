@@ -1,0 +1,10 @@
+{
+  "github.on_repo_event": {
+    "displayName": "GitHub: 仓库事件",
+    "description": "在仓库发生所选 GitHub webhook 事件时触发。"
+  },
+  "github.watch_pull_request": {
+    "displayName": "GitHub: 关注拉取请求",
+    "description": "通过通知和定期检查关注一个拉取请求。从当前状态开始，报告观察到的变化，不保证每次中间状态转换或评审事件都被报告。"
+  }
+}

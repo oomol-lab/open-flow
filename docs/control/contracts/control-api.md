@@ -426,9 +426,26 @@ Trigger Key catalog 是 deployment scope 资源：
 
 ```ts
 { keys: readonly TriggerKeySummary[]; version: 1 }
-{ definitions: readonly TriggerKeySnapshot[]; version: 1 }
+{
+  definitions: readonly TriggerKeySnapshot[]
+  display: Readonly<Record<string, { displayName: string; description: string }>>
+  locale: 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko' | 'ru' | 'fr'
+  version: 1
+}
 { definition: TriggerKeySnapshot; version: 1 }
 ```
+
+`GET /v1/trigger-keys` 与 `GET /v1/trigger-keys/catalog` 接受可选 `locale` query；query 优先于
+`Accept-Language`，缺省与不支持的语言回退英文，非法 BCP 47 query 返回 400。语言映射复用公共 localization
+契约。摘要返回翻译后的名称与描述；完整 catalog 的 `display` 按 Trigger key 保存展示文案，`definitions`
+始终保留原始英文定义。单条 definition、CLI 与持久化的 Flow definition 不因界面语言改变。
+
+这两个接口返回 `Content-Language`、`Vary: Accept-Language`、`Cache-Control: private, no-cache` 与根据最终响应
+生成的 `ETag`。匹配 `If-None-Match` 时返回无 body 的 304，并保留语言与缓存响应头。翻译更新也会使 ETag 失效。
+
+WorkbenchHost 可通过 `triggerCatalogCache: { namespace, storage? }` 启用持久化 catalog 缓存。namespace 必须标识
+部署；可选 storage 实现 `getItem` / `setItem`，缺省使用 localStorage，所有存储 key 都带缓存版本、部署和语言。
+未提供配置的宿主仅使用内存。列表先显示有效缓存，再用 ETag 刷新；后台失败保留缓存并显示重试提示。
 
 成功 Publication 为 Flow graph 中每个 Trigger node 提交 Live binding：
 
@@ -525,7 +542,7 @@ type FlowChangeEvent =
 | `POST`    | `/v1/runs/:runId/cancel`                                   |      200 | `{ version: 1 }`                                  |
 | `POST`    | `/v1/runs/:runId/waits/:waitId/resolve`                    |      200 | `{ action, version: 1 }`                          |
 | `GET`     | `/v1/trigger-keys`                                         |      200 | Trigger summaries                                 |
-| `GET`     | `/v1/trigger-keys/catalog`                                 |      200 | definitions                                       |
+| `GET`     | `/v1/trigger-keys/catalog`                                 | 200, 304 | definitions, display, locale                      |
 | `GET`     | `/v1/trigger-keys/:key`                                    |      200 | definition detail                                 |
 | `GET`     | `/v1/flows/:flowId/triggers`                               |      200 | Trigger bindings                                  |
 | `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId`                |      200 | binding detail                                    |

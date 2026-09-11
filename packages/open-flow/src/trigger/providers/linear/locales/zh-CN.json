@@ -1,0 +1,6 @@
+{
+  "linear.on_issue_changed": {
+    "displayName": "Linear: 议题创建或更新",
+    "description": "定期检查 Linear 团队中新建和更新的议题。从现在开始，不触发已有议题。报告观察到的当前状态，不报告删除，也不保证涵盖每次中间状态变化。"
+  }
+}

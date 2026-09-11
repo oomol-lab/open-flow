@@ -91,7 +91,8 @@
     "noConnections": "Для этого Trigger нет доступных Connection.",
     "retry": "Повторить",
     "search": "Поиск узлов",
-    "searchPlaceholder": "Поиск узлов…"
+    "searchPlaceholder": "Поиск узлов…",
+    "catalogRefreshFailed": "Не удалось обновить каталог триггеров. Сохранённые результаты остаются доступны."
   },
   "empty": {
     "loadFailedDescription": "Проверьте настройки API и убедитесь, что адрес развёртывания доступен.",

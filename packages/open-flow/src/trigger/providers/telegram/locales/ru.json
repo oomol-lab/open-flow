@@ -1,0 +1,6 @@
+{
+  "telegram.on_update": {
+    "displayName": "Telegram: Обновление бота",
+    "description": "Срабатывает, когда подключённый бот Telegram получает выбранное обновление."
+  }
+}

@@ -1,8 +1,12 @@
 import type { FlowChangeEvent } from '@oomol-lab/open-flow/workbench'
 
 import { verifyWorkbenchHost } from '@oomol-lab/open-flow/workbench-host-conformance'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createBrowserHost } from '../browser/host.ts'
+
+beforeEach(() => {
+  vi.stubGlobal('window', { location: { origin: 'https://flow.test' } })
+})
 
 afterEach(() => {
   vi.unstubAllGlobals()

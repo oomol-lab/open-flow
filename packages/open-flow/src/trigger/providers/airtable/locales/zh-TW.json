@@ -1,0 +1,6 @@
+{
+  "airtable.on_record_changed": {
+    "displayName": "Airtable: 記錄建立或更新",
+    "description": "輪詢 Airtable 資料表，依時間欄位排序，在記錄建立或更新時觸發。"
+  }
+}

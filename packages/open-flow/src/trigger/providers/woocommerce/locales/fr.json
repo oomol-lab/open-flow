@@ -1,0 +1,6 @@
+{
+  "woocommerce.on_store_event": {
+    "displayName": "WooCommerce: Événement de boutique",
+    "description": "Se déclenche lors des événements de boutique WooCommerce sélectionnés."
+  }
+}

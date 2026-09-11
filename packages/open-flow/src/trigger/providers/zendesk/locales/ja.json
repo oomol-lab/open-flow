@@ -1,0 +1,6 @@
+{
+  "zendesk.on_event": {
+    "displayName": "Zendesk: イベント購読",
+    "description": "選択した Zendesk アカウントイベントのいずれかが発生すると実行します。"
+  }
+}

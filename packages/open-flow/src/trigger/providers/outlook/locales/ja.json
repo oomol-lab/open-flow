@@ -1,0 +1,6 @@
+{
+  "outlook.on_message_received": {
+    "displayName": "Outlook: 新着メール",
+    "description": "Microsoft Outlook のメールフォルダを定期的に確認し、新しいメールが届くと実行します。"
+  }
+}

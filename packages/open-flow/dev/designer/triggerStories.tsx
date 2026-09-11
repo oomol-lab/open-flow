@@ -21,6 +21,7 @@ import { RunInputPanel } from '../../src/workbench/browser/runtime/runs/runInput
 import { RunRequestStore } from '../../src/workbench/browser/runtime/runs/runRequestStore.ts'
 import { designerGraph } from '../../src/workbench/browser/runtime/workspace.ts'
 import { useStorySidebar } from './storySidebar.tsx'
+import { TriggerCatalogStory } from './triggerCatalogStory.tsx'
 import { triggerDraft, triggerFixtures } from './triggerFixtures.ts'
 import { createTriggerSession } from './triggerSession.ts'
 
@@ -531,6 +532,14 @@ function ProviderStory({ view, ...props }: Omit<StoryProps, 'fixture'> & { reado
 }
 
 export const triggerStories: readonly FrontendStory[] = [
+  {
+    group: 'Trigger Provider',
+    id: 'trigger-provider-catalog',
+    title: 'Catalog languages & cache',
+    description: 'English, localized and long copy with cached, refreshed and failed responses. Complete refresh to load the full catalog.',
+    standalone: true,
+    render: (log, dark, language) => <TriggerCatalogStory dark={dark} language={language} log={log} />,
+  },
   {
     id: 'trigger-listener-health',
     group: 'Trigger Provider',

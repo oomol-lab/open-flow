@@ -60,6 +60,10 @@ interface LibraryNodeItem {
 type LibraryMenuItem = LibraryNodeItem | { readonly type: 'divider'; readonly label: string; readonly detail?: string }
 
 interface BlockLibraryProps {
+  readonly catalogRevision?: number
+  readonly catalogFailed?: boolean
+  readonly refreshCatalog?: () => void
+
   readonly browseOptions: (signal: AbortSignal) => Promise<readonly AddNodeOption[] | undefined>
   readonly searchOptions: (query: string, signal: AbortSignal) => Promise<readonly AddNodeOption[] | undefined>
   readonly disabled: boolean
@@ -383,6 +387,9 @@ function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices, 
 }
 
 export function BlockLibrary({
+  catalogRevision,
+  catalogFailed,
+  refreshCatalog,
   browseOptions,
   disabled,
   draggable = true,
@@ -394,6 +401,9 @@ export function BlockLibrary({
   searchOptions,
 }: BlockLibraryProps): ReactElement {
   const t = useTranslate()
+  useEffect(() => {
+    refreshCatalog?.()
+  }, [refreshCatalog, t])
   const searchLabel = options.length == 0 ? t('actionPicker.search') : t('contextPanel.search')
   const search = useRef<HTMLInputElement>(null)
   const active = useRef(true)
@@ -403,7 +413,9 @@ export function BlockLibrary({
   const filterQuery = useDebouncedValue(query, 100)
   const [adding, setAdding] = useState(false)
   const [settled, setSettled] = useState(false)
-  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(() => new Set(options.length == 0 ? [t('addNode.connectorActions')] : []))
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(
+    () => new Set(options.length == 0 ? [t('addNode.connectorActions'), t('addNode.integrationTriggers')] : []),
+  )
   const [openItems, setOpenItems] = useState<ReadonlySet<string>>(() => new Set())
   const staticOptions = useMemo(() => indexAddNodeOptions(options), [options])
   const integrationGroup = t('addNode.connectorActions')
@@ -429,7 +441,7 @@ export function BlockLibrary({
         if (!signal.aborted) setSettled(true)
       }
     },
-    [browseOptions, searchOptions],
+    [browseOptions, searchOptions, catalogRevision],
   )
   const loadChoices = useCallback(
     async (itemId: string, signal: AbortSignal): Promise<readonly LibraryChoice[] | undefined> => {
@@ -535,6 +547,7 @@ export function BlockLibrary({
       <Button
         onClick={() => {
           setSettled(false)
+          refreshCatalog?.()
           retry()
         }}
         size="sm"
@@ -611,6 +624,14 @@ export function BlockLibrary({
           />
         </InputGroup>
       </div>
+      {catalogFailed && !error && (
+        <div className="block-library-feedback" role="alert">
+          {t('contextPanel.catalogRefreshFailed')}
+          <Button onClick={refreshCatalog} size="sm" type="button" variant="secondary">
+            {t('contextPanel.retry')}
+          </Button>
+        </div>
+      )}
       <ScrollArea className="block-library-list" defer={false} events={{ initialized: (instance) => setViewport(instance.elements().viewport) }} tabIndex={-1}>
         {viewport == null ? (
           items.map(renderItem)

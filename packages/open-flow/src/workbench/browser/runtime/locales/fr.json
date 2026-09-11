@@ -91,7 +91,8 @@
     "noConnections": "Aucune Connection n'est disponible pour ce Trigger.",
     "retry": "Réessayer",
     "search": "Rechercher des blocs",
-    "searchPlaceholder": "Rechercher des blocs…"
+    "searchPlaceholder": "Rechercher des blocs…",
+    "catalogRefreshFailed": "Impossible d’actualiser le catalogue des déclencheurs. Les résultats en cache restent disponibles."
   },
   "empty": {
     "loadFailedDescription": "Vérifiez la configuration de l'API et assurez-vous que le point de terminaison de déploiement est accessible.",

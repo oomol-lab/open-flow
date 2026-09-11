@@ -1,0 +1,6 @@
+{
+  "slack.on_message_posted": {
+    "displayName": "Slack: 频道新消息",
+    "description": "轮询一个 Slack 会话，在有新消息发布时触发。"
+  }
+}

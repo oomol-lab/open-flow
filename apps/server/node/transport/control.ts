@@ -6,8 +6,11 @@ import { parseResultQuery } from '@oomol-lab/open-flow/control-api'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { controlRequests } from '@oomol-lab/open-flow/control-requests'
 import { validVariableName } from '@oomol-lab/open-flow/flow-change'
+import { resolveMetadataLanguage } from '@oomol-lab/open-flow/localization'
+import { localizeTrigger } from '@oomol-lab/open-flow/provider-triggers'
 import { runStatuses } from '@oomol-lab/open-flow/run-lifecycle'
 import { Hono } from 'hono'
+import { etag, RETAINED_304_HEADERS } from 'hono/etag'
 import { ControlError } from '../error.ts'
 import {
   decodeFlowCursor,
@@ -68,13 +71,39 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     return response(200, { version: 1 })
   })
 
+  for (const path of ['/trigger-keys', '/trigger-keys/catalog']) {
+    app.use(path, etag({ retainedHeaders: [...RETAINED_304_HEADERS, 'content-language'] }))
+  }
+  const metadataLocale = (context: Context<Environment>) => {
+    query(context.req.raw, ['locale'], controlErrorCode.flowInvalid)
+    try {
+      const locale = resolveMetadataLanguage(context.req.query('locale'), context.req.header('Accept-Language'))
+      context.header('Content-Language', locale)
+      context.header('Vary', [context.res.headers.get('Vary'), 'Accept-Language'].filter(Boolean).join(', '))
+      context.header('Cache-Control', 'private, no-cache')
+      return locale
+    } catch {
+      throw new ControlError(controlErrorCode.flowInvalid, 'locale must be a valid BCP 47 language tag.')
+    }
+  }
   app.get('/trigger-keys', (context) => {
-    query(context.req.raw, [], controlErrorCode.flowInvalid)
-    return response(200, { keys: service.listTriggerKeys(), version: 1 })
+    const locale = metadataLocale(context)
+    const keys = service.listTriggerDefinitions().map((definition) => {
+      const { key, name, provider, type } = definition
+      const { displayName, description } = localizeTrigger(definition, locale)
+      return { key, name, provider, type, displayName, description }
+    })
+    return context.json({ keys, version: 1 })
   })
   app.get('/trigger-keys/catalog', (context) => {
-    query(context.req.raw, [], controlErrorCode.flowInvalid)
-    return response(200, { definitions: service.listTriggerDefinitions(), version: 1 })
+    const locale = metadataLocale(context)
+    const definitions = service.listTriggerDefinitions()
+    return context.json({
+      definitions,
+      display: Object.fromEntries(definitions.map((definition) => [definition.key, localizeTrigger(definition, locale)])),
+      locale,
+      version: 1,
+    })
   })
   app.get('/trigger-keys/:key', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)

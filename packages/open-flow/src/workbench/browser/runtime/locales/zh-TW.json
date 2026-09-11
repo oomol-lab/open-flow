@@ -91,7 +91,8 @@
     "noConnections": "這個 Trigger 沒有可用的 Connection。",
     "retry": "重試",
     "search": "搜尋節點",
-    "searchPlaceholder": "搜尋節點…"
+    "searchPlaceholder": "搜尋節點…",
+    "catalogRefreshFailed": "無法重新整理觸發器清單，仍可使用已快取的結果。"
   },
   "empty": {
     "loadFailedDescription": "請檢查 API 設定，並確認部署端點可以連線。",

@@ -1,0 +1,6 @@
+{
+  "slack.on_message_posted": {
+    "displayName": "Slack: 頻道新訊息",
+    "description": "輪詢一個 Slack 對話，在有新訊息發布時觸發。"
+  }
+}

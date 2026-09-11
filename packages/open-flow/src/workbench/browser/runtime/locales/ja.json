@@ -91,7 +91,8 @@
     "noConnections": "この Trigger で利用できる Connection はありません。",
     "retry": "再試行",
     "search": "ノードを検索",
-    "searchPlaceholder": "ノードを検索…"
+    "searchPlaceholder": "ノードを検索…",
+    "catalogRefreshFailed": "トリガー一覧を更新できませんでした。キャッシュ済みの結果は引き続き利用できます。"
   },
   "empty": {
     "loadFailedDescription": "API 設定を確認し、デプロイ先のエンドポイントに接続できることを確認してください。",

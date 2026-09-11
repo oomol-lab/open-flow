@@ -1,3 +1,7 @@
+import type { TriggerCatalogCache } from './triggerCatalog.ts'
+
+import { decodeTriggerCatalog } from './triggerCatalog.ts'
+export { decodeTriggerCatalog, type TriggerCatalog, type TriggerCatalogCache, type TriggerDisplay } from './triggerCatalog.ts'
 import type { TriggerConfigOption } from '../../trigger/common/configOptions.ts'
 export type { TriggerConfigOption } from '../../trigger/common/configOptions.ts'
 import type { ResultQuery } from './results.ts'
@@ -603,8 +607,8 @@ export class ControlClient {
     return flow(await this.request(`/v1/flows/${segment(flowId)}`, { method: 'DELETE' }))
   }
 
-  async listTriggerKeys(signal?: AbortSignal): Promise<readonly TriggerKeySummary[]> {
-    const source = record(await this.request('/v1/trigger-keys', { signal }))
+  async listTriggerKeys(signal?: AbortSignal, locale?: string): Promise<readonly TriggerKeySummary[]> {
+    const source = record(await this.request(`/v1/trigger-keys${locale == null ? '' : `?locale=${encodeURIComponent(locale)}`}`, { signal }))
     if (source.version != 1 || !Array.isArray(source.keys)) return invalidResponse()
     return source.keys.map(triggerKeySummary)
   }
@@ -613,6 +617,17 @@ export class ControlClient {
     const source = record(await this.request('/v1/trigger-keys/catalog', { signal }))
     if (source.version != 1 || !Array.isArray(source.definitions)) return invalidResponse()
     return source.definitions.map(triggerKey)
+  }
+
+  async getTriggerCatalog(locale: string, cached?: TriggerCatalogCache, signal?: AbortSignal): Promise<TriggerCatalogCache> {
+    const headers = new Headers()
+    if (cached?.etag) headers.set('if-none-match', cached.etag)
+    const response = await this.response(`/v1/trigger-keys/catalog?locale=${encodeURIComponent(locale)}`, { headers, signal }, true)
+    if (response.status == 304) {
+      if (cached == null) return invalidResponse()
+      return cached
+    }
+    return { data: decodeTriggerCatalog(await response.json()), etag: response.headers.get('etag')?.trim() || null }
   }
 
   async getTriggerKey(key: string, signal?: AbortSignal): Promise<TriggerKeySnapshot> {
@@ -945,11 +960,11 @@ export class ControlClient {
     return source.actions.map(connectorAction)
   }
 
-  private async response(path: string, init: RequestInit): Promise<Response> {
+  private async response(path: string, init: RequestInit, allowNotModified = false): Promise<Response> {
     const headers = new Headers(init.headers)
     if (init.body != null) headers.set('content-type', 'application/json')
     const response = await this.requestControl(path, { ...init, headers })
-    if (!response.ok) {
+    if (!response.ok && !(allowNotModified && response.status == 304)) {
       let value: unknown
       try {
         value = await response.json()
