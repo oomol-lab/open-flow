@@ -2,6 +2,7 @@ import type {
   CodeModule,
   FlowDocument,
   Graph,
+  GraphEdge,
   GraphNode,
   Group,
   InlineTaskDefinition,
@@ -17,7 +18,9 @@ import type {
   WebhookOptions,
 } from '@oomol-lab/open-flow/flow-change'
 
-import { decodeRevisionEnvelope } from './changeSchema.ts'
+import { nextNodeName } from '@oomol-lab/open-flow/flow-change'
+import { z } from 'zod'
+import { decodeRevisionContent, decodeRevisionEnvelope } from './changeSchema.ts'
 export { maxJsonDepth } from './json.ts'
 
 export { decodeFlowDocument, decodeRevisionContent } from './changeSchema.ts'
@@ -313,4 +316,107 @@ export function encodeRevision(content: RevisionContent): Uint8Array {
 export function decodeRevision(bytes: Uint8Array): RevisionContent {
   const value: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
   return decodeRevisionEnvelope(value)
+}
+
+const object = z.record(z.string(), z.unknown())
+const port = z.object({ jsonSchema: z.unknown(), nullable: z.boolean(), value: z.unknown().optional(), description: z.string().optional() }).strict()
+const ports = z.record(z.string(), port)
+const mapping = z.union([
+  z.object({ kind: z.literal('value'), value: z.unknown() }).strict(),
+  z.object({ kind: z.literal('sources'), sources: z.array(z.object({ kind: z.literal('node'), nodeId: z.string(), output: z.string() }).strict()) }).strict(),
+])
+const metadata = { name: z.string().optional(), description: z.string().optional(), icon: z.string().optional() }
+const node = z.union([
+  z.object({ ...metadata, kind: z.literal('cron'), cronTimes: z.array(z.unknown()) }).strict(),
+  z.object({ ...metadata, kind: z.literal('manual') }).strict(),
+  z
+    .object({
+      ...metadata,
+      kind: z.literal('task'),
+      concurrency: z.literal(1).optional(),
+      inputs: z.record(z.string(), mapping),
+      task: z.object({ name: z.string(), moduleId: z.string(), inputs: ports, outputs: z.record(z.string(), port.omit({ value: true })) }).strict(),
+    })
+    .strict(),
+])
+const flow = z.object({ name: z.string(), graph: z.object({ nodes: z.record(z.string(), node) }).strict() }).strict()
+const legacyProject = z
+  .object({
+    kind: z.literal('open-flow-project-revision'),
+    version: z.literal(1),
+    modelVersion: z.literal(1),
+    modules: z.record(z.string(), z.object({ name: z.string(), source: z.string(), imports: z.array(z.string()) }).strict()),
+    document: z.object({ bindings: object, flows: object, subflows: object, tasks: object }).strict(),
+  })
+  .strict()
+
+function convertPorts(definitions: z.infer<typeof ports>) {
+  return Object.entries(definitions).map(([handle, definition]) => Object.assign({ handle }, definition))
+}
+
+export function legacyProjectFlowIds(value: unknown): readonly string[] {
+  return Object.keys(legacyProject.parse(value).document.flows).toSorted()
+}
+
+export function convertProjectFlow(value: unknown, flowId: string): { name: string; revision: RevisionContent; adjustments: readonly string[] } {
+  const source = legacyProject.parse(value)
+  if ([source.document.bindings, source.document.subflows, source.document.tasks].some((definitions) => Object.keys(definitions).length != 0)) {
+    throw new Error('Project bindings, managed tasks and subflows require an explicit semantic conversion.')
+  }
+  const selected = flow.parse(source.document.flows[flowId])
+  const adjustments: string[] = []
+  const names = new Set<string>()
+  const nodes = Object.fromEntries(
+    Object.entries(selected.graph.nodes).map(([id, entry]) => {
+      const originalName = entry.name ?? (entry.kind == 'task' ? entry.task.name : id)
+      const name = nextNodeName(originalName, names)
+      names.add(name)
+      if (name != originalName) adjustments.push(`Renamed node ${id} to ${name}.`)
+      if (entry.kind != 'task') return [id, { ...entry, name }]
+      const { concurrency: _, ...taskNode } = entry
+      return [
+        id,
+        {
+          ...taskNode,
+          name,
+          task: { ...entry.task, inputs: convertPorts(entry.task.inputs), outputs: convertPorts(entry.task.outputs) },
+        },
+      ]
+    }),
+  )
+  const revision = decodeRevisionContent({
+    modelVersion: 1,
+    modules: source.modules,
+    document: { bindings: {}, subflows: {}, tasks: {}, graph: { nodes, edges: [] } },
+  })
+  const edges: GraphEdge[] = []
+  const successors = new Set<string>()
+  const triggers = Object.values(revision.document.graph.nodes).filter((entry) => entry.kind != 'task')
+  let manualId: string | undefined
+  if (Object.keys(nodes).length > 0 && triggers.length == 0) {
+    manualId = 'migration-start'
+    while (Object.hasOwn(nodes, manualId)) manualId += '-start'
+    adjustments.push(`Added manual entry ${manualId}.`)
+  } else if (triggers.length > 1) throw new Error('Multiple legacy triggers require an explicit execution-order decision.')
+  for (const [id, entry] of Object.entries(revision.document.graph.nodes)) {
+    if (entry.kind != 'task') continue
+    const dependencies = new Set<string>()
+    for (const input of Object.values(entry.inputs)) {
+      if (input.kind == 'sources') {
+        for (const dependency of input.sources) {
+          if (dependency.kind != 'node') throw new Error('Only node input sources can be converted automatically.')
+          dependencies.add(dependency.nodeId)
+        }
+      }
+    }
+    if (dependencies.size == 0 && manualId != null) dependencies.add(manualId)
+    if (dependencies.size != 1) throw new Error(`Task ${id} does not have exactly one execution predecessor.`)
+    const predecessor = [...dependencies][0]!
+    if (successors.has(predecessor)) throw new Error('Parallel legacy branches require an explicit execution-order decision.')
+    successors.add(predecessor)
+    edges.push({ source: predecessor, target: id })
+  }
+  const convertedNodes = { ...revision.document.graph.nodes }
+  if (manualId != null) convertedNodes[manualId] = { kind: 'manual', name: nextNodeName('Start', names) }
+  return { name: selected.name, adjustments, revision: { ...revision, document: { ...revision.document, graph: { nodes: convertedNodes, edges } } } }
 }
