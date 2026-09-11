@@ -200,7 +200,7 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
   )
 }
 
-type RunState = 'empty' | 'ready' | 'invalid' | 'starting' | 'direct' | 'disabled'
+type RunState = 'closed' | 'empty' | 'ready' | 'invalid' | 'starting' | 'direct' | 'disabled'
 function RunSample({ fixture, dark, language, log, state, downstream = false }: StoryProps & { state: RunState; downstream?: boolean }) {
   const [resource, setResource] = useState<{
     store: RunRequestStore
@@ -251,16 +251,12 @@ function RunSample({ fixture, dark, language, log, state, downstream = false }: 
     )
     let disposed = false
     void (async () => {
-      if (state !== 'direct' && state !== 'disabled') {
+      if (state !== 'closed' && state !== 'direct' && state !== 'disabled') {
         await store.editDraft(flow, draft, 'trigger')
         if (disposed) return
-        for (const group of store.$.inputRequest.value?.groups ?? []) {
+        for (const group of state === 'empty' ? [] : (store.$.inputRequest.value?.groups ?? [])) {
           group.editor.replaceValues(
-            state === 'empty'
-              ? {}
-              : group.nodeId === 'trigger'
-                ? { payload: state === 'invalid' ? null : fixture.payload }
-                : { message: state === 'invalid' ? 123 : 'Test message' },
+            group.nodeId === 'trigger' ? { payload: state === 'invalid' ? null : fixture.payload } : { message: state === 'invalid' ? 123 : 'Test message' },
           )
         }
         if (state === 'invalid' || state === 'starting') void store.confirmInputs()
@@ -283,20 +279,26 @@ function RunSample({ fixture, dark, language, log, state, downstream = false }: 
         {downstream ? 'Downstream input · ' : ''}
         {state}
       </h3>
-      {resource && request && (
+      {resource && request && state !== 'closed' && (
         <div className="run-input-popover trigger-run-panel">
           <RunInputPanel store={resource.store} theme={dark ? 'dark' : 'light'} onStarted={() => log('run.started')} />
         </div>
       )}
       <div className="trigger-run-dock">
         <RunControl
+          inputContent={
+            state === 'closed' && resource ? (
+              <RunInputPanel store={resource.store} theme={dark ? 'dark' : 'light'} onStarted={() => log('run.started')} />
+            ) : undefined
+          }
           disabled={state === 'disabled'}
           inputOpen={request != null}
           inputStatus={
             request ? (valid ? 'ready' : 'missing') : (resource?.store.inputStatus(resource.inputs.flow.flowId, resource.inputs.draft, 'trigger') ?? 'none')
           }
           onInputOpenChange={(open) => {
-            // Gallery panels stay visible when another sample receives focus.
+            // Gallery panels stay visible; the closed sample exercises the real popover.
+            if (!open && state === 'closed') resource?.store.dismissInputs()
             if (open && resource) void resource.store.editDraft(resource.inputs.flow, resource.inputs.draft, 'trigger')
           }}
           onRun={() => {
@@ -321,6 +323,7 @@ function RunStory(props: StoryProps) {
         {(['empty', 'ready', 'invalid', 'starting'] as const).map((state) => (
           <RunSample key={state} {...props} state={state} downstream={direct} />
         ))}
+        <RunSample {...props} state="closed" downstream={direct} />
         <RunSample {...props} state="disabled" />
       </div>
     </Gallery>

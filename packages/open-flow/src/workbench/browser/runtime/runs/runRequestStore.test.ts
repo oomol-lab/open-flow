@@ -317,3 +317,74 @@ it('reopens test data when its input shape changes', async () => {
     store.dispose()
   }
 })
+
+function webhookDraft(): Draft {
+  const revision = entryDraft()
+  return {
+    ...revision,
+    content: {
+      ...revision.content,
+      document: {
+        ...revision.content.document,
+        graph: { edges: [], nodes: { start: { kind: 'webhook', name: 'Webhook', inputsDef: [], options: {} } } },
+      },
+    },
+  }
+}
+
+it('keeps the run button idle throughout opening the test data editor', async () => {
+  const { client, store } = harness()
+  const starting: boolean[] = []
+  const unsubscribe = store.$.starting.subscribe((value) => starting.push(value))
+  try {
+    const opening = store.editDraft(flow, webhookDraft(), 'start')
+    expect(store.$.starting.value).toBe(false)
+    expect(await opening).toBe('input')
+    expect(starting).not.toContain(true)
+    expect(client.createDraftRun).not.toHaveBeenCalled()
+  } finally {
+    unsubscribe()
+    store.dispose()
+  }
+})
+
+it('preserves missing webhook data across untouched open/close cycles', async () => {
+  const { client, store } = harness()
+  const revision = webhookDraft()
+  try {
+    for (let cycle = 0; cycle < 2; cycle++) {
+      expect(await store.editDraft(flow, revision, 'start')).toBe('input')
+      expect(store.$.inputRequest.value?.groups[0]?.editor.values()).toEqual({})
+      expect(store.$.inputRequest.value?.valid.value).toBe(false)
+      store.dismissInputs()
+      expect(store.inputStatus(flow.flowId, revision, 'start')).toBe('missing')
+    }
+    expect(await store.requestDraft(flow, revision, 'start')).toBe('input')
+    expect(await store.confirmInputs()).toBe(false)
+    expect(client.createDraftRun).not.toHaveBeenCalled()
+  } finally {
+    store.dispose()
+  }
+})
+
+it('remembers explicitly entered empty payloads and keeps cleared data missing', async () => {
+  const { client, store } = harness()
+  const revision = webhookDraft()
+  try {
+    await store.editDraft(flow, revision, 'start')
+    store.$.inputRequest.value?.groups[0]?.editor.setValue('payload', {})
+    store.dismissInputs()
+    expect(store.inputStatus(flow.flowId, revision, 'start')).toBe('ready')
+    expect(await store.requestDraft(flow, revision, 'start')).toBe('started')
+    expect(client.createDraftRun).toHaveBeenCalledWith('flow', 'revision', expect.objectContaining({ trigger: { nodeId: 'start', payload: {} } }))
+    await store.editDraft(flow, revision, 'start')
+    expect(store.$.inputRequest.value?.groups[0]?.editor.values()).toEqual({ payload: {} })
+    store.$.inputRequest.value?.groups[0]?.editor.setValue('payload', undefined)
+    store.dismissInputs()
+    expect(store.inputStatus(flow.flowId, revision, 'start')).toBe('missing')
+    await store.editDraft(flow, revision, 'start')
+    expect(store.$.inputRequest.value?.groups[0]?.editor.values()).toEqual({})
+  } finally {
+    store.dispose()
+  }
+})

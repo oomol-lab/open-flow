@@ -125,13 +125,11 @@ function inputSignature(specs: ReturnType<typeof inputSpecs>): string {
 async function inputGroups(
   specs: ReturnType<typeof inputSpecs>,
   language: ReadonlyVal<string>,
-  triggerId: string,
   values?: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
 ): Promise<readonly RunInputGroup[]> {
   const { FlowRunInputEditorStore } = await import('../../flowRunInputEditorStore.ts')
   return specs.map((group) => {
     const editor = new FlowRunInputEditorStore(group.definitions, language)
-    if (group.nodeId == triggerId) editor.replaceValues({ payload: {} })
     if (values?.[group.nodeId] != null) editor.replaceValues(values[group.nodeId])
     return { editor, nodeId: group.nodeId, title: group.title }
   })
@@ -291,7 +289,7 @@ export class RunRequestStore {
     try {
       const specs = inputSpecs(request.revision, triggerId)
       const saved = this.#savedInputs.get(this.#inputKey(request.flow.flowId, triggerId))
-      const groups = await inputGroups(specs, this.#i18n.lang$, triggerId, saved?.values)
+      const groups = await inputGroups(specs, this.#i18n.lang$, saved?.values)
       if (!current() || this.#state.value.inputRequest !== request) {
         for (const group of groups) group.editor.dispose()
         return
@@ -318,7 +316,7 @@ export class RunRequestStore {
   ): Promise<RunRequestOutcome> {
     const previous = this.#state.value.inputRequest
     this.#rememberInputs(previous)
-    this.#set({ inputRequest: undefined, starting: true, submitting: undefined })
+    this.#set({ inputRequest: undefined, starting: !edit, submitting: undefined })
     this.#disposeInputRequest(previous)
     const graph = revisionView(revision).graph({ kind: 'flow' })
     const triggers = Object.entries(graph?.nodes ?? {}).flatMap(([nodeId, node]) => ('inputs' in node ? [] : [{ nodeId, title: node.name }]))
@@ -336,7 +334,7 @@ export class RunRequestStore {
     const specs = only == null ? [] : inputSpecs(revision, only.nodeId)
     const signature = inputSignature(specs)
     const saved = only == null ? undefined : this.#savedInputs.get(this.#inputKey(flow.flowId, only.nodeId))
-    const groups = only == null ? [] : await inputGroups(specs, this.#i18n.lang$, only.nodeId, saved?.values)
+    const groups = only == null ? [] : await inputGroups(specs, this.#i18n.lang$, saved?.values)
     if (!current()) {
       for (const group of groups) group.editor.dispose()
       return 'unavailable'
