@@ -1,6 +1,6 @@
 # 统一业务变化监听实施计划
 
-日期：2026-09-11。状态：Server 监听链路已实施，Cloud 与产品入口待接入。
+日期：2026-09-11。状态：Server、Cloud、业务入口与两个 Provider 场景已接入，存量迁移和清理继续进行。
 
 需求来源：[Issue #114](https://github.com/oomol-lab/open-flow/issues/114)。
 本文是实施计划，不修改当前产品合同，也不代表已经提供新的可靠性保证。
@@ -326,6 +326,22 @@ GitHub PR 列表支持按更新时间排序，但这不能证明能恢复每一�
   已在 Lab 验证浅色英文和简体中文；闭源宿主遵循其仓库约束，使用检查、测试与构建验证。
 - 公共仓库根目录 check 和 test 通过，公共包 1182 项、CLI 90 项、Server 417 项测试通过。
   包含 PR 读取、重复读取、签名过滤、取消、错误响应、独立健康协议与状态呈现。
+- 公共包 `0.1.0-beta.19` 已发布，源码提交为 `85200187`（`codex/unified-change-listener`）。
+  发布分支的根目录 check、test 与 npm package 消费验证通过；该分支 Server 415 项测试通过。
+  原工作区另外两项无关存储测试与其修改未纳入本次发布。
+- Cloud、Executor 与 Workbench 已精确升级 beta.19，根目录 check、test、build 全部通过；
+  Cloud 444 项、Workbench 18 项测试通过。Cloud 实际 D1/control 响应验证订阅失败时返回独立的 healthy 扫描状态。
+  本次未部署 Cloud、未对原始数据库执行迁移；Lab 验证服务已停止。
 - 其他适用 Poll 定义的迁移、旧 Project 数据转换与阶段五清理仍未完成；本节不代表整个计划完成。
 
 PR 状态字段依据 [GitHub Get a pull request](https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request)。
+
+### 9.7 发布时的进度继承修正
+
+- 发现原来的完整 trigger JSON 比较会将节点改名、说明和图标变化判定为换源，导致重新建立 baseline。
+- 公共运行语义投影忽略这三个展示字段；Server 的候选准备、激活和普通发布，以及 Cloud 的发布规划与 D1 激活同步采用这一规则。
+  当前 binding / state 更新到新节点信息，checkpoint、订阅、去重和持久唤醒保留；真实配置或 Connection 变化继续准备候选。
+- 旧 Worker 仍须通过当前 Publication 与 runtime version 的准入校验，不能因展示信息兼容而越过发布隔离。
+- 进一步只读核实：旧 Cloud 开发 tenant 中有 1 个 Project、44 个 Project Revision；旧 Server standalone 中有 6 个 Project Revision。
+  其中包含旧字典式端口、无显式执行边的数据流图，不能通过改表名或修改 envelope kind 变成当前可执行 Revision。
+  这些原库继续保留，尚未实施语义转换；其他适用 Poll 定义的迁移和旧路径退出也仍待完成。

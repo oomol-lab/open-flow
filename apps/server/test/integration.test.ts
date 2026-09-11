@@ -121,12 +121,15 @@ async function publish(
   service: ServerService,
   mode: 'connection' | 'permanent' | 'ready' | 'transient',
   expectedLivePublicationId: string | null,
+  presentation?: { name: string; description: string; icon: string },
 ): Promise<string> {
+  const content = revision(mode)
+  if (presentation != null) Object.assign(content.document.graph.nodes.integration!, presentation)
   const result = await service.publisher.publish({
     expectedLivePublicationId,
     flowId: 'main',
     idempotencyKey: next('publish'),
-    revision: revision(mode),
+    revision: content,
     revisionId: next('revision'),
   })
   if (result.kind != 'published') throw new Error('Integration test Publication conflicted.')
@@ -738,7 +741,7 @@ describe('Server change listener', () => {
     }
   })
 
-  it('rejects an old worker after republish and retries from the retained cursor', async () => {
+  it.each([false, true])('retains progress and fences old workers across republish (presentation changed: %s)', async (rename) => {
     const file = await databaseFile()
     let now = 0
     const entered = Promise.withResolvers<void>()
@@ -760,7 +763,7 @@ describe('Server change listener', () => {
       const first = await publishListener(service, file)
       const scanning = service.tickIntegration()
       await entered.promise
-      await publish(service, 'ready', first)
+      await publish(service, 'ready', first, rename ? { name: 'Renamed listener', description: 'Updated display text', icon: 'changed-icon' } : undefined)
       release.resolve()
       await scanning
       expect(service.integrationState('main', 'integration')?.checkpoint).toBe(0)

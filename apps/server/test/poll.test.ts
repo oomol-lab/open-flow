@@ -459,6 +459,31 @@ describe('Server Poll Trigger', () => {
     await closeService(service)
   })
 
+  it('keeps Poll progress when only the node presentation changes', async () => {
+    const file = await databaseFile()
+    const checkpoints: unknown[] = []
+    const definition: PollDefinition = {
+      snapshot,
+      async poll({ checkpoint }) {
+        checkpoints.push(checkpoint)
+        return { checkpoint: { cursor: checkpoints.length }, events: [] }
+      },
+    }
+    const service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
+    try {
+      const first = await publish(service)
+      await service.tickPoll('2026-08-21T00:01:00.000Z')
+      const changed = revision()
+      Object.assign(changed.document.graph.nodes.poll!, { name: 'Renamed', description: 'New description', icon: 'new-icon' })
+      await publish(service, changed, first)
+      expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: { cursor: 1 }, health: 'healthy' })
+      await service.tickPoll('2026-08-21T00:02:00.000Z')
+      expect(checkpoints).toEqual([null, { cursor: 1 }])
+    } finally {
+      await closeService(service)
+    }
+  })
+
   it('fences an in-flight page when Poll semantics are republished', async () => {
     const file = await databaseFile()
     const entered = Promise.withResolvers<void>()

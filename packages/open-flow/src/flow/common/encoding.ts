@@ -268,6 +268,11 @@ function canonicalTriggerNode(trigger: TriggerNode): JsonValue {
   }
 }
 
+export function triggerRuntimeJson(trigger: TriggerNode): string {
+  const { name: _name, description: _description, icon: _icon, ...runtime } = trigger
+  return canonicalText(runtime as unknown as JsonValue)
+}
+
 export function canonicalDocument(document: FlowDocument): JsonValue {
   return {
     bindings: Object.fromEntries(entries(document.bindings)),

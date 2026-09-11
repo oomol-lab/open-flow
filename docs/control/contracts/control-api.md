@@ -432,6 +432,8 @@ Trigger Key catalog 是 deployment scope 资源：
 
 成功 Publication 为 Flow graph 中每个 Trigger node 提交 Live binding：
 
+Trigger 节点的 `name`、`description`、`icon` 只影响呈现。仅修改这些字段的发布保留已有 Poll / Integration 进度、订阅和去重状态；配置、定义、调度与 Connection 仍参与运行语义判断。历史 Revision 和 digest 不改写。
+
 具备统一监听能力的 binding 通过 `listener` 返回独立的变化读取状态。顶层 `health` 仍表示订阅状态；订阅失败且 `listener.health` 为 `healthy` 时，定期读取继续工作。暂停和退役优先于两种健康状态。
 
 ```ts
