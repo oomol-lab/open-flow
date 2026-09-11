@@ -124,6 +124,7 @@ describe('provider Poll Trigger definitions', () => {
       'integration:gitlab.on_project_event',
       'poll:googlecalendar.on_event_changed',
       'integration:googledrive.changes_detected',
+      'integration:googledrive.watch_changes',
       'poll:googledrive.on_file_change',
       'poll:googlesheets.on_row_added',
       'poll:notion.on_database_page_event',

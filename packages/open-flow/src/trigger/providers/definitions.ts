@@ -6,7 +6,7 @@ import { githubRepoEvent } from './github/on-repo-event.ts'
 import { gitlabProjectEvent } from './gitlab/on-project-event.ts'
 import { gmailMessageReceived } from './gmail/on-message-received.ts'
 import { googleCalendarEventChanged } from './google-calendar/on-event-changed.ts'
-import { googleDriveChanges } from './google-drive/changes.ts'
+import { googleDriveChangeListener, googleDriveChanges } from './google-drive/changes.ts'
 import { googleDriveFileChange } from './google-drive/on-file-change.ts'
 import { googleSheetsRowAdded } from './google-sheets/on-row-added.ts'
 import { notionDatabasePageEvent } from './notion/on-database-page-event.ts'
@@ -28,6 +28,7 @@ export const triggerDefinitions: readonly ProviderTriggerDefinition[] = [
   gitlabProjectEvent,
   googleCalendarEventChanged,
   googleDriveChanges,
+  googleDriveChangeListener,
   googleDriveFileChange,
   googleSheetsRowAdded,
   notionDatabasePageEvent,

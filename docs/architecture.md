@@ -230,6 +230,15 @@ package；subscription、checkpoint、调度持久化、endpoint routing 和 adm
 Integration callback 的处理生命周期同时受请求取消、部署关闭和整次 delivery deadline 约束，并向 Provider 与 Connector 传播取消。
 这些取消只能停止尚未完成的回调处理，不能撤销已准入的 Run；部署不能自动重试整段 callback，以免重放 Provider 的外部副作用。
 
+具有 `listener` 能力的 Integration 定义将已验证通知转为持久唤醒；通知与定期扫描共用同一 cursor reader，
+回调不能推进扫描游标。Server 在同一事务中提交页面准入、checkpoint 与工作完成，并保留领取后新增的通知。
+扫描使用独立租约和健康状态；订阅故障不能单独撤销仍然可用的扫描准入资格。旧事件型 Integration 的 callback/payload 语义保持不变。
+
+监听配置与 Connection 未变的发布保留最新进度、待处理工作与身份作用域，并以 Live publication 拒绝旧 worker 的提交。
+监听范围改变时先准备独立候选，再原子切换；切换终止旧范围尚未准入的扫描工作，新范围从自己的基线开始，不承接旧范围工作。
+旧订阅继续作为持久清理任务处理。Google Drive `watch_changes` 首版以同一 change stream 的 cursor/page 身份准入，
+不把对象 ID 当作变化 ID，不承诺还原上游未保留的所有状态转换。
+
 Cron 不为同一 Flow 创建重叠的未终结 Run。已有未终结 Run 时保留当前到期位置并重试；前一个 Run terminal 后最多补入一个最早未处理
 occurrence，再把计划推进到当前时间之后。手动 Run 和其他 Trigger 保留各自的 admission 与 backpressure 语义。
 

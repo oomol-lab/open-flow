@@ -1,6 +1,12 @@
-import type { ConnectorProxyRequest, ConnectorProxyResult } from '../../../connector/common/proxy.ts'
+import type { ConnectorProxy, ConnectorProxyRequest, ConnectorProxyResult } from '../../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
-import type { IntegrationDefinition, IntegrationReceiveContext, IntegrationReconcileContext, IntegrationStateContext } from '../../common/integration.ts'
+import type {
+  IntegrationDefinition,
+  IntegrationReceiveContext,
+  IntegrationReceiveResult,
+  IntegrationReconcileContext,
+  IntegrationStateContext,
+} from '../../common/integration.ts'
 
 import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '../../common/integration.ts'
 
@@ -21,10 +27,10 @@ interface Channel {
   readonly state: 'active' | 'creating' | 'retiring' | 'stopping'
 }
 
-interface ChangeList {
-  readonly changes?: readonly Record<string, JsonValue>[]
-  readonly newStartPageToken?: string
-  readonly nextPageToken?: string
+interface ReadContext {
+  readonly config: Readonly<Record<string, JsonValue>>
+  readonly connector: ConnectorProxy
+  readonly signal?: AbortSignal
 }
 
 interface ChannelResponse {
@@ -117,30 +123,10 @@ export const googleDriveChanges: IntegrationDefinition = {
   initialState: { checkpoint: null, subscription: { channels: [] } },
   snapshot,
   async receive(context) {
+    const verified = await receiveNotification(context)
+    if (verified.outcome != 'wake') return verified
     const state = requireState(context.state)
-    const channelId = context.header('x-goog-channel-id')
-    const resourceId = context.header('x-goog-resource-id')
-    const resourceState = context.header('x-goog-resource-state')
-    const token = context.header('x-goog-channel-token')
-    if (channelId == null || resourceId == null || resourceState == null || token == null) {
-      return { body: '', contentType: 'text/plain', outcome: 'respond', status: 404 }
-    }
-    let channels = readChannels(state)
-    const channel = channels.find((candidate) => candidate.id == channelId && Date.parse(candidate.expiration) > context.now.getTime())
-    if (
-      channel == null ||
-      !sameSecret(token, await channelToken(context.callbackSecret, channelId)) ||
-      (channel.resourceId != null && channel.resourceId != resourceId)
-    ) {
-      return { body: '', contentType: 'text/plain', outcome: 'respond', status: 404 }
-    }
-    if (channel.resourceId == null) {
-      channels = channels.map((candidate) => (candidate.id == channelId ? { ...candidate, resourceId } : candidate))
-      await saveChannels(state, channels, context.now)
-    }
-    if (resourceState != 'sync' && resourceState != 'change') {
-      return { outcome: 'ignored', reason: 'Google Drive notification state is not actionable.' }
-    }
+    const resourceState = context.header('x-goog-resource-state')!
     if (!context.admit) {
       return context.current
         ? { body: '', contentType: 'text/plain', outcome: 'respond', status: 503 }
@@ -148,12 +134,7 @@ export const googleDriveChanges: IntegrationDefinition = {
     }
     if (context.allow != null && !(await context.allow())) return { outcome: 'ignored', reason: 'The Team cannot admit Trigger events.' }
 
-    const config = resolveConfig(context.config)
-    const pageToken = checkpoint(state.checkpoint)
-    const result = await changes(context, config, pageToken)
-    const nextPageToken = optionalString(result.nextPageToken)
-    const nextCheckpoint = nextPageToken ?? optionalString(result.newStartPageToken)
-    if (nextCheckpoint == null) throw new TransientIntegrationError('Google Drive changes response is missing its next checkpoint.')
+    const page = await readGoogleDriveChanges(context, state.checkpoint)
     const notification = {
       changedTypes: (context.header('x-goog-changed') ?? '')
         .split(',')
@@ -163,11 +144,11 @@ export const googleDriveChanges: IntegrationDefinition = {
       resourceState,
       resourceUri: context.header('x-goog-resource-uri') ?? null,
     }
-    const events = (result.changes ?? []).map((change) => normalizeChange(change, notification))
+    const events = page.changes.map((change) => normalizeChange(change, notification))
     const delivery = {
-      checkpoint: { pageToken: nextCheckpoint },
-      continue: nextPageToken != null,
-      dedupeKey: `${config.driveId ?? 'my-drive'}:${pageToken}`,
+      checkpoint: page.checkpoint,
+      continue: page.hasMore,
+      dedupeKey: page.dedupeKey,
     }
     return events.length == 0
       ? { ...delivery, outcome: 'ignored', reason: 'Google Drive change page is empty.' }
@@ -286,7 +267,7 @@ async function watch(context: IntegrationReconcileContext, channels: Channel[]) 
   const config = resolveConfig(context.config)
   let pageToken: string
   if (state.checkpoint === null) {
-    pageToken = await startPageToken(context, config)
+    pageToken = await googleDriveStartPageToken(context)
     await state.saveCheckpoint({ pageToken })
   } else {
     pageToken = checkpoint(state.checkpoint)
@@ -375,7 +356,8 @@ async function stopRetiring(context: IntegrationReconcileContext, channels: Chan
   return channels
 }
 
-async function startPageToken(context: IntegrationReconcileContext, config: Config): Promise<string> {
+export async function googleDriveStartPageToken(context: ReadContext): Promise<string> {
+  const config = resolveConfig(context.config)
   const result = await request(
     context,
     {
@@ -390,8 +372,10 @@ async function startPageToken(context: IntegrationReconcileContext, config: Conf
   return token
 }
 
-async function changes(context: IntegrationReceiveContext, config: Config, pageToken: string): Promise<ChangeList> {
-  return await request(
+export async function readGoogleDriveChanges(context: ReadContext, cursor: JsonValue) {
+  const config = resolveConfig(context.config)
+  const pageToken = checkpoint(cursor)
+  const result = await request<Record<string, JsonValue>>(
     context,
     {
       endpoint: '/changes',
@@ -410,6 +394,24 @@ async function changes(context: IntegrationReceiveContext, config: Config, pageT
     },
     'changes.list',
   )
+  for (const field of ['nextPageToken', 'newStartPageToken'] as const) {
+    if (result[field] !== undefined && optionalString(result[field]) == null) {
+      throw new TransientIntegrationError(`Google Drive changes response contains an invalid ${field}.`)
+    }
+  }
+  const nextPageToken = optionalString(result.nextPageToken)
+  const nextCheckpoint = nextPageToken ?? optionalString(result.newStartPageToken)
+  if (nextCheckpoint == null) throw new TransientIntegrationError('Google Drive changes response is missing its next checkpoint.')
+  if (result.changes != null && (!Array.isArray(result.changes) || !result.changes.every(isRecord))) {
+    throw new TransientIntegrationError('Google Drive changes response contains invalid changes.')
+  }
+  if (nextPageToken === pageToken) throw new TransientIntegrationError('Google Drive changes continuation did not advance.')
+  return {
+    changes: (result.changes ?? []) as readonly Readonly<Record<string, JsonValue>>[],
+    checkpoint: { pageToken: nextCheckpoint },
+    dedupeKey: `${config.driveId ?? 'my-drive'}:${pageToken}`,
+    hasMore: nextPageToken != null,
+  }
 }
 
 async function stopChannel(context: IntegrationReconcileContext, channel: Channel): Promise<void> {
@@ -518,4 +520,64 @@ function optionalString(value: unknown): string | undefined {
 
 function isRecord(value: unknown): value is Record<string, JsonValue> {
   return value != null && typeof value == 'object' && !Array.isArray(value)
+}
+
+async function receiveNotification(context: IntegrationReceiveContext): Promise<IntegrationReceiveResult> {
+  const state = requireState(context.state)
+  const channelId = context.header('x-goog-channel-id')
+  const resourceId = context.header('x-goog-resource-id')
+  const resourceState = context.header('x-goog-resource-state')
+  const token = context.header('x-goog-channel-token')
+  if (channelId == null || resourceId == null || resourceState == null || token == null) {
+    return { body: '', contentType: 'text/plain', outcome: 'respond', status: 404 }
+  }
+  let channels = readChannels(state)
+  const channel = channels.find((candidate) => candidate.id == channelId && Date.parse(candidate.expiration) > context.now.getTime())
+  if (
+    channel == null ||
+    !sameSecret(token, await channelToken(context.callbackSecret, channelId)) ||
+    (channel.resourceId != null && channel.resourceId != resourceId)
+  ) {
+    return { body: '', contentType: 'text/plain', outcome: 'respond', status: 404 }
+  }
+  if (channel.resourceId == null) {
+    channels = channels.map((candidate) => (candidate.id == channelId ? { ...candidate, resourceId } : candidate))
+    await saveChannels(state, channels, context.now)
+  }
+  if (resourceState != 'sync' && resourceState != 'change') {
+    return { outcome: 'ignored', reason: 'Google Drive notification state is not actionable.' }
+  }
+  return { outcome: 'wake' }
+}
+
+export const googleDriveChangeListener: IntegrationDefinition = {
+  initialState: googleDriveChanges.initialState,
+  reconcile: googleDriveChanges.reconcile,
+  receive: receiveNotification,
+  listener: {
+    intervalMs: 300_000,
+    async read(context) {
+      const page = await readGoogleDriveChanges(context, context.checkpoint)
+      return {
+        checkpoint: page.checkpoint,
+        dedupeKey: page.dedupeKey,
+        hasMore: page.hasMore,
+        payload: page.changes.length == 0 ? null : { events: page.changes },
+      }
+    },
+  },
+  snapshot: {
+    ...snapshot,
+    configSchema: { ...snapshot.configSchema, description: 'Configuration for googledrive.watch_changes.' },
+    key: 'googledrive.watch_changes',
+    name: 'watch_changes',
+    displayName: 'Google Drive: Watch Changes',
+    description: 'Monitors Drive changes using notifications and periodic scans of the same change stream.',
+    payloadSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: { events: { type: 'array', items: { type: 'object' } } },
+      required: ['events'],
+    },
+  },
 }

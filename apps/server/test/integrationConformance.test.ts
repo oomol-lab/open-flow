@@ -1,7 +1,7 @@
 import type { JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { IntegrationConformanceFixture, IntegrationConformanceHarness, IntegrationDefinition } from '@oomol-lab/open-flow/integration-trigger'
 
-import { integrationCallbackSecret, integrationConformanceCases } from '@oomol-lab/open-flow/integration-trigger'
+import { integrationCallbackSecret, integrationConformanceCases, listenerConformanceCases } from '@oomol-lab/open-flow/integration-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -95,6 +95,7 @@ async function createHarness(fixture: IntegrationConformanceFixture): Promise<In
       return await fixture.definition.reconcile(input)
     },
     snapshot,
+    ...(fixture.definition.listener == null ? {} : { listener: fixture.definition.listener }),
   }
   const connector = createConnectorHost({
     listConnections: async () => [
@@ -124,6 +125,17 @@ async function createHarness(fixture: IntegrationConformanceFixture): Promise<In
     revisionId,
   })
   if (published.kind != 'published') throw new Error('Initial Server Integration conformance Publication conflicted.')
+  if (fixture.definition.listener != null) {
+    const database = new DatabaseSync(file)
+    try {
+      database
+        .prepare(`INSERT INTO flows (flow_id, name, status, draft_revision_id, create_idempotency_key, create_request_digest, created_at, updated_at)
+        VALUES ('main', 'Listener conformance', 'active', ?, 'create-main', 'create-main', ?, ?)`)
+        .run(revisionId, now, now)
+    } finally {
+      database.close()
+    }
+  }
   let publicationId = published.publicationId
   const endpointId = service.integrationEndpoint('main', 'integration')
   if (endpointId == null) throw new Error('Server Integration conformance endpoint was not created.')
@@ -205,7 +217,7 @@ async function createHarness(fixture: IntegrationConformanceFixture): Promise<In
 }
 
 describe('Server Integration Trigger conformance', () => {
-  for (const conformance of integrationConformanceCases) {
+  for (const conformance of [...integrationConformanceCases, ...listenerConformanceCases]) {
     it(conformance.name, async () => {
       const harness = await createHarness(conformance.fixture)
       try {

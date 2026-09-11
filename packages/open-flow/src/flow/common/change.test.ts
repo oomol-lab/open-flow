@@ -86,7 +86,7 @@ describe('Flow changes', () => {
 
     expect(changed.document.graph.nodes.a?.name).toBe('Review (2)')
     expect(changed.document.graph.nodes.b?.name).toBe('Review')
-    expect(changed.document.graph.nodes.c?.name).toBe('Value')
+    expect(changed.document.graph.nodes.c?.name).toBe('Fixed Values')
     expect(changed.document.graph.nodes.d?.name).toBe('Review (3)')
     expect(changed.document.subflows.child?.graph.nodes.task?.name).toBe('Summarize')
     expect(repairNodeNames(changed)).toEqual([])

@@ -22,6 +22,7 @@ import {
   maximumIntegrationDeliveryPages,
   PermanentIntegrationError,
   TransientIntegrationError,
+  validateListenerPage,
 } from '@oomol-lab/open-flow/integration-trigger'
 import * as Effect from 'effect/Effect'
 import * as Semaphore from 'effect/Semaphore'
@@ -43,7 +44,7 @@ export interface IntegrationResponse {
   readonly status: number
 }
 
-export interface IntegrationTarget {
+interface ActiveIntegrationTarget {
   readonly connectionId: string
   readonly current: boolean
   readonly definition: IntegrationDefinition
@@ -52,10 +53,20 @@ export interface IntegrationTarget {
   readonly trigger: Extract<TriggerNode, { readonly kind: 'integration' }>
 }
 
+interface CandidateIntegrationTarget {
+  readonly candidate: IntegrationCandidate
+  readonly definition: IntegrationDefinition
+  readonly state: IntegrationStateContext
+  readonly trigger: Extract<TriggerNode, { readonly kind: 'integration' }>
+}
+
+export type IntegrationTarget = ActiveIntegrationTarget | CandidateIntegrationTarget
+
 export interface IntegrationRuntimeState {
   readonly bindingId: string
   readonly checkpoint: JsonValue | null
   readonly endpointId: string
+  readonly listener?: { readonly health: 'healthy' | 'failed' | 'needs_reauth'; readonly lastErrorCode: string | null; readonly nextAt: number }
   readonly health: IntegrationHealth
   readonly runtimeVersion: number
   readonly subscription: Readonly<Record<string, JsonValue>> | null
@@ -118,8 +129,12 @@ export class IntegrationRuntime {
       if (binding?.kind != 'connection' || binding.target.length == 0) {
         throw new AcceptanceError('trigger-invalid', 'Integration Trigger Connection is unresolved.')
       }
+      if (definition.listener != null && (!Number.isSafeInteger(definition.listener.intervalMs) || definition.listener.intervalMs <= 0)) {
+        throw new AcceptanceError('trigger-invalid', 'Listener interval must be a positive integer.')
+      }
       return {
         connectionId: binding.target,
+        listener: definition.listener != null,
         reconcileAt: publishedAt,
         triggerJson: JSON.stringify(trigger),
         triggerNodeId,
@@ -135,7 +150,9 @@ export class IntegrationRuntime {
     const binding = this.#store.integrations.integrationBinding(flowId, triggerNodeId)
     if (binding == null) return
     const state = this.#store.integrations.integrationState(binding.bindingId)
+    const listener = this.#store.integrations.listenerState(binding.bindingId, binding.runtimeVersion)
     return {
+      ...(listener == null ? {} : { listener }),
       bindingId: binding.bindingId,
       checkpoint: state == null ? null : (JSON.parse(state.checkpointJson) as JsonValue),
       endpointId: binding.endpointId,
@@ -147,7 +164,13 @@ export class IntegrationRuntime {
 
   target(endpointId: string): IntegrationTarget | undefined {
     let stored = this.#store.integrations.integrationTarget(endpointId)
-    if (stored == null) return
+    if (stored == null) {
+      const candidate = this.#store.integrations.candidateTarget(endpointId, this.#clock())
+      if (candidate == null || candidate.checkpointJson == null || candidate.subscriptionJson == null) return
+      const resolved = this.#trigger(candidate.triggerJson)
+      if (resolved.definition.listener == null) return
+      return { candidate, ...resolved, state: this.#candidateStateContext(candidate, this.#clock()) }
+    }
     if (stored.state == null) {
       const { definition } = this.#trigger(stored.triggerJson)
       const initial = definition.initialState ?? { checkpoint: null, subscription: {} }
@@ -191,6 +214,7 @@ export class IntegrationRuntime {
     },
   ): Effect.Effect<IntegrationResponse, unknown> {
     return Effect.gen({ self: this }, function* () {
+      if ('candidate' in target) return yield* this.#receiveCandidate(target, input)
       const fixed = yield* Effect.tryPromise({
         try: () => this.#validateFlow(decodeRevision(new TextEncoder().encode(target.stored.content))),
         catch: (error) => error,
@@ -239,6 +263,7 @@ export class IntegrationRuntime {
                 },
                 saveCheckpoint: async (value) => {
                   signal.throwIfAborted()
+                  if (target.definition.listener != null) throw new TypeError('Listener callbacks cannot advance the checkpoint.')
                   await target.state.saveCheckpoint(value)
                 },
                 saveSubscription: async (value, at) => {
@@ -249,6 +274,16 @@ export class IntegrationRuntime {
             }),
           catch: (error) => error,
         })
+        if (received.outcome == 'wake') {
+          if (target.definition.listener == null || !target.current) return { status: 404 }
+          if (
+            this.#store.integrations.integrationTarget(target.stored.endpointId)?.runtimeVersion != target.stored.runtimeVersion ||
+            !this.#store.integrations.wakeListener(target.stored.bindingId, target.stored.runtimeVersion, now.getTime())
+          )
+            return { status: 404 }
+          this.#wake()
+          return { status: target.trigger.definition.endpoint.successStatus }
+        }
         if (received.outcome == 'respond') {
           return {
             body: received.body,
@@ -305,6 +340,58 @@ export class IntegrationRuntime {
         orElse: () => Effect.fail(new TransientIntegrationError('Integration delivery exceeded its execution deadline.')),
       }),
     )
+  }
+
+  #receiveCandidate(target: CandidateIntegrationTarget, input: Parameters<IntegrationRuntime['receive']>[1]): Effect.Effect<IntegrationResponse, unknown> {
+    return Effect.gen({ self: this }, function* () {
+      const options = this.#resolveOptions()
+      const candidate = target.candidate
+      if (options == null || this.#store.integrations.candidateTarget(candidate.endpointId, this.#clock()) == null) return { status: 404 }
+      const callbackSecret = yield* Effect.tryPromise({
+        try: () => integrationCallbackSecret(options.callbackKey, candidate.endpointId),
+        catch: (error) => error,
+      })
+      const result = yield* Effect.tryPromise({
+        try: async (signal) =>
+          await target.definition.receive({
+            admit: false,
+            current: true,
+            bindingId: candidate.bindingId,
+            callbackSecret,
+            config: target.trigger.config,
+            connector: this.#connectorProxy(target.definition, candidate.bindingId, candidate.connectionId, candidate.flowId, signal),
+            signal,
+            header: (name) => input.headers.get(name) ?? undefined,
+            method: input.method,
+            now: new Date(this.#clock()),
+            payload: input.payload,
+            query: (name) => input.query.get(name) ?? undefined,
+            rawBody: input.rawBody,
+            state: {
+              get checkpoint() {
+                return target.state.checkpoint
+              },
+              get subscription() {
+                return target.state.subscription
+              },
+              saveCheckpoint: async () => {
+                throw new TypeError('Listener callbacks cannot advance the checkpoint.')
+              },
+              saveSubscription: async (value, at) => {
+                signal.throwIfAborted()
+                await target.state.saveSubscription(value, at)
+              },
+            },
+          }),
+        catch: (error) => error,
+      })
+      if (result.outcome == 'respond') return result
+      if (result.outcome == 'wake') {
+        if (!this.#store.integrations.wakeCandidate(candidate.endpointId, this.#clock())) return { status: 404 }
+        this.#wake()
+      }
+      return { status: target.trigger.definition.endpoint.successStatus }
+    })
   }
 
   #invokeReconcile(
@@ -369,6 +456,7 @@ export class IntegrationRuntime {
         catch: (error) => error,
       })
       const active = current.status == 'preparing'
+      if (active && resolved.definition.listener != null) this.#store.integrations.initializeListener(current.bindingId, 1, now)
       const outcome = yield* this.#invokeReconcile(resolved.definition, current.bindingId, current.connectionId, current.flowId, {
         active,
         callbackSecret,
@@ -528,6 +616,7 @@ export class IntegrationRuntime {
           return yield* Effect.fail(new TransientIntegrationError('Integration runtime state changed.'))
         }
       }
+      if (resolved.definition.listener != null) this.#store.integrations.initializeListener(binding.bindingId, binding.runtimeVersion, now)
       const outcome = yield* this.#invokeReconcile(resolved.definition, binding.bindingId, binding.connectionId, binding.flowId, {
         active: true,
         callbackSecret,
@@ -622,12 +711,95 @@ export class IntegrationRuntime {
       }
       while (true) {
         const bindings = this.#store.integrations.dueIntegrations(now, batchSize)
-        if (bindings.length == 0) return
+        if (bindings.length == 0) break
         for (const binding of bindings) {
           yield* this.#reconcile(binding, now)
         }
       }
+      for (let page = 0; page < batchSize; page += 1) {
+        const lease = this.#store.integrations.claimListener(now, reconcileTimeoutMs * 2)
+        if (lease == null) break
+        yield* this.#readListener(lease, now)
+      }
     })
+  }
+
+  #readListener(lease: import('../storage/integration-store.ts').ListenerLease & { readonly endpointId: string }, now: number): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const target = this.#store.integrations.integrationTarget(lease.endpointId)
+      if (target == null || target.state == null || target.runtimeVersion != lease.runtimeVersion) {
+        this.#store.integrations.retryListener(lease, now + retryMs)
+        return
+      }
+      const { definition, trigger } = this.#trigger(target.triggerJson)
+      const source = definition.listener
+      if (source == null) return yield* Effect.fail(new PermanentIntegrationError('Listener source is unavailable.'))
+      const page = yield* Effect.tryPromise({
+        try: async (signal) => {
+          const result = await source.read({
+            checkpoint: JSON.parse(target.state!.checkpointJson) as JsonValue,
+            config: trigger.config,
+            connector: this.#connectorProxy(definition, target.bindingId, target.connectionId, target.flowId, signal),
+            now: new Date(now),
+            signal,
+          })
+          signal.throwIfAborted()
+          validateListenerPage(result)
+          if ((result.hasMore || result.payload != null) && isDeepStrictEqual(result.checkpoint, JSON.parse(target.state!.checkpointJson))) {
+            throw new PermanentIntegrationError('Listener continuation must advance the checkpoint.')
+          }
+          return result
+        },
+        catch: (error) => error,
+      })
+      let event: { occurrenceId: string; payload: JsonValue; requestDigest: string } | undefined
+      if (page.payload != null) {
+        const occurrenceId = yield* Effect.tryPromise({
+          try: () => integrationOccurrenceId(target.bindingId, target.runtimeVersion, definition.snapshot.key, page.dedupeKey),
+          catch: (error) => error,
+        })
+        const requestDigest = yield* Effect.tryPromise({
+          try: () =>
+            digestBytes(
+              canonicalJsonBytes({
+                bindingId: target.bindingId,
+                occurrenceId,
+                payload: page.payload,
+                publicationId: target.currentPublicationId,
+                revisionDigest: target.revisionDigest,
+                runtimeVersion: target.runtimeVersion,
+              }),
+            ),
+          catch: (error) => error,
+        })
+        event = { occurrenceId, payload: page.payload, requestDigest }
+      }
+      const completed = this.#store.integrations.finishListenerPage(
+        lease,
+        target,
+        JSON.stringify(page.checkpoint),
+        page.hasMore ? now : now + source.intervalMs,
+        this.#clock(),
+        event,
+      )
+      if (completed == null || (completed != 'advanced' && completed.kind != 'accepted')) {
+        this.#store.integrations.retryListener(lease, now + retryMs)
+      } else if (completed != 'advanced' && completed.kind == 'accepted' && completed.created) {
+        this.#runCreated(target.flowId, completed.runId)
+        this.#wake()
+      }
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: reconcileTimeoutMs,
+        orElse: () => Effect.fail(new TransientIntegrationError('Listener scan exceeded its execution deadline.')),
+      }),
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          this.#store.integrations.retryListener(lease, now + retryMs, failure(error) ?? 'failed')
+          this.#logger.warn({ category: 'trigger.listener.retrying', bindingId: lease.bindingId, ...errorKind(error) }, 'Listener scan will be retried.')
+        }),
+      ),
+    )
   }
 
   #trigger(triggerJson: string): {
