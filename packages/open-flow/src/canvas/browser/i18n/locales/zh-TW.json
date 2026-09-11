@@ -337,7 +337,9 @@
   "ms": "毫秒",
   "s": "秒",
   "nodeContent": {
-    "addDescription": "新增描述"
+    "addDescription": "新增描述",
+    "show": "顯示內容",
+    "hide": "隱藏內容"
   },
   "nodeStatus": {
     "error": "錯誤",
@@ -627,9 +629,5 @@
     "Europe/Moscow": "莫斯科",
     "Australia/Sydney": "雪梨",
     "Pacific/Auckland": "奧克蘭"
-  },
-  "nodeContent": {
-    "show": "顯示內容",
-    "hide": "隱藏內容"
   }
 }

@@ -337,7 +337,9 @@
   "ms": "ミリ秒",
   "s": "秒",
   "nodeContent": {
-    "addDescription": "説明を追加"
+    "addDescription": "説明を追加",
+    "show": "内容を表示",
+    "hide": "内容を非表示"
   },
   "nodeStatus": {
     "error": "エラー",
@@ -627,9 +629,5 @@
     "Europe/Moscow": "モスクワ",
     "Australia/Sydney": "シドニー",
     "Pacific/Auckland": "オークランド"
-  },
-  "nodeContent": {
-    "show": "内容を表示",
-    "hide": "内容を非表示"
   }
 }
