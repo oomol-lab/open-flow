@@ -32,7 +32,7 @@ import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { PartialConnection, RFConnection, RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
 import type { HandleImpl } from '../../components/handle.tsx'
 import type { InteractiveMode, RFGraph } from '../../stores/canvas/canvas.store.ts'
-import type { FlowCanvasViewAddItem } from '../FlowCanvas/model.ts'
+import type { FlowCanvasViewAddItem, FlowCanvasViewProps } from '../FlowCanvas/model.ts'
 import type { GetPopupContainer } from './useGetPopupContainer.ts'
 
 import {
@@ -151,6 +151,7 @@ export interface ReactFlowContainerProps {
   onCopy?: (nodeIds: NodeId[]) => void
   onPaste?: (position?: XYPosition) => void
   provideAddNodeMenuItems?: () => readonly FlowCanvasViewAddItem[] | undefined
+  addItemsCatalog?: FlowCanvasViewProps['addItemsCatalog']
   provideAsyncAddNodeMenuItems?: (searchTerm: string, signal: AbortSignal) => Promise<readonly FlowCanvasViewAddItem[] | undefined>
   fitView?: boolean
   fitViewOptions?: FitViewOptions
@@ -732,6 +733,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             )}
             {blockQuickPickPanel && props.provideAddNodeMenuItems && props.onAddNode && (
               <BlockQuickPickPanelPopover
+                addItemsCatalog={props.addItemsCatalog}
                 position={blockQuickPickPanel.position}
                 fromSource={blockQuickPickPanel.fromSource}
                 connection={blockQuickPickPanel.connection}
@@ -963,6 +965,7 @@ interface ConnectionSource {
 }
 
 interface BlockQuickPickPanelPopoverProps {
+  readonly addItemsCatalog?: FlowCanvasViewProps['addItemsCatalog']
   readonly position: XYPosition
   readonly fromSource?: ConnectionSource
   readonly connection?: PartialConnection
@@ -1016,6 +1019,7 @@ function BlockQuickPickPanelPopover(props: BlockQuickPickPanelPopoverProps) {
         sideOffset={0}
       >
         <BlockQuickPickPanel
+          catalog={props.addItemsCatalog}
           items={items}
           provideAsyncItems={props.provideAsyncItems}
           onClick={onClick}

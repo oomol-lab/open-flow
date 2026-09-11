@@ -1,0 +1,6 @@
+{
+  "googlecalendar.on_event_changed": {
+    "displayName": "Google Calendar: 予定の変更",
+    "description": "Google カレンダーを定期的に確認し、予定が作成、更新、キャンセルされると実行します。"
+  }
+}

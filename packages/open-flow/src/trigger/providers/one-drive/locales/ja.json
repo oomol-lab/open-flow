@@ -1,0 +1,6 @@
+{
+  "one_drive.on_item_changed": {
+    "displayName": "OneDrive: ファイル・フォルダの変更",
+    "description": "OneDrive の変更フィードを定期的に確認し、ファイルやフォルダの作成、更新、削除を検出すると実行します。"
+  }
+}

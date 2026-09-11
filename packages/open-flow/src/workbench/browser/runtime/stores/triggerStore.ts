@@ -1,5 +1,6 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
+import type { TriggerDisplay } from '../../../../control/common/triggerCatalog.ts'
 import type { WorkbenchClient, ConnectorConnection, TriggerKeySnapshot } from '../api.ts'
 import type { WorkbenchHost } from '../contract.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
@@ -9,10 +10,12 @@ import type { SetNotice } from './workbenchNotice.ts'
 import type { WorkspaceStore } from './workspaceStore.ts'
 
 import { compute, derive, val } from 'value-enhancer'
+import { resolveUiLanguage } from '../../../../localization/common/languages.ts'
 import { createI18n } from '../i18n.ts'
 import { providerIcon } from '../providerIcon.ts'
 import { connectionCatalog } from '../workspace.ts'
 import { Latest } from './latest.ts'
+import { TriggerCatalogStore } from './triggerCatalog.ts'
 import { errorNotice } from './workbenchNotice.ts'
 
 interface TriggerState {
@@ -60,23 +63,22 @@ function target(selection: ResolvedSelection | undefined, workspace: WorkspaceSt
   }
 }
 
-function option(definition: TriggerKeySnapshot, i18n: I18n): AddNodeOption {
+function option(definition: TriggerKeySnapshot, i18n: I18n, display?: TriggerDisplay): AddNodeOption {
   return {
-    description: definition.description,
+    description: display?.description ?? definition.description,
     group: i18n.t('addNode.integrationTriggers'),
     icon: providerIcon({ serviceId: definition.provider, serviceName: definition.provider }),
     id: `${optionPrefix}${definition.key}`,
     inputs: [],
     kind: 'trigger',
-    label: definition.displayName,
+    label: display?.displayName ?? definition.displayName,
     outputs: [{ handle: 'payload', jsonSchema: definition.payloadSchema }],
     trigger: { definition, kind: 'catalog' },
   }
 }
 
 export class TriggerStore {
-  #catalog?: Promise<ReadonlyMap<string, TriggerKeySnapshot>>
-  #catalogController = new AbortController()
+  public readonly catalog: TriggerCatalogStore
   readonly #client: WorkbenchClient
   readonly #host: Pick<WorkbenchHost, 'openExternalPage'>
   readonly #i18n: I18n
@@ -94,9 +96,10 @@ export class TriggerStore {
     client: WorkbenchClient,
     workspace: WorkspaceStore,
     setNotice: SetNotice,
-    host: Pick<WorkbenchHost, 'openExternalPage'>,
+    host: Pick<WorkbenchHost, 'openExternalPage' | 'triggerCatalogCache'>,
     i18n: I18n = createI18n(),
   ) {
+    this.catalog = new TriggerCatalogStore(client, resolveUiLanguage([i18n.lang]), host)
     this.#client = client
     this.#host = host
     this.#i18n = i18n
@@ -131,7 +134,7 @@ export class TriggerStore {
 
   public dispose(): void {
     this.#disposed = true
-    this.#catalogController.abort()
+    this.catalog.dispose()
     this.#refresh.invalidate()
     for (const value of Object.values(this.$)) value.dispose()
     this.#selected.dispose()
@@ -140,9 +143,7 @@ export class TriggerStore {
 
   public reset(): void {
     if (this.#disposed) return
-    this.#catalogController.abort()
-    this.#catalogController = new AbortController()
-    this.#catalog = undefined
+    this.catalog.reset()
     this.#stale.clear()
     this.#refresh.invalidate()
     this.#state.set(initialState)
@@ -151,9 +152,9 @@ export class TriggerStore {
   public readonly browseAddNodeOptions = async (signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
     const flowId = this.#workspace.$.flowId.value
     if (signal.aborted || this.#disposed || flowId == null || this.#workspace.$.target.value?.kind != 'flow') return []
-    const definitions = await this.#loadCatalog()
+    const catalog = await this.catalog.get()
     if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
-    return [...definitions.values()].map((definition) => option(definition, this.#i18n))
+    return catalog.definitions.map((definition) => option(definition, this.#i18n, catalog.display[definition.key]))
   }
 
   public readonly provideAddNodeOptions = async (searchTerm: string, signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
@@ -161,12 +162,21 @@ export class TriggerStore {
     if (signal.aborted || this.#disposed || flowId == null || this.#workspace.$.target.value?.kind != 'flow') return []
     const query = searchTerm.trim().toLowerCase()
     if (query.length == 0) return []
-    const catalog = await this.#loadCatalog()
+    const catalog = await this.catalog.get()
     if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
-    const definitions = [...catalog.values()].filter((item) =>
-      [item.description, item.displayName, item.key, item.name, item.provider, item.type].some((value) => value.toLowerCase().includes(query)),
+    const definitions = catalog.definitions.filter((item) =>
+      [
+        catalog.display[item.key]?.displayName ?? '',
+        catalog.display[item.key]?.description ?? '',
+        item.description,
+        item.displayName,
+        item.key,
+        item.name,
+        item.provider,
+        item.type,
+      ].some((value) => value.toLowerCase().includes(query)),
     )
-    return definitions.map((definition) => option(definition, this.#i18n))
+    return definitions.map((definition) => option(definition, this.#i18n, catalog.display[definition.key]))
   }
 
   public async refresh(force = false): Promise<void> {
@@ -223,18 +233,6 @@ export class TriggerStore {
     this.#stale.add(provider)
     this.#set({ authorizationProvider: undefined })
     if (target(this.#workspace.$.selection.value, this.#workspace)?.provider == provider) await this.refresh(true)
-  }
-
-  #loadCatalog(): Promise<ReadonlyMap<string, TriggerKeySnapshot>> {
-    if (this.#catalog != null) return this.#catalog
-    const request = this.#client
-      .listTriggerDefinitions(this.#catalogController.signal)
-      .then((definitions) => new Map(definitions.map((definition) => [definition.key, definition])))
-    this.#catalog = request
-    void request.catch(() => {
-      if (this.#catalog == request) this.#catalog = undefined
-    })
-    return request
   }
 
   #set(patch: Partial<TriggerState>): void {

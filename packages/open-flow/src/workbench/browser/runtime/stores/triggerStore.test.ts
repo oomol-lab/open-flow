@@ -2,6 +2,7 @@ import type { ConnectorConnection } from '../api.ts'
 
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
+import { createI18n } from '../i18n.ts'
 import { providerIcon } from '../providerIcon.ts'
 import { TriggerStore } from './triggerStore.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
@@ -17,7 +18,7 @@ const flow = {
   version: 1,
 } as const
 
-function createSetup() {
+function createSetup(language: 'en' | 'zh-CN' = 'en') {
   const requests: string[] = []
   const request = vi.fn(async (path: string, init?: RequestInit) => {
     requests.push(path)
@@ -106,8 +107,15 @@ function createSetup() {
         version: 1,
       })
     }
-    if (path == '/v1/trigger-keys/catalog') {
+    if (path == `/v1/trigger-keys/catalog?locale=${language}`) {
       return Response.json({
+        locale: language,
+        display: {
+          'github.on_repo_event': {
+            displayName: language == 'en' ? 'Repository event' : '仓库事件',
+            description: language == 'en' ? 'Runs when a repository changes.' : '仓库变更时运行。',
+          },
+        },
         definitions: [
           {
             configSchema: { additionalProperties: false, type: 'object' },
@@ -133,7 +141,7 @@ function createSetup() {
   })
   const client = new WorkbenchClient(request)
   const workspace = new WorkspaceStore(client, vi.fn())
-  const triggers = new TriggerStore(client, workspace, vi.fn(), { openExternalPage: async () => true })
+  const triggers = new TriggerStore(client, workspace, vi.fn(), { openExternalPage: async () => true }, createI18n(language))
   const signal = new AbortController().signal
   return { client, workspace, triggers, requests, request, signal }
 }
@@ -158,12 +166,36 @@ describe('TriggerStore', () => {
       expect(options?.[0]).not.toHaveProperty('choices')
       expect(options?.[0]).not.toHaveProperty('trigger.connectionId')
       expect(searched?.map((option) => option.id)).toEqual(['trigger:github.on_repo_event'])
-      expect(requests.filter((path) => path == '/v1/trigger-keys/catalog')).toHaveLength(1)
+      expect(requests.filter((path) => path == '/v1/trigger-keys/catalog?locale=en')).toHaveLength(1)
       expect(requests.some((path) => path.startsWith('/v1/connector/connections/'))).toBe(false)
     } finally {
       triggers.dispose()
       workspace.dispose()
     }
+  })
+
+  it('searches translated and canonical copy and saves the same definition in both languages', async () => {
+    const saved = []
+    for (const language of ['en', 'zh-CN'] as const) {
+      const { workspace, triggers, client, signal } = createSetup(language)
+      vi.spyOn(client, 'listConnectorConnections').mockResolvedValue([])
+      try {
+        await workspace.start(flow.flowId)
+        const result = await triggers.provideAddNodeOptions(language == 'en' ? 'repository' : '仓库', signal)
+        expect(result).toHaveLength(1)
+        const option = result![0]!
+        expect(option.label).toBe(language == 'en' ? 'Repository event' : '仓库事件')
+        expect(await triggers.provideAddNodeOptions('repository', signal)).toHaveLength(1)
+        const id = await workspace.addNode(option, { x: 0, y: 0 })
+        const node = workspace.$.draft.value!.content.document.graph.nodes[id!]!
+        if (node.kind != 'integration') throw new Error('Expected Integration Trigger.')
+        saved.push(node.definition)
+      } finally {
+        triggers.dispose()
+        workspace.dispose()
+      }
+    }
+    expect(saved[0]).toEqual(saved[1])
   })
 
   it.each(['default', 'only', 'ambiguous', 'inactive', 'empty', 'explicit', 'failure'] as const)(

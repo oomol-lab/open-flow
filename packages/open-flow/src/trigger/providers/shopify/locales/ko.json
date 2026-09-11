@@ -1,0 +1,6 @@
+{
+  "shopify.on_shop_event": {
+    "displayName": "Shopify: 스토어 이벤트",
+    "description": "연결된 스토어에서 선택한 Shopify webhook 주제의 이벤트가 발생하면 실행합니다."
+  }
+}

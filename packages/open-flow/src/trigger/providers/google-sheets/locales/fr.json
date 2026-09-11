@@ -1,0 +1,6 @@
+{
+  "googlesheets.on_row_added": {
+    "displayName": "Google Sheets: Nouvelle ligne ajoutée",
+    "description": "Interroge périodiquement une feuille et se déclenche une fois pour chaque nouvelle ligne ajoutée après la dernière ligne déjà observée."
+  }
+}

@@ -309,8 +309,9 @@ function Session({
   }, [i18n, navigation, store])
   useEffect(() => void navigation.apply(location), [location, navigation])
   useEffect(() => {
+    store.triggers.catalog.setLanguage(language)
     if (i18n.lang != language) void i18n.switchLang(language)
-  }, [i18n, language])
+  }, [i18n, language, store])
   return (
     <I18nProvider i18n={i18n}>
       <div className="open-flow-theme open-flow-workbench" data-theme={theme}>

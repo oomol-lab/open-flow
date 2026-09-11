@@ -193,7 +193,8 @@
     "loadFailed": "Connector actions could not be loaded.",
     "paste": "Paste",
     "retry": "Retry",
-    "search": "Search"
+    "search": "Search",
+    "catalogRefreshFailed": "Could not refresh the Trigger catalog. Saved results remain available."
   },
   "copy": "Copy",
   "close": "Close",

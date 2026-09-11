@@ -250,6 +250,11 @@ export interface FlowCanvasViewProps {
   readonly onCopy: (nodeIds: readonly string[]) => void
   readonly onPaste: (position?: FlowCanvasViewPosition) => void
   readonly onSelectionChange: (nodeIds: readonly string[], edge: FlowCanvasViewEdge | undefined) => void
+  readonly addItemsCatalog?: {
+    readonly revision: number
+    readonly failed: boolean
+    readonly refresh: () => void
+  }
   readonly provideAddItems?: (searchTerm: string, signal: AbortSignal) => Promise<readonly FlowCanvasViewAddItem[] | undefined>
   readonly selectedNodeIds: readonly string[]
 }

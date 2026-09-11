@@ -193,7 +193,8 @@
     "loadFailed": "无法加载连接器操作。",
     "paste": "粘贴",
     "retry": "重试",
-    "search": "搜索"
+    "search": "搜索",
+    "catalogRefreshFailed": "无法刷新触发器列表，仍可使用已缓存的结果。"
   },
   "copy": "复制",
   "close": "关闭",

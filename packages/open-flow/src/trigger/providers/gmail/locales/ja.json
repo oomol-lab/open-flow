@@ -1,0 +1,6 @@
+{
+  "gmail.on_message_received": {
+    "displayName": "Gmail: 新着メール",
+    "description": "Gmail のメールボックスを定期的に確認し、新しいメールを受信すると実行します。"
+  }
+}

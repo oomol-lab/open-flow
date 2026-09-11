@@ -1,0 +1,6 @@
+{
+  "linear.on_issue_changed": {
+    "displayName": "Linear: Création ou mise à jour d’un ticket",
+    "description": "Vérifie périodiquement les tickets nouveaux et modifiés d’une équipe Linear. Commence maintenant, sans déclencher les tickets existants. Signale les états actuels observés, sans couvrir les suppressions ni chaque changement de statut intermédiaire."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "gmail.on_message_received": {
+    "displayName": "Gmail: Nouveau message reçu",
+    "description": "Interroge périodiquement la boîte Gmail et se déclenche à la réception d’un nouveau message."
+  }
+}

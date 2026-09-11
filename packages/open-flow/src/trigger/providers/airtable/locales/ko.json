@@ -1,0 +1,6 @@
+{
+  "airtable.on_record_changed": {
+    "displayName": "Airtable: 레코드 생성 또는 업데이트",
+    "description": "Airtable 테이블을 주기적으로 확인하고 시간 필드 순서에 따라 레코드가 생성되거나 업데이트되면 실행합니다."
+  }
+}

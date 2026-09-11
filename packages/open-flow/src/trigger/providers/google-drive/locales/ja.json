@@ -1,0 +1,14 @@
+{
+  "googledrive.changes_detected": {
+    "displayName": "Google Drive: 変更の検出",
+    "description": "Google Drive の changes.watch チャネルを使用し、ドライブの変更を取得できるようになると実行します。"
+  },
+  "googledrive.watch_changes": {
+    "displayName": "Google Drive: 変更の監視",
+    "description": "通知と同じ変更ストリームの定期スキャンでドライブの変更を監視します。"
+  },
+  "googledrive.on_file_change": {
+    "displayName": "Google Drive: フォルダ直下のファイル・フォルダの変更",
+    "description": "Google Drive の1つのフォルダを定期的に確認し、直下のファイルやフォルダが作成、更新されると実行します。"
+  }
+}

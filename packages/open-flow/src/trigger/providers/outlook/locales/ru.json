@@ -1,0 +1,6 @@
+{
+  "outlook.on_message_received": {
+    "displayName": "Outlook: Новое письмо",
+    "description": "Периодически проверяет почтовую папку Microsoft Outlook и срабатывает при поступлении нового письма."
+  }
+}

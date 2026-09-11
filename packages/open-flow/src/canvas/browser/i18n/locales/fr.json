@@ -193,7 +193,8 @@
     "loadFailed": "Impossible de charger les actions Connector.",
     "paste": "Coller",
     "retry": "Réessayer",
-    "search": "Rechercher"
+    "search": "Rechercher",
+    "catalogRefreshFailed": "Impossible d’actualiser le catalogue des déclencheurs. Les résultats en cache restent disponibles."
   },
   "copy": "Copier",
   "close": "Fermer",

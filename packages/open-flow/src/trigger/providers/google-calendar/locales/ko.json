@@ -1,0 +1,6 @@
+{
+  "googlecalendar.on_event_changed": {
+    "displayName": "Google Calendar: 일정 변경",
+    "description": "Google Calendar를 주기적으로 확인하고 일정이 생성, 업데이트 또는 취소되면 실행합니다."
+  }
+}

@@ -112,6 +112,7 @@ function Editor({
 }): ReactElement {
   const t = useTranslate()
   const addNodeOptions = useVal(store.workspace.$.addNodeOptions)
+  const triggerCatalogState = useVal(store.triggers.catalog.state)
   const [startId, setStartId] = useState<string>()
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   const busy = useVal(store.$.busy)
@@ -303,6 +304,7 @@ function Editor({
         onOpenBlocks={openBlocks}
         onOpenInspector={openInspector}
         onPaste={() => void store.workspace.pasteNodes()}
+        addItemsCatalog={{ ...triggerCatalogState, refresh: store.triggers.catalog.open }}
         provideAddNodeOptions={store.provideAddNodeOptions}
         onSelectNodes={(nodeIds) => store.selectNodes(nodeIds)}
         onToggleInspector={toggleInspector}
@@ -361,6 +363,9 @@ function Editor({
         >
           {contextPanelMode == 'blocks' ? (
             <BlockLibrary
+              catalogRevision={triggerCatalogState.revision}
+              catalogFailed={triggerCatalogState.failed}
+              refreshCatalog={store.triggers.catalog.open}
               browseOptions={store.browseAddNodeOptions}
               searchOptions={store.provideAddNodeOptions}
               disabled={authoringDisabled}

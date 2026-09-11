@@ -1,0 +1,14 @@
+{
+  "googledrive.changes_detected": {
+    "displayName": "Google Drive: 检测到变更",
+    "description": "使用 Google Drive changes.watch 通道，在有云端硬盘变更可用时触发。"
+  },
+  "googledrive.watch_changes": {
+    "displayName": "Google Drive: 关注变更",
+    "description": "通过通知和对同一变更流的定期扫描监控云端硬盘变更。"
+  },
+  "googledrive.on_file_change": {
+    "displayName": "Google Drive: 文件夹内的文件或文件夹变更",
+    "description": "轮询一个 Google Drive 文件夹，在其直属文件或文件夹创建或更新时触发。"
+  }
+}

@@ -91,7 +91,8 @@
     "noConnections": "No connections are available for this Trigger.",
     "retry": "Retry",
     "search": "Search blocks",
-    "searchPlaceholder": "Search blocks…"
+    "searchPlaceholder": "Search blocks…",
+    "catalogRefreshFailed": "Could not refresh the Trigger catalog. Saved results remain available."
   },
   "empty": {
     "loadFailedDescription": "Check the API configuration and make sure the deployment endpoint is reachable.",

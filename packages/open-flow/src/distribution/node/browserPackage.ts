@@ -256,6 +256,18 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'./errors.ts'", "'./control-api-errors.js'")
       .replaceAll("'./results.ts'", "'./run-results.js'")
       .replaceAll("'./flowNotifications.ts'", "'./flow-notifications.js'")
+      .replaceAll("'./triggerCatalog.ts'", "'./trigger-catalog.js'")
+      .replaceAll("'../../trigger/common/configOptions.ts'", "'./trigger-config-options.js'")
+    const triggerConfigOptionsDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/configOptions.d.ts'), 'utf8'))
+      .replaceAll("'../../connector/common/proxy.ts'", "'./connector-proxy.js'")
+      .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
+    const triggerCatalogDeclaration = (await readFile(path.join(declarationRoot, 'control/common/triggerCatalog.d.ts'), 'utf8'))
+      .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
+      .replaceAll("'../../localization/common/languages.ts'", "'./localization.js'")
+    const triggerLocalizationDeclaration = (await readFile(path.join(declarationRoot, 'trigger/providers/localization.d.ts'), 'utf8'))
+      .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
+      .replaceAll("'../../localization/common/languages.ts'", "'./localization.js'")
+      .replaceAll("'../../control/common/triggerCatalog.ts'", "'./trigger-catalog.js'")
     const controlApiConformanceDeclaration = await readFile(path.join(declarationRoot, 'control/common/conformance.d.ts'), 'utf8')
     const controlApiErrorsDeclaration = await readFile(path.join(declarationRoot, 'control/common/errors.d.ts'), 'utf8')
     const flowEncodingDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/encoding.d.ts'), 'utf8'))
@@ -291,13 +303,17 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
     )
     const integrationTriggerDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/integration.d.ts'), 'utf8'))
       .replaceAll("'../../connector/common/proxy.ts'", "'./connector-proxy.js'")
+      .replaceAll("'./configOptions.ts'", "'./trigger-config-options.js'")
       .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
     const pollTriggerDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/poll.d.ts'), 'utf8'))
       .replaceAll("'../../connector/common/proxy.ts'", "'./connector-proxy.js'")
+      .replaceAll("'./configOptions.ts'", "'./trigger-config-options.js'")
       .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
     const providerTriggersDeclaration = (await readFile(path.join(declarationRoot, 'trigger/providers/definitions.d.ts'), 'utf8'))
       .replaceAll("'../common/integration.ts'", "'./integration-trigger.js'")
       .replaceAll("'../common/poll.ts'", "'./poll-trigger.js'")
+      .replaceAll("'../common/configOptions.ts'", "'./trigger-config-options.js'")
+      .replaceAll("'./localization.ts'", "'./trigger-localization.js'")
     const webhookTriggerDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/webhook.d.ts'), 'utf8')).replaceAll(
       "'../../flow/common/change.ts'",
       "'../browser/flow-change.js'",
@@ -357,6 +373,9 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         ),
       ),
       writeFile(path.join(commonOutputPath, 'control-api.d.ts'), controlApiDeclaration),
+      writeFile(path.join(commonOutputPath, 'trigger-catalog.d.ts'), triggerCatalogDeclaration),
+      writeFile(path.join(commonOutputPath, 'trigger-config-options.d.ts'), triggerConfigOptionsDeclaration),
+      writeFile(path.join(commonOutputPath, 'trigger-localization.d.ts'), triggerLocalizationDeclaration),
       writeFile(
         path.join(commonOutputPath, 'run-results.d.ts'),
         (await readFile(path.join(declarationRoot, 'control/common/results.d.ts'), 'utf8')).replaceAll(

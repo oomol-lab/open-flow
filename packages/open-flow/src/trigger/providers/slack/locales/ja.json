@@ -1,0 +1,6 @@
+{
+  "slack.on_message_posted": {
+    "displayName": "Slack: チャンネルの新着メッセージ",
+    "description": "Slack の1つの会話を定期的に確認し、新しいメッセージが投稿されると実行します。"
+  }
+}

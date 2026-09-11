@@ -1,0 +1,14 @@
+{
+  "googledrive.changes_detected": {
+    "displayName": "Google Drive: Обнаружение изменений",
+    "description": "Использует канал Google Drive changes.watch и срабатывает, когда доступны изменения Диска."
+  },
+  "googledrive.watch_changes": {
+    "displayName": "Google Drive: Наблюдение за изменениями",
+    "description": "Отслеживает изменения Диска через уведомления и периодическое сканирование одного и того же потока изменений."
+  },
+  "googledrive.on_file_change": {
+    "displayName": "Google Drive: Изменение файла или папки внутри папки",
+    "description": "Периодически проверяет одну папку Google Drive и срабатывает при создании или изменении файлов и папок непосредственно в ней."
+  }
+}

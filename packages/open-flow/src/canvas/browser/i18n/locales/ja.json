@@ -193,7 +193,8 @@
     "loadFailed": "Connector アクションを読み込めませんでした。",
     "paste": "貼り付け",
     "retry": "再試行",
-    "search": "検索"
+    "search": "検索",
+    "catalogRefreshFailed": "トリガー一覧を更新できませんでした。キャッシュ済みの結果は引き続き利用できます。"
   },
   "copy": "コピー",
   "close": "閉じる",

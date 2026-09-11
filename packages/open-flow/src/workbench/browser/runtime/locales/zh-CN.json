@@ -91,7 +91,8 @@
     "noConnections": "这个 Trigger 没有可用的 Connection。",
     "retry": "重试",
     "search": "搜索节点",
-    "searchPlaceholder": "搜索节点…"
+    "searchPlaceholder": "搜索节点…",
+    "catalogRefreshFailed": "无法刷新触发器列表，仍可使用已缓存的结果。"
   },
   "empty": {
     "loadFailedDescription": "请检查 API 配置，并确认部署服务可访问。",

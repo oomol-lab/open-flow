@@ -1,5 +1,5 @@
 import type { KeyboardEvent, PointerEvent, ReactElement, ReactNode } from 'react'
-import type { FlowCanvasViewAddItem } from '../../../../canvas/browser/graph/FlowCanvas/model.ts'
+import type { FlowCanvasViewAddItem, FlowCanvasViewProps } from '../../../../canvas/browser/graph/FlowCanvas/model.ts'
 import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { DesignerEdge, DesignerGraph, DesignerViewport, Point } from '../workspace.ts'
@@ -17,6 +17,7 @@ import { indexAddNodeOptions } from './addNodeOptions.ts'
 import { CanvasHistoryControls } from './canvasHistoryControls.tsx'
 
 interface Props {
+  readonly addItemsCatalog?: FlowCanvasViewProps['addItemsCatalog']
   readonly history?: CanvasHistoryControlsProps
   readonly ignoredNodeIds: readonly string[]
   readonly onIgnoreNodes: (nodeIds: readonly string[], ignored: boolean) => void
@@ -110,6 +111,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     onOpenInspector,
     onPaste,
     provideAddNodeOptions,
+    addItemsCatalog,
     onSelectNodes,
     onToggleInspector,
     ignoredNodeIds,
@@ -305,6 +307,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
       tabIndex={0}
     >
       <FlowCanvasView
+        addItemsCatalog={addItemsCatalog}
         ignoredNodeIds={ignoredNodeIds}
         onIgnoreNodes={onIgnoreNodes}
         addItemRequest={addItemRequest}

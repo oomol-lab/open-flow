@@ -109,6 +109,7 @@ export function FlowCanvasView(props: FlowCanvasViewProps): ReactElement {
 
   return (
     <FlowCanvas
+      addItemsCatalog={props.addItemsCatalog}
       cornerTools={props.cornerTools}
       toolbar={props.toolbar}
       addItemRequest={props.addItemRequest}

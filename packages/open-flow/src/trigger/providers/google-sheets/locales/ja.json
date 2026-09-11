@@ -1,0 +1,6 @@
+{
+  "googlesheets.on_row_added": {
+    "displayName": "Google Sheets: 新しい行の追加",
+    "description": "シートを定期的に確認し、前回確認した最終行の下に追加された新しい行ごとに1回実行します。"
+  }
+}

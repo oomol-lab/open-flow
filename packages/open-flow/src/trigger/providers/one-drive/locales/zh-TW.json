@@ -1,0 +1,6 @@
+{
+  "one_drive.on_item_changed": {
+    "displayName": "OneDrive: 檔案或資料夾變更",
+    "description": "輪詢 OneDrive 變更串流，在檔案或資料夾建立、更新或刪除時觸發。"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "shopify.on_shop_event": {
+    "displayName": "Shopify: Événement de boutique",
+    "description": "Se déclenche lors des événements correspondant aux sujets webhook Shopify sélectionnés dans la boutique connectée."
+  }
+}

@@ -73,6 +73,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false) {
     },
     runs: { $: { externalRunId: value(undefined) } },
     triggers: {
+      catalog: { state: value({ revision: 0, failed: false }), open: vi.fn() },
       $: {
         connectionLoading: value(undefined),
         selectedActiveConnections: value([]),

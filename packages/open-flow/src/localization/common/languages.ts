@@ -68,3 +68,39 @@ function matchUiLanguage(candidate: string): UiLanguage | undefined {
   }
   return uiLanguageTags.get(subtags[0]!)
 }
+
+/** Resolve metadata query/header preferences using the same language mapping as the UI. */
+export function resolveMetadataLanguage(query: string | undefined, acceptLanguage?: string): UiLanguage {
+  if (query != null) {
+    const canonical = Intl.getCanonicalLocales(query.trim())[0]
+    if (canonical == null) throw new RangeError('locale must be a valid BCP 47 language tag')
+    return resolveUiLanguage([canonical])
+  }
+  const candidates = (acceptLanguage ?? '').split(',').flatMap<{ tag: string; q: number; order: number; language: UiLanguage | undefined }>((part, order) => {
+    const [tag, ...parameters] = part.trim().split(';')
+    const quality = parameters
+      .find((parameter) => parameter.trim().startsWith('q='))
+      ?.trim()
+      .slice(2)
+    const q = quality == null ? 1 : Number(quality)
+    if (!tag || !Number.isFinite(q) || q < 0 || q > 1) return []
+    if (tag == '*') return [{ tag, q, order, language: undefined }]
+    try {
+      const canonical = Intl.getCanonicalLocales(tag)[0]
+      const language = canonical == null ? undefined : matchUiLanguage(canonical)
+      return language == null ? [] : [{ tag, q, order, language }]
+    } catch {
+      return []
+    }
+  })
+  const preferences = uiLanguages
+    .flatMap((language) => {
+      const matches = candidates
+        .filter((candidate) => candidate.tag == '*' || candidate.language == language)
+        .toSorted((a, b) => (b.tag == '*' ? 0 : b.tag.split('-').length) - (a.tag == '*' ? 0 : a.tag.split('-').length) || a.order - b.order)
+      const candidate = matches[0]
+      return candidate == null || candidate.q == 0 ? [] : [{ language, q: candidate.q, order: candidate.order }]
+    })
+    .toSorted((a, b) => b.q - a.q || a.order - b.order)
+  return preferences[0]?.language ?? defaultUiLanguage
+}

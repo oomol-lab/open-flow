@@ -1,0 +1,10 @@
+{
+  "github.on_repo_event": {
+    "displayName": "GitHub: 저장소 이벤트",
+    "description": "저장소에서 선택한 GitHub webhook 이벤트가 발생하면 실행합니다."
+  },
+  "github.watch_pull_request": {
+    "displayName": "GitHub: 풀 리퀘스트 감시",
+    "description": "알림과 정기 확인으로 풀 리퀘스트 하나를 감시합니다. 현재 상태에서 시작하며 관찰된 변경을 보고합니다. 모든 중간 상태 전환이나 리뷰 이벤트를 보고하지는 않습니다."
+  }
+}

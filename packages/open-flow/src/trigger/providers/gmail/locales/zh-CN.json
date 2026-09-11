@@ -1,0 +1,6 @@
+{
+  "gmail.on_message_received": {
+    "displayName": "Gmail: 收到新邮件",
+    "description": "轮询 Gmail 邮箱，在收到新邮件时触发。"
+  }
+}

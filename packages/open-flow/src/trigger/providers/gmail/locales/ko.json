@@ -1,0 +1,6 @@
+{
+  "gmail.on_message_received": {
+    "displayName": "Gmail: 새 메일 수신",
+    "description": "Gmail 메일함을 주기적으로 확인하고 새 메일을 받으면 실행합니다."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "outlook.on_message_received": {
+    "displayName": "Outlook: 收到新郵件",
+    "description": "輪詢 Microsoft Outlook 郵件資料夾，在新郵件到達時觸發。"
+  }
+}

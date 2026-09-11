@@ -1,0 +1,6 @@
+{
+  "zendesk.on_event": {
+    "displayName": "Zendesk: 이벤트 구독",
+    "description": "선택한 Zendesk 계정 이벤트 중 하나가 발생하면 실행합니다."
+  }
+}

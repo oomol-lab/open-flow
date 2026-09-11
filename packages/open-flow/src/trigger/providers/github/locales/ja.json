@@ -1,0 +1,10 @@
+{
+  "github.on_repo_event": {
+    "displayName": "GitHub: リポジトリイベント",
+    "description": "リポジトリで選択した GitHub webhook イベントが発生すると実行します。"
+  },
+  "github.watch_pull_request": {
+    "displayName": "GitHub: プルリクエストの監視",
+    "description": "通知と定期チェックで1件のプルリクエストを監視します。現在の状態から開始し、観測した変更を報告します。途中の状態遷移やレビューイベントをすべて報告するとは限りません。"
+  }
+}

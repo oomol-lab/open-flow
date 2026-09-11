@@ -1,0 +1,6 @@
+{
+  "zendesk.on_event": {
+    "displayName": "Zendesk: Подписка на события",
+    "description": "Срабатывает при любом из выбранных событий аккаунта Zendesk."
+  }
+}

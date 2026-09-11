@@ -1,6 +1,7 @@
 import type { IsValidConnection, OnMoveEnd, OnNodeDrag, OnSelectionChangeFunc, Edge as RFEdge, Node as RFNode } from '@xyflow/react'
 import type { CanvasStore } from '../../stores/canvas/canvas.store.ts'
 import type { ReactFlowContainerProps } from '../ReactFlowContainer/ReactFlowContainer.tsx'
+import type { FlowCanvasViewProps } from './model.ts'
 
 import { useEffect } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -11,6 +12,7 @@ import { fitViewOptions } from '../FlowCanvas/constants.ts'
 import { ReactFlowContainer } from '../ReactFlowContainer/ReactFlowContainer.tsx'
 
 export interface FlowCanvasProps {
+  addItemsCatalog?: FlowCanvasViewProps['addItemsCatalog']
   cornerTools?: React.ReactNode
   toolbar?: React.ReactNode
   flowCanvasStore: CanvasStore
@@ -29,6 +31,7 @@ export interface FlowCanvasProps {
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   flowCanvasStore,
+  addItemsCatalog,
   cornerTools,
   toolbar,
   dark,
@@ -88,6 +91,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           onCopy={flowCanvasStore.onCopy}
           onPaste={flowCanvasStore.onPaste}
           provideAddNodeMenuItems={flowCanvasStore.provideAddNodeMenuItems}
+          addItemsCatalog={addItemsCatalog}
           provideAsyncAddNodeMenuItems={flowCanvasStore.provideAsyncAddNodeMenuItems}
           waitNode={flowCanvasStore.waitNode}
           duplicateNodes={flowCanvasStore.duplicateNodes}

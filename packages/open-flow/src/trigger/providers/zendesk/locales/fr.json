@@ -1,0 +1,6 @@
+{
+  "zendesk.on_event": {
+    "displayName": "Zendesk: Abonnement aux événements",
+    "description": "Se déclenche lorsque l’un des événements de compte Zendesk sélectionnés se produit."
+  }
+}

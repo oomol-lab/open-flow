@@ -1,0 +1,10 @@
+{
+  "github.on_repo_event": {
+    "displayName": "GitHub: Événement de dépôt",
+    "description": "Se déclenche lors des événements webhook GitHub sélectionnés dans un dépôt."
+  },
+  "github.watch_pull_request": {
+    "displayName": "GitHub: Suivi d’une pull request",
+    "description": "Suit une pull request grâce aux notifications et à des vérifications périodiques. Part de son état actuel et signale les changements observés, sans garantir chaque transition intermédiaire ou événement de revue."
+  }
+}

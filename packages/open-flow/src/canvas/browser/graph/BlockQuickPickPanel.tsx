@@ -1,6 +1,6 @@
 import styles from './BlockQuickPickPanel.module.scss'
 import type { DragEventHandler, MouseEventHandler, ReactNode } from 'react'
-import type { FlowCanvasViewAddItem } from './FlowCanvas/model.ts'
+import type { FlowCanvasViewAddItem, FlowCanvasViewProps } from './FlowCanvas/model.ts'
 import type { NodePickerItem } from './nodePickerItems.ts'
 
 import { clsx } from 'clsx'
@@ -19,6 +19,7 @@ import { defaultNodeIcon, defaultTriggerIcon } from './Nodes/components/constant
 import { useGetStaticPopupContainer } from './ReactFlowContainer/useGetPopupContainer.ts'
 
 export interface BlockQuickPickPanelProps {
+  readonly catalog?: FlowCanvasViewProps['addItemsCatalog']
   readonly hideDescription?: boolean
   readonly items: readonly FlowCanvasViewAddItem[]
   readonly connectionSide?: 'left' | 'right'
@@ -28,6 +29,9 @@ export interface BlockQuickPickPanelProps {
 
 export const BlockQuickPickPanel: React.FC<BlockQuickPickPanelProps> = (props) => {
   const t = useTranslate()
+  useEffect(() => {
+    props.catalog?.refresh()
+  }, [props.catalog?.refresh, t])
   const ref = useRef<HTMLInputElement>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [cursorIndex, setCursorIndex] = useState(0)
@@ -40,7 +44,7 @@ export const BlockQuickPickPanel: React.FC<BlockQuickPickPanelProps> = (props) =
       const result = await provider(search, signal)
       return result == null ? undefined : nodePickerItems(result, props.connectionSide)
     }
-  }, [props.provideAsyncItems, props.connectionSide])
+  }, [props.provideAsyncItems, props.connectionSide, props.catalog?.revision])
   const { error: asyncError, items: filteredItems, loading, retry } = useCollectionItems(items, searchTerm, provideAsyncItems)
 
   useEffect(() => {
@@ -120,10 +124,17 @@ export const BlockQuickPickPanel: React.FC<BlockQuickPickPanelProps> = (props) =
             <i className="i-codicon:loading open-flow-canvas-spin" />
           </div>
         )}
-        {!loading && asyncError && (
+        {!loading && (asyncError || props.catalog?.failed) && (
           <div className={styles.feedback} role="alert">
-            <span>{t('contextMenu.loadFailed')}</span>
-            <Button onClick={retry} size="sm" variant="outline">
+            <span>{t(props.catalog?.failed && !asyncError ? 'contextMenu.catalogRefreshFailed' : 'contextMenu.loadFailed')}</span>
+            <Button
+              onClick={() => {
+                props.catalog?.refresh()
+                retry()
+              }}
+              size="sm"
+              variant="outline"
+            >
               {t('contextMenu.retry')}
             </Button>
           </div>
