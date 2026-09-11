@@ -1,3 +1,4 @@
+import { generateTriggerLocales } from '@oomol-lab/open-flow/trigger-locales-plugin'
 import { spawn } from 'node:child_process'
 import { copyFile, cp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
@@ -9,6 +10,7 @@ const outputRoot = path.join(appRoot, 'dist')
 const require = createRequire(import.meta.url)
 const vitePath = path.join(path.dirname(require.resolve('vite/package.json')), 'bin/vite.js')
 
+await generateTriggerLocales()
 await rm(outputRoot, { force: true, recursive: true })
 await run([vitePath, 'build'])
 await run([
@@ -17,6 +19,7 @@ await run([
   'node/runtime/isolated-vm.ts',
   'node/runtime/isolated-vm-executor.ts',
   '--target=node',
+  '--splitting',
   '--packages=bundle',
   '--external=isolated-vm',
   '--outdir=dist/server',

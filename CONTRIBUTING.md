@@ -57,6 +57,14 @@ does not narrow it. Root `bun test` is unsuitable: it loads Vitest files with Bu
 Some test scripts include builds; inspect the scripts when choosing checks to avoid duplicate work.
 TypeScript executed directly by Node must use erasable syntax supported by the pinned runtime.
 
+Trigger translations live in `packages/open-flow/src/trigger/providers/<provider>/locales/<language>.json`,
+keyed by Trigger key. Add translations beside the provider definition; do not edit the generated
+language indexes in `providers/locales/`. Development servers regenerate indexes at startup and
+when resource files are added or removed; package and Server builds regenerate them as well.
+`bun run --cwd packages/open-flow generate:trigger-locales` updates indexes without starting a
+server. `bun run check` detects stale indexes, and translation tests verify registered keys and
+language coverage. Runtime loading fetches only the requested language; English uses definitions.
+
 CI scopes package, command, Server, and image jobs to the files a change touches.
 
 ## Documentation

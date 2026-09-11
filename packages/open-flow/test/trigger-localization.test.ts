@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { resolveMetadataLanguage, uiLanguages } from '../src/localization/common/languages.ts'
 import { triggerDefinitions } from '../src/trigger/providers/definitions.ts'
-import { localizeTrigger, triggerTranslations } from '../src/trigger/providers/localization.ts'
+import { localizeTrigger, loadTriggerTranslations } from '../src/trigger/providers/localization.ts'
 
 // Coverage protects resource ownership and completeness when definitions are added or removed.
 describe('Trigger localization', () => {
-  it('covers every registered key in every UI language and allows only display copy', () => {
+  it('covers every registered key in every UI language and allows only display copy', async () => {
     const keys = triggerDefinitions.map(({ snapshot }) => snapshot.key).toSorted()
     for (const locale of uiLanguages) {
       if (locale == 'en') continue
-      const translations = triggerTranslations[locale]
+      const translations = await loadTriggerTranslations(locale)
       expect(Object.keys(translations).toSorted()).toEqual(keys)
       for (const copy of Object.values(translations)) {
         expect(Object.keys(copy).toSorted()).toEqual(['description', 'displayName'])
@@ -19,12 +19,15 @@ describe('Trigger localization', () => {
     }
   })
 
-  it('projects translated display copy without mutating definitions and falls back for unknown keys', () => {
+  it('projects translated display copy without mutating definitions and falls back for unknown keys', async () => {
     const snapshot = triggerDefinitions[0]!.snapshot
     const before = structuredClone(snapshot)
-    expect(localizeTrigger(snapshot, 'zh-CN').displayName).not.toBe(snapshot.displayName)
+    expect((await localizeTrigger(snapshot, 'zh-CN')).displayName).not.toBe(snapshot.displayName)
     expect(snapshot).toEqual(before)
-    expect(localizeTrigger({ ...snapshot, key: 'custom.trigger' }, 'zh-CN')).toEqual({ displayName: snapshot.displayName, description: snapshot.description })
+    expect(await localizeTrigger({ ...snapshot, key: 'custom.trigger' }, 'zh-CN')).toEqual({
+      displayName: snapshot.displayName,
+      description: snapshot.description,
+    })
   })
 
   it.each([

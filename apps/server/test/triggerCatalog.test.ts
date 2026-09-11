@@ -54,8 +54,8 @@ describe('Trigger catalog HTTP representations', () => {
     const first = await app.request('/trigger-keys/catalog?locale=zh-CN')
     const before = await first.json()
     const original = providers.localizeTrigger
-    vi.spyOn(providers, 'localizeTrigger').mockImplementation((definition, locale) => {
-      const copy = original(definition, locale)
+    vi.spyOn(providers, 'localizeTrigger').mockImplementation(async (definition, locale) => {
+      const copy = await original(definition, locale)
       return { ...copy, description: copy.description + ' Updated.' }
     })
     const changed = await app.request('/trigger-keys/catalog?locale=zh-CN', { headers: { 'if-none-match': first.headers.get('etag')! } })

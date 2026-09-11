@@ -440,6 +440,9 @@ Trigger Key catalog 是 deployment scope 资源：
 契约。摘要返回翻译后的名称与描述；完整 catalog 的 `display` 按 Trigger key 保存展示文案，`definitions`
 始终保留原始英文定义。单条 definition、CLI 与持久化的 Flow definition 不因界面语言改变。
 
+公共 `provider-triggers` entry 的 `localizeTrigger(definition, locale)` 返回 `Promise<TriggerDisplay>`，调用方需等待
+本地化结果。非英文翻译按语言延迟加载并缓存；英文使用原始定义，不加载翻译资源。
+
 这两个接口返回 `Content-Language`、`Vary: Accept-Language`、`Cache-Control: private, no-cache` 与根据最终响应
 生成的 `ETag`。匹配 `If-None-Match` 时返回无 body 的 304，并保留语言与缓存响应头。翻译更新也会使 ETag 失效。
 

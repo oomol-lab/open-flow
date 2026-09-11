@@ -26,13 +26,13 @@ function Sample({
   const [ready, setReady] = useState(false)
   const pending = useRef<(() => void) | undefined>(undefined)
   const session = useMemo(() => {
-    const data = (count: number) => {
+    const data = async (count: number) => {
       const definitions = snapshots.slice(0, count)
       return {
         version: 1,
         locale: language,
         definitions,
-        display: Object.fromEntries(definitions.map((definition) => [definition.key, localizeTrigger(definition, language)])),
+        display: Object.fromEntries(await Promise.all(definitions.map(async (definition) => [definition.key, await localizeTrigger(definition, language)]))),
       }
     }
     const values = new Map<string, string>()
@@ -42,26 +42,35 @@ function Sample({
         values.set(key, value)
       },
     }
-    browserTriggerCatalogStorage('lab', storage).setItem(language, JSON.stringify({ data: data(mode == 'ready' ? 20 : 4), etag: '"cached"' }))
-    return createTriggerSession(triggerFixtures[0]!.trigger, language, log, 'sample', false, {
+    const sampleSession = createTriggerSession(triggerFixtures[0]!.trigger, language, log, 'sample', false, {
       cache: { namespace: 'lab', storage },
       request: async (_url, init) => {
         log('catalog.request', { language, etag: new Headers(init?.headers).get('if-none-match') })
         if (mode == 'failed') return Response.json({ error: { code: 'request.failed', message: 'Sample offline response.' } }, { status: 503 })
         if (mode == 'ready') return new Response(null, { status: 304 })
         return new Promise<Response>((resolve, reject) => {
-          pending.current = () => resolve(Response.json(data(20), { headers: { etag: '"fresh"' } }))
+          pending.current = () => {
+            void data(20).then((value) => resolve(Response.json(value, { headers: { etag: '"fresh"' } })), reject)
+          }
           init?.signal?.addEventListener('abort', () => reject(new DOMException('Cancelled', 'AbortError')), { once: true })
         })
       },
     })
+    return {
+      ...sampleSession,
+      prepare: async () => {
+        browserTriggerCatalogStorage('lab', storage).setItem(language, JSON.stringify({ data: await data(mode == 'ready' ? 20 : 4), etag: '"cached"' }))
+      },
+    }
   }, [language, mode, log])
   const state = useVal(session.triggers.catalog.state)
   useEffect(() => register(() => pending.current?.()), [register])
   useEffect(() => {
     let active = true
     setReady(false)
-    void session.start().then(() => {
+    void session.prepare().then(async () => {
+      if (!active) return
+      await session.start()
       if (active) setReady(true)
     })
     return () => {
