@@ -338,8 +338,6 @@
     "flowRenamed": "已将 Flow 重命名为 {{name}}。",
     "layoutConflict": "布局已在其他位置发生变化。已加载最新布局，本次移动未应用。",
     "moduleUpdated": "草稿已在其他位置发生变化。你的本地代码仍保留，请检查后再保存。",
-    "nodeDeleted": "已删除节点。",
-    "nodesDeleted": "已删除 {{count}} 个节点。",
     "networkFailed": "暂时无法连接服务，请检查网络后重试。",
     "published": "已发布 {{name}}。",
     "rolledBack": "已将线上版本回滚到修订 {{revision}}。",
