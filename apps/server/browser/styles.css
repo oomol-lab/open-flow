@@ -23,7 +23,7 @@ body,
 
 body {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--ui-font-size);
 }
 
 .server-host {

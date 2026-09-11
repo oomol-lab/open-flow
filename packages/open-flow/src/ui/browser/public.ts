@@ -31,8 +31,12 @@ export const notificationToasterProps = {
 export function NotificationUndoLabel({ children }: { children: ReactNode }): ReactNode {
   return createElement(
     'span',
-    { className: 'inline-flex items-center gap-1.5' },
-    createElement('i', { 'aria-hidden': true, 'className': 'i-lucide-light:undo-2', 'style': { width: 16, height: 16, flexShrink: 0 } }),
+    { 'className': 'inline-flex items-center gap-1.5', 'data-notification-action-icon': 'start' },
+    createElement('i', {
+      'aria-hidden': true,
+      'className': 'i-lucide:undo-2',
+      'style': { width: 14, height: 14, flexShrink: 0, transform: 'translateY(-1px)' },
+    }),
     children,
   )
 }
