@@ -93,7 +93,7 @@ Les trois options prises en charge utilisent le même produit Open Flow et le m�
   des événements de chaque Run.
 - **Publiez des automatisations de longue durée.** Démarrez les Flows manuellement ou à partir de
   planifications Cron, de Webhooks, de sources de polling et d'événements de Provider.
-- **Gardez l'état opérationnel au même endroit.** Les Projects, les Revisions immuables, les
+- **Gardez l'état opérationnel au même endroit.** Les Flows, les Revisions immuables, les
   Publications, les versions Live, les Runs et l'état des Triggers appartiennent à un seul déploiement
   sélectionné, au lieu d'être répartis entre des fichiers locaux et des services cachés.
 - **Exécutez du code non fiable en toute sécurité.** Le Server exécute chaque Task de code dans un
@@ -137,7 +137,7 @@ flowchart LR
   CLI["oo flow CLI"] -->|"Control API"| Server
   Server -. "optionnel" .-> Connector["Runtime Connector"]
   Connector --> Providers["Providers tiers"]
-  Server --> Store["SQLite : Projects, Revisions, Publications, Runs"]
+  Server --> Store["SQLite : Flows, Revisions, Publications, Runs"]
   Server --> Triggers["Ordonnanceur de Triggers : Cron, Webhook, Poll, Integration"]
   Server --> Runtime["Runtime JavaScript isolé"]
 ```
@@ -169,10 +169,10 @@ docker run --rm \
 
 Ouvrez [http://127.0.0.1:3000](http://127.0.0.1:3000) et connectez-vous avec la valeur de
 `OPEN_FLOW_TOKEN`. La même valeur sert de Bearer token pour les clients machine de la Control API.
-Les Projects et l'historique des Runs sont persistés dans le volume Docker `open-flow-data`.
+Les Flows et l'historique des Runs sont persistés dans le volume Docker `open-flow-data`.
 
 Pour éviter la construction, téléchargez l'image multi-architecture préconstruite `ghcr.io/oomol-lab/open-flow` ou démarrez-la avec
-le `docker-compose.yml` à la racine du dépôt. Les tags (`latest`, versions de Release, `tip` et hashs de commit) et les étapes de mise
+le `docker-compose.yml` à la racine du dépôt. Les tags (`latest` et les versions de Release) et les étapes de mise
 à niveau sont dans le [guide de l'image Docker](server/docker-ghcr/README.fr.md).
 
 Le Server est utile sans services externes. Les Actions adossées à un Connector, les Triggers de
@@ -249,8 +249,11 @@ bun run dev
 ```
 
 Ouvrez le Workbench de développement à l'adresse
-[http://127.0.0.1:5173](http://127.0.0.1:5173). Ses requêtes API sont relayées vers le Server sur
-`http://127.0.0.1:3000`.
+[http://localhost:5174](http://localhost:5174). Ses requêtes Control API sont relayées vers le port du
+backend de développement (`OPEN_FLOW_PORT`, par défaut `3001` ; la cible du proxy est transmise à
+Vite sous le nom `OPEN_FLOW_DEV_API_ORIGIN`). Les Actions adossées à un Connector restent
+indisponibles tant que `OPEN_FLOW_CONNECTOR_ORIGIN` n'est pas configuré. Le token Connector reste
+facultatif.
 
 Le premier lancement en développement crée un token opérateur dans
 `apps/server/.open-flow-dev/operator-token`. Les lancements suivants le réutilisent, de sorte que

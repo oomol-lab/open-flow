@@ -86,7 +86,7 @@ Agent는 일회용 로컬 설정이 아니라 선택한 Open Flow 배포 안에 
   모든 Run의 전체 이벤트 이력을 따라갈 수 있습니다.
 - **장기 실행 자동화를 게시합니다.** Flow는 수동으로 시작할 수도 있고 Cron 일정, Webhook, 폴링 소스, Provider
   이벤트로 시작할 수도 있습니다.
-- **운영 상태를 한데 모읍니다.** Project, 불변 Revision, Publication, Live 버전, Run, Trigger 상태는 로컬 파일과
+- **운영 상태를 한데 모읍니다.** Flow, 불변 Revision, Publication, Live 버전, Run, Trigger 상태는 로컬 파일과
   숨겨진 서비스에 흩어지지 않고 선택된 하나의 배포에 속합니다.
 - **신뢰할 수 없는 코드를 안전하게 실행합니다.** Server는 오래 유지되는 Executor 프로세스 안에서 코드 Task마다 새
   V8 isolate를 만들고, 해당 Task가 선언한 Capability만 제공합니다.
@@ -126,7 +126,7 @@ flowchart LR
   CLI["oo flow CLI"] -->|"Control API"| Server
   Server -. "선택 사항" .-> Connector["Connector 런타임"]
   Connector --> Providers["서드파티 Provider"]
-  Server --> Store["SQLite: Project, Revision, Publication, Run"]
+  Server --> Store["SQLite: Flow, Revision, Publication, Run"]
   Server --> Triggers["Trigger 스케줄러: Cron, Webhook, Poll, Integration"]
   Server --> Runtime["격리된 JavaScript 런타임"]
 ```
@@ -155,11 +155,11 @@ docker run --rm \
 ```
 
 [http://127.0.0.1:3000](http://127.0.0.1:3000)을 열고 `OPEN_FLOW_TOKEN` 값으로 로그인합니다. 같은 값은 Control
-API의 머신 클라이언트를 위한 Bearer 토큰으로도 사용할 수 있습니다. Project와 Run 이력은 `open-flow-data` Docker
+API의 머신 클라이언트를 위한 Bearer 토큰으로도 사용할 수 있습니다. Flow와 Run 이력은 `open-flow-data` Docker
 볼륨에 저장됩니다.
 
 빌드를 건너뛰려면 미리 빌드된 멀티 아키텍처 이미지 `ghcr.io/oomol-lab/open-flow`를 pull하거나 저장소 루트의 `docker-compose.yml`로
-시작하세요. Tag (`latest`, Release 버전, `tip`, 커밋 해시)와 업그레이드 절차는 [Docker 이미지 가이드](server/docker-ghcr/README.ko.md)를
+시작하세요. Tag (`latest`, Release 버전)와 업그레이드 절차는 [Docker 이미지 가이드](server/docker-ghcr/README.ko.md)를
 참고하세요.
 
 Server는 외부 서비스 없이도 유용하게 사용할 수 있습니다. Connector 기반 Action, Provider Trigger, LLM Task는 해당
@@ -200,7 +200,7 @@ OpenConnector와 Open Flow를 함께 시작하고, runtime token을 만들고, �
 ## 하나의 제품, 이식 가능한 배포
 
 Workbench와 CLI는 특정 데이터베이스나 클라우드 런타임에 의존하지 않고 버전 관리되는 Control API로 통신합니다.
-배포가 실행과 영속화를 담당하며, 클라이언트는 두 번째 로컬 Project 형식을 만들거나 다른 백엔드로 조용히 전환하지
+배포가 실행과 영속화를 담당하며, 클라이언트는 두 번째 로컬 워크플로 형식을 만들거나 다른 백엔드로 조용히 전환하지
 않습니다.
 
 이 저장소에는 다음이 포함되어 있습니다.
@@ -225,8 +225,7 @@ bun install --frozen-lockfile
 bun run dev
 ```
 
-개발용 Workbench는 [http://127.0.0.1:5173](http://127.0.0.1:5173)에서 열 수 있습니다. API 요청은
-`http://127.0.0.1:3000`의 Server로 프록시됩니다.
+개발용 Workbench는 [http://localhost:5174](http://localhost:5174)에서 열 수 있습니다. Control API 요청은 개발 백엔드 포트(`OPEN_FLOW_PORT`, 기본값 `3001`)로 프록시되며, 프록시 대상은 Vite에 `OPEN_FLOW_DEV_API_ORIGIN`으로 전달됩니다. Connector 기반 Action은 `OPEN_FLOW_CONNECTOR_ORIGIN`을 설정할 때까지 사용할 수 없습니다. Connector 토큰은 계속 선택 사항입니다.
 
 첫 개발 실행 시 운영자 토큰이 `apps/server/.open-flow-dev/operator-token`에 생성됩니다. 이후 실행에서는 같은 토큰을
 재사용하므로 개발 서버를 재시작해도 현재 Workbench 세션이 무효화되지 않습니다. 명시적인 토큰을 사용하려면

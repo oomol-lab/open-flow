@@ -25,7 +25,7 @@ import '@oomol-lab/open-flow/workbench.css'
 Deployment chrome that needs the same light and dark semantic palette without the Workbench styles
 can import `@oomol-lab/open-flow/theme.css` and apply `open-flow-theme` plus `data-theme` to its root.
 
-Open Flow clients operate Projects through one selected Control API deployment and do not create,
+Open Flow clients operate Flows through one selected Control API deployment and do not create,
 scan or execute local workflow directories. The concrete Isolated VM host belongs to Server and
 is not exported by this package.
 

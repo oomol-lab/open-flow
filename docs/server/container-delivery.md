@@ -20,7 +20,7 @@ docker build --file apps/server/Dockerfile --tag open-flow-server:dev .
 
 Dockerfile 使用多阶段构建。builder 生成可脱离 monorepo 运行的 `dist`，最终 Node.js 镜像只复制以下 release artifact：
 
-- `server/main.js` 和 `server/isolated-vm.js`：服务端 bundle 与其长驻 Isolated VM Executor；
+- `server/main.js`、`server/isolated-vm.js` 和 `server/isolated-vm-executor.js`：服务端 bundle、Isolated VM host 与其长驻 Executor 进程；
 - `public/`：Workbench 静态资源；
 - `migrations/`：按顺序执行的独立 SQL migration；
 - `node_modules/isolated-vm` 和 `node_modules/node-gyp-build`：当前平台的原生 Isolated VM runtime；
@@ -29,13 +29,13 @@ Dockerfile 使用多阶段构建。builder 生成可脱离 monorepo 运行的 `d
 `isolated-vm` host、Executor、资源限制和 Engine digest 属于 Server release，不从公共 `@oomol-lab/open-flow` package 导出。公共 package
 只提供它必须满足的 Engine/Runtime contract 和 conformance cases。
 
-显式 Docker smoke 会构建临时镜像，并验证 Workbench、operator session、项目创建、真实 Code 节点执行、Docker health check、优雅退出和 SQLite volume 重启恢复：
+显式 Docker smoke 会构建临时镜像，并验证 Workbench、operator session、Flow 创建、真实 Code 节点执行、Docker health check、优雅退出和 SQLite volume 重启恢复：
 
 ```bash
 bun run --filter @oomol-lab/open-flow-server test:docker
 ```
 
-该命令创建带随机后缀的临时镜像、两个容器和一个 volume，并在结束时清理。它不进入默认单元测试，因为开发机和 CI 不一定提供 Docker daemon。
+该命令创建带随机后缀的临时镜像、四个容器和一个 volume，并在结束时清理。它不进入默认单元测试，因为开发机和 CI 不一定提供 Docker daemon。
 
 ## 3. 启动
 
@@ -172,7 +172,7 @@ curl --fail http://127.0.0.1:3000/readyz
 正常停止应给 Run drain 和 SQLite 关闭留出宽限期：
 
 ```bash
-docker stop --time 30 open-flow-server
+docker stop --time 45 open-flow-server
 ```
 
 镜像声明 `SIGTERM` 为停止信号。进程停止接受 HTTP 请求，等待已接受的工作结束，然后关闭 SQLite 并以 0 退出。超过部署宽限期后再由容器运行时强制终止。

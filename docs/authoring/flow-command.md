@@ -60,9 +60,9 @@ Apply 的提交成功与校验结果分开：`changed: true` 表示变更已接�
 
 ## Agent 节点
 
-`node add --kind agent` 创建可继续配置的 Agent 草稿。完整配置通过 `task.agent.set` 原子更新，`before` 是读取到的完整 Task；模型、任务说明、工具与参数来源属于同一个配置。使用 `oo flow schema task.agent.set --json` 查看操作结构。
+`oo flow node add <flow> agent <name>` 创建可继续配置的 Agent 草稿。完整配置通过 `task.agent.set` 原子更新，`before` 是读取到的完整 Task；模型、任务说明、工具与参数来源属于同一个配置。使用 `oo flow schema task.agent.set --json` 查看操作结构。
 
-快速建图形式也接受 `nodes.<id> = { "kind": "agent", "task": <完整 ManagedTaskDefinition> }`，其中 `task.executor.kind` 必须为 `agent`。它保留显式工具定义与账号，不重新解释当前 Connector 目录。精确字段、参数约束与审批语义见 [Agent Task 合同](../control/contracts/control-api.md#10-agent-task)。
+快速建图形式也接受 `nodes.<id> = { "kind": "agent", "task": <完整 ManagedTaskDefinition> }`，其中 `task.executor.kind` 必须为 `agent`。它保留显式工具定义与账号，不重新解释当前 Connector 目录。精确字段、参数约束与审批语义见 [Agent Task 合同](../control/contracts/control-api.md#11-agent-task)。
 
 `task.executor.code: true` 启用 JavaScript 代码计算，允许 `tools: []`；这类 Agent 无需 Connector 部署。
 代码只处理当前输入和已取得的结果，不修改 Flow 或获得业务工具权限。结果列表的 `source.kind` 区分 `code` 与 `connector`，后者提供 `source.action`。

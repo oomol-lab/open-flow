@@ -114,7 +114,7 @@ We follow a coordinated disclosure process:
   Connector, or in third-party Providers. Report those to the respective project or provider.
 - Behavior that requires operator privileges and works as designed. Open Flow executes code that a
   deployment operator authored: an operator making a workflow call a network service, read its own
-  Project data, or consume its own deployment's Run limits is not a vulnerability. The isolated
+  Flow data, or consume its own deployment's Run limits is not a vulnerability. The isolated
   runtime is a boundary between user code and the host, not between operators of the same
   deployment.
 - Insecure **self-hosted configuration** that this project documents how to avoid, for example
@@ -191,7 +191,7 @@ For contributors and anyone working with this repository:
 - Keep platform credentials out of Flow Revisions, RunEvents, the Workbench, API responses, and logs.
   Do not mistake the authenticated Variable API, which intentionally returns Variable values to an
   Operator, for a Secret Manager. Do not
-  add Capabilities to the user realm without validating the current Project, Run, Task, and
+  add Capabilities to the user realm without validating the current Flow, Run, Task, and
   invocation, and do not weaken the isolate, Executor, or callback authentication boundaries
   described in [docs/architecture.md](docs/architecture.md).
 

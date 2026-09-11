@@ -19,21 +19,18 @@ Control API, Run runtime, Trigger runtime и миграциями SQLite. Кон
 | --------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | `latest`        | новейший стабильный Release                               | нужен текущий стабильный Server                                              |
 | `<release-tag>` | конкретный Release, например `v0.1.0-beta.1` (неизменяем) | вы разворачиваете production и хотите зафиксированную воспроизводимую сборку |
-| `tip`           | последний коммит в `main`                                 | хотите попробовать ещё не выпущенные изменения                               |
-| `<short-sha>`   | конкретный коммит в `main` (неизменяем)                   | хотите зафиксировать точную предрелизную сборку                              |
 
 Каждый GitHub Release публикует свой тег. Стабильный Release также перемещает `latest`; pre-release этого не делает, поэтому `latest`
-никогда не указывает на beta. Каждый push в `main` публикует `tip` и короткий хеш коммита. Тег с тем же именем заменяется более новой
-сборкой, поэтому `latest` и `tip` перемещаются, а теги Release и хеши коммитов остаются фиксированными.
+никогда не указывает на beta.
 
-Open Flow находится в beta: `latest` появится с первым стабильным Release, а до тех пор используйте `tip` или beta-тег Release, например `v0.1.0-beta.1`. Для production фиксируйте тег Release, а не `latest`.
+Open Flow находится в beta: `latest` появится с первым стабильным Release, а до тех пор используйте beta-тег Release, например `v0.1.0-beta.1`. Для production фиксируйте тег Release, а не `latest`.
 
 ## Загрузка
 
 Образ публичный, вход не требуется:
 
 ```bash
-docker pull ghcr.io/oomol-lab/open-flow:tip
+docker pull ghcr.io/oomol-lab/open-flow:v0.1.0-beta.1   # или другой тег Release
 ```
 
 Если вы получаете ошибку `unauthorized` или `denied`, войдите с GitHub token со scope `read:packages`:
@@ -62,7 +59,7 @@ docker run -d \
   -p 3000:3000 \
   -v open-flow-data:/data/open-flow \
   -e OPEN_FLOW_TOKEN="$OPEN_FLOW_TOKEN" \
-  ghcr.io/oomol-lab/open-flow:tip
+  ghcr.io/oomol-lab/open-flow:v0.1.0-beta.1
 ```
 
 Откройте [http://127.0.0.1:3000](http://127.0.0.1:3000) и войдите с этим токеном. Если опустить `OPEN_FLOW_TOKEN`, при первом запуске в
@@ -83,7 +80,7 @@ docker compose up -d
 docker compose logs -f open-flow
 ```
 
-Чтобы запустить конкретный тег, экспортируйте `OPEN_FLOW_IMAGE_TAG` в оболочке перед каждой командой compose, включая команды обновления ниже, иначе зафиксированный Release откатится на `tip`: `export OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1`.
+Чтобы запустить конкретный тег, экспортируйте `OPEN_FLOW_IMAGE_TAG` в оболочке перед каждой командой compose, включая команды обновления ниже: `export OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1`. Поставляемый compose-файл по умолчанию использует `latest`, который появится только с первым стабильным Release, поэтому в период beta обязательно задавайте эту переменную.
 
 ### Сборка из исходников
 

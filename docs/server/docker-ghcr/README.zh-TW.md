@@ -17,20 +17,17 @@ SQLite migration。設定、健康檢查、持久化和備份在該文件中說�
 | --------------- | ----------------------------------------------- | -------------------------------- |
 | `latest`        | 最新的穩定 Release                              | 需要目前穩定版 Server            |
 | `<release-tag>` | 某個特定 Release，例如 `v0.1.0-beta.1` (不可變) | 生產部署，需要固定且可重現的建置 |
-| `tip`           | `main` 分支最新 commit                          | 想試用尚未發布的變更             |
-| `<short-sha>`   | `main` 分支某個特定 commit (不可變)             | 需要固定到某個精確的預發布建置   |
 
-每個 GitHub Release 都會發布其 tag。穩定 Release 會同時移動 `latest`；pre-release 不會，因此 `latest` 不會指向 beta。每次推送到 `main`
-都會發布 `tip` 和短 commit hash。同名 tag 會被較新的建置覆蓋，所以 `latest` 和 `tip` 會移動，而 Release tag 和 commit hash 固定不變。
+每個 GitHub Release 都會發布其 tag。穩定 Release 會同時移動 `latest`；pre-release 不會，因此 `latest` 不會指向 beta。
 
-Open Flow 目前處於 beta 階段: `latest` 會隨首個穩定 Release 出現，在此之前請使用 `tip` 或 beta Release tag，例如 `v0.1.0-beta.1`。生產環境請固定到 Release tag，不要使用 `latest`。
+Open Flow 目前處於 beta 階段: `latest` 會隨首個穩定 Release 出現，在此之前請使用 beta Release tag，例如 `v0.1.0-beta.1`。生產環境請固定到 Release tag，不要使用 `latest`。
 
 ## 拉取
 
 映像是公開的，不需要登入:
 
 ```bash
-docker pull ghcr.io/oomol-lab/open-flow:tip
+docker pull ghcr.io/oomol-lab/open-flow:v0.1.0-beta.1   # 或其他 Release tag
 ```
 
 如果遇到 `unauthorized` 或 `denied` 錯誤，用具有 `read:packages` scope 的 GitHub token 登入:
@@ -57,7 +54,7 @@ docker run -d \
   -p 3000:3000 \
   -v open-flow-data:/data/open-flow \
   -e OPEN_FLOW_TOKEN="$OPEN_FLOW_TOKEN" \
-  ghcr.io/oomol-lab/open-flow:tip
+  ghcr.io/oomol-lab/open-flow:v0.1.0-beta.1
 ```
 
 開啟 [http://127.0.0.1:3000](http://127.0.0.1:3000)，用該 token 登入。如果省略 `OPEN_FLOW_TOKEN`，首次啟動會在日誌中輸出一次性 setup code，
@@ -76,7 +73,7 @@ docker compose up -d
 docker compose logs -f open-flow
 ```
 
-要執行指定 tag，在每次執行 compose 指令 (包括下面的升級指令) 之前先在 shell 中 export `OPEN_FLOW_IMAGE_TAG`，否則固定的 Release 會退回到 `tip`: `export OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1`。
+要執行指定 tag，在每次執行 compose 指令 (包括下面的升級指令) 之前先在 shell 中 export `OPEN_FLOW_IMAGE_TAG`: `export OPEN_FLOW_IMAGE_TAG=v0.1.0-beta.1`。儲存庫自帶的 compose 檔案預設使用 `latest`，而 `latest` 只會在第一個穩定 Release 時出現；beta 階段必須設定這個變數。
 
 ### 從原始碼建置
 

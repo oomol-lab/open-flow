@@ -1,6 +1,6 @@
 # Code 节点调用 Connector Action 实施计划
 
-状态：本仓库实现与工作区检查已完成；上游原子执行身份仍是未完成的外部依赖。本文保留原设计与验收清单，实际字段与脚本合同见 [Control API 技术参考](../control/contracts/control-api.md#9-code-action-合同)。
+状态：本仓库实现与工作区检查已完成；上游原子执行身份仍是未完成的外部依赖。本文保留原设计与验收清单，实际字段与脚本合同见 [Control API 技术参考](../control/contracts/control-api.md#10-code-action-合同)。
 
 ## 目标与范围
 

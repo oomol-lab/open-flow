@@ -382,7 +382,7 @@ Run list 按 `createdAt`、`runId` 逆序稳定分页，`status=waiting` 可以�
 
 Node context 固定为 `{ flowId, scopeId, nodeId, executionId }`，各 identity 为非空字符串。
 `progress` 为 0–100 的有限数值；Artifact `size` 为非负安全整数，`digest` 为 `sha256:` 加 64 位小写十六进制。
-`nodeKind` 为 `condition / connector / javascript / llm / subflow / value / wait`。
+`nodeKind` 为 `agent / condition / connector / javascript / llm / subflow / value / wait`。
 Runtime projector 不接受旧的 `node.cache-hit`、`node.preview` 或 `run.output` 事件。
 
 Wait 进入和离开暂停状态分别追加事件：
@@ -458,7 +458,7 @@ Connector credential 不进入响应、Revision 或 RunEvent。
 部署没有配置 Connector 时，catalog、Connection 请求和 Connector Task 运行失败返回 `connector.unconfigured`；已经配置但上游不可用或响应无效时返回
 `connector.unavailable`，客户端不能把两者合并为同一配置提示。
 
-## 6. 实时通知
+## 7. 实时通知
 
 公共 Workbench Host 合同包含两个独立 subscriber：
 
@@ -490,7 +490,7 @@ type FlowChangeEvent =
 两者返回 `text/event-stream`，要求 operator 认证，并在 session 失效或 Server shutdown 时结束。其他部署可以使用不同实时 transport，但必须维持
 相同的两个独立逻辑通道和事件合同。
 
-## 7. Routes
+## 8. Routes
 
 | Method    | Path                                                     | 成功状态 | 说明                                       |
 | --------- | -------------------------------------------------------- | -------: | ------------------------------------------ |
@@ -539,7 +539,7 @@ Connection；客户端不能改用 Team ID、Connection owner 或其他外部 id
 
 分页 cursor 是 opaque、scope-bound token。跨 Flow、Trigger 或资源类型使用 cursor 返回 `page.invalid-cursor`。
 
-## 8. 公开 Wait action hook
+## 9. 公开 Wait action hook
 
 配置了公开 origin 的部署可以把一次 Wait 的 opaque capability URL 放进 Connector 通知。该路由不使用 Operator session 或 bearer token：
 
@@ -596,7 +596,7 @@ remainingMs 必须为正且不得超过原上限。总 JSON 大小不得超过 1
 Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保存已执行完成的图末端节点，按 node ID 排序。
 每项为 `{ nodeId, status: 'completed', jobId, outputs }`，不包含未执行节点或重复执行的 jobs 数组；没有已执行完成的末端节点时为 `[]`。
 
-## 9. Code Action 合同
+## 10. Code Action 合同
 
 当前脚本合同为 `open-flow-engine/v2`。它用 `context.actions` 替代 v1 的 `context.connector`，不提供旧名转发；
 固定为 v1 的 Publication / Run 必须由相应 Engine 执行，当前 Server 对 v1 明确返回不支持。
@@ -702,7 +702,7 @@ Run 取消、deadline、兄弟节点失败和节点退出沿既有执行生命�
 
 公共解码入口、版本兼容和部署一致性验证见[公共契约与版本演进](compatibility.md)。
 
-## 10. Agent Task
+## 11. Agent Task
 
 Agent 使用 Managed Task：`executor.kind: "agent"`，只能由根 Flow 的 Task node 引用。Subflow 引用产生
 `agent.subflow-unsupported`；其他确定性配置错误产生 `agent.config-invalid`。
