@@ -338,6 +338,8 @@
     "flowRenamed": "Le Flow a été renommé en {{name}}.",
     "layoutConflict": "La disposition a changé ailleurs. La dernière disposition a été chargée ; votre déplacement n'a pas été appliqué.",
     "moduleUpdated": "Le Brouillon a changé ailleurs. Votre code local est conservé ; vérifiez-le avant de l'enregistrer à nouveau.",
+    "nodeDeleted": "Nœud supprimé.",
+    "nodesDeleted": "{{count}} nœuds supprimés.",
     "networkFailed": "Impossible de joindre le service. Vérifiez votre connexion, puis réessayez.",
     "published": "{{name}} publié.",
     "rolledBack": "Version en ligne restaurée à la révision {{revision}}.",

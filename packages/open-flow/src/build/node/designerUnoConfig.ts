@@ -22,7 +22,7 @@ export default defineConfig({
   },
   postprocess: [
     (utility) => {
-      utility.selector = `:where(.open-flow-workbench, .open-flow-canvas-root) ${utility.selector}`
+      utility.selector = `:where(.open-flow-workbench, .open-flow-canvas-root, .open-flow-notifications) ${utility.selector}`
     },
   ],
   presets: [

@@ -1,7 +1,8 @@
 import './theme.css'
 import './styles.css'
-import type { ComponentPropsWithoutRef, ForwardRefExoticComponent, RefAttributes } from 'react'
+import type { ComponentPropsWithoutRef, ForwardRefExoticComponent, ReactNode, RefAttributes } from 'react'
 
+import { createElement } from 'react'
 import { Button as SharedButton } from './button.tsx'
 
 /** Native host button contract; Base UI composition stays internal to the product. */
@@ -26,3 +27,12 @@ export const notificationToasterProps = {
   position: 'top-center',
   visibleToasts: 3,
 } as const
+
+export function NotificationUndoLabel({ children }: { children: ReactNode }): ReactNode {
+  return createElement(
+    'span',
+    { className: 'inline-flex items-center gap-1.5' },
+    createElement('i', { 'aria-hidden': true, 'className': 'i-lucide-light:undo-2', 'style': { width: 16, height: 16, flexShrink: 0 } }),
+    children,
+  )
+}

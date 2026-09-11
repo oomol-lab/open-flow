@@ -338,6 +338,8 @@
     "flowRenamed": "Renamed the Flow to {{name}}.",
     "layoutConflict": "The layout changed elsewhere. Loaded the latest layout; your move was not applied.",
     "moduleUpdated": "The Draft changed elsewhere. Your local code is preserved; review it before saving again.",
+    "nodeDeleted": "Node deleted.",
+    "nodesDeleted": "Deleted {{count}} nodes.",
     "networkFailed": "Could not reach the service. Check your connection and try again.",
     "published": "Published {{name}}.",
     "rolledBack": "Rolled Live back to revision {{revision}}.",

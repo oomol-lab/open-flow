@@ -338,6 +338,8 @@
     "flowRenamed": "已將 Flow 重新命名為 {{name}}。",
     "layoutConflict": "版面已在其他地方變更。已載入最新版面，這次的移動未套用。",
     "moduleUpdated": "草稿已在其他地方變更。本機程式碼仍保留，請檢查後再儲存。",
+    "nodeDeleted": "已刪除節點。",
+    "nodesDeleted": "已刪除 {{count}} 個節點。",
     "networkFailed": "暫時無法連線到服務，請檢查網路後再試一次。",
     "published": "已發布 {{name}}。",
     "rolledBack": "已將線上版本還原到修訂 {{revision}}。",

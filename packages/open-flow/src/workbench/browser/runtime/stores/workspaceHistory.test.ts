@@ -77,6 +77,63 @@ async function session() {
 }
 
 describe('Workspace canvas history', () => {
+  it.each([
+    [['code'], 'Node deleted.'],
+    [['code', 'value'], 'Deleted 2 nodes.'],
+    [['note'], 'Node deleted.'],
+  ] as const)('notifies after deleting %j', async (selection, message) => {
+    const { store, notices } = await session()
+    try {
+      notices.mockClear()
+      store.selectNodes([...selection])
+      await store.deleteSelectedNodes()
+      expect(notices).toHaveBeenCalledWith(expect.objectContaining({ kind: 'success', message, undo: { label: 'Undo', run: expect.any(Function) } }))
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('does not report a successful deletion before saving or after a failed save', async () => {
+    const { store, change, notices } = await session()
+    const gate = Promise.withResolvers<never>()
+    change.mockImplementationOnce(() => gate.promise)
+    try {
+      notices.mockClear()
+      await store.deleteSelectedNodes()
+      expect(notices).not.toHaveBeenCalled()
+      store.selectNodes(['code'])
+      const deletion = store.deleteSelectedNodes()
+      await vi.waitFor(() => expect(change).toHaveBeenCalled())
+      expect(notices).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'success' }))
+      gate.reject(new Error('Save failed'))
+      await deletion
+      expect(notices).not.toHaveBeenCalledWith({ kind: 'success', message: 'Node deleted.' })
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('undoes the deletion from its notification without undoing later edits', async () => {
+    const { store, notices, saved } = await session()
+    try {
+      store.selectNodes(['code', 'note'])
+      await store.deleteSelectedNodes()
+      const undo = notices.mock.calls.findLast(([notice]) => notice?.undo)?.[0].undo
+      expect(undo).toBeDefined()
+      await undo.run()
+      expect(saved().draft.content.document.graph.nodes.code).toBeDefined()
+      expect(store.$.selectedNodeIds.value).toEqual(['code', 'note'])
+      await store.deleteSelectedNodes()
+      const staleUndo = notices.mock.calls.findLast(([notice]) => notice?.undo)?.[0].undo
+      await store.moveNodes({ value: { x: 123, y: 456 } })
+      const afterMove = saved()
+      await staleUndo.run()
+      expect(saved()).toEqual(afterMove)
+    } finally {
+      store.dispose()
+    }
+  })
+
   it('restores mixed deletion, module, edges, comments and selection in one step, preserving viewport', async () => {
     const { store, saved } = await session()
     try {
