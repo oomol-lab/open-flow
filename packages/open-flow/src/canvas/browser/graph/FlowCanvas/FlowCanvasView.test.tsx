@@ -124,6 +124,7 @@ function props(value: FlowCanvasViewModel, overrides: Partial<FlowCanvasViewProp
     onDuplicate: () => undefined,
     onMoveNodes: () => undefined,
     onMoveViewport: () => undefined,
+    onCopy: () => undefined,
     onPaste: () => undefined,
     onSelectionChange: () => undefined,
     selectedNodeIds: [],
@@ -270,6 +271,46 @@ describe('FlowCanvasView model synchronization', () => {
       },
     )
     view.props.flowCanvasStore.dispose()
+  })
+
+  it('forwards copy and keyboard or positioned paste to the current host callbacks', () => {
+    const oldCopy = vi.fn()
+    const onCopy = vi.fn()
+    const onPaste = vi.fn()
+    const initial = props(model([task([])]), { onCopy: oldCopy })
+    const view = FlowCanvasView(initial) as React.ReactElement<FlowCanvasProps>
+    FlowCanvasView({ ...initial, onCopy, onPaste })
+    const store = view.props.flowCanvasStore
+
+    store.onCopy(['target' as NodeId])
+    store.onPaste()
+    store.onPaste({ x: 100, y: 80 })
+
+    expect(oldCopy).not.toHaveBeenCalled()
+    expect(onCopy).toHaveBeenCalledExactlyOnceWith(['target'])
+    expect(onPaste.mock.calls).toEqual([[undefined], [{ x: 100, y: 80 }]])
+    store.dispose()
+  })
+
+  it('duplicates a mixed selection including triggers and comments in one operation', async () => {
+    const onDuplicate = vi.fn()
+    const nodes: FlowCanvasViewModel['nodes'] = [
+      { ...task([]), id: 'trigger', kind: 'trigger' },
+      task([]),
+      { id: 'note', kind: 'comment', title: 'Note', content: 'Keep this', position: { x: 40, y: 90 } },
+    ]
+    const view = FlowCanvasView(props(model(nodes), { onDuplicate, selectedNodeIds: ['trigger', 'target', 'note'] })) as React.ReactElement<FlowCanvasProps>
+    const store = view.props.flowCanvasStore
+    expect(store.$.nodes.get('trigger' as NodeId)?.duplicateNode).toBeTypeOf('function')
+
+    await store.duplicateNodes()
+
+    expect(onDuplicate).toHaveBeenCalledExactlyOnceWith(
+      ['trigger', 'target', 'note'],
+      { x: 24, y: 24 },
+      { trigger: { x: 200, y: 0 }, target: { x: 200, y: 0 }, note: { x: 40, y: 90 } },
+    )
+    store.dispose()
   })
 
   it('updates node error state from model diagnostics', () => {

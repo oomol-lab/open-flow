@@ -28,7 +28,7 @@ import { reactiveMap } from 'value-enhancer/collections'
 import { isSameViewport } from '../../base/compare.ts'
 import { isInside, isMac } from '../../base/dom.ts'
 import { applyEdgeChanges, applyNodeChanges, getRFNodeType, RF_NODE_TYPE, toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
-import { coalesce, filterMap, Negative } from '../../base/trivial.ts'
+import { coalesce } from '../../base/trivial.ts'
 import { toViewEdge } from '../../graph/FlowCanvas/model.ts'
 import { createNodeEntry, createCommentNodeEntry, updateNodeEntry, updateCommentNodeEntry } from '../../graph/FlowCanvas/node.tsx'
 import { createI18n } from '../../i18n/index.ts'
@@ -347,9 +347,9 @@ export class CanvasStore {
     this.#callbacks.onMoveNodes(Object.fromEntries(this.allLayoutNodes().map((node) => [node.nodeId, node.$.position.value])))
   }
 
-  public duplicateNodes = async (manifestNodeIds?: NodeId[], offset?: XYPosition): Promise<void> => {
+  public duplicateNodes = async (nodeIds?: NodeId[], offset?: XYPosition): Promise<void> => {
     if (!this.onDuplicate) return
-    const toDuplicateNodes = manifestNodeIds ?? filterMap(this.$.selectedNodes.value, (node) => (CommentNodeStore.is(node) ? Negative : node.nodeId))
+    const toDuplicateNodes = nodeIds ?? this.$.selectedNodes.value.map((node) => node.nodeId)
     const deselect = this.prepareDeselectNodesAndEdges()
     await this.onDuplicate(toDuplicateNodes, offset)
     setTimeout(deselect, 0)
@@ -589,7 +589,8 @@ export class CanvasStore {
     if (!copies.length) return
     this.#callbacks.onDuplicate(nodeIds, offset ?? { x: 24, y: 24 }, Object.fromEntries(copies.map((node) => [node.nodeId, node.$.position.value])))
   }
-  public onPaste = (position: XYPosition): void => this.#callbacks.onPaste(position)
+  public onCopy = (nodeIds: NodeId[]): void => this.#callbacks.onCopy(nodeIds)
+  public onPaste = (position?: XYPosition): void => this.#callbacks.onPaste(position)
   public provideAddNodeMenuItems = (): readonly FlowCanvasViewAddItem[] => this.#addItems
   public provideAsyncAddNodeMenuItems = (searchTerm: string, signal: AbortSignal): Promise<readonly FlowCanvasViewAddItem[] | undefined> =>
     this.#callbacks.provideAddItems?.(searchTerm, signal) ?? Promise.resolve(undefined)

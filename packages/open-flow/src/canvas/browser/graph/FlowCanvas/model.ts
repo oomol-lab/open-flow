@@ -247,7 +247,8 @@ export interface FlowCanvasViewProps {
   readonly onDuplicate: (nodeIds: readonly string[], offset?: FlowCanvasViewPosition, positions?: Readonly<Record<string, FlowCanvasViewPosition>>) => void
   readonly onMoveNodes: (positions: Readonly<Record<string, FlowCanvasViewPosition>>) => void
   readonly onMoveViewport: (viewport: FlowCanvasViewViewport) => void
-  readonly onPaste: (position: FlowCanvasViewPosition) => void
+  readonly onCopy: (nodeIds: readonly string[]) => void
+  readonly onPaste: (position?: FlowCanvasViewPosition) => void
   readonly onSelectionChange: (nodeIds: readonly string[], edge: FlowCanvasViewEdge | undefined) => void
   readonly provideAddItems?: (searchTerm: string, signal: AbortSignal) => Promise<readonly FlowCanvasViewAddItem[] | undefined>
   readonly selectedNodeIds: readonly string[]
@@ -263,6 +264,7 @@ export interface ViewCallbacks {
   readonly onDeleteNodes: FlowCanvasViewProps['onDeleteNodes']
   readonly onDisconnect: FlowCanvasViewProps['onDisconnect']
   readonly onDuplicate: FlowCanvasViewProps['onDuplicate']
+  readonly onCopy: FlowCanvasViewProps['onCopy']
   readonly onPaste: FlowCanvasViewProps['onPaste']
   readonly provideAddItems: FlowCanvasViewProps['provideAddItems']
 }

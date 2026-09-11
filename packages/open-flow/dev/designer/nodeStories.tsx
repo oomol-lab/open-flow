@@ -175,6 +175,7 @@ function ConditionStory({ dark, language, log }: { readonly dark: boolean; reado
           onDisconnect={(edge) => log('edge.disconnect', edge)}
           onDeleteNodes={(ids) => log('node.delete', ids)}
           onDuplicate={(ids) => log('node.duplicate', ids)}
+          onCopy={(nodeIds) => log('canvas.copy', nodeIds)}
           onPaste={(position) => log('canvas.paste', position)}
           onMoveNodes={(positions) => log('node.move', positions)}
           onMoveViewport={(viewport) => log('canvas.move', viewport)}
@@ -260,6 +261,7 @@ function CommentStory({ dark, language, log }: { readonly dark: boolean; readonl
             setSelected((current) => current.filter((id) => !ids.includes(id)))
             log('node.delete', ids)
           }}
+          onCopy={(nodeIds) => log('canvas.copy', nodeIds)}
           onPaste={(position) => log('canvas.paste', position)}
           onMoveNodes={(positions) => log('node.move', positions)}
           onMoveViewport={(viewport) => log('canvas.move', viewport)}
@@ -447,6 +449,7 @@ function NodeContentStory({
           onDisconnect={(edge) => log('edge.disconnect', edge)}
           onDeleteNodes={(ids) => log('node.delete', ids)}
           onDuplicate={(ids) => log('node.duplicate', ids)}
+          onCopy={(nodeIds) => log('canvas.copy', nodeIds)}
           onPaste={(position) => log('canvas.paste', position)}
           onMoveNodes={(positions) => log('node.move', positions)}
           onMoveViewport={(viewport) => log('canvas.move', viewport)}
@@ -536,6 +539,7 @@ function NodeZoomStory({ dark, language, log }: { readonly dark: boolean; readon
               onDisconnect={(edge) => log('edge.disconnect', edge)}
               onDeleteNodes={(ids) => log('node.delete', ids)}
               onDuplicate={(ids) => log('node.duplicate', ids)}
+              onCopy={(nodeIds) => log('canvas.copy', nodeIds)}
               onPaste={(position) => log('canvas.paste', position)}
               onMoveNodes={(positions) => log('node.move', positions)}
               autoLayout={false}

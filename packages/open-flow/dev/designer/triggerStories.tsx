@@ -191,6 +191,7 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
           onDisconnect={(value) => log('edge.disconnect', value)}
           onDeleteNodes={(value) => log('node.delete', value)}
           onDuplicate={(value) => log('node.duplicate', value)}
+          onCopy={(nodeIds) => log('canvas.copy', nodeIds)}
           onPaste={(value) => log('canvas.paste', value)}
           onMoveNodes={(value) => log('node.move', value)}
           onMoveViewport={(value) => log('canvas.move', value)}
