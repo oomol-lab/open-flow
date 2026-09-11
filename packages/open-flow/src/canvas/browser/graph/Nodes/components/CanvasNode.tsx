@@ -10,7 +10,7 @@ import { CanvasTooltip } from '../../../components/tooltip.tsx'
 import { nodeCardContent } from '../../FlowCanvas/cardContent.ts'
 import { cronDescription, cronLabel } from '../../FlowCanvas/cronDescription.ts'
 import { timeZoneLabel } from '../../FlowCanvas/timeZoneLabel.ts'
-import { CanvasCard, CardCollapse } from './CanvasCard.tsx'
+import { CanvasCard, CardCollapse, TriggerIndicator } from './CanvasCard.tsx'
 import { iconForNodeType } from './constants.ts'
 import { NodeContentRows } from './NodeContentRows.tsx'
 import { RunChips, ImagePreview } from './RunChips.tsx'
@@ -81,6 +81,7 @@ export function CanvasNode({
         subtitle={distinctSubtitle}
         selected={selected}
         problem={problem}
+        indicator={kind === 'trigger' ? <TriggerIndicator label={t('canvasCard.kind.trigger')} /> : undefined}
         branches={branches}
         footer={
           toolContent || runContent ? (

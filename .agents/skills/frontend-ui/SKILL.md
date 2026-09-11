@@ -14,7 +14,9 @@ paths are relative to the repository root. Use production code as the source for
 - Identify the component that owns the behavior and its affected consumers before making changes.
   Follow the ownership and context boundaries below.
 - When adding, replacing, or choosing icons, use the project
-  [iconify-icons skill](../iconify-icons/SKILL.md).
+  [iconify-icons skill](../iconify-icons/SKILL.md). Lucide icons must use the thin-stroke
+  variant: `i-lucide-light:<name>` (stroke width 1.5), not the default `i-lucide:<name>`
+  (stroke width 2). When using an existing `lucide-react` component, set `strokeWidth={1.5}`.
 - Prefer Lab for appearance and interaction checks. Maintain related Stories and add missing states.
   See the [Lab documentation](../../../packages/open-flow/dev/designer/README.md) for entry points,
   Story organization, and run commands. Supplement Lab with the actual product page when correctness

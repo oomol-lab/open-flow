@@ -2,8 +2,17 @@ import styles from './CanvasCard.module.scss'
 import type { ReactNode } from 'react'
 
 import { clsx } from 'clsx'
+import { Zap } from 'lucide-react'
 import { Children, useLayoutEffect, useRef, useState } from 'react'
 import { isEmptyReactNode } from '../../../../../ui/browser/hooks.ts'
+
+export function TriggerIndicator({ label }: { readonly label: string }) {
+  return (
+    <span className={styles.triggerIndicator} role="img" aria-label={label}>
+      <Zap aria-hidden="true" />
+    </span>
+  )
+}
 
 export function CanvasCard({
   title,
@@ -17,6 +26,7 @@ export function CanvasCard({
   footer,
   actions,
   problem,
+  indicator,
   selected,
   compact = false,
   contentHidden = false,
@@ -36,19 +46,21 @@ export function CanvasCard({
   readonly footer?: ReactNode
   readonly actions?: ReactNode
   readonly problem?: string
+  readonly indicator?: ReactNode
   readonly selected?: boolean
 }) {
   const hasContent = Children.toArray(children).some((child) => typeof child != 'string' || child.trim().length > 0)
+  const statusIndicator = (problem || indicator) && (
+    <span className={clsx(styles.icon, styles.indicator, problem && styles.warning)} title={problem} aria-label={problem} role={problem ? 'img' : undefined}>
+      {problem ? <i aria-hidden="true" className="i-lucide:triangle-alert" /> : indicator}
+    </span>
+  )
   return (
     <article className={clsx(styles.card, compact && styles.compact, tone && styles[tone], selected && styles.selected, problem && styles.problem)}>
       <div className={styles.compactIdentity}>
         <span className={styles.icon}>{icon}</span>
         <strong title={title}>{title}</strong>
-        {problem && (
-          <span className={styles.warning} title={problem} aria-label={problem}>
-            <i className="i-codicon:warning" />
-          </span>
-        )}
+        {statusIndicator}
       </div>
       <header className={styles.header}>
         <span className={styles.icon}>{icon}</span>
@@ -56,11 +68,7 @@ export function CanvasCard({
           <strong title={title}>{titleContent ?? title}</strong>
           {subtitle && <span>{subtitle}</span>}
         </div>
-        {problem && (
-          <span className={styles.warning} title={problem} aria-label={problem}>
-            <i className="i-codicon:warning" />
-          </span>
-        )}
+        {statusIndicator}
         {actions}
       </header>
       {(hasContent || !isEmptyReactNode(preview)) && (

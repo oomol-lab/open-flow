@@ -97,9 +97,24 @@
   }
 }
 
+.indicator {
+  font-size: 20px;
+}
+
+.triggerIndicator {
+  display: inline-flex;
+  color: color-mix(in srgb, var(--accent-orange-2) 80%, #fff);
+
+  > svg {
+    width: 1em;
+    height: 1em;
+    stroke-width: 1.25;
+    fill: color-mix(in srgb, var(--accent-yellow-1) 25%, #fff);
+  }
+}
+
 .warning {
   color: var(--accent-red-1);
-  font-size: 16px;
 }
 
 .content {
@@ -180,8 +195,8 @@
     }
   }
 
-  .warning {
-    font-size: 24px;
+  .indicator {
+    font-size: 30px;
   }
 
   strong {
