@@ -145,7 +145,8 @@
     border-end-start-radius: inherit;
   }
 
-  .run-control-group > button:last-of-type {
+  .run-control-group > button[data-standalone='true'],
+  .run-control-segment-slot {
     border-start-end-radius: inherit;
     border-end-end-radius: inherit;
   }
@@ -160,6 +161,11 @@
     min-width: 0;
     padding-inline: 10px 9px;
     font-weight: 500;
+    transition:
+      padding-inline-end 180ms ease-in-out,
+      background-color 150ms,
+      opacity 150ms,
+      transform 150ms;
   }
 
   .run-control-label {
@@ -168,13 +174,42 @@
     transition: width 180ms ease-in-out;
   }
 
+  .run-control-segment-slot {
+    width: 0;
+    flex: none;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      width 180ms ease-in-out,
+      opacity 180ms ease-in-out,
+      visibility 180ms;
+  }
+
+  .run-control-segment-slot[data-visible='true'] {
+    width: 32px;
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .run-control-segment-slot:has(~ [data-visible='true']) {
+    border-radius: 0;
+  }
+
+  .run-control-segment-slot > button {
+    border-start-end-radius: inherit;
+    border-end-end-radius: inherit;
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .run-control-label {
+    .run-control-main,
+    .run-control-label,
+    .run-control-segment-slot {
       transition: none;
     }
   }
 
-  .run-control-main:only-child {
+  .run-control-main[data-standalone='true'] {
     padding-inline-end: 16px;
   }
 
