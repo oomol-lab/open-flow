@@ -146,7 +146,7 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
   const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'initial')
   const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v2', null, 'poll-staging')
 
-  await service.tickPoll('2026-08-31T10:00:30.000Z')
+  await service.tickListeners('2026-08-31T10:00:30.000Z')
   expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('pending')
   let database = new DatabaseSync(file, { readOnly: true })
   expect(database.prepare('SELECT checkpoint_json AS checkpointJson FROM poll_candidates').get()).toEqual({
@@ -167,7 +167,7 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
     triggerDefinitions: [definition],
   })
   services.add(service)
-  await service.tickPoll('2026-08-31T10:00:31.000Z')
+  await service.tickListeners('2026-08-31T10:00:31.000Z')
   expect(checkpoints).toEqual([null, { cursor: 'page-1' }, { cursor: 'page-1' }])
   expect(sources).toEqual(['initial', 'initial', 'initial'])
   expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('pending')
@@ -200,7 +200,7 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
     live.publication?.publicationId ?? null,
     'poll-changed',
   )
-  await service.tickPoll('2026-08-31T10:00:33.000Z')
+  await service.tickListeners('2026-08-31T10:00:33.000Z')
   expect(checkpoints.at(-1)).toBeNull()
   expect(service.pollState(created.flow.flowId, 'poll')?.checkpoint).toEqual({ cursor: 'page-2' })
   await service.tickMaintenance('2026-08-31T10:00:33.000Z')
@@ -248,7 +248,7 @@ it('fails a permanent Poll baseline before activation and preserves the old Live
     initialDone.publicationId,
     'poll-failed',
   )
-  await service.tickPoll('2026-08-31T11:00:00.000Z')
+  await service.tickListeners('2026-08-31T11:00:00.000Z')
   await service.tickMaintenance('2026-08-31T11:00:00.000Z')
 
   expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId)).toMatchObject({
@@ -277,7 +277,7 @@ it('rolls back a changed Poll candidate during activation and succeeds after rec
   const created = await service.control.createFlow('operator', 'Poll activation', 'poll-activation-flow')
   const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'activation')
   const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v2', null, 'poll-activation')
-  await service.tickPoll('2026-08-31T12:00:00.000Z')
+  await service.tickListeners('2026-08-31T12:00:00.000Z')
 
   const database = new DatabaseSync(file)
   const scheduleJson = JSON.stringify(pollNode('activation').pollTimes)

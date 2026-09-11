@@ -234,6 +234,10 @@ Integration callback 的处理生命周期同时受请求取消、部署关闭�
 回调不能推进扫描游标。Server 在同一事务中提交页面准入、checkpoint 与工作完成，并保留领取后新增的通知。
 扫描使用独立租约和健康状态；订阅故障不能单独撤销仍然可用的扫描准入资格。旧事件型 Integration 的 callback/payload 语义保持不变。
 
+Server 的 Poll 读取与 Integration listener 扫描由同一个监听运行时调度，共用 Connector 作用域、取消与读取 deadline。
+订阅准备、续期与事件型 callback 由 Integration owner 处理，不能持有扫描调度锁。已有 Poll 的调度配置、checkpoint 与事件级去重继续作为其权威持久状态，
+运行时接管不改写历史 Revision 或重新建立基线；不同读取合同分别在自己的准入事务中提交结果。
+
 监听配置与 Connection 未变的发布保留最新进度、待处理工作与身份作用域，并以 Live publication 拒绝旧 worker 的提交。
 监听范围改变时先准备独立候选，再原子切换；切换终止旧范围尚未准入的扫描工作，新范围从自己的基线开始，不承接旧范围工作。
 旧订阅继续作为持久清理任务处理。Google Drive `watch_changes` 首版以同一 change stream 的 cursor/page 身份准入，

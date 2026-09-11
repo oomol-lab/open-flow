@@ -196,7 +196,7 @@ async function createHarness(fixture: PollConformanceFixture): Promise<PollConfo
         occurrenceId: await scheduledTriggerOccurrenceId(state.bindingId, state.runtimeVersion, scheduledAt),
         runtimeVersion: state.runtimeVersion,
       }
-      await service.tickPoll(at)
+      await service.tickListeners(at)
       if (staged.length != 0) throw new Error('Server Poll conformance pages were not fully consumed.')
       nextAt = nextTriggerScheduledAt(fixture.rules, now)
     },

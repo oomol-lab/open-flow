@@ -27,7 +27,7 @@ import { ControlError } from '../error.ts'
 import { silentLogger } from '../logger.ts'
 import { IntegrationRuntime } from '../runtime/integration-runtime.ts'
 import { IsolatedVmHost } from '../runtime/isolated-vm.ts'
-import { PollRuntime } from '../runtime/poll-runtime.ts'
+import { ListenerRuntime } from '../runtime/listener-runtime.ts'
 import { migrateDatabase } from '../storage/migrate.ts'
 import { Store } from '../storage/store.ts'
 import { ControlService } from './control-service.ts'
@@ -80,7 +80,7 @@ export class ServerService {
   readonly #integration: IntegrationRuntime
   readonly #logger: Logger
   readonly #maintenance: Maintenance
-  readonly #poll: PollRuntime
+  readonly #listeners: ListenerRuntime
   readonly #receive: (effect: Effect.Effect<IntegrationResponse, unknown>, signal?: AbortSignal) => Promise<IntegrationResponse>
   readonly #resolveConnector: () => ConnectorHost | undefined
   readonly #resolveConnectorConsoleOrigin: () => URL | undefined
@@ -100,7 +100,7 @@ export class ServerService {
       readonly cronLock: Semaphore.Semaphore
       readonly isolatedVm: IsolatedVmHost
       readonly maintenanceLock: Semaphore.Semaphore
-      readonly pollLock: Semaphore.Semaphore
+      readonly listenerLock: Semaphore.Semaphore
       readonly signals: Queue.Queue<Deferred.Deferred<void> | undefined>
       readonly store: Store
       readonly tasks: FiberMap.FiberMap<string, void, never>
@@ -112,7 +112,7 @@ export class ServerService {
     logger: Logger,
     triggerDefinitions: readonly ProviderTriggerDefinition[],
   ) {
-    const { clockService, cronLock, isolatedVm, maintenanceLock, pollLock, signals, store, tasks, workers } = resources
+    const { clockService, cronLock, isolatedVm, maintenanceLock, listenerLock, signals, store, tasks, workers } = resources
     this.#receive = resources.receive
     this.#clock = clock
     this.#clockService = clockService
@@ -149,13 +149,14 @@ export class ServerService {
       (flowId, runId) => this.#runCreated(flowId, runId),
       logger,
     )
-    this.#poll = new PollRuntime(
+    this.#listeners = new ListenerRuntime(
       store,
       this.#resolveConnector,
       this.#clock,
       this.#clockService,
-      pollLock,
+      listenerLock,
       pollDefinitions,
+      integrationDefinitions,
       validatedFlow,
       () => this.#supervisor.signal(),
       (flowId, runId) => this.#runCreated(flowId, runId),
@@ -164,7 +165,7 @@ export class ServerService {
     this.publisher = new Publisher(
       store,
       this.#integration,
-      this.#poll,
+      this.#listeners,
       this.#resolveConnector,
       this.#resolveWaitPublicOrigin,
       this.#clock,
@@ -205,7 +206,7 @@ export class ServerService {
       runtime.maxConcurrentRuns ?? defaultMaxConcurrentRuns,
       this.#cron,
       this.#integration,
-      this.#poll,
+      this.#listeners,
       this.#maintenance,
       this.#clock,
     )
@@ -230,7 +231,7 @@ export class ServerService {
       (input) => this.publisher.accept(input),
       () => this.#maintenance.wake(),
       snapshots,
-      (flowId, triggerNodeId) => this.#poll.test(flowId, triggerNodeId),
+      (flowId, triggerNodeId) => this.#listeners.test(flowId, triggerNodeId),
       () => this.#notifyFlowCatalog(),
       (event) => this.#notifyFlow(event),
       (kind) => (kind == 'agent' ? this.#resolveLlm()?.config != null : this.#resolveLlm() != null),
@@ -269,7 +270,7 @@ export class ServerService {
       )
       const cronLock = yield* Semaphore.make(1)
       const maintenanceLock = yield* Semaphore.make(1)
-      const pollLock = yield* Semaphore.make(1)
+      const listenerLock = yield* Semaphore.make(1)
       const signals = yield* Queue.unbounded<Deferred.Deferred<void> | undefined>()
       const tasks = yield* FiberMap.make<string, void, never>()
       const workers = yield* FiberMap.make<string, void, never>()
@@ -281,7 +282,7 @@ export class ServerService {
           cronLock,
           isolatedVm,
           maintenanceLock,
-          pollLock,
+          listenerLock,
           signals,
           store,
           tasks,
@@ -399,12 +400,12 @@ export class ServerService {
     return this.#run(this.#cron.tick(at))
   }
 
-  tickPoll(at = new Date(this.#clock()).toISOString()): Promise<void> {
-    return this.#run(this.#poll.tick(at))
+  tickListeners(at = new Date(this.#clock()).toISOString()): Promise<void> {
+    return this.#run(this.#listeners.tick(at))
   }
 
   tickIntegration(at = new Date(this.#clock()).toISOString()): Promise<void> {
-    return this.#run(this.#integration.tick(at))
+    return this.#run(this.#integration.tick(at).pipe(Effect.andThen(this.#listeners.tick(at))))
   }
 
   tickMaintenance(at = new Date(this.#clock()).toISOString()): Promise<void> {
@@ -412,11 +413,11 @@ export class ServerService {
   }
 
   pollState(flowId: string, triggerNodeId: string): PollState | undefined {
-    return this.#poll.state(flowId, triggerNodeId)
+    return this.#listeners.state(flowId, triggerNodeId)
   }
 
   processPollOccurrence(input: PollOccurrenceInput): Promise<void> {
-    return this.#poll.process(input)
+    return this.#listeners.process(input)
   }
 
   integrationEndpoint(flowId: string, triggerNodeId: string): string | undefined {

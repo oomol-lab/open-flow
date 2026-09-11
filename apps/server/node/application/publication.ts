@@ -4,7 +4,7 @@ import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { Logger } from 'pino'
 import type { ConnectorHost } from '../deployment/connector.ts'
 import type { IntegrationRuntime } from '../runtime/integration-runtime.ts'
-import type { PollRuntime } from '../runtime/poll-runtime.ts'
+import type { ListenerRuntime } from '../runtime/listener-runtime.ts'
 import type { PublicationStore } from '../storage/publication-store.ts'
 import type { PublicationAcceptance, Store } from '../storage/store.ts'
 
@@ -39,7 +39,7 @@ type PublicationMetadata =
 export class Publisher {
   readonly #store: Store
   readonly #integration: IntegrationRuntime
-  readonly #poll: PollRuntime
+  readonly #listeners: ListenerRuntime
   readonly #agentAvailable: () => boolean
   readonly #resolveConnector: () => ConnectorHost | undefined
   readonly #resolveWaitPublicOrigin: () => URL | undefined
@@ -58,7 +58,7 @@ export class Publisher {
   constructor(
     store: Store,
     integration: IntegrationRuntime,
-    poll: PollRuntime,
+    listeners: ListenerRuntime,
     resolveConnector: () => ConnectorHost | undefined,
     resolveWaitPublicOrigin: () => URL | undefined,
     clock: () => number,
@@ -77,7 +77,7 @@ export class Publisher {
     this.#agentAvailable = agentAvailable
     this.#store = store
     this.#integration = integration
-    this.#poll = poll
+    this.#listeners = listeners
     this.#resolveConnector = resolveConnector
     this.#resolveWaitPublicOrigin = resolveWaitPublicOrigin
     this.#clock = clock
@@ -229,7 +229,7 @@ export class Publisher {
         } catch (error) {
           throw new AcceptanceError('trigger-invalid', error instanceof Error ? error.message : 'Poll Trigger schedule is invalid.')
         }
-        if (!this.#poll.supports(trigger.definition.key, trigger.definition.definitionVersion)) {
+        if (!this.#listeners.supports(trigger.definition.key, trigger.definition.definitionVersion)) {
           throw new AcceptanceError('trigger-invalid', 'Poll Trigger definition is not available.')
         }
         const binding = input.revision.document.bindings[trigger.bindingId]

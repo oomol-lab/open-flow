@@ -819,16 +819,21 @@ export class IntegrationStore {
            WHERE bindings.operator_state = 'active' AND bindings.retry_at IS NULL
            UNION ALL
            SELECT next_at FROM integration_candidates WHERE status IN ('preparing', 'cleanup') AND next_at IS NOT NULL
-           UNION ALL
-           SELECT MAX(work.next_at, COALESCE(work.lease_until, work.next_at))
+         )`,
+      )
+      .get() as { readonly nextAt: number | null }
+    return row.nextAt ?? undefined
+  }
+
+  nextListenerAt(): number | undefined {
+    const row = this.#database
+      .prepare(`SELECT MIN(MAX(work.next_at, COALESCE(work.lease_until, work.next_at))) AS nextAt
            FROM listener_work AS work
            JOIN integration_bindings AS bindings ON bindings.binding_id = work.binding_id AND bindings.runtime_version = work.runtime_version
            JOIN integration_states AS states ON states.binding_id = work.binding_id AND states.runtime_version = work.runtime_version
            JOIN flow_live ON flow_live.flow_id = bindings.flow_id AND flow_live.publication_id = bindings.current_publication_id AND flow_live.enabled = 1
            JOIN flows ON flows.flow_id = bindings.flow_id AND flows.status = 'active'
-           WHERE bindings.operator_state = 'active' AND states.checkpoint_json != 'null'
-         )`,
-      )
+           WHERE bindings.operator_state = 'active' AND states.checkpoint_json != 'null'`)
       .get() as { readonly nextAt: number | null }
     return row.nextAt ?? undefined
   }
