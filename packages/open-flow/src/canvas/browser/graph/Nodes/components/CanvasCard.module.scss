@@ -29,7 +29,7 @@
 }
 
 .comment .preview {
-  background: color-mix(in srgb, var(--comment-bg) 55%, var(--node-background-color));
+  background: var(--comment-preview-bg);
   border-color: color-mix(in srgb, var(--comment-border) 45%, transparent);
 }
 
