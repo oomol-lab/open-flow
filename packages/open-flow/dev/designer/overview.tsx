@@ -133,6 +133,22 @@ function ProductOverview({ log }: { readonly log: LogAction }) {
         <Sample title="Actions">
           <ButtonSamples log={log} />
         </Sample>
+        <Sample title="Compact keyboard focus">
+          <div className="overview-buttons">
+            <Button aria-label="Zoom in" size="icon-sm" variant="ghost" onClick={() => log('zoom.in', null)}>
+              <i aria-hidden="true" className="i-lucide:zoom-in" />
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => log('zoom.reset', null)}>
+              72%
+            </Button>
+            <Button size="sm" variant="outline">
+              Button
+            </Button>
+            <Button size="sm" variant="ghost" disabled>
+              Disabled
+            </Button>
+          </div>
+        </Sample>
         <Sample title="Inputs">
           <Input aria-label="Default input" defaultValue="Daily digest" onChange={(event) => log('input.change', event.target.value)} />
           <Input aria-label="Empty input" placeholder="Search workflows" />

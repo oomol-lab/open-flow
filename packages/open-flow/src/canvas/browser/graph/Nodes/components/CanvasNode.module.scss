@@ -1,3 +1,5 @@
+@use '../../../../../ui/browser/focus.scss' as focus;
+
 .summary {
   margin: 0;
   white-space: pre-line;
@@ -50,8 +52,7 @@
   line-height: 16px;
 
   &:focus-visible {
-    outline: 2px solid var(--node-selected-border-color);
-    outline-offset: 2px;
+    @include focus.compact-focus;
   }
 }
 

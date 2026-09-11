@@ -1,3 +1,5 @@
+@use '../../../../../ui/browser/focus.scss' as focus;
+
 .rows {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 40%);
@@ -23,9 +25,15 @@
     }
   }
 
-  [tabindex]:focus-visible {
-    outline: 2px solid var(--node-selected-border-color);
-    outline-offset: 2px;
-    border-radius: 2px;
+  :is([tabindex], button) {
+    // Reserve space inside the focus frame without moving the aligned row text.
+    padding-inline: 4px;
+    margin-inline: -4px;
+    max-width: calc(100% + 8px);
+    border-radius: 3px;
+
+    &:focus-visible {
+      @include focus.compact-focus;
+    }
   }
 }

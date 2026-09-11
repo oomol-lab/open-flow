@@ -17,7 +17,7 @@
   --open-flow-destructive: #dc2626;
   --open-flow-border: #dedede;
   --open-flow-input: #d2d2d2;
-  --open-flow-ring: #a3a3a3;
+  --open-flow-ring: #777777;
   --open-flow-radius: 10px;
   --ui-background: var(--open-flow-background);
   --ui-foreground: var(--open-flow-foreground);
@@ -59,7 +59,7 @@
   --open-flow-destructive: #f87171;
   --open-flow-border: #3c3c3c;
   --open-flow-input: #484848;
-  --open-flow-ring: #747474;
+  --open-flow-ring: #b4b4b4;
 }
 
 /* Canvas surfaces preserve the approved node and floating-control palette.
@@ -194,7 +194,7 @@
   --ui-destructive: var(--accent-red-1);
   --ui-border: var(--border-2);
   --ui-input: var(--border-2);
-  --ui-ring: var(--brand-highlight-color);
+  --ui-ring: var(--open-flow-ring);
   --ui-radius: 6px;
 
   --brand-color: #3d3d3d;
@@ -367,7 +367,7 @@
   --ui-destructive: var(--accent-red-1);
   --ui-border: var(--border-2);
   --ui-input: var(--border-2);
-  --ui-ring: var(--brand-highlight-color);
+  --ui-ring: var(--open-flow-ring);
   --ui-radius: 6px;
 
   --node-background-color: var(--fill-1);
