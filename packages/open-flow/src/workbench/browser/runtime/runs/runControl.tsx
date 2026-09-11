@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
 
-import { useId, useState } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { CanvasTooltip } from '../../../../canvas/browser/components/tooltip.tsx'
 import { defaultTriggerIcon } from '../../../../canvas/browser/graph/Nodes/components/constants.ts'
@@ -46,10 +46,23 @@ export function RunControl({
 }): ReactElement {
   const t = useTranslate()
   const inputTriggerId = useId()
+  const labelRef = useRef<HTMLSpanElement>(null)
+  const [labelWidth, setLabelWidth] = useState<number>()
   const [popupContainer, setPopupContainer] = useState<HTMLDivElement | null>(null)
   const selected = triggers.find((trigger) => trigger.id == selectedTriggerId) ?? triggers[0]!
   const inputLabel = t(inputStatus == 'ready' ? 'runInput.editReady' : 'runInput.editMissing')
   const triggerLabel = t('runInput.testTrigger', { name: selected.title })
+  const label = starting ? t('workspace.starting') : triggerLabel
+
+  useLayoutEffect(() => {
+    const element = labelRef.current
+    if (!element) return
+    const measure = () => setLabelWidth(element.offsetWidth)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [label])
 
   return (
     <div className="run-control-shell" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} ref={setPopupContainer}>
@@ -65,7 +78,11 @@ export function RunControl({
             type="button"
           >
             {starting ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" name="play" />}
-            <span className="max-w-40 truncate">{starting ? t('workspace.starting') : triggerLabel}</span>
+            <span className="run-control-label" style={{ width: labelWidth }}>
+              <span className="inline-block w-max max-w-40 truncate align-middle" ref={labelRef}>
+                {label}
+              </span>
+            </span>
           </Button>
         </CanvasTooltip>
         {inputStatus != 'none' && (

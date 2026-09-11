@@ -31,6 +31,7 @@ import { Textarea } from '../../src/ui/browser/textarea.tsx'
 import { WorkbenchCanvasActions, WorkbenchInspectorToggle } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
 import { createI18n as createWorkbenchI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
+import { useStoryActions } from './storyActions.tsx'
 
 export type LogAction = (name: string, value?: unknown) => void
 
@@ -425,6 +426,8 @@ function RunControlSample({
 function RunControlStory({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
   const i18n = useMemo(() => createWorkbenchI18n(language), [language])
   useEffect(() => () => i18n.dispose(), [i18n])
+  const [transitionStarting, setTransitionStarting] = useState(false)
+  useStoryActions([{ label: transitionStarting ? 'Finish test' : 'Simulate starting', onClick: () => setTransitionStarting((value) => !value) }])
   const one = [{ id: 'schedule', title: 'Daily schedule', icon: ':carbon:time:' }]
   const multiple = [
     { id: 'schedule', title: 'Daily schedule', icon: ':carbon:time:' },
@@ -438,7 +441,7 @@ function RunControlStory({ dark, language, log }: { readonly dark: boolean; read
           <RunControlSample inputStatus="none" language={language} label="Direct run" log={log} triggers={one} />
           <RunControlSample defaultOpen inputStatus="missing" language={language} label="Input required" log={log} triggers={[multiple[1]!]} />
           <RunControlSample inputStatus="ready" language={language} label="Remembered input" log={log} triggers={[multiple[1]!]} />
-          <RunControlSample inputStatus="none" language={language} label="Multiple triggers" log={log} triggers={multiple} />
+          <RunControlSample inputStatus="none" language={language} label="Multiple triggers" log={log} starting={transitionStarting} triggers={multiple} />
           <RunControlSample inputStatus="ready" language={language} label="Starting" log={log} starting triggers={[multiple[1]!]} />
           <RunControlSample disabled inputStatus="missing" language={language} label="Draft has problems" log={log} triggers={[multiple[1]!]} />
           <RunControlSample inputStatus="none" language={language} label="Mini map open" log={log} miniMapOpen triggers={one} />
