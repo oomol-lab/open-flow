@@ -47,6 +47,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const contentWidth$ = nodeStore.interaction.contentWidth
   const selected = useVal(nodeStore.$.selected)
   const showError = useShowNodeError(nodeStore)
+  const problem = showError ? t('nodeStatus.hasError') : modelNode?.run?.status == 'error' ? t('canvasCard.status.error') : undefined
   const [hovered, setHovered] = useState(false)
   const [hintTriggered, setHintTriggered] = useState(false)
   // Only uninterrupted hover starts a hint session; selection can preserve it after the delay.
@@ -70,19 +71,22 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const animateEntry = useRef(initialized).current
 
   const contentWidth = useVal(contentWidth$)
-  const selectedOutlineColor = showError ? 'var(--edge-error)' : undefined
+  const problemColor = problem ? 'var(--accent-red-1)' : undefined
   const conditionNode = modelNode?.kind == 'condition' ? modelNode : undefined
 
   const containerStyle: CSSProperties = {
     width: cardStore ? CARD_WIDTH : Math.max(contentWidth || DEFAULT_NODE_WIDTH, MIN_NODE_WIDTH),
-    ['--node-selected-border-color' as any]: selectedOutlineColor,
+    ['--node-selected-border-color' as any]: problemColor,
+    ['--execution-port-color' as any]: problemColor,
+    ['--execution-port-active-color' as any]: problemColor,
+    ['--execution-port-overlap' as any]: problem ? '1px' : undefined,
     ['--node-selected-shadow' as any]: showError ? 'var(--node-error-selected-shadow)' : undefined,
   }
   const card = cardStore ? (
     <CanvasNode
       nodeStore={cardStore}
       compact={canvasMiniMapPhase !== NodeMiniMapPhase.None}
-      showError={showError}
+      problem={problem}
       branches={branches?.map((branch) => {
         const summary =
           conditionNode != null ? conditionBranchSummary(conditionNode, branch, t) : modelNode?.kind == 'wait' ? t(`canvasCard.waitBranch.${branch}`) : ''

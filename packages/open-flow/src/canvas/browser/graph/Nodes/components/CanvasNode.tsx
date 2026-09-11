@@ -10,7 +10,7 @@ import { CanvasTooltip } from '../../../components/tooltip.tsx'
 import { nodeCardContent } from '../../FlowCanvas/cardContent.ts'
 import { cronDescription, cronLabel } from '../../FlowCanvas/cronDescription.ts'
 import { timeZoneLabel } from '../../FlowCanvas/timeZoneLabel.ts'
-import { CanvasCard, CardCollapse, TriggerIndicator } from './CanvasCard.tsx'
+import { CanvasCard, CardCollapse } from './CanvasCard.tsx'
 import { iconForNodeType } from './constants.ts'
 import { NodeContentRows } from './NodeContentRows.tsx'
 import { RunChips, ImagePreview } from './RunChips.tsx'
@@ -18,12 +18,12 @@ import { ValuePreview } from './ValuePreview.tsx'
 
 export function CanvasNode({
   nodeStore,
-  showError,
+  problem,
   branches,
   compact = false,
 }: {
   readonly nodeStore: NodeStore
-  readonly showError: boolean
+  readonly problem?: string
   readonly branches?: ReactNode
   readonly compact?: boolean
 }) {
@@ -34,7 +34,6 @@ export function CanvasNode({
   const title = node.title
   const icon = node.icon ?? (node.kind == 'wait' ? ':carbon:time:' : undefined)
   const { values, summary, schedules, images, tools, inline, hidden } = nodeCardContent(node)
-  const problem = showError ? t('nodeStatus.hasError') : node?.run?.status == 'error' ? t('canvasCard.status.error') : undefined
   const kind = node?.kind ?? 'task'
   const subtitle = inline ? summary : node?.kind == 'task' ? node.executorName || t('canvasCard.kind.task') : t(`canvasCard.kind.${kind}`)
   const distinctSubtitle = subtitle.trim().toLocaleLowerCase() == title.trim().toLocaleLowerCase() ? undefined : subtitle
@@ -81,7 +80,6 @@ export function CanvasNode({
         subtitle={distinctSubtitle}
         selected={selected}
         problem={problem}
-        indicator={kind === 'trigger' ? <TriggerIndicator label={t('canvasCard.kind.trigger')} /> : undefined}
         branches={branches}
         footer={
           toolContent || runContent ? (

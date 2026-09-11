@@ -2,17 +2,8 @@ import styles from './CanvasCard.module.scss'
 import type { ReactNode } from 'react'
 
 import { clsx } from 'clsx'
-import { Zap } from 'lucide-react'
 import { Children, useLayoutEffect, useRef, useState } from 'react'
 import { isEmptyReactNode } from '../../../../../ui/browser/hooks.ts'
-
-export function TriggerIndicator({ label }: { readonly label: string }) {
-  return (
-    <span className={styles.triggerIndicator} role="img" aria-label={label}>
-      <Zap aria-hidden="true" />
-    </span>
-  )
-}
 
 export function CanvasCard({
   title,
@@ -26,7 +17,6 @@ export function CanvasCard({
   footer,
   actions,
   problem,
-  indicator,
   selected,
   compact = false,
   contentHidden = false,
@@ -46,13 +36,12 @@ export function CanvasCard({
   readonly footer?: ReactNode
   readonly actions?: ReactNode
   readonly problem?: string
-  readonly indicator?: ReactNode
   readonly selected?: boolean
 }) {
   const hasContent = Children.toArray(children).some((child) => typeof child != 'string' || child.trim().length > 0)
-  const statusIndicator = (problem || indicator) && (
-    <span className={clsx(styles.icon, styles.indicator, problem && styles.warning)} title={problem} aria-label={problem} role={problem ? 'img' : undefined}>
-      {problem ? <i aria-hidden="true" className="i-lucide:triangle-alert" /> : indicator}
+  const statusIndicator = problem && (
+    <span className={clsx(styles.icon, styles.indicator, styles.warning)} title={problem} aria-label={problem} role="img">
+      <i aria-hidden="true" className="i-lucide:triangle-alert" />
     </span>
   )
   return (
