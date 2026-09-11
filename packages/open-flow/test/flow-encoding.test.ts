@@ -280,11 +280,11 @@ describe('Revision decoding', () => {
   })
 
   it.each([undefined, null, 'invalid', { stale: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'missing', output: 'out' }] } }])(
-    'ignores Value Node inputs and incoming execution edges: %j',
+    'ignores Value Node inputs while preserving execution edges: %j',
     (inputs) => {
       const content = revision()
       const outgoing = { source: 'value', target: 'condition' }
-      const expectedGraph = { ...content.document.graph, edges: [outgoing] }
+      const expectedGraph = { ...content.document.graph, edges: [{ source: 'start', target: 'value' }, outgoing] }
       const expected = {
         ...content,
         document: {
@@ -296,7 +296,6 @@ describe('Revision decoding', () => {
       const legacy = JSON.parse(decoder.decode(encodeRevision(expected)))
       for (const graph of [legacy.document.graph, legacy.document.subflows.child.graph]) {
         graph.nodes.value.inputs = inputs
-        graph.edges.push({ source: 'condition', target: 'value' }, { source: 'missing', target: 'value' })
       }
       const before = structuredClone(legacy)
 
