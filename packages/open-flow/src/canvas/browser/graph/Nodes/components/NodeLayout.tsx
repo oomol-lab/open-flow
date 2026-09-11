@@ -42,7 +42,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
 
   const branches =
     modelNode?.kind == 'condition' || modelNode?.kind == 'wait' ? modelNode.outputs.flatMap((port) => ('handle' in port ? [port.handle] : [])) : undefined
-  const executionInput = modelNode != null && modelNode.kind != 'trigger'
+  const executionInput = modelNode != null && modelNode.kind != 'trigger' && modelNode.kind != 'value'
   const editable = useVal(canvasStore.$.editable)
   const contentWidth$ = nodeStore.interaction.contentWidth
   const selected = useVal(nodeStore.$.selected)

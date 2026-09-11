@@ -133,7 +133,15 @@ const trigger = { name: text, description: text.optional(), icon: text.optional(
 const base = { inputs, name: text.optional(), description: text.optional(), icon: text.optional(), timeoutMs: z.number().optional() }
 const node = z.union([
   z.object({ ...base, kind: z.literal('condition'), ...condition }),
-  z.object({ ...base, kind: z.literal('value'), values: z.array(input) }),
+  z.object({
+    ...base,
+    inputs: z
+      .unknown()
+      .transform(() => ({}))
+      .default({}),
+    kind: z.literal('value'),
+    values: z.array(input),
+  }),
   z.object({ ...base, kind: z.literal('subflow'), subflowId: text }),
   z.object({ ...base, kind: z.literal('task'), task: inline, additionalInputs: z.array(input).optional() }),
   z.object({ ...base, kind: z.literal('task'), taskId: text, additionalInputs: z.array(input).optional() }),
@@ -161,7 +169,10 @@ const target = z.union([z.object({ kind: z.literal('flow') }), z.object({ kind: 
 const edge = z.object({ source: text, target: text, sourceHandle: text.optional() })
 const at = { nodeId: text, target }
 const subflow = z.object({ name: text, inputs: z.array(input), outputs: z.array(port.extend({ sources: z.array(z.union([nodeSource, flowSource])) })) })
-const graph = z.object({ nodes: z.record(text, node), edges: z.array(edge).default([]) })
+const graph = z.object({ nodes: z.record(text, node), edges: z.array(edge).default([]) }).transform((graph) => ({
+  ...graph,
+  edges: graph.edges.filter((edge) => graph.nodes[edge.target]?.kind != 'value'),
+}))
 const binding = z.object({ kind: z.enum(['connection', 'variable']), target: text })
 const module = z.object({ name: text, imports: strings, source: text })
 const document = z.object({
