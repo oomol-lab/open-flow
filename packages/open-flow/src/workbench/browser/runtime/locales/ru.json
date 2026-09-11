@@ -38,7 +38,7 @@
     "webhookDescription": "Получать внешние события через выделенный HTTP-адрес.",
     "manual": "Ручной триггер",
     "manualDescription": "Запустить выполнение вручную с этого узла.",
-    "integrationTriggers": "Триггеры внешних сервисов"
+    "integrationTriggers": "Триггеры приложений"
   },
   "common": {
     "cancel": "Отмена",
@@ -427,7 +427,10 @@
     "webhookCopied": "Скопировано",
     "webhookCopy": "Копировать URL",
     "webhookUrl": "URL Webhook",
-    "upToDate": "Текущий черновик совпадает с рабочей версией."
+    "upToDate": "Текущий черновик совпадает с рабочей версией.",
+    "listenerDegraded": "Проверка работает, уведомления недоступны",
+    "listenerScanning": "Периодическая проверка находит изменения при пропущенных уведомлениях.",
+    "listenerScanFailed": "Проверка изменений не удалась. Прогресс сохранён для повторной попытки."
   },
   "run": {
     "actionApprove": "Одобрить",
@@ -824,8 +827,7 @@
     "webhookDescription": "Получать JSON-объект через сгенерированный HTTP-адрес."
   },
   "triggerSummary": {
-    "manualSummary": "Нажмите «Запустить», чтобы начать с этого узла.",
-    "integrationSummary": "При получении события"
+    "manualSummary": "Нажмите «Запустить», чтобы начать с этого узла."
   },
   "conditionEditor": {
     "addCondition": "Добавить условие",

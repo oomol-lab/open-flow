@@ -22,6 +22,8 @@ export interface StoredTriggerActivity {
 }
 
 export interface StoredTriggerBinding {
+  readonly listenerHealth: 'healthy' | 'failed' | 'needs_reauth' | null
+  readonly listenerErrorCode: string | null
   readonly bindingId: string
   readonly currentPublicationId: string | null
   readonly currentRevisionId: string | null
@@ -191,7 +193,7 @@ export class TriggerStore {
   listTriggerBindings(flowId: string): readonly StoredTriggerBinding[] {
     return this.#database
       .prepare(
-        `SELECT * FROM (
+        `SELECT listed.*, work.health AS listenerHealth, work.last_error_code AS listenerErrorCode FROM (
            SELECT bindings.endpoint_id AS bindingId,
                   bindings.current_publication_id AS currentPublicationId,
                   publications.revision_id AS currentRevisionId,
@@ -228,7 +230,8 @@ export class TriggerStore {
            FROM integration_bindings AS bindings
            LEFT JOIN publications ON publications.publication_id = bindings.current_publication_id
            WHERE bindings.flow_id = ?
-         ) ORDER BY triggerNodeId`,
+         ) AS listed LEFT JOIN listener_work AS work ON listed.kind = 'integration' AND work.binding_id = listed.bindingId AND work.runtime_version = listed.runtimeVersion
+         ORDER BY triggerNodeId`,
       )
       .all(flowId, flowId, flowId, flowId) as unknown as readonly StoredTriggerBinding[]
   }

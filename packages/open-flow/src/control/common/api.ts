@@ -84,6 +84,7 @@ export interface TriggerKeySummary {
 }
 
 export interface TriggerBinding {
+  readonly listener?: { readonly health: 'healthy' | 'failed' | 'needs_reauth'; readonly lastErrorCode?: string }
   readonly currentPublicationId?: string
   readonly currentRevisionId?: string
   readonly endpointUrl?: string

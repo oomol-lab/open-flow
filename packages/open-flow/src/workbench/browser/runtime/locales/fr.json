@@ -38,7 +38,7 @@
     "webhookDescription": "Recevoir des événements externes via un point de terminaison HTTP dédié.",
     "manual": "Déclencheur manuel",
     "manualDescription": "Démarrer manuellement à partir de ce nœud.",
-    "integrationTriggers": "Triggers de services tiers"
+    "integrationTriggers": "Déclencheurs d’applications"
   },
   "common": {
     "cancel": "Annuler",
@@ -427,7 +427,10 @@
     "webhookCopied": "Copié",
     "webhookCopy": "Copier l'URL",
     "webhookUrl": "URL du Webhook",
-    "upToDate": "Le Brouillon actuel correspond à la version en ligne."
+    "upToDate": "Le Brouillon actuel correspond à la version en ligne.",
+    "listenerDegraded": "Vérifications actives, notifications indisponibles",
+    "listenerScanning": "Les vérifications périodiques récupèrent les changements sans notification.",
+    "listenerScanFailed": "La vérification a échoué. La progression est conservée pour réessayer."
   },
   "run": {
     "actionApprove": "Approuver",
@@ -824,8 +827,7 @@
     "webhookDescription": "Recevoir un objet JSON via un point de terminaison HTTP généré."
   },
   "triggerSummary": {
-    "manualSummary": "Cliquez sur Exécuter pour démarrer ici.",
-    "integrationSummary": "À la réception d'un événement"
+    "manualSummary": "Cliquez sur Exécuter pour démarrer ici."
   },
   "conditionEditor": {
     "addCondition": "Ajouter une condition",

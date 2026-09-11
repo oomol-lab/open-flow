@@ -38,7 +38,7 @@
     "webhookDescription": "透過專屬的 HTTP 端點接收外部事件。",
     "manual": "手動觸發",
     "manualDescription": "從這裡手動啟動執行。",
-    "integrationTriggers": "第三方 Trigger"
+    "integrationTriggers": "應用觸發器"
   },
   "common": {
     "cancel": "取消",
@@ -427,7 +427,10 @@
     "webhookCopied": "已複製",
     "webhookCopy": "複製 URL",
     "webhookUrl": "Webhook URL",
-    "upToDate": "目前的草稿與線上版本一致。"
+    "upToDate": "目前的草稿與線上版本一致。",
+    "listenerDegraded": "掃描正常，通知無法使用",
+    "listenerScanning": "定期檢查會補查未收到通知的變化。",
+    "listenerScanFailed": "變化檢查失敗，已保留進度以便重試。"
   },
   "run": {
     "actionApprove": "通過",
@@ -824,8 +827,7 @@
     "webhookDescription": "透過產生的 HTTP 端點接收 JSON 物件。"
   },
   "triggerSummary": {
-    "manualSummary": "點擊執行，從這裡開始。",
-    "integrationSummary": "事件送達時觸發"
+    "manualSummary": "點擊執行，從這裡開始。"
   },
   "conditionEditor": {
     "addCondition": "新增條件",

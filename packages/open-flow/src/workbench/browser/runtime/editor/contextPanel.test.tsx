@@ -44,7 +44,7 @@ describe('Context Panel', () => {
     expect(indexAddNodeOptions([group]).get(connector.id)).toBe(connector)
   })
 
-  it.each(['Connector actions', 'Integration triggers'])('keeps %s collapsed so common nodes remain visible', (label) => {
+  it.each(['Connector actions', 'App triggers'])('keeps %s collapsed so common nodes remain visible', (label) => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <BlockLibrary
@@ -77,7 +77,7 @@ describe('Context Panel', () => {
     expect(markup).toContain('aria-expanded="false"')
     expect(markup).not.toContain('GitHub')
     expect(markup).toContain('Code task')
-    if (label == 'Integration triggers') {
+    if (label == 'App triggers') {
       expect(markup.indexOf('Manual trigger')).toBeLessThan(markup.indexOf(label))
       expect(markup.indexOf(label)).toBeLessThan(markup.indexOf('Code task'))
     }

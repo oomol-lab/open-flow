@@ -333,15 +333,15 @@
     font-weight: 500;
   }
 
-  .trigger-binding-summary > .trigger-binding-state.success {
+  .trigger-binding-state.success {
     color: var(--success-foreground);
   }
 
-  .trigger-binding-summary > .trigger-binding-state.danger {
+  .trigger-binding-state.danger {
     color: var(--ui-destructive);
   }
 
-  .trigger-binding-summary > .trigger-binding-state.running {
+  .trigger-binding-state.running {
     color: var(--warning);
   }
 

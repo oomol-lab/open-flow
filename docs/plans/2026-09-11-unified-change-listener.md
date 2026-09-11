@@ -253,7 +253,7 @@ GitHub PR 列表支持按更新时间排序，但这不能证明能恢复每一�
 
 ### 9.2 迁移调查与约束
 
-- 当前公共包与 Cloud 依赖版本均为 `0.1.0-beta.17`；Cloud 后续必须通过精确的新发布版本接入。
+- 阶段一盘点时公共包与 Cloud 依赖版本均为 `0.1.0-beta.17`；Cloud 必须通过精确的新发布版本接入。
 - 已只读检查的 Server 当前开发库为 schema 14，包含 Flow、Revision、Publication 与 Run，不能重置。
   当前没有 Poll / Integration binding，但历史 Revision 中仍存在 GitHub、Gmail 和 Airtable 定义；无 active binding 不等于无消费者。
 - 历史 Revision 的 serialized kind、definitionVersion、payload 与 digest 保持可读；迁移不能用新 kind 原地改写历史内容。
@@ -287,3 +287,45 @@ GitHub PR 列表支持按更新时间排序，但这不能证明能恢复每一�
   旧 Project / 未知 schema 不再隐式重置，明确拒绝自动升级并保留原数据，专门迁移仍待后续处理。
 - 本阶段未发布 npm 包、未改 Cloud 仓库。Cloud 的 D1/Queue/调度接入与共享 conformance、Workbench/CLI 业务入口、
   第二个 Provider 及历史 Poll 定义迁移仍按后续阶段进行；当前结果不代表整个计划完成。
+
+### 9.5 Cloud 实施与验证
+
+- 公共包 `0.1.0-beta.18` 已通过发布流程上线；Cloud、Executor 与 Workbench 的 manifest 和 lockfile 均消费该精确 artifact。
+  发布源码保存在 `codex/unified-change-listener` 分支，包含此前公共合同和 Server 的变更。
+- tenant D1 migration `0029_change_listeners.sql` 追加持久监听工作，不改写已有 Flow、Publication、Run 或旧 Trigger 状态。
+  ScheduleIndex 内部 schema 2 保留原 Cron/Poll 调度和版本隔离记录，增加 listener 唤醒传输。
+- callback 验证后只保存 generation；Queue 发送失败仍保留到期工作，由 Trigger binding maintenance 重新发送。
+  periodic scan 与通知共用同一个 source reader，通过 TeamLimiter 和 D1 租约限制并发。
+- Run、执行快照、事件、Run 调度工作与 page checkpoint 在同一 D1 batch 接受。空页只更新进度；容量不足、取消、读取或事务失败保留原游标。
+  租约、runtimeVersion、Publication、预期 checkpoint 与 Live/operator 状态在提交时校验。
+- 未变化发布保留最新 checkpoint；暂停和恢复不重新建立 baseline。范围或 Connection 替换先准备独立 candidate endpoint，
+  激活事务安装新状态并保存旧订阅的清理工作；旧 reader 和 callback 被隔离。已完成 activation 重投不会覆盖随后推进的游标。
+- source health 独立存储；订阅失败不阻断读取，扫描成功不会将失败订阅标记恢复。
+- Cloud 使用公开 artifact 中的三项 listener conformance，通过实际 D1/R2 生产入口验证分页、无通知扫描、重启和重新发布。
+  补充 Queue 重投、持久唤醒、容量恢复、事务回滚、空页期间新通知、取消、租约失效、暂停恢复、换源清理及 activation 重投测试。
+  Google Drive candidate 创建响应丢失后的 callback 恢复也覆盖新旧两个定义。
+- 本地 Cloud 状态盘点发现 tenant migration 10 和更早的 Project 库，另有当前 Flow schema 的验证库。
+  本阶段未修改这些原库，启动前检查阻止历史 reset migration 隐式清空旧库；独立测试覆盖原文件不变及 0028 → 0029 数据保留。
+  旧 Project 转 Flow 的专门转换、远端 shard/R2/Directory 完整盘点仍待后续升级阶段处理，不能宣称已有数据全部完成迁移。
+- 闭源仓库根目录 `bun run check`、`bun run test`、`bun run build` 全部通过；Cloud 444 项测试、Workbench 18 项测试通过。
+- 本阶段不包含 Cloud 部署。下一阶段仍需业务化 Workbench/CLI 入口、第二种 Provider 读取模式，以及已有 Poll 定义的显式迁移。
+
+### 9.6 业务入口与第二种读取模式
+
+- Workbench 将 Poll 与 Integration 放在同一个应用触发器目录，直接展示 Provider 的业务说明。
+  已发布 snapshot 的 kind、版本和 digest 保持不变，CLI/MCP 和程序化 authoring 继续消费同一 Registry。
+- Control API 的 TriggerBinding 增加可选 listener 健康投影。Server 和 Cloud 分别返回订阅与扫描状态，
+  Workbench 明确显示通知降级、扫描失败和重新授权；暂停与退役优先于机制健康。
+- 新增 `github.watch_pull_request`，范围为指定仓库的单个 PR。通知验签并过滤 PR 后只唤醒，
+  定时读取同一个 PR 并比较规范化状态版本；首次读取仅保存基线，状态变化后才创建 Run。
+  与 Google Drive 的 cursor 分页不同，该定义验证定向对象读取，复用两部署相同的 listener 运行时。
+- 输出是被观察到的 PR 当前状态与版本，不包含全部中间转换或 review 历史。
+  checkpoint 中的单调序号使观察到 A → B → A 可以分别准入，而失败后重读同一进度仍保持稳定身份。
+  失去访问权限不推断为删除，订阅创建失败也不重置已保存的基线。
+- 新增使用真实 TriggerSummary 与发布状态组件的 Lab Story，同时展示正常、通知降级、读取失败、重新授权和暂停。
+  已在 Lab 验证浅色英文和简体中文；闭源宿主遵循其仓库约束，使用检查、测试与构建验证。
+- 公共仓库根目录 check 和 test 通过，公共包 1182 项、CLI 90 项、Server 417 项测试通过。
+  包含 PR 读取、重复读取、签名过滤、取消、错误响应、独立健康协议与状态呈现。
+- 其他适用 Poll 定义的迁移、旧 Project 数据转换与阶段五清理仍未完成；本节不代表整个计划完成。
+
+PR 状态字段依据 [GitHub Get a pull request](https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request)。

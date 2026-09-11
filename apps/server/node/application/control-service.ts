@@ -1081,6 +1081,9 @@ function presentation(stored: StoredPresentation): Presentation {
 
 function triggerBinding(stored: StoredTriggerBinding, endpointOrigin?: string): TriggerBinding {
   return {
+    ...(stored.listenerHealth == null
+      ? {}
+      : { listener: { health: stored.listenerHealth, ...(stored.listenerErrorCode == null ? {} : { lastErrorCode: stored.listenerErrorCode }) } }),
     ...(stored.currentPublicationId == null ? {} : { currentPublicationId: stored.currentPublicationId }),
     ...(stored.currentRevisionId == null ? {} : { currentRevisionId: stored.currentRevisionId }),
     ...(endpointOrigin == null || stored.currentPublicationId == null || stored.kind != 'webhook' || stored.endpointId == null

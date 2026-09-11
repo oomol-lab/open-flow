@@ -38,7 +38,7 @@
     "webhookDescription": "専用の HTTP エンドポイントで外部イベントを受信します。",
     "manual": "手動トリガー",
     "manualDescription": "ここから手動で実行を開始します。",
-    "integrationTriggers": "外部サービスの Trigger"
+    "integrationTriggers": "アプリのトリガー"
   },
   "common": {
     "cancel": "キャンセル",
@@ -427,7 +427,10 @@
     "webhookCopied": "コピーしました",
     "webhookCopy": "URL をコピー",
     "webhookUrl": "Webhook URL",
-    "upToDate": "現在のドラフトは本番と同じ内容です。"
+    "upToDate": "現在のドラフトは本番と同じ内容です。",
+    "listenerDegraded": "スキャン中・通知は利用不可",
+    "listenerScanning": "定期チェックで通知されなかった変更を確認します。",
+    "listenerScanFailed": "変更の確認に失敗しました。進捗は再試行のために保持されます。"
   },
   "run": {
     "actionApprove": "承認",
@@ -824,8 +827,7 @@
     "webhookDescription": "生成された HTTP エンドポイントで JSON オブジェクトを受信します。"
   },
   "triggerSummary": {
-    "manualSummary": "実行をクリックすると、ここから開始します。",
-    "integrationSummary": "イベントを受信したとき"
+    "manualSummary": "実行をクリックすると、ここから開始します。"
   },
   "conditionEditor": {
     "addCondition": "条件を追加",
