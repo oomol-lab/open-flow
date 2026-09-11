@@ -315,6 +315,7 @@
   --pseudo-outline-color: var(--brand-3);
 
   --comment-bg: #f3eddc;
+  --comment-preview-bg: color-mix(in srgb, var(--comment-bg) 55%, var(--node-background-color));
   --comment-head-bg: #e8d7b3;
   --comment-border: #e3d8ba;
   --comment-selected-border: #a58b50;
@@ -485,9 +486,10 @@
 
   --pseudo-outline-color: var(--brand-7);
 
-  --comment-bg: #343128;
-  --comment-head-bg: #504837;
-  --comment-border: #514a38;
+  --comment-bg: #403727;
+  --comment-preview-bg: #2b261d;
+  --comment-head-bg: #514532;
+  --comment-border: #5c4e36;
   --comment-selected-border: #bba165;
   --comment-hover-bg: color-mix(in srgb, var(--comment-head-bg) 89%, #ffffff);
   --comment-active-bg: color-mix(in srgb, var(--comment-head-bg) 90%, #000000);
