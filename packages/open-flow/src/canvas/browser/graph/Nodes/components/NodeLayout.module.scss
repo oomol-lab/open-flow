@@ -71,6 +71,24 @@
   }
 }
 
+.cardContainer > .triggerIcon {
+  position: absolute;
+  left: -40px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  color: var(--trigger-icon-color);
+  fill: var(--trigger-icon-fill);
+  pointer-events: none;
+}
+
+.cardContainer.compact > .triggerIcon {
+  left: -52px;
+  width: 32px;
+  height: 32px;
+}
+
 .resizeHandle {
   user-select: none;
   -webkit-touch-callout: none;
