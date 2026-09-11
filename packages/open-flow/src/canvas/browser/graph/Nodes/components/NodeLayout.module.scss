@@ -256,10 +256,19 @@
   left: 7px;
 }
 
-// Match the visible mark to the measured bounds so edges meet it without a gap.
+// Extend error marks inward without moving the outer edge or narrowing the visible port.
+.cardContainer .executionHandle > :global(.react-flow__handle-left) {
+  --port-inset-right: calc(0px - var(--execution-port-overlap, 0px));
+}
+
+.cardContainer .executionHandle > :global(.react-flow__handle-right) {
+  --port-inset-left: calc(0px - var(--execution-port-overlap, 0px));
+}
+
+// Keep the outward connection point aligned with the measured handle bounds.
 .cardContainer .executionHandle > :global(.react-flow__handle)::before,
 :global(.react-flow__node.selected) .cardContainer .executionHandle > :global(.react-flow__handle)::before {
-  inset: 0;
+  inset: 0 var(--port-inset-right, 0px) 0 var(--port-inset-left, 0px);
 }
 
 .cardContainer .executionHandle.connected,
