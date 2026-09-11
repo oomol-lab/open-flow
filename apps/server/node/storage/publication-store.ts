@@ -1,6 +1,7 @@
 import type { PublishOperation } from '@oomol-lab/open-flow/control-api'
 import type { PublicationAcceptance, StoredFlow, StoredFlowRevision, StoredLive, StoredPublication } from './store.ts'
 
+import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
 import { randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { AcceptanceError } from '../error.ts'
@@ -678,19 +679,22 @@ export class PublicationStore {
     for (const binding of pollBindings) {
       const poll = desiredPolls.get(binding.triggerNodeId)
       if (poll != null) {
-        const unchanged = binding.triggerJson == poll.triggerJson && binding.connectionId == poll.connectionId
+        const unchanged =
+          binding.triggerJson != null &&
+          triggerRuntimeJson(JSON.parse(binding.triggerJson)) == triggerRuntimeJson(JSON.parse(poll.triggerJson)) &&
+          binding.connectionId == poll.connectionId
         if (input.operationId != null && unchanged && binding.currentPublicationId == input.expectedLivePublicationId && binding.health == 'healthy') {
           this.#database
             .prepare(
               `UPDATE poll_bindings
                SET current_publication_id = ?, runtime_version = runtime_version + 1,
-                   schedule_json = ?, next_at = ?, retry_at = NULL,
+                   trigger_json = ?, schedule_json = ?, next_at = ?, retry_at = NULL,
                    continuation_root_id = NULL, continuation_page = 0,
                    active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL,
                    updated_at = ?
                WHERE binding_id = ?`,
             )
-            .run(publicationId, poll.scheduleJson, poll.nextAt, input.publishedAt, binding.bindingId)
+            .run(publicationId, poll.triggerJson, poll.scheduleJson, poll.nextAt, input.publishedAt, binding.bindingId)
         } else if (input.operationId != null) {
           if (!this.#polls.activateCandidate(input.operationId, input.flowId, publicationId, poll, input.publishedAt)) {
             throw publishPending
@@ -781,15 +785,18 @@ export class PublicationStore {
     for (const binding of integrationBindings) {
       const integration = desiredIntegrations.get(binding.triggerNodeId)
       if (integration != null) {
-        const unchanged = binding.triggerJson == integration.triggerJson && binding.connectionId == integration.connectionId
+        const unchanged =
+          binding.triggerJson != null &&
+          triggerRuntimeJson(JSON.parse(binding.triggerJson)) == triggerRuntimeJson(JSON.parse(integration.triggerJson)) &&
+          binding.connectionId == integration.connectionId
         if (input.operationId != null && integration.listener && !unchanged) {
           if (!this.#integrations.replaceCandidate(input.operationId, binding.bindingId, input.flowId, publicationId, integration, input.publishedAt)) {
             throw publishPending
           }
         } else if ((input.operationId != null || integration.listener) && unchanged) {
           this.#database
-            .prepare('UPDATE integration_bindings SET current_publication_id = ?, updated_at = ? WHERE binding_id = ?')
-            .run(publicationId, input.publishedAt, binding.bindingId)
+            .prepare('UPDATE integration_bindings SET current_publication_id = ?, trigger_json = ?, updated_at = ? WHERE binding_id = ?')
+            .run(publicationId, integration.triggerJson, input.publishedAt, binding.bindingId)
         } else {
           this.#database
             .prepare(

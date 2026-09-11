@@ -9,6 +9,7 @@ import type {
   TriggerOccurrenceInput,
 } from './trigger-store.ts'
 
+import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
 import { insertTriggerActivity, pruneTriggerActivities } from '../runtime/trigger-activity.ts'
 
 export interface IntegrationCandidate {
@@ -59,7 +60,11 @@ export class IntegrationStore {
       const current = this.integrationBinding(flowId, integration.triggerNodeId)
       if (current != null) {
         if (current.currentPublicationId != expectedLivePublicationId) return false
-        if (current.triggerJson == integration.triggerJson && current.connectionId == integration.connectionId) {
+        if (
+          current.triggerJson != null &&
+          triggerRuntimeJson(JSON.parse(current.triggerJson)) == triggerRuntimeJson(JSON.parse(integration.triggerJson)) &&
+          current.connectionId == integration.connectionId
+        ) {
           if (current.health != 'healthy' && !(integration.listener && this.listenerState(current.bindingId, current.runtimeVersion)?.health == 'healthy'))
             return false
           continue
@@ -243,7 +248,8 @@ export class IntegrationStore {
       if (
         current != null &&
         current.currentPublicationId == expectedLivePublicationId &&
-        current.triggerJson == integration.triggerJson &&
+        current.triggerJson != null &&
+        triggerRuntimeJson(JSON.parse(current.triggerJson)) == triggerRuntimeJson(JSON.parse(integration.triggerJson)) &&
         current.connectionId == integration.connectionId &&
         (current.health == 'healthy' || (integration.listener && this.listenerState(current.bindingId, current.runtimeVersion)?.health == 'healthy'))
       ) {

@@ -12,6 +12,7 @@ import type {
   TriggerOccurrenceInput,
 } from './trigger-store.ts'
 
+import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
 import { randomUUID } from 'node:crypto'
 import { insertTriggerActivity, pruneTriggerActivities } from '../runtime/trigger-activity.ts'
 
@@ -73,7 +74,8 @@ export class PollStore {
       if (
         current != null &&
         current.currentPublicationId == expectedLivePublicationId &&
-        current.triggerJson == poll.triggerJson &&
+        current.triggerJson != null &&
+        triggerRuntimeJson(JSON.parse(current.triggerJson)) == triggerRuntimeJson(JSON.parse(poll.triggerJson)) &&
         current.connectionId == poll.connectionId &&
         current.health == 'healthy'
       ) {
@@ -234,7 +236,8 @@ export class PollStore {
       if (
         current != null &&
         current.currentPublicationId == expectedLivePublicationId &&
-        current.triggerJson == poll.triggerJson &&
+        current.triggerJson != null &&
+        triggerRuntimeJson(JSON.parse(current.triggerJson)) == triggerRuntimeJson(JSON.parse(poll.triggerJson)) &&
         current.connectionId == poll.connectionId &&
         current.health == 'healthy'
       ) {
