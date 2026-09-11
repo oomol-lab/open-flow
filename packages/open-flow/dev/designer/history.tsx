@@ -1,15 +1,18 @@
 import type { ChangeOperation, RevisionContent } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { JsonValue } from '../../src/workbench/browser/runtime/api.ts'
+import type { SetNotice } from '../../src/workbench/browser/runtime/stores/workbenchNotice.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { Toaster, toast } from 'sonner'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
 import { applyFlowChanges } from '../../src/flow/common/change.ts'
 import { createCodeTask, createBuiltinTrigger, createValue } from '../../src/flow/common/nodeChanges.ts'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '../../src/ui/browser/dialog.tsx'
+import { notificationToasterProps, NotificationUndoLabel } from '../../src/ui/browser/public.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { CanvasHistoryControls } from '../../src/workbench/browser/runtime/editor/canvasHistoryControls.tsx'
 import { CanvasHistoryScope } from '../../src/workbench/browser/runtime/editor/canvasHistoryScope.tsx'
@@ -21,7 +24,7 @@ import { useStoryActions } from './storyActions.tsx'
 
 const target = { kind: 'flow' } as const
 const modes = ['Empty', 'Undo', 'Redo', 'Saving', 'Failed'] as const
-function createSession(language: UiLanguage, log: LogAction) {
+function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) {
   const i18n = createI18n(language)
   const timestamp = '2026-09-10T00:00:00.000Z'
   let sequence = 1
@@ -125,7 +128,15 @@ function createSession(language: UiLanguage, log: LogAction) {
       })
     throw new Error(`Unexpected Lab request ${url.pathname}`)
   })
-  const store = new WorkspaceStore(client, (notice) => log('history.notice', notice), undefined, i18n)
+  const store = new WorkspaceStore(
+    client,
+    (notice) => {
+      log('history.notice', notice)
+      notify(notice)
+    },
+    undefined,
+    i18n,
+  )
   let release: (() => void) | undefined
   return {
     store,
@@ -169,11 +180,30 @@ function HistorySample({
   keyboardOnly?: boolean
   dark: boolean
 }) {
+  const toasterId = useId()
   const logRef = useRef(log)
   logRef.current = log
   const [session, setSession] = useState<ReturnType<typeof createSession>>()
   useEffect(() => {
-    const next = createSession(language, (name, value) => logRef.current(name, value))
+    const toastIds = new Set<string | number>()
+    const next = createSession(
+      language,
+      (name, value) => logRef.current(name, value),
+      (notice) => {
+        if (!interactive || notice == null) return
+        const options = {
+          toasterId,
+          action:
+            notice.undo == null
+              ? undefined
+              : { label: <NotificationUndoLabel>{notice.undo.label}</NotificationUndoLabel>, onClick: () => void notice.undo?.run() },
+          duration: notice.kind == 'error' ? 8000 : 4000,
+          onDismiss: ({ id }: { id: string | number }) => toastIds.delete(id),
+          onAutoClose: ({ id }: { id: string | number }) => toastIds.delete(id),
+        }
+        toastIds.add(notice.kind == 'error' ? toast.error(notice.message, options) : toast.success(notice.message, options))
+      },
+    )
     let disposed = false
     setSession(next)
     void next.store.selectFlow('history-lab').then(async () => {
@@ -187,9 +217,23 @@ function HistorySample({
     return () => {
       disposed = true
       next.dispose()
+      for (const id of toastIds) toast.dismiss(id)
     }
-  }, [language, mode])
-  return session == null ? null : <HistorySession session={session} dark={dark} interactive={interactive} keyboardOnly={keyboardOnly} mode={mode} />
+  }, [language, mode, interactive, toasterId])
+  return session == null ? null : (
+    <>
+      <HistorySession session={session} dark={dark} interactive={interactive} keyboardOnly={keyboardOnly} mode={mode} />
+      {interactive && (
+        <Toaster
+          {...notificationToasterProps}
+          id={toasterId}
+          theme={dark ? 'dark' : 'light'}
+          containerAriaLabel="Notifications"
+          toastOptions={{ closeButtonAriaLabel: 'Close notification' }}
+        />
+      )}
+    </>
+  )
 }
 
 function HistorySession({

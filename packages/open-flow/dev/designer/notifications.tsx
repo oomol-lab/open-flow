@@ -2,7 +2,7 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useEffect, useId, useRef } from 'react'
 import { Toaster, toast } from 'sonner'
-import { notificationToasterProps } from '../../src/ui/browser/public.ts'
+import { notificationToasterProps, NotificationUndoLabel } from '../../src/ui/browser/public.ts'
 import { useStoryActions } from './storyActions.tsx'
 
 function NotificationsStory({ dark, log }: { dark: boolean; log: LogAction }) {
@@ -32,7 +32,7 @@ function NotificationsStory({ dark, log }: { dark: boolean; log: LogAction }) {
             description: 'The connection was interrupted. Your edits are still available. Try saving again when the connection returns.',
           })
         : kind == 'action'
-          ? toast('Flow archived', { ...options, action: { label: 'Undo', onClick: () => log('undo') } })
+          ? toast('Flow archived', { ...options, action: { label: <NotificationUndoLabel>Undo</NotificationUndoLabel>, onClick: () => log('undo') } })
           : toast.success(`Changes saved · ${sequence.current}`, options)
     ids.current.add(toastId)
   }

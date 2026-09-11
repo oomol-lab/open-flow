@@ -10,6 +10,11 @@ export type WorkbenchView = 'design' | 'publications' | 'runs'
 export interface WorkbenchNotification {
   readonly kind: 'error' | 'success'
   readonly message: string
+  readonly undo?: {
+    readonly label: string
+    /** Restores this notification's operation only while it is the current undo entry. */
+    readonly run: () => Promise<void>
+  }
 }
 
 export interface WorkbenchHost {

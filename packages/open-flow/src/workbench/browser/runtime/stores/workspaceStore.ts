@@ -466,7 +466,7 @@ export class WorkspaceStore {
     const comments = commentIds(this.#model.value.presentation?.value ?? {}, target)
     const commentNodes = new Set(this.#model.value.selectedNodeIds.filter((nodeId) => comments.has(nodeId)))
     const changes = deleteSelection(revision, target, this.#model.value.selectedNodeIds)
-    await this.#canvasChange(
+    const deleted = await this.#canvasChange(
       'delete',
       this.#model.value.selectedNodeIds.length,
       changes,
@@ -477,6 +477,25 @@ export class WorkspaceStore {
       },
       [],
     )
+    if (deleted && !this.#disposed) {
+      const count = selectedNodeIds.filter((nodeId) => comments.has(nodeId) || revision.node(target, nodeId) != null).length
+      const entry = this.history$.value.undo
+      if (count > 0)
+        this.#setNotice({
+          kind: 'success',
+          message: this.#i18n.t(count == 1 ? 'notice.nodeDeleted' : 'notice.nodesDeleted', { count }),
+          ...(entry?.forward === changes && this.history$.value.canUndo
+            ? {
+                undo: {
+                  label: this.#i18n.t('history.undo'),
+                  run: async () => {
+                    if (!this.#disposed && this.history$.value.undo === entry && this.history$.value.canUndo) await this.undo()
+                  },
+                },
+              }
+            : {}),
+        })
+    }
   }
 
   public copySelectedNodes(): void {
