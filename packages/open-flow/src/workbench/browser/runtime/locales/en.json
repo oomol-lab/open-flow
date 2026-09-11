@@ -38,7 +38,7 @@
     "webhookDescription": "Receive external events through a dedicated HTTP endpoint.",
     "manual": "Manual trigger",
     "manualDescription": "Start execution manually from here.",
-    "integrationTriggers": "Integration triggers"
+    "integrationTriggers": "App triggers"
   },
   "common": {
     "cancel": "Cancel",
@@ -427,7 +427,10 @@
     "webhookCopied": "Copied",
     "webhookCopy": "Copy URL",
     "webhookUrl": "Webhook URL",
-    "upToDate": "The current Draft matches Live."
+    "upToDate": "The current Draft matches Live.",
+    "listenerDegraded": "Scanning; notifications unavailable",
+    "listenerScanning": "Periodic checks recover changes when notifications are missed.",
+    "listenerScanFailed": "Change checks failed. Saved progress is retained for retry."
   },
   "run": {
     "actionApprove": "Approve",
@@ -824,8 +827,7 @@
     "webhookDescription": "Receive a JSON object through a generated HTTP endpoint."
   },
   "triggerSummary": {
-    "manualSummary": "Click Run to start execution here.",
-    "integrationSummary": "When an event arrives"
+    "manualSummary": "Click Run to start execution here."
   },
   "conditionEditor": {
     "addCondition": "Add condition",

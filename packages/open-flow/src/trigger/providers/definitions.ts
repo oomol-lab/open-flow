@@ -3,6 +3,7 @@ import type { PollDefinition } from '../common/poll.ts'
 
 import { airtableRecordChanged } from './airtable/on-record-changed.ts'
 import { githubRepoEvent } from './github/on-repo-event.ts'
+import { githubPullRequestListener } from './github/watch-pull-request.ts'
 import { gitlabProjectEvent } from './gitlab/on-project-event.ts'
 import { gmailMessageReceived } from './gmail/on-message-received.ts'
 import { googleCalendarEventChanged } from './google-calendar/on-event-changed.ts'
@@ -25,6 +26,7 @@ export const triggerDefinitions: readonly ProviderTriggerDefinition[] = [
   airtableRecordChanged,
   gmailMessageReceived,
   githubRepoEvent,
+  githubPullRequestListener,
   gitlabProjectEvent,
   googleCalendarEventChanged,
   googleDriveChanges,

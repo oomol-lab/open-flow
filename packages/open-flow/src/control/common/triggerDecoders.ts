@@ -85,6 +85,8 @@ const triggerActivityKinds: ReadonlySet<TriggerActivityKind> = new Set([
 export function triggerBinding(value: unknown): TriggerBinding {
   const source = record(value)
   const health = source.health
+  const listener = source.listener == null ? undefined : record(source.listener)
+  if (listener != null && listener.health != 'healthy' && listener.health != 'failed' && listener.health != 'needs_reauth') return invalidResponse()
   const kind = source.kind
   const operatorState = source.operatorState
   const runtimeVersion = integer(source.runtimeVersion)
@@ -96,6 +98,14 @@ export function triggerBinding(value: unknown): TriggerBinding {
     ...(source.currentPublicationId == null ? {} : { currentPublicationId: string(source.currentPublicationId) }),
     ...(source.currentRevisionId == null ? {} : { currentRevisionId: string(source.currentRevisionId) }),
     ...(source.endpointUrl == null ? {} : { endpointUrl: string(source.endpointUrl) }),
+    ...(listener == null
+      ? {}
+      : {
+          listener: {
+            health: listener.health as NonNullable<TriggerBinding['listener']>['health'],
+            ...(listener.lastErrorCode == null ? {} : { lastErrorCode: string(listener.lastErrorCode) }),
+          },
+        }),
     flowId: string(source.flowId),
     health: health as TriggerBinding['health'],
     kind: kind as TriggerBinding['kind'],

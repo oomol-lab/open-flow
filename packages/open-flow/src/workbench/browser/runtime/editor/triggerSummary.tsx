@@ -12,7 +12,7 @@ export function TriggerSummary({ trigger }: { readonly trigger: TriggerNode }) {
   return (
     <section className="inspector-section">
       {trigger.kind === 'manual' && <p>{t('triggerSummary.manualSummary')}</p>}
-      {trigger.kind === 'integration' && <p>{t('triggerSummary.integrationSummary')}</p>}
+      {(trigger.kind === 'integration' || trigger.kind === 'poll') && <p>{trigger.definition.description}</p>}
       {source != null && <p className="text-sm text-muted-foreground">{source}</p>}
       <div className="flex items-center justify-between gap-3 text-sm">
         <code>payload</code>

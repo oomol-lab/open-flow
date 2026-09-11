@@ -432,6 +432,8 @@ Trigger Key catalog 是 deployment scope 资源：
 
 成功 Publication 为 Flow graph 中每个 Trigger node 提交 Live binding：
 
+具备统一监听能力的 binding 通过 `listener` 返回独立的变化读取状态。顶层 `health` 仍表示订阅状态；订阅失败且 `listener.health` 为 `healthy` 时，定期读取继续工作。暂停和退役优先于两种健康状态。
+
 ```ts
 interface TriggerBinding {
   currentPublicationId?: string
@@ -441,6 +443,7 @@ interface TriggerBinding {
   health: 'failed' | 'healthy' | 'initializing' | 'needs_reauth' | 'suspended'
   kind: 'cron' | 'integration' | 'poll' | 'webhook'
   lastErrorCode?: string
+  listener?: { health: 'healthy' | 'failed' | 'needs_reauth'; lastErrorCode?: string }
   operatorState: 'active' | 'paused'
   runtimeVersion: number
   triggerNodeId: string

@@ -62,7 +62,7 @@ function target(selection: ResolvedSelection | undefined, workspace: WorkspaceSt
 
 function option(definition: TriggerKeySnapshot, i18n: I18n): AddNodeOption {
   return {
-    description: i18n.t('addNode.triggerNeedsConnection', { provider: definition.provider }),
+    description: definition.description,
     group: i18n.t('addNode.integrationTriggers'),
     icon: providerIcon({ serviceId: definition.provider, serviceName: definition.provider }),
     id: `${optionPrefix}${definition.key}`,

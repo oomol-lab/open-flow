@@ -51,7 +51,8 @@ function liveClass(live: Live): string {
 function triggerLabel(binding: TriggerBinding, t: TFunction): string {
   if (binding.currentPublicationId == null) return t('publication.retired')
   if (binding.operatorState == 'paused') return t('publication.suspended')
-  switch (binding.health) {
+  if (binding.listener?.health == 'healthy' && (binding.health == 'failed' || binding.health == 'needs_reauth')) return t('publication.listenerDegraded')
+  switch (binding.listener?.health == 'failed' || binding.listener?.health == 'needs_reauth' ? binding.listener.health : binding.health) {
     case 'healthy':
       return t('publication.active')
     case 'failed':
@@ -91,7 +92,8 @@ function triggerName(binding: TriggerBinding, revision: RevisionView | undefined
 
 function triggerClass(binding: TriggerBinding): string {
   if (binding.currentPublicationId == null || binding.operatorState == 'paused') return 'neutral'
-  switch (binding.health) {
+  if (binding.listener?.health == 'healthy' && (binding.health == 'failed' || binding.health == 'needs_reauth')) return 'running'
+  switch (binding.listener?.health == 'failed' || binding.listener?.health == 'needs_reauth' ? binding.listener.health : binding.health) {
     case 'healthy':
       return 'success'
     case 'failed':
@@ -102,6 +104,28 @@ function triggerClass(binding: TriggerBinding): string {
     case 'suspended':
       return 'neutral'
   }
+}
+
+export function TriggerStatus({ binding }: { readonly binding: TriggerBinding }) {
+  const t = useTranslate()
+  return <span className={'trigger-binding-state ' + triggerClass(binding)}>{triggerLabel(binding, t)}</span>
+}
+
+export function ListenerHealth({ binding }: { readonly binding: TriggerBinding }) {
+  const t = useTranslate()
+  if (binding.listener == null || binding.currentPublicationId == null || binding.operatorState == 'paused') return null
+  return (
+    <p className="trigger-recovery">
+      {t(
+        binding.listener.health == 'healthy'
+          ? 'publication.listenerScanning'
+          : binding.listener.health == 'needs_reauth'
+            ? 'publication.needsReauthDescription'
+            : 'publication.listenerScanFailed',
+      )}
+      {binding.listener.lastErrorCode == null ? '' : ` (${binding.listener.lastErrorCode})`}
+    </p>
+  )
 }
 
 export function PublicationsView({ store }: { readonly store: WorkbenchStore }): ReactElement {
@@ -287,7 +311,7 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
                     >
                       <span className={`status-dot ${triggerClass(binding)}`} />
                       <strong title={binding.triggerNodeId}>{triggerName(binding, revision)}</strong>
-                      <span className={'trigger-binding-state ' + triggerClass(binding)}>{triggerLabel(binding, t)}</span>
+                      <TriggerStatus binding={binding} />
                       <code className="trigger-binding-kind">{binding.kind}</code>
                       <span className="trigger-binding-detail-label">{t(selected ? 'publication.hideTriggerDetails' : 'publication.triggerDetails')}</span>
                       <Icon name={selected ? 'chevron-up' : 'chevron-down'} />
@@ -348,6 +372,7 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
                               </div>
                             )}
                           </dl>
+                          <ListenerHealth binding={detail.binding} />
                           {detail.binding.health == 'needs_reauth' && <p className="trigger-recovery">{t('publication.needsReauthDescription')}</p>}
                           {detail.binding.endpointUrl != null && (
                             <div className="trigger-webhook">

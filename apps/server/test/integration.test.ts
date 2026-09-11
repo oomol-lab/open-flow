@@ -903,6 +903,7 @@ describe('Server change listener', () => {
       await publishListener(service, file)
       await service.tickIntegration()
       expect(service.integrationState('main', 'integration')?.health).toBe('failed')
+      expect(service.control.listFlowTriggerBindings('main')[0]).toMatchObject({ health: 'failed', listener: { health: 'healthy' } })
       expect(service.integrationState('main', 'integration')?.checkpoint).toBe(1)
       expect(admissionCount(file)).toBe(1)
     } finally {

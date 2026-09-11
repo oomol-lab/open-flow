@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import type { FlowCanvasViewModel, FlowCanvasViewNodeRun } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
 import type { TriggerNode, TriggerSchedule } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { DraftRun } from '../../src/workbench/browser/runtime/api.ts'
+import type { DraftRun, TriggerBinding } from '../../src/workbench/browser/runtime/api.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 import type { TriggerFixture } from './triggerFixtures.ts'
 
@@ -13,7 +13,9 @@ import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCa
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '../../src/ui/browser/empty.tsx'
 import { NodeInspector } from '../../src/workbench/browser/runtime/editor/nodeInspector.tsx'
+import { TriggerSummary } from '../../src/workbench/browser/runtime/editor/triggerSummary.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
+import { ListenerHealth, TriggerStatus } from '../../src/workbench/browser/runtime/publications/publicationsView.tsx'
 import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
 import { RunInputPanel } from '../../src/workbench/browser/runtime/runs/runInputPanel.tsx'
 import { RunRequestStore } from '../../src/workbench/browser/runtime/runs/runRequestStore.ts'
@@ -505,6 +507,50 @@ function ProviderStory({ view, ...props }: Omit<StoryProps, 'fixture'> & { reado
 }
 
 export const triggerStories: readonly FrontendStory[] = [
+  {
+    id: 'trigger-listener-health',
+    group: 'Trigger Provider',
+    title: 'Listener health',
+    standalone: true,
+    description: 'Listener summaries and independent notification / scan health. All states use production components.',
+    render: (_log, dark, language) => (
+      <Gallery dark={dark} language={language}>
+        <div className="trigger-case-grid">
+          {(
+            [
+              ['Healthy', 'healthy', 'healthy', 'active'],
+              ['Notifications unavailable', 'failed', 'healthy', 'active'],
+              ['Read failed', 'healthy', 'failed', 'active'],
+              ['Authorization required', 'healthy', 'needs_reauth', 'active'],
+              ['Paused', 'failed', 'healthy', 'paused'],
+            ] as const
+          ).map(([label, health, sourceHealth, operatorState]) => {
+            const fixture = triggerFixtures.find((item) => item.trigger.kind == 'integration' && item.trigger.definition.key == 'github.watch_pull_request')!
+            const binding: TriggerBinding = {
+              flowId: 'lab',
+              triggerNodeId: 'listener',
+              health,
+              listener: { health: sourceHealth },
+              operatorState,
+              runtimeVersion: 1,
+              currentPublicationId: 'live',
+              updatedAt: '2026-09-11T00:00:00Z',
+              kind: 'integration',
+              version: 1,
+            }
+            return (
+              <section key={label} className="rounded-lg border p-4">
+                <h3>{label}</h3>
+                <TriggerSummary trigger={fixture.trigger} />
+                <TriggerStatus binding={binding} />
+                <ListenerHealth binding={binding} />
+              </section>
+            )
+          })}
+        </div>
+      </Gallery>
+    ),
+  },
   ...triggerFixtures
     .filter(({ trigger }) => trigger.kind !== 'integration' && trigger.kind !== 'poll')
     .flatMap((fixture): FrontendStory[] => [

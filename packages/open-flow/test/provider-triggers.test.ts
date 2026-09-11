@@ -121,6 +121,7 @@ describe('provider Poll Trigger definitions', () => {
       'poll:airtable.on_record_changed',
       'poll:gmail.on_message_received',
       'integration:github.on_repo_event',
+      'integration:github.watch_pull_request',
       'integration:gitlab.on_project_event',
       'poll:googlecalendar.on_event_changed',
       'integration:googledrive.changes_detected',
