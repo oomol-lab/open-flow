@@ -572,7 +572,7 @@ export const nodeStories: readonly FrontendStory[] = [
     group: 'Node Value',
     id: 'node-value',
     description:
-      'Value rows · Left-aligned keys and right-aligned values, with empty, structured, nullable, overflowing and invalid samples. Canvas actions are logged.',
+      'Value rows · Left-aligned keys and right-aligned values, with empty, structured, nullable, overflowing and invalid samples. Tab through keys and value previews to inspect compact keyboard focus. Canvas actions are logged.',
     title: 'Node States',
     standalone: true,
     render: (log, dark, language) => <NodeContentStory dark={dark} language={language} log={log} />,

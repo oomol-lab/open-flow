@@ -127,7 +127,7 @@
   flex-wrap: wrap;
   gap: 10px;
 }
-.overview-buttons > button {
+.overview-buttons > button:not([data-size^='icon']) {
   width: auto;
 }
 .product-overview.open-flow-workbench {

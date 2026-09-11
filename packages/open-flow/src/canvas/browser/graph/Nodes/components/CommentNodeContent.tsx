@@ -53,7 +53,7 @@ export function CommentNodeContent({ store }: { store: CommentNodeStore }): JSX.
             autoFocus={sourceCode || (empty && !!selected)}
             onFocus={() => store.$$.sourceCode.set(true)}
             disabled={!editable}
-            className="min-h-30 resize-y rounded-none border-0 bg-transparent p-0 text-inherit shadow-none focus-visible:ring-0"
+            className="min-h-30 resize-y rounded-none border-0 bg-transparent p-0 text-inherit shadow-none focus-visible:outline-none"
             value={content ?? ''}
             onCompositionStart={() => setComposing(true)}
             onCompositionEnd={(event) => {

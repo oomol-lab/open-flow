@@ -19,6 +19,9 @@ paths are relative to the repository root. Use production code as the source for
   See the [Lab documentation](../../../packages/open-flow/dev/designer/README.md) for entry points,
   Story organization, and run commands. Supplement Lab with the actual product page when correctness
   depends on host layout or a complete flow.
+- Try opening the existing Lab or dev service directly before starting a service yourself. Only
+  consider starting one if the existing service cannot be reached. Stop any service you start for
+  verification and confirm it has terminated before delivery; leave pre-existing services running.
 - Choose verification according to risk; small, low-risk edits do not require browser acceptance.
   Static checks do not establish visual correctness. Report the checks performed and material gaps.
   Follow the [development principles](../../../AGENTS.md#verification) and use the commands in

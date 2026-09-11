@@ -1,3 +1,5 @@
+@use '../../../../../ui/browser/focus.scss' as focus;
+
 .chip.chip {
   display: inline-flex;
   align-items: center;
@@ -19,8 +21,7 @@
     color: var(--text-4);
   }
   &:focus-visible {
-    outline: 2px solid var(--node-selected-border-color);
-    outline-offset: 2px;
+    @include focus.compact-focus;
   }
 }
 
