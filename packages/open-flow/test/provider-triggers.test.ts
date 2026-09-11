@@ -286,6 +286,64 @@ describe('provider Poll Trigger definitions', () => {
     expect(outlook.calls).toHaveLength(2)
   })
 
+  it('distinguishes OneDrive deletions after restoration while replaying the same cursor stably', async () => {
+    const definition = poll('one_drive.on_item_changed')
+    const config = { events: ['created', 'updated', 'deleted'] }
+    const initial = { deltaToken: 'before-delete', lastPolledAt: '2026-08-20T12:00:00.000Z' }
+    const source = connector((request) => {
+      const token = request.query?.token
+      if (token == 'before-delete' || token == 'after-restore')
+        return {
+          data: { '@odata.deltaLink': `https://graph.example/delta?token=${token}-deleted`, 'value': [{ id: 'file-1', deleted: {} }] },
+          status: 200,
+        }
+      expect(token).toBe('before-delete-deleted')
+      return {
+        data: { '@odata.deltaLink': 'https://graph.example/delta?token=after-restore', 'value': [{ id: 'file-1', file: {}, eTag: 'restored-version' }] },
+        status: 200,
+      }
+    })
+    const first = await definition.poll(pollContext(source.value, config, initial))
+    const replay = await definition.poll({ ...pollContext(source.value, config, initial), now: new Date('2026-08-21T00:00:00.000Z') })
+    expect(replay.events).toEqual(first.events)
+    const restored = await definition.poll(pollContext(source.value, config, first.checkpoint))
+    expect(restored.events).toMatchObject([{ dedupeKey: 'file-1:restored-version', payload: { changeType: 'updated' } }])
+    const second = await definition.poll(pollContext(source.value, config, restored.checkpoint))
+    expect(second.events[0]!.payload).toEqual(first.events[0]!.payload)
+    expect(first.events[0]!.payload).toMatchObject({ changeType: 'deleted', itemId: 'file-1' })
+    expect(second.events[0]!.dedupeKey).not.toBe(first.events[0]!.dedupeKey)
+    expect(new Set([...first.events, ...replay.events, ...restored.events, ...second.events].map((event) => event.dedupeKey)).size).toBe(3)
+  })
+
+  it('keeps OneDrive deletion identity across continuation batches without embedding opaque cursors', async () => {
+    const definition = poll('one_drive.on_item_changed')
+    const initial = { deltaToken: 'opaque-cursor-'.repeat(200), lastPolledAt: '2026-08-20T12:00:00.000Z' }
+    const config = { events: ['deleted'] }
+    const source = connector((_request, index) => ({
+      data: {
+        ...(index < 5
+          ? { '@odata.nextLink': `https://graph.example/delta?token=page-${index + 1}` }
+          : { '@odata.deltaLink': 'https://graph.example/delta?token=next-cycle' }),
+        value: [
+          { id: 'file-1', deleted: {} },
+          { id: 'file-2', deleted: {} },
+        ],
+      },
+      status: 200,
+    }))
+    const first = await definition.poll(pollContext(source.value, config, initial))
+    expect(first.hasMore).toBe(true)
+    const continued = await definition.poll(pollContext(source.value, config, first.checkpoint))
+    expect(source.calls[5]!.query?.token).toBe('page-5')
+    expect(continued.hasMore).not.toBe(true)
+    expect(continued.events).toEqual(first.events)
+    expect(new Set(first.events.map((event) => event.dedupeKey)).size).toBe(2)
+    for (const event of first.events) {
+      expect(new TextEncoder().encode(event.dedupeKey).byteLength).toBeLessThanOrEqual(1024)
+      expect(event.dedupeKey).not.toContain(initial.deltaToken)
+    }
+  })
+
   it('baselines, filters, and classifies Slack messages', async () => {
     const baseline = connector(() => ({ data: { messages: [{ ts: '1787229200.000001' }], ok: true }, status: 200 }))
     await expect(poll('slack.on_message_posted').poll(pollContext(baseline.value, { channelId: 'C012ABC' }))).resolves.toEqual({
