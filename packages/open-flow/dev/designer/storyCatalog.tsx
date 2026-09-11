@@ -15,6 +15,7 @@ import { markdownStory } from './markdown.tsx'
 import { metadataStory } from './metadata.tsx'
 import { nodeInputStory } from './nodeInput.tsx'
 import { nodeStories } from './nodeStories.tsx'
+import { notificationsStory } from './notifications.tsx'
 import { overviewStories } from './overview.tsx'
 import { scheduleStory } from './schedule.tsx'
 import { stories } from './stories.tsx'
@@ -52,6 +53,7 @@ const codeEditorStory: FrontendStory = {
 }
 
 export const labStories: readonly FrontendStory[] = [
+  notificationsStory,
   historyStory,
   historyControlsStory,
   historyKeyboardStory,

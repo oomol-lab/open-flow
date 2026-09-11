@@ -20,6 +20,7 @@ The **Theme Preview** group also contains:
 
 - **Node states**: idle, selected, waiting, running, success and error nodes together.
 - **Node controls**: compact inputs, switches, checkboxes, selects, dates, buttons and popups.
+- **Notifications** (`?story=notifications`): production Sonner presentation with success, error, long text and action samples. Add a burst to inspect the stack, or test timed dismissal.
 - **Workbench controls**: shared buttons, inputs, choices, badges and feedback in the product theme.
 - **Theme palette**: Canvas and product color tokens side by side, using the actual CSS variables.
 
