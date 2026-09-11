@@ -6,7 +6,7 @@
   overflow: hidden;
   color: var(--ui-foreground);
   background: var(--ui-background);
-  font-size: 14px;
+  font-size: var(--ui-font-size);
   font-family: inherit;
   font-synthesis: none;
   font-kerning: normal;

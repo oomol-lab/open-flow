@@ -1,3 +1,8 @@
+:root,
+.open-flow-theme {
+  --ui-font-size: 13px;
+}
+
 .open-flow-theme {
   color-scheme: light;
   --open-flow-background: #fafafa;

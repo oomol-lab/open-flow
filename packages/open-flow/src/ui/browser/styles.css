@@ -11,6 +11,10 @@
 @source '../../workbench/browser';
 
 @layer base {
+  :where(.open-flow-theme) {
+    font-size: var(--ui-font-size);
+  }
+
   :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root),
   :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) *,
   :where(.open-flow-theme, .open-flow-workbench, .open-flow-canvas-root) ::before,
@@ -43,6 +47,7 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 @theme inline {
+  --text-sm: var(--ui-font-size);
   --color-background: var(--ui-background);
   --color-foreground: var(--ui-foreground);
   --color-card: var(--ui-card);
