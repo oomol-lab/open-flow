@@ -143,7 +143,7 @@ export class WorkspaceStore {
     this.#flows = new FlowCatalog(client, setNotice, i18n)
     this.#model = new WorkspaceModel(i18n, this.#flows)
     this.#draftChanges = new DraftChanges(client, setNotice, i18n, {
-      apply: (draft, preserveDiagnostics) => this.#applyDraft(draft, 'local', preserveDiagnostics),
+      apply: (draft) => this.#applyDraft(draft, 'local'),
       beforeChange: (manageBusy) => {
         if (manageBusy) {
           this.#set({ busy: 'designer' })
@@ -152,7 +152,6 @@ export class WorkspaceStore {
       },
       check: () => void this.#checkTarget(),
       current: (context) => this.#isDraftChangeCurrent(context),
-      diagnostics: () => this.#model.value.diagnostics,
       finishChanges: () => {
         if (!this.#disposed && this.#model.value.busy == 'designer') this.#set({ busy: undefined })
       },
@@ -802,6 +801,13 @@ export class WorkspaceStore {
     return this.#moduleDrafts.size > 0
   }
 
+  public async saveDraft(): Promise<boolean> {
+    const current = this.#draftSession.capture()
+    const saved = await Promise.all([this.#draftChanges.flush(), this.saveModuleEditor()])
+    if (saved.some((success) => !success) || !current()) return false
+    return (await this.#draftChanges.flush()) && current() && !this.#disposed && !this.#history.failed
+  }
+
   public async saveModuleEditor(): Promise<boolean> {
     if (this.#disposed) return false
     for (const pending of this.#moduleDrafts.values()) {
@@ -971,7 +977,7 @@ export class WorkspaceStore {
     if (current()) void this.#checkTarget()
   }
 
-  #applyDraft(draft: Draft, origin: 'local' | 'external', preserveDiagnostics = false): boolean {
+  #applyDraft(draft: Draft, origin: 'local' | 'external'): boolean {
     const previousDraft = this.#model.value.draft
     const { revision, selectedNodeIds, target } = this.#reconcileRevision(draft)
     const editor = this.#model.value.moduleEditor
@@ -980,7 +986,7 @@ export class WorkspaceStore {
     if (keepEditor) moduleEditor = origin == 'external' ? { ...editor, phase: 'failed' } : editor
     else moduleEditor = selectedModuleEditor(revision, target, selectedNodeIds)
     this.#set({
-      diagnostics: preserveDiagnostics ? this.#model.value.diagnostics : undefined,
+      // Keep the last check until its replacement arrives; pending is not error-free.
       draft,
       moduleEditor,
       selectedNodeIds,

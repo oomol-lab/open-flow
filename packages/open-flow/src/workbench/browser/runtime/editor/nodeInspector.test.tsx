@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
 
-import { Children, isValidElement, useState } from 'react'
+import { Children, isValidElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { NodeInspector } from './nodeInspector.tsx'
 
@@ -176,7 +176,7 @@ describe('Node timeout settings', () => {
   })
 })
 
-it('keeps the previous diagnostic visible until revalidation finishes', () => {
+it('renders diagnostics directly and removes them when cleared', () => {
   const element = NodeInspector({
     variables: { enabled: true, names: [], loaded: false, loading: false, onOpen: vi.fn() },
     connectorAuthorizationPending: false,
@@ -198,15 +198,8 @@ it('keeps the previous diagnostic visible until revalidation finishes', () => {
   if (item == null || typeof item.type != 'function') throw new Error('Expected diagnostics.')
   const render = item.type as (props: unknown) => ReactElement | null
   const previous = [{ code: 'trigger.config-incomplete', message: 'Missing events', path: '/document/graph/nodes/github', line: 1, column: 0 }]
-  const update = vi.fn()
-  vi.mocked(useState).mockReturnValueOnce([previous, update])
-  const pending = render({ diagnostics: [], pending: true })
-  expect(JSON.stringify(pending)).toContain('trigger.config-incomplete')
-  expect(update).not.toHaveBeenCalled()
-
-  vi.mocked(useState).mockReturnValueOnce([previous, update])
-  expect(render({ diagnostics: [], pending: false })).toBeNull()
-  expect(update).toHaveBeenCalledWith([])
+  expect(JSON.stringify(render({ diagnostics: previous }))).toContain('trigger.config-incomplete')
+  expect(render({ diagnostics: [] })).toBeNull()
 })
 
 describe('Node input ownership', () => {

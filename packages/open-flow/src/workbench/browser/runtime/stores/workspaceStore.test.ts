@@ -830,3 +830,58 @@ it('saves queued positions and viewport through a catalog refresh and restores t
     store.dispose()
   }
 })
+
+it.each(['unchanged', 'resolved', 'failed'] as const)('retains diagnostics through a draft save and %s revalidation', async (outcome) => {
+  const saved = Promise.withResolvers<Response>()
+  const rechecked = Promise.withResolvers<Response>()
+  const initial = {
+    ...draft,
+    content: {
+      ...draft.content,
+      document: {
+        ...draft.content.document,
+        graph: { edges: [], nodes: { value: { kind: 'value', name: 'Input', inputs: {}, values: [] } } },
+      },
+    },
+  }
+  const diagnostic = { code: 'schema.invalid', message: 'Invalid input', path: '/document/graph/nodes/value', line: 1, column: 0 }
+  const check = (revisionId: string, diagnostics = [diagnostic]) => ({
+    closureDigest: `closure-${revisionId}`,
+    diagnostics,
+    engineContract: 'open-flow-engine/v2',
+    flowId: flow.flowId,
+    modelVersion: 1,
+    revisionDigest: `digest-${revisionId}`,
+    revisionId,
+    valid: diagnostics.length == 0,
+    version: 1,
+  })
+  const request = vi.fn(async (path: string) => {
+    if (path.endsWith('/editor')) return Response.json({ ...editor, draft: initial })
+    if (path.endsWith('/draft/changes')) return saved.promise
+    if (path.includes('/revision-1/check')) return Response.json(check('revision-1'))
+    if (path.includes('/revision-2/check')) return rechecked.promise
+    throw new Error(path)
+  })
+  const store = new WorkspaceStore(new WorkbenchClient(request), vi.fn())
+  try {
+    await store.selectFlow(flow.flowId)
+    await vi.waitFor(() => expect(store.$.diagnostics.value?.diagnostics).toEqual([diagnostic]))
+    const previous = store.$.diagnostics.value
+    const changing = store.saveNodeTitle('value', 'Renamed input')
+    expect(store.$.diagnostics.value).toBe(previous)
+    saved.resolve(Response.json({ revision: { ...draft, revisionId: 'revision-2', parentRevisionId: 'revision-1' }, version: 1 }))
+    await changing
+    await vi.waitFor(() => expect(store.$.checkLoading.value).toBe(true))
+    expect(store.$.diagnostics.value).toBe(previous)
+    if (outcome == 'failed') rechecked.reject(new Error('Check unavailable'))
+    else rechecked.resolve(Response.json(check('revision-2', outcome == 'resolved' ? [] : [diagnostic])))
+    await vi.waitFor(() => expect(store.$.checkLoading.value).toBe(false))
+    expect(store.$.diagnostics.value?.diagnostics).toEqual(outcome == 'resolved' ? [] : [diagnostic])
+    expect(store.$.diagnostics.value?.revisionId).toBe(outcome == 'failed' ? 'revision-1' : 'revision-2')
+    await store.selectFlow(undefined)
+    expect(store.$.diagnostics.value).toBeUndefined()
+  } finally {
+    store.dispose()
+  }
+})

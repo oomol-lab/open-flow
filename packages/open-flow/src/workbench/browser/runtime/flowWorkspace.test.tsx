@@ -130,6 +130,14 @@ describe('FlowWorkspace run drawer', () => {
     expect(mocks.setOpen).toHaveBeenCalledWith(true)
   })
 
+  it('keeps the test button enabled while ordinary edits save', () => {
+    const { editor } = renderWorkspace('designer')
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const designer = (view.props.children as ReactElement[])[0]!
+    expect(designer.props.runControl.props.disabled).toBe(false)
+    expect(designer.props.runControl.props.starting).toBe(false)
+  })
+
   it.each(['new-node', undefined])('opens node details only after a successful addition: %s', async (nodeId) => {
     const { editor, store } = renderWorkspace()
     vi.mocked(store.addNode).mockResolvedValue(nodeId)

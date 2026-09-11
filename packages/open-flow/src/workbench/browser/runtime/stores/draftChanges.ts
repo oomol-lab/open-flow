@@ -1,5 +1,5 @@
 import type { I18n } from 'val-i18n'
-import type { WorkbenchClient, Draft, FlowCheck } from '../api.ts'
+import type { WorkbenchClient, Draft } from '../api.ts'
 import type { FlowChanges } from '../editor/flowChanges.ts'
 import type { Current } from './latest.ts'
 import type { SetNotice } from './workbenchNotice.ts'
@@ -24,11 +24,10 @@ interface PendingChange extends DraftChangeContext {
 }
 
 type Hooks = {
-  readonly apply: (draft: Draft, preserveDiagnostics?: boolean) => void
+  readonly apply: (draft: Draft) => void
   readonly beforeChange: (manageBusy: boolean) => void
   readonly check: () => void
   readonly current: (context: DraftChangeContext) => boolean
-  readonly diagnostics: () => FlowCheck | undefined
   readonly finishChanges: () => void
   readonly headChanged: (flowId: string, revisionId: string) => void
   readonly recover: (context: DraftChangeContext) => Promise<boolean>
@@ -110,6 +109,15 @@ export class DraftChanges {
     await this.#queue
   }
 
+  public async flush(): Promise<boolean> {
+    while (this.#pending.length > 0) {
+      const results = await Promise.all(this.#pending.map((change) => change.result))
+      if (results.some((draft) => draft == null)) return false
+    }
+    await this.settled()
+    return true
+  }
+
   public enqueue(task: () => Promise<void>): Promise<void> {
     const queued = this.#queue.then(task)
     this.#queue = queued
@@ -189,9 +197,7 @@ export class DraftChanges {
     const committed = { ...change.revision, content: applyFlowChanges(base, pending.changes).content }
     this.#pending = this.#pending.filter((candidate) => candidate !== pending)
     this.#committed = committed
-    const diagnostics = this.#hooks.diagnostics()
-    const preserveDiagnostics = this.#pending.length == 0 && diagnostics?.revisionId == committed.revisionId
-    this.#hooks.apply(this.project(committed), preserveDiagnostics)
+    this.#hooks.apply(this.project(committed))
     this.#hooks.headChanged(pending.flowId, committed.revisionId)
     return committed
   }

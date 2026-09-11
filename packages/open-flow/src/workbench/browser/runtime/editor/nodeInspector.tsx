@@ -84,11 +84,8 @@ function codeStatusLabel(status: ModuleEditorStatus, t: TFunction): string {
   }
 }
 
-function Diagnostics({ diagnostics: incoming, pending }: { readonly diagnostics: readonly Diagnostic[]; readonly pending: boolean }): ReactElement | null {
+function Diagnostics({ diagnostics }: { readonly diagnostics: readonly Diagnostic[] }): ReactElement | null {
   const t = useTranslate()
-  const [previous, setPrevious] = useState(incoming)
-  if (!pending && previous != incoming) setPrevious(incoming)
-  const diagnostics = pending ? previous : incoming
   if (diagnostics.length == 0) return null
   const incomplete = diagnostics.every((diagnostic) => diagnostic.code == 'trigger.config-incomplete')
   return (
@@ -1086,7 +1083,6 @@ interface Props {
   readonly connectors: ConnectorStore
   readonly connectorLoading: boolean
   readonly diagnostics: readonly Diagnostic[]
-  readonly diagnosticsPending?: boolean
   readonly disabled: boolean
   readonly focus?: DiagnosticFocus
   readonly onChooseWaitNotification: (button: HTMLButtonElement) => void
@@ -1114,7 +1110,6 @@ export function NodeInspector({
   connectors,
   connectorLoading,
   diagnostics,
-  diagnosticsPending = false,
   disabled,
   focus,
   onChooseWaitNotification,
@@ -1165,7 +1160,7 @@ export function NodeInspector({
   return (
     <ScrollArea className="inspector-scroll" defer={false} tabIndex={-1}>
       <div className="inspector-content" ref={content}>
-        <Diagnostics key={JSON.stringify([store.$.flowId.value, target, selection?.id])} diagnostics={diagnostics} pending={diagnosticsPending} />
+        <Diagnostics key={JSON.stringify([store.$.flowId.value, target, selection?.id])} diagnostics={diagnostics} />
         {selection?.kind == 'trigger' && (
           <TriggerConnection
             activeConnections={triggerActiveConnections}

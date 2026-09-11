@@ -166,6 +166,53 @@ describe('code autosave', () => {
     }
   })
 
+  it.each(['run', 'inputs'] as const)('waits for ordinary draft saves before %s and uses the saved revision', async (action) => {
+    const { client, store, workspace } = await setup()
+    const held = Promise.withResolvers<void>()
+    const realChange = client.changeDraft.bind(client)
+    vi.spyOn(client, 'changeDraft').mockImplementation(async (...args) => {
+      await held.promise
+      return realChange(...args)
+    })
+    const request = vi.spyOn(store.runRequests, action == 'run' ? 'requestDraft' : 'editDraft').mockResolvedValue('unavailable')
+    try {
+      const changing = workspace.saveNodeTitle('a', 'Edited A')
+      const running = action == 'run' ? store.requestDraftRun('start') : store.editDraftRunInputs('start')
+      await Promise.resolve()
+      expect(request).not.toHaveBeenCalled()
+      held.resolve()
+      await changing
+      await running
+      expect(request).toHaveBeenCalledOnce()
+      expect(request.mock.calls[0]?.[1].revisionId).toBe(workspace.$.draft.value?.revisionId)
+      expect(request.mock.calls[0]?.[1].content.document.graph.nodes.a?.name).toBe('Edited A')
+    } finally {
+      held.resolve()
+      store.dispose()
+    }
+  })
+
+  it('does not run when a pending ordinary save fails', async () => {
+    const { client, store, workspace } = await setup()
+    const held = Promise.withResolvers<void>()
+    vi.spyOn(client, 'changeDraft').mockImplementation(async () => {
+      await held.promise
+      throw new Error('Save failed')
+    })
+    const request = vi.spyOn(store.runRequests, 'requestDraft').mockResolvedValue('unavailable')
+    try {
+      const changing = workspace.saveNodeTitle('a', 'Unsaved A')
+      const running = store.requestDraftRun('start')
+      held.resolve()
+      await changing
+      expect(await running).toBe('unavailable')
+      expect(request).not.toHaveBeenCalled()
+    } finally {
+      held.resolve()
+      store.dispose()
+    }
+  })
+
   it('preserves local code when another client changes the same module', async () => {
     const { client, commit, store, workspace, revision } = await setup()
     const remoteSource = 'export default () => "remote"'

@@ -443,6 +443,7 @@ function RunControlStory({ dark, language, log }: { readonly dark: boolean; read
       <div className="run-control-stories open-flow-workbench" data-theme={dark ? 'dark' : 'light'}>
         <div className="run-control-story-grid">
           <RunControlSample inputStatus="none" language={language} label="Direct run" log={log} triggers={one} />
+          <RunControlSample inputStatus="none" language={language} label="Draft saving · run stays available" log={log} triggers={one} />
           <RunControlSample defaultOpen inputStatus="missing" language={language} label="Input required" log={log} triggers={[multiple[1]!]} />
           <RunControlSample inputStatus="ready" language={language} label="Remembered input" log={log} triggers={[multiple[1]!]} />
           <RunControlSample
