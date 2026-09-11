@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
 import { applyFlowChanges } from '../../src/flow/common/change.ts'
-import { createCodeTask, createValue } from '../../src/flow/common/nodeChanges.ts'
+import { createCodeTask, createBuiltinTrigger, createValue } from '../../src/flow/common/nodeChanges.ts'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '../../src/ui/browser/dialog.tsx'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
@@ -29,16 +29,22 @@ function createSession(language: UiLanguage, log: LogAction) {
   let content: RevisionContent = applyFlowChanges(
     { modelVersion: 1, document: { graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {}, bindings: {} }, modules: {} },
     [
+      ...createBuiltinTrigger(target, 'trigger', { kind: 'cron', name: 'Schedule', cronTimes: [] }),
       ...createValue(target, 'value', 'Input'),
       ...createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Transform'),
       { kind: 'graph.edge.connect', target, edge: { source: 'value', target: 'code' } },
     ],
   )
-  let value: Readonly<Record<string, JsonValue>> = setComment(setNodePositions({}, target, { value: { x: 0, y: 0 }, code: { x: 430, y: 0 } }), target, 'note', {
-    title: 'Review notes',
-    content: 'Delete and undo to restore this note.\n\nThe code node and its connection can be restored together.',
-    position: { x: 0, y: 200 },
-  })
+  let value: Readonly<Record<string, JsonValue>> = setComment(
+    setNodePositions({}, target, { trigger: { x: 430, y: 200 }, value: { x: 0, y: 0 }, code: { x: 430, y: 0 } }),
+    target,
+    'note',
+    {
+      title: 'Review notes',
+      content: 'Delete and undo to restore this note.\n\nThe code node and its connection can be restored together.',
+      position: { x: 0, y: 200 },
+    },
+  )
   value = setFlowViewport(value, target, { x: 36, y: 72, zoom: 0.7 })
   const flow = {
     flowId: 'history-lab',
@@ -160,7 +166,7 @@ function HistorySample({
     setSession(next)
     void next.store.selectFlow('history-lab').then(async () => {
       if (disposed) return
-      next.store.selectNodes(['code', 'note'])
+      next.store.selectNodes(['trigger', 'value', 'code', 'note'])
       if (mode == 'Saving') next.hold()
       if (mode == 'Failed') next.fail()
       if (mode != 'Empty') await next.store.moveNodes({ code: { x: 470, y: 0 } })
@@ -304,7 +310,7 @@ function HistoryCanvasActions({ session }: { session: ReturnType<typeof createSe
   const { store } = session
   const history = useVal(store.history$)
   useStoryActions([
-    { label: 'Select code + comment', onClick: () => store.selectNodes(['code', 'note']) },
+    { label: 'Select mixed group', onClick: () => store.selectNodes(['trigger', 'value', 'code', 'note']) },
     { label: 'Edit title (clear history)', disabled: history.failed || history.applying, onClick: () => void store.saveNodeTitle('code', 'Edited transform') },
     { label: 'Hold saves', onClick: () => session.hold() },
     { label: 'Release saves', onClick: () => session.release() },
@@ -336,7 +342,7 @@ export const historyStory: FrontendStory = {
   group: 'Undo & Redo',
   id: 'canvas-history',
   title: 'Canvas operations',
-  description: 'Clone a node or selection, then undo and redo with keyboard shortcuts without clicking the canvas again.',
+  description: 'Duplicate the selected trigger, connected nodes and comment with the toolbar or Cmd/Ctrl+D. Cmd/Ctrl+C and V, undo and redo also work.',
   standalone: true,
   render: (log, dark, language) => (
     <div

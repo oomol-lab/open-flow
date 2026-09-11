@@ -148,7 +148,8 @@ export interface ReactFlowContainerProps {
   onFitView?: () => void
   onInstance?: (rf: ReactFlowInstance) => () => void
   onInit?: OnInit<RFNode<any>, RFEdge<any>>
-  onPaste?: (position: XYPosition) => void
+  onCopy?: (nodeIds: NodeId[]) => void
+  onPaste?: (position?: XYPosition) => void
   provideAddNodeMenuItems?: () => readonly FlowCanvasViewAddItem[] | undefined
   provideAsyncAddNodeMenuItems?: (searchTerm: string, signal: AbortSignal) => Promise<readonly FlowCanvasViewAddItem[] | undefined>
   fitView?: boolean
@@ -580,6 +581,31 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
     <NodePlaceholder.Provider value={queue}>
       <PaneRectContext.Provider value={paneRect$}>
         <ReactFlow
+          onKeyDown={(event) => {
+            if (!editable || event.defaultPrevented || event.nativeEvent.isComposing || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey)
+              return
+            if (!(event.target instanceof Element) || !event.currentTarget.contains(event.target)) return
+            if (
+              event.target.closest(
+                'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="dialog"], [role="alertdialog"], .nokey',
+              )
+            )
+              return
+            const nodeIds = selectedNodes.flatMap((node) => (node.data.store ? [node.data.store.nodeId] : []))
+            const key = event.key.toLowerCase()
+            const action =
+              key === 'c' && nodeIds.length > 0 && props.onCopy
+                ? () => props.onCopy!(nodeIds)
+                : key === 'v' && props.onPaste
+                  ? () => props.onPaste!()
+                  : key === 'd' && nodeIds.length > 0 && props.duplicateNodes
+                    ? () => props.duplicateNodes!(nodeIds)
+                    : undefined
+            if (!action) return
+            event.preventDefault()
+            event.stopPropagation()
+            action()
+          }}
           className={clsx(
             styles.flow,
             CANVAS_CLASSNAME,
@@ -837,7 +863,7 @@ function SelectionFloatBar(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
   return (
     <NodeToolbar data-tooltip-toolbar className={nodeHeadStyles.floatBar} isVisible nodeId={props.nodes.map((node) => node.id)} offset={12 - 8 * zoom}>
       {items
-        .filter((item) => item.key !== '$delete' || props.editable)
+        .filter((item) => props.editable || (item.key !== '$delete' && item.key !== '$duplicate'))
         .map((item) => (
           <CanvasTooltip key={item.key} placement="top" title={item.key === '$delete' ? `${item.label} (Backspace / Delete)` : item.label}>
             <Button
@@ -860,7 +886,7 @@ function SelectionFloatBar(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
 function useSelectionItems(props: Pick<SelectionContextMenuProps, 'nodes' | 'onDelete' | 'duplicateNodes'>): ContextMenuItem[] {
   const t = useTranslate()
   const nodes = useMemo(() => props.nodes.filter((node) => node.data.store), [props.nodes])
-  const hasDuplicate = nodes.every((node) => node.data.store?.duplicateNode)
+  const hasDuplicate = nodes.some((node) => node.data.store?.duplicateNode)
   const skipState$ = useMemo(() => {
     const ignore$ = nodes.flatMap((node) => (NodeStore.is(node.data.store) ? [node.data.store.ignore] : []))
     return combine(ignore$, (values): [boolean, boolean] => [values.length > 0, values.every(Boolean)])
@@ -868,26 +894,10 @@ function useSelectionItems(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
   const [hasSkip, skip] = useVal(skipState$)
 
   const duplicateNodes = useCallback(() => {
-    const manifestNodeIds: NodeId[] = []
-    const commentNodes: CommentNodeStore[] = []
-    for (const rfNode of nodes) {
-      const node = rfNode.data.store
-      if (CommentNodeStore.is(node)) {
-        // Delay the comment node duplication, as props.duplicateNodes will fix the selection issue first.
-        commentNodes.push(node)
-      } else if (node) {
-        if (props.duplicateNodes) {
-          manifestNodeIds.push(node.nodeId)
-        } else {
-          node.duplicateNode?.()
-        }
-      }
-    }
-    if (manifestNodeIds.length > 0 && props.duplicateNodes) {
-      props.duplicateNodes(manifestNodeIds)
-    }
-    for (const commentNode of commentNodes) {
-      commentNode.duplicateNode?.()
+    if (props.duplicateNodes) {
+      props.duplicateNodes(nodes.map((node) => node.data.store!.nodeId))
+    } else {
+      for (const node of nodes) node.data.store?.duplicateNode?.()
     }
   }, [nodes, props.duplicateNodes])
 

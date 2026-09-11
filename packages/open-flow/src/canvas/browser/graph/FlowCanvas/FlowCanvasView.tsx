@@ -26,6 +26,7 @@ function callbacksFromProps(props: FlowCanvasViewProps): ViewCallbacks {
     onDeleteNodes: props.onDeleteNodes,
     onDisconnect: props.onDisconnect,
     onDuplicate: props.onDuplicate,
+    onCopy: props.onCopy,
     onPaste: props.onPaste,
     provideAddItems: props.provideAddItems,
   }

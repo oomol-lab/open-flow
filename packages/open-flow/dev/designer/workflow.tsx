@@ -377,6 +377,7 @@ function WorkflowStory({
             onDisconnect={(edge) => log('edge.disconnect', edge)}
             onDeleteNodes={(ids) => log('node.delete', ids)}
             onDuplicate={(ids) => log('node.duplicate', ids)}
+            onCopy={(nodeIds) => log('canvas.copy', nodeIds)}
             onPaste={(position) => log('canvas.paste', position)}
             onMoveNodes={(positions) => log('node.move', positions)}
             onMoveViewport={(viewport) => log('canvas.move', viewport)}

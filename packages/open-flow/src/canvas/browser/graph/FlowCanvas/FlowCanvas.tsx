@@ -85,6 +85,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           onLayoutMeasured={flowCanvasStore.completeLayout}
           onInstance={flowCanvasStore.rfCommand.onRFInstance}
           onInit={flowCanvasStore.onInit}
+          onCopy={flowCanvasStore.onCopy}
           onPaste={flowCanvasStore.onPaste}
           provideAddNodeMenuItems={flowCanvasStore.provideAddNodeMenuItems}
           provideAsyncAddNodeMenuItems={flowCanvasStore.provideAsyncAddNodeMenuItems}

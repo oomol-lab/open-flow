@@ -32,6 +32,7 @@ function createTestSetup(connections = val<readonly FlowCanvasViewEdge[]>([]), a
       onDisconnect: () => {},
       onDuplicate: () => {},
       onMoveNodes: () => {},
+      onCopy: () => {},
       onPaste: () => {},
       onChangeComment: undefined,
       provideAddItems: undefined,

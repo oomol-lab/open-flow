@@ -372,6 +372,10 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         }}
         onMoveNodes={onMoveNodes}
         onMoveViewport={onMoveViewport}
+        onCopy={(nodeIds) => {
+          onSelectNodes(nodeIds)
+          onCopy()
+        }}
         onPaste={() => onPaste()}
         provideAddItems={async (searchTerm, signal) => {
           const generation = targetGeneration.current
