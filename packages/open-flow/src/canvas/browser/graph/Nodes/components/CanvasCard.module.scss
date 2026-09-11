@@ -17,15 +17,6 @@
   --card-shadow: 0 1px 2px rgb(0 0 0 / 3%);
   border-radius: 12px;
 
-  .header {
-    min-height: 46px;
-    padding: 4px 10px;
-  }
-
-  .identity {
-    gap: 1px;
-  }
-
   .preview {
     border-radius: 6px;
   }
@@ -201,11 +192,11 @@
 }
 
 .compact {
-  > :not(.compactIdentity) {
+  > .header {
     visibility: hidden;
   }
 
-  > .compactIdentity {
+  .compactIdentity {
     visibility: visible;
   }
 }
@@ -219,4 +210,31 @@
     white-space: normal;
     overflow-wrap: anywhere;
   }
+}
+
+// Anchor identity to the retained header when the node has lower content.
+.withBody {
+  position: relative;
+
+  .compactIdentity {
+    padding: 8px 10px;
+  }
+}
+
+.compactContent > :not(.header) {
+  visibility: hidden;
+}
+
+.compactContent .singleContent {
+  border-radius: 12px;
+  background: var(--node-background-color);
+  visibility: visible;
+
+  > * {
+    visibility: hidden;
+  }
+}
+
+.value.compactContent .singleContent {
+  border-radius: 6px;
 }

@@ -361,3 +361,12 @@
     animation: none;
   }
 }
+
+.compactContent .branchRow {
+  background: var(--node-background-color);
+  visibility: visible;
+
+  > :not(.executionHandle) {
+    visibility: hidden;
+  }
+}

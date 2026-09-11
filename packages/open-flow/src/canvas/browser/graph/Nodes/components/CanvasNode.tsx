@@ -21,11 +21,13 @@ export function CanvasNode({
   problem,
   branches,
   compact = false,
+  compactContent = false,
 }: {
   readonly nodeStore: NodeStore
   readonly problem?: string
   readonly branches?: ReactNode
   readonly compact?: boolean
+  readonly compactContent?: boolean
 }) {
   const t = useTranslate()
   const language = useLang()
@@ -73,6 +75,7 @@ export function CanvasNode({
       <CanvasCard
         tone={kind === 'value' ? 'value' : undefined}
         compact={compact}
+        compactContent={compactContent}
         contentHidden={hidden}
         footerHidden={hidden && !runContent}
         title={title}
