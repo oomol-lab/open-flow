@@ -401,23 +401,14 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
   const isMouse = interactiveMode === 'mouse'
 
   const nodes = useVal(props.nodes$)
-  const projectedEdges = useVal(props.edges$)
+  // React Flow waits for each edge's endpoint measurements before rendering it.
+  const edges = useVal(props.edges$)
   const selectedNodes = useMemo(() => nodes.filter((node) => node.selected), [nodes])
   const deleteSelectedNodes = useCallback(async () => {
     if (await props.onBeforeDelete({ nodes: selectedNodes, edges: [] })) {
       props.onNodesChange(selectedNodes.map((node) => ({ type: 'remove', id: node.id })))
     }
   }, [props.onBeforeDelete, props.onNodesChange, selectedNodes])
-  const edgeTopology = useMemo(
-    () => JSON.stringify([projectedEdges.map((edge) => [edge.id, edge.source, edge.sourceHandle, edge.target, edge.targetHandle])]),
-    [projectedEdges],
-  )
-  const [readyEdgeTopology, setReadyEdgeTopology] = useState(() => (projectedEdges.length == 0 ? edgeTopology : ''))
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setReadyEdgeTopology(edgeTopology))
-    return () => cancelAnimationFrame(frame)
-  }, [edgeTopology])
-  const edges = readyEdgeTopology == edgeTopology ? projectedEdges : []
   const nodeIdsRef = useRef<string[]>([])
   nodeIdsRef.current = nodes.map((node) => node.id)
   const layoutMounted = useRef(false)

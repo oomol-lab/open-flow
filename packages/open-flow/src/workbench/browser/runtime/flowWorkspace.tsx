@@ -113,7 +113,6 @@ function Editor({
   const t = useTranslate()
   const addNodeOptions = useVal(store.workspace.$.addNodeOptions)
   const [startId, setStartId] = useState<string>()
-  const diagnostics = useVal(store.$.diagnostics)
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   const busy = useVal(store.$.busy)
   const history = useVal(store.workspace.history$)
@@ -262,7 +261,7 @@ function Editor({
         runControl={
           target?.kind == 'flow' && draft != null && selectedTrigger != null ? (
             <RunControl
-              disabled={busy != null && busy != 'run'}
+              disabled={busy != null && busy != 'run' && busy != 'designer'}
               inputContent={<RunInputPanel onStarted={onRunStarted} store={store.runRequests} theme={theme} />}
               inputOpen={runInputRequest?.triggerId == selectedTrigger.id}
               inputStatus={store.runRequests.inputStatus(draft.flowId, draft, selectedTrigger.id)}
@@ -420,7 +419,6 @@ function Editor({
                 connectors={store.connectors}
                 connectorLoading={connectorActionLoading != null || connectorConnectionLoading != null}
                 diagnostics={inspectorDiagnostics}
-                diagnosticsPending={diagnostics == null}
                 focus={diagnosticFocus}
                 disabled={authoringDisabled}
                 onChooseWaitNotification={openNotification}

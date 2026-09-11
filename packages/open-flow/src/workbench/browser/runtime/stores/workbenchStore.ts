@@ -353,7 +353,7 @@ export class WorkbenchStore {
 
   public async requestDraftRun(triggerId?: string) {
     const flowId = this.workspace.$.flowId.value
-    if (!(await this.workspace.saveModuleEditor()) || this.#disposed || flowId != this.workspace.$.flowId.value) return 'unavailable' as const
+    if (!(await this.workspace.saveDraft()) || this.#disposed || flowId != this.workspace.$.flowId.value) return 'unavailable' as const
     const flow = this.workspace.$.targetFlow.value
     const draft = this.workspace.$.draft.value
     if (flow == null || draft == null) return 'unavailable' as const
@@ -362,7 +362,7 @@ export class WorkbenchStore {
 
   public async editDraftRunInputs(triggerId: string) {
     const flowId = this.workspace.$.flowId.value
-    if (!(await this.workspace.saveModuleEditor()) || this.#disposed || flowId != this.workspace.$.flowId.value) return 'unavailable' as const
+    if (!(await this.workspace.saveDraft()) || this.#disposed || flowId != this.workspace.$.flowId.value) return 'unavailable' as const
     const flow = this.workspace.$.targetFlow.value
     const draft = this.workspace.$.draft.value
     if (flow == null || draft == null) return 'unavailable' as const

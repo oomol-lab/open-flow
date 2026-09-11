@@ -33,6 +33,7 @@ function createSession(language: UiLanguage, log: LogAction) {
       ...createValue(target, 'value', 'Input'),
       ...createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Transform'),
       { kind: 'graph.edge.connect', target, edge: { source: 'value', target: 'code' } },
+      { kind: 'graph.edge.connect', target, edge: { source: 'trigger', target: 'code' } },
     ],
   )
   let value: Readonly<Record<string, JsonValue>> = setComment(
@@ -102,13 +103,24 @@ function createSession(language: UiLanguage, log: LogAction) {
     if (url.pathname.endsWith('/check'))
       return Response.json({
         closureDigest: 'lab',
-        diagnostics: [],
+        diagnostics:
+          content.document.graph.nodes.code == null
+            ? []
+            : [
+                {
+                  code: 'module.syntax',
+                  message: 'Simulated module syntax error',
+                  path: '/modules/module/source',
+                  line: 1,
+                  column: 0,
+                },
+              ],
         engineContract: 'open-flow-engine/v2',
         flowId: flow.flowId,
         modelVersion: 1,
         revisionDigest: revision().digest,
         revisionId: revision().revisionId,
-        valid: true,
+        valid: content.document.graph.nodes.code == null,
         version: 1,
       })
     throw new Error(`Unexpected Lab request ${url.pathname}`)
@@ -197,6 +209,7 @@ function HistorySession({
   const history = useVal(store.history$)
   const draft = useVal(store.$.draft)
   const presentation = useVal(store.$.presentation)
+  const diagnostics = useVal(store.$.diagnostics)
   const selected = useVal(store.$.selectedNodeIds)
   const options = useVal(store.$.addNodeOptions)
   const [ignored, setIgnored] = useState<readonly string[]>([])
@@ -210,7 +223,7 @@ function HistorySession({
     },
   }
   const [actionVisible, setActionVisible] = useState(true)
-  const model = designerGraph(draft, target, presentation?.value, [], {}, {}, i18n.t)
+  const model = designerGraph(draft, target, presentation?.value, diagnostics?.diagnostics, {}, {}, i18n.t)
   return (
     <I18nProvider i18n={i18n}>
       {keyboardOnly ? (
@@ -342,7 +355,7 @@ export const historyStory: FrontendStory = {
   group: 'Undo & Redo',
   id: 'canvas-history',
   title: 'Canvas operations',
-  description: 'Duplicate the selected trigger, connected nodes and comment with the toolbar or Cmd/Ctrl+D. Cmd/Ctrl+C and V, undo and redo also work.',
+  description: 'Delete Input and undo/redo: the other edge and Transform’s simulated error stay visible. Hold saves to inspect pending changes.',
   standalone: true,
   render: (log, dark, language) => (
     <div
