@@ -169,10 +169,7 @@ const target = z.union([z.object({ kind: z.literal('flow') }), z.object({ kind: 
 const edge = z.object({ source: text, target: text, sourceHandle: text.optional() })
 const at = { nodeId: text, target }
 const subflow = z.object({ name: text, inputs: z.array(input), outputs: z.array(port.extend({ sources: z.array(z.union([nodeSource, flowSource])) })) })
-const graph = z.object({ nodes: z.record(text, node), edges: z.array(edge).default([]) }).transform((value) => ({
-  ...value,
-  edges: value.edges.filter((connection) => value.nodes[connection.target]?.kind != 'value'),
-}))
+const graph = z.object({ nodes: z.record(text, node), edges: z.array(edge).default([]) })
 const binding = z.object({ kind: z.enum(['connection', 'variable']), target: text })
 const module = z.object({ name: text, imports: strings, source: text })
 const document = z.object({

@@ -64,6 +64,10 @@ current policy. A local fix should not become a permanent universal rule.
 
 ## Verification
 
+Before every Git commit, run `bun run check` from the repository root and require it to pass.
+After a rebase or merge introduces changes, run it again on the resulting code before committing
+or pushing. A check from before those changes does not satisfy this requirement.
+
 Evidence must support the claimed outcome. Choose verification by the affected behavior, consumers,
 and risk, not by a fixed ritual. During iteration, resolve the current uncertainty with focused
 checks. Before delivery, ensure the combined evidence covers the final change and its consequences.
