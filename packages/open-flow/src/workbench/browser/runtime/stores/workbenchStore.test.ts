@@ -251,3 +251,55 @@ describe('WorkbenchStore node catalog', () => {
     }
   })
 })
+
+async function notificationSession() {
+  const client = new WorkbenchClient(vi.fn())
+  vi.spyOn(client, 'listVariables').mockRejectedValue(new Error('Existing notification'))
+  const store = new WorkbenchStore(client, { getItem: () => null, setItem: () => undefined })
+  await store.refreshVariableNames()
+  return { store, notice: store.$.notice.value }
+}
+
+describe('Workbench notification lifecycle', () => {
+  it('preserves notices when leaving the editor is rejected', async () => {
+    const { store, notice } = await notificationSession()
+    vi.spyOn(store.workspace, 'selectFlow').mockResolvedValue(false)
+    try {
+      expect(await store.selectFlow('other')).toBe(false)
+      expect(store.$.notice.value).toBe(notice)
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('preserves notices on same-Flow refresh and clears them after changing Flow', async () => {
+    const { store, notice } = await notificationSession()
+    vi.spyOn(store.workspace, 'selectFlow').mockResolvedValue(true)
+    try {
+      await store.selectFlow(undefined)
+      expect(store.$.notice.value).toBe(notice)
+      await store.selectFlow('other')
+      expect(store.$.notice.value).toBeUndefined()
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('keeps new feedback produced during navigation', async () => {
+    const { store, notice } = await notificationSession()
+    vi.spyOn(store.workspace, 'selectFlow').mockImplementation(async () => {
+      store.invalidateVariableNames()
+      await store.refreshVariableNames()
+      return true
+    })
+    try {
+      await store.selectFlow('other')
+      expect(store.$.notice.value).toBeDefined()
+      expect(store.$.notice.value).not.toBe(notice)
+      store.dismissNotice()
+      expect(store.$.notice.value).toBeUndefined()
+    } finally {
+      store.dispose()
+    }
+  })
+})

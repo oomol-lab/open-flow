@@ -113,6 +113,23 @@ describe('Workspace canvas history', () => {
     }
   })
 
+  it('preserves earlier notifications when deleting consecutive nodes', async () => {
+    const { store, notices } = await session()
+    try {
+      notices.mockClear()
+      store.selectNodes(['code'])
+      await store.deleteSelectedNodes()
+      store.selectNodes(['value'])
+      await store.deleteSelectedNodes()
+      expect(notices.mock.calls.map(([notice]) => notice)).toEqual([
+        expect.objectContaining({ kind: 'success', message: 'Node deleted.' }),
+        expect.objectContaining({ kind: 'success', message: 'Node deleted.' }),
+      ])
+    } finally {
+      store.dispose()
+    }
+  })
+
   it('undoes the deletion from its notification without undoing later edits', async () => {
     const { store, notices, saved } = await session()
     try {

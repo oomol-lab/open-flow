@@ -222,7 +222,6 @@ export class PublicationStore {
     if (warm) {
       this.#set({ loadFailed: false, loadingMore: false, loadMoreFailed: false, refreshing: true })
     } else {
-      this.#setNotice(undefined)
       this.#state.set({ ...initialState, loading: true, target })
     }
     try {
@@ -295,7 +294,6 @@ export class PublicationStore {
     this.#stopObservation()
     const current = this.#operation.begin()
     this.#attempt = attempt
-    this.#setNotice(undefined)
     this.#setTarget(target, { publishing: true })
     try {
       const operation = await this.#client.publishFlow(flow.flowId, draft.revisionId, expectedLivePublicationId, { idempotencyKey: attempt.key })
@@ -336,7 +334,6 @@ export class PublicationStore {
     this.#stopObservation()
     const current = this.#operation.begin()
     this.#attempt = attempt
-    this.#setNotice(undefined)
     this.#set({ rollingBackPublicationId: publication.publicationId })
     try {
       await this.#client.rollbackFlow(target.flowId, publication.publicationId, currentPublicationId, { idempotencyKey: attempt.key })

@@ -111,7 +111,7 @@ export class WorkbenchStore {
     this.results = client
     this.#i18n = i18n
     this.#variables = variables
-    const setNotice = (notice: Notice | undefined): void => {
+    const setNotice = (notice: Notice): void => {
       if (!this.#disposed) this.#notice.set(notice)
     }
     this.runs = new RunStore(client, setNotice, i18n)
@@ -267,8 +267,12 @@ export class WorkbenchStore {
   public async selectFlow(flowId: string | undefined): Promise<boolean> {
     if (this.#disposed) return false
     this.#externalRuns.invalidate()
-    this.#notice.set(undefined)
+    const previousFlowId = this.workspace.$.flowId.value
+    const previousNotice = this.#notice.value
     if (!(await this.workspace.selectFlow(flowId))) return false
+    if (this.#disposed) return false
+    // Clear the previous Flow's notices only after navigation succeeds, preserving new feedback.
+    if (flowId != previousFlowId && this.#notice.value === previousNotice) this.#notice.set(undefined)
     this.connectors.reset()
     this.triggers.reset()
     this.publications.reset()

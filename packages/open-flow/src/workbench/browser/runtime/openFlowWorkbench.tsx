@@ -102,9 +102,11 @@ export function OpenFlowSessionGate({
 }
 
 function NotificationBridge({ host, store }: { readonly host: WorkbenchHost; readonly store: WorkbenchStore }): null {
+  // Match the session Store's captured host; a new props object is not a new notification owner.
+  const [notify] = useState(() => host.notify.bind(host))
   const notice = useVal(store.$.notice)
-  useEffect(() => host.notify(notice), [host, notice])
-  useEffect(() => () => host.notify(undefined), [host])
+  useEffect(() => notify(notice), [notify, notice])
+  useEffect(() => () => notify(undefined), [notify])
   return null
 }
 

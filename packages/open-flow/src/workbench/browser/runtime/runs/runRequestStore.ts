@@ -242,7 +242,6 @@ export class RunRequestStore {
 
   public async requestLive(flow: Flow): Promise<RunRequestOutcome> {
     const current = this.#requests.begin()
-    this.#setNotice(undefined)
     this.#set({ starting: true })
     try {
       const live = await this.#client.getLive(flow.flowId)
@@ -380,7 +379,6 @@ export class RunRequestStore {
     if (source == 'live' && publicationId == null) return false
     const alive = this.#lifetime.capture()
     const current = this.#runs.prepareStart()
-    this.#setNotice(undefined)
     this.#set({ starting: true, submitting: source })
     try {
       if (source == 'draft') {

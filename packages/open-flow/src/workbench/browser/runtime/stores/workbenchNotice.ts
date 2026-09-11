@@ -7,7 +7,8 @@ import { ApiError } from '../api.ts'
 
 export type Notice = WorkbenchNotification
 
-export type SetNotice = (notice: Notice | undefined) => void
+/** Business operations emit notices; only the Workbench lifecycle clears them. */
+export type SetNotice = (notice: Notice) => void
 
 const errorKeys = {
   [controlErrorCode.authenticationRequired]: 'notice.error.authenticationRequired',
