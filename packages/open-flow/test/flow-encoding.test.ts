@@ -279,6 +279,36 @@ describe('Revision decoding', () => {
     expect(legacy.document.subflows.child.graph).not.toHaveProperty('edges')
   })
 
+  it.each([undefined, null, 'invalid', { stale: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'missing', output: 'out' }] } }])(
+    'ignores Value Node inputs and incoming execution edges: %j',
+    (inputs) => {
+      const content = revision()
+      const outgoing = { source: 'value', target: 'condition' }
+      const expectedGraph = { ...content.document.graph, edges: [outgoing] }
+      const expected = {
+        ...content,
+        document: {
+          ...content.document,
+          graph: expectedGraph,
+          subflows: { child: { ...content.document.subflows.child!, graph: expectedGraph } },
+        },
+      }
+      const legacy = JSON.parse(decoder.decode(encodeRevision(expected)))
+      for (const graph of [legacy.document.graph, legacy.document.subflows.child.graph]) {
+        graph.nodes.value.inputs = inputs
+        graph.edges.push({ source: 'condition', target: 'value' }, { source: 'missing', target: 'value' })
+      }
+      const before = structuredClone(legacy)
+
+      expect(decodeFlowDocument(legacy.document)).toEqual(expected.document)
+      expect(decodeRevisionContent(legacy)).toEqual(expected)
+      const decoded = decodeRevision(new TextEncoder().encode(JSON.stringify(legacy)))
+      expect(decoded).toEqual(expected)
+      expect(encodeRevision(decoded)).toEqual(encodeRevision(expected))
+      expect(legacy).toEqual(before)
+    },
+  )
+
   it.each([null, {}, 'invalid', [{ source: 'a' }]])('rejects malformed graph edges: %j', (edges) => {
     const content = revision()
     expect(() => decodeFlowDocument({ ...content.document, graph: { ...content.document.graph, edges } })).toThrow()
