@@ -894,5 +894,23 @@
     "deleteOne": "Delete 1 node",
     "pasteOne": "Paste 1 node",
     "moveOne": "Move 1 node"
+  },
+  "linearTrigger": {
+    "team": "Team",
+    "selectTeam": "Select a Team",
+    "connectFirst": "Select a Connection first.",
+    "loading": "Loading…",
+    "noTeams": "No accessible Teams.",
+    "missingTeam": "The selected Team is no longer available. Choose another Team.",
+    "loadFailed": "Could not load options.",
+    "retry": "Retry",
+    "statuses": "Issue statuses",
+    "selectTeamFirst": "Select a Team first.",
+    "statusHint": "Matches the current status when an Issue changes, not only transitions into it.",
+    "allStatuses": "All statuses",
+    "selectedCount": "Selected statuses: {{count}}",
+    "noStatuses": "No available statuses.",
+    "unavailableStatus": "Unavailable status ({{id}})",
+    "missingStatuses": "Some selected statuses are no longer available. Remove or replace them."
   }
 }

@@ -1,3 +1,5 @@
+import type { TriggerConfigOption } from '../../trigger/common/configOptions.ts'
+export type { TriggerConfigOption } from '../../trigger/common/configOptions.ts'
 import type { ResultQuery } from './results.ts'
 
 import { decodeResultList, decodeResultRead } from './results.ts'
@@ -702,6 +704,19 @@ export class ControlClient {
 
   async getRevision(flowId: string, revisionId: string): Promise<Draft> {
     return draft(await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}`))
+  }
+
+  async listTriggerConfigOptions(flowId: string, nodeId: string, field: string, signal?: AbortSignal): Promise<readonly TriggerConfigOption[]> {
+    const source = record(await this.request(`/v1/flows/${segment(flowId)}/triggers/${segment(nodeId)}/options/${segment(field)}`, { signal }))
+    exact(source, ['options', 'version'])
+    if (source.version != 1 || !Array.isArray(source.options) || source.options.length > 1000) return invalidResponse()
+    return source.options.map((value) => {
+      const item = record(value)
+      exact(item, ['value', 'label', ...(item.color == null ? [] : ['color'])])
+      const color = item.color == null ? undefined : string(item.color)
+      if (color != null && !/^#[0-9a-fA-F]{6}$/.test(color)) return invalidResponse()
+      return color == null ? { value: string(item.value), label: string(item.label) } : { value: string(item.value), label: string(item.label), color }
+    })
   }
 
   async listConnectorProviders(signal?: AbortSignal, flowId?: string): Promise<readonly ConnectorProvider[]> {

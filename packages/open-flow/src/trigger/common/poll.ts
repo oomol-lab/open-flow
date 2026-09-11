@@ -1,5 +1,6 @@
 import type { ConnectorProxy } from '../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot, TriggerSchedule } from '../../flow/common/change.ts'
+import type { TriggerConfigOption, TriggerConfigOptionsContext } from './configOptions.ts'
 
 const encoder = new TextEncoder()
 
@@ -28,6 +29,7 @@ export interface PollContext {
 }
 
 export interface PollDefinition {
+  readonly configOptions?: (context: TriggerConfigOptionsContext) => Promise<readonly TriggerConfigOption[]>
   readonly poll: (context: PollContext) => Promise<PollResult>
   readonly snapshot: TriggerKeySnapshot & { readonly type: 'poll' }
 }

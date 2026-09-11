@@ -128,6 +128,7 @@ describe('provider Poll Trigger definitions', () => {
       'integration:googledrive.watch_changes',
       'poll:googledrive.on_file_change',
       'poll:googlesheets.on_row_added',
+      'poll:linear.on_issue_changed',
       'poll:notion.on_database_page_event',
       'poll:one_drive.on_item_changed',
       'poll:outlook.on_message_received',

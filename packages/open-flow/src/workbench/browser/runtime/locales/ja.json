@@ -894,5 +894,23 @@
     "deleteOne": "ノードを 1 個削除",
     "pasteOne": "ノードを 1 個貼り付け",
     "moveOne": "ノードを 1 個移動"
+  },
+  "linearTrigger": {
+    "team": "チーム",
+    "selectTeam": "チームを選択",
+    "connectFirst": "先に接続を選択してください。",
+    "loading": "読み込み中…",
+    "noTeams": "アクセス可能なチームがありません。",
+    "missingTeam": "選択したチームは利用できません。別のチームを選択してください。",
+    "loadFailed": "選択肢を読み込めませんでした。",
+    "retry": "再試行",
+    "statuses": "Issue のステータス",
+    "selectTeamFirst": "先にチームを選択してください。",
+    "statusHint": "Issue の変更時の現在のステータスに一致します。そのステータスへの遷移だけには限定されません。",
+    "allStatuses": "すべてのステータス",
+    "selectedCount": "{{count}} 件のステータスを選択中",
+    "noStatuses": "利用可能なステータスがありません。",
+    "unavailableStatus": "利用できないステータス（{{id}}）",
+    "missingStatuses": "選択したステータスの一部は利用できません。削除するか選び直してください。"
   }
 }

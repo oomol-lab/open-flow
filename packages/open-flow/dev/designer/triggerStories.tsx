@@ -330,7 +330,7 @@ function RunStory(props: StoryProps) {
   )
 }
 
-type SidebarState = 'display' | 'edit' | 'unconfigured' | 'connection-error' | 'description'
+type SidebarState = 'missing-status' | 'options-error' | 'created-with-default' | 'display' | 'edit' | 'unconfigured' | 'connection-error' | 'description'
 function SidebarSample({ fixture, dark, language, log, state, framed = true }: StoryProps & { state: SidebarState; framed?: boolean }) {
   const [session, setSession] = useState<ReturnType<typeof createTriggerSession>>()
   const sidebar = useRef<HTMLElement>(null)
@@ -349,12 +349,23 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
       else if (trigger.kind === 'cron') trigger = { ...trigger, cronTimes: [] }
       else if (trigger.kind === 'webhook') trigger = { ...trigger, inputsDef: [], options: {} }
     }
-    const next = createTriggerSession(trigger, language, (name, value) => logRef.current(name, value), `trigger-${fixture.id}-${state}`)
+    if (trigger.kind === 'poll' && trigger.definition.provider === 'linear') {
+      if (state === 'missing-status') trigger = { ...trigger, config: { ...trigger.config, stateIds: ['00000000-0000-4000-8000-000000000098'] } }
+      if (state === 'options-error') trigger = { ...trigger, config: { ...trigger.config, teamId: '00000000-0000-4000-8000-000000000099' } }
+    }
+    const next = createTriggerSession(
+      trigger,
+      language,
+      (name, value) => logRef.current(name, value),
+      `trigger-${fixture.id}-${state}`,
+      state === 'created-with-default',
+    )
     setSession(next)
-    void next.workspace.start('trigger-lab')
+    void next.start()
     return () => next.dispose()
   }, [fixture, language, state])
   const revision = useVal(session?.workspace.$.revision)
+  const createdConnection = useVal(session?.triggers.$.selectedConnection)
   const selection = revision?.selection({ kind: 'flow' }, `trigger-${fixture.id}-${state}`)
   useEffect(() => {
     // Open the production disclosure for simultaneous visual inspection, without changing its contents.
@@ -393,7 +404,7 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
             target={{ kind: 'flow' }}
             triggerActiveConnections={state === 'unconfigured' ? [] : [session.account]}
             triggerAuthorizationPending={false}
-            triggerConnection={state === 'unconfigured' ? undefined : session.account}
+            triggerConnection={state === 'unconfigured' ? undefined : state === 'created-with-default' ? createdConnection : session.account}
             triggerConnectionError={state === 'connection-error' ? 'Unable to load accounts. Sample network failure.' : undefined}
             triggerConnectionLoading={false}
             triggers={session.triggers}
@@ -406,7 +417,16 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
 function SidebarStory(props: StoryProps) {
   const provider = props.fixture.trigger.kind === 'poll' || props.fixture.trigger.kind === 'integration'
   const states: SidebarState[] = provider
-    ? ['display', 'edit', 'unconfigured', 'connection-error']
+    ? [
+        'created-with-default',
+        'display',
+        'edit',
+        'unconfigured',
+        'connection-error',
+        ...(props.fixture.trigger.kind === 'poll' && props.fixture.trigger.definition.provider === 'linear'
+          ? (['missing-status', 'options-error'] as const)
+          : []),
+      ]
     : ['display', 'edit', props.fixture.trigger.kind === 'manual' ? 'description' : 'unconfigured']
   return (
     <Gallery {...props}>
@@ -493,8 +513,8 @@ function ProviderStory({ view, ...props }: Omit<StoryProps, 'fixture'> & { reado
                 </>
               ) : (
                 <>
-                  <SidebarSample {...props} fixture={integrationExample} state="edit" />
-                  <SidebarSample {...props} fixture={pollExample} state="edit" />
+                  <SidebarSample {...props} fixture={integrationExample} state="created-with-default" />
+                  <SidebarSample {...props} fixture={pollExample} state="created-with-default" />
                   <SidebarSample {...props} fixture={integrationExample} state="unconfigured" />
                   <SidebarSample {...props} fixture={pollExample} state="unconfigured" />
                   <SidebarSample {...props} fixture={integrationExample} state="connection-error" />

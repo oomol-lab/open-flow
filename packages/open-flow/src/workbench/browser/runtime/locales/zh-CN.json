@@ -894,5 +894,23 @@
     "deleteOne": "删除 1 个节点",
     "pasteOne": "粘贴 1 个节点",
     "moveOne": "移动 1 个节点"
+  },
+  "linearTrigger": {
+    "team": "Team",
+    "selectTeam": "选择 Team",
+    "connectFirst": "请先选择连接。",
+    "loading": "加载中…",
+    "noTeams": "没有可访问的 Team。",
+    "missingTeam": "已选 Team 不再可用，请重新选择。",
+    "loadFailed": "无法加载选项。",
+    "retry": "重试",
+    "statuses": "Issue 状态",
+    "selectTeamFirst": "请先选择 Team。",
+    "statusHint": "匹配 Issue 变化时的当前状态，不仅限于进入该状态的变化。",
+    "allStatuses": "全部状态",
+    "selectedCount": "已选择 {{count}} 个状态",
+    "noStatuses": "没有可用状态。",
+    "unavailableStatus": "不可用的状态（{{id}}）",
+    "missingStatuses": "部分已选状态不再可用，请移除或重新选择。"
   }
 }

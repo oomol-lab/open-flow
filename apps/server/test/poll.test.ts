@@ -4,6 +4,7 @@ import type { DestinationStream, Logger } from 'pino'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { maximumPollCheckpointBytes, maximumPollEventsPerPage, PollConnectionError, TransientPollError } from '@oomol-lab/open-flow/poll-trigger'
+import { triggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import * as Effect from 'effect/Effect'
 import { TestClock } from 'effect/testing'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -120,6 +121,110 @@ async function publish(service: ServerService, content = revision(), expectedLiv
 }
 
 describe('Server Poll Trigger', () => {
+  it('loads Linear options from the saved Draft Connection without creating Runs or bindings', async () => {
+    const linear = triggerDefinitions.find((item) => item.snapshot.key == 'linear.on_issue_changed')!
+    if (!('poll' in linear)) throw new Error('Expected Linear Poll.')
+    let calls = 0
+    const host = createConnectorHost({
+      proxy: async (provider, connectionId, _rateLimitId, request, signal) => {
+        calls++
+        expect(provider).toBe('linear')
+        expect(connectionId).toBe('connection-main')
+        expect(signal.aborted).toBe(false)
+        expect(request.endpoint).toBe('/graphql')
+        return {
+          status: 200,
+          data: {
+            data: { teams: { nodes: [{ id: '72b2a2dc-6f4f-4423-9d34-24b5bd10634a', name: 'Engineering', key: 'ENG' }], pageInfo: { hasNextPage: false } } },
+          },
+        }
+      },
+    })
+    const file = await databaseFile()
+    const service = await openService(file, { capabilities: { connector: () => host } })
+    const database = new DatabaseSync(file)
+    try {
+      const { flow } = await service.control.createFlow('operator', 'Options', 'linear-options')
+      const original = revision().document.graph.nodes.poll!
+      if (original.kind != 'poll') throw new Error('Expected Poll fixture.')
+      await service.control.changeDraft('operator', flow.flowId, flow.draftRevisionId, [
+        { kind: 'binding.create', bindingId: 'connection', binding: { kind: 'connection', target: 'connection-main' } },
+        { kind: 'graph.node.create', nodeId: 'linear', target: { kind: 'flow' }, node: { ...original, definition: linear.snapshot, config: {} } },
+      ])
+      const before = service.control.getDraft(flow.flowId)
+      expect(await service.control.listTriggerConfigOptions(flow.flowId, 'linear', 'teamId', new AbortController().signal)).toEqual([
+        { value: '72b2a2dc-6f4f-4423-9d34-24b5bd10634a', label: 'Engineering (ENG)' },
+      ])
+      expect(service.control.getDraft(flow.flowId)).toEqual(before)
+      expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 0 })
+      await expect(service.control.listTriggerConfigOptions('missing', 'linear', 'teamId', new AbortController().signal)).rejects.toThrow()
+      await expect(service.control.listTriggerConfigOptions(flow.flowId, 'linear', 'unknown', new AbortController().signal)).rejects.toThrow()
+      expect(calls).toBe(1)
+    } finally {
+      database.close()
+      await closeService(service)
+    }
+  })
+
+  it('runs the Linear provider through the unified reader and deduplicates overlap after restart', async () => {
+    const definition = triggerDefinitions.find((item) => item.snapshot.key == 'linear.on_issue_changed')!
+    if (!('poll' in definition)) throw new Error('Expected Linear Poll definition.')
+    const teamId = '72b2a2dc-6f4f-4423-9d34-24b5bd10634a'
+    const issue = {
+      id: '2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9',
+      identifier: 'ENG-114',
+      title: 'Changes',
+      url: 'https://linear.app/team/issue/ENG-114',
+      createdAt: '2026-08-21T00:01:30.000Z',
+      updatedAt: '2026-08-21T00:01:30.000Z',
+      state: { id: '539068e2-ae88-4d09-bd75-22eb4a59612f', name: 'Done', type: 'completed' },
+    }
+    const host = createConnectorHost({
+      listConnections: async () => [{ ...activeConnection, serviceId: 'linear' }],
+      proxy: async (provider, connectionId, _rateLimitId, request) => {
+        expect(provider).toBe('linear')
+        expect(connectionId).toBe('connection-main')
+        expect(request.endpoint).toBe('/graphql')
+        return { status: 200, data: { data: { team: { id: teamId, issues: { nodes: [issue], pageInfo: { hasNextPage: false, endCursor: null } } } } } }
+      },
+    })
+    const file = await databaseFile()
+    const options = { capabilities: { connector: () => host }, clock: () => publishedAt }
+    let service = await openService(file, options)
+    const content = revision()
+    const original = content.document.graph.nodes.poll!
+    if (original.kind != 'poll') throw new Error('Expected Poll fixture.')
+    const linearContent: RevisionContent = {
+      ...content,
+      document: {
+        ...content.document,
+        graph: {
+          ...content.document.graph,
+          nodes: {
+            ...content.document.graph.nodes,
+            poll: { ...original, config: { teamId }, definition: definition.snapshot },
+          },
+        },
+      },
+    }
+    const database = new DatabaseSync(file)
+    try {
+      await publish(service, linearContent)
+      await service.tickListeners('2026-08-21T00:01:00.000Z')
+      expect(database.prepare('SELECT COUNT(*) AS count FROM poll_admissions').get()).toEqual({ count: 0 })
+      await service.tickListeners('2026-08-21T00:02:00.000Z')
+      expect(database.prepare('SELECT COUNT(*) AS count FROM poll_admissions').get()).toEqual({ count: 1 })
+      await closeService(service)
+      service = await openService(file, options)
+      await service.tickListeners('2026-08-21T00:03:00.000Z')
+      expect(database.prepare('SELECT COUNT(*) AS count FROM poll_admissions').get()).toEqual({ count: 1 })
+      expect(service.pollState('main', 'poll')).toMatchObject({ health: 'healthy', checkpoint: { since: '2026-08-21T00:03:00.000Z' } })
+    } finally {
+      database.close()
+      await closeService(service)
+    }
+  })
+
   it('does not call the provider while the published Flow is disabled', async () => {
     const file = await databaseFile()
     let calls = 0

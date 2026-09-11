@@ -188,6 +188,18 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
 
   app.get('/flows/:flowId/live', async (context) => response(200, await service.getLive(context.req.param('flowId'))))
+  app.get('/flows/:flowId/triggers/:triggerNodeId/options/:field', async (context) => {
+    query(context.req.raw, [], controlErrorCode.flowInvalid)
+    return response(200, {
+      options: await service.listTriggerConfigOptions(
+        context.req.param('flowId'),
+        context.req.param('triggerNodeId'),
+        context.req.param('field'),
+        context.req.raw.signal,
+      ),
+      version: 1,
+    })
+  })
   app.get('/flows/:flowId/triggers', (context) => {
     const flowId = context.req.param('flowId')
     return response(200, { bindings: service.listFlowTriggerBindings(flowId), flowId, version: 1 })

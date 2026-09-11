@@ -31,6 +31,7 @@ const configExamples: Readonly<Record<string, Readonly<Record<string, JsonValue>
   googlecalendar: { calendarId: 'primary' },
   googledrive: { folderId: 'folder_sample', changeType: 'created' },
   googlesheets: { spreadsheetId: 'sheet_sample', sheetId: '0' },
+  linear: { teamId: '72b2a2dc-6f4f-4423-9d34-24b5bd10634a', stateIds: ['539068e2-ae88-4d09-bd75-22eb4a59612f'] },
   notion: { databaseId: '00000000-0000-4000-8000-000000000001' },
   onedrive: { folderId: 'root' },
   outlook: { folderId: 'inbox' },

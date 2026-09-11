@@ -894,5 +894,23 @@
     "deleteOne": "刪除 1 個節點",
     "pasteOne": "貼上 1 個節點",
     "moveOne": "移動 1 個節點"
+  },
+  "linearTrigger": {
+    "team": "Team",
+    "selectTeam": "選擇 Team",
+    "connectFirst": "請先選擇連線。",
+    "loading": "載入中…",
+    "noTeams": "沒有可存取的 Team。",
+    "missingTeam": "已選 Team 不再可用，請重新選擇。",
+    "loadFailed": "無法載入選項。",
+    "retry": "重試",
+    "statuses": "Issue 狀態",
+    "selectTeamFirst": "請先選擇 Team。",
+    "statusHint": "比對 Issue 變更時的目前狀態，不僅限於進入該狀態的變更。",
+    "allStatuses": "全部狀態",
+    "selectedCount": "已選擇 {{count}} 個狀態",
+    "noStatuses": "沒有可用狀態。",
+    "unavailableStatus": "不可用的狀態（{{id}}）",
+    "missingStatuses": "部分已選狀態不再可用，請移除或重新選擇。"
   }
 }
