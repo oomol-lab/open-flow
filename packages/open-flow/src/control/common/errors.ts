@@ -75,3 +75,15 @@ export const controlErrorMetadata = {
   [controlErrorCode.variableLimitReached]: { status: 409 },
   [controlErrorCode.variableNotFound]: { status: 404 },
 } as const satisfies Record<ControlErrorCode, { readonly status: number }>
+
+export class ApiError extends Error {
+  readonly code: string
+  readonly status: number
+
+  constructor(status: number, code: string, message: string) {
+    super(message)
+    this.code = code
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
