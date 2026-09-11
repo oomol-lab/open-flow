@@ -4,6 +4,7 @@ import type { DestinationStream, Logger } from 'pino'
 import type { ServerServiceOptions } from '../node/application/service.ts'
 
 import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '@oomol-lab/open-flow/integration-trigger'
+import { integrationDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import * as Scope from 'effect/Scope'
@@ -640,3 +641,428 @@ it('rejects an Integration target captured before its Flow was disabled', async 
     await closeService(service)
   }
 })
+
+describe('Server change listener', () => {
+  async function publishListener(service: ServerService, file: string): Promise<string> {
+    const publicationId = await publish(service, 'ready', null)
+    const database = new DatabaseSync(file)
+    try {
+      database
+        .prepare(`INSERT INTO flows (flow_id, name, status, draft_revision_id, create_idempotency_key, create_request_digest, created_at, updated_at)
+        SELECT 'main', 'Listener test', 'active', revision_id, 'create-main', 'create-main', 0, 0 FROM publications WHERE publication_id = ?`)
+        .run(publicationId)
+    } finally {
+      database.close()
+    }
+    return publicationId
+  }
+
+  function listener(read: NonNullable<IntegrationDefinition['listener']>['read']): IntegrationDefinition {
+    return {
+      snapshot,
+      initialState: { checkpoint: null, subscription: {} },
+      listener: { intervalMs: 60_000, read },
+      receive: () => ({ outcome: 'wake' }),
+      reconcile: async ({ active, state, now }) => {
+        if (active && state?.checkpoint == null) await state!.saveCheckpoint(0)
+        if (active) await state!.saveSubscription({}, new Date(now.getTime() + 3_600_000))
+        return { outcome: 'ready' }
+      },
+    }
+  }
+
+  it('drains continuation pages without callbacks and resumes periodic scans after restart', async () => {
+    const file = await databaseFile()
+    let now = 0
+    const cursors: JsonValue[] = []
+    const definition = listener(async ({ checkpoint }) => {
+      cursors.push(checkpoint)
+      return Number(checkpoint) < 7
+        ? page(Number(checkpoint), Number(checkpoint) < 6)
+        : { checkpoint, dedupeKey: String(checkpoint), hasMore: false, payload: null }
+    })
+    let service = await openService(
+      file,
+      options(() => now, [definition]),
+    )
+    try {
+      await publishListener(service, file)
+      await service.tickIntegration()
+      expect(cursors).toEqual([0, 1, 2, 3, 4, 5, 6])
+      expect(admissionCount(file)).toBe(7)
+      await closeService(service)
+      service = await openService(
+        file,
+        options(() => now, [definition]),
+      )
+      now = 60_000
+      await service.tickIntegration()
+      expect(cursors.at(-1)).toBe(7)
+      expect(service.integrationState('main', 'integration')?.checkpoint).toBe(7)
+      expect(admissionCount(file)).toBe(7)
+    } finally {
+      await closeService(service)
+    }
+  })
+
+  it('retains a wake arriving during a scan and coalesces duplicate notifications', async () => {
+    const file = await databaseFile()
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const cursors: JsonValue[] = []
+    const definition = listener(async ({ checkpoint }) => {
+      cursors.push(checkpoint)
+      if (cursors.length == 1) {
+        entered.resolve()
+        await release.promise
+      }
+      return cursors.length == 1 ? page(Number(checkpoint)) : { checkpoint, dedupeKey: String(checkpoint), hasMore: false, payload: null }
+    })
+    const service = await openService(
+      file,
+      options(() => 0, [definition]),
+    )
+    try {
+      await publishListener(service, file)
+      const scanning = service.tickIntegration()
+      await entered.promise
+      expect((await wake(service)).status).toBe(202)
+      expect((await wake(service)).status).toBe(202)
+      release.resolve()
+      await scanning
+      expect(cursors).toEqual([0, 1])
+      expect(admissionCount(file)).toBe(1)
+    } finally {
+      release.resolve()
+      await closeService(service)
+    }
+  })
+
+  it('rejects an old worker after republish and retries from the retained cursor', async () => {
+    const file = await databaseFile()
+    let now = 0
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const cursors: JsonValue[] = []
+    const definition = listener(async ({ checkpoint }) => {
+      cursors.push(checkpoint)
+      if (cursors.length == 1) {
+        entered.resolve()
+        await release.promise
+      }
+      return page(Number(checkpoint))
+    })
+    const service = await openService(
+      file,
+      options(() => now, [definition]),
+    )
+    try {
+      const first = await publishListener(service, file)
+      const scanning = service.tickIntegration()
+      await entered.promise
+      await publish(service, 'ready', first)
+      release.resolve()
+      await scanning
+      expect(service.integrationState('main', 'integration')?.checkpoint).toBe(0)
+      expect(admissionCount(file)).toBe(0)
+      now = 1000
+      await service.tickIntegration()
+      expect(cursors).toEqual([0, 0])
+      expect(admissionCount(file)).toBe(1)
+    } finally {
+      release.resolve()
+      await closeService(service)
+    }
+  })
+
+  it('does not advance a page rejected by Run capacity', async () => {
+    const file = await databaseFile()
+    let now = 0
+    const definition = listener(async ({ checkpoint }) => page(Number(checkpoint), true))
+    const service = await openService(file, { ...options(() => now, [definition]), runtime: { maxPendingRuns: 1 } })
+    try {
+      await publishListener(service, file)
+      await service.tickIntegration()
+      expect(admissionCount(file)).toBe(1)
+      expect(service.integrationState('main', 'integration')?.checkpoint).toBe(1)
+      now = 1000
+      await service.tickIntegration()
+      expect(admissionCount(file)).toBe(1)
+      expect(service.integrationState('main', 'integration')?.checkpoint).toBe(1)
+      const database = new DatabaseSync(file, { readOnly: true })
+      const run = database.prepare("SELECT run_id AS runId FROM runs WHERE status = 'queued'").get() as { runId: string }
+      database.close()
+      expect(service.cancel(run.runId)).toBe(true)
+      now = 2000
+      await service.tickIntegration()
+      expect(admissionCount(file)).toBe(2)
+      expect(service.integrationState('main', 'integration')?.checkpoint).toBe(2)
+    } finally {
+      await closeService(service)
+    }
+  })
+
+  it('rolls back Run admission when checkpoint storage fails and recovers the expired lease', async () => {
+    const file = await databaseFile()
+    let now = 0
+    const definition = listener(async ({ checkpoint }) => page(Number(checkpoint)))
+    const service = await openService(
+      file,
+      options(() => now, [definition]),
+    )
+    const database = new DatabaseSync(file)
+    try {
+      await publishListener(service, file)
+      database.exec(`CREATE TRIGGER reject_listener_checkpoint BEFORE UPDATE OF checkpoint_json ON integration_states
+        WHEN NEW.checkpoint_json = '1' BEGIN SELECT RAISE(ABORT, 'simulated disk failure'); END`)
+      await expect(service.tickIntegration()).rejects.toThrow('simulated disk failure')
+      expect(admissionCount(file)).toBe(0)
+      expect(service.integrationState('main', 'integration')?.checkpoint).toBe(0)
+      database.exec('DROP TRIGGER reject_listener_checkpoint')
+      now = 60_000
+      await service.tickIntegration()
+      expect(admissionCount(file)).toBe(1)
+      expect(service.integrationState('main', 'integration')?.checkpoint).toBe(1)
+    } finally {
+      database.close()
+      await closeService(service)
+    }
+  })
+
+  it('recovers an interrupted scan after restart without advancing the cursor', async () => {
+    const file = await databaseFile()
+    let now = 0
+    const entered = Promise.withResolvers<void>()
+    let signal: AbortSignal | undefined
+    let first = true
+    const definition = listener(async (context) => {
+      if (first) {
+        first = false
+        signal = context.signal
+        entered.resolve()
+        await new Promise<void>((_, reject) => context.signal!.addEventListener('abort', () => reject(context.signal!.reason), { once: true }))
+      }
+      return page(Number(context.checkpoint))
+    })
+    let service = await openService(
+      file,
+      options(() => now, [definition]),
+    )
+    try {
+      await publishListener(service, file)
+      await startService(service)
+      await entered.promise
+      await closeService(service)
+      expect(signal?.aborted).toBe(true)
+      expect(admissionCount(file)).toBe(0)
+      service = await openService(
+        file,
+        options(() => now, [definition]),
+      )
+      expect(service.integrationState('main', 'integration')?.checkpoint).toBe(0)
+      now = 60_000
+      await service.tickIntegration()
+      expect(admissionCount(file)).toBe(1)
+    } finally {
+      await closeService(service)
+    }
+  })
+
+  it('rejects an invalid continuation without advancing its cursor', async () => {
+    const file = await databaseFile()
+    const definition = listener(async ({ checkpoint }) => ({ checkpoint, hasMore: true, payload: null, dedupeKey: 'invalid' }))
+    const service = await openService(
+      file,
+      options(() => 0, [definition]),
+    )
+    try {
+      await publishListener(service, file)
+      await service.tickIntegration()
+      expect(service.integrationState('main', 'integration')).toMatchObject({ checkpoint: 0, listener: { health: 'failed', nextAt: 1000 } })
+      expect(admissionCount(file)).toBe(0)
+    } finally {
+      await closeService(service)
+    }
+  })
+
+  it('continues scanning when subscription maintenance fails', async () => {
+    const file = await databaseFile()
+    const definition = listener(async ({ checkpoint }) => page(Number(checkpoint)))
+    const failing: IntegrationDefinition = {
+      ...definition,
+      reconcile: async (context) => {
+        await definition.reconcile(context)
+        throw new PermanentIntegrationError('Subscription unavailable')
+      },
+    }
+    const service = await openService(
+      file,
+      options(() => 0, [failing]),
+    )
+    try {
+      await publishListener(service, file)
+      await service.tickIntegration()
+      expect(service.integrationState('main', 'integration')?.health).toBe('failed')
+      expect(service.integrationState('main', 'integration')?.checkpoint).toBe(1)
+      expect(admissionCount(file)).toBe(1)
+    } finally {
+      await closeService(service)
+    }
+  })
+})
+
+it('prepares a Drive listener, preserves candidate wakes across restart, and scans after activation', async () => {
+  const file = await databaseFile()
+  let now = 0
+  let changesRead = 0
+  let failPreparation = false
+  let stopped = 0
+  const definition = integrationDefinitions.find((item) => item.snapshot.key == 'googledrive.watch_changes')!
+  let notification: { address: string; id: string; token: string } | undefined
+  const drive = createConnectorHost({
+    listConnections: async () => [{ connectionId: 'connection-main', displayName: 'Drive', isDefault: true, serviceId: 'googledrive', status: 'active' }],
+    proxy: async (_provider, _connection, _binding, request) => {
+      if (request.endpoint == '/changes/startPageToken') return { status: 200, data: { startPageToken: 'baseline' } }
+      if (request.endpoint == '/changes/watch') {
+        if (failPreparation) return { status: 503, data: {} }
+        notification = request.body as typeof notification
+        return { status: 200, data: { resourceId: 'resource', expiration: String(86_400_000) } }
+      }
+      if (request.endpoint == '/changes') {
+        changesRead += 1
+        return request.query?.pageToken == 'baseline'
+          ? { status: 200, data: { changes: [{ fileId: 'new-file' }], newStartPageToken: 'next' } }
+          : { status: 200, data: { changes: [], newStartPageToken: 'next' } }
+      }
+      if (request.endpoint == '/channels/stop') {
+        stopped += 1
+        return { status: 204, data: null }
+      }
+      throw new Error('Unexpected Drive request')
+    },
+  })
+  const settings: ServerServiceOptions = {
+    clock: () => now,
+    triggerDefinitions: [definition],
+    capabilities: {
+      connector: () => drive,
+      integration: () => ({ callbackKey: 'callback-key', publicOrigin: 'https://flow.example' }),
+    },
+  }
+  let service = await openService(file, settings)
+  try {
+    const created = await service.control.createFlow('operator', 'Drive listener', 'drive-listener')
+    const flowId = created.flow.flowId
+    const changed = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+      { kind: 'binding.create', bindingId: 'drive', binding: { kind: 'connection', target: 'connection-main' } },
+      {
+        kind: 'graph.node.create',
+        nodeId: 'listen',
+        target: { kind: 'flow' },
+        node: {
+          kind: 'integration',
+          bindingId: 'drive',
+          config: {},
+          definition: definition.snapshot,
+          name: 'Watch Drive',
+        },
+      },
+    ])
+    const operation = await service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v2', null, 'publish-drive')
+    await service.tickIntegration()
+    expect(changesRead).toBe(0)
+    expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('pending')
+    const endpointId = new URL(notification!.address).pathname.split('/').at(-1)!
+    const target = service.integrationTarget(endpointId)!
+    const input = {
+      method: 'POST' as const,
+      payload: {},
+      query: new URLSearchParams(),
+      rawBody: new Uint8Array(),
+      headers: new Headers({
+        'x-goog-channel-id': notification!.id,
+        'x-goog-channel-token': notification!.token,
+        'x-goog-resource-id': 'resource',
+        'x-goog-resource-state': 'change',
+      }),
+    }
+    const invalid = { ...input, headers: new Headers(input.headers) }
+    invalid.headers.set('x-goog-channel-token', 'invalid')
+    expect((await service.receiveIntegrationTarget(target, invalid)).status).toBe(404)
+    expect((await service.receiveIntegrationTarget(target, input)).status).toBe(204)
+    expect(admissionCount(file)).toBe(0)
+    await closeService(service)
+    service = await openService(file, settings)
+    await service.tickMaintenance()
+    expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('succeeded')
+    await service.tickIntegration()
+    expect(service.integrationState(flowId, 'listen')?.checkpoint).toEqual({ pageToken: 'next' })
+    expect(admissionCount(file)).toBe(1)
+    expect((await service.receiveIntegrationTarget(service.integrationTarget(endpointId)!, input)).status).toBe(204)
+    await service.tickIntegration()
+    expect(admissionCount(file)).toBe(1)
+    now = 300_000
+    await service.tickIntegration()
+    expect(changesRead).toBe(3)
+    const live = await service.control.getLive(flowId)
+    const scoped = await service.control.changeDraft('operator', flowId, changed.revision.revisionId, [
+      { kind: 'graph.trigger.config.set', name: 'driveId', nodeId: 'listen', value: 'shared-drive' },
+    ])
+    failPreparation = true
+    const replacement = await service.control.publishFlow(
+      'operator',
+      flowId,
+      scoped.revision.revisionId,
+      'open-flow-engine/v2',
+      live.publication!.publicationId,
+      'replace-drive',
+    )
+    await service.tickIntegration()
+    await service.tickMaintenance()
+    expect(service.control.getPublishOperation(flowId, replacement.operationId).status).toBe('pending')
+    expect(service.integrationEndpoint(flowId, 'listen')).toBe(endpointId)
+    expect(service.integrationState(flowId, 'listen')?.checkpoint).toEqual({ pageToken: 'next' })
+    failPreparation = false
+    now += 61_000
+    await service.tickIntegration()
+    await service.tickMaintenance()
+    expect(service.control.getPublishOperation(flowId, replacement.operationId).status).toBe('succeeded')
+    expect(service.integrationEndpoint(flowId, 'listen')).not.toBe(endpointId)
+    expect(service.integrationTarget(endpointId)).toBeUndefined()
+    expect(service.integrationState(flowId, 'listen')?.checkpoint).toEqual({ pageToken: 'baseline' })
+    await service.tickIntegration()
+    expect(admissionCount(file)).toBe(2)
+    expect(stopped).toBe(1)
+    service.control.retireFlow(flowId)
+    await service.tickMaintenance()
+    await service.tickIntegration()
+    await service.tickMaintenance()
+    now = 7 * 24 * 60 * 60 * 1000
+    await service.tickIntegration()
+    await service.tickMaintenance()
+    const retired = new DatabaseSync(file, { readOnly: true })
+    try {
+      expect(retired.prepare('SELECT COUNT(*) AS count FROM listener_work').get()).toEqual({ count: 0 })
+    } finally {
+      retired.close()
+    }
+    expect(stopped).toBe(2)
+  } finally {
+    await closeService(service)
+  }
+})
+
+function page(checkpoint: number, hasMore = false) {
+  return { checkpoint: checkpoint + 1, dedupeKey: String(checkpoint), hasMore, payload: { body: {}, deliveryId: String(checkpoint), event: 'change' } }
+}
+
+async function wake(service: ServerService) {
+  const target = service.integrationTarget(service.integrationEndpoint('main', 'integration')!)!
+  return service.receiveIntegrationTarget(target, {
+    headers: new Headers(),
+    method: 'POST',
+    payload: {},
+    query: new URLSearchParams(),
+    rawBody: new Uint8Array(),
+  })
+}

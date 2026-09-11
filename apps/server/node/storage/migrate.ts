@@ -16,6 +16,7 @@ const migrationFiles = [
   '0012_flow_enabled.sql',
   '0013_agent_runs.sql',
   '0014_run_results.sql',
+  '0015_listener_work.sql',
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 
@@ -24,10 +25,9 @@ export function migrateDatabase(file: string): void {
   try {
     database.exec('BEGIN IMMEDIATE')
     try {
-      let currentVersion = (database.prepare('PRAGMA user_version').get() as { readonly user_version: number }).user_version
+      const currentVersion = (database.prepare('PRAGMA user_version').get() as { readonly user_version: number }).user_version
       if (hasApplicationTables(database) && !hasFlowSchema(database)) {
-        resetApplicationTables(database)
-        currentVersion = 0
+        throw new Error('Legacy application schema requires an explicit migration; the database was not modified.')
       }
       if (currentVersion > migrationFiles.length) {
         throw new Error(`SQLite schema version ${currentVersion} is newer than the supported version ${migrationFiles.length}.`)
@@ -48,14 +48,6 @@ export function migrateDatabase(file: string): void {
 
 function hasFlowSchema(database: DatabaseSync): boolean {
   return database.prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'flows'").get() != null
-}
-
-function resetApplicationTables(database: DatabaseSync): void {
-  const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as unknown as readonly {
-    readonly name: string
-  }[]
-  for (const { name } of tables) database.exec(`DROP TABLE "${name.replaceAll('"', '""')}"`)
-  database.exec('PRAGMA user_version = 0')
 }
 
 function hasApplicationTables(database: DatabaseSync): boolean {

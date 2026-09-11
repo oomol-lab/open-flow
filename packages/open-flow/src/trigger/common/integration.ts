@@ -2,6 +2,7 @@ import type { ConnectorProxy } from '../../connector/common/proxy.ts'
 import type { IntegrationEndpointMethod, JsonValue, TriggerKeySnapshot } from '../../flow/common/change.ts'
 
 import { dequal } from 'dequal/lite'
+import { isJsonObject, isJsonValue } from '../../base/common/json.ts'
 
 export const maximumIntegrationBodyBytes = 64 * 1024
 export const maximumIntegrationDeliveryPages = 5
@@ -9,7 +10,41 @@ export const maximumIntegrationDeliveryPages = 5
 const endpointPattern = /^\/v1\/integrations\/(endpoint_[0-9a-f]{32})$/
 const encoder = new TextEncoder()
 
+export interface ListenerReadContext {
+  readonly checkpoint: JsonValue
+  readonly config: Readonly<Record<string, JsonValue>>
+  readonly connector: ConnectorProxy
+  readonly now: Date
+  readonly signal?: AbortSignal
+}
+
+export interface ListenerPage {
+  readonly checkpoint: JsonValue
+  readonly dedupeKey: string
+  readonly hasMore: boolean
+  readonly payload: Readonly<Record<string, JsonValue>> | null
+}
+
+export interface ListenerSource {
+  readonly intervalMs: number
+  readonly read: (context: ListenerReadContext) => Promise<ListenerPage>
+}
+
+export function validateListenerPage(value: unknown): asserts value is ListenerPage {
+  if (!isJsonObject(value) || value.checkpoint == null || !isJsonValue(value.checkpoint) || typeof value.hasMore != 'boolean') {
+    throw new TypeError('Listener page must contain a JSON checkpoint and a boolean hasMore.')
+  }
+  if (typeof value.dedupeKey != 'string' || value.dedupeKey.length == 0 || encoder.encode(value.dedupeKey).byteLength > 1024) {
+    throw new TypeError('Listener page identity must contain between 1 and 1024 bytes.')
+  }
+  if (value.payload !== null && !isJsonObject(value.payload)) throw new TypeError('Listener page payload must be an object or null.')
+  if (encoder.encode(JSON.stringify(value.checkpoint)).byteLength > 64 * 1024) {
+    throw new TypeError('Listener checkpoint exceeds 64 KiB.')
+  }
+}
+
 export type IntegrationReceiveResult =
+  | { readonly outcome: 'wake' }
   | {
       readonly checkpoint?: JsonValue
       readonly continue?: boolean
@@ -68,6 +103,7 @@ export interface IntegrationReconcileResult {
 }
 
 export interface IntegrationDefinition {
+  readonly listener?: ListenerSource
   readonly initialState?: { readonly checkpoint: JsonValue; readonly subscription: Readonly<Record<string, JsonValue>> }
   readonly receive: (context: IntegrationReceiveContext) => IntegrationReceiveResult | Promise<IntegrationReceiveResult>
   readonly reconcile: (context: IntegrationReconcileContext) => Promise<IntegrationReconcileResult>
@@ -110,7 +146,7 @@ export async function integrationOccurrenceId(bindingId: string, runtimeVersion:
 export interface IntegrationConformanceFixture {
   readonly config: Readonly<Record<string, JsonValue>>
   readonly connectionId: string
-  readonly definition: Pick<IntegrationDefinition, 'initialState' | 'receive' | 'reconcile'>
+  readonly definition: Pick<IntegrationDefinition, 'initialState' | 'listener' | 'receive' | 'reconcile'>
   readonly publishedAt: string
 }
 
@@ -337,6 +373,83 @@ export const integrationConformanceCases: readonly IntegrationConformanceCase[] 
       await harness.reconcile('2026-08-21T00:00:41.000Z')
       await response(await delivery(harness, { action: 'event', deliveryId: 'retired' }), { status: 404 }, 'Reconciled retirement')
       equal((await harness.state()).payloads, [], 'Retired payloads')
+    },
+  },
+]
+
+const listenerFixture: IntegrationConformanceFixture = {
+  ...fixture,
+  definition: {
+    initialState: { checkpoint: null, subscription: {} },
+    async reconcile({ active, state, now }) {
+      if (active && state?.checkpoint == null) await state!.saveCheckpoint(0)
+      if (active) await state!.saveSubscription({}, new Date(now.getTime() + 3_600_000))
+      return { outcome: 'ready' }
+    },
+    receive(context) {
+      return context.header('x-integration-secret') == context.callbackSecret
+        ? { outcome: 'wake' }
+        : { outcome: 'respond', status: 404, body: '', contentType: 'text/plain' }
+    },
+    listener: {
+      intervalMs: 60_000,
+      async read({ checkpoint, now }) {
+        const cursor = Number(checkpoint)
+        const available = now.getTime() >= Date.parse('2026-08-21T00:01:31.000Z') ? 8 : 7
+        return cursor < available
+          ? {
+              checkpoint: cursor + 1,
+              dedupeKey: String(cursor),
+              hasMore: cursor + 1 < available,
+              payload: { body: {}, deliveryId: String(cursor), event: 'change' },
+            }
+          : { checkpoint, dedupeKey: String(cursor), hasMore: false, payload: null }
+      },
+    },
+  },
+}
+
+export const listenerConformanceCases: readonly IntegrationConformanceCase[] = [
+  {
+    fixture: listenerFixture,
+    name: 'drains listener pages without a callback and resumes periodic scanning after restart',
+    async verify(harness) {
+      await harness.reconcile('2026-08-21T00:00:31.000Z')
+      equal((await harness.state()).checkpoint, 7, 'Drained cursor')
+      equal((await harness.state()).payloads.length, 7, 'Drained pages')
+      await harness.restart()
+      await harness.reconcile('2026-08-21T00:01:31.000Z')
+      equal((await harness.state()).checkpoint, 8, 'Periodic cursor')
+      equal((await harness.state()).payloads.length, 8, 'Periodic pages')
+    },
+  },
+  {
+    fixture: listenerFixture,
+    name: 'persists verified listener wakes across restart without duplicating accepted pages',
+    async verify(harness) {
+      await harness.reconcile('2026-08-21T00:00:31.000Z')
+      await response(await delivery(harness, {}, false), { status: 404 }, 'Invalid wake')
+      await response(await delivery(harness, {}), { status: 202 }, 'First wake')
+      await response(await delivery(harness, {}), { status: 202 }, 'Duplicate wake')
+      await harness.restart()
+      await harness.reconcile('2026-08-21T00:00:32.000Z')
+      equal((await harness.state()).checkpoint, 7, 'Retained cursor')
+      equal((await harness.state()).payloads.length, 7, 'Deduplicated pages')
+    },
+  },
+  {
+    fixture: listenerFixture,
+    name: 'preserves a listener cursor on unchanged publication and fences retirement',
+    async verify(harness) {
+      await harness.reconcile('2026-08-21T00:00:31.000Z')
+      await harness.republish('2026-08-21T00:00:40.000Z')
+      equal((await harness.state()).checkpoint, 7, 'Republished cursor')
+      await harness.reconcile('2026-08-21T00:01:31.000Z')
+      equal((await harness.state()).payloads.length, 8, 'Republished pages')
+      await harness.retire('2026-08-21T00:01:40.000Z')
+      await response(await delivery(harness, {}), { status: 404 }, 'Retired wake')
+      await harness.reconcile('2026-08-21T00:02:40.000Z')
+      equal((await harness.state()).payloads.length, 8, 'Retired pages')
     },
   },
 ]

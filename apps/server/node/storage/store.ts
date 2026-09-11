@@ -459,6 +459,7 @@ export class Store {
         .run(flowId, flowId, flowId, flowId)
       this.#database.prepare('DELETE FROM poll_claims WHERE binding_id IN (SELECT binding_id FROM poll_bindings WHERE flow_id = ?)').run(flowId)
       this.#database.prepare('DELETE FROM poll_event_dedupe WHERE binding_id IN (SELECT binding_id FROM poll_bindings WHERE flow_id = ?)').run(flowId)
+      this.#database.prepare('DELETE FROM listener_work WHERE binding_id IN (SELECT binding_id FROM integration_bindings WHERE flow_id = ?)').run(flowId)
       this.#database.prepare('DELETE FROM integration_states WHERE binding_id IN (SELECT binding_id FROM integration_bindings WHERE flow_id = ?)').run(flowId)
       this.#database.prepare('DELETE FROM webhook_bindings WHERE flow_id = ?').run(flowId)
       this.#database.prepare('DELETE FROM cron_bindings WHERE flow_id = ?').run(flowId)

@@ -12,6 +12,7 @@
 - [Agent 代码计算工具](2026-09-09-agent-code-spec.md)
 - [前端架构重构记录](2026-09-09-frontend-refactor.md)
 - [Code 节点调用 Connector Action 实施计划](code-actions.md)
+- [统一业务变化监听实施计划](2026-09-11-unified-change-listener.md)
 - [Flow 顶层化重置计划](flow-first-migration.md)
 - [前端重构后续清单](frontend-refactor-followups.md)
 - [即时协作编辑重构计划](local-first-collaboration.md)

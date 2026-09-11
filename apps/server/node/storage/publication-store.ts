@@ -38,6 +38,7 @@ interface PublishInput {
   readonly flowId: string
   readonly idempotencyKey: string
   readonly integrations: readonly {
+    readonly listener?: boolean
     readonly connectionId: string
     readonly reconcileAt: number
     readonly triggerJson: string
@@ -781,7 +782,11 @@ export class PublicationStore {
       const integration = desiredIntegrations.get(binding.triggerNodeId)
       if (integration != null) {
         const unchanged = binding.triggerJson == integration.triggerJson && binding.connectionId == integration.connectionId
-        if (input.operationId != null && unchanged) {
+        if (input.operationId != null && integration.listener && !unchanged) {
+          if (!this.#integrations.replaceCandidate(input.operationId, binding.bindingId, input.flowId, publicationId, integration, input.publishedAt)) {
+            throw publishPending
+          }
+        } else if ((input.operationId != null || integration.listener) && unchanged) {
           this.#database
             .prepare('UPDATE integration_bindings SET current_publication_id = ?, updated_at = ? WHERE binding_id = ?')
             .run(publicationId, input.publishedAt, binding.bindingId)
