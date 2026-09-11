@@ -337,7 +337,9 @@
   "ms": "ms",
   "s": "s",
   "nodeContent": {
-    "addDescription": "Add description"
+    "addDescription": "Add description",
+    "show": "Show content",
+    "hide": "Hide content"
   },
   "nodeStatus": {
     "error": "Error",
@@ -627,9 +629,5 @@
     "Europe/Moscow": "Moscow",
     "Australia/Sydney": "Sydney",
     "Pacific/Auckland": "Auckland"
-  },
-  "nodeContent": {
-    "show": "Show content",
-    "hide": "Hide content"
   }
 }

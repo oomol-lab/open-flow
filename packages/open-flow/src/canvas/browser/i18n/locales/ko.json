@@ -337,7 +337,9 @@
   "ms": "밀리초",
   "s": "초",
   "nodeContent": {
-    "addDescription": "설명 추가"
+    "addDescription": "설명 추가",
+    "show": "내용 표시",
+    "hide": "내용 숨기기"
   },
   "nodeStatus": {
     "error": "오류",
@@ -627,9 +629,5 @@
     "Europe/Moscow": "모스크바",
     "Australia/Sydney": "시드니",
     "Pacific/Auckland": "오클랜드"
-  },
-  "nodeContent": {
-    "show": "내용 표시",
-    "hide": "내용 숨기기"
   }
 }

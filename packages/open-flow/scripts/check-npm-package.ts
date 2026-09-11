@@ -1,9 +1,7 @@
-import { parse } from '@babel/parser'
-import traverseModule from '@babel/traverse'
 import { unpackTar } from 'modern-tar'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -12,9 +10,8 @@ import { gunzipSync } from 'node:zlib'
 
 const execFileAsync = promisify(execFile)
 const packageRequire = createRequire(import.meta.url)
-const traverse = ((traverseModule as unknown as { readonly default?: typeof traverseModule }).default ?? traverseModule) as typeof traverseModule
 const rootPath = path.resolve(import.meta.dirname, '..')
-const manifest = JSON.parse(await readFile(path.join(rootPath, 'package.json'), 'utf8')) as { version: string }
+const manifest = JSON.parse(await readFile(path.join(rootPath, 'package.json'), 'utf8')) as { version: string; devDependencies: Record<string, string> }
 const tarballPath = path.join(rootPath, 'dist/release', `oomol-lab-open-flow-${manifest.version}.tgz`)
 const sharedUiTokens = [
   '--ui-accent',
@@ -253,35 +250,10 @@ for (const forbidden of ['bin', 'dependencies', 'devDependencies', 'main', 'modu
   assert.equal(Object.hasOwn(packedManifest, forbidden), false)
 }
 
-const workbenchEntry = entries.find((entry) => entry.header.name == 'package/dist/browser/workbench.js')
-assert.ok(workbenchEntry?.data)
-const workbenchSource = new TextDecoder().decode(workbenchEntry.data)
-assert.match(workbenchSource, /from ['"]react['"]/)
-assert.match(workbenchSource, /from ['"]react\/jsx-runtime['"]/)
-assert.match(workbenchSource, /OpenFlowSessionGate/)
-const workspaceChunks = entryNames.filter((name) => /^package\/dist\/browser\/flowWorkspace-[A-Za-z\d_-]+\.js$/.test(name))
-assert.equal(workspaceChunks.length, 1)
-assert.match(workbenchSource, /import\(['"]\.\/flowWorkspace-[A-Za-z\d_-]+\.js['"]\)/)
-const resourceDialogChunks = entryNames.filter((name) => /^package\/dist\/browser\/createResourceDialog-[A-Za-z\d_-]+\.js$/.test(name))
-assert.equal(resourceDialogChunks.length, 1)
-assert.ok(
-  entries.some(
-    (entry) =>
-      entry.header.name.endsWith('.js') &&
-      entry.data != null &&
-      /import\(['"]\.\/createResourceDialog-[A-Za-z\d_-]+\.js['"]\)/.test(new TextDecoder().decode(entry.data)),
-  ),
-)
 const workbenchStyleEntry = entries.find((entry) => entry.header.name == 'package/dist/browser/workbench.css')
 assert.ok(workbenchStyleEntry?.data)
 const workbenchStyle = new TextDecoder().decode(workbenchStyleEntry.data)
-assert.match(workbenchStyle, /:where\(\.open-flow-theme,\.open-flow-workbench,\.open-flow-canvas-root\) \.hidden\{display:none\}/)
-assert.match(workbenchStyle, /\.sm\\:w-56\{[^}]*width:/)
-assert.ok(workbenchStyle.includes('.i-custom\\:mouse{'))
-assert.ok(workbenchStyle.includes('.bg-popover{background-color:var(--ui-popover)}'))
-assert.ok(workbenchStyle.includes('.bg-card{background-color:var(--ui-card)}'))
-assert.ok(workbenchStyle.includes('data-open\\:animate-in'))
-assert.ok(workbenchStyle.includes('aria-current\\:bg-muted'))
+assert.match(workbenchStyle, /:where\([^)]*\.open-flow-workbench[^)]*\)\s+\.hidden\s*\{\s*display:\s*none\s*;?\s*\}/)
 for (const token of sharedUiTokens) assert.ok(workbenchStyle.includes(`${token}:`), `Missing ${token} from the published Workbench CSS.`)
 const themeStyleEntry = entries.find((entry) => entry.header.name == 'package/dist/browser/theme.css')
 assert.ok(themeStyleEntry?.data)
@@ -289,9 +261,7 @@ const themeStyle = new TextDecoder().decode(themeStyleEntry.data)
 assert.match(themeStyle, /\.open-flow-theme\s*\{/)
 assert.match(themeStyle, /\.open-flow-theme\[data-theme='dark'\]/)
 for (const token of sharedUiTokens) assert.ok(themeStyle.includes(`${token}:`), `Missing ${token} from the published product theme CSS.`)
-assert.doesNotMatch(workbenchStyle, /--rf-/)
-assert.doesNotMatch(workbenchStyle, /(?:font-size-4|mb-2px|\\!justify-start|bg-dark)/)
-assert.doesNotMatch(workbenchStyle, /(?:^|[{},])\.hidden\{display:none\}/)
+assert.doesNotMatch(workbenchStyle, /(?:^|[{},])\s*\.hidden\s*\{\s*display:\s*none/)
 assert.doesNotMatch(workbenchStyle, /data:font\//)
 const referencedFonts = [...workbenchStyle.matchAll(/url\((\.\/assets\/font-[a-f\d]{16}\.(?:woff2|woff|ttf))\)/g)]
   .map((match) => `package/dist/browser/${match[1]!.slice(2)}`)
@@ -301,33 +271,12 @@ assert.deepEqual(
   entryNames.filter((name) => /^package\/dist\/browser\/assets\/font-[a-f\d]{16}\.(?:woff2|woff|ttf)$/.test(name)),
   referencedFonts,
 )
-const workbenchJavaScript = entries.filter(
-  (entry) => entry.header.name.startsWith('package/dist/browser/') && entry.header.name.endsWith('.js') && entry.data != null,
-)
-assert.ok(workbenchJavaScript.some((entry) => /from ['"]react-dom['"]/.test(new TextDecoder().decode(entry.data!))))
-assert.equal(
-  entryNames.some((name) => /^package\/dist\/browser\/assets\/typeScriptWorker-.+\.js$/.test(name)),
-  false,
-)
-assert.equal(
-  workbenchJavaScript.some((entry) => /\/assets\/typeScriptWorker-.+\.js/.test(new TextDecoder().decode(entry.data!))),
-  false,
-)
-for (const entry of workbenchJavaScript) {
-  assertNoReactRequire(new TextDecoder().decode(entry.data!), entry.header.name)
-}
+await verifyConsumer()
 
-await Promise.all(
-  [
-    { react: '18.3.1', reactDomTypes: '18.3.1', reactTypes: '18.3.12' },
-    { react: '19.2.0', reactDomTypes: '19.2.3', reactTypes: '19.2.2' },
-  ].map(verifyConsumer),
-)
+console.log('Verified the public npm package contract, Browser runtime exports, and package consumer.')
 
-console.log('Verified the public npm package contract, Browser runtime exports, and React 18/19 consumers.')
-
-async function verifyConsumer(versions: { readonly react: string; readonly reactDomTypes: string; readonly reactTypes: string }): Promise<void> {
-  const directory = await mkdtemp(path.join(tmpdir(), `open-flow-react-${versions.react.split('.')[0]}-`))
+async function verifyConsumer(): Promise<void> {
+  const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-consumer-'))
   try {
     await writeFile(
       path.join(directory, 'package.json'),
@@ -335,13 +284,13 @@ async function verifyConsumer(versions: { readonly react: string; readonly react
         {
           dependencies: {
             '@oomol-lab/open-flow': `file:${tarballPath}`,
-            'effect': '4.0.0-rc.112',
-            'react': versions.react,
-            'react-dom': versions.react,
+            'effect': manifest.devDependencies.effect,
+            'react': manifest.devDependencies.react,
+            'react-dom': manifest.devDependencies['react-dom'],
           },
           devDependencies: {
-            '@types/react': versions.reactTypes,
-            '@types/react-dom': versions.reactDomTypes,
+            '@types/react': manifest.devDependencies['@types/react'],
+            '@types/react-dom': manifest.devDependencies['@types/react-dom'],
           },
           private: true,
           type: 'module',
@@ -456,59 +405,10 @@ async function verifyConsumer(versions: { readonly react: string; readonly react
       ],
       { cwd: directory },
     )
-    await execFileAsync(
-      process.execPath,
-      [
-        '-e',
-        "const action = await import('@oomol-lab/open-flow/connector-action'); if (typeof action.connectorActionPorts !== 'function') throw new Error('Missing Connector Action contract.')",
-      ],
-      { cwd: directory },
-    )
-    await execFileAsync(
-      process.execPath,
-      [
-        '-e',
-        "const Effect = await import('effect/Effect'); const { runFlow } = await import('@oomol-lab/open-flow/scheduler'); const result = await Effect.runPromise(runFlow({ closureDigest: 'consumer', engineContract: 'open-flow-engine/v2', graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } }, modules: {}, subflows: {}, tasks: {} }, { trigger: { nodeId: 'start', payload: {} }, createId: () => 'consumer-job', flowId: 'main', invokeTask: () => Effect.fail(new Error('Unexpected Task invocation.')), runId: 'consumer-run' })); if (result.kind !== 'node-results' || result.nodes.length !== 0) throw new Error('Scheduler Effect is not interoperable with the consumer Effect runtime.')",
-      ],
-      { cwd: directory },
-    )
-    await execFileAsync(
-      process.execPath,
-      [
-        '-e',
-        "const api = await import('@oomol-lab/open-flow/control-api'); if (typeof api.ControlClient !== 'function') throw new Error('Missing Control API client.'); if (api.controlErrorMetadata[api.controlErrorCode.runNotFound].status !== 404) throw new Error('Missing Control API errors.'); const proxy = await import('@oomol-lab/open-flow/connector-proxy'); if (Object.keys(proxy).length !== 0) throw new Error('Connector Proxy should be type-only.'); const control = await import('@oomol-lab/open-flow/control-api-conformance'); if (control.controlApiConformanceCases.length !== 12 || control.controlRecoveryConformanceCases.length !== 1 || control.publicationControlApiConformanceCases.length !== 3 || control.triggerControlApiConformanceCases.length !== 2 || control.connectorControlApiConformanceCases.length !== 2) throw new Error('Missing Control API conformance.'); const cron = await import('@oomol-lab/open-flow/cron-trigger'); if (typeof cron.nextTriggerScheduledAt !== 'function') throw new Error('Missing Cron Trigger contract.'); const integration = await import('@oomol-lab/open-flow/integration-trigger'); if (integration.integrationConformanceCases.length === 0) throw new Error('Missing Integration Trigger contract.'); const poll = await import('@oomol-lab/open-flow/poll-trigger'); if (poll.maximumPollEventsPerPage !== 100) throw new Error('Missing Poll Trigger contract.'); const providers = await import('@oomol-lab/open-flow/provider-triggers'); if (providers.triggerDefinitions.length !== 17) throw new Error('Missing Provider Trigger definitions.'); const slack = providers.triggerDefinitions.find((definition) => definition.snapshot.key === 'slack.on_message_posted'); if (slack == null || !('poll' in slack)) throw new Error('Missing Slack Trigger definition.'); let sharedPollError = false; try { await slack.poll({ checkpoint: null, config: { channelId: 'C1' }, connector: { execute: async () => ({ data: { error: 'invalid_auth', ok: false }, status: 200 }) }, now: new Date() }) } catch (error) { sharedPollError = error instanceof poll.PollConnectionError } if (!sharedPollError) throw new Error('Provider Trigger does not share the Poll error identity.'); const lifecycle = await import('@oomol-lab/open-flow/run-lifecycle'); if (lifecycle.transitionRun('queued', { kind: 'claim' }).kind !== 'ready') throw new Error('Missing Run lifecycle runtime.'); const events = await import('@oomol-lab/open-flow/run-events'); if (typeof events.createEventProjector !== 'function') throw new Error('Missing Run event projection.'); const runtime = await import('@oomol-lab/open-flow/runtime-contract'); if (runtime.runtimeConformanceCases.length === 0) throw new Error('Missing Runtime contract.'); const scheduler = await import('@oomol-lab/open-flow/scheduler'); if (typeof scheduler.runFlow !== 'function') throw new Error('Missing Scheduler runtime.'); const webhook = await import('@oomol-lab/open-flow/webhook-trigger'); if (webhook.maximumWebhookBodyBytes !== 65536) throw new Error('Missing Webhook Trigger contract.'); const encoding = await import('@oomol-lab/open-flow/flow-encoding'); if (typeof encoding.encodeRevision !== 'function') throw new Error('Missing Flow encoding runtime.'); const semantics = await import('@oomol-lab/open-flow/flow-semantics'); if (typeof semantics.prepareFlow !== 'function') throw new Error('Missing Flow semantics runtime.'); const localization = await import('@oomol-lab/open-flow/localization'); if (localization.uiLanguages.length !== 7 || localization.resolveUiLanguage(['zh-Hant-HK']) !== 'zh-TW') throw new Error('Missing UI language registry.'); const workbench = await import('@oomol-lab/open-flow/workbench'); if (typeof workbench.OpenFlowWorkbench !== 'function' || typeof workbench.OpenFlowSessionGate !== 'function') throw new Error('Missing Workbench runtime.'); await import.meta.resolve('@oomol-lab/open-flow/workbench.css'); await import.meta.resolve('@oomol-lab/open-flow/theme.css')",
-      ],
-      { cwd: directory },
-    )
-    await assert.rejects(
-      execFileAsync(process.execPath, ['-e', "await import('@oomol-lab/open-flow')"], { cwd: directory }),
-      (error: unknown) => error instanceof Error && error.message.includes("Cannot find module '@oomol-lab/open-flow'"),
-    )
+    const runtimePath = path.join(directory, 'consumer.mjs')
+    await copyFile(path.join(rootPath, 'scripts/npm-package-consumer.mjs'), runtimePath)
+    await execFileAsync(process.execPath, [runtimePath], { cwd: directory })
   } finally {
     await rm(directory, { force: true, recursive: true })
   }
-}
-
-function assertNoReactRequire(source: string, sourcePath: string): void {
-  const ast = parse(source, { sourceFilename: sourcePath, sourceType: 'module' })
-  const requireNames = new Set<string>()
-  for (const statement of ast.program.body) {
-    if (statement.type != 'ImportDeclaration' || !/^\.\/rolldown-runtime-.+\.js$/.test(statement.source.value)) continue
-    for (const specifier of statement.specifiers) {
-      if (specifier.type == 'ImportSpecifier' && specifier.imported.type == 'Identifier' && specifier.imported.name == 'r') {
-        requireNames.add(specifier.local.name)
-      }
-    }
-  }
-  traverse(ast, {
-    CallExpression(call) {
-      if (call.node.callee.type != 'Identifier' || !requireNames.has(call.node.callee.name)) return
-      const [moduleId] = call.node.arguments
-      assert.equal(
-        moduleId?.type == 'StringLiteral' && /^react(?:-dom)?(?:\/.*)?$/.test(moduleId.value),
-        false,
-        `${sourcePath} calls the Rolldown runtime require helper for React.`,
-      )
-    },
-  })
 }

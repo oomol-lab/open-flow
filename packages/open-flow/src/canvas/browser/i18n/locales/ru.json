@@ -337,7 +337,9 @@
   "ms": "мс",
   "s": "с",
   "nodeContent": {
-    "addDescription": "Добавить описание"
+    "addDescription": "Добавить описание",
+    "show": "Показать содержимое",
+    "hide": "Скрыть содержимое"
   },
   "nodeStatus": {
     "error": "Ошибка",
@@ -627,9 +629,5 @@
     "Europe/Moscow": "Москва",
     "Australia/Sydney": "Сидней",
     "Pacific/Auckland": "Окленд"
-  },
-  "nodeContent": {
-    "show": "Показать содержимое",
-    "hide": "Скрыть содержимое"
   }
 }
