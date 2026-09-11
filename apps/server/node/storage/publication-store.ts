@@ -5,6 +5,7 @@ import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
 import { randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { AcceptanceError } from '../error.ts'
+import { insert } from './insert.ts'
 import { IntegrationStore } from './integration-store.ts'
 import { PollStore } from './poll-store.ts'
 
@@ -224,30 +225,23 @@ export class PublicationStore {
         return { kind: 'unsupported' }
       }
       this.#polls.createCandidates(operationId, input.flowId, input.expectedLivePublicationId, input.polls, createdAt)
-      this.#database
-        .prepare(
-          `INSERT INTO publish_operations (
-             operation_id, flow_id, revision_id, revision_digest, closure_digest, engine_contract,
-             expected_live_publication_id, idempotency_key, request_digest, input_json, status,
-             deadline_at, created_at, updated_at, expires_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
-        )
-        .run(
-          operationId,
-          input.flowId,
-          input.revisionId,
-          input.revisionDigest,
-          input.closureDigest,
-          input.engineContract,
-          input.expectedLivePublicationId,
-          input.idempotencyKey,
-          input.requestDigest,
-          JSON.stringify(input),
-          createdAt + publishDeadlineMs,
-          createdAt,
-          createdAt,
-          createdAt + publishRetentionMs,
-        )
+      insert(this.#database, 'publish_operations', {
+        operation_id: operationId,
+        flow_id: input.flowId,
+        revision_id: input.revisionId,
+        revision_digest: input.revisionDigest,
+        closure_digest: input.closureDigest,
+        engine_contract: input.engineContract,
+        expected_live_publication_id: input.expectedLivePublicationId,
+        idempotency_key: input.idempotencyKey,
+        request_digest: input.requestDigest,
+        input_json: JSON.stringify(input),
+        status: 'pending',
+        deadline_at: createdAt + publishDeadlineMs,
+        created_at: createdAt,
+        updated_at: createdAt,
+        expires_at: createdAt + publishRetentionMs,
+      })
       const operation = this.publishOperation(input.flowId, operationId)
       if (operation == null) throw new Error('Created Publish operation is missing.')
       return { kind: 'accepted', operation }
@@ -510,29 +504,21 @@ export class PublicationStore {
 
       this.#ensureRevision(input)
       const publicationId = `publication_${randomUUID().replaceAll('-', '')}`
-      this.#database
-        .prepare(
-          `INSERT INTO publications (
-             publication_id, flow_id, revision_id, revision_digest,
-             closure_digest, engine_contract, idempotency_key, request_digest,
-             actor_id, operation, source_publication_id, model_version, created_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
-          publicationId,
-          input.flowId,
-          input.revisionId,
-          input.revisionDigest,
-          input.closureDigest,
-          input.engineContract,
-          input.idempotencyKey,
-          input.requestDigest,
-          input.metadata?.actorId ?? 'legacy',
-          input.metadata?.operation ?? 'publish',
-          input.metadata?.operation == 'rollback' ? input.metadata.sourcePublicationId : null,
-          input.metadata?.modelVersion ?? 1,
-          input.publishedAt,
-        )
+      insert(this.#database, 'publications', {
+        publication_id: publicationId,
+        flow_id: input.flowId,
+        revision_id: input.revisionId,
+        revision_digest: input.revisionDigest,
+        closure_digest: input.closureDigest,
+        engine_contract: input.engineContract,
+        idempotency_key: input.idempotencyKey,
+        request_digest: input.requestDigest,
+        actor_id: input.metadata?.actorId ?? 'legacy',
+        operation: input.metadata?.operation ?? 'publish',
+        source_publication_id: input.metadata?.operation == 'rollback' ? input.metadata.sourcePublicationId : null,
+        model_version: input.metadata?.modelVersion ?? 1,
+        created_at: input.publishedAt,
+      })
       this.#database
         .prepare(
           `INSERT INTO flow_live (flow_id, publication_id, revision, updated_at) VALUES (?, ?, 1, ?)

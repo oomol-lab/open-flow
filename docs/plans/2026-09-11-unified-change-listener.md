@@ -1,6 +1,12 @@
 # 统一业务变化监听实施计划
 
-日期：2026-09-11。状态：Server、Cloud、业务入口与两个 Provider 场景已接入，存量迁移和清理继续进行。
+日期：2026-09-11。状态：公共包、Server、业务入口与两个 Provider 场景已实现，相关提交已整合到 `feat/execution-graph`。
+
+当前未完成项（以此处和最新实施记录为准，旧阶段记录中的“下一步”保留作历史）：
+
+- 真实 Provider 的线上端到端验收：baseline、通知唤醒、无通知补查、去重、暂停恢复及订阅清理；按当前安排暂缓。
+- 阶段三其他适用 Provider 的迁移与边界确认：现有 Poll 已由统一运行时读取，但不等于其公开定义全部改为 listener 或已有通知能力。
+- 阶段四最终交付收尾：核对仍有消费者的旧 snapshot / 协议，明确保留与退出范围，更新最终合同与验收记录。
 
 需求来源：[Issue #114](https://github.com/oomol-lab/open-flow/issues/114)。
 本文是实施计划，不修改当前产品合同，也不代表已经提供新的可靠性保证。
@@ -20,7 +26,7 @@ Manual、Cron、通用 Webhook 保持独立语义。现有 Integration 中逐条
 不能在迁移时悄悄改为只读取对象最新状态。是否共用同一公开定义类型，在完成 Provider 分类后确定，
 不为统一名称强迫不适用的语义进入对象监听。
 
-实施覆盖公共 package、开源 Server 和 Cloud 部署。复用现有 Connector、持久化、调度、发布准备和 Run 准入设施；
+实施覆盖公共 package 与开源 Server。复用现有 Connector、持久化、调度、发布准备和 Run 准入设施；
 不新增通用同步平台、消息系统、Provider SDK 框架或 rollout flag。
 
 ## 2. 现状与改造边界
@@ -29,12 +35,11 @@ Manual、Cron、通用 Webhook 保持独立语义。现有 Integration 中逐条
 | --------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------- |
 | 公共 package    | Poll / Integration 定义、Provider、Registry、conformance               | 同一个定义能够表达扫描与通知协作，以及明确的变化身份和恢复合同 |
 | Server          | SQLite、Poll claim 与 checkpoint、批量准入、Integration 回调和订阅维护 | 回调与调度进入同一个监听工作 owner                             |
-| Cloud           | D1、调度索引、Queue、执行租约、订阅维护、staged publication            | 调度、回调、存储提交与发布准备不再按互斥 kind 分割业务监听     |
 | Connector       | Connection、授权、credential 和 proxy                                  | 继续复用现有边界，不转移监听进度或 Run authority               |
 | Workbench / CLI | Trigger 配置、snapshot、诊断和测试入口                                 | 表达业务监听及实际能力，更新公开协议消费者                     |
 
 当前 Poll 已将一页 fresh events 合成一个 Run；baseline 不产生历史 Run。Integration 的部分 Provider 已在通知后回源，
-但该行为不是与定期扫描协作的共享合同。Cloud 的队列工作当前仅包括 Cron / Poll，Integration 在回调中处理并准入。
+但该行为不是与定期扫描协作的共享合同。
 不能只把两种 kind 改名，或并行启用现有两个独立 binding。
 
 ## 3. 第一版语义
@@ -72,8 +77,8 @@ Manual、Cron、通用 Webhook 保持独立语义。现有 Integration 中逐条
 外部通知依次完成路由、验签、握手判断和通知解析。对需要异步检查的有效通知，先保存待处理工作，
 再返回协议允许的成功响应。保存失败不能返回表示已经可靠接收的成功。握手等同步响应仍在入口完成。
 
-定时扫描唤醒同一个监听实例。Server 使用已有本地调度；Cloud 扩展现有调度和 Queue。
-Queue、定时器和 HTTP 唤醒都不拥有处理完成事实；消息投递遗漏后，持久工作仍可由维护任务重新发现。
+定时扫描使用 Server 已有本地调度，唤醒同一个监听实例。
+定时器和 HTTP 唤醒都不拥有处理完成事实；唤醒遗漏后，持久工作仍可由维护任务重新发现。
 
 处理 owner 领取工作，执行定向读取或增量扫描，生成具有稳定身份的变化，再进行批量准入。
 外部网络请求不进入数据库事务。原子提交边界包含本次变化接受事实、Run 准入、相关进度推进和工作完成状态。
@@ -91,7 +96,7 @@ Queue、定时器和 HTTP 唤醒都不拥有处理完成事实；消息投递遗
   调度与准入资格依据所需能力是否可用判断，不能因单一总体 health 标为失败就停止所有路径；通过 health / activity 明确报告降级或不可恢复错误。
 - 所有路径按所属 Flow 固定的 Connection / Team scope 调用 Connector；共享监听不产生跨租户状态或凭据缓存。
 
-具体类型、表结构、claim 字段和 Queue envelope 在合同阶段按实际需求确定，不预建通用任务框架。
+具体类型、表结构、claim 字段和唤醒合同 在合同阶段按实际需求确定，不预建通用任务框架。
 
 ### 4.3 发布和清理
 
@@ -119,17 +124,17 @@ Provider 必须给出可验证的准备顺序，例如先取得可回放 cursor�
 2. 根据真实能力区分对象监听和事件接收，明确迁入统一监听的清单；不删除仍有独立用途的事件 Trigger。
 3. 优先选择已有 Google Drive changes 定义验证“通知唤醒 + cursor 扫描”。实施前核对其官方协议与当前实现，证明起点与变化身份。
 4. 选择第二个对象级场景验证定向读取，优先研究 GitHub PR；不能将通用 Repository Event 直接改成 PR 最新状态监听。
-5. 确认两个部署实际存在的 Flow、Revision、binding、外部订阅及在途工作，不能由 beta 版本号推断没有用户数据。
+5. 确认 Server 实际存在的 Flow、Revision、binding、外部订阅及在途工作，不能由 beta 版本号推断没有用户数据。
    为 serialized kind、definition version、旧 Revision 解码与执行、消息和工作交接制定升级方案，明确旧执行版本如何退出。
    不原地改写历史 Revision 或 digest，不无授权清空部署数据。
 6. 定义公共监听合同、snapshot、decoder、validation、错误和 payload 语义，以及实际机制所需的最小能力声明；
    明确机制故障隔离和重新发布时完整状态交接的义务。
-7. 更新架构与 Control API 技术参考，编写跨部署 conformance；覆盖初始化、通知、扫描、去重、恢复与生命周期。
+7. 更新架构与 Control API 技术参考，编写共享 conformance；覆盖初始化、通知、扫描、去重、恢复与生命周期。
 
 完成条件：首个 Provider 的双通道变化身份和初始化衔接有依据；第二个场景不会要求复制整套运行时。
 若第二个场景需要更窄的产品定义，应先收紧定义，不为通用性增加大量配置开关。
-消费者调查和升级方案必须在首个新公共包发布及 Server / Cloud 数据迁移前完成，并影响合同设计。
-各部署首次升级前，使用已有 Revision、binding、订阅与在途工作验证升级和升级中断后的恢复。
+消费者调查和升级方案必须在首个新公共包发布及 Server 数据迁移前完成，并影响合同设计。
+Server 首次升级前，使用已有 Revision、binding、订阅与在途工作验证升级和升级中断后的恢复。
 
 ### 阶段二：Server 完整实现
 
@@ -140,36 +145,26 @@ Provider 必须给出可验证的准备顺序，例如先取得可回放 cursor�
 
 完成条件：丢弃通知后扫描仍能发现变化；双入口只准入一次；保存通知后重启仍能继续；Run 满额后释放容量能恢复。
 
-### 阶段三：Cloud 同合同实现
-
-1. 满足阶段一的升级前置条件后，发布包含新公共合同与 conformance 的精确 package 版本；Cloud 通过公开 entry 升级，不复制源码或 deep-import。
-2. 将监听唤醒接入现有调度索引和 Queue；在 tenant D1 持久化工作与准入事实。
-3. 将对象监听回调收敛为验证、持久化与唤醒，保留必要的同步握手响应。
-4. 复用 Team 限制与租约，覆盖多消费者重复投递、租约过期、调度遗漏和队列发送失败后的恢复。
-5. 扩展 staged publication，保证 D1 是 activation authority，Directory / Queue / 调度索引可重新对齐。
-
-完成条件：Cloud 通过同一组 conformance，且部署专有故障测试证明至少一次交付不会导致重复 Run 或进度丢失。
-
-### 阶段四：业务配置与 Provider 迁移
+### 阶段三：业务配置与 Provider 迁移
 
 1. Workbench 以业务名称呈现监听，按实际能力展示必要配置；不要求用户在 Poll / Integration 间做互斥选择。
 2. 复用现有诊断与 activity 表达初始化、健康、失败和重新授权，明确呈现“通知失效但扫描仍正常”等机制降级；
    展示状态服从公共合同，不由 UI 决定是否继续扫描。
 3. 更新 CLI、MCP、程序化 authoring、snapshot、测试运行与 schema 消费者；草稿编辑和测试不能隐式创建生产订阅。
-4. 更新相关 Lab Stories，在入口同时展示配置与状态；按 frontend-ui 技能验证共享 UI。Cloud 宿主按其仓库要求运行静态检查和构建。
+4. 更新相关 Lab Stories，在入口同时展示配置与状态；按 frontend-ui 技能验证共享 UI。
 5. 实现第二个对象级 Provider 场景，再按阶段一清单迁移其他适用定义，保留已有事件语义与 payload 契约，或明确版本化变更。
 
 完成条件：用户用一个节点获得双机制监听；两个不同读取模式的 Provider 共用生产处理逻辑；没有要求用户自行去重的第二个 Trigger。
 
-### 阶段五：版本升级、清理和交付
+### 阶段四：版本升级、清理和交付
 
 1. 按阶段一确定并验证的方案完成剩余升级，核对实际持久化消费者与迁移结果。
 2. 确认旧 Revision 的读取与执行符合升级合同，在途消息和工作已经交接或按明确规则结束，旧外部订阅清理可恢复。
 3. 确认旧执行版本满足退出条件后再删除旧路径，不提前移除已有持久化消费者仍依赖的能力。
 4. 未发布且确无消费者的旧行为直接删除。不保留仅为旧名称转发的接口，不长期维护两套业务监听运行时。
-5. 完成引用清理、package 发布验证与 Cloud 精确版本升级，移除已迁移路径的旧表写入、调度分支和无效测试。
+5. 完成引用清理、package 发布验证，移除已迁移路径的旧表写入、调度分支和无效测试。
 
-完成条件：两部署新合同一致，旧资源清理可恢复，已有业务行为没有未经声明的变化；测试与文档不再描述已删除的实现。
+完成条件：公共合同与 Server 实现一致，旧资源清理可恢复，已有业务行为没有未经声明的变化；测试与文档不再描述已删除的实现。
 
 ## 6. 验收矩阵
 
@@ -181,9 +176,9 @@ Provider 必须给出可验证的准备顺序，例如先取得可回放 cursor�
 | 订阅续期失败或回调失效，查询仍正常               | 扫描继续发现变化，明确报告降级；通知恢复后不重复准入           |
 | 通知与扫描发现同一次变化                         | 在身份作用域与保留期内仅一个 Run 接受该变化                    |
 | 同一对象连续不同变化                             | 合法的新版本 / 事件不被对象 ID 去重吞掉                        |
-| 保存通知后、入队前进程退出                       | 维护任务重新发现持久工作并继续                                 |
+| 保存通知后、处理前进程退出                       | 维护任务重新发现持久工作并继续                                 |
 | 回源失败、提交前退出                             | 进度不越过未接受变化，重试能继续                               |
-| 提交成功、响应或 Queue ack 前退出                | 重投返回已完成事实，不重复准入                                 |
+| 提交成功、响应前退出                             | 重投返回已完成事实，不重复准入                                 |
 | 批次重试时页面内容或划分改变                     | 已接受变化不重复，未接受变化仍可继续                           |
 | 处理期间收到新通知                               | 旧任务完成不清除新工作                                         |
 | 超过一页或回调处理上限                           | 后续分页无需等待另一条外部通知即可继续                         |
@@ -203,9 +198,9 @@ Provider 必须给出可验证的准备顺序，例如先取得可回放 cursor�
 
 ## 7. 检查与交付要求
 
-- 迭代期间先运行受影响的公共、Server 或 Cloud 测试；发布前覆盖完整消费者与生命周期。
-- 每次提交前从相应仓库根目录运行 `bun run check` 并通过；rebase / merge 后按仓库要求重新运行。
-- 公共包变更运行 package 发布验证及受影响的 CLI 测试；Cloud 使用 workspace 的测试和构建命令，不在根目录直接 `bun test`。
+- 迭代期间先运行受影响的公共包或 Server 测试；发布前覆盖完整消费者与生命周期。
+- 每次提交前从仓库根目录运行 `bun run check` 并通过；rebase / merge 后按仓库要求重新运行。
+- 公共包变更运行 package 发布验证及受影响的 CLI 测试。
 - 共享 UI 用 Lab 验证实际外观与交互，维护相关 Stories；停止并确认本次启动的验证服务已退出。
 - 文档写明各 Provider 的初始化语义、批量输出、恢复范围和去重保留期。不能用“企业级”代替精确保证。
 - 实施完成后再更新 issue。创建本计划不包含发评论、发布 package 或部署的授权。
@@ -218,7 +213,7 @@ Provider 必须给出可验证的准备顺序，例如先取得可回放 cursor�
 - 为每个 Provider 建立独立调度器，或先实现全部 Provider 再验证恢复和一致性。
 - 无关执行引擎、Run scheduler、Workbench 布局及部署基础设施重构。
 
-## 9. 阶段一实施记录
+## 9. 实施记录
 
 ### 9.1 现有 Provider 分类
 
@@ -253,7 +248,7 @@ GitHub PR 列表支持按更新时间排序，但这不能证明能恢复每一�
 
 ### 9.2 迁移调查与约束
 
-- 阶段一盘点时公共包与 Cloud 依赖版本均为 `0.1.0-beta.17`；Cloud 必须通过精确的新发布版本接入。
+- 阶段一盘点时公共包版本为 `0.1.0-beta.17`。
 - 已只读检查的 Server 当前开发库为 schema 14，包含 Flow、Revision、Publication 与 Run，不能重置。
   当前没有 Poll / Integration binding，但历史 Revision 中仍存在 GitHub、Gmail 和 Airtable 定义；无 active binding 不等于无消费者。
 - 历史 Revision 的 serialized kind、definitionVersion、payload 与 digest 保持可读；迁移不能用新 kind 原地改写历史内容。
@@ -261,7 +256,6 @@ GitHub PR 列表支持按更新时间排序，但这不能证明能恢复每一�
 - 监听状态迁移使用追加 migration，在同一业务 owner 内接管旧 cursor、去重记录与待处理工作；不能仅复制表后同时启动两套处理。
 - 已发现另一个前 Flow schema 的本地 standalone 库。现有 Server migrator 对这类库会重建应用表，本次不能直接在原库运行该逻辑。
   对这一旧库先保留原文件，在副本确认可迁移数据与旧语义；它不属于已验证的 schema 14 升级路径。
-- 已扫描到 Cloud 本地 D1 状态文件，但部署数据与各 shard 的完整对应关系尚未核实；不能据此声称 Cloud 无需数据迁移。
 - Server 当前 staged Integration 创建逻辑对新候选只放行 Stripe；首个 Google Drive 场景必须同时实现其独立候选订阅准备与清理。
 
 ### 9.3 已完成的代码准备
@@ -285,72 +279,47 @@ GitHub PR 列表支持按更新时间排序，但这不能证明能恢复每一�
 - 现有开发库副本验证了 14 → 15 升级，34 张原表、1527 行记录逐表比较未变；验证时开发库已处于 15，
   因此只在临时副本移除空的新表并恢复 version 14 后重放迁移。另有带旧订阅和 checkpoint 的迁移测试。
   旧 Project / 未知 schema 不再隐式重置，明确拒绝自动升级并保留原数据，专门迁移仍待后续处理。
-- 本阶段未发布 npm 包、未改 Cloud 仓库。Cloud 的 D1/Queue/调度接入与共享 conformance、Workbench/CLI 业务入口、
-  第二个 Provider 及历史 Poll 定义迁移仍按后续阶段进行；当前结果不代表整个计划完成。
+- 本阶段尚未发布 npm 包；Workbench/CLI 业务入口、第二个 Provider 及历史 Poll 定义迁移按后续阶段进行。
 
-### 9.5 Cloud 实施与验证
+### 9.5 公共包发布
 
-- 公共包 `0.1.0-beta.18` 已通过发布流程上线；Cloud、Executor 与 Workbench 的 manifest 和 lockfile 均消费该精确 artifact。
-  发布源码保存在 `codex/unified-change-listener` 分支，包含此前公共合同和 Server 的变更。
-- tenant D1 migration `0029_change_listeners.sql` 追加持久监听工作，不改写已有 Flow、Publication、Run 或旧 Trigger 状态。
-  ScheduleIndex 内部 schema 2 保留原 Cron/Poll 调度和版本隔离记录，增加 listener 唤醒传输。
-- callback 验证后只保存 generation；Queue 发送失败仍保留到期工作，由 Trigger binding maintenance 重新发送。
-  periodic scan 与通知共用同一个 source reader，通过 TeamLimiter 和 D1 租约限制并发。
-- Run、执行快照、事件、Run 调度工作与 page checkpoint 在同一 D1 batch 接受。空页只更新进度；容量不足、取消、读取或事务失败保留原游标。
-  租约、runtimeVersion、Publication、预期 checkpoint 与 Live/operator 状态在提交时校验。
-- 未变化发布保留最新 checkpoint；暂停和恢复不重新建立 baseline。范围或 Connection 替换先准备独立 candidate endpoint，
-  激活事务安装新状态并保存旧订阅的清理工作；旧 reader 和 callback 被隔离。已完成 activation 重投不会覆盖随后推进的游标。
-- source health 独立存储；订阅失败不阻断读取，扫描成功不会将失败订阅标记恢复。
-- Cloud 使用公开 artifact 中的三项 listener conformance，通过实际 D1/R2 生产入口验证分页、无通知扫描、重启和重新发布。
-  补充 Queue 重投、持久唤醒、容量恢复、事务回滚、空页期间新通知、取消、租约失效、暂停恢复、换源清理及 activation 重投测试。
-  Google Drive candidate 创建响应丢失后的 callback 恢复也覆盖新旧两个定义。
-- 本地 Cloud 状态盘点发现 tenant migration 10 和更早的 Project 库，另有当前 Flow schema 的验证库。
-  本阶段未修改这些原库，启动前检查阻止历史 reset migration 隐式清空旧库；独立测试覆盖原文件不变及 0028 → 0029 数据保留。
-  旧 Project 转 Flow 的专门转换、远端 shard/R2/Directory 完整盘点仍待后续升级阶段处理，不能宣称已有数据全部完成迁移。
-- 闭源仓库根目录 `bun run check`、`bun run test`、`bun run build` 全部通过；Cloud 444 项测试、Workbench 18 项测试通过。
-- 本阶段不包含 Cloud 部署。下一阶段仍需业务化 Workbench/CLI 入口、第二种 Provider 读取模式，以及已有 Poll 定义的显式迁移。
+- 公共包 `0.1.0-beta.18` 已通过发布流程上线，包含此前公共合同和 Server 的变更。
 
 ### 9.6 业务入口与第二种读取模式
 
 - Workbench 将 Poll 与 Integration 放在同一个应用触发器目录，直接展示 Provider 的业务说明。
   已发布 snapshot 的 kind、版本和 digest 保持不变，CLI/MCP 和程序化 authoring 继续消费同一 Registry。
-- Control API 的 TriggerBinding 增加可选 listener 健康投影。Server 和 Cloud 分别返回订阅与扫描状态，
+- Control API 的 TriggerBinding 增加可选 listener 健康投影。Server 分别返回订阅与扫描状态，
   Workbench 明确显示通知降级、扫描失败和重新授权；暂停与退役优先于机制健康。
 - 新增 `github.watch_pull_request`，范围为指定仓库的单个 PR。通知验签并过滤 PR 后只唤醒，
   定时读取同一个 PR 并比较规范化状态版本；首次读取仅保存基线，状态变化后才创建 Run。
-  与 Google Drive 的 cursor 分页不同，该定义验证定向对象读取，复用两部署相同的 listener 运行时。
+  与 Google Drive 的 cursor 分页不同，该定义验证定向对象读取，复用 Server 的同一个 listener 运行时。
 - 输出是被观察到的 PR 当前状态与版本，不包含全部中间转换或 review 历史。
   checkpoint 中的单调序号使观察到 A → B → A 可以分别准入，而失败后重读同一进度仍保持稳定身份。
   失去访问权限不推断为删除，订阅创建失败也不重置已保存的基线。
 - 新增使用真实 TriggerSummary 与发布状态组件的 Lab Story，同时展示正常、通知降级、读取失败、重新授权和暂停。
-  已在 Lab 验证浅色英文和简体中文；闭源宿主遵循其仓库约束，使用检查、测试与构建验证。
+  已在 Lab 验证浅色英文和简体中文，验证服务已停止。
 - 公共仓库根目录 check 和 test 通过，公共包 1182 项、CLI 90 项、Server 417 项测试通过。
   包含 PR 读取、重复读取、签名过滤、取消、错误响应、独立健康协议与状态呈现。
 - 公共包 `0.1.0-beta.19` 已发布，源码提交为 `85200187`（`codex/unified-change-listener`）。
   发布分支的根目录 check、test 与 npm package 消费验证通过；该分支 Server 415 项测试通过。
   原工作区另外两项无关存储测试与其修改未纳入本次发布。
-- Cloud、Executor 与 Workbench 已精确升级 beta.19，根目录 check、test、build 全部通过；
-  Cloud 444 项、Workbench 18 项测试通过。Cloud 实际 D1/control 响应验证订阅失败时返回独立的 healthy 扫描状态。
-  本次未部署 Cloud、未对原始数据库执行迁移；Lab 验证服务已停止。
-- 其他适用 Poll 定义的迁移、旧 Project 数据转换与阶段五清理仍未完成；本节不代表整个计划完成。
+- 其他适用 Poll 定义的迁移、旧 Project 数据转换与阶段四清理仍未完成；本节不代表整个计划完成。
 
 PR 状态字段依据 [GitHub Get a pull request](https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request)。
 
 ### 9.7 发布时的进度继承修正
 
 - 发现原来的完整 trigger JSON 比较会将节点改名、说明和图标变化判定为换源，导致重新建立 baseline。
-- 公共运行语义投影忽略这三个展示字段；Server 的候选准备、激活和普通发布，以及 Cloud 的发布规划与 D1 激活同步采用这一规则。
+- 公共运行语义投影忽略这三个展示字段；Server 的候选准备、激活和普通发布采用这一规则。
   当前 binding / state 更新到新节点信息，checkpoint、订阅、去重和持久唤醒保留；真实配置或 Connection 变化继续准备候选。
 - 旧 Worker 仍须通过当前 Publication 与 runtime version 的准入校验，不能因展示信息兼容而越过发布隔离。
-- 进一步只读核实：旧 Cloud 开发 tenant 中有 1 个 Project、44 个 Project Revision；旧 Server standalone 中有 6 个 Project Revision。
+- 进一步只读核实：旧 Server standalone 中有 6 个 Project Revision。
   其中包含旧字典式端口、无显式执行边的数据流图，不能通过改表名或修改 envelope kind 变成当前可执行 Revision。
   这些原库继续保留，尚未实施语义转换；其他适用 Poll 定义的迁移和旧路径退出也仍待完成。
 
 - 已发布公共包 `0.1.0-beta.20`，提交 `be58cc6a`，发布流程与 npm 包消费验证通过。
   发布分支公共包 1182 项、CLI 90 项、Server 417 项测试通过；原工作区包含其他存储修改的 Server 共 419 项通过。
-- 闭源 Cloud、Executor、Workbench 已精确升级 beta.20，根目录 check、test、build 通过。
-  当前工作区 Cloud 452 项、Workbench 18 项测试通过，其中新增的发布测试验证 D1 保留 checkpoint、订阅和 pending generation，且不创建候选订阅 work。
-  本轮未部署服务，未对原始数据库执行迁移。
 
 ### 9.8 旧 Server Project 草稿转换
 
@@ -361,6 +330,43 @@ PR 状态字段依据 [GitHub Get a pull request](https://docs.github.com/en/res
 - 已实际转换旧 standalone 当前草稿：1 个 Flow 成功，0 个草稿被阻断，未创建 Live 或外部订阅。
   输出位于 `apps/server/.open-flow-dev/project-migration-20260911/`；逐表比较确认备份的 23 张表、603 行记录与原库一致，目标 integrity check 为 ok。
 - 历史 Revision、Publication、Run、订阅、监听进度、Presentation 与部署设置仅完整保存在旧库备份，未转为新引擎可执行记录。
-  这属于当前草稿导入，不代表完整部署迁移；Cloud D1/R2 的转换、其他适用 Poll 定义迁移及旧执行路径退出仍未完成。
+  这属于当前草稿导入，不代表完整部署迁移；其他适用 Poll 定义迁移及旧执行路径退出仍未完成。
 - 根目录 check 与 Server 424 项测试通过，包含 WAL 备份、正常转换、部分拒绝、损坏 digest、重复内容的身份隔离与拒绝覆盖目录。
   操作与边界见 [旧 Project 草稿导入](../project-draft-import.md)。
+
+### 9.9 公共 Project 草稿转换接口
+
+- 将 Project 图转换收敛到公共 `flow-encoding` 入口，Server 消费同一实现。没有 Trigger 的单一任务链补充手动入口，
+  重复节点名称按公共规则消歧；节点 ID、数据引用、字面量输入与模块源码保留，调整记录随结果返回。
+- 公共包 beta.21 已发布（提交 `7e5c19e2`），公共发布流程、package 验证和测试通过；发布分支 Server 423 项测试通过。
+
+### 9.10 OneDrive 迁移前的删除身份修正
+
+- 修复 `one_drive.on_item_changed` 使用固定 `itemId:deleted` 的问题：同一 ID 恢复后再次删除会被此前去重记录抑制。
+  删除身份改为 delta 读取轮次的起始 token 与 item ID 的稳定 digest；同一轮 continuation 保持该 token，后续轮次独立。
+  普通 created / updated 身份、payload、配置、definition snapshot 与已有 checkpoint 格式不变，不要求重建 baseline。
+- Provider 回归覆盖同一游标重试、删除后恢复再删除、跨五页预算的 continuation、不同 item 身份及长 opaque token 的有界 digest。
+- 此身份表示被观察到的 delta 轮次中的删除，不是上游永久事件 ID。不同轮次重复返回同一删除可能再次准入，
+  升级前的 `itemId:deleted` 记录无法反推出读取轮次，不能承诺升级边界上的历史 tombstone 全部跨版本去重。
+  不自动改写旧去重记录或进度。微软 delta 只返回最新状态，也不保证捕获读取之间的每一次恢复与删除。
+- 已发布公共包 `0.1.0-beta.22`，提交 `324c79c3`。发布分支 check、test 与 npm 包消费验证通过，
+  公共包 1184 项、CLI 90 项、Server 423 项测试通过；原工作区 Server 425 项测试通过。
+  CI 首次运行在既有 Project 导入测试超时，该测试本地单独 6 项通过，重跑同一提交的发布流程全部通过，未放宽超时或跳过测试。
+- 本节只处理计划 9.1 中明确列出的迁移前身份边界；尚未将 OneDrive Poll 改为 listener 或移除其旧调度路径。
+
+协议依据：[Microsoft Graph driveItem delta](https://learn.microsoft.com/en-us/graph/api/driveitem-delta?view=graph-rest-1.0)。
+
+### 9.11 Server 统一读取 owner
+
+- 用 `ListenerRuntime` 接管所有现有 Poll 读取、候选 baseline 和 Integration listener 扫描；删除独立 `PollRuntime`，
+  Supervisor 只保留一个监听读取调度入口。订阅创建、续期与事件 callback 继续由 Integration owner 处理。
+- 两类读取共用 Connector / Team 作用域、AbortSignal 与读取 deadline；Poll 的事件级去重与 listener 的页面级准入仍分别使用原有权威事务。
+  没有创建第二份 checkpoint、改写历史 snapshot / Revision 或搬移数据表。旧 Poll 的调度、checkpoint、claim、去重记录直接由新 owner 使用，
+  纯定时读取不要求 callback endpoint。仅运行时 owner 接管，不等于所有 Provider 已获得通知能力。
+- 每批最多处理 100 项读取 / baseline 工作，Poll 与 listener 到期时交替处理，避免持续分页的 Poll 饿死其他 listener。
+  将扫描到期时间从订阅维护调度中分离，订阅维护不持有扫描锁。
+- 增加混合持续分页和重启恢复测试，验证两类工作都推进、binding / runtimeVersion / checkpoint 原样保留，并从原进度继续。
+  补充畸形页面校验，验证源返回非法页面时记录失败并保留进度，不能作为未捕获缺陷中止整个监听 worker。
+- 提交 `d9016ed`（`codex/unified-change-listener`）。提交分支根目录 check、test 通过，公共包 1184 项、CLI 90 项、Server 425 项测试通过；
+  Server test 包含构建。原工作区包含其他存储测试，共 427 项 Server 测试通过。
+- 本轮没有发布新 npm 包。
