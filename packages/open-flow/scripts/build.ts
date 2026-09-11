@@ -4,6 +4,7 @@ import { mkdir, readFile, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import { generateTriggerLocales } from '../src/build/node/triggerLocales.ts'
 import { buildBrowserPackage } from '../src/distribution/node/browserPackage.ts'
 import { stageNpmPackage } from '../src/distribution/node/npmPackage.ts'
 
@@ -20,6 +21,7 @@ const workspaceManifest = await readManifest(path.join(workspaceRoot, 'package.j
 const openFlowVersion = readString(packageManifest, 'version')
 
 await validateVersions()
+await generateTriggerLocales()
 await rm(outputPath, { force: true, recursive: true })
 await mkdir(releaseRoot, { recursive: true })
 await buildNpmPackage()

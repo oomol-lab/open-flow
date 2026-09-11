@@ -6,6 +6,7 @@ import { defineConfig } from 'vite'
 import { generateScopedName } from '../../src/build/node/cssModules.ts'
 import designerUnoConfig from '../../src/build/node/designerUnoConfig.ts'
 import { providerIconsPlugin } from '../../src/build/node/providerIcons.ts'
+import { triggerLocalesPlugin } from '../../src/build/node/triggerLocales.ts'
 import { twemojiCollectionPlugin } from '../../src/build/node/twemojiCollection.ts'
 import { triggerDefinitions } from '../../src/trigger/providers/definitions.ts'
 
@@ -13,6 +14,7 @@ export default defineConfig({
   root: import.meta.dirname,
   css: { modules: { generateScopedName } },
   plugins: [
+    triggerLocalesPlugin(),
     {
       name: 'lab-trigger-snapshots',
       resolveId: (id) => (id === 'virtual:lab-trigger-snapshots' ? '\0virtual:lab-trigger-snapshots' : undefined),

@@ -86,21 +86,23 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       throw new ControlError(controlErrorCode.flowInvalid, 'locale must be a valid BCP 47 language tag.')
     }
   }
-  app.get('/trigger-keys', (context) => {
+  app.get('/trigger-keys', async (context) => {
     const locale = metadataLocale(context)
-    const keys = service.listTriggerDefinitions().map((definition) => {
-      const { key, name, provider, type } = definition
-      const { displayName, description } = localizeTrigger(definition, locale)
-      return { key, name, provider, type, displayName, description }
-    })
+    const keys = await Promise.all(
+      service.listTriggerDefinitions().map(async (definition) => {
+        const { key, name, provider, type } = definition
+        const { displayName, description } = await localizeTrigger(definition, locale)
+        return { key, name, provider, type, displayName, description }
+      }),
+    )
     return context.json({ keys, version: 1 })
   })
-  app.get('/trigger-keys/catalog', (context) => {
+  app.get('/trigger-keys/catalog', async (context) => {
     const locale = metadataLocale(context)
     const definitions = service.listTriggerDefinitions()
     return context.json({
       definitions,
-      display: Object.fromEntries(definitions.map((definition) => [definition.key, localizeTrigger(definition, locale)])),
+      display: Object.fromEntries(await Promise.all(definitions.map(async (definition) => [definition.key, await localizeTrigger(definition, locale)]))),
       locale,
       version: 1,
     })

@@ -52,6 +52,15 @@ if (poll.maximumPollEventsPerPage !== 100) throw new Error('Missing Poll Trigger
 const providers = await import('@oomol-lab/open-flow/provider-triggers')
 const slack = providers.triggerDefinitions.find((definition) => definition.snapshot.key === 'slack.on_message_posted')
 if (slack == null || !('poll' in slack)) throw new Error('Missing Slack Trigger definition.')
+assert.deepEqual(await providers.localizeTrigger(slack.snapshot, 'en'), {
+  displayName: slack.snapshot.displayName,
+  description: slack.snapshot.description,
+})
+for (const locale of ['zh-CN', 'zh-TW', 'ja', 'ko', 'ru', 'fr']) {
+  const display = await providers.localizeTrigger(slack.snapshot, locale)
+  assert.ok(display.displayName && display.description, `Missing ${locale} Trigger translations.`)
+  assert.notEqual(display.description, slack.snapshot.description, `Untranslated ${locale} Trigger description.`)
+}
 await assert.rejects(
   () =>
     slack.poll({

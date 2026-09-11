@@ -48,11 +48,12 @@
     "./control-requests": "./src/control/common/requests.ts",
     "./workbench-host-conformance": "./src/workbench/browser/runtime/hostConformance.ts",
     "./ui": "./src/ui/browser/public.ts",
-    "./ui.css": "./src/ui/browser/styles.css"
+    "./ui.css": "./src/ui/browser/styles.css",
+    "./trigger-locales-plugin": "./src/build/node/triggerLocales.ts"
   },
   "scripts": {
     "build": "bun scripts/build.ts",
-    "check": "bun run format -- --check && bun run lint && bun run check:types && bun run check:boundaries",
+    "check": "bun run format -- --check && bun run lint && bun run check:trigger-locales && bun run check:types && bun run check:boundaries",
     "check:boundaries": "bun scripts/check-platform-boundaries.ts",
     "check:types": "tsc --noEmit",
     "designer:dev": "vite --config dev/designer/vite.config.ts",
@@ -61,7 +62,9 @@
     "test": "bun run test:vitest",
     "test:coverage": "vitest run --config vitest.config.ts --coverage src/flow/common test/designer/schema-compare.test.ts test/designer/schema-subset-comparer.test.ts test/flow-encoding.test.ts test/flow-semantics.test.ts test/provider-triggers.test.ts test/run-events.test.ts test/scheduler.test.ts",
     "test:vitest": "vitest run --config vitest.config.ts src test",
-    "test:package": "bun scripts/check-npm-package.ts"
+    "test:package": "bun scripts/check-npm-package.ts",
+    "generate:trigger-locales": "bun scripts/trigger-locales.ts",
+    "check:trigger-locales": "bun scripts/trigger-locales.ts --check"
   },
   "devDependencies": {
     "@babel/parser": "8.0.4",
