@@ -72,6 +72,7 @@ export function RunControl({
             aria-controls={inputStatus == 'none' ? undefined : 'run-input-popover'}
             aria-expanded={inputStatus == 'none' ? undefined : inputOpen}
             className="run-control-main text-[13px]"
+            data-standalone={inputStatus == 'none' && triggers.length <= 1}
             disabled={disabled || starting}
             onClick={onRun}
             size="default"
@@ -85,13 +86,24 @@ export function RunControl({
             </span>
           </Button>
         </CanvasTooltip>
-        {inputStatus != 'none' && (
-          <Popover onOpenChange={(open) => onInputOpenChange(open)} open={inputOpen} triggerId={inputOpen ? inputTriggerId : null}>
+        <div aria-hidden={inputStatus == 'none' || undefined} className="run-control-segment-slot" data-visible={inputStatus != 'none'}>
+          <Popover
+            onOpenChange={(open) => onInputOpenChange(open)}
+            open={inputStatus != 'none' && inputOpen}
+            triggerId={inputStatus != 'none' && inputOpen ? inputTriggerId : null}
+          >
             <CanvasTooltip placement="top" title={inputLabel} getPopupContainer={() => popupContainer || document.body}>
               <PopoverTrigger
                 id={inputTriggerId}
                 render={
-                  <Button aria-label={inputLabel} className="run-control-segment relative" disabled={disabled || starting} size="icon" type="button">
+                  <Button
+                    aria-label={inputLabel}
+                    className="run-control-segment relative"
+                    disabled={disabled || starting || inputStatus == 'none'}
+                    size="icon"
+                    tabIndex={inputStatus == 'none' ? -1 : undefined}
+                    type="button"
+                  >
                     <Icon name="task" />
                     <span aria-hidden="true" className={`run-input-state status-dot ${inputStatus == 'ready' ? 'success' : 'running'}`} />
                   </Button>
@@ -112,13 +124,20 @@ export function RunControl({
               </PopoverContent>
             )}
           </Popover>
-        )}
-        {triggers.length > 1 && (
+        </div>
+        <div aria-hidden={triggers.length <= 1 || undefined} className="run-control-segment-slot" data-visible={triggers.length > 1}>
           <DropdownMenu>
             <CanvasTooltip placement="top" title={t('runInput.selectTrigger')} getPopupContainer={() => popupContainer || document.body}>
               <DropdownMenuTrigger
                 render={
-                  <Button aria-label={t('runInput.selectTrigger')} className="run-control-segment" disabled={disabled || starting} size="icon" type="button">
+                  <Button
+                    aria-label={t('runInput.selectTrigger')}
+                    className="run-control-segment"
+                    disabled={disabled || starting || triggers.length <= 1}
+                    size="icon"
+                    tabIndex={triggers.length <= 1 ? -1 : undefined}
+                    type="button"
+                  >
                     <Icon name="chevron-down" />
                   </Button>
                 }
@@ -157,7 +176,7 @@ export function RunControl({
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
-        )}
+        </div>
       </div>
     </div>
   )

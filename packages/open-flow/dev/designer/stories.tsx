@@ -427,7 +427,11 @@ function RunControlStory({ dark, language, log }: { readonly dark: boolean; read
   const i18n = useMemo(() => createWorkbenchI18n(language), [language])
   useEffect(() => () => i18n.dispose(), [i18n])
   const [transitionStarting, setTransitionStarting] = useState(false)
-  useStoryActions([{ label: transitionStarting ? 'Finish test' : 'Simulate starting', onClick: () => setTransitionStarting((value) => !value) }])
+  const [transitionInputs, setTransitionInputs] = useState(true)
+  useStoryActions([
+    { label: transitionStarting ? 'Finish test' : 'Simulate starting', onClick: () => setTransitionStarting((value) => !value) },
+    { label: transitionInputs ? 'Hide test data button' : 'Show test data button', onClick: () => setTransitionInputs((value) => !value) },
+  ])
   const one = [{ id: 'schedule', title: 'Daily schedule', icon: ':carbon:time:' }]
   const multiple = [
     { id: 'schedule', title: 'Daily schedule', icon: ':carbon:time:' },
@@ -441,7 +445,14 @@ function RunControlStory({ dark, language, log }: { readonly dark: boolean; read
           <RunControlSample inputStatus="none" language={language} label="Direct run" log={log} triggers={one} />
           <RunControlSample defaultOpen inputStatus="missing" language={language} label="Input required" log={log} triggers={[multiple[1]!]} />
           <RunControlSample inputStatus="ready" language={language} label="Remembered input" log={log} triggers={[multiple[1]!]} />
-          <RunControlSample inputStatus="none" language={language} label="Multiple triggers" log={log} starting={transitionStarting} triggers={multiple} />
+          <RunControlSample
+            inputStatus={transitionInputs ? 'missing' : 'none'}
+            language={language}
+            label="Multiple triggers"
+            log={log}
+            starting={transitionStarting}
+            triggers={multiple}
+          />
           <RunControlSample inputStatus="ready" language={language} label="Starting" log={log} starting triggers={[multiple[1]!]} />
           <RunControlSample disabled inputStatus="missing" language={language} label="Draft has problems" log={log} triggers={[multiple[1]!]} />
           <RunControlSample inputStatus="none" language={language} label="Mini map open" log={log} miniMapOpen triggers={one} />
