@@ -7,7 +7,7 @@ export enum NodeMiniMapPhase {
   Phase2,
 }
 
-const NODE_MINIMAP_PHASE1_ZOOM = 0.4
+const NODE_MINIMAP_PHASE1_ZOOM = 0.45
 const NODE_MINIMAP_PHASE2_ZOOM = 0.2
 
 export const NO_NODE_MINIMAP_MAX_ITEMS = 0

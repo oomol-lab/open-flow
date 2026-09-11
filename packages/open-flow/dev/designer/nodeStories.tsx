@@ -517,10 +517,10 @@ function NodeZoomStory({ dark, language, log }: { readonly dark: boolean; readon
   const [selected, setSelected] = useState<readonly string[]>([])
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, padding: 16, height: '100%' }}>
-      {[0.5, 0.35, 0.18].map((zoom) => (
+      {[0.45, 0.44, 0.18].map((zoom) => (
         <section key={zoom} style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', minHeight: 440 }}>
           <h3>
-            {Math.round(zoom * 100)}% · {zoom >= 0.4 ? 'Full content' : 'Icon + title'}
+            {Math.round(zoom * 100)}% · {zoom >= 0.45 ? 'Full content' : 'Icon + title'}
           </h3>
           <div style={{ flex: 1, position: 'relative' }}>
             <FlowCanvasView
@@ -569,7 +569,7 @@ export const nodeStories: readonly FrontendStory[] = [
     group: 'Canvas',
     id: 'node-zoom',
     title: 'Node zoom',
-    description: 'Compare full and simplified nodes. Tall cards clamp titles to two lines; short cards retain one line. Includes Chinese and unbroken titles.',
+    description: 'Compare the 45% zoom boundary and simplified nodes, including trigger lightning icons, Chinese and unbroken titles.',
     standalone: true,
     render: (log, dark, language) => <NodeZoomStory dark={dark} language={language} log={log} />,
   },

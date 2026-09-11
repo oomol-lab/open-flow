@@ -169,6 +169,8 @@
   --accent-soft: #ededed;
   --accent-soft-hover: #e3e3e3;
   --accent-foreground: #333333;
+  --trigger-icon-color: var(--accent-orange-2);
+  --trigger-icon-fill: color-mix(in srgb, var(--trigger-icon-color) 16%, transparent);
   --canvas-grid: rgb(100 100 100 / 14%);
   --node-shadow: none;
   --node-selected-shadow: 0 0 0 2px rgb(70 70 70 / 12%), 0 2px 6px rgb(0 0 0 / 5%);
@@ -341,6 +343,8 @@
   --accent-soft: #353535;
   --accent-soft-hover: #424242;
   --accent-foreground: #e0e0e0;
+  --trigger-icon-color: var(--warning);
+  --trigger-icon-fill: color-mix(in srgb, var(--trigger-icon-color) 24%, transparent);
   --canvas-grid: rgb(180 180 180 / 13%);
   --node-shadow: none;
   --node-selected-shadow: 0 0 0 2px rgb(190 190 190 / 16%), 0 2px 6px rgb(0 0 0 / 20%);

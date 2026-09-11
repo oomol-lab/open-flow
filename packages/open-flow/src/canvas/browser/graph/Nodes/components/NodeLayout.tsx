@@ -8,6 +8,7 @@ import type { CanvasStore } from '../../../stores/canvas/canvas.store.ts'
 
 import { useConnection, useNodeConnections, useStoreApi } from '@xyflow/react'
 import { clsx } from 'clsx'
+import { Zap } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
@@ -134,9 +135,10 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
               }}
               onPointerLeave={() => setHovered(false)}
               ref={containerRef}
-              className={clsx(styles.container, styles.cardContainer, skip && styles.skip)}
+              className={clsx(styles.container, styles.cardContainer, canvasMiniMapPhase !== NodeMiniMapPhase.None && styles.compact, skip && styles.skip)}
               style={containerStyle}
             >
+              {modelNode?.kind === 'trigger' && <Zap aria-hidden="true" className={styles.triggerIcon} strokeWidth={1.5} />}
               <div className={styles.executionHead}>
                 {card ? (
                   <NodeHeadContextMenu canvasStore={canvasStore}>{card}</NodeHeadContextMenu>
