@@ -4,6 +4,7 @@ import type { DatabaseSync } from 'node:sqlite'
 
 import { canonicalJsonBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { createHash, randomUUID } from 'node:crypto'
+import { insert } from './insert.ts'
 
 function digest(value: Uint8Array | string): string {
   return createHash('sha256').update(value).digest('hex')
@@ -58,11 +59,19 @@ export class ResultStore {
       }
       const total = this.#database.prepare('SELECT COALESCE(SUM(bytes), 0) AS bytes FROM run_results WHERE run_id = ?').get(runId)
       if (Number(total?.bytes) + bytes > 128 * 1024 * 1024) throw new Error('The Run exceeds the 128 MiB tool result storage limit.')
-      this.#database
-        .prepare(
-          'INSERT INTO run_results (result_id, run_id, invocation_id, call_id, tool_id, source, input_digest, digest, bytes, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        )
-        .run(result.resultId, runId, invocationId, callId, tool.id, JSON.stringify(result.source), inputDigest, result.digest, bytes, content, result.createdAt)
+      insert(this.#database, 'run_results', {
+        result_id: result.resultId,
+        run_id: runId,
+        invocation_id: invocationId,
+        call_id: callId,
+        tool_id: tool.id,
+        source: JSON.stringify(result.source),
+        input_digest: inputDigest,
+        digest: result.digest,
+        bytes,
+        content,
+        created_at: result.createdAt,
+      })
       return result
     })
   }
