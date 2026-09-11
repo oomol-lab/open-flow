@@ -41,7 +41,7 @@ export function defaultNodeName(content: RevisionContent, node: GraphNode): stri
     case 'condition':
       return 'Condition'
     case 'value':
-      return 'Value'
+      return 'Fixed Values'
     case 'wait':
       return 'Wait'
     case 'subflow':

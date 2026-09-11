@@ -252,7 +252,7 @@ function nodeTitle(prepared: PreparedFlow, node: ExecutableNode): string | undef
     case 'condition':
       return
     case 'value':
-      return 'Value'
+      return 'Fixed Values'
     case 'subflow':
       return prepared.subflows[node.subflowId]!.name
     case 'task':

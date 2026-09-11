@@ -181,6 +181,7 @@ class CodeMirrorEditor {
       parent: layoutRoot,
       extensions: [
         modules.basicSetup,
+        modules.EditorView.editorAttributes.of({ class: 'open-flow-code-editor' }),
         modules.autocompletion({
           icons: false,
           addToOptions: [

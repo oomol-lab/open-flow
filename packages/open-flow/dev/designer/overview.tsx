@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '../../src/ui/browser/alert.
 import { Badge } from '../../src/ui/browser/badge.tsx'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { Checkbox } from '../../src/ui/browser/checkbox.tsx'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '../../src/ui/browser/input-group.tsx'
 import { Input } from '../../src/ui/browser/input.tsx'
 import { Label } from '../../src/ui/browser/label.tsx'
 import { Progress } from '../../src/ui/browser/progress.tsx'
@@ -155,6 +156,16 @@ function ProductOverview({ log }: { readonly log: LogAction }) {
           <Input aria-label="Invalid input" aria-invalid defaultValue="Invalid value" />
           <Input aria-label="Disabled input" disabled defaultValue="Disabled value" />
           <Textarea aria-label="Description" defaultValue="Summarize new records and prepare a digest." />
+          <Textarea aria-label="Empty description" placeholder="Describe what this step should do." />
+          <Textarea aria-label="Invalid description" aria-invalid defaultValue="Invalid description" />
+          <InputGroup>
+            <InputGroupAddon>Search</InputGroupAddon>
+            <InputGroupInput aria-label="Grouped input" placeholder="Search workflows" />
+          </InputGroup>
+          <InputGroup>
+            <InputGroupAddon>Search</InputGroupAddon>
+            <InputGroupInput aria-label="Invalid grouped input" aria-invalid defaultValue="Invalid value" />
+          </InputGroup>
         </Sample>
         <Sample title="Choices">
           <div className="overview-inline">
@@ -247,6 +258,13 @@ export const overviewStories: readonly FrontendStory[] = [
     title: 'Node controls',
     render: (log, dark, language) => <ControlOverview log={log} dark={dark} language={language} />,
   },
-  { group: 'Theme Preview', id: 'product-controls', title: 'Workbench controls', standalone: true, render: (log) => <ProductOverview log={log} /> },
+  {
+    group: 'Theme Preview',
+    id: 'product-controls',
+    title: 'Workbench controls',
+    description: 'Text inputs use one focus ring for pointer and keyboard focus, including invalid and grouped fields.',
+    standalone: true,
+    render: (log) => <ProductOverview log={log} />,
+  },
   { group: 'Theme Preview', id: 'palette', title: 'Theme palette', standalone: true, render: (_log, dark) => <PaletteOverview dark={dark} /> },
 ]

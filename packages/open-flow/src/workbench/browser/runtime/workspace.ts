@@ -118,7 +118,7 @@ function nodeTitle(node: ResolvedNode, t?: TFunction): string {
     case 'condition':
       return t?.('addNode.condition') ?? 'Condition'
     case 'value':
-      return t?.('addNode.value') ?? 'Value'
+      return t?.('addNode.value') ?? 'Fixed Values'
     case 'wait':
       return 'Wait'
     case 'subflow':

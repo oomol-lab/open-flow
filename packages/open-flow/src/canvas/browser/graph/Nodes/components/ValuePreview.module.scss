@@ -13,13 +13,7 @@
   border: 0;
   border-radius: 2px;
   background: transparent;
-  cursor: pointer;
-
-  &:hover,
-  &[data-popup-open] {
-    text-decoration: underline dotted;
-    text-underline-offset: 3px;
-  }
+  cursor: default;
 }
 
 .popup.popup {
@@ -33,6 +27,7 @@
 .content {
   min-height: 0;
   user-select: text;
+  cursor: text;
   overflow-wrap: anywhere;
 }
 

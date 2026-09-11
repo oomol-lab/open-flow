@@ -28,7 +28,7 @@ function AutoThemeIcon() {
 // Directory icons belong to navigation metadata, not individual stories.
 const storyGroupIcons: Readonly<Record<string, `i-${string}`>> = {
   'Undo & Redo': 'i-lucide:undo-2',
-  'Node Value': 'i-lucide:variable',
+  'Fixed Values': 'i-lucide:variable',
   'Node Condition': 'i-carbon:flow',
   'Canvas': 'i-carbon:template',
   'Theme Preview': 'i-carbon:color-palette',
