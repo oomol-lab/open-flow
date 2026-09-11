@@ -6,7 +6,7 @@ import type { RFNodeId } from '../../../base/rfHelpers.ts'
 import type { HandleProps } from '../../../components/handle.tsx'
 import type { CanvasStore } from '../../../stores/canvas/canvas.store.ts'
 
-import { useConnection, useNodeConnections, useStoreApi } from '@xyflow/react'
+import { useConnection, useNodeConnections, useStore, useStoreApi } from '@xyflow/react'
 import { clsx } from 'clsx'
 import { Zap } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
@@ -64,6 +64,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const skip = useVal(NodeStore.to(nodeStore)?.ignore)
   const cardStore = NodeStore.is(nodeStore) ? nodeStore : undefined
   const canvasMiniMapPhase = useNodeMiniMapPhase()
+  const compactContent = useStore((state) => state.transform[2] <= 0.25)
   const nodeMiniMapPhase = cardStore ? NodeMiniMapPhase.None : visible ? canvasMiniMapPhase : selected ? NodeMiniMapPhase.None : NodeMiniMapPhase.Phase2
 
   const handleTrack = useHandleTrack(nodeStore.rfNodeId, MIN_NODE_WIDTH, contentWidth$, containerRef, DEFAULT_NODE_WIDTH)
@@ -87,6 +88,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
     <CanvasNode
       nodeStore={cardStore}
       compact={canvasMiniMapPhase !== NodeMiniMapPhase.None}
+      compactContent={compactContent}
       problem={problem}
       branches={branches?.map((branch) => {
         const summary =
@@ -135,7 +137,13 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
               }}
               onPointerLeave={() => setHovered(false)}
               ref={containerRef}
-              className={clsx(styles.container, styles.cardContainer, canvasMiniMapPhase !== NodeMiniMapPhase.None && styles.compact, skip && styles.skip)}
+              className={clsx(
+                styles.container,
+                styles.cardContainer,
+                canvasMiniMapPhase !== NodeMiniMapPhase.None && styles.compact,
+                compactContent && styles.compactContent,
+                skip && styles.skip,
+              )}
               style={containerStyle}
             >
               {modelNode?.kind === 'trigger' && <Zap aria-hidden="true" className={styles.triggerIcon} strokeWidth={1.5} />}

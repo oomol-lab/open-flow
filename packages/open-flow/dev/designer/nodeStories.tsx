@@ -517,10 +517,10 @@ function NodeZoomStory({ dark, language, log }: { readonly dark: boolean; readon
   const [selected, setSelected] = useState<readonly string[]>([])
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, padding: 16, height: '100%' }}>
-      {[0.45, 0.44, 0.18].map((zoom) => (
+      {[0.45, 0.26, 0.25].map((zoom) => (
         <section key={zoom} style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', minHeight: 440 }}>
           <h3>
-            {Math.round(zoom * 100)}% · {zoom >= 0.45 ? 'Full content' : 'Icon + title'}
+            {Math.round(zoom * 100)}% · {zoom >= 0.45 ? 'Full content' : zoom > 0.25 ? 'Simplified title' : 'Simplified content'}
           </h3>
           <div style={{ flex: 1, position: 'relative' }}>
             <FlowCanvasView
@@ -550,8 +550,15 @@ function NodeZoomStory({ dark, language, log }: { readonly dark: boolean; readon
                   .map((node, index) =>
                     Object.assign({}, node, {
                       title: zoomTitles[node.id] ?? node.title,
+                      ...(node.kind === 'condition'
+                        ? {
+                            title: 'Condition',
+                            outputs: [{ handle: 'matched' }, { handle: 'fallback' }],
+                            defaultOutput: 'fallback',
+                          }
+                        : {}),
                       diagnostics: node.id === 'empty' ? 1 : undefined,
-                      position: { x: 0, y: [0, 150, 300, 540, 710][index]! },
+                      position: { x: 0, y: [0, 150, 300, 560, 780][index]! },
                     }),
                   ),
               }}
@@ -569,7 +576,7 @@ export const nodeStories: readonly FrontendStory[] = [
     group: 'Canvas',
     id: 'node-zoom',
     title: 'Node zoom',
-    description: 'Compare the 45% zoom boundary and simplified nodes, including trigger lightning icons, Chinese and unbroken titles.',
+    description: 'Titles simplify below 45%; content hides at 25% and below. Compare single content frames and Condition strips aligned with branch ports.',
     standalone: true,
     render: (log, dark, language) => <NodeZoomStory dark={dark} language={language} log={log} />,
   },

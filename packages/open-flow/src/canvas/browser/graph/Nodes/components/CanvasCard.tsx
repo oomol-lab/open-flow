@@ -19,10 +19,12 @@ export function CanvasCard({
   problem,
   selected,
   compact = false,
+  compactContent = false,
   contentHidden = false,
   footerHidden = false,
 }: {
   readonly compact?: boolean
+  readonly compactContent?: boolean
   readonly contentHidden?: boolean
   readonly footerHidden?: boolean
   readonly tone?: 'comment' | 'value'
@@ -39,19 +41,31 @@ export function CanvasCard({
   readonly selected?: boolean
 }) {
   const hasContent = Children.toArray(children).some((child) => typeof child != 'string' || child.trim().length > 0)
+  const hasBranches = !isEmptyReactNode(branches)
+  const hasBody = (!contentHidden && (hasContent || !isEmptyReactNode(preview))) || hasBranches || (!footerHidden && !isEmptyReactNode(footer))
   const statusIndicator = problem && (
     <span className={clsx(styles.icon, styles.indicator, styles.warning)} title={problem} aria-label={problem} role="img">
       <i aria-hidden="true" className="i-lucide:triangle-alert" />
     </span>
   )
   return (
-    <article className={clsx(styles.card, compact && styles.compact, tone && styles[tone], selected && styles.selected, problem && styles.problem)}>
-      <div className={styles.compactIdentity}>
-        <span className={styles.icon}>{icon}</span>
-        <strong title={title}>{title}</strong>
-        {statusIndicator}
-      </div>
-      <header className={styles.header}>
+    <article
+      className={clsx(
+        styles.card,
+        compact && styles.compact,
+        compactContent && styles.compactContent,
+        tone && styles[tone],
+        selected && styles.selected,
+        problem && styles.problem,
+      )}
+    >
+      <header className={clsx(styles.header, hasBody && styles.withBody)}>
+        <div className={styles.compactIdentity}>
+          <span className={styles.icon}>{icon}</span>
+          <strong title={title}>{title}</strong>
+          {statusIndicator}
+        </div>
+
         <span className={styles.icon}>{icon}</span>
         <div className={styles.identity}>
           <strong title={title}>{titleContent ?? title}</strong>
@@ -60,18 +74,20 @@ export function CanvasCard({
         {statusIndicator}
         {actions}
       </header>
-      {(hasContent || !isEmptyReactNode(preview)) && (
-        <CardCollapse hidden={contentHidden}>
-          {hasContent && <div className={styles.content}>{children}</div>}
-          {!isEmptyReactNode(preview) && <div className={styles.preview}>{preview}</div>}
-        </CardCollapse>
-      )}
-      {!isEmptyReactNode(branches) && <div className={styles.branches}>{branches}</div>}
-      {!isEmptyReactNode(footer) && (
-        <CardCollapse hidden={footerHidden}>
-          <footer className={clsx(styles.footer, !contentHidden && !isEmptyReactNode(preview) && styles.afterPreview)}>{footer}</footer>
-        </CardCollapse>
-      )}
+      <div className={clsx(hasBody && !hasBranches && styles.singleContent)}>
+        {(hasContent || !isEmptyReactNode(preview)) && (
+          <CardCollapse hidden={contentHidden}>
+            {hasContent && <div className={styles.content}>{children}</div>}
+            {!isEmptyReactNode(preview) && <div className={styles.preview}>{preview}</div>}
+          </CardCollapse>
+        )}
+        {!isEmptyReactNode(branches) && <div className={styles.branches}>{branches}</div>}
+        {!isEmptyReactNode(footer) && (
+          <CardCollapse hidden={footerHidden}>
+            <footer className={clsx(styles.footer, !contentHidden && !isEmptyReactNode(preview) && styles.afterPreview)}>{footer}</footer>
+          </CardCollapse>
+        )}
+      </div>
     </article>
   )
 }
