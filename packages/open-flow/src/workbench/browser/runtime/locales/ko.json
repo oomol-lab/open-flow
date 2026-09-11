@@ -894,5 +894,23 @@
     "deleteOne": "노드 1개 삭제",
     "pasteOne": "노드 1개 붙여넣기",
     "moveOne": "노드 1개 이동"
+  },
+  "linearTrigger": {
+    "team": "팀",
+    "selectTeam": "팀 선택",
+    "connectFirst": "먼저 연결을 선택하세요.",
+    "loading": "불러오는 중…",
+    "noTeams": "접근 가능한 팀이 없습니다.",
+    "missingTeam": "선택한 팀을 사용할 수 없습니다. 다른 팀을 선택하세요.",
+    "loadFailed": "옵션을 불러오지 못했습니다.",
+    "retry": "다시 시도",
+    "statuses": "Issue 상태",
+    "selectTeamFirst": "먼저 팀을 선택하세요.",
+    "statusHint": "해당 상태로 전환될 때뿐 아니라 Issue 변경 시 현재 상태와 일치하는지 확인합니다.",
+    "allStatuses": "모든 상태",
+    "selectedCount": "상태 {{count}}개 선택됨",
+    "noStatuses": "사용 가능한 상태가 없습니다.",
+    "unavailableStatus": "사용할 수 없는 상태 ({{id}})",
+    "missingStatuses": "선택한 상태 중 일부를 사용할 수 없습니다. 삭제하거나 다시 선택하세요."
   }
 }

@@ -45,6 +45,8 @@ import {
   validRunTrigger,
   variableBindings,
 } from '@oomol-lab/open-flow/flow-semantics'
+import { PermanentPollError, PollConnectionError } from '@oomol-lab/open-flow/poll-trigger'
+import { triggerDefinitions as providerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { randomUUID } from 'node:crypto'
 import { checkCodeActions, ConnectorTaskError } from '../deployment/connector.ts'
@@ -173,6 +175,35 @@ export class ControlService {
     const definition = this.triggerDefinitions.find((candidate) => candidate.key == key)
     if (definition == null) throw new ControlError(controlErrorCode.triggerKeyNotFound, 'The Trigger Key was not found.')
     return definition
+  }
+
+  async listTriggerConfigOptions(flowId: string, nodeId: string, field: string, signal: AbortSignal) {
+    const currentDraft = this.getDraft(flowId)
+    const trigger = currentDraft.content.document.graph.nodes[nodeId]
+    if (trigger == null || (trigger.kind != 'poll' && trigger.kind != 'integration'))
+      throw new ControlError(controlErrorCode.triggerKeyNotFound, 'The Trigger was not found.')
+    const definition = providerDefinitions.find((item) => item.snapshot.key == trigger.definition.key)
+    if (definition?.configOptions == null) throw new ControlError(controlErrorCode.triggerKeyInvalid, 'This Trigger has no dynamic configuration options.')
+    const binding = currentDraft.content.document.bindings[trigger.bindingId]
+    if (binding?.kind != 'connection') throw new ControlError(serverErrorCode.connectorConnectionRequired, 'Select a Connection first.')
+    return await this.#connectorRequest(flowId, async (connector, teamId) => {
+      try {
+        return await definition.configOptions!({
+          field,
+          config: trigger.config,
+          signal,
+          connector: {
+            execute: (request) => connector.proxy(definition.snapshot.provider, binding.target, `trigger-options:${flowId}`, request, signal, teamId),
+          },
+        })
+      } catch (error) {
+        if (error instanceof PollConnectionError) throw new ControlError(serverErrorCode.connectorConnectionRequired, error.message)
+        if (error instanceof PermanentPollError) throw new ControlError(controlErrorCode.triggerKeyInvalid, error.message)
+        if (error instanceof ConnectorTaskError) throw error
+        if (signal.aborted) throw error
+        throw new ControlError(controlErrorCode.connectorUnavailable, 'Trigger configuration options could not be loaded.')
+      }
+    })
   }
 
   async listConnectorProviders(flowId?: string, signal?: AbortSignal): Promise<readonly ConnectorProvider[]> {

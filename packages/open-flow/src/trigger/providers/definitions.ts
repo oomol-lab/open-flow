@@ -10,6 +10,7 @@ import { googleCalendarEventChanged } from './google-calendar/on-event-changed.t
 import { googleDriveChangeListener, googleDriveChanges } from './google-drive/changes.ts'
 import { googleDriveFileChange } from './google-drive/on-file-change.ts'
 import { googleSheetsRowAdded } from './google-sheets/on-row-added.ts'
+import { linearIssueChanged } from './linear/on-issue-changed.ts'
 import { notionDatabasePageEvent } from './notion/on-database-page-event.ts'
 import { oneDriveItemChanged } from './one-drive/on-item-changed.ts'
 import { outlookMessageReceived } from './outlook/on-message-received.ts'
@@ -33,6 +34,7 @@ export const triggerDefinitions: readonly ProviderTriggerDefinition[] = [
   googleDriveChangeListener,
   googleDriveFileChange,
   googleSheetsRowAdded,
+  linearIssueChanged,
   notionDatabasePageEvent,
   oneDriveItemChanged,
   outlookMessageReceived,
@@ -51,3 +53,5 @@ export const pollDefinitions: readonly PollDefinition[] = triggerDefinitions.fil
 export const integrationDefinitions: readonly IntegrationDefinition[] = triggerDefinitions.filter(
   (definition): definition is IntegrationDefinition => definition.snapshot.type == 'integration',
 )
+
+export type { TriggerConfigOption, TriggerConfigOptionsContext } from '../common/configOptions.ts'

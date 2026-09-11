@@ -67,7 +67,7 @@ import {
 } from '../editor/flowChanges.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
-import { canvasPresentationChange, restoreCanvasPresentation } from '../workspace.ts'
+import { connectionCatalog, canvasPresentationChange, restoreCanvasPresentation } from '../workspace.ts'
 import { commentIds, designerGraph, removeComments, setComment, setFlowViewport, setNodePositions, setNodeContentHidden } from '../workspace.ts'
 import { CanvasHistory } from './canvasHistory.ts'
 import { DraftChanges } from './draftChanges.ts'
@@ -403,8 +403,17 @@ export class WorkspaceStore {
     const nodeId = this.#identity()
     if (option.kind == 'comment') return await this.#addComment(target, nodeId, position)
     const revision = revisionView(draft)
-    const intent = addNodeIntent(option, revision, target, this.#i18n.t)
+    let intent = addNodeIntent(option, revision, target, this.#i18n.t)
     if (intent == null) return
+    if (intent.kind == 'provider-trigger' && intent.connectionId == null) {
+      try {
+        const connections = await this.#client.listConnectorConnections(intent.definition.provider, undefined, draft.flowId)
+        intent = { ...intent, connectionId: connectionCatalog(connections).preferred?.connectionId }
+      } catch (error) {
+        if (!this.#disposed && this.#model.value.draft == draft) this.#setNotice(errorNotice(error, this.#i18n.t))
+      }
+      if (this.#disposed || this.#model.value.draft != draft || this.#model.value.target != target) return
+    }
     const edge = connection?.(nodeId)
     const nodeChanges = addFlowNode(revision, target, nodeId, intent, this.#identity)
     if (nodeChanges == null) return
@@ -705,12 +714,28 @@ export class WorkspaceStore {
     return changes != null && (await this.#changeDraft(changes)) != null
   }
 
+  public async loadTriggerConfigOptions(triggerId: string, field: string, signal: AbortSignal) {
+    const flowId = this.#model.value.flowId
+    const current = this.#draftSession.capture()
+    await this.#draftChanges.settled()
+    signal.throwIfAborted()
+    if (this.#disposed || !current() || flowId == null) throw new DOMException('Draft changed', 'AbortError')
+    return await this.#client.listTriggerConfigOptions(flowId, triggerId, field, signal)
+  }
+
   public async saveTriggerConfig(triggerId: string, name: string, value: JsonValue | undefined): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target?.kind != 'flow') return false
     const changes = updateTriggerConfig(revision.revision.content, target, triggerId, name, value)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    if (changes == null) return false
+    const trigger = revision.graph(target)?.nodes[triggerId]
+    if (changes.length > 0 && trigger?.kind == 'poll' && trigger.definition.key == 'linear.on_issue_changed' && name == 'teamId') {
+      return (
+        (await this.#changeDraft([...changes, ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'stateIds', undefined) ?? [])])) != null
+      )
+    }
+    return (await this.#changeDraft(changes)) != null
   }
 
   public async saveTriggerSchedule(triggerId: string, schedule: readonly TriggerSchedule[]): Promise<boolean> {
@@ -734,7 +759,17 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target?.kind != 'flow') return false
     const changes = changeTriggerConnection(revision.revision.content, target, triggerId, connectionId)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    if (changes == null) return false
+    const trigger = revision.graph(target)?.nodes[triggerId]
+    if (changes.length > 0 && trigger?.kind == 'poll' && trigger.definition.key == 'linear.on_issue_changed') {
+      return (
+        (await this.#changeDraft([
+          ...changes,
+          ...['teamId', 'stateIds'].flatMap((field) => updateTriggerConfig(revision.revision.content, target, triggerId, field, undefined) ?? []),
+        ])) != null
+      )
+    }
+    return (await this.#changeDraft(changes)) != null
   }
 
   public async saveSubflowSettings(subflowId: string, settings: SubflowSettings): Promise<boolean> {

@@ -1,5 +1,6 @@
 import type { ConnectorProxy } from '../../connector/common/proxy.ts'
 import type { IntegrationEndpointMethod, JsonValue, TriggerKeySnapshot } from '../../flow/common/change.ts'
+import type { TriggerConfigOption, TriggerConfigOptionsContext } from './configOptions.ts'
 
 import { dequal } from 'dequal/lite'
 import { isJsonObject, isJsonValue } from '../../base/common/json.ts'
@@ -103,6 +104,7 @@ export interface IntegrationReconcileResult {
 }
 
 export interface IntegrationDefinition {
+  readonly configOptions?: (context: TriggerConfigOptionsContext) => Promise<readonly TriggerConfigOption[]>
   readonly listener?: ListenerSource
   readonly initialState?: { readonly checkpoint: JsonValue; readonly subscription: Readonly<Record<string, JsonValue>> }
   readonly receive: (context: IntegrationReceiveContext) => IntegrationReceiveResult | Promise<IntegrationReceiveResult>

@@ -19,7 +19,7 @@ const flow = {
 
 function createSetup() {
   const requests: string[] = []
-  const request = vi.fn(async (path: string) => {
+  const request = vi.fn(async (path: string, init?: RequestInit) => {
     requests.push(path)
     if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [flow], total: 1, version: 1 })
     if (path == `/v1/flows/${flow.flowId}/editor`) {
@@ -29,21 +29,21 @@ function createSetup() {
           actorId: 'actor',
           content: {
             document: {
-              bindings: Object.fromEntries(['github', 'mail'].map((provider) => [provider, { kind: 'connection', target: `${provider}-old` }])),
+              bindings: Object.fromEntries(['github', 'mail', 'linear'].map((provider) => [provider, { kind: 'connection', target: `${provider}-old` }])),
               graph: {
                 edges: [],
                 nodes: Object.fromEntries(
-                  ['github', 'mail'].map((provider) => [
+                  ['github', 'mail', 'linear'].map((provider) => [
                     provider,
                     {
                       bindingId: provider,
-                      config: {},
+                      config: provider == 'linear' ? { teamId: 'team-old', stateIds: ['state-old'] } : {},
                       definition: {
                         configSchema: { type: 'object' },
                         definitionVersion: 1,
                         description: '',
                         displayName: 'New event',
-                        key: `${provider}.event`,
+                        key: provider == 'linear' ? 'linear.on_issue_changed' : `${provider}.event`,
                         name: 'event',
                         payloadSchema: { type: 'object' },
                         provider,
@@ -75,7 +75,25 @@ function createSetup() {
         version: 1,
       })
     }
-    if (path == `/v1/flows/${flow.flowId}/revisions/${flow.draftRevisionId}/check`) {
+    if (path == `/v1/flows/${flow.flowId}/draft/changes`) {
+      return Response.json({
+        revision: {
+          actorId: 'actor',
+          createdAt: timestamp,
+          digest: 'next-digest',
+          flowId: flow.flowId,
+          modelVersion: 1,
+          parentRevisionId: flow.draftRevisionId,
+          revisionId: 'revision-2',
+          version: 1,
+        },
+        version: 1,
+      })
+    }
+    if (path == `/v1/flows/${flow.flowId}/presentation`) {
+      return Response.json({ revision: 2, updatedAt: timestamp, value: JSON.parse(String(init?.body)).value, version: 1 })
+    }
+    if (path.endsWith('/check')) {
       return Response.json({
         closureDigest: 'closure',
         diagnostics: [],
@@ -117,7 +135,7 @@ function createSetup() {
   const workspace = new WorkspaceStore(client, vi.fn())
   const triggers = new TriggerStore(client, workspace, vi.fn(), { openExternalPage: async () => true })
   const signal = new AbortController().signal
-  return { client, workspace, triggers, requests, signal }
+  return { client, workspace, triggers, requests, request, signal }
 }
 
 describe('TriggerStore', () => {
@@ -142,6 +160,112 @@ describe('TriggerStore', () => {
       expect(searched?.map((option) => option.id)).toEqual(['trigger:github.on_repo_event'])
       expect(requests.filter((path) => path == '/v1/trigger-keys/catalog')).toHaveLength(1)
       expect(requests.some((path) => path.startsWith('/v1/connector/connections/'))).toBe(false)
+    } finally {
+      triggers.dispose()
+      workspace.dispose()
+    }
+  })
+
+  it.each(['default', 'only', 'ambiguous', 'inactive', 'empty', 'explicit', 'failure'] as const)(
+    'saves a new Trigger with the appropriate connection: %s',
+    async (scenario) => {
+      const { client, workspace, triggers, signal } = createSetup()
+      const account: ConnectorConnection = { connectionId: 'preferred', displayName: 'Work', isDefault: true, serviceId: 'github', status: 'active' }
+      const other = { ...account, connectionId: 'other', isDefault: false }
+      const connections =
+        scenario == 'empty'
+          ? []
+          : scenario == 'only'
+            ? [other]
+            : scenario == 'ambiguous'
+              ? [other, { ...account, isDefault: false }]
+              : scenario == 'inactive'
+                ? [{ ...account, status: 'reauth_required' as const }]
+                : [other, account]
+      const list = vi.spyOn(client, 'listConnectorConnections').mockResolvedValue(connections)
+      if (scenario == 'failure') list.mockRejectedValue(new Error('Connection lookup failed'))
+      try {
+        await workspace.start(flow.flowId)
+        const option = (await triggers.browseAddNodeOptions(signal))![0]!
+        if (option.kind != 'trigger' || !('trigger' in option) || option.trigger.kind != 'catalog') throw new Error('Expected provider Trigger.')
+        const nodeId = await workspace.addNode(scenario == 'explicit' ? { ...option, trigger: { ...option.trigger, connectionId: 'chosen' } } : option, {
+          x: 0,
+          y: 0,
+        })
+        expect(nodeId).toBeDefined()
+        const node = workspace.$.draft.value!.content.document.graph.nodes[nodeId!]!
+        if (node.kind != 'integration') throw new Error('Expected Integration Trigger.')
+        const expected = scenario == 'default' ? 'preferred' : scenario == 'only' ? 'other' : scenario == 'explicit' ? 'chosen' : ''
+        expect(workspace.$.draft.value!.content.document.bindings[node.bindingId]).toEqual(
+          expected == '' ? undefined : { kind: 'connection', target: expected },
+        )
+        if (scenario == 'explicit') expect(list).not.toHaveBeenCalled()
+        else expect(list).toHaveBeenCalledWith('github', undefined, flow.flowId)
+      } finally {
+        triggers.dispose()
+        workspace.dispose()
+      }
+    },
+  )
+
+  it('does not create a Trigger after leaving the Flow during connection lookup', async () => {
+    const { client, workspace, triggers, signal, requests } = createSetup()
+    const pending = Promise.withResolvers<readonly ConnectorConnection[]>()
+    const list = vi.spyOn(client, 'listConnectorConnections').mockReturnValue(pending.promise)
+    try {
+      await workspace.start(flow.flowId)
+      const option = (await triggers.browseAddNodeOptions(signal))![0]!
+      const adding = workspace.addNode(option, { x: 0, y: 0 })
+      await vi.waitFor(() => expect(list).toHaveBeenCalled())
+      await workspace.selectFlow(undefined)
+      pending.resolve([])
+      expect(await adding).toBeUndefined()
+      expect(requests.some((path) => path.endsWith('/draft/changes'))).toBe(false)
+    } finally {
+      triggers.dispose()
+      workspace.dispose()
+    }
+  })
+
+  it('loads Linear options only after pending configuration is saved', async () => {
+    const { client, workspace, triggers } = createSetup()
+    const pending = Promise.withResolvers<void>()
+    const original = client.changeDraft.bind(client)
+    vi.spyOn(client, 'changeDraft').mockImplementation(async (...args) => {
+      await pending.promise
+      return await original(...args)
+    })
+    const options = vi.spyOn(client, 'listTriggerConfigOptions').mockResolvedValue([{ value: 'state-new', label: 'Ready' }])
+    try {
+      await workspace.start(flow.flowId)
+      const saving = workspace.saveTriggerConfig('linear', 'teamId', 'team-new')
+      const loading = workspace.loadTriggerConfigOptions('linear', 'stateIds', new AbortController().signal)
+      await Promise.resolve()
+      expect(options).not.toHaveBeenCalled()
+      pending.resolve()
+      expect(await saving).toBe(true)
+      expect(await loading).toEqual([{ value: 'state-new', label: 'Ready' }])
+      expect(options).toHaveBeenCalledOnce()
+    } finally {
+      pending.resolve()
+      triggers.dispose()
+      workspace.dispose()
+    }
+  })
+
+  it.each(['team', 'connection'] as const)('clears dependent Linear selections in the same save when changing %s', async (change) => {
+    const { workspace, triggers, request } = createSetup()
+    try {
+      await workspace.start(flow.flowId)
+      if (change == 'team') await workspace.saveTriggerConfig('linear', 'teamId', 'team-new')
+      else await workspace.setTriggerConnection('linear', 'connection-new')
+      const node = workspace.$.draft.value!.content.document.graph.nodes.linear!
+      if (node.kind != 'poll') throw new Error('Expected Poll.')
+      expect(node.config).toEqual(change == 'team' ? { teamId: 'team-new' } : {})
+      const saves = request.mock.calls.filter(([path]) => path.endsWith('/draft/changes'))
+      expect(saves).toHaveLength(1)
+      const body = JSON.parse(String(saves[0]![1]?.body))
+      expect(body.operations).toHaveLength(change == 'team' ? 2 : 3)
     } finally {
       triggers.dispose()
       workspace.dispose()

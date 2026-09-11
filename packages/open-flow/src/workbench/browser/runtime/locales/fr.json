@@ -894,5 +894,23 @@
     "deleteOne": "Supprimer 1 nœuds",
     "pasteOne": "Coller 1 nœuds",
     "moveOne": "Déplacer 1 nœuds"
+  },
+  "linearTrigger": {
+    "team": "Équipe",
+    "selectTeam": "Choisir une équipe",
+    "connectFirst": "Choisissez d’abord une connexion.",
+    "loading": "Chargement…",
+    "noTeams": "Aucune équipe accessible.",
+    "missingTeam": "L’équipe sélectionnée n’est plus disponible. Choisissez-en une autre.",
+    "loadFailed": "Impossible de charger les options.",
+    "retry": "Réessayer",
+    "statuses": "Statuts des issues",
+    "selectTeamFirst": "Choisissez d’abord une équipe.",
+    "statusHint": "Correspond au statut actuel lors d’une modification, pas uniquement aux transitions vers ce statut.",
+    "allStatuses": "Tous les statuts",
+    "selectedCount": "{{count}} statuts sélectionnés",
+    "noStatuses": "Aucun statut disponible.",
+    "unavailableStatus": "Statut indisponible ({{id}})",
+    "missingStatuses": "Certains statuts sélectionnés ne sont plus disponibles. Supprimez-les ou remplacez-les."
   }
 }

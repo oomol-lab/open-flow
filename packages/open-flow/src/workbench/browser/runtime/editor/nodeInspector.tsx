@@ -34,6 +34,7 @@ import { CodeEditor } from './codeEditor.tsx'
 import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
 import { codeTyping } from './flowChanges.ts'
+import { LinearTriggerConfig } from './linearTriggerConfig.tsx'
 import { NodeDescription } from './nodeDescription.tsx'
 import { NodeInputs } from './nodeInputs.tsx'
 import { taskDiagnosticReady, taskInspectorSection } from './nodeInspectorBehavior.ts'
@@ -1226,17 +1227,29 @@ export function NodeInspector({
             }}
           />
         )}
-        {selection?.kind === 'trigger' && (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') && (
-          <TriggerConfigEditor
-            key={`config:${selection.id}`}
-            schema={selection.trigger.definition.configSchema}
-            config={selection.trigger.config}
-            disabled={disabled}
-            onChange={(name, value) => {
-              void store.saveTriggerConfig(selection.id, name, value)
-            }}
-          />
-        )}
+        {selection?.kind === 'trigger' &&
+          (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') &&
+          (selection.trigger.definition.key === 'linear.on_issue_changed' ? (
+            <LinearTriggerConfig
+              config={selection.trigger.config}
+              nodeId={selection.id}
+              connectionId={
+                revision.binding(selection.trigger.bindingId)?.kind === 'connection' ? revision.binding(selection.trigger.bindingId)!.target : undefined
+              }
+              disabled={disabled}
+              store={store}
+            />
+          ) : (
+            <TriggerConfigEditor
+              key={`config:${selection.id}`}
+              schema={selection.trigger.definition.configSchema}
+              config={selection.trigger.config}
+              disabled={disabled}
+              onChange={(name, value) => {
+                void store.saveTriggerConfig(selection.id, name, value)
+              }}
+            />
+          ))}
         {selection?.kind === 'trigger' && selection.trigger.kind === 'webhook' && (
           <WebhookEditor
             key={`webhook:${selection.id}`}
