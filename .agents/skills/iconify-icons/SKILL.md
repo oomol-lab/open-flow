@@ -24,13 +24,16 @@ For example, run from `packages/open-flow`:
 bun -e '
 const data = await Bun.file("node_modules/@iconify/json/json/lucide.json").json();
 for (const name of [...Object.keys(data.icons), ...Object.keys(data.aliases ?? {})]) {
-  if (/flow|connection|minimap/i.test(name)) console.log(`i-${data.prefix}:${name}`);
+  if (/flow|connection|minimap/i.test(name)) console.log(`i-lucide-light:${name}`);
 }
 '
 ```
 
-Prefer Lucide for new or replaced UI icons, using its rounded outlines and consistent
-stroke weight. Search other installed collections only when Lucide has no suitable
+Prefer Lucide for new or replaced UI icons. Use the project's `lucide-light` collection
+with stroke width 1.5, not the default `lucide` collection with stroke width 2.
+It uses the same icon keys as the installed `lucide.json`; search that file and emit
+`i-lucide-light:<name>`. When using an existing `lucide-react` component, explicitly set
+`strokeWidth={1.5}`. Search other installed collections only when Lucide has no suitable
 icon or the user specifies another collection. Keep icons within the same control
 group visually consistent in stroke weight, proportions, and apparent size; nearby
 legacy icons do not override the Lucide preference. Try related English keywords
@@ -45,7 +48,7 @@ Choose verification using the [repository verification principles](../../../AGEN
 Use the collection prefix and exact icon key to form a complete class:
 
 ```tsx
-<i aria-hidden="true" className="i-lucide:workflow" />
+<i aria-hidden="true" className="i-lucide-light:workflow" />
 ```
 
 Write the complete class literally in source so UnoCSS can discover it. Do not

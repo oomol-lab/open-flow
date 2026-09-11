@@ -5,7 +5,7 @@ import type { FrontendStory } from './stories.tsx'
 
 import { useRef, useMemo } from 'react'
 import { I18nProvider } from 'val-i18n-react'
-import { CanvasCard } from '../../src/canvas/browser/graph/Nodes/components/CanvasCard.tsx'
+import { CanvasCard, TriggerIndicator } from '../../src/canvas/browser/graph/Nodes/components/CanvasCard.tsx'
 import { RunChips } from '../../src/canvas/browser/graph/Nodes/components/RunChips.tsx'
 import { GetPopupContainerContext } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
@@ -58,6 +58,36 @@ function CardStage({ dark, language, children }: { readonly dark: boolean; reado
 }
 
 export const cardStories: readonly FrontendStory[] = [
+  {
+    group: 'Canvas',
+    id: 'canvas-card-indicators',
+    title: 'Cards · Identity indicators',
+    description: 'Warm trigger indicators and error replacements at normal and compact zoom, balanced with the leading icons.',
+    standalone: true,
+    render: (_log, dark, language) => (
+      <CardStage dark={dark} language={language}>
+        <div className="card-studies-grid">
+          {[false, true].flatMap((compact) =>
+            [
+              { label: 'Trigger', indicator: true, problem: undefined },
+              { label: 'Trigger error', indicator: true, problem: 'Review the configuration.' },
+              { label: 'Task error', indicator: false, problem: 'Review the configuration.' },
+            ].map((state) => (
+              <CanvasCard
+                key={`${compact}-${state.label}`}
+                title={`${state.label} · ${compact ? 'Compact' : 'Normal'}`}
+                subtitle="Identity indicators"
+                icon={<i className="i-carbon:code" />}
+                indicator={state.indicator ? <TriggerIndicator label="Trigger" /> : undefined}
+                problem={state.problem}
+                compact={compact}
+              />
+            )),
+          )}
+        </div>
+      </CardStage>
+    ),
+  },
   {
     group: 'Canvas',
     id: 'canvas-card-states',
