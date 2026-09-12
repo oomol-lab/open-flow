@@ -10,7 +10,7 @@ import { ServerService } from './application/service.ts'
 import { OperatorSession } from './deployment/operator.ts'
 import { Settings } from './deployment/settings.ts'
 import { createLogger } from './logger.ts'
-import { migrateDatabase } from './storage/migrate.ts'
+import { Database } from './storage/database.ts'
 import { OperatorStore } from './storage/operator-store.ts'
 import { SettingsStore } from './storage/settings-store.ts'
 import { createServerApp } from './transport/http.ts'
@@ -30,7 +30,10 @@ function main(): Effect.Effect<void> {
       const dataDirectory = path.resolve(process.env.OPEN_FLOW_DATA_DIR ?? '.open-flow-dev/server')
       yield* Effect.promise(() => mkdir(dataDirectory, { recursive: true }))
       const databaseFile = path.join(dataDirectory, 'open-flow.sqlite')
-      yield* Effect.sync(() => migrateDatabase(databaseFile))
+      const database = yield* Effect.acquireRelease(
+        Effect.sync(() => Database.open(databaseFile)),
+        (opened) => Effect.sync(() => opened.close()),
+      )
 
       const retentionDays = Number(process.env.OPEN_FLOW_RUN_EVENT_RETENTION_DAYS ?? '30')
       const runEventRetentionMs = retentionDays * 24 * 60 * 60 * 1000
@@ -70,10 +73,7 @@ function main(): Effect.Effect<void> {
       if ((llmOrigin == null) != (llmToken == null)) {
         throw new Error('OPEN_FLOW_LLM_ORIGIN and OPEN_FLOW_LLM_TOKEN must be configured together.')
       }
-      const settingsStore = yield* Effect.acquireRelease(
-        Effect.sync(() => new SettingsStore(databaseFile)),
-        (opened) => Effect.sync(() => opened.close()),
-      )
+      const settingsStore = new SettingsStore(database)
       const integrationPublicOrigin = process.env.OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN
       const integrationCallbackKey = process.env.OPEN_FLOW_INTEGRATION_CALLBACK_KEY
       if ((integrationPublicOrigin == null) != (integrationCallbackKey == null)) {
@@ -112,7 +112,7 @@ function main(): Effect.Effect<void> {
       if (secureCookie != null && secureCookie != 'true' && secureCookie != 'false') {
         throw new Error('OPEN_FLOW_SESSION_COOKIE_SECURE must be true or false.')
       }
-      const service = yield* ServerService.open(databaseFile, {
+      const service = yield* ServerService.open(database, {
         capabilities: {
           connector: () => settings.connector(),
           connectorConsoleOrigin: () => settings.connectorConsoleOrigin(),
@@ -129,10 +129,7 @@ function main(): Effect.Effect<void> {
         },
       })
       yield* service.start()
-      const operatorStore = yield* Effect.acquireRelease(
-        Effect.sync(() => new OperatorStore(databaseFile)),
-        (opened) => Effect.sync(() => opened.close()),
-      )
+      const operatorStore = new OperatorStore(database)
       const setupCode = operatorToken == null && !operatorStore.state().claimed ? randomBytes(32).toString('base64url') : undefined
       const operator = new OperatorSession(operatorStore, operatorToken, secureCookie == 'true', setupCode)
       if (setupCode != null) {

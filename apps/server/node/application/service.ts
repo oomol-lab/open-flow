@@ -8,7 +8,8 @@ import type { Logger } from 'pino'
 import type { ConnectorHost } from '../deployment/connector.ts'
 import type { LlmHost } from '../deployment/llm.ts'
 import type { IntegrationOptions, IntegrationResponse, IntegrationRuntimeState, IntegrationTarget } from '../runtime/integration-runtime.ts'
-import type { RunEvent, RunRecord } from '../storage/store.ts'
+import type { Database } from '../storage/database.ts'
+import type { RunEvent, RunRecord } from '../storage/run-view-store.ts'
 import type { PollState, RunAdmission } from '../storage/trigger-store.ts'
 import type { ServerCapabilities, ServerRuntime, ServerServiceOptions } from './service-options.ts'
 import type { WebhookTarget } from './webhook-targets.ts'
@@ -28,7 +29,6 @@ import { silentLogger } from '../logger.ts'
 import { IntegrationRuntime } from '../runtime/integration-runtime.ts'
 import { IsolatedVmHost } from '../runtime/isolated-vm.ts'
 import { ListenerRuntime } from '../runtime/listener-runtime.ts'
-import { migrateDatabase } from '../storage/migrate.ts'
 import { Store } from '../storage/store.ts'
 import { ControlService } from './control-service.ts'
 import { CronDriver } from './cron-driver.ts'
@@ -242,7 +242,7 @@ export class ServerService {
     )
   }
 
-  static open(databaseFile: string, options: ServerServiceOptions = {}): Effect.Effect<ServerService, Error, Scope.Scope> {
+  static open(database: Database, options: ServerServiceOptions = {}): Effect.Effect<ServerService, Error, Scope.Scope> {
     const { capabilities = {}, clock, logger = silentLogger, runtime = {}, triggerDefinitions = providerTriggerDefinitions } = options
     return Effect.gen(function* () {
       const clockService = typeof clock == 'object' ? clock : yield* Clock.Clock
@@ -254,16 +254,10 @@ export class ServerService {
         },
         catch: (error) => (error instanceof Error ? error : new Error(String(error))),
       })
-      const store = yield* Effect.acquireRelease(
-        Effect.try({
-          try: () => {
-            migrateDatabase(databaseFile)
-            return new Store(databaseFile, now, runtime.runEventRetentionMs, runtime.maxPendingRuns, () => capabilities.llm?.()?.config)
-          },
-          catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-        }),
-        (opened) => Effect.sync(() => opened.close()),
-      )
+      const store = yield* Effect.try({
+        try: () => new Store(database, now, runtime.runEventRetentionMs, runtime.maxPendingRuns, () => capabilities.llm?.()?.config),
+        catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+      })
       const isolatedVm = yield* Effect.acquireRelease(
         Effect.sync(() => new IsolatedVmHost()),
         (opened) => Effect.promise(() => opened.close()),
@@ -309,8 +303,8 @@ export class ServerService {
     if (!(connector instanceof ConnectorClient) || !connector.teamSupported()) return { bindings: [], enabled: false, teams: [], version: 1 }
     const teams = await loadTeams(connector, signal)
     const defaultTeam = teams.find((team) => team.systemCreated)
-    if (defaultTeam != null) this.#store.bindUnassignedConnectorTeams(defaultTeam.id)
-    return { bindings: this.#store.connectorTeamBindings(), enabled: true, teams, version: 1 }
+    if (defaultTeam != null) this.#store.connectorTeams.bindUnassigned(defaultTeam.id)
+    return { bindings: this.#store.connectorTeams.list(), enabled: true, teams, version: 1 }
   }
 
   async #connectorTeam(teamId?: string): Promise<string | undefined> {
@@ -330,7 +324,7 @@ export class ServerService {
   }
 
   cancel(runId: string): boolean {
-    const committed = this.#store.cancel(runId)
+    const committed = this.#store.runs.cancel(runId)
     if (committed) {
       this.#supervisor.interrupt(runId)
       this.#logger.info({ category: 'run.canceled', runId }, 'Run canceled.')
@@ -355,10 +349,10 @@ export class ServerService {
   }
 
   events(runId: string): readonly RunEvent[] {
-    if (this.#store.eventsExpired(runId, this.#clock())) {
+    if (this.#store.runViews.eventsExpired(runId, this.#clock())) {
       throw new ControlError(controlErrorCode.runEventsExpired, 'The Run event history has expired.')
     }
-    return this.#store.events(runId)
+    return this.#store.runViews.events(runId)
   }
 
   async ready(): Promise<boolean> {
@@ -371,7 +365,7 @@ export class ServerService {
   }
 
   run(runId: string): RunRecord | undefined {
-    return this.#store.run(runId)
+    return this.#store.runViews.run(runId)
   }
 
   start(): Effect.Effect<void, never, Scope.Scope> {
@@ -379,7 +373,7 @@ export class ServerService {
       yield* Effect.promise(async () => {
         try {
           const teamId = await this.#connectorTeam()
-          if (teamId != null) this.#store.bindUnassignedConnectorTeams(teamId)
+          if (teamId != null) this.#store.connectorTeams.bindUnassigned(teamId)
         } catch (error) {
           this.#logger.warn({ category: 'connector.team.resolve-failed', err: error }, 'Default OOMOL Team could not be resolved.')
         }

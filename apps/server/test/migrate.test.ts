@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, expect, it } from 'vitest'
-import { migrateDatabase } from '../node/storage/migrate.ts'
+import { Database } from '../node/storage/database.ts'
 
 const directories: string[] = []
 
@@ -24,7 +24,7 @@ function version(database: DatabaseSync): number {
 
 it('applies the Flow-first schema without foreign keys', async () => {
   const file = await databaseFile()
-  migrateDatabase(file)
+  Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
     expect(version(database)).toBe(15)
@@ -59,7 +59,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
   database.prepare('INSERT INTO revisions (revision_id, digest, content) VALUES (?, ?, ?)').run('revision-a', 'digest-a', '{}')
   database.close()
 
-  migrateDatabase(file)
+  Database.open(file).close()
 
   const reopened = new DatabaseSync(file)
   try {
@@ -89,7 +89,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
     .run()
   database.close()
 
-  migrateDatabase(file)
+  Database.open(file).close()
 
   const reopened = new DatabaseSync(file)
   try {
@@ -103,12 +103,12 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
 it('does not reapply the current schema', async () => {
   const file = await databaseFile()
-  migrateDatabase(file)
+  Database.open(file).close()
   const database = new DatabaseSync(file)
   database.prepare('INSERT INTO revisions (revision_id, digest, content) VALUES (?, ?, ?)').run('revision-a', 'digest-a', '{}')
   database.close()
 
-  migrateDatabase(file)
+  Database.open(file).close()
 
   const reopened = new DatabaseSync(file)
   try {
@@ -126,7 +126,7 @@ it('preserves an old Project schema until an explicit migration is available', a
   database.exec('PRAGMA user_version = 9')
   database.close()
 
-  expect(() => migrateDatabase(file)).toThrow('Legacy application schema requires an explicit migration')
+  expect(() => Database.open(file)).toThrow('Legacy application schema requires an explicit migration')
 
   const reset = new DatabaseSync(file)
   try {
@@ -139,12 +139,12 @@ it('preserves an old Project schema until an explicit migration is available', a
 
 it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
-  migrateDatabase(file)
+  Database.open(file).close()
   const database = new DatabaseSync(file)
   database.exec('PRAGMA user_version = 16')
   database.close()
 
-  expect(() => migrateDatabase(file)).toThrow('SQLite schema version 16 is newer than the supported version 15.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 16 is newer than the supported version 15.')
 
   const reopened = new DatabaseSync(file)
   expect(version(reopened)).toBe(16)
@@ -157,7 +157,7 @@ it('preserves an unversioned application schema', async () => {
   database.exec('CREATE TABLE revisions (revision_id TEXT PRIMARY KEY) STRICT')
   database.close()
 
-  expect(() => migrateDatabase(file)).toThrow('Legacy application schema requires an explicit migration')
+  expect(() => Database.open(file)).toThrow('Legacy application schema requires an explicit migration')
 
   const reset = new DatabaseSync(file)
   try {
@@ -170,7 +170,7 @@ it('preserves an unversioned application schema', async () => {
 
 it('removes obsolete Wait ordering while preserving a pending checkpoint', async () => {
   const file = await databaseFile()
-  migrateDatabase(file)
+  Database.open(file).close()
   const database = new DatabaseSync(file)
   database.exec(
     'DROP TABLE listener_work; DROP TABLE run_results; DROP TABLE wait_receipts; ALTER TABLE runs DROP COLUMN llm_config; ALTER TABLE runs DROP COLUMN binding_values',
@@ -193,7 +193,7 @@ it('removes obsolete Wait ordering while preserving a pending checkpoint', async
   expect(job_order).toBe(0)
   database.close()
 
-  migrateDatabase(file)
+  Database.open(file).close()
 
   const reopened = new DatabaseSync(file)
   try {
@@ -206,7 +206,7 @@ it('removes obsolete Wait ordering while preserving a pending checkpoint', async
 
 it('upgrades version 14 while preserving existing Integration progress, subscriptions, and Revision bytes', async () => {
   const file = await databaseFile()
-  migrateDatabase(file)
+  Database.open(file).close()
   const database = new DatabaseSync(file)
   database.exec('DROP TABLE listener_work; PRAGMA user_version = 14')
   database.prepare('INSERT INTO revisions (revision_id, digest, content) VALUES (?, ?, ?)').run('legacy-revision', 'legacy-digest', '{ "legacy": true }')
@@ -223,7 +223,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   const tables = ['revisions', 'integration_bindings', 'integration_states']
   const before = tables.map((table) => database.prepare('SELECT * FROM ' + table).all())
   database.close()
-  migrateDatabase(file)
+  Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
     expect(version(upgraded)).toBe(15)

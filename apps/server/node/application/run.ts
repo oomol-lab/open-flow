@@ -6,7 +6,8 @@ import type { FlowRunOutcome, FlowRunResult, RunLaunch, TaskInvocation } from '@
 import type { Logger } from 'pino'
 import type { ConnectorHost } from '../deployment/connector.ts'
 import type { LlmHost } from '../deployment/llm.ts'
-import type { Store, StoredRun } from '../storage/store.ts'
+import type { StoredRun } from '../storage/run-store.ts'
+import type { Store } from '../storage/store.ts'
 
 import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-action'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
@@ -152,7 +153,7 @@ export class RunExecutor {
       if (Object.values(prepared.flow.tasks).some((task) => task.executor.kind == 'agent') && run.bindingValues == null)
         return yield* Effect.fail(new Error('The fixed Agent Variable snapshot is unavailable.'))
       const bindingValues =
-        run.bindingValues ?? this.#store.resolveVariables(variableBindings(revision, prepared.validation.closure.dependencies.inputBindings))
+        run.bindingValues ?? this.#store.variables.resolve(variableBindings(revision, prepared.validation.closure.dependencies.inputBindings))
       if (bindingValues == null) return { kind: 'binding-unresolved' as const }
       return { bindingValues, flow: prepared.flow, kind: 'prepared' as const, projectEvent, started }
     })
@@ -169,7 +170,7 @@ export class RunExecutor {
     return Effect.gen({ self: this }, function* () {
       if (run.resumeUnavailable) {
         if (
-          this.#store.failResume(run.runId, {
+          this.#store.runs.failResume(run.runId, {
             error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint is unavailable.' },
           })
         ) {
@@ -183,13 +184,13 @@ export class RunExecutor {
             Effect.sync(() => {
               const committed =
                 run.resume == null
-                  ? this.#store.failStarting(run.runId, {
+                  ? this.#store.runs.failStarting(run.runId, {
                       error:
                         error instanceof ConnectorTaskError
                           ? { code: error.code, message: error.message }
                           : { code: 'execution.unavailable', message: 'The fixed Run could not be started by this deployment.' },
                     })
-                  : this.#store.failResume(run.runId, {
+                  : this.#store.runs.failResume(run.runId, {
                       error: { code: 'execution.resume-unavailable', message: 'The stored Wait checkpoint cannot resume against the fixed Flow.' },
                     })
               if (committed) {
@@ -201,13 +202,14 @@ export class RunExecutor {
         }),
       )
       if (start?.kind == 'binding-unresolved') {
-        this.#store.failStarting(run.runId, {
+        this.#store.runs.failStarting(run.runId, {
           error: { code: controlErrorCode.bindingUnresolved, message: 'A required Variable is unresolved.' },
         })
         return
       }
       if (start == null || start.started == null) return
-      const started = run.resume == null ? this.#store.start(run.runId, start.started) : this.#store.resume(run.runId, run.resume.checkpoint.wait.waitId)
+      const started =
+        run.resume == null ? this.#store.runs.start(run.runId, start.started) : this.#store.runs.resume(run.runId, run.resume.checkpoint.wait.waitId)
       if (!started) return
       return { bindingValues: start.bindingValues, flow: start.flow, projectEvent: start.projectEvent }
     })
@@ -242,7 +244,7 @@ export class RunExecutor {
           emit: async (event) => {
             if (event.type == 'run.started' && event.runId == run.runId) return
             const projected = await projectEvent(event)
-            if (projected != null) this.#store.append(run.runId, projected)
+            if (projected != null) this.#store.runs.append(run.runId, projected)
           },
           flowId: run.flowId,
           ...launch,
@@ -257,7 +259,7 @@ export class RunExecutor {
                 level: 'info',
                 message: JSON.stringify(data),
               })
-              if (event != null) this.#store.append(run.runId, event)
+              if (event != null) this.#store.runs.append(run.runId, event)
             }).catch((error: unknown) => {
               if (error instanceof ConnectorTaskError && error.code == 'connector.indeterminate') indeterminate = true
               throw error
@@ -323,7 +325,7 @@ export class RunExecutor {
           taskId: output.notification.taskId,
         }
       }
-      if (this.#store.wait(run.runId, output, remainingMs, notification) == null) return
+      if (this.#store.runs.wait(run.runId, output, remainingMs, notification) == null) return
       this.#runChanged(run.flowId, run.runId)
       this.#wakeMaintenance()
       this.#logger.info(
@@ -341,7 +343,7 @@ export class RunExecutor {
       : timedOut
         ? { error: { code: 'run.timeout', message: 'The Run exceeded its execution deadline.' } }
         : { error: { code: 'run.failed', message: 'The Flow could not be completed.' } }
-    if (!this.#store.commit(run.runId, indeterminate ? 'indeterminate' : 'failed', result)) return
+    if (!this.#store.runs.commit(run.runId, indeterminate ? 'indeterminate' : 'failed', result)) return
     this.#runChanged(run.flowId, run.runId)
     this.#logger.error(
       {
@@ -356,7 +358,7 @@ export class RunExecutor {
   }
 
   #completeRun(run: StoredRun, startedAt: number, output: FlowRunResult): void {
-    if (!this.#store.commit(run.runId, 'completed', output)) return
+    if (!this.#store.runs.commit(run.runId, 'completed', output)) return
     this.#runChanged(run.flowId, run.runId)
     this.#logger.info(
       { category: 'run.completed', durationMs: Math.round(performance.now() - startedAt), flowId: run.flowId, runId: run.runId },

@@ -5,17 +5,17 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, it } from 'vitest'
-import { migrateDatabase } from '../node/storage/migrate.ts'
+import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
 for (const conformance of runLifecycleConformanceCases) {
   it(conformance.name, async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-lifecycle-'))
     const file = path.join(directory, 'store.sqlite')
-    migrateDatabase(file)
-    const store = new Store(file)
+    const opened = Database.open(file)
+    const store = new Store(opened)
     try {
-      store.createFlow({
+      store.flows.createFlow({
         actorId: 'operator',
         content: '{}',
         createdAt: Date.now(),
@@ -28,7 +28,7 @@ for (const conformance of runLifecycleConformanceCases) {
       })
       const harness: RunLifecycleHarness = {
         async accept(input) {
-          const result = store.acceptControlRun({
+          const result = store.runs.acceptControlRun({
             ...input,
             closureDigest: 'closure',
             flowId: 'flow',
@@ -43,40 +43,42 @@ for (const conformance of runLifecycleConformanceCases) {
           return result
         },
         async claim(runId) {
-          const run = store.run(runId)
+          const run = store.runViews.run(runId)
           if (run == null) throw new Error('Run is missing.')
           if (isRunTerminal(run.status)) return { kind: 'terminal', status: run.status }
           if (run.status == 'running' || run.status == 'waiting') {
-            expect(store.claim()).toBeUndefined()
+            expect(store.runs.claim()).toBeUndefined()
             return run.status == 'running' ? { kind: 'running', status: 'running' } : { kind: 'waiting', status: 'waiting' }
           }
-          expect(store.claim()?.runId).toBe(runId)
-          expect(store.run(runId)?.status).toBe('starting')
+          expect(store.runs.claim()?.runId).toBe(runId)
+          expect(store.runViews.run(runId)?.status).toBe('starting')
           return { kind: 'ready', status: 'starting' }
         },
         async start(runId) {
-          const run = store.controlRun(runId)
+          const run = store.runViews.controlRun(runId)
           if (run == null) throw new Error('Run is missing.')
           const started =
-            run.startedAt == null ? store.start(runId, { kind: 'run.started', payload: { flowId: 'flow', scopeId: runId } }) : store.resume(runId, 'wait')
+            run.startedAt == null
+              ? store.runs.start(runId, { kind: 'run.started', payload: { flowId: 'flow', scopeId: runId } })
+              : store.runs.resume(runId, 'wait')
           if (started) return { kind: 'started', status: 'running' }
           return run.status == 'running' ? { kind: 'already-started', status: 'running' } : { kind: 'stale', status: run.status }
         },
         async commit(runId, status) {
-          return store.commit(runId, status, {})
+          return store.runs.commit(runId, status, {})
         },
         async failStarting(runId) {
-          return store.failStarting(runId, {})
+          return store.runs.failStarting(runId, {})
         },
         async failResume(runId) {
-          return store.failResume(runId, {})
+          return store.runs.failResume(runId, {})
         },
         async observe(runId) {
-          const run = store.run(runId)
+          const run = store.runViews.run(runId)
           if (run == null) throw new Error('Run is missing.')
           return {
             status: run.status,
-            terminalEvents: store.events(runId).flatMap(({ kind }) => {
+            terminalEvents: store.runViews.events(runId).flatMap(({ kind }) => {
               switch (kind) {
                 case 'run.canceled':
                   return ['canceled' as const]
@@ -95,7 +97,7 @@ for (const conformance of runLifecycleConformanceCases) {
         async wait(runId) {
           const wait = { jobId: 'job', nodeId: 'wait', waitId: 'wait' }
           return (
-            store.wait(
+            store.runs.wait(
               runId,
               {
                 kind: 'waiting',
@@ -107,13 +109,13 @@ for (const conformance of runLifecycleConformanceCases) {
           )
         },
         async resolve(runId) {
-          const result = store.resolveWait(runId, 'wait', 'continue')
+          const result = store.runs.resolveWait(runId, 'wait', 'continue')
           return result.kind == 'resolved' && result.changed && result.resolutionAccepted
         },
       }
       await conformance.verify(harness)
     } finally {
-      store.close()
+      opened.close()
       await rm(directory, { force: true, recursive: true })
     }
   })

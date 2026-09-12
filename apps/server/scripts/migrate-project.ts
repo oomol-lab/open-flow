@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { backup, DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
-import { migrateDatabase } from '../node/storage/migrate.ts'
+import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
 export async function migrateProjectDatabase(sourceFile: string, outputDirectory: string) {
@@ -17,14 +17,14 @@ export async function migrateProjectDatabase(sourceFile: string, outputDirectory
     source.close()
   }
   const archive = new DatabaseSync(path.join(outputDirectory, 'source.sqlite'), { readOnly: true })
-  let target: Store | undefined
+  let database: Database | undefined
   const migrated: { projectId: string; sourceRevisionId: string; flowId: string; revisionId: string; adjustments: readonly string[] }[] = []
   const blocked: { projectId: string; flowId?: string; reason: string }[] = []
   const flowIds = new Set<string>()
   try {
     const targetFile = path.join(outputDirectory, 'open-flow.sqlite')
-    migrateDatabase(targetFile)
-    target = new Store(targetFile)
+    database = Database.open(targetFile)
+    const target = new Store(database)
     const projects = archive
       .prepare(`SELECT project_id AS projectId, draft_revision_id AS revisionId, status, created_at AS createdAt FROM projects ORDER BY project_id`)
       .all() as unknown as { projectId: string; revisionId: string; status: string; createdAt: number }[]
@@ -51,7 +51,7 @@ export async function migrateProjectDatabase(sourceFile: string, outputDirectory
             const digest = await digestBytes(bytes)
             const identity = await digestBytes(new TextEncoder().encode(JSON.stringify([entry.projectId, flowId, digest])))
             const revisionId = `revision_${identity.slice(7)}`
-            const result = target.createFlow({
+            const result = target.flows.createFlow({
               actorId: 'project-migration',
               content: new TextDecoder().decode(bytes),
               createdAt: entry.createdAt,
@@ -74,7 +74,7 @@ export async function migrateProjectDatabase(sourceFile: string, outputDirectory
       }
     }
   } finally {
-    target?.close()
+    database?.close()
     archive.close()
   }
   const report = {

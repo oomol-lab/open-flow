@@ -248,7 +248,7 @@ export class ListenerRuntime {
                   target.bindingId,
                   request,
                   requestSignal == null ? signal : AbortSignal.any([signal, requestSignal]),
-                  this.#store.connectorTeam(target.flowId),
+                  this.#store.connectorTeams.get(target.flowId),
                 ),
             },
             signal,

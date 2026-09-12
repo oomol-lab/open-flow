@@ -679,7 +679,7 @@ export class IntegrationRuntime {
           const connector = this.#resolveConnector()
           if (connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
           const connectorSignal = signal == null ? parentSignal : AbortSignal.any([parentSignal, signal])
-          return await connector.proxy(definition.snapshot.provider, connectionId, bindingId, request, connectorSignal, this.#store.connectorTeam(flowId))
+          return await connector.proxy(definition.snapshot.provider, connectionId, bindingId, request, connectorSignal, this.#store.connectorTeams.get(flowId))
         } catch (cause) {
           if (cause instanceof ConnectorTaskError && cause.code == 'connector.connection-required') {
             throw new IntegrationConnectionError('Integration Connection requires reauthorization.', { cause })

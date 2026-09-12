@@ -1,5 +1,5 @@
 import type { PublishOperation } from '@oomol-lab/open-flow/control-api'
-import type { PublicationAcceptance, StoredFlow, StoredFlowRevision, StoredLive, StoredPublication } from './store.ts'
+import type { StoredFlow, StoredFlowRevision } from './flow-store.ts'
 
 import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
 import { randomUUID } from 'node:crypto'
@@ -8,6 +8,33 @@ import { AcceptanceError } from '../error.ts'
 import { insert } from './insert.ts'
 import { IntegrationStore } from './integration-store.ts'
 import { PollStore } from './poll-store.ts'
+import { VariableStore } from './variable-store.ts'
+
+export type PublicationAcceptance =
+  | { readonly created: boolean; readonly kind: 'published'; readonly publicationId: string }
+  | {
+      readonly kind: 'binding-unresolved' | 'busy' | 'conflict' | 'live-conflict' | 'not-found' | 'operation-pending' | 'revision-conflict' | 'source-not-found'
+    }
+
+export interface StoredPublication {
+  readonly actorId: string
+  readonly closureDigest: string
+  readonly createdAt: number
+  readonly engineContract: string
+  readonly flowId: string
+  readonly modelVersion: number
+  readonly operation: 'publish' | 'rollback'
+  readonly publicationId: string
+  readonly revisionDigest: string
+  readonly revisionId: string
+  readonly sourcePublicationId: string | null
+}
+
+export interface StoredLive {
+  readonly publication: StoredPublication
+  readonly revision: number
+  readonly updatedAt: number
+}
 
 const publicationColumns = `
   publications.actor_id AS actorId,
@@ -76,6 +103,7 @@ export class PublicationStore {
   readonly #integrations: IntegrationStore
   readonly #polls: PollStore
   readonly #transaction: <Value>(operation: () => Value) => Value
+  readonly #variables: VariableStore
 
   constructor(
     database: DatabaseSync,
@@ -83,12 +111,14 @@ export class PublicationStore {
     transaction: <Value>(operation: () => Value) => Value,
     integrations: IntegrationStore,
     polls: PollStore,
+    variables: VariableStore,
   ) {
     this.#clock = clock
     this.#database = database
     this.#integrations = integrations
     this.#polls = polls
     this.#transaction = transaction
+    this.#variables = variables
   }
 
   publication(flowId: string, publicationId: string): StoredPublication | undefined {
@@ -213,7 +243,7 @@ export class PublicationStore {
       const revision = this.#revision(input.flowId, input.revisionId)
       if (revision == null || revision.digest != input.revisionDigest) return { kind: 'not-found' }
       if (flow.draftRevisionId != input.revisionId) return { kind: 'revision-conflict' }
-      if (!this.#variablesExist(input.variableNames)) return { kind: 'binding-unresolved' }
+      if (!this.#variables.hasAll(input.variableNames)) return { kind: 'binding-unresolved' }
       const live = this.#database.prepare('SELECT publication_id AS publicationId FROM flow_live WHERE flow_id = ?').get(input.flowId) as
         | { readonly publicationId: string }
         | undefined
@@ -492,7 +522,7 @@ export class PublicationStore {
         }
       }
 
-      if (!this.#variablesExist(input.variableNames)) return { kind: 'binding-unresolved' }
+      if (!this.#variables.hasAll(input.variableNames)) return { kind: 'binding-unresolved' }
 
       const live = this.#database.prepare('SELECT publication_id AS publicationId FROM flow_live WHERE flow_id = ?').get(input.flowId) as
         | { readonly publicationId: string }
@@ -876,16 +906,5 @@ export class PublicationStore {
     if (revision == null) {
       this.#database.prepare('INSERT INTO revisions (revision_id, digest, content) VALUES (?, ?, ?)').run(input.revisionId, input.revisionDigest, input.content)
     }
-  }
-
-  #variablesExist(names: readonly string[]): boolean {
-    const unique = [...new Set(names)]
-    if (unique.length == 0) return true
-    const count = (
-      this.#database.prepare(`SELECT COUNT(*) AS count FROM variables WHERE name IN (${unique.map(() => '?').join(', ')})`).get(...unique) as {
-        readonly count: number
-      }
-    ).count
-    return count == unique.length
   }
 }

@@ -5,12 +5,13 @@ import path from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { ConnectorClient } from '../node/deployment/connector.ts'
 import { OperatorSession } from '../node/deployment/operator.ts'
+import { Database } from '../node/storage/database.ts'
 import { OperatorStore } from '../node/storage/operator-store.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { closeService, openService } from './serviceFixture.ts'
 
 const token = 'open-flow-server-operator-token-00000001'
-const operatorStores: OperatorStore[] = []
+const operatorStores: Database[] = []
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -24,9 +25,9 @@ async function cleanup(directory: string): Promise<void> {
 }
 
 function operator(file: string, envToken: string | undefined, secure = false, setupCode?: string, now?: () => number): OperatorSession {
-  const store = new OperatorStore(file, now)
-  operatorStores.push(store)
-  return new OperatorSession(store, envToken, secure, setupCode, now)
+  const database = Database.open(file)
+  operatorStores.push(database)
+  return new OperatorSession(new OperatorStore(database, now), envToken, secure, setupCode, now)
 }
 
 it('uses a signed operator session, expires it on time or token rotation, and clears its cookie on logout', async () => {
@@ -162,9 +163,11 @@ it('throttles failed stored token verification and caches a verified token', asy
   const file = path.join(directory, 'open-flow.sqlite')
   const service = await openService(file)
   let now = Date.UTC(2026, 7, 22)
-  const claimed = new OperatorStore(file, () => now)
-  const restored = new OperatorStore(file, () => now)
-  operatorStores.push(claimed, restored)
+  const claimedDatabase = Database.open(file)
+  const restoredDatabase = Database.open(file)
+  const claimed = new OperatorStore(claimedDatabase, () => now)
+  const restored = new OperatorStore(restoredDatabase, () => now)
+  operatorStores.push(claimedDatabase, restoredDatabase)
   try {
     expect(claimed.claim(token)).toBe(true)
     expect(await restored.matches('wrong')).toBe(false)

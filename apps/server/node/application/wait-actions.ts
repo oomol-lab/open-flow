@@ -25,9 +25,9 @@ export class WaitActions {
     | { readonly retryAfter: number }
     | undefined {
     const digest = createHash('sha256').update(capability).digest('hex')
-    const receipt = this.#store.waitByCapability(digest)
+    const receipt = this.#store.runViews.waitByCapability(digest)
     if (receipt == null) return
-    const wait = this.#store.waitReceipt(receipt.runId, receipt.waitId)
+    const wait = this.#store.runViews.waitReceipt(receipt.runId, receipt.waitId)
     if (wait == null || !wait.actions.some((action) => action == requested) || receipt.expiresAt <= this.#clock()) return
     if (receipt.action == null && (receipt.status != 'waiting' || receipt.expiresAt <= this.#clock())) return
     const retryAfter = admit(digest)
@@ -52,13 +52,13 @@ export class WaitActions {
     | { readonly retryAfter: number }
     | undefined {
     const digest = createHash('sha256').update(capability).digest('hex')
-    const receipt = this.#store.waitByCapability(digest)
+    const receipt = this.#store.runViews.waitByCapability(digest)
     if (receipt == null) return
-    const wait = this.#store.waitReceipt(receipt.runId, receipt.waitId)
+    const wait = this.#store.runViews.waitReceipt(receipt.runId, receipt.waitId)
     if (wait == null || !wait.actions.some((action) => action == requested) || receipt.expiresAt <= this.#clock()) return
     const retryAfter = admit(digest)
     if (retryAfter != null) return { retryAfter }
-    const result = this.#store.resolveWait(receipt.runId, receipt.waitId, requested)
+    const result = this.#store.runs.resolveWait(receipt.runId, receipt.waitId, requested)
     if (result.kind != 'resolved') return
     if (result.changed) {
       this.#runChanged(receipt.flowId, receipt.runId)

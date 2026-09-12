@@ -1,5 +1,6 @@
+import type { Database } from './database.ts'
+
 import { readFileSync } from 'node:fs'
-import { DatabaseSync } from 'node:sqlite'
 
 const migrationFiles = [
   '0001_flow.sql',
@@ -20,36 +21,27 @@ const migrationFiles = [
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 
-export function migrateDatabase(file: string): void {
-  const database = new DatabaseSync(file)
-  try {
-    database.exec('BEGIN IMMEDIATE')
-    try {
-      const currentVersion = (database.prepare('PRAGMA user_version').get() as { readonly user_version: number }).user_version
-      if (hasApplicationTables(database) && !hasFlowSchema(database)) {
-        throw new Error('Legacy application schema requires an explicit migration; the database was not modified.')
-      }
-      if (currentVersion > migrationFiles.length) {
-        throw new Error(`SQLite schema version ${currentVersion} is newer than the supported version ${migrationFiles.length}.`)
-      }
-      for (let index = currentVersion; index < migrationFiles.length; index += 1) {
-        database.exec(readFileSync(new URL(migrationFiles[index], migrationsDirectory), 'utf8'))
-        database.exec(`PRAGMA user_version = ${index + 1}`)
-      }
-      database.exec('COMMIT')
-    } catch (error) {
-      database.exec('ROLLBACK')
-      throw error
+/** Brings an open database to the current schema version inside one transaction. */
+export function migrate(database: Database): void {
+  database.transaction(() => {
+    const currentVersion = (database.connection.prepare('PRAGMA user_version').get() as { readonly user_version: number }).user_version
+    if (hasApplicationTables(database) && !hasFlowSchema(database)) {
+      throw new Error('Legacy application schema requires an explicit migration; the database was not modified.')
     }
-  } finally {
-    database.close()
-  }
+    if (currentVersion > migrationFiles.length) {
+      throw new Error(`SQLite schema version ${currentVersion} is newer than the supported version ${migrationFiles.length}.`)
+    }
+    for (let index = currentVersion; index < migrationFiles.length; index += 1) {
+      database.connection.exec(readFileSync(new URL(migrationFiles[index], migrationsDirectory), 'utf8'))
+      database.connection.exec(`PRAGMA user_version = ${index + 1}`)
+    }
+  })
 }
 
-function hasFlowSchema(database: DatabaseSync): boolean {
-  return database.prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'flows'").get() != null
+function hasFlowSchema(database: Database): boolean {
+  return database.connection.prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'flows'").get() != null
 }
 
-function hasApplicationTables(database: DatabaseSync): boolean {
-  return database.prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' LIMIT 1").get() != null
+function hasApplicationTables(database: Database): boolean {
+  return database.connection.prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' LIMIT 1").get() != null
 }
