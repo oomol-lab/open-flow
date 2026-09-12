@@ -706,7 +706,7 @@ describe('Server application service', () => {
     expect(invocationIds[1]).toBe(invocationIds[0])
   })
 
-  it('clears expired Wait notifications even while publication is pending', async () => {
+  it('expires Waits and clears their notifications even while publication is pending', async () => {
     const file = await databaseFile()
     let now = Date.parse('2026-09-01T00:00:00.000Z')
     const execute = vi.fn(async () => {
@@ -743,7 +743,7 @@ describe('Server application service', () => {
       await service.tickMaintenance()
       expect(advance).toHaveBeenCalled()
       expect(notification.get(accepted.runId)).toBeUndefined()
-      expect(service.run(accepted.runId)?.status).toBe('waiting')
+      expect(service.run(accepted.runId)).toMatchObject({ status: 'failed', result: { error: { code: 'run.wait-expired' } } })
       expect(execute).toHaveBeenCalledTimes(1)
     } finally {
       advance.mockRestore()

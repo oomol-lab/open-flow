@@ -86,6 +86,9 @@ Flow 删除先进入 `retiring`，立即阻断新的 mutation、Run、Publish �
 
 RunEvent 明细可以按部署声明的 retention 到期，但唯一 terminal result 必须独立保留，直到所属 Flow 的物理删除流程清理该 Run。
 
+Server 的 Run owner 统一处理 Wait 到期、事件清理、通知 work 领取及下一到期时间；发布等待不能阻断 Run 的到期维护。
+维护调度统一提供下一工作时间，Supervisor 只据此启动维护，不另行解释 Wait 或通知的持久状态。
+
 ## 2. 源码与模块所有权
 
 本仓库是公共合同、可移植实现、Workbench runtime 和 Server 的唯一可编辑源码事实源。

@@ -225,36 +225,6 @@ export class RunViewStore {
       | undefined
   }
 
-  nextWaitExpiry(): number | undefined {
-    return (
-      (
-        this.#database
-          .prepare(
-            `SELECT MIN(run_waits.expires_at) AS expiresAt
-           FROM run_waits JOIN runs USING (run_id)
-           WHERE runs.status = 'waiting'`,
-          )
-          .get() as { readonly expiresAt: number | null }
-      ).expiresAt ?? undefined
-    )
-  }
-
-  nextWaitNotificationAt(): number | undefined {
-    return (
-      (
-        this.#database
-          .prepare(
-            `SELECT MIN(COALESCE(wait_notifications.claim_expires_at, wait_notifications.retry_at)) AS dueAt
-           FROM wait_notifications JOIN runs USING (run_id) JOIN run_waits USING (run_id)
-           WHERE wait_notifications.status = 'pending'
-             AND runs.status = 'waiting'
-             AND run_waits.wait_id = wait_notifications.wait_id`,
-          )
-          .get() as { readonly dueAt: number | null }
-      ).dueAt ?? undefined
-    )
-  }
-
   #controlRuns(condition: string, parameters: readonly (number | string)[], suffix: string): readonly StoredControlRun[] {
     const rows = this.#database
       .prepare(
