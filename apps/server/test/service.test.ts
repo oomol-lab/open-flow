@@ -706,7 +706,7 @@ describe('Server application service', () => {
     expect(invocationIds[1]).toBe(invocationIds[0])
   })
 
-  it('expires Waits and clears their notifications even while publication is pending', async () => {
+  it('expires Waits and clears their notifications even while more publications need processing', async () => {
     const file = await databaseFile()
     let now = Date.parse('2026-09-01T00:00:00.000Z')
     const execute = vi.fn(async () => {
@@ -736,7 +736,7 @@ describe('Server application service', () => {
     service = await openService(file, options)
     now = Date.parse(waiting.expiresAt)
     const database = new DatabaseSync(file)
-    const advance = vi.spyOn(Publisher.prototype, 'advance').mockReturnValue('pending')
+    const advance = vi.spyOn(Publisher.prototype, 'advance').mockReturnValue('more')
     try {
       const notification = database.prepare('SELECT status FROM wait_notifications WHERE run_id = ?')
       expect(notification.get(accepted.runId)).toEqual({ status: 'pending' })

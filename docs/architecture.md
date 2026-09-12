@@ -202,6 +202,10 @@ Revision、closure、Engine、预期 Live 和必要 binding，并完成 validati
 Publication、比较并移动 Live、安装 current Trigger binding 并把 operation 标为 succeeded。pending 或 failed operation 不创建 Publication、不移动
 Live，旧 Live 继续作为 Run 和 Trigger admission 的事实来源。Rollback 创建新 Publication，不修改历史记录。
 
+PublicationStore 拥有发布总事务；PollStore 与 IntegrationStore 各自拥有候选准备、binding 复用判断和安装，在该事务内重新检查激活条件。
+候选准备成功或失败与对应 publish work 的状态在同一事务中提交。PublicationStore 从持久化 operation 与 work 推导下一次推进时间，
+Maintenance 将它纳入调度；暂时无法激活的 operation 持久化重试时间，不阻塞其他 Flow，重启后仍按该时间与准备期限恢复。
+
 current Trigger binding 与 Live pointer 共同构成 Trigger admission authority。候选 Integration callback、Poll baseline event 和旧 runtime claim 在激活前后
 都不能绕过该 authority 创建 Run；Poll baseline checkpoint 只在激活 transaction 中安装。不能使用独立候选 endpoint 安全替换的 Integration 变更必须
 fail closed，不能先修改 current provider resource 再依赖补偿恢复。

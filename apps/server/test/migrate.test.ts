@@ -27,7 +27,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(15)
+    expect(version(database)).toBe(16)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -63,7 +63,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(15)
+    expect(version(reopened)).toBe(16)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -93,7 +93,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(15)
+    expect(version(reopened)).toBe(16)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -141,13 +141,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 16')
+  database.exec('PRAGMA user_version = 17')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 16 is newer than the supported version 15.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 17 is newer than the supported version 16.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(16)
+  expect(version(reopened)).toBe(17)
   reopened.close()
 })
 
@@ -178,7 +178,7 @@ it('removes obsolete Wait ordering while preserving a pending checkpoint', async
   database.exec('ALTER TABLE flow_live DROP COLUMN enabled')
   database.exec('ALTER TABLE run_waits ADD COLUMN job_order INTEGER NOT NULL DEFAULT 0 CHECK (job_order >= 0)')
   database.exec('ALTER TABLE runs DROP COLUMN trigger_node_id; ALTER TABLE runs DROP COLUMN trigger_payload')
-  database.exec('PRAGMA user_version = 9')
+  database.exec('ALTER TABLE publish_operations DROP COLUMN next_attempt_at; PRAGMA user_version = 9')
   database
     .prepare(`
     INSERT INTO run_waits (
@@ -197,7 +197,7 @@ it('removes obsolete Wait ordering while preserving a pending checkpoint', async
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(15)
+    expect(version(reopened)).toBe(16)
     expect(reopened.prepare('SELECT * FROM run_waits').get()).toEqual(expected)
   } finally {
     reopened.close()
@@ -208,7 +208,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('DROP TABLE listener_work; PRAGMA user_version = 14')
+  database.exec('DROP TABLE listener_work; ALTER TABLE publish_operations DROP COLUMN next_attempt_at; PRAGMA user_version = 14')
   database.prepare('INSERT INTO revisions (revision_id, digest, content) VALUES (?, ?, ?)').run('legacy-revision', 'legacy-digest', '{ "legacy": true }')
   database
     .prepare(`INSERT INTO integration_bindings (binding_id, endpoint_id, flow_id, trigger_node_id, current_publication_id,
@@ -226,7 +226,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(15)
+    expect(version(upgraded)).toBe(16)
     expect(tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())).toEqual(before)
     expect(upgraded.prepare('SELECT * FROM listener_work').all()).toEqual([])
   } finally {

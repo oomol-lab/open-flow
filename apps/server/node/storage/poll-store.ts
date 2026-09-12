@@ -16,6 +16,14 @@ import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
 import { randomUUID } from 'node:crypto'
 import { insertTriggerActivity, pruneTriggerActivities } from '../runtime/trigger-activity.ts'
 
+export interface PollPublication {
+  readonly connectionId: string
+  readonly nextAt: number
+  readonly scheduleJson: string
+  readonly triggerJson: string
+  readonly triggerNodeId: string
+}
+
 export interface PollCandidate {
   readonly bindingId: string
   readonly checkpointJson: string
@@ -71,16 +79,7 @@ export class PollStore {
             readonly triggerJson: string | null
           }
         | undefined
-      if (
-        current != null &&
-        current.currentPublicationId == expectedLivePublicationId &&
-        current.triggerJson != null &&
-        triggerRuntimeJson(JSON.parse(current.triggerJson)) == triggerRuntimeJson(JSON.parse(poll.triggerJson)) &&
-        current.connectionId == poll.connectionId &&
-        current.health == 'healthy'
-      ) {
-        continue
-      }
+      if (current != null && this.#canReuse(current, poll, expectedLivePublicationId)) continue
       const bindingId = current?.bindingId ?? `binding_${randomUUID().replaceAll('-', '')}`
       this.#database
         .prepare(
@@ -212,51 +211,144 @@ export class PollStore {
     this.#database.prepare('DELETE FROM poll_candidates WHERE operation_id = ?').run(operationId)
   }
 
-  candidatesReady(
-    operationId: string,
-    flowId: string,
-    expectedLivePublicationId: string | null,
-    polls: readonly { readonly connectionId: string; readonly triggerJson: string; readonly triggerNodeId: string }[],
+  // Runs inside the publication transaction; false requires the caller to roll it back.
+  install(
+    input: {
+      readonly flowId: string
+      readonly expectedLivePublicationId: string | null
+      readonly operationId?: string
+      readonly publishedAt: number
+      readonly polls: readonly PollPublication[]
+    },
+    publicationId: string,
   ): boolean {
-    for (const poll of polls) {
-      const current = this.#database
-        .prepare(
-          `SELECT current_publication_id AS currentPublicationId, trigger_json AS triggerJson,
-                  connection_id AS connectionId, health
-           FROM poll_bindings WHERE flow_id = ? AND trigger_node_id = ?`,
-        )
-        .get(flowId, poll.triggerNodeId) as
-        | {
-            readonly connectionId: string | null
-            readonly currentPublicationId: string | null
-            readonly health: PollHealth
-            readonly triggerJson: string | null
+    const desiredPolls = new Map(input.polls.map((poll) => [poll.triggerNodeId, poll]))
+    const pollBindings = this.#database
+      .prepare(
+        `SELECT binding_id AS bindingId, trigger_node_id AS triggerNodeId,
+                current_publication_id AS currentPublicationId, trigger_json AS triggerJson,
+                connection_id AS connectionId, health
+         FROM poll_bindings WHERE flow_id = ?`,
+      )
+      .all(input.flowId) as {
+      readonly bindingId: string
+      readonly connectionId: string | null
+      readonly currentPublicationId: string | null
+      readonly health: PollHealth
+      readonly triggerJson: string | null
+      readonly triggerNodeId: string
+    }[]
+    for (const binding of pollBindings) {
+      const poll = desiredPolls.get(binding.triggerNodeId)
+      if (poll != null) {
+        if (input.operationId != null && this.#canReuse(binding, poll, input.expectedLivePublicationId)) {
+          this.#database
+            .prepare(
+              `UPDATE poll_bindings
+               SET current_publication_id = ?, runtime_version = runtime_version + 1,
+                   trigger_json = ?, schedule_json = ?, next_at = ?, retry_at = NULL,
+                   continuation_root_id = NULL, continuation_page = 0,
+                   active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL,
+                   updated_at = ?
+               WHERE binding_id = ?`,
+            )
+            .run(publicationId, poll.triggerJson, poll.scheduleJson, poll.nextAt, input.publishedAt, binding.bindingId)
+        } else if (input.operationId != null) {
+          if (!this.#activateCandidate(input.operationId, input.flowId, publicationId, poll, input.publishedAt)) {
+            return false
           }
-        | undefined
-      if (
-        current != null &&
-        current.currentPublicationId == expectedLivePublicationId &&
-        current.triggerJson != null &&
-        triggerRuntimeJson(JSON.parse(current.triggerJson)) == triggerRuntimeJson(JSON.parse(poll.triggerJson)) &&
-        current.connectionId == poll.connectionId &&
-        current.health == 'healthy'
-      ) {
-        continue
+        } else {
+          const unchanged =
+            binding.triggerJson != null &&
+            binding.connectionId == poll.connectionId &&
+            triggerRuntimeJson(JSON.parse(binding.triggerJson)) == triggerRuntimeJson(JSON.parse(poll.triggerJson))
+          this.#database
+            .prepare(
+              `UPDATE poll_bindings
+               SET current_publication_id = ?, runtime_version = runtime_version + 1,
+                   trigger_json = ?, connection_id = ?, schedule_json = ?, next_at = ?, retry_at = NULL,
+                   health = CASE WHEN ? = 1 THEN health ELSE 'initializing' END,
+                   checkpoint_json = CASE WHEN ? = 1 THEN checkpoint_json ELSE 'null' END,
+                   continuation_root_id = NULL, continuation_page = 0,
+                   active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL,
+                   updated_at = ?
+               WHERE binding_id = ?`,
+            )
+            .run(
+              publicationId,
+              poll.triggerJson,
+              poll.connectionId,
+              poll.scheduleJson,
+              poll.nextAt,
+              unchanged ? 1 : 0,
+              unchanged ? 1 : 0,
+              input.publishedAt,
+              binding.bindingId,
+            )
+        }
+        desiredPolls.delete(binding.triggerNodeId)
+      } else if (binding.currentPublicationId != null) {
+        this.#database
+          .prepare(
+            `UPDATE poll_bindings
+             SET current_publication_id = NULL, runtime_version = runtime_version + 1,
+                 next_at = NULL, retry_at = NULL, continuation_root_id = NULL, continuation_page = 0,
+                 active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL,
+                 updated_at = ?
+             WHERE binding_id = ?`,
+          )
+          .run(input.publishedAt, binding.bindingId)
       }
-      const candidate = this.candidate(operationId, poll.triggerNodeId)
-      if (
-        candidate?.status != 'ready' ||
-        candidate.flowId != flowId ||
-        candidate.triggerJson != poll.triggerJson ||
-        candidate.connectionId != poll.connectionId
-      ) {
-        return false
+    }
+    for (const [triggerNodeId, poll] of desiredPolls) {
+      if (input.operationId != null) {
+        if (!this.#activateCandidate(input.operationId, input.flowId, publicationId, poll, input.publishedAt)) {
+          return false
+        }
+      } else {
+        this.#database
+          .prepare(
+            `INSERT INTO poll_bindings (
+               binding_id, flow_id, trigger_node_id, current_publication_id,
+               runtime_version, trigger_json, connection_id, schedule_json, next_at, health, updated_at
+             ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, 'initializing', ?)`,
+          )
+          .run(
+            `binding_${randomUUID().replaceAll('-', '')}`,
+            input.flowId,
+            triggerNodeId,
+            publicationId,
+            poll.triggerJson,
+            poll.connectionId,
+            poll.scheduleJson,
+            poll.nextAt,
+            input.publishedAt,
+          )
       }
     }
     return true
   }
 
-  activateCandidate(
+  #canReuse(
+    binding: {
+      readonly connectionId: string | null
+      readonly triggerJson: string | null
+      readonly currentPublicationId: string | null
+      readonly health: PollHealth
+    },
+    poll: Pick<PollPublication, 'connectionId' | 'triggerJson'>,
+    expectedLivePublicationId: string | null,
+  ): boolean {
+    return (
+      binding.currentPublicationId == expectedLivePublicationId &&
+      binding.health == 'healthy' &&
+      binding.connectionId == poll.connectionId &&
+      binding.triggerJson != null &&
+      triggerRuntimeJson(JSON.parse(binding.triggerJson)) == triggerRuntimeJson(JSON.parse(poll.triggerJson))
+    )
+  }
+
+  #activateCandidate(
     operationId: string,
     flowId: string,
     publicationId: string,

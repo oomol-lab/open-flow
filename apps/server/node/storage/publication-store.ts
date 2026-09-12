@@ -1,7 +1,8 @@
 import type { PublishOperation } from '@oomol-lab/open-flow/control-api'
 import type { StoredFlow, StoredFlowRevision } from './flow-store.ts'
+import type { IntegrationPublication } from './integration-store.ts'
+import type { PollPublication } from './poll-store.ts'
 
-import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
 import { randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { AcceptanceError } from '../error.ts'
@@ -49,9 +50,15 @@ const publicationColumns = `
   publications.revision_id AS revisionId,
   publications.source_publication_id AS sourcePublicationId`
 
+const publishNextAt = `MIN(operations.deadline_at, CASE
+  WHEN EXISTS (SELECT 1 FROM publish_work WHERE operation_id = operations.operation_id AND status = 'failed') THEN 0
+  WHEN NOT EXISTS (SELECT 1 FROM publish_work WHERE operation_id = operations.operation_id AND status = 'pending') THEN operations.next_attempt_at
+  ELSE operations.deadline_at
+END)`
+
 const publishDeadlineMs = 30 * 60 * 1_000
 const publishRetentionMs = 24 * 60 * 60 * 1_000
-export const publishPending = new Error('Publish candidate activation is pending.')
+const publishPending = new Error('Publish candidate activation is pending.')
 
 interface PublishInput {
   readonly closureDigest: string
@@ -66,13 +73,7 @@ interface PublishInput {
   readonly engineContract: string
   readonly flowId: string
   readonly idempotencyKey: string
-  readonly integrations: readonly {
-    readonly listener?: boolean
-    readonly connectionId: string
-    readonly reconcileAt: number
-    readonly triggerJson: string
-    readonly triggerNodeId: string
-  }[]
+  readonly integrations: readonly IntegrationPublication[]
   readonly metadata?:
     | { readonly actorId: string; readonly modelVersion: number; readonly operation: 'publish' }
     | {
@@ -82,13 +83,7 @@ interface PublishInput {
         readonly sourcePublicationId: string
       }
   readonly operationId?: string
-  readonly polls: readonly {
-    readonly connectionId: string
-    readonly nextAt: number
-    readonly scheduleJson: string
-    readonly triggerJson: string
-    readonly triggerNodeId: string
-  }[]
+  readonly polls: readonly PollPublication[]
   readonly publishedAt: number
   readonly requestDigest: string
   readonly revisionDigest: string
@@ -349,6 +344,17 @@ export class PublicationStore {
     }
   }
 
+  nextPublishAt(): number | undefined {
+    const row = this.#database
+      .prepare(`SELECT MIN(${publishNextAt}) AS nextAt FROM publish_operations AS operations WHERE operations.status = 'pending'`)
+      .get() as { readonly nextAt: number | null }
+    return row.nextAt ?? undefined
+  }
+
+  retryPublishOperation(operationId: string, now: number): void {
+    this.#database.prepare("UPDATE publish_operations SET next_attempt_at = ? WHERE operation_id = ? AND status = 'pending'").run(now + 1_000, operationId)
+  }
+
   nextPublishOperation(now: number):
     | {
         readonly code: string
@@ -371,13 +377,7 @@ export class PublicationStore {
            ORDER BY failed.created_at, failed.work_id LIMIT 1
          )
          WHERE operations.status = 'pending'
-           AND (
-             operations.deadline_at <= ? OR work.work_id IS NOT NULL OR
-             NOT EXISTS (
-               SELECT 1 FROM publish_work AS pending
-               WHERE pending.operation_id = operations.operation_id AND pending.status = 'pending'
-             )
-           )
+           AND ${publishNextAt} <= ?
          ORDER BY operations.created_at, operations.operation_id LIMIT 1`,
       )
       .get(now) as
@@ -464,115 +464,114 @@ export class PublicationStore {
   }
 
   publish(input: PublishInput): PublicationAcceptance {
-    return this.#transaction(() => {
-      const existing = this.replayPublication(input.flowId, input.idempotencyKey, input.requestDigest)
-      if (existing != null) {
-        if (existing.kind == 'conflict') return existing
-        if (input.operationId != null) {
-          this.#database
-            .prepare(
-              `UPDATE publish_operations SET status = 'succeeded', publication_id = ?, updated_at = ?
+    try {
+      return this.#transaction(() => {
+        const existing = this.replayPublication(input.flowId, input.idempotencyKey, input.requestDigest)
+        if (existing != null) {
+          if (existing.kind == 'conflict') return existing
+          if (input.operationId != null) {
+            this.#database
+              .prepare(
+                `UPDATE publish_operations SET status = 'succeeded', publication_id = ?, updated_at = ?
                WHERE operation_id = ? AND status = 'pending'`,
-            )
-            .run(existing.publicationId, input.publishedAt, input.operationId)
+              )
+              .run(existing.publicationId, input.publishedAt, input.operationId)
+          }
+          return existing
         }
-        return existing
-      }
 
-      if (input.operationId != null) {
-        const operation = this.#database
-          .prepare('SELECT publication_id AS publicationId, status FROM publish_operations WHERE operation_id = ?')
-          .get(input.operationId) as { readonly publicationId: string | null; readonly status: PublishOperation['status'] } | undefined
-        if (operation?.status == 'succeeded' && operation.publicationId != null) {
-          return { created: false, kind: 'published', publicationId: operation.publicationId }
-        }
-        if (
-          operation?.status != 'pending' ||
-          this.#database.prepare("SELECT 1 FROM publish_work WHERE operation_id = ? AND status != 'ready' LIMIT 1").get(input.operationId) != null
-        ) {
-          return { kind: 'operation-pending' }
-        }
-        if (!this.#integrations.candidatesReady(input.operationId, input.flowId, input.expectedLivePublicationId, input.integrations)) {
-          return { kind: 'operation-pending' }
-        }
-        if (!this.#polls.candidatesReady(input.operationId, input.flowId, input.expectedLivePublicationId, input.polls)) {
-          return { kind: 'operation-pending' }
-        }
-      }
-
-      if (input.metadata != null) {
-        const flow = this.#flow(input.flowId)
-        if (flow == null) return { kind: 'not-found' }
-        if (flow.status != 'active') return { kind: 'busy' }
-        const revision = this.#revision(input.flowId, input.revisionId)
-        if (revision == null || revision.digest != input.revisionDigest) return { kind: 'not-found' }
-        if (input.metadata.operation == 'publish' && flow.draftRevisionId != input.revisionId) return { kind: 'revision-conflict' }
-        if (input.metadata.operation == 'rollback') {
-          const source = this.publication(input.flowId, input.metadata.sourcePublicationId)
-          if (source == null) return { kind: 'source-not-found' }
+        if (input.operationId != null) {
+          const operation = this.#database
+            .prepare('SELECT publication_id AS publicationId, status FROM publish_operations WHERE operation_id = ?')
+            .get(input.operationId) as { readonly publicationId: string | null; readonly status: PublishOperation['status'] } | undefined
+          if (operation?.status == 'succeeded' && operation.publicationId != null) {
+            return { created: false, kind: 'published', publicationId: operation.publicationId }
+          }
           if (
-            source.revisionId != input.revisionId ||
-            source.revisionDigest != input.revisionDigest ||
-            source.closureDigest != input.closureDigest ||
-            source.modelVersion != input.metadata.modelVersion ||
-            source.engineContract != input.engineContract
+            operation?.status != 'pending' ||
+            this.#database.prepare("SELECT 1 FROM publish_work WHERE operation_id = ? AND status != 'ready' LIMIT 1").get(input.operationId) != null
           ) {
-            return { kind: 'revision-conflict' }
+            return { kind: 'operation-pending' }
           }
         }
-      }
 
-      if (!this.#variables.hasAll(input.variableNames)) return { kind: 'binding-unresolved' }
+        if (input.metadata != null) {
+          const flow = this.#flow(input.flowId)
+          if (flow == null) return { kind: 'not-found' }
+          if (flow.status != 'active') return { kind: 'busy' }
+          const revision = this.#revision(input.flowId, input.revisionId)
+          if (revision == null || revision.digest != input.revisionDigest) return { kind: 'not-found' }
+          if (input.metadata.operation == 'publish' && flow.draftRevisionId != input.revisionId) return { kind: 'revision-conflict' }
+          if (input.metadata.operation == 'rollback') {
+            const source = this.publication(input.flowId, input.metadata.sourcePublicationId)
+            if (source == null) return { kind: 'source-not-found' }
+            if (
+              source.revisionId != input.revisionId ||
+              source.revisionDigest != input.revisionDigest ||
+              source.closureDigest != input.closureDigest ||
+              source.modelVersion != input.metadata.modelVersion ||
+              source.engineContract != input.engineContract
+            ) {
+              return { kind: 'revision-conflict' }
+            }
+          }
+        }
 
-      const live = this.#database.prepare('SELECT publication_id AS publicationId FROM flow_live WHERE flow_id = ?').get(input.flowId) as
-        | { readonly publicationId: string }
-        | undefined
-      if ((live?.publicationId ?? null) != input.expectedLivePublicationId) {
-        if (input.metadata != null) return { kind: 'live-conflict' }
-        throw new AcceptanceError('publication-live-conflict', 'The Flow Live pointer no longer matches the expected Publication.')
-      }
+        if (!this.#variables.hasAll(input.variableNames)) return { kind: 'binding-unresolved' }
 
-      this.#ensureRevision(input)
-      const publicationId = `publication_${randomUUID().replaceAll('-', '')}`
-      insert(this.#database, 'publications', {
-        publication_id: publicationId,
-        flow_id: input.flowId,
-        revision_id: input.revisionId,
-        revision_digest: input.revisionDigest,
-        closure_digest: input.closureDigest,
-        engine_contract: input.engineContract,
-        idempotency_key: input.idempotencyKey,
-        request_digest: input.requestDigest,
-        actor_id: input.metadata?.actorId ?? 'legacy',
-        operation: input.metadata?.operation ?? 'publish',
-        source_publication_id: input.metadata?.operation == 'rollback' ? input.metadata.sourcePublicationId : null,
-        model_version: input.metadata?.modelVersion ?? 1,
-        created_at: input.publishedAt,
-      })
-      this.#database
-        .prepare(
-          `INSERT INTO flow_live (flow_id, publication_id, revision, updated_at) VALUES (?, ?, 1, ?)
+        const live = this.#database.prepare('SELECT publication_id AS publicationId FROM flow_live WHERE flow_id = ?').get(input.flowId) as
+          | { readonly publicationId: string }
+          | undefined
+        if ((live?.publicationId ?? null) != input.expectedLivePublicationId) {
+          if (input.metadata != null) return { kind: 'live-conflict' }
+          throw new AcceptanceError('publication-live-conflict', 'The Flow Live pointer no longer matches the expected Publication.')
+        }
+
+        this.#ensureRevision(input)
+        const publicationId = `publication_${randomUUID().replaceAll('-', '')}`
+        insert(this.#database, 'publications', {
+          publication_id: publicationId,
+          flow_id: input.flowId,
+          revision_id: input.revisionId,
+          revision_digest: input.revisionDigest,
+          closure_digest: input.closureDigest,
+          engine_contract: input.engineContract,
+          idempotency_key: input.idempotencyKey,
+          request_digest: input.requestDigest,
+          actor_id: input.metadata?.actorId ?? 'legacy',
+          operation: input.metadata?.operation ?? 'publish',
+          source_publication_id: input.metadata?.operation == 'rollback' ? input.metadata.sourcePublicationId : null,
+          model_version: input.metadata?.modelVersion ?? 1,
+          created_at: input.publishedAt,
+        })
+        this.#database
+          .prepare(
+            `INSERT INTO flow_live (flow_id, publication_id, revision, updated_at) VALUES (?, ?, 1, ?)
            ON CONFLICT (flow_id) DO UPDATE SET
              publication_id = excluded.publication_id,
              revision = flow_live.revision + 1,
              updated_at = excluded.updated_at`,
-        )
-        .run(input.flowId, publicationId, input.publishedAt)
-
-      this.#installWebhooks(input, publicationId)
-      this.#installCrons(input, publicationId)
-      this.#installPolls(input, publicationId)
-      this.#installIntegrations(input, publicationId)
-      if (input.operationId != null) {
-        this.#database
-          .prepare(
-            `UPDATE publish_operations SET status = 'succeeded', publication_id = ?, updated_at = ?
-             WHERE operation_id = ? AND status = 'pending'`,
           )
-          .run(publicationId, input.publishedAt, input.operationId)
-      }
-      return { created: true, kind: 'published', publicationId }
-    })
+          .run(input.flowId, publicationId, input.publishedAt)
+
+        this.#installWebhooks(input, publicationId)
+        this.#installCrons(input, publicationId)
+        if (!this.#polls.install(input, publicationId)) throw publishPending
+        if (!this.#integrations.install(input, publicationId)) throw publishPending
+        if (input.operationId != null) {
+          this.#database
+            .prepare(
+              `UPDATE publish_operations SET status = 'succeeded', publication_id = ?, updated_at = ?
+             WHERE operation_id = ? AND status = 'pending'`,
+            )
+            .run(publicationId, input.publishedAt, input.operationId)
+        }
+        return { created: true, kind: 'published', publicationId }
+      })
+    } catch (error) {
+      if (error === publishPending) return { kind: 'operation-pending' }
+      throw error
+    }
   }
 
   #installWebhooks(input: PublishInput, publicationId: string): void {
@@ -670,204 +669,6 @@ export class PublicationStore {
           cron.triggerJson,
           cron.scheduleJson,
           cron.nextAt,
-          input.publishedAt,
-        )
-    }
-  }
-
-  #installPolls(input: PublishInput, publicationId: string): void {
-    const desiredPolls = new Map(input.polls.map((poll) => [poll.triggerNodeId, poll]))
-    const pollBindings = this.#database
-      .prepare(
-        `SELECT binding_id AS bindingId, trigger_node_id AS triggerNodeId,
-                current_publication_id AS currentPublicationId, trigger_json AS triggerJson,
-                connection_id AS connectionId, health
-         FROM poll_bindings WHERE flow_id = ?`,
-      )
-      .all(input.flowId) as {
-      readonly bindingId: string
-      readonly connectionId: string | null
-      readonly currentPublicationId: string | null
-      readonly health: 'failed' | 'healthy' | 'initializing' | 'needs_reauth'
-      readonly triggerJson: string | null
-      readonly triggerNodeId: string
-    }[]
-    for (const binding of pollBindings) {
-      const poll = desiredPolls.get(binding.triggerNodeId)
-      if (poll != null) {
-        const unchanged =
-          binding.triggerJson != null &&
-          triggerRuntimeJson(JSON.parse(binding.triggerJson)) == triggerRuntimeJson(JSON.parse(poll.triggerJson)) &&
-          binding.connectionId == poll.connectionId
-        if (input.operationId != null && unchanged && binding.currentPublicationId == input.expectedLivePublicationId && binding.health == 'healthy') {
-          this.#database
-            .prepare(
-              `UPDATE poll_bindings
-               SET current_publication_id = ?, runtime_version = runtime_version + 1,
-                   trigger_json = ?, schedule_json = ?, next_at = ?, retry_at = NULL,
-                   continuation_root_id = NULL, continuation_page = 0,
-                   active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL,
-                   updated_at = ?
-               WHERE binding_id = ?`,
-            )
-            .run(publicationId, poll.triggerJson, poll.scheduleJson, poll.nextAt, input.publishedAt, binding.bindingId)
-        } else if (input.operationId != null) {
-          if (!this.#polls.activateCandidate(input.operationId, input.flowId, publicationId, poll, input.publishedAt)) {
-            throw publishPending
-          }
-        } else {
-          this.#database
-            .prepare(
-              `UPDATE poll_bindings
-               SET current_publication_id = ?, runtime_version = runtime_version + 1,
-                   trigger_json = ?, connection_id = ?, schedule_json = ?, next_at = ?, retry_at = NULL,
-                   health = CASE WHEN ? = 1 THEN health ELSE 'initializing' END,
-                   checkpoint_json = CASE WHEN ? = 1 THEN checkpoint_json ELSE 'null' END,
-                   continuation_root_id = NULL, continuation_page = 0,
-                   active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL,
-                   updated_at = ?
-               WHERE binding_id = ?`,
-            )
-            .run(
-              publicationId,
-              poll.triggerJson,
-              poll.connectionId,
-              poll.scheduleJson,
-              poll.nextAt,
-              unchanged ? 1 : 0,
-              unchanged ? 1 : 0,
-              input.publishedAt,
-              binding.bindingId,
-            )
-        }
-        desiredPolls.delete(binding.triggerNodeId)
-      } else if (binding.currentPublicationId != null) {
-        this.#database
-          .prepare(
-            `UPDATE poll_bindings
-             SET current_publication_id = NULL, runtime_version = runtime_version + 1,
-                 next_at = NULL, retry_at = NULL, continuation_root_id = NULL, continuation_page = 0,
-                 active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL,
-                 updated_at = ?
-             WHERE binding_id = ?`,
-          )
-          .run(input.publishedAt, binding.bindingId)
-      }
-    }
-    for (const [triggerNodeId, poll] of desiredPolls) {
-      if (input.operationId != null) {
-        if (!this.#polls.activateCandidate(input.operationId, input.flowId, publicationId, poll, input.publishedAt)) {
-          throw publishPending
-        }
-      } else {
-        this.#database
-          .prepare(
-            `INSERT INTO poll_bindings (
-               binding_id, flow_id, trigger_node_id, current_publication_id,
-               runtime_version, trigger_json, connection_id, schedule_json, next_at, health, updated_at
-             ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, 'initializing', ?)`,
-          )
-          .run(
-            `binding_${randomUUID().replaceAll('-', '')}`,
-            input.flowId,
-            triggerNodeId,
-            publicationId,
-            poll.triggerJson,
-            poll.connectionId,
-            poll.scheduleJson,
-            poll.nextAt,
-            input.publishedAt,
-          )
-      }
-    }
-  }
-
-  #installIntegrations(input: PublishInput, publicationId: string): void {
-    const desiredIntegrations = new Map(input.integrations.map((integration) => [integration.triggerNodeId, integration]))
-    const integrationBindings = this.#database
-      .prepare(
-        `SELECT binding_id AS bindingId, trigger_node_id AS triggerNodeId,
-                current_publication_id AS currentPublicationId, trigger_json AS triggerJson,
-                connection_id AS connectionId
-         FROM integration_bindings WHERE flow_id = ?`,
-      )
-      .all(input.flowId) as {
-      readonly bindingId: string
-      readonly connectionId: string
-      readonly currentPublicationId: string | null
-      readonly triggerJson: string
-      readonly triggerNodeId: string
-    }[]
-    for (const binding of integrationBindings) {
-      const integration = desiredIntegrations.get(binding.triggerNodeId)
-      if (integration != null) {
-        const unchanged =
-          binding.triggerJson != null &&
-          triggerRuntimeJson(JSON.parse(binding.triggerJson)) == triggerRuntimeJson(JSON.parse(integration.triggerJson)) &&
-          binding.connectionId == integration.connectionId
-        if (input.operationId != null && integration.listener && !unchanged) {
-          if (!this.#integrations.replaceCandidate(input.operationId, binding.bindingId, input.flowId, publicationId, integration, input.publishedAt)) {
-            throw publishPending
-          }
-        } else if ((input.operationId != null || integration.listener) && unchanged) {
-          this.#database
-            .prepare('UPDATE integration_bindings SET current_publication_id = ?, trigger_json = ?, updated_at = ? WHERE binding_id = ?')
-            .run(publicationId, integration.triggerJson, input.publishedAt, binding.bindingId)
-        } else {
-          this.#database
-            .prepare(
-              `UPDATE integration_bindings
-               SET current_publication_id = ?, runtime_version = runtime_version + 1,
-                   trigger_json = ?, connection_id = ?, reconcile_at = ?, retry_at = NULL,
-                   health = CASE WHEN ? = 1 THEN health ELSE 'initializing' END,
-                   updated_at = ?
-               WHERE binding_id = ?`,
-            )
-            .run(
-              publicationId,
-              integration.triggerJson,
-              integration.connectionId,
-              integration.reconcileAt,
-              unchanged ? 1 : 0,
-              input.publishedAt,
-              binding.bindingId,
-            )
-        }
-        desiredIntegrations.delete(binding.triggerNodeId)
-      } else if (binding.currentPublicationId != null) {
-        this.#database
-          .prepare(
-            `UPDATE integration_bindings
-             SET current_publication_id = NULL, runtime_version = runtime_version + 1,
-                 reconcile_at = ?, retry_at = NULL, updated_at = ?
-             WHERE binding_id = ?`,
-          )
-          .run(input.publishedAt, input.publishedAt, binding.bindingId)
-      }
-    }
-    for (const [triggerNodeId, integration] of desiredIntegrations) {
-      if (input.operationId != null) {
-        if (!this.#integrations.activateCandidate(input.operationId, input.flowId, publicationId, integration, input.publishedAt)) {
-          throw publishPending
-        }
-        continue
-      }
-      this.#database
-        .prepare(
-          `INSERT INTO integration_bindings (
-             binding_id, endpoint_id, flow_id, trigger_node_id,
-             current_publication_id, runtime_version, trigger_json, connection_id, health, reconcile_at, updated_at
-           ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 'initializing', ?, ?)`,
-        )
-        .run(
-          `binding_${randomUUID().replaceAll('-', '')}`,
-          `endpoint_${randomUUID().replaceAll('-', '')}`,
-          input.flowId,
-          triggerNodeId,
-          publicationId,
-          integration.triggerJson,
-          integration.connectionId,
-          integration.reconcileAt,
           input.publishedAt,
         )
     }
