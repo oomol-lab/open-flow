@@ -21,7 +21,7 @@ export class Maintenance {
   readonly #logger: Logger
   readonly #maintenanceLock: Semaphore.Semaphore
   readonly #notifyFlowCatalog: () => void
-  readonly #publisher: Publisher
+  readonly #publisher: Pick<Publisher, 'advance'>
   readonly #resolveConnector: () => ConnectorHost | undefined
   readonly #runChanged: (flowId: string, runId: string) => void
   readonly #signal: () => void
@@ -30,7 +30,7 @@ export class Maintenance {
 
   constructor(
     store: Store,
-    publisher: Publisher,
+    publisher: Pick<Publisher, 'advance'>,
     clock: () => number,
     logger: Logger,
     resolveConnector: () => ConnectorHost | undefined,
@@ -55,7 +55,7 @@ export class Maintenance {
   }
 
   nextAt(): number {
-    return this.#maintenanceAt
+    return Math.min(this.#maintenanceAt, this.#store.runs.nextMaintenanceAt() ?? Infinity)
   }
 
   markDue(): void {
@@ -72,7 +72,10 @@ export class Maintenance {
       Effect.gen({ self: this }, function* () {
         const now = Date.parse(at)
         if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Maintenance tick time must be an ISO timestamp.'))
-        const notification = this.#store.runs.claimWaitNotification(now, waitNotificationLeaseMs)
+        this.#maintenanceAt = Infinity
+        const runs = this.#store.runs.maintain(now, maintenanceBatchSize, waitNotificationLeaseMs)
+        for (const { flowId, runId } of runs.expiredWaits) this.#runChanged(flowId, runId)
+        const notification = runs.notification
         if (notification != null) {
           const connector = this.#resolveConnector()
           if (connector == null) {
@@ -114,10 +117,9 @@ export class Maintenance {
             )
           }
         }
-        let nextDelay = this.#maintain(now)
-        const nextNotificationAt = this.#store.runViews.nextWaitNotificationAt()
-        if (nextNotificationAt != null) nextDelay = Math.min(nextDelay, Math.max(0, nextNotificationAt - now))
-        this.#maintenanceAt = this.#clock() + nextDelay
+        const nextDelay = Math.min(runs.more ? 0 : maintenanceIntervalMs, this.#maintain(now))
+        // Preserve wakes received while notification delivery was awaiting the Connector.
+        this.#maintenanceAt = Math.min(this.#maintenanceAt, this.#clock() + nextDelay)
         this.#signal()
       }),
     )
@@ -126,11 +128,8 @@ export class Maintenance {
   #maintain(now: number): number {
     const publication = this.#publisher.advance(now)
     if (publication == 'pending') return maintenanceRetryMs
-    let nextDelay = publication == 'more' || this.#store.runs.pruneExpiredEvents(now, maintenanceBatchSize) > 0 ? 0 : maintenanceIntervalMs
+    let nextDelay = publication == 'more' ? 0 : maintenanceIntervalMs
     if (this.#store.publications.prunePublishOperations(now, maintenanceBatchSize) > 0) nextDelay = 0
-    const expiredWaits = this.#store.runs.expireWaits(now, maintenanceBatchSize)
-    for (const { flowId, runId } of expiredWaits) this.#runChanged(flowId, runId)
-    if (expiredWaits.length == maintenanceBatchSize) nextDelay = 0
     const flowId = this.#store.flows.claimRetiring(now)
     if (flowId == null) {
       if (this.#store.flows.collectOrphanRevisions(maintenanceBatchSize) > 0) nextDelay = 0

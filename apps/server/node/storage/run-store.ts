@@ -563,29 +563,6 @@ export class RunStore {
     })
   }
 
-  expireWaits(now: number, limit: number): readonly { readonly flowId: string; readonly runId: string }[] {
-    return this.#transaction(() => {
-      const due = this.#database
-        .prepare(
-          `SELECT runs.flow_id AS flowId, runs.run_id AS runId
-           FROM runs JOIN run_waits USING (run_id)
-           WHERE runs.status = 'waiting' AND run_waits.expires_at <= ?
-           ORDER BY run_waits.expires_at, runs.run_id LIMIT ?`,
-        )
-        .all(now, limit) as unknown as readonly { readonly flowId: string; readonly runId: string }[]
-      for (const { runId } of due) {
-        this.#finishRun(
-          runId,
-          'failed',
-          { error: { code: 'run.wait-expired', message: 'The Wait expired before it was resolved.' } },
-          "status = 'waiting'",
-          now,
-        )
-      }
-      return due
-    })
-  }
-
   cancelControlRun(runId: string): { readonly accepted: boolean; readonly run: StoredControlRun } | undefined {
     return this.#transaction(() => {
       const current = this.#database.prepare('SELECT status FROM runs WHERE run_id = ?').get(runId) as { readonly status: RunStatus } | undefined
@@ -649,7 +626,50 @@ export class RunStore {
     })
   }
 
-  pruneExpiredEvents(now: number, limit: number): number {
+  nextMaintenanceAt(): number | undefined {
+    const row = this.#database
+      .prepare(
+        `SELECT MIN(dueAt) AS dueAt FROM (
+           SELECT MIN(run_waits.expires_at) AS dueAt
+           FROM run_waits JOIN runs USING (run_id)
+           WHERE runs.status = 'waiting'
+           UNION ALL
+           SELECT MIN(MAX(wait_notifications.retry_at, COALESCE(wait_notifications.claim_expires_at, wait_notifications.retry_at))) AS dueAt
+           FROM wait_notifications JOIN runs USING (run_id) JOIN run_waits USING (run_id)
+           WHERE wait_notifications.status = 'pending'
+             AND runs.status = 'waiting'
+             AND run_waits.wait_id = wait_notifications.wait_id
+         )`,
+      )
+      .get() as { readonly dueAt: number | null }
+    return row.dueAt ?? undefined
+  }
+
+  maintain(now: number, limit: number, notificationLeaseMs: number) {
+    return this.#transaction(() => {
+      const expiredWaits = this.#expireWaits(now, limit)
+      const prunedEvents = this.#pruneExpiredEvents(now, limit)
+      const notification = this.#claimWaitNotification(now, notificationLeaseMs)
+      return { expiredWaits, more: expiredWaits.length == limit || prunedEvents > 0, notification }
+    })
+  }
+
+  #expireWaits(now: number, limit: number): readonly { readonly flowId: string; readonly runId: string }[] {
+    const due = this.#database
+      .prepare(
+        `SELECT runs.flow_id AS flowId, runs.run_id AS runId
+         FROM runs JOIN run_waits USING (run_id)
+         WHERE runs.status = 'waiting' AND run_waits.expires_at <= ?
+         ORDER BY run_waits.expires_at, runs.run_id LIMIT ?`,
+      )
+      .all(now, limit) as unknown as readonly { readonly flowId: string; readonly runId: string }[]
+    for (const { runId } of due) {
+      this.#finishRun(runId, 'failed', { error: { code: 'run.wait-expired', message: 'The Wait expired before it was resolved.' } }, "status = 'waiting'", now)
+    }
+    return due
+  }
+
+  #pruneExpiredEvents(now: number, limit: number): number {
     return Number(
       this.#database
         .prepare(
@@ -663,7 +683,7 @@ export class RunStore {
     )
   }
 
-  claimWaitNotification(
+  #claimWaitNotification(
     now: number,
     leaseDurationMs: number,
   ):
@@ -678,66 +698,64 @@ export class RunStore {
         readonly waitId: string
       }
     | undefined {
-    return this.#transaction(() => {
-      this.#database
-        .prepare(
-          `DELETE FROM wait_notifications
-           WHERE status = 'pending' AND NOT EXISTS (
-             SELECT 1 FROM runs JOIN run_waits USING (run_id)
-             WHERE runs.run_id = wait_notifications.run_id
-               AND runs.status = 'waiting'
-               AND run_waits.wait_id = wait_notifications.wait_id
-               AND run_waits.expires_at > ?
-           )`,
-        )
-        .run(now)
-      const row = this.#database
-        .prepare(
-          `SELECT wait_notifications.action, wait_notifications.connection_id AS connectionId,
-                  wait_notifications.input_json AS inputJson, wait_notifications.invocation_id AS invocationId,
-                  wait_notifications.run_id AS runId, runs.connector_team_id AS teamId,
-                  wait_notifications.wait_id AS waitId
-           FROM wait_notifications JOIN runs USING (run_id) JOIN run_waits USING (run_id)
-           WHERE wait_notifications.status = 'pending'
-             AND wait_notifications.retry_at <= ?
-             AND (wait_notifications.claim_id IS NULL OR wait_notifications.claim_expires_at <= ?)
+    this.#database
+      .prepare(
+        `DELETE FROM wait_notifications
+         WHERE status = 'pending' AND NOT EXISTS (
+           SELECT 1 FROM runs JOIN run_waits USING (run_id)
+           WHERE runs.run_id = wait_notifications.run_id
              AND runs.status = 'waiting'
              AND run_waits.wait_id = wait_notifications.wait_id
              AND run_waits.expires_at > ?
-           ORDER BY wait_notifications.created_at, wait_notifications.run_id LIMIT 1`,
-        )
-        .get(now, now, now) as
-        | {
-            readonly action: string
-            readonly connectionId: string | null
-            readonly inputJson: string
-            readonly invocationId: string
-            readonly runId: string
-            readonly teamId: string | null
-            readonly waitId: string
-          }
-        | undefined
-      if (row == null) return
-      const claimId = randomUUID()
-      const changed = this.#database
-        .prepare(
-          `UPDATE wait_notifications SET attempts = attempts + 1, claim_id = ?, claim_expires_at = ?, updated_at = ?
-           WHERE run_id = ? AND wait_id = ? AND status = 'pending'
-             AND retry_at <= ? AND (claim_id IS NULL OR claim_expires_at <= ?)`,
-        )
-        .run(claimId, now + leaseDurationMs, now, row.runId, row.waitId, now, now)
-      if (changed.changes != 1) return
-      return {
-        action: row.action,
-        claimId,
-        connectionId: row.connectionId ?? undefined,
-        input: JSON.parse(row.inputJson) as Readonly<Record<string, JsonValue>>,
-        invocationId: row.invocationId,
-        runId: row.runId,
-        teamId: row.teamId ?? undefined,
-        waitId: row.waitId,
-      }
-    })
+         )`,
+      )
+      .run(now)
+    const row = this.#database
+      .prepare(
+        `SELECT wait_notifications.action, wait_notifications.connection_id AS connectionId,
+                wait_notifications.input_json AS inputJson, wait_notifications.invocation_id AS invocationId,
+                wait_notifications.run_id AS runId, runs.connector_team_id AS teamId,
+                wait_notifications.wait_id AS waitId
+         FROM wait_notifications JOIN runs USING (run_id) JOIN run_waits USING (run_id)
+         WHERE wait_notifications.status = 'pending'
+           AND wait_notifications.retry_at <= ?
+           AND (wait_notifications.claim_id IS NULL OR wait_notifications.claim_expires_at <= ?)
+           AND runs.status = 'waiting'
+           AND run_waits.wait_id = wait_notifications.wait_id
+           AND run_waits.expires_at > ?
+         ORDER BY wait_notifications.created_at, wait_notifications.run_id LIMIT 1`,
+      )
+      .get(now, now, now) as
+      | {
+          readonly action: string
+          readonly connectionId: string | null
+          readonly inputJson: string
+          readonly invocationId: string
+          readonly runId: string
+          readonly teamId: string | null
+          readonly waitId: string
+        }
+      | undefined
+    if (row == null) return
+    const claimId = randomUUID()
+    const changed = this.#database
+      .prepare(
+        `UPDATE wait_notifications SET attempts = attempts + 1, claim_id = ?, claim_expires_at = ?, updated_at = ?
+         WHERE run_id = ? AND wait_id = ? AND status = 'pending'
+           AND retry_at <= ? AND (claim_id IS NULL OR claim_expires_at <= ?)`,
+      )
+      .run(claimId, now + leaseDurationMs, now, row.runId, row.waitId, now, now)
+    if (changed.changes != 1) return
+    return {
+      action: row.action,
+      claimId,
+      connectionId: row.connectionId ?? undefined,
+      input: JSON.parse(row.inputJson) as Readonly<Record<string, JsonValue>>,
+      invocationId: row.invocationId,
+      runId: row.runId,
+      teamId: row.teamId ?? undefined,
+      waitId: row.waitId,
+    }
   }
 
   finishWaitNotification(runId: string, waitId: string, claimId: string, delivered: boolean): boolean {

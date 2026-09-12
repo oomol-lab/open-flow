@@ -21,7 +21,7 @@
     "@mastra/core": "1.64.0",
     "@modelcontextprotocol/server": "2.0.0",
     "@oomol-lab/open-flow": "workspace:*",
-    "effect": "4.0.0-rc.112",
+    "effect": "4.0.0-rc.113",
     "hono": "4.13.3",
     "isolated-vm": "7.0.1",
     "node-gyp-build": "4.8.4",

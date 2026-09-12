@@ -185,10 +185,6 @@ export class Supervisor {
   #nextDelay(now: number): number {
     const deadlines: number[] = []
     if (!FiberMap.hasUnsafe(this.#tasks, 'maintenance')) deadlines.push(this.#maintenance.nextAt())
-    const waitExpiry = this.#store.runViews.nextWaitExpiry()
-    if (waitExpiry != null) deadlines.push(waitExpiry)
-    const waitNotificationAt = this.#store.runViews.nextWaitNotificationAt()
-    if (waitNotificationAt != null) deadlines.push(waitNotificationAt)
     if (!FiberMap.hasUnsafe(this.#tasks, 'cron')) {
       const nextAt = this.#cron.nextAt()
       if (nextAt != null) deadlines.push(nextAt)
