@@ -55,7 +55,7 @@ export class Maintenance {
   }
 
   nextAt(): number {
-    return Math.min(this.#maintenanceAt, this.#store.runs.nextMaintenanceAt() ?? Infinity)
+    return Math.min(this.#maintenanceAt, this.#store.runs.nextMaintenanceAt() ?? Infinity, this.#store.publications.nextPublishAt() ?? Infinity)
   }
 
   markDue(): void {
@@ -127,7 +127,6 @@ export class Maintenance {
 
   #maintain(now: number): number {
     const publication = this.#publisher.advance(now)
-    if (publication == 'pending') return maintenanceRetryMs
     let nextDelay = publication == 'more' ? 0 : maintenanceIntervalMs
     if (this.#store.publications.prunePublishOperations(now, maintenanceBatchSize) > 0) nextDelay = 0
     const flowId = this.#store.flows.claimRetiring(now)

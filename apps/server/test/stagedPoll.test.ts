@@ -6,10 +6,10 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { ServerService } from '../node/application/service.ts'
 import { createConnectorHost } from './connectorHost.ts'
-import { closeService, openService } from './serviceFixture.ts'
+import { closeService, openService, startService } from './serviceFixture.ts'
 
 const directories: string[] = []
 const services = new Set<ServerService>()
@@ -265,14 +265,15 @@ it('fails a permanent Poll baseline before activation and preserves the old Live
   database.close()
 })
 
-it('rolls back a changed Poll candidate during activation and succeeds after recovery', async () => {
+it('rolls back a changed Poll candidate, lets another Flow publish, and resumes its retry after restart', async () => {
   const file = await databaseFile()
   const definition: PollDefinition = { snapshot, poll: async () => ({ checkpoint: { ready: true }, events: [] }) }
-  const service = await openService(file, {
+  const options = {
     capabilities: { connector: () => connector },
     clock: () => Date.parse('2026-08-31T12:00:00.000Z'),
     triggerDefinitions: [definition],
-  })
+  }
+  let service = await openService(file, options)
   services.add(service)
   const created = await service.control.createFlow('operator', 'Poll activation', 'poll-activation-flow')
   const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'activation')
@@ -287,9 +288,51 @@ it('rolls back a changed Poll candidate during activation and succeeds after rec
   await expect(service.control.getLive(created.flow.flowId)).resolves.toMatchObject({ publication: null })
   expect(database.prepare('SELECT COUNT(*) AS count FROM publications').get()).toEqual({ count: 0 })
 
+  const other = await service.control.createFlow('operator', 'Other Flow', 'other-flow')
+  const otherOperation = await service.control.publishFlow(
+    'operator',
+    other.flow.flowId,
+    other.flow.draftRevisionId,
+    'open-flow-engine/v2',
+    null,
+    'other-publish',
+  )
+  await service.tickMaintenance('2026-08-31T12:00:00.000Z')
+  expect(service.control.getPublishOperation(other.flow.flowId, otherOperation.operationId).status).toBe('succeeded')
+
   database.prepare('UPDATE poll_candidates SET schedule_json = ? WHERE operation_id = ?').run(scheduleJson, operation.operationId)
+  await closeService(service)
+  service = await openService(file, options)
+  services.add(service)
+  await service.tickMaintenance('2026-08-31T12:00:00.500Z')
+  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('pending')
   await service.tickMaintenance('2026-08-31T12:00:01.000Z')
   expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('succeeded')
-  expect(database.prepare('SELECT COUNT(*) AS count FROM publications').get()).toEqual({ count: 1 })
+  expect(database.prepare('SELECT COUNT(*) AS count FROM publications').get()).toEqual({ count: 2 })
   database.close()
+})
+
+it('publishes promptly when asynchronous baseline preparation finishes after maintenance has gone idle', async () => {
+  const file = await databaseFile()
+  const baseline = Promise.withResolvers<void>()
+  const entered = Promise.withResolvers<void>()
+  const definition: PollDefinition = {
+    snapshot,
+    async poll() {
+      entered.resolve()
+      await baseline.promise
+      return { checkpoint: { ready: true }, events: [] }
+    },
+  }
+  const service = await openService(file, { capabilities: { connector: () => connector }, triggerDefinitions: [definition] })
+  services.add(service)
+  const created = await service.control.createFlow('operator', 'Delayed baseline', 'delayed-baseline')
+  const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'delayed')
+  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v2', null, 'delayed-publish')
+  await startService(service)
+  await entered.promise
+  await service.tickMaintenance()
+  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('pending')
+  baseline.resolve()
+  await vi.waitFor(() => expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('succeeded'))
 })

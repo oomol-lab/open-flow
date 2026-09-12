@@ -16,7 +16,6 @@ import { agentActions, codeActions } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { checkCodeActions, ConnectorTaskError } from '../deployment/connector.ts'
 import { AcceptanceError, ControlError } from '../error.ts'
-import { publishPending } from '../storage/publication-store.ts'
 
 const batchSize = 100
 
@@ -293,7 +292,7 @@ export class Publisher {
     )
   }
 
-  advance(now: number): 'pending' | 'more' | 'idle' {
+  advance(now: number): 'more' | 'idle' {
     let publishCount = 0
     for (; publishCount < batchSize; publishCount += 1) {
       const target = this.#store.publications.nextPublishOperation(now)
@@ -305,13 +304,7 @@ export class Publisher {
         continue
       }
       const input = JSON.parse(target.input) as Parameters<PublicationStore['publish']>[0]
-      let accepted: PublicationAcceptance
-      try {
-        accepted = this.#store.publications.publish({ ...input, operationId: target.operationId, publishedAt: now })
-      } catch (error) {
-        if (error === publishPending) return 'pending'
-        throw error
-      }
+      const accepted = this.#store.publications.publish({ ...input, operationId: target.operationId, publishedAt: now })
       switch (accepted.kind) {
         case 'published':
           this.#notifyFlowCatalog()
@@ -354,7 +347,8 @@ export class Publisher {
           })
           break
         case 'operation-pending':
-          return 'pending'
+          this.#store.publications.retryPublishOperation(target.operationId, now)
+          break
       }
     }
     return publishCount == batchSize ? 'more' : 'idle'

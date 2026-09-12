@@ -12,6 +12,14 @@ import type {
 import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
 import { insertTriggerActivity, pruneTriggerActivities } from '../runtime/trigger-activity.ts'
 
+export interface IntegrationPublication {
+  readonly listener?: boolean
+  readonly connectionId: string
+  readonly reconcileAt: number
+  readonly triggerJson: string
+  readonly triggerNodeId: string
+}
+
 export interface IntegrationCandidate {
   readonly bindingId: string
   readonly checkpointJson: string | null
@@ -59,17 +67,8 @@ export class IntegrationStore {
     for (const integration of integrations) {
       const current = this.integrationBinding(flowId, integration.triggerNodeId)
       if (current != null) {
-        if (current.currentPublicationId != expectedLivePublicationId) return false
-        if (
-          current.triggerJson != null &&
-          triggerRuntimeJson(JSON.parse(current.triggerJson)) == triggerRuntimeJson(JSON.parse(integration.triggerJson)) &&
-          current.connectionId == integration.connectionId
-        ) {
-          if (current.health != 'healthy' && !(integration.listener && this.listenerState(current.bindingId, current.runtimeVersion)?.health == 'healthy'))
-            return false
-          continue
-        }
-        if (!integration.listener) return false
+        if (this.#canReuse(current, integration, expectedLivePublicationId)) continue
+        if (current.currentPublicationId != expectedLivePublicationId || this.#matches(current, integration) || !integration.listener) return false
       }
       const trigger = JSON.parse(integration.triggerJson) as TriggerNode
       if (trigger.kind != 'integration' || (trigger.definition.key != 'stripe.on_event' && !integration.listener)) return false
@@ -237,38 +236,133 @@ export class IntegrationStore {
       .run(now, now, operationId)
   }
 
-  candidatesReady(
-    operationId: string,
-    flowId: string,
-    expectedLivePublicationId: string | null,
-    integrations: readonly { readonly listener?: boolean; readonly connectionId: string; readonly triggerJson: string; readonly triggerNodeId: string }[],
+  // Runs inside the publication transaction; false requires the caller to roll it back.
+  install(
+    input: {
+      readonly flowId: string
+      readonly expectedLivePublicationId: string | null
+      readonly operationId?: string
+      readonly publishedAt: number
+      readonly integrations: readonly IntegrationPublication[]
+    },
+    publicationId: string,
   ): boolean {
-    for (const integration of integrations) {
-      const current = this.integrationBinding(flowId, integration.triggerNodeId)
-      if (
-        current != null &&
-        current.currentPublicationId == expectedLivePublicationId &&
-        current.triggerJson != null &&
-        triggerRuntimeJson(JSON.parse(current.triggerJson)) == triggerRuntimeJson(JSON.parse(integration.triggerJson)) &&
-        current.connectionId == integration.connectionId &&
-        (current.health == 'healthy' || (integration.listener && this.listenerState(current.bindingId, current.runtimeVersion)?.health == 'healthy'))
-      ) {
+    const desiredIntegrations = new Map(input.integrations.map((integration) => [integration.triggerNodeId, integration]))
+    const integrationBindings = this.#database
+      .prepare(
+        `SELECT binding_id AS bindingId, trigger_node_id AS triggerNodeId,
+                current_publication_id AS currentPublicationId, trigger_json AS triggerJson,
+                connection_id AS connectionId, runtime_version AS runtimeVersion, health
+         FROM integration_bindings WHERE flow_id = ?`,
+      )
+      .all(input.flowId) as {
+      readonly bindingId: string
+      readonly runtimeVersion: number
+      readonly health: IntegrationHealth
+      readonly connectionId: string
+      readonly currentPublicationId: string | null
+      readonly triggerJson: string
+      readonly triggerNodeId: string
+    }[]
+    for (const binding of integrationBindings) {
+      const integration = desiredIntegrations.get(binding.triggerNodeId)
+      if (integration != null) {
+        const unchanged = this.#matches(binding, integration)
+        if (input.operationId != null && !this.#canReuse(binding, integration, input.expectedLivePublicationId)) {
+          if (
+            !integration.listener ||
+            !this.#replaceCandidate(input.operationId, binding.bindingId, input.flowId, publicationId, integration, input.publishedAt)
+          ) {
+            return false
+          }
+        } else if ((input.operationId != null || integration.listener) && unchanged) {
+          this.#database
+            .prepare('UPDATE integration_bindings SET current_publication_id = ?, trigger_json = ?, updated_at = ? WHERE binding_id = ?')
+            .run(publicationId, integration.triggerJson, input.publishedAt, binding.bindingId)
+        } else {
+          this.#database
+            .prepare(
+              `UPDATE integration_bindings
+               SET current_publication_id = ?, runtime_version = runtime_version + 1,
+                   trigger_json = ?, connection_id = ?, reconcile_at = ?, retry_at = NULL,
+                   health = CASE WHEN ? = 1 THEN health ELSE 'initializing' END,
+                   updated_at = ?
+               WHERE binding_id = ?`,
+            )
+            .run(
+              publicationId,
+              integration.triggerJson,
+              integration.connectionId,
+              integration.reconcileAt,
+              unchanged ? 1 : 0,
+              input.publishedAt,
+              binding.bindingId,
+            )
+        }
+        desiredIntegrations.delete(binding.triggerNodeId)
+      } else if (binding.currentPublicationId != null) {
+        this.#database
+          .prepare(
+            `UPDATE integration_bindings
+             SET current_publication_id = NULL, runtime_version = runtime_version + 1,
+                 reconcile_at = ?, retry_at = NULL, updated_at = ?
+             WHERE binding_id = ?`,
+          )
+          .run(input.publishedAt, input.publishedAt, binding.bindingId)
+      }
+    }
+    for (const [triggerNodeId, integration] of desiredIntegrations) {
+      if (input.operationId != null) {
+        if (!this.#activateCandidate(input.operationId, input.flowId, publicationId, integration, input.publishedAt)) {
+          return false
+        }
         continue
       }
-      const candidate = this.candidate(operationId, integration.triggerNodeId)
-      if (
-        candidate?.status != 'ready' ||
-        candidate.flowId != flowId ||
-        candidate.triggerJson != integration.triggerJson ||
-        candidate.connectionId != integration.connectionId
-      ) {
-        return false
-      }
+      this.#database
+        .prepare(
+          `INSERT INTO integration_bindings (
+             binding_id, endpoint_id, flow_id, trigger_node_id,
+             current_publication_id, runtime_version, trigger_json, connection_id, health, reconcile_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 'initializing', ?, ?)`,
+        )
+        .run(
+          `binding_${crypto.randomUUID().replaceAll('-', '')}`,
+          `endpoint_${crypto.randomUUID().replaceAll('-', '')}`,
+          input.flowId,
+          triggerNodeId,
+          publicationId,
+          integration.triggerJson,
+          integration.connectionId,
+          integration.reconcileAt,
+          input.publishedAt,
+        )
     }
     return true
   }
 
-  activateCandidate(
+  #matches(
+    binding: Pick<StoredIntegrationBinding, 'connectionId' | 'triggerJson'>,
+    integration: Pick<IntegrationPublication, 'connectionId' | 'triggerJson'>,
+  ): boolean {
+    return (
+      binding.connectionId == integration.connectionId &&
+      triggerRuntimeJson(JSON.parse(binding.triggerJson)) == triggerRuntimeJson(JSON.parse(integration.triggerJson))
+    )
+  }
+
+  #canReuse(
+    binding: Pick<StoredIntegrationBinding, 'bindingId' | 'connectionId' | 'currentPublicationId' | 'health' | 'runtimeVersion' | 'triggerJson'>,
+    integration: Pick<IntegrationPublication, 'listener' | 'connectionId' | 'triggerJson'>,
+    expectedLivePublicationId: string | null,
+  ): boolean {
+    return (
+      binding.currentPublicationId == expectedLivePublicationId &&
+      this.#matches(binding, integration) &&
+      (binding.health == 'healthy' || (integration.listener === true && this.listenerState(binding.bindingId, binding.runtimeVersion)?.health == 'healthy'))
+    )
+  }
+
+  #activateCandidate(
     operationId: string,
     flowId: string,
     publicationId: string,
@@ -324,7 +418,7 @@ export class IntegrationStore {
     return true
   }
 
-  replaceCandidate(
+  #replaceCandidate(
     operationId: string,
     bindingId: string,
     flowId: string,
@@ -337,7 +431,7 @@ export class IntegrationStore {
       readonly endpointId: string
     }
     this.#database.prepare('DELETE FROM integration_bindings WHERE binding_id = ?').run(bindingId)
-    if (!this.activateCandidate(operationId, flowId, publicationId, integration, now)) return false
+    if (!this.#activateCandidate(operationId, flowId, publicationId, integration, now)) return false
     if (previous != null) {
       this.#database
         .prepare(`INSERT INTO integration_candidates (
