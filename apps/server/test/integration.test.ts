@@ -17,6 +17,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ServerService } from '../node/application/service.ts'
 import { createLogger } from '../node/logger.ts'
+import { Database } from '../node/storage/database.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
@@ -243,7 +244,11 @@ describe('Server Integration reconciliation', () => {
             },
             snapshot,
           }
-          const service = yield* ServerService.open(file, options(clock, [definition]))
+          const database = yield* Effect.acquireRelease(
+            Effect.sync(() => Database.open(file)),
+            (opened) => Effect.sync(() => opened.close()),
+          )
+          const service = yield* ServerService.open(database, options(clock, [definition]))
           yield* Effect.tryPromise({ try: () => publish(service, 'ready', null), catch: (error) => error })
           const ticking = service.tickIntegration(new Date(at).toISOString())
           yield* Effect.promise(() => entered.promise)
@@ -325,7 +330,11 @@ describe('Server Integration reconciliation', () => {
           }
           yield* Effect.scoped(
             Effect.gen(function* () {
-              const service = yield* ServerService.open(file, options(clock, [definition]))
+              const database = yield* Effect.acquireRelease(
+                Effect.sync(() => Database.open(file)),
+                (opened) => Effect.sync(() => opened.close()),
+              )
+              const service = yield* ServerService.open(database, options(clock, [definition]))
               yield* Effect.tryPromise({
                 try: async () => {
                   await publish(service, 'ready', null)

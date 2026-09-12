@@ -1,16 +1,13 @@
-import { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from 'node:sqlite'
+import type { Database } from './database.ts'
 
 export class SettingsStore {
   readonly #clock: () => number
   readonly #database: DatabaseSync
 
-  constructor(file: string, clock: () => number = Date.now) {
+  constructor(database: Database, clock: () => number = Date.now) {
     this.#clock = clock
-    this.#database = new DatabaseSync(file, { timeout: 5_000 })
-    this.#database.exec(`
-      PRAGMA journal_mode = WAL;
-      PRAGMA synchronous = NORMAL;
-    `)
+    this.#database = database.connection
     this.#database.prepare('INSERT OR IGNORE INTO deployment_settings (id, revision, updated_at) VALUES (1, 1, ?)').run(this.#clock())
   }
 
@@ -140,9 +137,5 @@ export class SettingsStore {
         )
         .run(this.#clock(), expectedRevision).changes == 1
     )
-  }
-
-  close(): void {
-    this.#database.close()
   }
 }

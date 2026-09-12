@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { ServerService } from '../node/application/service.ts'
 import { serverErrorCode } from '../node/error.ts'
 import { createLogger } from '../node/logger.ts'
+import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
@@ -323,7 +324,11 @@ describe('Server Poll Trigger', () => {
               })
             },
           }
-          const service = yield* ServerService.open(file, {
+          const database = yield* Effect.acquireRelease(
+            Effect.sync(() => Database.open(file)),
+            (opened) => Effect.sync(() => opened.close()),
+          )
+          const service = yield* ServerService.open(database, {
             capabilities: { connector: () => connector },
             clock,
             triggerDefinitions: [definition],
@@ -626,7 +631,8 @@ describe('Server Poll Trigger', () => {
     await publish(service)
     await closeService(service)
 
-    const store = new Store(file)
+    const opened = Database.open(file)
+    const store = new Store(opened)
     const target = store.polls.duePoll(Date.parse('2026-08-21T00:01:00.000Z'), 1)[0]
     if (target == null) throw new Error('Poll claim target was not due.')
     const first = store.polls.claimPoll(target, 'claim-main', 1_000, 2_000)
@@ -638,6 +644,6 @@ describe('Server Poll Trigger', () => {
     expect(reacquired).toMatchObject({ kind: 'acquired' })
     if (first.kind != 'acquired' || reacquired.kind != 'acquired') throw new Error('Poll claim was not acquired.')
     expect(reacquired.leaseToken).not.toBe(first.leaseToken)
-    store.close()
+    opened.close()
   })
 })

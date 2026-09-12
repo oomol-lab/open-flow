@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Settings } from '../node/deployment/settings.ts'
-import { migrateDatabase } from '../node/storage/migrate.ts'
+import { Database } from '../node/storage/database.ts'
 import { SettingsStore } from '../node/storage/settings-store.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { closeService, openService } from './serviceFixture.ts'
 
 const directories: string[] = []
-const stores: SettingsStore[] = []
+const stores: Database[] = []
 
 afterEach(async () => {
   vi.unstubAllGlobals()
@@ -21,14 +21,14 @@ async function databaseFile(): Promise<string> {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-settings-'))
   directories.push(directory)
   const file = path.join(directory, 'open-flow.sqlite')
-  migrateDatabase(file)
+  Database.open(file).close()
   return file
 }
 
 function settings(file: string, environment: ConstructorParameters<typeof Settings>[1] = {}): Settings {
-  const store = new SettingsStore(file)
-  stores.push(store)
-  return new Settings(store, environment)
+  const database = Database.open(file)
+  stores.push(database)
+  return new Settings(new SettingsStore(database), environment)
 }
 
 it('keeps LLM invocations on the configuration snapshot taken when they start', async () => {

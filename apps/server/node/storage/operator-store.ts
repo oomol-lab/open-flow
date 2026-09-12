@@ -1,5 +1,7 @@
+import type { DatabaseSync } from 'node:sqlite'
+import type { Database } from './database.ts'
+
 import { createHash, randomBytes, scrypt, scryptSync, timingSafeEqual } from 'node:crypto'
-import { DatabaseSync } from 'node:sqlite'
 
 const keyBytes = 32
 const retryDelayMs = 1_000
@@ -16,13 +18,9 @@ export class OperatorStore {
   #verification?: { readonly digest: Buffer; readonly result: Promise<boolean> }
   #verified?: Buffer
 
-  constructor(file: string, clock: () => number = Date.now) {
+  constructor(database: Database, clock: () => number = Date.now) {
     this.#clock = clock
-    this.#database = new DatabaseSync(file, { timeout: 5_000 })
-    this.#database.exec(`
-      PRAGMA journal_mode = WAL;
-      PRAGMA synchronous = NORMAL;
-    `)
+    this.#database = database.connection
     const now = this.#clock()
     this.#database
       .prepare('INSERT OR IGNORE INTO operator_auth (id, session_secret, revision, updated_at) VALUES (1, ?, 1, ?)')
@@ -88,9 +86,5 @@ export class OperatorStore {
         .run(hash.toString('base64url'), salt.toString('base64url'), now, now).changes == 1
     if (claimed) this.#verified = digest(token)
     return claimed
-  }
-
-  close(): void {
-    this.#database.close()
   }
 }

@@ -10,7 +10,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Publisher } from '../node/application/publication.ts'
 import { ServerService } from '../node/application/service.ts'
+import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
@@ -413,8 +415,9 @@ describe('Server application service', () => {
   it.each(['completed', 'failed', 'canceled', 'indeterminate'] as const)('counts %s event bytes exactly once', async (status) => {
     const file = await databaseFile()
     const service = await openService(file)
-    const store = new Store(file)
-    const database = new DatabaseSync(file)
+    const opened = Database.open(file)
+    const store = new Store(opened)
+    const database = opened.connection
     try {
       const accepted = await acceptRun(service, {
         flowId: 'main',
@@ -423,28 +426,28 @@ describe('Server application service', () => {
         revisionId: 'revision-terminal-bytes',
       })
       if (accepted.kind != 'accepted') throw new Error('Initial Run acceptance conflicted.')
-      expect(store.claim()?.runId).toBe(accepted.runId)
-      expect(store.start(accepted.runId, { kind: 'run.started', payload: { flowId: 'main', scopeId: 'scope' } })).toBe(true)
+      expect(store.runs.claim()?.runId).toBe(accepted.runId)
+      expect(store.runs.start(accepted.runId, { kind: 'run.started', payload: { flowId: 'main', scopeId: 'scope' } })).toBe(true)
       const counts = database.prepare('SELECT event_count AS count, event_bytes AS bytes FROM runs WHERE run_id = ?')
       const before = counts.get(accepted.runId) as { count: number; bytes: number }
       const result = { message: '终态结果 🎉' }
       const bytes = new TextEncoder().encode(JSON.stringify({ kind: `run.${status}`, payload: { result } })).byteLength
 
-      expect(store.commit(accepted.runId, status, result)).toBe(true)
+      expect(store.runs.commit(accepted.runId, status, result)).toBe(true)
       expect(counts.get(accepted.runId)).toEqual({ count: before.count + 1, bytes: before.bytes + bytes })
-      expect(store.commit(accepted.runId, status, result)).toBe(false)
+      expect(store.runs.commit(accepted.runId, status, result)).toBe(false)
       expect(counts.get(accepted.runId)).toEqual({ count: before.count + 1, bytes: before.bytes + bytes })
-      expect(store.events(accepted.runId).filter((event) => event.kind == `run.${status}`)).toHaveLength(1)
+      expect(store.runViews.events(accepted.runId).filter((event) => event.kind == `run.${status}`)).toHaveLength(1)
     } finally {
-      database.close()
-      store.close()
+      opened.close()
     }
   })
 
   it.each([32, 600_000])('stores or truncates a complete output event atomically with %i-byte fields', async (size) => {
     const file = await databaseFile()
     const service = await openService(file)
-    const store = new Store(file)
+    const opened = Database.open(file)
+    const store = new Store(opened)
     try {
       const accepted = await acceptRun(service, {
         flowId: 'main',
@@ -453,10 +456,10 @@ describe('Server application service', () => {
         revisionId: 'revision-completion-event',
       })
       if (accepted.kind != 'accepted') throw new Error('Initial Run acceptance conflicted.')
-      expect(store.claim()?.runId).toBe(accepted.runId)
-      expect(store.start(accepted.runId, { kind: 'run.started', payload: { flowId: 'main', scopeId: 'scope' } })).toBe(true)
+      expect(store.runs.claim()?.runId).toBe(accepted.runId)
+      expect(store.runs.start(accepted.runId, { kind: 'run.started', payload: { flowId: 'main', scopeId: 'scope' } })).toBe(true)
       const outputs = { first: 'a'.repeat(size), second: 'b'.repeat(size), empty: null }
-      store.append(accepted.runId, {
+      store.runs.append(accepted.runId, {
         kind: 'node.completed',
         payload: { nodeId: 'source', executionId: 'execution', scopeId: 'scope', flowId: 'main' },
         value: outputs,
@@ -472,7 +475,7 @@ describe('Server application service', () => {
         expect(completions).toEqual([])
       }
     } finally {
-      store.close()
+      opened.close()
       await closeService(service)
     }
   })
@@ -701,6 +704,51 @@ describe('Server application service', () => {
     database.close()
     expect(invocationIds).toHaveLength(2)
     expect(invocationIds[1]).toBe(invocationIds[0])
+  })
+
+  it('clears expired Wait notifications even while publication is pending', async () => {
+    const file = await databaseFile()
+    let now = Date.parse('2026-09-01T00:00:00.000Z')
+    const execute = vi.fn(async () => {
+      throw new Error('Temporary network failure.')
+    })
+    const options = {
+      capabilities: {
+        connector: () => createConnectorHost({ execute, ready: async () => true }),
+        waitPublicOrigin: () => new URL('https://flows.example.com'),
+      },
+      clock: () => now,
+    }
+    let service = await openService(file, options)
+    await startService(service)
+    const accepted = await acceptRun(service, {
+      flowId: 'main',
+      idempotencyKey: 'wait-notification-expired',
+      revision: notificationFlow(),
+      revisionId: 'revision-wait-notification-expired',
+    })
+    if (accepted.kind != 'accepted') throw new Error('Wait notification Run was not accepted.')
+    await service.waitForIdle()
+    const waiting = service.control.getRun(accepted.runId).waiting
+    if (waiting == null) throw new Error('Run is not waiting.')
+    await closeService(service)
+
+    service = await openService(file, options)
+    now = Date.parse(waiting.expiresAt)
+    const database = new DatabaseSync(file)
+    const advance = vi.spyOn(Publisher.prototype, 'advance').mockReturnValue('pending')
+    try {
+      const notification = database.prepare('SELECT status FROM wait_notifications WHERE run_id = ?')
+      expect(notification.get(accepted.runId)).toEqual({ status: 'pending' })
+      await service.tickMaintenance()
+      expect(advance).toHaveBeenCalled()
+      expect(notification.get(accepted.runId)).toBeUndefined()
+      expect(service.run(accepted.runId)?.status).toBe('waiting')
+      expect(execute).toHaveBeenCalledTimes(1)
+    } finally {
+      advance.mockRestore()
+      database.close()
+    }
   })
 
   it('bounds repeated Wait notification failures', async () => {
@@ -1044,7 +1092,7 @@ describe('Server application service', () => {
 
   it('keeps executing when a Code node log cannot be stored', async () => {
     const service = await openService(await databaseFile())
-    const store = (service.control as unknown as { readonly store: { append(runId: string, event: ProjectedRunEvent): void } }).store
+    const store = (service.control as unknown as { readonly store: { readonly runs: { append(runId: string, event: ProjectedRunEvent): void } } }).store.runs
     const append = store.append.bind(store)
     let rejected = false
     vi.spyOn(store, 'append').mockImplementation((runId, event) => {
@@ -1311,7 +1359,11 @@ describe('Server application service', () => {
         Effect.gen(function* () {
           const clock = yield* TestClock.make()
           const file = yield* Effect.promise(databaseFile)
-          const service = yield* ServerService.open(file, { clock, runtime: { runTimeoutMs: 25 } })
+          const database = yield* Effect.acquireRelease(
+            Effect.sync(() => Database.open(file)),
+            (opened) => Effect.sync(() => opened.close()),
+          )
+          const service = yield* ServerService.open(database, { clock, runtime: { runTimeoutMs: 25 } })
           yield* service.start()
           yield* Effect.tryPromise({
             try: async () => {

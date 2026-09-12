@@ -159,7 +159,7 @@ export class Supervisor {
   #launchWorkers(): Effect.Effect<boolean> {
     return Effect.gen({ self: this }, function* () {
       while (this.#failure == null && (yield* FiberMap.size(this.#workers)) < this.#maxConcurrentRuns) {
-        const run = this.#store.claim([...this.#runningFlows])
+        const run = this.#store.runs.claim([...this.#runningFlows])
         if (run == null) return true
         this.#runningFlows.add(run.flowId)
         yield* FiberMap.run(
@@ -185,9 +185,9 @@ export class Supervisor {
   #nextDelay(now: number): number {
     const deadlines: number[] = []
     if (!FiberMap.hasUnsafe(this.#tasks, 'maintenance')) deadlines.push(this.#maintenance.nextAt())
-    const waitExpiry = this.#store.nextWaitExpiry()
+    const waitExpiry = this.#store.runViews.nextWaitExpiry()
     if (waitExpiry != null) deadlines.push(waitExpiry)
-    const waitNotificationAt = this.#store.nextWaitNotificationAt()
+    const waitNotificationAt = this.#store.runViews.nextWaitNotificationAt()
     if (waitNotificationAt != null) deadlines.push(waitNotificationAt)
     if (!FiberMap.hasUnsafe(this.#tasks, 'cron')) {
       const nextAt = this.#cron.nextAt()

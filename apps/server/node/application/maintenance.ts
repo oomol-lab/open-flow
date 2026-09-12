@@ -72,11 +72,11 @@ export class Maintenance {
       Effect.gen({ self: this }, function* () {
         const now = Date.parse(at)
         if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Maintenance tick time must be an ISO timestamp.'))
-        const notification = this.#store.claimWaitNotification(now, waitNotificationLeaseMs)
+        const notification = this.#store.runs.claimWaitNotification(now, waitNotificationLeaseMs)
         if (notification != null) {
           const connector = this.#resolveConnector()
           if (connector == null) {
-            this.#store.releaseWaitNotification(
+            this.#store.runs.releaseWaitNotification(
               notification.runId,
               notification.waitId,
               notification.claimId,
@@ -93,9 +93,9 @@ export class Maintenance {
                 onFailure: (error) =>
                   Effect.sync(() => {
                     if (error instanceof ConnectorTaskError && (error.code == 'connector.action-not-found' || error.code == 'connector.connection-required')) {
-                      this.#store.finishWaitNotification(notification.runId, notification.waitId, notification.claimId, false)
+                      this.#store.runs.finishWaitNotification(notification.runId, notification.waitId, notification.claimId, false)
                     } else {
-                      this.#store.releaseWaitNotification(
+                      this.#store.runs.releaseWaitNotification(
                         notification.runId,
                         notification.waitId,
                         notification.claimId,
@@ -107,7 +107,7 @@ export class Maintenance {
                   }),
                 onSuccess: () =>
                   Effect.sync(() => {
-                    this.#store.finishWaitNotification(notification.runId, notification.waitId, notification.claimId, true)
+                    this.#store.runs.finishWaitNotification(notification.runId, notification.waitId, notification.claimId, true)
                     this.#logger.info({ category: 'wait.notification.delivered', runId: notification.runId }, 'Wait notification was delivered.')
                   }),
               }),
@@ -115,7 +115,7 @@ export class Maintenance {
           }
         }
         let nextDelay = this.#maintain(now)
-        const nextNotificationAt = this.#store.nextWaitNotificationAt()
+        const nextNotificationAt = this.#store.runViews.nextWaitNotificationAt()
         if (nextNotificationAt != null) nextDelay = Math.min(nextDelay, Math.max(0, nextNotificationAt - now))
         this.#maintenanceAt = this.#clock() + nextDelay
         this.#signal()
@@ -126,28 +126,28 @@ export class Maintenance {
   #maintain(now: number): number {
     const publication = this.#publisher.advance(now)
     if (publication == 'pending') return maintenanceRetryMs
-    let nextDelay = publication == 'more' || this.#store.pruneExpiredEvents(now, maintenanceBatchSize) > 0 ? 0 : maintenanceIntervalMs
+    let nextDelay = publication == 'more' || this.#store.runs.pruneExpiredEvents(now, maintenanceBatchSize) > 0 ? 0 : maintenanceIntervalMs
     if (this.#store.publications.prunePublishOperations(now, maintenanceBatchSize) > 0) nextDelay = 0
-    const expiredWaits = this.#store.expireWaits(now, maintenanceBatchSize)
+    const expiredWaits = this.#store.runs.expireWaits(now, maintenanceBatchSize)
     for (const { flowId, runId } of expiredWaits) this.#runChanged(flowId, runId)
     if (expiredWaits.length == maintenanceBatchSize) nextDelay = 0
-    const flowId = this.#store.claimRetiringFlow(now)
+    const flowId = this.#store.flows.claimRetiring(now)
     if (flowId == null) {
-      if (this.#store.collectOrphanRevisions(maintenanceBatchSize) > 0) nextDelay = 0
+      if (this.#store.flows.collectOrphanRevisions(maintenanceBatchSize) > 0) nextDelay = 0
       return nextDelay
     }
 
-    const canceled = this.#store.cancelFlowRuns(flowId, maintenanceBatchSize)
+    const canceled = this.#store.runs.cancelByFlow(flowId, maintenanceBatchSize)
     for (const runId of canceled) this.#interrupt(runId)
     if (canceled.length > 0) return 0
     if (this.#isFlowRunning(flowId)) return maintenanceRetryMs
-    if (this.#store.flowHasIntegrationState(flowId)) return nextDelay
-    if (this.#store.deleteFlowRuns(flowId, maintenanceBatchSize) > 0) return 0
-    if (!this.#store.deleteFlow(flowId)) return nextDelay
+    if (this.#store.flows.hasIntegrationState(flowId)) return nextDelay
+    if (this.#store.runs.deleteByFlow(flowId, maintenanceBatchSize) > 0) return 0
+    if (!this.#store.flows.delete(flowId)) return nextDelay
 
     this.#logger.info({ category: 'flow.deleted', flowId }, 'Retired Flow was physically deleted.')
     this.#notifyFlowCatalog()
-    if (this.#store.collectOrphanRevisions(maintenanceBatchSize) > 0) return 0
+    if (this.#store.flows.collectOrphanRevisions(maintenanceBatchSize) > 0) return 0
     return nextDelay
   }
 }

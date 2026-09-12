@@ -28,7 +28,9 @@ import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
 import type { ConnectorHost } from '../deployment/connector.ts'
-import type { PublicationAcceptance, StoredControlRun, StoredPresentation, StoredFlow, StoredFlowRevision, StoredPublication } from '../storage/store.ts'
+import type { StoredFlow, StoredFlowRevision, StoredPresentation } from '../storage/flow-store.ts'
+import type { PublicationAcceptance, StoredPublication } from '../storage/publication-store.ts'
+import type { StoredControlRun } from '../storage/run-view-store.ts'
 import type { StoredTriggerActivity, StoredTriggerBinding } from '../storage/trigger-store.ts'
 
 import { readResult } from '@oomol-lab/open-flow/control-api'
@@ -150,17 +152,17 @@ export class ControlService {
   }
 
   listVariables(): { readonly variables: readonly Variable[]; readonly version: 1 } {
-    return { variables: this.store.listVariables().map(variable), version: 1 }
+    return { variables: this.store.variables.list().map(variable), version: 1 }
   }
 
   getVariable(name: string): Variable {
-    const stored = this.store.variable(name)
+    const stored = this.store.variables.get(name)
     if (stored == null) throw new ControlError(controlErrorCode.variableNotFound, 'The Variable was not found.')
     return variable(stored)
   }
 
   putVariable(name: string, value: string): Variable {
-    const saved = this.store.putVariable(name, value)
+    const saved = this.store.variables.put(name, value)
     if (saved.kind == 'limit-reached') {
       throw new ControlError(controlErrorCode.variableLimitReached, 'The deployment has reached its Variable limit.')
     }
@@ -168,7 +170,7 @@ export class ControlService {
   }
 
   deleteVariable(name: string): void {
-    if (!this.store.deleteVariable(name)) throw new ControlError(controlErrorCode.variableNotFound, 'The Variable was not found.')
+    if (!this.store.variables.delete(name)) throw new ControlError(controlErrorCode.variableNotFound, 'The Variable was not found.')
   }
 
   getTriggerKey(key: string): TriggerKeySnapshot {
@@ -237,10 +239,10 @@ export class ControlService {
     const connector = this.resolveConnector()
     if (connector == null) throw new ControlError(controlErrorCode.connectorUnconfigured, 'Connector is not configured for this deployment.')
     if (flowId != null) this.getFlow(flowId)
-    let teamId = flowId == null ? undefined : this.store.connectorTeam(flowId)
+    let teamId = flowId == null ? undefined : this.store.connectorTeams.get(flowId)
     if (flowId != null && teamId == null) {
       const resolved = await this.resolveConnectorTeam()
-      if (resolved != null) teamId = this.store.bindConnectorTeam(flowId, resolved)
+      if (resolved != null) teamId = this.store.connectorTeams.bind(flowId, resolved)
     }
     try {
       return await request(connector, teamId)
@@ -263,7 +265,7 @@ export class ControlService {
     const content = emptyRevision()
     const bytes = encodeRevision(content)
     const createdAt = this.clock()
-    const stored = this.store.createFlow({
+    const stored = this.store.flows.createFlow({
       actorId,
       connectorTeamId: selectedConnectorTeamId,
       content: new TextDecoder().decode(bytes),
@@ -288,7 +290,7 @@ export class ControlService {
     readonly next?: FlowPosition
     readonly page: { readonly flows: readonly Flow[]; readonly total?: number; readonly version: 1 }
   } {
-    const stored = this.store.listFlows(limit + 1, after, includeTotal)
+    const stored = this.store.flows.list(limit + 1, after, includeTotal)
     const rows = stored.flows.slice(0, limit)
     const last = rows.at(-1)
     return {
@@ -302,14 +304,14 @@ export class ControlService {
   }
 
   getFlow(flowId: string): Flow {
-    const stored = this.store.flow(flowId)
+    const stored = this.store.flows.get(flowId)
     if (stored == null) notFound()
     return flow(stored)
   }
 
   setFlowEnabled(flowId: string, publicationId: string, enabled: boolean): Flow {
     this.getFlow(flowId)
-    const stored = this.store.setFlowEnabled(flowId, publicationId, enabled)
+    const stored = this.store.flows.setEnabled(flowId, publicationId, enabled)
     if (stored == null) throw new ControlError(controlErrorCode.flowConflict, 'The published Flow changed or is retiring.')
     this.triggersChanged()
     this.flowCatalogChanged()
@@ -317,14 +319,14 @@ export class ControlService {
   }
 
   renameFlow(flowId: string, name: string): Flow {
-    const stored = this.store.renameFlow(flowId, name, this.clock())
+    const stored = this.store.flows.rename(flowId, name, this.clock())
     if (stored == null) notFound()
     this.flowCatalogChanged()
     return flow(stored)
   }
 
   retireFlow(flowId: string): Flow {
-    const stored = this.store.retireFlow(flowId, this.clock())
+    const stored = this.store.flows.retire(flowId, this.clock())
     if (stored == null) notFound()
     this.triggersChanged()
     this.flowCatalogChanged()
@@ -344,7 +346,7 @@ export class ControlService {
   }
 
   getRevision(flowId: string, revisionId: string): Draft {
-    const stored = this.store.revision(flowId, revisionId)
+    const stored = this.store.flows.revision(flowId, revisionId)
     if (stored == null) notFound()
     return draft(stored)
   }
@@ -362,7 +364,7 @@ export class ControlService {
     changeId: string = randomUUID(),
   ): Promise<DraftChange> {
     this.requireDraft(flowId)
-    const base = this.store.revision(flowId, expectedRevisionId)
+    const base = this.store.flows.revision(flowId, expectedRevisionId)
     if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
     let content: RevisionContent
     try {
@@ -380,7 +382,7 @@ export class ControlService {
     const digest = await digestBytes(bytes)
     if (digest == base.digest) invalidFlow('The Draft change does not modify the Flow.')
     const requestDigest = await digestBytes(canonicalJsonBytes({ expectedRevisionId, operations: operations as unknown as JsonValue }))
-    const stored = this.store.commitRevision({
+    const stored = this.store.flows.commitRevision({
       actorId,
       changeId,
       content: new TextDecoder().decode(bytes),
@@ -510,7 +512,7 @@ export class ControlService {
     idempotencyKey: string,
   ): Promise<PublishOperation> {
     if (engineContract != currentEngineContract) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
-    const revision = this.store.revision(flowId, revisionId)
+    const revision = this.store.flows.revision(flowId, revisionId)
     if (revision == null) notFound()
     return await this.commitPublishOperation({
       control: { actorId, operation: 'publish' },
@@ -542,7 +544,7 @@ export class ControlService {
   ): Promise<{ readonly created: boolean; readonly publication: Publication }> {
     const source = this.store.publications.publication(flowId, sourcePublicationId)
     if (source == null) throw new ControlError(controlErrorCode.publicationNotFound, 'The Publication was not found.')
-    const revision = this.store.revision(flowId, source.revisionId)
+    const revision = this.store.flows.revision(flowId, source.revisionId)
     if (revision == null || revision.digest != source.revisionDigest) {
       throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Revision does not match the Publication.')
     }
@@ -568,13 +570,13 @@ export class ControlService {
   }
 
   getPresentation(flowId: string): Presentation {
-    const stored = this.store.presentation(flowId)
+    const stored = this.store.flows.presentation(flowId)
     if (stored == null) notFound()
     return presentation(stored)
   }
 
   updatePresentation(flowId: string, expectedRevision: number, value: Readonly<Record<string, JsonValue>>): Presentation {
-    const stored = this.store.updatePresentation(flowId, expectedRevision, value, this.clock())
+    const stored = this.store.flows.updatePresentation(flowId, expectedRevision, value, this.clock())
     switch (stored.kind) {
       case 'busy':
         throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
@@ -590,7 +592,7 @@ export class ControlService {
   async checkFlow(flowId: string, revisionId: string, engineContract: string): Promise<FlowCheck> {
     const engine = findEngineContract(engineContract)
     if (engine == null) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
-    const stored = this.store.revision(flowId, revisionId)
+    const stored = this.store.flows.revision(flowId, revisionId)
     if (stored == null) notFound()
     const content = revisionContent(stored)
     let checked: Awaited<ReturnType<typeof validateFlow>>
@@ -638,14 +640,14 @@ export class ControlService {
     const existing = this.replayRun(idempotencyKey, requestDigest, 'draft')
     if (existing != null) return existing
     if (engineContract != currentEngineContract) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
-    const stored = this.store.revision(flowId, revisionId)
+    const stored = this.store.flows.revision(flowId, revisionId)
     if (stored == null) notFound()
     const content = revisionContent(stored)
     if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and payload.')
     const fixed = await this.prepareRun(content, engineContract, trigger.nodeId)
     await this.checkRunActions(fixed.flow, flowId)
     if (validateFlowInputs(content, inputs) != 'valid') throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
-    const accepted = this.store.acceptControlRun({
+    const accepted = this.store.runs.acceptControlRun({
       closureDigest: fixed.flow.closureDigest,
       flowId,
       idempotencyKey,
@@ -673,7 +675,7 @@ export class ControlService {
     const livePublication = this.store.publications.publicationById(publicationId)
     if (livePublication == null) throw new ControlError(controlErrorCode.publicationNotFound, 'The Publication was not found.')
     const { flowId } = livePublication
-    const currentFlow = this.store.flow(flowId)
+    const currentFlow = this.store.flows.get(flowId)
     if (currentFlow == null) notFound()
     if (currentFlow.status != 'active') throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
     const live = this.store.publications.live(flowId)
@@ -683,7 +685,7 @@ export class ControlService {
     if (findEngineContract(livePublication.engineContract) == null) {
       throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
     }
-    const stored = this.store.revision(flowId, livePublication.revisionId)
+    const stored = this.store.flows.revision(flowId, livePublication.revisionId)
     if (stored == null || stored.digest != livePublication.revisionDigest) {
       throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Revision does not match the Publication.')
     }
@@ -696,7 +698,7 @@ export class ControlService {
       throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Flow does not match the Publication.')
     }
     await this.checkRunActions(fixed.flow, flowId)
-    const accepted = this.store.acceptLiveControlRun({
+    const accepted = this.store.runs.acceptLiveControlRun({
       closureDigest: livePublication.closureDigest,
       expectedPublicationId: livePublication.publicationId,
       flowId,
@@ -730,9 +732,9 @@ export class ControlService {
     readonly waitId: string
   } {
     const stored = this.requireRun(runId)
-    const receipt = this.store.waitReceipt(runId, waitId)
+    const receipt = this.store.runViews.waitReceipt(runId, waitId)
     if (receipt == null) throw new ControlError(controlErrorCode.runWaitNotFound, 'The active Wait was not found.')
-    const result = this.store.resolveWait(runId, waitId, action)
+    const result = this.store.runs.resolveWait(runId, waitId, action)
     switch (result.kind) {
       case 'invalid-action':
         throw new ControlError(controlErrorCode.runInvalid, 'The Wait action is invalid.')
@@ -763,8 +765,8 @@ export class ControlService {
     readonly next?: RunPosition
     readonly page: { readonly flowId: string; readonly runs: readonly Run[]; readonly version: 1 }
   } {
-    if (this.store.flow(flowId) == null) notFound()
-    const stored = this.store.listControlRuns(flowId, limit + 1, options)
+    if (this.store.flows.get(flowId) == null) notFound()
+    const stored = this.store.runViews.listControlRuns(flowId, limit + 1, options)
     const rows = stored.slice(0, limit)
     const last = rows.at(-1)
     return {
@@ -778,7 +780,7 @@ export class ControlService {
     if (current.eventsExpiresAt != null && current.eventsExpiresAt <= this.clock()) {
       throw new ControlError(controlErrorCode.runEventsExpired, 'The Run event history has expired.')
     }
-    const stored = this.store.controlEvents(runId, after, limit)
+    const stored = this.store.runViews.controlEvents(runId, after, limit)
     const events = stored.map((event) =>
       decodeRunEvent({
         createdAt: timestamp(event.createdAt),
@@ -841,7 +843,7 @@ export class ControlService {
   }
 
   cancelRun(runId: string): RunCancellation {
-    const canceled = this.store.cancelControlRun(runId)
+    const canceled = this.store.runs.cancelControlRun(runId)
     if (canceled == null) runNotFound()
     if (canceled.accepted) {
       this.abortRun(runId)
@@ -851,7 +853,7 @@ export class ControlService {
   }
 
   private replayRun(idempotencyKey: string, requestDigest: string, source: 'draft' | 'live') {
-    const existing = this.store.runRequest(idempotencyKey)
+    const existing = this.store.runViews.request(idempotencyKey)
     if (existing == null) return
     if (existing.requestDigest != requestDigest || existing.source != source) {
       throw new ControlError(controlErrorCode.runConflict, 'The idempotency key refers to another Run request.')
@@ -883,10 +885,10 @@ export class ControlService {
   private async checkRunActions(prepared: PreparedFlow, flowId: string): Promise<void> {
     if (Object.values(prepared.tasks).some((task) => task.executor.kind == 'agent') && !this.llmAvailable('agent'))
       throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
-    await checkCodeActions([...codeActions(prepared), ...agentActions(prepared)], this.resolveConnector(), this.store.connectorTeam(flowId))
+    await checkCodeActions([...codeActions(prepared), ...agentActions(prepared)], this.resolveConnector(), this.store.connectorTeams.get(flowId))
   }
 
-  private acceptedRun(flowId: string, accepted: ReturnType<Store['acceptLiveControlRun']>) {
+  private acceptedRun(flowId: string, accepted: ReturnType<Store['runs']['acceptLiveControlRun']>) {
     switch (accepted.kind) {
       case 'binding-unresolved':
         throw new ControlError(controlErrorCode.bindingUnresolved, 'A required Variable is unresolved.')
@@ -972,13 +974,13 @@ export class ControlService {
   }
 
   private requireDraft(flowId: string): StoredFlowRevision {
-    const stored = this.store.draft(flowId)
+    const stored = this.store.flows.draft(flowId)
     if (stored == null) notFound()
     return stored
   }
 
   private requireRun(runId: string): StoredControlRun {
-    const stored = this.store.controlRun(runId)
+    const stored = this.store.runViews.controlRun(runId)
     if (stored == null) runNotFound()
     return stored
   }
@@ -986,7 +988,7 @@ export class ControlService {
   private runDetails(stored: StoredControlRun): RunDetails {
     const state = (() => {
       if (stored.status == 'waiting') {
-        const receipt = this.store.activeWait(stored.runId)
+        const receipt = this.store.runViews.activeWait(stored.runId)
         if (receipt == null) throw new Error('Waiting Run is missing its active Wait receipt.')
         return {
           status: 'waiting' as const,

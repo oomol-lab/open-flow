@@ -6,7 +6,8 @@ import type { ConnectorHost } from '../deployment/connector.ts'
 import type { IntegrationRuntime } from '../runtime/integration-runtime.ts'
 import type { ListenerRuntime } from '../runtime/listener-runtime.ts'
 import type { PublicationStore } from '../storage/publication-store.ts'
-import type { PublicationAcceptance, Store } from '../storage/store.ts'
+import type { PublicationAcceptance } from '../storage/publication-store.ts'
+import type { Store } from '../storage/store.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { nextTriggerScheduledAt, validateTriggerSchedule } from '@oomol-lab/open-flow/cron-trigger'
@@ -135,7 +136,11 @@ export class Publisher {
     const fixed = await this.#validatedFlow(input.revision)
     if (Object.values(fixed.prepared.tasks).some((task) => task.executor.kind == 'agent') && !this.#agentAvailable())
       throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
-    await checkCodeActions([...codeActions(fixed.prepared), ...agentActions(fixed.prepared)], this.#resolveConnector(), this.#store.connectorTeam(input.flowId))
+    await checkCodeActions(
+      [...codeActions(fixed.prepared), ...agentActions(fixed.prepared)],
+      this.#resolveConnector(),
+      this.#store.connectorTeams.get(input.flowId),
+    )
     const engineContract = input.engineContract ?? currentEngineContract
     if (input.revisionDigest != null && input.revisionDigest != fixed.revisionDigest) {
       throw new AcceptanceError('revision-conflict', 'The fixed Revision digest does not match its content.')
@@ -159,7 +164,7 @@ export class Publisher {
     if (connectorTasks.length > 0 || providerTriggers.length > 0) {
       const connector = this.#resolveConnector()
       if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
-      const teamId = this.#store.connectorTeam(input.flowId)
+      const teamId = this.#store.connectorTeams.get(input.flowId)
       const actionRequests = new Map<string, ReturnType<ConnectorHost['getAction']>>()
       const connectionRequests = new Map<string, ReturnType<ConnectorHost['listConnections']>>()
       const action = (actionId: string): ReturnType<ConnectorHost['getAction']> => {

@@ -9,6 +9,7 @@ import path from 'node:path'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import * as z from 'zod'
 import { OperatorSession } from '../node/deployment/operator.ts'
+import { Database } from '../node/storage/database.ts'
 import { OperatorStore } from '../node/storage/operator-store.ts'
 import { Store } from '../node/storage/store.ts'
 import { createServerApp } from '../node/transport/http.ts'
@@ -23,8 +24,8 @@ async function fixture(options: Parameters<typeof openService>[1] = {}) {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-mcp-'))
   const file = path.join(directory, 'flow.sqlite')
   const service = await openService(file, options)
-  const store = new OperatorStore(file)
-  const operator = new OperatorSession(store, token, false)
+  const database = Database.open(file)
+  const operator = new OperatorSession(new OperatorStore(database), token, false)
   const shutdown = new AbortController()
   const app = createServerApp(service, { operator, shutdownSignal: shutdown.signal })
   const http = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 0, overrideGlobalObjects: false })
@@ -39,7 +40,7 @@ async function fixture(options: Parameters<typeof openService>[1] = {}) {
     await Promise.all(clients.map((client) => client.close()))
     await new Promise<void>((resolve, reject) => http.close((error) => (error == null ? resolve() : reject(error))))
     await closeService(service)
-    store.close()
+    database.close()
     await rm(directory, { force: true, recursive: true })
   })
   const connect = async (credential = token) => {
@@ -272,15 +273,16 @@ it('pages stored tool results through MCP and REST and isolates results by Run',
     trigger: { nodeId: 'start', payload: {} },
   }
   const runId = z.string().parse((await call('flow_run', { ...args, idempotencyKey: 'results-run' })).runId)
-  const store = new Store(file)
+  const opened = Database.open(file)
+  const store = new Store(opened)
   let resultId: string
   try {
-    expect(store.claim()?.runId).toBe(runId)
-    expect(store.start(runId, { kind: 'run.started', payload: { flowId: flow.flowId, scopeId: runId } })).toBe(true)
+    expect(store.runs.claim()?.runId).toBe(runId)
+    expect(store.runs.start(runId, { kind: 'run.started', payload: { flowId: flow.flowId, scopeId: runId } })).toBe(true)
     resultId = store.results.put(runId, 'agent', 'data', { id: 'fetch', kind: 'connector', action: 'data.fetch' }, {}, { rows: [10, 20, 30] }).resultId
     for (let index = 0; index < 50; index++) store.results.put(runId, 'agent', `code-${index}`, { id: 'run_code', kind: 'code' }, {}, index)
   } finally {
-    store.close()
+    opened.close()
   }
   const first = await call('run_results', { runId })
   expect(first.results).toHaveLength(50)
