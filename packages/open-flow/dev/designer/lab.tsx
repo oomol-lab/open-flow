@@ -2,7 +2,7 @@ import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { Moon, Sun } from 'lucide-react'
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
 import { defaultUiLanguage, uiLanguageNames, uiLanguages } from '../../src/localization/common/languages.ts'
 import { Button } from '../../src/ui/browser/button.tsx'
@@ -181,7 +181,7 @@ export function FrontendLab() {
     url.searchParams.set('story', next.id)
     history.replaceState(null, '', url)
   }
-  const log: LogAction = (name, value) => {
+  const log: LogAction = useCallback((name, value) => {
     let detail = ''
     if (value !== undefined) {
       try {
@@ -191,7 +191,7 @@ export function FrontendLab() {
       }
     }
     setStatus(detail ? `${name} ${detail}` : name)
-  }
+  }, [])
 
   return (
     <div className="lab-shell">

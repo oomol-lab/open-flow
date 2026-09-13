@@ -52,7 +52,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false) {
     },
     connectors: {
       $: {
-        catalogRevision: value(0),
+        connections: value([]),
         actionLoading: value(undefined),
         connectionLoading: value(undefined),
         selectedAction: value(undefined),
@@ -74,7 +74,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false) {
     },
     runs: { $: { externalRunId: value(undefined) } },
     triggers: {
-      catalog: { state: value({ revision: 0, failed: false }), open: vi.fn() },
+      catalog: { state: value({ data: undefined, refreshing: false, error: undefined }), open: vi.fn() },
       $: {
         connectionLoading: value(undefined),
         selectedActiveConnections: value([]),

@@ -1,3 +1,4 @@
+import { val } from 'value-enhancer'
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
 import { WorkbenchStore } from './workbenchStore.ts'
@@ -110,18 +111,20 @@ describe('WorkbenchStore diagnostics', () => {
           version: 1,
         })
       }
-      if (path == `/v1/connector/actions/amap.geocode?flowId=${flow.flowId}&locale=en`) {
+      if (path == `/v1/connector/actions?flowId=${flow.flowId}&service=amap&locale=en`) {
         return Response.json({
-          action: {
-            actionId: 'amap.geocode',
-            authenticated: true,
-            description: 'Geocode an address.',
-            inputs: {},
-            name: 'Geocode',
-            outputs: {},
-            serviceId: 'amap',
-            serviceName: 'AMap',
-          },
+          actions: [
+            {
+              actionId: 'amap.geocode',
+              authenticated: true,
+              description: 'Geocode an address.',
+              inputs: {},
+              name: 'Geocode',
+              outputs: {},
+              serviceId: 'amap',
+              serviceName: 'AMap',
+            },
+          ],
           version: 1,
         })
       }
@@ -240,12 +243,23 @@ describe('WorkbenchStore node catalog', () => {
       { getItem: () => null, setItem: () => {} },
     )
     try {
-      vi.spyOn(store.triggers, 'browseAddNodeOptions').mockResolvedValue([])
-      const connectors = vi.spyOn(store.connectors, 'browseAddNodeOptions').mockRejectedValueOnce(new Error('Catalog unavailable')).mockResolvedValue([])
-      const signal = new AbortController().signal
-      await expect(store.browseAddNodeOptions(signal)).rejects.toThrow('Catalog unavailable')
-      await expect(store.browseAddNodeOptions(signal)).resolves.toEqual([])
-      expect(connectors).toHaveBeenCalledTimes(2)
+      const trigger = val({ data: [], refreshing: false, error: undefined })
+      const connector = val({
+        data: undefined as import('../editor/addNodeOptions.ts').AddNodeOption[] | undefined,
+        refreshing: false,
+        error: new Error('Catalog unavailable') as unknown,
+      })
+      vi.spyOn(store.triggers, 'browseAddNodeOptions').mockReturnValue(trigger)
+      vi.spyOn(store.connectors, 'browseAddNodeOptions').mockReturnValue(connector)
+      const controller = new AbortController()
+      const source = store.browseAddNodeOptions(controller.signal)
+      expect(source.value.error).toEqual(new Error('Catalog unavailable'))
+      connector.set({ data: [], refreshing: false, error: undefined })
+      expect(source.value.data).toEqual([])
+      expect(source.value.error).toBeUndefined()
+      controller.abort()
+      trigger.dispose()
+      connector.dispose()
     } finally {
       store.dispose()
     }

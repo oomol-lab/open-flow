@@ -2,6 +2,7 @@ import type { DragEvent as ReactDragEvent, ReactElement, ReactNode, RefObject } 
 import type { ConnectorConnection } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
+import type { ResourceSource } from '../stores/resource.ts'
 import type { AddNodeOption } from './addNodeOptions.ts'
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
@@ -9,7 +10,7 @@ import { useTranslate } from 'val-i18n-react'
 import { Virtualizer } from 'virtua'
 import { setAddItemId } from '../../../../canvas/browser/addItemDrag.ts'
 import { Button, buttonVariants } from '../../../../ui/browser/button.tsx'
-import { filterCollectionItems, useCollectionItems } from '../../../../ui/browser/collectionSearch.ts'
+import { filterCollectionItems, mergeCollectionItems } from '../../../../ui/browser/collectionSearch.ts'
 import { useDebouncedValue } from '../../../../ui/browser/hooks.ts'
 import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
@@ -17,6 +18,8 @@ import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
+import { mapSource } from '../stores/optionSource.ts'
+import { observeResource } from '../stores/resource.ts'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
 import { cycleContextPanelFocus, observeContextPanelOverlay } from './contextPanelBehavior.ts'
 import { NodePickerContent } from './nodePicker.tsx'
@@ -38,7 +41,8 @@ interface LibraryItemProps {
   readonly item: LibraryNodeItem
   readonly onAdd: (itemId: string) => void
   readonly onDrag: (event: ReactDragEvent, itemId: string) => void
-  readonly onLoadChoices: (itemId: string, signal: AbortSignal) => Promise<readonly LibraryChoice[] | undefined>
+  readonly onRetry?: () => void
+  readonly onLoadChoices: (itemId: string, signal: AbortSignal) => ResourceSource<readonly LibraryChoice[]>
   readonly onOpenChange: (itemId: string, open: boolean) => void
 }
 
@@ -66,19 +70,18 @@ export interface BlockLibraryProps {
   readonly loadConnections?: (signal: AbortSignal) => Promise<void>
   readonly isOptionDisabled?: (option: AddNodeOption) => boolean
   readonly presentation?: 'picker'
-  readonly catalogRevision?: number
   readonly catalogFailed?: boolean
   readonly refreshCatalog?: () => void
 
-  readonly browseOptions: (signal: AbortSignal) => Promise<readonly AddNodeOption[] | undefined>
-  readonly searchOptions: (query: string, signal: AbortSignal) => Promise<readonly AddNodeOption[] | undefined>
+  readonly browseOptions: (signal: AbortSignal) => ResourceSource<readonly AddNodeOption[]>
+  readonly searchOptions: (query: string, signal: AbortSignal) => ResourceSource<readonly AddNodeOption[]>
   readonly disabled: boolean
   readonly draggable?: boolean
   readonly focusRequest: number
   readonly onAdd: (option: AddNodeOption) => Promise<string | undefined>
   readonly onRegisterDragOption?: (option: AddNodeOption) => void
   readonly options: readonly AddNodeOption[]
-  readonly provideChoices: (optionId: string, signal: AbortSignal) => Promise<readonly AddNodeOption[] | undefined>
+  readonly provideChoices: (optionId: string, signal: AbortSignal) => ResourceSource<readonly AddNodeOption[]>
 }
 
 function useOverlayPanel(panel: RefObject<HTMLElement | null>): boolean {
@@ -278,7 +281,7 @@ function LibraryGroup({
   )
 }
 
-function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices, onOpenChange }: LibraryItemProps): ReactElement {
+function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices, onOpenChange, onRetry }: LibraryItemProps): ReactElement {
   const t = useTranslate()
   const details = useRef<HTMLDetailsElement>(null)
   const connectionChoices = item.type == 'trigger'
@@ -304,18 +307,14 @@ function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices, 
     controller.current = nextController
     setError(false)
     setLoading(true)
-    void onLoadChoices(item.data, nextController.signal)
-      .then((nextChoices) => {
-        if (nextController.signal.aborted || nextChoices == null) return
-        setChoices(nextChoices)
+    observeResource(onLoadChoices(item.data, nextController.signal), nextController.signal, (state) => {
+      if (state.data != null) {
+        setChoices(state.data)
         setLoaded(true)
-      })
-      .catch(() => {
-        if (!nextController.signal.aborted) setError(true)
-      })
-      .finally(() => {
-        if (!nextController.signal.aborted) setLoading(false)
-      })
+      }
+      setError(state.error != null)
+      setLoading(state.data == null && state.error == null)
+    })
   }, [disabled, item.data, onLoadChoices])
 
   useEffect(() => {
@@ -371,7 +370,15 @@ function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices, 
           {!loading && error && (
             <div className="block-library-choice-feedback" role="alert">
               <span>{t(connectionChoices ? 'contextPanel.loadConnectionsFailed' : 'contextPanel.loadActionsFailed')}</span>
-              <Button onClick={load} size="sm" type="button" variant="secondary">
+              <Button
+                onClick={() => {
+                  onRetry?.()
+                  load()
+                }}
+                size="sm"
+                type="button"
+                variant="secondary"
+              >
                 {t('contextPanel.retry')}
               </Button>
             </div>
@@ -403,7 +410,6 @@ export function BlockLibrary(props: BlockLibraryProps): ReactElement {
 }
 
 function SidebarBlockLibrary({
-  catalogRevision,
   catalogFailed,
   refreshCatalog,
   browseOptions,
@@ -442,30 +448,43 @@ function SidebarBlockLibrary({
     }
     return items
   }, [options, integrationGroup, triggerGroup, triggers])
-  const provideAsyncItems = useCallback(
-    async (searchTerm: string, signal: AbortSignal): Promise<readonly LibraryMenuItem[] | undefined> => {
-      setSettled(false)
-      try {
-        const nextOptions = await (searchTerm.trim() == '' ? browseOptions(signal) : searchOptions(searchTerm, signal))
-        if (signal.aborted || nextOptions == null) return
-        dynamicOptions.current = indexAddNodeOptions(nextOptions)
-        return menuItems(nextOptions)
-      } finally {
-        if (!signal.aborted) setSettled(true)
-      }
-    },
-    [browseOptions, searchOptions, catalogRevision],
-  )
+  const [remoteOptions, setRemoteOptions] = useState<readonly AddNodeOption[]>([])
+  const [error, setError] = useState(false)
+  const [retryRequest, setRetryRequest] = useState(0)
+  const retry = useCallback(() => {
+    refreshCatalog?.()
+    setRetryRequest((value) => value + 1)
+  }, [refreshCatalog])
+  useEffect(() => {
+    const controller = new AbortController()
+    setSettled(false)
+    setRemoteOptions([])
+    const source = filterQuery.trim() == '' ? browseOptions(controller.signal) : searchOptions(filterQuery, controller.signal)
+    observeResource(source, controller.signal, (state) => {
+      const data = state.data ?? []
+      dynamicOptions.current = indexAddNodeOptions(data)
+      setRemoteOptions(data)
+      setError(state.error != null)
+      setSettled(state.data != null || state.error != null)
+    })
+    return () => controller.abort()
+  }, [browseOptions, searchOptions, filterQuery, retryRequest, t])
   const loadChoices = useCallback(
-    async (itemId: string, signal: AbortSignal): Promise<readonly LibraryChoice[] | undefined> => {
-      const nextOptions = await provideChoices(itemId, signal)
-      if (signal.aborted || nextOptions == null) return
-      dynamicOptions.current = new Map([...dynamicOptions.current, ...indexAddNodeOptions(nextOptions)])
-      return nextOptions.map((option) => ({ data: option.id, description: option.description, label: option.label }))
-    },
-    [provideChoices, catalogRevision],
+    (itemId: string, signal: AbortSignal): ResourceSource<readonly LibraryChoice[]> =>
+      mapSource(provideChoices(itemId, signal), signal, (nextOptions) => {
+        dynamicOptions.current = new Map([...dynamicOptions.current, ...indexAddNodeOptions(nextOptions)])
+        return nextOptions.map((option) => ({ data: option.id, description: option.description, label: option.label }))
+      }),
+    [provideChoices, t],
   )
-  const { error, items: catalogItems, retry } = useCollectionItems(localItems, filterQuery, provideAsyncItems)
+  const catalogItems = useMemo(
+    () =>
+      mergeCollectionItems(
+        filterCollectionItems(filterQuery, localItems),
+        menuItems(remoteOptions).map((item, index) => Object.assign({}, item, { index: localItems.length + index })),
+      ),
+    [filterQuery, localItems, remoteOptions],
+  )
   const loading = !settled
   const searching = filterQuery.trim() != ''
   const items = useMemo(() => {
@@ -606,6 +625,7 @@ function SidebarBlockLibrary({
           </LibraryGroup>
         ) : (
           <LibraryItem
+            onRetry={refreshCatalog}
             disabled={busy || item.disabled == true}
             draggable={draggable}
             item={item}

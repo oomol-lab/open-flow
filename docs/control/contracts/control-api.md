@@ -572,15 +572,21 @@ Provider 仅描述应用目录；面板独立加载 Connections，并根据 acti
 Connector Provider、Action（列表、搜索和详情）及 Connection GET 响应使用 `Cache-Control: private, no-cache` 和内容生成的
 `ETag`。服务端在完成当前身份、Flow scope 校验及数据读取后比较 `If-None-Match`；匹配时返回无 body 的 304。
 
-WorkbenchHost 可通过 `connectorCache: { namespace, localStorage?, sessionStorage? }` 启用浏览器缓存；namespace 标识部署，
-可选存储实现 `getItem` / `setItem`。Provider 使用 localStorage；Action 含默认 Connection 信息，与 Connection 一起使用
-sessionStorage。缓存键包含版本、部署及完整请求路径（含 Flow、语言、service 或搜索参数）。持久化数据经过接口解码器校验，
-Provider、Action 和 Connection 的有效缓存立即返回，并在后台用 ETag 重验证；响应式缓存更新后，菜单和连接选择器同步更新。
-每个完整请求 URL 独立保存并更新响应，304 仅复用该请求的响应。列表、搜索和详情，以及全量与按服务的 Connections，不互相合并或覆盖。
-画布使用按 Action ID 读取的详情；应用排序使用全量 Connections，账号选择使用对应服务的 Connections。
-Provider 成功后 5 分钟内复用，Action 和 Connection 成功后 30 秒内复用；后台失败保留缓存并延迟 30 秒重试。
-授权完成后的强制刷新等待服务端结果，失败会抛出错误。存储不可用或损坏时正常请求。
-未提供 `connectorCache` 的宿主不启用持久化 Connector 缓存。
+WorkbenchHost 可通过 `connectorCache: { namespace, localStorage?, sessionStorage? }` 配置持久化；namespace 标识部署。
+Providers 和 Actions 使用 localStorage，Connections 使用 sessionStorage；Triggers 通过 `triggerCatalogCache` 使用 localStorage。
+各数据 Store 持有稳定的 `ReadonlyVal<{ data, refreshing, error }>`，底层请求仅负责传输和解码，不保存缓存。
+存储键包含版本、部署及业务标识：Providers 为 Flow scope 和语言，Actions 为 Flow scope、service 和语言，
+Connections 为 Flow scope 和可选 service，Triggers 为语言。使用新版本键，不读取旧 URL 缓存。
+
+Actions 只持久化 service 列表的元数据，详情从列表派生；默认连接与当前连接状态从独立的 Connections Store 组合。
+全局搜索使用独立的临时查询状态，不持久化，也不写入 service 列表。全量与按服务的 Connections 独立保存，互不合并或覆盖。
+画布使用派生的 Action 详情；应用排序使用全量 Connections，账号选择使用对应服务的 Connections。
+
+业务访问 Store 接口时检查刷新间隔：Providers、Triggers 为 5 分钟，Actions、Connections 为 30 秒。
+没有定时轮询或额外的聚焦刷新；授权完成和手动重试按业务需要强制刷新。同一条目的进行中请求合并，由 Store 管理取消。
+恢复持久化数据时校验结构，首次访问立即重验证。刷新期间保留数据，失败保留数据并发布 error，自动重试延后 30 秒。
+ETag 与数据共同持有；304 保留数据并采用返回的新 ETag，200 没有 ETag 时清除旧验证器。
+未配置持久化、存储损坏或不可用时以内存运行。浏览器业务禁止绕过数据 Store 调用这四类底层请求，由边界检查约束。
 
 部署的 Connector 客户端按完整路径（含查询参数）、Team scope 和语言独立缓存上游 Providers、Actions（列表、搜索、详情）及 Apps（全量、按服务）的完整响应及 ETag，每次读取都向上游条件重验证。
 该缓存限于当前客户端的 origin、凭据和 Team scope；不保存无 ETag、解码失败或取消的响应，不在请求失败时返回旧数据。

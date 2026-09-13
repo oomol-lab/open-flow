@@ -13,6 +13,7 @@ import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../../ui/browser/tabs.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
+import { observeResource } from '../stores/resource.ts'
 import { comparePickerApps, pickerConnectionPriorities } from './nodePickerApps.ts'
 
 interface App {
@@ -34,7 +35,6 @@ export function NodePickerContent({
   onAdd,
   disabled,
   isOptionDisabled,
-  catalogRevision,
   catalogFailed,
   refreshCatalog,
 }: BlockLibraryProps): ReactElement {
@@ -71,20 +71,14 @@ export function NodePickerContent({
     setLoading(true)
     setResults([])
     const request = term ? searchOptions(term, controller.signal) : browseOptions(controller.signal)
-    void request
-      .then((items) => {
-        if (controller.signal.aborted) return
-        if (term) setResults(items ?? [])
-        else setCatalog(items ?? [])
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setFailed(true)
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false)
-      })
+    observeResource(request, controller.signal, (state) => {
+      if (term) setResults(state.data ?? [])
+      else setCatalog(state.data ?? [])
+      setFailed(state.error != null)
+      setLoading(state.data == null && state.error == null)
+    })
     return () => controller.abort()
-  }, [term, browseOptions, searchOptions, catalogRevision, retry, options])
+  }, [term, browseOptions, searchOptions, retry, options, t])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -127,18 +121,13 @@ export function NodePickerContent({
     setChoicesFailed(false)
     setChoicesLoading(directoryId != null)
     if (directoryId != null)
-      void provideChoices(directoryId, controller.signal)
-        .then((items) => {
-          if (!controller.signal.aborted) setActions(items ?? [])
-        })
-        .catch(() => {
-          if (!controller.signal.aborted) setChoicesFailed(true)
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setChoicesLoading(false)
-        })
+      observeResource(provideChoices(directoryId, controller.signal), controller.signal, (state) => {
+        setActions(state.data ?? [])
+        setChoicesFailed(state.error != null)
+        setChoicesLoading(state.data == null && state.error == null)
+      })
     return () => controller.abort()
-  }, [directoryId, provideChoices, catalogRevision, retry])
+  }, [directoryId, provideChoices, retry, t])
   useEffect(() => {
     list.current?.scrollTo(0, 0)
   }, [appId, term, page])
@@ -255,7 +244,7 @@ export function NodePickerContent({
                   searchInput.current?.focus()
                 }}
               >
-                <Icon name="close" size={14} />
+                <Icon name="close" />
               </Button>
             </InputGroupAddon>
           )}

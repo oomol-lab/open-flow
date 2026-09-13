@@ -28,6 +28,7 @@ import { RunInputPanel } from './runs/runInputPanel.tsx'
 import { RunResults } from './runs/runResults.tsx'
 import { RunsView } from './runs/runsView.tsx'
 import { WorkspaceHeader } from './shell/workspaceHeader.tsx'
+import { mapSource } from './stores/optionSource.ts'
 import { WorkbenchStore } from './stores/workbenchStore.ts'
 
 type ContextPanelMode = 'blocks' | 'inspector' | 'notification' | undefined
@@ -114,7 +115,6 @@ function Editor({
   const t = useTranslate()
   const addNodeOptions = useVal(store.workspace.$.addNodeOptions)
   const connections = useVal(store.connectors.$.connections)
-  const connectorCatalogRevision = useVal(store.connectors.$.catalogRevision)
   const triggerCatalogState = useVal(store.triggers.catalog.state)
   const [startId, setStartId] = useState<string>()
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
@@ -287,9 +287,8 @@ function Editor({
             browseOptions={store.browseAddNodeOptions}
             searchOptions={store.provideAddNodeOptions}
             provideChoices={store.provideAddNodeOptionChoices}
-            catalogRevision={triggerCatalogState.revision + connectorCatalogRevision}
-            catalogFailed={triggerCatalogState.failed}
-            refreshCatalog={store.triggers.catalog.retry}
+            catalogFailed={triggerCatalogState.error != null}
+            refreshCatalog={store.retryCatalog}
             disabled={authoringDisabled || target == null}
             focusRequest={0}
             onAdd={addFromBlocks}
@@ -300,9 +299,8 @@ function Editor({
           loadConnections: store.connectors.loadConnections,
           browseOptions: store.browseAddNodeOptions,
           provideChoices: store.provideAddNodeOptionChoices,
-          catalogRevision: triggerCatalogState.revision + connectorCatalogRevision,
-          catalogFailed: triggerCatalogState.failed,
-          refreshCatalog: store.triggers.catalog.retry,
+          catalogFailed: triggerCatalogState.error != null,
+          refreshCatalog: store.retryCatalog,
         }}
         addNodeOptions={addNodeOptions}
         blocksOpen={contextPanelVisible && contextPanelMode == 'blocks'}
@@ -385,9 +383,8 @@ function Editor({
         >
           {contextPanelMode == 'blocks' ? (
             <BlockLibrary
-              catalogRevision={triggerCatalogState.revision + connectorCatalogRevision}
-              catalogFailed={triggerCatalogState.failed}
-              refreshCatalog={store.triggers.catalog.retry}
+              catalogFailed={triggerCatalogState.error != null}
+              refreshCatalog={store.retryCatalog}
               browseOptions={store.browseAddNodeOptions}
               searchOptions={store.provideAddNodeOptions}
               disabled={authoringDisabled}
@@ -399,19 +396,20 @@ function Editor({
             />
           ) : contextPanelMode == 'notification' ? (
             <BlockLibrary
-              catalogRevision={connectorCatalogRevision}
               browseOptions={store.connectors.browseAddNodeOptions}
-              searchOptions={async (query, signal) =>
-                (await store.connectors.provideAddNodeOptions(query, signal))?.filter((option) => option.kind == 'connector' && option.inputs.length > 0)
+              searchOptions={(query, signal) =>
+                mapSource(store.connectors.provideAddNodeOptions(query, signal), signal, (options) =>
+                  options.filter((option) => option.kind == 'connector' && option.inputs.length > 0),
+                )
               }
               disabled={authoringDisabled}
               draggable={false}
               focusRequest={blocksFocusRequest}
               onAdd={setNotification}
               options={[]}
-              provideChoices={async (optionId, signal) =>
-                (await store.connectors.provideAddNodeOptionChoices(optionId, signal))?.filter(
-                  (option) => option.kind == 'connector' && option.inputs.length > 0,
+              provideChoices={(optionId, signal) =>
+                mapSource(store.connectors.provideAddNodeOptionChoices(optionId, signal), signal, (options) =>
+                  options.filter((option) => option.kind == 'connector' && option.inputs.length > 0),
                 )
               }
             />

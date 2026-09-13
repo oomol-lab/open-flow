@@ -2,6 +2,7 @@ import type { KeyboardEvent, PointerEvent, ReactElement, ReactNode } from 'react
 import type { FlowCanvasViewProps } from '../../../../canvas/browser/graph/FlowCanvas/model.ts'
 import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { WorkbenchTheme } from '../contract.ts'
+import type { ResourceSource } from '../stores/resource.ts'
 import type { DesignerEdge, DesignerGraph, DesignerViewport, Point } from '../workspace.ts'
 import type { AddNodeOption } from './addNodeOptions.ts'
 import type { CanvasHistoryControlsProps } from './canvasHistoryControls.tsx'
@@ -19,10 +20,7 @@ import { CanvasHistoryControls } from './canvasHistoryControls.tsx'
 import { CanvasNodePicker } from './nodePickerPopover.tsx'
 
 interface Props {
-  readonly nodePicker?: Pick<
-    BlockLibraryProps,
-    'connections' | 'loadConnections' | 'browseOptions' | 'provideChoices' | 'catalogRevision' | 'catalogFailed' | 'refreshCatalog'
-  >
+  readonly nodePicker?: Pick<BlockLibraryProps, 'connections' | 'loadConnections' | 'browseOptions' | 'provideChoices' | 'catalogFailed' | 'refreshCatalog'>
   readonly addNodeControl?: ReactNode
   readonly history?: CanvasHistoryControlsProps
   readonly ignoredNodeIds: readonly string[]
@@ -51,7 +49,7 @@ interface Props {
   readonly onOpenBlocks: (opener?: HTMLButtonElement) => void
   readonly onOpenInspector: () => void
   readonly onPaste: () => void
-  readonly provideAddNodeOptions: (searchTerm: string, signal: AbortSignal) => Promise<readonly AddNodeOption[] | undefined>
+  readonly provideAddNodeOptions: (searchTerm: string, signal: AbortSignal) => ResourceSource<readonly AddNodeOption[]>
   readonly onSelectNodes: (nodeIds: readonly string[]) => void
   readonly onToggleInspector: (opener: HTMLButtonElement) => void
   readonly selectedNodeIds: readonly string[]
@@ -367,7 +365,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           browseOptions={nodePicker?.browseOptions ?? (async () => [])}
           searchOptions={provideAddNodeOptions}
           provideChoices={nodePicker?.provideChoices ?? (async () => [])}
-          catalogRevision={nodePicker?.catalogRevision}
           catalogFailed={nodePicker?.catalogFailed}
           refreshCatalog={nodePicker?.refreshCatalog}
           disabled={disabled}

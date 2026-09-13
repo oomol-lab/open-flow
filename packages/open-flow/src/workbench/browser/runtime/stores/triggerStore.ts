@@ -5,24 +5,22 @@ import type { WorkbenchClient, ConnectorConnection, TriggerKeySnapshot } from '.
 import type { WorkbenchHost } from '../contract.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
 import type { ResolvedSelection } from '../revisionView.ts'
-import type { ConnectionCatalog } from '../workspace.ts'
 import type { SetNotice } from './workbenchNotice.ts'
 import type { WorkspaceStore } from './workspaceStore.ts'
 
 import { compute, derive, val } from 'value-enhancer'
-import { connectorConnectionsQuery } from '../../../../control/common/connectorQueries.ts'
 import { resolveUiLanguage } from '../../../../localization/common/languages.ts'
 import { createI18n } from '../i18n.ts'
 import { providerIcon } from '../providerIcon.ts'
-import { cachedResponse } from '../requestCache.ts'
 import { connectionCatalog } from '../workspace.ts'
 import { Latest } from './latest.ts'
+import { scopedValue } from './optionSource.ts'
+import { resourceValue } from './resource.ts'
 import { TriggerCatalogStore } from './triggerCatalog.ts'
 import { errorNotice } from './workbenchNotice.ts'
 
 interface TriggerState {
   readonly authorizationProvider?: string
-  readonly catalogs: Readonly<Record<string, ConnectionCatalog>>
   readonly connectionError?: { readonly message: string; readonly provider: string }
   readonly connectionLoading?: string
 }
@@ -50,7 +48,7 @@ export interface Trigger$ {
   readonly selectedDefinition: ReadonlyVal<TriggerKeySnapshot | undefined>
 }
 
-const initialState: TriggerState = { catalogs: {} }
+const initialState: TriggerState = {}
 const optionPrefix = 'trigger:'
 
 function target(selection: ResolvedSelection | undefined, workspace: WorkspaceStore): TriggerTarget | undefined {
@@ -114,15 +112,14 @@ export class TriggerStore {
       if (selection?.kind != 'trigger') return { authorizationPending: false }
       const trigger = selection.trigger
       if (trigger.kind != 'poll' && trigger.kind != 'integration') return { authorizationPending: false }
-      const connections =
-        current == null ? undefined : cachedResponse(get(client.requestCache.responses), connectorConnectionsQuery(current.provider, get(workspace.$.flowId)))
-      const catalog = connections != null ? connectionCatalog(connections) : current == null ? undefined : state.catalogs[current.provider]
-      const connectionError = state.connectionError
+      const connections = current == null ? undefined : get(workspace.catalogs.connections.get(current.provider, get(workspace.$.flowId))).data
+      const catalog = connections == null ? undefined : connectionCatalog(connections)
+      const connectionError = current == null ? undefined : get(workspace.catalogs.connections.get(current.provider, get(workspace.$.flowId))).error
       return {
         activeConnections: catalog?.active,
         authorizationPending: state.authorizationProvider == current?.provider,
         connection: current?.connectionId == null ? undefined : catalog?.byId.get(current.connectionId),
-        connectionError: connectionError != null && connectionError.provider == current?.provider ? connectionError.message : undefined,
+        connectionError: connectionError == null ? undefined : errorNotice(connectionError, this.#i18n.t).message,
         definition: trigger.definition,
       }
     })
@@ -147,40 +144,38 @@ export class TriggerStore {
 
   public reset(): void {
     if (this.#disposed) return
-    this.catalog.reset()
     this.#stale.clear()
     this.#refresh.invalidate()
     this.#state.set(initialState)
   }
 
-  public readonly browseAddNodeOptions = async (signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
-    const flowId = this.#workspace.$.flowId.value
-    if (signal.aborted || this.#disposed || flowId == null || this.#workspace.$.target.value?.kind != 'flow') return []
-    const catalog = await this.catalog.get()
-    if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
-    return catalog.definitions.map((definition) => option(definition, this.#i18n, catalog.display[definition.key]))
-  }
+  public readonly browseAddNodeOptions = (signal: AbortSignal) => this.#options('', signal)
+  public readonly provideAddNodeOptions = (searchTerm: string, signal: AbortSignal) => this.#options(searchTerm, signal)
 
-  public readonly provideAddNodeOptions = async (searchTerm: string, signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
-    const flowId = this.#workspace.$.flowId.value
-    if (signal.aborted || this.#disposed || flowId == null || this.#workspace.$.target.value?.kind != 'flow') return []
+  #options(searchTerm: string, signal: AbortSignal) {
+    const source = this.catalog.get()
     const query = searchTerm.trim().toLowerCase()
-    if (query.length == 0) return []
-    const catalog = await this.catalog.get()
-    if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
-    const definitions = catalog.definitions.filter((item) =>
-      [
-        catalog.display[item.key]?.displayName ?? '',
-        catalog.display[item.key]?.description ?? '',
-        item.description,
-        item.displayName,
-        item.key,
-        item.name,
-        item.provider,
-        item.type,
-      ].some((value) => value.toLowerCase().includes(query)),
-    )
-    return definitions.map((definition) => option(definition, this.#i18n, catalog.display[definition.key]))
+    return scopedValue(signal, (get) => {
+      const state = get(source)
+      get(this.#i18n.t$)
+      const enabled = get(this.#workspace.$.flowId) != null && get(this.#workspace.$.target)?.kind == 'flow'
+      const catalog = state.data
+      const definitions = catalog?.definitions.filter(
+        (item) =>
+          !query ||
+          [
+            catalog.display[item.key]?.displayName,
+            catalog.display[item.key]?.description,
+            item.description,
+            item.displayName,
+            item.key,
+            item.name,
+            item.provider,
+            item.type,
+          ].some((value) => value?.toLowerCase().includes(query)),
+      )
+      return { ...state, data: !enabled ? [] : definitions?.map((definition) => option(definition, this.#i18n, catalog!.display[definition.key])) }
+    })
   }
 
   public async refresh(force = false): Promise<void> {
@@ -194,12 +189,11 @@ export class TriggerStore {
     }
     this.#set({ connectionError: undefined, connectionLoading: selected.provider })
     try {
-      const catalog = connectionCatalog(
-        await this.#client.listConnectorConnections(selected.provider, undefined, flowId, force || this.#stale.has(selected.provider)),
-      )
+      const state = this.#workspace.catalogs.connections.get(selected.provider, flowId, force || this.#stale.has(selected.provider))
+      await Promise.resolve()
+      await resourceValue(state, undefined, force || this.#stale.has(selected.provider))
       if (!this.#current(current, flowId)) return
       this.#stale.delete(selected.provider)
-      this.#set({ catalogs: { ...this.#state.value.catalogs, [selected.provider]: catalog } })
     } catch (error) {
       if (this.#current(current, flowId)) {
         this.#set({ connectionError: { message: errorNotice(error, this.#i18n.t).message, provider: selected.provider } })
