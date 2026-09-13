@@ -83,6 +83,10 @@ const PAN_ON_DRAG_TOUCHPAD = [1]
 
 const GRID_GAP: [number, number] = [20, 20]
 
+function getViewportTransitionDuration() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 200
+}
+
 const PRO_OPTIONS = { hideAttribution: true }
 
 const LAYOUT_TRANSITION_DURATION = 200
@@ -235,15 +239,16 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
           setTimeout(() => {
             rf.fitView({
               ...fitViewOptions,
+              duration: getViewportTransitionDuration(),
               nodes: selectedNodes.length === 0 ? undefined : selectedNodes,
             })
             props.onFitView?.()
           }, 100)
         }}
         onRelayout={relayout}
-        onZoomIn={() => rf.zoomIn()}
-        onZoomOut={() => rf.zoomOut()}
-        onZoomReset={() => rf.zoomTo(1)}
+        onZoomIn={() => rf.zoomIn({ duration: getViewportTransitionDuration() })}
+        onZoomOut={() => rf.zoomOut({ duration: getViewportTransitionDuration() })}
+        onZoomReset={() => rf.zoomTo(1, { duration: getViewportTransitionDuration() })}
         zoom={zoom}
       />
       {props.toolbar != null && <CanvasToolbar>{props.toolbar}</CanvasToolbar>}
