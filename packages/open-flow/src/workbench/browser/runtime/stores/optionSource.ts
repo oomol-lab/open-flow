@@ -21,8 +21,8 @@ export function combineSources<T>(signal: AbortSignal, sources: readonly Readonl
   return scopedValue(signal, (get) => {
     const states = sources.map((source) => get(source))
     return {
-      data: states.some((state) => state.data === undefined) ? undefined : states.flatMap((state) => state.data ?? []),
-      refreshing: states.some((state) => state.refreshing),
+      data: states.every((state) => state.data === undefined) ? undefined : states.flatMap((state) => state.data ?? []),
+      refreshing: states.some((state) => state.refreshing || (state.data === undefined && state.error == null)),
       error: states.find((state) => state.error != null)?.error,
     }
   })

@@ -37,10 +37,12 @@ export function NodePickerContent({
   isOptionDisabled,
   catalogFailed,
   refreshCatalog,
-}: BlockLibraryProps): ReactElement {
+  initialQuery = '',
+}: BlockLibraryProps & { readonly initialQuery?: string }): ReactElement {
   const t = useTranslate()
   const [page, setPage] = useState('nodes')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery)
+  const [appQuery, setAppQuery] = useState('')
   const searchInput = useRef<HTMLInputElement>(null)
   const debouncedQuery = useDebouncedValue(query, 150)
   const term = query.trim() ? debouncedQuery.trim() : ''
@@ -51,8 +53,12 @@ export function NodePickerContent({
   const navigateApp = (id?: string) => {
     setNavigation(id ? 'forward' : 'back')
     setAppId(id)
+    setAppQuery('')
+    searchInput.current?.focus()
   }
   const [actions, setActions] = useState<readonly AddNodeOption[]>([])
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [catalogError, setCatalogError] = useState(false)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
   const [retry, setRetry] = useState(0)
@@ -67,18 +73,31 @@ export function NodePickerContent({
 
   useEffect(() => {
     const controller = new AbortController()
-    setFailed(false)
-    setLoading(true)
-    setResults([])
-    const request = term ? searchOptions(term, controller.signal) : browseOptions(controller.signal)
-    observeResource(request, controller.signal, (state) => {
-      if (term) setResults(state.data ?? [])
-      else setCatalog(state.data ?? [])
-      setFailed(state.error != null)
-      setLoading(state.data == null && state.error == null)
+    setCatalogError(false)
+    setCatalogLoading(true)
+    observeResource(browseOptions(controller.signal), controller.signal, (state) => {
+      setCatalog(state.data ?? [])
+      setCatalogError(state.error != null)
+      setCatalogLoading(state.refreshing || (state.data == null && state.error == null))
     })
     return () => controller.abort()
-  }, [term, browseOptions, searchOptions, retry, options, t])
+  }, [browseOptions, retry, options, t])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setFailed(false)
+    setLoading(false)
+    setResults([])
+    if (term && appId == null) {
+      setLoading(true)
+      observeResource(searchOptions(term, controller.signal), controller.signal, (state) => {
+        setResults(state.data ?? [])
+        setFailed(state.error != null)
+        setLoading(state.refreshing || (state.data == null && state.error == null))
+      })
+    }
+    return () => controller.abort()
+  }, [term, appId, searchOptions, retry, options, t])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -112,7 +131,8 @@ export function NodePickerContent({
     return [...entries.values()].toSorted(comparePickerApps)
   }, [catalog, connections])
   const app = apps.find((item) => item.id == appId)
-  const directoryId = page == 'nodes' ? app?.directory?.id : undefined
+  const directoryId = app?.directory?.id
+  const searching = term != '' && app == null
   const [choicesLoading, setChoicesLoading] = useState(false)
   const [choicesFailed, setChoicesFailed] = useState(false)
   useEffect(() => {
@@ -164,7 +184,7 @@ export function NodePickerContent({
         )}
         <span className="min-w-0 flex-1 py-1">
           <span className="block text-[13px] leading-5">
-            {term && (
+            {searching && (
               <span className="text-xs font-normal text-muted-foreground">
                 {item.kind == 'trigger'
                   ? 'trigger' in item && item.trigger.kind == 'catalog'
@@ -221,6 +241,30 @@ export function NodePickerContent({
     })
   const local = options.filter((item) => !term || `${item.label} ${item.description}`.toLowerCase().includes(term.toLowerCase()))
   const matches = [...new Map([...local, ...results].filter((item) => item.kind != 'connector-group').map((item) => [item.id, item])).values()]
+  const matchedApps = apps.filter((item) => `${item.label} ${item.id}`.toLowerCase().includes(term.toLowerCase()))
+  const filterAppOptions = (items: readonly AddNodeOption[]) =>
+    items.filter((item) => `${item.label} ${item.description}`.toLowerCase().includes(appQuery.trim().toLowerCase()))
+  const visibleActions = filterAppOptions(actions)
+  const visibleTriggers = filterAppOptions(app?.triggers ?? [])
+  const appRow = (item: App, description = false) => (
+    <Button
+      variant="ghost"
+      key={item.id}
+      type="button"
+      disabled={disabled || adding}
+      onClick={() => navigateApp(item.id)}
+      className="group/app h-auto justify-start whitespace-normal font-normal flex min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+    >
+      <AppIcon src={item.icon} />
+      <span className="min-w-0 flex-1 py-1 text-[13px] font-normal leading-5">
+        <span className="block truncate">{item.label}</span>
+        {description && <span className="mt-1 block text-xs text-muted-foreground">{t('nodePicker.browseNodes')}</span>}
+      </span>
+      <span aria-hidden="true">›</span>
+    </Button>
+  )
+  const inputQuery = app == null ? query : appQuery
+  const setInputQuery = app == null ? setQuery : setAppQuery
   return (
     <Tabs value={page} onValueChange={(value) => setPage(String(value))} className="h-full min-h-0 gap-0" aria-busy={adding}>
       <div ref={mount} className="shrink-0 px-3 pb-2 pt-3">
@@ -233,8 +277,8 @@ export function NodePickerContent({
             autoFocus
             aria-label={t('nodePicker.search')}
             placeholder={t('nodePicker.search')}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={inputQuery}
+            onChange={(event) => setInputQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key == 'ArrowDown') {
                 event.preventDefault()
@@ -242,14 +286,14 @@ export function NodePickerContent({
               }
             }}
           />
-          {query.length > 0 && (
+          {inputQuery.length > 0 && (
             <InputGroupAddon align="inline-end">
               <Button
                 variant="ghost"
                 size="icon-xs"
                 aria-label={t('nodePicker.clearSearch')}
                 onClick={() => {
-                  setQuery('')
+                  setInputQuery('')
                   searchInput.current?.focus()
                 }}
               >
@@ -273,13 +317,13 @@ export function NodePickerContent({
       )}
       <TabsContent value={page} className="flex min-h-0 flex-1 flex-col overflow-visible">
         <div key={appId ?? 'catalog'} className={styles.page} data-navigation={navigation}>
-          {!term && page == 'nodes' && app != null && (
+          {app != null && (
             <div className="mx-3 mb-2 grid h-8 shrink-0 grid-cols-[28px_minmax(0,1fr)_28px] items-center gap-2 rounded-lg bg-[color-mix(in_srgb,var(--ui-foreground)_4%,var(--ui-popover))] px-1.5">
               <Button
                 size="icon-sm"
                 variant="ghost"
                 className="text-muted-foreground hover:bg-popover hover:text-foreground hover:shadow-sm focus-visible:bg-popover focus-visible:text-foreground dark:hover:bg-[color-mix(in_srgb,var(--ui-foreground)_12%,var(--ui-popover))] dark:focus-visible:bg-[color-mix(in_srgb,var(--ui-foreground)_12%,var(--ui-popover))]"
-                aria-label={t('nodePicker.back')}
+                aria-label={t(query.trim() ? 'nodePicker.backToResults' : 'nodePicker.back')}
                 onClick={() => navigateApp()}
               >
                 <Icon name="chevron-left" />
@@ -301,8 +345,22 @@ export function NodePickerContent({
               buttons[(index + (event.key == 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus()
             }}
           >
-            {term ? (
+            {app != null ? (
               <>
+                {section(t('addNode.triggers'), visibleTriggers)}
+                {actionSections(visibleActions)}
+                {!choicesLoading && !choicesFailed && visibleActions.length == 0 && visibleTriggers.length == 0 && <PickerStatus />}
+              </>
+            ) : searching ? (
+              <>
+                {matchedApps.length > 0 && (
+                  <section className="mb-3">
+                    <h3 style={{ margin: 0 }} className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">
+                      {t('nodePicker.apps')}
+                    </h3>
+                    <div className="grid">{matchedApps.map((item) => appRow(item, true))}</div>
+                  </section>
+                )}
                 {section(
                   t('addNode.triggers'),
                   matches.filter((item) => item.kind == 'trigger'),
@@ -312,7 +370,7 @@ export function NodePickerContent({
                   matches.filter((item) => item.kind != 'trigger' && item.kind != 'connector'),
                 )}
                 {actionSections(matches)}
-                {!loading && !failed && matches.length == 0 && <PickerStatus />}
+                {!loading && !catalogLoading && !failed && !catalogError && matchedApps.length == 0 && matches.length == 0 && <PickerStatus />}
               </>
             ) : page == 'triggers' ? (
               <>
@@ -325,12 +383,6 @@ export function NodePickerContent({
                   .map((item) => (
                     <div key={item.id}>{section(item.label, item.triggers, false, item.label)}</div>
                   ))}
-              </>
-            ) : app != null ? (
-              <>
-                {section(t('addNode.triggers'), app.triggers)}
-                {actionSections(actions)}
-                {!choicesLoading && !choicesFailed && actions.length == 0 && app.triggers.length == 0 && <PickerStatus />}
               </>
             ) : (
               <>
@@ -360,29 +412,14 @@ export function NodePickerContent({
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                      <AppDirectory viewport={list.current}>
-                        {items.map((item) => (
-                          <Button
-                            variant="ghost"
-                            key={item.id}
-                            type="button"
-                            disabled={disabled || adding}
-                            onClick={() => navigateApp(item.id)}
-                            className="group/app h-auto justify-start whitespace-normal font-normal flex min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                          >
-                            <AppIcon src={item.icon} />
-                            <span className="min-w-0 flex-1 truncate py-1 text-[13px] font-normal leading-5">{item.label}</span>
-                            <span aria-hidden="true">›</span>
-                          </Button>
-                        ))}
-                      </AppDirectory>
+                      <AppDirectory viewport={list.current}>{items.map((item) => appRow(item))}</AppDirectory>
                     </section>
                   )
                 })}
               </>
             )}
-            {(loading || (!term && page == 'nodes' && choicesLoading)) && <PickerStatus loading />}
-            {(failed || catalogFailed || (!term && page == 'nodes' && choicesFailed)) && (
+            {(app != null ? choicesLoading : catalogLoading || loading) && <PickerStatus loading searching={searching} />}
+            {(catalogFailed || catalogError || (app != null ? choicesFailed : failed)) && (
               <div className="flex items-center justify-between gap-2 p-3 text-xs" role="alert">
                 {t('contextPanel.loadFailed')}
                 <Button
@@ -470,14 +507,14 @@ function AppDirectory({ children, viewport }: { children: ReactElement[]; viewpo
   )
 }
 
-function PickerStatus({ loading = false }: { loading?: boolean }) {
+function PickerStatus({ loading = false, searching = false }: { loading?: boolean; searching?: boolean }) {
   const t = useTranslate()
   return (
     <div className="flex items-center gap-2 p-3 text-xs leading-4 text-muted-foreground" role="status">
       <span aria-hidden="true" className="flex size-4 shrink-0 items-center justify-center">
         {loading ? <Spinner /> : <i className="i-lucide-light:search-x text-base" />}
       </span>
-      <span>{t(loading ? 'contextPanel.loading' : 'contextPanel.empty')}</span>
+      <span>{t(loading ? (searching ? 'nodePicker.searching' : 'contextPanel.loading') : 'contextPanel.empty')}</span>
     </div>
   )
 }

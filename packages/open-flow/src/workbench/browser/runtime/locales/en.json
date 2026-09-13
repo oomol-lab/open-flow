@@ -928,6 +928,9 @@
     "clearSearch": "Clear search",
     "search": "Search nodes, apps, or actions…",
     "apps": "Apps",
+    "searching": "Searching…",
+    "browseNodes": "Browse all nodes",
+    "backToResults": "Back to search results",
     "back": "Back to all nodes",
     "results": "Search results",
     "builtIn": "Built-in"

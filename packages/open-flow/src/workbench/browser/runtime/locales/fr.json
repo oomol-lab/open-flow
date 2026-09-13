@@ -928,6 +928,9 @@
     "clearSearch": "Effacer la recherche",
     "search": "Rechercher des nœuds, applications ou actions…",
     "apps": "Applications",
+    "searching": "Recherche en cours…",
+    "browseNodes": "Parcourir tous les nœuds",
+    "backToResults": "Retour aux résultats de recherche",
     "back": "Retour à tous les nœuds",
     "results": "Résultats",
     "builtIn": "Intégrés"
