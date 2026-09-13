@@ -5,11 +5,11 @@ import type { AddNodeOption } from './addNodeOptions.ts'
 
 import { Plus } from 'lucide-react'
 import { useCallback, useState } from 'react'
-import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '../../../../ui/browser/dialog.tsx'
 import { FieldError } from '../../../../ui/browser/field.tsx'
+import { mapSource } from '../stores/optionSource.ts'
 import { BlockLibrary } from './contextPanel.tsx'
 
 const empty: readonly AddNodeOption[] = []
@@ -27,7 +27,6 @@ export function ActionPicker({
   readonly exclude?: readonly string[]
   readonly onSelect: (action: ConnectorAction) => Promise<boolean>
 }): ReactElement {
-  const catalogRevision = useVal(connectors.$.catalogRevision)
   const t = useTranslate()
   const [open, setOpen] = useState(false)
   const [root, setRoot] = useState<HTMLElement | null>(null)
@@ -35,17 +34,17 @@ export function ActionPicker({
   const [error, setError] = useState<string>()
   const excluded = exclude.join(',')
   const choices = useCallback(
-    async (id: string, signal: AbortSignal) => {
-      const options = await connectors.provideAddNodeOptionChoices(id, signal)
-      return options?.filter((option) => option.kind != 'connector' || !excluded.split(',').includes(option.connector.actionId))
-    },
+    (id: string, signal: AbortSignal) =>
+      mapSource(connectors.provideAddNodeOptionChoices(id, signal), signal, (options) =>
+        options.filter((option) => option.kind != 'connector' || !excluded.split(',').includes(option.connector.actionId)),
+      ),
     [connectors, excluded],
   )
   const search = useCallback(
-    async (query: string, signal: AbortSignal) => {
-      const options = await connectors.provideAddNodeOptions(query, signal)
-      return options?.filter((option) => option.kind != 'connector' || !excluded.split(',').includes(option.connector.actionId))
-    },
+    (query: string, signal: AbortSignal) =>
+      mapSource(connectors.provideAddNodeOptions(query, signal), signal, (options) =>
+        options.filter((option) => option.kind != 'connector' || !excluded.split(',').includes(option.connector.actionId)),
+      ),
     [connectors, excluded],
   )
   return (
@@ -65,7 +64,7 @@ export function ActionPicker({
           <DialogTitle>{t('actionPicker.title')}</DialogTitle>
           {open && (
             <BlockLibrary
-              catalogRevision={catalogRevision}
+              refreshCatalog={connectors.retryCatalog}
               browseOptions={connectors.browseAddNodeOptions}
               searchOptions={search}
               provideChoices={choices}

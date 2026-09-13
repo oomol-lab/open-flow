@@ -1,139 +1,70 @@
-import type { TriggerCatalog, TriggerCatalogCache } from '../../../../control/common/triggerCatalog.ts'
+import type { ReadonlyVal } from 'value-enhancer'
+import type { TriggerCatalog } from '../../../../control/common/triggerCatalog.ts'
 import type { UiLanguage } from '../../../../localization/common/languages.ts'
 import type { WorkbenchClient } from '../api.ts'
 import type { WorkbenchHost } from '../contract.ts'
+import type { ResourceState, ResourceStorage } from './resource.ts'
 
-import { val } from 'value-enhancer'
+import { compute, val } from 'value-enhancer'
 import { decodeTriggerCatalog } from '../../../../control/common/triggerCatalog.ts'
+import { Resource } from './resource.ts'
 
-export interface TriggerCatalogStorage {
-  getItem(key: string): string | null
-  setItem(key: string, value: string): void
-}
-
+export type TriggerCatalogStorage = ResourceStorage
 export function browserTriggerCatalogStorage(namespace: string, storage?: TriggerCatalogStorage): TriggerCatalogStorage {
-  const prefix = `open-flow:trigger-catalog:v1:${encodeURIComponent(namespace)}:`
+  const prefix = `open-flow:trigger-catalog:v2:${encodeURIComponent(namespace)}:`
   return {
     getItem: (key) => (storage ?? window.localStorage).getItem(prefix + key),
     setItem: (key, value) => (storage ?? window.localStorage).setItem(prefix + key, value),
   }
 }
 
-const freshnessMs = 5 * 60_000
-const retryDelayMs = 30_000
-
-/** Owns freshness, cached representations and conditional requests; callers own the displayed options. */
 export class TriggerCatalogStore {
-  readonly state = val<{ revision: number; failed: boolean; catalogs: ReadonlyMap<UiLanguage, TriggerCatalogCache> }>({
-    revision: 0,
-    failed: false,
-    catalogs: new Map(),
-  })
-  readonly #storage?: TriggerCatalogStorage
-  readonly #nextCheck = new Map<UiLanguage, number>()
-  readonly #errors = new Map<UiLanguage, unknown>()
-  #controller = new AbortController()
-  #pending?: Promise<TriggerCatalogCache>
-  #disposed = false
-
+  readonly #language
+  readonly #entries = new Map<UiLanguage, Resource<TriggerCatalog>>()
+  readonly state: ReadonlyVal<ResourceState<TriggerCatalog>>
   constructor(
     private readonly client: WorkbenchClient,
-    private language: UiLanguage,
-    host: Pick<WorkbenchHost, 'triggerCatalogCache'>,
+    language: UiLanguage,
+    private readonly host: Pick<WorkbenchHost, 'triggerCatalogCache'>,
   ) {
-    this.#storage =
-      host.triggerCatalogCache == null ? undefined : browserTriggerCatalogStorage(host.triggerCatalogCache.namespace, host.triggerCatalogCache.storage)
+    this.#language = val(language)
+    this.state = compute((get) => get(this.#entry(get(this.#language)).state))
   }
-
+  #entry(locale: UiLanguage): Resource<TriggerCatalog> {
+    let entry = this.#entries.get(locale)
+    if (entry == null) {
+      const decode = (value: unknown) => {
+        const data = decodeTriggerCatalog(value)
+        if (data.locale != locale) throw new Error('Unexpected Trigger catalog language.')
+        return data
+      }
+      const storage = this.host.triggerCatalogCache
+      entry = new Resource(
+        (etag, signal) => this.client.readCatalog({ path: `/v1/trigger-keys/catalog?locale=${encodeURIComponent(locale)}`, decode }, etag, signal),
+        300_000,
+        storage == null ? undefined : { key: locale, storage: () => browserTriggerCatalogStorage(storage.namespace, storage.storage), decode },
+      )
+      this.#entries.set(locale, entry)
+    }
+    return entry
+  }
   setLanguage(language: UiLanguage): void {
-    if (language == this.language || this.#disposed) return
-    this.reset()
-    this.language = language
-    this.#changed(false)
+    this.#language.set(language)
   }
-
-  reset(): void {
-    this.#controller.abort()
-    this.#controller = new AbortController()
-    this.#pending = undefined
+  get(force = false): ReadonlyVal<ResourceState<TriggerCatalog>> {
+    this.#entry(this.#language.value).get(force)
+    return this.state
   }
-
-  dispose(): void {
-    this.#disposed = true
-    this.reset()
-    this.state.dispose()
-  }
-
-  #read(): TriggerCatalogCache | undefined {
-    const memory = this.state.value.catalogs.get(this.language)
-    if (memory != null) return memory
-    try {
-      const raw = this.#storage?.getItem(this.language)
-      if (raw == null) return
-      const cached = JSON.parse(raw) as TriggerCatalogCache
-      if (cached == null || (cached.etag !== null && typeof cached.etag != 'string')) return
-      const data = decodeTriggerCatalog(cached.data)
-      if (data.locale != this.language) return
-      const entry = { data, etag: cached.etag }
-      this.state.set({ ...this.state.value, catalogs: new Map(this.state.value.catalogs).set(this.language, entry) })
-      return entry
-    } catch {
-      return
-    }
-  }
-
-  async get(): Promise<TriggerCatalog> {
-    if (this.#disposed) throw new DOMException('Catalog disposed', 'AbortError')
-    const cached = this.#read()
-    const due = Date.now() >= (this.#nextCheck.get(this.language) ?? 0)
-    if (cached != null) {
-      if (due) void this.refresh().catch(() => {})
-      return cached.data
-    }
-    if (!due && this.#errors.has(this.language)) throw this.#errors.get(this.language)
-    return (await this.refresh()).data
-  }
-
   readonly retry = (): void => {
-    void this.refresh().catch(() => {})
+    this.get(true)
   }
-
-  refresh(): Promise<TriggerCatalogCache> {
-    if (this.#disposed) return Promise.reject(new DOMException('Catalog disposed', 'AbortError'))
-    if (this.#pending != null) return this.#pending
-    const locale = this.language
-    const cached = this.#read()
-    const signal = this.#controller.signal
-    const request = this.client
-      .getTriggerCatalog(locale, cached, signal)
-      .then((entry) => {
-        if (signal.aborted || this.#disposed) throw new DOMException('Catalog request cancelled', 'AbortError')
-        this.#nextCheck.set(locale, Date.now() + freshnessMs)
-        this.#errors.delete(locale)
-        try {
-          this.#storage?.setItem(locale, JSON.stringify(entry))
-        } catch {
-          /* Storage is optional. */
-        }
-        this.#changed(false, new Map(this.state.value.catalogs).set(locale, entry))
-        return entry
-      })
-      .catch((error: unknown) => {
-        if (!signal.aborted && !this.#disposed) {
-          this.#nextCheck.set(locale, Date.now() + retryDelayMs)
-          this.#errors.set(locale, error)
-          this.#changed(true)
-        }
-        throw error
-      })
-      .finally(() => {
-        if (this.#pending == request) this.#pending = undefined
-      })
-    this.#pending = request
-    return request
+  refresh(): Promise<void> {
+    return this.#entry(this.#language.value).refresh()
   }
-
-  #changed(failed: boolean, catalogs = this.state.value.catalogs): void {
-    this.state.set({ catalogs, revision: this.state.value.revision + (failed ? 0 : 1), failed })
+  dispose(): void {
+    this.state.dispose()
+    this.#language.dispose()
+    for (const entry of this.#entries.values()) entry.dispose()
+    this.#entries.clear()
   }
 }

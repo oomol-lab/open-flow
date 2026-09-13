@@ -63,9 +63,11 @@ function Sample({
       },
     }
   }, [language, mode, log])
+  const lifetime = useMemo(() => ({ users: 0 }), [session])
   const state = useVal(session.triggers.catalog.state)
   useEffect(() => register(() => pending.current?.()), [register])
   useEffect(() => {
+    lifetime.users++
     let active = true
     setReady(false)
     void session.prepare().then(async () => {
@@ -75,9 +77,12 @@ function Sample({
     })
     return () => {
       active = false
-      session.dispose()
+      lifetime.users--
+      queueMicrotask(() => {
+        if (lifetime.users == 0) session.dispose()
+      })
     }
-  }, [session])
+  }, [session, lifetime])
   return (
     <I18nProvider i18n={session.i18n}>
       <section className="min-w-0 rounded-lg border border-[var(--ui-border)] p-3">
@@ -86,8 +91,7 @@ function Sample({
         </h3>
         {ready && (
           <BlockLibrary
-            catalogRevision={state.revision}
-            catalogFailed={state.failed}
+            catalogFailed={state.error != null}
             refreshCatalog={session.triggers.catalog.retry}
             browseOptions={session.triggers.browseAddNodeOptions}
             searchOptions={session.triggers.provideAddNodeOptions}

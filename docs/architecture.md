@@ -264,3 +264,7 @@ Callback response 不能在承载 Workbench 或 Control API 的 origin 上成为
 - Server 容器、环境变量、SQLite、备份和运维约束写入 [Server 容器交付](server/container-delivery.md)。
 - 前端交互约束写入 [Workbench 与 Designer 前端注意事项](../.agents/skills/frontend-ui/SKILL.md)。
 - 实现步骤和采纳历史只保存在 Git 历史或阶段计划中，不属于当前架构合同。
+
+## 浏览器目录数据
+
+Workbench 的 Providers、Actions、Connections、Triggers 数据分别由所属 Store 管理。Store 对外提供稳定的只读 Val，拥有刷新协调、ETag 和持久化；传输层保持无状态。业务访问触发刷新条件检查，消费者订阅实际数据变化，不使用 URL 缓存或 revision 通知计数。Actions 详情由服务列表派生，连接状态在消费处组合。浏览器业务通过静态边界检查限制为从 Store 访问这些数据。存储位置与刷新间隔见 [Control API 契约](control/contracts/control-api.md)。

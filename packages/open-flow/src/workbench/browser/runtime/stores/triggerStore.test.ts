@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
 import { createI18n } from '../i18n.ts'
 import { providerIcon } from '../providerIcon.ts'
+import { resourceValue } from './resource.ts'
 import { TriggerStore } from './triggerStore.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
 
@@ -18,8 +19,12 @@ const flow = {
   version: 1,
 } as const
 
+const connectionRequests = new WeakMap<WorkbenchClient, ReturnType<typeof connectionFetcher>>()
+const connectionFetcher = () => vi.fn(async (_service: string, _flowId: string | undefined): Promise<readonly ConnectorConnection[]> => [])
+
 function createSetup(language: 'en' | 'zh-CN' = 'en') {
   const requests: string[] = []
+  const fetchConnections = connectionFetcher()
   const request = vi.fn(async (path: string, init?: RequestInit) => {
     requests.push(path)
     if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [flow], total: 1, version: 1 })
@@ -107,6 +112,11 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
         version: 1,
       })
     }
+    if (path.startsWith('/v1/connector/connections/')) {
+      const url = new URL(path, 'https://test.invalid')
+      const serviceId = decodeURIComponent(url.pathname.split('/').at(-1)!)
+      return Response.json({ version: 1, serviceId, connections: await fetchConnections(serviceId, url.searchParams.get('flowId') ?? undefined) })
+    }
     if (path == `/v1/trigger-keys/catalog?locale=${language}`) {
       return Response.json({
         locale: language,
@@ -140,6 +150,7 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
     throw new Error(`Unexpected request: ${path}`)
   })
   const client = new WorkbenchClient(request)
+  connectionRequests.set(client, fetchConnections)
   const workspace = new WorkspaceStore(client, vi.fn())
   const triggers = new TriggerStore(client, workspace, vi.fn(), { openExternalPage: async () => true }, createI18n(language))
   const signal = new AbortController().signal
@@ -152,8 +163,8 @@ describe('TriggerStore', () => {
 
     try {
       await workspace.start(flow.flowId)
-      const options = await triggers.browseAddNodeOptions(signal)
-      const searched = await triggers.provideAddNodeOptions('repository', signal)
+      const options = await resourceValue(triggers.browseAddNodeOptions(signal))
+      const searched = await resourceValue(triggers.provideAddNodeOptions('repository', signal))
 
       expect(options).toHaveLength(1)
       expect(options?.[0]).toMatchObject({
@@ -178,14 +189,14 @@ describe('TriggerStore', () => {
     const saved = []
     for (const language of ['en', 'zh-CN'] as const) {
       const { workspace, triggers, client, signal } = createSetup(language)
-      vi.spyOn(client, 'listConnectorConnections').mockResolvedValue([])
+      connectionRequests.get(client)!.mockResolvedValue([])
       try {
         await workspace.start(flow.flowId)
-        const result = await triggers.provideAddNodeOptions(language == 'en' ? 'repository' : '仓库', signal)
+        const result = await resourceValue(triggers.provideAddNodeOptions(language == 'en' ? 'repository' : '仓库', signal))
         expect(result).toHaveLength(1)
         const option = result![0]!
         expect(option.label).toBe(language == 'en' ? 'Repository event' : '仓库事件')
-        expect(await triggers.provideAddNodeOptions('repository', signal)).toHaveLength(1)
+        expect(await resourceValue(triggers.provideAddNodeOptions('repository', signal))).toHaveLength(1)
         const id = await workspace.addNode(option, { x: 0, y: 0 })
         const node = workspace.$.draft.value!.content.document.graph.nodes[id!]!
         if (node.kind != 'integration') throw new Error('Expected Integration Trigger.')
@@ -214,11 +225,11 @@ describe('TriggerStore', () => {
               : scenario == 'inactive'
                 ? [{ ...account, status: 'reauth_required' as const }]
                 : [other, account]
-      const list = vi.spyOn(client, 'listConnectorConnections').mockResolvedValue(connections)
+      const list = connectionRequests.get(client)!.mockResolvedValue(connections)
       if (scenario == 'failure') list.mockRejectedValue(new Error('Connection lookup failed'))
       try {
         await workspace.start(flow.flowId)
-        const option = (await triggers.browseAddNodeOptions(signal))![0]!
+        const option = (await resourceValue(triggers.browseAddNodeOptions(signal)))![0]!
         if (option.kind != 'trigger' || !('trigger' in option) || option.trigger.kind != 'catalog') throw new Error('Expected provider Trigger.')
         const nodeId = await workspace.addNode(scenario == 'explicit' ? { ...option, trigger: { ...option.trigger, connectionId: 'chosen' } } : option, {
           x: 0,
@@ -232,7 +243,7 @@ describe('TriggerStore', () => {
           expected == '' ? undefined : { kind: 'connection', target: expected },
         )
         if (scenario == 'explicit') expect(list).not.toHaveBeenCalled()
-        else expect(list).toHaveBeenCalledWith('github', undefined, flow.flowId)
+        else expect(list).toHaveBeenCalledWith('github', flow.flowId)
       } finally {
         triggers.dispose()
         workspace.dispose()
@@ -243,10 +254,10 @@ describe('TriggerStore', () => {
   it('does not create a Trigger after leaving the Flow during connection lookup', async () => {
     const { client, workspace, triggers, signal, requests } = createSetup()
     const pending = Promise.withResolvers<readonly ConnectorConnection[]>()
-    const list = vi.spyOn(client, 'listConnectorConnections').mockReturnValue(pending.promise)
+    const list = connectionRequests.get(client)!.mockReturnValue(pending.promise)
     try {
       await workspace.start(flow.flowId)
-      const option = (await triggers.browseAddNodeOptions(signal))![0]!
+      const option = (await resourceValue(triggers.browseAddNodeOptions(signal)))![0]!
       const adding = workspace.addNode(option, { x: 0, y: 0 })
       await vi.waitFor(() => expect(list).toHaveBeenCalled())
       await workspace.selectFlow(undefined)
@@ -309,7 +320,7 @@ describe('TriggerStore', () => {
     const old: ConnectorConnection = { connectionId: 'github-old', displayName: 'Old', isDefault: true, serviceId: 'github', status: 'active' }
     const fresh = { ...old, displayName: 'Refreshed' }
     const pending = Promise.withResolvers<readonly ConnectorConnection[]>()
-    const list = vi.spyOn(client, 'listConnectorConnections').mockResolvedValueOnce([old]).mockReturnValueOnce(pending.promise).mockResolvedValue([fresh])
+    const list = connectionRequests.get(client)!.mockResolvedValueOnce([old]).mockReturnValueOnce(pending.promise).mockResolvedValue([fresh])
     try {
       await workspace.start(flow.flowId)
       workspace.selectNodes(['github'])
@@ -331,14 +342,14 @@ describe('TriggerStore', () => {
         expect(triggers.$.selectedActiveConnections.value).toEqual([old])
         expect(triggers.$.selectedConnection.value).toEqual(old)
         expect(triggers.$.selectedConnectionError.value).toContain('Connection refresh failed')
-        await triggers.refresh()
+        await triggers.refresh(true)
         expect(triggers.$.selectedConnection.value).toEqual(fresh)
         expect(triggers.$.selectedConnectionError.value).toBeUndefined()
         expect(list).toHaveBeenCalledTimes(3)
       } else {
         expect(triggers.$.selectedActiveConnections.value).toEqual(outcome == 'empty' ? [] : [fresh])
         await triggers.refresh()
-        expect(list).toHaveBeenCalledTimes(3)
+        expect(list).toHaveBeenCalledTimes(2)
       }
     } finally {
       triggers.dispose()
@@ -351,7 +362,7 @@ describe('TriggerStore', () => {
     const old: ConnectorConnection = { connectionId: 'github-old', displayName: 'Old', isDefault: true, serviceId: 'github', status: 'active' }
     const fresh = { ...old, displayName: 'Refreshed' }
     const pending = Promise.withResolvers<readonly ConnectorConnection[]>()
-    const list = vi.spyOn(client, 'listConnectorConnections').mockResolvedValue([old])
+    const list = connectionRequests.get(client)!.mockResolvedValue([old])
     try {
       await workspace.start(flow.flowId)
       workspace.selectNodes(['mail'])
@@ -375,12 +386,12 @@ describe('TriggerStore', () => {
         await refresh
       }
       workspace.selectNodes(['github'])
-      expect(triggers.$.selectedConnection.value).toEqual(old)
+      expect(triggers.$.selectedConnection.value).toEqual(timing == 'before' ? old : undefined)
       list.mockResolvedValue([fresh])
       await triggers.refresh()
-      expect(list).toHaveBeenLastCalledWith('github', undefined, flow.flowId, true)
+      expect(list).toHaveBeenLastCalledWith('github', flow.flowId)
       expect(triggers.$.selectedConnection.value).toEqual(fresh)
-      expect(list).toHaveBeenCalledTimes(timing == 'before' ? 1 : 3)
+      expect(list).toHaveBeenCalledTimes(timing == 'before' ? 1 : 2)
     } finally {
       triggers.dispose()
       workspace.dispose()

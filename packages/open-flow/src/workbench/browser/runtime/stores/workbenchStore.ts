@@ -10,19 +10,19 @@ import type { Notice } from './workbenchNotice.ts'
 import type { WorkspaceBusy } from './workspaceModel.ts'
 
 import { compute, derive, val } from 'value-enhancer'
-import { connectorProvidersQuery } from '../../../../control/common/connectorQueries.ts'
 import { randomId } from '../../../../control/common/random.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { diagnosticItems } from '../editor/diagnostics.ts'
 import { createI18n } from '../i18n.ts'
 import { PublicationStore } from '../publications/publicationStore.ts'
-import { cachedResponse } from '../requestCache.ts'
 import { revisionView } from '../revisionView.ts'
 import { RunRequestStore } from '../runs/runRequestStore.ts'
 import { RunStore } from '../runs/runStore.ts'
 import { designerGraph, targetPresentation } from '../workspace.ts'
+import { CatalogStores } from './catalogStores.ts'
 import { ConnectorStore } from './connectorStore.ts'
 import { Latest } from './latest.ts'
+import { combineSources } from './optionSource.ts'
 import { TriggerStore } from './triggerStore.ts'
 import { errorNotice } from './workbenchNotice.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
@@ -106,7 +106,7 @@ export class WorkbenchStore {
     preferences: WorkbenchPreferences,
     identity: () => string = randomId,
     i18n: I18n = createI18n(),
-    host: Pick<WorkbenchHost, 'openExternalPage'> = blockedExternalPages,
+    host: Pick<WorkbenchHost, 'openExternalPage' | 'connectorCache' | 'triggerCatalogCache'> = blockedExternalPages,
     variables = true,
   ) {
     this.#client = client
@@ -117,10 +117,17 @@ export class WorkbenchStore {
       if (!this.#disposed) this.#notice.set(notice)
     }
     this.runs = new RunStore(client, setNotice, i18n)
-    this.workspace = new WorkspaceStore(client, setNotice, createAuthoringId, i18n, (event) => {
-      if (event.kind == 'run.created') void this.#followExternalRun(client, event)
-      else this.runs.changed(event.runId)
-    })
+    this.workspace = new WorkspaceStore(
+      client,
+      setNotice,
+      createAuthoringId,
+      i18n,
+      (event) => {
+        if (event.kind == 'run.created') void this.#followExternalRun(client, event)
+        else this.runs.changed(event.runId)
+      },
+      new CatalogStores(client, host.connectorCache),
+    )
     this.connectors = new ConnectorStore(client, this.workspace, setNotice, host, i18n)
     this.triggers = new TriggerStore(client, this.workspace, setNotice, host, i18n)
     this.publications = new PublicationStore(client, this.workspace, setNotice, preferences, identity, i18n)
@@ -154,7 +161,7 @@ export class WorkbenchStore {
       const target = get(this.workspace.$.target)
       const presentation = get(this.workspace.$.presentation)?.value
       const designerDiagnostics = get(diagnostics)?.diagnostics ?? get(this.connectors.$.diagnostics)
-      const providerEntries = draft == null ? undefined : cachedResponse(get(client.requestCache.responses), connectorProvidersQuery(draft.flowId, i18n.lang))
+      const providerEntries = draft == null ? undefined : get(this.workspace.catalogs.providers.get(draft.flowId, i18n.lang)).data
       const providerCatalog = Object.fromEntries((providerEntries ?? []).map((provider) => [provider.serviceId, provider]))
       const actions = get(this.connectors.$.actions)
       const catalogs = get(this.connectors.$.catalogs)
@@ -326,35 +333,18 @@ export class WorkbenchStore {
     return nodeId
   }
 
-  async #mergeAddNodeOptions(
-    requests: readonly Promise<readonly AddNodeOption[] | undefined>[],
-    signal: AbortSignal,
-  ): Promise<readonly AddNodeOption[] | undefined> {
-    const results = await Promise.allSettled(requests)
-    if (signal.aborted || this.#disposed) return
-    const rejected = results.filter((result): result is PromiseRejectedResult => result.status == 'rejected')
-    if (rejected.length > 0 && rejected.length == results.length) throw rejected[0]!.reason
-    if (rejected.length > 0) this.#notice.set(errorNotice(rejected[0]!.reason, this.#i18n.t))
-    return results.flatMap((result) => (result.status == 'fulfilled' ? (result.value ?? []) : []))
+  public readonly retryCatalog = (): void => {
+    this.connectors.retryCatalog()
+    this.triggers.catalog.retry()
   }
 
-  public readonly provideAddNodeOptions = async (searchTerm: string, signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
-    return await this.#mergeAddNodeOptions(
-      [this.triggers.provideAddNodeOptions(searchTerm, signal), this.connectors.provideAddNodeOptions(searchTerm, signal)],
-      signal,
-    )
-  }
+  public readonly provideAddNodeOptions = (searchTerm: string, signal: AbortSignal) =>
+    combineSources(signal, [this.triggers.provideAddNodeOptions(searchTerm, signal), this.connectors.provideAddNodeOptions(searchTerm, signal)])
 
-  public readonly browseAddNodeOptions = async (signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
-    const options = await Promise.all([this.triggers.browseAddNodeOptions(signal), this.connectors.browseAddNodeOptions(signal)])
-    if (signal.aborted || this.#disposed) return
-    return options.flatMap((items) => items ?? [])
-  }
+  public readonly browseAddNodeOptions = (signal: AbortSignal) =>
+    combineSources(signal, [this.triggers.browseAddNodeOptions(signal), this.connectors.browseAddNodeOptions(signal)])
 
-  public readonly provideAddNodeOptionChoices = async (optionId: string, signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
-    if (optionId.startsWith('trigger:')) return
-    return await this.connectors.provideAddNodeOptionChoices(optionId, signal)
-  }
+  public readonly provideAddNodeOptionChoices = (optionId: string, signal: AbortSignal) => this.connectors.provideAddNodeOptionChoices(optionId, signal)
 
   public async refreshSelectedConnector(force = false): Promise<void> {
     await this.connectors.refresh(force)

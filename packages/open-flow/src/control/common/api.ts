@@ -541,6 +541,10 @@ function operationKey(operation: string): string {
   return `${operation}-${randomId()}`
 }
 
+export type ConditionalResult<T> =
+  | { readonly modified: true; readonly data: T; readonly etag: string | null }
+  | { readonly modified: false; readonly etag: string | null }
+
 export class ControlClient {
   private readonly requestControl: ControlRequest
 
@@ -620,6 +624,19 @@ export class ControlClient {
     const source = record(await this.request('/v1/trigger-keys/catalog', { signal }))
     if (source.version != 1 || !Array.isArray(source.definitions)) return invalidResponse()
     return source.definitions.map(triggerKey)
+  }
+
+  async readCatalog<T>(
+    query: { readonly path: string; readonly decode: (data: unknown) => T },
+    etag: string | null,
+    signal?: AbortSignal,
+  ): Promise<ConditionalResult<T>> {
+    const headers = new Headers()
+    if (etag) headers.set('if-none-match', etag)
+    const response = await this.response(query.path, { headers, signal }, true)
+    const nextETag = response.headers.get('etag')?.trim() || null
+    if (response.status == 304) return { modified: false, etag: nextETag }
+    return { modified: true, data: query.decode(await response.json()), etag: nextETag }
   }
 
   async getTriggerCatalog(locale: string, cached?: TriggerCatalogCache, signal?: AbortSignal): Promise<TriggerCatalogCache> {

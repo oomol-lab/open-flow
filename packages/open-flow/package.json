@@ -54,7 +54,7 @@
   "scripts": {
     "build": "bun scripts/build.ts",
     "check": "bun run format -- --check && bun run lint && bun run check:trigger-locales && bun run check:types && bun run check:boundaries",
-    "check:boundaries": "bun scripts/check-platform-boundaries.ts",
+    "check:boundaries": "bun scripts/check-platform-boundaries.ts && bun scripts/check-catalog-boundaries.ts",
     "check:types": "tsc --noEmit",
     "designer:dev": "vite --config dev/designer/vite.config.ts",
     "format": "oxfmt README.md NOTICE src test scripts dev vitest.config.ts package.json tsconfig.json",

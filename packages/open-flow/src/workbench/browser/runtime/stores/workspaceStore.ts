@@ -70,10 +70,12 @@ import { revisionView } from '../revisionView.ts'
 import { connectionCatalog, canvasPresentationChange, restoreCanvasPresentation } from '../workspace.ts'
 import { commentIds, designerGraph, removeComments, setComment, setFlowViewport, setNodePositions, setNodeContentHidden } from '../workspace.ts'
 import { CanvasHistory } from './canvasHistory.ts'
+import { CatalogStores } from './catalogStores.ts'
 import { DraftChanges } from './draftChanges.ts'
 import { FlowCatalog } from './flowCatalog.ts'
 import { Latest } from './latest.ts'
 import { PresentationChanges } from './presentationChanges.ts'
+import { resourceValue } from './resource.ts'
 import { errorNotice } from './workbenchNotice.ts'
 import { moduleEditorStatus, selectedModuleEditor, WorkspaceModel } from './workspaceModel.ts'
 
@@ -134,6 +136,7 @@ export class WorkspaceStore {
     identity: () => string = createAuthoringId,
     i18n: I18n = createI18n(),
     runChanged: (event: Extract<FlowChangeEvent, { readonly kind: 'run.changed' | 'run.created' }>) => void = () => {},
+    public readonly catalogs = new CatalogStores(client),
   ) {
     this.#client = client
     this.#setNotice = setNotice
@@ -165,6 +168,7 @@ export class WorkspaceStore {
   }
 
   public dispose(): void {
+    this.catalogs.dispose()
     this.#disposed = true
     this.#draftSession.invalidate()
     this.#presentationChanges.dispose()
@@ -401,7 +405,7 @@ export class WorkspaceStore {
     if (intent == null) return
     if (intent.kind == 'provider-trigger' && intent.connectionId == null) {
       try {
-        const connections = await this.#client.listConnectorConnections(intent.definition.provider, undefined, draft.flowId)
+        const connections = await resourceValue(this.catalogs.connections.get(intent.definition.provider, draft.flowId))
         intent = { ...intent, connectionId: connectionCatalog(connections).preferred?.connectionId }
       } catch (error) {
         if (!this.#disposed && this.#model.value.draft == draft) this.#setNotice(errorNotice(error, this.#i18n.t))

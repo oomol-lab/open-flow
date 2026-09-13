@@ -10,7 +10,9 @@ import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { BlockLibrary } from '../../src/workbench/browser/runtime/editor/contextPanel.tsx'
 import { NodePickerPopover } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
 import { WorkbenchCanvasActions } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
+import { CatalogStores } from '../../src/workbench/browser/runtime/stores/catalogStores.ts'
 import { ConnectorStore } from '../../src/workbench/browser/runtime/stores/connectorStore.ts'
+import { combineSources, mapSource } from '../../src/workbench/browser/runtime/stores/optionSource.ts'
 import { useStoryActions } from './storyActions.tsx'
 import { triggerFixtures } from './triggerFixtures.ts'
 import { createTriggerSession } from './triggerSession.ts'
@@ -93,7 +95,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
       }),
     [language, log],
   )
-  const connectors = useMemo(() => {
+  const sampleCatalog = useMemo(() => {
     const providers = sampleProviders.map((provider) =>
       Object.assign({}, provider, {
         serviceName: session.i18n.lang.startsWith('zh')
@@ -105,41 +107,44 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
               : provider.serviceName,
       }),
     )
-    let cached = JSON.stringify({ data: { version: 1, providers: providers.slice(0, 1) }, etag: '"cached"' })
-    return new ConnectorStore(
-      new WorkbenchClient(
-        async (path) => {
-          const url = new URL(String(path), 'https://lab.invalid')
-          if (url.pathname.endsWith('/connections')) return Response.json({ version: 1, connections: sampleConnections })
-          if (url.pathname.endsWith('/providers')) {
-            await new Promise((resolve) => setTimeout(resolve, 1500))
-            return Response.json({ version: 1, providers })
+    const client = new WorkbenchClient(async (path) => {
+      const url = new URL(String(path), 'https://lab.invalid')
+      if (url.pathname.includes('/connections/')) {
+        const serviceId = decodeURIComponent(url.pathname.split('/').at(-1)!)
+        return Response.json({ version: 1, serviceId, connections: sampleConnections.filter((connection) => connection.serviceId == serviceId) })
+      }
+      if (url.pathname.endsWith('/connections')) return Response.json({ version: 1, connections: sampleConnections })
+      if (url.pathname.endsWith('/providers')) {
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+        return Response.json({ version: 1, providers })
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      return Response.json(sampleActionData(String(path)))
+    })
+    const entries = new Map<string, string>()
+    const data = new CatalogStores(client, {
+      namespace: 'lab-node-picker',
+      localStorage: {
+        getItem: (key) => {
+          const stored = entries.get(key)
+          if (stored != null) return stored
+          if (key.includes(':providers:')) return JSON.stringify({ data: providers.slice(0, 1), etag: '"cached"' })
+          if (key.includes(':actions:')) {
+            const [, service] = JSON.parse(key.slice(key.indexOf('['))) as string[]
+            return JSON.stringify({ data: sampleActionData(`/v1/connector/actions?service=${encodeURIComponent(service!)}`, true).actions, etag: null })
           }
-          await new Promise((resolve) => setTimeout(resolve, 1500))
-          return Response.json(sampleActionData(String(path)))
+          return null
         },
-        undefined,
-        undefined,
-        {
-          namespace: 'lab-node-picker',
-          sessionStorage: {
-            getItem: (key) => JSON.stringify({ data: sampleActionData(key.slice(key.indexOf('/v1/')), true), etag: null }),
-            setItem: () => {},
-          },
-          localStorage: {
-            getItem: () => cached,
-            setItem: (_key, value) => {
-              cached = value
-            },
-          },
+        setItem: (key, value) => {
+          entries.set(key, value)
         },
-      ),
-      session.workspace,
-      (notice) => log('notice', notice),
-      { openExternalPage: async () => false },
-      session.i18n,
-    )
+      },
+      sessionStorage: { getItem: () => null, setItem: () => {} },
+    })
+    const store = new ConnectorStore(client, session.workspace, (notice) => log('notice', notice), { openExternalPage: async () => false }, session.i18n, data)
+    return { store, data }
   }, [session, log])
+  const connectors = sampleCatalog.store
   const lifetime = useMemo(() => ({ users: 0 }), [session, connectors])
   useEffect(() => {
     lifetime.users++
@@ -149,15 +154,14 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
       queueMicrotask(() => {
         if (lifetime.users == 0) {
           connectors.dispose()
+          sampleCatalog.data.dispose()
           session.dispose()
         }
       })
     }
-  }, [session, connectors, lifetime])
+  }, [session, connectors, lifetime, sampleCatalog])
   const options = useVal(session.workspace.$.addNodeOptions)
-  const catalog = useVal(session.triggers.catalog.state)
   const connections = useVal(connectors.$.connections)
-  const connectorRevision = useVal(connectors.$.catalogRevision)
   useStoryActions([
     { label: largeCatalog ? 'Small catalog' : '1,000 apps', onClick: () => setLargeCatalog(!largeCatalog) },
     { label: slowAdd ? 'Instant add' : 'Slow add', onClick: () => setSlowAdd(!slowAdd) },
@@ -168,30 +172,26 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
   ])
   const data = useMemo(
     () => ({
-      browseOptions: async (signal: AbortSignal) => {
-        if (mode == 'failed') throw new Error('Sample failure')
+      browseOptions: (signal: AbortSignal) => {
+        if (mode == 'failed') return Promise.reject(new Error('Sample failure'))
         if (mode == 'loading')
-          await new Promise<void>((resolve) => {
-            if (signal.aborted) resolve()
-            else signal.addEventListener('abort', () => resolve(), { once: true })
-          })
-        const apps = (await connectors.browseAddNodeOptions(signal)) ?? []
-        const sample = apps.find((item) => item.kind == 'connector-group')
-        const extra =
-          largeCatalog && sample
-            ? Array.from({ length: 1000 }, (_, index) => ({
-                ...sample,
-                id: `sample-${index}`,
-                serviceId: `sample-${index}`,
-                label: `Sample App ${String(index).padStart(4, '0')}`,
-              }))
-            : []
-        return [...((await session.triggers.browseAddNodeOptions(signal)) ?? []), ...apps, ...extra]
+          return new Promise<readonly (typeof options)[number][]>((resolve) => signal.addEventListener('abort', () => resolve([]), { once: true }))
+        return mapSource(combineSources(signal, [session.triggers.browseAddNodeOptions(signal), connectors.browseAddNodeOptions(signal)]), signal, (apps) => {
+          const sample = apps.find((item) => item.kind == 'connector-group')
+          const extra =
+            largeCatalog && sample
+              ? Array.from({ length: 1000 }, (_, index) => ({
+                  ...sample,
+                  id: `sample-${index}`,
+                  serviceId: `sample-${index}`,
+                  label: `Sample App ${String(index).padStart(4, '0')}`,
+                }))
+              : []
+          return [...apps, ...extra]
+        })
       },
-      searchOptions: async (query: string, signal: AbortSignal) => [
-        ...((await session.triggers.provideAddNodeOptions(query, signal)) ?? []),
-        ...((await connectors.provideAddNodeOptions(query, signal)) ?? []),
-      ],
+      searchOptions: (query: string, signal: AbortSignal) =>
+        combineSources(signal, [session.triggers.provideAddNodeOptions(query, signal), connectors.provideAddNodeOptions(query, signal)]),
       provideChoices: connectors.provideAddNodeOptionChoices,
     }),
     [session, connectors, mode, largeCatalog],
@@ -201,7 +201,6 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
     connections,
     loadConnections: connectors.loadConnections,
     options,
-    catalogRevision: catalog.revision + connectorRevision,
     disabled,
     focusRequest: 0,
     onAdd: async (option: (typeof options)[number]) => {

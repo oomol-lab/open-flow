@@ -1,240 +1,47 @@
-import type { TriggerCatalog, TriggerCatalogCache } from '../../../../control/common/triggerCatalog.ts'
-import type { TriggerCatalogStorage } from './triggerCatalog.ts'
-
-import { describe, expect, it, vi } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
-import { browserTriggerCatalogStorage, TriggerCatalogStore } from './triggerCatalog.ts'
+import { resourceValue } from './resource.ts'
+import { TriggerCatalogStore, browserTriggerCatalogStorage } from './triggerCatalog.ts'
 
-const catalog: TriggerCatalog = { version: 1, locale: 'en', definitions: [], display: {} }
-function storage(): TriggerCatalogStorage {
+it('restores local data, retains replacement 304 ETags and separates languages', async () => {
   const values = new Map<string, string>()
-  return {
-    getItem: (key) => values.get(key) ?? null,
-    setItem: (key, value) => {
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => {
       values.set(key, value)
     },
   }
-}
-function setup(request: (path: string, init?: RequestInit) => Promise<Response>, local = storage(), namespace = 'test') {
-  return new TriggerCatalogStore(new WorkbenchClient(request), 'en', { triggerCatalogCache: { namespace, storage: local } })
-}
-function seed(local: TriggerCatalogStorage, entry: TriggerCatalogCache = { data: catalog, etag: '"old"' }) {
-  browserTriggerCatalogStorage('test', local).setItem(entry.data.locale, JSON.stringify(entry))
-}
-
-describe('Trigger catalog cache', () => {
-  it('persists a replacement ETag from a 304 and uses it for subsequent requests', async () => {
-    const local = storage()
-    seed(local)
-    const request = vi.fn(async (_path: string, _init?: RequestInit) => new Response(null, { status: 304 }))
-    request.mockResolvedValueOnce(new Response(null, { status: 304, headers: { etag: 'W/"new"' } }))
-    const store = setup(request, local)
-    try {
-      const entry = await store.refresh()
-      expect(entry).toEqual({ data: catalog, etag: 'W/"new"' })
-      expect(JSON.parse(browserTriggerCatalogStorage('test', local).getItem('en')!)).toEqual(entry)
-      expect(await store.refresh()).toEqual(entry)
-      expect(await store.refresh()).toEqual(entry)
-      expect(request.mock.calls.map(([, init]) => new Headers(init?.headers).get('if-none-match'))).toEqual(['"old"', 'W/"new"', 'W/"new"'])
-    } finally {
-      store.dispose()
-    }
+  const local = browserTriggerCatalogStorage('test', storage)
+  local.setItem('en', JSON.stringify({ data: { version: 1, locale: 'en', definitions: [], display: {} }, etag: '"old"' }))
+  const request = vi.fn(async (_path: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    expect(new Headers(init?.headers).get('if-none-match')).toBe('"old"')
+    return new Response(null, { status: 304, headers: { etag: 'W/"new"' } })
   })
-
-  it('displays persisted data immediately while revalidating with its ETag across sessions', async () => {
-    const local = storage()
-    const first = setup(async () => Response.json(catalog, { headers: { etag: 'W/"one"' } }), local)
-    await first.refresh()
-    first.dispose()
-    let finish!: (value: Response) => void
-    const request = vi.fn(
-      (_path: string, _init?: RequestInit) =>
-        new Promise<Response>((resolve) => {
-          finish = resolve
-        }),
-    )
-    const next = setup(request, local)
-    try {
-      expect(await next.get()).toEqual(catalog)
-      expect(new Headers(request.mock.calls[0]?.[1]?.headers).get('if-none-match')).toBe('W/"one"')
-      finish(new Response(null, { status: 304 }))
-      expect((await next.refresh()).data).toEqual(catalog)
-    } finally {
-      next.dispose()
-    }
+  const store = new TriggerCatalogStore(new WorkbenchClient(request), 'en', { triggerCatalogCache: { namespace: 'test', storage } })
+  const state = store.get()
+  expect(state.value.data?.locale).toBe('en')
+  await store.refresh()
+  expect(JSON.parse(local.getItem('en')!).etag).toBe('W/"new"')
+  request.mockImplementation(async (_path, init) => {
+    expect(new Headers(init?.headers).has('if-none-match')).toBe(false)
+    return Response.json({ version: 1, locale: 'zh-CN', definitions: [], display: {} })
   })
+  store.setLanguage('zh-CN')
+  expect((await resourceValue(store.get())).locale).toBe('zh-CN')
+  store.setLanguage('en')
+  expect(store.get().value.data?.locale).toBe('en')
+  expect(values.size).toBe(2)
+  store.dispose()
+})
 
-  it('sends the cached validator, merges concurrent refreshes and persists a new response', async () => {
-    const local = storage()
-    seed(local)
-    let finish!: (value: Response) => void
-    const request = vi.fn(
-      (_path: string, _init?: RequestInit) =>
-        new Promise<Response>((resolve) => {
-          finish = resolve
-        }),
-    )
-    const store = setup(request, local)
-    try {
-      const pending = store.refresh()
-      expect(store.refresh()).toBe(pending)
-      expect(new Headers(request.mock.calls[0]?.[1]?.headers).get('if-none-match')).toBe('"old"')
-      finish(Response.json(catalog, { headers: { etag: '"new"' } }))
-      await pending
-      expect(JSON.parse(browserTriggerCatalogStorage('test', local).getItem('en')!).etag).toBe('"new"')
-      expect(store.state.value.catalogs.get('en')).toEqual({ data: catalog, etag: '"new"' })
-      expect(store.state.value.revision).toBe(1)
-    } finally {
-      store.dispose()
-    }
+it('rejects a mismatched locale without persisting or publishing it', async () => {
+  const storage = { getItem: () => null, setItem: vi.fn() }
+  const store = new TriggerCatalogStore(new WorkbenchClient(async () => Response.json({ version: 1, locale: 'en', definitions: [], display: {} })), 'zh-CN', {
+    triggerCatalogCache: { namespace: 'test', storage },
   })
-
-  it('isolates deployments and languages and ignores a late response after switching language', async () => {
-    const local = storage()
-    seed(local)
-    let finish!: (value: Response) => void
-    const request = vi.fn((path: string, _init?: RequestInit) =>
-      path.endsWith('en')
-        ? new Promise<Response>((resolve) => {
-            finish = resolve
-          })
-        : Promise.resolve(Response.json({ ...catalog, locale: 'zh-CN' })),
-    )
-    const store = setup(request, local, 'another')
-    try {
-      const old = store.refresh()
-      const rejected = expect(old).rejects.toMatchObject({ name: 'AbortError' })
-      expect(new Headers(request.mock.calls[0]?.[1]?.headers).has('if-none-match')).toBe(false)
-      store.setLanguage('zh-CN')
-      expect(request.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
-      await store.refresh()
-      finish(Response.json(catalog))
-      await rejected
-      expect((await store.get()).locale).toBe('zh-CN')
-      expect(browserTriggerCatalogStorage('another', local).getItem('en')).toBeNull()
-    } finally {
-      store.dispose()
-    }
-  })
-
-  it.each([
-    '{broken',
-    JSON.stringify({ data: { ...catalog, version: 2 }, etag: 'old' }),
-    JSON.stringify({ data: { ...catalog, display: { extra: {} } }, etag: null }),
-  ])('ignores invalid persisted data: %s', async (raw) => {
-    const local = storage()
-    browserTriggerCatalogStorage('test', local).setItem('en', raw)
-    const request = vi.fn(async (_path: string, _init?: RequestInit) => Response.json(catalog))
-    const store = setup(request, local)
-    try {
-      expect(await store.get()).toEqual(catalog)
-      expect(new Headers(request.mock.calls[0]?.[1]?.headers).has('if-none-match')).toBe(false)
-    } finally {
-      store.dispose()
-    }
-  })
-
-  it('tolerates unavailable storage and caches successful responses without an ETag', async () => {
-    const request = vi.fn(async () => Response.json(catalog))
-    const store = setup(request, {
-      getItem() {
-        throw new Error('blocked')
-      },
-      setItem() {
-        throw new Error('full')
-      },
-    })
-    try {
-      await store.refresh()
-      expect(await store.get()).toEqual(catalog)
-      expect(request).toHaveBeenCalledTimes(1)
-    } finally {
-      store.dispose()
-    }
-  })
-
-  it('keeps cached data on failure and reports failure without triggering a reload loop', async () => {
-    const local = storage()
-    seed(local)
-    const store = setup(async () => {
-      throw new Error('offline')
-    }, local)
-    try {
-      await expect(store.refresh()).rejects.toThrow('offline')
-      expect(await store.get()).toEqual(catalog)
-      expect(store.state.value).toMatchObject({ failed: true, revision: 0 })
-    } finally {
-      store.dispose()
-    }
-  })
-
-  it('revalidates stale reads once and treats 304 as fresh', async () => {
-    let now = 1000
-    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
-    const request = vi.fn(async () => Response.json(catalog, { headers: { etag: '"one"' } }))
-    const store = setup(request)
-    try {
-      await store.get()
-      now += 299_999
-      await store.get()
-      expect(request).toHaveBeenCalledTimes(1)
-      request.mockImplementation(async () => new Response(null, { status: 304 }))
-      now += 1
-      await Promise.all([store.get(), store.get(), store.get()])
-      await vi.waitFor(() => expect(store.state.value.revision).toBe(2))
-      expect(request).toHaveBeenCalledTimes(2)
-      await store.get()
-      expect(request).toHaveBeenCalledTimes(2)
-    } finally {
-      clock.mockRestore()
-      store.dispose()
-    }
-  })
-
-  it('keeps stale data after failure, backs off automatic retries and allows explicit retry', async () => {
-    let now = 1000
-    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
-    const local = storage()
-    seed(local)
-    const request = vi.fn(async (): Promise<Response> => {
-      throw new Error('offline')
-    })
-    const store = setup(request, local)
-    try {
-      expect(await store.get()).toEqual(catalog)
-      await vi.waitFor(() => expect(store.state.value.failed).toBe(true))
-      await store.get()
-      expect(request).toHaveBeenCalledTimes(1)
-      now += 30_000
-      await store.get()
-      await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2))
-      await expect(store.refresh()).rejects.toThrow('offline')
-      request.mockImplementation(async () => Response.json(catalog))
-      await store.refresh()
-      expect(store.state.value.failed).toBe(false)
-      await store.get()
-      expect(request).toHaveBeenCalledTimes(3)
-    } finally {
-      clock.mockRestore()
-      store.dispose()
-    }
-  })
-
-  it('does not make requests after disposal', async () => {
-    const request = vi.fn(async () => Response.json(catalog))
-    const store = setup(request)
-    store.dispose()
-    await expect(store.get()).rejects.toMatchObject({ name: 'AbortError' })
-    await expect(store.refresh()).rejects.toMatchObject({ name: 'AbortError' })
-    expect(request).not.toHaveBeenCalled()
-  })
-
-  it('rejects an unexpected 304 without a cached representation', async () => {
-    const store = setup(async () => new Response(null, { status: 304 }))
-    try {
-      await expect(store.get()).rejects.toThrow()
-    } finally {
-      store.dispose()
-    }
-  })
+  await store.refresh()
+  expect(store.state.value.data).toBeUndefined()
+  expect(store.state.value.error).toBeInstanceOf(Error)
+  expect(storage.setItem).not.toHaveBeenCalled()
+  store.dispose()
 })

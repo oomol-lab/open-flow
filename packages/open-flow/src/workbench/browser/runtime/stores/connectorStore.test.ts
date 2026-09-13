@@ -1,9 +1,8 @@
-import type { ConnectorConnection } from '../api.ts'
-
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
 import { providerIcon } from '../providerIcon.ts'
 import { ConnectorStore } from './connectorStore.ts'
+import { resourceValue } from './resource.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
 
 const timestamp = '2026-08-30T00:00:00.000Z'
@@ -98,6 +97,7 @@ describe('ConnectorStore', () => {
           },
         })
       }
+      if (path.startsWith('/v1/connector/connections/')) return Response.json({ version: 1, serviceId: 'mail', connections: [] })
       if (path.startsWith('/v1/connector/actions?')) {
         connectorRequests.push(path)
         return Response.json({
@@ -126,8 +126,8 @@ describe('ConnectorStore', () => {
 
     try {
       await workspace.start(flows[0]!.flowId)
-      const firstProviders = await connectors.browseAddNodeOptions(signal)
-      const firstActions = await connectors.provideAddNodeOptionChoices('connector-provider:mail', signal)
+      const firstProviders = await resourceValue(connectors.browseAddNodeOptions(signal))
+      const firstActions = await resourceValue(connectors.provideAddNodeOptionChoices('connector-provider:mail', signal))
 
       expect(firstProviders?.[0]?.label).toBe('Mail flow-a')
       expect(firstProviders?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail flow-a' }))
@@ -135,46 +135,43 @@ describe('ConnectorStore', () => {
       expect(firstActions?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail flow-a' }))
       expect(connectors.$.actions.value).toEqual({})
       await connectors.loadCodeAction('mail.send', signal)
-      await connectors.provideAddNodeOptions('send', signal)
-      expect(connectors.$.actions.value['mail.send']?.description).toBe('Detail for flow-a.')
+      await resourceValue(connectors.provideAddNodeOptions('send', signal))
+      expect(connectors.$.actions.value['mail.send']?.description).toBe('Send for flow-a.')
 
       const choice = firstActions?.[0]
       if (choice?.kind != 'connector') throw new Error('Expected a Connector choice.')
-      const action = choice.connector
-      const lateAction = Promise.withResolvers<typeof action>()
-      const lateConnections = Promise.withResolvers<readonly ConnectorConnection[]>()
-      vi.spyOn(client, 'getConnectorAction').mockReturnValueOnce(lateAction.promise)
-      vi.spyOn(client, 'listConnectorConnections').mockReturnValueOnce(lateConnections.promise)
+      const lateConnections = Promise.withResolvers<Response>()
+      request.mockImplementationOnce(() => lateConnections.promise)
+      workspace.catalogs.connections.get('mail', flows[0]!.flowId, true)
+      await Promise.resolve()
       const pending = Promise.all([connectors.loadCodeAction('mail.send', signal), connectors.loadCodeConnections('mail', signal)])
 
       await workspace.selectFlow(flows[1]!.flowId)
-      lateAction.resolve({ ...action, description: 'Stale Flow A schema.' })
-      lateConnections.resolve([{ connectionId: 'flow-a-account', alias: 'work', displayName: 'Work', isDefault: true, serviceId: 'mail', status: 'active' }])
+      lateConnections.resolve(Response.json({ version: 1, serviceId: 'mail', connections: [] }))
       await pending
       expect(connectors.$.actions.value).toEqual({})
       expect(connectors.$.catalogs.value).toEqual({})
 
-      const secondProviders = await connectors.browseAddNodeOptions(signal)
-      await connectors.provideAddNodeOptionChoices('connector-provider:mail', signal)
+      const secondProviders = await resourceValue(connectors.browseAddNodeOptions(signal))
+      await resourceValue(connectors.provideAddNodeOptionChoices('connector-provider:mail', signal))
 
       expect(secondProviders?.[0]?.label).toBe('Mail flow-b')
       expect(connectors.$.actions.value).toEqual({})
       expect(connectorRequests).toEqual([
         '/v1/connector/providers?flowId=flow-a&locale=en',
-        '/v1/connector/actions?locale=en&flowId=flow-a&service=mail',
-        '/v1/connector/actions/mail.send?flowId=flow-a&locale=en',
-        '/v1/connector/actions?locale=en&flowId=flow-a&q=send',
+        '/v1/connector/actions?flowId=flow-a&service=mail&locale=en',
+        '/v1/connector/actions?flowId=flow-a&q=send&locale=en',
         '/v1/connector/providers?flowId=flow-b&locale=en',
-        '/v1/connector/actions?locale=en&flowId=flow-b&service=mail',
+        '/v1/connector/actions?flowId=flow-b&service=mail&locale=en',
       ])
       connectors.setLanguage('zh-CN')
-      const localizedProviders = await connectors.browseAddNodeOptions(signal)
+      const localizedProviders = await resourceValue(connectors.browseAddNodeOptions(signal))
       expect(localizedProviders?.[0]?.label).toBe('邮件 flow-b')
-      await connectors.provideAddNodeOptionChoices(localizedProviders![0]!.id, signal)
-      await connectors.provideAddNodeOptions('send', signal)
+      await resourceValue(connectors.provideAddNodeOptionChoices(localizedProviders![0]!.id, signal))
+      await resourceValue(connectors.provideAddNodeOptions('send', signal))
       expect(connectorRequests.slice(-2)).toEqual([
-        '/v1/connector/actions?locale=zh-CN&flowId=flow-b&service=mail',
-        '/v1/connector/actions?locale=zh-CN&flowId=flow-b&q=send',
+        '/v1/connector/actions?flowId=flow-b&service=mail&locale=zh-CN',
+        '/v1/connector/actions?flowId=flow-b&q=send&locale=zh-CN',
       ])
     } finally {
       connectors.dispose()
