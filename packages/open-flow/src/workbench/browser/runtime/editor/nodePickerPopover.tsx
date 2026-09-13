@@ -12,7 +12,6 @@ import { BlockLibrary } from './contextPanel.tsx'
 export function NodePickerPopover(props: BlockLibraryProps & { readonly anchor?: { readonly x: number; readonly y: number }; readonly onClose?: () => void }) {
   const t = useTranslate()
   const [open, setOpen] = useState(props.anchor != null)
-  const [addFailed, setAddFailed] = useState(false)
   const [adding, setAdding] = useState(false)
   const [root, setRoot] = useState<HTMLElement | null>(null)
   const mount = useCallback((element: HTMLDivElement | null) => setRoot(element?.closest<HTMLElement>('.open-flow-workbench') ?? null), [])
@@ -51,11 +50,6 @@ export function NodePickerPopover(props: BlockLibraryProps & { readonly anchor?:
           className="h-[min(560px,var(--available-height))] max-h-[calc(100dvh-32px)] w-[440px] max-w-[calc(100vw-32px)] gap-0 overflow-hidden p-0"
         >
           <PopoverTitle className="sr-only">{t('designer.addNode')}</PopoverTitle>
-          {addFailed && (
-            <p role="alert" className="px-3 pt-3 text-xs text-destructive">
-              {t('actionPicker.failed')}
-            </p>
-          )}
           {open && (
             <BlockLibrary
               {...props}
@@ -63,24 +57,14 @@ export function NodePickerPopover(props: BlockLibraryProps & { readonly anchor?:
               draggable={false}
               onAdd={async (option) => {
                 flushSync(() => {
-                  setAddFailed(false)
                   setAdding(true)
                   setOpen(false)
                 })
                 try {
-                  const id = await props.onAdd(option)
-                  if (id == null) {
-                    setAddFailed(true)
-                    setOpen(true)
-                  }
-                  if (id != null) close()
-                  return id
-                } catch {
-                  setAddFailed(true)
-                  setOpen(true)
-                  return undefined
+                  return await props.onAdd(option)
                 } finally {
                   setAdding(false)
+                  close()
                 }
               }}
             />

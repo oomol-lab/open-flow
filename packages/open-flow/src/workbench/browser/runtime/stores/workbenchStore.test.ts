@@ -319,3 +319,19 @@ describe('Workbench notification lifecycle', () => {
     }
   })
 })
+
+it('reports thrown add failures through notices without treating an empty result as failure', async () => {
+  const store = new WorkbenchStore(new WorkbenchClient(vi.fn()), { getItem: () => null, setItem: () => undefined })
+  const option = { kind: 'comment' as const, id: 'comment', label: 'Comment', description: '', inputs: [], outputs: [] }
+  const add = vi.spyOn(store.workspace, 'addNode').mockRejectedValueOnce(new Error('Add failed')).mockResolvedValue(undefined)
+  try {
+    await expect(store.addNode(option, { x: 0, y: 0 })).resolves.toBeUndefined()
+    expect(store.$.notice.value).toEqual({ kind: 'error', message: 'Add failed' })
+    store.dismissNotice()
+    await expect(store.addNode(option, { x: 0, y: 0 })).resolves.toBeUndefined()
+    expect(store.$.notice.value).toBeUndefined()
+    expect(add).toHaveBeenCalledTimes(2)
+  } finally {
+    store.dispose()
+  }
+})

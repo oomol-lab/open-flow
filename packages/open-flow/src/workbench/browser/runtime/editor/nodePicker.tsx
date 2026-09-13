@@ -36,7 +36,6 @@ export function NodePickerContent({
   disabled,
   isOptionDisabled,
   catalogFailed,
-  refreshCatalog,
   initialQuery = '',
 }: BlockLibraryProps & { readonly initialQuery?: string }): ReactElement {
   const t = useTranslate()
@@ -67,9 +66,7 @@ export function NodePickerContent({
   const [catalogError, setCatalogError] = useState(false)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
-  const [retry, setRetry] = useState(0)
   const [adding, setAdding] = useState(false)
-  const [addError, setAddError] = useState(false)
   const busy = useRef(false)
   const list = useRef<HTMLDivElement>(null)
   const [root, setRoot] = useState<HTMLElement | null>(null)
@@ -87,7 +84,7 @@ export function NodePickerContent({
       setCatalogLoading(state.refreshing || (state.data == null && state.error == null))
     })
     return () => controller.abort()
-  }, [browseOptions, retry, options, t])
+  }, [browseOptions, options, t])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -103,7 +100,7 @@ export function NodePickerContent({
       })
     }
     return () => controller.abort()
-  }, [term, appId, searchOptions, retry, options, t])
+  }, [term, appId, searchOptions, options, t])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -153,7 +150,7 @@ export function NodePickerContent({
         setChoicesLoading(state.data == null && state.error == null)
       })
     return () => controller.abort()
-  }, [directoryId, provideChoices, retry, t])
+  }, [directoryId, provideChoices, t])
   useEffect(() => {
     list.current?.scrollTo(0, 0)
   }, [appId, term, page])
@@ -162,11 +159,8 @@ export function NodePickerContent({
     if (busy.current || disabled || isOptionDisabled?.(item)) return
     busy.current = true
     setAdding(true)
-    setAddError(false)
     try {
-      if ((await onAdd(item)) == null) setAddError(true)
-    } catch {
-      setAddError(true)
+      await onAdd(item)
     } finally {
       busy.current = false
       setAdding(false)
@@ -355,7 +349,7 @@ export function NodePickerContent({
               <>
                 {section(t('addNode.triggers'), visibleTriggers)}
                 {actionSections(visibleActions)}
-                {!choicesLoading && !choicesFailed && visibleActions.length == 0 && visibleTriggers.length == 0 && <PickerStatus />}
+                {!choicesLoading && !choicesFailed && !catalogFailed && visibleActions.length == 0 && visibleTriggers.length == 0 && <PickerStatus />}
               </>
             ) : searching ? (
               <>
@@ -376,7 +370,9 @@ export function NodePickerContent({
                   matches.filter((item) => item.kind != 'trigger' && item.kind != 'connector'),
                 )}
                 {actionSections(matches)}
-                {!loading && !catalogLoading && !failed && !catalogError && matchedApps.length == 0 && matches.length == 0 && <PickerStatus />}
+                {!loading && !catalogLoading && !failed && !catalogError && !catalogFailed && matchedApps.length == 0 && matches.length == 0 && (
+                  <PickerStatus />
+                )}
               </>
             ) : page == 'triggers' ? (
               <>
@@ -425,26 +421,6 @@ export function NodePickerContent({
               </>
             )}
             {(app != null ? choicesLoading : catalogLoading || loading) && <PickerStatus loading searching={searching} />}
-            {(catalogFailed || catalogError || (app != null ? choicesFailed : failed)) && (
-              <div className="flex items-center justify-between gap-2 p-3 text-xs" role="alert">
-                {t('contextPanel.loadFailed')}
-                <Button
-                  size="xs"
-                  variant="outline"
-                  onClick={() => {
-                    setRetry((value) => value + 1)
-                    refreshCatalog?.()
-                  }}
-                >
-                  {t('contextPanel.retry')}
-                </Button>
-              </div>
-            )}
-            {addError && (
-              <p className="p-3 text-xs text-destructive" role="alert">
-                {t('actionPicker.failed')}
-              </p>
-            )}
           </div>
         </div>
       </TabsContent>

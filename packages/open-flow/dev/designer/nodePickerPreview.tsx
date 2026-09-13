@@ -109,6 +109,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
   const [largeCatalog, setLargeCatalog] = useState(false)
   const [configuredOnly, setConfiguredOnly] = useState(false)
   const [slowAdd, setSlowAdd] = useState(false)
+  const [cancelAdd, setCancelAdd] = useState(false)
   const session = useMemo(
     () =>
       createTriggerSession(triggerFixtures[0]!.trigger, language, log, 'sample', false, {
@@ -190,6 +191,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
     { label: configuredOnly ? 'All groups' : 'Configured only', onClick: () => setConfiguredOnly(!configuredOnly) },
     { label: largeCatalog ? 'Small catalog' : '1,000 apps', onClick: () => setLargeCatalog(!largeCatalog) },
     { label: slowAdd ? 'Instant add' : 'Slow add', onClick: () => setSlowAdd(!slowAdd) },
+    { label: cancelAdd ? 'Create on selection' : 'Cancel on selection', onClick: () => setCancelAdd(!cancelAdd) },
     { label: 'Ready', onClick: () => setMode('ready') },
     { label: 'Loading', onClick: () => setMode('loading') },
     { label: 'Error', onClick: () => setMode('failed') },
@@ -231,6 +233,10 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
     focusRequest: 0,
     onAdd: async (option: (typeof options)[number]) => {
       if (slowAdd) await new Promise((resolve) => setTimeout(resolve, 1500))
+      if (cancelAdd) {
+        log('Add cancelled', option.id)
+        return undefined
+      }
       log('Add node', option.id)
       return option.id
     },

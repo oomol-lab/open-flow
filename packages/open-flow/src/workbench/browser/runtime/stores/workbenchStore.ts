@@ -323,14 +323,19 @@ export class WorkbenchStore {
   }
 
   public async addNode(option: AddNodeOption, position: Point, connection?: (nodeId: string) => Omit<DesignerEdge, 'id'>): Promise<string | undefined> {
-    if (option.kind == 'trigger' && 'trigger' in option && option.trigger.kind == 'connect') {
-      await this.triggers.connect(option.trigger.provider)
-      return
+    try {
+      if (option.kind == 'trigger' && 'trigger' in option && option.trigger.kind == 'connect') {
+        await this.triggers.connect(option.trigger.provider)
+        return
+      }
+      const nodeId = await this.workspace.addNode(option, position, connection)
+      if (nodeId != null && option.kind == 'connector') void this.connectors.refresh()
+      if (nodeId != null && option.kind == 'trigger') void this.triggers.refresh()
+      return nodeId
+    } catch (error) {
+      if (!this.#disposed) this.#notice.set(errorNotice(error, this.#i18n.t))
+      return undefined
     }
-    const nodeId = await this.workspace.addNode(option, position, connection)
-    if (nodeId != null && option.kind == 'connector') void this.connectors.refresh()
-    if (nodeId != null && option.kind == 'trigger') void this.triggers.refresh()
-    return nodeId
   }
 
   public readonly retryCatalog = (): void => {
