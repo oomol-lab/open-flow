@@ -20,7 +20,7 @@ interface ResponseBudget {
   readonly limit: number
   used: number
 }
-interface ConditionalOptions {
+interface GetOptions {
   readonly fields?: Readonly<Record<string, string>>
   readonly teamId?: string
   readonly locale?: string
@@ -100,10 +100,6 @@ export class ConnectorClient implements ConnectorHost {
   readonly #teamOrigin?: URL
   readonly #timeoutMs: number
   readonly #token: string
-  // Origin and credentials are fixed by this client; each request representation is independent.
-  readonly #responses = new Map<string, { readonly etag: string; readonly data: unknown; readonly bytes: number }>()
-  readonly #requests = new Map<string, symbol>()
-  #cachedBytes = 0
 
   constructor(origin: string, token: string, timeoutMs = 30_000, logger: Logger = silentLogger) {
     const url = new URL(origin)
@@ -161,7 +157,7 @@ export class ConnectorClient implements ConnectorHost {
   }
 
   async #providers(signal?: AbortSignal, teamId?: string, locale?: string) {
-    return this.#conditionalGet('providers.list', 'v1/providers', (data) => runtimeList(runtimeData(data), runtimeProvider), signal, { teamId, locale })
+    return this.#get('providers.list', 'v1/providers', (data) => runtimeList(runtimeData(data), runtimeProvider), signal, { teamId, locale })
   }
 
   async listActions(serviceId?: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
@@ -232,7 +228,7 @@ export class ConnectorClient implements ConnectorHost {
   async getAction(actionId: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<ConnectorActionMetadata> {
     const [providers, action] = await Promise.all([
       this.#providers(signal, teamId, locale),
-      this.#conditionalGet('actions.get', `v1/actions/${encodeURIComponent(actionId)}`, (data) => runtimeAction(runtimeData(data)), signal, {
+      this.#get('actions.get', `v1/actions/${encodeURIComponent(actionId)}`, (data) => runtimeAction(runtimeData(data)), signal, {
         fields: { actionId },
         teamId,
         locale,
@@ -345,7 +341,7 @@ export class ConnectorClient implements ConnectorHost {
     budget?: ResponseBudget,
     locale?: string,
   ): Promise<readonly RuntimeAction[]> {
-    return this.#conditionalGet(
+    return this.#get(
       search ? 'actions.search' : 'actions.list',
       path,
       (data) => runtimeList(runtimeData(data), (value) => runtimeAction(value, search)),
@@ -356,7 +352,7 @@ export class ConnectorClient implements ConnectorHost {
 
   async #connections(serviceId?: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]> {
     const path = serviceId == null ? 'v1/apps' : `v1/apps/services/${encodeURIComponent(serviceId)}`
-    return this.#conditionalGet(
+    return this.#get(
       'connections.list',
       path,
       (data) => {
@@ -369,62 +365,12 @@ export class ConnectorClient implements ConnectorHost {
     )
   }
 
-  async #conditionalGet<Value>(
-    operation: string,
-    path: string,
-    decode: (data: unknown) => Value,
-    signal?: AbortSignal,
-    options: ConditionalOptions = {},
-  ): Promise<Value> {
+  async #get<Value>(operation: string, path: string, decode: (data: unknown) => Value, signal?: AbortSignal, options: GetOptions = {}): Promise<Value> {
     signal?.throwIfAborted()
-    const key = JSON.stringify([path, options.teamId, options.locale])
-    const cached = this.#responses.get(key)
-    const requestId = Symbol()
-    this.#requests.set(key, requestId)
-    try {
-      const response = await this.#request(
-        operation,
-        path,
-        {
-          method: 'GET',
-          headers: cached == null ? {} : { 'if-none-match': cached.etag },
-        },
-        signal,
-        { ...options, allowNotModified: cached != null },
-      )
-      if (!response.ok) throw options.failure?.(response.value) ?? unavailable()
-      signal?.throwIfAborted()
-      const data = response.status == 304 ? cached!.data : response.value
-      const bytes = response.status == 304 ? cached!.bytes : response.bytes
-      if (response.status == 304) {
-        if (bytes > (options.maximumResponseBytes ?? maxResponseBytes)) throw unavailable('Cached Connector response exceeds the size limit.')
-        if (options.budget != null) {
-          const total = options.budget.used + bytes
-          if (total > options.budget.limit) throw options.budget.exhaust(total)
-          options.budget.used = total
-        }
-      }
-      const value = this.#decode(operation, options.fields ?? {}, () => decode(data))
-      if (this.#requests.get(key) == requestId) {
-        const previous = this.#responses.get(key)
-        if (previous) this.#cachedBytes -= previous.bytes
-        this.#responses.delete(key)
-        const etag = response.etag ?? (response.status == 304 ? cached!.etag : undefined)
-        if (etag) {
-          this.#responses.set(key, { data, bytes, etag })
-          this.#cachedBytes += bytes
-        }
-        // Bound memory across arbitrary searches, locales and Team scopes.
-        while (this.#cachedBytes > maxActionResponseBytes) {
-          const oldest = this.#responses.entries().next().value!
-          this.#cachedBytes -= oldest[1].bytes
-          this.#responses.delete(oldest[0])
-        }
-      }
-      return value
-    } finally {
-      if (this.#requests.get(key) == requestId) this.#requests.delete(key)
-    }
+    const response = await this.#request(operation, path, { method: 'GET' }, signal, options)
+    if (!response.ok) throw options.failure?.(response.value) ?? unavailable()
+    signal?.throwIfAborted()
+    return this.#decode(operation, options.fields ?? {}, () => decode(response.value))
   }
 
   #decode<Value>(operation: string, fields: Readonly<Record<string, string>>, decode: () => Value): Value {
@@ -449,7 +395,7 @@ export class ConnectorClient implements ConnectorHost {
 
   async #resolveConnection(connectionId: string, service: string, signal: AbortSignal, teamId?: string): Promise<string> {
     const fields = { connectionId, provider: service }
-    const apps = await this.#conditionalGet(
+    const apps = await this.#get(
       'connection.resolve',
       'v1/apps',
       (data) => {
@@ -481,14 +427,12 @@ export class ConnectorClient implements ConnectorHost {
     signal?: AbortSignal,
     {
       budget,
-      allowNotModified = false,
       fields = {},
       maximumResponseBytes = maxResponseBytes,
       origin = this.#origin,
       teamId,
       locale,
     }: {
-      readonly allowNotModified?: boolean
       readonly budget?: ResponseBudget
       readonly fields?: Readonly<Record<string, string>>
       readonly maximumResponseBytes?: number
@@ -496,7 +440,7 @@ export class ConnectorClient implements ConnectorHost {
       readonly origin?: URL
       readonly teamId?: string
     } = {},
-  ): Promise<{ readonly ok: boolean; readonly status: number; readonly value: unknown; readonly etag: string | null; readonly bytes: number }> {
+  ): Promise<{ readonly ok: boolean; readonly status: number; readonly value: unknown }> {
     const startedAt = performance.now()
     const timeout = AbortSignal.timeout(this.#timeoutMs)
     let status: number | undefined
@@ -513,12 +457,7 @@ export class ConnectorClient implements ConnectorHost {
         signal: signal == null ? timeout : AbortSignal.any([signal, timeout]),
       })
       status = response.status
-      const etag = response.headers.get('etag')?.trim() || null
-      if (status == 304 && allowNotModified) {
-        await response.body?.cancel()
-        return { ok: true, status, value: undefined, etag, bytes: 0 }
-      }
-      const { value, bytes } = await readJson(response, maximumResponseBytes, budget)
+      const value = await readJson(response, maximumResponseBytes, budget)
       if (!response.ok) {
         this.#logger.warn(
           {
@@ -533,7 +472,7 @@ export class ConnectorClient implements ConnectorHost {
           'Connector request failed.',
         )
       }
-      return { ok: response.ok, status: response.status, value, etag, bytes }
+      return { ok: response.ok, status: response.status, value }
     } catch (error) {
       if (signal?.aborted) throw signal.reason
       let failure = 'transport'
@@ -585,7 +524,7 @@ function record(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value == 'object' && !Array.isArray(value)
 }
 
-async function readJson(response: Response, limit: number, budget?: ResponseBudget): Promise<{ readonly value: unknown; readonly bytes: number }> {
+async function readJson(response: Response, limit: number, budget?: ResponseBudget): Promise<unknown> {
   if (response.body == null) throw unavailable('Connector response has no body')
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
@@ -610,7 +549,7 @@ async function readJson(response: Response, limit: number, budget?: ResponseBudg
     reader.releaseLock()
   }
   try {
-    return { value: JSON.parse(responseDecoder.decode(Buffer.concat(chunks, bytes))) as unknown, bytes }
+    return JSON.parse(responseDecoder.decode(Buffer.concat(chunks, bytes))) as unknown
   } catch {
     throw unavailable('Connector response is not valid JSON')
   }

@@ -6,7 +6,7 @@ import { createControlApp } from '../node/transport/control.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 
-it('isolates upstream Provider validators by language and localizes Action service names', async () => {
+it('forwards language on every upstream read and localizes Action service names', async () => {
   const requests: { path: string; locale: string | null; etag: string | null }[] = []
   const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input)).pathname
@@ -42,9 +42,9 @@ it('isolates upstream Provider validators by language and localizes Action servi
   expect(requests.filter((request) => request.path == '/v1/providers').map(({ locale, etag }) => ({ locale, etag }))).toEqual([
     { locale: 'en', etag: null },
     { locale: 'zh-CN', etag: null },
-    { locale: 'en', etag: '"en"' },
-    { locale: 'zh-CN', etag: '"zh-CN"' },
-    { locale: 'zh-CN', etag: '"zh-CN"' },
+    { locale: 'en', etag: null },
+    { locale: 'zh-CN', etag: null },
+    { locale: 'zh-CN', etag: null },
   ])
 })
 

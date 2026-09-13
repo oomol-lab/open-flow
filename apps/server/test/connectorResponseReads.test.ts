@@ -41,17 +41,29 @@ function setup() {
 }
 afterEach(() => vi.unstubAllGlobals())
 
-describe('upstream Action and Connection conditional requests', () => {
-  it.each(cases)('revalidates $path and keeps replacement 304 validators', async ({ path, read }) => {
+describe('upstream Action and Connection reads', () => {
+  it.each(cases)('reads $path on every call without upstream validators', async ({ path, read }) => {
     const { client, calls } = setup()
     const first = await read(client)
     expect(await read(client)).toEqual(first)
     expect(await read(client)).toEqual(first)
-    expect(calls.filter((call) => call.path == path).map((call) => call.headers.get('if-none-match'))).toEqual([null, '"initial"', 'W/"updated"'])
+    expect(calls.filter((call) => call.path == path).map((call) => call.headers.get('if-none-match'))).toEqual([null, null, null])
     expect(calls.every((call) => call.headers.get('x-oo-team-id') == 'team-a')).toBe(true)
   })
 
-  it('keeps full paths, Team scopes and Action languages independent', async () => {
+  it.each(cases)('rejects an upstream 304 for $path after a successful read', async ({ path, read }) => {
+    const { client, fetcher } = setup()
+    await read(client)
+    const implementation = fetcher.getMockImplementation()!
+    fetcher.mockImplementation(async (input, init) => {
+      const url = new URL(String(input))
+      if (url.pathname + url.search == path) return new Response(null, { status: 304 })
+      return implementation(input, init)
+    })
+    await expect(read(client)).rejects.toMatchObject({ code: 'connector.unavailable' })
+  })
+
+  it('requests distinct paths, Team scopes and Action languages', async () => {
     const { client, calls } = setup()
     await client.searchActions('send', undefined, 'team-a', 'en')
     await client.searchActions('send', undefined, 'team-a', 'zh-CN')
@@ -63,7 +75,7 @@ describe('upstream Action and Connection conditional requests', () => {
     expect(calls.at(-1)?.headers.has('if-none-match')).toBe(false)
   })
 
-  it('keeps the last valid Connection response after failures or malformed data', async () => {
+  it('reads Connections again after failures or malformed data', async () => {
     const { client, fetcher, calls } = setup()
     const first = await client.listAllConnections()
     fetcher.mockResolvedValueOnce(Response.json({ success: false }, { status: 403 }))
@@ -71,10 +83,10 @@ describe('upstream Action and Connection conditional requests', () => {
     fetcher.mockResolvedValueOnce(Response.json({ success: true, data: [{}] }, { headers: { etag: '"invalid"' } }))
     await expect(client.listAllConnections()).rejects.toMatchObject({ code: 'connector.unavailable' })
     expect(await client.listAllConnections()).toEqual(first)
-    expect(calls.at(-1)?.headers.get('if-none-match')).toBe('"initial"')
+    expect(calls.at(-1)?.headers.get('if-none-match')).toBeNull()
   })
 
-  it('does not let a superseded or cancelled Connection response replace the validator', async () => {
+  it('keeps concurrent Connection reads independent and rejects cancellation', async () => {
     const { client, fetcher, calls } = setup()
     const pending = Promise.withResolvers<Response>()
     fetcher.mockReturnValueOnce(pending.promise)
@@ -89,10 +101,10 @@ describe('upstream Action and Connection conditional requests', () => {
     })
     await expect(client.listAllConnections(controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
     await client.listAllConnections()
-    expect(calls.at(-1)?.headers.get('if-none-match')).toBe('"initial"')
+    expect(calls.at(-1)?.headers.get('if-none-match')).toBeNull()
   })
 
-  it('counts cached 304 bodies against the combined Action catalog budget', async () => {
+  it('enforces the combined Action catalog budget after previous successful reads', async () => {
     const client = new ConnectorClient('https://connector.example', 'token')
     vi.stubGlobal(
       'fetch',
