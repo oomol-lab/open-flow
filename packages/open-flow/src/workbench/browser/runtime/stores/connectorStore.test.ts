@@ -71,7 +71,32 @@ describe('ConnectorStore', () => {
       const flowId = new URL(path, 'https://open-flow.example').searchParams.get('flowId')
       if (path.startsWith('/v1/connector/providers?')) {
         connectorRequests.push(path)
-        return Response.json({ providers: [{ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: `Mail ${flowId}` }], version: 1 })
+        return Response.json({
+          providers: [
+            {
+              homepageUrl: 'https://mail.example',
+              serviceId: 'mail',
+              serviceName: `${new URL(path, 'https://open-flow.example').searchParams.get('locale') == 'zh-CN' ? '邮件' : 'Mail'} ${flowId}`,
+            },
+          ],
+          version: 1,
+        })
+      }
+      if (path.startsWith('/v1/connector/actions/mail.send?')) {
+        connectorRequests.push(path)
+        return Response.json({
+          version: 1,
+          action: {
+            actionId: 'mail.send',
+            authenticated: false,
+            description: `Detail for ${flowId}.`,
+            inputs: {},
+            outputs: {},
+            name: 'Send',
+            serviceId: 'mail',
+            serviceName: 'Mail',
+          },
+        })
       }
       if (path.startsWith('/v1/connector/actions?')) {
         connectorRequests.push(path)
@@ -108,10 +133,14 @@ describe('ConnectorStore', () => {
       expect(firstProviders?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail flow-a' }))
       expect(firstActions?.[0]?.description).toBe('Send for flow-a.')
       expect(firstActions?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail flow-a' }))
-      expect(connectors.$.actions.value['mail.send']?.description).toBe('Send for flow-a.')
+      expect(connectors.$.actions.value).toEqual({})
+      await connectors.loadCodeAction('mail.send', signal)
+      await connectors.provideAddNodeOptions('send', signal)
+      expect(connectors.$.actions.value['mail.send']?.description).toBe('Detail for flow-a.')
 
-      const action = connectors.$.actions.value['mail.send']
-      if (action == null) throw new Error('Expected the loaded Action.')
+      const choice = firstActions?.[0]
+      if (choice?.kind != 'connector') throw new Error('Expected a Connector choice.')
+      const action = choice.connector
       const lateAction = Promise.withResolvers<typeof action>()
       const lateConnections = Promise.withResolvers<readonly ConnectorConnection[]>()
       vi.spyOn(client, 'getConnectorAction').mockReturnValueOnce(lateAction.promise)
@@ -129,15 +158,18 @@ describe('ConnectorStore', () => {
       await connectors.provideAddNodeOptionChoices('connector-provider:mail', signal)
 
       expect(secondProviders?.[0]?.label).toBe('Mail flow-b')
-      expect(connectors.$.actions.value['mail.send']?.description).toBe('Send for flow-b.')
+      expect(connectors.$.actions.value).toEqual({})
       expect(connectorRequests).toEqual([
-        '/v1/connector/providers?flowId=flow-a',
+        '/v1/connector/providers?flowId=flow-a&locale=en',
         '/v1/connector/actions?locale=en&flowId=flow-a&service=mail',
-        '/v1/connector/providers?flowId=flow-b',
+        '/v1/connector/actions/mail.send?flowId=flow-a&locale=en',
+        '/v1/connector/actions?locale=en&flowId=flow-a&q=send',
+        '/v1/connector/providers?flowId=flow-b&locale=en',
         '/v1/connector/actions?locale=en&flowId=flow-b&service=mail',
       ])
       connectors.setLanguage('zh-CN')
       const localizedProviders = await connectors.browseAddNodeOptions(signal)
+      expect(localizedProviders?.[0]?.label).toBe('邮件 flow-b')
       await connectors.provideAddNodeOptionChoices(localizedProviders![0]!.id, signal)
       await connectors.provideAddNodeOptions('send', signal)
       expect(connectorRequests.slice(-2)).toEqual([

@@ -30,6 +30,13 @@ each source's own interface and derive combined views, filters, and ordering at 
 layer. Do not embed Connection state in Provider metadata, write derived state into another
 source's cache, or couple cache lifecycles merely because a feature uses those sources together.
 
+Cache complete responses by request identity, including scope and representation parameters.
+The cache owns storage, freshness, conditional requests, and request coordination; it does not
+merge business entities across responses or infer data authority from insertion or arrival order.
+Consumers read the response for the query they need. Introduce a separate derived layer for
+multi-source views only when its benefit justifies the complexity and its ownership rules are
+explicit. Keep caching simpler than the repeated work it eliminates.
+
 ## Simplicity and coherence
 
 Prefer clear, direct code and existing project conventions. Abstractions, compatibility layers,

@@ -10,10 +10,11 @@ import type { SetNotice } from './workbenchNotice.ts'
 import type { WorkspaceStore } from './workspaceStore.ts'
 
 import { compute, derive, val } from 'value-enhancer'
+import { connectorConnectionsQuery } from '../../../../control/common/connectorQueries.ts'
 import { resolveUiLanguage } from '../../../../localization/common/languages.ts'
-import { cachedConnectorConnections } from '../connectorCache.ts'
 import { createI18n } from '../i18n.ts'
 import { providerIcon } from '../providerIcon.ts'
+import { cachedResponse } from '../requestCache.ts'
 import { connectionCatalog } from '../workspace.ts'
 import { Latest } from './latest.ts'
 import { TriggerCatalogStore } from './triggerCatalog.ts'
@@ -113,8 +114,8 @@ export class TriggerStore {
       if (selection?.kind != 'trigger') return { authorizationPending: false }
       const trigger = selection.trigger
       if (trigger.kind != 'poll' && trigger.kind != 'integration') return { authorizationPending: false }
-      const cached = cachedConnectorConnections(get(client.connectorCache.connections), get(workspace.$.flowId))
-      const connections = current == null ? undefined : cached[current.provider]
+      const connections =
+        current == null ? undefined : cachedResponse(get(client.requestCache.responses), connectorConnectionsQuery(current.provider, get(workspace.$.flowId)))
       const catalog = connections != null ? connectionCatalog(connections) : current == null ? undefined : state.catalogs[current.provider]
       const connectionError = state.connectionError
       return {

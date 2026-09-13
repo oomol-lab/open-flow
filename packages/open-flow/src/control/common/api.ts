@@ -29,7 +29,8 @@ import type {
 } from '../../flow/common/change.ts'
 
 import { flowCheck } from './checkDecoders.ts'
-import { connection, connectorAction, connectorProvider } from './connectorDecoders.ts'
+import { connectorAction } from './connectorDecoders.ts'
+import { allConnectorConnectionsQuery, connectorActionQuery, connectorConnectionsQuery, connectorProvidersQuery } from './connectorQueries.ts'
 import { exact, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 import { flow, flowPage, variable } from './flowDecoders.ts'
 import { live, publication, publicationPage, publishOperation } from './publicationDecoders.ts'
@@ -734,13 +735,9 @@ export class ControlClient {
     })
   }
 
-  async listConnectorProviders(signal?: AbortSignal, flowId?: string): Promise<readonly ConnectorProvider[]> {
-    return this.connectorRequest(`/v1/connector/providers${flowId == null ? '' : `?flowId=${segment(flowId)}`}`, 'providers', signal, (value) => {
-      const source = record(value)
-      exact(source, ['providers', 'version'])
-      if (source.version != 1 || !Array.isArray(source.providers)) return invalidResponse()
-      return source.providers.map(connectorProvider)
-    })
+  async listConnectorProviders(signal?: AbortSignal, flowId?: string, locale?: string): Promise<readonly ConnectorProvider[]> {
+    const query = connectorProvidersQuery(flowId, locale)
+    return this.connectorRequest(query.path, 'providers', signal, query.decode)
   }
 
   async listConnectorActions(serviceId?: string, signal?: AbortSignal, flowId?: string, locale?: string): Promise<readonly ConnectorAction[]> {
@@ -755,49 +752,18 @@ export class ControlClient {
   }
 
   async getConnectorAction(actionId: string, signal?: AbortSignal, flowId?: string, locale?: string, fresh = false): Promise<ConnectorAction> {
-    const parameters = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), ...(locale == null ? {} : { locale }) }).toString()
-    return this.connectorRequest(
-      `/v1/connector/actions/${segment(actionId)}${parameters ? `?${parameters}` : ''}`,
-      'actions',
-      signal,
-      (value) => {
-        const source = record(value)
-        exact(source, ['action', 'version'])
-        if (source.version != 1) return invalidResponse()
-        return connectorAction(source.action)
-      },
-      fresh,
-    )
+    const query = connectorActionQuery(actionId, flowId, locale)
+    return this.connectorRequest(query.path, 'actions', signal, query.decode, fresh)
   }
 
   async listAllConnectorConnections(signal?: AbortSignal, flowId?: string, fresh = false): Promise<readonly ConnectorConnection[]> {
-    return this.connectorRequest(
-      `/v1/connector/connections${flowId == null ? '' : `?flowId=${segment(flowId)}`}`,
-      'connections',
-      signal,
-      (value) => {
-        const source = record(value)
-        exact(source, ['connections', 'version'])
-        if (source.version != 1 || !Array.isArray(source.connections)) return invalidResponse()
-        return source.connections.map(connection)
-      },
-      fresh,
-    )
+    const query = allConnectorConnectionsQuery(flowId)
+    return this.connectorRequest(query.path, 'connections', signal, query.decode, fresh)
   }
 
   async listConnectorConnections(serviceId: string, signal?: AbortSignal, flowId?: string, fresh = false): Promise<readonly ConnectorConnection[]> {
-    return this.connectorRequest(
-      `/v1/connector/connections/${segment(serviceId)}${flowId == null ? '' : `?flowId=${segment(flowId)}`}`,
-      'connections',
-      signal,
-      (value) => {
-        const source = record(value)
-        exact(source, ['connections', 'serviceId', 'version'])
-        if (source.version != 1 || string(source.serviceId) != serviceId || !Array.isArray(source.connections)) return invalidResponse()
-        return source.connections.map(connection)
-      },
-      fresh,
-    )
+    const query = connectorConnectionsQuery(serviceId, flowId)
+    return this.connectorRequest(query.path, 'connections', signal, query.decode, fresh)
   }
 
   async createConnectorConnectionPage(serviceId: string, flowId?: string): Promise<string> {

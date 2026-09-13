@@ -3,7 +3,7 @@ import type { JsonValue } from '../../../flow/common/change.ts'
 import type { FlowCatalogEvent, FlowChangeEvent, WorkbenchHost } from './contract.ts'
 
 import { ControlClient } from '../../../control/common/api.ts'
-import { ConnectorCache } from './connectorCache.ts'
+import { RequestCache } from './requestCache.ts'
 
 export { ApiError } from '../../../control/common/api.ts'
 export type {
@@ -78,7 +78,8 @@ type FlowCatalogSubscriber = WorkbenchHost['subscribeFlowCatalog']
 const segment = encodeURIComponent
 
 export class WorkbenchClient extends ControlClient {
-  readonly #connectorCache: ConnectorCache
+  readonly #requestCache: RequestCache
+  readonly #cacheOptions: WorkbenchHost['connectorCache']
   constructor(
     fetcher: Fetcher,
     private readonly subscribeFlow: FlowSubscriber = () => ({ ready: Promise.resolve(), stop() {} }),
@@ -86,7 +87,8 @@ export class WorkbenchClient extends ControlClient {
     connectorCache?: WorkbenchHost['connectorCache'],
   ) {
     super(fetcher)
-    this.#connectorCache = new ConnectorCache(connectorCache)
+    this.#cacheOptions = connectorCache
+    this.#requestCache = new RequestCache(`open-flow:connector:v1:${encodeURIComponent(connectorCache?.namespace ?? '')}`)
   }
 
   protected override connectorRequest<Value>(
@@ -96,11 +98,25 @@ export class WorkbenchClient extends ControlClient {
     decode: (value: unknown) => Value,
     fresh = false,
   ): Promise<Value> {
-    return this.#connectorCache.get(path, kind, signal, decode, (headers) => this.response(path, { headers, signal }, true), fresh)
+    const options = this.#cacheOptions
+    return this.#requestCache.get(
+      path,
+      {
+        maxAgeMs: kind == 'providers' ? 5 * 60_000 : 30_000,
+        storage:
+          options == null
+            ? undefined
+            : () => (kind == 'providers' ? (options.localStorage ?? window.localStorage) : (options.sessionStorage ?? window.sessionStorage)),
+      },
+      signal,
+      decode,
+      (headers) => this.response(path, { headers, signal }, true),
+      fresh,
+    )
   }
 
-  get connectorCache() {
-    return this.#connectorCache
+  get requestCache() {
+    return this.#requestCache
   }
 
   watchFlowCatalog(changed: (event?: FlowCatalogEvent) => void): ReturnType<FlowCatalogSubscriber> {
