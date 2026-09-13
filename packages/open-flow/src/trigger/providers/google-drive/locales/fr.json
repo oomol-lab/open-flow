@@ -1,14 +1,14 @@
 {
   "googledrive.changes_detected": {
-    "displayName": "Google Drive: Modifications détectées",
+    "displayName": "Modifications détectées",
     "description": "Utilise un canal Google Drive changes.watch et se déclenche lorsque des modifications Drive sont disponibles."
   },
   "googledrive.watch_changes": {
-    "displayName": "Google Drive: Suivi des modifications",
+    "displayName": "Suivi des modifications",
     "description": "Surveille les modifications Drive grâce aux notifications et à des analyses périodiques du même flux de modifications."
   },
   "googledrive.on_file_change": {
-    "displayName": "Google Drive: Modification d’un fichier ou dossier dans un dossier",
+    "displayName": "Modification d’un fichier ou dossier dans un dossier",
     "description": "Interroge périodiquement un dossier Google Drive et se déclenche à la création ou à la modification d’un fichier ou dossier directement à l’intérieur."
   }
 }

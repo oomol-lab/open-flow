@@ -1,6 +1,6 @@
 {
   "airtable.on_record_changed": {
-    "displayName": "Airtable: レコードの作成・更新",
+    "displayName": "レコードの作成・更新",
     "description": "Airtable のテーブルを定期的に確認し、時刻フィールド順にレコードの作成や更新を検出すると実行します。"
   }
 }

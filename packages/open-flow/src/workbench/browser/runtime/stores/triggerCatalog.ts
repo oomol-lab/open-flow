@@ -19,11 +19,16 @@ export function browserTriggerCatalogStorage(namespace: string, storage?: Trigge
   }
 }
 
-/** Owns cached representations and conditional requests; callers own the displayed options. */
+const freshnessMs = 5 * 60_000
+const retryDelayMs = 30_000
+
+/** Owns freshness, cached representations and conditional requests; callers own the displayed options. */
 export class TriggerCatalogStore {
   readonly state = val({ revision: 0, failed: false })
   readonly #memory = new Map<UiLanguage, TriggerCatalogCache>()
   readonly #storage?: TriggerCatalogStorage
+  readonly #nextCheck = new Map<UiLanguage, number>()
+  readonly #errors = new Map<UiLanguage, unknown>()
   #controller = new AbortController()
   #pending?: Promise<TriggerCatalogCache>
   #disposed = false
@@ -75,15 +80,23 @@ export class TriggerCatalogStore {
   }
 
   async get(): Promise<TriggerCatalog> {
+    if (this.#disposed) throw new DOMException('Catalog disposed', 'AbortError')
     const cached = this.#read()
-    return cached?.data ?? (await this.refresh()).data
+    const due = Date.now() >= (this.#nextCheck.get(this.language) ?? 0)
+    if (cached != null) {
+      if (due) void this.refresh().catch(() => {})
+      return cached.data
+    }
+    if (!due && this.#errors.has(this.language)) throw this.#errors.get(this.language)
+    return (await this.refresh()).data
   }
 
-  readonly open = (): void => {
+  readonly retry = (): void => {
     void this.refresh().catch(() => {})
   }
 
   refresh(): Promise<TriggerCatalogCache> {
+    if (this.#disposed) return Promise.reject(new DOMException('Catalog disposed', 'AbortError'))
     if (this.#pending != null) return this.#pending
     const locale = this.language
     const cached = this.#read()
@@ -92,6 +105,8 @@ export class TriggerCatalogStore {
       .getTriggerCatalog(locale, cached, signal)
       .then((entry) => {
         if (signal.aborted || this.#disposed) throw new DOMException('Catalog request cancelled', 'AbortError')
+        this.#nextCheck.set(locale, Date.now() + freshnessMs)
+        this.#errors.delete(locale)
         this.#memory.set(locale, entry)
         try {
           this.#storage?.setItem(locale, JSON.stringify(entry))
@@ -102,7 +117,11 @@ export class TriggerCatalogStore {
         return entry
       })
       .catch((error: unknown) => {
-        if (!signal.aborted && !this.#disposed) this.#changed(true)
+        if (!signal.aborted && !this.#disposed) {
+          this.#nextCheck.set(locale, Date.now() + retryDelayMs)
+          this.#errors.set(locale, error)
+          this.#changed(true)
+        }
         throw error
       })
       .finally(() => {

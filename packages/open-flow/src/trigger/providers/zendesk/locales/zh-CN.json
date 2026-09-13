@@ -1,6 +1,6 @@
 {
   "zendesk.on_event": {
-    "displayName": "Zendesk: 事件订阅",
+    "displayName": "事件订阅",
     "description": "在发生任一所选 Zendesk 账户事件时触发。"
   }
 }

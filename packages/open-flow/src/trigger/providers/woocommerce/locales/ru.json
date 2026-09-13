@@ -1,6 +1,6 @@
 {
   "woocommerce.on_store_event": {
-    "displayName": "WooCommerce: Событие магазина",
+    "displayName": "Событие магазина",
     "description": "Срабатывает при выбранных событиях магазина WooCommerce."
   }
 }

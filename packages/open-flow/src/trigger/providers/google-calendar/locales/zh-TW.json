@@ -1,6 +1,6 @@
 {
   "googlecalendar.on_event_changed": {
-    "displayName": "Google Calendar: 日曆事件變更",
+    "displayName": "日曆事件變更",
     "description": "輪詢 Google 日曆，在事件建立、更新或取消時觸發。"
   }
 }

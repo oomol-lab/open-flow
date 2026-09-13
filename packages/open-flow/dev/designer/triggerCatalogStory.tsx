@@ -88,7 +88,7 @@ function Sample({
           <BlockLibrary
             catalogRevision={state.revision}
             catalogFailed={state.failed}
-            refreshCatalog={session.triggers.catalog.open}
+            refreshCatalog={session.triggers.catalog.retry}
             browseOptions={session.triggers.browseAddNodeOptions}
             searchOptions={session.triggers.provideAddNodeOptions}
             disabled={false}

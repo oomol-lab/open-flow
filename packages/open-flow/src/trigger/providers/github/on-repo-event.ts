@@ -84,7 +84,7 @@ const snapshot = {
   },
   definitionVersion: 2,
   description: 'Triggers when selected GitHub webhook events occur in a repository.',
-  displayName: 'GitHub: Repository Event',
+  displayName: 'Repository Event',
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'github.on_repo_event',
   name: 'on_repo_event',

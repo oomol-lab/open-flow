@@ -42,7 +42,7 @@ const snapshot = {
   },
   definitionVersion: 2,
   description: 'Triggers when selected WooCommerce store events occur.',
-  displayName: 'WooCommerce: Store Event',
+  displayName: 'Store Event',
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'woocommerce.on_store_event',
   name: 'on_store_event',

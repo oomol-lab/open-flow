@@ -1,6 +1,6 @@
 {
   "telegram.on_update": {
-    "displayName": "Telegram: ボットの更新",
+    "displayName": "ボットの更新",
     "description": "接続した Telegram ボットが選択した更新を受信すると実行します。"
   }
 }

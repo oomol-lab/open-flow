@@ -29,9 +29,6 @@ export interface BlockQuickPickPanelProps {
 
 export const BlockQuickPickPanel: React.FC<BlockQuickPickPanelProps> = (props) => {
   const t = useTranslate()
-  useEffect(() => {
-    props.catalog?.refresh()
-  }, [props.catalog?.refresh, t])
   const ref = useRef<HTMLInputElement>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [cursorIndex, setCursorIndex] = useState(0)

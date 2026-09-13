@@ -1,10 +1,10 @@
 {
   "github.on_repo_event": {
-    "displayName": "GitHub: 儲存庫事件",
+    "displayName": "儲存庫事件",
     "description": "在儲存庫發生所選 GitHub webhook 事件時觸發。"
   },
   "github.watch_pull_request": {
-    "displayName": "GitHub: 追蹤提取要求",
+    "displayName": "追蹤提取要求",
     "description": "透過通知與定期檢查追蹤一個提取要求。從目前狀態開始，回報觀察到的變更，不保證涵蓋每次中間狀態轉換或審查事件。"
   }
 }

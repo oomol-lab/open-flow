@@ -52,7 +52,7 @@ const snapshot = {
   definitionVersion: 1,
   description:
     'Watches new and updated issues in a Linear team with periodic checks. Starts from now without running existing issues. Reports observed current states, not deletions or every intermediate status change.',
-  displayName: 'Linear: Issue Created or Updated',
+  displayName: 'Issue Created or Updated',
   key: 'linear.on_issue_changed',
   name: 'on_issue_changed',
   payloadSchema: {

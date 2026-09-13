@@ -1,6 +1,6 @@
 {
   "one_drive.on_item_changed": {
-    "displayName": "OneDrive: Modification d’un fichier ou dossier",
+    "displayName": "Modification d’un fichier ou dossier",
     "description": "Interroge périodiquement le flux de modifications OneDrive et se déclenche à la création, à la modification ou à la suppression d’un fichier ou dossier."
   }
 }

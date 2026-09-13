@@ -1,6 +1,6 @@
 {
   "outlook.on_message_received": {
-    "displayName": "Outlook: 새 메일 수신",
+    "displayName": "새 메일 수신",
     "description": "Microsoft Outlook 메일 폴더를 주기적으로 확인하고 새 메일이 도착하면 실행합니다."
   }
 }

@@ -72,7 +72,7 @@ const snapshot = {
   },
   definitionVersion: 1,
   description: 'Polls an Airtable table and triggers when a record is created or updated, ordered by a time field.',
-  displayName: 'Airtable: Record Created or Updated',
+  displayName: 'Record Created or Updated',
   key: 'airtable.on_record_changed',
   name: 'on_record_changed',
   payloadSchema: {

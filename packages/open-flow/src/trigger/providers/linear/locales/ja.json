@@ -1,6 +1,6 @@
 {
   "linear.on_issue_changed": {
-    "displayName": "Linear: 課題の作成・更新",
+    "displayName": "課題の作成・更新",
     "description": "Linear チームの課題の作成と更新を定期的に確認します。現在から開始し、既存の課題では実行しません。観測した現在の状態を報告し、削除や途中のすべての状態変化は報告しません。"
   }
 }

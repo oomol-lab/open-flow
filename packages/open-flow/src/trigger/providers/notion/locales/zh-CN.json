@@ -1,6 +1,6 @@
 {
   "notion.on_database_page_event": {
-    "displayName": "Notion: 数据库页面新增或更新",
+    "displayName": "数据库页面新增或更新",
     "description": "轮询 Notion 数据库，在新增页面或编辑现有页面时触发。"
   }
 }

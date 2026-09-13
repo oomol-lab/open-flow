@@ -1,14 +1,14 @@
 {
   "googledrive.changes_detected": {
-    "displayName": "Google Drive: 변경 감지",
+    "displayName": "변경 감지",
     "description": "Google Drive changes.watch 채널을 사용하여 드라이브 변경을 가져올 수 있을 때 실행합니다."
   },
   "googledrive.watch_changes": {
-    "displayName": "Google Drive: 변경 감시",
+    "displayName": "변경 감시",
     "description": "알림과 동일한 변경 스트림의 정기 스캔으로 드라이브 변경을 감시합니다."
   },
   "googledrive.on_file_change": {
-    "displayName": "Google Drive: 폴더 내 파일 또는 폴더 변경",
+    "displayName": "폴더 내 파일 또는 폴더 변경",
     "description": "Google Drive 폴더 하나를 주기적으로 확인하고 바로 아래의 파일이나 폴더가 생성 또는 업데이트되면 실행합니다."
   }
 }

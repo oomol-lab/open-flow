@@ -407,9 +407,6 @@ function SidebarBlockLibrary({
   searchOptions,
 }: BlockLibraryProps): ReactElement {
   const t = useTranslate()
-  useEffect(() => {
-    refreshCatalog?.()
-  }, [refreshCatalog, t])
   const searchLabel = options.length == 0 ? t('actionPicker.search') : t('contextPanel.search')
   const search = useRef<HTMLInputElement>(null)
   const active = useRef(true)

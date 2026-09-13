@@ -1,6 +1,6 @@
 {
   "one_drive.on_item_changed": {
-    "displayName": "OneDrive: 파일 또는 폴더 변경",
+    "displayName": "파일 또는 폴더 변경",
     "description": "OneDrive 변경 피드를 주기적으로 확인하고 파일이나 폴더가 생성, 업데이트 또는 삭제되면 실행합니다."
   }
 }

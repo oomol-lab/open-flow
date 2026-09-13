@@ -1,6 +1,6 @@
 {
   "googlesheets.on_row_added": {
-    "displayName": "Google Sheets: 새 행 추가",
+    "displayName": "새 행 추가",
     "description": "시트를 주기적으로 확인하고 마지막으로 확인한 행 아래에 추가된 새 행마다 한 번 실행합니다."
   }
 }

@@ -104,7 +104,7 @@ const snapshot = {
   },
   definitionVersion: 1,
   description: 'Polls the OneDrive change feed and triggers when a file or folder is created, updated or deleted.',
-  displayName: 'OneDrive: File or Folder Changed',
+  displayName: 'File or Folder Changed',
   key: 'one_drive.on_item_changed',
   name: 'on_item_changed',
   payloadSchema: {

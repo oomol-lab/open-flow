@@ -1,6 +1,6 @@
 {
   "gitlab.on_project_event": {
-    "displayName": "GitLab: Événement de projet",
+    "displayName": "Événement de projet",
     "description": "Se déclenche lors des événements webhook GitLab sélectionnés dans un projet."
   }
 }

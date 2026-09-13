@@ -1,6 +1,6 @@
 {
   "gmail.on_message_received": {
-    "displayName": "Gmail: Новое письмо",
+    "displayName": "Новое письмо",
     "description": "Периодически проверяет почтовый ящик Gmail и срабатывает при получении нового письма."
   }
 }

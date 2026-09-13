@@ -1,6 +1,6 @@
 {
   "notion.on_database_page_event": {
-    "displayName": "Notion: Ajout ou mise à jour d’une page de base de données",
+    "displayName": "Ajout ou mise à jour d’une page de base de données",
     "description": "Interroge périodiquement une base Notion et se déclenche à l’ajout d’une page ou à la modification d’une page existante."
   }
 }

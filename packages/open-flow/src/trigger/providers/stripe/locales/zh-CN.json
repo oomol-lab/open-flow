@@ -1,6 +1,6 @@
 {
   "stripe.on_event": {
-    "displayName": "Stripe: 账户事件",
+    "displayName": "账户事件",
     "description": "在已连接账户发生所选 Stripe 事件时触发。"
   }
 }

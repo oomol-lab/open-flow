@@ -89,7 +89,7 @@ const snapshot = {
   },
   definitionVersion: 1,
   description: 'Polls a Notion database and triggers when a page is added to it or an existing page is edited.',
-  displayName: 'Notion: Database Page Added or Updated',
+  displayName: 'Database Page Added or Updated',
   key: 'notion.on_database_page_event',
   name: 'on_database_page_event',
   payloadSchema: {

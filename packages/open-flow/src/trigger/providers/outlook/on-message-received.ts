@@ -112,7 +112,7 @@ const snapshot = {
   },
   definitionVersion: 1,
   description: 'Polls a Microsoft Outlook mail folder and triggers when a new message arrives.',
-  displayName: 'Outlook: New Message Received',
+  displayName: 'New Message Received',
   key: 'outlook.on_message_received',
   name: 'on_message_received',
   payloadSchema: {

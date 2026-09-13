@@ -1,6 +1,6 @@
 {
   "woocommerce.on_store_event": {
-    "displayName": "WooCommerce: 商店事件",
+    "displayName": "商店事件",
     "description": "在发生所选 WooCommerce 商店事件时触发。"
   }
 }

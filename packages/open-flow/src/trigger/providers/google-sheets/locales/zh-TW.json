@@ -1,6 +1,6 @@
 {
   "googlesheets.on_row_added": {
-    "displayName": "Google Sheets: 新增列",
+    "displayName": "新增列",
     "description": "輪詢工作表，在上次已知的最後一列下方附加新列時，為每個新列觸發一次。"
   }
 }

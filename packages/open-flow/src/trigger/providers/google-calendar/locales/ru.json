@@ -1,6 +1,6 @@
 {
   "googlecalendar.on_event_changed": {
-    "displayName": "Google Calendar: Изменение события календаря",
+    "displayName": "Изменение события календаря",
     "description": "Периодически проверяет Google Calendar и срабатывает при создании, изменении или отмене события."
   }
 }
