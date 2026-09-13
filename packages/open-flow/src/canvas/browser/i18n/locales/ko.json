@@ -576,6 +576,11 @@
       "error": "실패",
       "waiting": "대기 중"
     },
+    "triggerSource": {
+      "manual": "수동",
+      "cron": "일정",
+      "webhook": "Webhook"
+    },
     "kind": {
       "task": "작업",
       "trigger": "트리거",

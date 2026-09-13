@@ -431,7 +431,7 @@ export function updateNodeIcon(revision: RevisionView, target: GraphTarget, node
 
 export function updateNodeName(revision: RevisionView, target: GraphTarget, nodeId: string, name: string | undefined): FlowChanges | undefined {
   const node = revision.node(target, nodeId)?.node
-  if (node == null) return
+  if (node == null || node.kind == 'manual') return
   const value = !('inputs' in node) ? (name ?? node.name) : name
   if (node.name == value) return []
   return [{ before: node.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value }]

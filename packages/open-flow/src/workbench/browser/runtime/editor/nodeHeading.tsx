@@ -11,6 +11,7 @@ export function NodeHeading({
   icon,
   fallback,
   disabled,
+  titleReadOnly = false,
   validate,
   onRename,
   onIconChange,
@@ -18,6 +19,7 @@ export function NodeHeading({
   readonly title: string
   readonly icon?: string
   readonly fallback: ReactNode
+  readonly titleReadOnly?: boolean
   readonly disabled: boolean
   readonly validate: (name: string) => string | undefined
   readonly onRename: (name: string) => void
@@ -32,7 +34,7 @@ export function NodeHeading({
     setError(undefined)
   }, [title])
   const commit = () => {
-    if (disabled) return
+    if (disabled || titleReadOnly) return
     const issue = validate(draft)
     setError(issue)
     if (!issue && draft !== title) onRename(draft)
@@ -48,6 +50,7 @@ export function NodeHeading({
           aria-invalid={error != null}
           aria-describedby={error == null ? undefined : errorId}
           disabled={disabled}
+          readOnly={titleReadOnly}
           value={draft}
           onChange={(event) => {
             setDraft(event.target.value)

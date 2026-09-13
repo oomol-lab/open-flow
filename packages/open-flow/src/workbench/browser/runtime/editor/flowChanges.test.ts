@@ -6,6 +6,7 @@ import { revisionView } from '../revisionView.ts'
 import {
   addNode,
   updateNodeDescription,
+  updateNodeName,
   updateValue,
   updateWebhook,
   agentTool,
@@ -804,4 +805,21 @@ it('copies a trigger group while preserving the single manual trigger contract',
   expect(pasted.sourceIds).toEqual(['timer', 'task'])
   expect(Object.values(copied.content.document.graph.nodes).filter((node) => node.kind === 'manual')).toHaveLength(1)
   expect(copied.content.document.graph.edges).toContainEqual({ source: pasted.nodeIds[0], target: pasted.nodeIds[1] })
+})
+
+it('keeps manual trigger names fixed while allowing other trigger names to change', () => {
+  const current = draft('')
+  const target = { kind: 'flow' } as const
+  Object.assign(current.content.document.graph.nodes, {
+    manual: { kind: 'manual', name: 'Manual trigger' },
+    webhook: { kind: 'webhook', name: 'Webhook', inputsDef: [] },
+    schedule: { kind: 'cron', name: 'Schedule', cronTimes: [] },
+  })
+  const revision = revisionView(current)
+  expect(updateNodeName(revision, target, 'manual', 'Renamed')).toBeUndefined()
+  for (const nodeId of ['webhook', 'schedule']) {
+    expect(updateNodeName(revision, target, nodeId, 'Renamed')).toEqual([
+      expect.objectContaining({ kind: 'graph.node.field.set', field: 'name', nodeId, value: 'Renamed' }),
+    ])
+  }
 })

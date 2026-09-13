@@ -576,6 +576,11 @@
       "error": "失敗",
       "waiting": "待機中"
     },
+    "triggerSource": {
+      "manual": "手動",
+      "cron": "スケジュール実行",
+      "webhook": "Webhook"
+    },
     "kind": {
       "task": "タスク",
       "trigger": "トリガー",

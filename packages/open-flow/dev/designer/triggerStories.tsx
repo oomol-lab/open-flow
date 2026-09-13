@@ -12,6 +12,7 @@ import { I18nProvider } from 'val-i18n-react'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '../../src/ui/browser/empty.tsx'
+import { NodeHeading } from '../../src/workbench/browser/runtime/editor/nodeHeading.tsx'
 import { NodeInspector } from '../../src/workbench/browser/runtime/editor/nodeInspector.tsx'
 import { TriggerSummary } from '../../src/workbench/browser/runtime/editor/triggerSummary.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
@@ -403,7 +404,19 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
       {framed && <h3>{state.replaceAll('-', ' ')}</h3>}
       <aside className={framed ? 'trigger-sidebar inspector' : 'trigger-sidebar-content inspector'} ref={sidebar}>
         <header className="trigger-sidebar-heading">
-          <strong>{fixture.trigger.name}</strong>
+          <NodeHeading
+            title={selection?.node.name ?? fixture.trigger.name}
+            titleReadOnly={fixture.trigger.kind === 'manual'}
+            disabled={state === 'display'}
+            fallback={null}
+            validate={() => undefined}
+            onRename={(name) => {
+              if (session && selection) void session.workspace.saveNodeTitle(selection.id, name)
+            }}
+            onIconChange={(icon) => {
+              if (session && selection) void session.workspace.saveNodeIcon(selection.id, icon)
+            }}
+          />
         </header>
         {session && revision && (
           <NodeInspector
