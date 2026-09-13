@@ -210,6 +210,15 @@ export function NodePickerContent({
         <div className={compact ? 'grid grid-cols-2 gap-x-2' : 'grid'}>{items.map((item, index) => row(item, compact, index))}</div>
       </section>
     )
+  const actionSections = (items: readonly AddNodeOption[]) =>
+    (['read', 'write', 'destructive', 'other'] as const).map((type) => {
+      const grouped = items.filter((item) => {
+        if (item.kind != 'connector') return false
+        const operation = item.connector.operationType
+        return type == 'other' ? !['read', 'write', 'destructive'].includes(operation ?? '') : operation == type
+      })
+      return <div key={type}>{section(t(`nodePicker.actionGroups.${type}`), grouped)}</div>
+    })
   const local = options.filter((item) => !term || `${item.label} ${item.description}`.toLowerCase().includes(term.toLowerCase()))
   const matches = [...new Map([...local, ...results].filter((item) => item.kind != 'connector-group').map((item) => [item.id, item])).values()]
   return (
@@ -250,7 +259,7 @@ export function NodePickerContent({
           )}
         </InputGroup>
       </div>
-      {!term && (
+      {!term && app == null && (
         <div className="shrink-0 px-3 pb-2">
           <TabsList aria-label={t('designer.addNode')} variant="flat" className="w-full">
             <TabsTrigger value="nodes" className="px-3">
@@ -262,20 +271,27 @@ export function NodePickerContent({
           </TabsList>
         </div>
       )}
-      <TabsContent value={page} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <TabsContent value={page} className="flex min-h-0 flex-1 flex-col overflow-visible">
         <div key={appId ?? 'catalog'} className={styles.page} data-navigation={navigation}>
           {!term && page == 'nodes' && app != null && (
-            <div className="mx-3 mb-1 flex shrink-0 items-center gap-2 border-b border-[color-mix(in_srgb,var(--ui-foreground)_9%,var(--ui-popover))] pb-3 pt-1">
-              <Button size="icon-sm" variant="ghost" aria-label={t('nodePicker.back')} onClick={() => navigateApp()}>
+            <div className="mx-3 mb-2 grid h-8 shrink-0 grid-cols-[28px_minmax(0,1fr)_28px] items-center gap-2 rounded-lg bg-[color-mix(in_srgb,var(--ui-foreground)_4%,var(--ui-popover))] px-1.5">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="text-muted-foreground hover:bg-popover hover:text-foreground hover:shadow-sm focus-visible:bg-popover focus-visible:text-foreground dark:hover:bg-[color-mix(in_srgb,var(--ui-foreground)_12%,var(--ui-popover))] dark:focus-visible:bg-[color-mix(in_srgb,var(--ui-foreground)_12%,var(--ui-popover))]"
+                aria-label={t('nodePicker.back')}
+                onClick={() => navigateApp()}
+              >
                 <Icon name="chevron-left" />
               </Button>
-              <AppIcon src={app.icon} />
-              <span className="text-sm font-medium">{app.label}</span>
+              <span className="min-w-0 truncate text-center text-sm font-semibold" title={app.label}>
+                {app.label}
+              </span>
             </div>
           )}
           <div
             ref={list}
-            className="min-h-0 flex-1 overflow-y-scroll overscroll-contain py-2 pl-2 pr-0"
+            className="min-h-0 flex-1 overflow-y-scroll overscroll-contain py-2 pl-2 pr-1"
             onKeyDown={(event) => {
               if (event.key != 'ArrowDown' && event.key != 'ArrowUp') return
               const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]
@@ -293,8 +309,9 @@ export function NodePickerContent({
                 )}
                 {section(
                   t('addNode.blocks'),
-                  matches.filter((item) => item.kind != 'trigger'),
+                  matches.filter((item) => item.kind != 'trigger' && item.kind != 'connector'),
                 )}
+                {actionSections(matches)}
                 {!loading && !failed && matches.length == 0 && <PickerStatus />}
               </>
             ) : page == 'triggers' ? (
@@ -311,8 +328,9 @@ export function NodePickerContent({
               </>
             ) : app != null ? (
               <>
-                <div className="grid">{actions.map((item) => row(item))}</div>
-                {!choicesLoading && !choicesFailed && actions.length == 0 && <PickerStatus />}
+                {section(t('addNode.triggers'), app.triggers)}
+                {actionSections(actions)}
+                {!choicesLoading && !choicesFailed && actions.length == 0 && app.triggers.length == 0 && <PickerStatus />}
               </>
             ) : (
               <>

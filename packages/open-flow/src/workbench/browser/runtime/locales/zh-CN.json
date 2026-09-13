@@ -915,6 +915,7 @@
     "missingStatuses": "部分已选状态不再可用，请移除或重新选择。"
   },
   "nodePicker": {
+    "actionGroups": { "read": "读取接口", "write": "写入接口", "destructive": "高风险接口", "other": "其他接口" },
     "builtInNodes": "内置节点",
     "configured": "已配置",
     "configuredDescription": "已配置账号，可直接使用。",

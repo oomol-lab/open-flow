@@ -915,6 +915,7 @@
     "missingStatuses": "Certains statuts sélectionnés ne sont plus disponibles. Supprimez-les ou remplacez-les."
   },
   "nodePicker": {
+    "actionGroups": { "read": "Actions de lecture", "write": "Actions d’écriture", "destructive": "Actions à haut risque", "other": "Autres actions" },
     "builtInNodes": "Nœuds intégrés",
     "configured": "Configurées",
     "configuredDescription": "Un compte est configuré et prêt à être utilisé.",

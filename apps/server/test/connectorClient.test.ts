@@ -412,7 +412,7 @@ describe('Server Connector client', () => {
       id: 'example.echo',
       inputSchema: { properties: {}, type: 'object' },
       name: 'echo',
-      operationType: 'action',
+      operationType: 'read',
       outputSchema: { properties: {}, type: 'object' },
       service: 'example',
     }
@@ -438,6 +438,7 @@ describe('Server Connector client', () => {
     await expect(connector.listActions('example')).resolves.toEqual([
       {
         actionId: 'example.echo',
+        operationType: 'read',
         authenticated: true,
         description: 'Echo one message.',
         inputSchema: { properties: {}, type: 'object' },

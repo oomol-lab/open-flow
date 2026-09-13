@@ -82,6 +82,7 @@ export function action(source: Readonly<Record<string, unknown>>, providers: Pro
     ...(display.icon == null ? {} : { icon: display.icon }),
     ...(display.homepageUrl == null ? {} : { homepageUrl: display.homepageUrl }),
     actionId: string(source.id),
+    ...(source.operationType == null ? {} : { operationType: string(source.operationType) }),
     name: string(source.name),
     description: source.description as string,
     authenticated: !(owner.authTypes as readonly string[]).includes('no_auth'),

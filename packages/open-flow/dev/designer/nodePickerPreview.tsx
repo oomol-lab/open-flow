@@ -19,6 +19,7 @@ import { createTriggerSession } from './triggerSession.ts'
 
 const sampleActions = [
   {
+    operationType: 'write',
     actionId: 'gmail.send',
     name: 'Send email',
     description: 'Send an email to one or more recipients.',
@@ -30,6 +31,7 @@ const sampleActions = [
     outputs: {},
   },
   {
+    operationType: 'read',
     actionId: 'googledrive.find',
     name: 'Find files',
     description: 'Find files by name in Google Drive.',
@@ -41,13 +43,21 @@ const sampleActions = [
   },
 ]
 
+sampleActions.push(
+  { ...sampleActions[0]!, actionId: 'gmail.list', name: 'List emails', description: 'Read messages in the inbox.', operationType: 'read' },
+  { ...sampleActions[0]!, actionId: 'gmail.delete', name: 'Delete email', description: 'Permanently delete a message.', operationType: 'destructive' },
+  { ...sampleActions[0]!, actionId: 'gmail.legacy', name: 'Legacy action', description: 'An action without a recognized operation type.', operationType: '' },
+)
+
 const sampleProviders = [
-  ...sampleActions.map((action) => ({
-    service: action.serviceId,
-    displayName: action.serviceName,
-    authTypes: ['oauth2'],
-    ...(action.icon ? { iconUrl: action.icon } : {}),
-  })),
+  ...sampleActions
+    .filter((action, index) => sampleActions.findIndex((candidate) => candidate.serviceId == action.serviceId) == index)
+    .map((action) => ({
+      service: action.serviceId,
+      displayName: action.serviceName,
+      authTypes: ['oauth2'],
+      iconUrl: action.icon,
+    })),
   { service: 'feishu', displayName: '飞书', authTypes: ['oauth2'] },
   { service: 'wecom', displayName: '企业微信', authTypes: ['oauth2'] },
   { service: '17track', displayName: '17TRACK', authTypes: ['no_auth'] },
@@ -73,7 +83,7 @@ function sampleActionData(path: string, cached = false) {
           (!url.searchParams.get('service') || action.serviceId == url.searchParams.get('service')) &&
           (!url.searchParams.get('q') || `${action.name} ${action.serviceName}`.toLowerCase().includes(url.searchParams.get('q')!.toLowerCase())),
       )
-      .map((action) => (cached ? Object.assign({}, action, { name: `${action.name} (cached)` }) : action)),
+      .map((action) => Object.assign({}, action, { operationType: action.operationType || undefined }, cached ? { name: `${action.name} (cached)` } : {})),
   }
 }
 
@@ -82,6 +92,7 @@ function proxyActions(path: string, cached = false) {
     success: true,
     data: sampleActionData(path, cached).actions.map((action) => ({
       id: action.actionId,
+      operationType: action.operationType || undefined,
       service: action.serviceId,
       name: action.name,
       description: action.description,
@@ -256,6 +267,6 @@ export const nodePickerPreviewStory: FrontendStory = {
   title: 'Add Node Popover',
   standalone: true,
   description:
-    'Cached Gmail appears immediately. Four app groups with help tooltips. Configured only hides empty groups. Real Trigger definitions, search and 1,000-app scrolling are available.',
+    'Provider details use a centered title and quiet back arrow, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Includes cached loading, search and 1,000-app scrolling.',
   render: (log, dark, language) => <Preview dark={dark} language={language} log={log} />,
 }
