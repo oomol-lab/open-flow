@@ -1,6 +1,6 @@
 {
   "telegram.on_update": {
-    "displayName": "Telegram: Mise à jour du bot",
+    "displayName": "Mise à jour du bot",
     "description": "Se déclenche lorsque le bot Telegram connecté reçoit une mise à jour sélectionnée."
   }
 }

@@ -199,7 +199,7 @@ const snapshot = {
   },
   definitionVersion: 2,
   description: 'Triggers when selected Shopify webhook topics occur in the connected store.',
-  displayName: 'Shopify: Store Event',
+  displayName: 'Store Event',
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'shopify.on_shop_event',
   name: 'on_shop_event',

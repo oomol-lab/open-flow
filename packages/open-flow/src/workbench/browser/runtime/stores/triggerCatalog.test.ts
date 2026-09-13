@@ -37,7 +37,6 @@ describe('Trigger catalog cache', () => {
     )
     const next = setup(request, local)
     try {
-      next.open()
       expect(await next.get()).toEqual(catalog)
       expect(new Headers(request.mock.calls[0]?.[1]?.headers).get('if-none-match')).toBe('W/"one"')
       finish(new Response(null, { status: 304 }))
@@ -148,6 +147,67 @@ describe('Trigger catalog cache', () => {
     } finally {
       store.dispose()
     }
+  })
+
+  it('revalidates stale reads once and treats 304 as fresh', async () => {
+    let now = 1000
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    const request = vi.fn(async () => Response.json(catalog, { headers: { etag: '"one"' } }))
+    const store = setup(request)
+    try {
+      await store.get()
+      now += 299_999
+      await store.get()
+      expect(request).toHaveBeenCalledTimes(1)
+      request.mockImplementation(async () => new Response(null, { status: 304 }))
+      now += 1
+      await Promise.all([store.get(), store.get(), store.get()])
+      await vi.waitFor(() => expect(store.state.value.revision).toBe(2))
+      expect(request).toHaveBeenCalledTimes(2)
+      await store.get()
+      expect(request).toHaveBeenCalledTimes(2)
+    } finally {
+      clock.mockRestore()
+      store.dispose()
+    }
+  })
+
+  it('keeps stale data after failure, backs off automatic retries and allows explicit retry', async () => {
+    let now = 1000
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    const local = storage()
+    seed(local)
+    const request = vi.fn(async (): Promise<Response> => {
+      throw new Error('offline')
+    })
+    const store = setup(request, local)
+    try {
+      expect(await store.get()).toEqual(catalog)
+      await vi.waitFor(() => expect(store.state.value.failed).toBe(true))
+      await store.get()
+      expect(request).toHaveBeenCalledTimes(1)
+      now += 30_000
+      await store.get()
+      await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2))
+      await expect(store.refresh()).rejects.toThrow('offline')
+      request.mockImplementation(async () => Response.json(catalog))
+      await store.refresh()
+      expect(store.state.value.failed).toBe(false)
+      await store.get()
+      expect(request).toHaveBeenCalledTimes(3)
+    } finally {
+      clock.mockRestore()
+      store.dispose()
+    }
+  })
+
+  it('does not make requests after disposal', async () => {
+    const request = vi.fn(async () => Response.json(catalog))
+    const store = setup(request)
+    store.dispose()
+    await expect(store.get()).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(store.refresh()).rejects.toMatchObject({ name: 'AbortError' })
+    expect(request).not.toHaveBeenCalled()
   })
 
   it('rejects an unexpected 304 without a cached representation', async () => {

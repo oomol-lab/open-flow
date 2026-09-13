@@ -1,6 +1,6 @@
 {
   "slack.on_message_posted": {
-    "displayName": "Slack: 채널 새 메시지",
+    "displayName": "채널 새 메시지",
     "description": "Slack 대화 하나를 주기적으로 확인하고 새 메시지가 게시되면 실행합니다."
   }
 }

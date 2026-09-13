@@ -113,7 +113,7 @@ const snapshot = {
   },
   definitionVersion: 1,
   description: 'Polls a Google Calendar and triggers when an event is created, updated or cancelled.',
-  displayName: 'Google Calendar: Event Changed',
+  displayName: 'Event Changed',
   key: 'googlecalendar.on_event_changed',
   name: 'on_event_changed',
   payloadSchema: {

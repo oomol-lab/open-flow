@@ -1,14 +1,14 @@
 {
   "googledrive.changes_detected": {
-    "displayName": "Google Drive: 偵測到變更",
+    "displayName": "偵測到變更",
     "description": "使用 Google Drive changes.watch 通道，在有雲端硬碟變更可用時觸發。"
   },
   "googledrive.watch_changes": {
-    "displayName": "Google Drive: 追蹤變更",
+    "displayName": "追蹤變更",
     "description": "透過通知與對同一變更串流的定期掃描監控雲端硬碟變更。"
   },
   "googledrive.on_file_change": {
-    "displayName": "Google Drive: 資料夾內的檔案或資料夾變更",
+    "displayName": "資料夾內的檔案或資料夾變更",
     "description": "輪詢一個 Google Drive 資料夾，在其直屬檔案或資料夾建立或更新時觸發。"
   }
 }

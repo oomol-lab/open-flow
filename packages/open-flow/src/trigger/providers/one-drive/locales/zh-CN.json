@@ -1,6 +1,6 @@
 {
   "one_drive.on_item_changed": {
-    "displayName": "OneDrive: 文件或文件夹变更",
+    "displayName": "文件或文件夹变更",
     "description": "轮询 OneDrive 变更流，在文件或文件夹创建、更新或删除时触发。"
   }
 }

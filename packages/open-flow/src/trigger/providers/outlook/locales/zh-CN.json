@@ -1,6 +1,6 @@
 {
   "outlook.on_message_received": {
-    "displayName": "Outlook: 收到新邮件",
+    "displayName": "收到新邮件",
     "description": "轮询 Microsoft Outlook 邮件文件夹，在新邮件到达时触发。"
   }
 }

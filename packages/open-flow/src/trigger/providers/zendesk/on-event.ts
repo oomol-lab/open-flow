@@ -91,7 +91,7 @@ const snapshot = {
   },
   definitionVersion: 2,
   description: 'Triggers when one of the selected Zendesk account events occurs.',
-  displayName: 'Zendesk: Event Subscription',
+  displayName: 'Event Subscription',
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'zendesk.on_event',
   name: 'on_event',

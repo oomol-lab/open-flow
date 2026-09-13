@@ -1,6 +1,6 @@
 {
   "gitlab.on_project_event": {
-    "displayName": "GitLab: 项目事件",
+    "displayName": "项目事件",
     "description": "在项目发生所选 GitLab webhook 事件时触发。"
   }
 }

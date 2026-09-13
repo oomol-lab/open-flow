@@ -82,7 +82,7 @@ const snapshot = {
   },
   definitionVersion: 1,
   description: 'Polls a sheet and triggers once for every new row appended below the last row already seen.',
-  displayName: 'Google Sheets: New Row Added',
+  displayName: 'New Row Added',
   key: 'googlesheets.on_row_added',
   name: 'on_row_added',
   payloadSchema: {

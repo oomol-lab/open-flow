@@ -1,6 +1,6 @@
 {
   "slack.on_message_posted": {
-    "displayName": "Slack: Nouveau message de canal",
+    "displayName": "Nouveau message de canal",
     "description": "Interroge périodiquement une conversation Slack et se déclenche à la publication d’un nouveau message."
   }
 }

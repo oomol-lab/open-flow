@@ -35,7 +35,7 @@ const snapshot = {
   },
   definitionVersion: 2,
   description: 'Triggers when selected Stripe events happen on the connected account.',
-  displayName: 'Stripe: Account Event',
+  displayName: 'Account Event',
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'stripe.on_event',
   name: 'on_event',

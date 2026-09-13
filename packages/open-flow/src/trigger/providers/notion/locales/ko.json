@@ -1,6 +1,6 @@
 {
   "notion.on_database_page_event": {
-    "displayName": "Notion: 데이터베이스 페이지 추가 또는 업데이트",
+    "displayName": "데이터베이스 페이지 추가 또는 업데이트",
     "description": "Notion 데이터베이스를 주기적으로 확인하고 페이지가 추가되거나 기존 페이지가 편집되면 실행합니다."
   }
 }

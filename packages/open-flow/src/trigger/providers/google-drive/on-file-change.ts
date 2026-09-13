@@ -96,7 +96,7 @@ const snapshot = {
   },
   definitionVersion: 1,
   description: 'Polls one Google Drive folder and triggers when a file or folder directly inside it is created or updated.',
-  displayName: 'Google Drive: File or Folder Change in a Folder',
+  displayName: 'File or Folder Change in a Folder',
   key: 'googledrive.on_file_change',
   name: 'on_file_change',
   payloadSchema: {

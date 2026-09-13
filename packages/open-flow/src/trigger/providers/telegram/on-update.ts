@@ -89,7 +89,7 @@ const snapshot = {
   },
   definitionVersion: 1,
   description: 'Triggers when the connected Telegram bot receives a selected update.',
-  displayName: 'Telegram: Bot Update',
+  displayName: 'Bot Update',
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 200 },
   key: 'telegram.on_update',
   name: 'on_update',

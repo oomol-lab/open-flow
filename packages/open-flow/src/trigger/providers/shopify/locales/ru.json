@@ -1,6 +1,6 @@
 {
   "shopify.on_shop_event": {
-    "displayName": "Shopify: Событие магазина",
+    "displayName": "Событие магазина",
     "description": "Срабатывает при событиях выбранных тем webhook Shopify в подключённом магазине."
   }
 }

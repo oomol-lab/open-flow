@@ -17,6 +17,15 @@ export default defineConfig({
     triggerLocalesPlugin(),
     {
       name: 'lab-trigger-snapshots',
+      configureServer(server) {
+        const providers = path.resolve(import.meta.dirname, '../../src/trigger/providers') + path.sep
+        server.watcher.add(providers)
+        const refreshSnapshots = (file: string) => {
+          if (file.startsWith(providers) && file.endsWith('.ts')) void server.restart()
+        }
+        server.watcher.on('change', refreshSnapshots)
+        server.httpServer?.once('close', () => server.watcher.off('change', refreshSnapshots))
+      },
       resolveId: (id) => (id === 'virtual:lab-trigger-snapshots' ? '\0virtual:lab-trigger-snapshots' : undefined),
       load: (id) =>
         id === '\0virtual:lab-trigger-snapshots' ? `export default ${JSON.stringify(triggerDefinitions.map(({ snapshot }) => snapshot))}` : undefined,

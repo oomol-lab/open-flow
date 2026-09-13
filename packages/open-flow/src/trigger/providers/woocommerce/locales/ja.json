@@ -1,6 +1,6 @@
 {
   "woocommerce.on_store_event": {
-    "displayName": "WooCommerce: ストアイベント",
+    "displayName": "ストアイベント",
     "description": "選択した WooCommerce ストアイベントが発生すると実行します。"
   }
 }

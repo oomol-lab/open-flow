@@ -75,7 +75,7 @@ const snapshot = {
   },
   definitionVersion: 1,
   description: 'Uses a Google Drive changes.watch channel and triggers when Drive changes are available.',
-  displayName: 'Google Drive: Changes Detected',
+  displayName: 'Changes Detected',
   endpoint: { body: { allowArray: false, allowEmpty: true, formats: ['json'] }, methods: ['POST'], successStatus: 204 },
   key: 'googledrive.changes_detected',
   name: 'changes_detected',
@@ -571,7 +571,7 @@ export const googleDriveChangeListener: IntegrationDefinition = {
     configSchema: { ...snapshot.configSchema, description: 'Configuration for googledrive.watch_changes.' },
     key: 'googledrive.watch_changes',
     name: 'watch_changes',
-    displayName: 'Google Drive: Watch Changes',
+    displayName: 'Watch Changes',
     description: 'Monitors Drive changes using notifications and periodic scans of the same change stream.',
     payloadSchema: {
       type: 'object',

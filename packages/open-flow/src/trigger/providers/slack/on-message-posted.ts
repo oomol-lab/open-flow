@@ -100,7 +100,7 @@ const snapshot = {
   },
   definitionVersion: 1,
   description: 'Polls one Slack conversation and triggers when a new message is posted to it.',
-  displayName: 'Slack: New Channel Message',
+  displayName: 'New Channel Message',
   key: 'slack.on_message_posted',
   name: 'on_message_posted',
   payloadSchema: {

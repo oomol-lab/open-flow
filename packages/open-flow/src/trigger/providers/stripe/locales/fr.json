@@ -1,6 +1,6 @@
 {
   "stripe.on_event": {
-    "displayName": "Stripe: Événement de compte",
+    "displayName": "Événement de compte",
     "description": "Se déclenche lors des événements Stripe sélectionnés sur le compte connecté."
   }
 }

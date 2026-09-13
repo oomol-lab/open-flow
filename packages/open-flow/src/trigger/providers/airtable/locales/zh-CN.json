@@ -1,6 +1,6 @@
 {
   "airtable.on_record_changed": {
-    "displayName": "Airtable: 记录创建或更新",
+    "displayName": "记录创建或更新",
     "description": "轮询 Airtable 表，按时间字段排序，在记录创建或更新时触发。"
   }
 }

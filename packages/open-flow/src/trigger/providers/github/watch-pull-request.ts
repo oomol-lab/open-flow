@@ -39,7 +39,7 @@ const snapshot = {
   definitionVersion: 1,
   description:
     'Watches one pull request using notifications and periodic checks. Starts from its current state; reports observed changes, not every intermediate transition or review event.',
-  displayName: 'GitHub: Watch Pull Request',
+  displayName: 'Watch Pull Request',
   endpoint: githubRepoEvent.snapshot.endpoint,
   key: 'github.watch_pull_request',
   name: 'watch_pull_request',

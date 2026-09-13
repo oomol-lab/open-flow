@@ -84,7 +84,7 @@ export function NodePickerContent({
     for (const item of catalog) {
       if (item.kind != 'trigger' || !('trigger' in item) || item.trigger.kind != 'catalog') continue
       const id = item.trigger.definition.provider
-      const app = entries.get(id) ?? { id, label: item.trigger.definition.displayName.split(':')[0] ?? id, icon: item.icon, triggers: [] }
+      const app = entries.get(id) ?? { id, label: id, icon: item.icon, triggers: [] }
       app.triggers.push(item)
       entries.set(id, app)
     }
@@ -130,7 +130,7 @@ export function NodePickerContent({
       setAdding(false)
     }
   }
-  const row = (item: AddNodeOption, compact = false, appLabel?: string) => {
+  const row = (item: AddNodeOption, compact = false) => {
     const button = (
       <Button
         variant="ghost"
@@ -148,9 +148,7 @@ export function NodePickerContent({
         )}
         <span className="min-w-0 flex-1 py-1">
           <span className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0 text-[13px] font-medium leading-5">
-              {appLabel && item.label.startsWith(`${appLabel}:`) ? item.label.slice(appLabel.length + 1).trim() : item.label}
-            </span>
+            <span className="min-w-0 text-[13px] font-medium leading-5">{item.label}</span>
             {term && (
               <span className="max-w-[35%] shrink-0 truncate text-[11px] font-normal text-muted-foreground">
                 {item.kind == 'trigger' ? t('addNode.triggers') : item.kind == 'connector' ? item.connector.serviceName : t('addNode.blocks')}
@@ -184,7 +182,7 @@ export function NodePickerContent({
         <h3 style={{ margin: 0 }} className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">
           {title}
         </h3>
-        <div className={compact ? 'grid grid-cols-2 gap-x-2' : 'grid'}>{items.map((item) => row(item, compact, appLabel))}</div>
+        <div className={compact ? 'grid grid-cols-2 gap-x-2' : 'grid'}>{items.map((item) => row(item, compact))}</div>
       </section>
     )
   const local = options.filter((item) => !term || `${item.label} ${item.description}`.toLowerCase().includes(term.toLowerCase()))

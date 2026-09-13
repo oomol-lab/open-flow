@@ -1,6 +1,6 @@
 {
   "googlecalendar.on_event_changed": {
-    "displayName": "Google Calendar: Modification d’un événement",
+    "displayName": "Modification d’un événement",
     "description": "Interroge périodiquement un agenda Google et se déclenche à la création, à la modification ou à l’annulation d’un événement."
   }
 }

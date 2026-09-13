@@ -71,7 +71,7 @@ const snapshot = {
   },
   definitionVersion: 2,
   description: 'Triggers when selected GitLab webhook events occur in a project.',
-  displayName: 'GitLab: Project Event',
+  displayName: 'Project Event',
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'gitlab.on_project_event',
   name: 'on_project_event',

@@ -1,6 +1,6 @@
 {
   "stripe.on_event": {
-    "displayName": "Stripe: 계정 이벤트",
+    "displayName": "계정 이벤트",
     "description": "연결된 계정에서 선택한 Stripe 이벤트가 발생하면 실행합니다."
   }
 }

@@ -80,7 +80,7 @@ const snapshot = {
   },
   definitionVersion: 1,
   description: 'Polls the Gmail mailbox and triggers when a new message is received.',
-  displayName: 'Gmail: New Message Received',
+  displayName: 'New Message Received',
   key: 'gmail.on_message_received',
   name: 'on_message_received',
   payloadSchema: {

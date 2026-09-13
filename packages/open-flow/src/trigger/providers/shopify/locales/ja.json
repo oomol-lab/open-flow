@@ -1,6 +1,6 @@
 {
   "shopify.on_shop_event": {
-    "displayName": "Shopify: ストアイベント",
+    "displayName": "ストアイベント",
     "description": "接続したストアで選択した Shopify webhook トピックのイベントが発生すると実行します。"
   }
 }

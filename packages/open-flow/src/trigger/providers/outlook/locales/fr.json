@@ -1,6 +1,6 @@
 {
   "outlook.on_message_received": {
-    "displayName": "Outlook: Nouveau message reçu",
+    "displayName": "Nouveau message reçu",
     "description": "Interroge périodiquement un dossier de courrier Microsoft Outlook et se déclenche à l’arrivée d’un nouveau message."
   }
 }

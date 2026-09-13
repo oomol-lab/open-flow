@@ -291,7 +291,7 @@ function Editor({
             provideChoices={store.provideAddNodeOptionChoices}
             catalogRevision={triggerCatalogState.revision}
             catalogFailed={triggerCatalogState.failed}
-            refreshCatalog={store.triggers.catalog.open}
+            refreshCatalog={store.triggers.catalog.retry}
             disabled={authoringDisabled || target == null}
             focusRequest={0}
             onAdd={addFromBlocks}
@@ -320,7 +320,7 @@ function Editor({
         onOpenBlocks={openBlocks}
         onOpenInspector={openInspector}
         onPaste={() => void store.workspace.pasteNodes()}
-        addItemsCatalog={{ ...triggerCatalogState, refresh: store.triggers.catalog.open }}
+        addItemsCatalog={{ ...triggerCatalogState, refresh: store.triggers.catalog.retry }}
         provideAddNodeOptions={store.provideAddNodeOptions}
         onSelectNodes={(nodeIds) => store.selectNodes(nodeIds)}
         onToggleInspector={toggleInspector}
@@ -381,7 +381,7 @@ function Editor({
             <BlockLibrary
               catalogRevision={triggerCatalogState.revision}
               catalogFailed={triggerCatalogState.failed}
-              refreshCatalog={store.triggers.catalog.open}
+              refreshCatalog={store.triggers.catalog.retry}
               browseOptions={store.browseAddNodeOptions}
               searchOptions={store.provideAddNodeOptions}
               disabled={authoringDisabled}

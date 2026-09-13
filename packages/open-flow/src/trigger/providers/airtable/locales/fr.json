@@ -1,6 +1,6 @@
 {
   "airtable.on_record_changed": {
-    "displayName": "Airtable: Création ou mise à jour d’un enregistrement",
+    "displayName": "Création ou mise à jour d’un enregistrement",
     "description": "Interroge périodiquement une table Airtable et se déclenche à la création ou à la mise à jour d’un enregistrement, dans l’ordre d’un champ temporel."
   }
 }
