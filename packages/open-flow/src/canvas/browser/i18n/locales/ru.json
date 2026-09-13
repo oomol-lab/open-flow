@@ -14,7 +14,7 @@
     "llmStructured": "Структурированный вывод LLM",
     "sharedBlocks": "Задачи и Subflow",
     "triggers": "Triggers",
-    "value": "Значение"
+    "value": "Фиксированные значения"
   },
   "blockEditor": {
     "addDefaultAdditionalInput": "Добавить дополнительный вход по умолчанию",
@@ -582,7 +582,7 @@
       "condition": "Условие",
       "wait": "Ожидание подтверждения",
       "subflow": "Подпроцесс",
-      "value": "Значения",
+      "value": "Фиксированные значения",
       "input": "Вход",
       "output": "Выход"
     },
