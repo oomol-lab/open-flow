@@ -20,6 +20,7 @@ export class Resource<T> {
   #etag: string | null = null
   #nextCheck = 0
   #pending?: Promise<void>
+  #refreshAgain = false
   #disposed = false
   #restored = false
   readonly #controller = new AbortController()
@@ -54,38 +55,46 @@ export class Resource<T> {
 
   get(force = false): ReadonlyVal<ResourceState<T>> {
     this.#restore()
-    if (!this.#disposed && (force || Date.now() >= this.#nextCheck)) void this.refresh()
+    if (!this.#disposed && (force || Date.now() >= this.#nextCheck)) void this.refresh(force)
     return this.state
   }
 
-  refresh(): Promise<void> {
+  refresh(force = false): Promise<void> {
     this.#restore()
     if (this.#disposed) return Promise.resolve()
-    if (this.#pending != null) return this.#pending
+    if (this.#pending != null) {
+      if (force) this.#refreshAgain = true
+      return this.#pending
+    }
     // Publish asynchronously so accessing a resource inside a computed Val is safe.
     const pending = Promise.resolve()
       .then(async () => {
         if (this.#disposed) return
         this.#state.set({ ...this.#state.value, refreshing: true })
-        try {
-          const result = await this.read(this.#etag, this.#controller.signal)
-          if (this.#disposed) return
-          const data = result.modified ? result.data : this.#state.value.data
-          if (data === undefined) throw new Error('Received 304 without cached data.')
-          this.#etag = result.modified ? result.etag : (result.etag ?? this.#etag)
-          this.#nextCheck = Date.now() + this.interval
+        do {
+          // A forced read must start after the change that invalidated the current request.
+          this.#refreshAgain = false
           try {
-            this.persistence?.storage().setItem(this.persistence.key, JSON.stringify({ data, etag: this.#etag }))
-          } catch {
-            /* Storage is optional. */
+            const result = await this.read(this.#etag, this.#controller.signal)
+            if (this.#disposed) return
+            if (this.#refreshAgain) continue
+            const data = result.modified ? result.data : this.#state.value.data
+            if (data === undefined) throw new Error('Received 304 without cached data.')
+            this.#etag = result.modified ? result.etag : (result.etag ?? this.#etag)
+            this.#nextCheck = Date.now() + this.interval
+            try {
+              this.persistence?.storage().setItem(this.persistence.key, JSON.stringify({ data, etag: this.#etag }))
+            } catch {
+              /* Storage is optional. */
+            }
+            this.#state.set({ data, refreshing: false, error: undefined })
+          } catch (error) {
+            if (!this.#disposed && !this.#refreshAgain) {
+              this.#nextCheck = Date.now() + 30_000
+              this.#state.set({ ...this.#state.value, refreshing: false, error })
+            }
           }
-          this.#state.set({ data, refreshing: false, error: undefined })
-        } catch (error) {
-          if (!this.#disposed) {
-            this.#nextCheck = Date.now() + 30_000
-            this.#state.set({ ...this.#state.value, refreshing: false, error })
-          }
-        }
+        } while (!this.#disposed && this.#refreshAgain)
       })
       .finally(() => {
         if (this.#pending === pending) this.#pending = undefined
