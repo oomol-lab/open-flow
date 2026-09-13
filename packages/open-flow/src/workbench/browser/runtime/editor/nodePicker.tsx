@@ -358,7 +358,11 @@ export function NodePickerContent({
                     <h3 style={{ margin: 0 }} className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">
                       {t('nodePicker.apps')}
                     </h3>
-                    <div className="grid">{matchedApps.map((item) => appRow(item, true))}</div>
+                    {matchedApps.length == 1 ? (
+                      <div className="grid">{matchedApps.map((item) => appRow(item, true))}</div>
+                    ) : (
+                      <AppDirectory viewport={list.current}>{matchedApps.map((item) => appRow(item))}</AppDirectory>
+                    )}
                   </section>
                 )}
                 {section(
