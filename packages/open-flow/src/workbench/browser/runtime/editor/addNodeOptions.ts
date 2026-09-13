@@ -1,7 +1,8 @@
 import type { TFunction } from 'val-i18n'
 import type { GraphTarget } from '../../../../flow/common/change.ts'
-import type { ConnectorAction, Draft, JsonValue, TriggerKeySnapshot } from '../api.ts'
+import type { Draft, JsonValue, TriggerKeySnapshot } from '../api.ts'
 import type { RevisionView } from '../revisionView.ts'
+import type { ConnectorActionView } from '../workspace.ts'
 import type { AddNodeIntent } from './flowChanges.ts'
 
 import { revisionView } from '../revisionView.ts'
@@ -42,7 +43,7 @@ export type AddNodeOption = AddNodeOptionBase &
   (
     | { readonly kind: 'comment' }
     | { readonly kind: 'condition' }
-    | { readonly connector: ConnectorAction; readonly kind: 'connector' }
+    | { readonly connector: ConnectorActionView; readonly kind: 'connector' }
     | {
         readonly choices: NonNullable<AddNodeOptionBase['choices']>
         readonly kind: 'connector-group'

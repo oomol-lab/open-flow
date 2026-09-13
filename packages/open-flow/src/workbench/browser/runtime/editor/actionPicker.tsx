@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
-import type { ConnectorAction } from '../api.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
+import type { ConnectorActionView } from '../workspace.ts'
 import type { AddNodeOption } from './addNodeOptions.ts'
 
 import { Plus } from 'lucide-react'
@@ -25,7 +25,7 @@ export function ActionPicker({
   readonly disabled: boolean
   readonly label: string
   readonly exclude?: readonly string[]
-  readonly onSelect: (action: ConnectorAction) => Promise<boolean>
+  readonly onSelect: (action: ConnectorActionView) => Promise<boolean>
 }): ReactElement {
   const t = useTranslate()
   const [open, setOpen] = useState(false)

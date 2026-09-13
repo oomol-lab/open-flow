@@ -1,5 +1,5 @@
 import type { InputPortDefinition } from '../../flow/common/change.ts'
-import type { ConnectorAction, ConnectorConnection, ConnectorProvider } from './api.ts'
+import type { ConnectorAction, ConnectorActionMetadata, ConnectorConnection, ConnectorProvider } from './api.ts'
 
 import { exact, invalidResponse, jsonValue, record, string } from './decoding.ts'
 
@@ -52,17 +52,15 @@ function ports<Value>(value: unknown, decode: (value: unknown) => Value): Readon
   return Object.fromEntries(Object.entries(record(value)).map(([handle, candidate]) => [handle, decode(candidate)]))
 }
 
-export function connectorAction(value: unknown): ConnectorAction {
+export function connectorActionMetadata(value: unknown): ConnectorActionMetadata {
   const source = record(value)
   const homepageUrl = source.homepageUrl
   const icon = source.icon
-  const hasConnection = source.defaultConnection != null
   exact(source, [
     'actionId',
     ...(Object.hasOwn(source, 'inputSchema') ? ['inputSchema'] : []),
     ...(Object.hasOwn(source, 'outputSchema') ? ['outputSchema'] : []),
     'authenticated',
-    ...(hasConnection ? ['defaultConnection'] : []),
     'description',
     ...(homepageUrl == null ? [] : ['homepageUrl']),
     ...(icon == null ? [] : ['icon']),
@@ -73,12 +71,11 @@ export function connectorAction(value: unknown): ConnectorAction {
     'serviceName',
   ])
   if ((homepageUrl != null && typeof homepageUrl != 'string') || (icon != null && typeof icon != 'string')) return invalidResponse()
-  const result: ConnectorAction = {
+  const result: ConnectorActionMetadata = {
     ...(source.inputSchema === undefined ? {} : { inputSchema: jsonValue(source.inputSchema) }),
     ...(source.outputSchema === undefined ? {} : { outputSchema: jsonValue(source.outputSchema) }),
     actionId: string(source.actionId),
     authenticated: typeof source.authenticated == 'boolean' ? source.authenticated : invalidResponse(),
-    ...(hasConnection ? { defaultConnection: connection(source.defaultConnection) } : {}),
     description: typeof source.description == 'string' ? source.description : invalidResponse(),
     ...(homepageUrl == null ? {} : { homepageUrl }),
     ...(icon == null ? {} : { icon }),
@@ -88,10 +85,16 @@ export function connectorAction(value: unknown): ConnectorAction {
     serviceId: string(source.serviceId),
     serviceName: string(source.serviceName),
   }
-  if (result.defaultConnection != null && (result.defaultConnection.serviceId != result.serviceId || result.defaultConnection.status != 'active')) {
-    return invalidResponse()
-  }
   return result
+}
+
+export function connectorAction(value: unknown): ConnectorAction {
+  const { defaultConnection, ...metadata } = record(value)
+  const action = connectorActionMetadata(metadata)
+  if (defaultConnection == null) return action
+  const preferred = connection(defaultConnection)
+  if (preferred.serviceId != action.serviceId || preferred.status != 'active') return invalidResponse()
+  return { ...action, defaultConnection: preferred }
 }
 
 export function connectorProvider(value: unknown): ConnectorProvider {

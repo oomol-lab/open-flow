@@ -87,8 +87,8 @@ function createSession(language: UiLanguage, log: LogAction) {
         version: 1,
       })
     if (url.pathname === '/v1/connector/providers') return Response.json({ providers: [{ serviceId: 'lab', serviceName: 'Lab catalog' }], version: 1 })
-    if (url.pathname === '/v1/connector/actions') return Response.json({ actions: [action], version: 1 })
-    if (url.pathname === '/v1/connector/actions/lab.lookup') return Response.json({ action, version: 1 })
+    if (url.pathname === '/v1/connector/action-metadata') return Response.json({ actions: [action], version: 1 })
+    if (url.pathname === '/v1/connector/action-metadata/lab.lookup') return Response.json({ action, version: 1 })
     if (url.pathname === '/v1/connector/connections/lab')
       return Response.json({
         serviceId: 'lab',

@@ -111,7 +111,7 @@ describe('WorkbenchStore diagnostics', () => {
           version: 1,
         })
       }
-      if (path == `/v1/connector/actions?flowId=${flow.flowId}&service=amap&locale=en`) {
+      if (path == `/v1/connector/action-metadata?flowId=${flow.flowId}&service=amap&locale=en`) {
         return Response.json({
           actions: [
             {

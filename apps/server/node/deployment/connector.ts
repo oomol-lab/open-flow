@@ -1,5 +1,5 @@
 import type { ConnectorProxyRequest, ConnectorProxyResult } from '@oomol-lab/open-flow/connector-proxy'
-import type { ConnectorAction, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorActionMetadata, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
 import type { ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { Logger } from 'pino'
 
@@ -47,8 +47,8 @@ export interface ConnectorHost {
     signal: AbortSignal,
     teamId?: string,
   ): Promise<JsonValue>
-  getAction(actionId: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<ConnectorAction>
-  listActions(serviceId?: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorAction[]>
+  getAction(actionId: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<ConnectorActionMetadata>
+  listActions(serviceId?: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorActionMetadata[]>
   listAllConnections(signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]>
   listConnections(serviceId: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]>
   listProviders(signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorProvider[]>
@@ -61,7 +61,7 @@ export interface ConnectorHost {
     teamId?: string,
   ): Promise<ConnectorProxyResult>
   ready(): Promise<boolean>
-  searchActions(query: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorAction[]>
+  searchActions(query: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorActionMetadata[]>
 }
 
 export type ConnectorErrorCode =
@@ -164,24 +164,17 @@ export class ConnectorClient implements ConnectorHost {
     return this.#conditionalGet('providers.list', 'v1/providers', (data) => runtimeList(runtimeData(data), runtimeProvider), signal, { teamId, locale })
   }
 
-  async listActions(serviceId?: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorAction[]> {
+  async listActions(serviceId?: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
     if (serviceId != null) {
-      const [providers, connections, actions] = await Promise.all([
+      const [providers, actions] = await Promise.all([
         this.#providers(signal, teamId, locale),
-        this.#connections(serviceId, signal, teamId),
         this.#actions(`v1/actions?service=${encodeURIComponent(serviceId)}`, false, signal, teamId, { serviceId }, undefined, locale),
       ])
-      return this.#decode('actions.list', { serviceId }, () => mapActions(actions, providers, connections))
+      return this.#decode('actions.list', { serviceId }, () => mapActions(actions, providers))
     }
     return await Effect.runPromise(
       Effect.gen({ self: this }, function* () {
-        const [providers, connections] = yield* Effect.all(
-          [
-            Effect.tryPromise({ try: (requestSignal) => this.#providers(requestSignal, teamId, locale), catch: (error) => error }),
-            Effect.tryPromise({ try: (requestSignal) => this.#connections(undefined, requestSignal, teamId), catch: (error) => error }),
-          ],
-          { concurrency: 'unbounded' },
-        )
+        const providers = yield* Effect.tryPromise({ try: (requestSignal) => this.#providers(requestSignal, teamId, locale), catch: (error) => error })
         const exhausted = Deferred.makeUnsafe<never, ConnectorTaskError>()
         let catalogError: ConnectorTaskError | undefined
         const budget = {
@@ -222,25 +215,23 @@ export class ConnectorClient implements ConnectorHost {
             }),
           { concurrency: catalogConcurrency },
         ).pipe(Effect.raceFirst(Deferred.await(exhausted)))
-        return this.#decode('actions.list', {}, () => mapActions(catalogs.flat(), providers, connections))
+        return this.#decode('actions.list', {}, () => mapActions(catalogs.flat(), providers))
       }),
       { signal },
     )
   }
 
-  async searchActions(query: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorAction[]> {
-    const [providers, connections, actions] = await Promise.all([
+  async searchActions(query: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
+    const [providers, actions] = await Promise.all([
       this.#providers(signal, teamId, locale),
-      this.#connections(undefined, signal, teamId),
       this.#actions(`v1/actions/search?q=${encodeURIComponent(query)}`, true, signal, teamId, {}, undefined, locale),
     ])
-    return this.#decode('actions.search', {}, () => mapActions(actions, providers, connections))
+    return this.#decode('actions.search', {}, () => mapActions(actions, providers))
   }
 
-  async getAction(actionId: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<ConnectorAction> {
-    const [providers, connections, action] = await Promise.all([
+  async getAction(actionId: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<ConnectorActionMetadata> {
+    const [providers, action] = await Promise.all([
       this.#providers(signal, teamId, locale),
-      this.#connections(undefined, signal, teamId),
       this.#conditionalGet('actions.get', `v1/actions/${encodeURIComponent(actionId)}`, (data) => runtimeAction(runtimeData(data)), signal, {
         fields: { actionId },
         teamId,
@@ -248,7 +239,7 @@ export class ConnectorClient implements ConnectorHost {
         failure: (data) => (record(data) && data.success === false && data.errorCode === 'unknown_action' ? actionNotFound() : unavailable()),
       }),
     ])
-    return this.#decode('actions.get', { actionId }, () => mapAction(action, providers, connections))
+    return this.#decode('actions.get', { actionId }, () => mapAction(action, providers))
   }
 
   async listAllConnections(signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]> {
@@ -713,25 +704,13 @@ function connectionStatus(value: unknown): 'active' | 'disconnected' {
   }
 }
 
-function mapActions(
-  actions: readonly RuntimeAction[],
-  providers: readonly ReturnType<typeof runtimeProvider>[],
-  connections: readonly ConnectorConnection[],
-): readonly ConnectorAction[] {
-  return actions.map((action) => mapAction(action, providers, connections))
+function mapActions(actions: readonly RuntimeAction[], providers: readonly ReturnType<typeof runtimeProvider>[]): readonly ConnectorActionMetadata[] {
+  return actions.map((action) => mapAction(action, providers))
 }
 
-function mapAction(
-  action: RuntimeAction,
-  providers: readonly ReturnType<typeof runtimeProvider>[],
-  connections: readonly ConnectorConnection[],
-): ConnectorAction {
+function mapAction(action: RuntimeAction, providers: readonly ReturnType<typeof runtimeProvider>[]): ConnectorActionMetadata {
   const provider = providers.find((candidate) => candidate.serviceId == action.service)
   if (provider == null) throw unavailable('Connector Action referenced an unknown service.')
-  const active = connections.filter((connection) => connection.serviceId == action.service && connection.status == 'active')
-  const defaultConnection = provider.authenticated
-    ? (active.find((connection) => connection.isDefault) ?? (active.length == 1 ? active[0] : undefined))
-    : undefined
   let ports: ReturnType<typeof connectorActionPorts>
   try {
     ports = connectorActionPorts(action.inputSchema, action.outputSchema)
@@ -743,7 +722,6 @@ function mapAction(
     inputSchema: action.inputSchema,
     outputSchema: action.outputSchema,
     authenticated: provider.authenticated,
-    ...(defaultConnection == null ? {} : { defaultConnection }),
     description: action.description,
     ...(provider.homepageUrl == null ? {} : { homepageUrl: provider.homepageUrl }),
     ...(provider.icon == null ? {} : { icon: provider.icon }),
@@ -792,7 +770,7 @@ export async function checkCodeActions(
 ): Promise<void> {
   if (declarations.length == 0) return
   if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
-  const actions = new Map<string, Promise<ConnectorAction>>()
+  const actions = new Map<string, Promise<ConnectorActionMetadata>>()
   const catalogs = new Map<string, Promise<readonly ConnectorConnection[]>>()
   for (const declaration of declarations) {
     let action = actions.get(declaration.action)

@@ -77,6 +77,8 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     '/connector/providers',
     '/connector/actions',
     '/connector/actions/*',
+    '/connector/action-metadata',
+    '/connector/action-metadata/*',
     '/connector/connections',
     '/connector/connections/:serviceId',
   ]) {
@@ -191,34 +193,39 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       version: 1,
     })
   })
-  app.get('/connector/actions', async (context) => {
-    const parameters = query(context.req.raw, ['flowId', 'q', 'service', 'locale'], controlErrorCode.flowInvalid)
-    const flowId = parameters.get('flowId')
-    const queryValue = parameters.get('q')?.trim()
-    const serviceId = parameters.get('service')?.trim()
-    if (queryValue != null && serviceId != null) invalid(controlErrorCode.flowInvalid, 'Connector Action query is invalid.')
-    if (queryValue != null && (queryValue.length == 0 || queryValue.length > 256)) invalid(controlErrorCode.flowInvalid, 'Connector Action query is invalid.')
-    if (serviceId != null && (serviceId.length == 0 || serviceId.length > 256)) invalid(controlErrorCode.flowInvalid, 'Connector service is invalid.')
-    const scope = flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid)
-    const locale = metadataLocale(context, ['flowId', 'q', 'service', 'locale'])
-    const actions =
-      queryValue == null
-        ? await service.listConnectorActions(serviceId, scope, locale)
-        : await service.searchConnectorActions(queryValue, scope, undefined, locale)
-    return response(200, { actions, version: 1 })
-  })
-  app.get('/connector/actions/:actionId', async (context) => {
-    const flowId = query(context.req.raw, ['flowId', 'locale'], controlErrorCode.flowInvalid).get('flowId')
-    return response(200, {
-      action: await service.getConnectorAction(
-        text(context.req.param('actionId'), controlErrorCode.flowInvalid),
-        flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
-        undefined,
-        metadataLocale(context, ['flowId', 'locale']),
-      ),
-      version: 1,
+  for (const metadata of [false, true]) {
+    const path = metadata ? '/connector/action-metadata' : '/connector/actions'
+    app.get(path, async (context) => {
+      const parameters = query(context.req.raw, ['flowId', 'q', 'service', 'locale'], controlErrorCode.flowInvalid)
+      const flowId = parameters.get('flowId')
+      const queryValue = parameters.get('q')?.trim()
+      const serviceId = parameters.get('service')?.trim()
+      if (queryValue != null && serviceId != null) invalid(controlErrorCode.flowInvalid, 'Connector Action query is invalid.')
+      if (queryValue != null && (queryValue.length == 0 || queryValue.length > 256)) invalid(controlErrorCode.flowInvalid, 'Connector Action query is invalid.')
+      if (serviceId != null && (serviceId.length == 0 || serviceId.length > 256)) invalid(controlErrorCode.flowInvalid, 'Connector service is invalid.')
+      const scope = flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid)
+      const locale = metadataLocale(context, ['flowId', 'q', 'service', 'locale'])
+      const actions =
+        queryValue == null
+          ? await (metadata ? service.listConnectorActionMetadata(serviceId, scope, locale) : service.listConnectorActions(serviceId, scope, locale))
+          : await (metadata
+              ? service.searchConnectorActionMetadata(queryValue, scope, undefined, locale)
+              : service.searchConnectorActions(queryValue, scope, undefined, locale))
+      return response(200, { actions, version: 1 })
     })
-  })
+    app.get(`${path}/:actionId`, async (context) => {
+      const flowId = query(context.req.raw, ['flowId', 'locale'], controlErrorCode.flowInvalid).get('flowId')
+      return response(200, {
+        action: await (metadata ? service.getConnectorActionMetadata.bind(service) : service.getConnectorAction.bind(service))(
+          text(context.req.param('actionId'), controlErrorCode.flowInvalid),
+          flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
+          undefined,
+          metadataLocale(context, ['flowId', 'locale']),
+        ),
+        version: 1,
+      })
+    })
+  }
   app.get('/connector/connections', async (context) => {
     const flowId = query(context.req.raw, ['flowId'], controlErrorCode.flowInvalid).get('flowId')
     return response(200, {

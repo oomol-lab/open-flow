@@ -20,6 +20,49 @@ const token = 'mcp-test-operator-token-000000000001'
 const version = '2026-07-28'
 const start = { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'start', node: { kind: 'manual', name: 'Start' } }
 
+it('preserves default accounts for CLI and MCP while browser metadata stays independent', async () => {
+  const action = {
+    actionId: 'mail.send',
+    authenticated: true,
+    name: 'send',
+    description: 'Send',
+    serviceId: 'mail',
+    serviceName: 'Mail',
+    inputs: {},
+    outputs: {},
+  }
+  let accountId = 'before'
+  const connections = vi.fn(async () => [{ connectionId: accountId, displayName: accountId, serviceId: 'mail', status: 'active' as const, isDefault: true }])
+  const connector = createConnectorHost({
+    getAction: async () => action,
+    listActions: async () => [action],
+    searchActions: async () => [action],
+    listConnections: connections,
+    listAllConnections: connections,
+  })
+  const { app, call, control } = await fixture({ capabilities: { connector: () => connector } })
+  const headers = { authorization: `Bearer ${token}` }
+  const first = await app.request('/v1/connector/action-metadata?service=mail&locale=en', { headers })
+  expect(first.status).toBe(200)
+  expect(await first.json()).toEqual({ actions: [action], version: 1 })
+  expect(connections).not.toHaveBeenCalled()
+  expect((await control.getConnectorAction('mail.send')).defaultConnection?.connectionId).toBe('before')
+  expect((await control.listConnectorActions('mail'))[0]?.defaultConnection?.connectionId).toBe('before')
+  expect((await control.searchConnectorActions('send'))[0]?.defaultConnection?.connectionId).toBe('before')
+  expect(await call('connector_get', { actionId: 'mail.send' })).toMatchObject({ defaultConnection: { connectionId: 'before' } })
+  expect(await call('connector_search', { query: 'send' })).toMatchObject({ actions: [{ defaultConnection: { connectionId: 'before' } }] })
+  accountId = 'after'
+  expect(await call('connector_get', { actionId: 'mail.send' })).toMatchObject({ defaultConnection: { connectionId: 'after' } })
+  const before = connections.mock.calls.length
+  connections.mockRejectedValue(new Error('Connections unavailable'))
+  const next = await app.request('/v1/connector/action-metadata?service=mail&locale=en', {
+    headers: { ...headers, 'if-none-match': first.headers.get('etag')! },
+  })
+  expect(next.status).toBe(304)
+  expect(connections).toHaveBeenCalledTimes(before)
+  await expect(control.getConnectorAction('mail.send')).rejects.toThrow()
+})
+
 async function fixture(options: Parameters<typeof openService>[1] = {}) {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-mcp-'))
   const file = path.join(directory, 'flow.sqlite')

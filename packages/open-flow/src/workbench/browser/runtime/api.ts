@@ -12,6 +12,7 @@ export type {
   DraftSync,
   Diagnostic,
   ConnectorAction,
+  ConnectorActionMetadata,
   ConnectorConnection,
   ConnectorProvider,
   Live,

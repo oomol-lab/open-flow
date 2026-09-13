@@ -31,7 +31,7 @@ for (const path of globSync('src/**/browser/**/*.{ts,tsx}')) {
     }
     if (
       (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node)) &&
-      /\/v1\/(connector\/(providers|actions|connections)(?:[/?]|$)|trigger-keys\/catalog)/.test(node.text)
+      /\/v1\/(connector\/(providers|actions|action-metadata|connections)(?:[/?]|$)|trigger-keys\/catalog)/.test(node.text)
     ) {
       violations.push(`${path}: catalog request paths belong to the catalog Stores`)
     }

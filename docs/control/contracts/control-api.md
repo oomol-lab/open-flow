@@ -579,6 +579,12 @@ Providers 和 Actions 使用 localStorage，Connections 使用 sessionStorage；
 Connections 为 Flow scope 和可选 service，Triggers 为语言。使用新版本键，不读取旧 URL 缓存。
 
 Actions 只持久化 service 列表的元数据，详情从列表派生；默认连接与当前连接状态从独立的 Connections Store 组合。
+浏览器使用 `/v1/connector/action-metadata`（可选 `service` 或 `q`）及其 `/:actionId` 详情接口；它们接受 `flowId` 和 `locale`，
+遵循相同鉴权、语言协商及条件请求规则。响应分别为 `{ version: 1, actions: ConnectorActionMetadata[] }` 和 `{ version: 1, action: ConnectorActionMetadata }`，
+不包含 `defaultConnection`，读取时不查询 Connections。Action 持久化键升级为 v3，避免复用旧组合响应的 ETag。
+Workbench 使用独立的 `ConnectorActionView` 表示组合后的展示数据。
+CLI 和 MCP 继续使用原 `/v1/connector/actions` 对应的组合接口；它们在响应时选择 active 默认账号或唯一 active 账号，
+保留 `ConnectorAction.defaultConnection`。这些组合响应的 ETag 仍随账号变化，浏览器不使用它们作为 Action 缓存。
 全局搜索使用独立的临时查询状态，不持久化，也不写入 service 列表。全量与按服务的 Connections 独立保存，互不合并或覆盖。
 画布使用派生的 Action 详情；应用排序使用全量 Connections，账号选择使用对应服务的 Connections。
 

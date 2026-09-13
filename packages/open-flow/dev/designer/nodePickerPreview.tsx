@@ -132,7 +132,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
           if (key.includes(':providers:')) return JSON.stringify({ data: providers.slice(0, 1), etag: '"cached"' })
           if (key.includes(':actions:')) {
             const [, service] = JSON.parse(key.slice(key.indexOf('['))) as string[]
-            return JSON.stringify({ data: sampleActionData(`/v1/connector/actions?service=${encodeURIComponent(service!)}`, true).actions, etag: null })
+            return JSON.stringify({ data: sampleActionData(`/v1/connector/action-metadata?service=${encodeURIComponent(service!)}`, true).actions, etag: null })
           }
           return null
         },
