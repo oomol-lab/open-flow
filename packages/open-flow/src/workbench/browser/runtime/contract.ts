@@ -23,6 +23,12 @@ export interface WorkbenchHost {
     readonly namespace: string
     readonly storage?: { getItem(key: string): string | null; setItem(key: string, value: string): void }
   }
+  /** Deployment identity for Connector caches. Every persisted response is revalidated before use. */
+  readonly connectorCache?: {
+    readonly namespace: string
+    readonly localStorage?: WorkbenchPreferences
+    readonly sessionStorage?: WorkbenchPreferences
+  }
   notify(notification: WorkbenchNotification | undefined): void
   openExternalPage(resolveUrl: () => Promise<string>): Promise<boolean>
   request(input: RequestInfo | URL, init?: RequestInit): Promise<Response>

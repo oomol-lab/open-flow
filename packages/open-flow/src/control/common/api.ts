@@ -735,10 +735,12 @@ export class ControlClient {
   }
 
   async listConnectorProviders(signal?: AbortSignal, flowId?: string): Promise<readonly ConnectorProvider[]> {
-    const source = record(await this.request(`/v1/connector/providers${flowId == null ? '' : `?flowId=${segment(flowId)}`}`, { signal }))
-    exact(source, ['providers', 'version'])
-    if (source.version != 1 || !Array.isArray(source.providers)) return invalidResponse()
-    return source.providers.map(connectorProvider)
+    return this.connectorRequest(`/v1/connector/providers${flowId == null ? '' : `?flowId=${segment(flowId)}`}`, 'providers', signal, (value) => {
+      const source = record(value)
+      exact(source, ['providers', 'version'])
+      if (source.version != 1 || !Array.isArray(source.providers)) return invalidResponse()
+      return source.providers.map(connectorProvider)
+    })
   }
 
   async listConnectorActions(serviceId?: string, signal?: AbortSignal, flowId?: string, locale?: string): Promise<readonly ConnectorAction[]> {
@@ -754,21 +756,26 @@ export class ControlClient {
 
   async getConnectorAction(actionId: string, signal?: AbortSignal, flowId?: string, locale?: string): Promise<ConnectorAction> {
     const parameters = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), ...(locale == null ? {} : { locale }) }).toString()
-    const source = record(await this.request(`/v1/connector/actions/${segment(actionId)}${parameters ? `?${parameters}` : ''}`, { signal }))
-    exact(source, ['action', 'version'])
-    if (source.version != 1) return invalidResponse()
-    return connectorAction(source.action)
+    return this.connectorRequest(`/v1/connector/actions/${segment(actionId)}${parameters ? `?${parameters}` : ''}`, 'actions', signal, (value) => {
+      const source = record(value)
+      exact(source, ['action', 'version'])
+      if (source.version != 1) return invalidResponse()
+      return connectorAction(source.action)
+    })
   }
 
   async listConnectorConnections(serviceId: string, signal?: AbortSignal, flowId?: string): Promise<readonly ConnectorConnection[]> {
-    const source = record(
-      await this.request(`/v1/connector/connections/${segment(serviceId)}${flowId == null ? '' : `?flowId=${segment(flowId)}`}`, { signal }),
+    return this.connectorRequest(
+      `/v1/connector/connections/${segment(serviceId)}${flowId == null ? '' : `?flowId=${segment(flowId)}`}`,
+      'connections',
+      signal,
+      (value) => {
+        const source = record(value)
+        exact(source, ['connections', 'serviceId', 'version'])
+        if (source.version != 1 || string(source.serviceId) != serviceId || !Array.isArray(source.connections)) return invalidResponse()
+        return source.connections.map(connection)
+      },
     )
-    exact(source, ['connections', 'serviceId', 'version'])
-    if (source.version != 1 || string(source.serviceId) != serviceId || !Array.isArray(source.connections)) {
-      return invalidResponse()
-    }
-    return source.connections.map(connection)
   }
 
   async createConnectorConnectionPage(serviceId: string, flowId?: string): Promise<string> {
@@ -958,13 +965,24 @@ export class ControlClient {
       .map(([key, value]) => `${segment(key)}=${segment(value)}`)
       .join('&')
     const suffix = query == '' ? '' : `?${query}`
-    const source = record(await this.request(`/v1/connector/actions${suffix}`, { signal }))
-    exact(source, ['actions', 'version'])
-    if (source.version != 1 || !Array.isArray(source.actions)) return invalidResponse()
-    return source.actions.map(connectorAction)
+    return this.connectorRequest(`/v1/connector/actions${suffix}`, 'actions', signal, (value) => {
+      const source = record(value)
+      exact(source, ['actions', 'version'])
+      if (source.version != 1 || !Array.isArray(source.actions)) return invalidResponse()
+      return source.actions.map(connectorAction)
+    })
   }
 
-  private async response(path: string, init: RequestInit, allowNotModified = false): Promise<Response> {
+  protected async connectorRequest<Value>(
+    path: string,
+    _kind: 'providers' | 'actions' | 'connections',
+    signal: AbortSignal | undefined,
+    decode: (value: unknown) => Value,
+  ): Promise<Value> {
+    return decode(await this.request(path, { signal }))
+  }
+
+  protected async response(path: string, init: RequestInit, allowNotModified = false): Promise<Response> {
     const headers = new Headers(init.headers)
     if (init.body != null) headers.set('content-type', 'application/json')
     const response = await this.requestControl(path, { ...init, headers })

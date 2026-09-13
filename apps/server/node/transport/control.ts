@@ -71,7 +71,14 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     return response(200, { version: 1 })
   })
 
-  for (const path of ['/trigger-keys', '/trigger-keys/catalog']) {
+  for (const path of [
+    '/trigger-keys',
+    '/trigger-keys/catalog',
+    '/connector/providers',
+    '/connector/actions',
+    '/connector/actions/*',
+    '/connector/connections/:serviceId',
+  ]) {
     app.use(path, etag({ retainedHeaders: [...RETAINED_304_HEADERS, 'content-language'] }))
   }
   const metadataLocale = (context: Context<Environment>, parameters = ['locale']) => {
@@ -168,6 +175,10 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.get('/flows/:flowId/revisions/:revisionId', (context) => response(200, service.getRevision(context.req.param('flowId'), context.req.param('revisionId'))))
 
+  app.use('/connector/*', async (context, next) => {
+    await next()
+    context.header('Cache-Control', 'private, no-cache')
+  })
   app.get('/connector/providers', async (context) => {
     const flowId = query(context.req.raw, ['flowId'], controlErrorCode.flowInvalid).get('flowId')
     return response(200, {

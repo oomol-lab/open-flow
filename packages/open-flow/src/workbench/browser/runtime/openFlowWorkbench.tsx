@@ -279,6 +279,7 @@ function Session({
         (input, init) => host.request(input, init),
         (flowId, listener) => host.subscribeFlow(flowId, listener),
         (listener) => host.subscribeFlowCatalog(listener),
+        host.connectorCache,
       ),
       preferences,
       randomId,

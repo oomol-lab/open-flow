@@ -3,6 +3,7 @@ import type { JsonValue } from '../../../flow/common/change.ts'
 import type { FlowCatalogEvent, FlowChangeEvent, WorkbenchHost } from './contract.ts'
 
 import { ControlClient } from '../../../control/common/api.ts'
+import { ConnectorCache } from './connectorCache.ts'
 
 export { ApiError } from '../../../control/common/api.ts'
 export type {
@@ -77,12 +78,24 @@ type FlowCatalogSubscriber = WorkbenchHost['subscribeFlowCatalog']
 const segment = encodeURIComponent
 
 export class WorkbenchClient extends ControlClient {
+  readonly #connectorCache: ConnectorCache
   constructor(
     fetcher: Fetcher,
     private readonly subscribeFlow: FlowSubscriber = () => ({ ready: Promise.resolve(), stop() {} }),
     private readonly subscribeFlowCatalog: FlowCatalogSubscriber = () => ({ ready: Promise.resolve(), stop() {} }),
+    connectorCache?: WorkbenchHost['connectorCache'],
   ) {
     super(fetcher)
+    this.#connectorCache = new ConnectorCache(connectorCache)
+  }
+
+  protected override connectorRequest<Value>(
+    path: string,
+    kind: 'providers' | 'actions' | 'connections',
+    signal: AbortSignal | undefined,
+    decode: (value: unknown) => Value,
+  ): Promise<Value> {
+    return this.#connectorCache.get(path, kind, signal, decode, (headers) => this.response(path, { headers, signal }, true))
   }
 
   watchFlowCatalog(changed: (event?: FlowCatalogEvent) => void): ReturnType<FlowCatalogSubscriber> {

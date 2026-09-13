@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import type { AddNodeOption } from './addNodeOptions.ts'
 import type { BlockLibraryProps } from './contextPanel.tsx'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { useDebouncedValue } from '../../../../ui/browser/hooks.ts'
@@ -55,7 +55,10 @@ export function NodePickerContent({
   const [addError, setAddError] = useState(false)
   const busy = useRef(false)
   const list = useRef<HTMLDivElement>(null)
-  const [root, setRoot] = useState<HTMLDivElement | null>(null)
+  const [root, setRoot] = useState<HTMLElement | null>(null)
+  const mount = useCallback((element: HTMLDivElement | null) => {
+    setRoot(element?.closest<HTMLElement>('.open-flow-workbench') ?? element?.closest<HTMLElement>('.open-flow-theme') ?? null)
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -132,7 +135,7 @@ export function NodePickerContent({
       setAdding(false)
     }
   }
-  const row = (item: AddNodeOption, compact = false) => {
+  const row = (item: AddNodeOption, compact = false, index = 0) => {
     const button = (
       <Button
         variant="ghost"
@@ -177,7 +180,7 @@ export function NodePickerContent({
     return compact ? (
       <Tooltip key={item.id}>
         <TooltipTrigger render={button} />
-        <TooltipContent container={root} side="bottom">
+        <TooltipContent container={root} side={index % 2 == 0 ? 'left' : 'right'} sideOffset={24}>
           {item.description}
         </TooltipContent>
       </Tooltip>
@@ -193,14 +196,14 @@ export function NodePickerContent({
         <h3 style={{ margin: 0 }} className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">
           {title}
         </h3>
-        <div className={compact ? 'grid grid-cols-2 gap-x-2' : 'grid'}>{items.map((item) => row(item, compact))}</div>
+        <div className={compact ? 'grid grid-cols-2 gap-x-2' : 'grid'}>{items.map((item, index) => row(item, compact, index))}</div>
       </section>
     )
   const local = options.filter((item) => !term || `${item.label} ${item.description}`.toLowerCase().includes(term.toLowerCase()))
   const matches = [...new Map([...local, ...results].filter((item) => item.kind != 'connector-group').map((item) => [item.id, item])).values()]
   return (
-    <Tabs ref={setRoot} value={page} onValueChange={(value) => setPage(String(value))} className="h-full min-h-0 gap-0" aria-busy={adding}>
-      <div className="shrink-0 px-3 pb-2 pt-3">
+    <Tabs value={page} onValueChange={(value) => setPage(String(value))} className="h-full min-h-0 gap-0" aria-busy={adding}>
+      <div ref={mount} className="shrink-0 px-3 pb-2 pt-3">
         <InputGroup>
           <InputGroupAddon>
             <Icon name="search" size={16} />
