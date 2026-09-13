@@ -605,6 +605,8 @@ Providers 和 Actions 使用 localStorage，Connections 使用 sessionStorage；
 Connections 为 Flow scope 和可选 service，Triggers 为语言。使用新版本键，不读取旧 URL 缓存。
 
 Actions 只持久化 service 列表的元数据，详情从列表派生；默认连接与当前连接状态从独立的 Connections Store 组合。
+Action metadata 保留上游可选的 `operationType` 字段（`read`、`write`、`destructive`）；缺失或未知值在节点面板显示为其他接口。
+
 浏览器使用 `/v1/connector/action-metadata`（可选 `service` 或 `q`）及其 `/:actionId` 详情接口；它们接受 `flowId` 和 `locale`，
 遵循相同鉴权、语言协商及条件请求规则。响应分别为 `{ version: 1, actions: ConnectorActionMetadata[] }` 和 `{ version: 1, action: ConnectorActionMetadata }`，
 不包含 `defaultConnection`，读取时不查询 Connections。Action 持久化键升级为 v3，避免复用旧组合响应的 ETag。

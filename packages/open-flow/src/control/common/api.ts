@@ -153,6 +153,8 @@ export interface ConnectorConnection {
 
 /** Action metadata independent of account availability and selection. */
 export interface ConnectorActionMetadata {
+  /** Upstream operation classification; unknown values remain uncategorized. */
+  readonly operationType?: string
   readonly inputSchema?: JsonValue
   readonly outputSchema?: JsonValue
   readonly actionId: string

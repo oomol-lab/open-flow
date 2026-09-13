@@ -30,6 +30,7 @@ interface GetOptions {
 }
 
 interface RuntimeAction {
+  readonly operationType?: string
   readonly description: string
   readonly id: string
   readonly inputSchema: JsonValue
@@ -598,6 +599,7 @@ function runtimeAction(value: unknown, search = false): RuntimeAction {
   const name = string(source.name, 'action.name')
   const service = string(source.service, 'action.service')
   return {
+    ...(source.operationType == null ? {} : { operationType: string(source.operationType, 'action.operationType') }),
     description: source.description,
     id: search ? `${service}.${name}` : string(source.id, 'action.id'),
     inputSchema: source.inputSchema as JsonValue,
@@ -658,6 +660,7 @@ function mapAction(action: RuntimeAction, providers: readonly ReturnType<typeof 
   }
   return {
     actionId: action.id,
+    ...(action.operationType == null ? {} : { operationType: action.operationType }),
     inputSchema: action.inputSchema,
     outputSchema: action.outputSchema,
     authenticated: provider.authenticated,

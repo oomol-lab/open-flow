@@ -6,6 +6,7 @@ import { resourceValue } from './resource.ts'
 
 const connection = { connectionId: 'account', serviceId: 'mail', displayName: 'Account', isDefault: true, status: 'active' }
 const action = {
+  operationType: 'write',
   actionId: 'mail.send',
   serviceId: 'mail',
   serviceName: 'Mail',
@@ -35,6 +36,7 @@ function setup() {
       : url.pathname.endsWith('/actions')
         ? [
             {
+              operationType: 'write',
               id: 'mail.send',
               service: 'mail',
               name: 'Send',
@@ -255,4 +257,18 @@ it('derives Action ports and authentication from independent Proxy responses', a
   expect(persisted.data[0]).not.toHaveProperty('serviceName')
   expect(persisted.data[0]).toHaveProperty('inputSchema')
   stores.dispose()
+})
+
+it('preserves operation types through proxy lists, cached responses and metadata search', async () => {
+  const test = setup()
+  const first = test.create()
+  expect(await resourceValue(first.actions.get('mail', 'flow', 'en'))).toMatchObject([{ operationType: 'write' }])
+  first.dispose()
+  const restored = test.create()
+  expect(restored.actions.get('mail', 'flow', 'en').value.data).toMatchObject([{ operationType: 'write' }])
+  const controller = new AbortController()
+  const search = restored.actions.search('Send', 'flow', 'en', controller.signal)
+  expect(await resourceValue(search.get())).toMatchObject([{ operationType: 'write' }])
+  controller.abort()
+  restored.dispose()
 })

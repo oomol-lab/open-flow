@@ -58,6 +58,7 @@ export function connectorActionMetadata(value: unknown): ConnectorActionMetadata
   const icon = source.icon
   exact(source, [
     'actionId',
+    ...(Object.hasOwn(source, 'operationType') ? ['operationType'] : []),
     ...(Object.hasOwn(source, 'inputSchema') ? ['inputSchema'] : []),
     ...(Object.hasOwn(source, 'outputSchema') ? ['outputSchema'] : []),
     'authenticated',
@@ -75,6 +76,7 @@ export function connectorActionMetadata(value: unknown): ConnectorActionMetadata
     ...(source.inputSchema === undefined ? {} : { inputSchema: jsonValue(source.inputSchema) }),
     ...(source.outputSchema === undefined ? {} : { outputSchema: jsonValue(source.outputSchema) }),
     actionId: string(source.actionId),
+    ...(source.operationType == null ? {} : { operationType: string(source.operationType) }),
     authenticated: typeof source.authenticated == 'boolean' ? source.authenticated : invalidResponse(),
     description: typeof source.description == 'string' ? source.description : invalidResponse(),
     ...(homepageUrl == null ? {} : { homepageUrl }),
