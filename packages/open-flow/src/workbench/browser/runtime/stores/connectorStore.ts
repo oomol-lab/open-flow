@@ -337,7 +337,7 @@ export class ConnectorStore {
     })
   }
 
-  public readonly provideAddNodeOptions = (searchTerm: string, signal: AbortSignal) => {
+  public readonly provideAddNodeOptions = (searchTerm: string, signal: AbortSignal, sessionSignal = signal) => {
     const flowId = this.#workspace.$.flowId.value
     const query = searchTerm.trim()
     if (query.length == 0)
@@ -346,7 +346,7 @@ export class ConnectorStore {
         refreshing: false,
         error: undefined,
       }))
-    const source = this.data.actions.search(query, flowId, this.#language, signal).get()
+    const source = this.data.actions.search(query, flowId, this.#language, sessionSignal).get()
     return scopedValue(signal, (get) => {
       const state = get(source)
       const t = get(this.#i18n.t$)

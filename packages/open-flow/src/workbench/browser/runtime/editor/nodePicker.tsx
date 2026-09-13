@@ -44,6 +44,12 @@ export function NodePickerContent({
   const [query, setQuery] = useState(initialQuery)
   const [appQuery, setAppQuery] = useState('')
   const searchInput = useRef<HTMLInputElement>(null)
+  const searchSession = useRef<AbortController | null>(null)
+  useEffect(() => {
+    const controller = new AbortController()
+    searchSession.current = controller
+    return () => controller.abort()
+  }, [])
   const debouncedQuery = useDebouncedValue(query, 150)
   const term = query.trim() ? debouncedQuery.trim() : ''
   const [catalog, setCatalog] = useState<readonly AddNodeOption[]>([])
@@ -90,7 +96,7 @@ export function NodePickerContent({
     setResults([])
     if (term && appId == null) {
       setLoading(true)
-      observeResource(searchOptions(term, controller.signal), controller.signal, (state) => {
+      observeResource(searchOptions(term, controller.signal, searchSession.current!.signal), controller.signal, (state) => {
         setResults(state.data ?? [])
         setFailed(state.error != null)
         setLoading(state.refreshing || (state.data == null && state.error == null))
