@@ -5,12 +5,22 @@ import { exact, invalidResponse, jsonValue, record, string } from './decoding.ts
 
 export function connection(value: unknown): ConnectorConnection {
   const source = record(value)
-  exact(source, [...(Object.hasOwn(source, 'alias') ? ['alias'] : []), 'connectionId', 'displayName', 'isDefault', 'serviceId', 'status'])
+  exact(source, [
+    ...(Object.hasOwn(source, 'alias') ? ['alias'] : []),
+    ...(Object.hasOwn(source, 'builtInAccount') ? ['builtInAccount'] : []),
+    'connectionId',
+    'displayName',
+    'isDefault',
+    'serviceId',
+    'status',
+  ])
+  if (source.builtInAccount !== undefined && typeof source.builtInAccount != 'boolean') return invalidResponse()
   const status = source.status
   if (status != 'active' && status != 'disconnected' && status != 'error' && status != 'reauth_required') return invalidResponse()
   if (typeof source.isDefault != 'boolean') return invalidResponse()
   return {
     ...(source.alias === undefined ? {} : { alias: string(source.alias) }),
+    ...(source.builtInAccount === undefined ? {} : { builtInAccount: source.builtInAccount }),
     connectionId: string(source.connectionId),
     displayName: string(source.displayName),
     isDefault: source.isDefault,
@@ -88,12 +98,20 @@ export function connectorProvider(value: unknown): ConnectorProvider {
   const source = record(value)
   const homepageUrl = source.homepageUrl
   const icon = source.icon
-  exact(source, ['serviceId', 'serviceName', ...(homepageUrl == null ? [] : ['homepageUrl']), ...(icon == null ? [] : ['icon'])])
+  if (source.noSetup !== undefined && typeof source.noSetup != 'boolean') return invalidResponse()
+  exact(source, [
+    ...(Object.hasOwn(source, 'noSetup') ? ['noSetup'] : []),
+    'serviceId',
+    'serviceName',
+    ...(homepageUrl == null ? [] : ['homepageUrl']),
+    ...(icon == null ? [] : ['icon']),
+  ])
   if ((homepageUrl != null && typeof homepageUrl != 'string') || (icon != null && typeof icon != 'string')) return invalidResponse()
   return {
     ...(homepageUrl == null ? {} : { homepageUrl }),
     ...(icon == null ? {} : { icon }),
     serviceId: string(source.serviceId),
     serviceName: string(source.serviceName),
+    ...(source.noSetup === undefined ? {} : { noSetup: source.noSetup }),
   }
 }

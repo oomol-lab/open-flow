@@ -47,10 +47,12 @@ const sampleProviders = [
   })),
   { serviceId: 'feishu', serviceName: '飞书' },
   { serviceId: 'wecom', serviceName: '企业微信' },
-  { serviceId: '17track', serviceName: '17TRACK' },
+  { serviceId: '17track', serviceName: '17TRACK', noSetup: true },
+  { serviceId: 'seedream', serviceName: 'Doubao Seedream' },
 ]
 
-const sampleConnections = ['feishu', 'gmail'].map((serviceId) => ({
+const sampleConnections = ['feishu', 'gmail', 'seedream'].map((serviceId) => ({
+  builtInAccount: serviceId == 'seedream',
   connectionId: `${serviceId}-account`,
   displayName: serviceId,
   serviceId,
@@ -241,6 +243,6 @@ export const nodePickerPreviewStory: FrontendStory = {
   title: 'Add Node Popover',
   standalone: true,
   description:
-    'Cached Gmail appears immediately. After refresh, connected 飞书 and Gmail lead, followed by 企业微信, 17TRACK and Google Drive. Real Trigger definitions, cached actions, search and large-catalog states are available.',
+    'Cached Gmail appears immediately. After refresh, connected 飞书 and Gmail lead, followed by built-in Doubao Seedream, no-setup 17TRACK, then unconfigured 企业微信 and Google Drive. Real Trigger definitions, cached actions, search and large-catalog states are available.',
   render: (log, dark, language) => <Preview dark={dark} language={language} log={log} />,
 }

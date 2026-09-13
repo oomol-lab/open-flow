@@ -130,6 +130,7 @@ function providerOption(provider: ConnectorProvider, t: TFunction): AddNodeOptio
     kind: 'connector-group',
     label: provider.serviceName,
     outputs: [],
+    noSetup: provider.noSetup,
     serviceId: provider.serviceId,
   }
 }

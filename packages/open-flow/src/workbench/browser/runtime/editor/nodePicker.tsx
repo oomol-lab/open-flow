@@ -13,13 +13,13 @@ import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../../ui/browser/tabs.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
-import { comparePickerApps } from './nodePickerApps.ts'
+import { comparePickerApps, pickerConnectionPriorities } from './nodePickerApps.ts'
 
 interface App {
   id: string
   label: string
   icon?: string
-  connected?: boolean
+  priority?: number
   directory?: AddNodeOption
   triggers: AddNodeOption[]
 }
@@ -95,7 +95,7 @@ export function NodePickerContent({
   }, [loadConnections])
 
   const apps = useMemo(() => {
-    const connected = new Set(connections?.filter((item) => item.status == 'active').map((item) => item.serviceId))
+    const priorities = pickerConnectionPriorities(connections ?? [])
     const entries = new Map<string, App>()
     for (const item of catalog) {
       if (item.kind == 'connector-group')
@@ -103,7 +103,7 @@ export function NodePickerContent({
           id: item.serviceId,
           label: item.label,
           icon: item.icon,
-          connected: connected.has(item.serviceId),
+          priority: Math.min(priorities.get(item.serviceId) ?? 3, item.noSetup ? 2 : 3),
           directory: item,
           triggers: [],
         })
@@ -111,7 +111,7 @@ export function NodePickerContent({
     for (const item of catalog) {
       if (item.kind != 'trigger' || !('trigger' in item) || item.trigger.kind != 'catalog') continue
       const id = item.trigger.definition.provider
-      const app = entries.get(id) ?? { id, label: id, icon: item.icon, connected: connected.has(id), triggers: [] }
+      const app = entries.get(id) ?? { id, label: id, icon: item.icon, priority: priorities.get(id), triggers: [] }
       app.triggers.push(item)
       entries.set(id, app)
     }

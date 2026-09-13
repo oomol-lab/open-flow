@@ -322,3 +322,13 @@ it('scopes provider responses to the exact request', async () => {
   expect(cachedResponse(client.requestCache.responses.value, connectorProvidersQuery('two'))?.[0]?.serviceName).toBe('Other')
   expect(cachedResponse(client.requestCache.responses.value, connectorProvidersQuery())).toBeUndefined()
 })
+
+it('preserves account and no-setup metadata through client decoding', async () => {
+  const builtIn = { ...connection, builtInAccount: true }
+  const noSetup = { ...provider, noSetup: true }
+  const client = new WorkbenchClient(async (path) =>
+    Response.json(String(path).includes('/providers') ? { version: 1, providers: [noSetup] } : { version: 1, connections: [builtIn] }),
+  )
+  expect(await client.listConnectorProviders()).toEqual([noSetup])
+  expect(await client.listAllConnectorConnections()).toEqual([builtIn])
+})
