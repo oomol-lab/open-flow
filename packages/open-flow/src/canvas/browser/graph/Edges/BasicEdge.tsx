@@ -6,9 +6,8 @@ import { BaseEdge, EdgeLabelRenderer, getBezierPath, Position } from '@xyflow/re
 import { useId, useMemo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { ErrorCircle } from '../../components/errorCircle.tsx'
-import { DEFAULT_HANDLE_KIND } from '../../components/handleKind.ts'
-import { gradientToStroke } from '../../stores/edge/colors.ts'
 import { useCanvasStore } from '../CanvasStoreContext.tsx'
+import { EdgeGradient } from './EdgeGradient.tsx'
 
 export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
   const arrowId = useId().replaceAll(':', '')
@@ -33,14 +32,14 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
 
   const selected = useVal(edgeStore?.$.selected)
   const nodeSelected = useVal(edgeStore?.$.nodeSelected)
-  const sourceGradientColor = useVal(edgeStore?.$.sourceGradientColor) || DEFAULT_HANDLE_KIND
-  const targetGradientColor = useVal(edgeStore?.$.targetGradientColor) || DEFAULT_HANDLE_KIND
+  const sourceGradientColor = useVal(edgeStore?.$.sourceGradientColor) || 'var(--edge-primitive)'
+  const targetGradientColor = useVal(edgeStore?.$.targetGradientColor) || 'var(--edge-primitive)'
   const connectionMeta = useVal(edgeStore?.$.connectionMeta)
 
-  const inverse = props.sourceX > props.targetX
   const emphasized = selected || nodeSelected
   const strokeWidth = emphasized ? 2.5 : 1.5
-  const stroke = selected ? 'var(--edge-selected)' : connectionMeta?.muted ? undefined : gradientToStroke(sourceGradientColor, targetGradientColor, inverse)
+  const gradientId = `${arrowId}-gradient`
+  const stroke = selected ? 'var(--edge-selected)' : connectionMeta?.muted ? undefined : `url(#${gradientId})`
 
   const style = useMemo<React.CSSProperties>(
     () => ({
@@ -55,6 +54,15 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
 
   return (
     <>
+      <EdgeGradient
+        id={gradientId}
+        sourceX={props.sourceX}
+        sourceY={props.sourceY}
+        targetX={targetX}
+        targetY={targetY}
+        sourceColor={sourceGradientColor}
+        targetColor={targetGradientColor}
+      />
       <defs>
         <marker
           id={arrowId}
@@ -70,7 +78,7 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
           <path
             d="M 1 1 L 9 5 L 1 9"
             fill="none"
-            stroke={selected ? 'var(--edge-selected)' : 'var(--edge-primitive)'}
+            stroke={selected ? 'var(--edge-selected)' : connectionMeta?.muted ? 'var(--edge-primitive)' : targetGradientColor}
             strokeWidth={strokeWidth}
             strokeLinecap="round"
             strokeLinejoin="round"

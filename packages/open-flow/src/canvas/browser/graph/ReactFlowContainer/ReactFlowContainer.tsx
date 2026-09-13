@@ -71,7 +71,6 @@ import { CommentNodeStore } from '../../stores/node/commentNode.store.ts'
 import { FITTING_VIEW_CLASSNAME } from '../../stores/node/constants.ts'
 import { NodeStore } from '../../stores/node/node.store.ts'
 import { BlockQuickPickPanel } from '../BlockQuickPickPanel.tsx'
-import { EdgeDefs } from '../Edges/EdgeDefs.tsx'
 import { NodePlaceholder, NodePlaceholderQueue } from '../Nodes/useNodePlaceholder.ts'
 import { getPaneRect, PaneRectContext } from '../Nodes/usePaneRect.ts'
 import { CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from './CanvasControls.tsx'
@@ -183,7 +182,6 @@ export const ReactFlowContainer: React.FC<ReactFlowContainerProps> = (props: Rea
           <TooltipProvider delay={300}>
             <ReactFlowProvider>
               <HandleContextProvider Handle={Handle as HandleImpl}>
-                <EdgeDefs />
                 <ReactFlowContainerInner {...props} />
               </HandleContextProvider>
             </ReactFlowProvider>
