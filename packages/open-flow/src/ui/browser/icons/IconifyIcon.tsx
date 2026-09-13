@@ -74,9 +74,29 @@ const IconifyIconAsync = ({ collection, icon, color, className, onError }: Iconi
   return <i />
 }
 
+// Reuse loaded icons across mounts and share concurrent requests.
+const loadedIcons = new Map<string, RawIcon>()
+const pendingIcons = new Map<string, Promise<RawIcon>>()
+
+export const fetchIcon = (collection: string, icon: string): Promise<RawIcon> => {
+  const key = `${collection}:${icon}`
+  const loaded = loadedIcons.get(key)
+  if (loaded) return Promise.resolve(loaded)
+  const pending = pendingIcons.get(key)
+  if (pending) return pending
+  const request = requestIcon(collection, icon)
+    .then((rawIcon) => {
+      loadedIcons.set(key, rawIcon)
+      return rawIcon
+    })
+    .finally(() => pendingIcons.delete(key))
+  pendingIcons.set(key, request)
+  return request
+}
+
 // Reuse the URL object between requests.
 const fetchIconUrl = new URL('https://api.iconify.design/codicon.json?icons=close')
-export const fetchIcon = async (collection: string, icon: string): Promise<RawIcon> => {
+const requestIcon = async (collection: string, icon: string): Promise<RawIcon> => {
   fetchIconUrl.pathname = `/${collection}.json`
   fetchIconUrl.searchParams.set('icons', icon)
   const res = await fetch(fetchIconUrl.href)
@@ -86,6 +106,7 @@ export const fetchIcon = async (collection: string, icon: string): Promise<RawIc
     throw new Error(`Failed to fetch ${collection}:${icon}: ${res.statusText}. Status: ${json}`)
   }
   const rawIcon = json.icons[icon]
+  if (!rawIcon) throw new Error(`Icon not found: ${collection}:${icon}`)
   if (rawIcon) {
     const width = rawIcon.width || json.width
     const height = rawIcon.height || json.height
@@ -120,6 +141,10 @@ export const getInlineIconifyIcon = (collection: string, icon: string, color?: s
   if (!json) {
     json = (MANUALLY_ADDED_ICONS as any)[collection]
     rawIcon = json && json.icons[icon]
+  }
+  if (!rawIcon) {
+    const fetched = loadedIcons.get(`${collection}:${icon}`)
+    if (fetched) return generateSvgDataUri(fetched.width, fetched.height, fetched, color)
   }
   if (rawIcon && json) {
     return generateSvgDataUri(rawIcon.width || json.width, rawIcon.height || json.height, rawIcon, color)
