@@ -343,6 +343,7 @@
     "hide": "隐藏内容"
   },
   "nodeStatus": {
+    "connectionRequired": "尚未连接或连接已失效。请在节点设置中重新连接或选择可用连接。",
     "error": "错误",
     "hasError": "存在错误",
     "running": "运行中",
@@ -584,7 +585,7 @@
       "task": "任务",
       "trigger": "触发器",
       "condition": "条件判断",
-      "wait": "等待",
+      "wait": "等待确认",
       "subflow": "子流程",
       "value": "设定值",
       "input": "流程输入",

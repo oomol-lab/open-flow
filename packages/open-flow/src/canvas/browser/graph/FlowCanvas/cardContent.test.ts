@@ -5,6 +5,16 @@ import { conditionBranchSummary, imageSources, nodeCardContent, nodeSummary } fr
 const base = { id: 'node', title: 'Schedule', position: { x: 0, y: 0 }, inputs: [], outputs: [] }
 
 describe('Canvas content', () => {
+  it('keeps a provider trigger description in the body so the subtitle identifies its provider', () => {
+    expect(
+      nodeCardContent({
+        ...base,
+        kind: 'trigger',
+        description: 'Watch new issues',
+        presentation: { kind: 'integration', schedules: [], source: 'github' },
+      }),
+    ).toMatchObject({ inline: false, summary: 'Watch new issues', collapsible: true })
+  })
   it('leaves configured nodes without a description compact instead of inventing a configuration prompt', () => {
     expect(nodeSummary({ ...base, kind: 'task', reference: 'normalize', description: '  ' })).toBe('')
     expect(nodeSummary({ ...base, kind: 'trigger', presentation: { kind: 'webhook', schedules: [] } })).toBe('')

@@ -37,7 +37,13 @@ export function CanvasNode({
   const icon = node.icon ?? (node.kind == 'wait' ? ':carbon:time:' : undefined)
   const { values, summary, schedules, images, tools, inline, hidden } = nodeCardContent(node)
   const kind = node?.kind ?? 'task'
-  const subtitle = inline ? summary : node?.kind == 'task' ? node.executorName || t('canvasCard.kind.task') : t(`canvasCard.kind.${kind}`)
+  const subtitle = inline
+    ? summary
+    : node.kind == 'task'
+      ? node.executorName || t('canvasCard.kind.task')
+      : node.kind == 'trigger' && node.presentation?.source
+        ? `${t('canvasCard.kind.trigger')} · ${node.presentation.source}`
+        : t(`canvasCard.kind.${kind}`)
   const distinctSubtitle = subtitle.trim().toLocaleLowerCase() == title.trim().toLocaleLowerCase() ? undefined : subtitle
   const toolContent = tools != null && tools.length > 0 && (
     <div className={styles.tools}>
@@ -82,7 +88,10 @@ export function CanvasNode({
         icon={<ContentIcon src={icon} fallback={<i className={iconForNodeType(nodeStore.nodeType)} />} />}
         subtitle={distinctSubtitle}
         selected={selected}
-        problem={problem}
+        problem={(node.kind == 'task' || node.kind == 'trigger') && node.connectionRequired ? t('nodeStatus.connectionRequired') : problem}
+        problemIcon={
+          (node.kind == 'task' || node.kind == 'trigger') && node.connectionRequired ? <i aria-hidden="true" className="i-lucide-light:unplug" /> : undefined
+        }
         branches={branches}
         footer={
           toolContent || runContent ? (

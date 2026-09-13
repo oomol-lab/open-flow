@@ -32,7 +32,7 @@
     "triggers": "Trigger",
     "value": "固定値",
     "valueDescription": "テキストや数値などの固定値を設定し、下流のノードで使用します。",
-    "wait": "待機",
+    "wait": "確認待ち",
     "waitDescription": "オペレーターが続行または承認するまで Run を一時停止します。",
     "webhook": "Webhook",
     "webhookDescription": "専用の HTTP エンドポイントで外部イベントを受信します。",

@@ -67,7 +67,7 @@ export function nodeCardContent(node: NodeContent) {
   const schedules = node.kind == 'trigger' ? node.presentation?.schedules : undefined
   const images = imageSources(node.run?.outputs)
   const tools = node.kind == 'task' ? node.tools : undefined
-  const inline = node.kind == 'trigger' && !schedules?.length && !!summary && !summary.includes('\n') && summary.length <= 48
+  const inline = node.kind == 'trigger' && !node.presentation?.source && !schedules?.length && !!summary && !summary.includes('\n') && summary.length <= 48
   const collapsible = node.kind != 'condition' && (values.length > 0 || !!schedules?.length || images.length > 0 || !!tools?.length || (!inline && !!summary))
   return { values, summary, schedules, images, tools, inline, collapsible, hidden: collapsible && node.contentHidden === true }
 }

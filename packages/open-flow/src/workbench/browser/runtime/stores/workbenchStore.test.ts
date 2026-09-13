@@ -165,8 +165,8 @@ describe('WorkbenchStore diagnostics', () => {
         }),
       ])
       expect(store.$.diagnosticItems.value).toEqual([expect.objectContaining({ location: { nodeId: 'connector', section: 'account' }, scope: 'task' })])
-      expect(store.$.designerNodeById.value.get('connector')).toMatchObject({ diagnostics: 1, executorName: 'connection required' })
-      expect(store.$.designerNodeById.value.get('connected')).toMatchObject({ diagnostics: 0 })
+      expect(store.$.designerNodeById.value.get('connector')).toMatchObject({ diagnostics: 1, executorName: 'connector · AMap', connectionRequired: true })
+      expect(store.$.designerNodeById.value.get('connected')).toMatchObject({ diagnostics: 0, executorName: 'connector · AMap' })
     } finally {
       store.dispose()
     }

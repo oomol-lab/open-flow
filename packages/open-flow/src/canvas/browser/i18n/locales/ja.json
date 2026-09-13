@@ -343,6 +343,7 @@
     "hide": "内容を非表示"
   },
   "nodeStatus": {
+    "connectionRequired": "接続が未設定、または無効です。ノード設定で再接続するか、利用可能な接続を選択してください。",
     "error": "エラー",
     "hasError": "エラーあり",
     "running": "実行中",
@@ -584,7 +585,7 @@
       "task": "タスク",
       "trigger": "トリガー",
       "condition": "条件",
-      "wait": "待機",
+      "wait": "確認待ち",
       "subflow": "サブフロー",
       "value": "設定値",
       "input": "入力",

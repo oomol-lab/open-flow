@@ -32,7 +32,7 @@
     "triggers": "Triggers",
     "value": "Fixed Values",
     "valueDescription": "Set fixed values, such as text and numbers, for downstream nodes to use.",
-    "wait": "Wait",
+    "wait": "Wait for confirmation",
     "waitDescription": "Pause the Run until an operator continues or approves it.",
     "webhook": "Webhook",
     "webhookDescription": "Receive external events through a dedicated HTTP endpoint.",

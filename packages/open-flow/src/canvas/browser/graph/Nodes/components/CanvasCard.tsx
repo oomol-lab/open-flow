@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { clsx } from 'clsx'
 import { Children, useLayoutEffect, useRef, useState } from 'react'
 import { isEmptyReactNode } from '../../../../../ui/browser/hooks.ts'
+import { CanvasTooltip } from '../../../components/tooltip.tsx'
 
 export function CanvasCard({
   title,
@@ -17,6 +18,7 @@ export function CanvasCard({
   footer,
   actions,
   problem,
+  problemIcon,
   selected,
   compact = false,
   compactContent = false,
@@ -37,6 +39,7 @@ export function CanvasCard({
   readonly branches?: ReactNode
   readonly footer?: ReactNode
   readonly actions?: ReactNode
+  readonly problemIcon?: ReactNode
   readonly problem?: string
   readonly selected?: boolean
 }) {
@@ -44,9 +47,11 @@ export function CanvasCard({
   const hasBranches = !isEmptyReactNode(branches)
   const hasBody = (!contentHidden && (hasContent || !isEmptyReactNode(preview))) || hasBranches || (!footerHidden && !isEmptyReactNode(footer))
   const statusIndicator = problem && (
-    <span className={clsx(styles.icon, styles.indicator, styles.warning)} title={problem} aria-label={problem} role="img">
-      <i aria-hidden="true" className="i-lucide:triangle-alert" />
-    </span>
+    <CanvasTooltip title={problem} placement="top">
+      <span className={clsx(styles.icon, styles.indicator, styles.warning)} aria-label={problem} role="img" tabIndex={0}>
+        {problemIcon ?? <i aria-hidden="true" className="i-lucide-light:triangle-alert" />}
+      </span>
+    </CanvasTooltip>
   )
   return (
     <article

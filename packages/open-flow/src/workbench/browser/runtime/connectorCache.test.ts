@@ -2,7 +2,7 @@ import type { WorkbenchHost } from './contract.ts'
 
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from './api.ts'
-import { cachedConnectorActions, cachedConnectorConnections } from './connectorCache.ts'
+import { cachedConnectorActions, cachedConnectorConnections, cachedConnectorProviders } from './connectorCache.ts'
 
 function storage() {
   const entries = new Map<string, string>()
@@ -224,4 +224,14 @@ describe('Connector browser caches', () => {
     await expect(test.client().listConnectorProviders(controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
     expect(test.localStorage.entries.size).toBe(0)
   })
+})
+
+it('scopes provider display names to the active Flow', () => {
+  const entries = new Map([
+    ['/v1/connector/providers?flowId=one', { etag: null, data: { providers: [{ serviceId: 'github', serviceName: 'GitHub' }] } }],
+    ['/v1/connector/providers?flowId=two', { etag: null, data: { providers: [{ serviceId: 'github', serviceName: 'Other name' }] } }],
+  ])
+  expect(cachedConnectorProviders(entries, 'one').github?.serviceName).toBe('GitHub')
+  expect(cachedConnectorProviders(entries, 'two').github?.serviceName).toBe('Other name')
+  expect(cachedConnectorProviders(entries, undefined)).toEqual({})
 })

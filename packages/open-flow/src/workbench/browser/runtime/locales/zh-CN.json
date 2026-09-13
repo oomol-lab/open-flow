@@ -32,7 +32,7 @@
     "triggers": "触发器",
     "value": "固定值",
     "valueDescription": "设置固定的文本、数字等值，供下游节点使用。",
-    "wait": "等待",
+    "wait": "等待确认",
     "waitDescription": "暂停 Run，直到 Operator 继续、审批或拒绝。",
     "webhook": "Webhook",
     "webhookDescription": "通过专属 HTTP 入口接收外部事件。",

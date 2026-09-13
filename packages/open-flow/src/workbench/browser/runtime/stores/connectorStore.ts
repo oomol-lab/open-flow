@@ -475,6 +475,11 @@ export class ConnectorStore {
     const flowId = this.#workspace.$.flowId.value
     const revision = this.#workspace.$.revision.value
     if (flowId == null || revision == null) return
+    if (Object.values(revision.revision.content.document.graph.nodes).some((node) => node.kind == 'integration' || node.kind == 'poll')) {
+      void this.#client.listConnectorProviders(undefined, flowId).catch(() => {
+        /* Keep provider IDs while the catalog is unavailable. */
+      })
+    }
     const missing = [...revision.connectorActionIds].filter((actionId) => this.$.actions.value[actionId] == null && !this.#loadingActions.has(actionId))
     if (missing.length > 0) {
       for (const actionId of missing) this.#loadingActions.add(actionId)

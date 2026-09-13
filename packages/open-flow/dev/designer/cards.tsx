@@ -74,16 +74,23 @@ export const cardStories: readonly FrontendStory[] = [
         <div className="card-studies-grid">
           {[false, true].flatMap((compact) =>
             [
-              { label: 'Trigger', problem: undefined },
-              { label: 'Trigger error', problem: 'Review the configuration.' },
-              { label: 'Task error', problem: 'Review the configuration.' },
+              { label: 'Trigger', problem: undefined, disconnected: false },
+              { label: 'GitHub trigger', problem: undefined, disconnected: false },
+              { label: 'Trigger error', problem: 'Review the configuration.', disconnected: false },
+              { label: 'Task error', problem: 'Review the configuration.', disconnected: false },
+              {
+                label: 'Gmail disconnected',
+                problem: 'A connection is missing or unavailable. Reconnect or select an available connection in the node settings.',
+                disconnected: true,
+              },
             ].map((state) => (
               <CanvasCard
                 key={`${compact}-${state.label}`}
                 title={`${state.label} · ${compact ? 'Compact' : 'Normal'}`}
-                subtitle="Identity indicators"
+                subtitle={state.disconnected ? 'Connector · Gmail' : state.label == 'GitHub trigger' ? 'Trigger · GitHub' : 'Identity indicators'}
                 icon={<i className="i-carbon:code" />}
                 problem={state.problem}
+                problemIcon={state.disconnected ? <i aria-hidden="true" className="i-lucide-light:unplug" /> : undefined}
                 compact={compact}
               />
             )),
@@ -197,8 +204,9 @@ export const cardStories: readonly FrontendStory[] = [
           </CanvasCard>
           <CanvasCard
             title="Send the campaign"
-            subtitle="Connector"
-            problem="The account needs to be reconnected."
+            subtitle="Connector · Gmail"
+            problem="A connection is missing or unavailable. Reconnect or select an available connection in the node settings."
+            problemIcon={<i aria-hidden="true" className="i-lucide-light:unplug" />}
             icon={<i className="i-carbon:email" />}
             footer={
               <RunChips
