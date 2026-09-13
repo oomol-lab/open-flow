@@ -576,6 +576,11 @@
       "error": "Échec",
       "waiting": "En attente"
     },
+    "triggerSource": {
+      "manual": "Manuel",
+      "cron": "Planification",
+      "webhook": "Webhook"
+    },
     "kind": {
       "task": "Tâche",
       "trigger": "Déclencheur",

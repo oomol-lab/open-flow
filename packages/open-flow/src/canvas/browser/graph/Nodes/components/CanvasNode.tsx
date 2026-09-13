@@ -37,12 +37,18 @@ export function CanvasNode({
   const icon = node.icon ?? (node.kind == 'wait' ? ':carbon:time:' : undefined)
   const { values, summary, schedules, images, tools, inline, hidden } = nodeCardContent(node)
   const kind = node?.kind ?? 'task'
+  const triggerSource =
+    node.kind == 'trigger'
+      ? node.presentation?.kind == 'manual' || node.presentation?.kind == 'cron' || node.presentation?.kind == 'webhook'
+        ? t(`canvasCard.triggerSource.${node.presentation.kind}`)
+        : node.presentation?.source
+      : undefined
   const subtitle = inline
     ? summary
     : node.kind == 'task'
       ? node.executorName || t('canvasCard.kind.task')
-      : node.kind == 'trigger' && node.presentation?.source
-        ? `${t('canvasCard.kind.trigger')} · ${node.presentation.source}`
+      : node.kind == 'trigger' && triggerSource
+        ? `${t('canvasCard.kind.trigger')} · ${triggerSource}`
         : t(`canvasCard.kind.${kind}`)
   const toolContent = tools != null && tools.length > 0 && (
     <div className={styles.tools}>

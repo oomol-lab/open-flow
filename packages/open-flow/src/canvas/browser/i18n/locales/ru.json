@@ -576,6 +576,11 @@
       "error": "Ошибка",
       "waiting": "Ожидание"
     },
+    "triggerSource": {
+      "manual": "Вручную",
+      "cron": "Расписание",
+      "webhook": "Webhook"
+    },
     "kind": {
       "task": "Задача",
       "trigger": "Триггер",

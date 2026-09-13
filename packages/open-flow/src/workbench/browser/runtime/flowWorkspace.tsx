@@ -339,6 +339,7 @@ function Editor({
             contextPanelMode === 'inspector' && selection != null ? (
               <NodeHeading
                 key={selection.id}
+                titleReadOnly={selection.kind === 'trigger' && selection.trigger.kind === 'manual'}
                 title={selection.node.name ?? selectedDesignerNode?.title ?? ''}
                 icon={selectedDesignerNode != null && 'icon' in selectedDesignerNode ? selectedDesignerNode.icon : undefined}
                 disabled={authoringDisabled}

@@ -576,6 +576,11 @@
       "error": "Failed",
       "waiting": "Waiting"
     },
+    "triggerSource": {
+      "manual": "Manual",
+      "cron": "Schedule",
+      "webhook": "Webhook"
+    },
     "kind": {
       "task": "Task",
       "trigger": "Trigger",
