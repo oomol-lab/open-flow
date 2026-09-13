@@ -1,7 +1,60 @@
+import type { ConditionalResult } from '../../../../control/common/api.ts'
+
 import { afterEach, expect, it, vi } from 'vitest'
 import { Resource, resourceValue } from './resource.ts'
 
 afterEach(() => vi.restoreAllMocks())
+
+it.each(['200', '304', 'error'])('waits for a post-invalidation read after an older %s response', async (response) => {
+  const old = Promise.withResolvers<ConditionalResult<string[]>>()
+  const fresh = Promise.withResolvers<ConditionalResult<string[]>>()
+  const read = vi
+    .fn<() => Promise<ConditionalResult<string[]>>>()
+    .mockResolvedValueOnce({ modified: true, data: ['cached'], etag: '"cached"' })
+    .mockReturnValueOnce(old.promise)
+    .mockReturnValueOnce(fresh.promise)
+  const storage = { getItem: () => null, setItem: vi.fn() }
+  const resource = new Resource(read, 30_000, { key: 'test', storage: () => storage, decode: (data) => data as string[] })
+  await resource.refresh()
+  storage.setItem.mockClear()
+  const pending = resource.refresh()
+  await Promise.resolve()
+  const state = resource.get(true)
+  resource.get(true)
+  let settled = false
+  const value = resourceValue(state, undefined, true).then((data) => {
+    settled = true
+    return data
+  })
+  if (response == 'error') old.reject(new Error('Old request failed'))
+  else old.resolve(response == '304' ? { modified: false, etag: '"old"' } : { modified: true, data: ['old'], etag: '"old"' })
+  await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(3))
+  expect(settled).toBe(false)
+  expect(state.value).toMatchObject({ data: ['cached'], refreshing: true, error: undefined })
+  expect(storage.setItem).not.toHaveBeenCalled()
+  expect(read.mock.calls[2]).toEqual(['"cached"', expect.any(AbortSignal)])
+  fresh.resolve({ modified: true, data: ['new-account'], etag: '"new"' })
+  expect(await value).toEqual(['new-account'])
+  await pending
+  expect(read).toHaveBeenCalledTimes(3)
+  expect(JSON.parse(storage.setItem.mock.calls[0]![1])).toEqual({ data: ['new-account'], etag: '"new"' })
+  resource.dispose()
+})
+
+it('publishes a failed replacement request instead of accepting the invalidated result', async () => {
+  const old = Promise.withResolvers<ConditionalResult<string[]>>()
+  const read = vi.fn<() => Promise<ConditionalResult<string[]>>>().mockReturnValueOnce(old.promise).mockRejectedValueOnce(new Error('Replacement failed'))
+  const resource = new Resource(read, 30_000)
+  const pending = resource.refresh()
+  await Promise.resolve()
+  const value = resourceValue(resource.get(true), undefined, true)
+  const failed = expect(value).rejects.toThrow('Replacement failed')
+  old.resolve({ modified: true, data: ['old'], etag: '"old"' })
+  await pending
+  await failed
+  expect(resource.state.value.data).toBeUndefined()
+  resource.dispose()
+})
 
 it('returns a stable Val, merges reads and checks freshness only on access', async () => {
   let now = 1_000
@@ -67,6 +120,7 @@ it('rejects a cold 304 and prevents late writes after disposal', async () => {
   const late = new Resource(() => pending.promise, 30_000, { key: 'one', storage: () => storage, decode: (value) => value as string[] })
   const request = late.refresh()
   await Promise.resolve()
+  late.get(true)
   late.dispose()
   pending.resolve({ modified: true, data: ['late'], etag: null })
   await request
