@@ -110,7 +110,7 @@ describe('WorkbenchStore diagnostics', () => {
           version: 1,
         })
       }
-      if (path == `/v1/connector/actions/amap.geocode?flowId=${flow.flowId}`) {
+      if (path == `/v1/connector/actions/amap.geocode?flowId=${flow.flowId}&locale=en`) {
         return Response.json({
           action: {
             actionId: 'amap.geocode',

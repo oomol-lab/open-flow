@@ -52,6 +52,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false) {
     },
     connectors: {
       $: {
+        catalogRevision: value(0),
         actionLoading: value(undefined),
         connectionLoading: value(undefined),
         selectedAction: value(undefined),

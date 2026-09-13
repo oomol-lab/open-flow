@@ -24,8 +24,11 @@ const retryDelayMs = 30_000
 
 /** Owns freshness, cached representations and conditional requests; callers own the displayed options. */
 export class TriggerCatalogStore {
-  readonly state = val({ revision: 0, failed: false })
-  readonly #memory = new Map<UiLanguage, TriggerCatalogCache>()
+  readonly state = val<{ revision: number; failed: boolean; catalogs: ReadonlyMap<UiLanguage, TriggerCatalogCache> }>({
+    revision: 0,
+    failed: false,
+    catalogs: new Map(),
+  })
   readonly #storage?: TriggerCatalogStorage
   readonly #nextCheck = new Map<UiLanguage, number>()
   readonly #errors = new Map<UiLanguage, unknown>()
@@ -62,7 +65,7 @@ export class TriggerCatalogStore {
   }
 
   #read(): TriggerCatalogCache | undefined {
-    const memory = this.#memory.get(this.language)
+    const memory = this.state.value.catalogs.get(this.language)
     if (memory != null) return memory
     try {
       const raw = this.#storage?.getItem(this.language)
@@ -72,7 +75,7 @@ export class TriggerCatalogStore {
       const data = decodeTriggerCatalog(cached.data)
       if (data.locale != this.language) return
       const entry = { data, etag: cached.etag }
-      this.#memory.set(this.language, entry)
+      this.state.set({ ...this.state.value, catalogs: new Map(this.state.value.catalogs).set(this.language, entry) })
       return entry
     } catch {
       return
@@ -107,13 +110,12 @@ export class TriggerCatalogStore {
         if (signal.aborted || this.#disposed) throw new DOMException('Catalog request cancelled', 'AbortError')
         this.#nextCheck.set(locale, Date.now() + freshnessMs)
         this.#errors.delete(locale)
-        this.#memory.set(locale, entry)
         try {
           this.#storage?.setItem(locale, JSON.stringify(entry))
         } catch {
           /* Storage is optional. */
         }
-        this.#changed(false)
+        this.#changed(false, new Map(this.state.value.catalogs).set(locale, entry))
         return entry
       })
       .catch((error: unknown) => {
@@ -131,7 +133,7 @@ export class TriggerCatalogStore {
     return request
   }
 
-  #changed(failed: boolean): void {
-    this.state.set({ revision: this.state.value.revision + (failed ? 0 : 1), failed })
+  #changed(failed: boolean, catalogs = this.state.value.catalogs): void {
+    this.state.set({ catalogs, revision: this.state.value.revision + (failed ? 0 : 1), failed })
   }
 }

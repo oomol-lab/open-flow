@@ -113,6 +113,7 @@ function Editor({
 }): ReactElement {
   const t = useTranslate()
   const addNodeOptions = useVal(store.workspace.$.addNodeOptions)
+  const connectorCatalogRevision = useVal(store.connectors.$.catalogRevision)
   const triggerCatalogState = useVal(store.triggers.catalog.state)
   const [startId, setStartId] = useState<string>()
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
@@ -283,7 +284,7 @@ function Editor({
             browseOptions={store.browseAddNodeOptions}
             searchOptions={store.provideAddNodeOptions}
             provideChoices={store.provideAddNodeOptionChoices}
-            catalogRevision={triggerCatalogState.revision}
+            catalogRevision={triggerCatalogState.revision + connectorCatalogRevision}
             catalogFailed={triggerCatalogState.failed}
             refreshCatalog={store.triggers.catalog.retry}
             disabled={authoringDisabled || target == null}
@@ -373,7 +374,7 @@ function Editor({
         >
           {contextPanelMode == 'blocks' ? (
             <BlockLibrary
-              catalogRevision={triggerCatalogState.revision}
+              catalogRevision={triggerCatalogState.revision + connectorCatalogRevision}
               catalogFailed={triggerCatalogState.failed}
               refreshCatalog={store.triggers.catalog.retry}
               browseOptions={store.browseAddNodeOptions}
@@ -387,6 +388,7 @@ function Editor({
             />
           ) : contextPanelMode == 'notification' ? (
             <BlockLibrary
+              catalogRevision={connectorCatalogRevision}
               browseOptions={store.connectors.browseAddNodeOptions}
               searchOptions={async (query, signal) =>
                 (await store.connectors.provideAddNodeOptions(query, signal))?.filter((option) => option.kind == 'connector' && option.inputs.length > 0)

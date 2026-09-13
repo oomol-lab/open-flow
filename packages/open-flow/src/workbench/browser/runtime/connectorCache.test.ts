@@ -2,6 +2,7 @@ import type { WorkbenchHost } from './contract.ts'
 
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from './api.ts'
+import { cachedConnectorActions, cachedConnectorConnections } from './connectorCache.ts'
 
 function storage() {
   const entries = new Map<string, string>()
@@ -40,7 +41,40 @@ function setup() {
   return { client, localStorage, sessionStorage, options, request }
 }
 
+const readFreshConnections = (client: WorkbenchClient) => client.listConnectorConnections('mail', undefined, 'flow', true)
+
 describe('Connector browser caches', () => {
+  it('returns persisted providers before the network completes and publishes changed data', async () => {
+    const test = setup()
+    await test.client().listConnectorProviders()
+    const pending = Promise.withResolvers<Response>()
+    test.request.mockImplementation(() => pending.promise)
+    const client = test.client()
+    const changed = vi.fn()
+    const stop = client.connectorCache.providers.reaction(changed)
+    expect(await client.listConnectorProviders()).toEqual([provider])
+    expect(await client.listConnectorProviders()).toEqual([provider])
+    expect(test.request).toHaveBeenCalledTimes(2)
+    changed.mockClear()
+    const updated = { ...provider, serviceName: 'Updated mail' }
+    pending.resolve(Response.json({ providers: [updated], version: 1 }, { headers: { etag: '"two"' } }))
+    await vi.waitFor(() => expect(changed).toHaveBeenCalledOnce())
+    expect(await client.listConnectorProviders()).toEqual([updated])
+    expect(test.request).toHaveBeenCalledTimes(2)
+    stop()
+  })
+
+  it('retains cached providers after background failure and backs off retries', async () => {
+    const test = setup()
+    await test.client().listConnectorProviders()
+    test.request.mockRejectedValue(new Error('offline'))
+    const client = test.client()
+    expect(await client.listConnectorProviders()).toEqual([provider])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(await client.listConnectorProviders()).toEqual([provider])
+    expect(test.request).toHaveBeenCalledTimes(2)
+  })
+
   it.each(cases)('persists $kind in the appropriate storage and revalidates across clients', async ({ kind, body, read }) => {
     const test = setup()
     test.request.mockImplementation(async () => Response.json(body, { headers: { etag: '"one"' } }))
@@ -50,6 +84,41 @@ describe('Connector browser caches', () => {
     test.request.mockImplementation(async () => new Response(null, { status: 304 }))
     expect(await read(test.client())).toEqual(expected)
     expect(new Headers(test.request.mock.calls[1]?.[1]?.headers).get('if-none-match')).toBe('"one"')
+  })
+
+  it.each(cases)('returns cached $kind while its request remains pending', async ({ body, read }) => {
+    const test = setup()
+    test.request.mockImplementation(async () => Response.json(body))
+    const expected = await read(test.client())
+    const pending = Promise.withResolvers<Response>()
+    test.request.mockImplementation(() => pending.promise)
+    const client = test.client()
+    expect(await read(client)).toEqual(expected)
+    expect(await read(client)).toEqual(expected)
+    expect(test.request).toHaveBeenCalledTimes(2)
+    pending.resolve(Response.json(body))
+  })
+
+  it('publishes changed actions and connections without another caller request', async () => {
+    const test = setup()
+    test.request.mockImplementation(async (path) => Response.json(path.includes('/connections/') ? cases[4]!.body : cases[2]!.body))
+    await cases[2]!.read(test.client())
+    await cases[4]!.read(test.client())
+    const client = test.client()
+    const actionResponse = Promise.withResolvers<Response>()
+    const connectionResponse = Promise.withResolvers<Response>()
+    test.request.mockImplementation((path) => (path.includes('/connections/') ? connectionResponse.promise : actionResponse.promise))
+    expect(await cases[2]!.read(client)).toEqual(action)
+    expect(await cases[4]!.read(client)).toEqual([connection])
+    actionResponse.resolve(Response.json({ action: { ...action, name: 'Updated' }, version: 1 }))
+    connectionResponse.resolve(Response.json({ connections: [], serviceId: 'mail', version: 1 }))
+    await vi.waitFor(() => {
+      expect(cachedConnectorActions(client.connectorCache.actions.value, 'flow', 'en')['mail.send']?.name).toBe('Updated')
+      expect(cachedConnectorConnections(client.connectorCache.connections.value, 'flow')['mail']).toEqual([])
+    })
+    expect(cachedConnectorActions(client.connectorCache.actions.value, 'other', 'en')).toEqual({})
+    expect(cachedConnectorActions(client.connectorCache.actions.value, 'flow', 'zh-CN')).toEqual({})
+    expect(cachedConnectorConnections(client.connectorCache.connections.value, 'other')).toEqual({})
   })
 
   it('isolates deployments, flows, languages, services and search queries', async () => {
@@ -72,18 +141,56 @@ describe('Connector browser caches', () => {
     expect(new Headers(test.request.mock.calls[1]?.[1]?.headers).has('if-none-match')).toBe(false)
   })
 
-  it('does not return stale connections on failure and replaces them after a successful refresh', async () => {
+  it('requires fresh connections for explicit refresh and replaces the reactive cache', async () => {
     const test = setup()
-    const read = cases[4]!.read
     test.request.mockImplementation(async () => Response.json(cases[4]!.body, { headers: { etag: '"one"' } }))
-    await read(test.client())
+    await readFreshConnections(test.client())
     test.request.mockImplementation(async () => Response.json({ error: { message: 'Signed out' } }, { status: 401 }))
-    await expect(read(test.client())).rejects.toMatchObject({ status: 401 })
+    await expect(readFreshConnections(test.client())).rejects.toMatchObject({ status: 401 })
     test.request.mockImplementation(async () => Response.json({ connections: [], serviceId: 'mail', version: 1 }, { headers: { etag: '"two"' } }))
-    expect(await read(test.client())).toEqual([])
+    expect(await readFreshConnections(test.client())).toEqual([])
     test.request.mockImplementation(async () => new Response(null, { status: 304 }))
-    expect(await read(test.client())).toEqual([])
+    expect(await readFreshConnections(test.client())).toEqual([])
     expect(new Headers(test.request.mock.calls[3]?.[1]?.headers).get('if-none-match')).toBe('"two"')
+  })
+
+  it.each(['older-first', 'newer-first'])('resolves concurrent cold connection reads without exposing cache supersession: %s', async (order) => {
+    const test = setup()
+    const older = Promise.withResolvers<Response>()
+    const newer = Promise.withResolvers<Response>()
+    test.request.mockImplementationOnce(() => older.promise).mockImplementationOnce(() => newer.promise)
+    const client = test.client()
+    const first = cases[4]!.read(client)
+    const second = cases[4]!.read(client)
+    const olderResponse = Response.json(cases[4]!.body)
+    const newerResponse = Response.json({ connections: [], serviceId: 'mail', version: 1 })
+    if (order == 'older-first') {
+      older.resolve(olderResponse)
+      await expect(first).resolves.toEqual([connection])
+      newer.resolve(newerResponse)
+    } else {
+      newer.resolve(newerResponse)
+      await expect(second).resolves.toEqual([])
+      older.resolve(olderResponse)
+    }
+    await expect(first).resolves.toEqual([connection])
+    await expect(second).resolves.toEqual([])
+    expect(cachedConnectorConnections(client.connectorCache.connections.value, 'flow')['mail']).toEqual([])
+  })
+
+  it('does not let an older background response overwrite a forced refresh', async () => {
+    const test = setup()
+    test.request.mockImplementation(async () => Response.json(cases[4]!.body))
+    await cases[4]!.read(test.client())
+    const pending = Promise.withResolvers<Response>()
+    test.request.mockImplementationOnce(() => pending.promise)
+    const client = test.client()
+    expect(await cases[4]!.read(client)).toEqual([connection])
+    test.request.mockImplementation(async () => Response.json({ connections: [], serviceId: 'mail', version: 1 }))
+    expect(await readFreshConnections(client)).toEqual([])
+    pending.resolve(Response.json(cases[4]!.body))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(cachedConnectorConnections(client.connectorCache.connections.value, 'flow')['mail']).toEqual([])
   })
 
   it('tolerates unavailable storage and responses without ETags', async () => {

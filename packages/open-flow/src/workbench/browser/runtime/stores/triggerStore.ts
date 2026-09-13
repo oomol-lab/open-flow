@@ -11,6 +11,7 @@ import type { WorkspaceStore } from './workspaceStore.ts'
 
 import { compute, derive, val } from 'value-enhancer'
 import { resolveUiLanguage } from '../../../../localization/common/languages.ts'
+import { cachedConnectorConnections } from '../connectorCache.ts'
 import { createI18n } from '../i18n.ts'
 import { providerIcon } from '../providerIcon.ts'
 import { connectionCatalog } from '../workspace.ts'
@@ -112,7 +113,9 @@ export class TriggerStore {
       if (selection?.kind != 'trigger') return { authorizationPending: false }
       const trigger = selection.trigger
       if (trigger.kind != 'poll' && trigger.kind != 'integration') return { authorizationPending: false }
-      const catalog = current == null ? undefined : state.catalogs[current.provider]
+      const cached = cachedConnectorConnections(get(client.connectorCache.connections), get(workspace.$.flowId))
+      const connections = current == null ? undefined : cached[current.provider]
+      const catalog = connections != null ? connectionCatalog(connections) : current == null ? undefined : state.catalogs[current.provider]
       const connectionError = state.connectionError
       return {
         activeConnections: catalog?.active,
@@ -188,13 +191,11 @@ export class TriggerStore {
       if (this.#state.value.connectionLoading != null) this.#set({ connectionLoading: undefined })
       return
     }
-    if (!force && !this.#stale.has(selected.provider) && this.#state.value.catalogs[selected.provider] != null) {
-      if (this.#state.value.connectionLoading != null) this.#set({ connectionLoading: undefined })
-      return
-    }
     this.#set({ connectionError: undefined, connectionLoading: selected.provider })
     try {
-      const catalog = connectionCatalog(await this.#client.listConnectorConnections(selected.provider, undefined, flowId))
+      const catalog = connectionCatalog(
+        await this.#client.listConnectorConnections(selected.provider, undefined, flowId, force || this.#stale.has(selected.provider)),
+      )
       if (!this.#current(current, flowId)) return
       this.#stale.delete(selected.provider)
       this.#set({ catalogs: { ...this.#state.value.catalogs, [selected.provider]: catalog } })
