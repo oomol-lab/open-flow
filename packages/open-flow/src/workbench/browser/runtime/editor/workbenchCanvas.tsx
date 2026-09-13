@@ -17,6 +17,7 @@ import { indexAddNodeOptions } from './addNodeOptions.ts'
 import { CanvasHistoryControls } from './canvasHistoryControls.tsx'
 
 interface Props {
+  readonly addNodeControl?: ReactNode
   readonly addItemsCatalog?: FlowCanvasViewProps['addItemsCatalog']
   readonly history?: CanvasHistoryControlsProps
   readonly ignoredNodeIds: readonly string[]
@@ -90,6 +91,7 @@ function focusPanel(event: PointerEvent<HTMLElement>): void {
 
 export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function WorkbenchCanvas(
   {
+    addNodeControl,
     addNodeOptions,
     history,
     blocksOpen,
@@ -341,6 +343,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
                     },
                   }
             }
+            addNodeControl={addNodeControl}
             blocksOpen={blocksOpen}
             disabled={disabled || target == null}
             onOpenBlocks={onOpenBlocks}
@@ -436,6 +439,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
 })
 
 export function WorkbenchCanvasActions({
+  addNodeControl,
   history,
   blocksOpen,
   disabled,
@@ -443,6 +447,7 @@ export function WorkbenchCanvasActions({
   runControl,
   onAddTrigger,
 }: {
+  readonly addNodeControl?: ReactNode
   readonly history?: CanvasHistoryControlsProps
   readonly blocksOpen: boolean
   readonly disabled: boolean
@@ -454,19 +459,21 @@ export function WorkbenchCanvasActions({
   return (
     <div className="designer-actions">
       {history != null && <CanvasHistoryControls {...history} disabled={disabled} />}
-      <CanvasTooltip placement="top" title={t('designer.openBlocks')}>
-        <Button
-          aria-expanded={blocksOpen}
-          className="pr-3 text-[13px]"
-          disabled={disabled}
-          onClick={(event) => onOpenBlocks(event.currentTarget)}
-          size="default"
-          type="button"
-          variant="ghost"
-        >
-          <Icon data-icon="inline-start" name="plus" /> {t('designer.addNode')}
-        </Button>
-      </CanvasTooltip>
+      {addNodeControl ?? (
+        <CanvasTooltip placement="top" title={t('designer.openBlocks')}>
+          <Button
+            aria-expanded={blocksOpen}
+            className="pr-3 text-[13px]"
+            disabled={disabled}
+            onClick={(event) => onOpenBlocks(event.currentTarget)}
+            size="default"
+            type="button"
+            variant="ghost"
+          >
+            <Icon data-icon="inline-start" name="plus" /> {t('designer.addNode')}
+          </Button>
+        </CanvasTooltip>
+      )}
       {runControl}
       {onAddTrigger != null && (
         <CanvasTooltip placement="top" title={t('designer.triggerDescription')}>

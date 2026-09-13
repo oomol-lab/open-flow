@@ -17,6 +17,7 @@ import { CommentInspector } from './editor/commentInspector.tsx'
 import { BlockLibrary, ContextPanel } from './editor/contextPanel.tsx'
 import { NodeHeading } from './editor/nodeHeading.tsx'
 import { inspectorIcon, NodeInspector } from './editor/nodeInspector.tsx'
+import { NodePickerPopover } from './editor/nodePickerPopover.tsx'
 import { WorkbenchCanvas } from './editor/workbenchCanvas.tsx'
 import { Icon } from './icons.tsx'
 import { NavigationStore } from './navigation.ts'
@@ -280,6 +281,21 @@ function Editor({
               triggers={triggers}
             />
           ) : undefined
+        }
+        addNodeControl={
+          <NodePickerPopover
+            key={`${flowId}:${target?.kind}`}
+            options={addNodeOptions}
+            browseOptions={store.browseAddNodeOptions}
+            searchOptions={store.provideAddNodeOptions}
+            provideChoices={store.provideAddNodeOptionChoices}
+            catalogRevision={triggerCatalogState.revision}
+            catalogFailed={triggerCatalogState.failed}
+            refreshCatalog={store.triggers.catalog.open}
+            disabled={authoringDisabled || target == null}
+            focusRequest={0}
+            onAdd={addFromBlocks}
+          />
         }
         addNodeOptions={addNodeOptions}
         blocksOpen={contextPanelVisible && contextPanelMode == 'blocks'}

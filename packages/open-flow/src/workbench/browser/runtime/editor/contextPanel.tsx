@@ -18,6 +18,7 @@ import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
 import { cycleContextPanelFocus, observeContextPanelOverlay } from './contextPanelBehavior.ts'
+import { NodePickerContent } from './nodePicker.tsx'
 
 interface ContextPanelProps {
   readonly heading?: ReactNode
@@ -59,7 +60,8 @@ interface LibraryNodeItem {
 
 type LibraryMenuItem = LibraryNodeItem | { readonly type: 'divider'; readonly label: string; readonly detail?: string }
 
-interface BlockLibraryProps {
+export interface BlockLibraryProps {
+  readonly presentation?: 'picker'
   readonly catalogRevision?: number
   readonly catalogFailed?: boolean
   readonly refreshCatalog?: () => void
@@ -386,7 +388,11 @@ function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices, 
   )
 }
 
-export function BlockLibrary({
+export function BlockLibrary(props: BlockLibraryProps): ReactElement {
+  return props.presentation == 'picker' ? <NodePickerContent {...props} /> : <SidebarBlockLibrary {...props} />
+}
+
+function SidebarBlockLibrary({
   catalogRevision,
   catalogFailed,
   refreshCatalog,

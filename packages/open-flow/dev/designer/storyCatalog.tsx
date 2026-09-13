@@ -14,6 +14,7 @@ import { llmStory } from './llm.tsx'
 import { markdownStory } from './markdown.tsx'
 import { metadataStory } from './metadata.tsx'
 import { nodeInputStory } from './nodeInput.tsx'
+import { nodePickerPreviewStory } from './nodePickerPreview.tsx'
 import { nodeStories } from './nodeStories.tsx'
 import { notificationsStory } from './notifications.tsx'
 import { overviewStories } from './overview.tsx'
@@ -66,6 +67,7 @@ export const labStories: readonly FrontendStory[] = [
   ...stories,
   formStory,
   libraryStory,
+  nodePickerPreviewStory,
   agentStory,
   llmStory,
   metadataStory,

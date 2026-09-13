@@ -1,5 +1,5 @@
 import providerIconUrls from 'virtual:oomol-provider-icons'
-import { imageIcon } from '../../../ui/browser/icons/ContentIcon.tsx'
+import { imageIcon, initialsIcon } from '../../../ui/browser/icons/ContentIcon.tsx'
 
 export function providerIcon(
   provider: { readonly homepageUrl?: string; readonly icon?: string; readonly serviceId: string; readonly serviceName: string },
@@ -42,10 +42,4 @@ function homepageHostname(homepageUrl: string | undefined): string | undefined {
   } catch {
     return
   }
-}
-
-function initialsIcon(initials: string): string {
-  const text = [...initials].map((letter) => `&#${letter.codePointAt(0)};`).join('')
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#e4e4e7"/><text x="32" y="33" fill="#3f3f46" font-family="Arial,sans-serif" font-size="25" font-weight="600" text-anchor="middle" dominant-baseline="central">${text}</text></svg>`
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }

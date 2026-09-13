@@ -19,7 +19,7 @@
     "javascriptDescription": "Créer un mini-script JavaScript pour ce nœud.",
     "llmChat": "Conversation LLM",
     "llmChatDescription": "Générer une réponse texte à partir de messages et d'un modèle de prompt.",
-    "llmStructured": "Sortie structurée LLM",
+    "llmStructured": "LLM JSON",
     "llmStructuredDescription": "Générer du JSON structuré à partir de messages et d'un modèle de prompt.",
     "generatedResponse": "Réponse générée.",
     "subflowDescription": "Ajouter un Subflow existant.",
@@ -913,5 +913,12 @@
     "noStatuses": "Aucun statut disponible.",
     "unavailableStatus": "Statut indisponible ({{id}})",
     "missingStatuses": "Certains statuts sélectionnés ne sont plus disponibles. Supprimez-les ou remplacez-les."
+  },
+  "nodePicker": {
+    "search": "Rechercher des nœuds, applications ou actions…",
+    "apps": "Applications",
+    "back": "Retour à tous les nœuds",
+    "results": "Résultats",
+    "builtIn": "Intégrés"
   }
 }

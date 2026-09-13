@@ -88,3 +88,5 @@ The Lab reserves an optional rounded sidebar beside the content frame, inside th
 Drag the centered three-dot handle in the 8px gap to resize the sidebar. Focus the handle to use Left/Right (Shift for larger steps), Home/End for width limits, or double-click to restore the default width. The sidebar stays within 60% of the available panel space.
 
 **Canvas / Node content** (`?story=node-content`) compares collapsible Schedule, Value, Task and Comment content with empty nodes and Condition. Collapse preserves run status and branches.
+
+`?story=node-picker-preview` compares the open node catalog and the button dock popover. Built-in nodes use compact rows with tooltips; the Triggers tab lists real definitions by app, and the Nodes tab browses sample connector actions. Story actions expose loading, errors and disabled controls.

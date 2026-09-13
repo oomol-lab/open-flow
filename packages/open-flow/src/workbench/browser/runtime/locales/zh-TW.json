@@ -19,7 +19,7 @@
     "javascriptDescription": "為這個節點建立 JavaScript 小腳本。",
     "llmChat": "LLM 對話",
     "llmChatDescription": "依訊息和提示詞範本產生文字回覆。",
-    "llmStructured": "LLM 結構化輸出",
+    "llmStructured": "LLM JSON",
     "llmStructuredDescription": "依訊息和提示詞範本產生結構化 JSON。",
     "generatedResponse": "產生的回覆。",
     "subflowDescription": "加入現有的 Subflow。",
@@ -913,5 +913,12 @@
     "noStatuses": "沒有可用狀態。",
     "unavailableStatus": "不可用的狀態（{{id}}）",
     "missingStatuses": "部分已選狀態不再可用，請移除或重新選擇。"
+  },
+  "nodePicker": {
+    "search": "搜尋節點、應用或操作…",
+    "apps": "應用",
+    "back": "返回全部節點",
+    "results": "搜尋結果",
+    "builtIn": "內建"
   }
 }

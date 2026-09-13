@@ -19,7 +19,7 @@
     "javascriptDescription": "このノード用の JavaScript スクリプトレットを作成します。",
     "llmChat": "LLM チャット",
     "llmChatDescription": "メッセージとプロンプトテンプレートからテキストの応答を生成します。",
-    "llmStructured": "LLM 構造化出力",
+    "llmStructured": "LLM JSON",
     "llmStructuredDescription": "メッセージとプロンプトテンプレートから構造化された JSON を生成します。",
     "generatedResponse": "生成された応答。",
     "subflowDescription": "既存の Subflow を追加します。",
@@ -913,5 +913,12 @@
     "noStatuses": "利用可能なステータスがありません。",
     "unavailableStatus": "利用できないステータス（{{id}}）",
     "missingStatuses": "選択したステータスの一部は利用できません。削除するか選び直してください。"
+  },
+  "nodePicker": {
+    "search": "ノード、アプリ、操作を検索…",
+    "apps": "アプリ",
+    "back": "すべてのノードに戻る",
+    "results": "検索結果",
+    "builtIn": "組み込み"
   }
 }

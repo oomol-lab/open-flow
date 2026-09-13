@@ -19,7 +19,7 @@
     "javascriptDescription": "이 노드에 사용할 JavaScript 스크립틀릿을 만듭니다.",
     "llmChat": "LLM 대화",
     "llmChatDescription": "메시지와 프롬프트 템플릿으로 텍스트 응답을 생성합니다.",
-    "llmStructured": "LLM 구조화 출력",
+    "llmStructured": "LLM JSON",
     "llmStructuredDescription": "메시지와 프롬프트 템플릿으로 구조화된 JSON을 생성합니다.",
     "generatedResponse": "생성된 응답.",
     "subflowDescription": "기존 Subflow를 추가합니다.",
@@ -913,5 +913,12 @@
     "noStatuses": "사용 가능한 상태가 없습니다.",
     "unavailableStatus": "사용할 수 없는 상태 ({{id}})",
     "missingStatuses": "선택한 상태 중 일부를 사용할 수 없습니다. 삭제하거나 다시 선택하세요."
+  },
+  "nodePicker": {
+    "search": "노드, 앱 또는 작업 검색…",
+    "apps": "앱",
+    "back": "모든 노드로 돌아가기",
+    "results": "검색 결과",
+    "builtIn": "기본 제공"
   }
 }

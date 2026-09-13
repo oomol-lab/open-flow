@@ -20,6 +20,14 @@ export const ContentIcon = ({ src, className, fallback = null }: ContentIconProp
   const [error, setError] = useState<string>()
   const onError = () => setError(source)
 
+  if (source?.startsWith(initialsIconPrefix)) {
+    return (
+      <span data-icon-kind="initials" aria-hidden="true" className={clsx(styles.initials, className)}>
+        <span>{source.slice(initialsIconPrefix.length)}</span>
+      </span>
+    )
+  }
+
   if (!source) {
     return fallback as React.ReactElement
   }
@@ -30,6 +38,12 @@ export const ContentIcon = ({ src, className, fallback = null }: ContentIconProp
   ) : (
     <img className={clsx(styles.img, className)} src={source} alt="" decoding="async" loading="lazy" referrerPolicy="no-referrer" onError={onError} />
   )
+}
+
+const initialsIconPrefix = 'data:application/vnd.open-flow.initials,'
+
+export function initialsIcon(initials: string): string {
+  return `${initialsIconPrefix}${initials}`
 }
 
 const imageIconPrefix = 'data:application/vnd.open-flow.image-icon+json,'

@@ -19,7 +19,7 @@
     "javascriptDescription": "为此节点创建 JavaScript scriptlet。",
     "llmChat": "LLM 对话",
     "llmChatDescription": "根据消息和提示词模板生成文本回复。",
-    "llmStructured": "LLM 结构化输出",
+    "llmStructured": "LLM JSON",
     "llmStructuredDescription": "根据消息和提示词模板生成结构化 JSON。",
     "generatedResponse": "生成的回复。",
     "subflowDescription": "添加已有的 Subflow。",
@@ -913,5 +913,12 @@
     "noStatuses": "没有可用状态。",
     "unavailableStatus": "不可用的状态（{{id}}）",
     "missingStatuses": "部分已选状态不再可用，请移除或重新选择。"
+  },
+  "nodePicker": {
+    "search": "搜索节点、应用或操作…",
+    "apps": "应用",
+    "back": "返回全部节点",
+    "results": "搜索结果",
+    "builtIn": "内置"
   }
 }

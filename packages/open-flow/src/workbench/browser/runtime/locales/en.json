@@ -19,7 +19,7 @@
     "javascriptDescription": "Create a JavaScript scriptlet for this node.",
     "llmChat": "LLM Chat",
     "llmChatDescription": "Generate a text response from messages and a prompt template.",
-    "llmStructured": "LLM Structured Output",
+    "llmStructured": "LLM JSON",
     "llmStructuredDescription": "Generate structured JSON from messages and a prompt template.",
     "generatedResponse": "Generated response.",
     "subflowDescription": "Add an existing subflow.",
@@ -913,5 +913,12 @@
     "noStatuses": "No available statuses.",
     "unavailableStatus": "Unavailable status ({{id}})",
     "missingStatuses": "Some selected statuses are no longer available. Remove or replace them."
+  },
+  "nodePicker": {
+    "search": "Search nodes, apps, or actions…",
+    "apps": "Apps",
+    "back": "Back to all nodes",
+    "results": "Search results",
+    "builtIn": "Built-in"
   }
 }
