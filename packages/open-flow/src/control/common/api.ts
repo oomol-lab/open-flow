@@ -142,6 +142,7 @@ export interface PollTriggerTestResult {
 }
 
 export interface ConnectorConnection {
+  readonly builtInAccount?: boolean
   readonly alias?: string
   readonly connectionId: string
   readonly displayName: string
@@ -167,6 +168,7 @@ export interface ConnectorAction {
 }
 
 export interface ConnectorProvider {
+  readonly noSetup?: boolean
   readonly homepageUrl?: string
   readonly icon?: string
   readonly serviceId: string
@@ -626,7 +628,7 @@ export class ControlClient {
     const response = await this.response(`/v1/trigger-keys/catalog?locale=${encodeURIComponent(locale)}`, { headers, signal }, true)
     if (response.status == 304) {
       if (cached == null) return invalidResponse()
-      return cached
+      return { ...cached, etag: response.headers.get('etag')?.trim() || cached.etag }
     }
     return { data: decodeTriggerCatalog(await response.json()), etag: response.headers.get('etag')?.trim() || null }
   }

@@ -206,7 +206,7 @@ describe('Server Connector client', () => {
       expect(new Headers(init?.headers).get('x-oo-team-id')).toBe('team-1')
       return Response.json(
         success([
-          { id: 'mail-1', service: 'mail', displayName: 'Mail', isDefault: false, status: 'active' },
+          { id: 'mail-1', service: 'mail', displayName: 'Mail', isDefault: false, status: 'active', marketplace: { id: 'oomol', pricing: 'metered' } },
           { id: 'drive-1', service: 'drive', displayName: 'Drive', isDefault: true, status: 'disconnected' },
         ]),
       )
@@ -214,10 +214,29 @@ describe('Server Connector client', () => {
     vi.stubGlobal('fetch', request)
     const connector = new ConnectorClient('https://connector.oomol.dev', 'runtime-token')
     expect(await connector.listAllConnections(undefined, 'team-1')).toEqual([
-      { connectionId: 'mail-1', serviceId: 'mail', displayName: 'Mail', isDefault: false, status: 'active' },
+      { connectionId: 'mail-1', serviceId: 'mail', displayName: 'Mail', isDefault: false, status: 'active', builtInAccount: true },
       { connectionId: 'drive-1', serviceId: 'drive', displayName: 'Drive', isDefault: true, status: 'disconnected' },
     ])
     expect(request).toHaveBeenCalledTimes(1)
+  })
+
+  it('projects no-setup capability only for no-auth-only Providers', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json(
+          success([
+            { service: 'free', displayName: 'Free', authTypes: ['no_auth'] },
+            { service: 'mixed', displayName: 'Mixed', authTypes: ['api_key', 'no_auth'] },
+          ]),
+        ),
+      ),
+    )
+    const connector = new ConnectorClient('https://connector.oomol.dev', 'runtime-token')
+    await expect(connector.listProviders()).resolves.toEqual([
+      { serviceId: 'free', serviceName: 'Free', noSetup: true },
+      { serviceId: 'mixed', serviceName: 'Mixed' },
+    ])
   })
 
   it('rejects malformed UTF-8 in Connector JSON responses', async () => {

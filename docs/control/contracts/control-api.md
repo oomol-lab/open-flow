@@ -735,6 +735,8 @@ Workbench 的调用示例以只读预览展示，支持分层写法与完整 ID 
 用户可以捕获普通 Connector 错误并返回成功，之后抛出的其他错误不会被已捕获的旧错误覆盖。能力数量或响应大小超限导致节点失败，捕获不能将其变成成功。
 Run 取消、deadline、兄弟节点失败和节点退出沿既有执行生命周期终止能力；未等待的请求也会清理。取消请求不承诺撤销已发生的外部副作用。
 
+`ConnectorProvider` 可选 `noSetup` 表示 Provider 仅支持 `no_auth`，不包含 Connection 状态。`ConnectorConnection` 可选 `builtInAccount` 表示上游账号包含 `marketplace` 元数据；`connectionId` 的 `no_auth:` 前缀标识免配置虚拟账号。节点面板按有效普通账号、有效内置账号、免配置、未配置排序，组合独立获取的 Provider 和 Connection 数据。
+
 `ConnectorConnection` 额外投影可选 `alias`，缺省时仍可按 ID 绑定；`ConnectorAction` 额外投影可选 `inputSchema` / `outputSchema` 原始 JSON Schema。
 旧的 `inputs` / `outputs` 仍是图端口 projection。schema 的暂时缺失不移除声明，也不扩大运行权限。
 

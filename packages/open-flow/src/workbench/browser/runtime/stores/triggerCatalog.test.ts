@@ -23,6 +23,24 @@ function seed(local: TriggerCatalogStorage, entry: TriggerCatalogCache = { data:
 }
 
 describe('Trigger catalog cache', () => {
+  it('persists a replacement ETag from a 304 and uses it for subsequent requests', async () => {
+    const local = storage()
+    seed(local)
+    const request = vi.fn(async (_path: string, _init?: RequestInit) => new Response(null, { status: 304 }))
+    request.mockResolvedValueOnce(new Response(null, { status: 304, headers: { etag: 'W/"new"' } }))
+    const store = setup(request, local)
+    try {
+      const entry = await store.refresh()
+      expect(entry).toEqual({ data: catalog, etag: 'W/"new"' })
+      expect(JSON.parse(browserTriggerCatalogStorage('test', local).getItem('en')!)).toEqual(entry)
+      expect(await store.refresh()).toEqual(entry)
+      expect(await store.refresh()).toEqual(entry)
+      expect(request.mock.calls.map(([, init]) => new Headers(init?.headers).get('if-none-match'))).toEqual(['"old"', 'W/"new"', 'W/"new"'])
+    } finally {
+      store.dispose()
+    }
+  })
+
   it('displays persisted data immediately while revalidating with its ETag across sessions', async () => {
     const local = storage()
     const first = setup(async () => Response.json(catalog, { headers: { etag: 'W/"one"' } }), local)

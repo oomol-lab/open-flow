@@ -46,6 +46,7 @@ export type AddNodeOption = AddNodeOptionBase &
     | {
         readonly choices: NonNullable<AddNodeOptionBase['choices']>
         readonly kind: 'connector-group'
+        readonly noSetup?: boolean
         readonly serviceId: string
       }
     | { readonly kind: 'agent' }

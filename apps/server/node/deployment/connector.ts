@@ -153,6 +153,7 @@ export class ConnectorClient implements ConnectorHost {
     return (await this.#providers(signal, teamId, locale)).map((provider) =>
       Object.assign(
         { serviceId: provider.serviceId, serviceName: provider.serviceName },
+        provider.noSetup ? { noSetup: true } : {},
         provider.homepageUrl == null ? {} : { homepageUrl: provider.homepageUrl },
         provider.icon == null ? {} : { icon: provider.icon },
       ),
@@ -652,6 +653,7 @@ function runtimeProvider(value: unknown) {
   if (source.iconUrl != null && typeof source.iconUrl != 'string') throw unavailable('Connector Provider iconUrl must be a string.')
   return {
     authenticated: !source.authTypes.includes('no_auth'),
+    noSetup: source.authTypes.length == 1 && source.authTypes[0] == 'no_auth',
     ...(source.homepageUrl == null || source.homepageUrl.length == 0 ? {} : { homepageUrl: source.homepageUrl }),
     ...(source.iconUrl == null || source.iconUrl.length == 0 ? {} : { icon: source.iconUrl }),
     serviceId: string(source.service, 'provider.service'),
@@ -682,6 +684,7 @@ function runtimeConnection(value: unknown): ConnectorConnection {
   if (typeof source.isDefault != 'boolean') throw unavailable('Connector Connection isDefault must be a boolean.')
   return {
     ...(source.alias == null ? {} : { alias: string(source.alias, 'connection.alias') }),
+    ...(source.marketplace == null ? {} : { builtInAccount: true }),
     connectionId: string(source.id, 'connection.id'),
     displayName: string(source.displayName, 'connection.displayName'),
     isDefault: source.isDefault,
