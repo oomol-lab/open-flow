@@ -10,12 +10,13 @@ import type { Notice } from './workbenchNotice.ts'
 import type { WorkspaceBusy } from './workspaceModel.ts'
 
 import { compute, derive, val } from 'value-enhancer'
+import { connectorProvidersQuery } from '../../../../control/common/connectorQueries.ts'
 import { randomId } from '../../../../control/common/random.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
-import { cachedConnectorProviders } from '../connectorCache.ts'
 import { diagnosticItems } from '../editor/diagnostics.ts'
 import { createI18n } from '../i18n.ts'
 import { PublicationStore } from '../publications/publicationStore.ts'
+import { cachedResponse } from '../requestCache.ts'
 import { revisionView } from '../revisionView.ts'
 import { RunRequestStore } from '../runs/runRequestStore.ts'
 import { RunStore } from '../runs/runStore.ts'
@@ -153,8 +154,8 @@ export class WorkbenchStore {
       const target = get(this.workspace.$.target)
       const presentation = get(this.workspace.$.presentation)?.value
       const designerDiagnostics = get(diagnostics)?.diagnostics ?? get(this.connectors.$.diagnostics)
-      const providerEntries = get(client.connectorCache.providers)
-      const providerCatalog = cachedConnectorProviders(providerEntries, draft?.flowId)
+      const providerEntries = draft == null ? undefined : cachedResponse(get(client.requestCache.responses), connectorProvidersQuery(draft.flowId, i18n.lang))
+      const providerCatalog = Object.fromEntries((providerEntries ?? []).map((provider) => [provider.serviceId, provider]))
       const actions = get(this.connectors.$.actions)
       const catalogs = get(this.connectors.$.catalogs)
       const t = get(i18n.t$)

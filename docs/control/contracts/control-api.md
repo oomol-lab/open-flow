@@ -565,6 +565,8 @@ Connector route 的 `flowId` 是 opaque Flow identity。提供时部署必须先
 Connection；客户端不能改用 Team ID、Connection owner 或其他外部 identity 代替 Flow scope。省略时使用部署的未限定 Connector catalog。
 
 `GET /v1/connector/connections` 返回 `{ version: 1, connections: ConnectorConnection[] }`，与按服务读取的接口使用相同的 Flow scope 校验。
+Provider 列表接受可选 `locale`，省略时按 `Accept-Language` 解析默认语言；响应携带 `Content-Language` 和 `Vary: Accept-Language`。
+Workbench 将界面语言写入 Provider 请求 URL，按语言分别持久化响应及 ETag；部署将相同语言传递至上游，Action 中的应用名称也采用该语言。
 Provider 仅描述应用目录；面板独立加载 Connections，并根据 active Connection 在展示层计算应用排序。
 
 Connector Provider、Action（列表、搜索和详情）及 Connection GET 响应使用 `Cache-Control: private, no-cache` 和内容生成的
@@ -574,9 +576,16 @@ WorkbenchHost 可通过 `connectorCache: { namespace, localStorage?, sessionStor
 可选存储实现 `getItem` / `setItem`。Provider 使用 localStorage；Action 含默认 Connection 信息，与 Connection 一起使用
 sessionStorage。缓存键包含版本、部署及完整请求路径（含 Flow、语言、service 或搜索参数）。持久化数据经过接口解码器校验，
 Provider、Action 和 Connection 的有效缓存立即返回，并在后台用 ETag 重验证；响应式缓存更新后，菜单和连接选择器同步更新。
+每个完整请求 URL 独立保存并更新响应，304 仅复用该请求的响应。列表、搜索和详情，以及全量与按服务的 Connections，不互相合并或覆盖。
+画布使用按 Action ID 读取的详情；应用排序使用全量 Connections，账号选择使用对应服务的 Connections。
 Provider 成功后 5 分钟内复用，Action 和 Connection 成功后 30 秒内复用；后台失败保留缓存并延迟 30 秒重试。
 授权完成后的强制刷新等待服务端结果，失败会抛出错误。存储不可用或损坏时正常请求。
 未提供 `connectorCache` 的宿主不启用持久化 Connector 缓存。
+
+部署的 Connector 客户端按完整路径（含查询参数）、Team scope 和语言独立缓存上游 Providers、Actions（列表、搜索、详情）及 Apps（全量、按服务）的完整响应及 ETag，每次读取都向上游条件重验证。
+该缓存限于当前客户端的 origin、凭据和 Team scope；不保存无 ETag、解码失败或取消的响应，不在请求失败时返回旧数据。
+缓存总响应体最多 32 MiB；304 复用的响应仍计入 Action 目录大小限制。
+Open Flow 对转换后的响应生成自己的 ETag，不直接透传上游 ETag。
 
 分页 cursor 是 opaque、scope-bound token。跨 Flow、Trigger 或资源类型使用 cursor 返回 `page.invalid-cursor`。
 

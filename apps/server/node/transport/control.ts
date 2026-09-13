@@ -181,9 +181,13 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     context.header('Cache-Control', 'private, no-cache')
   })
   app.get('/connector/providers', async (context) => {
-    const flowId = query(context.req.raw, ['flowId'], controlErrorCode.flowInvalid).get('flowId')
+    const flowId = query(context.req.raw, ['flowId', 'locale'], controlErrorCode.flowInvalid).get('flowId')
     return response(200, {
-      providers: await service.listConnectorProviders(flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid)),
+      providers: await service.listConnectorProviders(
+        flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
+        undefined,
+        metadataLocale(context, ['flowId', 'locale']),
+      ),
       version: 1,
     })
   })

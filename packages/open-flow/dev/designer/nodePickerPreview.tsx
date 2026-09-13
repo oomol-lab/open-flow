@@ -92,7 +92,18 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
     [language, log],
   )
   const connectors = useMemo(() => {
-    let cached = JSON.stringify({ data: { version: 1, providers: sampleProviders.slice(0, 1) }, etag: '"cached"' })
+    const providers = sampleProviders.map((provider) =>
+      Object.assign({}, provider, {
+        serviceName: session.i18n.lang.startsWith('zh')
+          ? provider.serviceName
+          : provider.serviceId == 'feishu'
+            ? 'Feishu'
+            : provider.serviceId == 'wecom'
+              ? 'WeCom'
+              : provider.serviceName,
+      }),
+    )
+    let cached = JSON.stringify({ data: { version: 1, providers: providers.slice(0, 1) }, etag: '"cached"' })
     return new ConnectorStore(
       new WorkbenchClient(
         async (path) => {
@@ -100,7 +111,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
           if (url.pathname.endsWith('/connections')) return Response.json({ version: 1, connections: sampleConnections })
           if (url.pathname.endsWith('/providers')) {
             await new Promise((resolve) => setTimeout(resolve, 1500))
-            return Response.json({ version: 1, providers: sampleProviders })
+            return Response.json({ version: 1, providers })
           }
           await new Promise((resolve) => setTimeout(resolve, 1500))
           return Response.json(sampleActionData(String(path)))
