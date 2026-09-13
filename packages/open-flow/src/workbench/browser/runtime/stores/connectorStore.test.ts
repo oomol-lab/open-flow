@@ -132,9 +132,17 @@ describe('ConnectorStore', () => {
       expect(connectors.$.actions.value['mail.send']?.description).toBe('Send for flow-b.')
       expect(connectorRequests).toEqual([
         '/v1/connector/providers?flowId=flow-a',
-        '/v1/connector/actions?flowId=flow-a&service=mail',
+        '/v1/connector/actions?locale=en&flowId=flow-a&service=mail',
         '/v1/connector/providers?flowId=flow-b',
-        '/v1/connector/actions?flowId=flow-b&service=mail',
+        '/v1/connector/actions?locale=en&flowId=flow-b&service=mail',
+      ])
+      connectors.setLanguage('zh-CN')
+      const localizedProviders = await connectors.browseAddNodeOptions(signal)
+      await connectors.provideAddNodeOptionChoices(localizedProviders![0]!.id, signal)
+      await connectors.provideAddNodeOptions('send', signal)
+      expect(connectorRequests.slice(-2)).toEqual([
+        '/v1/connector/actions?locale=zh-CN&flowId=flow-b&service=mail',
+        '/v1/connector/actions?locale=zh-CN&flowId=flow-b&q=send',
       ])
     } finally {
       connectors.dispose()
