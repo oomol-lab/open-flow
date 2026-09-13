@@ -8,6 +8,7 @@ import snapshots from 'virtual:lab-trigger-snapshots'
 import { localizeTrigger } from '../../src/trigger/providers/localization.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { BlockLibrary } from '../../src/workbench/browser/runtime/editor/contextPanel.tsx'
+import { NodePickerContent } from '../../src/workbench/browser/runtime/editor/nodePicker.tsx'
 import { NodePickerPopover } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
 import { WorkbenchCanvasActions } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
 import { CatalogStores } from '../../src/workbench/browser/runtime/stores/catalogStores.ts'
@@ -81,7 +82,7 @@ function sampleActionData(path: string, cached = false) {
       .filter(
         (action) =>
           (!url.searchParams.get('service') || action.serviceId == url.searchParams.get('service')) &&
-          (!url.searchParams.get('q') || `${action.name} ${action.serviceName}`.toLowerCase().includes(url.searchParams.get('q')!.toLowerCase())),
+          (!url.searchParams.get('q') || `${action.name} ${action.description}`.toLowerCase().includes(url.searchParams.get('q')!.toLowerCase())),
       )
       .map((action) => Object.assign({}, action, { operationType: action.operationType || undefined }, cached ? { name: `${action.name} (cached)` } : {})),
   }
@@ -244,6 +245,14 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
               <BlockLibrary {...props} presentation="picker" />
             </div>
           </section>
+          {['gmail', 'email'].map((query) => (
+            <section key={query}>
+              <h3 className="mb-3 text-sm font-medium">{query == 'gmail' ? 'Provider match · browse and return' : 'Action matches · direct add'}</h3>
+              <div className="h-[560px] max-h-[70vh] w-[440px] max-w-full overflow-hidden rounded-xl border border-[var(--ui-border)] bg-popover text-popover-foreground shadow-md">
+                <NodePickerContent {...props} initialQuery={query} />
+              </div>
+            </section>
+          ))}
           <section className="relative min-h-[640px] rounded-xl border border-[var(--ui-border)] bg-muted/30">
             <h3 className="p-4 text-sm font-medium">Button dock · anchored popover</h3>
             <div className="absolute bottom-4 left-4">
@@ -267,6 +276,6 @@ export const nodePickerPreviewStory: FrontendStory = {
   title: 'Add Node Popover',
   standalone: true,
   description:
-    'Provider details use a centered title and quiet back arrow, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Includes cached loading, search and 1,000-app scrolling.',
+    'Provider details use a centered title and quiet back arrow, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Open search samples compare Provider-only and action matches, app navigation and return. Includes cached loading and 1,000-app scrolling.',
   render: (log, dark, language) => <Preview dark={dark} language={language} log={log} />,
 }

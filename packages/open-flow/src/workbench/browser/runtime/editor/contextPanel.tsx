@@ -465,7 +465,7 @@ function SidebarBlockLibrary({
       dynamicOptions.current = indexAddNodeOptions(data)
       setRemoteOptions(data)
       setError(state.error != null)
-      setSettled(state.data != null || state.error != null)
+      setSettled(!state.refreshing && (state.data != null || state.error != null))
     })
     return () => controller.abort()
   }, [browseOptions, searchOptions, filterQuery, retryRequest, t])

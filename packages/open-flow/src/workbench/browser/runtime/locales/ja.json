@@ -928,6 +928,9 @@
     "clearSearch": "検索をクリア",
     "search": "ノード、アプリ、操作を検索…",
     "apps": "アプリ",
+    "searching": "検索中…",
+    "browseNodes": "すべてのノードを表示",
+    "backToResults": "検索結果に戻る",
     "back": "すべてのノードに戻る",
     "results": "検索結果",
     "builtIn": "組み込み"

@@ -928,6 +928,9 @@
     "clearSearch": "清空搜尋",
     "search": "搜尋節點、應用或操作…",
     "apps": "應用",
+    "searching": "正在搜尋…",
+    "browseNodes": "瀏覽全部節點",
+    "backToResults": "返回搜尋結果",
     "back": "返回全部節點",
     "results": "搜尋結果",
     "builtIn": "內建"
