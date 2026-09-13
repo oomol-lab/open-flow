@@ -499,3 +499,28 @@
   --comment-hover-bg: color-mix(in srgb, var(--comment-head-bg) 89%, #ffffff);
   --comment-active-bg: color-mix(in srgb, var(--comment-head-bg) 90%, #000000);
 }
+
+/* Native scroll regions share a quiet thumb and transparent track. */
+:where(.open-flow-theme, .open-flow-theme *) {
+  scrollbar-width: thin;
+  scrollbar-color: light-dark(rgb(0 0 0 / 24%), rgb(255 255 255 / 28%)) transparent;
+}
+
+@supports not (scrollbar-width: thin) {
+  :where(.open-flow-theme, .open-flow-theme *)::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  :where(.open-flow-theme, .open-flow-theme *)::-webkit-scrollbar-track,
+  :where(.open-flow-theme, .open-flow-theme *)::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  :where(.open-flow-theme, .open-flow-theme *)::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 8px;
+    background: light-dark(rgb(0 0 0 / 24%), rgb(255 255 255 / 28%));
+    background-clip: padding-box;
+  }
+}

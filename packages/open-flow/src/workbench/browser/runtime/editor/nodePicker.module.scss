@@ -1,0 +1,42 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+
+  &[data-navigation='forward'] {
+    animation: enter-forward 160ms ease-out;
+  }
+
+  &[data-navigation='back'] {
+    animation: enter-back 160ms ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &[data-navigation] {
+      animation: none;
+    }
+  }
+}
+
+@keyframes enter-forward {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes enter-back {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

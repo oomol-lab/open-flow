@@ -5,3 +5,23 @@
   pointer-events: none;
   object-fit: contain;
 }
+
+.initials {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--content-icon-initials-background, var(--ui-muted));
+  color: var(--ui-foreground);
+  vertical-align: middle;
+  pointer-events: none;
+
+  > span {
+    font-size: 0.42em;
+    font-weight: 400;
+    line-height: 1;
+  }
+}

@@ -19,7 +19,7 @@
     "javascriptDescription": "Создать JavaScript-скриптлет для этого узла.",
     "llmChat": "Чат LLM",
     "llmChatDescription": "Генерировать текстовый ответ по сообщениям и шаблону промпта.",
-    "llmStructured": "Структурированный вывод LLM",
+    "llmStructured": "LLM JSON",
     "llmStructuredDescription": "Генерировать структурированный JSON по сообщениям и шаблону промпта.",
     "generatedResponse": "Сгенерированный ответ.",
     "subflowDescription": "Добавить существующий Subflow.",
@@ -913,5 +913,12 @@
     "noStatuses": "Нет доступных статусов.",
     "unavailableStatus": "Недоступный статус ({{id}})",
     "missingStatuses": "Некоторые выбранные статусы больше недоступны. Удалите или замените их."
+  },
+  "nodePicker": {
+    "search": "Поиск узлов, приложений и действий…",
+    "apps": "Приложения",
+    "back": "Назад ко всем узлам",
+    "results": "Результаты поиска",
+    "builtIn": "Встроенные"
   }
 }
