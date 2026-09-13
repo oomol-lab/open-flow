@@ -1,28 +1,23 @@
 import type { ReadonlyVal } from 'value-enhancer'
-import type { ConnectorAction, ConnectorConnection, ConnectorProvider } from '../../../../control/common/api.ts'
+import type { ConnectorActionMetadata, ConnectorConnection, ConnectorProvider } from '../../../../control/common/api.ts'
 import type { WorkbenchClient } from '../api.ts'
 import type { WorkbenchHost } from '../contract.ts'
 import type { ResourceState } from './resource.ts'
 
 import { compute } from 'value-enhancer'
-import { connectorAction, connectorProvider, connection } from '../../../../control/common/connectorDecoders.ts'
+import { connectorActionMetadata, connectorProvider, connection } from '../../../../control/common/connectorDecoders.ts'
 import { connectorProvidersQuery, allConnectorConnectionsQuery, connectorConnectionsQuery } from '../../../../control/common/connectorQueries.ts'
 import { invalidResponse, record } from '../../../../control/common/decoding.ts'
-import { connectionCatalog } from '../workspace.ts'
 import { Resource } from './resource.ts'
 
 function list<T>(value: unknown, decode: (value: unknown) => T): readonly T[] {
   if (!Array.isArray(value)) return invalidResponse()
   return value.map(decode)
 }
-function metadata(value: unknown): ConnectorAction {
-  const { defaultConnection: _connection, ...action } = connectorAction(value)
-  return action
-}
-function actionsResponse(value: unknown): readonly ConnectorAction[] {
+function actionsResponse(value: unknown): readonly ConnectorActionMetadata[] {
   const source = record(value)
   if (source.version != 1) return invalidResponse()
-  return list(source.actions, metadata)
+  return list(source.actions, connectorActionMetadata)
 }
 const identity = (...parts: (string | undefined)[]) => JSON.stringify(parts)
 
@@ -101,31 +96,31 @@ export class ConnectionStore {
 }
 
 export class ActionStore {
-  readonly #searches = new Set<Resource<readonly ConnectorAction[]>>()
-  readonly #entries = new Map<string, Resource<readonly ConnectorAction[]>>()
-  readonly #details = new Map<string, ReadonlyVal<ResourceState<ConnectorAction>>>()
+  readonly #searches = new Set<Resource<readonly ConnectorActionMetadata[]>>()
+  readonly #entries = new Map<string, Resource<readonly ConnectorActionMetadata[]>>()
+  readonly #details = new Map<string, ReadonlyVal<ResourceState<ConnectorActionMetadata>>>()
   constructor(
     private readonly client: WorkbenchClient,
     private readonly options?: WorkbenchHost['connectorCache'],
   ) {}
-  get(serviceId: string, flowId?: string, locale = 'en', force = false): ReadonlyVal<ResourceState<readonly ConnectorAction[]>> {
+  get(serviceId: string, flowId?: string, locale = 'en', force = false): ReadonlyVal<ResourceState<readonly ConnectorActionMetadata[]>> {
     const key = identity(flowId, serviceId, locale)
     let entry = this.#entries.get(key)
     if (entry == null) {
       const decode = (value: unknown) => {
-        const actions = list(value, metadata)
+        const actions = list(value, connectorActionMetadata)
         if (actions.some((action) => action.serviceId != serviceId)) return invalidResponse()
         return actions
       }
       const params = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), service: serviceId, locale })
-      const query = { path: `/v1/connector/actions?${params}`, decode: (value: unknown) => decode(actionsResponse(value)) }
+      const query = { path: `/v1/connector/action-metadata?${params}`, decode: (value: unknown) => decode(actionsResponse(value)) }
       entry = new Resource(
         (etag, signal) => this.client.readCatalog(query, etag, signal),
         30_000,
         this.options == null
           ? undefined
           : {
-              key: `open-flow:actions:v2:${encodeURIComponent(this.options.namespace)}:${key}`,
+              key: `open-flow:actions:v3:${encodeURIComponent(this.options.namespace)}:${key}`,
               storage: () => this.options!.localStorage ?? window.localStorage,
               decode,
             },
@@ -134,7 +129,7 @@ export class ActionStore {
     }
     return entry.get(force)
   }
-  detail(actionId: string, flowId?: string, locale = 'en', force = false): ReadonlyVal<ResourceState<ConnectorAction>> {
+  detail(actionId: string, flowId?: string, locale = 'en', force = false): ReadonlyVal<ResourceState<ConnectorActionMetadata>> {
     const service = actionId.slice(0, actionId.indexOf('.'))
     const source = this.get(service, flowId, locale, force)
     const key = identity(flowId, actionId, locale)
@@ -149,10 +144,10 @@ export class ActionStore {
     }
     return detail
   }
-  search(query: string, flowId: string | undefined, locale: string, signal: AbortSignal): Resource<readonly ConnectorAction[]> {
+  search(query: string, flowId: string | undefined, locale: string, signal: AbortSignal): Resource<readonly ConnectorActionMetadata[]> {
     const params = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), q: query.trim(), locale })
     const resource = new Resource(
-      (etag, requestSignal) => this.client.readCatalog({ path: `/v1/connector/actions?${params}`, decode: actionsResponse }, etag, requestSignal),
+      (etag, requestSignal) => this.client.readCatalog({ path: `/v1/connector/action-metadata?${params}`, decode: actionsResponse }, etag, requestSignal),
       30_000,
     )
     this.#searches.add(resource)
@@ -181,12 +176,6 @@ export class ActionStore {
     this.#details.clear()
     this.#entries.clear()
   }
-}
-
-/** Composition happens in consumers; persisted Actions contain no Connection snapshot. */
-export function actionWithConnections(action: ConnectorAction, connections: readonly ConnectorConnection[] | undefined): ConnectorAction {
-  const preferred = action.authenticated && connections != null ? connectionCatalog(connections).preferred : undefined
-  return { ...action, ...(preferred == null ? {} : { defaultConnection: preferred }) }
 }
 
 export class CatalogStores {

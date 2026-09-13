@@ -1,6 +1,7 @@
 import type { ResultQuery } from '@oomol-lab/open-flow/control-api'
 import type {
   ConnectorAction,
+  ConnectorActionMetadata,
   ConnectorConnection,
   ConnectorProvider,
   Draft,
@@ -212,16 +213,40 @@ export class ControlService {
     return await this.#connectorRequest(flowId, (connector, teamId) => connector.listProviders(signal, teamId, locale))
   }
 
-  async listConnectorActions(serviceId?: string, flowId?: string, locale?: string): Promise<readonly ConnectorAction[]> {
+  async listConnectorActionMetadata(serviceId?: string, flowId?: string, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
     return await this.#connectorRequest(flowId, (connector, teamId) => connector.listActions(serviceId, undefined, teamId, locale))
   }
 
-  async searchConnectorActions(query: string, flowId?: string, signal?: AbortSignal, locale?: string): Promise<readonly ConnectorAction[]> {
+  async searchConnectorActionMetadata(query: string, flowId?: string, signal?: AbortSignal, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
     return await this.#connectorRequest(flowId, (connector, teamId) => connector.searchActions(query, signal, teamId, locale))
   }
 
-  async getConnectorAction(actionId: string, flowId?: string, signal?: AbortSignal, locale?: string): Promise<ConnectorAction> {
+  async getConnectorActionMetadata(actionId: string, flowId?: string, signal?: AbortSignal, locale?: string): Promise<ConnectorActionMetadata> {
     return await this.#connectorRequest(flowId, (connector, teamId) => connector.getAction(actionId, signal, teamId, locale))
+  }
+
+  async listConnectorActions(serviceId?: string, flowId?: string, locale?: string): Promise<readonly ConnectorAction[]> {
+    return await this.#connectorRequest(flowId, async (connector, teamId) => {
+      const [actions, connections] = await Promise.all([
+        connector.listActions(serviceId, undefined, teamId, locale),
+        serviceId == null ? connector.listAllConnections(undefined, teamId) : connector.listConnections(serviceId, undefined, teamId),
+      ])
+      return actions.map((action) => actionWithDefaultConnection(action, connections))
+    })
+  }
+
+  async searchConnectorActions(query: string, flowId?: string, signal?: AbortSignal, locale?: string): Promise<readonly ConnectorAction[]> {
+    return await this.#connectorRequest(flowId, async (connector, teamId) => {
+      const [actions, connections] = await Promise.all([connector.searchActions(query, signal, teamId, locale), connector.listAllConnections(signal, teamId)])
+      return actions.map((action) => actionWithDefaultConnection(action, connections))
+    })
+  }
+
+  async getConnectorAction(actionId: string, flowId?: string, signal?: AbortSignal, locale?: string): Promise<ConnectorAction> {
+    return await this.#connectorRequest(flowId, async (connector, teamId) => {
+      const [action, connections] = await Promise.all([connector.getAction(actionId, signal, teamId, locale), connector.listAllConnections(signal, teamId)])
+      return actionWithDefaultConnection(action, connections)
+    })
   }
 
   async listAllConnectorConnections(flowId?: string, signal?: AbortSignal): Promise<readonly ConnectorConnection[]> {
@@ -1214,4 +1239,11 @@ function runNotFound(): never {
 
 function triggerNotFound(): never {
   throw new ControlError(controlErrorCode.triggerNotFound, 'The Trigger binding was not found.')
+}
+
+/** Compose the legacy public response without coupling the upstream metadata cache to accounts. */
+function actionWithDefaultConnection(action: ConnectorActionMetadata, connections: readonly ConnectorConnection[]): ConnectorAction {
+  const active = connections.filter((connection) => connection.serviceId == action.serviceId && connection.status == 'active')
+  const preferred = action.authenticated ? (active.find((connection) => connection.isDefault) ?? (active.length == 1 ? active[0] : undefined)) : undefined
+  return { ...action, ...(preferred == null ? {} : { defaultConnection: preferred }) }
 }

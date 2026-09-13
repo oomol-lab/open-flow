@@ -296,15 +296,18 @@ describe('Server Connector host', () => {
       getAction: async () => actions[0]!,
       listActions: async () => actions,
       listConnections: async () => connections,
+      listAllConnections: async () => connections,
       listProviders: async () => providers,
       searchActions: async () => actions,
     })
     const service = await open(connector, 'https://connector.example')
 
     await expect(service.control.listConnectorProviders()).resolves.toEqual(providers)
-    await expect(service.control.listConnectorActions('example')).resolves.toEqual(actions)
-    await expect(service.control.searchConnectorActions('echo')).resolves.toEqual(actions)
-    await expect(service.control.getConnectorAction('example.echo')).resolves.toEqual(actions[0])
+    const combined = actions.map((action) => ({ ...action, defaultConnection: connections[0] }))
+    await expect(service.control.listConnectorActionMetadata('example')).resolves.toEqual(actions)
+    await expect(service.control.listConnectorActions('example')).resolves.toEqual(combined)
+    await expect(service.control.searchConnectorActions('echo')).resolves.toEqual(combined)
+    await expect(service.control.getConnectorAction('example.echo')).resolves.toEqual(combined[0])
     await expect(service.control.listConnectorConnections('example')).resolves.toEqual(connections)
     expect(service.control.connectorConnectionPage('example')).toBe('https://connector.example/providers/example')
   })

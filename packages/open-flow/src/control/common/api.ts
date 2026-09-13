@@ -151,12 +151,12 @@ export interface ConnectorConnection {
   readonly status: 'active' | 'disconnected' | 'error' | 'reauth_required'
 }
 
-export interface ConnectorAction {
+/** Action metadata independent of account availability and selection. */
+export interface ConnectorActionMetadata {
   readonly inputSchema?: JsonValue
   readonly outputSchema?: JsonValue
   readonly actionId: string
   readonly authenticated: boolean
-  readonly defaultConnection?: ConnectorConnection
   readonly description: string
   readonly homepageUrl?: string
   readonly icon?: string
@@ -165,6 +165,11 @@ export interface ConnectorAction {
   readonly outputs: Readonly<Record<string, PortDefinition>>
   readonly serviceId: string
   readonly serviceName: string
+}
+
+/** Existing CLI/MCP representation, including the currently preferred account. */
+export interface ConnectorAction extends ConnectorActionMetadata {
+  readonly defaultConnection?: ConnectorConnection
 }
 
 export interface ConnectorProvider {

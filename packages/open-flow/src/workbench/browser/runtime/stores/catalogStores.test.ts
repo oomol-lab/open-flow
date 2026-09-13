@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
+import { actionWithConnections } from '../workspace.ts'
 import { CatalogStores } from './catalogStores.ts'
 import { resourceValue } from './resource.ts'
 
@@ -13,7 +14,6 @@ const action = {
   authenticated: true,
   inputs: {},
   outputs: {},
-  defaultConnection: connection,
 }
 function storage() {
   const entries = new Map<string, string>()
@@ -32,7 +32,7 @@ function setup() {
     const url = new URL(String(path), 'https://test.invalid')
     const data = url.pathname.endsWith('/providers')
       ? { providers: [{ serviceId: 'mail', serviceName: url.searchParams.get('locale')! }] }
-      : url.pathname.endsWith('/actions')
+      : url.pathname.endsWith('/action-metadata')
         ? { actions: [action] }
         : { connections: [connection], ...(url.pathname.endsWith('/mail') ? { serviceId: 'mail' } : {}) }
     return Response.json({ version: 1, ...data }, { headers: { etag: '"one"' } })
@@ -109,5 +109,47 @@ it('ignores invalid stored data and tolerates unavailable storage', async () => 
   const stores = test.create()
   expect(await resourceValue(stores.providers.get('flow', 'en'))).toHaveLength(1)
   expect(new Headers(test.request.mock.calls[0]?.[1]?.headers).has('if-none-match')).toBe(false)
+  stores.dispose()
+})
+
+it('updates the selected account from Connections without changing Action metadata or its validator', async () => {
+  const test = setup()
+  const stores = test.create()
+  const metadata = await resourceValue(stores.actions.get('mail', 'flow', 'en'))
+  const source = stores.connections.get('mail', 'flow')
+  const initial = await resourceValue(source)
+  // Let the initial request finish before changing the account in this scenario.
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  expect(actionWithConnections(metadata[0]!, initial).defaultConnection?.connectionId).toBe('account')
+  const persisted = [...test.localStorage.entries]
+  test.request.mockImplementation(async () => Response.json({ version: 1, serviceId: 'mail', connections: [{ ...connection, connectionId: 'new-account' }] }))
+  stores.connections.get('mail', 'flow', true)
+  await vi.waitFor(() => expect(source.value.data?.[0]?.connectionId).toBe('new-account'))
+  expect(actionWithConnections(metadata[0]!, source.value.data).defaultConnection?.connectionId).toBe('new-account')
+  expect(stores.actions.get('mail', 'flow', 'en').value.data).toBe(metadata)
+  expect(metadata[0]).not.toHaveProperty('defaultConnection')
+  expect([...test.localStorage.entries]).toEqual(persisted)
+  expect(actionWithConnections(metadata[0]!, []).defaultConnection).toBeUndefined()
+  expect(actionWithConnections({ ...metadata[0]!, authenticated: false }, source.value.data).defaultConnection).toBeUndefined()
+  stores.dispose()
+})
+
+it('rejects account snapshots in Action responses instead of silently stripping them', async () => {
+  const test = setup()
+  test.request.mockImplementation(async () => Response.json({ version: 1, actions: [{ ...action, defaultConnection: connection }] }))
+  const stores = test.create()
+  await expect(resourceValue(stores.actions.get('mail', 'flow', 'en'))).rejects.toThrow()
+  expect(test.localStorage.entries.size).toBe(0)
+  stores.dispose()
+})
+
+it('does not reuse the old combined Action validator for the metadata endpoint', async () => {
+  const test = setup()
+  test.localStorage.setItem('open-flow:actions:v2:test:["flow","mail","en"]', JSON.stringify({ data: [action], etag: '"combined"' }))
+  const stores = test.create()
+  await resourceValue(stores.actions.get('mail', 'flow', 'en'))
+  expect(String(test.request.mock.calls[0]?.[0])).toBe('/v1/connector/action-metadata?flowId=flow&service=mail&locale=en')
+  expect(new Headers(test.request.mock.calls[0]?.[1]?.headers).has('if-none-match')).toBe(false)
+  expect([...test.localStorage.entries.keys()].some((key) => key.startsWith('open-flow:actions:v3:'))).toBe(true)
   stores.dispose()
 })

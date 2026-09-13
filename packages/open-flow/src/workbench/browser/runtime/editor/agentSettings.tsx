@@ -1,9 +1,9 @@
 import type { ReactElement, SetStateAction } from 'react'
 import type { AgentInput, AgentTool, InputPort, JsonValue, ManagedTaskDefinition, ManagedTaskExecutor } from '../../../../flow/common/change.ts'
-import type { ConnectorAction } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
+import type { ConnectorActionView } from '../workspace.ts'
 
 import { dequal } from 'dequal/lite'
 import { ChevronDown, ChevronRight } from 'lucide-react'
@@ -174,7 +174,7 @@ export function AgentSettings({
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null)
   const [config, renderConfig] = useState(task.executor)
   const [parameter, setParameter] = useState<string>()
-  const [pendingTool, setPendingTool] = useState<ConnectorAction>()
+  const [pendingTool, setPendingTool] = useState<ConnectorActionView>()
   const [approval, setApproval] = useState(false)
   const [saveError, setSaveError] = useState<string>()
   const [flowId] = useState(store.$.flowId.value)
@@ -250,7 +250,7 @@ export function AgentSettings({
     else invalidDrafts.current.add(key)
     setInvalid(new Set(invalidDrafts.current))
   }
-  const addTool = (action: ConnectorAction, confirm: boolean): void => {
+  const addTool = (action: ConnectorActionView, confirm: boolean): void => {
     setConfig({ ...config, tools: [...config.tools, agentTool(action, confirm, crypto.randomUUID())] })
     setPendingTool(undefined)
     setApproval(false)

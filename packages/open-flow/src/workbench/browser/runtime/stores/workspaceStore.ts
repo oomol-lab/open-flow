@@ -3,7 +3,7 @@ import type { ReadonlyVal } from 'value-enhancer'
 import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { ConnectorCapability } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
-import type { WorkbenchClient, ConnectorAction, Draft, Flow, GraphNode, InputPort, JsonValue, Live, TriggerSchedule } from '../api.ts'
+import type { WorkbenchClient, Draft, Flow, GraphNode, InputPort, JsonValue, Live, TriggerSchedule } from '../api.ts'
 import type { FlowChangeEvent } from '../contract.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
 import type { DiagnosticItem } from '../editor/diagnostics.ts'
@@ -18,6 +18,7 @@ import type {
   WebhookSettings,
 } from '../editor/flowChanges.ts'
 import type { RevisionView } from '../revisionView.ts'
+import type { ConnectorActionView } from '../workspace.ts'
 import type { DesignerEdge, DesignerGraph, DesignerViewport, Point } from '../workspace.ts'
 import type { CanvasAction } from './canvasHistory.ts'
 import type { DraftChangeContext } from './draftChanges.ts'
@@ -652,7 +653,7 @@ export class WorkspaceStore {
     return changes != null && (await this.#changeDraft(changes)) != null
   }
 
-  public async setWaitNotification(nodeId: string, action: ConnectorAction): Promise<boolean> {
+  public async setWaitNotification(nodeId: string, action: ConnectorActionView): Promise<boolean> {
     const revision = this.$.revision.value
     const changes = revision == null ? undefined : setWaitNotification(revision, nodeId, action, this.#identity())
     return changes != null && (await this.#changeDraft(changes)) != null

@@ -1,10 +1,10 @@
 import type { I18n, TFunction } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { WorkbenchClient, ConnectorAction, ConnectorConnection, ConnectorProvider, Diagnostic, JsonValue } from '../api.ts'
+import type { WorkbenchClient, ConnectorActionMetadata, ConnectorConnection, ConnectorProvider, Diagnostic, JsonValue } from '../api.ts'
 import type { WorkbenchHost } from '../contract.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
 import type { ResolvedSelection, RevisionView } from '../revisionView.ts'
-import type { ConnectionCatalog } from '../workspace.ts'
+import type { ConnectionCatalog, ConnectorActionView } from '../workspace.ts'
 import type { CatalogStores } from './catalogStores.ts'
 import type { Current } from './latest.ts'
 import type { SetNotice } from './workbenchNotice.ts'
@@ -14,8 +14,7 @@ import { compute, derive, val } from 'value-enhancer'
 import { flowDependencies } from '../../../../flow/common/semantics.ts'
 import { createI18n } from '../i18n.ts'
 import { providerIcon } from '../providerIcon.ts'
-import { connectionCatalog } from '../workspace.ts'
-import { actionWithConnections } from './catalogStores.ts'
+import { connectionCatalog, actionWithConnections } from '../workspace.ts'
 import { Latest } from './latest.ts'
 import { scopedValue } from './optionSource.ts'
 import { resourceValue } from './resource.ts'
@@ -32,7 +31,7 @@ interface ConnectorState {
 }
 
 interface Selection {
-  readonly action?: ConnectorAction
+  readonly action?: ConnectorActionView
   readonly actionError?: string
   readonly activeConnections?: readonly ConnectorConnection[]
   readonly authorizationPending: boolean
@@ -50,11 +49,11 @@ interface ConnectorTarget {
 export interface Connector$ {
   readonly connections: ReadonlyVal<readonly ConnectorConnection[]>
   readonly actionLoading: ReadonlyVal<string | undefined>
-  readonly actions: ReadonlyVal<Readonly<Record<string, ConnectorAction>>>
+  readonly actions: ReadonlyVal<Readonly<Record<string, ConnectorActionView>>>
   readonly catalogs: ReadonlyVal<Readonly<Record<string, ConnectionCatalog>>>
   readonly connectionLoading: ReadonlyVal<string | undefined>
   readonly diagnostics: ReadonlyVal<readonly Diagnostic[]>
-  readonly selectedAction: ReadonlyVal<ConnectorAction | undefined>
+  readonly selectedAction: ReadonlyVal<ConnectorActionView | undefined>
   readonly selectedActionError: ReadonlyVal<string | undefined>
   readonly selectedActiveConnections: ReadonlyVal<readonly ConnectorConnection[] | undefined>
   readonly selectedAuthorizationPending: ReadonlyVal<boolean>
@@ -71,7 +70,7 @@ function ports(values: Readonly<Record<string, { readonly description?: string; 
   return Object.entries(values).map(([handle, value]) => ({ description: value.description, handle, jsonSchema: value.jsonSchema }))
 }
 
-function option(action: ConnectorAction, t: TFunction): AddNodeOption {
+function option(action: ConnectorActionView, t: TFunction): AddNodeOption {
   return {
     connector: action,
     description:
@@ -88,8 +87,8 @@ function option(action: ConnectorAction, t: TFunction): AddNodeOption {
   }
 }
 
-function providerOptions(actions: readonly ConnectorAction[], t: TFunction): readonly AddNodeOption[] {
-  const providers = new Map<string, ConnectorAction[]>()
+function providerOptions(actions: readonly ConnectorActionView[], t: TFunction): readonly AddNodeOption[] {
+  const providers = new Map<string, ConnectorActionView[]>()
   for (const action of actions) {
     const provider = providers.get(action.serviceId) ?? []
     provider.push(action)
@@ -151,7 +150,7 @@ function connectorTarget(selection: ResolvedSelection | undefined, revision: Rev
 
 function connectionDiagnostics(
   revision: RevisionView | undefined,
-  actions: Readonly<Record<string, ConnectorAction>>,
+  actions: Readonly<Record<string, ConnectorActionView>>,
   catalogs: Readonly<Record<string, ConnectionCatalog>>,
 ): readonly Diagnostic[] {
   if (revision == null) return []
@@ -438,7 +437,7 @@ export class ConnectorStore {
     if (!this.#disposed && this.#authorization?.serviceId == serviceId) this.#authorization = undefined
   }
 
-  async #loadAction(actionId: string, force: boolean): Promise<ConnectorAction> {
+  async #loadAction(actionId: string, force: boolean): Promise<ConnectorActionMetadata> {
     const state = this.data.actions.detail(actionId, this.#workspace.$.flowId.value, this.#language, force)
     await Promise.resolve()
     return await resourceValue(state, undefined, force)

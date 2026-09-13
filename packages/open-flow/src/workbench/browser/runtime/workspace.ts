@@ -10,7 +10,7 @@ import type {
 } from '../../../canvas/browser/graph/FlowCanvas/model.ts'
 import type { GraphTarget } from '../../../flow/common/change.ts'
 import type {
-  ConnectorAction,
+  ConnectorActionMetadata,
   ConnectorConnection,
   ConnectorProvider,
   Diagnostic,
@@ -30,6 +30,16 @@ import { dequal } from 'dequal/lite'
 import { triggerPayloadSchema } from '../../../flow/common/schema.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
+
+/** Consumer-derived account state; never part of the Action API or metadata cache. */
+export interface ConnectorActionView extends ConnectorActionMetadata {
+  readonly defaultConnection?: ConnectorConnection
+}
+
+export function actionWithConnections(action: ConnectorActionMetadata, connections: readonly ConnectorConnection[] | undefined): ConnectorActionView {
+  const preferred = action.authenticated && connections != null ? connectionCatalog(connections).preferred : undefined
+  return { ...action, ...(preferred == null ? {} : { defaultConnection: preferred }) }
+}
 
 export interface Point {
   readonly x: number
@@ -87,7 +97,7 @@ interface NodeLayout {
 
 interface NodeProjectionContext {
   readonly connectionCatalogs: Readonly<Record<string, ConnectionCatalog>>
-  readonly connectorActions: Readonly<Record<string, ConnectorAction>>
+  readonly connectorActions: Readonly<Record<string, ConnectorActionView>>
   readonly diagnostics: readonly Diagnostic[]
   readonly revision: RevisionView
   readonly runNodes: ReadonlyMap<string, FlowCanvasViewNodeRun>
@@ -700,7 +710,7 @@ export function designerGraph(
   target: GraphTarget | undefined,
   presentation: Readonly<Record<string, JsonValue>> = {},
   diagnostics: readonly Diagnostic[] = [],
-  connectorActions: Readonly<Record<string, ConnectorAction>> = {},
+  connectorActions: Readonly<Record<string, ConnectorActionView>> = {},
   connectionCatalogs: Readonly<Record<string, ConnectionCatalog>> = {},
   t?: TFunction,
   run?: Run | RunDetails,

@@ -81,7 +81,7 @@ describe('ConnectorStore', () => {
           version: 1,
         })
       }
-      if (path.startsWith('/v1/connector/actions/mail.send?')) {
+      if (path.startsWith('/v1/connector/action-metadata/mail.send?')) {
         connectorRequests.push(path)
         return Response.json({
           version: 1,
@@ -98,7 +98,7 @@ describe('ConnectorStore', () => {
         })
       }
       if (path.startsWith('/v1/connector/connections/')) return Response.json({ version: 1, serviceId: 'mail', connections: [] })
-      if (path.startsWith('/v1/connector/actions?')) {
+      if (path.startsWith('/v1/connector/action-metadata?')) {
         connectorRequests.push(path)
         return Response.json({
           actions: [
@@ -159,10 +159,10 @@ describe('ConnectorStore', () => {
       expect(connectors.$.actions.value).toEqual({})
       expect(connectorRequests).toEqual([
         '/v1/connector/providers?flowId=flow-a&locale=en',
-        '/v1/connector/actions?flowId=flow-a&service=mail&locale=en',
-        '/v1/connector/actions?flowId=flow-a&q=send&locale=en',
+        '/v1/connector/action-metadata?flowId=flow-a&service=mail&locale=en',
+        '/v1/connector/action-metadata?flowId=flow-a&q=send&locale=en',
         '/v1/connector/providers?flowId=flow-b&locale=en',
-        '/v1/connector/actions?flowId=flow-b&service=mail&locale=en',
+        '/v1/connector/action-metadata?flowId=flow-b&service=mail&locale=en',
       ])
       connectors.setLanguage('zh-CN')
       const localizedProviders = await resourceValue(connectors.browseAddNodeOptions(signal))
@@ -170,8 +170,8 @@ describe('ConnectorStore', () => {
       await resourceValue(connectors.provideAddNodeOptionChoices(localizedProviders![0]!.id, signal))
       await resourceValue(connectors.provideAddNodeOptions('send', signal))
       expect(connectorRequests.slice(-2)).toEqual([
-        '/v1/connector/actions?flowId=flow-b&service=mail&locale=zh-CN',
-        '/v1/connector/actions?flowId=flow-b&q=send&locale=zh-CN',
+        '/v1/connector/action-metadata?flowId=flow-b&service=mail&locale=zh-CN',
+        '/v1/connector/action-metadata?flowId=flow-b&q=send&locale=zh-CN',
       ])
     } finally {
       connectors.dispose()

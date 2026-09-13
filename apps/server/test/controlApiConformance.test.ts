@@ -34,7 +34,6 @@ const connectorConnection: ConnectorConnection = {
 const connectorAction: ConnectorAction = {
   actionId: 'mail.send',
   authenticated: true,
-  defaultConnection: connectorConnection,
   description: 'Send one message.',
   inputs: {
     to: {
@@ -63,6 +62,7 @@ async function createHarness(start = false): Promise<ControlApiConformanceHarnes
       return connectorAction
     },
     listActions: async () => [connectorAction],
+    listAllConnections: async () => [connectorConnection],
     listConnections: async (serviceId) => (serviceId == connectorConnection.serviceId ? [connectorConnection] : []),
     listProviders: async () => [connectorProvider],
     ready: async () => true,

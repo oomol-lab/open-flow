@@ -5,7 +5,6 @@ import type {
   ChangeOperation,
   CodeModule,
   ConditionNode,
-  ConnectorAction,
   Draft,
   GraphNode,
   InputPort,
@@ -17,6 +16,7 @@ import type {
   WebhookOptions,
 } from '../api.ts'
 import type { RevisionView } from '../revisionView.ts'
+import type { ConnectorActionView } from '../workspace.ts'
 
 import { dequal } from 'dequal/lite'
 import { applyFlowChanges as reduceFlowChanges, nextNodeName, normalizeNodeName } from '../../../../flow/common/change.ts'
@@ -83,7 +83,7 @@ export type TaskPorts = Pick<TaskDefinition, 'inputs' | 'outputs'>
 export function codeTyping(
   ports: TaskPorts,
   capabilities: readonly ConnectorCapability[] = [],
-  catalog: Readonly<Record<string, ConnectorAction>> = {},
+  catalog: Readonly<Record<string, ConnectorActionView>> = {},
 ): string {
   const typing = generateTyping(
     'javascript',
@@ -124,7 +124,7 @@ export interface SubflowSettings {
 export type AddNodeIntent =
   | { readonly kind: 'agent'; readonly name: string }
   | { readonly kind: 'code'; readonly name: string; readonly ports?: TaskPorts }
-  | { readonly action: ConnectorAction; readonly kind: 'connector' }
+  | { readonly action: ConnectorActionView; readonly kind: 'connector' }
   | { readonly kind: 'condition'; readonly name: string }
   | { readonly kind: 'manual'; readonly name: string }
   | { readonly kind: 'cron'; readonly name: string }
@@ -141,7 +141,7 @@ export interface PastedNodes {
   readonly sourceIds: readonly string[]
 }
 
-function connectorTask(action: ConnectorAction): Extract<TaskDefinition, { readonly executor: unknown }> {
+function connectorTask(action: ConnectorActionView): Extract<TaskDefinition, { readonly executor: unknown }> {
   return {
     executor: {
       action: action.actionId,
@@ -154,7 +154,7 @@ function connectorTask(action: ConnectorAction): Extract<TaskDefinition, { reado
   }
 }
 
-export function agentTool(action: ConnectorAction, approval: boolean, id: string): AgentTool {
+export function agentTool(action: ConnectorActionView, approval: boolean, id: string): AgentTool {
   return {
     id,
     name: `${action.actionId.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 48)}_${id.slice(0, 8)}`,
@@ -168,7 +168,7 @@ export function agentTool(action: ConnectorAction, approval: boolean, id: string
   }
 }
 
-function messageHandle(action: ConnectorAction): string | undefined {
+function messageHandle(action: ConnectorActionView): string | undefined {
   const inputs = Object.entries(action.inputs)
   return (
     inputs.find(([, port]) => {
@@ -609,7 +609,7 @@ export function updateWait(
   return cleanTask(revision, cleaned, current.notification?.taskId == settings.notification?.taskId ? undefined : current.notification?.taskId)
 }
 
-export function setWaitNotification(revision: RevisionView, nodeId: string, action: ConnectorAction, taskId: string): FlowChanges | undefined {
+export function setWaitNotification(revision: RevisionView, nodeId: string, action: ConnectorActionView, taskId: string): FlowChanges | undefined {
   const graph = revision.graph({ kind: 'flow' })
   const current = graph?.nodes[nodeId]
   const handle = messageHandle(action)

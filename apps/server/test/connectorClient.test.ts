@@ -360,7 +360,6 @@ describe('Server Connector client', () => {
       expect.objectContaining({
         actionId: 'example.echo',
         authenticated: true,
-        defaultConnection: expect.objectContaining({ connectionId: 'connection-work' }),
         homepageUrl: 'https://example.test',
         inputs: {
           message: { description: 'Message.', jsonSchema: { default: 'hello', description: 'Message.', type: 'string' }, nullable: true, value: 'hello' },
@@ -388,7 +387,6 @@ describe('Server Connector client', () => {
         '/v1/actions/example.echo',
         '/v1/actions/search?q=echo',
         '/v1/actions?service=example',
-        '/v1/apps',
         '/v1/apps/services/example',
         '/v1/providers',
       ]),
@@ -441,14 +439,6 @@ describe('Server Connector client', () => {
       {
         actionId: 'example.echo',
         authenticated: true,
-        defaultConnection: {
-          alias: 'work',
-          connectionId: 'connection-work',
-          displayName: 'Work account',
-          isDefault: true,
-          serviceId: 'example',
-          status: 'active',
-        },
         description: 'Echo one message.',
         inputSchema: { properties: {}, type: 'object' },
         outputSchema: { properties: {}, type: 'object' },
