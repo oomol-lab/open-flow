@@ -1,4 +1,8 @@
 {
+  "contextMenu": {
+    "addNode": "添加节点",
+    "paste": "粘贴"
+  },
   "addNode": {
     "comment": "注释",
     "condition": "条件",

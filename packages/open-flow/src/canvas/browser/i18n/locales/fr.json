@@ -1,4 +1,8 @@
 {
+  "contextMenu": {
+    "addNode": "Ajouter un nœud",
+    "paste": "Coller"
+  },
   "addNode": {
     "comment": "Commentaire",
     "condition": "Condition",

@@ -300,6 +300,8 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
     [edgeContextMenu, rf],
   )
 
+  const [paneContextMenu, setPaneContextMenu] = useState<{ position: XYPosition; screenPosition: XYPosition } | null>(null)
+
   const [selectionContextMenu, setSelectionContextMenu] = useState<SelectionContextMenuData | null>(null)
 
   const selectionContextMenuPosition = useMemo(
@@ -601,7 +603,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           onPaneContextMenu={(event) => {
             event.preventDefault()
             const screenPosition = { x: event.clientX, y: event.clientY }
-            editCanvas(() => props.onRequestAddNode?.({ position: rf.screenToFlowPosition(screenPosition), screenPosition }))
+            setPaneContextMenu({ position: rf.screenToFlowPosition(screenPosition), screenPosition })
           }}
           onConnectEnd={onConnectEnd}
           isValidConnection={props.isValidConnection}
@@ -647,6 +649,22 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           <HelperLines horizontal={helperLineHorizontal} vertical={helperLineVertical} />
           {props.children}
           <ViewportPortal>
+            {paneContextMenu && (props.onPaste || props.onRequestAddNode) && (
+              <PaneContextMenu
+                position={paneContextMenu.position}
+                onClose={() => setPaneContextMenu(null)}
+                onPaste={editable ? props.onPaste : undefined}
+                onAddNode={
+                  editable && props.onRequestAddNode
+                    ? () => {
+                        const request = paneContextMenu
+                        cancelAnimationFrame(pickerFrame.current)
+                        pickerFrame.current = requestAnimationFrame(() => editCanvas(() => props.onRequestAddNode?.(request)))
+                      }
+                    : undefined
+                }
+              />
+            )}
             {edgeContextMenu && edgeContextMenuPosition && (
               <EdgeContextMenu
                 position={edgeContextMenuPosition}
@@ -696,6 +714,40 @@ function restoreFlowFocus(event: React.DragEvent): void {
   let parent = event.target as Partial<HTMLElement> | undefined | null
   while (parent && !parent.classList?.contains(styles.flow)) parent = parent.parentElement
   parent?.focus?.()
+}
+
+interface PaneContextMenuProps {
+  readonly position: XYPosition
+  readonly onClose: () => void
+  readonly onPaste?: (position: XYPosition) => void
+  readonly onAddNode?: () => void
+}
+
+function PaneContextMenu(props: PaneContextMenuProps) {
+  const t = useTranslate()
+
+  return (
+    <ContextMenu
+      items={[
+        {
+          label: t('contextMenu.addNode'),
+          key: '$addNode',
+          icon: <i className="i-codicon:add" />,
+          disabled: !props.onAddNode,
+          onClick: props.onAddNode,
+        },
+        {
+          label: t('contextMenu.paste'),
+          key: '$paste',
+          icon: <i className="i-carbon:paste" />,
+          disabled: !props.onPaste,
+          onClick: () => props.onPaste?.(props.position),
+        },
+      ]}
+      onClose={props.onClose}
+      position={props.position}
+    />
+  )
 }
 
 interface EdgeContextMenuProps {

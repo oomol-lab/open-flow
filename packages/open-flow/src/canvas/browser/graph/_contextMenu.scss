@@ -1,0 +1,19 @@
+@mixin appearance {
+  min-width: 176px;
+  padding: 6px;
+  border-radius: calc(var(--open-flow-radius) + 2px);
+
+  :global([data-slot$='menu-item']) {
+    min-height: 28px;
+    gap: 8px;
+    padding: 4px 10px;
+    border-radius: var(--open-flow-radius);
+
+    > i,
+    > svg {
+      flex: 0 0 16px;
+      width: 16px;
+      height: 16px;
+    }
+  }
+}

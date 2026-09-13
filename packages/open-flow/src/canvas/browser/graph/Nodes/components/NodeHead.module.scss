@@ -1,3 +1,5 @@
+@use '../../contextMenu';
+
 .container {
   padding: 0 4px;
   background-color: var(--node-head-background-color);
@@ -57,17 +59,7 @@
 }
 
 .menu {
-  padding: 4px;
-  border-radius: 4px;
-  background: var(--widget-popup-background);
-  box-shadow: 0 2px 16px var(--contextmenu-shadow);
-  font-size: var(--base-font-size);
-  white-space: nowrap;
-
-  :global([data-slot$='menu-item']) {
-    border-radius: var(--widget-radius);
-    font-size: var(--base-font-size);
-  }
+  @include contextMenu.appearance;
 }
 
 .menuButton {

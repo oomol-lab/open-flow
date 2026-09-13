@@ -1,4 +1,8 @@
 {
+  "contextMenu": {
+    "addNode": "노드 추가",
+    "paste": "붙여넣기"
+  },
   "addNode": {
     "comment": "주석",
     "condition": "조건",
