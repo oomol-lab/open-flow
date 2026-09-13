@@ -111,36 +111,38 @@ describe('WorkbenchStore diagnostics', () => {
           version: 1,
         })
       }
-      if (path == `/v1/connector/action-metadata?flowId=${flow.flowId}&service=amap&locale=en`) {
+      if (path.startsWith('/v1/connector/proxy/providers?'))
+        return Response.json({ success: true, data: [{ service: 'amap', displayName: 'AMap', authTypes: ['api_key'] }] })
+      if (path == `/v1/connector/proxy/actions?flowId=${flow.flowId}&service=amap&locale=en`) {
         return Response.json({
-          actions: [
+          data: [
             {
-              actionId: 'amap.geocode',
+              id: 'amap.geocode',
               authenticated: true,
               description: 'Geocode an address.',
-              inputs: {},
+              inputSchema: { type: 'object', properties: {} },
               name: 'Geocode',
-              outputs: {},
-              serviceId: 'amap',
+              outputSchema: { type: 'object', properties: {} },
+              service: 'amap',
               serviceName: 'AMap',
             },
           ],
-          version: 1,
+          success: true,
         })
       }
-      if (path == `/v1/connector/connections/amap?flowId=${flow.flowId}`) {
+      if (path == `/v1/connector/proxy/apps?flowId=${flow.flowId}`) {
         return Response.json({
-          connections: [
+          data: [
             {
-              connectionId: 'connection-1',
+              id: 'connection-1',
               displayName: 'Primary',
               isDefault: true,
-              serviceId: 'amap',
+              service: 'amap',
               status: 'active',
             },
           ],
-          serviceId: 'amap',
-          version: 1,
+          service: 'amap',
+          success: true,
         })
       }
       throw new Error(`Unexpected request: ${path}`)
@@ -157,7 +159,7 @@ describe('WorkbenchStore diagnostics', () => {
     try {
       await store.start(flow.flowId)
       await vi.waitFor(() => expect(store.$.diagnostics.value?.valid).toBe(false))
-      await vi.waitFor(() => expect(requests).toContain(`/v1/connector/connections/amap?flowId=${flow.flowId}`))
+      await vi.waitFor(() => expect(requests).toContain(`/v1/connector/proxy/apps?flowId=${flow.flowId}`))
 
       expect(store.workspace.$.diagnostics.value).toMatchObject({ diagnostics: [], valid: true })
       expect(store.$.diagnostics.value?.diagnostics).toEqual([

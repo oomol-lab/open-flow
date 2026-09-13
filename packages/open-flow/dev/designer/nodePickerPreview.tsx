@@ -43,21 +43,22 @@ const sampleActions = [
 
 const sampleProviders = [
   ...sampleActions.map((action) => ({
-    serviceId: action.serviceId,
-    serviceName: action.serviceName,
-    ...(action.icon ? { icon: action.icon } : {}),
+    service: action.serviceId,
+    displayName: action.serviceName,
+    authTypes: ['oauth2'],
+    ...(action.icon ? { iconUrl: action.icon } : {}),
   })),
-  { serviceId: 'feishu', serviceName: '飞书' },
-  { serviceId: 'wecom', serviceName: '企业微信' },
-  { serviceId: '17track', serviceName: '17TRACK', noSetup: true },
-  { serviceId: 'seedream', serviceName: 'Doubao Seedream' },
+  { service: 'feishu', displayName: '飞书', authTypes: ['oauth2'] },
+  { service: 'wecom', displayName: '企业微信', authTypes: ['oauth2'] },
+  { service: '17track', displayName: '17TRACK', authTypes: ['no_auth'] },
+  { service: 'seedream', displayName: 'Doubao Seedream', authTypes: ['api_key'] },
 ]
 
 const sampleConnections = ['feishu', 'gmail', 'seedream'].map((serviceId) => ({
-  builtInAccount: serviceId == 'seedream',
-  connectionId: `${serviceId}-account`,
+  marketplace: serviceId == 'seedream' ? { id: 'oomol' } : undefined,
+  id: `${serviceId}-account`,
   displayName: serviceId,
-  serviceId,
+  service: serviceId,
   isDefault: true,
   status: 'active' as const,
 }))
@@ -73,6 +74,20 @@ function sampleActionData(path: string, cached = false) {
           (!url.searchParams.get('q') || `${action.name} ${action.serviceName}`.toLowerCase().includes(url.searchParams.get('q')!.toLowerCase())),
       )
       .map((action) => (cached ? Object.assign({}, action, { name: `${action.name} (cached)` }) : action)),
+  }
+}
+
+function proxyActions(path: string, cached = false) {
+  return {
+    success: true,
+    data: sampleActionData(path, cached).actions.map((action) => ({
+      id: action.actionId,
+      service: action.serviceId,
+      name: action.name,
+      description: action.description,
+      inputSchema: { type: 'object', properties: {} },
+      outputSchema: { type: 'object', properties: {} },
+    })),
   }
 }
 
@@ -99,28 +114,24 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
   const sampleCatalog = useMemo(() => {
     const providers = sampleProviders.map((provider) =>
       Object.assign({}, provider, {
-        serviceName: session.i18n.lang.startsWith('zh')
-          ? provider.serviceName
-          : provider.serviceId == 'feishu'
+        displayName: session.i18n.lang.startsWith('zh')
+          ? provider.displayName
+          : provider.service == 'feishu'
             ? 'Feishu'
-            : provider.serviceId == 'wecom'
+            : provider.service == 'wecom'
               ? 'WeCom'
-              : provider.serviceName,
+              : provider.displayName,
       }),
     )
     const client = new WorkbenchClient(async (path) => {
       const url = new URL(String(path), 'https://lab.invalid')
-      if (url.pathname.includes('/connections/')) {
-        const serviceId = decodeURIComponent(url.pathname.split('/').at(-1)!)
-        return Response.json({ version: 1, serviceId, connections: sampleConnections.filter((connection) => connection.serviceId == serviceId) })
-      }
-      if (url.pathname.endsWith('/connections')) return Response.json({ version: 1, connections: sampleConnections })
+      if (url.pathname.endsWith('/apps')) return Response.json({ success: true, data: sampleConnections })
       if (url.pathname.endsWith('/providers')) {
         await new Promise((resolve) => setTimeout(resolve, 1500))
-        return Response.json({ version: 1, providers })
+        return Response.json({ success: true, data: providers })
       }
       await new Promise((resolve) => setTimeout(resolve, 1500))
-      return Response.json(sampleActionData(String(path)))
+      return Response.json(url.pathname.endsWith('/actions') ? proxyActions(String(path)) : sampleActionData(String(path)))
     })
     const entries = new Map<string, string>()
     const data = new CatalogStores(client, {
@@ -129,10 +140,10 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
         getItem: (key) => {
           const stored = entries.get(key)
           if (stored != null) return stored
-          if (key.includes(':providers:')) return JSON.stringify({ data: providers.slice(0, 1), etag: '"cached"' })
+          if (key.includes(':providers:')) return JSON.stringify({ data: { success: true, data: providers.slice(0, 1) }, etag: '"cached"' })
           if (key.includes(':actions:')) {
-            const [, service] = JSON.parse(key.slice(key.indexOf('['))) as string[]
-            return JSON.stringify({ data: sampleActionData(`/v1/connector/action-metadata?service=${encodeURIComponent(service!)}`, true).actions, etag: null })
+            const path = key.slice(key.indexOf('/v1/'))
+            return JSON.stringify({ data: proxyActions(path, true), etag: null })
           }
           return null
         },

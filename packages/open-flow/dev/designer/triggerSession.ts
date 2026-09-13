@@ -94,7 +94,11 @@ export function createTriggerSession(
         valid: true,
         version: 1,
       })
-    if (url.pathname.includes('/connections/')) return Response.json({ serviceId, connections: [account], version: 1 })
+    if (url.pathname === '/v1/connector/proxy/apps')
+      return Response.json({
+        success: true,
+        data: [{ id: account.connectionId, service: serviceId, displayName: account.displayName, isDefault: account.isDefault, status: account.status }],
+      })
     throw new Error(`Unsupported Trigger Lab request: ${url.pathname}`)
   })
   const notice = (value: unknown) => log('trigger.notice', value)

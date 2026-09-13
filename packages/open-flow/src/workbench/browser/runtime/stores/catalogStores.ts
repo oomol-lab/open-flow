@@ -2,142 +2,173 @@ import type { ReadonlyVal } from 'value-enhancer'
 import type { ConnectorActionMetadata, ConnectorConnection, ConnectorProvider } from '../../../../control/common/api.ts'
 import type { WorkbenchClient } from '../api.ts'
 import type { WorkbenchHost } from '../contract.ts'
+import type { ProxyResponse } from './proxyCatalog.ts'
 import type { ResourceState } from './resource.ts'
 
 import { compute } from 'value-enhancer'
-import { connectorActionMetadata, connectorProvider, connection } from '../../../../control/common/connectorDecoders.ts'
-import { connectorProvidersQuery, allConnectorConnectionsQuery, connectorConnectionsQuery } from '../../../../control/common/connectorQueries.ts'
+import { connectorActionMetadata } from '../../../../control/common/connectorDecoders.ts'
 import { invalidResponse, record } from '../../../../control/common/decoding.ts'
+import { action, app, provider, proxyResponse, validateAction } from './proxyCatalog.ts'
 import { Resource } from './resource.ts'
 
-function list<T>(value: unknown, decode: (value: unknown) => T): readonly T[] {
-  if (!Array.isArray(value)) return invalidResponse()
-  return value.map(decode)
-}
 function actionsResponse(value: unknown): readonly ConnectorActionMetadata[] {
   const source = record(value)
-  if (source.version != 1) return invalidResponse()
-  return list(source.actions, connectorActionMetadata)
+  if (source.version != 1 || !Array.isArray(source.actions)) return invalidResponse()
+  return source.actions.map(connectorActionMetadata)
 }
 const identity = (...parts: (string | undefined)[]) => JSON.stringify(parts)
 
-export class ProviderStore {
-  readonly #entries = new Map<string, Resource<readonly ConnectorProvider[]>>()
+/** Each entry owns one complete upstream response, never a merged entity catalog. */
+class ProxyStore {
+  readonly entries = new Map<string, Resource<ProxyResponse>>()
   constructor(
     private readonly client: WorkbenchClient,
+    private readonly kind: 'providers' | 'actions' | 'apps',
     private readonly options?: WorkbenchHost['connectorCache'],
   ) {}
-  get(flowId?: string, locale = 'en', force = false): ReadonlyVal<ResourceState<readonly ConnectorProvider[]>> {
-    const key = identity(flowId, locale)
-    let entry = this.#entries.get(key)
+  get(flowId?: string, locale?: string, service?: string, force = false): ReadonlyVal<ResourceState<ProxyResponse>> {
+    const params = new URLSearchParams({
+      ...(flowId == null ? {} : { flowId }),
+      ...(service == null ? {} : { service }),
+      ...(locale == null ? {} : { locale }),
+    })
+    const path = `/v1/connector/proxy/${this.kind}${params.size ? `?${params}` : ''}`
+    let entry = this.entries.get(path)
     if (entry == null) {
-      const query = connectorProvidersQuery(flowId, locale)
+      const decode = (value: unknown) =>
+        proxyResponse(
+          value,
+          this.kind == 'providers'
+            ? provider
+            : this.kind == 'apps'
+              ? app
+              : (item) => {
+                  validateAction(item)
+                  if (item.service != service) return invalidResponse()
+                },
+        )
       entry = new Resource(
-        (etag, signal) => this.client.readCatalog(query, etag, signal),
-        300_000,
+        (etag, signal) => this.client.readProxyCatalog({ path, decode }, etag, signal),
+        this.kind == 'providers' ? 300_000 : 30_000,
         this.options == null
           ? undefined
           : {
-              key: `open-flow:providers:v2:${encodeURIComponent(this.options.namespace)}:${key}`,
-              storage: () => this.options!.localStorage ?? window.localStorage,
-              decode: (value) => list(value, connectorProvider),
+              key: `open-flow:proxy:${this.kind}:v1:${encodeURIComponent(this.options.namespace)}:${path}`,
+              storage: () =>
+                this.kind == 'apps' ? (this.options!.sessionStorage ?? window.sessionStorage) : (this.options!.localStorage ?? window.localStorage),
+              decode,
             },
       )
-      this.#entries.set(key, entry)
+      this.entries.set(path, entry)
     }
     return entry.get(force)
   }
   retryFailed(): void {
-    for (const entry of this.#entries.values()) if (entry.state.value.error != null) void entry.refresh()
+    for (const entry of this.entries.values()) if (entry.state.value.error != null) void entry.refresh()
   }
   dispose(): void {
-    for (const entry of this.#entries.values()) entry.dispose()
-    this.#entries.clear()
+    for (const entry of this.entries.values()) entry.dispose()
+    this.entries.clear()
+  }
+}
+
+class Views<T> {
+  readonly entries = new Map<string, ReadonlyVal<ResourceState<T>>>()
+  get(key: string, sources: readonly ReadonlyVal<ResourceState<ProxyResponse>>[], project: (...data: ProxyResponse[]) => T): ReadonlyVal<ResourceState<T>> {
+    let view = this.entries.get(key)
+    if (view == null) {
+      let previous: readonly ProxyResponse[] | undefined
+      let projected: T | undefined
+      view = compute((get) => {
+        const states = sources.map((source) => get(source))
+        const base = { refreshing: states.some((state) => state.refreshing), error: states.find((state) => state.error != null)?.error }
+        try {
+          if (!states.every((state) => state.data != null)) return { ...base, data: undefined }
+          const responses = states.map((state) => state.data!)
+          if (previous == null || responses.some((response, index) => response !== previous![index])) {
+            projected = project(...responses)
+            previous = responses
+          }
+          return { ...base, data: projected }
+        } catch (error) {
+          return { ...base, data: undefined, error }
+        }
+      })
+      this.entries.set(key, view)
+    }
+    return view
+  }
+  dispose(): void {
+    for (const entry of this.entries.values()) entry.dispose()
+    this.entries.clear()
+  }
+}
+
+export class ProviderStore {
+  readonly raw: ProxyStore
+  readonly #views = new Views<readonly ConnectorProvider[]>()
+  constructor(client: WorkbenchClient, options?: WorkbenchHost['connectorCache']) {
+    this.raw = new ProxyStore(client, 'providers', options)
+  }
+  get(flowId?: string, locale = 'en', force = false): ReadonlyVal<ResourceState<readonly ConnectorProvider[]>> {
+    return this.#views.get(identity(flowId, locale), [this.raw.get(flowId, locale, undefined, force)], (response) => response.data.map(provider))
+  }
+  retryFailed(): void {
+    this.raw.retryFailed()
+  }
+  dispose(): void {
+    this.#views.dispose()
+    this.raw.dispose()
   }
 }
 
 export class ConnectionStore {
-  readonly #entries = new Map<string, Resource<readonly ConnectorConnection[]>>()
-  constructor(
-    private readonly client: WorkbenchClient,
-    private readonly options?: WorkbenchHost['connectorCache'],
-  ) {}
+  readonly #raw: ProxyStore
+  readonly #views = new Views<readonly ConnectorConnection[]>()
+  constructor(client: WorkbenchClient, options?: WorkbenchHost['connectorCache']) {
+    this.#raw = new ProxyStore(client, 'apps', options)
+  }
   get(serviceId: string | undefined, flowId?: string, force = false): ReadonlyVal<ResourceState<readonly ConnectorConnection[]>> {
-    const key = identity(flowId, serviceId)
-    let entry = this.#entries.get(key)
-    if (entry == null) {
-      const query = serviceId == null ? allConnectorConnectionsQuery(flowId) : connectorConnectionsQuery(serviceId, flowId)
-      entry = new Resource(
-        (etag, signal) => this.client.readCatalog(query, etag, signal),
-        30_000,
-        this.options == null
-          ? undefined
-          : {
-              key: `open-flow:connections:v2:${encodeURIComponent(this.options.namespace)}:${key}`,
-              storage: () => this.options!.sessionStorage ?? window.sessionStorage,
-              decode: (value) => {
-                const connections = list(value, connection)
-                if (serviceId != null && connections.some((item) => item.serviceId != serviceId)) return invalidResponse()
-                return connections
-              },
-            },
-      )
-      this.#entries.set(key, entry)
-    }
-    return entry.get(force)
+    return this.#views.get(identity(flowId, serviceId), [this.#raw.get(flowId, undefined, undefined, force)], (response) =>
+      response.data.filter((item) => serviceId == null || item.service == serviceId).map(app),
+    )
   }
   retryFailed(): void {
-    for (const entry of this.#entries.values()) if (entry.state.value.error != null) void entry.refresh()
+    this.#raw.retryFailed()
   }
   dispose(): void {
-    for (const entry of this.#entries.values()) entry.dispose()
-    this.#entries.clear()
+    this.#views.dispose()
+    this.#raw.dispose()
   }
 }
 
 export class ActionStore {
-  readonly #searches = new Set<Resource<readonly ConnectorActionMetadata[]>>()
-  readonly #entries = new Map<string, Resource<readonly ConnectorActionMetadata[]>>()
+  readonly #raw: ProxyStore
+  readonly #views = new Views<readonly ConnectorActionMetadata[]>()
   readonly #details = new Map<string, ReadonlyVal<ResourceState<ConnectorActionMetadata>>>()
+  readonly #searches = new Set<Resource<readonly ConnectorActionMetadata[]>>()
   constructor(
     private readonly client: WorkbenchClient,
-    private readonly options?: WorkbenchHost['connectorCache'],
-  ) {}
+    private readonly providers: ProviderStore,
+    options?: WorkbenchHost['connectorCache'],
+  ) {
+    this.#raw = new ProxyStore(client, 'actions', options)
+  }
   get(serviceId: string, flowId?: string, locale = 'en', force = false): ReadonlyVal<ResourceState<readonly ConnectorActionMetadata[]>> {
-    const key = identity(flowId, serviceId, locale)
-    let entry = this.#entries.get(key)
-    if (entry == null) {
-      const decode = (value: unknown) => {
-        const actions = list(value, connectorActionMetadata)
-        if (actions.some((action) => action.serviceId != serviceId)) return invalidResponse()
-        return actions
-      }
-      const params = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), service: serviceId, locale })
-      const query = { path: `/v1/connector/action-metadata?${params}`, decode: (value: unknown) => decode(actionsResponse(value)) }
-      entry = new Resource(
-        (etag, signal) => this.client.readCatalog(query, etag, signal),
-        30_000,
-        this.options == null
-          ? undefined
-          : {
-              key: `open-flow:actions:v3:${encodeURIComponent(this.options.namespace)}:${key}`,
-              storage: () => this.options!.localStorage ?? window.localStorage,
-              decode,
-            },
-      )
-      this.#entries.set(key, entry)
-    }
-    return entry.get(force)
+    return this.#views.get(
+      identity(flowId, serviceId, locale),
+      [this.#raw.get(flowId, locale, serviceId, force), this.providers.raw.get(flowId, locale)],
+      (actions, providers) => actions.data.map((item) => action(item, providers)),
+    )
   }
   detail(actionId: string, flowId?: string, locale = 'en', force = false): ReadonlyVal<ResourceState<ConnectorActionMetadata>> {
-    const service = actionId.slice(0, actionId.indexOf('.'))
-    const source = this.get(service, flowId, locale, force)
+    const source = this.get(actionId.slice(0, actionId.indexOf('.')), flowId, locale, force)
     const key = identity(flowId, actionId, locale)
     let detail = this.#details.get(key)
     if (detail == null) {
       detail = compute((get) => {
         const state = get(source)
-        const data = state.data?.find((action) => action.actionId == actionId)
+        const data = state.data?.find((item) => item.actionId == actionId)
         return { ...state, data, error: state.error ?? (state.data != null && data == null ? new Error(`Action ${actionId} was not found.`) : undefined) }
       })
       this.#details.set(key, detail)
@@ -147,7 +178,7 @@ export class ActionStore {
   search(query: string, flowId: string | undefined, locale: string, signal: AbortSignal): Resource<readonly ConnectorActionMetadata[]> {
     const params = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), q: query.trim(), locale })
     const resource = new Resource(
-      (etag, requestSignal) => this.client.readCatalog({ path: `/v1/connector/action-metadata?${params}`, decode: actionsResponse }, etag, requestSignal),
+      (_etag, requestSignal) => this.client.readCatalog({ path: `/v1/connector/action-metadata?${params}`, decode: actionsResponse }, null, requestSignal),
       30_000,
     )
     this.#searches.add(resource)
@@ -166,15 +197,15 @@ export class ActionStore {
     return resource
   }
   retryFailed(): void {
-    for (const entry of this.#entries.values()) if (entry.state.value.error != null) void entry.refresh()
+    this.#raw.retryFailed()
   }
   dispose(): void {
     for (const search of this.#searches) search.dispose()
     this.#searches.clear()
     for (const detail of this.#details.values()) detail.dispose()
-    for (const entry of this.#entries.values()) entry.dispose()
     this.#details.clear()
-    this.#entries.clear()
+    this.#views.dispose()
+    this.#raw.dispose()
   }
 }
 
@@ -184,12 +215,12 @@ export class CatalogStores {
   readonly connections: ConnectionStore
   constructor(client: WorkbenchClient, options?: WorkbenchHost['connectorCache']) {
     this.providers = new ProviderStore(client, options)
-    this.actions = new ActionStore(client, options)
+    this.actions = new ActionStore(client, this.providers, options)
     this.connections = new ConnectionStore(client, options)
   }
   dispose(): void {
-    this.providers.dispose()
     this.actions.dispose()
     this.connections.dispose()
+    this.providers.dispose()
   }
 }

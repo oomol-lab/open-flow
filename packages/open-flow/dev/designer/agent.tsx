@@ -86,17 +86,34 @@ function createSession(language: UiLanguage, log: LogAction) {
         valid: true,
         version: 1,
       })
-    if (url.pathname === '/v1/connector/providers') return Response.json({ providers: [{ serviceId: 'lab', serviceName: 'Lab catalog' }], version: 1 })
+    if (url.pathname === '/v1/connector/proxy/providers')
+      return Response.json({ success: true, data: [{ service: 'lab', displayName: 'Lab catalog', authTypes: ['api_key'] }] })
     if (url.pathname === '/v1/connector/action-metadata') return Response.json({ actions: [action], version: 1 })
-    if (url.pathname === '/v1/connector/action-metadata/lab.lookup') return Response.json({ action, version: 1 })
-    if (url.pathname === '/v1/connector/connections/lab')
+    if (url.pathname === '/v1/connector/proxy/actions')
       return Response.json({
-        serviceId: 'lab',
-        connections: [
-          { connectionId: 'lab-active', serviceId: 'lab', displayName: 'Lab account', isDefault: true, status: 'active' },
-          { connectionId: 'lab-expired', serviceId: 'lab', displayName: 'Expired account', isDefault: false, status: 'reauth_required' },
+        success: true,
+        data: [
+          {
+            id: action.actionId,
+            service: 'lab',
+            name: action.name,
+            description: action.description,
+            inputSchema: {
+              type: 'object',
+              properties: { query: { type: 'string', description: 'Search query' }, limit: { type: 'integer', minimum: 1, description: 'Maximum records' } },
+              required: ['query', 'limit'],
+            },
+            outputSchema: { type: 'object', properties: { records: { type: 'array', items: { type: 'object' } } }, required: ['records'] },
+          },
         ],
-        version: 1,
+      })
+    if (url.pathname === '/v1/connector/proxy/apps')
+      return Response.json({
+        data: [
+          { id: 'lab-active', service: 'lab', displayName: 'Lab account', isDefault: true, status: 'active' },
+          { id: 'lab-expired', service: 'lab', displayName: 'Expired account', isDefault: false, status: 'reauth_required' },
+        ],
+        success: true,
       })
     throw new Error(`Unsupported Lab request: ${url.pathname}`)
   })
