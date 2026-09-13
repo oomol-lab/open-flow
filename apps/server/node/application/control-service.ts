@@ -224,6 +224,10 @@ export class ControlService {
     return await this.#connectorRequest(flowId, (connector, teamId) => connector.getAction(actionId, signal, teamId, locale))
   }
 
+  async listAllConnectorConnections(flowId?: string, signal?: AbortSignal): Promise<readonly ConnectorConnection[]> {
+    return await this.#connectorRequest(flowId, (connector, teamId) => connector.listAllConnections(signal, teamId))
+  }
+
   async listConnectorConnections(serviceId: string, flowId?: string, signal?: AbortSignal): Promise<readonly ConnectorConnection[]> {
     return await this.#connectorRequest(flowId, (connector, teamId) => connector.listConnections(serviceId, signal, teamId))
   }

@@ -113,6 +113,7 @@ function Editor({
 }): ReactElement {
   const t = useTranslate()
   const addNodeOptions = useVal(store.workspace.$.addNodeOptions)
+  const connections = useVal(store.connectors.$.connections)
   const connectorCatalogRevision = useVal(store.connectors.$.catalogRevision)
   const triggerCatalogState = useVal(store.triggers.catalog.state)
   const [startId, setStartId] = useState<string>()
@@ -281,6 +282,8 @@ function Editor({
           <NodePickerPopover
             key={`${flowId}:${target?.kind}`}
             options={addNodeOptions}
+            connections={connections}
+            loadConnections={store.connectors.loadConnections}
             browseOptions={store.browseAddNodeOptions}
             searchOptions={store.provideAddNodeOptions}
             provideChoices={store.provideAddNodeOptionChoices}
@@ -293,6 +296,8 @@ function Editor({
           />
         }
         nodePicker={{
+          connections,
+          loadConnections: store.connectors.loadConnections,
           browseOptions: store.browseAddNodeOptions,
           provideChoices: store.provideAddNodeOptionChoices,
           catalogRevision: triggerCatalogState.revision + connectorCatalogRevision,

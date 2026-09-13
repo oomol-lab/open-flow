@@ -11,6 +11,7 @@ export function createConnectorHost(overrides: Partial<ConnectorHost> = {}): Con
     execute: unavailable,
     getAction: unavailable,
     listActions: unavailable,
+    listAllConnections: unavailable,
     listConnections: unavailable,
     listProviders: unavailable,
     proxy: unavailable,

@@ -39,10 +39,23 @@ const sampleActions = [
   },
 ]
 
-const sampleProviders = sampleActions.map((action) => ({
-  serviceId: action.serviceId,
-  serviceName: action.serviceName,
-  ...(action.icon ? { icon: action.icon } : {}),
+const sampleProviders = [
+  ...sampleActions.map((action) => ({
+    serviceId: action.serviceId,
+    serviceName: action.serviceName,
+    ...(action.icon ? { icon: action.icon } : {}),
+  })),
+  { serviceId: 'feishu', serviceName: '飞书' },
+  { serviceId: 'wecom', serviceName: '企业微信' },
+  { serviceId: '17track', serviceName: '17TRACK' },
+]
+
+const sampleConnections = ['feishu', 'gmail'].map((serviceId) => ({
+  connectionId: `${serviceId}-account`,
+  displayName: serviceId,
+  serviceId,
+  isDefault: true,
+  status: 'active' as const,
 }))
 
 function sampleActionData(path: string, cached = false) {
@@ -84,6 +97,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
       new WorkbenchClient(
         async (path) => {
           const url = new URL(String(path), 'https://lab.invalid')
+          if (url.pathname.endsWith('/connections')) return Response.json({ version: 1, connections: sampleConnections })
           if (url.pathname.endsWith('/providers')) {
             await new Promise((resolve) => setTimeout(resolve, 1500))
             return Response.json({ version: 1, providers: sampleProviders })
@@ -129,6 +143,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
   }, [session, connectors, lifetime])
   const options = useVal(session.workspace.$.addNodeOptions)
   const catalog = useVal(session.triggers.catalog.state)
+  const connections = useVal(connectors.$.connections)
   const connectorRevision = useVal(connectors.$.catalogRevision)
   useStoryActions([
     { label: largeCatalog ? 'Small catalog' : '1,000 apps', onClick: () => setLargeCatalog(!largeCatalog) },
@@ -170,6 +185,8 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
   )
   const props = {
     ...data,
+    connections,
+    loadConnections: connectors.loadConnections,
     options,
     catalogRevision: catalog.revision + connectorRevision,
     disabled,
@@ -213,6 +230,6 @@ export const nodePickerPreviewStory: FrontendStory = {
   title: 'Add Node Popover',
   standalone: true,
   description:
-    'Cached Gmail appears immediately; Google Drive arrives after a 1.5-second background refresh. App actions also show cached labels before refreshing. Nodes and Triggers use real definitions. Search across both tabs, browse app actions, or select an event directly.',
+    'Cached Gmail appears immediately. After refresh, connected 飞书 and Gmail lead, followed by 企业微信, 17TRACK and Google Drive. Real Trigger definitions, cached actions, search and large-catalog states are available.',
   render: (log, dark, language) => <Preview dark={dark} language={language} log={log} />,
 }

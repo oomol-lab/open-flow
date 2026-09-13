@@ -13,17 +13,21 @@ import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../../ui/browser/tabs.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
+import { comparePickerApps } from './nodePickerApps.ts'
 
 interface App {
   id: string
   label: string
   icon?: string
+  connected?: boolean
   directory?: AddNodeOption
   triggers: AddNodeOption[]
 }
 
 export function NodePickerContent({
   options,
+  connections,
+  loadConnections,
   browseOptions,
   searchOptions,
   provideChoices,
@@ -82,20 +86,37 @@ export function NodePickerContent({
     return () => controller.abort()
   }, [term, browseOptions, searchOptions, catalogRevision, retry, options])
 
+  useEffect(() => {
+    const controller = new AbortController()
+    void loadConnections?.(controller.signal).catch(() => {
+      // Connection availability enriches ordering without blocking the app directory.
+    })
+    return () => controller.abort()
+  }, [loadConnections])
+
   const apps = useMemo(() => {
+    const connected = new Set(connections?.filter((item) => item.status == 'active').map((item) => item.serviceId))
     const entries = new Map<string, App>()
     for (const item of catalog) {
-      if (item.kind == 'connector-group') entries.set(item.serviceId, { id: item.serviceId, label: item.label, icon: item.icon, directory: item, triggers: [] })
+      if (item.kind == 'connector-group')
+        entries.set(item.serviceId, {
+          id: item.serviceId,
+          label: item.label,
+          icon: item.icon,
+          connected: connected.has(item.serviceId),
+          directory: item,
+          triggers: [],
+        })
     }
     for (const item of catalog) {
       if (item.kind != 'trigger' || !('trigger' in item) || item.trigger.kind != 'catalog') continue
       const id = item.trigger.definition.provider
-      const app = entries.get(id) ?? { id, label: id, icon: item.icon, triggers: [] }
+      const app = entries.get(id) ?? { id, label: id, icon: item.icon, connected: connected.has(id), triggers: [] }
       app.triggers.push(item)
       entries.set(id, app)
     }
-    return [...entries.values()].toSorted((a, b) => a.label.localeCompare(b.label))
-  }, [catalog])
+    return [...entries.values()].toSorted(comparePickerApps)
+  }, [catalog, connections])
   const app = apps.find((item) => item.id == appId)
   const directoryId = page == 'nodes' ? app?.directory?.id : undefined
   const [choicesLoading, setChoicesLoading] = useState(false)

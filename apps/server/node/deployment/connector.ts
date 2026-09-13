@@ -35,6 +35,7 @@ export interface ConnectorHost {
   ): Promise<JsonValue>
   getAction(actionId: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<ConnectorAction>
   listActions(serviceId?: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorAction[]>
+  listAllConnections(signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]>
   listConnections(serviceId: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]>
   listProviders(signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorProvider[]>
   proxy(
@@ -231,6 +232,10 @@ export class ConnectorClient implements ConnectorHost {
       throw unavailable()
     }
     return this.#decode('actions.get', { actionId }, () => mapAction(runtimeAction(runtimeData(response.value)), providers, connections))
+  }
+
+  async listAllConnections(signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]> {
+    return await this.#connections(undefined, signal, teamId)
   }
 
   async listConnections(serviceId: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]> {

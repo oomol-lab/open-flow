@@ -557,11 +557,15 @@ type FlowChangeEvent =
 | `GET`     | `/v1/connector/actions`                                    |      200 | `service` 或 `q`；可选 `flowId`                   |
 | `GET`     | `/v1/connector/actions/:actionId`                          |      200 | Action detail；可选 `flowId`                      |
 | `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId/options/:field` |      200 | 草稿 Trigger 的动态配置选项；由已保存连接限定范围 |
+| `GET`     | `/v1/connector/connections`                                |      200 | 当前 scope 的全部 Connections；可选 `flowId`      |
 | `GET`     | `/v1/connector/connections/:serviceId`                     |      200 | Connections；可选 `flowId`                        |
 | `POST`    | `/v1/connector/connections/:serviceId/page`                |      200 | 外部授权页 URL；可选 `flowId`                     |
 
 Connector route 的 `flowId` 是 opaque Flow identity。提供时部署必须先确认 Flow 存在，并在该 Flow 的 Connector scope 内解析 Provider、Action 与
 Connection；客户端不能改用 Team ID、Connection owner 或其他外部 identity 代替 Flow scope。省略时使用部署的未限定 Connector catalog。
+
+`GET /v1/connector/connections` 返回 `{ version: 1, connections: ConnectorConnection[] }`，与按服务读取的接口使用相同的 Flow scope 校验。
+Provider 仅描述应用目录；面板独立加载 Connections，并根据 active Connection 在展示层计算应用排序。
 
 Connector Provider、Action（列表、搜索和详情）及 Connection GET 响应使用 `Cache-Control: private, no-cache` 和内容生成的
 `ETag`。服务端在完成当前身份、Flow scope 校验及数据读取后比较 `If-None-Match`；匹配时返回无 body 的 304。

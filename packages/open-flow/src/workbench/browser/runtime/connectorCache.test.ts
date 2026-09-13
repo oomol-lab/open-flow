@@ -31,6 +31,11 @@ const cases = [
     body: { connections: [connection], serviceId: 'mail', version: 1 },
     read: (client: WorkbenchClient) => client.listConnectorConnections('mail', undefined, 'flow'),
   },
+  {
+    kind: 'all connections',
+    body: { connections: [connection], version: 1 },
+    read: (client: WorkbenchClient) => client.listAllConnectorConnections(undefined, 'flow'),
+  },
 ]
 function setup() {
   const localStorage = storage()
@@ -40,6 +45,8 @@ function setup() {
   const client = (cache: WorkbenchHost['connectorCache'] = options) => new WorkbenchClient(request, undefined, undefined, cache)
   return { client, localStorage, sessionStorage, options, request }
 }
+
+const entry = (data: unknown) => ({ data, etag: null })
 
 const readFreshConnections = (client: WorkbenchClient) => client.listConnectorConnections('mail', undefined, 'flow', true)
 
@@ -62,6 +69,34 @@ describe('Connector browser caches', () => {
     expect(await client.listConnectorProviders()).toEqual([updated])
     expect(test.request).toHaveBeenCalledTimes(2)
     stop()
+  })
+
+  it('uses the latest revalidated Connection snapshot even when its content is unchanged', async () => {
+    const test = setup()
+    const client = test.client()
+    test.request.mockImplementation(async (path) =>
+      Response.json(path.includes('/connections/mail') ? { connections: [], serviceId: 'mail', version: 1 } : { connections: [connection], version: 1 }),
+    )
+    await client.listAllConnectorConnections(undefined, 'flow')
+    await client.listConnectorConnections('mail', undefined, 'flow')
+    expect(cachedConnectorConnections(client.connectorCache.connections.value, 'flow').mail).toEqual([])
+    await client.listAllConnectorConnections(undefined, 'flow', true)
+    expect(cachedConnectorConnections(client.connectorCache.connections.value, 'flow').mail).toEqual([connection])
+  })
+
+  it('combines full and newer per-service connection snapshots within the current Flow', () => {
+    const entries = new Map([
+      ['/v1/connector/connections/mail?flowId=flow', entry({ connections: [connection], serviceId: 'mail', version: 1 })],
+      ['/v1/connector/connections?flowId=other', entry({ connections: [{ ...connection, serviceId: 'private' }], version: 1 })],
+      ['/v1/connector/connections?flowId=flow', entry({ connections: [{ ...connection, serviceId: 'drive' }], version: 1 })],
+    ])
+    expect(cachedConnectorConnections(entries, 'flow')).toEqual({ mail: [], drive: [{ ...connection, serviceId: 'drive' }] })
+    entries.delete('/v1/connector/connections/mail?flowId=flow')
+    entries.set('/v1/connector/connections/mail?flowId=flow', entry({ connections: [connection], serviceId: 'mail', version: 1 }))
+    expect(cachedConnectorConnections(entries, 'flow')).toEqual({ mail: [connection], drive: [{ ...connection, serviceId: 'drive' }] })
+    entries.delete('/v1/connector/connections?flowId=flow')
+    entries.set('/v1/connector/connections?flowId=flow', entry({ connections: [], version: 1 }))
+    expect(Object.values(cachedConnectorConnections(entries, 'flow')).flat()).toEqual([])
   })
 
   it('retains cached providers after background failure and backs off retries', async () => {

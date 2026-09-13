@@ -770,6 +770,21 @@ export class ControlClient {
     )
   }
 
+  async listAllConnectorConnections(signal?: AbortSignal, flowId?: string, fresh = false): Promise<readonly ConnectorConnection[]> {
+    return this.connectorRequest(
+      `/v1/connector/connections${flowId == null ? '' : `?flowId=${segment(flowId)}`}`,
+      'connections',
+      signal,
+      (value) => {
+        const source = record(value)
+        exact(source, ['connections', 'version'])
+        if (source.version != 1 || !Array.isArray(source.connections)) return invalidResponse()
+        return source.connections.map(connection)
+      },
+      fresh,
+    )
+  }
+
   async listConnectorConnections(serviceId: string, signal?: AbortSignal, flowId?: string, fresh = false): Promise<readonly ConnectorConnection[]> {
     return this.connectorRequest(
       `/v1/connector/connections/${segment(serviceId)}${flowId == null ? '' : `?flowId=${segment(flowId)}`}`,

@@ -10,6 +10,7 @@ const routes = [
   '/connector/actions?q=send&locale=en',
   '/connector/actions/mail.send?locale=en',
   '/connector/connections/mail',
+  '/connector/connections?flowId=flow',
 ]
 
 describe('Connector conditional HTTP responses', () => {
@@ -26,6 +27,7 @@ describe('Connector conditional HTTP responses', () => {
       listConnectorActions: read,
       searchConnectorActions: read,
       getConnectorAction: read,
+      listAllConnectorConnections: read,
       listConnectorConnections: read,
     } as unknown as ControlService
     const app = createControlApp(service, () => (authorized ? 'actor' : undefined)).onError((error) =>

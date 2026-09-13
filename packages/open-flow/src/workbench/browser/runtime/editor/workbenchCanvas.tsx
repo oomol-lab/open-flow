@@ -19,7 +19,10 @@ import { CanvasHistoryControls } from './canvasHistoryControls.tsx'
 import { CanvasNodePicker } from './nodePickerPopover.tsx'
 
 interface Props {
-  readonly nodePicker?: Pick<BlockLibraryProps, 'browseOptions' | 'provideChoices' | 'catalogRevision' | 'catalogFailed' | 'refreshCatalog'>
+  readonly nodePicker?: Pick<
+    BlockLibraryProps,
+    'connections' | 'loadConnections' | 'browseOptions' | 'provideChoices' | 'catalogRevision' | 'catalogFailed' | 'refreshCatalog'
+  >
   readonly addNodeControl?: ReactNode
   readonly history?: CanvasHistoryControlsProps
   readonly ignoredNodeIds: readonly string[]
@@ -359,6 +362,8 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         <CanvasNodePicker
           key={`${pickerRequest.screenPosition.x}:${pickerRequest.screenPosition.y}`}
           options={addNodeOptions}
+          connections={nodePicker?.connections}
+          loadConnections={nodePicker?.loadConnections}
           browseOptions={nodePicker?.browseOptions ?? (async () => [])}
           searchOptions={provideAddNodeOptions}
           provideChoices={nodePicker?.provideChoices ?? (async () => [])}

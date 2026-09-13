@@ -77,6 +77,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     '/connector/providers',
     '/connector/actions',
     '/connector/actions/*',
+    '/connector/connections',
     '/connector/connections/:serviceId',
   ]) {
     app.use(path, etag({ retainedHeaders: [...RETAINED_304_HEADERS, 'content-language'] }))
@@ -211,6 +212,13 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
         undefined,
         metadataLocale(context, ['flowId', 'locale']),
       ),
+      version: 1,
+    })
+  })
+  app.get('/connector/connections', async (context) => {
+    const flowId = query(context.req.raw, ['flowId'], controlErrorCode.flowInvalid).get('flowId')
+    return response(200, {
+      connections: await service.listAllConnectorConnections(flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid)),
       version: 1,
     })
   })
