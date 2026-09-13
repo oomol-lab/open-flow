@@ -7,14 +7,11 @@ import type { ID } from '../../base/typing.ts'
 import type { ToReadonly$Group } from '../../base/val.ts'
 import type { FlowCanvasViewEdge } from '../../graph/FlowCanvas/model.ts'
 import type { NodeStore } from '../node/node.store.ts'
-import type { EdgeColor } from './colors.ts'
 
 import { disposableStore } from '@wopjs/disposable'
 import { compute, derive, val } from 'value-enhancer'
 import { shallowPlainObjectEqual } from '../../../../base/common/equality.ts'
 import { toRFHandleName, toRFNodeId } from '../../base/rfHelpers.ts'
-import { DEFAULT_HANDLE_KIND, getHandleKind } from '../../components/handleKind.ts'
-import { portSchema } from '../../graph/FlowCanvas/nodeContent.ts'
 import { NODE_TYPE } from '../node/constants.ts'
 
 export type EdgeId = ID<string, EdgeStore>
@@ -33,8 +30,8 @@ export interface EdgeStore$$ {
 
 export interface EdgeStore$ extends ToReadonly$Group<EdgeStore$$> {
   readonly rfEdge: ReadonlyVal<RFEdge | undefined>
-  readonly sourceGradientColor: ReadonlyVal<EdgeColor>
-  readonly targetGradientColor: ReadonlyVal<EdgeColor>
+  readonly sourceGradientColor: ReadonlyVal<string>
+  readonly targetGradientColor: ReadonlyVal<string>
   readonly connectionMeta: ReadonlyVal<ConnectionMeta | undefined>
   readonly nodeSelected: ReadonlyVal<boolean>
   readonly hasError: ReadonlyVal<boolean>
@@ -68,13 +65,13 @@ export class EdgeStore {
     const sourceGradientColor$ = this.dispose.add(
       compute((get) => {
         const node = get(sourceNodeStore$)
-        return node == null ? DEFAULT_HANDLE_KIND : getHandleKind(portSchema(get(node.content$), 'output', connection.sourceHandle))
+        return get(node?.$.executionPortColor) ?? 'var(--edge-primitive)'
       }),
     )
     const targetGradientColor$ = this.dispose.add(
       compute((get) => {
         const node = get(targetNodeStore$)
-        return node == null ? DEFAULT_HANDLE_KIND : getHandleKind(portSchema(get(node.content$), 'input', connection.targetHandle))
+        return get(node?.$.executionPortColor) ?? 'var(--edge-primitive)'
       }),
     )
 

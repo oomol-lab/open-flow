@@ -9,7 +9,7 @@ import type { NodeType } from './constants.ts'
 import type { NodeInteraction } from './nodeInteraction.ts'
 
 import { disposableStore } from '@wopjs/disposable'
-import { derive } from 'value-enhancer'
+import { compute, derive } from 'value-enhancer'
 import { NODE_HANDLE_CLASSNAME } from '../../base/canvas.ts'
 import { toRFNodeId } from '../../base/rfHelpers.ts'
 import { createNodeInteraction } from './nodeInteraction.ts'
@@ -23,6 +23,7 @@ export interface NodeStore$$ {
 }
 
 export type NodeStore$ = ToReadonly$Group<NodeStore$$> & {
+  readonly executionPortColor: ReadonlyVal<string>
   readonly hasError: ReadonlyVal<boolean>
   readonly measured: ReadonlyVal<Partial<Size> | undefined>
 }
@@ -91,6 +92,13 @@ export class NodeStore {
     this.$ = {
       ...this.$$,
       measured: interaction.measured,
+      executionPortColor: this.dispose.add(
+        compute((get) => {
+          const content = get(this.content$)
+          if ((content.diagnostics ?? 0) > 0 || content.run?.status === 'error') return 'var(--accent-red-1)'
+          return get(interaction.selected) ? 'var(--node-selected-border-color)' : 'var(--edge-primitive)'
+        }),
+      ),
       hasError: this.dispose.add(derive(this.content$, (content) => (content.diagnostics ?? 0) > 0)),
     }
   }

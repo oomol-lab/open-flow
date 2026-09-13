@@ -65,6 +65,14 @@
     width: 24px;
     height: 24px;
   }
+
+  &:has(> img, > [data-icon-kind='initials']) {
+    --content-icon-initials-background: transparent;
+    width: 36px;
+    height: 36px;
+    border: 1px solid color-mix(in srgb, var(--ui-foreground) 9%, var(--ui-popover));
+    border-radius: 9px;
+  }
 }
 
 .identity {
@@ -172,6 +180,12 @@
     > :where(img, svg) {
       width: 32px;
       height: 32px;
+    }
+
+    &:has(> img, > [data-icon-kind='initials']) {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
     }
   }
 

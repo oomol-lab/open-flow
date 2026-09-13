@@ -15,6 +15,21 @@ function setup() {
 }
 
 describe('NodeStore', () => {
+  it('updates execution port colors with selection, diagnostics and run recovery', () => {
+    const { node, content$ } = setup()
+    expect(node.$.executionPortColor.value).toBe('var(--edge-primitive)')
+    node.$$.selected.set(true)
+    expect(node.$.executionPortColor.value).toBe('var(--node-selected-border-color)')
+    content$.set({ ...content, diagnostics: 1 })
+    expect(node.$.executionPortColor.value).toBe('var(--accent-red-1)')
+    content$.set({ ...content, run: { status: 'error' } })
+    node.$$.selected.set(false)
+    expect(node.$.executionPortColor.value).toBe('var(--accent-red-1)')
+    content$.set({ ...content, run: { status: 'success' } })
+    expect(node.$.executionPortColor.value).toBe('var(--edge-primitive)')
+    node.dispose()
+  })
+
   it('disposes owned content once', () => {
     const { node, content$ } = setup()
     const dispose = vi.spyOn(content$, 'dispose')

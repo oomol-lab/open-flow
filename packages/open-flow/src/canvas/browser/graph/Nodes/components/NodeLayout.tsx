@@ -73,13 +73,14 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const animateEntry = useRef(initialized).current
 
   const contentWidth = useVal(contentWidth$)
+  const executionPortColor = useVal(cardStore?.$.executionPortColor)
   const problemColor = problem ? 'var(--accent-red-1)' : undefined
   const conditionNode = modelNode?.kind == 'condition' ? modelNode : undefined
 
   const containerStyle: CSSProperties = {
     width: cardStore ? CARD_WIDTH : Math.max(contentWidth || DEFAULT_NODE_WIDTH, MIN_NODE_WIDTH),
     ['--node-selected-border-color' as any]: problemColor,
-    ['--execution-port-color' as any]: problemColor,
+    ['--execution-port-color' as any]: executionPortColor,
     ['--execution-port-active-color' as any]: problemColor,
     ['--execution-port-overlap' as any]: problem ? '1px' : undefined,
     ['--node-selected-shadow' as any]: showError ? 'var(--node-error-selected-shadow)' : undefined,

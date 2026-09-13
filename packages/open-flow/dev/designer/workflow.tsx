@@ -393,7 +393,33 @@ function WorkflowStory({
   )
 }
 
+const edgeColors: FlowCanvasViewModel = {
+  viewport: { x: 45, y: 50, zoom: 0.8 },
+  nodes: [
+    { id: 'error-source', title: 'Error → idle', position: { x: 0, y: 0 }, diagnostics: 1 },
+    { id: 'idle-target', title: 'Idle target', position: { x: 530, y: 0 } },
+    { id: 'idle-source', title: 'Idle → error', position: { x: 0, y: 180 } },
+    { id: 'error-target', title: 'Failed target', position: { x: 530, y: 250 }, run: { status: 'error' as const } },
+    { id: 'selected-source', title: 'Selected → error', position: { x: 0, y: 440 } },
+    { id: 'reverse-source', title: 'Error → error (reverse)', position: { x: 530, y: 440 }, diagnostics: 1 },
+  ].map((node) => Object.assign(node, { kind: 'task' as const, reference: 'lab/task', inputs: [], outputs: [] })),
+  edges: [
+    ['error-source', 'idle-target'],
+    ['idle-source', 'error-target'],
+    ['selected-source', 'error-target'],
+    ['reverse-source', 'error-source'],
+  ].map(([source, target]) => ({ id: `${source}-${target}`, source, target, sourceHandle: '$out', targetHandle: '$in' })),
+}
+
 export const workflowStories: readonly FrontendStory[] = [
+  {
+    group: 'Theme Preview',
+    id: 'edge-colors',
+    title: 'Edge colors',
+    description: 'Port colors blend along straight, curved and reverse connections. Select nodes or edges and switch themes to compare states.',
+    standalone: true,
+    render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={edgeColors} initialSelectedNodeId="selected-source" />,
+  },
   {
     group: 'Theme Preview',
     id: 'workflow',

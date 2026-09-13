@@ -9,6 +9,11 @@ import { CanvasCard } from '../../src/canvas/browser/graph/Nodes/components/Canv
 import { RunChips } from '../../src/canvas/browser/graph/Nodes/components/RunChips.tsx'
 import { GetPopupContainerContext } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
+import { ContentIcon, initialsIcon } from '../../src/ui/browser/icons/ContentIcon.tsx'
+
+// Local snapshots of the providers' favicons keep the visual comparison deterministic.
+const trackingAppIcon = new URL('./fixtures/17track.png', import.meta.url).href
+const sheetsAppIcon = new URL('./fixtures/google-sheets.ico', import.meta.url).href
 
 const completed: FlowCanvasViewNodeRun = {
   status: 'success',
@@ -126,6 +131,15 @@ export const cardStories: readonly FrontendStory[] = [
     render: (_log, dark, language) => (
       <CardStage dark={dark} language={language}>
         <div className="card-studies-grid">
+          <CanvasCard title="New Row Added" subtitle="Google Sheets" icon={<ContentIcon src={sheetsAppIcon} />} />
+          <CanvasCard title="App initials" subtitle="Connected" icon={<ContentIcon src={initialsIcon('AC')} />} />
+          <CanvasCard
+            title="register_trackings"
+            subtitle="Connect account"
+            problem="Connection required"
+            selected
+            icon={<ContentIcon src={trackingAppIcon} />}
+          />
           <CanvasCard title="Receive an order" subtitle="Webhook" icon={<i className="i-carbon:webhook" />} />
           <CanvasCard title="Normalize order data" subtitle="JavaScript" icon={<i className="i-carbon:code" />} />
           <CanvasCard title="Check for updates" subtitle="Every 1 hour" icon={<i className="i-carbon:time" />} />
