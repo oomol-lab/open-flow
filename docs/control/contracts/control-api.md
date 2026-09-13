@@ -563,6 +563,15 @@ type FlowChangeEvent =
 Connector route 的 `flowId` 是 opaque Flow identity。提供时部署必须先确认 Flow 存在，并在该 Flow 的 Connector scope 内解析 Provider、Action 与
 Connection；客户端不能改用 Team ID、Connection owner 或其他外部 identity 代替 Flow scope。省略时使用部署的未限定 Connector catalog。
 
+Connector Provider、Action（列表、搜索和详情）及 Connection GET 响应使用 `Cache-Control: private, no-cache` 和内容生成的
+`ETag`。服务端在完成当前身份、Flow scope 校验及数据读取后比较 `If-None-Match`；匹配时返回无 body 的 304。
+
+WorkbenchHost 可通过 `connectorCache: { namespace, localStorage?, sessionStorage? }` 启用浏览器缓存；namespace 标识部署，
+可选存储实现 `getItem` / `setItem`。Provider 使用 localStorage；Action 含默认 Connection 信息，与 Connection 一起使用
+sessionStorage。缓存键包含版本、部署及完整请求路径（含 Flow、语言、service 或搜索参数）。持久化数据经过接口解码器校验，
+每次接口调用仍向服务端重验证；只有 304 才复用缓存，200 替换缓存，失败不返回旧数据。存储不可用或损坏时正常请求。
+未提供 `connectorCache` 的宿主不启用持久化 Connector 缓存。
+
 分页 cursor 是 opaque、scope-bound token。跨 Flow、Trigger 或资源类型使用 cursor 返回 `page.invalid-cursor`。
 
 ## 9. 公开 Wait action hook

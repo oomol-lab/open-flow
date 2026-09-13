@@ -8,6 +8,7 @@ const initialConnectionTimeoutMs = 5_000
 
 export function createBrowserHost(notify: (notification: WorkbenchNotification | undefined) => void, sessionExpired: () => void): WorkbenchHost {
   return {
+    connectorCache: { namespace: window.location.origin },
     triggerCatalogCache: { namespace: window.location.origin },
     async openExternalPage(resolveUrl) {
       const tab = window.open('about:blank', '_blank')
