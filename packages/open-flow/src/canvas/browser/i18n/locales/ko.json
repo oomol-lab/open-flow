@@ -14,7 +14,7 @@
     "llmStructured": "LLM 구조화 출력",
     "sharedBlocks": "태스크와 Subflow",
     "triggers": "Trigger",
-    "value": "값"
+    "value": "고정 값"
   },
   "blockEditor": {
     "addDefaultAdditionalInput": "기본 추가 입력 만들기",
@@ -582,7 +582,7 @@
       "condition": "조건",
       "wait": "확인 대기",
       "subflow": "하위 흐름",
-      "value": "설정값",
+      "value": "고정 값",
       "input": "입력",
       "output": "출력"
     },

@@ -14,7 +14,7 @@
     "llmStructured": "Sortie structurée LLM",
     "sharedBlocks": "Tâches et Subflows",
     "triggers": "Triggers",
-    "value": "Valeur"
+    "value": "Valeurs fixes"
   },
   "blockEditor": {
     "addDefaultAdditionalInput": "Ajouter une entrée supplémentaire par défaut",
@@ -582,7 +582,7 @@
       "condition": "Condition",
       "wait": "Attendre une confirmation",
       "subflow": "Sous-flux",
-      "value": "Valeurs",
+      "value": "Valeurs fixes",
       "input": "Entrée",
       "output": "Sortie"
     },

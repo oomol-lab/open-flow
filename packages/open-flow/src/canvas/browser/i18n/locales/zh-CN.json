@@ -14,7 +14,7 @@
     "llmStructured": "LLM 结构化输出",
     "sharedBlocks": "任务与子流程",
     "triggers": "触发器",
-    "value": "值"
+    "value": "固定值"
   },
   "blockEditor": {
     "addDefaultAdditionalInput": "添加默认额外输入",
@@ -582,7 +582,7 @@
       "condition": "条件判断",
       "wait": "等待确认",
       "subflow": "子流程",
-      "value": "设定值",
+      "value": "固定值",
       "input": "流程输入",
       "output": "流程输出"
     },

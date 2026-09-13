@@ -14,7 +14,7 @@
     "llmStructured": "LLM Structured Output",
     "sharedBlocks": "Tasks and subflows",
     "triggers": "Triggers",
-    "value": "Value"
+    "value": "Fixed Values"
   },
   "blockEditor": {
     "addDefaultAdditionalInput": "Add default additional input",
@@ -582,7 +582,7 @@
       "condition": "Condition",
       "wait": "Wait for confirmation",
       "subflow": "Subflow",
-      "value": "Values",
+      "value": "Fixed Values",
       "input": "Flow input",
       "output": "Flow output"
     },

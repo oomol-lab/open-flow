@@ -14,7 +14,7 @@
     "llmStructured": "LLM 結構化輸出",
     "sharedBlocks": "任務與 Subflow",
     "triggers": "Trigger",
-    "value": "值"
+    "value": "固定值"
   },
   "blockEditor": {
     "addDefaultAdditionalInput": "新增預設額外輸入",
@@ -582,7 +582,7 @@
       "condition": "條件判斷",
       "wait": "等待確認",
       "subflow": "子流程",
-      "value": "設定值",
+      "value": "固定值",
       "input": "流程輸入",
       "output": "流程輸出"
     },

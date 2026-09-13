@@ -14,7 +14,7 @@
     "llmStructured": "LLM 構造化出力",
     "sharedBlocks": "タスクと Subflow",
     "triggers": "Trigger",
-    "value": "値"
+    "value": "固定値"
   },
   "blockEditor": {
     "addDefaultAdditionalInput": "デフォルトの追加入力を追加",
@@ -582,7 +582,7 @@
       "condition": "条件",
       "wait": "確認待ち",
       "subflow": "サブフロー",
-      "value": "設定値",
+      "value": "固定値",
       "input": "入力",
       "output": "出力"
     },
