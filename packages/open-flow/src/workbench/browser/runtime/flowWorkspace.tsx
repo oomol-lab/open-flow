@@ -151,7 +151,6 @@ function Editor({
   const triggerActiveConnections = useVal(store.triggers.$.selectedActiveConnections)
   const [contextPanelMode, setContextPanelMode] = useState<ContextPanelMode>()
   const [blocksFocusRequest, setBlocksFocusRequest] = useState(0)
-  const blockAddCount = useRef(0)
   const designerRef = useRef<WorkbenchCanvasHandle>(null)
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent): void => {
@@ -168,7 +167,6 @@ function Editor({
 
   useEffect(() => {
     setStartId(undefined)
-    blockAddCount.current = 0
     focusInspectorOnOpen.current = false
     opener.current = undefined
     setContextPanelMode(undefined)
@@ -222,11 +220,7 @@ function Editor({
     setContextPanelMode('inspector')
   }
   const addFromBlocks = async (option: AddNodeOption): Promise<string | undefined> => {
-    const offset = blockAddCount.current * 32
-    const canvasPosition = { x: 92 + offset, y: 92 + offset }
-    const nodeId = await designerRef.current?.addNode(option, canvasPosition)
-    if (nodeId != null) blockAddCount.current++
-    return nodeId
+    return designerRef.current?.addNode(option)
   }
 
   const setNotification = async (option: AddNodeOption): Promise<string | undefined> => {
