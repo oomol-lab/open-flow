@@ -11,6 +11,7 @@ import type { WorkspaceStore } from './workspaceStore.ts'
 
 import { compute, derive, val } from 'value-enhancer'
 import { flowDependencies } from '../../../../flow/common/semantics.ts'
+import { cachedConnectorActions, cachedConnectorConnections } from '../connectorCache.ts'
 import { createI18n } from '../i18n.ts'
 import { providerIcon } from '../providerIcon.ts'
 import { connectionCatalog } from '../workspace.ts'
@@ -18,6 +19,7 @@ import { Latest } from './latest.ts'
 import { errorNotice } from './workbenchNotice.ts'
 
 interface ConnectorState {
+  readonly catalogRevision: number
   readonly actionError?: { readonly actionId: string; readonly message: string }
   readonly actionLoading?: string
   readonly actions: Readonly<Record<string, ConnectorAction>>
@@ -44,6 +46,7 @@ interface ConnectorTarget {
 }
 
 export interface Connector$ {
+  readonly catalogRevision: ReadonlyVal<number>
   readonly actionLoading: ReadonlyVal<string | undefined>
   readonly actions: ReadonlyVal<Readonly<Record<string, ConnectorAction>>>
   readonly catalogs: ReadonlyVal<Readonly<Record<string, ConnectionCatalog>>>
@@ -58,6 +61,7 @@ export interface Connector$ {
 }
 
 const initialState: ConnectorState = {
+  catalogRevision: 0,
   actions: {},
   catalogs: {},
 }
@@ -175,10 +179,11 @@ export class ConnectorStore {
   readonly #i18n: I18n
   #language: string
   readonly #host: Pick<WorkbenchHost, 'openExternalPage'>
-  readonly #providerActions = new Map<string, readonly ConnectorAction[]>()
   readonly #loadingActions = new Set<string>()
   readonly #draftRefresh = new Latest()
   readonly #refresh = new Latest()
+  readonly #actionReaction: () => void
+  readonly #providerReaction: () => void
   readonly #flowReaction: () => void
   readonly #revisionReaction: () => void
   readonly #selected: ReadonlyVal<Selection>
@@ -204,14 +209,25 @@ export class ConnectorStore {
     this.#setNotice = setNotice
     this.#i18n = i18n
     this.#language = i18n.lang
-    const actions = derive(this.#state, (state) => state.actions)
-    const catalogs = derive(this.#state, (state) => state.catalogs)
+    const actions = compute((get) => ({
+      ...get(this.#state).actions,
+      ...cachedConnectorActions(get(client.connectorCache.actions), get(workspace.$.flowId), this.#language),
+    }))
+    const catalogs = compute((get) => ({
+      ...get(this.#state).catalogs,
+      ...Object.fromEntries(
+        Object.entries(cachedConnectorConnections(get(client.connectorCache.connections), get(workspace.$.flowId))).map(([service, connections]) => [
+          service,
+          connectionCatalog(connections),
+        ]),
+      ),
+    }))
     this.#selected = compute<Selection>((get) => {
       const target = connectorTarget(get(workspace.$.selection), get(workspace.$.revision))
       const state = get(this.#state)
       if (target == null) return { authorizationPending: false }
-      const action = state.actions[target.actionId]
-      const catalog = action == null ? undefined : state.catalogs[action.serviceId]
+      const action = get(actions)[target.actionId]
+      const catalog = action == null ? undefined : get(catalogs)[action.serviceId]
       let connection = target.connectionId == null ? undefined : catalog?.byId.get(target.connectionId)
       if (connection == null && action?.defaultConnection?.connectionId == target.connectionId) connection = action.defaultConnection
       return {
@@ -224,6 +240,7 @@ export class ConnectorStore {
       }
     })
     this.$ = {
+      catalogRevision: derive(this.#state, (state) => state.catalogRevision),
       actionLoading: derive(this.#state, (state) => state.actionLoading),
       actions,
       catalogs,
@@ -236,6 +253,13 @@ export class ConnectorStore {
       selectedConnection: derive(this.#selected, (value) => value.connection),
       selectedConnectionError: derive(this.#selected, (value) => value.connectionError),
     }
+    this.#actionReaction = client.connectorCache.actions.reaction(() => {
+      this.#set({ catalogRevision: this.#state.value.catalogRevision + 1 })
+    })
+    this.#providerReaction = client.connectorCache.providers.reaction(() => {
+      this.#providers = undefined
+      this.#set({ catalogRevision: this.#state.value.catalogRevision + 1 })
+    })
     this.#flowReaction = workspace.$.flowId.reaction(() => this.reset())
     this.#revisionReaction = workspace.$.revision.reaction(() => void this.#loadDraftActions())
   }
@@ -244,6 +268,8 @@ export class ConnectorStore {
     this.#disposed = true
     this.#draftRefresh.invalidate()
     this.#refresh.invalidate()
+    this.#actionReaction()
+    this.#providerReaction()
     this.#flowReaction()
     this.#revisionReaction()
     for (const value of Object.values(this.$)) value.dispose()
@@ -263,7 +289,6 @@ export class ConnectorStore {
     this.#draftRefresh.invalidate()
     this.#refresh.invalidate()
     this.#authorization = undefined
-    this.#providerActions.clear()
     this.#providers = undefined
     this.#loadingActions.clear()
     this.#state.set(initialState)
@@ -274,7 +299,7 @@ export class ConnectorStore {
     const language = this.#language
     const flowId = this.#workspace.$.flowId.value
     if (flowId == null) return
-    const providers = this.#providers ?? (await this.#client.listConnectorProviders(signal, flowId))
+    const providers = await this.#client.listConnectorProviders(signal, flowId)
     if (signal.aborted || this.#disposed || language != this.#language || flowId != this.#workspace.$.flowId.value) return
     this.#providers = providers
     return providers.toSorted((left, right) => left.serviceName.localeCompare(right.serviceName)).map((provider) => providerOption(provider, this.#i18n.t))
@@ -286,14 +311,12 @@ export class ConnectorStore {
     const flowId = this.#workspace.$.flowId.value
     const provider = this.#providers?.find((candidate) => `connector-provider:${candidate.serviceId}` == optionId)
     if (flowId == null || provider == null) return
-    const loaded = this.#providerActions.get(provider.serviceId)
-    const actions = loaded ?? (await this.#client.listConnectorActions(provider.serviceId, signal, flowId, language))
+    const actions = await this.#client.listConnectorActions(provider.serviceId, signal, flowId, language)
     if (signal.aborted || this.#disposed || language != this.#language || flowId != this.#workspace.$.flowId.value) return
     const resolved = actions.map((action) =>
       Object.assign({}, action, action.icon == null && provider.icon != null ? { icon: provider.icon } : {}, { serviceName: provider.serviceName }),
     )
-    this.#providerActions.set(provider.serviceId, resolved)
-    this.#set({ actions: { ...this.#state.value.actions, ...Object.fromEntries(resolved.map((action) => [action.actionId, action])) } })
+    this.#set({ actions: { ...this.$.actions.value, ...Object.fromEntries(resolved.map((action) => [action.actionId, action])) } })
     return resolved.map((action) => option(action, this.#i18n.t))
   }
 
@@ -303,9 +326,9 @@ export class ConnectorStore {
     const flowId = this.#workspace.$.flowId.value
     if (flowId == null) return
     const query = searchTerm.trim()
-    const actions = query.length == 0 ? Object.values(this.#state.value.actions) : await this.#client.searchConnectorActions(query, signal, flowId, language)
+    const actions = query.length == 0 ? Object.values(this.$.actions.value) : await this.#client.searchConnectorActions(query, signal, flowId, language)
     if (signal.aborted || this.#disposed || language != this.#language || flowId != this.#workspace.$.flowId.value) return
-    const next = { ...this.#state.value.actions }
+    const next = { ...this.$.actions.value }
     for (const action of actions) next[action.actionId] = action
     this.#set({ actions: next })
     if (query.length != 0) return actions.map((action) => option(action, this.#i18n.t))
@@ -332,7 +355,7 @@ export class ConnectorStore {
     try {
       const action = await this.#loadAction(target.actionId, force)
       if (!this.#isCurrent(current, flowId)) return
-      this.#set({ actions: { ...this.#state.value.actions, [action.actionId]: action } })
+      this.#set({ actions: { ...this.$.actions.value, [action.actionId]: action } })
       if (action.authenticated) await this.#refreshConnections(flowId, target, action.serviceId, force, current)
     } catch (error) {
       if (this.#isCurrent(current, flowId)) {
@@ -348,7 +371,7 @@ export class ConnectorStore {
     if (flowId == null || this.#disposed) return
     const connections = await this.#client.listConnectorConnections(serviceId, signal, flowId)
     if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
-    this.#set({ catalogs: { ...this.#state.value.catalogs, [serviceId]: connectionCatalog(connections) } })
+    this.#set({ catalogs: { ...this.$.catalogs.value, [serviceId]: connectionCatalog(connections) } })
   }
 
   public async loadCodeAction(actionId: string, signal: AbortSignal): Promise<void> {
@@ -357,14 +380,14 @@ export class ConnectorStore {
     if (flowId == null || this.#disposed) return
     const action = await this.#client.getConnectorAction(actionId, signal, flowId, language)
     if (signal.aborted || this.#disposed || language != this.#language || flowId != this.#workspace.$.flowId.value) return
-    this.#set({ actions: { ...this.#state.value.actions, [actionId]: action } })
+    this.#set({ actions: { ...this.$.actions.value, [actionId]: action } })
   }
 
   public async connect(serviceId: string): Promise<void> {
     if (this.#disposed) return
     const flowId = this.#workspace.$.flowId.value
     if (flowId == null) return
-    const catalog = this.#state.value.catalogs[serviceId]
+    const catalog = this.$.catalogs.value[serviceId]
     try {
       const opened = await this.#host.openExternalPage(() => this.#client.createConnectorConnectionPage(serviceId, flowId))
       if (!opened) {
@@ -386,16 +409,13 @@ export class ConnectorStore {
   public async refreshAfterAuthorization(): Promise<void> {
     if (this.#disposed || this.#authorization == null) return
     const serviceId = this.#authorization.serviceId
-    this.#providerActions.delete(serviceId)
     this.#set({ authorizationServiceId: undefined })
     if (this.$.selectedAction.value?.serviceId == serviceId) await this.refresh(true)
     if (!this.#disposed && this.#authorization?.serviceId == serviceId) this.#authorization = undefined
   }
 
   async #loadAction(actionId: string, force: boolean): Promise<ConnectorAction> {
-    const action = this.#state.value.actions[actionId]
-    if (!force && action != null) return action
-    return await this.#client.getConnectorAction(actionId, undefined, this.#workspace.$.flowId.value, this.#language)
+    return await this.#client.getConnectorAction(actionId, undefined, this.#workspace.$.flowId.value, this.#language, force)
   }
 
   async #refreshConnections(flowId: string, target: ConnectorTarget, serviceId: string, force: boolean, current: Current): Promise<void> {
@@ -410,18 +430,16 @@ export class ConnectorStore {
   }
 
   async #loadCatalog(flowId: string, serviceId: string, force: boolean, current: Current): Promise<ConnectionCatalog | undefined> {
-    const cached = this.#state.value.catalogs[serviceId]
-    if (!force && cached != null) return cached
     let connections: readonly ConnectorConnection[]
     try {
-      connections = await this.#client.listConnectorConnections(serviceId, undefined, flowId)
+      connections = await this.#client.listConnectorConnections(serviceId, undefined, flowId, force)
     } catch (error) {
       if (this.#isCurrent(current, flowId)) this.#set({ connectionError: { message: errorNotice(error, this.#i18n.t).message, serviceId } })
       return
     }
     if (!this.#isCurrent(current, flowId)) return
     const catalog = connectionCatalog(connections)
-    this.#set({ catalogs: { ...this.#state.value.catalogs, [serviceId]: catalog } })
+    this.#set({ catalogs: { ...this.$.catalogs.value, [serviceId]: catalog } })
     return catalog
   }
 
@@ -457,13 +475,13 @@ export class ConnectorStore {
     const flowId = this.#workspace.$.flowId.value
     const revision = this.#workspace.$.revision.value
     if (flowId == null || revision == null) return
-    const missing = [...revision.connectorActionIds].filter((actionId) => this.#state.value.actions[actionId] == null && !this.#loadingActions.has(actionId))
+    const missing = [...revision.connectorActionIds].filter((actionId) => this.$.actions.value[actionId] == null && !this.#loadingActions.has(actionId))
     if (missing.length > 0) {
       for (const actionId of missing) this.#loadingActions.add(actionId)
       try {
         const actions = await Promise.all(missing.map((actionId) => this.#client.getConnectorAction(actionId, undefined, flowId, this.#language)))
         if (!this.#isCurrent(current, flowId)) return
-        const next = { ...this.#state.value.actions }
+        const next = { ...this.$.actions.value }
         for (const action of actions) next[action.actionId] = action
         this.#set({ actions: next })
       } catch {
@@ -477,7 +495,7 @@ export class ConnectorStore {
     for (const taskId of flowDependencies(revision.revision.content).tasks) {
       const task = revision.task(taskId)
       if (task?.executor.kind != 'connector') continue
-      const action = this.#state.value.actions[task.executor.action]
+      const action = this.$.actions.value[task.executor.action]
       if (action?.authenticated == true) services.add(action.serviceId)
     }
     await Promise.all([...services].map((serviceId) => this.#loadCatalog(flowId, serviceId, false, current)))

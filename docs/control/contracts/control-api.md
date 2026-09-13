@@ -569,7 +569,9 @@ Connector Provider、Action（列表、搜索和详情）及 Connection GET 响�
 WorkbenchHost 可通过 `connectorCache: { namespace, localStorage?, sessionStorage? }` 启用浏览器缓存；namespace 标识部署，
 可选存储实现 `getItem` / `setItem`。Provider 使用 localStorage；Action 含默认 Connection 信息，与 Connection 一起使用
 sessionStorage。缓存键包含版本、部署及完整请求路径（含 Flow、语言、service 或搜索参数）。持久化数据经过接口解码器校验，
-每次接口调用仍向服务端重验证；只有 304 才复用缓存，200 替换缓存，失败不返回旧数据。存储不可用或损坏时正常请求。
+Provider、Action 和 Connection 的有效缓存立即返回，并在后台用 ETag 重验证；响应式缓存更新后，菜单和连接选择器同步更新。
+Provider 成功后 5 分钟内复用，Action 和 Connection 成功后 30 秒内复用；后台失败保留缓存并延迟 30 秒重试。
+授权完成后的强制刷新等待服务端结果，失败会抛出错误。存储不可用或损坏时正常请求。
 未提供 `connectorCache` 的宿主不启用持久化 Connector 缓存。
 
 分页 cursor 是 opaque、scope-bound token。跨 Flow、Trigger 或资源类型使用 cursor 返回 `page.invalid-cursor`。

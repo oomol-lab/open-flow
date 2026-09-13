@@ -5,6 +5,7 @@ import type { AddNodeOption } from './addNodeOptions.ts'
 
 import { Plus } from 'lucide-react'
 import { useCallback, useState } from 'react'
+import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '../../../../ui/browser/dialog.tsx'
@@ -26,6 +27,7 @@ export function ActionPicker({
   readonly exclude?: readonly string[]
   readonly onSelect: (action: ConnectorAction) => Promise<boolean>
 }): ReactElement {
+  const catalogRevision = useVal(connectors.$.catalogRevision)
   const t = useTranslate()
   const [open, setOpen] = useState(false)
   const [root, setRoot] = useState<HTMLElement | null>(null)
@@ -63,6 +65,7 @@ export function ActionPicker({
           <DialogTitle>{t('actionPicker.title')}</DialogTitle>
           {open && (
             <BlockLibrary
+              catalogRevision={catalogRevision}
               browseOptions={connectors.browseAddNodeOptions}
               searchOptions={search}
               provideChoices={choices}

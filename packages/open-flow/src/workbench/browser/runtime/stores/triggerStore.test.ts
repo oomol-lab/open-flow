@@ -338,7 +338,7 @@ describe('TriggerStore', () => {
       } else {
         expect(triggers.$.selectedActiveConnections.value).toEqual(outcome == 'empty' ? [] : [fresh])
         await triggers.refresh()
-        expect(list).toHaveBeenCalledTimes(2)
+        expect(list).toHaveBeenCalledTimes(3)
       }
     } finally {
       triggers.dispose()
@@ -378,9 +378,9 @@ describe('TriggerStore', () => {
       expect(triggers.$.selectedConnection.value).toEqual(old)
       list.mockResolvedValue([fresh])
       await triggers.refresh()
-      expect(list).toHaveBeenLastCalledWith('github', undefined, flow.flowId)
+      expect(list).toHaveBeenLastCalledWith('github', undefined, flow.flowId, true)
       expect(triggers.$.selectedConnection.value).toEqual(fresh)
-      expect(list).toHaveBeenCalledTimes(timing == 'before' ? 1 : 2)
+      expect(list).toHaveBeenCalledTimes(timing == 'before' ? 1 : 3)
     } finally {
       triggers.dispose()
       workspace.dispose()

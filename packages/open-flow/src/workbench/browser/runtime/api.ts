@@ -94,8 +94,13 @@ export class WorkbenchClient extends ControlClient {
     kind: 'providers' | 'actions' | 'connections',
     signal: AbortSignal | undefined,
     decode: (value: unknown) => Value,
+    fresh = false,
   ): Promise<Value> {
-    return this.#connectorCache.get(path, kind, signal, decode, (headers) => this.response(path, { headers, signal }, true))
+    return this.#connectorCache.get(path, kind, signal, decode, (headers) => this.response(path, { headers, signal }, true), fresh)
+  }
+
+  get connectorCache() {
+    return this.#connectorCache
   }
 
   watchFlowCatalog(changed: (event?: FlowCatalogEvent) => void): ReturnType<FlowCatalogSubscriber> {

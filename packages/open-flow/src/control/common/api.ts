@@ -754,17 +754,23 @@ export class ControlClient {
     return await this.connectorActions({ ...(locale == null ? {} : { locale }), ...(flowId == null ? {} : { flowId }), q: query.trim() }, signal)
   }
 
-  async getConnectorAction(actionId: string, signal?: AbortSignal, flowId?: string, locale?: string): Promise<ConnectorAction> {
+  async getConnectorAction(actionId: string, signal?: AbortSignal, flowId?: string, locale?: string, fresh = false): Promise<ConnectorAction> {
     const parameters = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), ...(locale == null ? {} : { locale }) }).toString()
-    return this.connectorRequest(`/v1/connector/actions/${segment(actionId)}${parameters ? `?${parameters}` : ''}`, 'actions', signal, (value) => {
-      const source = record(value)
-      exact(source, ['action', 'version'])
-      if (source.version != 1) return invalidResponse()
-      return connectorAction(source.action)
-    })
+    return this.connectorRequest(
+      `/v1/connector/actions/${segment(actionId)}${parameters ? `?${parameters}` : ''}`,
+      'actions',
+      signal,
+      (value) => {
+        const source = record(value)
+        exact(source, ['action', 'version'])
+        if (source.version != 1) return invalidResponse()
+        return connectorAction(source.action)
+      },
+      fresh,
+    )
   }
 
-  async listConnectorConnections(serviceId: string, signal?: AbortSignal, flowId?: string): Promise<readonly ConnectorConnection[]> {
+  async listConnectorConnections(serviceId: string, signal?: AbortSignal, flowId?: string, fresh = false): Promise<readonly ConnectorConnection[]> {
     return this.connectorRequest(
       `/v1/connector/connections/${segment(serviceId)}${flowId == null ? '' : `?flowId=${segment(flowId)}`}`,
       'connections',
@@ -775,6 +781,7 @@ export class ControlClient {
         if (source.version != 1 || string(source.serviceId) != serviceId || !Array.isArray(source.connections)) return invalidResponse()
         return source.connections.map(connection)
       },
+      fresh,
     )
   }
 
@@ -978,6 +985,7 @@ export class ControlClient {
     _kind: 'providers' | 'actions' | 'connections',
     signal: AbortSignal | undefined,
     decode: (value: unknown) => Value,
+    _fresh = false,
   ): Promise<Value> {
     return decode(await this.request(path, { signal }))
   }

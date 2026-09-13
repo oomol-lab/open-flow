@@ -23,7 +23,7 @@ export interface WorkbenchHost {
     readonly namespace: string
     readonly storage?: { getItem(key: string): string | null; setItem(key: string, value: string): void }
   }
-  /** Deployment identity for Connector caches. Every persisted response is revalidated before use. */
+  /** Deployment identity for Connector caches. Cached representations display immediately and revalidate in the background. */
   readonly connectorCache?: {
     readonly namespace: string
     readonly localStorage?: WorkbenchPreferences

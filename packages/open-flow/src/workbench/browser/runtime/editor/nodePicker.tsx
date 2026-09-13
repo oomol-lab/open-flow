@@ -116,7 +116,7 @@ export function NodePickerContent({
           if (!controller.signal.aborted) setChoicesLoading(false)
         })
     return () => controller.abort()
-  }, [directoryId, provideChoices, retry])
+  }, [directoryId, provideChoices, catalogRevision, retry])
   useEffect(() => {
     list.current?.scrollTo(0, 0)
   }, [appId, term, page])

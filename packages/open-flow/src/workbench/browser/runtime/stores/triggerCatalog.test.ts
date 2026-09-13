@@ -64,6 +64,7 @@ describe('Trigger catalog cache', () => {
       finish(Response.json(catalog, { headers: { etag: '"new"' } }))
       await pending
       expect(JSON.parse(browserTriggerCatalogStorage('test', local).getItem('en')!).etag).toBe('"new"')
+      expect(store.state.value.catalogs.get('en')).toEqual({ data: catalog, etag: '"new"' })
       expect(store.state.value.revision).toBe(1)
     } finally {
       store.dispose()
@@ -143,7 +144,7 @@ describe('Trigger catalog cache', () => {
     try {
       await expect(store.refresh()).rejects.toThrow('offline')
       expect(await store.get()).toEqual(catalog)
-      expect(store.state.value).toEqual({ failed: true, revision: 0 })
+      expect(store.state.value).toMatchObject({ failed: true, revision: 0 })
     } finally {
       store.dispose()
     }

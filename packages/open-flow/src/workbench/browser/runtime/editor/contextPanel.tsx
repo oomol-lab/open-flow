@@ -276,6 +276,7 @@ function LibraryGroup({
 
 function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices, onOpenChange }: LibraryItemProps): ReactElement {
   const t = useTranslate()
+  const details = useRef<HTMLDetailsElement>(null)
   const connectionChoices = item.type == 'trigger'
   const controller = useRef<AbortController>()
   const [choices, setChoices] = useState(item.choices)
@@ -290,10 +291,10 @@ function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices, 
     setLoaded(item.choices == null || item.choices.length > 0)
     setLoading(false)
     return () => controller.current?.abort()
-  }, [item.choices, item.data])
+  }, [item.choices, item.data, onLoadChoices])
 
   const load = useCallback((): void => {
-    if (item.data == null || disabled || loading) return
+    if (item.data == null || disabled) return
     controller.current?.abort()
     const nextController = new AbortController()
     controller.current = nextController
@@ -311,11 +312,16 @@ function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices, 
       .finally(() => {
         if (!nextController.signal.aborted) setLoading(false)
       })
-  }, [disabled, item.data, loading, onLoadChoices])
+  }, [disabled, item.data, onLoadChoices])
+
+  useEffect(() => {
+    if (details.current?.open) load()
+  }, [load])
 
   if (item.choices != null) {
     return (
       <details
+        ref={details}
         className="block-library-choices"
         onToggle={(event) => {
           onOpenChange(item.data ?? item.label, event.currentTarget.open)
@@ -453,7 +459,7 @@ function SidebarBlockLibrary({
       dynamicOptions.current = new Map([...dynamicOptions.current, ...indexAddNodeOptions(nextOptions)])
       return nextOptions.map((option) => ({ data: option.id, description: option.description, label: option.label }))
     },
-    [provideChoices],
+    [provideChoices, catalogRevision],
   )
   const { error, items: catalogItems, retry } = useCollectionItems(localItems, filterQuery, provideAsyncItems)
   const loading = !settled

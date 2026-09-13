@@ -39,6 +39,26 @@ const sampleActions = [
   },
 ]
 
+const sampleProviders = sampleActions.map((action) => ({
+  serviceId: action.serviceId,
+  serviceName: action.serviceName,
+  ...(action.icon ? { icon: action.icon } : {}),
+}))
+
+function sampleActionData(path: string, cached = false) {
+  const url = new URL(path, 'https://lab.invalid')
+  return {
+    version: 1,
+    actions: sampleActions
+      .filter(
+        (action) =>
+          (!url.searchParams.get('service') || action.serviceId == url.searchParams.get('service')) &&
+          (!url.searchParams.get('q') || `${action.name} ${action.serviceName}`.toLowerCase().includes(url.searchParams.get('q')!.toLowerCase())),
+      )
+      .map((action) => (cached ? Object.assign({}, action, { name: `${action.name} (cached)` }) : action)),
+  }
+}
+
 function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const [mode, setMode] = useState<'ready' | 'failed' | 'loading'>('ready')
   const [disabled, setDisabled] = useState(false)
@@ -58,36 +78,41 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
       }),
     [language, log],
   )
-  const connectors = useMemo(
-    () =>
-      new ConnectorStore(
-        new WorkbenchClient(async (path) => {
+  const connectors = useMemo(() => {
+    let cached = JSON.stringify({ data: { version: 1, providers: sampleProviders.slice(0, 1) }, etag: '"cached"' })
+    return new ConnectorStore(
+      new WorkbenchClient(
+        async (path) => {
           const url = new URL(String(path), 'https://lab.invalid')
-          if (url.pathname.endsWith('/providers'))
-            return Response.json({
-              version: 1,
-              providers: sampleActions.map((action) => ({
-                serviceId: action.serviceId,
-                serviceName: action.serviceName,
-                ...(action.icon ? { icon: action.icon } : {}),
-              })),
-            })
-          return Response.json({
-            version: 1,
-            actions: sampleActions.filter(
-              (action) =>
-                (!url.searchParams.get('service') || action.serviceId == url.searchParams.get('service')) &&
-                (!url.searchParams.get('q') || `${action.name} ${action.serviceName}`.toLowerCase().includes(url.searchParams.get('q')!.toLowerCase())),
-            ),
-          })
-        }),
-        session.workspace,
-        (notice) => log('notice', notice),
-        { openExternalPage: async () => false },
-        session.i18n,
+          if (url.pathname.endsWith('/providers')) {
+            await new Promise((resolve) => setTimeout(resolve, 1500))
+            return Response.json({ version: 1, providers: sampleProviders })
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1500))
+          return Response.json(sampleActionData(String(path)))
+        },
+        undefined,
+        undefined,
+        {
+          namespace: 'lab-node-picker',
+          sessionStorage: {
+            getItem: (key) => JSON.stringify({ data: sampleActionData(key.slice(key.indexOf('/v1/')), true), etag: null }),
+            setItem: () => {},
+          },
+          localStorage: {
+            getItem: () => cached,
+            setItem: (_key, value) => {
+              cached = value
+            },
+          },
+        },
       ),
-    [session, log],
-  )
+      session.workspace,
+      (notice) => log('notice', notice),
+      { openExternalPage: async () => false },
+      session.i18n,
+    )
+  }, [session, log])
   const lifetime = useMemo(() => ({ users: 0 }), [session, connectors])
   useEffect(() => {
     lifetime.users++
@@ -104,6 +129,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
   }, [session, connectors, lifetime])
   const options = useVal(session.workspace.$.addNodeOptions)
   const catalog = useVal(session.triggers.catalog.state)
+  const connectorRevision = useVal(connectors.$.catalogRevision)
   useStoryActions([
     { label: largeCatalog ? 'Small catalog' : '1,000 apps', onClick: () => setLargeCatalog(!largeCatalog) },
     { label: slowAdd ? 'Instant add' : 'Slow add', onClick: () => setSlowAdd(!slowAdd) },
@@ -145,7 +171,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
   const props = {
     ...data,
     options,
-    catalogRevision: catalog.revision,
+    catalogRevision: catalog.revision + connectorRevision,
     disabled,
     focusRequest: 0,
     onAdd: async (option: (typeof options)[number]) => {
@@ -187,6 +213,6 @@ export const nodePickerPreviewStory: FrontendStory = {
   title: 'Add Node Popover',
   standalone: true,
   description:
-    'Gmail shows a brand logo; Google Drive shows the initials fallback. Nodes and Triggers use real definitions. Search across both tabs, browse app actions, or select an event directly.',
+    'Cached Gmail appears immediately; Google Drive arrives after a 1.5-second background refresh. App actions also show cached labels before refreshing. Nodes and Triggers use real definitions. Search across both tabs, browse app actions, or select an event directly.',
   render: (log, dark, language) => <Preview dark={dark} language={language} log={log} />,
 }
