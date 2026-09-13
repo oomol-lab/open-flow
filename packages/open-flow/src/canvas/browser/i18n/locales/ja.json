@@ -1,4 +1,8 @@
 {
+  "contextMenu": {
+    "addNode": "ノードを追加",
+    "paste": "貼り付け"
+  },
   "addNode": {
     "comment": "コメント",
     "condition": "条件",

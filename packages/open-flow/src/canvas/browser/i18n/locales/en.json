@@ -1,4 +1,8 @@
 {
+  "contextMenu": {
+    "addNode": "Add node",
+    "paste": "Paste"
+  },
   "addNode": {
     "comment": "Comment",
     "condition": "Condition",

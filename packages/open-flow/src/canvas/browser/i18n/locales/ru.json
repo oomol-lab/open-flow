@@ -1,4 +1,8 @@
 {
+  "contextMenu": {
+    "addNode": "Добавить узел",
+    "paste": "Вставить"
+  },
   "addNode": {
     "comment": "Комментарий",
     "condition": "Условие",

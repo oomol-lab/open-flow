@@ -1,4 +1,8 @@
 {
+  "contextMenu": {
+    "addNode": "新增節點",
+    "paste": "貼上"
+  },
   "addNode": {
     "comment": "註解",
     "condition": "條件",

@@ -405,7 +405,8 @@ export const workflowStories: readonly FrontendStory[] = [
     group: 'Theme Preview',
     id: 'workflow',
     title: 'Workflow components',
-    description: 'Select nodes to compare outlines and execution states. Interactions appear in the status below.',
+    description:
+      'Right-click the canvas for Add node and Paste. Add node opens the current picker; Paste logs its canvas position. Switch to read-only to inspect disabled actions.',
     standalone: true,
     render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={workflow} />,
   },
