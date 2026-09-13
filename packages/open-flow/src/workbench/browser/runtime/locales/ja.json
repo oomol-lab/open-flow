@@ -915,6 +915,15 @@
     "missingStatuses": "選択したステータスの一部は利用できません。削除するか選び直してください。"
   },
   "nodePicker": {
+    "builtInNodes": "組み込みノード",
+    "configured": "設定済み",
+    "configuredDescription": "アカウントが設定済みで、そのまま利用できます。",
+    "builtInAccount": "組み込みアカウント",
+    "builtInAccountDescription": "OOMOL が提供するアカウントを使用します。利用時にクレジットが消費されます。",
+    "noSetup": "設定不要",
+    "noSetupDescription": "アカウントを設定せずに利用できます。",
+    "needsSetup": "要設定",
+    "needsSetupDescription": "アカウントを追加または再認証すると利用できます。",
     "clearSearch": "検索をクリア",
     "search": "ノード、アプリ、操作を検索…",
     "apps": "アプリ",

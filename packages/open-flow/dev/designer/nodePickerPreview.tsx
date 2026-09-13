@@ -80,6 +80,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
   const [mode, setMode] = useState<'ready' | 'failed' | 'loading'>('ready')
   const [disabled, setDisabled] = useState(false)
   const [largeCatalog, setLargeCatalog] = useState(false)
+  const [configuredOnly, setConfiguredOnly] = useState(false)
   const [slowAdd, setSlowAdd] = useState(false)
   const session = useMemo(
     () =>
@@ -163,6 +164,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
   const options = useVal(session.workspace.$.addNodeOptions)
   const connections = useVal(connectors.$.connections)
   useStoryActions([
+    { label: configuredOnly ? 'All groups' : 'Configured only', onClick: () => setConfiguredOnly(!configuredOnly) },
     { label: largeCatalog ? 'Small catalog' : '1,000 apps', onClick: () => setLargeCatalog(!largeCatalog) },
     { label: slowAdd ? 'Instant add' : 'Slow add', onClick: () => setSlowAdd(!slowAdd) },
     { label: 'Ready', onClick: () => setMode('ready') },
@@ -177,6 +179,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
         if (mode == 'loading')
           return new Promise<readonly (typeof options)[number][]>((resolve) => signal.addEventListener('abort', () => resolve([]), { once: true }))
         return mapSource(combineSources(signal, [session.triggers.browseAddNodeOptions(signal), connectors.browseAddNodeOptions(signal)]), signal, (apps) => {
+          if (configuredOnly) return apps.filter((item) => item.kind != 'connector-group' || ['gmail', 'feishu'].includes(item.serviceId))
           const sample = apps.find((item) => item.kind == 'connector-group')
           const extra =
             largeCatalog && sample
@@ -194,7 +197,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
         combineSources(signal, [session.triggers.provideAddNodeOptions(query, signal), connectors.provideAddNodeOptions(query, signal)]),
       provideChoices: connectors.provideAddNodeOptionChoices,
     }),
-    [session, connectors, mode, largeCatalog],
+    [session, connectors, mode, largeCatalog, configuredOnly],
   )
   const props = {
     ...data,
@@ -242,6 +245,6 @@ export const nodePickerPreviewStory: FrontendStory = {
   title: 'Add Node Popover',
   standalone: true,
   description:
-    'Cached Gmail appears immediately. After refresh, connected 飞书 and Gmail lead, followed by built-in Doubao Seedream, no-setup 17TRACK, then unconfigured 企业微信 and Google Drive. Real Trigger definitions, cached actions, search and large-catalog states are available.',
+    'Cached Gmail appears immediately. Four app groups with help tooltips. Configured only hides empty groups. Real Trigger definitions, search and 1,000-app scrolling are available.',
   render: (log, dark, language) => <Preview dark={dark} language={language} log={log} />,
 }

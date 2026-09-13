@@ -915,6 +915,15 @@
     "missingStatuses": "Some selected statuses are no longer available. Remove or replace them."
   },
   "nodePicker": {
+    "builtInNodes": "Built-in nodes",
+    "configured": "Configured",
+    "configuredDescription": "An account is configured and ready to use.",
+    "builtInAccount": "Built-in account",
+    "builtInAccountDescription": "Uses an account provided by OOMOL. Usage consumes credits.",
+    "noSetup": "No setup",
+    "noSetupDescription": "Ready to use without configuring an account.",
+    "needsSetup": "Needs setup",
+    "needsSetupDescription": "Add or reauthorize an account to use these apps.",
     "clearSearch": "Clear search",
     "search": "Search nodes, apps, or actions…",
     "apps": "Apps",
