@@ -14,9 +14,11 @@ import { parseAccept } from 'hono/utils/accept'
 import { randomUUID } from 'node:crypto'
 import { ServerService } from '../application/service.ts'
 import { createConfigApp } from '../deployment/config.ts'
+import { forwardConnector } from '../deployment/connector-proxy.ts'
 import { createOperatorApp } from '../deployment/operator.ts'
 import { AcceptanceError, ControlError, serverErrorCode } from '../error.ts'
 import { errorKind, silentLogger } from '../logger.ts'
+import { createConnectorProxyApp } from './connector-proxy.ts'
 import { createControlApp } from './control.ts'
 import { handleIntegration } from './integration.ts'
 import { createMcpApp } from './mcp.ts'
@@ -163,6 +165,15 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     return method == 'HEAD' ? new Response(null, { headers: response.headers, status: response.status }) : response
   })
   app.route('/v1/mcp', createMcpApp(service, authenticate, logger, options.shutdownSignal))
+  app.route(
+    '/v1/connector/proxy',
+    createConnectorProxyApp({
+      authenticate,
+      configuration: () => options.settings?.connectorConfiguration(),
+      resolveScope: (flowId) => service.control.resolveConnectorScope(flowId),
+      forward: (configuration, resource, request, teamId) => forwardConnector(configuration, resource, request, teamId, { logger }),
+    }),
+  )
   app.route('/v1', createControlApp(service.control, resolveActor))
   if (options.settings != null)
     app.route(

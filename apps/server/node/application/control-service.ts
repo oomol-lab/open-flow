@@ -264,15 +264,20 @@ export class ControlService {
     return new URL(`providers/${encodeURIComponent(serviceId)}`, origin).href
   }
 
-  async #connectorRequest<Value>(flowId: string | undefined, request: (connector: ConnectorHost, teamId?: string) => Promise<Value>): Promise<Value> {
-    const connector = this.resolveConnector()
-    if (connector == null) throw new ControlError(controlErrorCode.connectorUnconfigured, 'Connector is not configured for this deployment.')
+  async resolveConnectorScope(flowId?: string): Promise<string | undefined> {
     if (flowId != null) this.getFlow(flowId)
     let teamId = flowId == null ? undefined : this.store.connectorTeams.get(flowId)
     if (flowId != null && teamId == null) {
       const resolved = await this.resolveConnectorTeam()
       if (resolved != null) teamId = this.store.connectorTeams.bind(flowId, resolved)
     }
+    return teamId
+  }
+
+  async #connectorRequest<Value>(flowId: string | undefined, request: (connector: ConnectorHost, teamId?: string) => Promise<Value>): Promise<Value> {
+    const connector = this.resolveConnector()
+    if (connector == null) throw new ControlError(controlErrorCode.connectorUnconfigured, 'Connector is not configured for this deployment.')
+    const teamId = await this.resolveConnectorScope(flowId)
     try {
       return await request(connector, teamId)
     } catch (error) {

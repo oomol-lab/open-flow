@@ -483,6 +483,32 @@ Connector credential 不进入响应、Revision 或 RunEvent。
 部署没有配置 Connector 时，catalog、Connection 请求和 Connector Task 运行失败返回 `connector.unconfigured`；已经配置但上游不可用或响应无效时返回
 `connector.unavailable`，客户端不能把两者合并为同一配置提示。
 
+### Connector 原样透传
+
+以下 GET 接口独立于 Flow catalog 接口实现，直接访问部署配置的 Connector：
+
+| Flow 接口                       | 上游接口        |
+| ------------------------------- | --------------- |
+| `/v1/connector/proxy/providers` | `/v1/providers` |
+| `/v1/connector/proxy/actions`   | `/v1/actions`   |
+| `/v1/connector/proxy/apps`      | `/v1/apps`      |
+
+三个接口均要求 Flow 认证。可选 `flowId` 必须非空且只提供一次，由 Flow 校验并解析团队范围，不传给上游。
+其余查询参数（包括重复项）原样透传，由上游解释和校验；不转换 `locale`、`q`，也不按服务展开目录。
+使用部署的 Connector token 和解析后的 `x-oo-team-id`，不接受客户端覆盖凭据或团队。
+请求头 `Accept-Language`、`If-None-Match` 透传。
+
+参数和响应结构遵循当前部署的 oomol-connector 或 open-connector 对应非 proxy 接口：Provider、Action、App 的原始字段及
+`success` / `data` 等上游封装保持不变，不转换成 Flow 的 `ConnectorProvider`、`ConnectorAction`、`ConnectorConnection`，不添加 `version`。
+`apps` 对应运行时账号发现，不对应上游连接管理接口 `/v1/connections`。
+
+上游 HTTP 状态码、响应体和 `ETag` 原样返回，错误响应也不改写；304 保持空响应体。
+不使用 Flow catalog 缓存或生成本地 ETag，也不覆盖上游 `Cache-Control`、`Vary`、`Content-Language`。
+过滤逐跳响应头及 fetch 解压后的 `Content-Encoding`、`Content-Length`；重定向原样返回，不自动跟随。
+请求超时为 30 秒，覆盖响应体读取，并支持客户端取消。响应体直接流式转发，保留背压和下游取消传播，
+不全量缓冲、不设置响应体总大小限制。返回响应头之前的传输失败使用 Flow 错误格式；响应开始后的读取失败或超时中断响应流，不能再改写状态码。
+本地未配置、Flow 校验与传输失败仍使用 Flow 错误格式；其中返回响应头之前的传输失败或超时返回 `connector.unavailable`。
+
 ## 7. 实时通知
 
 公共 Workbench Host 合同包含两个独立 subscriber：
