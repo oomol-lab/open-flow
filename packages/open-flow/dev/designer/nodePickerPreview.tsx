@@ -251,9 +251,11 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
               <BlockLibrary {...props} presentation="picker" />
             </div>
           </section>
-          {['gmail', 'email'].map((query) => (
+          {['g', 'gmail', 'email'].map((query) => (
             <section key={query}>
-              <h3 className="mb-3 text-sm font-medium">{query == 'gmail' ? 'Provider match · browse and return' : 'Action matches · direct add'}</h3>
+              <h3 className="mb-3 text-sm font-medium">
+                {query == 'g' ? 'Provider matches · two columns' : query == 'gmail' ? 'Provider match · browse and return' : 'Action matches · direct add'}
+              </h3>
               <div className="h-[560px] max-h-[70vh] w-[440px] max-w-full overflow-hidden rounded-xl border border-[var(--ui-border)] bg-popover text-popover-foreground shadow-md">
                 <NodePickerContent {...props} initialQuery={query} />
               </div>
