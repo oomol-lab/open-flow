@@ -621,9 +621,9 @@ CLI 和 MCP 继续使用原 `/v1/connector/actions` 对应的组合接口；它�
 ETag 与数据共同持有；304 保留数据并采用返回的新 ETag，200 没有 ETag 时清除旧验证器。
 未配置持久化、存储损坏或不可用时以内存运行。浏览器业务禁止绕过数据 Store 调用这四类底层请求，由边界检查约束。
 
-部署的 Connector 客户端按完整路径（含查询参数）、Team scope 和语言独立缓存上游 Providers、Actions（列表、搜索、详情）及 Apps（全量、按服务）的完整响应及 ETag，每次读取都向上游条件重验证。
-该缓存限于当前客户端的 origin、凭据和 Team scope；不保存无 ETag、解码失败或取消的响应，不在请求失败时返回旧数据。
-缓存总响应体最多 32 MiB；304 复用的响应仍计入 Action 目录大小限制。
+部署的 Connector 客户端每次直接读取上游 Providers、Actions（列表、搜索、详情）及 Apps（全量、按服务）的完整响应，
+不保存响应体或 ETag，不发送上游条件请求；失败时不复用历史数据。Action 目录的单响应和总响应大小限制仍然生效。
+三个浏览器 proxy 接口独立透传上游缓存协议，不经过此客户端。
 Open Flow 对转换后的响应生成自己的 ETag，不直接透传上游 ETag。
 
 分页 cursor 是 opaque、scope-bound token。跨 Flow、Trigger 或资源类型使用 cursor 返回 `page.invalid-cursor`。
