@@ -187,15 +187,6 @@
     "title": "条件输出接口",
     "toggleDefault": "默认条件"
   },
-  "contextMenu": {
-    "addNode": "添加节点",
-    "empty": "没有匹配的节点",
-    "loadFailed": "无法加载连接器操作。",
-    "paste": "粘贴",
-    "retry": "重试",
-    "search": "搜索",
-    "catalogRefreshFailed": "无法刷新触发器列表，仍可使用已缓存的结果。"
-  },
   "copy": "复制",
   "close": "关闭",
   "create": "创建",

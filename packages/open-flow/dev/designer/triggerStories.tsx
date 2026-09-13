@@ -201,7 +201,6 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
           editable
           autoLayout={false}
           layoutMotion={false}
-          addItems={[]}
           selectedNodeIds={active ? selected : []}
           ignoredNodeIds={ignoredNodeIds}
           onIgnoreNodes={onIgnoreNodes}

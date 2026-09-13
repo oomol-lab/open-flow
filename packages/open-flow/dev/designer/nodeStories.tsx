@@ -168,7 +168,6 @@ function ConditionStory({ dark, language, log }: { readonly dark: boolean; reado
           layoutMotion={false}
           editable
           model={conditionModel}
-          addItems={[]}
           selectedNodeIds={selected}
           onAddNode={() => undefined}
           onConnect={(edge) => log('edge.connect', edge)}
@@ -272,7 +271,6 @@ function CommentStory({ dark, language, log }: { readonly dark: boolean; readonl
           layoutMotion={false}
           editable={editable}
           model={model}
-          addItems={[]}
           selectedNodeIds={selected}
           onSelectionChange={setSelected}
           onDuplicate={(ids) => log('node.duplicate', ids)}
@@ -446,7 +444,6 @@ function NodeContentStory({
             }))
             log('node.contentHidden', { nodeId, hidden })
           }}
-          addItems={[]}
           ignoredNodeIds={ignoredNodeIds}
           onIgnoreNodes={onIgnoreNodes}
           selectedNodeIds={selected}
@@ -541,7 +538,6 @@ function NodeZoomStory({ dark, language, log }: { readonly dark: boolean; readon
               editable
               ignoredNodeIds={ignoredNodeIds}
               onIgnoreNodes={onIgnoreNodes}
-              addItems={[]}
               selectedNodeIds={selected}
               onSelectionChange={setSelected}
               onAddNode={() => undefined}

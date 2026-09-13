@@ -292,6 +292,13 @@ function Editor({
             onAdd={addFromBlocks}
           />
         }
+        nodePicker={{
+          browseOptions: store.browseAddNodeOptions,
+          provideChoices: store.provideAddNodeOptionChoices,
+          catalogRevision: triggerCatalogState.revision + connectorCatalogRevision,
+          catalogFailed: triggerCatalogState.failed,
+          refreshCatalog: store.triggers.catalog.retry,
+        }}
         addNodeOptions={addNodeOptions}
         blocksOpen={contextPanelVisible && contextPanelMode == 'blocks'}
         disabled={authoringDisabled}
@@ -315,7 +322,6 @@ function Editor({
         onOpenBlocks={openBlocks}
         onOpenInspector={openInspector}
         onPaste={() => void store.workspace.pasteNodes()}
-        addItemsCatalog={{ ...triggerCatalogState, refresh: store.triggers.catalog.retry }}
         provideAddNodeOptions={store.provideAddNodeOptions}
         onSelectNodes={(nodeIds) => store.selectNodes(nodeIds)}
         onToggleInspector={toggleInspector}

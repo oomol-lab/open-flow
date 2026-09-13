@@ -1,72 +1,31 @@
-import type { FlowCanvasViewAddItem, FlowCanvasViewModel, FlowCanvasViewProps } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
+import type { FlowCanvasViewModel, FlowCanvasViewProps } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
+import type { Draft } from '../../src/workbench/browser/runtime/api.ts'
+import type { CanvasNodePickerRequest } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
+import { deriveAddNodeOptions } from '../../src/workbench/browser/runtime/editor/addNodeOptions.ts'
+import { CanvasNodePicker } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
 import { WorkbenchCanvasActions } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
 import { useStoryActions } from './storyActions.tsx'
 
-const pickerCatalog: readonly FlowCanvasViewAddItem[] = [
-  {
-    id: 'javascript',
-    type: 'scriptlet',
-    label: 'JavaScript',
-    description: 'Run a script.',
-    group: 'Blocks',
-    inputs: [],
-    outputs: [],
-  },
-  {
-    id: 'condition',
-    type: 'condition',
-    label: 'Condition',
-    group: 'Blocks',
-    inputs: [],
-    outputs: [],
-  },
-  {
-    id: 'unavailable',
-    type: 'block',
-    label: 'Unavailable task',
-    disabled: true,
-    group: 'Blocks',
-    inputs: [],
-    outputs: [],
-  },
-  {
-    id: 'mail',
-    type: 'connector',
-    label: 'Mail',
-    group: 'Services',
-    inputs: [],
-    outputs: [],
-    choices: [
-      {
-        id: 'mail.send',
-        label: 'Send message',
-        description: 'Send a new message.',
-      },
-      {
-        id: 'mail.read',
-        label: 'Read messages',
-        description: 'Read the inbox.',
-      },
-    ],
-  },
-  {
-    id: 'manual',
-    type: 'trigger',
-    label: 'Manual trigger',
-    group: 'Triggers',
-    inputs: [],
-    outputs: [],
-  },
-]
+const pickerDraft: Draft = {
+  actorId: 'lab',
+  createdAt: '2026-09-13T00:00:00.000Z',
+  digest: 'lab',
+  flowId: 'lab',
+  modelVersion: 1,
+  parentRevisionId: null,
+  revisionId: 'lab',
+  version: 1,
+  content: { modelVersion: 1, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } } },
+}
 
 const workflowViewport = { x: 35, y: 40, zoom: 0.9 }
 const workflowPositions = {
@@ -309,7 +268,10 @@ function WorkflowStory({
   const [selectedTriggerId, setSelectedTriggerId] = useState(triggers[0]?.id ?? '')
   const [version, setVersion] = useState(0)
   const [editable, setEditable] = useState(true)
-  const [addNodeRequest, setAddNodeRequest] = useState<FlowCanvasViewProps['addNodeRequest']>()
+  const [pickerRequest, setPickerRequest] = useState<CanvasNodePickerRequest>()
+  const [addNodeRequest, setAddNodeRequest] = useState<FlowCanvasViewProps['addNodeRequest']>(
+    picker ? { position: { x: 140, y: 80 }, onComplete: () => setAddNodeRequest(undefined) } : undefined,
+  )
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(String(version))
   const [selected, setSelected] = useState<readonly string[]>([initialSelectedNodeId])
   useStoryActions([
@@ -328,7 +290,27 @@ function WorkflowStory({
     <I18nProvider i18n={i18n}>
       <div className="workflow-story">
         <div className="workflow-canvas open-flow-workbench">
+          {pickerRequest && editable && (
+            <CanvasNodePicker
+              key={`${pickerRequest.screenPosition.x}:${pickerRequest.screenPosition.y}`}
+              request={pickerRequest}
+              options={deriveAddNodeOptions(pickerDraft, { kind: 'flow' }, i18n.t)}
+              browseOptions={async () => []}
+              searchOptions={async (query) =>
+                deriveAddNodeOptions(pickerDraft, { kind: 'flow' }, i18n.t).filter((option) => option.label.toLowerCase().includes(query.toLowerCase()))
+              }
+              provideChoices={async () => []}
+              disabled={!editable}
+              focusRequest={0}
+              onClose={() => setPickerRequest(undefined)}
+              onAdd={async (option) => {
+                log('node.add', { item: option.id, position: pickerRequest.position, connection: pickerRequest.connection?.('new-node') })
+                return 'new-node'
+              }}
+            />
+          )}
           <FlowCanvasView
+            onRequestAddNode={setPickerRequest}
             ignoredNodeIds={ignoredNodeIds}
             onIgnoreNodes={onIgnoreNodes}
             key={version}
@@ -342,7 +324,7 @@ function WorkflowStory({
             toolbar={
               <WorkbenchCanvasActions
                 blocksOpen={addNodeRequest != null}
-                disabled={false}
+                disabled={!editable}
                 onOpenBlocks={() =>
                   setAddNodeRequest({
                     position: { x: 100, y: 100 },
@@ -366,7 +348,6 @@ function WorkflowStory({
                 }
               />
             }
-            addItems={pickerCatalog}
             addNodeRequest={addNodeRequest}
             selectedNodeIds={selected}
             onAddNode={(item, position, connection) => {
@@ -441,7 +422,7 @@ export const workflowStories: readonly FrontendStory[] = [
     id: 'node-picker',
     title: 'Canvas Node Picker',
     description:
-      'Hover a node for 2s: unconnected ports show arrows that nudge ten times at a steady pace, then fade out and unmount. Selection alone does not trigger arrows; leaving during the delay cancels it. Once arrows appear, hovering or selection keeps the sequence alive. Leave and deselect to remove them; a connected side keeps all its ports visible without arrows. Read-only and connecting states hide arrows.',
+      'Right-click the canvas or drop an execution connection on empty space to open Add node near the pointer. Choose a node to log its position and connection. Compare both port directions, search, edge placement, and read-only behavior.',
     standalone: true,
     render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={workflow} picker />,
   },

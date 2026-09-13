@@ -28,13 +28,12 @@ function callbacksFromProps(props: FlowCanvasViewProps): ViewCallbacks {
     onDuplicate: props.onDuplicate,
     onCopy: props.onCopy,
     onPaste: props.onPaste,
-    provideAddItems: props.provideAddItems,
   }
 }
 
 export function FlowCanvasView(props: FlowCanvasViewProps): ReactElement {
   const store = useMemo(
-    () => new CanvasStore(props.model, props.editable, props.language ?? 'en', props.addItems, callbacksFromProps(props), props.autoLayout),
+    () => new CanvasStore(props.model, props.editable, props.language ?? 'en', callbacksFromProps(props), props.autoLayout),
     [props.identity],
   )
   const previousStore = useRef(store)
@@ -97,8 +96,8 @@ export function FlowCanvasView(props: FlowCanvasViewProps): ReactElement {
   }, [store])
   useLayoutEffect(() => store.setCallbacks(callbacksFromProps(props)))
   useLayoutEffect(() => {
-    store.reconcile(props.model, props.editable, props.language ?? 'en', props.addItems, props.selectedNodeIds, props.ignoredNodeIds)
-  }, [store, props.addItems, props.editable, props.language, props.model, props.selectedNodeIds, props.ignoredNodeIds])
+    store.reconcile(props.model, props.editable, props.language ?? 'en', props.selectedNodeIds, props.ignoredNodeIds)
+  }, [store, props.editable, props.language, props.model, props.selectedNodeIds, props.ignoredNodeIds])
   useEffect(() => {
     if (props.focusNodeRequest != null) {
       const reducedMotion =
@@ -109,10 +108,10 @@ export function FlowCanvasView(props: FlowCanvasViewProps): ReactElement {
 
   return (
     <FlowCanvas
-      addItemsCatalog={props.addItemsCatalog}
       cornerTools={props.cornerTools}
       toolbar={props.toolbar}
       addItemRequest={props.addItemRequest}
+      onRequestAddNode={props.onRequestAddNode}
       addNodeRequest={props.addNodeRequest}
       className={props.className}
       dark={props.dark ?? false}

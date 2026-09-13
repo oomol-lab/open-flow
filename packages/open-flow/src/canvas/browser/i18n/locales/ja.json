@@ -187,15 +187,6 @@
     "title": "条件の出力 Handle",
     "toggleDefault": "デフォルトの条件"
   },
-  "contextMenu": {
-    "addNode": "ノードを追加",
-    "empty": "一致するノードがありません",
-    "loadFailed": "Connector アクションを読み込めませんでした。",
-    "paste": "貼り付け",
-    "retry": "再試行",
-    "search": "検索",
-    "catalogRefreshFailed": "トリガー一覧を更新できませんでした。キャッシュ済みの結果は引き続き利用できます。"
-  },
   "copy": "コピー",
   "close": "閉じる",
   "create": "作成",

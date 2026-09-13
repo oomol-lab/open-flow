@@ -1,10 +1,11 @@
 import type { KeyboardEvent, PointerEvent, ReactElement, ReactNode } from 'react'
-import type { FlowCanvasViewAddItem, FlowCanvasViewProps } from '../../../../canvas/browser/graph/FlowCanvas/model.ts'
+import type { FlowCanvasViewProps } from '../../../../canvas/browser/graph/FlowCanvas/model.ts'
 import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { DesignerEdge, DesignerGraph, DesignerViewport, Point } from '../workspace.ts'
 import type { AddNodeOption } from './addNodeOptions.ts'
 import type { CanvasHistoryControlsProps } from './canvasHistoryControls.tsx'
+import type { BlockLibraryProps } from './contextPanel.tsx'
 
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
@@ -15,10 +16,11 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { Icon } from '../icons.tsx'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
 import { CanvasHistoryControls } from './canvasHistoryControls.tsx'
+import { CanvasNodePicker } from './nodePickerPopover.tsx'
 
 interface Props {
+  readonly nodePicker?: Pick<BlockLibraryProps, 'browseOptions' | 'provideChoices' | 'catalogRevision' | 'catalogFailed' | 'refreshCatalog'>
   readonly addNodeControl?: ReactNode
-  readonly addItemsCatalog?: FlowCanvasViewProps['addItemsCatalog']
   readonly history?: CanvasHistoryControlsProps
   readonly ignoredNodeIds: readonly string[]
   readonly onIgnoreNodes: (nodeIds: readonly string[], ignored: boolean) => void
@@ -59,29 +61,7 @@ export interface WorkbenchCanvasHandle {
   readonly registerAddNodeOption: (option: AddNodeOption) => void
 }
 
-const browseProviderTriggersId = 'workbench:browse-provider-triggers'
 const inspectorReflowDelay = 300
-
-function addItems(options: readonly AddNodeOption[]): FlowCanvasViewAddItem[] {
-  return options.map((option) => ({
-    choices: option.choices?.map((choice) => ({
-      description: choice.description,
-      id: choice.option.id,
-      inputs: choice.option.inputs,
-      label: choice.label,
-      outputs: choice.option.outputs,
-    })),
-    description: option.description,
-    group: option.group,
-    icon: option.icon,
-    id: option.id,
-    inputs: option.inputs,
-    label: option.label,
-    outputs: option.outputs,
-    type:
-      option.kind == 'agent' || option.kind == 'new-task' || option.kind == 'subflow' ? 'block' : option.kind == 'connector-group' ? 'connector' : option.kind,
-  }))
-}
 
 function focusPanel(event: PointerEvent<HTMLElement>): void {
   const element = event.target
@@ -91,6 +71,7 @@ function focusPanel(event: PointerEvent<HTMLElement>): void {
 
 export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function WorkbenchCanvas(
   {
+    nodePicker,
     addNodeControl,
     addNodeOptions,
     history,
@@ -113,7 +94,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     onOpenInspector,
     onPaste,
     provideAddNodeOptions,
-    addItemsCatalog,
     onSelectNodes,
     onToggleInspector,
     ignoredNodeIds,
@@ -125,6 +105,10 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
   }: Props,
   ref,
 ): ReactElement {
+  const [pickerRequest, setPickerRequest] = useState<Parameters<NonNullable<FlowCanvasViewProps['onRequestAddNode']>>[0]>()
+  useEffect(() => {
+    if (disabled) setPickerRequest(undefined)
+  }, [disabled])
   const language = useLang()
   const t = useTranslate()
   const [addNodeRequest, setAddNodeRequest] = useState<{
@@ -143,7 +127,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
   const inspectorOpenedAt = useRef(0)
   const dynamicOptions = useRef(new Map<string, AddNodeOption>())
   const pendingAdd = useRef<((nodeId: string | undefined) => void) | undefined>(undefined)
-  const targetGeneration = useRef(0)
   const staticOptions = useMemo(() => indexAddNodeOptions(addNodeOptions), [addNodeOptions])
 
   useLayoutEffect(() => {
@@ -166,23 +149,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     return () => globalThis.clearTimeout(timer)
   }, [focusNodeRequest])
 
-  const designerAddItems = useMemo(() => {
-    const items = [...addItems(addNodeOptions)]
-    if (target?.kind != 'flow') return items
-    const lastTrigger = items.findLastIndex((item) => item.type == 'trigger')
-    const index = lastTrigger < 0 ? items.length : lastTrigger + 1
-    items.splice(index, 0, {
-      description: t('addNode.triggerBrowseDescription'),
-      group: t('addNode.triggers'),
-      icon: ':carbon:events:',
-      id: browseProviderTriggersId,
-      inputs: [],
-      label: t('addNode.triggerBrowse'),
-      outputs: [],
-      type: 'trigger',
-    })
-    return items
-  }, [addNodeOptions, t, target?.kind])
   const addingRecommended = useRef(false)
   const isValidConnection = useMemo(() => {
     const nodes = new Map(model.nodes.map((node) => [node.id, node]))
@@ -206,7 +172,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
   }, [model.nodes])
 
   useEffect(() => {
-    targetGeneration.current++
+    setPickerRequest(undefined)
     setAddNodeRequest(undefined)
     setAddItemRequest(undefined)
     pendingAdd.current?.(undefined)
@@ -314,12 +280,11 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
       tabIndex={0}
     >
       <FlowCanvasView
-        addItemsCatalog={addItemsCatalog}
+        onRequestAddNode={setPickerRequest}
         ignoredNodeIds={ignoredNodeIds}
         onIgnoreNodes={onIgnoreNodes}
         addItemRequest={addItemRequest}
         addNodeRequest={addNodeRequest}
-        addItems={designerAddItems}
         className="workbench-canvas-canvas"
         dark={theme == 'dark'}
         editable={!disabled}
@@ -357,10 +322,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           />
         }
         onAddNode={async (itemId, position, connection) => {
-          if (itemId == browseProviderTriggersId) {
-            onOpenBlocks()
-            return
-          }
           const option = staticOptions.get(itemId) ?? dynamicOptions.current.get(itemId)
           if (option == null) return
           return await onAddNode(option, position, connection)
@@ -388,19 +349,32 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           onCopy()
         }}
         onPaste={() => onPaste()}
-        provideAddItems={async (searchTerm, signal) => {
-          const generation = targetGeneration.current
-          const options = await provideAddNodeOptions(searchTerm, signal)
-          if (options == null || signal.aborted || generation != targetGeneration.current) return
-          dynamicOptions.current = new Map(indexAddNodeOptions(options))
-          return addItems(options)
-        }}
         onSelectionChange={(nodeIds) => {
           onSelectNodes(nodeIds)
           if (nodeIds.some((nodeId) => model.nodes.some((node) => node.id == nodeId && node.kind != 'comment'))) onOpenInspector()
         }}
         selectedNodeIds={selectedNodeIds}
       />
+      {pickerRequest && !disabled && (
+        <CanvasNodePicker
+          key={`${pickerRequest.screenPosition.x}:${pickerRequest.screenPosition.y}`}
+          options={addNodeOptions}
+          browseOptions={nodePicker?.browseOptions ?? (async () => [])}
+          searchOptions={provideAddNodeOptions}
+          provideChoices={nodePicker?.provideChoices ?? (async () => [])}
+          catalogRevision={nodePicker?.catalogRevision}
+          catalogFailed={nodePicker?.catalogFailed}
+          refreshCatalog={nodePicker?.refreshCatalog}
+          disabled={disabled}
+          focusRequest={0}
+          request={pickerRequest}
+          onClose={() => {
+            setPickerRequest(undefined)
+            canvas.current?.focus({ preventScroll: true })
+          }}
+          onAdd={(option) => onAddNode(option, pickerRequest.position, pickerRequest.connection)}
+        />
+      )}
       <Badge className="designer-overlay top-left" variant="secondary">
         <span className="status-dot neutral" />
         {t('designer.draftBadge', {

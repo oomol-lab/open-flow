@@ -187,15 +187,6 @@
     "title": "Condition Handles",
     "toggleDefault": "Default condition"
   },
-  "contextMenu": {
-    "addNode": "Add node",
-    "empty": "No matching blocks",
-    "loadFailed": "Connector actions could not be loaded.",
-    "paste": "Paste",
-    "retry": "Retry",
-    "search": "Search",
-    "catalogRefreshFailed": "Could not refresh the Trigger catalog. Saved results remain available."
-  },
   "copy": "Copy",
   "close": "Close",
   "create": "Create",

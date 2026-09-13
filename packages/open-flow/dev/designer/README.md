@@ -48,7 +48,7 @@ Add production node boundary cases to `nodeStories.tsx`, layered card examples t
 
 `?story=variable-picker` 使用生产变量选择器，展示搜索、正常、缺失、加载、空列表、不可用及只读状态。
 
-`?story=node-picker` 使用生产画布的新增节点菜单，覆盖分组、搜索、禁用项、服务动作二级选项，以及从执行端口拉线后创建节点的回调。点击底部 Add node 打开菜单；从任务左侧输入端拉到空白处可检查连接方向与不兼容项。样例只记录动作，不写入业务数据。
+`?story=node-picker` 使用生产添加节点面板，进入时直接展示。右键画布或将执行连线空放，在鼠标附近打开同一面板；覆盖双向连接、不兼容项、搜索、边缘避让及只读状态。选择节点会记录创建位置和连接，只使用确定性数据。
 
 `?story=agent-tools` uses production AgentSettings, WorkspaceStore and ConnectorStore. Its HTTP fixture provides tools and active/expired accounts, and applies draft changes with the production reducer. It covers parameter sources, approval, validation and read-only controls without external requests.
 
