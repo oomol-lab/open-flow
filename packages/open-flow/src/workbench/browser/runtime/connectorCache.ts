@@ -82,7 +82,7 @@ export class ConnectorCache {
         // Storage is optional; quota and privacy settings must not break requests.
       }
       this.#nextCheck.set(key, Date.now() + (kind == 'providers' ? 5 * 60_000 : 30_000))
-      if (JSON.stringify(memory.value.get(key)) != JSON.stringify(entry)) {
+      if (JSON.stringify(memory.value.get(key)) != JSON.stringify(entry) || (kind == 'connections' && [...memory.value.keys()].at(-1) != key)) {
         const updated = new Map(memory.value)
         updated.delete(key)
         memory.set(updated.set(key, entry))
@@ -138,7 +138,16 @@ export function cachedConnectorConnections(
   for (const [path, entry] of entries) {
     if (new URL(path, 'https://cache.invalid').searchParams.get('flowId') != flowId) continue
     const source = record(entry.data)
-    if (typeof source.serviceId == 'string' && Array.isArray(source.connections)) connections[source.serviceId] = source.connections.map(connection)
+    if (!Array.isArray(source.connections)) continue
+    if (typeof source.serviceId == 'string') connections[source.serviceId] = source.connections.map(connection)
+    else {
+      // A full snapshot replaces the scope; newer service snapshots override only their service.
+      for (const serviceId of Object.keys(connections)) connections[serviceId] = []
+      for (const value of source.connections) {
+        const item = connection(value)
+        connections[item.serviceId] = [...(connections[item.serviceId] ?? []), item]
+      }
+    }
   }
   return connections
 }

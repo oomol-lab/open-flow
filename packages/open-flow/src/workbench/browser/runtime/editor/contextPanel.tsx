@@ -1,4 +1,5 @@
 import type { DragEvent as ReactDragEvent, ReactElement, ReactNode, RefObject } from 'react'
+import type { ConnectorConnection } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
 import type { AddNodeOption } from './addNodeOptions.ts'
@@ -61,6 +62,8 @@ interface LibraryNodeItem {
 type LibraryMenuItem = LibraryNodeItem | { readonly type: 'divider'; readonly label: string; readonly detail?: string }
 
 export interface BlockLibraryProps {
+  readonly connections?: readonly ConnectorConnection[]
+  readonly loadConnections?: (signal: AbortSignal) => Promise<void>
   readonly isOptionDisabled?: (option: AddNodeOption) => boolean
   readonly presentation?: 'picker'
   readonly catalogRevision?: number

@@ -24,6 +24,12 @@ browser code is independent of Node. Dependencies must make these boundaries vis
 Preserve established product contracts unless the task calls for changing them. A contract change
 includes its affected implementations, consumers, and specifications.
 
+Provider, Action, and Connection data retain independent fetching and caching responsibilities,
+including scope, freshness, refresh, and invalidation. Consumers fetch the data they need through
+each source's own interface and derive combined views, filters, and ordering at the consumption
+layer. Do not embed Connection state in Provider metadata, write derived state into another
+source's cache, or couple cache lifecycles merely because a feature uses those sources together.
+
 ## Simplicity and coherence
 
 Prefer clear, direct code and existing project conventions. Abstractions, compatibility layers,

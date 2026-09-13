@@ -46,6 +46,7 @@ interface ConnectorTarget {
 }
 
 export interface Connector$ {
+  readonly connections: ReadonlyVal<readonly ConnectorConnection[]>
   readonly catalogRevision: ReadonlyVal<number>
   readonly actionLoading: ReadonlyVal<string | undefined>
   readonly actions: ReadonlyVal<Readonly<Record<string, ConnectorAction>>>
@@ -240,6 +241,7 @@ export class ConnectorStore {
       }
     })
     this.$ = {
+      connections: compute((get) => Object.values(cachedConnectorConnections(get(client.connectorCache.connections), get(workspace.$.flowId))).flat()),
       catalogRevision: derive(this.#state, (state) => state.catalogRevision),
       actionLoading: derive(this.#state, (state) => state.actionLoading),
       actions,
@@ -292,6 +294,12 @@ export class ConnectorStore {
     this.#providers = undefined
     this.#loadingActions.clear()
     this.#state.set(initialState)
+  }
+
+  public readonly loadConnections = async (signal: AbortSignal): Promise<void> => {
+    const flowId = this.#workspace.$.flowId.value
+    if (this.#disposed || flowId == null) return
+    await this.#client.listAllConnectorConnections(signal, flowId)
   }
 
   public readonly browseAddNodeOptions = async (signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
@@ -475,7 +483,7 @@ export class ConnectorStore {
     const flowId = this.#workspace.$.flowId.value
     const revision = this.#workspace.$.revision.value
     if (flowId == null || revision == null) return
-    if (Object.values(revision.revision.content.document.graph.nodes).some((node) => node.kind == 'integration' || node.kind == 'poll')) {
+    if (Object.values(revision.graph({ kind: 'flow' })?.nodes ?? {}).some((node) => node.kind == 'integration' || node.kind == 'poll')) {
       void this.#client.listConnectorProviders(undefined, flowId).catch(() => {
         /* Keep provider IDs while the catalog is unavailable. */
       })
