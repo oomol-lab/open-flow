@@ -310,6 +310,7 @@ function Session({
   useEffect(() => void navigation.apply(location), [location, navigation])
   useEffect(() => {
     store.triggers.catalog.setLanguage(language)
+    store.connectors.setLanguage(language)
     if (i18n.lang != language) void i18n.switchLang(language)
   }, [i18n, language, store])
   return (

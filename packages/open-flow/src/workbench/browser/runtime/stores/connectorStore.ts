@@ -173,6 +173,7 @@ function connectionDiagnostics(
 export class ConnectorStore {
   readonly #client: WorkbenchClient
   readonly #i18n: I18n
+  #language: string
   readonly #host: Pick<WorkbenchHost, 'openExternalPage'>
   readonly #providerActions = new Map<string, readonly ConnectorAction[]>()
   readonly #loadingActions = new Set<string>()
@@ -202,6 +203,7 @@ export class ConnectorStore {
     this.#workspace = workspace
     this.#setNotice = setNotice
     this.#i18n = i18n
+    this.#language = i18n.lang
     const actions = derive(this.#state, (state) => state.actions)
     const catalogs = derive(this.#state, (state) => state.catalogs)
     this.#selected = compute<Selection>((get) => {
@@ -249,6 +251,13 @@ export class ConnectorStore {
     this.#state.dispose()
   }
 
+  public setLanguage(language: string): void {
+    if (language == this.#language || this.#disposed) return
+    this.#language = language
+    this.reset()
+    void this.#loadDraftActions()
+  }
+
   public reset(): void {
     if (this.#disposed) return
     this.#draftRefresh.invalidate()
@@ -262,22 +271,24 @@ export class ConnectorStore {
 
   public readonly browseAddNodeOptions = async (signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
     if (this.#disposed) return
+    const language = this.#language
     const flowId = this.#workspace.$.flowId.value
     if (flowId == null) return
     const providers = this.#providers ?? (await this.#client.listConnectorProviders(signal, flowId))
-    if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
+    if (signal.aborted || this.#disposed || language != this.#language || flowId != this.#workspace.$.flowId.value) return
     this.#providers = providers
     return providers.toSorted((left, right) => left.serviceName.localeCompare(right.serviceName)).map((provider) => providerOption(provider, this.#i18n.t))
   }
 
   public readonly provideAddNodeOptionChoices = async (optionId: string, signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
     if (this.#disposed) return
+    const language = this.#language
     const flowId = this.#workspace.$.flowId.value
     const provider = this.#providers?.find((candidate) => `connector-provider:${candidate.serviceId}` == optionId)
     if (flowId == null || provider == null) return
     const loaded = this.#providerActions.get(provider.serviceId)
-    const actions = loaded ?? (await this.#client.listConnectorActions(provider.serviceId, signal, flowId))
-    if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
+    const actions = loaded ?? (await this.#client.listConnectorActions(provider.serviceId, signal, flowId, language))
+    if (signal.aborted || this.#disposed || language != this.#language || flowId != this.#workspace.$.flowId.value) return
     const resolved = actions.map((action) =>
       Object.assign({}, action, action.icon == null && provider.icon != null ? { icon: provider.icon } : {}, { serviceName: provider.serviceName }),
     )
@@ -288,11 +299,12 @@ export class ConnectorStore {
 
   public readonly provideAddNodeOptions = async (searchTerm: string, signal: AbortSignal): Promise<readonly AddNodeOption[] | undefined> => {
     if (this.#disposed) return
+    const language = this.#language
     const flowId = this.#workspace.$.flowId.value
     if (flowId == null) return
     const query = searchTerm.trim()
-    const actions = query.length == 0 ? Object.values(this.#state.value.actions) : await this.#client.searchConnectorActions(query, signal, flowId)
-    if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
+    const actions = query.length == 0 ? Object.values(this.#state.value.actions) : await this.#client.searchConnectorActions(query, signal, flowId, language)
+    if (signal.aborted || this.#disposed || language != this.#language || flowId != this.#workspace.$.flowId.value) return
     const next = { ...this.#state.value.actions }
     for (const action of actions) next[action.actionId] = action
     this.#set({ actions: next })
@@ -340,10 +352,11 @@ export class ConnectorStore {
   }
 
   public async loadCodeAction(actionId: string, signal: AbortSignal): Promise<void> {
+    const language = this.#language
     const flowId = this.#workspace.$.flowId.value
     if (flowId == null || this.#disposed) return
-    const action = await this.#client.getConnectorAction(actionId, signal, flowId)
-    if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
+    const action = await this.#client.getConnectorAction(actionId, signal, flowId, language)
+    if (signal.aborted || this.#disposed || language != this.#language || flowId != this.#workspace.$.flowId.value) return
     this.#set({ actions: { ...this.#state.value.actions, [actionId]: action } })
   }
 
@@ -382,7 +395,7 @@ export class ConnectorStore {
   async #loadAction(actionId: string, force: boolean): Promise<ConnectorAction> {
     const action = this.#state.value.actions[actionId]
     if (!force && action != null) return action
-    return await this.#client.getConnectorAction(actionId, undefined, this.#workspace.$.flowId.value)
+    return await this.#client.getConnectorAction(actionId, undefined, this.#workspace.$.flowId.value, this.#language)
   }
 
   async #refreshConnections(flowId: string, target: ConnectorTarget, serviceId: string, force: boolean, current: Current): Promise<void> {
@@ -448,7 +461,7 @@ export class ConnectorStore {
     if (missing.length > 0) {
       for (const actionId of missing) this.#loadingActions.add(actionId)
       try {
-        const actions = await Promise.all(missing.map((actionId) => this.#client.getConnectorAction(actionId, undefined, flowId)))
+        const actions = await Promise.all(missing.map((actionId) => this.#client.getConnectorAction(actionId, undefined, flowId, this.#language)))
         if (!this.#isCurrent(current, flowId)) return
         const next = { ...this.#state.value.actions }
         for (const action of actions) next[action.actionId] = action

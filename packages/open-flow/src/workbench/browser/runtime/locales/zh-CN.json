@@ -915,6 +915,7 @@
     "missingStatuses": "部分已选状态不再可用，请移除或重新选择。"
   },
   "nodePicker": {
+    "clearSearch": "清空搜索",
     "search": "搜索节点、应用或操作…",
     "apps": "应用",
     "back": "返回全部节点",

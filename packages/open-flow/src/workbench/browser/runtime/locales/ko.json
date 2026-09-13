@@ -915,6 +915,7 @@
     "missingStatuses": "선택한 상태 중 일부를 사용할 수 없습니다. 삭제하거나 다시 선택하세요."
   },
   "nodePicker": {
+    "clearSearch": "검색 지우기",
     "search": "노드, 앱 또는 작업 검색…",
     "apps": "앱",
     "back": "모든 노드로 돌아가기",

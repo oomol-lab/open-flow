@@ -741,16 +741,20 @@ export class ControlClient {
     return source.providers.map(connectorProvider)
   }
 
-  async listConnectorActions(serviceId?: string, signal?: AbortSignal, flowId?: string): Promise<readonly ConnectorAction[]> {
-    return await this.connectorActions({ ...(flowId == null ? {} : { flowId }), ...(serviceId == null ? {} : { service: serviceId }) }, signal)
+  async listConnectorActions(serviceId?: string, signal?: AbortSignal, flowId?: string, locale?: string): Promise<readonly ConnectorAction[]> {
+    return await this.connectorActions(
+      { ...(locale == null ? {} : { locale }), ...(flowId == null ? {} : { flowId }), ...(serviceId == null ? {} : { service: serviceId }) },
+      signal,
+    )
   }
 
-  async searchConnectorActions(query: string, signal?: AbortSignal, flowId?: string): Promise<readonly ConnectorAction[]> {
-    return await this.connectorActions({ ...(flowId == null ? {} : { flowId }), q: query.trim() }, signal)
+  async searchConnectorActions(query: string, signal?: AbortSignal, flowId?: string, locale?: string): Promise<readonly ConnectorAction[]> {
+    return await this.connectorActions({ ...(locale == null ? {} : { locale }), ...(flowId == null ? {} : { flowId }), q: query.trim() }, signal)
   }
 
-  async getConnectorAction(actionId: string, signal?: AbortSignal, flowId?: string): Promise<ConnectorAction> {
-    const source = record(await this.request(`/v1/connector/actions/${segment(actionId)}${flowId == null ? '' : `?flowId=${segment(flowId)}`}`, { signal }))
+  async getConnectorAction(actionId: string, signal?: AbortSignal, flowId?: string, locale?: string): Promise<ConnectorAction> {
+    const parameters = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), ...(locale == null ? {} : { locale }) }).toString()
+    const source = record(await this.request(`/v1/connector/actions/${segment(actionId)}${parameters ? `?${parameters}` : ''}`, { signal }))
     exact(source, ['action', 'version'])
     if (source.version != 1) return invalidResponse()
     return connectorAction(source.action)

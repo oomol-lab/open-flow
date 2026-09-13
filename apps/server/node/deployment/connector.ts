@@ -33,8 +33,8 @@ export interface ConnectorHost {
     signal: AbortSignal,
     teamId?: string,
   ): Promise<JsonValue>
-  getAction(actionId: string, signal?: AbortSignal, teamId?: string): Promise<ConnectorAction>
-  listActions(serviceId?: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorAction[]>
+  getAction(actionId: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<ConnectorAction>
+  listActions(serviceId?: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorAction[]>
   listConnections(serviceId: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]>
   listProviders(signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorProvider[]>
   proxy(
@@ -46,7 +46,7 @@ export interface ConnectorHost {
     teamId?: string,
   ): Promise<ConnectorProxyResult>
   ready(): Promise<boolean>
-  searchActions(query: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorAction[]>
+  searchActions(query: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorAction[]>
 }
 
 export type ConnectorErrorCode =
@@ -146,12 +146,12 @@ export class ConnectorClient implements ConnectorHost {
     return this.#decode('providers.list', {}, () => runtimeList(runtimeData(response.value), runtimeProvider))
   }
 
-  async listActions(serviceId?: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorAction[]> {
+  async listActions(serviceId?: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorAction[]> {
     if (serviceId != null) {
       const [providers, connections, actions] = await Promise.all([
         this.#providers(signal, teamId),
         this.#connections(serviceId, signal, teamId),
-        this.#actions(`v1/actions?service=${encodeURIComponent(serviceId)}`, false, signal, teamId, { serviceId }),
+        this.#actions(`v1/actions?service=${encodeURIComponent(serviceId)}`, false, signal, teamId, { serviceId }, undefined, locale),
       ])
       return this.#decode('actions.list', { serviceId }, () => mapActions(actions, providers, connections))
     }
@@ -198,6 +198,7 @@ export class ConnectorClient implements ConnectorHost {
                   teamId,
                   { serviceId: provider.serviceId },
                   budget,
+                  locale,
                 ),
               catch: (error) => error,
             }),
@@ -209,20 +210,20 @@ export class ConnectorClient implements ConnectorHost {
     )
   }
 
-  async searchActions(query: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorAction[]> {
+  async searchActions(query: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorAction[]> {
     const [providers, connections, actions] = await Promise.all([
       this.#providers(signal, teamId),
       this.#connections(undefined, signal, teamId),
-      this.#actions(`v1/actions/search?q=${encodeURIComponent(query)}`, true, signal, teamId),
+      this.#actions(`v1/actions/search?q=${encodeURIComponent(query)}`, true, signal, teamId, {}, undefined, locale),
     ])
     return this.#decode('actions.search', {}, () => mapActions(actions, providers, connections))
   }
 
-  async getAction(actionId: string, signal?: AbortSignal, teamId?: string): Promise<ConnectorAction> {
+  async getAction(actionId: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<ConnectorAction> {
     const [providers, connections, response] = await Promise.all([
       this.#providers(signal, teamId),
       this.#connections(undefined, signal, teamId),
-      this.#request('actions.get', `v1/actions/${encodeURIComponent(actionId)}`, { method: 'GET' }, signal, { fields: { actionId }, teamId }),
+      this.#request('actions.get', `v1/actions/${encodeURIComponent(actionId)}`, { method: 'GET' }, signal, { fields: { actionId }, teamId, locale }),
     ])
     if (!response.ok) {
       const failure = record(response.value) ? response.value : undefined
@@ -329,11 +330,13 @@ export class ConnectorClient implements ConnectorHost {
     teamId?: string,
     fields: Readonly<Record<string, string>> = {},
     budget?: { readonly exhaust: (responseBytes: number) => ConnectorTaskError; readonly limit: number; used: number },
+    locale?: string,
   ): Promise<readonly RuntimeAction[]> {
     const response = await this.#request(search ? 'actions.search' : 'actions.list', path, { method: 'GET' }, signal, {
       budget,
       fields,
       maximumResponseBytes: search ? maxResponseBytes : maxActionCatalogBytes,
+      locale,
       teamId,
     })
     if (!response.ok) throw unavailable()
@@ -407,10 +410,12 @@ export class ConnectorClient implements ConnectorHost {
       maximumResponseBytes = maxResponseBytes,
       origin = this.#origin,
       teamId,
+      locale,
     }: {
       readonly budget?: { readonly exhaust: (responseBytes: number) => ConnectorTaskError; readonly limit: number; used: number }
       readonly fields?: Readonly<Record<string, string>>
       readonly maximumResponseBytes?: number
+      readonly locale?: string
       readonly origin?: URL
       readonly teamId?: string
     } = {},
@@ -424,6 +429,7 @@ export class ConnectorClient implements ConnectorHost {
         headers: {
           ...(this.#token == '' ? {} : { authorization: `Bearer ${this.#token}` }),
           ...(origin == this.#origin && teamId != null ? { 'x-oo-team-id': teamId } : {}),
+          ...(locale == null ? {} : { 'Accept-Language': locale }),
           ...init.headers,
         },
         redirect: 'error',

@@ -247,6 +247,7 @@ describe('Server Connector client', () => {
   })
 
   it('projects runtime discovery through the restricted server token', async () => {
+    const metadataLanguages: (string | undefined)[] = []
     const requests: { readonly authorization?: string; readonly path: string }[] = []
     const provider = {
       authTypes: ['api_key'],
@@ -284,6 +285,7 @@ describe('Server Connector client', () => {
       status: 'active',
     }
     const origin = await startConnector((request, response) => {
+      if (request.url?.startsWith('/v1/actions')) metadataLanguages.push(request.headers['accept-language'])
       requests.push({ authorization: request.headers.authorization, path: request.url! })
       if (request.url == '/v1/providers') return send(response, 200, success([provider]))
       if (request.url == '/v1/apps' || request.url == '/v1/apps/services/example') return send(response, 200, success([connectedApp]))
@@ -352,6 +354,11 @@ describe('Server Connector client', () => {
         '/v1/providers',
       ]),
     )
+    metadataLanguages.length = 0
+    await connector.listActions('example', undefined, undefined, 'zh-CN')
+    await connector.searchActions('echo', undefined, undefined, 'ja')
+    await connector.getAction('example.echo', undefined, undefined, 'fr')
+    expect(metadataLanguages).toEqual(['zh-CN', 'ja', 'fr'])
   })
 
   it('projects Hosted Connector discovery responses without requiring exact keys', async () => {

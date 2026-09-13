@@ -36,6 +36,7 @@ export function NodePickerContent({
   const t = useTranslate()
   const [page, setPage] = useState('nodes')
   const [query, setQuery] = useState('')
+  const searchInput = useRef<HTMLInputElement>(null)
   const term = useDebouncedValue(query, 150).trim()
   const [catalog, setCatalog] = useState<readonly AddNodeOption[]>([])
   const [results, setResults] = useState<readonly AddNodeOption[]>([])
@@ -147,13 +148,22 @@ export function NodePickerContent({
           </span>
         )}
         <span className="min-w-0 flex-1 py-1">
-          <span className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0 text-[13px] font-medium leading-5">{item.label}</span>
+          <span className="block text-[13px] leading-5">
             {term && (
-              <span className="max-w-[35%] shrink-0 truncate text-[11px] font-normal text-muted-foreground">
-                {item.kind == 'trigger' ? t('addNode.triggers') : item.kind == 'connector' ? item.connector.serviceName : t('addNode.blocks')}
+              <span className="text-xs font-normal text-muted-foreground">
+                {item.kind == 'trigger'
+                  ? 'trigger' in item && item.trigger.kind == 'catalog'
+                    ? (apps.find((candidate) => candidate.triggers.some((trigger) => trigger.id == item.id))?.label ?? item.trigger.definition.provider)
+                    : t('nodePicker.builtIn')
+                  : item.kind == 'connector'
+                    ? item.connector.serviceName
+                    : t('nodePicker.builtIn')}
+                <span aria-hidden="true" className="mx-2 text-muted-foreground/40">
+                  |
+                </span>
               </span>
             )}
+            <span className="font-medium">{item.label}</span>
           </span>
           {!compact && (
             <span className="mt-1 block text-xs leading-[18px] text-muted-foreground">
@@ -195,6 +205,7 @@ export function NodePickerContent({
             <Icon name="search" size={16} />
           </InputGroupAddon>
           <InputGroupInput
+            ref={searchInput}
             autoFocus
             aria-label={t('nodePicker.search')}
             placeholder={t('nodePicker.search')}
@@ -207,6 +218,21 @@ export function NodePickerContent({
               }
             }}
           />
+          {query.length > 0 && (
+            <InputGroupAddon align="inline-end">
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={t('nodePicker.clearSearch')}
+                onClick={() => {
+                  setQuery('')
+                  searchInput.current?.focus()
+                }}
+              >
+                <Icon name="close" size={14} />
+              </Button>
+            </InputGroupAddon>
+          )}
         </InputGroup>
       </div>
       {!term && (

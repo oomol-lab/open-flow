@@ -212,16 +212,16 @@ export class ControlService {
     return await this.#connectorRequest(flowId, (connector, teamId) => connector.listProviders(signal, teamId))
   }
 
-  async listConnectorActions(serviceId?: string, flowId?: string): Promise<readonly ConnectorAction[]> {
-    return await this.#connectorRequest(flowId, (connector, teamId) => connector.listActions(serviceId, undefined, teamId))
+  async listConnectorActions(serviceId?: string, flowId?: string, locale?: string): Promise<readonly ConnectorAction[]> {
+    return await this.#connectorRequest(flowId, (connector, teamId) => connector.listActions(serviceId, undefined, teamId, locale))
   }
 
-  async searchConnectorActions(query: string, flowId?: string, signal?: AbortSignal): Promise<readonly ConnectorAction[]> {
-    return await this.#connectorRequest(flowId, (connector, teamId) => connector.searchActions(query, signal, teamId))
+  async searchConnectorActions(query: string, flowId?: string, signal?: AbortSignal, locale?: string): Promise<readonly ConnectorAction[]> {
+    return await this.#connectorRequest(flowId, (connector, teamId) => connector.searchActions(query, signal, teamId, locale))
   }
 
-  async getConnectorAction(actionId: string, flowId?: string, signal?: AbortSignal): Promise<ConnectorAction> {
-    return await this.#connectorRequest(flowId, (connector, teamId) => connector.getAction(actionId, signal, teamId))
+  async getConnectorAction(actionId: string, flowId?: string, signal?: AbortSignal, locale?: string): Promise<ConnectorAction> {
+    return await this.#connectorRequest(flowId, (connector, teamId) => connector.getAction(actionId, signal, teamId, locale))
   }
 
   async listConnectorConnections(serviceId: string, flowId?: string, signal?: AbortSignal): Promise<readonly ConnectorConnection[]> {

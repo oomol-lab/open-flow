@@ -915,6 +915,7 @@
     "missingStatuses": "Some selected statuses are no longer available. Remove or replace them."
   },
   "nodePicker": {
+    "clearSearch": "Clear search",
     "search": "Search nodes, apps, or actions…",
     "apps": "Apps",
     "back": "Back to all nodes",

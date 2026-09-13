@@ -915,6 +915,7 @@
     "missingStatuses": "Certains statuts sélectionnés ne sont plus disponibles. Supprimez-les ou remplacez-les."
   },
   "nodePicker": {
+    "clearSearch": "Effacer la recherche",
     "search": "Rechercher des nœuds, applications ou actions…",
     "apps": "Applications",
     "back": "Retour à tous les nœuds",
