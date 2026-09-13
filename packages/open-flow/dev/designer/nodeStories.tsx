@@ -379,6 +379,16 @@ const valueModel: FlowCanvasViewModel = {
       outputs: [],
       position: { x: 760, y: 560 },
     },
+    {
+      id: 'matching-title-subtitle',
+      kind: 'task',
+      reference: 'sample',
+      title: 'Agent',
+      executorName: 'Agent',
+      inputs: [],
+      outputs: [],
+      position: { x: 0, y: 840 },
+    },
   ],
 }
 
