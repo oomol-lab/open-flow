@@ -214,7 +214,12 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     dynamicOptions.current.clear()
   }, [target?.kind == 'subflow' ? target.id : undefined, target?.kind])
 
-  const defaultPosition = (canvasPosition: Point = { x: 92, y: 92 }): Point => ({
+  const canvasCenter = (): Point => ({
+    x: (canvas.current?.clientWidth ?? 184) / 2,
+    y: (canvas.current?.clientHeight ?? 184) / 2,
+  })
+
+  const defaultPosition = (canvasPosition: Point = canvasCenter()): Point => ({
     x: (canvasPosition.x - model.viewport.x) / model.viewport.zoom,
     y: (canvasPosition.y - model.viewport.y) / model.viewport.zoom,
   })
@@ -224,7 +229,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     return rect == null ? undefined : { x: rect.left + canvasPosition.x, y: rect.top + canvasPosition.y }
   }
 
-  const requestAddNode = (option: AddNodeOption, canvasPosition: Point = { x: 92, y: 92 }): Promise<string | undefined> => {
+  const requestAddNode = (option: AddNodeOption, canvasPosition: Point = canvasCenter()): Promise<string | undefined> => {
     pendingAdd.current?.(undefined)
     dynamicOptions.current.set(option.id, option)
     return new Promise((resolve) => {
@@ -255,7 +260,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
   )
 
   const openAddNode = () => {
-    const canvasPosition = { x: 92, y: 92 }
+    const canvasPosition = canvasCenter()
     setAddNodeRequest({
       onComplete: () => setAddNodeRequest(undefined),
       position: defaultPosition(canvasPosition),
