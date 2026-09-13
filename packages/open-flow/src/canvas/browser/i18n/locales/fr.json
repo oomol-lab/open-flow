@@ -187,15 +187,6 @@
     "title": "Handles de condition",
     "toggleDefault": "Condition par défaut"
   },
-  "contextMenu": {
-    "addNode": "Ajouter un nœud",
-    "empty": "Aucun bloc correspondant",
-    "loadFailed": "Impossible de charger les actions Connector.",
-    "paste": "Coller",
-    "retry": "Réessayer",
-    "search": "Rechercher",
-    "catalogRefreshFailed": "Impossible d’actualiser le catalogue des déclencheurs. Les résultats en cache restent disponibles."
-  },
   "copy": "Copier",
   "close": "Fermer",
   "create": "Créer",

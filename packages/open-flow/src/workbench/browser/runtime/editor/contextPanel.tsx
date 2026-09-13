@@ -61,6 +61,7 @@ interface LibraryNodeItem {
 type LibraryMenuItem = LibraryNodeItem | { readonly type: 'divider'; readonly label: string; readonly detail?: string }
 
 export interface BlockLibraryProps {
+  readonly isOptionDisabled?: (option: AddNodeOption) => boolean
   readonly presentation?: 'picker'
   readonly catalogRevision?: number
   readonly catalogFailed?: boolean

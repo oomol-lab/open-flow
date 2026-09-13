@@ -7,14 +7,7 @@ import type { NodeId } from '../../../../schema/index.ts'
 import type { AddNodeType } from '../../base/dragNDrop.ts'
 import type { RFConnection, RFEdge, RFNode, RFNodeId } from '../../base/rfHelpers.ts'
 import type { ToReadonly$Group } from '../../base/val.ts'
-import type {
-  FlowCanvasViewAddItem,
-  FlowCanvasViewEdge,
-  FlowCanvasViewModel,
-  FlowCanvasViewPosition,
-  FlowCanvasViewViewport,
-  ViewCallbacks,
-} from '../../graph/FlowCanvas/model.ts'
+import type { FlowCanvasViewEdge, FlowCanvasViewModel, FlowCanvasViewPosition, FlowCanvasViewViewport, ViewCallbacks } from '../../graph/FlowCanvas/model.ts'
 import type { NodeEntry } from '../../graph/FlowCanvas/node.tsx'
 import type { EdgeStore } from '../edge/edge.store.ts'
 import type { RFCommand } from './rfCommand.ts'
@@ -111,7 +104,6 @@ export class CanvasStore {
   private readonly pendingDisconnects = new Map<string, FlowCanvasViewEdge>()
 
   #connections: Val<readonly FlowCanvasViewEdge[]>
-  #addItems: readonly FlowCanvasViewAddItem[]
   readonly #callbacks: ViewCallbacks
   #entries = new Map<string, NodeEntry>()
   #language: Val<string>
@@ -120,15 +112,7 @@ export class CanvasStore {
   #runStatus: Val<FlowRunStatus>
   #selectedNodeIds = new Set<string>()
 
-  public constructor(
-    model: FlowCanvasViewModel,
-    editable: boolean,
-    language: string,
-    addItems: readonly FlowCanvasViewAddItem[],
-    callbacks: ViewCallbacks,
-    autoLayout = false,
-  ) {
-    this.#addItems = addItems
+  public constructor(model: FlowCanvasViewModel, editable: boolean, language: string, callbacks: ViewCallbacks, autoLayout = false) {
     this.#callbacks = callbacks
     this.#language = this.dispose.add(val(language))
     this.lang$ = this.#language
@@ -481,15 +465,7 @@ export class CanvasStore {
     for (const entry of this.#entries.values()) entry.store.$$.selected.set(entry.store === node)
   }
 
-  reconcile(
-    model: FlowCanvasViewModel,
-    editable: boolean,
-    language: string,
-    addItems: readonly FlowCanvasViewAddItem[],
-    selectedNodeIds: readonly string[],
-    ignoredNodeIds: readonly string[] = [],
-  ): void {
-    this.#addItems = addItems
+  reconcile(model: FlowCanvasViewModel, editable: boolean, language: string, selectedNodeIds: readonly string[], ignoredNodeIds: readonly string[] = []): void {
     const editableChanged = this.$.editable.value != editable
     if (editableChanged) this.$$.editable.set(editable)
     if (this.#language.value != language) this.#language.set(language)
@@ -591,7 +567,4 @@ export class CanvasStore {
   }
   public onCopy = (nodeIds: NodeId[]): void => this.#callbacks.onCopy(nodeIds)
   public onPaste = (position?: XYPosition): void => this.#callbacks.onPaste(position)
-  public provideAddNodeMenuItems = (): readonly FlowCanvasViewAddItem[] => this.#addItems
-  public provideAsyncAddNodeMenuItems = (searchTerm: string, signal: AbortSignal): Promise<readonly FlowCanvasViewAddItem[] | undefined> =>
-    this.#callbacks.provideAddItems?.(searchTerm, signal) ?? Promise.resolve(undefined)
 }

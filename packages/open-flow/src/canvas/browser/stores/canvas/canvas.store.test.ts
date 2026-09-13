@@ -23,7 +23,6 @@ function createTestSetup(connections = val<readonly FlowCanvasViewEdge[]>([]), a
     { nodes: [], edges: connections.value, viewport: { x: 0, y: 0, zoom: 1 } },
     true,
     'en',
-    [],
     {
       onIgnoreNodes: () => {},
       onAddNode: async () => undefined,
@@ -35,7 +34,6 @@ function createTestSetup(connections = val<readonly FlowCanvasViewEdge[]>([]), a
       onCopy: () => {},
       onPaste: () => {},
       onChangeComment: undefined,
-      provideAddItems: undefined,
     },
     autoLayout,
   )

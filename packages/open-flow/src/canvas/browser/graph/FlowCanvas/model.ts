@@ -173,31 +173,6 @@ export interface FlowCanvasViewModel {
   readonly viewport: FlowCanvasViewViewport
 }
 
-export interface FlowCanvasViewAddItem {
-  readonly choices?: readonly {
-    readonly description?: string
-    readonly id: string
-    readonly inputs?: readonly FlowCanvasViewAddPort[]
-    readonly label: string
-    readonly outputs?: readonly FlowCanvasViewAddPort[]
-  }[]
-  readonly description?: string
-  readonly disabled?: boolean
-  readonly group?: string
-  readonly icon?: string
-  readonly id: string
-  readonly inputs: readonly FlowCanvasViewAddPort[]
-  readonly label: string
-  readonly outputs: readonly FlowCanvasViewAddPort[]
-  readonly type: 'block' | 'comment' | 'condition' | 'connector' | 'llm' | 'scriptlet' | 'trigger' | 'value' | 'wait'
-}
-
-export interface FlowCanvasViewAddPort {
-  readonly description?: string
-  readonly handle: string
-  readonly jsonSchema?: unknown
-}
-
 export interface FlowCanvasViewEdge {
   readonly id: string
   readonly source: string
@@ -207,6 +182,12 @@ export interface FlowCanvasViewEdge {
 }
 
 export interface FlowCanvasViewProps {
+  readonly onRequestAddNode?: (request: {
+    readonly position: FlowCanvasViewPosition
+    readonly screenPosition: FlowCanvasViewPosition
+    readonly connectionSide?: 'left' | 'right'
+    readonly connection?: (nodeId: string) => Omit<FlowCanvasViewEdge, 'id'>
+  }) => void
   readonly ignoredNodeIds: readonly string[]
   readonly onIgnoreNodes: (nodeIds: readonly string[], ignored: boolean) => void
   readonly cornerTools?: ReactNode
@@ -222,7 +203,6 @@ export interface FlowCanvasViewProps {
     readonly position: FlowCanvasViewPosition
     readonly screenPosition?: FlowCanvasViewPosition
   }
-  readonly addItems: readonly FlowCanvasViewAddItem[]
   readonly autoLayout?: boolean
   readonly className?: string
   readonly dark?: boolean
@@ -252,12 +232,6 @@ export interface FlowCanvasViewProps {
   readonly onCopy: (nodeIds: readonly string[]) => void
   readonly onPaste: (position?: FlowCanvasViewPosition) => void
   readonly onSelectionChange: (nodeIds: readonly string[], edge: FlowCanvasViewEdge | undefined) => void
-  readonly addItemsCatalog?: {
-    readonly revision: number
-    readonly failed: boolean
-    readonly refresh: () => void
-  }
-  readonly provideAddItems?: (searchTerm: string, signal: AbortSignal) => Promise<readonly FlowCanvasViewAddItem[] | undefined>
   readonly selectedNodeIds: readonly string[]
 }
 
@@ -273,7 +247,6 @@ export interface ViewCallbacks {
   readonly onDuplicate: FlowCanvasViewProps['onDuplicate']
   readonly onCopy: FlowCanvasViewProps['onCopy']
   readonly onPaste: FlowCanvasViewProps['onPaste']
-  readonly provideAddItems: FlowCanvasViewProps['provideAddItems']
 }
 
 export function toViewEdge(source: string, sourceHandle: string, target: string, targetHandle: string): FlowCanvasViewEdge {

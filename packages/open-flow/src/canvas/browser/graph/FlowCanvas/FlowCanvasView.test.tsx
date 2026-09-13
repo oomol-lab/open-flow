@@ -111,7 +111,6 @@ const commentNode = (title: string): FlowCanvasViewCommentNode => ({
 
 function props(value: FlowCanvasViewModel, overrides: Partial<FlowCanvasViewProps> = {}): FlowCanvasViewProps {
   return {
-    addItems: [],
     editable: true,
     ignoredNodeIds: [],
     onIgnoreNodes: () => {},

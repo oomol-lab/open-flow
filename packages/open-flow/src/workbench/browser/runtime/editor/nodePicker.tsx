@@ -29,6 +29,7 @@ export function NodePickerContent({
   provideChoices,
   onAdd,
   disabled,
+  isOptionDisabled,
   catalogRevision,
   catalogFailed,
   refreshCatalog,
@@ -122,7 +123,7 @@ export function NodePickerContent({
   }, [appId, term, page])
 
   const add = async (item: AddNodeOption) => {
-    if (busy.current || disabled) return
+    if (busy.current || disabled || isOptionDisabled?.(item)) return
     busy.current = true
     setAdding(true)
     setAddError(false)
@@ -140,7 +141,7 @@ export function NodePickerContent({
       <Button
         variant="ghost"
         type="button"
-        disabled={disabled || adding}
+        disabled={disabled || adding || isOptionDisabled?.(item)}
         onClick={() => void add(item)}
         className="group/app h-auto justify-start whitespace-normal font-normal flex min-w-0 items-start gap-2.5 rounded-lg px-2.5 py-1.5 text-left outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
       >

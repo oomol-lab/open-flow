@@ -27,12 +27,12 @@ import type {
 } from '@xyflow/react'
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { HandleName, NodeId } from '../../../../schema/index.ts'
+import type { NodeId } from '../../../../schema/index.ts'
 import type { AddNodeType } from '../../base/dragNDrop.ts'
-import type { PartialConnection, RFConnection, RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
+import type { RFConnection, RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'
 import type { HandleImpl } from '../../components/handle.tsx'
 import type { InteractiveMode, RFGraph } from '../../stores/canvas/canvas.store.ts'
-import type { FlowCanvasViewAddItem, FlowCanvasViewProps } from '../FlowCanvas/model.ts'
+import type { FlowCanvasViewProps } from '../FlowCanvas/model.ts'
 import type { GetPopupContainer } from './useGetPopupContainer.ts'
 
 import {
@@ -59,18 +59,16 @@ import { shallowPlainObjectEqual } from '../../../../base/common/equality.ts'
 import { getAddItemId } from '../../../../canvas/browser/addItemDrag.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
-import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { TooltipProvider } from '../../../../ui/browser/tooltip.tsx'
 import { CANVAS_CLASSNAME } from '../../base/canvas.ts'
 import { getScriptletType, getSharedBlockPath, getTriggerType, isWithCommentType, isWithConditionType, isWithValueType } from '../../base/dragNDrop.ts'
-import { makeConnection, toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
+import { toManifestHandleName, toManifestNodeId } from '../../base/rfHelpers.ts'
 import { coalesce, toTrue } from '../../base/trivial.ts'
 import { HandleContextProvider } from '../../components/handle.tsx'
 import { CanvasTooltip } from '../../components/tooltip.tsx'
 import { CommentNodeStore } from '../../stores/node/commentNode.store.ts'
 import { FITTING_VIEW_CLASSNAME } from '../../stores/node/constants.ts'
 import { NodeStore } from '../../stores/node/node.store.ts'
-import { BlockQuickPickPanel } from '../BlockQuickPickPanel.tsx'
 import { NodePlaceholder, NodePlaceholderQueue } from '../Nodes/useNodePlaceholder.ts'
 import { getPaneRect, PaneRectContext } from '../Nodes/usePaneRect.ts'
 import { CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from './CanvasControls.tsx'
@@ -100,6 +98,7 @@ const isSizeEqual = (a: Dimensions, b: Dimensions) => a.width === b.width && a.h
 const isRectEqual = (a: Rect, b: Rect) => isSizeEqual(a, b) && a.x === b.x && a.y === b.y
 
 export interface ReactFlowContainerProps {
+  onRequestAddNode?: FlowCanvasViewProps['onRequestAddNode']
   className?: string
   cornerTools?: React.ReactNode
   dark: boolean
@@ -149,9 +148,6 @@ export interface ReactFlowContainerProps {
   onInit?: OnInit<RFNode<any>, RFEdge<any>>
   onCopy?: (nodeIds: NodeId[]) => void
   onPaste?: (position?: XYPosition) => void
-  provideAddNodeMenuItems?: () => readonly FlowCanvasViewAddItem[] | undefined
-  addItemsCatalog?: FlowCanvasViewProps['addItemsCatalog']
-  provideAsyncAddNodeMenuItems?: (searchTerm: string, signal: AbortSignal) => Promise<readonly FlowCanvasViewAddItem[] | undefined>
   fitView?: boolean
   fitViewOptions?: FitViewOptions
   layoutMotion?: boolean
@@ -268,12 +264,6 @@ interface SelectionContextMenuData {
   readonly event: React.MouseEvent
 }
 
-interface BlockQuickPickPanelData {
-  readonly position: XYPosition
-  readonly fromSource?: ConnectionSource
-  readonly connection?: PartialConnection
-}
-
 // Isolate the inner component because React Flow updates frequently.
 const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
   const rf = useReactFlow()
@@ -322,29 +312,15 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
     [selectionContextMenu, rf],
   )
 
-  const [paneContextMenu, setPaneContextMenu] = useState<XYPosition | null>(null)
-  const paneContextMenuScreen = useRef<XYPosition | undefined>(undefined)
-
-  const [blockQuickPickPanel, setBlockQuickPickPanel] = useState<BlockQuickPickPanelData | null>(null)
-  const quickPickFrame = useRef(0)
-
-  useEffect(
-    () => () => {
-      cancelAnimationFrame(quickPickFrame.current)
-    },
-    [],
-  )
-
   useEffect(() => {
     const request = props.addNodeRequest
     if (request == null) return
-    const open = () => {
-      const position = request.screenPosition == null ? request.position : rf.screenToFlowPosition(request.screenPosition)
-      setBlockQuickPickPanel({ position })
+    editCanvas(() => {
+      const screenPosition = request.screenPosition ?? rf.flowToScreenPosition(request.position)
+      props.onRequestAddNode?.({ position: rf.screenToFlowPosition(screenPosition), screenPosition })
       request.onComplete?.()
-    }
-    editCanvas(open)
-  }, [editCanvas, props.addNodeRequest, rf])
+    })
+  }, [editCanvas, props.addNodeRequest, props.onRequestAddNode, rf])
 
   useEffect(() => {
     const request = props.addItemRequest
@@ -358,40 +334,35 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
     })
   }, [editCanvas, props.addItemRequest, props.onDropAddItem, rf])
 
+  const pickerFrame = useRef(0)
+  useEffect(() => () => cancelAnimationFrame(pickerFrame.current), [])
+
   const onConnectEnd: OnConnectEnd = useCallback(
     (event, state) => {
-      if (props.onAddNode && props.provideAddNodeMenuItems && !state.isValid && state.from && state.fromNode && state.fromHandle?.id && 'clientX' in event) {
-        const position = rf.screenToFlowPosition({
-          x: event.clientX,
-          y: event.clientY,
-        })
-        if (tooShort(state.from, position)) {
-          return
-        }
-        // Otherwise open the add-node menu.
-        const data: BlockQuickPickPanelData = {
-          position,
-          fromSource: {
-            nodeId: toManifestNodeId(state.fromNode.id as RFNodeId),
-            handle: toManifestHandleName(state.fromHandle.id as RFHandleName),
-            side: state.fromPosition === 'left' ? 'left' : 'right',
-          },
+      if (!props.editable || !props.onRequestAddNode || state.isValid || state.toNode || !state.from || !state.fromNode || !state.fromHandle?.id) return
+      const pointer = 'clientX' in event ? event : event.changedTouches[0]
+      if (!pointer) return
+      const screenPosition = { x: pointer.clientX, y: pointer.clientY }
+      const position = rf.screenToFlowPosition(screenPosition)
+      if (tooShort(state.from, position)) return
+      const nodeId = toManifestNodeId(state.fromNode.id as RFNodeId)
+      const handle = toManifestHandleName(state.fromHandle.id as RFHandleName)
+      const connectionSide = state.fromHandle.type == 'target' ? 'left' : 'right'
+      cancelAnimationFrame(pickerFrame.current)
+      // Open after the release event so it cannot dismiss the new popover.
+      pickerFrame.current = requestAnimationFrame(() =>
+        props.onRequestAddNode?.({
+          position: connectionSide == 'left' ? { x: position.x - 250, y: position.y } : position,
+          screenPosition,
+          connectionSide,
           connection:
-            state.fromPosition === 'left'
-              ? {
-                  target: state.fromNode.id as RFNodeId,
-                  targetHandle: state.fromHandle.id as RFHandleName,
-                }
-              : {
-                  source: state.fromNode.id as RFNodeId,
-                  sourceHandle: state.fromHandle.id as RFHandleName,
-                },
-        }
-        cancelAnimationFrame(quickPickFrame.current)
-        quickPickFrame.current = requestAnimationFrame(() => setBlockQuickPickPanel(data))
-      }
+            connectionSide == 'left'
+              ? (source) => ({ source, sourceHandle: '$out', target: nodeId, targetHandle: handle })
+              : (target) => ({ source: nodeId, sourceHandle: handle, target, targetHandle: '$in' }),
+        }),
+      )
     },
-    [rf, props.onAddNode, props.provideAddNodeMenuItems],
+    [rf, props.editable, props.onRequestAddNode],
   )
 
   const editable = toTrue(props.editable)
@@ -457,7 +428,6 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
       layoutMounted.current = true
     }
     setEdgeContextMenu(null)
-    setBlockQuickPickPanel(null)
     return () => {
       active = false
       cancelAnimationFrame(frame)
@@ -630,11 +600,8 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           onSelectionContextMenu={(event, selectionNodes) => (event.preventDefault(), setSelectionContextMenu({ nodes: selectionNodes, event }))}
           onPaneContextMenu={(event) => {
             event.preventDefault()
-            paneContextMenuScreen.current = {
-              x: event.clientX,
-              y: event.clientY,
-            }
-            setPaneContextMenu(rf.screenToFlowPosition(paneContextMenuScreen.current))
+            const screenPosition = { x: event.clientX, y: event.clientY }
+            editCanvas(() => props.onRequestAddNode?.({ position: rf.screenToFlowPosition(screenPosition), screenPosition }))
           }}
           onConnectEnd={onConnectEnd}
           isValidConnection={props.isValidConnection}
@@ -709,38 +676,6 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
                   }
                 }}
                 duplicateNodes={props.duplicateNodes}
-              />
-            )}
-            {paneContextMenu && (props.onPaste || props.provideAddNodeMenuItems) && (
-              <PaneContextMenu
-                position={paneContextMenu}
-                onClose={() => setPaneContextMenu(null)}
-                onPaste={props.onPaste}
-                onAddNode={
-                  props.provideAddNodeMenuItems &&
-                  (() => {
-                    const screenPosition = paneContextMenuScreen.current
-                    editCanvas(() =>
-                      setBlockQuickPickPanel({
-                        position: screenPosition == null ? paneContextMenu : rf.screenToFlowPosition(screenPosition),
-                      }),
-                    )
-                  })
-                }
-              />
-            )}
-            {blockQuickPickPanel && props.provideAddNodeMenuItems && props.onAddNode && (
-              <BlockQuickPickPanelPopover
-                addItemsCatalog={props.addItemsCatalog}
-                position={blockQuickPickPanel.position}
-                fromSource={blockQuickPickPanel.fromSource}
-                connection={blockQuickPickPanel.connection}
-                onClose={() => setBlockQuickPickPanel(null)}
-                provideItems={props.provideAddNodeMenuItems}
-                provideAsyncItems={props.provideAsyncAddNodeMenuItems}
-                onAddNode={props.onAddNode}
-                onConnect={props.onConnect}
-                waitNode={props.waitNode}
               />
             )}
           </ViewportPortal>
@@ -920,113 +855,6 @@ function useSelectionItems(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
       onClick: props.onDelete,
     },
   ])
-}
-
-interface PaneContextMenuProps {
-  readonly position: XYPosition
-  readonly onClose: () => void
-  readonly onPaste?: (position: XYPosition) => void
-  readonly onAddNode?: () => void
-}
-
-function PaneContextMenu(props: PaneContextMenuProps) {
-  const t = useTranslate()
-
-  return (
-    <ContextMenu
-      items={[
-        {
-          label: t('contextMenu.addNode'),
-          key: '$addNode',
-          icon: <i className="i-codicon:add" />,
-          disabled: !props.onAddNode,
-          onClick: props.onAddNode,
-        },
-        {
-          label: t('contextMenu.paste'),
-          key: '$paste',
-          icon: <i className="i-carbon:paste" />,
-          disabled: !props.onPaste,
-          onClick: () => props.onPaste?.(props.position),
-        },
-      ]}
-      onClose={props.onClose}
-      position={props.position}
-    />
-  )
-}
-
-interface ConnectionSource {
-  readonly nodeId: NodeId
-  readonly handle: HandleName
-  readonly side: 'left' | 'right'
-}
-
-interface BlockQuickPickPanelPopoverProps {
-  readonly addItemsCatalog?: FlowCanvasViewProps['addItemsCatalog']
-  readonly position: XYPosition
-  readonly fromSource?: ConnectionSource
-  readonly connection?: PartialConnection
-  readonly onClose: () => void
-  readonly provideItems: ReactFlowContainerProps['provideAddNodeMenuItems']
-  readonly provideAsyncItems: ReactFlowContainerProps['provideAsyncAddNodeMenuItems']
-  readonly onAddNode: NonNullable<ReactFlowContainerProps['onAddNode']>
-  readonly onConnect: ReactFlowContainerProps['onConnect']
-  readonly waitNode?: ReactFlowContainerProps['waitNode']
-}
-
-function BlockQuickPickPanelPopover(props: BlockQuickPickPanelPopoverProps) {
-  const getContextMenuContainer = useGetStaticPopupContainer()
-  const addingNode = useRef(false)
-  const items = useMemo(() => props.provideItems?.() || [], [props.provideItems])
-
-  const onClick = async (item: FlowCanvasViewAddItem, id: string) => {
-    if (addingNode.current) return
-    addingNode.current = true
-    props.onClose()
-    try {
-      const handle = (props.fromSource?.side === 'left' ? '$out' : '$in') as HandleName
-      const connect = props.connection != null ? (nodeId: NodeId) => makeConnection(props.connection!, nodeId, handle) : undefined
-      await props.onAddNode(item.type, id, props.fromSource?.side === 'left' ? { x: props.position.x - 250, y: props.position.y } : props.position, connect)
-    } catch (error) {
-      console.error('Failed to add node.', error)
-    } finally {
-      addingNode.current = false
-    }
-  }
-
-  return (
-    <Popover open onOpenChange={(open) => !open && props.onClose()}>
-      <PopoverTrigger
-        nativeButton={false}
-        render={
-          <div
-            style={{
-              position: 'absolute',
-              left: props.position.x,
-              top: props.position.y,
-            }}
-          />
-        }
-      />
-      <PopoverContent
-        align="start"
-        className={clsx(styles.contextMenu, styles.quickPickPopover)}
-        container={getContextMenuContainer()}
-        side="bottom"
-        sideOffset={0}
-      >
-        <BlockQuickPickPanel
-          catalog={props.addItemsCatalog}
-          items={items}
-          provideAsyncItems={props.provideAsyncItems}
-          onClick={onClick}
-          connectionSide={props.fromSource?.side}
-          hideDescription
-        />
-      </PopoverContent>
-    </Popover>
-  )
 }
 
 function tooShort(from: XYPosition, to: XYPosition | null): boolean {

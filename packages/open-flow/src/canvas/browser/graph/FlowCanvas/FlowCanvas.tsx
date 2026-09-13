@@ -12,7 +12,7 @@ import { fitViewOptions } from '../FlowCanvas/constants.ts'
 import { ReactFlowContainer } from '../ReactFlowContainer/ReactFlowContainer.tsx'
 
 export interface FlowCanvasProps {
-  addItemsCatalog?: FlowCanvasViewProps['addItemsCatalog']
+  onRequestAddNode?: FlowCanvasViewProps['onRequestAddNode']
   cornerTools?: React.ReactNode
   toolbar?: React.ReactNode
   flowCanvasStore: CanvasStore
@@ -31,7 +31,7 @@ export interface FlowCanvasProps {
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   flowCanvasStore,
-  addItemsCatalog,
+  onRequestAddNode,
   cornerTools,
   toolbar,
   dark,
@@ -72,6 +72,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           nodes$={flowCanvasStore.$.rfNodes}
           edges$={flowCanvasStore.$.rfEdges}
           viewport$={flowCanvasStore.$$.viewport}
+          onRequestAddNode={onRequestAddNode}
           addNodeRequest={addNodeRequest}
           addItemRequest={addItemRequest}
           onAddNode={flowCanvasStore.onAddNode}
@@ -90,9 +91,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           onInit={flowCanvasStore.onInit}
           onCopy={flowCanvasStore.onCopy}
           onPaste={flowCanvasStore.onPaste}
-          provideAddNodeMenuItems={flowCanvasStore.provideAddNodeMenuItems}
-          addItemsCatalog={addItemsCatalog}
-          provideAsyncAddNodeMenuItems={flowCanvasStore.provideAsyncAddNodeMenuItems}
           waitNode={flowCanvasStore.waitNode}
           duplicateNodes={flowCanvasStore.duplicateNodes}
         ></ReactFlowContainer>
