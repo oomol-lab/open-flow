@@ -74,7 +74,7 @@ export interface BlockLibraryProps {
   readonly refreshCatalog?: () => void
 
   readonly browseOptions: (signal: AbortSignal) => ResourceSource<readonly AddNodeOption[]>
-  readonly searchOptions: (query: string, signal: AbortSignal) => ResourceSource<readonly AddNodeOption[]>
+  readonly searchOptions: (query: string, signal: AbortSignal, sessionSignal?: AbortSignal) => ResourceSource<readonly AddNodeOption[]>
   readonly disabled: boolean
   readonly draggable?: boolean
   readonly focusRequest: number

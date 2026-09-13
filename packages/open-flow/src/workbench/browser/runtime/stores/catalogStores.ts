@@ -147,6 +147,7 @@ export class ActionStore {
   readonly #views = new Views<readonly ConnectorActionMetadata[]>()
   readonly #details = new Map<string, ReadonlyVal<ResourceState<ConnectorActionMetadata>>>()
   readonly #searches = new Set<Resource<readonly ConnectorActionMetadata[]>>()
+  readonly #searchSessions = new WeakMap<AbortSignal, Map<string, Resource<readonly ConnectorActionMetadata[]>>>()
   constructor(
     private readonly client: WorkbenchClient,
     private readonly providers: ProviderStore,
@@ -177,22 +178,39 @@ export class ActionStore {
   }
   search(query: string, flowId: string | undefined, locale: string, signal: AbortSignal): Resource<readonly ConnectorActionMetadata[]> {
     const params = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), q: query.trim(), locale })
+    const key = params.toString()
+    let entries = this.#searchSessions.get(signal)
+    if (entries == null) {
+      entries = new Map()
+      this.#searchSessions.set(signal, entries)
+      const session = entries
+      signal.addEventListener(
+        'abort',
+        () => {
+          for (const resource of session.values()) {
+            resource.dispose()
+            this.#searches.delete(resource)
+          }
+          session.clear()
+          this.#searchSessions.delete(signal)
+        },
+        { once: true },
+      )
+    }
+    const cached = entries.get(key)
+    if (cached != null) {
+      // Keep the complete response visible while revalidating this exact search.
+      void cached.refresh()
+      return cached
+    }
     const resource = new Resource(
       (_etag, requestSignal) => this.client.readCatalog({ path: `/v1/connector/action-metadata?${params}`, decode: actionsResponse }, null, requestSignal),
       30_000,
     )
-    this.#searches.add(resource)
-    signal.addEventListener(
-      'abort',
-      () => {
-        resource.dispose()
-        this.#searches.delete(resource)
-      },
-      { once: true },
-    )
-    if (signal.aborted) {
-      resource.dispose()
-      this.#searches.delete(resource)
+    if (signal.aborted) resource.dispose()
+    else {
+      entries.set(key, resource)
+      this.#searches.add(resource)
     }
     return resource
   }

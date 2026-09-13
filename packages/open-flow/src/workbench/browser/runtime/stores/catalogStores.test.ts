@@ -272,3 +272,70 @@ it('preserves operation types through proxy lists, cached responses and metadata
   controller.abort()
   restored.dispose()
 })
+
+it('reuses search responses within one panel and refreshes them without hiding cached data', async () => {
+  const test = setup()
+  const stores = test.create()
+  const panel = new AbortController()
+  try {
+    const first = stores.actions.search('send', 'flow', 'en', panel.signal)
+    await resourceValue(first.get())
+    await first.refresh()
+    let complete!: (response: Response) => void
+    test.request.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          complete = resolve
+        }),
+    )
+    const repeated = stores.actions.search(' send ', 'flow', 'en', panel.signal)
+    expect(repeated).toBe(first)
+    expect(repeated.get().value.data?.[0]?.name).toBe('Send')
+    await vi.waitFor(() => expect(complete).toBeTypeOf('function'))
+    expect(repeated.state.value.refreshing).toBe(true)
+    complete(Response.json({ version: 1, actions: [{ ...action, name: 'Updated' }] }))
+    await resourceValue(repeated.state, undefined, true)
+    await repeated.refresh()
+    expect(repeated.state.value.data?.[0]?.name).toBe('Updated')
+
+    test.request.mockRejectedValueOnce(new Error('Offline'))
+    stores.actions.search('send', 'flow', 'en', panel.signal)
+    await vi.waitFor(() => expect(repeated.state.value.error).toBeInstanceOf(Error))
+    expect(repeated.state.value.data?.[0]?.name).toBe('Updated')
+    expect(test.localStorage.entries.size).toBe(0)
+  } finally {
+    panel.abort()
+    stores.dispose()
+  }
+})
+
+it('isolates search identities and releases results when the panel closes', async () => {
+  const test = setup()
+  const stores = test.create()
+  const panel = new AbortController()
+  const nextPanel = new AbortController()
+  try {
+    const first = stores.actions.search('send', 'flow', 'en', panel.signal)
+    await resourceValue(first.get())
+    for (const [query, flow, locale] of [
+      ['other', 'flow', 'en'],
+      ['send', 'other-flow', 'en'],
+      ['send', 'flow', 'zh-CN'],
+    ] as const) {
+      const separate = stores.actions.search(query, flow, locale, panel.signal)
+      expect(separate).not.toBe(first)
+      expect(separate.state.value.data).toBeUndefined()
+    }
+    panel.abort()
+    expect(first.state.value.error).toBeDefined()
+    const reopened = stores.actions.search('send', 'flow', 'en', nextPanel.signal)
+    expect(reopened).not.toBe(first)
+    expect(reopened.state.value.data).toBeUndefined()
+    await resourceValue(reopened.get())
+    expect(test.request).toHaveBeenCalledTimes(2)
+  } finally {
+    panel.abort()
+    nextPanel.abort()
+    stores.dispose()
+  }
+})

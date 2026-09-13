@@ -338,8 +338,8 @@ export class WorkbenchStore {
     this.triggers.catalog.retry()
   }
 
-  public readonly provideAddNodeOptions = (searchTerm: string, signal: AbortSignal) =>
-    combineSources(signal, [this.triggers.provideAddNodeOptions(searchTerm, signal), this.connectors.provideAddNodeOptions(searchTerm, signal)])
+  public readonly provideAddNodeOptions = (searchTerm: string, signal: AbortSignal, sessionSignal = signal) =>
+    combineSources(signal, [this.triggers.provideAddNodeOptions(searchTerm, signal), this.connectors.provideAddNodeOptions(searchTerm, signal, sessionSignal)])
 
   public readonly browseAddNodeOptions = (signal: AbortSignal) =>
     combineSources(signal, [this.triggers.browseAddNodeOptions(signal), this.connectors.browseAddNodeOptions(signal)])

@@ -216,8 +216,8 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
           return [...apps, ...extra]
         })
       },
-      searchOptions: (query: string, signal: AbortSignal) =>
-        combineSources(signal, [session.triggers.provideAddNodeOptions(query, signal), connectors.provideAddNodeOptions(query, signal)]),
+      searchOptions: (query: string, signal: AbortSignal, sessionSignal?: AbortSignal) =>
+        combineSources(signal, [session.triggers.provideAddNodeOptions(query, signal), connectors.provideAddNodeOptions(query, signal, sessionSignal)]),
       provideChoices: connectors.provideAddNodeOptionChoices,
     }),
     [session, connectors, mode, largeCatalog, configuredOnly],
