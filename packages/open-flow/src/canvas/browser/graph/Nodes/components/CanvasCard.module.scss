@@ -68,10 +68,16 @@
 
   &:has(> img, > [data-icon-kind='initials']) {
     --content-icon-initials-background: transparent;
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
+    font-size: 20px;
     border: 1px solid color-mix(in srgb, var(--ui-foreground) 14%, transparent);
-    border-radius: 9px;
+    border-radius: 11px;
+
+    > img {
+      width: 20px;
+      height: 20px;
+    }
   }
 }
 
@@ -183,9 +189,15 @@
     }
 
     &:has(> img, > [data-icon-kind='initials']) {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
+      width: 40px;
+      height: 40px;
+      font-size: 28px;
+      border-radius: 13px;
+
+      > img {
+        width: 28px;
+        height: 28px;
+      }
     }
   }
 
@@ -202,6 +214,8 @@
     font-size: 28px;
     font-weight: 600;
     line-height: 36px;
+    // Lift the glyphs slightly to align their visual center with the app icon.
+    transform: translateY(-1px);
   }
 }
 

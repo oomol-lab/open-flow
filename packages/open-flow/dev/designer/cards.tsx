@@ -140,6 +140,14 @@ export const cardStories: readonly FrontendStory[] = [
         <div className="card-studies-grid">
           <CanvasCard title="New Row Added" subtitle="Google Sheets" icon={<ContentIcon src={sheetsAppIcon} />} />
           <CanvasCard title="App initials" subtitle="Connected" icon={<ContentIcon src={initialsIcon('AC')} />} />
+          <div>
+            <p>Compact · app image</p>
+            <CanvasCard compact title="register_trackings" subtitle="17TRACK" icon={<ContentIcon src={trackingAppIcon} />} />
+          </div>
+          <div>
+            <p>Compact · app initials</p>
+            <CanvasCard compact title="New Row Added" subtitle="Connected" icon={<ContentIcon src={initialsIcon('AC')} />} />
+          </div>
           <CanvasCard
             title="register_trackings"
             subtitle="Connect account"

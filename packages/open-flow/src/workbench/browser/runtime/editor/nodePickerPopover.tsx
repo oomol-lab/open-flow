@@ -25,7 +25,8 @@ export function NodePickerPopover(props: BlockLibraryProps) {
         <PopoverContent
           container={root}
           side="top"
-          align="start"
+          align="center"
+          alignOffset={({ positioner }) => positioner.width / 4}
           sideOffset={12}
           className="h-[min(560px,var(--available-height))] max-h-[calc(100dvh-32px)] w-[440px] max-w-[calc(100vw-32px)] gap-0 overflow-hidden p-0"
         >

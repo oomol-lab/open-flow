@@ -44,7 +44,6 @@ export function CanvasNode({
       : node.kind == 'trigger' && node.presentation?.source
         ? `${t('canvasCard.kind.trigger')} · ${node.presentation.source}`
         : t(`canvasCard.kind.${kind}`)
-  const distinctSubtitle = subtitle.trim().toLocaleLowerCase() == title.trim().toLocaleLowerCase() ? undefined : subtitle
   const toolContent = tools != null && tools.length > 0 && (
     <div className={styles.tools}>
       <span className={styles.toolsLabel}>{t('canvasCard.tools')}</span>
@@ -86,7 +85,7 @@ export function CanvasNode({
         footerHidden={hidden && !runContent}
         title={title}
         icon={<ContentIcon src={icon} fallback={<i className={iconForNodeType(nodeStore.nodeType)} />} />}
-        subtitle={distinctSubtitle}
+        subtitle={subtitle}
         selected={selected}
         problem={(node.kind == 'task' || node.kind == 'trigger') && node.connectionRequired ? t('nodeStatus.connectionRequired') : problem}
         problemIcon={
