@@ -225,7 +225,7 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
 
   return (
     <>
-      {props.dottedBackground && <Background id={bgId} color="var(--canvas-grid)" gap={GRID_GAP} variant={BackgroundVariant.Dots} />}
+      {props.dottedBackground && <Background id={bgId} color="var(--canvas-grid)" gap={GRID_GAP} size={2} variant={BackgroundVariant.Dots} />}
       <CanvasViewControls
         maxZoomReached={maxZoomReached}
         minZoomReached={minZoomReached}
