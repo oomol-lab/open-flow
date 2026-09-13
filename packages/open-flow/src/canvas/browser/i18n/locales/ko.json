@@ -343,6 +343,7 @@
     "hide": "내용 숨기기"
   },
   "nodeStatus": {
+    "connectionRequired": "연결이 없거나 사용할 수 없습니다. 노드 설정에서 다시 연결하거나 사용 가능한 연결을 선택하세요.",
     "error": "오류",
     "hasError": "오류 있음",
     "running": "실행 중",
@@ -584,7 +585,7 @@
       "task": "작업",
       "trigger": "트리거",
       "condition": "조건",
-      "wait": "대기",
+      "wait": "확인 대기",
       "subflow": "하위 흐름",
       "value": "설정값",
       "input": "입력",

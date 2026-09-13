@@ -97,6 +97,7 @@ interface FlowCanvasViewNodeBase {
 export interface FlowCanvasViewTaskNode extends FlowCanvasViewNodeBase {
   readonly tools?: readonly { readonly id: string; readonly icon: string; readonly label: string }[]
   readonly additionalInputs?: readonly FlowCanvasViewInput[]
+  readonly connectionRequired?: boolean
   readonly executorName?: string
   readonly kind: 'task'
   readonly reference: string
@@ -137,6 +138,7 @@ export interface FlowCanvasViewTriggerPresentation {
 }
 
 export interface FlowCanvasViewTriggerNode extends FlowCanvasViewNodeBase {
+  readonly connectionRequired?: boolean
   readonly kind: 'trigger'
   readonly presentation?: FlowCanvasViewTriggerPresentation
 }

@@ -12,6 +12,7 @@ import type { GraphTarget } from '../../../flow/common/change.ts'
 import type {
   ConnectorAction,
   ConnectorConnection,
+  ConnectorProvider,
   Diagnostic,
   Draft,
   GraphNode,
@@ -394,12 +395,12 @@ function runProjection(
   return { nodes, status: active ? 'running' : 'idle' }
 }
 
-function executorName(task: TaskDefinition | undefined, connectionRequired: boolean, t?: TFunction): string | undefined {
+function executorName(task: TaskDefinition | undefined, providerName: string | undefined, t?: TFunction): string | undefined {
   if (task == null) return
   if ('moduleId' in task) return t?.('designer.executorJavaScript') ?? 'javascript'
-  if (connectionRequired) return t?.('designer.executorConnectionRequired') ?? 'connection required'
   if (task.executor.kind == 'agent') return 'Agent'
-  return task.executor.kind == 'llm' ? (t?.('designer.executorLlm') ?? 'llm') : (t?.('designer.executorConnector') ?? 'connector')
+  if (task.executor.kind == 'llm') return t?.('designer.executorLlm') ?? 'llm'
+  return `${t?.('designer.executorConnector') ?? 'connector'} · ${providerName ?? task.executor.action.split('.')[0]}`
 }
 
 function triggerIcon(trigger: TriggerNode): string {
@@ -417,9 +418,11 @@ function triggerIcon(trigger: TriggerNode): string {
   }
 }
 
-function triggerDiagnosticCount(triggerId: string, diagnostics: readonly Diagnostic[]): number {
-  return diagnostics.filter((diagnostic) => diagnostic.code != 'trigger.config-incomplete' && diagnostic.path.startsWith(`/document/graph/nodes/${triggerId}`))
-    .length
+function triggerDiagnostics(triggerId: string, diagnostics: readonly Diagnostic[]): readonly Diagnostic[] {
+  const path = `/document/graph/nodes/${triggerId}`
+  return diagnostics.filter(
+    (diagnostic) => diagnostic.code != 'trigger.config-incomplete' && (diagnostic.path == path || diagnostic.path.startsWith(`${path}/`)),
+  )
 }
 
 function projectEdges(graph: { readonly edges?: unknown }, nodeIds: ReadonlySet<string>): EdgeProjection {
@@ -545,7 +548,16 @@ function groupedOutputs(resolved: ResolvedNode, outputs: readonly FlowCanvasView
   return result
 }
 
-function triggerDesignerNode(triggerId: string, trigger: TriggerNode, position: Point, diagnostics: readonly Diagnostic[]): DesignerNode {
+function triggerDesignerNode(
+  triggerId: string,
+  trigger: TriggerNode,
+  position: Point,
+  diagnostics: readonly Diagnostic[],
+  providers: Readonly<Record<string, ConnectorProvider>>,
+): DesignerNode {
+  const problems = triggerDiagnostics(triggerId, diagnostics)
+  const connectionRequired = problems.some((problem) => problem.code == 'trigger.connection-missing' || problem.code == 'trigger.connection-invalid')
+  const provider = trigger.kind == 'integration' || trigger.kind == 'poll' ? providers[trigger.definition.provider] : undefined
   let presentation: FlowCanvasViewTriggerNode['presentation']
   switch (trigger.kind) {
     case 'manual':
@@ -555,13 +567,13 @@ function triggerDesignerNode(triggerId: string, trigger: TriggerNode, position: 
       presentation = { kind: trigger.kind, schedules: trigger.cronTimes }
       break
     case 'integration':
-      presentation = { kind: trigger.kind, schedules: [], source: trigger.definition.provider }
+      presentation = { kind: trigger.kind, schedules: [], source: provider?.serviceName ?? trigger.definition.provider }
       break
     case 'poll':
       presentation = {
         kind: trigger.kind,
         schedules: trigger.pollTimes,
-        source: trigger.definition.provider,
+        source: provider?.serviceName ?? trigger.definition.provider,
       }
       break
     case 'webhook':
@@ -573,11 +585,12 @@ function triggerDesignerNode(triggerId: string, trigger: TriggerNode, position: 
   }
   return {
     description: trigger.description,
-    diagnostics: triggerDiagnosticCount(triggerId, diagnostics),
+    diagnostics: problems.length,
+    connectionRequired,
     icon:
       trigger.icon ??
       (trigger.kind == 'integration' || trigger.kind == 'poll'
-        ? providerIcon({ serviceId: trigger.definition.provider, serviceName: trigger.definition.provider })
+        ? providerIcon(provider ?? { serviceId: trigger.definition.provider, serviceName: trigger.definition.provider })
         : triggerIcon(trigger)),
     id: triggerId,
     inputs: [],
@@ -641,7 +654,8 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
           return input == null || 'group' in input ? [] : [input]
         }),
         kind: node.kind,
-        executorName: executorName(task, connectionRequired, context.t),
+        executorName: executorName(task, connectorAction?.serviceName, context.t),
+        connectionRequired,
         ...(task != null && 'executor' in task && task.executor.kind == 'agent'
           ? {
               tools: task.executor.tools.map((tool) => {
@@ -691,6 +705,7 @@ export function designerGraph(
   t?: TFunction,
   run?: Run | RunDetails,
   runEvents: readonly RunEvent[] = [],
+  providers: Readonly<Record<string, ConnectorProvider>> = {},
 ): DesignerGraph {
   const revision = draft == null ? undefined : revisionView(draft)
   const graph = revision == null || target == null ? undefined : revision.graph(target)
@@ -724,7 +739,7 @@ export function designerGraph(
     const resolved = definitions.get(nodeId)!
     if (resolved.kind == 'trigger') {
       nodes.push({
-        ...triggerDesignerNode(nodeId, resolved.trigger, position, diagnostics),
+        ...triggerDesignerNode(nodeId, resolved.trigger, position, diagnostics, providers),
         contentHidden: hiddenNodeContent?.[nodeId] === true,
       })
       continue

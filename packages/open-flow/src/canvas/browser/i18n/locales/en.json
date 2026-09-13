@@ -343,6 +343,7 @@
     "hide": "Hide content"
   },
   "nodeStatus": {
+    "connectionRequired": "A connection is missing or unavailable. Reconnect or select an available connection in the node settings.",
     "error": "Error",
     "hasError": "Has errors",
     "running": "Running",
@@ -584,7 +585,7 @@
       "task": "Task",
       "trigger": "Trigger",
       "condition": "Condition",
-      "wait": "Wait",
+      "wait": "Wait for confirmation",
       "subflow": "Subflow",
       "value": "Values",
       "input": "Flow input",

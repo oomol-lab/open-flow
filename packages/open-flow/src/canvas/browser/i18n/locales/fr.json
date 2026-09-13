@@ -343,6 +343,7 @@
     "hide": "Masquer le contenu"
   },
   "nodeStatus": {
+    "connectionRequired": "La connexion est manquante ou indisponible. Reconnectez-vous ou sélectionnez une connexion disponible dans les paramètres du nœud.",
     "error": "Erreur",
     "hasError": "Contient des erreurs",
     "running": "En cours",
@@ -584,7 +585,7 @@
       "task": "Tâche",
       "trigger": "Déclencheur",
       "condition": "Condition",
-      "wait": "Attente",
+      "wait": "Attendre une confirmation",
       "subflow": "Sous-flux",
       "value": "Valeurs",
       "input": "Entrée",

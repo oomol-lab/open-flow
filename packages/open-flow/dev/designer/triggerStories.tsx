@@ -64,6 +64,7 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
       { id: 'running', title: 'Running', status: 'running' },
       { id: 'success', title: 'Success', status: 'success' },
       { id: 'error', title: 'Error', status: 'error' },
+      ...(trigger.kind === 'integration' || trigger.kind === 'poll' ? [{ id: 'disconnected', title: 'Connection unavailable', diagnostics: 1 }] : []),
       {
         id: 'long',
         title: `${trigger.name} · Orders received from all regional stores requiring manual review`,
@@ -125,7 +126,28 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
           else if (sample.kind === 'webhook') sample = { ...sample, inputsDef: [], options: {} }
         }
         samples.set(entry.id, { id: `${fixture.id}-${entry.id}`, trigger: sample, payload: fixture.payload })
-        const base = designerGraph(triggerDraft(sample).draft, { kind: 'flow' }).nodes.find((node) => node.kind === 'trigger')!
+        const base = designerGraph(
+          triggerDraft(sample).draft,
+          { kind: 'flow' },
+          {},
+          entry.id === 'disconnected'
+            ? [
+                {
+                  code: 'trigger.connection-missing',
+                  column: 0,
+                  line: 1,
+                  message: 'The trigger connection is unavailable.',
+                  path: '/document/graph/nodes/trigger/bindingId',
+                },
+              ]
+            : [],
+          {},
+          {},
+          undefined,
+          undefined,
+          [],
+          { github: { serviceId: 'github', serviceName: 'GitHub' }, gmail: { serviceId: 'gmail', serviceName: 'Gmail' } },
+        ).nodes.find((node) => node.kind === 'trigger')!
         return Object.assign({}, base, {
           id: entry.id,
           position: { x: (index % 3) * 420, y: Math.floor(index / 3) * (trigger.kind === 'cron' ? 320 : 210) },

@@ -1,8 +1,8 @@
-import type { ConnectorAction, ConnectorConnection } from '../../../control/common/api.ts'
+import type { ConnectorAction, ConnectorConnection, ConnectorProvider } from '../../../control/common/api.ts'
 import type { WorkbenchHost, WorkbenchPreferences } from './contract.ts'
 
 import { val } from 'value-enhancer'
-import { connection, connectorAction } from '../../../control/common/connectorDecoders.ts'
+import { connection, connectorAction, connectorProvider } from '../../../control/common/connectorDecoders.ts'
 import { record, invalidResponse } from '../../../control/common/decoding.ts'
 
 type Kind = 'providers' | 'actions' | 'connections'
@@ -141,4 +141,19 @@ export function cachedConnectorConnections(
     if (typeof source.serviceId == 'string' && Array.isArray(source.connections)) connections[source.serviceId] = source.connections.map(connection)
   }
   return connections
+}
+
+export function cachedConnectorProviders(entries: ReadonlyMap<string, Entry>, flowId: string | undefined): Readonly<Record<string, ConnectorProvider>> {
+  const providers: Record<string, ConnectorProvider> = {}
+  if (flowId == null) return providers
+  for (const [path, entry] of entries) {
+    if (new URL(path, 'https://cache.invalid').searchParams.get('flowId') != flowId) continue
+    const source = record(entry.data)
+    if (!Array.isArray(source.providers)) continue
+    for (const value of source.providers) {
+      const provider = connectorProvider(value)
+      providers[provider.serviceId] = provider
+    }
+  }
+  return providers
 }

@@ -12,6 +12,7 @@ import type { WorkspaceBusy } from './workspaceModel.ts'
 import { compute, derive, val } from 'value-enhancer'
 import { randomId } from '../../../../control/common/random.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
+import { cachedConnectorProviders } from '../connectorCache.ts'
 import { diagnosticItems } from '../editor/diagnostics.ts'
 import { createI18n } from '../i18n.ts'
 import { PublicationStore } from '../publications/publicationStore.ts'
@@ -152,6 +153,8 @@ export class WorkbenchStore {
       const target = get(this.workspace.$.target)
       const presentation = get(this.workspace.$.presentation)?.value
       const designerDiagnostics = get(diagnostics)?.diagnostics ?? get(this.connectors.$.diagnostics)
+      const providerEntries = get(client.connectorCache.providers)
+      const providerCatalog = cachedConnectorProviders(providerEntries, draft?.flowId)
       const actions = get(this.connectors.$.actions)
       const catalogs = get(this.connectors.$.catalogs)
       const t = get(i18n.t$)
@@ -163,6 +166,7 @@ export class WorkbenchStore {
         presentation == null || target == null ? undefined : targetPresentation(presentation, target),
         designerDiagnostics,
         actions,
+        providerEntries,
         catalogs,
         t,
         run,
@@ -171,7 +175,7 @@ export class WorkbenchStore {
       ]
       const cached = designerCache.get(key)
       if (cached != null && cached.inputs.length == inputs.length && cached.inputs.every((input, index) => input === inputs[index])) return cached.graph
-      const graph = designerGraph(draft, target, presentation, designerDiagnostics, actions, catalogs, t, run, events)
+      const graph = designerGraph(draft, target, presentation, designerDiagnostics, actions, catalogs, t, run, events, providerCatalog)
       designerCache.set(key, { graph, inputs })
       return graph
     })

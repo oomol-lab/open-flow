@@ -147,6 +147,8 @@ describe('Designer port projection', () => {
       serviceName: 'Hacker News',
     }
 
+    expect(designerGraph(draft, { kind: 'flow' }, {}, []).nodes[0]).toMatchObject({ executorName: 'connector · hacker-news' })
+
     const publicNode = designerGraph(draft, { kind: 'flow' }, {}, [], { [action.actionId]: action }).nodes[0]
     const authenticatedNode = designerGraph(
       draft,
@@ -168,9 +170,10 @@ describe('Designer port projection', () => {
     expect(publicNode).toMatchObject({
       additionalInputs: [{ handle: 'start', jsonSchema: {}, nullable: false }],
       diagnostics: 0,
-      executorName: 'connector',
+      executorName: 'connector · Hacker News',
+      connectionRequired: false,
     })
-    expect(authenticatedNode).toMatchObject({ diagnostics: 1, executorName: 'connection required' })
+    expect(authenticatedNode).toMatchObject({ diagnostics: 1, executorName: 'connector · Hacker News', connectionRequired: true })
   })
 
   it('projects a Wait notification summary from its Connector Action', () => {
@@ -328,6 +331,22 @@ describe('Designer port projection', () => {
       kind: 'trigger',
       presentation: { kind: 'integration', source: 'github' },
     })
+    expect(
+      designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, undefined, undefined, [], {
+        github: { serviceId: 'github', serviceName: 'GitHub' },
+      }).nodes[0],
+    ).toMatchObject({ presentation: { source: 'GitHub' }, title: 'Repository event' })
+    for (const code of ['trigger.connection-missing', 'trigger.connection-invalid', 'trigger.config-invalid']) {
+      const diagnostic = { code, column: 0, line: 1, message: 'Sample diagnostic', path: '/document/graph/nodes/trigger/bindingId' }
+      expect(designerGraph(draft, { kind: 'flow' }, {}, [diagnostic]).nodes[0]).toMatchObject({
+        diagnostics: 1,
+        connectionRequired: code !== 'trigger.config-invalid',
+      })
+      expect(designerGraph(draft, { kind: 'flow' }, {}, [{ ...diagnostic, path: '/document/graph/nodes/trigger-other/bindingId' }]).nodes[0]).toMatchObject({
+        diagnostics: 0,
+        connectionRequired: false,
+      })
+    }
     const trigger = draft.content.document.graph.nodes.trigger
     if (trigger?.kind != 'integration') throw new Error('Expected integration trigger.')
     const filled = {
