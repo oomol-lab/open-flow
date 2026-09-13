@@ -43,7 +43,7 @@ export function StoryStage({ children, dark, i18n }: { readonly children: ReactN
                 nodes={nodes}
                 proOptions={{ hideAttribution: true }}
               >
-                <Background gap={20} size={1} />
+                <Background color="var(--canvas-grid)" gap={20} size={2} />
                 <Controls showInteractive={false} />
               </ReactFlow>
             </TooltipProvider>
