@@ -68,36 +68,37 @@ describe('ConnectorStore', () => {
         }
       }
       const flowId = new URL(path, 'https://open-flow.example').searchParams.get('flowId')
-      if (path.startsWith('/v1/connector/providers?')) {
+      if (path.startsWith('/v1/connector/proxy/providers?')) {
         connectorRequests.push(path)
         return Response.json({
-          providers: [
+          data: [
             {
               homepageUrl: 'https://mail.example',
-              serviceId: 'mail',
-              serviceName: `${new URL(path, 'https://open-flow.example').searchParams.get('locale') == 'zh-CN' ? '邮件' : 'Mail'} ${flowId}`,
+              authTypes: ['no_auth'],
+              service: 'mail',
+              displayName: `${new URL(path, 'https://open-flow.example').searchParams.get('locale') == 'zh-CN' ? '邮件' : 'Mail'} ${flowId}`,
             },
           ],
-          version: 1,
+          success: true,
         })
       }
-      if (path.startsWith('/v1/connector/action-metadata/mail.send?')) {
+      if (path.startsWith('/v1/connector/proxy/actions?')) {
         connectorRequests.push(path)
         return Response.json({
-          version: 1,
-          action: {
-            actionId: 'mail.send',
-            authenticated: false,
-            description: `Detail for ${flowId}.`,
-            inputs: {},
-            outputs: {},
-            name: 'Send',
-            serviceId: 'mail',
-            serviceName: 'Mail',
-          },
+          success: true,
+          data: [
+            {
+              id: 'mail.send',
+              service: 'mail',
+              name: 'Send',
+              description: `Send for ${flowId}.`,
+              inputSchema: { type: 'object', properties: {} },
+              outputSchema: { type: 'object', properties: {} },
+            },
+          ],
         })
       }
-      if (path.startsWith('/v1/connector/connections/')) return Response.json({ version: 1, serviceId: 'mail', connections: [] })
+      if (path.startsWith('/v1/connector/proxy/apps')) return Response.json({ success: true, data: [] })
       if (path.startsWith('/v1/connector/action-metadata?')) {
         connectorRequests.push(path)
         return Response.json({
@@ -147,7 +148,7 @@ describe('ConnectorStore', () => {
       const pending = Promise.all([connectors.loadCodeAction('mail.send', signal), connectors.loadCodeConnections('mail', signal)])
 
       await workspace.selectFlow(flows[1]!.flowId)
-      lateConnections.resolve(Response.json({ version: 1, serviceId: 'mail', connections: [] }))
+      lateConnections.resolve(Response.json({ success: true, data: [] }))
       await pending
       expect(connectors.$.actions.value).toEqual({})
       expect(connectors.$.catalogs.value).toEqual({})
@@ -158,11 +159,11 @@ describe('ConnectorStore', () => {
       expect(secondProviders?.[0]?.label).toBe('Mail flow-b')
       expect(connectors.$.actions.value).toEqual({})
       expect(connectorRequests).toEqual([
-        '/v1/connector/providers?flowId=flow-a&locale=en',
-        '/v1/connector/action-metadata?flowId=flow-a&service=mail&locale=en',
+        '/v1/connector/proxy/providers?flowId=flow-a&locale=en',
+        '/v1/connector/proxy/actions?flowId=flow-a&service=mail&locale=en',
         '/v1/connector/action-metadata?flowId=flow-a&q=send&locale=en',
-        '/v1/connector/providers?flowId=flow-b&locale=en',
-        '/v1/connector/action-metadata?flowId=flow-b&service=mail&locale=en',
+        '/v1/connector/proxy/providers?flowId=flow-b&locale=en',
+        '/v1/connector/proxy/actions?flowId=flow-b&service=mail&locale=en',
       ])
       connectors.setLanguage('zh-CN')
       const localizedProviders = await resourceValue(connectors.browseAddNodeOptions(signal))
@@ -170,7 +171,7 @@ describe('ConnectorStore', () => {
       await resourceValue(connectors.provideAddNodeOptionChoices(localizedProviders![0]!.id, signal))
       await resourceValue(connectors.provideAddNodeOptions('send', signal))
       expect(connectorRequests.slice(-2)).toEqual([
-        '/v1/connector/action-metadata?flowId=flow-b&service=mail&locale=zh-CN',
+        '/v1/connector/proxy/actions?flowId=flow-b&service=mail&locale=zh-CN',
         '/v1/connector/action-metadata?flowId=flow-b&q=send&locale=zh-CN',
       ])
     } finally {

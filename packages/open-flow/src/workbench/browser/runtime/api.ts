@@ -1,8 +1,8 @@
-import type { Presentation } from '../../../control/common/api.ts'
+import type { ConditionalResult, Presentation } from '../../../control/common/api.ts'
 import type { JsonValue } from '../../../flow/common/change.ts'
 import type { FlowCatalogEvent, FlowChangeEvent, WorkbenchHost } from './contract.ts'
 
-import { ControlClient } from '../../../control/common/api.ts'
+import { ApiError, ControlClient } from '../../../control/common/api.ts'
 
 export { ApiError } from '../../../control/common/api.ts'
 export type {
@@ -79,11 +79,34 @@ const segment = encodeURIComponent
 
 export class WorkbenchClient extends ControlClient {
   constructor(
-    fetcher: Fetcher,
+    private readonly fetcher: Fetcher,
     private readonly subscribeFlow: FlowSubscriber = () => ({ ready: Promise.resolve(), stop() {} }),
     private readonly subscribeFlowCatalog: FlowCatalogSubscriber = () => ({ ready: Promise.resolve(), stop() {} }),
   ) {
     super(fetcher)
+  }
+
+  async readProxyCatalog<T>(
+    query: { readonly path: string; readonly decode: (value: unknown) => T },
+    etag: string | null,
+    signal?: AbortSignal,
+  ): Promise<ConditionalResult<T>> {
+    const response = await this.fetcher(query.path, { headers: { accept: 'application/json', ...(etag ? { 'if-none-match': etag } : {}) }, signal })
+    const nextETag = response.headers.get('etag')?.trim() || null
+    if (response.status == 304) return { modified: false, etag: nextETag }
+    const value: unknown = await response.json()
+    if (!response.ok) {
+      const source = value != null && typeof value == 'object' ? (value as Record<string, unknown>) : undefined
+      const flowError = source?.error != null && typeof source.error == 'object' ? (source.error as Record<string, unknown>) : undefined
+      const code = flowError?.code ?? source?.errorCode
+      const message = flowError?.message ?? source?.message
+      throw new ApiError(
+        response.status,
+        typeof code == 'string' ? code : 'request.failed',
+        typeof message == 'string' ? message : `Request failed with status ${response.status}.`,
+      )
+    }
+    return { modified: true, data: query.decode(value), etag: nextETag }
   }
 
   watchFlowCatalog(changed: (event?: FlowCatalogEvent) => void): ReturnType<FlowCatalogSubscriber> {

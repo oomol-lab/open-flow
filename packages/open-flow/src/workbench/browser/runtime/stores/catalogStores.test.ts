@@ -31,11 +31,22 @@ function setup() {
   const request = vi.fn(async (path: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
     const url = new URL(String(path), 'https://test.invalid')
     const data = url.pathname.endsWith('/providers')
-      ? { providers: [{ serviceId: 'mail', serviceName: url.searchParams.get('locale')! }] }
-      : url.pathname.endsWith('/action-metadata')
-        ? { actions: [action] }
-        : { connections: [connection], ...(url.pathname.endsWith('/mail') ? { serviceId: 'mail' } : {}) }
-    return Response.json({ version: 1, ...data }, { headers: { etag: '"one"' } })
+      ? [{ service: 'mail', displayName: url.searchParams.get('locale')!, authTypes: ['oauth2'], extra: 'preserved' }]
+      : url.pathname.endsWith('/actions')
+        ? [
+            {
+              id: 'mail.send',
+              service: 'mail',
+              name: 'Send',
+              description: 'Send mail',
+              inputSchema: { type: 'object', properties: {} },
+              outputSchema: { type: 'object', properties: {} },
+            },
+          ]
+        : [{ id: 'account', service: 'mail', displayName: 'Account', isDefault: true, status: 'active' }]
+    return Response.json(url.pathname.endsWith('/action-metadata') ? { version: 1, actions: [action] } : { success: true, data }, {
+      headers: { etag: '"one"' },
+    })
   })
   const create = () => new CatalogStores(new WorkbenchClient(request), { namespace: 'test', localStorage, sessionStorage })
   return { create, localStorage, sessionStorage, request }
@@ -74,7 +85,7 @@ it('isolates locales, services and scopes and restores the matching validator ac
   await vi.waitFor(() => expect([...test.localStorage.entries.values()].some((raw) => JSON.parse(raw).etag == 'W/"two"')).toBe(true))
   test.request.mockImplementation(async (_path, init) => {
     expect(new Headers(init?.headers).get('if-none-match')).toBe('W/"two"')
-    return Response.json({ version: 1, providers: [] })
+    return Response.json({ success: true, data: [] })
   })
   second.providers.get('a', 'zh-CN', true)
   await vi.waitFor(() => expect(state.value.data).toEqual([]))
@@ -94,8 +105,8 @@ it('keeps searches transient and connection refresh independent of Action data',
   await resourceValue(stores.connections.get('mail', 'flow'))
   await resourceValue(stores.connections.get(undefined, 'flow'))
   expect(list.value.data).toBe(before)
-  expect(test.localStorage.entries.size).toBe(1)
-  expect(test.sessionStorage.entries.size).toBe(2)
+  expect(test.localStorage.entries.size).toBe(2)
+  expect(test.sessionStorage.entries.size).toBe(1)
   controller.abort()
   stores.dispose()
 })
@@ -122,7 +133,7 @@ it('updates the selected account from Connections without changing Action metada
   await new Promise<void>((resolve) => setTimeout(resolve, 0))
   expect(actionWithConnections(metadata[0]!, initial).defaultConnection?.connectionId).toBe('account')
   const persisted = [...test.localStorage.entries]
-  test.request.mockImplementation(async () => Response.json({ version: 1, serviceId: 'mail', connections: [{ ...connection, connectionId: 'new-account' }] }))
+  test.request.mockImplementation(async () => Response.json({ success: true, data: [{ ...connection, id: 'new-account', service: 'mail' }] }))
   stores.connections.get('mail', 'flow', true)
   await vi.waitFor(() => expect(source.value.data?.[0]?.connectionId).toBe('new-account'))
   expect(actionWithConnections(metadata[0]!, source.value.data).defaultConnection?.connectionId).toBe('new-account')
@@ -134,7 +145,7 @@ it('updates the selected account from Connections without changing Action metada
   stores.dispose()
 })
 
-it('rejects account snapshots in Action responses instead of silently stripping them', async () => {
+it('rejects old Flow envelopes at Proxy endpoints', async () => {
   const test = setup()
   test.request.mockImplementation(async () => Response.json({ version: 1, actions: [{ ...action, defaultConnection: connection }] }))
   const stores = test.create()
@@ -148,8 +159,100 @@ it('does not reuse the old combined Action validator for the metadata endpoint',
   test.localStorage.setItem('open-flow:actions:v2:test:["flow","mail","en"]', JSON.stringify({ data: [action], etag: '"combined"' }))
   const stores = test.create()
   await resourceValue(stores.actions.get('mail', 'flow', 'en'))
-  expect(String(test.request.mock.calls[0]?.[0])).toBe('/v1/connector/action-metadata?flowId=flow&service=mail&locale=en')
+  expect(String(test.request.mock.calls[0]?.[0])).toBe('/v1/connector/proxy/actions?flowId=flow&service=mail&locale=en')
   expect(new Headers(test.request.mock.calls[0]?.[1]?.headers).has('if-none-match')).toBe(false)
-  expect([...test.localStorage.entries.keys()].some((key) => key.startsWith('open-flow:actions:v3:'))).toBe(true)
+  expect([...test.localStorage.entries.keys()].some((key) => key.startsWith('open-flow:proxy:actions:v1:'))).toBe(true)
+  stores.dispose()
+})
+
+it('preserves upstream response fields in storage and shares one Apps response across service views', async () => {
+  const test = setup()
+  const stores = test.create()
+  await resourceValue(stores.providers.get('flow', 'en'))
+  const persisted = JSON.parse([...test.localStorage.entries.values()][0]!).data
+  expect(persisted).toMatchObject({ success: true, data: [{ extra: 'preserved', authTypes: ['oauth2'] }] })
+  const all = stores.connections.get(undefined, 'flow')
+  const mail = stores.connections.get('mail', 'flow')
+  const other = stores.connections.get('other', 'flow')
+  await Promise.all([resourceValue(all), resourceValue(mail), resourceValue(other)])
+  expect(all.value.data).toEqual(mail.value.data)
+  expect(other.value.data).toEqual([])
+  expect(test.request.mock.calls.filter(([path]) => String(path).includes('/proxy/apps'))).toHaveLength(1)
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  test.request.mockImplementation(async () =>
+    Response.json({
+      success: true,
+      data: [{ id: 'other', service: 'other', displayName: 'Built in', status: 'active', isDefault: true, marketplace: { id: 'oomol' } }],
+    }),
+  )
+  stores.connections.get('mail', 'flow', true)
+  await vi.waitFor(() => expect(other.value.data?.[0]).toMatchObject({ connectionId: 'other', builtInAccount: true }))
+  expect(mail.value.data).toEqual([])
+  expect(all.value.data).toEqual(other.value.data)
+  stores.dispose()
+})
+
+it('requests repeated searches without validators or persistence', async () => {
+  const test = setup()
+  const stores = test.create()
+  for (let i = 0; i < 2; i++) {
+    const controller = new AbortController()
+    await resourceValue(stores.actions.search('send', 'flow', 'en', controller.signal).get())
+    controller.abort()
+  }
+  expect(test.request).toHaveBeenCalledTimes(2)
+  for (const [path, init] of test.request.mock.calls) {
+    expect(path).toBe('/v1/connector/action-metadata?flowId=flow&q=send&locale=en')
+    expect(new Headers(init?.headers).has('if-none-match')).toBe(false)
+  }
+  expect(test.localStorage.entries.size).toBe(0)
+  expect(test.sessionStorage.entries.size).toBe(0)
+  stores.dispose()
+})
+
+it.each([
+  [403, { success: false, errorCode: 'permission_denied', message: 'No access' }, 'permission_denied'],
+  [503, { error: { code: 'connector.unconfigured', message: 'Not configured' } }, 'connector.unconfigured'],
+  [200, { success: false, errorCode: 'catalog_failed', message: 'Unavailable' }, 'catalog_failed'],
+])('retains proxy and Flow error codes for status %s', async (status, body, code) => {
+  const test = setup()
+  test.request.mockImplementation(async () => Response.json(body, { status }))
+  const stores = test.create()
+  await expect(resourceValue(stores.providers.get('flow', 'en'))).rejects.toMatchObject({ code })
+  expect(test.localStorage.entries.size).toBe(0)
+  stores.dispose()
+})
+
+it('derives Action ports and authentication from independent Proxy responses', async () => {
+  const test = setup()
+  test.request.mockImplementation(async (path) =>
+    Response.json({
+      success: true,
+      data: String(path).includes('/providers')
+        ? [{ service: 'mail', displayName: 'Mail', authTypes: ['no_auth', 'api_key'] }]
+        : [
+            {
+              id: 'mail.send',
+              service: 'mail',
+              name: 'Send',
+              description: '',
+              inputSchema: { type: 'object', properties: { to: { type: 'string' }, limit: { type: 'integer', default: 10 } }, required: ['to'] },
+              outputSchema: { type: 'object', properties: { sent: { type: 'boolean' } }, required: ['sent'] },
+            },
+          ],
+    }),
+  )
+  const stores = test.create()
+  const [item] = await resourceValue(stores.actions.get('mail', 'flow', 'en'))
+  expect(item).toMatchObject({
+    authenticated: false,
+    inputs: { to: { nullable: false }, limit: { nullable: true, value: 10 } },
+    outputs: { sent: { nullable: false } },
+  })
+  expect(item).not.toHaveProperty('noSetup')
+  const persisted = JSON.parse([...test.localStorage.entries].find(([key]) => key.includes(':actions:'))![1]).data
+  expect(persisted.data[0]).not.toHaveProperty('authenticated')
+  expect(persisted.data[0]).not.toHaveProperty('serviceName')
+  expect(persisted.data[0]).toHaveProperty('inputSchema')
   stores.dispose()
 })

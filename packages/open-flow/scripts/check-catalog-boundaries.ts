@@ -4,6 +4,7 @@ import * as ts from 'typescript-lsp'
 const owners = new Set(['src/workbench/browser/runtime/stores/catalogStores.ts', 'src/workbench/browser/runtime/stores/triggerCatalog.ts'])
 const methods = new Set([
   'readCatalog',
+  'readProxyCatalog',
   'getTriggerCatalog',
   'listTriggerDefinitions',
   'listConnectorProviders',
@@ -31,7 +32,7 @@ for (const path of globSync('src/**/browser/**/*.{ts,tsx}')) {
     }
     if (
       (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node)) &&
-      /\/v1\/(connector\/(providers|actions|action-metadata|connections)(?:[/?]|$)|trigger-keys\/catalog)/.test(node.text)
+      /\/v1\/(connector\/(proxy\/(?:providers|actions|apps)|providers|actions|action-metadata|connections)(?:[/?]|$)|trigger-keys\/catalog)/.test(node.text)
     ) {
       violations.push(`${path}: catalog request paths belong to the catalog Stores`)
     }

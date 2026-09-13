@@ -112,10 +112,18 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
         version: 1,
       })
     }
-    if (path.startsWith('/v1/connector/connections/')) {
+    if (path.startsWith('/v1/connector/proxy/apps')) {
       const url = new URL(path, 'https://test.invalid')
-      const serviceId = decodeURIComponent(url.pathname.split('/').at(-1)!)
-      return Response.json({ version: 1, serviceId, connections: await fetchConnections(serviceId, url.searchParams.get('flowId') ?? undefined) })
+      return Response.json({
+        success: true,
+        data: (await fetchConnections('github', url.searchParams.get('flowId') ?? undefined)).map((account) => ({
+          id: account.connectionId,
+          service: account.serviceId,
+          displayName: account.displayName,
+          isDefault: account.isDefault,
+          status: account.status,
+        })),
+      })
     }
     if (path == `/v1/trigger-keys/catalog?locale=${language}`) {
       return Response.json({
@@ -178,7 +186,7 @@ describe('TriggerStore', () => {
       expect(options?.[0]).not.toHaveProperty('trigger.connectionId')
       expect(searched?.map((option) => option.id)).toEqual(['trigger:github.on_repo_event'])
       expect(requests.filter((path) => path == '/v1/trigger-keys/catalog?locale=en')).toHaveLength(1)
-      expect(requests.some((path) => path.startsWith('/v1/connector/connections/'))).toBe(false)
+      expect(requests.some((path) => path.startsWith('/v1/connector/proxy/apps'))).toBe(false)
     } finally {
       triggers.dispose()
       workspace.dispose()
