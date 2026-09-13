@@ -915,6 +915,15 @@
     "missingStatuses": "Certains statuts sélectionnés ne sont plus disponibles. Supprimez-les ou remplacez-les."
   },
   "nodePicker": {
+    "builtInNodes": "Nœuds intégrés",
+    "configured": "Configurées",
+    "configuredDescription": "Un compte est configuré et prêt à être utilisé.",
+    "builtInAccount": "Compte intégré",
+    "builtInAccountDescription": "Utilise un compte fourni par OOMOL. Son utilisation consomme des crédits.",
+    "noSetup": "Sans configuration",
+    "noSetupDescription": "Prêt à utiliser sans configurer de compte.",
+    "needsSetup": "À configurer",
+    "needsSetupDescription": "Ajoutez un compte ou renouvelez son autorisation pour utiliser ces applications.",
     "clearSearch": "Effacer la recherche",
     "search": "Rechercher des nœuds, applications ou actions…",
     "apps": "Applications",

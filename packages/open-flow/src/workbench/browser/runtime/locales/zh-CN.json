@@ -915,6 +915,15 @@
     "missingStatuses": "部分已选状态不再可用，请移除或重新选择。"
   },
   "nodePicker": {
+    "builtInNodes": "内置节点",
+    "configured": "已配置",
+    "configuredDescription": "已配置账号，可直接使用。",
+    "builtInAccount": "内置账号",
+    "builtInAccountDescription": "使用 OOMOL 提供的内置账号，使用时会扣除积分。",
+    "noSetup": "免配置",
+    "noSetupDescription": "无需配置账号即可使用。",
+    "needsSetup": "需要配置",
+    "needsSetupDescription": "添加或重新授权账号后即可使用。",
     "clearSearch": "清空搜索",
     "search": "搜索节点、应用或操作…",
     "apps": "应用",

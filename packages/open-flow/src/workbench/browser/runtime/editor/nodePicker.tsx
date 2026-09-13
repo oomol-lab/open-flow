@@ -317,33 +317,50 @@ export function NodePickerContent({
             ) : (
               <>
                 {section(
-                  t('nodePicker.builtIn'),
+                  t('nodePicker.builtInNodes'),
                   local.filter((item) => item.kind != 'trigger'),
                   true,
                 )}
-                <section>
-                  <h3 style={{ margin: 0 }} className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">
-                    {t('nodePicker.apps')}
-                  </h3>
-                  <AppDirectory viewport={list.current}>
-                    {apps
-                      .filter((item) => item.directory != null)
-                      .map((item) => (
-                        <Button
-                          variant="ghost"
-                          key={item.id}
-                          type="button"
-                          disabled={disabled || adding}
-                          onClick={() => navigateApp(item.id)}
-                          className="group/app h-auto justify-start whitespace-normal font-normal flex min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                        >
-                          <AppIcon src={item.icon} />
-                          <span className="min-w-0 flex-1 truncate py-1 text-[13px] font-normal leading-5">{item.label}</span>
-                          <span aria-hidden="true">›</span>
-                        </Button>
-                      ))}
-                  </AppDirectory>
-                </section>
+                {(['configured', 'builtInAccount', 'noSetup', 'needsSetup'] as const).map((group, priority) => {
+                  const items = apps.filter((item) => item.directory != null && (item.priority ?? 3) == priority)
+                  if (items.length == 0) return null
+                  return (
+                    <section key={group} className="mb-3">
+                      <div className="flex items-center gap-1 px-2.5 pb-1 text-muted-foreground">
+                        <h3 style={{ margin: 0 }} className="text-xs font-medium">
+                          {t(`nodePicker.${group}`)}
+                        </h3>
+                        <Tooltip>
+                          <TooltipTrigger
+                            aria-label={t(`nodePicker.${group}`)}
+                            className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <i aria-hidden="true" className="i-codicon:question text-[13px]" />
+                          </TooltipTrigger>
+                          <TooltipContent container={root} side="top" align="start">
+                            {t(`nodePicker.${group}Description`)}
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <AppDirectory viewport={list.current}>
+                        {items.map((item) => (
+                          <Button
+                            variant="ghost"
+                            key={item.id}
+                            type="button"
+                            disabled={disabled || adding}
+                            onClick={() => navigateApp(item.id)}
+                            className="group/app h-auto justify-start whitespace-normal font-normal flex min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                          >
+                            <AppIcon src={item.icon} />
+                            <span className="min-w-0 flex-1 truncate py-1 text-[13px] font-normal leading-5">{item.label}</span>
+                            <span aria-hidden="true">›</span>
+                          </Button>
+                        ))}
+                      </AppDirectory>
+                    </section>
+                  )
+                })}
               </>
             )}
             {(loading || (!term && page == 'nodes' && choicesLoading)) && <PickerStatus loading />}
@@ -409,7 +426,7 @@ function AppDirectory({ children, viewport }: { children: ReactElement[]; viewpo
     <div
       ref={container}
       className="grid grid-cols-2 gap-x-2"
-      style={{ paddingTop: (start / 2) * 42, paddingBottom: Math.ceil((children.length - end) / 2) * 42 }}
+      style={{ paddingTop: Math.ceil(start / 2) * 42, paddingBottom: Math.ceil((children.length - end) / 2) * 42 }}
       onKeyDown={(event) => {
         const button = (event.target as HTMLElement).closest('button')
         const index = [...event.currentTarget.querySelectorAll('button')].indexOf(button!) + start
