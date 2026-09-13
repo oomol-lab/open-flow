@@ -239,3 +239,38 @@ it('rejects malformed UTF-8 in configuration JSON bodies', async () => {
     await closeService(service)
   }
 })
+
+it('mounts independent Connector proxies with live settings and upstream cache headers', async () => {
+  const file = await databaseFile()
+  const service = await openService(file)
+  const configured = settings(file)
+  const app = createServerApp(service, { resolveControlActor: () => 'operator', settings: configured })
+  const fetcher = vi.fn(
+    async () => new Response('{ "success": true, "data": [] }', { headers: { 'etag': '"upstream"', 'cache-control': 'public, max-age=120' } }),
+  )
+  vi.stubGlobal('fetch', fetcher)
+  try {
+    expect((await (await app.request('/v1/connector/proxy/apps')).json()).error.code).toBe('connector.unconfigured')
+    expect(configured.putConnector(1, 'https://connector.example', 'first')).toBe('saved')
+    for (const resource of ['providers', 'actions', 'apps']) {
+      const response = await app.request(`/v1/connector/proxy/${resource}`)
+      expect(response.status).toBe(200)
+      expect(await response.text()).toBe('{ "success": true, "data": [] }')
+      expect(response.headers.get('etag')).toBe('"upstream"')
+      expect(response.headers.get('cache-control')).toBe('public, max-age=120')
+    }
+    expect(configured.putConnector(2, 'https://next.example', 'second')).toBe('saved')
+    await app.request('/v1/connector/proxy/apps')
+    const [target, init] = fetcher.mock.calls[3] as unknown as [URL, RequestInit]
+    expect(target.origin).toBe('https://next.example')
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer second')
+    expect((await app.request('/v1/connector/proxy/apps?flowId=missing')).status).toBe(404)
+    const anonymous = createServerApp(service, { settings: configured })
+    expect((await anonymous.request('/v1/connector/proxy/apps')).status).toBe(401)
+    expect(fetcher).toHaveBeenCalledTimes(4)
+    const environment = settings(file, { connectorOrigin: 'https://environment.example', connectorToken: 'env' })
+    expect(environment.connectorConfiguration()).toEqual({ origin: 'https://environment.example', token: 'env' })
+  } finally {
+    await closeService(service)
+  }
+})

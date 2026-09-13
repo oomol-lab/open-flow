@@ -61,6 +61,11 @@ export class Settings {
     return client
   }
 
+  connectorConfiguration(): { readonly origin: string; readonly token: string } | undefined {
+    const { origin, token } = this.#connectorValues(this.#store.state())
+    return origin == null || token == null ? undefined : { origin, token }
+  }
+
   connectorConsoleOrigin(): URL | undefined {
     if (this.#connectorConsoleOrigin != null) return new URL(this.#connectorConsoleOrigin)
     const stored = this.#store.state()
