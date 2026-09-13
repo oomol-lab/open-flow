@@ -9,11 +9,13 @@ export interface ContentIconProps {
   src?: string
   /** Applied to the `<img>` element. */
   className?: string
+  loading?: 'eager' | 'lazy'
+  decoding?: 'sync' | 'async' | 'auto'
   /** Fallback element if the `<img>` load failed. */
   fallback?: React.ReactNode
 }
 
-export const ContentIcon = ({ src, className, fallback = null }: ContentIconProps) => {
+export const ContentIcon = ({ src, className, fallback = null, loading = 'lazy', decoding = 'async' }: ContentIconProps) => {
   const image = useMemo(() => parseImageIcon(src), [src])
   const source = image?.source ?? src
   const result = useMemo(() => parseIconifyIcon(source), [source])
@@ -31,12 +33,17 @@ export const ContentIcon = ({ src, className, fallback = null }: ContentIconProp
   if (!source) {
     return fallback as React.ReactElement
   }
-  if (source === error) return image == null ? (fallback as React.ReactElement) : <ContentIcon className={className} fallback={fallback} src={image.fallback} />
+  if (source === error)
+    return image == null ? (
+      (fallback as React.ReactElement)
+    ) : (
+      <ContentIcon className={className} fallback={fallback} src={image.fallback} loading={loading} decoding={decoding} />
+    )
 
   return result ? (
     <IconifyIcon collection={result.collection} icon={result.icon} color={result.color} className={className} onError={onError} />
   ) : (
-    <img className={clsx(styles.img, className)} src={source} alt="" decoding="async" loading="lazy" referrerPolicy="no-referrer" onError={onError} />
+    <img className={clsx(styles.img, className)} src={source} alt="" decoding={decoding} loading={loading} referrerPolicy="no-referrer" onError={onError} />
   )
 }
 

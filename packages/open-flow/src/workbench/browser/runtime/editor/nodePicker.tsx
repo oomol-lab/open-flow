@@ -37,7 +37,8 @@ export function NodePickerContent({
   const [page, setPage] = useState('nodes')
   const [query, setQuery] = useState('')
   const searchInput = useRef<HTMLInputElement>(null)
-  const term = useDebouncedValue(query, 150).trim()
+  const debouncedQuery = useDebouncedValue(query, 150)
+  const term = query.trim() ? debouncedQuery.trim() : ''
   const [catalog, setCatalog] = useState<readonly AddNodeOption[]>([])
   const [results, setResults] = useState<readonly AddNodeOption[]>([])
   const [appId, setAppId] = useState<string>()
@@ -280,7 +281,7 @@ export function NodePickerContent({
                   t('addNode.blocks'),
                   matches.filter((item) => item.kind != 'trigger'),
                 )}
-                {!loading && !failed && matches.length == 0 && <p className="p-3 text-sm text-muted-foreground">{t('contextPanel.empty')}</p>}
+                {!loading && !failed && matches.length == 0 && <PickerStatus />}
               </>
             ) : page == 'triggers' ? (
               <>
@@ -297,7 +298,7 @@ export function NodePickerContent({
             ) : app != null ? (
               <>
                 <div className="grid">{actions.map((item) => row(item))}</div>
-                {!choicesLoading && !choicesFailed && actions.length == 0 && <p className="p-3 text-sm text-muted-foreground">{t('contextPanel.empty')}</p>}
+                {!choicesLoading && !choicesFailed && actions.length == 0 && <PickerStatus />}
               </>
             ) : (
               <>
@@ -310,7 +311,7 @@ export function NodePickerContent({
                   <h3 style={{ margin: 0 }} className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">
                     {t('nodePicker.apps')}
                   </h3>
-                  <div className="grid grid-cols-2 gap-x-2">
+                  <AppDirectory viewport={list.current}>
                     {apps
                       .filter((item) => item.directory != null)
                       .map((item) => (
@@ -327,16 +328,11 @@ export function NodePickerContent({
                           <span aria-hidden="true">›</span>
                         </Button>
                       ))}
-                  </div>
+                  </AppDirectory>
                 </section>
               </>
             )}
-            {(loading || (!term && page == 'nodes' && choicesLoading)) && (
-              <div className="flex items-center gap-2 p-3 text-xs text-muted-foreground" role="status">
-                <Spinner />
-                {t('contextPanel.loading')}
-              </div>
-            )}
+            {(loading || (!term && page == 'nodes' && choicesLoading)) && <PickerStatus loading />}
             {(failed || catalogFailed || (!term && page == 'nodes' && choicesFailed)) && (
               <div className="flex items-center justify-between gap-2 p-3 text-xs" role="alert">
                 {t('contextPanel.loadFailed')}
@@ -367,7 +363,72 @@ export function NodePickerContent({
 function AppIcon({ src }: { src?: string }) {
   return (
     <span className="flex size-7 shrink-0 items-center justify-center rounded-[9px] bg-popover border border-[color-mix(in_srgb,var(--ui-foreground)_9%,var(--ui-popover))] text-[16px] group-hover/app:border-[color-mix(in_srgb,var(--ui-foreground)_14%,var(--ui-popover))] group-focus-visible/app:border-[color-mix(in_srgb,var(--ui-foreground)_14%,var(--ui-popover))] [--content-icon-initials-background:transparent]">
-      <ContentIcon src={src} className="size-4 data-[icon-kind=initials]:text-[20px]" />
+      <ContentIcon src={src} loading="eager" decoding="sync" className="size-4 data-[icon-kind=initials]:text-[20px]" />
     </span>
+  )
+}
+
+// App rows have a fixed 42px height. Keep only the viewport and a small overscan mounted.
+function AppDirectory({ children, viewport }: { children: ReactElement[]; viewport: HTMLDivElement | null }) {
+  const container = useRef<HTMLDivElement>(null)
+  const [range, setRange] = useState({ start: 0, end: 20 })
+  useEffect(() => {
+    if (!viewport || !container.current) return
+    const update = () => {
+      const offset = container.current!.getBoundingClientRect().top - viewport.getBoundingClientRect().top + viewport.scrollTop
+      const start = Math.max(0, Math.floor((viewport.scrollTop - offset) / 42) - 4)
+      const end = Math.max(20, Math.ceil((viewport.scrollTop - offset + viewport.clientHeight) / 42) + 4)
+      setRange((previous) => (previous.start == start && previous.end == end ? previous : { start, end }))
+    }
+    update()
+    viewport.addEventListener('scroll', update)
+    const observer = new ResizeObserver(update)
+    observer.observe(viewport)
+    return () => {
+      viewport.removeEventListener('scroll', update)
+      observer.disconnect()
+    }
+  }, [viewport, children.length])
+  const start = Math.min(range.start * 2, children.length)
+  const end = Math.min(range.end * 2, children.length)
+  return (
+    <div
+      ref={container}
+      className="grid grid-cols-2 gap-x-2"
+      style={{ paddingTop: (start / 2) * 42, paddingBottom: Math.ceil((children.length - end) / 2) * 42 }}
+      onKeyDown={(event) => {
+        const button = (event.target as HTMLElement).closest('button')
+        const index = [...event.currentTarget.querySelectorAll('button')].indexOf(button!) + start
+        const step = event.key == 'ArrowDown' ? 1 : event.key == 'ArrowUp' ? -1 : event.key == 'Tab' ? (event.shiftKey ? -1 : 1) : 0
+        const next = index + step
+        if (!step || next < 0 || next >= children.length) return
+        event.preventDefault()
+        event.stopPropagation()
+        if (next < start || next >= end) setRange({ start: Math.max(0, Math.floor(next / 2) - 4), end: Math.floor(next / 2) + 16 })
+        requestAnimationFrame(() => {
+          const target = container.current?.querySelector<HTMLButtonElement>(`[data-app-index="${next}"] button`)
+          target?.focus()
+          target?.scrollIntoView({ block: 'nearest' })
+        })
+      }}
+    >
+      {children.slice(start, end).map((child, index) => (
+        <div key={child.key} data-app-index={start + index} className="grid h-[42px] min-w-0">
+          {child}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function PickerStatus({ loading = false }: { loading?: boolean }) {
+  const t = useTranslate()
+  return (
+    <div className="flex items-center gap-2 p-3 text-xs leading-4 text-muted-foreground" role="status">
+      <span aria-hidden="true" className="flex size-4 shrink-0 items-center justify-center">
+        {loading ? <Spinner /> : <i className="i-lucide-light:search-x text-base" />}
+      </span>
+      <span>{t(loading ? 'contextPanel.loading' : 'contextPanel.empty')}</span>
+    </div>
   )
 }

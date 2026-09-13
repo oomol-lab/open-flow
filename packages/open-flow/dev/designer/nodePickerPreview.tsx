@@ -42,6 +42,8 @@ const sampleActions = [
 function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const [mode, setMode] = useState<'ready' | 'failed' | 'loading'>('ready')
   const [disabled, setDisabled] = useState(false)
+  const [largeCatalog, setLargeCatalog] = useState(false)
+  const [slowAdd, setSlowAdd] = useState(false)
   const session = useMemo(
     () =>
       createTriggerSession(triggerFixtures[0]!.trigger, language, log, 'sample', false, {
@@ -103,6 +105,8 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
   const options = useVal(session.workspace.$.addNodeOptions)
   const catalog = useVal(session.triggers.catalog.state)
   useStoryActions([
+    { label: largeCatalog ? 'Small catalog' : '1,000 apps', onClick: () => setLargeCatalog(!largeCatalog) },
+    { label: slowAdd ? 'Instant add' : 'Slow add', onClick: () => setSlowAdd(!slowAdd) },
     { label: 'Ready', onClick: () => setMode('ready') },
     { label: 'Loading', onClick: () => setMode('loading') },
     { label: 'Error', onClick: () => setMode('failed') },
@@ -117,7 +121,18 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
             if (signal.aborted) resolve()
             else signal.addEventListener('abort', () => resolve(), { once: true })
           })
-        return [...((await session.triggers.browseAddNodeOptions(signal)) ?? []), ...((await connectors.browseAddNodeOptions(signal)) ?? [])]
+        const apps = (await connectors.browseAddNodeOptions(signal)) ?? []
+        const sample = apps.find((item) => item.kind == 'connector-group')
+        const extra =
+          largeCatalog && sample
+            ? Array.from({ length: 1000 }, (_, index) => ({
+                ...sample,
+                id: `sample-${index}`,
+                serviceId: `sample-${index}`,
+                label: `Sample App ${String(index).padStart(4, '0')}`,
+              }))
+            : []
+        return [...((await session.triggers.browseAddNodeOptions(signal)) ?? []), ...apps, ...extra]
       },
       searchOptions: async (query: string, signal: AbortSignal) => [
         ...((await session.triggers.provideAddNodeOptions(query, signal)) ?? []),
@@ -125,7 +140,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
       ],
       provideChoices: connectors.provideAddNodeOptionChoices,
     }),
-    [session, connectors, mode],
+    [session, connectors, mode, largeCatalog],
   )
   const props = {
     ...data,
@@ -134,6 +149,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
     disabled,
     focusRequest: 0,
     onAdd: async (option: (typeof options)[number]) => {
+      if (slowAdd) await new Promise((resolve) => setTimeout(resolve, 1500))
       log('Add node', option.id)
       return option.id
     },
