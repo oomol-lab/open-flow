@@ -30,7 +30,12 @@ describe('Field validation presentation', () => {
     try {
       expect(render(invalid)).toContain('aria-invalid="true"')
       expect(render(valid)).not.toContain('aria-invalid="true"')
-      expect(render(null, true)).not.toContain('aria-invalid="true"')
+      // Nullable null follows the existing unset presentation, including selection prompts.
+      if (_label === 'boolean' || _label === 'multiple select') {
+        expect(render(null, true).includes('aria-invalid="true"')).toBe(render(undefined, true).includes('aria-invalid="true"'))
+      } else {
+        expect(render(null, true)).not.toContain('aria-invalid="true"')
+      }
       expect(onChange).not.toHaveBeenCalled()
     } finally {
       i18n.dispose()
@@ -96,6 +101,41 @@ describe('JSON component with union schemas', () => {
       expect(render('hello', false)).toContain('choice variant')
       expect(onChange).not.toHaveBeenCalled()
       expect(onDefinitionChange).not.toHaveBeenCalled()
+    } finally {
+      i18n.dispose()
+    }
+  })
+})
+
+describe('Nullable field presentation', () => {
+  it('presents a nullable text null as unset without writing a value', () => {
+    const i18n = createI18n('en')
+    const onChange = vi.fn()
+    try {
+      const render = (value: unknown, schema: unknown = { type: 'string' }) =>
+        renderToStaticMarkup(
+          <I18nProvider i18n={i18n}>
+            <ValueEditor
+              label="note"
+              header={<span>note</span>}
+              schema={schema}
+              value={value}
+              nullable
+              onChange={onChange}
+              path="/note"
+              onDraftIssue={vi.fn()}
+            />
+          </I18nProvider>,
+        )
+      for (const value of [null, undefined]) {
+        const markup = render(value)
+        expect(markup).toContain('note Set value')
+        expect(markup).not.toContain('aria-invalid="true"')
+        expect(markup).toContain('>null</span>')
+      }
+      expect(render('', { type: 'string' })).toContain('placeholder="Empty string"')
+      expect(render(null, { type: 'null' })).toContain('>null</span>')
+      expect(onChange).not.toHaveBeenCalled()
     } finally {
       i18n.dispose()
     }

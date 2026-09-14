@@ -13,6 +13,7 @@
     "unset": "未设置",
     "clear": "清除",
     "select": "选择值",
+    "selectMultiple": "选择多个值",
     "setValue": "点击设置",
     "remove": "移除",
     "createObject": "创建对象",

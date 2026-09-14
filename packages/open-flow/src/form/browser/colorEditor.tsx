@@ -59,7 +59,7 @@ export function ColorEditor({ value, schema, label, disabled, onChange, path, on
           aria-label={label}
           aria-invalid={schemaInvalid || (text !== '' && !valid)}
           value={text}
-          disabled={disabled}
+          readOnly={disabled}
           onChange={(event) => {
             const next = event.target.value
             setText(next)

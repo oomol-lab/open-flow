@@ -360,16 +360,6 @@ function Editor({
                 }
               : undefined
           }
-          nodeActions={
-            contextPanelMode == 'inspector' && selectedDesignerNode != null && selectedDesignerNode.kind != 'comment'
-              ? {
-                  ignored: ignoredNodeIds.includes(selectedDesignerNode.id),
-                  onIgnore: (ignored) => onIgnoreNodes([selectedDesignerNode.id], ignored),
-                  onDuplicate: selectedDesignerNode.kind == 'trigger' ? undefined : () => void store.workspace.duplicateSelectedNodes(),
-                  onDelete: authoringDisabled ? undefined : () => void store.workspace.deleteSelectedNodes(),
-                }
-              : undefined
-          }
           focusOnOpen={contextPanelMode == 'inspector' && focusInspectorOnOpen.current}
           icon={contextPanelMode == 'blocks' ? 'plus' : contextPanelMode == 'notification' ? 'connection' : inspectorIcon(selection, target)}
           onClose={() => (contextPanelMode == 'notification' ? setContextPanelMode('inspector') : closeContextPanel())}

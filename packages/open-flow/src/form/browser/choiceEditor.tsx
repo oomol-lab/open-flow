@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '../../ui/brows
 import { choiceSchema, enumIndex, schemaChoices } from '../common/choices.ts'
 import { compile } from '../common/validation/validator.ts'
 import { initialValue, objectValue } from '../common/value.ts'
-import { FieldSelect, fieldSelectTriggerClass } from './fieldSelect.tsx'
+import { FieldSelect, fieldSelectTriggerClass, selectionMenuRowClass } from './fieldSelect.tsx'
 
 export function ChoiceEditor(props: ValueEditorProps & { render: (schema: unknown, index: number) => ReactNode }) {
   const { schema, value, label, disabled, onChange, render } = props
@@ -64,6 +64,7 @@ export function EnumChoices({
   invalid?: boolean
   onChange: (value: unknown) => void
 }) {
+  const [open, setOpen] = useState(false)
   const t = useTranslate()
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const display = (option: unknown, index: number) =>
@@ -72,17 +73,19 @@ export function EnumChoices({
   return (
     <div ref={setContainer} className="min-w-0">
       <Select
+        open={open}
+        onOpenChange={setOpen}
         multiple
         disabled={disabled}
         value={options.flatMap((option, index) => (Array.isArray(value) && enumIndex(value, option) >= 0 ? [String(index)] : []))}
         onValueChange={(next) => onChange(next.map((index) => structuredClone(options[Number(index)])))}
       >
-        <SelectTrigger aria-label={label} aria-invalid={invalid} className={fieldSelectTriggerClass}>
-          <span className="min-w-0 flex-1 truncate text-left">{value === undefined ? t('valueEditor.unset') : selected.join(', ') || '[]'}</span>
+        <SelectTrigger aria-label={label} aria-invalid={invalid || value === undefined} className={fieldSelectTriggerClass}>
+          <span className="min-w-0 flex-1 truncate text-left">{value === undefined ? t('valueEditor.selectMultiple') : selected.join(', ') || '[]'}</span>
         </SelectTrigger>
         <SelectContent container={container} align="start" alignItemWithTrigger={false} className="p-1">
           {options.map((option, index) => (
-            <SelectItem key={index} value={String(index)} className="text-xs">
+            <SelectItem key={index} value={String(index)} className={selectionMenuRowClass}>
               {display(option, index)}
             </SelectItem>
           ))}

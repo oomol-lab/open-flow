@@ -1,6 +1,9 @@
 .open-flow-workbench {
   .editor-context-panel {
     --ui-control-radius: 6px;
+    --ui-disabled-opacity: 1;
+    --ui-disabled-cursor: default;
+    --ui-disabled-background: var(--ui-control-background);
     --ui-input: color-mix(in srgb, var(--ui-border) 70%, var(--open-flow-node-content));
     --ui-card: var(--open-flow-node-surface);
     --ui-background: var(--open-flow-node-surface);
@@ -61,6 +64,10 @@
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .editor-context-panel > header {
+    padding-inline: 8px;
   }
 
   .context-panel-node-heading {
@@ -143,7 +150,7 @@
   }
 
   .inspector-content {
-    padding-right: 8px;
+    padding-right: 10px;
     font-size: 12px;
     display: flex;
     min-height: 100%;

@@ -1,0 +1,10 @@
+@use './inspectorGeometry.scss' as geometry;
+
+.field {
+  padding: 12px;
+
+  textarea {
+    margin-left: geometry.$name-inset - 12px;
+    width: calc(100% - (#{geometry.$name-inset} - 12px));
+  }
+}

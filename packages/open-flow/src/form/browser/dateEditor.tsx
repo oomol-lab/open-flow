@@ -30,7 +30,7 @@ export function DateEditor({
           className="h-full min-w-0 px-2 text-xs md:text-xs"
           aria-label={label}
           aria-invalid={invalid}
-          disabled={disabled}
+          readOnly={disabled}
           value={typeof value === 'string' ? value : ''}
           onChange={(event) => onChange(event.target.value)}
         />
@@ -66,7 +66,7 @@ export function DateEditor({
                         max={index === 0 ? 23 : index === 1 ? 59 : 59.999}
                         step={index === 2 ? 0.001 : 1}
                         defaultValue={time.split(':')[index]}
-                        disabled={disabled}
+                        readOnly={disabled}
                         className="w-16 text-xs md:text-xs"
                         onBlur={(event) => {
                           const input = event.currentTarget

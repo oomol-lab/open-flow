@@ -103,7 +103,7 @@ export function JsonEditor({
           ref={fallback}
           aria-label={`${label} JSON`}
           aria-invalid={invalid || schemaInvalid}
-          disabled={disabled}
+          readOnly={disabled}
           className={styles.json}
           value={text}
           onChange={(event) => change(event.target.value)}

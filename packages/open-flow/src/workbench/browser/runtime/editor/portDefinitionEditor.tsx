@@ -38,7 +38,7 @@ function PortName({ value, disabled, names, onChange }: { value: string; disable
     <Input
       aria-label={t('valueEditor.fieldName')}
       aria-invalid={invalid}
-      disabled={disabled}
+      readOnly={disabled}
       value={draft}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={save}
@@ -86,7 +86,7 @@ function PortSchema({ value, disabled, onChange }: { value: InputPort['jsonSchem
         <Textarea
           aria-label="JSON Schema"
           aria-invalid={invalid}
-          disabled={disabled}
+          readOnly={disabled}
           value={text}
           onChange={(event) => {
             setText(event.target.value)
@@ -263,17 +263,17 @@ export function PortDefinitionEditor(props: PortEditorProps) {
     const header = (
       <div className={styles.heading}>
         <span data-field-name className={styles.name} title={[port.handle, port.description].filter(Boolean).join(' — ')}>
-          {props.layout === 'values' && !disabled ? (
+          {props.layout === 'values' ? (
             <PortName
               value={port.handle}
               names={[...reservedNames, ...values.flatMap((entry) => ('handle' in entry ? [entry.handle] : []))]}
-              disabled={false}
+              disabled={disabled}
               onChange={(handle) => update(index, { ...port, handle })}
             />
           ) : (
             <>
               {port.handle}
-              {props.layout !== 'values' && port.nullable ? ' ?' : ''}
+              {port.nullable ? ' ?' : ''}
             </>
           )}
         </span>
@@ -300,6 +300,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
     const trailingControl = props.layout === 'values' && (
       <span className={styles.nullableControl}>
         <Checkbox
+          className="not-data-disabled:cursor-pointer"
           aria-label={`${port.handle} ${t('valueEditor.nullable')}`}
           checked={port.nullable === true}
           disabled={disabled}
@@ -308,17 +309,25 @@ export function PortDefinitionEditor(props: PortEditorProps) {
       </span>
     )
     const options = !disabled ? (
-      <Button
-        type="button"
-        size="xs"
-        variant="ghost"
-        aria-label={`${port.handle} ${t('valueEditor.fieldSettings')}`}
-        aria-expanded={editingIndex === index}
-        onClick={() => setEditingIndex(editingIndex === index ? undefined : index)}
-      >
-        <i aria-hidden="true" className="i-lucide-light:settings-2" />
-        {t('valueEditor.fieldSettings')}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              type="button"
+              size={props.layout === 'values' ? 'icon-sm' : 'xs'}
+              variant="ghost"
+              data-value-options
+              aria-label={`${port.handle} ${t('valueEditor.fieldSettings')}`}
+              aria-expanded={editingIndex === index}
+              onClick={() => setEditingIndex(editingIndex === index ? undefined : index)}
+            />
+          }
+        >
+          <i aria-hidden="true" className={props.layout === 'values' ? 'i-carbon:tuning' : 'i-lucide-light:settings-2'} />
+          {props.layout !== 'values' && t('valueEditor.fieldSettings')}
+        </TooltipTrigger>
+        <TooltipContent container={list.current}>{t('valueEditor.fieldSettings')}</TooltipContent>
+      </Tooltip>
     ) : undefined
     const settings =
       editingIndex === index && !disabled ? (
@@ -348,11 +357,16 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             <Input
               id={`${listId}-${index}-description`}
               value={port.description ?? ''}
-              disabled={disabled}
+              readOnly={disabled}
               onChange={(event) => update(index, { ...port, description: event.target.value })}
             />
             <Label className="flex items-center gap-2 text-xs font-normal">
-              <Checkbox disabled={disabled} checked={port.nullable} onCheckedChange={(nullable) => update(index, { ...port, nullable: nullable === true })} />
+              <Checkbox
+                className="not-data-disabled:cursor-pointer"
+                disabled={disabled}
+                checked={port.nullable}
+                onCheckedChange={(nullable) => update(index, { ...port, nullable: nullable === true })}
+              />
               {t('valueEditor.nullable')}
             </Label>
             <PortSchema

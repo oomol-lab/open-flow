@@ -13,6 +13,7 @@
     "unset": "설정 안 됨",
     "clear": "지우기",
     "select": "값 선택",
+    "selectMultiple": "여러 값 선택",
     "setValue": "값 설정",
     "remove": "삭제",
     "createObject": "객체 만들기",

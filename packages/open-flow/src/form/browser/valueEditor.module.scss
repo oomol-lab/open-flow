@@ -166,7 +166,6 @@
 }
 .summary {
   --preview-background: var(--ui-control-background, var(--ui-muted));
-  --preview-hover-background: var(--ui-control-hover-background, var(--ui-accent));
   --preview-border: var(--ui-input);
   min-width: 0;
   height: var(--field-control-height);
@@ -179,17 +178,60 @@
   text-overflow: ellipsis;
   &[aria-expanded='true'] {
     --preview-background: color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-background));
-    --preview-hover-background: color-mix(in srgb, var(--ui-foreground) 6%, var(--ui-background));
     --preview-border: transparent;
-  }
-  &:hover {
-    background: var(--preview-hover-background);
   }
 }
 .arrayItemType {
   grid-column: var(--field-value-column);
   grid-row: 1;
   min-width: 0;
+}
+.valueTools {
+  grid-column: var(--field-value-column);
+  grid-row: var(--field-value-row);
+  align-self: start;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  height: var(--field-control-height);
+  margin-right: calc(var(--value-suffix-width) + 3px);
+  z-index: 1;
+  color: var(--ui-muted-foreground);
+}
+.root[data-value-tools] {
+  > .arrayItemType [data-slot='select-trigger'],
+  &:not([data-collection]) > .body > div > :is([data-slot='select-trigger'], [aria-haspopup]) {
+    position: relative;
+    > svg {
+      position: absolute;
+      right: 8px;
+      pointer-events: none;
+    }
+  }
+  > .summary,
+  > .arrayItemType [data-slot='select-trigger'],
+  &:not([data-collection]) > .body > :is(input, select, button, [role='button']),
+  &:not([data-collection]) > .body > div > :is([data-slot='select-trigger'], [data-slot='button']) {
+    padding-right: calc(var(--value-tools-width) + var(--value-suffix-width) + 8px);
+  }
+  &:not([data-collection]) > .body [data-slot='input-group'] input {
+    padding-right: calc(var(--value-tools-width) + 8px);
+  }
+}
+.root[data-array-child] > .valueTools {
+  grid-column: handle / content-end;
+  grid-row: 1;
+}
+.root {
+  > .valueTools > .clearValue {
+    opacity: 0;
+    pointer-events: none;
+  }
+  &:has(> .body:hover, > .summary:hover, > .arrayItemType:hover, > .valueTools:hover) > .valueTools > .clearValue,
+  > .valueTools > .clearValue:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 .arrayIndex {
   position: absolute;
@@ -381,11 +423,6 @@
   justify-content: space-between;
   border-color: var(--ui-input);
   background: var(--ui-control-background, var(--ui-muted));
-  &[data-danger] {
-    border-color: color-mix(in srgb, var(--ui-destructive) 55%, var(--ui-input));
-    color: color-mix(in srgb, var(--ui-destructive) 70%, var(--ui-muted-foreground));
-    font-size: 11px;
-  }
   > i {
     opacity: 0;
   }

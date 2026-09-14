@@ -13,6 +13,7 @@
     "unset": "Non défini",
     "clear": "Effacer",
     "select": "Sélectionner une valeur",
+    "selectMultiple": "Sélectionner des valeurs",
     "setValue": "Définir la valeur",
     "remove": "Supprimer",
     "createObject": "Créer un objet",

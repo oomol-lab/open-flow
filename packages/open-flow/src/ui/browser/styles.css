@@ -88,15 +88,35 @@
   @apply text-field-focus;
 }
 
-/* Tint the control surface once, including grouped inputs and code editors. */
-:is([data-slot='input'], [data-slot='textarea'], [data-slot='native-select'], [data-slot='select-trigger'], [data-slot='button'])[aria-invalid='true'],
-[data-slot='input-group']:has([data-slot][aria-invalid='true']),
-.open-flow-code-editor.cm-editor[data-invalid='true'] {
-  background-color: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
+/* Field surfaces share hover feedback, regardless of their editor implementation. */
+:is(
+  [data-slot='input'],
+  [data-slot='textarea'],
+  [data-slot='native-select'],
+  [data-slot='select-trigger'],
+  [data-slot='input-group'],
+  [data-field-control],
+  .open-flow-code-editor.cm-editor
+):not(:disabled):not([readonly]):not([aria-disabled='true']):not(:has(:disabled, [readonly])):hover {
+  background-color: var(--ui-control-hover-background, var(--ui-muted));
 }
 
+/* Tint the control surface once, including grouped inputs and code editors. */
+:is([data-slot='input'], [data-slot='textarea'], [data-slot='native-select'], [data-slot='select-trigger'], button)[aria-invalid='true'],
+[data-slot='input-group']:has([data-slot][aria-invalid='true']),
 .open-flow-code-editor.cm-editor[data-invalid='true'] {
   border-color: var(--ui-destructive);
+  background-color: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
+  &:not(:disabled):not([readonly]):not([aria-disabled='true']):not(:has(:disabled, [readonly])):hover {
+    background-color: color-mix(in srgb, var(--ui-destructive) 8%, var(--ui-control-background, var(--ui-background)));
+  }
+}
+
+:is(button, [data-slot='select-trigger'])[aria-invalid='true'] {
+  color: var(--ui-destructive);
+  > svg {
+    color: inherit;
+  }
 }
 .open-flow-code-editor.cm-editor.cm-focused[data-invalid='true'] {
   @apply invalid-text-field-focus;

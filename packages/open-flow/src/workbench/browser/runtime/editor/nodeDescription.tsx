@@ -1,3 +1,5 @@
+import styles from './nodeDescription.module.scss'
+
 import { useEffect, useId, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
@@ -16,7 +18,7 @@ export function NodeDescription({ value, disabled, onSave }: Props) {
   const [draft, setDraft] = useState(value ?? '')
   useEffect(() => setDraft(value ?? ''), [value])
   return (
-    <Field className="px-3 py-3">
+    <Field className={styles.field}>
       <FieldLabel htmlFor={id}>{t('inspector.node.description')}</FieldLabel>
       <Textarea
         id={id}

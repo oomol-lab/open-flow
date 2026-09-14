@@ -32,7 +32,6 @@ export function InspectorSamplePanel({
   theme: WorkbenchTheme
 }) {
   const [open, setOpen] = useState(true)
-  const [ignored, setIgnored] = useState(false)
   const t = useTranslate()
   const target = { kind: 'flow' } as const
   const icon = inspectorIcon(selection, target)
@@ -71,25 +70,6 @@ export function InspectorSamplePanel({
           onIconChange: (value) => {
             void store.saveNodeIcon(selection.id, value)
           },
-        }
-      }
-      nodeActions={
-        selection && {
-          ignored,
-          onIgnore: setIgnored,
-          onDuplicate:
-            selection.kind === 'trigger'
-              ? undefined
-              : () => {
-                  store.selectNodes([selection.id])
-                  void store.duplicateSelectedNodes()
-                },
-          onDelete: disabled
-            ? undefined
-            : () => {
-                store.selectNodes([selection.id])
-                void store.deleteSelectedNodes()
-              },
         }
       }
     >
