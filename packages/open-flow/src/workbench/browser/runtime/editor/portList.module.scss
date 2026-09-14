@@ -4,7 +4,7 @@
   container: value-fields / inline-size;
   min-width: 0;
   --field-toggle-width: 20px;
-  --field-grip-width: calc(var(--field-toggle-width) - 2px);
+  --field-grip-width: 0px;
   padding: 8px 12px 16px 3px;
   --field-actions-width: 28px;
   &[data-inputs] {
@@ -40,7 +40,6 @@
 }
 
 .grip {
-  opacity: 0;
   cursor: grab;
   color: var(--ui-muted-foreground);
   &:active {
@@ -183,11 +182,6 @@
 
 .row[data-dragging] {
   opacity: 0.45;
-}
-
-.row:hover .grip,
-.row:focus-within .grip {
-  opacity: 1;
 }
 
 .columns {

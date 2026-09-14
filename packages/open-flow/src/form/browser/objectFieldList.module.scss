@@ -24,14 +24,9 @@
 }
 .grip {
   width: var(--field-toggle-width, 24px);
-  opacity: 0;
   cursor: grab;
   touch-action: none;
   &:active {
     cursor: grabbing;
   }
-}
-.row:hover .grip,
-.row:focus-within .grip {
-  opacity: 1;
 }

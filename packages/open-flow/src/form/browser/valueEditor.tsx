@@ -2,7 +2,7 @@ import styles from './valueEditor.module.scss'
 import type { ReactNode } from 'react'
 import type { ValueType } from '../common/value.ts'
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../ui/browser/button.tsx'
 import { Input } from '../../ui/browser/input.tsx'
@@ -19,6 +19,7 @@ import { ColorEditor } from './colorEditor.tsx'
 import { DateEditor } from './dateEditor.tsx'
 import { EditorComponentSelect } from './editorComponentSelect.tsx'
 import { FieldSelect } from './fieldSelect.tsx'
+import { FieldSorting } from './fieldSorting.ts'
 import { JsonEditor } from './jsonEditor.tsx'
 import { ObjectFieldList } from './objectFieldList.tsx'
 
@@ -79,6 +80,7 @@ function PropertyName({ name, onRename, disabled }: { name: string; onRename: (n
 
 /** Controlled JSON value editing. It has no graph, port, persistence, or theme context. */
 export function ValueEditor(props: ValueEditorProps) {
+  const sorting = useContext(FieldSorting)
   const { schema, value, onChange, label, nullable, disabled, path, onDraftIssue, depth = 0 } = props
   const t = useTranslate()
   const id = useId()
@@ -257,7 +259,7 @@ export function ValueEditor(props: ValueEditorProps) {
       {props.header != null && (
         <div className={styles.header} title={props.description}>
           {props.leadingControl != null && <div className={styles.leadingControl}>{props.leadingControl}</div>}
-          {expandable && (
+          {expandable && !sorting && (
             <div className={styles.toggleControl}>
               <Button
                 type="button"
@@ -279,6 +281,7 @@ export function ValueEditor(props: ValueEditorProps) {
         <button
           type="button"
           className={styles.summary}
+          disabled={sorting}
           aria-label={`${label} ${t('valueEditor.setValue')}`}
           aria-expanded={expanded}
           onClick={() => setExpanded(!expanded)}
@@ -394,7 +397,7 @@ export function ValueEditor(props: ValueEditorProps) {
             <span className={styles.nullChip}>null</span>
           </div>
         ) : type === 'object' ? (
-          <div className={styles.collection} data-reorder={(!disabled && props.onDefinitionChange != null) || undefined}>
+          <div className={styles.collection}>
             <ObjectFieldList
               names={names}
               onReorder={!disabled && props.onDefinitionChange ? (order) => props.onDefinitionChange!({ ...source, 'ui:order': order }, value) : undefined}

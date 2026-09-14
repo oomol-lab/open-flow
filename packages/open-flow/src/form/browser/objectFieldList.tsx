@@ -1,9 +1,10 @@
 import styles from './objectFieldList.module.scss'
 import type { ReactNode } from 'react'
 
-import { useRef, useState } from 'react'
+import { useContext, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../ui/browser/button.tsx'
+import { FieldSorting } from './fieldSorting.ts'
 
 export function ObjectFieldList({
   names,
@@ -14,6 +15,7 @@ export function ObjectFieldList({
   onReorder?: (names: string[]) => void
   children: (name: string, handle?: ReactNode) => ReactNode
 }) {
+  const sorting = useContext(FieldSorting)
   const t = useTranslate()
   const list = useRef<HTMLDivElement>(null)
   const drag = useRef<{ name: string; x: number; y: number; order: string; insertion?: number }>()
@@ -44,7 +46,7 @@ export function ObjectFieldList({
         >
           {children(
             name,
-            onReorder && (
+            sorting && onReorder && (
               <Button
                 type="button"
                 size="icon-xs"

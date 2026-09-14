@@ -291,6 +291,8 @@
       "moved": "{{name}} を {{position}} 番目に移動しました。",
       "groupSettings": "グループ設定",
       "connected": "接続済み",
+      "sort": "並べ替え",
+      "finishSorting": "並べ替えを完了",
       "valuesTitle": "値",
       "columnHandle": "Handle",
       "columnName": "名前",

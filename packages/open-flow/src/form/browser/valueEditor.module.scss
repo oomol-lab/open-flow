@@ -124,7 +124,7 @@
   height: var(--field-control-height);
 }
 .leadingControl {
-  grid-column: grip;
+  grid-column: toggle;
 }
 .toggleControl {
   grid-column: toggle;
@@ -362,11 +362,6 @@
   &:focus-visible > i {
     opacity: 1;
   }
-}
-
-.root[data-object-child]:has(> .header > .leadingControl),
-.collection[data-reorder] > .collectionActions {
-  --field-grip-width: calc(var(--field-toggle-width, 24px) - 2px);
 }
 
 .jsonCode {
