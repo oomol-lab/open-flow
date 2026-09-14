@@ -4,9 +4,9 @@ import type { JsonValue } from '../api.ts'
 import { useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { isUnknownRecord } from '../../../../base/common/type.ts'
+import { ValueControl } from '../../../../form/browser/valueEditor.tsx'
 import { defaultLlmMaxTokens, defaultLlmTemperature, defaultLlmTopP, maximumLlmOutputTokens } from '../../../../llm/common/model.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
 import { NativeSelect } from '../../../../ui/browser/native-select.tsx'
@@ -21,16 +21,6 @@ export function supportsLlmInput(schema: unknown, value: JsonValue | undefined):
     (value == null ||
       (Array.isArray(value) &&
         value.every((item) => isUnknownRecord(item) && ['system', 'user', 'assistant'].includes(String(item.role)) && typeof item.content === 'string')))
-  )
-}
-
-function SourceControl({ addon, children }: { addon?: ReactNode; children: ReactNode }) {
-  if (!addon) return children
-  return (
-    <InputGroup className="h-[30px] [&_input]:border-0 [&_input]:bg-transparent [&_select]:border-0 [&_select]:bg-transparent [&>button]:flex-1 [&>button]:border-0 [&>button]:bg-transparent">
-      <InputGroupAddon className="p-0 pl-0.5">{addon}</InputGroupAddon>
-      {children}
-    </InputGroup>
   )
 }
 
@@ -63,7 +53,7 @@ export function LlmInputEditor({
         {messages.map((message, index) => (
           <div key={index} className="grid gap-2 rounded-lg border border-border p-2">
             <div className="flex gap-2">
-              <SourceControl addon={index === 0 ? addon : undefined}>
+              <ValueControl addon={index === 0 ? addon : undefined}>
                 <NativeSelect
                   aria-label={`${t('llmEditor.messageRole')} / ${index + 1}`}
                   value={message.role}
@@ -76,7 +66,7 @@ export function LlmInputEditor({
                     </option>
                   ))}
                 </NativeSelect>
-              </SourceControl>
+              </ValueControl>
               <Button
                 aria-label={t('llmEditor.deleteMessage')}
                 disabled={disabled || messages.length <= minimum}
@@ -100,15 +90,14 @@ export function LlmInputEditor({
             />
           </div>
         ))}
-        <SourceControl addon={messages.length === 0 ? addon : undefined}>
+        <ValueControl addon={messages.length === 0 ? addon : undefined}>
           <Button disabled={disabled} variant="outline" onClick={() => onChange([...messages, { role: nextRole, content: '' }])}>
             {t('llmEditor.addMessage')}
           </Button>
-        </SourceControl>
+        </ValueControl>
       </div>
     )
   }
-  const ModelInput = addon ? InputGroupInput : Input
   const model = (value ?? {}) as Record<string, JsonValue>
   const update = (field: string, next: JsonValue | undefined) => {
     const result = { ...model }
@@ -119,15 +108,15 @@ export function LlmInputEditor({
   return (
     <div className="grid gap-2">
       <div className="flex items-center gap-2">
-        <SourceControl addon={addon}>
-          <ModelInput
+        <ValueControl addon={addon}>
+          <Input
             aria-label={t('llmEditor.customModel')}
             value={typeof model.model === 'string' ? model.model : ''}
             placeholder={t('llmEditor.defaultModel')}
             disabled={disabled}
             onChange={(event) => update('model', event.target.value || undefined)}
           />
-        </SourceControl>
+        </ValueControl>
         <Button aria-label={t('llmEditor.modelOptions')} aria-expanded={expanded} size="icon-xs" variant="ghost" onClick={() => setExpanded(!expanded)}>
           <i className="i-carbon:settings-adjust" />
         </Button>
