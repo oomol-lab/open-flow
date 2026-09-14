@@ -92,6 +92,29 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
           onValue={() => {}}
           onVariable={() => {}}
         />
+        <h3>Invalid sources · hover or focus the value</h3>
+        <div className="editor-context-panel grid grid-cols-2 gap-4">
+          <NodeInputValue
+            definition={{ ...definition, handle: 'invalidUpstream' }}
+            value={undefined}
+            connected
+            upstream={{ ...providerSource, current: providerSource.current.map((source) => ({ ...source, valid: false })) }}
+            variables={variables}
+            disabled={false}
+            onValue={() => {}}
+            onVariable={() => {}}
+          />
+          <NodeInputValue
+            definition={{ ...definition, handle: 'missingVariable' }}
+            value={undefined}
+            connected={false}
+            variableName="MISSING"
+            variables={variables}
+            disabled
+            onValue={() => {}}
+            onVariable={() => {}}
+          />
+        </div>
         <h3>No available sources</h3>
         <NodeInputValue
           definition={definition}
