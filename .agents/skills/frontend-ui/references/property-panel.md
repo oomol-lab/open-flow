@@ -54,7 +54,8 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
   rounded border; the addon base extends underneath its left edge.
   It does not reserve a separate table column. Source and value occupy adjacent interaction regions;
   hovering or opening either region must not highlight the other. Keep the source available for
-  literal and bound values. The source action stays neutral when the value is invalid; danger
+  editable literal and bound values. Read-only inputs omit the source addon and its reserved space,
+  matching Value Node; existing source labels remain visible. The source action stays neutral when the value is invalid; danger
   styling belongs to the value region.
 - A single selected upstream value shows the same node icon used on the canvas, including the
   resolved Provider icon for connector nodes, before the node and output label.

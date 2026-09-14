@@ -109,7 +109,7 @@ export function NodeInputValue({
   const sourceKind = bound ? 'variable' : connected ? 'upstream' : 'literal'
   const selectedUpstreamIcon = connected && upstream?.current.length === 1 ? upstream.current[0]?.icon : undefined
   const sourcePortal = sourceContainer?.closest<HTMLElement>('.editor-context-panel') ?? sourceContainer
-  const sourceControl = (
+  const sourceControl = disabled ? undefined : (
     <div ref={setSourceContainer} className="flex items-center">
       <DropdownMenu
         onOpenChange={(open) => {
