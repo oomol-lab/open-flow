@@ -267,13 +267,31 @@
 }
 
 .list[data-layout='ports'] {
+  padding-top: 2px;
+
+  .columns {
+    padding-block: 2px;
+  }
+
+  .group {
+    margin-top: 2px;
+  }
+
+  .group > summary {
+    min-height: 26px;
+  }
+
+  .groupSettings > summary {
+    top: 1px;
+  }
+
   .group + .group {
-    margin-top: 8px;
+    margin-top: 4px;
     padding-top: 0;
     border-top: 0;
   }
   .group + .group > .groupSettings > summary {
-    top: 3px;
+    top: 1px;
   }
 }
 
