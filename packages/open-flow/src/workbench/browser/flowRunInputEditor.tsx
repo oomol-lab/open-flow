@@ -55,6 +55,7 @@ function InputFields({ store, showErrors, labelledBy }: { store: FlowRunInputEdi
             path={`/${definition.handle.replaceAll('~', '~0').replaceAll('/', '~1')}`}
             schema={definition.jsonSchema}
             nullable={definition.nullable}
+            invalid={showErrors && issues[definition.handle] != null}
             value={Object.hasOwn(values, definition.handle) ? values[definition.handle] : undefined}
             onChange={(value) => store.setValue(definition.handle, value)}
             onDraftIssue={store.setDraftIssue}

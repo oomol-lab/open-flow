@@ -2,8 +2,11 @@ import type { Extension } from '@codemirror/state'
 import type { EditorView as CodeMirrorEditorView } from '@codemirror/view'
 import type { ReadonlyVal } from 'value-enhancer'
 export interface CodeEditorOptions {
+  readonly setup?: 'basic' | 'minimal'
+  readonly theme?: 'github' | 'warm'
   readonly ariaLabel?: string
   readonly language?: string
+  readonly invalid?: boolean
   readonly readOnly?: boolean
   readonly value?: string
   readonly wordWrap?: string
@@ -12,11 +15,13 @@ export interface CodeEditorOptions {
 export type CodeMirrorLanguage = 'javascript' | 'json' | 'markdown' | 'plaintext' | 'typescript' | 'yaml'
 
 interface CodeMirrorModules {
+  readonly warmCodeTheme: typeof import('./warmCodeTheme.ts').warmCodeTheme
   readonly Compartment: typeof import('@codemirror/state').Compartment
   readonly EditorState: typeof import('@codemirror/state').EditorState
   readonly EditorView: typeof import('@codemirror/view').EditorView
   readonly autocompletion: typeof import('@codemirror/autocomplete').autocompletion
   readonly basicSetup: typeof import('codemirror').basicSetup
+  readonly minimalSetup: typeof import('codemirror').minimalSetup
   readonly indentWithTab: typeof import('@codemirror/commands').indentWithTab
   readonly keymap: typeof import('@codemirror/view').keymap
   readonly githubDark: typeof import('@uiw/codemirror-theme-github').githubDark
@@ -100,9 +105,12 @@ async function loadCodeMirrorModules(): Promise<CodeMirrorModules> {
       import('@codemirror/lang-yaml'),
       import('@codemirror/commands'),
       import('@codemirror/autocomplete'),
-    ]).then(([codeMirror, state, view, github, javascript, json, markdown, yaml, commands, autocomplete]) => ({
+      import('./warmCodeTheme.ts'),
+    ]).then(([codeMirror, state, view, github, javascript, json, markdown, yaml, commands, autocomplete, warm]) => ({
+      warmCodeTheme: warm.warmCodeTheme,
       autocompletion: autocomplete.autocompletion,
       basicSetup: codeMirror.basicSetup,
+      minimalSetup: codeMirror.minimalSetup,
       indentWithTab: commands.indentWithTab,
       keymap: view.keymap,
       Compartment: state.Compartment,
@@ -137,7 +145,8 @@ function createLanguageExtension(modules: CodeMirrorModules, language: CodeMirro
   }
 }
 
-function createEditorTheme(modules: CodeMirrorModules, dark: boolean): Extension {
+function createEditorTheme(modules: CodeMirrorModules, dark: boolean, theme: CodeEditorOptions['theme']): Extension {
+  if (theme === 'warm') return modules.warmCodeTheme(dark)
   return dark ? modules.githubDark : modules.githubLight
 }
 
@@ -175,12 +184,12 @@ class CodeMirrorEditor {
     this.readOnlyCompartment = new modules.Compartment()
     this.themeCompartment = new modules.Compartment()
     this.wrappingCompartment = new modules.Compartment()
-    const dark = darkMode$?.value ?? layoutRoot.closest('[data-theme=dark]') != null
+    const dark = darkMode$?.value ?? layoutRoot.closest('[data-theme]')?.getAttribute('data-theme') === 'dark'
     this.view = new modules.EditorView({
       doc: options.value ?? '',
       parent: layoutRoot,
       extensions: [
-        modules.basicSetup,
+        options.setup === 'minimal' ? modules.minimalSetup : modules.basicSetup,
         modules.EditorView.editorAttributes.of({ class: 'open-flow-code-editor' }),
         modules.autocompletion({
           icons: false,
@@ -209,7 +218,7 @@ class CodeMirrorEditor {
           },
         }),
         modules.keymap.of([modules.indentWithTab]),
-        this.themeCompartment.of(createEditorTheme(modules, dark)),
+        this.themeCompartment.of(createEditorTheme(modules, dark, options.theme)),
         this.languageCompartment.of(createLanguageExtension(modules, this.language)),
         this.readOnlyCompartment.of(modules.EditorState.readOnly.of(this.readOnly)),
         this.editableCompartment.of(modules.EditorView.editable.of(!this.readOnly)),
@@ -221,13 +230,19 @@ class CodeMirrorEditor {
         }),
       ],
     })
+    this.setInvalid(options.invalid === true)
     this.view.dom.dataset.uri = uri
     this.view.dom.dataset.language = this.language
     if (options.ariaLabel != null) this.view.contentDOM.ariaLabel = options.ariaLabel
-    this.themeReactionDisposer = darkMode$?.reaction(
-      (nextDark) => this.view.dispatch({ effects: this.themeCompartment.reconfigure(createEditorTheme(this.modules, nextDark)) }),
-      true,
-    )
+    const updateTheme = (nextDark: boolean) =>
+      this.view.dispatch({ effects: this.themeCompartment.reconfigure(createEditorTheme(this.modules, nextDark, options.theme)) })
+    if (darkMode$) this.themeReactionDisposer = darkMode$.reaction(updateTheme, true)
+    else {
+      const observer = new MutationObserver(() => updateTheme(layoutRoot.closest('[data-theme]')?.getAttribute('data-theme') === 'dark'))
+      for (let ancestor: HTMLElement | null = layoutRoot; ancestor; ancestor = ancestor.parentElement)
+        observer.observe(ancestor, { attributes: true, attributeFilter: ['data-theme'] })
+      this.themeReactionDisposer = () => observer.disconnect()
+    }
     void extension?.then((value) => {
       if (!this.disposed && value != null) this.view.dispatch({ effects: this.modules.StateEffect.appendConfig.of(value) })
     })
@@ -266,7 +281,13 @@ class CodeMirrorEditor {
     }
   }
 
+  private setInvalid(invalid: boolean): void {
+    this.view.contentDOM.setAttribute('aria-invalid', String(invalid))
+    this.view.dom.dataset.invalid = String(invalid)
+  }
+
   public updateOptions(options: CodeEditorOptions): void {
+    if (options.invalid != null) this.setInvalid(options.invalid)
     if (options.ariaLabel != null) this.view.contentDOM.ariaLabel = options.ariaLabel
     if (options.language != null) this.setLanguage(options.language)
 

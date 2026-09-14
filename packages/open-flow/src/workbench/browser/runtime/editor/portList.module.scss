@@ -265,3 +265,24 @@
   padding: 8px 12px;
   background: var(--ui-background);
 }
+
+.nullableControl,
+.columns > .nullableHeading {
+  display: flex;
+  grid-column: nullable;
+  grid-row: 1;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+}
+.nullableControl {
+  height: var(--field-control-height);
+}
+.columns > .nullableHeading {
+  white-space: nowrap;
+  overflow: visible;
+}
+.row > [data-header][data-layout='values'],
+.columns[data-layout='values'] {
+  --field-nullable-width: 28px;
+}

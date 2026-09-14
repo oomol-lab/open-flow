@@ -12,6 +12,7 @@ export function FieldSelect({
   children,
   disabled,
   'aria-label': label,
+  'aria-invalid': invalid,
 }: {
   'value': string | number
   'onChange': (value: string) => void
@@ -19,6 +20,7 @@ export function FieldSelect({
   'disabled'?: boolean
   'size'?: string
   'aria-label': string
+  'aria-invalid'?: boolean
 }) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const options = Children.toArray(children)
@@ -37,7 +39,7 @@ export function FieldSelect({
         disabled={disabled}
         items={options}
       >
-        <SelectTrigger size="field" aria-label={label} className={fieldSelectTriggerClass}>
+        <SelectTrigger size="field" aria-label={label} aria-invalid={invalid} className={fieldSelectTriggerClass}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent container={container} align="start" alignItemWithTrigger={false} className="p-1">

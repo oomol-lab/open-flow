@@ -1,7 +1,9 @@
+import type { EditorComponent } from '../common/editorComponent.ts'
+
 import { Fragment, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '../../ui/browser/select.tsx'
-import { editorComponent, editorGroups, schemaForEditor, type EditorComponent } from '../common/editorComponent.ts'
+import { editorComponent, editorGroups, schemaForEditor } from '../common/editorComponent.ts'
 import { fieldSelectTriggerClass } from './fieldSelect.tsx'
 
 export function EditorComponentSelect({
@@ -33,7 +35,12 @@ export function EditorComponentSelect({
         <SelectTrigger size="field" aria-label={t('valueEditor.type', { name })} className={fieldSelectTriggerClass}>
           <SelectValue />
         </SelectTrigger>
-        <SelectContent container={container} align="start" alignItemWithTrigger={false} className="min-w-44 px-0 py-2 [scrollbar-width:thin] [scrollbar-gutter:stable_both-edges]">
+        <SelectContent
+          container={container}
+          align="start"
+          alignItemWithTrigger={false}
+          className="min-w-44 px-0 py-2 [scrollbar-width:thin] [scrollbar-gutter:stable_both-edges]"
+        >
           {Object.entries(editorGroups).map(([group, components], index) => (
             <Fragment key={group}>
               {index > 0 && <SelectSeparator className="mx-2 bg-border/50" />}

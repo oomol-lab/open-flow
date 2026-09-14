@@ -6,19 +6,24 @@ import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { PortDefinitionEditor } from '../../src/workbench/browser/runtime/editor/portDefinitionEditor.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
+import { useStoryActions } from './storyActions.tsx'
 
 function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; language: UiLanguage; log: LogAction; reservedNames?: readonly string[] }) {
   const [values, setValues] = useState<readonly InputPort[]>([
+    { handle: 'emptyText', jsonSchema: { type: 'string' }, nullable: false, value: '' },
+    { handle: 'emptyMultiline', jsonSchema: { 'type': 'string', 'ui:widget': 'text' }, nullable: false, value: '' },
+    { handle: 'unsetText', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'jsonEmpty', jsonSchema: {}, nullable: false },
+    { handle: 'jsonObject', jsonSchema: {}, nullable: true, value: { enabled: true, tags: ['sample'], count: 2 } },
+    { handle: 'jsonNull', jsonSchema: { 'ui:widget': 'any' }, nullable: true, value: null },
     { handle: 'value', jsonSchema: { type: 'object', properties: { count: { type: 'number' } } }, nullable: true, value: { count: 1 } },
   ])
   const [disabled, setDisabled] = useState(false)
+  useStoryActions([{ label: disabled ? 'Enable editing' : 'Read only', onClick: () => setDisabled(!disabled) }])
   const i18n = useMemo(() => createI18n(language), [language])
   return (
     <I18nProvider i18n={i18n}>
       <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ height: '100%', overflow: 'auto', padding: 24 }}>
-        <label>
-          <input type="checkbox" checked={disabled} onChange={(event) => setDisabled(event.target.checked)} /> Read only
-        </label>
         <div style={{ maxWidth: 520 }}>
           <PortDefinitionEditor
             reservedNames={reservedNames}
