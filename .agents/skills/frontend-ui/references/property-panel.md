@@ -83,7 +83,8 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 
 - All expandable fields, including nested fields, start collapsed when the panel opens.
 - Object, JSON, and Multiline use a preview when collapsed. When expanded, retain a visible shallow
-  neutral block of the same size, with no preview text or input-like border. It remains a real,
+  neutral block of the same size, without preview text and with the standard control border retained.
+  The attached source addon also retains its border. It remains a real,
   keyboard-accessible button that can collapse the editor and has appropriate hover/focus feedback.
   Neither invisible layout space nor an empty-looking input satisfies this contract.
 - Arrays keep their shared item-type selector in the parent value region rather than substituting

@@ -204,7 +204,6 @@
     margin-left: var(--value-addon-width);
   }
   &:has(> .summary[aria-expanded='true']) > .valueAddon {
-    border-color: transparent;
     background: color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-background));
   }
 }
@@ -222,7 +221,6 @@
   text-overflow: ellipsis;
   &[aria-expanded='true'] {
     --preview-background: color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-background));
-    --preview-border: transparent;
   }
 }
 .arrayItemType {
