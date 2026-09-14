@@ -291,6 +291,8 @@
       "moved": "{{name}} moved to position {{position}}.",
       "groupSettings": "Group settings",
       "connected": "Connected",
+      "sort": "Sort",
+      "finishSorting": "Done sorting",
       "valuesTitle": "Values",
       "columnHandle": "Handle",
       "columnName": "Name",

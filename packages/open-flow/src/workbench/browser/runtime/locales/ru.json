@@ -291,6 +291,8 @@
       "moved": "{{name}} перемещён на позицию {{position}}.",
       "groupSettings": "Настройки группы",
       "connected": "Подключено",
+      "sort": "Изменить порядок",
+      "finishSorting": "Готово",
       "valuesTitle": "Значения",
       "columnHandle": "Handle",
       "columnName": "Имя",

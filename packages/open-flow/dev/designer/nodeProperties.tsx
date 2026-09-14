@@ -243,7 +243,7 @@ export const nodePropertiesStories: readonly FrontendStory[] = fixtures.map((fix
   standalone: true,
   description:
     fixture.id === 'value'
-      ? 'Editable and read-only properties, including typed dates, calendar selection, and time editing with timezone preservation. Samples save independently.'
+      ? 'Editable and read-only properties, including typed dates, calendar selection, and time editing with timezone preservation. Use Sort to reorder fields and nested object properties; Done sorting restores disclosure arrows. Samples save independently.'
       : 'Properties panels stretch with the viewport for responsive testing. Edit and read-only samples save independently; reload verifies saved values.',
   render: (log, dark, language) => <PropertiesStory fixture={fixture} dark={dark} language={language} log={log} />,
 }))

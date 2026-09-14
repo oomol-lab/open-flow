@@ -6,6 +6,7 @@ import type { Group, InputPort } from '../api.ts'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { EditorComponentSelect } from '../../../../form/browser/editorComponentSelect.tsx'
+import { FieldSorting } from '../../../../form/browser/fieldSorting.ts'
 import { ValueEditor } from '../../../../form/browser/valueEditor.tsx'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
 import { compile } from '../../../../form/common/validation/validator.ts'
@@ -130,6 +131,8 @@ export function PortDefinitionEditor(props: PortEditorProps) {
     else props.onChange(next.filter((port): port is InputPort => 'handle' in port))
   }
   const t = useTranslate()
+  const [sorting, setSorting] = useState(false)
+  const sortingEnabled = sorting && !disabled
   const onDraftIssue = useCallback(() => {}, [])
   const update = (index: number, port: InputPort | Group) => onChange(values.map((entry, i) => (i === index ? port : entry)))
   const listId = useId()
@@ -188,7 +191,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
     else sections[sections.length - 1]!.ports.push({ port: entry, index })
   })
   const renderPort = ({ port, index }: { port: InputPort; index: number }) => {
-    const leadingControl = !disabled ? (
+    const leadingControl = sortingEnabled ? (
       <Button
         onClick={(event) => event.preventDefault()}
         type="button"
@@ -428,17 +431,40 @@ export function PortDefinitionEditor(props: PortEditorProps) {
     )
   }
   return (
-    <>
-      {props.layout === 'values' && (
+    <FieldSorting.Provider value={sortingEnabled}>
+      {(props.layout === 'values' || !disabled) && (
         <div ref={heading} className={styles.valuesTitle}>
-          <FieldLabel>{t('inspector.ports.valuesTitle')}</FieldLabel>
+          {props.layout === 'values' ? <FieldLabel>{t('inspector.ports.valuesTitle')}</FieldLabel> : <span />}
           {!disabled && (
-            <Tooltip>
-              <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label={t('valueEditor.addField')} onClick={addField} />}>
-                <i aria-hidden="true" className="i-ph:plus-light text-lg" />
-              </TooltipTrigger>
-              <TooltipContent>{t('valueEditor.addField')}</TooltipContent>
-            </Tooltip>
+            <div className="ml-auto flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}
+                      onClick={() => {
+                        cancelDrag()
+                        setSorting(!sortingEnabled)
+                      }}
+                    />
+                  }
+                >
+                  <i aria-hidden="true" className={sortingEnabled ? 'i-lucide-light:check text-lg' : 'i-lucide-light:grip-vertical text-lg'} />
+                </TooltipTrigger>
+                <TooltipContent>{t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}</TooltipContent>
+              </Tooltip>
+              {!sortingEnabled && (
+                <Tooltip>
+                  <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label={t('valueEditor.addField')} onClick={addField} />}>
+                    <i aria-hidden="true" className="i-lucide-light:plus text-lg" />
+                  </TooltipTrigger>
+                  <TooltipContent>{t('valueEditor.addField')}</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -509,6 +535,6 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           </div>
         )}
       </div>
-    </>
+    </FieldSorting.Provider>
   )
 }
