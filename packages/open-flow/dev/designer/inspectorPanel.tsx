@@ -19,7 +19,9 @@ const success: FlowCanvasViewNodeRun = {
 function CanvasSample({ dark, language }: { dark: boolean; language: UiLanguage }) {
   const [selected, setSelected] = useState<readonly string[]>(['review'])
   const [open, setOpen] = useState(true)
-  const [description, setDescription] = useState<string | undefined>('Fetch the issues that need review.')
+  const [description, setDescription] = useState<string | undefined>(
+    'Fetch the issues that need review, group them by priority, and include enough context for the reviewer to decide what needs attention.',
+  )
   useStoryActions([{ label: open ? 'Close properties' : 'Open properties', onClick: () => setOpen(!open) }])
   return (
     <div className={`editor-grid col-span-full h-[480px] overflow-hidden rounded-lg border border-border ${open ? '' : 'context-panel-closed'}`}>
@@ -80,6 +82,6 @@ export const inspectorPanelStory: FrontendStory = {
   id: 'inspector-panel',
   title: 'Properties Panel',
   standalone: true,
-  description: 'Toggle properties to inspect the smooth canvas resize; drag the divider to resize directly. Run results remain in the canvas card popover.',
+  description: 'Toggle properties to inspect the panel sliding at a fixed width without text reflow; drag the divider to resize directly.',
   render: (_log, dark, language) => <Gallery dark={dark} language={language} />,
 }
