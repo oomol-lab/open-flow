@@ -7,13 +7,13 @@ import { cn } from './utils.ts'
 
 // Keep the hit area rectangular so rounded corners don't expose the container's cursor.
 const buttonVariants = cva(
-  "nodrag group/button relative inline-flex shrink-0 items-center justify-center rounded-[var(--ui-control-radius,calc(var(--ui-radius)_+_2px))] border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap no-underline transition-[color,background-color,border-color,box-shadow,opacity,transform] outline-none select-none before:absolute before:inset-0 before:content-[''] motion-reduce:transition-none focus-visible:border-border focus-visible:outline-2 focus-visible:outline-solid focus-visible:ring-0 focus-visible:aria-invalid:ring-0 focus-visible:outline-offset-1 focus-visible:outline-ring focus-visible:aria-invalid:outline-destructive active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "nodrag group/button relative inline-flex shrink-0 items-center justify-center rounded-[var(--ui-control-radius,calc(var(--ui-radius)_+_2px))] border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap no-underline transition-[color,background-color,border-color,box-shadow,opacity,transform] outline-none select-none before:absolute before:inset-0 before:content-[''] motion-reduce:transition-none focus-visible:border-border focus-visible:outline-2 focus-visible:outline-solid focus-visible:ring-0 focus-visible:aria-invalid:ring-0 focus-visible:outline-offset-1 focus-visible:outline-ring focus-visible:aria-invalid:outline-destructive active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-[var(--ui-disabled-opacity,0.5)] aria-disabled:pointer-events-none aria-disabled:opacity-[var(--ui-disabled-opacity,0.5)] aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default: 'bg-primary text-primary-foreground hover:bg-primary/80',
         outline:
-          'border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50',
+          'border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-[var(--ui-disabled-background,color-mix(in_srgb,var(--ui-input)_50%,transparent))]',
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
         ghost:

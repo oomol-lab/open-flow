@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../../ui/browser/popove
 import { SelectChevron } from '../../ui/browser/select.tsx'
 import { enumIndex } from '../common/choices.ts'
 import { ChoiceOptions } from './choiceOptions.tsx'
+import { selectionMenuRowClass } from './fieldSelect.tsx'
 
 /** A selection and its definition share one popup, with separate selection and editing views. */
 export function EditableChoices({
@@ -35,6 +36,7 @@ export function EditableChoices({
   const [editing, setEditing] = useState(false)
   const popup = useRef<HTMLDivElement>(null)
   const empty = options.length === 0
+  const danger = empty || value === undefined
   const display = (option: unknown, index: number): string =>
     Array.isArray(labels) && typeof labels[index] === 'string'
       ? labels[index]
@@ -65,15 +67,19 @@ export function EditableChoices({
               type="button"
               size="field"
               variant="outline"
+              data-field-control
               disabled={disabled}
               aria-label={label}
-              aria-invalid={invalid || empty}
-              className={`w-full min-w-0 justify-between bg-[var(--ui-control-background,var(--ui-muted))] ${empty ? 'text-destructive hover:text-destructive aria-expanded:text-destructive' : ''}`}
+              aria-invalid={invalid || danger}
+              className="w-full min-w-0 justify-between bg-[var(--ui-control-background,var(--ui-muted))]"
             />
           }
         >
-          <span className={`min-w-0 truncate ${!empty && !summary ? 'text-muted-foreground' : ''}`}>
-            {empty ? t('valueEditor.editOptions') : summary || (value === undefined ? t('valueEditor.unset') : multiple ? '[]' : t('valueEditor.select'))}
+          <span className={`min-w-0 truncate ${!danger && !summary ? 'text-muted-foreground' : ''}`}>
+            {empty
+              ? t('valueEditor.editOptions')
+              : summary ||
+                (value === undefined ? t(multiple ? 'valueEditor.selectMultiple' : 'valueEditor.select') : multiple ? '[]' : t('valueEditor.select'))}
           </span>
           <SelectChevron />
         </PopoverTrigger>
@@ -81,9 +87,9 @@ export function EditableChoices({
           container={container}
           align="start"
           aria-label={`${label} ${t('valueEditor.choiceOptions')}`}
-          className="w-(--anchor-width) min-w-48 max-w-[calc(100vw-24px)] gap-1 p-1"
+          className="w-(--anchor-width) min-w-48 max-w-[calc(100vw-24px)] gap-1 rounded-[var(--ui-control-radius,calc(var(--ui-radius)_+_2px))] p-1"
         >
-          <div ref={popup} className="flex flex-col gap-1">
+          <div ref={popup} className="flex flex-col">
             {editing ? (
               <>
                 <div>
@@ -92,7 +98,7 @@ export function EditableChoices({
                     {t('valueEditor.backToChoices')}
                   </Button>
                 </div>
-                <div role="separator" className="mx-2 h-px bg-border/50" />
+                <div role="separator" className="mx-2 my-1 h-px bg-border/50" />
                 <div className="max-h-[min(60vh,360px)] overflow-y-auto p-1">
                   <ChoiceOptions options={options} disabled={disabled} onChange={onOptionsChange} />
                 </div>
@@ -104,7 +110,7 @@ export function EditableChoices({
                     {options.map((option, index) => (
                       <label
                         key={index}
-                        className="relative flex cursor-default items-center gap-2 rounded-[var(--ui-control-radius,var(--ui-radius))] px-2 py-1 text-xs focus-within:bg-accent"
+                        className={`relative flex cursor-default items-center gap-2 rounded-[var(--ui-control-radius,var(--ui-radius))] px-2 focus-within:bg-accent ${selectionMenuRowClass}`}
                         onPointerMove={(event) => {
                           if (event.pointerType === 'mouse') event.currentTarget.querySelector('input')?.focus({ preventScroll: true })
                         }}
@@ -130,13 +136,13 @@ export function EditableChoices({
                     ))}
                   </div>
                 )}
-                {!empty && <div role="separator" className="mx-2 h-px bg-border/50" />}
+                {!empty && <div role="separator" className="mx-2 my-1 h-px bg-border/50" />}
                 <div>
                   <Button
                     type="button"
                     variant={empty ? 'destructive' : 'ghost'}
-                    size="field"
-                    className="w-full justify-start"
+                    size="sm"
+                    className={`w-full justify-start px-2 ${selectionMenuRowClass}`}
                     onPointerMove={(event) => {
                       if (event.pointerType === 'mouse') event.currentTarget.focus({ preventScroll: true })
                     }}

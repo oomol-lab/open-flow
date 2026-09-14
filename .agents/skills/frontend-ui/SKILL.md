@@ -29,6 +29,35 @@ paths are relative to the repository root. Use production code as the source for
   Follow the [development principles](../../../AGENTS.md#verification) and use the commands in
   [Contributing](../../../CONTRIBUTING.md).
 
+## Property Panel Acceptance
+
+For value editors, field settings, and node settings, read
+[Property panel contracts](references/property-panel.md) before implementing or reviewing changes.
+The reference records product decisions; implementation code may still contain defects.
+
+- Identify the shared owner and affected sibling controls before editing. Keep color, dimensions,
+  icons, focus, and clear behavior in their owning components. Represent normal, danger, expanded,
+  hover, and focus states explicitly; remove superseded overrides instead of stacking specificity.
+- Treat a reported defect as evidence of a potentially shared cause. Inspect and fix the affected
+  family within the task's scope, rather than waiting for another screenshot of each instance.
+  For a dropdown-arrow issue, compare type selectors, Boolean, Select, and Multi-select together.
+- Select applicable states for verification: set, unset, empty string, null, invalid, disabled,
+  hover, focus, expanded, and collapsed. Equal semantics must produce equal styling. For appearance
+  changes, compare computed styles when visuals disagree; class names alone do not prove equality.
+- Make DOM order follow visual reading order. When changing layout or adding/removing controls,
+  exercise Tab and Shift+Tab, focus on expansion, and focus restoration on closing. Do not repair
+  DOM-order defects with positive tabindex values.
+- For type changes, clearing, and collection edits, verify the resulting value and definition,
+  their re-rendered presentation, and persistence when affected. Clicking successfully is not proof
+  that undefined, null, empty data, or incompatible data was handled correctly.
+- Inspect changed controls alongside sibling rows and nested levels in the full property-panel Lab
+  story. Compare typography, control height, column edges, indentation, connector endpoints, and
+  spacing above and below. Check both themes when changing shared colors. Use the actual product
+  when the relevant integration cannot be represented by the story.
+- Reuse valid verification evidence and keep checks proportional to the change. Report concrete
+  verification gaps; distinguish implementation, static checks, and observed visual/interaction
+  results. Do not claim the latter from code inspection alone.
+
 ## Visual Ownership
 
 Shared UI owns control appearance and interaction states; features own their business layouts.
@@ -58,11 +87,8 @@ without relying on ancestors to supply default styles.
 
 ## Visual Balance and Spacing
 
-Property-panel controls use a 6px corner-radius baseline. The editor panel owns
-`--ui-control-radius`; shared buttons, inputs, textareas, and select triggers consume it.
-Keep this control radius separate from panel surfaces and structural branch curves.
-Property panels share the canvas node's outer surface color, and their input controls share
-the node content surface color. Reuse the theme's node surface tokens for both appearances.
+Property-panel geometry and surface contracts are maintained in
+[Property panel contracts](references/property-panel.md#geometry-and-surfaces).
 
 Keep internal separators in menus and editing popovers light and inset from both sides.
 Use the theme border color at reduced opacity; `mx-2 h-px bg-border/50` is the current

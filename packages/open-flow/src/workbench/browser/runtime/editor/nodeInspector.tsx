@@ -253,19 +253,14 @@ function GeneralSettings({
   }
 
   return (
-    <details className="inspector-disclosure inspector-section-divider" data-inspector-section="node">
-      <summary>
-        <Icon name="chevron-down" size={14} />
-        <span className="inspector-disclosure-summary">
-          <strong>{t('inspector.node.title')}</strong>
-        </span>
-      </summary>
-      <div className="inspector-disclosure-content node-settings">
+    <section className="inspector-section" data-inspector-section="node">
+      <h3>{t('inspector.node.title')}</h3>
+      <div className="node-settings">
         <Field data-invalid={error != null}>
           <FieldLabel htmlFor={inputId}>{t('inspector.node.timeout')}</FieldLabel>
           <Input
             aria-invalid={error != null}
-            disabled={disabled}
+            readOnly={disabled}
             id={inputId}
             min="1"
             onChange={(event) => setTimeoutValue(event.target.value)}
@@ -277,7 +272,7 @@ function GeneralSettings({
           {error != null && <FieldError>{error}</FieldError>}
         </Field>
       </div>
-    </details>
+    </section>
   )
 }
 
@@ -570,7 +565,7 @@ function WaitDefinition({
           <Field>
             <FieldLabel htmlFor={`${fieldIdPrefix}-prompt`}>{t('inspector.wait.prompt')}</FieldLabel>
             <Textarea
-              disabled={disabled}
+              readOnly={disabled}
               id={`${fieldIdPrefix}-prompt`}
               onChange={(event) => setPrompt(event.target.value)}
               onBlur={(event) => {
@@ -929,12 +924,12 @@ function SubflowDefinition({
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor={`${subflowId}-name`}>{t('common.name')}</FieldLabel>
-          <Input disabled={disabled} id={`${subflowId}-name`} onChange={(event) => setName(event.target.value)} value={name} />
+          <Input readOnly={disabled} id={`${subflowId}-name`} onChange={(event) => setName(event.target.value)} value={name} />
         </Field>
         <Field>
           <FieldLabel htmlFor={`${subflowId}-inputs`}>{t('inspector.subflow.inputPorts')}</FieldLabel>
           <Textarea
-            disabled={disabled}
+            readOnly={disabled}
             id={`${subflowId}-inputs`}
             onChange={(event) => setInputs(event.target.value)}
             rows={8}
@@ -945,7 +940,7 @@ function SubflowDefinition({
         <Field>
           <FieldLabel htmlFor={`${subflowId}-outputs`}>{t('inspector.subflow.outputPorts')}</FieldLabel>
           <Textarea
-            disabled={disabled}
+            readOnly={disabled}
             id={`${subflowId}-outputs`}
             onChange={(event) => setOutputs(event.target.value)}
             rows={10}
@@ -1422,9 +1417,9 @@ export function NodeInspector({
                 store={store}
                 theme={theme}
               />
-            ) : (
+            ) : selection.kind == 'subflow' ? (
               <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
-            )}
+            ) : null}
             {selection.kind == 'subflow' && (
               <section className="inspector-section">
                 <h3>{t('inspector.subflow.referenced')}</h3>

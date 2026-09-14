@@ -22,7 +22,7 @@
   &[data-layout='values'] {
     --field-name-track: minmax(90px, 1fr);
     --field-type-track: var(--field-type-width, 112px);
-    --field-name-gap: 2px;
+    --field-name-gap: var(--field-value-name-gap, 2px);
     --field-actions-gap: 2px;
   }
   &[data-output] {

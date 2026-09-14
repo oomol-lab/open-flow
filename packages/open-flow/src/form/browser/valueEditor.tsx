@@ -8,9 +8,11 @@ import { Button } from '../../ui/browser/button.tsx'
 import { Input } from '../../ui/browser/input.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../ui/browser/popover.tsx'
 import { Textarea } from '../../ui/browser/textarea.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/tooltip.tsx'
 import { enumIndex, schemaChoices } from '../common/choices.ts'
 import { isDateFormat } from '../common/dateValue.ts'
 import { editorComponent, valueForEditor } from '../common/editorComponent.ts'
+import { getDefaultValue, typeOfSchema } from '../common/schemaWidget.ts'
 import { compile } from '../common/validation/validator.ts'
 import { initialValue, objectValue, renameObjectField, setObjectField, valueType } from '../common/value.ts'
 import { ChoiceEditor, EnumChoices } from './choiceEditor.tsx'
@@ -59,7 +61,7 @@ function PropertyName({ name, onRename, disabled }: { name: string; onRename: (n
     <Input
       aria-label={t('valueEditor.fieldName')}
       aria-invalid={invalid}
-      disabled={disabled}
+      readOnly={disabled}
       value={draft}
       onChange={(event) => {
         setDraft(event.target.value)
@@ -83,7 +85,7 @@ function PropertyName({ name, onRename, disabled }: { name: string; onRename: (n
 /** Controlled JSON value editing. It has no graph, port, persistence, or theme context. */
 export function ValueEditor(props: ValueEditorProps) {
   const sorting = useContext(FieldSorting)
-  const { schema, value, onChange, label, nullable, disabled, path, onDraftIssue, depth = 0 } = props
+  const { schema, value: storedValue, onChange, label, nullable, disabled, path, onDraftIssue, depth = 0 } = props
   const t = useTranslate()
   const id = useId()
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
@@ -93,12 +95,13 @@ export function ValueEditor(props: ValueEditorProps) {
   const [editorFocusRequest, setEditorFocusRequest] = useState(0)
   const [optionsOpen, setOptionsOpen] = useState(false)
   const source = objectValue(schema) ?? {}
-  const type = valueType(schema, value)
   const allowsNull =
     nullable === true ||
     source.type === 'null' ||
     (Array.isArray(source.type) && source.type.includes('null')) ||
     (Array.isArray(source.enum) && source.enum.includes(null))
+  const value = storedValue === null && allowsNull && source.type !== 'null' && !source.enum && !Object.hasOwn(source, 'const') ? undefined : storedValue
+  const type = valueType(schema, value)
   const validator = useMemo(() => compile(schema)[0], [schema])
   const invalid = props.invalid === true || (value !== undefined && !(value === null && allowsNull) && validator?.(value) === false)
   const variants = schemaChoices(schema)
@@ -116,7 +119,17 @@ export function ValueEditor(props: ValueEditorProps) {
       : source.uniqueItems === true && Array.isArray(objectValue(source.items)?.enum)
         ? (objectValue(source.items)!.enum as unknown[])
         : undefined)
-  const showUnset = !editableOptions && !complex && value === undefined && !editingUnset && props.editor === undefined && props.valueEditable !== false
+  const itemEnumeration = objectValue(source.items)?.enum
+  const showUnset =
+    type !== 'boolean' &&
+    !enumeration &&
+    !itemEnumeration &&
+    !editableOptions &&
+    !complex &&
+    value === undefined &&
+    !editingUnset &&
+    props.editor === undefined &&
+    props.valueEditable !== false
   useEffect(() => {
     setEditingUnset(false)
   }, [value, path, schema])
@@ -131,7 +144,6 @@ export function ValueEditor(props: ValueEditorProps) {
     } else if (input) input.focus()
     else body?.querySelector<HTMLButtonElement>('button')?.focus()
   }, [editingUnset, container])
-  const itemEnumeration = objectValue(source.items)?.enum
   const optionLabels = objectValue(source['ui:options'])?.labels
   const child = (
     key: string | number,
@@ -200,6 +212,15 @@ export function ValueEditor(props: ValueEditorProps) {
     if (!expanded || !editorFocusRequest || disabled || raw || complex) return
     container?.querySelector<HTMLTextAreaElement>(':scope > [data-value-body] > textarea')?.focus()
   }, [expanded, editorFocusRequest, disabled, raw, complex, container])
+  const inlineTools = props.layout === 'values' && props.header != null && props.valueEditable !== false && !disabled && !sorting
+  const canClear = inlineTools && value !== undefined
+  const canToggleJson = inlineTools && expanded && !complex && !enumeration && !itemEnumeration && !showUnset && (type === 'object' || type === 'array')
+  const valueSuffix =
+    !expandable && !showUnset && (enumeration || itemEnumeration || type === 'boolean' || source['ui:widget'] === 'color' || isDateFormat(source.format))
+      ? 26
+      : structured && type === 'array'
+        ? 26
+        : 0
   const toggleExpanded = () => {
     setExpanded(!expanded)
     if (!expanded) setEditorFocusRequest((request) => request + 1)
@@ -286,20 +307,22 @@ export function ValueEditor(props: ValueEditorProps) {
           variant="outline"
           size="field"
           className={styles.unsetValue}
-          data-danger={!allowsNull || undefined}
+          data-field-control
           aria-invalid={!allowsNull || undefined}
           aria-label={`${label} ${t('valueEditor.setValue')}`}
           disabled={disabled}
           onClick={() => {
-            if (type === 'null') onChange(null)
-            else setEditingUnset(true)
+            const next = getDefaultValue(typeOfSchema(schema), schema)
+            onChange(next === undefined ? getDefaultValue(type) : next)
+            if (type === 'object' || type === 'array' || source['ui:widget'] === 'text') setExpanded(true)
+            setEditingUnset(true)
           }}
         >
           {allowsNull ? <span className={styles.nullChip}>null</span> : <span>{t('valueEditor.setValue')}</span>}
           <i aria-hidden="true" className="i-lucide-light:pencil" />
         </Button>
       ) : props.valueEditable !== false && (raw || complex) ? (
-        <JsonEditor {...props} invalid={invalid} focusRequest={expanded ? editorFocusRequest : 0} />
+        <JsonEditor {...props} value={value} invalid={invalid} focusRequest={expanded ? editorFocusRequest : 0} />
       ) : props.editor !== undefined ? (
         props.editor
       ) : editableOptions ? (
@@ -320,10 +343,12 @@ export function ValueEditor(props: ValueEditorProps) {
       ) : variants ? (
         <ChoiceEditor
           {...props}
+          value={value}
           invalid={invalid}
           render={(selectedSchema, index) => (
             <ValueEditor
               {...props}
+              value={value}
               hideOptions
               header={undefined}
               description={undefined}
@@ -340,6 +365,7 @@ export function ValueEditor(props: ValueEditorProps) {
           aria-label={label}
           aria-invalid={invalid}
           value={enumIndex(enumeration, value)}
+          danger={value === undefined}
           disabled={disabled}
           onChange={(nextValue) => onChange(structuredClone(enumeration[Number(nextValue)]))}
         >
@@ -356,7 +382,7 @@ export function ValueEditor(props: ValueEditorProps) {
             </option>
           ))}
         </FieldSelect>
-      ) : value === null && type !== 'null' ? (
+      ) : value === null && type !== 'null' && type !== 'boolean' ? (
         <div className={styles.nullValue} aria-label={`${label} null`}>
           <span className={styles.nullChip}>null</span>
         </div>
@@ -385,7 +411,7 @@ export function ValueEditor(props: ValueEditorProps) {
                       <>
                         <div data-field-name>
                           {Object.hasOwn(properties, name) && !props.onDefinitionChange ? (
-                            <Input aria-label={t('valueEditor.fieldName')} value={name} readOnly disabled={disabled} />
+                            <Input aria-label={t('valueEditor.fieldName')} value={name} readOnly />
                           ) : (
                             <PropertyName
                               name={name}
@@ -598,6 +624,7 @@ export function ValueEditor(props: ValueEditorProps) {
         <FieldSelect
           aria-label={label}
           aria-invalid={invalid}
+          danger={value === undefined}
           disabled={disabled}
           value={value === undefined ? '' : String(value)}
           onChange={(nextValue) => onChange(nextValue === 'true')}
@@ -607,6 +634,11 @@ export function ValueEditor(props: ValueEditorProps) {
           </option>
           <option value="true">true</option>
           <option value="false">false</option>
+          {value === null && (
+            <option value="null" disabled>
+              null
+            </option>
+          )}
         </FieldSelect>
       ) : type === 'null' ? (
         value === null ? (
@@ -627,11 +659,11 @@ export function ValueEditor(props: ValueEditorProps) {
           </Button>
         )
       ) : type === 'string' && source['ui:widget'] === 'color' ? (
-        <ColorEditor {...props} invalid={invalid} />
+        <ColorEditor {...props} value={value} invalid={invalid} />
       ) : type === 'string' && isDateFormat(source.format) ? (
-        <DateEditor {...props} invalid={invalid} format={source.format} />
+        <DateEditor {...props} value={value} invalid={invalid} format={source.format} />
       ) : type === 'number' || type === 'integer' ? (
-        <NumberEditor {...props} invalid={invalid} integer={type === 'integer'} />
+        <NumberEditor {...props} value={value} invalid={invalid} integer={type === 'integer'} />
       ) : (
         <>
           <label className={styles.srOnly} htmlFor={id}>
@@ -643,7 +675,7 @@ export function ValueEditor(props: ValueEditorProps) {
               aria-invalid={invalid}
               className={value === '' ? styles.emptyString : undefined}
               placeholder={t(value === '' ? 'valueEditor.emptyStringValue' : 'valueEditor.unset')}
-              disabled={disabled}
+              readOnly={disabled}
               value={typeof value === 'string' ? value : ''}
               onChange={(event) => onChange(event.target.value)}
             />
@@ -653,7 +685,7 @@ export function ValueEditor(props: ValueEditorProps) {
               aria-invalid={invalid}
               className={value === '' ? styles.emptyString : undefined}
               placeholder={t(value === '' ? 'valueEditor.emptyStringValue' : 'valueEditor.unset')}
-              disabled={disabled}
+              readOnly={disabled}
               value={typeof value === 'string' ? value : ''}
               onChange={(event) => onChange(event.target.value)}
             />
@@ -677,10 +709,18 @@ export function ValueEditor(props: ValueEditorProps) {
           setEditingUnset(false)
       }}
       data-inline={(props.hideOptions && !props.header) || undefined}
+      data-value-tools={canClear || canToggleJson || undefined}
+      data-boolean={type === 'boolean' || undefined}
       data-array-child={props.arrayChild || undefined}
       data-object-child={props.objectChild || undefined}
       data-nested-field={depth > 0 || undefined}
-      style={{ '--field-indent': `${depth * 16}px` } as CSSProperties}
+      style={
+        {
+          '--field-indent': `${depth * 16}px`,
+          '--value-tools-width': `${(Number(canClear) + Number(canToggleJson)) * 24}px`,
+          '--value-suffix-width': `${valueSuffix}px`,
+        } as CSSProperties
+      }
       data-layout={props.layout}
       data-header={props.header != null || undefined}
       data-collection={expandable || undefined}
@@ -732,6 +772,7 @@ export function ValueEditor(props: ValueEditorProps) {
             variant="disclosure"
             size="field"
             className={styles.summary}
+            data-field-control
             disabled={sorting}
             aria-label={`${label} ${t('valueEditor.setValue')}`}
             aria-expanded={expanded}
@@ -753,35 +794,89 @@ export function ValueEditor(props: ValueEditorProps) {
         )
       )}
       {!expandable && body}
-      {props.trailingControl}
-      {(!props.hideOptions || props.actions) && (
-        <div className={styles.options}>
-          {props.actions}
-          {!props.hideOptions && (
-            <Popover open={optionsOpen} onOpenChange={setOptionsOpen}>
-              <PopoverTrigger
+      {(canClear || canToggleJson) && (
+        <div className={styles.valueTools}>
+          {canClear && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    className={styles.clearValue}
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`${t('valueEditor.clear')} ${label}`}
+                    onClick={() => {
+                      onChange(undefined)
+                      setExpanded(false)
+                      setRaw(false)
+                      setEditorFocusRequest(0)
+                    }}
+                  />
+                }
+              >
+                <i aria-hidden="true" className="i-lucide-light:x" />
+              </TooltipTrigger>
+              <TooltipContent container={container}>{t('valueEditor.clear')}</TooltipContent>
+            </Tooltip>
+          )}
+          {canToggleJson && (
+            <Tooltip>
+              <TooltipTrigger
                 render={
                   <Button
                     type="button"
                     variant="ghost"
-                    size="icon-sm"
-                    disabled={disabled}
-                    data-value-options
-                    aria-label={t('valueEditor.options', { name: label })}
+                    size="icon-xs"
+                    aria-label={`${label} JSON`}
+                    aria-pressed={raw}
+                    onClick={() => {
+                      setRaw(!raw)
+                      setExpanded(true)
+                      if (!raw) setEditorFocusRequest((request) => request + 1)
+                    }}
                   />
                 }
               >
-                <i aria-hidden="true" className="i-carbon:tuning" />
-              </PopoverTrigger>
-              <PopoverContent
-                container={container}
-                align="end"
-                className="w-auto max-w-[min(320px,calc(100vw-32px))] max-h-[70vh] overflow-y-auto rounded-lg p-1"
-              >
-                {toolbar}
-              </PopoverContent>
-            </Popover>
+                <i aria-hidden="true" className="i-lucide-light:braces" />
+              </TooltipTrigger>
+              <TooltipContent container={container}>{t('valueEditor.components.json')}</TooltipContent>
+            </Tooltip>
           )}
+        </div>
+      )}
+      {props.trailingControl}
+      {(!props.hideOptions || props.actions) && (
+        <div className={styles.options}>
+          {props.actions}
+          {!props.hideOptions &&
+            (props.options && props.layout === 'values' ? (
+              props.options
+            ) : (
+              <Popover open={optionsOpen} onOpenChange={setOptionsOpen}>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={disabled}
+                      data-value-options
+                      aria-label={t('valueEditor.options', { name: label })}
+                    />
+                  }
+                >
+                  <i aria-hidden="true" className="i-carbon:tuning" />
+                </PopoverTrigger>
+                <PopoverContent
+                  container={container}
+                  align="end"
+                  className="w-auto max-w-[min(320px,calc(100vw-32px))] max-h-[70vh] overflow-y-auto rounded-lg p-1"
+                >
+                  {toolbar}
+                </PopoverContent>
+              </Popover>
+            ))}
         </div>
       )}
       {expandable && body}
@@ -811,7 +906,7 @@ function NumberEditor(props: ValueEditorProps & { integer: boolean }) {
         inputMode={integer ? 'numeric' : 'decimal'}
         aria-label={label}
         aria-invalid={invalid || props.invalid}
-        disabled={disabled}
+        readOnly={disabled}
         value={text}
         onChange={(event) => {
           const nextText = event.target.value

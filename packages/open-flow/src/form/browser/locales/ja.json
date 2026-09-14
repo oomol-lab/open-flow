@@ -13,6 +13,7 @@
     "unset": "未設定",
     "clear": "クリア",
     "select": "値を選択",
+    "selectMultiple": "値を複数選択",
     "setValue": "値を設定",
     "remove": "削除",
     "createObject": "オブジェクトを作成",

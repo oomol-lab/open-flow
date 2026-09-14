@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 
 import { useState } from 'react'
 import { Button } from '../button.tsx'
@@ -12,6 +12,7 @@ export function IconPickerButton({
   label,
   onChange,
   side = 'bottom',
+  size = 'icon-xs',
 }: {
   readonly children: ReactNode
   readonly className?: string
@@ -19,15 +20,14 @@ export function IconPickerButton({
   readonly label: string
   readonly onChange: (icon: string) => void
   readonly side?: 'top' | 'bottom'
+  readonly size?: ComponentProps<typeof Button>['size']
 }) {
   const [open, setOpen] = useState(false)
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   return (
     <div className="inline-flex" ref={setContainer}>
       <Popover open={open && !disabled} onOpenChange={setOpen}>
-        <PopoverTrigger render={<Button aria-label={label} className={className} disabled={disabled} size="icon-xs" variant="ghost" />}>
-          {children}
-        </PopoverTrigger>
+        <PopoverTrigger render={<Button aria-label={label} className={className} disabled={disabled} size={size} variant="ghost" />}>{children}</PopoverTrigger>
         <PopoverContent aria-label={label} container={container} side={side} className="w-auto p-0">
           <IconPicker
             emoji
