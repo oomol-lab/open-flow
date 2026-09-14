@@ -195,20 +195,12 @@ body {
 .lab-navigation {
   flex: 1;
   min-height: 0;
-  padding: 6px var(--lab-column-gap) 20px 0;
-  overflow: auto;
+  padding: 6px 0 20px;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  overscroll-behavior: contain;
-}
-.lab-navigation:hover,
-.lab-navigation:focus-within {
   scrollbar-color: var(--ui-border) transparent;
-}
-@media (hover: none) {
-  .lab-navigation {
-    scrollbar-color: var(--ui-border) transparent;
-  }
+  overscroll-behavior: contain;
 }
 .lab-nav-section-label {
   padding: 4px 12px 6px;
