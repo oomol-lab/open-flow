@@ -123,3 +123,5 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 - Order fields as name, multiline purpose, labeled type selector, collapsed advanced settings, and a separate remove footer.
 - Values already expose Allow null in the main row; omit its duplicate in the secondary panel. Input/output definitions retain it under advanced settings.
 - Edit JSON Schema with the shared minimal CodeMirror JSON editor. Preserve invalid drafts, validate the Schema before saving, and keep the type selector synchronized with the same definition.
+- Input/output group settings use the same secondary-panel pattern, opened by a settings control aligned with the field gears. The panel edits the group name and default collapsed state and keeps removal in a separate footer.
+- Removing a field or group requires a second confirmation within its settings panel. Removing a group retains its fields and removes only the group marker.
