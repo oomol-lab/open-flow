@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../ui/browser/button.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../ui/browser/popover.tsx'
+import { SelectChevron } from '../../ui/browser/select.tsx'
 import { enumIndex } from '../common/choices.ts'
 import { ChoiceOptions } from './choiceOptions.tsx'
 
@@ -74,7 +75,7 @@ export function EditableChoices({
           <span className={`min-w-0 truncate ${!empty && !summary ? 'text-muted-foreground' : ''}`}>
             {empty ? t('valueEditor.editOptions') : summary || (value === undefined ? t('valueEditor.unset') : multiple ? '[]' : t('valueEditor.select'))}
           </span>
-          <i aria-hidden="true" className="i-lucide-light:chevron-down size-4 shrink-0 text-muted-foreground" />
+          <SelectChevron />
         </PopoverTrigger>
         <PopoverContent
           container={container}

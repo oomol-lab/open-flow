@@ -37,10 +37,12 @@ export interface ValueEditorProps {
   readonly onDraftIssue: (path: string, invalid: boolean) => void
   readonly header?: ReactNode
   readonly leadingControl?: ReactNode
+  readonly trailingControl?: ReactNode
   readonly description?: string
   readonly editor?: ReactNode
   readonly valueEditable?: boolean
   readonly hideOptions?: boolean
+  readonly arrayChild?: boolean
   readonly objectChild?: boolean
   readonly actions?: ReactNode
   readonly options?: ReactNode
@@ -87,7 +89,8 @@ export function ValueEditor(props: ValueEditorProps) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const [raw, setRaw] = useState(false)
   const [editingUnset, setEditingUnset] = useState(false)
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
+  const [editorFocusRequest, setEditorFocusRequest] = useState(0)
   const [optionsOpen, setOptionsOpen] = useState(false)
   const source = objectValue(schema) ?? {}
   const type = valueType(schema, value)
@@ -136,7 +139,10 @@ export function ValueEditor(props: ValueEditorProps) {
     childValue: unknown,
     change: (value: unknown) => void,
     options?: ReactNode,
-    presentation?: Pick<ValueEditorProps, 'header' | 'actions' | 'hideOptions' | 'objectChild' | 'layout' | 'onDefinitionChange' | 'leadingControl'>,
+    presentation?: Pick<
+      ValueEditorProps,
+      'header' | 'actions' | 'hideOptions' | 'arrayChild' | 'objectChild' | 'layout' | 'onDefinitionChange' | 'leadingControl'
+    >,
   ) => (
     <ValueEditor
       layout={props.layout}
@@ -190,6 +196,14 @@ export function ValueEditor(props: ValueEditorProps) {
   const structured =
     !raw && !complex && !variants && !enumeration && (type === 'object' || (type === 'array' && !itemEnumeration)) && props.editor === undefined
   const expandable = !showUnset && (structured || (props.valueEditable !== false && (raw || complex || (type === 'string' && source['ui:widget'] === 'text'))))
+  useEffect(() => {
+    if (!expanded || !editorFocusRequest || disabled || raw || complex) return
+    container?.querySelector<HTMLTextAreaElement>(':scope > [data-value-body] > textarea')?.focus()
+  }, [expanded, editorFocusRequest, disabled, raw, complex, container])
+  const toggleExpanded = () => {
+    setExpanded(!expanded)
+    if (!expanded) setEditorFocusRequest((request) => request + 1)
+  }
   const toolbar = (
     <div
       className={styles.toolbar}
@@ -261,6 +275,399 @@ export function ValueEditor(props: ValueEditorProps) {
       {props.options}
     </div>
   )
+  const body = (
+    <div id={`${id}-body`} className={styles.body} data-value-body hidden={props.header != null && expandable && !expanded}>
+      {!showUnset && props.header == null && props.valueEditable !== false && (value === undefined || value === null) && (
+        <span className={styles.presence}>{value === null ? 'null' : t('valueEditor.unset')}</span>
+      )}
+      {showUnset ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="field"
+          className={styles.unsetValue}
+          data-danger={!allowsNull || undefined}
+          aria-invalid={!allowsNull || undefined}
+          aria-label={`${label} ${t('valueEditor.setValue')}`}
+          disabled={disabled}
+          onClick={() => {
+            if (type === 'null') onChange(null)
+            else setEditingUnset(true)
+          }}
+        >
+          {allowsNull ? <span className={styles.nullChip}>null</span> : <span>{t('valueEditor.setValue')}</span>}
+          <i aria-hidden="true" className="i-lucide-light:pencil" />
+        </Button>
+      ) : props.valueEditable !== false && (raw || complex) ? (
+        <JsonEditor {...props} invalid={invalid} focusRequest={expanded ? editorFocusRequest : 0} />
+      ) : props.editor !== undefined ? (
+        props.editor
+      ) : editableOptions ? (
+        <EditableChoices
+          options={editableOptions}
+          labels={optionLabels}
+          value={value}
+          label={label}
+          disabled={disabled}
+          invalid={invalid}
+          multiple={!Array.isArray(source.enum)}
+          onChange={onChange}
+          onOptionsChange={(options) => {
+            const nextSchema = Array.isArray(source.enum) ? { ...source, enum: options } : { ...source, items: { ...objectValue(source.items), enum: options } }
+            props.onDefinitionChange!(nextSchema, valueForEditor(nextSchema, value))
+          }}
+        />
+      ) : variants ? (
+        <ChoiceEditor
+          {...props}
+          invalid={invalid}
+          render={(selectedSchema, index) => (
+            <ValueEditor
+              {...props}
+              hideOptions
+              header={undefined}
+              description={undefined}
+              options={undefined}
+              actions={undefined}
+              key={index}
+              schema={selectedSchema}
+              depth={depth + 1}
+            />
+          )}
+        />
+      ) : enumeration ? (
+        <FieldSelect
+          aria-label={label}
+          aria-invalid={invalid}
+          value={enumIndex(enumeration, value)}
+          disabled={disabled}
+          onChange={(nextValue) => onChange(structuredClone(enumeration[Number(nextValue)]))}
+        >
+          <option value={-1} disabled>
+            {t('valueEditor.select')}
+          </option>
+          {enumeration.map((item, index) => (
+            <option key={index} value={index}>
+              {Array.isArray(optionLabels) && typeof optionLabels[index] === 'string'
+                ? optionLabels[index]
+                : typeof item === 'string'
+                  ? item
+                  : JSON.stringify(item)}
+            </option>
+          ))}
+        </FieldSelect>
+      ) : value === null && type !== 'null' ? (
+        <div className={styles.nullValue} aria-label={`${label} null`}>
+          <span className={styles.nullChip}>null</span>
+        </div>
+      ) : type === 'object' ? (
+        <div className={styles.collection}>
+          <ObjectFieldList
+            names={names}
+            onReorder={!disabled && props.onDefinitionChange ? (order) => props.onDefinitionChange!({ ...source, 'ui:order': order }, value) : undefined}
+          >
+            {(name, handle) => {
+              const fieldSchema = Object.hasOwn(properties, name) ? properties[name] : (source.additionalProperties ?? {})
+              const fieldSource = objectValue(fieldSchema) ?? {}
+              const fieldValue = object && Object.hasOwn(object, name) ? object[name] : undefined
+              return (
+                <div data-object-field-content>
+                  {child(name, fieldSchema, fieldValue, (next) => onChange(setObjectField(value, name, next)), undefined, {
+                    onDefinitionChange: props.onDefinitionChange
+                      ? (nextSchema, nextValue) =>
+                          props.onDefinitionChange!({ ...source, properties: { ...properties, [name]: nextSchema } }, setObjectField(value, name, nextValue))
+                      : undefined,
+                    leadingControl: handle,
+                    objectChild: true,
+                    layout: 'values',
+                    hideOptions: true,
+                    header: (
+                      <>
+                        <div data-field-name>
+                          {Object.hasOwn(properties, name) && !props.onDefinitionChange ? (
+                            <Input aria-label={t('valueEditor.fieldName')} value={name} readOnly disabled={disabled} />
+                          ) : (
+                            <PropertyName
+                              name={name}
+                              disabled={disabled}
+                              onRename={(nextName) => {
+                                const next = renameObjectField(value, name, nextName)
+                                if (!next) return false
+                                if (props.onDefinitionChange) {
+                                  if (nextName !== name && Object.hasOwn(properties, nextName)) return false
+                                  props.onDefinitionChange(
+                                    {
+                                      ...source,
+                                      ...(Array.isArray(source['ui:order'])
+                                        ? { 'ui:order': source['ui:order'].map((key) => (key === name ? nextName : key)) }
+                                        : {}),
+                                      properties: Object.fromEntries(
+                                        Object.entries(properties).map(([key, definition]) => [key === name ? nextName : key, definition]),
+                                      ),
+                                      ...(Array.isArray(source.required) ? { required: source.required.map((key) => (key === name ? nextName : key)) } : {}),
+                                    },
+                                    next,
+                                  )
+                                } else onChange(next)
+                                return true
+                              }}
+                            />
+                          )}
+                        </div>
+                        <div data-field-type>
+                          {props.onDefinitionChange ? (
+                            <EditorComponentSelect
+                              schema={fieldSchema}
+                              name={`${label}.${name}`}
+                              disabled={disabled}
+                              onChange={(nextSchema) =>
+                                props.onDefinitionChange!(
+                                  { ...source, properties: { ...properties, [name]: nextSchema } },
+                                  setObjectField(value, name, valueForEditor(nextSchema, fieldValue)),
+                                )
+                              }
+                            />
+                          ) : (
+                            <FieldSelect
+                              aria-label={t('valueEditor.type', { name: `${label}.${name}` })}
+                              value={valueType(fieldSchema, fieldValue)}
+                              disabled={disabled || typeof fieldSource.type === 'string' || fieldSource.enum != null || fieldSource.const !== undefined}
+                              onChange={(next) => {
+                                onChange(setObjectField(value, name, initialValue(fieldSchema, next as ValueType)))
+                              }}
+                            >
+                              {[...types, 'integer' as const]
+                                .filter((candidate) => !Array.isArray(fieldSource.type) || (fieldSource.type as unknown[]).includes(candidate))
+                                .map((candidate) => (
+                                  <option key={candidate} value={candidate}>
+                                    {candidate}
+                                  </option>
+                                ))}
+                            </FieldSelect>
+                          )}
+                        </div>
+                      </>
+                    ),
+                    actions: (
+                      <>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label={`${t('valueEditor.addField')} ${label}.${name}`}
+                          disabled={disabled || !canAddObjectField}
+                          onClick={() => addObjectField(name)}
+                        >
+                          <i aria-hidden="true" className="i-tabler-light:square-rounded-plus text-lg" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label={`${t(Object.hasOwn(properties, name) && !props.onDefinitionChange ? 'valueEditor.clear' : 'valueEditor.remove')} ${name}`}
+                          disabled={
+                            disabled ||
+                            (!props.onDefinitionChange && (fieldValue === undefined || (Array.isArray(source.required) && source.required.includes(name))))
+                          }
+                          onClick={() => {
+                            const next = setObjectField(value, name, undefined)
+                            if (props.onDefinitionChange)
+                              props.onDefinitionChange(
+                                {
+                                  ...source,
+                                  properties: Object.fromEntries(Object.entries(properties).filter(([key]) => key !== name)),
+                                  ...(Array.isArray(source['ui:order']) ? { 'ui:order': source['ui:order'].filter((key) => key !== name) } : {}),
+                                  ...(Array.isArray(source.required) ? { required: source.required.filter((key) => key !== name) } : {}),
+                                },
+                                next,
+                              )
+                            else onChange(next)
+                          }}
+                        >
+                          <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg" />
+                        </Button>
+                      </>
+                    ),
+                  })}
+                </div>
+              )
+            }}
+          </ObjectFieldList>
+          <div className={styles.collectionActions} data-layout="values">
+            {source.additionalProperties === false && value === undefined && names.length === 0 && (
+              <Button type="button" variant="secondary" size="field" disabled={disabled} onClick={() => onChange({})}>
+                {t('valueEditor.createObject')}
+              </Button>
+            )}
+            {source.additionalProperties === false && value !== undefined && (
+              <span className={styles.presence}>
+                {t('valueEditor.object')} · {names.length}
+              </span>
+            )}
+            {canAddObjectField && names.length === 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="field"
+                className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectAction}`}
+                disabled={disabled}
+                aria-label={`${t('valueEditor.addField')} ${label}`}
+                onClick={() => addObjectField()}
+              >
+                <i aria-hidden="true" className="i-lucide-light:plus" />
+                {t('valueEditor.addField')}
+              </Button>
+            )}
+          </div>
+        </div>
+      ) : type === 'array' && source.uniqueItems === true && Array.isArray(itemEnumeration) ? (
+        <EnumChoices invalid={invalid} options={itemEnumeration} labels={optionLabels} value={value} label={label} disabled={disabled} onChange={onChange} />
+      ) : type === 'array' ? (
+        <div className={styles.collection}>
+          {array.map((item, index) => {
+            const itemSchema = Array.isArray(source.items) ? (source.items[index] ?? source.additionalItems ?? {}) : (source.items ?? {})
+            return (
+              <div key={index} data-array-field>
+                {child(index, itemSchema, item, (next) => onChange(array.map((entry, at) => (at === index ? (next ?? null) : entry))), undefined, {
+                  objectChild: true,
+                  arrayChild: true,
+                  header: <span className={styles.arrayIndex}>{index}.</span>,
+                  onDefinitionChange:
+                    props.onDefinitionChange && !Array.isArray(source.items)
+                      ? (items, nextValue) =>
+                          props.onDefinitionChange!(
+                            { ...source, items },
+                            array.map((entry, at) => (at === index ? nextValue : entry)),
+                          )
+                      : undefined,
+                  hideOptions: true,
+                  actions: (
+                    <>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label={`${t('valueEditor.addItem')} ${label}.${index}`}
+                        disabled={disabled || (typeof source.maxItems === 'number' && array.length >= source.maxItems)}
+                        onClick={() =>
+                          onChange(
+                            array.toSpliced(
+                              index + 1,
+                              0,
+                              initialValue(Array.isArray(source.items) ? (source.items[index + 1] ?? source.additionalItems ?? {}) : (source.items ?? {})),
+                            ),
+                          )
+                        }
+                      >
+                        <i aria-hidden="true" className="i-tabler-light:square-rounded-plus text-lg" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label={`${t('valueEditor.remove')} ${label}.${index}`}
+                        disabled={disabled}
+                        onClick={() => onChange(array.toSpliced(index, 1))}
+                      >
+                        <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg" />
+                      </Button>
+                    </>
+                  ),
+                })}
+              </div>
+            )
+          })}
+          {array.length === 0 && (
+            <div className={styles.collectionActions} data-layout="values">
+              <Button
+                type="button"
+                variant="ghost"
+                size="field"
+                className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectAction}`}
+                aria-label={`${t('valueEditor.addItem')} ${label}`}
+                disabled={disabled || (typeof source.maxItems === 'number' && array.length >= source.maxItems)}
+                onClick={() => onChange([initialValue(Array.isArray(source.items) ? (source.items[0] ?? source.additionalItems ?? {}) : (source.items ?? {}))])}
+              >
+                <i aria-hidden="true" className="i-lucide-light:plus" />
+                {t('valueEditor.addItem')}
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : type === 'boolean' ? (
+        <FieldSelect
+          aria-label={label}
+          aria-invalid={invalid}
+          disabled={disabled}
+          value={value === undefined ? '' : String(value)}
+          onChange={(nextValue) => onChange(nextValue === 'true')}
+        >
+          <option value="" disabled>
+            {t('valueEditor.select')}
+          </option>
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </FieldSelect>
+      ) : type === 'null' ? (
+        value === null ? (
+          <div className={styles.nullValue} aria-label={`${label} null`}>
+            <span className={styles.nullChip}>null</span>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            size="field"
+            variant="outline"
+            className={styles.nullValue}
+            disabled={disabled}
+            aria-label={`${label} ${t('valueEditor.setValue')}: null`}
+            onClick={() => onChange(null)}
+          >
+            {t('valueEditor.unset')}
+          </Button>
+        )
+      ) : type === 'string' && source['ui:widget'] === 'color' ? (
+        <ColorEditor {...props} invalid={invalid} />
+      ) : type === 'string' && isDateFormat(source.format) ? (
+        <DateEditor {...props} invalid={invalid} format={source.format} />
+      ) : type === 'number' || type === 'integer' ? (
+        <NumberEditor {...props} invalid={invalid} integer={type === 'integer'} />
+      ) : (
+        <>
+          <label className={styles.srOnly} htmlFor={id}>
+            {label}
+          </label>
+          {source['ui:widget'] === 'text' ? (
+            <Textarea
+              id={id}
+              aria-invalid={invalid}
+              className={value === '' ? styles.emptyString : undefined}
+              placeholder={t(value === '' ? 'valueEditor.emptyStringValue' : 'valueEditor.unset')}
+              disabled={disabled}
+              value={typeof value === 'string' ? value : ''}
+              onChange={(event) => onChange(event.target.value)}
+            />
+          ) : (
+            <Input
+              id={id}
+              aria-invalid={invalid}
+              className={value === '' ? styles.emptyString : undefined}
+              placeholder={t(value === '' ? 'valueEditor.emptyStringValue' : 'valueEditor.unset')}
+              disabled={disabled}
+              value={typeof value === 'string' ? value : ''}
+              onChange={(event) => onChange(event.target.value)}
+            />
+          )}
+          {value === undefined && props.header == null && (
+            <Button type="button" size="xs" variant="ghost" disabled={disabled} onClick={() => onChange('')}>
+              <i aria-hidden="true" className="i-lucide-light:text-cursor-input" />
+              {t('valueEditor.emptyString')}
+            </Button>
+          )}
+        </>
+      )}
+    </div>
+  )
   return (
     <div
       className={styles.root}
@@ -270,6 +677,7 @@ export function ValueEditor(props: ValueEditorProps) {
           setEditingUnset(false)
       }}
       data-inline={(props.hideOptions && !props.header) || undefined}
+      data-array-child={props.arrayChild || undefined}
       data-object-child={props.objectChild || undefined}
       data-nested-field={depth > 0 || undefined}
       style={{ '--field-indent': `${depth * 16}px` } as CSSProperties}
@@ -278,7 +686,6 @@ export function ValueEditor(props: ValueEditorProps) {
       data-collection={expandable || undefined}
       data-output={props.editor === null || undefined}
       data-expanded={(expandable && expanded) || undefined}
-      data-json={raw || complex || undefined}
       data-structured={(structured && !showUnset) || undefined}
     >
       {props.header != null && (
@@ -293,7 +700,8 @@ export function ValueEditor(props: ValueEditorProps) {
                 variant="disclosure"
                 aria-label={label}
                 aria-expanded={expanded}
-                onClick={() => setExpanded(!expanded)}
+                aria-controls={`${id}-body`}
+                onClick={toggleExpanded}
               >
                 <i aria-hidden="true" className={expanded ? 'i-lucide-light:chevron-down' : 'i-lucide-light:chevron-right'} />
               </Button>
@@ -302,32 +710,50 @@ export function ValueEditor(props: ValueEditorProps) {
           {props.header}
         </div>
       )}
-      {props.header != null && expandable && (
-        <button
-          type="button"
-          className={styles.summary}
-          disabled={sorting}
-          aria-label={`${label} ${t('valueEditor.setValue')}`}
-          aria-expanded={expanded}
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded && (raw || complex)
-            ? null
-            : value === undefined
-              ? t('valueEditor.unset')
-              : structured
-                ? type === 'object'
-                  ? expanded
-                    ? null
-                    : JSON.stringify(value)
-                  : `${t('valueEditor.array')} · ${array.length}`
-                : typeof value === 'string'
-                  ? value === ''
-                    ? t('valueEditor.emptyStringValue')
-                    : value
-                  : JSON.stringify(value)}
-        </button>
+      {props.header != null && expandable && structured && type === 'array' && !Array.isArray(source.items) ? (
+        <div className={styles.arrayItemType}>
+          <EditorComponentSelect
+            schema={source.items ?? {}}
+            name={`${label}[]`}
+            disabled={disabled || !props.onDefinitionChange}
+            onChange={(items) =>
+              props.onDefinitionChange?.(
+                { ...source, items },
+                array.map((item) => valueForEditor(items, item)),
+              )
+            }
+          />
+        </div>
+      ) : (
+        props.header != null &&
+        expandable && (
+          <Button
+            type="button"
+            variant="disclosure"
+            size="field"
+            className={styles.summary}
+            disabled={sorting}
+            aria-label={`${label} ${t('valueEditor.setValue')}`}
+            aria-expanded={expanded}
+            aria-controls={`${id}-body`}
+            onClick={toggleExpanded}
+          >
+            {expanded
+              ? null
+              : value === undefined
+                ? t('valueEditor.unset')
+                : structured
+                  ? JSON.stringify(value)
+                  : typeof value === 'string'
+                    ? value === ''
+                      ? t('valueEditor.emptyStringValue')
+                      : value
+                    : JSON.stringify(value)}
+          </Button>
+        )
       )}
+      {!expandable && body}
+      {props.trailingControl}
       {(!props.hideOptions || props.actions) && (
         <div className={styles.options}>
           {props.actions}
@@ -358,384 +784,7 @@ export function ValueEditor(props: ValueEditorProps) {
           )}
         </div>
       )}
-      <div className={styles.body} data-value-body hidden={props.header != null && expandable && !expanded}>
-        {!showUnset && props.header == null && props.valueEditable !== false && (value === undefined || value === null) && (
-          <span className={styles.presence}>{value === null ? 'null' : t('valueEditor.unset')}</span>
-        )}
-        {showUnset ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="field"
-            className={styles.unsetValue}
-            data-danger={!allowsNull || undefined}
-            aria-invalid={!allowsNull || undefined}
-            aria-label={`${label} ${t('valueEditor.setValue')}`}
-            disabled={disabled}
-            onClick={() => {
-              if (type === 'null') onChange(null)
-              else setEditingUnset(true)
-            }}
-          >
-            {allowsNull ? <span className={styles.nullChip}>null</span> : <span>{t('valueEditor.setValue')}</span>}
-            <i aria-hidden="true" className="i-lucide-light:pencil" />
-          </Button>
-        ) : props.valueEditable !== false && (raw || complex) ? (
-          <JsonEditor {...props} invalid={invalid} />
-        ) : props.editor !== undefined ? (
-          props.editor
-        ) : editableOptions ? (
-          <EditableChoices
-            options={editableOptions}
-            labels={optionLabels}
-            value={value}
-            label={label}
-            disabled={disabled}
-            invalid={invalid}
-            multiple={!Array.isArray(source.enum)}
-            onChange={onChange}
-            onOptionsChange={(options) => {
-              const nextSchema = Array.isArray(source.enum)
-                ? { ...source, enum: options }
-                : { ...source, items: { ...objectValue(source.items), enum: options } }
-              props.onDefinitionChange!(nextSchema, valueForEditor(nextSchema, value))
-            }}
-          />
-        ) : variants ? (
-          <ChoiceEditor
-            {...props}
-            invalid={invalid}
-            render={(selectedSchema, index) => (
-              <ValueEditor
-                {...props}
-                hideOptions
-                header={undefined}
-                description={undefined}
-                options={undefined}
-                actions={undefined}
-                key={index}
-                schema={selectedSchema}
-                depth={depth + 1}
-              />
-            )}
-          />
-        ) : enumeration ? (
-          <FieldSelect
-            aria-label={label}
-            aria-invalid={invalid}
-            value={enumIndex(enumeration, value)}
-            disabled={disabled}
-            onChange={(nextValue) => onChange(structuredClone(enumeration[Number(nextValue)]))}
-          >
-            <option value={-1} disabled>
-              {t('valueEditor.select')}
-            </option>
-            {enumeration.map((item, index) => (
-              <option key={index} value={index}>
-                {Array.isArray(optionLabels) && typeof optionLabels[index] === 'string'
-                  ? optionLabels[index]
-                  : typeof item === 'string'
-                    ? item
-                    : JSON.stringify(item)}
-              </option>
-            ))}
-          </FieldSelect>
-        ) : value === null && type !== 'null' ? (
-          <div className={styles.nullValue} aria-label={`${label} null`}>
-            <span className={styles.nullChip}>null</span>
-          </div>
-        ) : type === 'object' ? (
-          <div className={styles.collection}>
-            <ObjectFieldList
-              names={names}
-              onReorder={!disabled && props.onDefinitionChange ? (order) => props.onDefinitionChange!({ ...source, 'ui:order': order }, value) : undefined}
-            >
-              {(name, handle) => {
-                const fieldSchema = Object.hasOwn(properties, name) ? properties[name] : (source.additionalProperties ?? {})
-                const fieldSource = objectValue(fieldSchema) ?? {}
-                const fieldValue = object && Object.hasOwn(object, name) ? object[name] : undefined
-                return (
-                  <div data-object-field-content>
-                    {child(name, fieldSchema, fieldValue, (next) => onChange(setObjectField(value, name, next)), undefined, {
-                      onDefinitionChange: props.onDefinitionChange
-                        ? (nextSchema, nextValue) =>
-                            props.onDefinitionChange!({ ...source, properties: { ...properties, [name]: nextSchema } }, setObjectField(value, name, nextValue))
-                        : undefined,
-                      leadingControl: handle,
-                      objectChild: true,
-                      layout: 'values',
-                      hideOptions: true,
-                      header: (
-                        <>
-                          <div data-field-name>
-                            {Object.hasOwn(properties, name) && !props.onDefinitionChange ? (
-                              <Input aria-label={t('valueEditor.fieldName')} value={name} readOnly disabled={disabled} />
-                            ) : (
-                              <PropertyName
-                                name={name}
-                                disabled={disabled}
-                                onRename={(nextName) => {
-                                  const next = renameObjectField(value, name, nextName)
-                                  if (!next) return false
-                                  if (props.onDefinitionChange) {
-                                    if (nextName !== name && Object.hasOwn(properties, nextName)) return false
-                                    props.onDefinitionChange(
-                                      {
-                                        ...source,
-                                        ...(Array.isArray(source['ui:order'])
-                                          ? { 'ui:order': source['ui:order'].map((key) => (key === name ? nextName : key)) }
-                                          : {}),
-                                        properties: Object.fromEntries(
-                                          Object.entries(properties).map(([key, definition]) => [key === name ? nextName : key, definition]),
-                                        ),
-                                        ...(Array.isArray(source.required) ? { required: source.required.map((key) => (key === name ? nextName : key)) } : {}),
-                                      },
-                                      next,
-                                    )
-                                  } else onChange(next)
-                                  return true
-                                }}
-                              />
-                            )}
-                          </div>
-                          <div data-field-type>
-                            {props.onDefinitionChange ? (
-                              <EditorComponentSelect
-                                schema={fieldSchema}
-                                name={`${label}.${name}`}
-                                disabled={disabled}
-                                onChange={(nextSchema) =>
-                                  props.onDefinitionChange!(
-                                    { ...source, properties: { ...properties, [name]: nextSchema } },
-                                    setObjectField(value, name, valueForEditor(nextSchema, fieldValue)),
-                                  )
-                                }
-                              />
-                            ) : (
-                              <FieldSelect
-                                aria-label={t('valueEditor.type', { name: `${label}.${name}` })}
-                                value={valueType(fieldSchema, fieldValue)}
-                                disabled={disabled || typeof fieldSource.type === 'string' || fieldSource.enum != null || fieldSource.const !== undefined}
-                                onChange={(next) => {
-                                  onChange(setObjectField(value, name, initialValue(fieldSchema, next as ValueType)))
-                                }}
-                              >
-                                {[...types, 'integer' as const]
-                                  .filter((candidate) => !Array.isArray(fieldSource.type) || (fieldSource.type as unknown[]).includes(candidate))
-                                  .map((candidate) => (
-                                    <option key={candidate} value={candidate}>
-                                      {candidate}
-                                    </option>
-                                  ))}
-                              </FieldSelect>
-                            )}
-                          </div>
-                        </>
-                      ),
-                      actions: (
-                        <>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            aria-label={`${t('valueEditor.addField')} ${label}.${name}`}
-                            disabled={disabled || !canAddObjectField}
-                            onClick={() => addObjectField(name)}
-                          >
-                            <i aria-hidden="true" className="i-tabler-light:square-rounded-plus text-lg" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            aria-label={`${t(Object.hasOwn(properties, name) && !props.onDefinitionChange ? 'valueEditor.clear' : 'valueEditor.remove')} ${name}`}
-                            disabled={
-                              disabled ||
-                              (!props.onDefinitionChange && (fieldValue === undefined || (Array.isArray(source.required) && source.required.includes(name))))
-                            }
-                            onClick={() => {
-                              const next = setObjectField(value, name, undefined)
-                              if (props.onDefinitionChange)
-                                props.onDefinitionChange(
-                                  {
-                                    ...source,
-                                    properties: Object.fromEntries(Object.entries(properties).filter(([key]) => key !== name)),
-                                    ...(Array.isArray(source['ui:order']) ? { 'ui:order': source['ui:order'].filter((key) => key !== name) } : {}),
-                                    ...(Array.isArray(source.required) ? { required: source.required.filter((key) => key !== name) } : {}),
-                                  },
-                                  next,
-                                )
-                              else onChange(next)
-                            }}
-                          >
-                            <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg" />
-                          </Button>
-                        </>
-                      ),
-                    })}
-                  </div>
-                )
-              }}
-            </ObjectFieldList>
-            <div className={styles.collectionActions} data-layout="values">
-              {source.additionalProperties === false && value === undefined && names.length === 0 && (
-                <Button type="button" variant="secondary" size="field" disabled={disabled} onClick={() => onChange({})}>
-                  {t('valueEditor.createObject')}
-                </Button>
-              )}
-              {source.additionalProperties === false && value !== undefined && (
-                <span className={styles.presence}>
-                  {t('valueEditor.object')} · {names.length}
-                </span>
-              )}
-              {canAddObjectField && names.length === 0 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="field"
-                  className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectAction}`}
-                  disabled={disabled}
-                  aria-label={`${t('valueEditor.addField')} ${label}`}
-                  onClick={() => addObjectField()}
-                >
-                  <i aria-hidden="true" className="i-lucide-light:plus" />
-                  {t('valueEditor.addField')}
-                </Button>
-              )}
-            </div>
-          </div>
-        ) : type === 'array' && source.uniqueItems === true && Array.isArray(itemEnumeration) ? (
-          <EnumChoices invalid={invalid} options={itemEnumeration} labels={optionLabels} value={value} label={label} disabled={disabled} onChange={onChange} />
-        ) : type === 'array' ? (
-          <div className={styles.collection}>
-            {array.map((item, index) => {
-              const itemSchema = Array.isArray(source.items) ? (source.items[index] ?? source.additionalItems ?? {}) : (source.items ?? {})
-              return (
-                <div key={index} data-array-field>
-                  {child(
-                    index,
-                    itemSchema,
-                    item,
-                    (next) => onChange(array.map((entry, at) => (at === index ? (next ?? null) : entry))),
-                    <>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        disabled={disabled || index === 0}
-                        onClick={() => {
-                          const next = [...array]
-                          ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
-                          onChange(next)
-                        }}
-                      >
-                        <i aria-hidden="true" className="i-lucide-light:arrow-up" />
-                        {t('valueEditor.moveUp')}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        disabled={disabled || (typeof source.maxItems === 'number' && array.length >= source.maxItems)}
-                        onClick={() => onChange(array.toSpliced(index, 0, structuredClone(item)))}
-                      >
-                        <i aria-hidden="true" className="i-lucide-light:copy" />
-                        {t('valueEditor.duplicate')}
-                      </Button>
-                      <Button type="button" variant="ghost" size="xs" disabled={disabled} onClick={() => onChange(array.toSpliced(index, 1))}>
-                        <i aria-hidden="true" className="i-lucide-light:trash-2" />
-                        {t('valueEditor.remove')}
-                      </Button>
-                    </>,
-                  )}
-                </div>
-              )
-            })}
-            <div className={styles.actions}>
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                disabled={disabled || (typeof source.maxItems === 'number' && array.length >= source.maxItems)}
-                onClick={() => onChange([...array, initialValue(Array.isArray(source.items) ? (source.items[array.length] ?? {}) : (source.items ?? {}))])}
-              >
-                {t('valueEditor.addItem')}
-              </Button>
-            </div>
-          </div>
-        ) : type === 'boolean' ? (
-          <FieldSelect
-            aria-label={label}
-            aria-invalid={invalid}
-            disabled={disabled}
-            value={value === undefined ? '' : String(value)}
-            onChange={(nextValue) => onChange(nextValue === 'true')}
-          >
-            <option value="" disabled>
-              {t('valueEditor.select')}
-            </option>
-            <option value="true">true</option>
-            <option value="false">false</option>
-          </FieldSelect>
-        ) : type === 'null' ? (
-          value === null ? (
-            <div className={styles.nullValue} aria-label={`${label} null`}>
-              <span className={styles.nullChip}>null</span>
-            </div>
-          ) : (
-            <Button
-              type="button"
-              size="field"
-              variant="outline"
-              className={styles.nullValue}
-              disabled={disabled}
-              aria-label={`${label} ${t('valueEditor.setValue')}: null`}
-              onClick={() => onChange(null)}
-            >
-              {t('valueEditor.unset')}
-            </Button>
-          )
-        ) : type === 'string' && source['ui:widget'] === 'color' ? (
-          <ColorEditor {...props} invalid={invalid} />
-        ) : type === 'string' && isDateFormat(source.format) ? (
-          <DateEditor {...props} invalid={invalid} format={source.format} />
-        ) : type === 'number' || type === 'integer' ? (
-          <NumberEditor {...props} invalid={invalid} integer={type === 'integer'} />
-        ) : (
-          <>
-            <label className={styles.srOnly} htmlFor={id}>
-              {label}
-            </label>
-            {source['ui:widget'] === 'text' ? (
-              <Textarea
-                id={id}
-                aria-invalid={invalid}
-                className={value === '' ? styles.emptyString : undefined}
-                placeholder={t(value === '' ? 'valueEditor.emptyStringValue' : 'valueEditor.unset')}
-                disabled={disabled}
-                value={typeof value === 'string' ? value : ''}
-                onChange={(event) => onChange(event.target.value)}
-              />
-            ) : (
-              <Input
-                id={id}
-                aria-invalid={invalid}
-                className={value === '' ? styles.emptyString : undefined}
-                placeholder={t(value === '' ? 'valueEditor.emptyStringValue' : 'valueEditor.unset')}
-                disabled={disabled}
-                value={typeof value === 'string' ? value : ''}
-                onChange={(event) => onChange(event.target.value)}
-              />
-            )}
-            {value === undefined && props.header == null && (
-              <Button type="button" size="xs" variant="ghost" disabled={disabled} onClick={() => onChange('')}>
-                <i aria-hidden="true" className="i-lucide-light:text-cursor-input" />
-                {t('valueEditor.emptyString')}
-              </Button>
-            )}
-          </>
-        )}
-      </div>
+      {expandable && body}
     </div>
   )
 }

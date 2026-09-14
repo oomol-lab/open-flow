@@ -118,7 +118,10 @@ type PortEditorProps = {
   disabled: boolean
   allowAddGroup?: boolean
   output?: boolean
-  renderValue?: (port: InputPort, presentation: Pick<ValueEditorProps, 'header' | 'leadingControl' | 'description' | 'options'>) => ReactNode
+  renderValue?: (
+    port: InputPort,
+    presentation: Pick<ValueEditorProps, 'header' | 'leadingControl' | 'trailingControl' | 'description' | 'options'>,
+  ) => ReactNode
 } & (
   | { groups: true; values: readonly (InputPort | Group)[]; onChange: (values: readonly (InputPort | Group)[]) => void }
   | { groups?: false; values: readonly InputPort[]; onChange: (values: readonly InputPort[]) => void }
@@ -292,17 +295,17 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             portType(port)
           )}
         </span>
-        {props.layout === 'values' && (
-          <span className={styles.nullableControl}>
-            <Checkbox
-              aria-label={`${port.handle} ${t('valueEditor.nullable')}`}
-              checked={port.nullable === true}
-              disabled={disabled}
-              onCheckedChange={(checked) => update(index, { ...port, nullable: checked === true })}
-            />
-          </span>
-        )}
       </div>
+    )
+    const trailingControl = props.layout === 'values' && (
+      <span className={styles.nullableControl}>
+        <Checkbox
+          aria-label={`${port.handle} ${t('valueEditor.nullable')}`}
+          checked={port.nullable === true}
+          disabled={disabled}
+          onCheckedChange={(checked) => update(index, { ...port, nullable: checked === true })}
+        />
+      </span>
     )
     const options = !disabled ? (
       <Button
@@ -391,12 +394,13 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         data-dragging={dragIndex === index || undefined}
       >
         {props.renderValue ? (
-          props.renderValue(port, { header, leadingControl, options, description: port.description })
+          props.renderValue(port, { header, leadingControl, trailingControl, options, description: port.description })
         ) : (
           <ValueEditor
             leadingControl={leadingControl}
             layout={props.layout}
             header={header}
+            trailingControl={trailingControl}
             options={options}
             description={port.description}
             schema={port.jsonSchema}
@@ -470,8 +474,8 @@ export function PortDefinitionEditor(props: PortEditorProps) {
       )}
       <div className={styles.list} data-layout={props.layout} data-inputs={props.renderValue != null || undefined} ref={list}>
         <div className={styles.columns} data-layout={props.layout} data-output={props.output || undefined}>
-          <span>{t(props.layout === 'values' ? 'inspector.ports.columnHandle' : 'inspector.ports.columnName')}</span>
-          <span>{t(props.layout === 'values' ? 'valueEditor.component' : 'inspector.ports.columnType')}</span>
+          <span>{t('inspector.ports.columnName')}</span>
+          <span>{t('inspector.ports.columnType')}</span>
           {!props.output && <span>{t('inspector.ports.columnValue')}</span>}
           {props.layout === 'values' && <span className={styles.nullableHeading}>{t('valueEditor.nullable')}</span>}
         </div>
