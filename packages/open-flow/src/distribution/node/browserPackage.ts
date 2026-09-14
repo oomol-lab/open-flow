@@ -204,6 +204,21 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       { cwd: options.sourceRoot },
     )
     await Promise.all(
+      ['events', 'subscriptions'].map(async (name) => {
+        const declaration = (await readFile(path.join(declarationRoot, `trigger/providers/feishu/${name}.d.ts`), 'utf8'))
+          .replaceAll("'../../../connector/common/proxy.ts'", "'./connector-proxy.js'")
+          .replaceAll("'../../../flow/common/change.ts'", "'../browser/flow-change.js'")
+        await writeFile(path.join(commonOutputPath, `feishu-${name}.d.ts`), declaration)
+      }),
+    )
+    await writeFile(path.join(commonOutputPath, 'event-sources.d.ts'), await readFile(path.join(declarationRoot, 'control/common/eventSources.d.ts'), 'utf8'))
+    await writeFile(
+      path.join(browserOutputPath, 'event-sources.d.ts'),
+      (await readFile(path.join(declarationRoot, 'workbench/browser/runtime/eventSources.d.ts'), 'utf8'))
+        .replaceAll("'../../../control/common/api.ts'", "'../common/control-api.js'")
+        .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'"),
+    )
+    await Promise.all(
       ['input', 'label', 'textarea'].map(async (name) => {
         await copyFile(path.join(declarationRoot, `ui/browser/${name}.d.ts`), path.join(browserOutputPath, `ui-${name}.d.ts`))
       }),
@@ -251,6 +266,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
     const connectorActionDeclaration = await readFile(path.join(declarationRoot, 'connector/common/actionSchema.d.ts'), 'utf8')
     const connectorProxyDeclaration = await readFile(path.join(declarationRoot, 'connector/common/proxy.d.ts'), 'utf8')
     const controlApiDeclaration = (await readFile(path.join(declarationRoot, 'control/common/api.d.ts'), 'utf8'))
+      .replaceAll("'./eventSources.ts'", "'./event-sources.js'")
       .replaceAll("'../../execution/common/runLifecycle.ts'", "'./run-lifecycle.js'")
       .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
       .replaceAll("'./errors.ts'", "'./control-api-errors.js'")
@@ -310,6 +326,8 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'./configOptions.ts'", "'./trigger-config-options.js'")
       .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
     const providerTriggersDeclaration = (await readFile(path.join(declarationRoot, 'trigger/providers/definitions.d.ts'), 'utf8'))
+      .replaceAll("'./feishu/events.ts'", "'./feishu-events.js'")
+      .replaceAll("'./feishu/subscriptions.ts'", "'./feishu-subscriptions.js'")
       .replaceAll("'../common/integration.ts'", "'./integration-trigger.js'")
       .replaceAll("'../common/poll.ts'", "'./poll-trigger.js'")
       .replaceAll("'../common/configOptions.ts'", "'./trigger-config-options.js'")
@@ -332,6 +350,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         workbenchDeclaration
           .slice(workbenchStyleImport.length)
           .replaceAll("'./contract.ts'", "'./workbench-contract.js'")
+          .replaceAll("'./eventSources.tsx'", "'./event-sources.js'")
           .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'"),
       ),
       writeFile(

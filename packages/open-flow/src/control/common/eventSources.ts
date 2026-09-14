@@ -3,38 +3,6 @@ import { z } from 'zod'
 const id = z.string().min(1).max(256)
 const eventType = z.string().regex(/^[a-z][a-z0-9_.]{0,127}$/)
 const name = z.string().trim().min(1).max(128)
-const secret = z.string().min(1).max(256)
-
-export const createEventSourceSchema = z.strictObject({
-  version: z.literal(1),
-  name,
-  connectionId: id,
-  teamId: id.nullable(),
-  verificationToken: secret,
-  encryptKey: secret,
-  eventTypes: z
-    .array(eventType)
-    .min(1)
-    .max(200)
-    .refine((values) => new Set(values).size == values.length),
-  manageSubscriptions: z.boolean(),
-})
-
-export const updateEventSourceSchema = z.strictObject({
-  version: z.literal(1),
-  expectedRevision: z.int().positive(),
-  name,
-  enabled: z.boolean(),
-  eventTypes: z
-    .array(eventType)
-    .min(1)
-    .max(200)
-    .refine((values) => new Set(values).size == values.length),
-  verificationToken: secret.optional(),
-  encryptKey: secret.optional(),
-})
-
-export const eventSourceRevisionSchema = z.strictObject({ version: z.literal(1), expectedRevision: z.int().positive() })
 
 const eventSourceSchema = z.strictObject({
   version: z.literal(1),
@@ -58,9 +26,48 @@ const eventSourceSchema = z.strictObject({
   consumers: z.array(z.strictObject({ flowId: id, flowName: z.string(), triggerNodeId: id })),
 })
 
-export type EventSource = z.infer<typeof eventSourceSchema>
-export type CreateEventSource = z.infer<typeof createEventSourceSchema>
-export type UpdateEventSource = z.infer<typeof updateEventSourceSchema>
+export interface CreateEventSource {
+  readonly version: 1
+  readonly name: string
+  readonly connectionId: string
+  readonly teamId: string | null
+  readonly verificationToken: string
+  readonly encryptKey: string
+  readonly eventTypes: string[]
+  readonly manageSubscriptions: boolean
+}
+
+export interface UpdateEventSource {
+  readonly version: 1
+  readonly expectedRevision: number
+  readonly name: string
+  readonly enabled: boolean
+  readonly eventTypes: string[]
+  readonly verificationToken?: string
+  readonly encryptKey?: string
+}
+
+export interface EventSource {
+  readonly version: 1
+  readonly sourceId: string
+  readonly revision: number
+  readonly name: string
+  readonly provider: 'feishu' | 'feishu_app_bot'
+  readonly appId: string
+  readonly tenantKey: string
+  readonly connectionId: string
+  readonly teamId: string | null
+  readonly enabled: boolean
+  readonly eventTypes: string[]
+  readonly manageSubscriptions: boolean
+  readonly verificationTokenConfigured: boolean
+  readonly encryptKeyConfigured: boolean
+  readonly endpointUrl: string | null
+  readonly verifiedAt: string | null
+  readonly lastReceivedAt: string | null
+  readonly updatedAt: string
+  readonly consumers: { flowId: string; flowName: string; triggerNodeId: string }[]
+}
 
 export function decodeEventSource(value: unknown): EventSource {
   return eventSourceSchema.parse(value)

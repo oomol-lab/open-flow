@@ -2,7 +2,7 @@ import type { ChangeOperation, JsonValue } from '../../flow/common/change.ts'
 
 import { z } from 'zod'
 import { changeOperationsSchema, decodeChangeOperations, resourceNameIssue } from '../../flow/common/change.ts'
-import { createEventSourceSchema, updateEventSourceSchema, eventSourceRevisionSchema } from './eventSources.ts'
+import { createEventSourceSchema, updateEventSourceSchema, eventSourceRevisionSchema } from './eventSourceSchemas.ts'
 
 const json: z.ZodType<JsonValue> = z.json()
 const id = z.string().min(1)
