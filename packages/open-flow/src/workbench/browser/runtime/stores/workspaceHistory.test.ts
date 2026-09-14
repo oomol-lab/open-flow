@@ -398,3 +398,33 @@ it('persists generic task and comment visibility, including copying comments', a
     store.dispose()
   }
 })
+
+it('syncs saved comment edits to the canvas immediately and retains them after reopening', async () => {
+  const { store, saved, update, change } = await session()
+  const persist = update.getMockImplementation()!
+  const gate = Promise.withResolvers<void>()
+  update.mockImplementationOnce(async (...args) => {
+    await gate.promise
+    return persist(...args)
+  })
+  const comment = { title: 'Edited note', content: '## Updated\n\n**Saved from the inspector**' }
+  const canvasComment = () => designerGraph(store.$.draft.value, target, store.$.presentation.value?.value).nodes.find((node) => node.id == 'note')
+  try {
+    const saving = store.saveComment('note', comment)
+    expect(canvasComment()).toMatchObject({ ...comment, position: { x: 0, y: 300 } })
+    expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.find((node) => node.id == 'note')).toMatchObject({ content: 'Keep this' })
+
+    gate.resolve()
+    await saving
+    await store.selectFlow('flow')
+    expect(canvasComment()).toMatchObject(comment)
+
+    await store.saveComment('note', { ...comment, content: '' })
+    await store.selectFlow('flow')
+    expect(canvasComment()).toMatchObject({ title: comment.title, content: '' })
+    expect(change).not.toHaveBeenCalled()
+  } finally {
+    gate.resolve()
+    store.dispose()
+  }
+})

@@ -335,7 +335,7 @@ function Editor({
       {contextPanelVisible && (
         <EditorContextPanel
           resizable
-          nodeId={selection?.id}
+          nodeId={selectedDesignerNode?.id}
           nodeHeading={
             contextPanelMode === 'inspector' && selection != null
               ? {
@@ -358,7 +358,17 @@ function Editor({
                     return issue == null ? undefined : t(`inspector.node.${issue === 'empty' ? 'nameEmpty' : 'nameDuplicate'}`)
                   },
                 }
-              : undefined
+              : contextPanelMode === 'inspector' && selectedDesignerNode?.kind === 'comment'
+                ? {
+                    title: selectedDesignerNode.title,
+                    disabled: authoringDisabled,
+                    fallback: <i aria-hidden="true" className="i-lucide-light:sticky-note" />,
+                    validate: () => undefined,
+                    onRename: (title) => {
+                      void store.workspace.saveComment(selectedDesignerNode.id, { title, content: selectedDesignerNode.content ?? '' })
+                    },
+                  }
+                : undefined
           }
           focusOnOpen={contextPanelMode == 'inspector' && focusInspectorOnOpen.current}
           icon={contextPanelMode == 'blocks' ? 'plus' : contextPanelMode == 'notification' ? 'connection' : inspectorIcon(selection, target)}
@@ -412,8 +422,6 @@ function Editor({
               disabled={authoringDisabled}
               dark={theme == 'dark'}
               onSave={(comment) => void store.workspace.saveComment(selectedDesignerNode.id, comment)}
-              onDuplicate={() => void store.workspace.duplicateSelectedNodes()}
-              onDelete={() => void store.workspace.deleteSelectedNodes()}
             />
           ) : (
             revision != null && (

@@ -10,6 +10,8 @@
   --open-flow-card: #ffffff;
   --open-flow-node-surface: #f6f6f6;
   --open-flow-node-content: #ffffff;
+  --open-flow-comment-content: color-mix(in srgb, #f3eddc 55%, var(--open-flow-node-content));
+  --open-flow-comment-border: #e3d8ba;
   --open-flow-card-foreground: #242424;
   --open-flow-popover: #ffffff;
   --open-flow-popover-foreground: #242424;
@@ -54,6 +56,8 @@
   --open-flow-card: #242424;
   --open-flow-node-surface: #2b2b2b;
   --open-flow-node-content: #242424;
+  --open-flow-comment-content: #2b261d;
+  --open-flow-comment-border: #5c4e36;
   --open-flow-card-foreground: #eeeeee;
   --open-flow-popover: #2b2b2b;
   --open-flow-popover-foreground: #eeeeee;
@@ -324,9 +328,9 @@
   --pseudo-outline-color: var(--brand-3);
 
   --comment-bg: #f3eddc;
-  --comment-preview-bg: color-mix(in srgb, var(--comment-bg) 55%, var(--node-background-color));
+  --comment-preview-bg: var(--open-flow-comment-content);
   --comment-head-bg: #e8d7b3;
-  --comment-border: #e3d8ba;
+  --comment-border: var(--open-flow-comment-border);
   --comment-selected-border: #a58b50;
   --comment-hover-bg: color-mix(in srgb, var(--comment-head-bg) 70%, #ffffff);
   --comment-active-bg: color-mix(in srgb, var(--comment-head-bg) 93%, #000000);
@@ -496,9 +500,9 @@
   --pseudo-outline-color: var(--brand-7);
 
   --comment-bg: #403727;
-  --comment-preview-bg: #2b261d;
+  --comment-preview-bg: var(--open-flow-comment-content);
   --comment-head-bg: #514532;
-  --comment-border: #5c4e36;
+  --comment-border: var(--open-flow-comment-border);
   --comment-selected-border: #bba165;
   --comment-hover-bg: color-mix(in srgb, var(--comment-head-bg) 89%, #ffffff);
   --comment-active-bg: color-mix(in srgb, var(--comment-head-bg) 90%, #000000);

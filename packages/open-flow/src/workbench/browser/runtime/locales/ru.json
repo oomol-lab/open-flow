@@ -280,10 +280,8 @@
       "chooseAccounts": "Управление аккаунтами"
     },
     "comment": {
-      "source": "Показать исходный текст",
-      "preview": "Предпросмотр",
-      "duplicate": "Дублировать",
-      "delete": "Удалить"
+      "source": "Исходный код",
+      "preview": "Markdown"
     },
     "ports": {
       "reorder": "Изменить порядок {{name}}",

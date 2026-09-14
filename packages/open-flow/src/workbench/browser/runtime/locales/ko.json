@@ -280,10 +280,8 @@
       "chooseAccounts": "계정 관리"
     },
     "comment": {
-      "source": "원본 보기",
-      "preview": "미리 보기",
-      "duplicate": "복제",
-      "delete": "삭제"
+      "source": "소스",
+      "preview": "Markdown"
     },
     "ports": {
       "reorder": "{{name}} 순서 변경",

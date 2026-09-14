@@ -4,11 +4,18 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { CommentInspector } from '../../src/workbench/browser/runtime/editor/commentInspector.tsx'
+import { EditorContextPanel } from '../../src/workbench/browser/runtime/editor/editorContextPanel.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 
 const cases = [
   { label: 'Editable', title: 'Review notes', content: '### Before running\nCheck the inputs and review the output.', disabled: false },
   { label: 'Empty content', title: 'New comment', content: '', disabled: false },
+  {
+    label: 'Long content',
+    title: 'Review checklist',
+    content: Array.from({ length: 24 }, (_, index) => `### Step ${index + 1}\nCheck the inputs and review the output.`).join('\n\n'),
+    disabled: false,
+  },
   { label: 'Read only', title: 'Team guidelines', content: 'Keep each step focused on one task.', disabled: true },
 ] as const
 
@@ -17,17 +24,33 @@ function CommentCase({ sample, dark, log }: { sample: (typeof cases)[number]; da
   return (
     <section className="comment-properties-case" aria-label={sample.label}>
       <h2>{sample.label}</h2>
-      <CommentInspector
-        {...value}
-        dark={dark}
-        disabled={sample.disabled}
-        onSave={(next) => {
-          setValue(next)
-          log('comment.saved', { sample: sample.label, ...next })
+      <EditorContextPanel
+        title={value.title}
+        icon="panel"
+        theme={dark ? 'dark' : 'light'}
+        focusOnOpen={false}
+        onClose={() => log('comment.close', sample.label)}
+        nodeHeading={{
+          title: value.title,
+          disabled: sample.disabled,
+          fallback: <i aria-hidden="true" className="i-lucide-light:sticky-note" />,
+          validate: () => undefined,
+          onRename: (title) => {
+            setValue((previous) => ({ ...previous, title }))
+            log('comment.renamed', { sample: sample.label, title })
+          },
         }}
-        onDuplicate={() => log('comment.duplicate', sample.label)}
-        onDelete={() => log('comment.delete', sample.label)}
-      />
+      >
+        <CommentInspector
+          {...value}
+          dark={dark}
+          disabled={sample.disabled}
+          onSave={(next) => {
+            setValue(next)
+            log('comment.saved', { sample: sample.label, ...next })
+          }}
+        />
+      </EditorContextPanel>
     </section>
   )
 }

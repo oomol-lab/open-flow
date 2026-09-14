@@ -425,6 +425,12 @@
   border-radius: 12px;
   background: var(--ui-card);
 }
+.comment-properties-case > .context-panel {
+  position: relative;
+  width: 100%;
+  height: 360px;
+  border: 0;
+}
 .comment-properties-case > h2 {
   margin: 0;
   padding: 12px 12px 0;
