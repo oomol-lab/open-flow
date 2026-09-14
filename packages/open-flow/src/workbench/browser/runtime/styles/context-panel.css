@@ -113,39 +113,17 @@
     min-width: 0;
   }
 
-  .inspector-port-section {
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--ui-foreground) 1%, var(--ui-background));
-    > summary {
-      font-size: 12px;
-      font-weight: 500;
-    }
-  }
-
+  .inspector-port-section,
   .inspector-values-section {
     border-block: 1px solid var(--ui-border);
   }
 
-  .inspector-content > .inspector-port-section {
-    margin: 8px;
+  .inspector-port-section + .inspector-port-section {
+    border-top: 0;
   }
 
-  .inspector-ports-title {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 12px 10px 4px;
-    font-size: 12px;
-    > h3 {
-      flex: 1;
-      margin: 0;
-      font-size: inherit;
-      font-weight: 500;
-    }
-    > span {
-      color: var(--ui-muted-foreground);
-      font-size: 12px;
-    }
+  .inspector-nested-port-section {
+    border-top: 1px solid var(--ui-border);
   }
 
   .inspector-content {

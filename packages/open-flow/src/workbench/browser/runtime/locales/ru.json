@@ -293,6 +293,8 @@
       "connected": "Подключено",
       "sort": "Изменить порядок",
       "finishSorting": "Готово",
+      "inputsTitle": "Входы",
+      "outputsTitle": "Выходы",
       "valuesTitle": "Значения",
       "columnHandle": "Handle",
       "columnName": "Имя",

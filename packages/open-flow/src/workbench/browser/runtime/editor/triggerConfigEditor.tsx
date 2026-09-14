@@ -1,7 +1,7 @@
 import type { JsonValue } from '../api.ts'
 
 import { useTranslate } from 'val-i18n-react'
-import { EnumChoices } from '../../../../form/browser/choiceEditor.tsx'
+import { EnumChoices } from '../../../../form/browser/enumChoices.tsx'
 import { ValueEditor } from '../../../../form/browser/valueEditor.tsx'
 import { isJsonValue, objectValue } from '../../../../form/common/value.ts'
 import { Button } from '../../../../ui/browser/button.tsx'

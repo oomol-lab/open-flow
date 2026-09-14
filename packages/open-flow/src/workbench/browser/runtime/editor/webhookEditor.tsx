@@ -95,9 +95,15 @@ export function WebhookEditor({
           </div>
         </Field>
         <Field>
-          <FieldLabel>{t('webhookEditor.webhookPayloadFields')}</FieldLabel>
           {inputs.length === 0 && <p className="text-sm text-muted-foreground">{t('webhookEditor.webhookNoPayloadFields')}</p>}
-          <PortDefinitionEditor values={inputs} defaultNullable={false} disabled={disabled} onChange={(next) => onChange({ inputs: next, options })} />
+          <PortDefinitionEditor
+            layout="ports"
+            title={t('webhookEditor.webhookPayloadFields')}
+            values={inputs}
+            defaultNullable={false}
+            disabled={disabled}
+            onChange={(next) => onChange({ inputs: next, options })}
+          />
         </Field>
         <p className="text-sm text-muted-foreground">{t('webhookEditor.webhookTestHint')}</p>
         <details>

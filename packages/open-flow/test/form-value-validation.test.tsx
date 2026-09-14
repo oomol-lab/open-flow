@@ -72,7 +72,7 @@ describe('Empty string presentation', () => {
 })
 
 describe('JSON component with union schemas', () => {
-  it.each(['oneOf', 'anyOf'])('uses JSON editing for editable definitions while preserving %s validation', (keyword) => {
+  it.each(['oneOf', 'anyOf'])('always uses JSON editing while preserving %s validation', (keyword) => {
     const i18n = createI18n('en')
     const onChange = vi.fn()
     const onDefinitionChange = vi.fn()
@@ -98,7 +98,10 @@ describe('JSON component with union schemas', () => {
       expect(json).not.toContain('choice variant')
       expect(json).not.toContain('aria-invalid="true"')
       expect(render(false, true)).toContain('aria-invalid="true"')
-      expect(render('hello', false)).toContain('choice variant')
+      const fixedDefinition = render('hello', false)
+      expect(fixedDefinition).toContain('aria-label="choice JSON"')
+      expect(fixedDefinition).toContain('&quot;hello&quot;')
+      expect(fixedDefinition).not.toContain('choice variant')
       expect(onChange).not.toHaveBeenCalled()
       expect(onDefinitionChange).not.toHaveBeenCalled()
     } finally {

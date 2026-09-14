@@ -43,6 +43,27 @@ describe('Output definitions', () => {
   })
 })
 
+describe('Property panel port layout', () => {
+  it('uses the value-table controls without adding the value-only nullable column', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <PortDefinitionEditor
+          layout="ports"
+          title="Input ports"
+          disabled
+          values={[{ handle: 'message', jsonSchema: { type: 'string' }, nullable: true, value: 'Hello' }]}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('Input ports')
+    expect(markup).toContain('data-layout="ports"')
+    expect(markup).toContain('aria-label="Field name"')
+    expect(markup).toContain('aria-label="message type"')
+    expect(markup).not.toContain('message Allow null')
+  })
+})
+
 describe('Nested field definition editing', () => {
   it.each(['values', 'definition'] as const)('keeps schema editing scoped to the %s layout', (layout) => {
     const onChange = vi.fn()
