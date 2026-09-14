@@ -337,7 +337,7 @@ type PortEditorProps = {
     port: InputPort,
     presentation: Pick<
       ValueEditorProps,
-      'layout' | 'header' | 'leadingControl' | 'valueLeadingControl' | 'trailingControl' | 'description' | 'options' | 'onDefinitionChange'
+      'layout' | 'header' | 'leadingControl' | 'valueAddon' | 'trailingControl' | 'description' | 'options' | 'onDefinitionChange'
     >,
   ) => ReactNode
 } & (
@@ -712,7 +712,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         <div className={styles.columns} data-layout={props.layout} data-output={props.output || undefined}>
           <span>{t('inspector.ports.columnName')}</span>
           <span>{t('inspector.ports.columnType')}</span>
-          {!props.output && <span>{t('inspector.ports.columnValue')}</span>}
+          {!props.output && <span className={styles.valueHeading}>{t('inspector.ports.columnValue')}</span>}
           {tableLayout && <span className={styles.nullableHeading}>{t('valueEditor.nullable')}</span>}
         </div>
         <span className="sr-only" role="status" aria-live="polite">

@@ -50,6 +50,8 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
   muted foreground color rather than reduced opacity or a different weight.
 - Keep the separator above the upstream-source section when it shows its empty-state row so the
   menu structure remains stable when upstream nodes appear.
+- Input source is a leading addon inside the value control, sharing its surface and outer border.
+  It does not reserve a separate column. Keep it available for literal and bound values.
 - A single selected upstream value shows the same node icon used on the canvas, including the
   resolved Provider icon for connector nodes, before the node and output label.
 - A selected Variable value shows the Variable icon before its name, matching the icon used by

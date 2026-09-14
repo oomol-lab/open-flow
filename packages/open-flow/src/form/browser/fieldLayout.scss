@@ -5,8 +5,6 @@
   --field-type-track: minmax(64px, 0.48fr);
   --field-name-gap: 4px;
   --field-actions-gap: 4px;
-  --field-source-gap: 0px;
-  --field-source-width: 0px;
   --field-value-column: value;
   --field-value-row: 1;
   --field-branch-row: 2;
@@ -17,7 +15,6 @@
     [toggle] var(--field-toggle-width, 24px) var(--field-name-gap)
     [handle] var(--field-name-track) 4px
     [type] var(--field-type-track) 4px
-    [source] var(--field-source-width) var(--field-source-gap)
     [value] minmax(0, 1.5fr) [content-end] var(--field-actions-gap)
     [nullable] var(--field-nullable-width)
     [actions] var(--field-actions-width, 28px) [end];

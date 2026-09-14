@@ -1,6 +1,7 @@
 @use './fieldLayout.scss';
 
 .root {
+  --field-control-height: 30px;
   display: grid;
   min-width: 0;
   grid-template-columns: minmax(0, 1fr) var(--field-actions-width, 28px);
@@ -118,7 +119,6 @@
   @include fieldLayout.columns;
   position: relative;
   row-gap: 4px;
-  --field-control-height: 30px;
 }
 .header {
   display: contents;
@@ -171,26 +171,47 @@
 .root[data-header] > .body {
   gap: 4px;
 }
-.root[data-header] > .valueLeadingControl {
-  grid-column: source;
-  grid-row: var(--field-value-row);
+/* The addon shares the value control's surface and precedes it in Tab order. */
+.valueAddon {
+  color: var(--ui-muted-foreground);
+  grid-column: var(--field-value-column, 1);
+  grid-row: var(--field-value-row, 1);
+  align-self: start;
+  justify-self: start;
   display: flex;
-  height: var(--field-control-height);
   align-items: center;
+  height: var(--field-control-height, 30px);
+  padding-left: 2px;
+  z-index: 1;
 }
-@container value-fields (max-width: 340px) {
-  .root[data-header][data-value-leading] > .valueLeadingControl {
-    position: absolute;
-    left: calc(var(--field-grip-width, 0px) + var(--field-toggle-width, 24px) + var(--field-name-gap));
-    top: calc(var(--field-control-height) + 4px);
-    width: var(--field-source-width);
+.root:not([data-header])[data-value-addon] {
+  --field-value-column: 1;
+  --field-value-row: 1;
+  &[data-collection] > .body {
+    grid-row: 2;
   }
-  .root[data-header][data-value-leading] {
-    > .body,
-    > .summary,
-    > .arrayItemType {
-      margin-left: calc(var(--field-source-width) + var(--field-source-gap));
+}
+.root[data-value-addon] {
+  --value-addon-inset: 34px;
+  &:has(> .body > [aria-invalid='true'], > .body > div > [aria-invalid='true']) > .valueAddon {
+    color: var(--ui-destructive);
+    > div > button {
+      color: inherit;
+      &:is(:hover, [aria-expanded='true'], [aria-pressed='true']) {
+        background-color: color-mix(in srgb, var(--ui-destructive) 8%, var(--ui-control-background, var(--ui-background)));
+      }
+      &:focus-visible {
+        outline-color: var(--ui-destructive);
+      }
     }
+  }
+  > .summary,
+  > .body > .nullValue,
+  > .arrayItemType [data-slot='select-trigger'],
+  &:not([data-collection]) > .body > :is(input, button, select, textarea, [role='button']),
+  &:not([data-collection]) > .body > div > :is([data-slot='select-trigger'], [data-field-control], [data-value-control]),
+  &:not([data-collection]) > .body [data-slot='input-group'] input {
+    padding-left: var(--value-addon-inset);
   }
 }
 .summary {
@@ -240,7 +261,7 @@
   > .summary,
   > .arrayItemType [data-slot='select-trigger'],
   &:not([data-collection]) > .body > :is(input, select, button, [role='button']),
-  &:not([data-collection]) > .body > div > :is([data-slot='select-trigger'], [data-slot='button']) {
+  &:not([data-collection]) > .body > div > :is([data-slot='select-trigger'], [data-field-control]) {
     padding-right: calc(var(--value-tools-width) + var(--value-suffix-width) + 8px);
   }
   &:not([data-collection]) > .body [data-slot='input-group'] input {
