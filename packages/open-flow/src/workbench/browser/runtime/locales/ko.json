@@ -291,6 +291,8 @@
       "moved": "{{name}}이(가) {{position}}번째로 이동했습니다.",
       "groupSettings": "그룹 설정",
       "connected": "연결됨",
+      "valuesTitle": "값",
+      "columnHandle": "Handle",
       "columnName": "이름",
       "columnType": "유형",
       "columnValue": "값"

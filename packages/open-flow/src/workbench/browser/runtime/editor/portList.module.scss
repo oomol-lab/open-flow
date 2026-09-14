@@ -1,7 +1,8 @@
 .list {
   container: value-fields / inline-size;
   min-width: 0;
-  padding: 8px 12px 16px 27px;
+  --field-toggle-width: 22px;
+  padding: 8px 12px 16px calc(var(--field-toggle-width) + 3px);
   --field-actions-width: 28px;
   &[data-inputs] {
     --field-actions-width: 54px;
@@ -36,9 +37,6 @@
 }
 
 .grip {
-  position: absolute;
-  right: 100%;
-  top: 3px;
   opacity: 0;
   cursor: grab;
   color: var(--ui-muted-foreground);
@@ -191,7 +189,7 @@
 
 .columns {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) minmax(64px, 0.48fr) minmax(0, 1.5fr) var(--field-actions-width, 28px);
+  grid-template-columns: var(--field-toggle-width, 24px) minmax(0, 1fr) minmax(64px, 0.48fr) minmax(0, 1.5fr) var(--field-actions-width, 28px);
   gap: 4px;
   color: var(--ui-muted-foreground);
   font-size: 12px;
@@ -203,7 +201,7 @@
     grid-column: 2;
   }
   &[data-output] {
-    grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) var(--field-actions-width, 28px);
+    grid-template-columns: var(--field-toggle-width, 24px) minmax(0, 1fr) minmax(0, 1fr) var(--field-actions-width, 28px);
   }
 }
 
@@ -245,12 +243,23 @@
   }
 }
 
-.row[data-editing] [data-value-options],
-.row [data-popup-open] {
-  background: var(--ui-accent);
-  color: var(--ui-accent-foreground);
+.row[data-editing] [data-value-options] {
+  background-color: var(--ui-control-hover-background, var(--ui-muted));
+  color: var(--ui-foreground);
 }
 
-.list[data-layout='values'] > .columns {
-  display: none;
+.list[data-layout='values'] {
+  --field-type-width: 84px;
+  > .columns {
+    grid-template-columns: var(--field-toggle-width, 24px) minmax(90px, 1fr) var(--field-type-width) minmax(0, 1.5fr) var(--field-actions-width, 28px);
+  }
+}
+@container value-fields (max-width: 340px) {
+  .list[data-layout='values'] > .columns {
+    grid-template-columns: var(--field-toggle-width, 24px) minmax(0, 1fr) var(--field-type-width) var(--field-actions-width, 28px);
+    > span:last-child {
+      grid-column: 2 / -2;
+      grid-row: 2;
+    }
+  }
 }

@@ -291,6 +291,8 @@
       "moved": "{{name}} перемещён на позицию {{position}}.",
       "groupSettings": "Настройки группы",
       "connected": "Подключено",
+      "valuesTitle": "Значения",
+      "columnHandle": "Handle",
       "columnName": "Имя",
       "columnType": "Тип",
       "columnValue": "Значение"

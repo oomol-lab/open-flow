@@ -1133,7 +1133,7 @@ export function NodeInspector({
   }, [focus, selection?.id, selection?.kind, taskSection])
 
   return (
-    <ScrollArea className="inspector-scroll" defer={false} tabIndex={-1}>
+    <ScrollArea className="inspector-scroll" autoHide="never" defer={false} tabIndex={-1}>
       <div className="inspector-content" ref={content}>
         <Diagnostics key={JSON.stringify([store.$.flowId.value, target, selection?.id])} diagnostics={diagnostics} />
         {selection?.kind == 'trigger' && !(selection.trigger.kind == 'integration' && selection.trigger.definition.key == 'feishu_app_bot.on_event') && (
@@ -1342,14 +1342,19 @@ export function NodeInspector({
           />
         )}
         {selection?.kind === 'value' && (
-          <PortDefinitionEditor
-            layout="values"
-            values={selection.node.values}
-            disabled={disabled}
-            onChange={(values) => {
-              void store.saveValue(selection.id, values)
-            }}
-          />
+          <div className="inspector-values-section">
+            <div className="px-3 pt-3 pb-1">
+              <FieldLabel>{t('inspector.ports.valuesTitle')}</FieldLabel>
+            </div>
+            <PortDefinitionEditor
+              layout="values"
+              values={selection.node.values}
+              disabled={disabled}
+              onChange={(values) => {
+                void store.saveValue(selection.id, values)
+              }}
+            />
+          </div>
         )}
         {selection?.kind === 'task' && selection.definition != null && (
           <details className="inspector-disclosure inspector-port-section" open>

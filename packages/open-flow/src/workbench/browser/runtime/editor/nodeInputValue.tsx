@@ -31,7 +31,7 @@ export function NodeInputValue({
   onValue,
   onVariable,
 }: {
-  readonly presentation?: Pick<ValueEditorProps, 'header' | 'description' | 'options'>
+  readonly presentation?: Pick<ValueEditorProps, 'header' | 'leadingControl' | 'description' | 'options'>
   readonly sourceOptions?: ReactNode
   readonly embedded?: boolean
   readonly handleNames?: readonly string[]

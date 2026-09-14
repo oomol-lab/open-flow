@@ -291,6 +291,8 @@
       "moved": "{{name}} 已移至第 {{position}} 位。",
       "groupSettings": "群組設定",
       "connected": "已連接",
+      "valuesTitle": "值",
+      "columnHandle": "Handle",
       "columnName": "名稱",
       "columnType": "類型",
       "columnValue": "值"

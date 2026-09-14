@@ -27,6 +27,7 @@ export interface ValueEditorProps {
   readonly path: string
   readonly onDraftIssue: (path: string, invalid: boolean) => void
   readonly header?: ReactNode
+  readonly leadingControl?: ReactNode
   readonly description?: string
   readonly editor?: ReactNode
   readonly valueEditable?: boolean
@@ -245,8 +246,17 @@ export function ValueEditor(props: ValueEditorProps) {
     >
       {props.header != null && (
         <div className={styles.header} title={props.description}>
+          {props.leadingControl != null && <div className={styles.leadingControl}>{props.leadingControl}</div>}
           {expandable && (
-            <Button type="button" size="icon-xs" variant="ghost" aria-label={label} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+            <Button
+              type="button"
+              size="icon-xs"
+              className="w-[var(--field-toggle-width,24px)]"
+              variant="disclosure"
+              aria-label={label}
+              aria-expanded={expanded}
+              onClick={() => setExpanded(!expanded)}
+            >
               <i aria-hidden="true" className={expanded ? 'i-lucide-light:chevron-down' : 'i-lucide-light:chevron-right'} />
             </Button>
           )}
