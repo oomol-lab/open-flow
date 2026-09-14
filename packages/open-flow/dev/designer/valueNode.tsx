@@ -58,6 +58,7 @@ export const additionalInputsStory: FrontendStory = {
 
 function GroupedInputsStory({ dark, language, log, output = false }: { dark: boolean; language: UiLanguage; log: LogAction; output?: boolean }) {
   const i18n = useMemo(() => createI18n(language), [language])
+  const [emptyValues, setEmptyValues] = useState<readonly (InputPort | Group)[]>([])
   const [values, setValues] = useState<readonly (InputPort | Group)[]>([
     { group: 'Request', collapsed: !output },
     { handle: 'message', jsonSchema: { type: 'string' }, nullable: false, ...(output ? {} : { value: 'hello' }) },
@@ -86,6 +87,21 @@ function GroupedInputsStory({ dark, language, log, output = false }: { dark: boo
             log('Save grouped inputs', next)
           }}
         />
+        <h3>Empty {output ? 'outputs' : 'inputs'}</h3>
+        <PortDefinitionEditor
+          groups
+          layout="ports"
+          title={output ? 'Outputs' : 'Inputs'}
+          output={output}
+          values={emptyValues}
+          disabled={false}
+          onChange={(next) => {
+            setEmptyValues(next)
+            log('Save empty sample ports', next)
+          }}
+        />
+        <h3>Empty read-only {output ? 'outputs' : 'inputs'}</h3>
+        <PortDefinitionEditor groups layout="ports" title={output ? 'Outputs' : 'Inputs'} output={output} values={[]} disabled onChange={() => {}} />
         <pre aria-label="Saved ports">{JSON.stringify(values, null, 2)}</pre>
       </div>
     </I18nProvider>
