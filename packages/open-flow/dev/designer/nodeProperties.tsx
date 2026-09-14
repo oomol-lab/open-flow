@@ -210,7 +210,7 @@ function PropertySample({
         <h3>{disabled ? 'Read only' : 'Editable'}</h3>
         <InspectorSamplePanel disabled={disabled} revision={revision} selection={selection} store={session.store} theme={dark ? 'dark' : 'light'}>
           <NodeInspector
-            variables={{ enabled: false, names: [], loaded: true, loading: false, onOpen: () => {} }}
+            variables={{ enabled: true, names: ['API_TOKEN', 'TEAM_NAME'], loaded: true, loading: false, onOpen: () => {} }}
             connectorAuthorizationPending={false}
             connectorLoading={false}
             connectors={session.connectors}

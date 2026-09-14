@@ -891,6 +891,9 @@
   "nodeInput": {
     "literal": "固定値",
     "variable": "Variable",
+    "noVariables": "Variable はまだ宣言されていません",
+    "noUpstreamNodes": "上流ノードがありません",
+    "unsupported": "非対応",
     "mode": "型",
     "connected": "上流の入力元に接続されています。入力元で変更できます。"
   },

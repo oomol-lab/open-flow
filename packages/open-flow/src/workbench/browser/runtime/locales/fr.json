@@ -891,6 +891,9 @@
   "nodeInput": {
     "literal": "Littéral",
     "variable": "Variable",
+    "noVariables": "Aucune Variable déclarée",
+    "noUpstreamNodes": "Aucun nœud en amont",
+    "unsupported": "Non pris en charge",
     "mode": "Type",
     "connected": "Relié à une source en amont. Modifiez-la dans les sources d’entrée."
   },

@@ -12,7 +12,7 @@ import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 import type { DiagnosticFocus } from './diagnostics.ts'
 import type { SubflowSettings } from './flowChanges.ts'
 import type { NodeInputField } from './nodeInputs.tsx'
-import type { InputVariables } from './nodeInputValue.tsx'
+import type { InputVariables, NodeInputUpstreamSources } from './nodeInputValue.tsx'
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -22,7 +22,6 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../
 import { Input } from '../../../../ui/browser/input.tsx'
 import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../../../../ui/browser/select.tsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { ToggleGroup, ToggleGroupItem } from '../../../../ui/browser/toggle-group.tsx'
@@ -108,115 +107,34 @@ function Diagnostics({ diagnostics }: { readonly diagnostics: readonly Diagnosti
   )
 }
 
-function InputSources({
+function inputUpstreamSources({
   revision,
   target,
   selection,
   store,
-  disabled,
   handleName,
-}: Pick<Props, 'revision' | 'target' | 'store' | 'disabled'> & { readonly selection: ResolvedNode; readonly handleName?: string }): ReactElement | null {
-  const t = useTranslate()
-  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null)
+}: Pick<Props, 'revision' | 'target' | 'store'> & { readonly selection: ResolvedNode; readonly handleName: string }): NodeInputUpstreamSources | undefined {
   const graph = revision.graph(target)!
-  const ports = revision.inputSources(target, selection.id).filter((port) => handleName == null || port.handle === handleName)
-  if (ports.length == 0) return null
-  const content = (
-    <section
-      className={handleName == null ? 'inspector-section inspector-sources' : 'inspector-field-source'}
-      data-inspector-section="inputs"
-      ref={setPortalRoot}
-    >
-      {handleName == null && <h3>{t('inspector.sources.title')}</h3>}
-      <FieldGroup className="gap-2">
-        {ports.map(({ handle, outputs: options }) => {
-          const mapping = selection.node.inputs[handle]
-          const sources = mapping?.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node') : []
-          const source = sources.length == 1 ? sources[0] : undefined
-          const current = source == null ? (sources.length > 0 ? 'merged' : '') : JSON.stringify([source.nodeId, source.output])
-          const valid = source != null && options[source.nodeId]?.includes(source.output)
-          const fieldId = `source-${selection.id}-${handle}`
-          return (
-            <Field key={handle} className={handleName == null ? 'grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-x-2 gap-y-1' : 'gap-1'}>
-              <FieldLabel htmlFor={fieldId} className={handleName == null ? 'min-w-0' : 'sr-only'} title={handle}>
-                <code className="truncate text-xs font-normal text-muted-foreground">{handleName == null ? handle : t('inspector.sources.title')}</code>
-              </FieldLabel>
-              <Select
-                disabled={disabled}
-                value={current}
-                onValueChange={(next) => {
-                  if (next == null) return
-                  if (next == '') void store.setInputValue(selection.id, handle, undefined)
-                  else {
-                    const [nodeId, output] = JSON.parse(next) as [string, string]
-                    void store.setInputSource(selection.id, handle, { nodeId, output })
-                  }
-                }}
-              >
-                <SelectTrigger
-                  id={fieldId}
-                  aria-label={`${handle} ${t('inspector.sources.title')}`}
-                  size="field"
-                  className="min-w-0 w-full px-2 text-xs font-normal"
-                  aria-invalid={source != null && !valid}
-                >
-                  <SelectValue className="min-w-0">
-                    {sources.length == 0 ? (
-                      <span className="truncate">{t('inspector.sources.local')}</span>
-                    ) : (
-                      <span
-                        className="flex min-w-0 items-center gap-1"
-                        title={sources.map((item) => `${graph.nodes[item.nodeId]?.name ?? item.nodeId}.${item.output}`).join(' / ')}
-                      >
-                        {sources.map((item, index) => (
-                          <span key={`${item.nodeId}:${item.output}`} className="min-w-0 truncate">
-                            {index > 0 && <span className="text-muted-foreground">/</span>}
-                            <span className="truncate">{graph.nodes[item.nodeId]?.name ?? item.nodeId}</span>
-                            <span aria-hidden="true" className="text-muted-foreground">
-                              {' '}
-                              ·{' '}
-                            </span>
-                            <code className="text-[11px]">{item.output}</code>
-                          </span>
-                        ))}
-                      </span>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent align="start" alignItemWithTrigger={false} container={portalRoot}>
-                  <SelectGroup>
-                    <SelectItem value="">{t('inspector.sources.local')}</SelectItem>
-                    {sources.length > 1 && (
-                      <SelectItem value="merged" disabled>
-                        {sources.map((item) => `${graph.nodes[item.nodeId]?.name ?? item.nodeId}.${item.output}`).join(' / ')}
-                      </SelectItem>
-                    )}
-                    {source != null && !valid && (
-                      <SelectItem value={current} disabled>
-                        {graph.nodes[source.nodeId]?.name ?? source.nodeId}.{source.output}
-                      </SelectItem>
-                    )}
-                  </SelectGroup>
-                  {Object.entries(options).map(([id, outputs]) => (
-                    <SelectGroup key={id}>
-                      <SelectLabel>{graph.nodes[id]?.name ?? id}</SelectLabel>
-                      {outputs.map((output) => (
-                        <SelectItem key={output} value={JSON.stringify([id, output])}>
-                          {output}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
-              {source != null && !valid && <FieldError className="col-start-2">{t('inspector.sources.unavailable')}</FieldError>}
-            </Field>
-          )
-        })}
-      </FieldGroup>
-    </section>
-  )
-  return content
+  const port = revision.inputSources(target, selection.id).find(({ handle }) => handle === handleName)
+  if (port == null) return undefined
+  const mapping = selection.node.inputs[handleName]
+  const sources = mapping?.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node') : []
+  return {
+    current: sources.map((source) => ({
+      nodeId: source.nodeId,
+      nodeName: graph.nodes[source.nodeId]?.name ?? source.nodeId,
+      output: source.output,
+      valid: port.outputs[source.nodeId]?.includes(source.output) === true,
+    })),
+    groups: Object.entries(port.outputs).map(([nodeId, outputs]) => ({
+      nodeId,
+      nodeName: graph.nodes[nodeId]?.name ?? nodeId,
+      outputs,
+    })),
+    onChange: (source) => {
+      void store.setInputSource(selection.id, handleName, source)
+    },
+  }
 }
 
 function GeneralSettings({
@@ -1265,9 +1183,7 @@ export function NodeInspector({
                       }
                     : undefined
                 }
-                renderSource={(handle) => (
-                  <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} handleName={handle} />
-                )}
+                renderSource={(handle) => inputUpstreamSources({ revision, target, selection, store, handleName: handle })}
                 variables={variables}
                 disabled={disabled}
                 onValue={(handle, value) => {
@@ -1313,9 +1229,7 @@ export function NodeInspector({
                       onVariable={(handle, name) => {
                         void store.setInputVariable(selection.id, handle, name)
                       }}
-                      renderSource={(handle) => (
-                        <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} handleName={handle} />
-                      )}
+                      renderSource={(handle) => inputUpstreamSources({ revision, target, selection, store, handleName: handle })}
                     />
                   </section>
                 )}

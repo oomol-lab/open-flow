@@ -36,6 +36,16 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
         <output aria-label="Saved input">{JSON.stringify({ mapping, variableName })}</output>
         <h3>Connected source</h3>
         <NodeInputValue definition={definition} value={undefined} connected variables={variables} disabled={false} onValue={() => {}} onVariable={() => {}} />
+        <h3>No available sources</h3>
+        <NodeInputValue
+          definition={definition}
+          value={undefined}
+          connected={false}
+          variables={{ ...variables, names: [] }}
+          disabled={false}
+          onValue={() => {}}
+          onVariable={() => {}}
+        />
         <h3>Read only</h3>
         <NodeInputValue
           definition={definition}

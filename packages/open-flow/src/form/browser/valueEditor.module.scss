@@ -171,6 +171,28 @@
 .root[data-header] > .body {
   gap: 4px;
 }
+.root[data-header] > .valueLeadingControl {
+  grid-column: source;
+  grid-row: var(--field-value-row);
+  display: flex;
+  height: var(--field-control-height);
+  align-items: center;
+}
+@container value-fields (max-width: 340px) {
+  .root[data-header][data-value-leading] > .valueLeadingControl {
+    position: absolute;
+    left: calc(var(--field-grip-width, 0px) + var(--field-toggle-width, 24px) + var(--field-name-gap));
+    top: calc(var(--field-control-height) + 4px);
+    width: var(--field-source-width);
+  }
+  .root[data-header][data-value-leading] {
+    > .body,
+    > .summary,
+    > .arrayItemType {
+      margin-left: calc(var(--field-source-width) + var(--field-source-gap));
+    }
+  }
+}
 .summary {
   --preview-background: var(--ui-control-background, var(--ui-muted));
   --preview-border: var(--ui-input);

@@ -335,7 +335,10 @@ type PortEditorProps = {
   output?: boolean
   renderValue?: (
     port: InputPort,
-    presentation: Pick<ValueEditorProps, 'layout' | 'header' | 'leadingControl' | 'trailingControl' | 'description' | 'options' | 'onDefinitionChange'>,
+    presentation: Pick<
+      ValueEditorProps,
+      'layout' | 'header' | 'leadingControl' | 'valueLeadingControl' | 'trailingControl' | 'description' | 'options' | 'onDefinitionChange'
+    >,
   ) => ReactNode
 } & (
   | {
@@ -545,7 +548,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         </span>
       </div>
     )
-    const trailingControl = props.layout === 'values' && (
+    const trailingControl = tableLayout && (
       <span className={styles.nullableControl}>
         <Checkbox
           className="not-data-disabled:cursor-pointer"
@@ -592,7 +595,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           }}
         >
           <PortSettingsPanel
-            showNullable={props.layout !== 'values'}
+            showNullable={!tableLayout}
             container={list.current?.closest<HTMLElement>('.editor-context-panel') ?? list.current}
             anchor={() => fieldPanelAnchor(list.current?.querySelector(`[data-port-index="${index}"]`))}
             port={port}
@@ -710,7 +713,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           <span>{t('inspector.ports.columnName')}</span>
           <span>{t('inspector.ports.columnType')}</span>
           {!props.output && <span>{t('inspector.ports.columnValue')}</span>}
-          {props.layout === 'values' && <span className={styles.nullableHeading}>{t('valueEditor.nullable')}</span>}
+          {tableLayout && <span className={styles.nullableHeading}>{t('valueEditor.nullable')}</span>}
         </div>
         <span className="sr-only" role="status" aria-live="polite">
           {announcement}

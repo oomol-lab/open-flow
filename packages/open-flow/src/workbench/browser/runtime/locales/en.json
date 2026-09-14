@@ -891,6 +891,9 @@
   "nodeInput": {
     "literal": "Literal",
     "variable": "Variable",
+    "noVariables": "No Variables declared",
+    "noUpstreamNodes": "No upstream nodes",
+    "unsupported": "Unsupported",
     "mode": "Type",
     "connected": "Connected to an upstream source. Use Input sources to change it."
   },

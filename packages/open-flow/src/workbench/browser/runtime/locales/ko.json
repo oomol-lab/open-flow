@@ -891,6 +891,9 @@
   "nodeInput": {
     "literal": "고정 값",
     "variable": "Variable",
+    "noVariables": "선언된 Variable이 없습니다",
+    "noUpstreamNodes": "업스트림 노드가 없습니다",
+    "unsupported": "지원되지 않음",
     "mode": "타입",
     "connected": "상위 입력 소스에 연결되어 있습니다. 입력 소스에서 변경할 수 있습니다."
   },
