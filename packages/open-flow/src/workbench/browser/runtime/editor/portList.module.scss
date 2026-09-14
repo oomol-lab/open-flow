@@ -266,6 +266,10 @@
   }
 }
 
+.list[data-empty] {
+  padding-block: 0;
+}
+
 .row[data-editing] [data-value-options] {
   background-color: var(--ui-control-hover-background, var(--ui-muted));
   color: var(--ui-foreground);

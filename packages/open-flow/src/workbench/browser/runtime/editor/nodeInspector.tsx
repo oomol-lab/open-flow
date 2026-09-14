@@ -1023,6 +1023,7 @@ export function NodeInspector({
   const content = useRef<HTMLDivElement>(null)
   const task = selection?.kind == 'task' ? selection.definition : undefined
   const isAgent = task != null && 'executor' in task && task.executor.kind == 'agent'
+  const isLlm = task != null && 'executor' in task && task.executor.kind == 'llm'
   const connector = task != null && 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
   const taskId = selection?.kind == 'task' && selection.node.task == null ? selection.node.taskId : undefined
   const locatedRequest = useRef<number>()
@@ -1204,7 +1205,7 @@ export function NodeInspector({
             return (
               <section className="inspector-port-section" data-inspector-section="inputs">
                 {fields}
-                {selection.kind === 'task' && selection.definition != null && selection.node.task == null && !isAgent && (
+                {selection.kind === 'task' && selection.definition != null && selection.node.task == null && isLlm && (
                   <section className="inspector-nested-port-section">
                     <NodeInputs
                       key={`additional:${selection.id}`}

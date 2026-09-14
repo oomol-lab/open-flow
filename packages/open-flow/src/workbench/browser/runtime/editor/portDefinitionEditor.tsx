@@ -361,7 +361,11 @@ export function PortDefinitionEditor(props: PortEditorProps) {
   }
   const t = useTranslate()
   const [sorting, setSorting] = useState(false)
-  const sortingEnabled = sorting && !disabled
+  const hasFields = values.some((port) => 'handle' in port)
+  const sortingEnabled = sorting && !disabled && hasFields
+  useEffect(() => {
+    if (!hasFields) setSorting(false)
+  }, [hasFields])
   const onDraftIssue = useCallback(() => {}, [])
   const update = (index: number, port: InputPort | Group) => onChange(values.map((entry, i) => (i === index ? port : entry)))
   const list = useRef<HTMLDivElement>(null)
@@ -677,25 +681,27 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           {props.title != null || props.layout === 'values' ? <FieldLabel>{props.title ?? t('inspector.ports.valuesTitle')}</FieldLabel> : <span />}
           {!disabled && (
             <div className="ml-auto flex items-center gap-1">
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label={t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}
-                      onClick={() => {
-                        cancelDrag()
-                        setSorting(!sortingEnabled)
-                      }}
-                    />
-                  }
-                >
-                  <i aria-hidden="true" className={sortingEnabled ? 'i-lucide-light:check text-lg' : 'i-lucide-light:grip-vertical text-lg'} />
-                </TooltipTrigger>
-                <TooltipContent>{t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}</TooltipContent>
-              </Tooltip>
+              {hasFields && (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label={t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}
+                        onClick={() => {
+                          cancelDrag()
+                          setSorting(!sortingEnabled)
+                        }}
+                      />
+                    }
+                  >
+                    <i aria-hidden="true" className={sortingEnabled ? 'i-lucide-light:check text-lg' : 'i-lucide-light:grip-vertical text-lg'} />
+                  </TooltipTrigger>
+                  <TooltipContent>{t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}</TooltipContent>
+                </Tooltip>
+              )}
               {!sortingEnabled && (
                 <Tooltip>
                   <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label={t('valueEditor.addField')} onClick={addField} />}>
@@ -708,13 +714,21 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           )}
         </div>
       )}
-      <div className={styles.list} data-layout={props.layout} data-inputs={props.renderValue != null || undefined} ref={list}>
-        <div className={styles.columns} data-layout={props.layout} data-output={props.output || undefined}>
-          <span>{t('inspector.ports.columnName')}</span>
-          <span>{t('inspector.ports.columnType')}</span>
-          {!props.output && <span className={styles.valueHeading}>{t('inspector.ports.columnValue')}</span>}
-          {tableLayout && <span className={styles.nullableHeading}>{t('valueEditor.nullable')}</span>}
-        </div>
+      <div
+        className={styles.list}
+        data-layout={props.layout}
+        data-inputs={props.renderValue != null || undefined}
+        data-empty={(values.length === 0 && (tableLayout || disabled)) || undefined}
+        ref={list}
+      >
+        {hasFields && (
+          <div className={styles.columns} data-layout={props.layout} data-output={props.output || undefined}>
+            <span>{t('inspector.ports.columnName')}</span>
+            <span>{t('inspector.ports.columnType')}</span>
+            {!props.output && <span className={styles.valueHeading}>{t('inspector.ports.columnValue')}</span>}
+            {tableLayout && <span className={styles.nullableHeading}>{t('valueEditor.nullable')}</span>}
+          </div>
+        )}
         <span className="sr-only" role="status" aria-live="polite">
           {announcement}
         </span>
