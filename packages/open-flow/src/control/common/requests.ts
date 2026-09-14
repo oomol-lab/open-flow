@@ -2,6 +2,7 @@ import type { ChangeOperation, JsonValue } from '../../flow/common/change.ts'
 
 import { z } from 'zod'
 import { changeOperationsSchema, decodeChangeOperations, resourceNameIssue } from '../../flow/common/change.ts'
+import { createEventSourceSchema, updateEventSourceSchema, eventSourceRevisionSchema } from './eventSources.ts'
 
 const json: z.ZodType<JsonValue> = z.json()
 const id = z.string().min(1)
@@ -10,6 +11,9 @@ const flowName = id.refine((value) => value == value.trim() && resourceNameIssue
 const inputs = z.record(z.string(), z.record(z.string(), json))
 const trigger = z.strictObject({ nodeId: id, payload: json })
 const schemas = {
+  createEventSource: createEventSourceSchema,
+  updateEventSource: updateEventSourceSchema,
+  eventSourceRevision: eventSourceRevisionSchema,
   createFlow: z.strictObject({ name: flowName, version }),
   renameFlow: z.strictObject({ name: flowName, version }),
   changeDraft: z.strictObject({ expectedRevisionId: id, operations: z.array(json).min(1), version }),
@@ -30,6 +34,9 @@ function decoder<Value>(schema: z.ZodType<Value>): (value: unknown) => Value {
 }
 
 export const controlRequests = {
+  createEventSource: decoder(schemas.createEventSource),
+  updateEventSource: decoder(schemas.updateEventSource),
+  eventSourceRevision: decoder(schemas.eventSourceRevision),
   createFlow: decoder(schemas.createFlow),
   renameFlow: decoder(schemas.renameFlow),
   changeDraft(value: unknown): { expectedRevisionId: string; operations: readonly ChangeOperation[]; version: 1 } {

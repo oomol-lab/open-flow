@@ -3,8 +3,8 @@ import type { FormEvent, MouseEvent, ReactElement } from 'react'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { Button, notificationToasterProps } from '@oomol-lab/open-flow/ui'
-import { OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { EventSourcesPage, OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { Toaster } from 'sonner'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { createBrowserHost } from './host.ts'
@@ -106,7 +106,8 @@ function connectorTeams(value: unknown):
 function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   const [pathname, setPathname] = useState(() => window.location.pathname)
   const route = useMemo(() => parseRoute(pathname), [pathname])
-  const settingsOpen = pathname == '/settings'
+  const eventSourcesOpen = pathname == '/settings/event-sources'
+  const settingsOpen = pathname == '/settings' || eventSourcesOpen
   const variablesOpen = pathname == '/variables'
   const [session, setSession] = useState<Session>({ kind: 'checking' })
   const [token, setToken] = useState('')
@@ -209,12 +210,12 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
     setPathname(path)
   }
 
-  function openPage(path: '/' | '/settings' | '/variables'): void {
+  function openPage(path: '/' | '/settings' | '/settings/event-sources' | '/variables'): void {
     if (path != window.location.pathname) window.history.pushState(null, '', path)
     setPathname(path)
   }
 
-  function followPage(event: MouseEvent<HTMLAnchorElement>, path: '/' | '/settings' | '/variables'): void {
+  function followPage(event: MouseEvent<HTMLAnchorElement>, path: '/' | '/settings' | '/settings/event-sources' | '/variables'): void {
     if (event.defaultPrevented || event.button != 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
     openPage(path)
@@ -390,7 +391,27 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
           </header>
           <div className="workbench-frame">
             {settingsOpen ? (
-              <SettingsPage onConnectorChange={() => void loadTeams()} onUnauthorized={sessionExpired} />
+              <div className="settings-layout">
+                <nav className="settings-nav" aria-label={t('shell.settings')}>
+                  <a href="/settings" aria-current={eventSourcesOpen ? undefined : 'page'} onClick={(event) => followPage(event, '/settings')}>
+                    {t('shell.settings')}
+                  </a>
+                  <a
+                    href="/settings/event-sources"
+                    aria-current={eventSourcesOpen ? 'page' : undefined}
+                    onClick={(event) => followPage(event, '/settings/event-sources')}
+                  >
+                    {t('settings.eventSources')}
+                  </a>
+                </nav>
+                <div className="settings-body">
+                  {eventSourcesOpen ? (
+                    <EventSourcesPage client={client} language={language} teams={team.kind == 'ready' ? team.teams : []} />
+                  ) : (
+                    <SettingsPage onConnectorChange={() => void loadTeams()} onUnauthorized={sessionExpired} />
+                  )}
+                </div>
+              </div>
             ) : variablesOpen ? (
               <VariablesPage client={client} language={language} />
             ) : (
@@ -469,6 +490,10 @@ export function App(): ReactElement {
   const [language, setLanguage] = useState(initialLanguage)
   const [theme, setTheme] = useState(initialTheme)
   const [i18n] = useState(() => createI18n(language))
+
+  useLayoutEffect(() => {
+    document.body.dataset.theme = theme
+  }, [theme])
 
   useEffect(() => {
     document.documentElement.lang = language

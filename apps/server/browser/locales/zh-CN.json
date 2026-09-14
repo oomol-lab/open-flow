@@ -59,7 +59,8 @@
     },
     "title": "设置",
     "token": "Token",
-    "tokenHint": "现有 token 永远不会显示；保存会替换它。"
+    "tokenHint": "现有 token 永远不会显示；保存会替换它。",
+    "eventSources": "事件源"
   },
   "team": {
     "createFailed": "无法在这个 Connector 团队中创建 Flow。",

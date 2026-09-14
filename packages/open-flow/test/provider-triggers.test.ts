@@ -118,6 +118,7 @@ async function signature(secret: string, source: Uint8Array, format: 'base64' | 
 describe('provider Poll Trigger definitions', () => {
   it('exposes the complete built-in Provider catalog', () => {
     expect(triggerDefinitions.map(({ snapshot }) => `${snapshot.type}:${snapshot.key}`)).toEqual([
+      'integration:feishu_app_bot.on_event',
       'poll:airtable.on_record_changed',
       'poll:gmail.on_message_received',
       'integration:github.on_repo_event',

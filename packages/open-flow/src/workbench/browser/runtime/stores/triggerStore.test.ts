@@ -278,6 +278,75 @@ describe('TriggerStore', () => {
     }
   })
 
+  it('keeps Feishu filters compatible when changing sources and event types', async () => {
+    const { workspace, triggers, request } = createSetup()
+    const original = request.getMockImplementation()!
+    let revision = 1
+    request.mockImplementation(async (path, init) => {
+      const response = await original(path, init)
+      if (path.endsWith('/draft/changes')) {
+        const data = await response.json()
+        data.revision.parentRevisionId = `revision-${revision}`
+        data.revision.revisionId = `revision-${++revision}`
+        data.revision.digest = `digest-${revision}`
+        return Response.json(data)
+      }
+      if (!path.endsWith('/editor')) return response
+      const data = await response.json()
+      const node = data.draft.content.document.graph.nodes.linear
+      node.kind = 'integration'
+      node.definition.type = 'integration'
+      node.definition.endpoint = { body: { formats: ['json'], allowArray: false, allowEmpty: false }, methods: ['POST'], successStatus: 200 }
+      node.definition.provider = 'feishu_app_bot'
+      node.definition.key = 'feishu_app_bot.on_event'
+      node.config = { sourceId: 'old-source', eventTypes: ['drive.file.edit_v1'], resource: { kind: 'document', id: 'doc' } }
+      delete node.pollTimes
+      return Response.json(data)
+    })
+    try {
+      await workspace.start(flow.flowId)
+      expect(
+        await workspace.setTriggerEventSource('linear', {
+          version: 1,
+          sourceId: 'new-source',
+          revision: 1,
+          name: 'Events',
+          provider: 'feishu_app_bot',
+          appId: 'cli_demo',
+          tenantKey: 'tenant',
+          connectionId: 'app-connection',
+          teamId: null,
+          enabled: true,
+          eventTypes: ['im.message.receive_v1'],
+          manageSubscriptions: false,
+          verificationTokenConfigured: true,
+          encryptKeyConfigured: true,
+          endpointUrl: null,
+          verifiedAt: null,
+          lastReceivedAt: null,
+          updatedAt: timestamp,
+          consumers: [],
+        }),
+      ).toBe(true)
+      const node = workspace.$.draft.value!.content.document.graph.nodes.linear!
+      if (node.kind != 'integration') throw new Error('Expected integration.')
+      expect(node.config).toEqual({ sourceId: 'new-source', eventTypes: [] })
+      expect(workspace.$.revision.value!.binding(node.bindingId)).toMatchObject({ kind: 'connection', target: 'app-connection' })
+      expect(request.mock.calls.filter(([path]) => path.endsWith('/draft/changes'))).toHaveLength(1)
+      await workspace.saveTriggerConfig('linear', 'chatIds', ['chat'])
+      await workspace.saveTriggerConfig('linear', 'eventTypes', ['drive.file.edit_v1'])
+      expect(workspace.$.draft.value!.content.document.graph.nodes.linear).not.toHaveProperty('config.chatIds')
+      await workspace.saveTriggerConfig('linear', 'resource', { kind: 'document', id: 'token', documentType: 'docx' })
+      await workspace.saveTriggerConfig('linear', 'eventTypes', ['drive.file.title_updated_v1'])
+      expect(workspace.$.draft.value!.content.document.graph.nodes.linear).toHaveProperty('config.resource.id', 'token')
+      await workspace.saveTriggerConfig('linear', 'eventTypes', ['contact.user.created_v3'])
+      expect(workspace.$.draft.value!.content.document.graph.nodes.linear).not.toHaveProperty('config.resource')
+    } finally {
+      triggers.dispose()
+      workspace.dispose()
+    }
+  })
+
   it('loads Linear options only after pending configuration is saved', async () => {
     const { client, workspace, triggers } = createSetup()
     const pending = Promise.withResolvers<void>()

@@ -19,6 +19,7 @@ const migrationFiles = [
   '0014_run_results.sql',
   '0015_listener_work.sql',
   '0016_publish_retry.sql',
+  '0017_event_sources.sql',
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 

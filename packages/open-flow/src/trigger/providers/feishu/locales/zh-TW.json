@@ -1,0 +1,6 @@
+{
+  "feishu_app_bot.on_event": {
+    "displayName": "應用程式事件",
+    "description": "透過共用事件來源接收所選飛書應用程式事件。"
+  }
+}

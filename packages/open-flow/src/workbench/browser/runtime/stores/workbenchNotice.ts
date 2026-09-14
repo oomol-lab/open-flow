@@ -11,12 +11,17 @@ export type Notice = WorkbenchNotification
 export type SetNotice = (notice: Notice) => void
 
 const errorKeys = {
+  [controlErrorCode.eventSourceInvalid]: 'eventSources.invalid',
+  [controlErrorCode.eventSourceIdentityUnavailable]: 'eventSources.identityUnavailable',
+  [controlErrorCode.eventSourceNotFound]: 'eventSources.notFound',
+  [controlErrorCode.eventSourceConflict]: 'eventSources.conflict',
   [controlErrorCode.authenticationRequired]: 'notice.error.authenticationRequired',
   [controlErrorCode.authorizationDenied]: 'notice.error.authorizationDenied',
   [controlErrorCode.bindingUnresolved]: 'notice.error.bindingUnresolved',
   [controlErrorCode.connectorActionNotFound]: 'notice.error.connectorActionNotFound',
   [controlErrorCode.connectorUnconfigured]: 'notice.connectorUnconfigured',
   [controlErrorCode.connectorUnavailable]: 'notice.error.connectorUnavailable',
+  [controlErrorCode.connectorConsoleUnconfigured]: 'notice.error.connectorConsoleUnconfigured',
   [controlErrorCode.engineUnavailable]: 'notice.error.engineUnavailable',
   [controlErrorCode.engineUnsupported]: 'notice.error.engineUnsupported',
   [controlErrorCode.flowInvalid]: 'notice.error.flowInvalid',

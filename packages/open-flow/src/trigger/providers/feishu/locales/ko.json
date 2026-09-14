@@ -1,0 +1,6 @@
+{
+  "feishu_app_bot.on_event": {
+    "displayName": "앱 이벤트",
+    "description": "공유 이벤트 소스로 선택한 Feishu 앱 이벤트를 수신합니다."
+  }
+}

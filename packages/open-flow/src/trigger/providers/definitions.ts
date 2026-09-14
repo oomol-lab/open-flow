@@ -1,3 +1,6 @@
+export { feishuSubscriptions, feishuResponse } from './feishu/subscriptions.ts'
+import { feishuEvents } from './feishu/on-event.ts'
+export { receiveFeishuEvent, matchesFeishuEvent, type FeishuEvent } from './feishu/events.ts'
 import type { IntegrationDefinition } from '../common/integration.ts'
 import type { PollDefinition } from '../common/poll.ts'
 
@@ -24,6 +27,7 @@ import { zendeskEvent } from './zendesk/on-event.ts'
 export type ProviderTriggerDefinition = IntegrationDefinition | PollDefinition
 
 export const triggerDefinitions: readonly ProviderTriggerDefinition[] = [
+  ...feishuEvents,
   airtableRecordChanged,
   gmailMessageReceived,
   githubRepoEvent,

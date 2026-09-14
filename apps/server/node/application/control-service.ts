@@ -1,3 +1,4 @@
+import type { CreateEventSource, UpdateEventSource } from '@oomol-lab/open-flow/control-api'
 import type { ResultQuery } from '@oomol-lab/open-flow/control-api'
 import type {
   ConnectorAction,
@@ -29,6 +30,7 @@ import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
 import type { ConnectorHost } from '../deployment/connector.ts'
+import type { EventSourceRuntime } from '../runtime/event-source-runtime.ts'
 import type { StoredFlow, StoredFlowRevision, StoredPresentation } from '../storage/flow-store.ts'
 import type { PublicationAcceptance, StoredPublication } from '../storage/publication-store.ts'
 import type { StoredControlRun } from '../storage/run-view-store.ts'
@@ -52,7 +54,7 @@ import { PermanentPollError, PollConnectionError } from '@oomol-lab/open-flow/po
 import { triggerDefinitions as providerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { randomUUID } from 'node:crypto'
-import { checkCodeActions, ConnectorTaskError } from '../deployment/connector.ts'
+import { checkCodeActions, ConnectorTaskError, ConnectorClient } from '../deployment/connector.ts'
 import { AcceptanceError, ControlError, serverErrorCode } from '../error.ts'
 import { Store } from '../storage/store.ts'
 
@@ -108,6 +110,8 @@ export class ControlService {
   private readonly triggersChanged: () => void
   private readonly wake: () => void
 
+  readonly eventSources?: EventSourceRuntime
+
   constructor(
     store: Store,
     clock: () => number,
@@ -125,7 +129,9 @@ export class ControlService {
     resolveConnectorConsoleOrigin: () => URL | undefined,
     resolveWaitPublicOrigin: () => URL | undefined,
     resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>,
+    eventSources?: EventSourceRuntime,
   ) {
+    this.eventSources = eventSources
     this.store = store
     this.clock = clock
     this.abortRun = abortRun
@@ -142,6 +148,38 @@ export class ControlService {
     this.resolveConnectorConsoleOrigin = resolveConnectorConsoleOrigin
     this.resolveWaitPublicOrigin = resolveWaitPublicOrigin
     this.resolveConnectorTeam = resolveConnectorTeam
+  }
+
+  async listEventSources(flowId?: string) {
+    if (this.eventSources == null) throw new ControlError(controlErrorCode.eventSourceInvalid, 'Event sources are unavailable.')
+    if (flowId == null) return this.eventSources.list()
+    const teamId = (await this.resolveConnectorScope(flowId)) ?? null
+    return { ...this.eventSources.list(teamId), teamId }
+  }
+
+  async listEventSourceConnections(teamId: string | undefined, signal: AbortSignal) {
+    const scope = await this.resolveConnectorTeam(teamId)
+    if (scope != teamId) throw new ControlError(controlErrorCode.eventSourceInvalid, 'Select the Connector Team explicitly.')
+    const connector = this.resolveConnector()
+    if (connector == null) throw new ControlError(controlErrorCode.connectorUnconfigured, 'Connector is not configured.')
+    return { version: 1, connections: await connector.listConnections('feishu_app_bot', signal, scope) }
+  }
+
+  async createEventSource(input: CreateEventSource, signal: AbortSignal) {
+    if (this.eventSources == null) throw new ControlError(controlErrorCode.eventSourceInvalid, 'Event sources are unavailable.')
+    const teamId = await this.resolveConnectorTeam(input.teamId ?? undefined)
+    if ((teamId ?? null) != input.teamId) throw new ControlError(controlErrorCode.eventSourceInvalid, 'Select the Connector Team explicitly.')
+    return this.eventSources.create(input, signal)
+  }
+
+  updateEventSource(sourceId: string, input: UpdateEventSource) {
+    if (this.eventSources == null) throw new ControlError(controlErrorCode.eventSourceInvalid, 'Event sources are unavailable.')
+    return this.eventSources.update(sourceId, input)
+  }
+
+  deleteEventSource(sourceId: string, revision: number) {
+    if (this.eventSources == null) throw new ControlError(controlErrorCode.eventSourceInvalid, 'Event sources are unavailable.')
+    this.eventSources.delete(sourceId, revision)
   }
 
   listTriggerKeys(): readonly TriggerKeySummary[] {
@@ -186,6 +224,17 @@ export class ControlService {
     if (trigger == null || (trigger.kind != 'poll' && trigger.kind != 'integration'))
       throw new ControlError(controlErrorCode.triggerKeyNotFound, 'The Trigger was not found.')
     const definition = providerDefinitions.find((item) => item.snapshot.key == trigger.definition.key)
+    if (definition != null && 'eventSource' in definition && definition.eventSource != null) {
+      const binding = currentDraft.content.document.bindings[trigger.bindingId]
+      if (binding?.kind != 'connection') throw new ControlError(serverErrorCode.connectorConnectionRequired, 'Select a Connection first.')
+      const sources = (await this.listEventSources(flowId)).sources.filter(
+        (source) => source.connectionId == binding.target && source.provider == trigger.definition.provider,
+      )
+      if (field == 'sourceId') return sources.map((source) => ({ value: source.sourceId, label: source.name }))
+      if (field == 'eventTypes')
+        return (sources.find((source) => source.sourceId == trigger.config.sourceId)?.eventTypes ?? []).map((type) => ({ value: type, label: type }))
+      throw new ControlError(controlErrorCode.triggerKeyInvalid, 'Unknown event source configuration field.')
+    }
     if (definition?.configOptions == null) throw new ControlError(controlErrorCode.triggerKeyInvalid, 'This Trigger has no dynamic configuration options.')
     const binding = currentDraft.content.document.bindings[trigger.bindingId]
     if (binding?.kind != 'connection') throw new ControlError(serverErrorCode.connectorConnectionRequired, 'Select a Connection first.')
@@ -257,10 +306,26 @@ export class ControlService {
     return await this.#connectorRequest(flowId, (connector, teamId) => connector.listConnections(serviceId, signal, teamId))
   }
 
-  connectorConnectionPage(serviceId: string, flowId?: string): string {
+  async connectorConnectionPage(serviceId: string, flowId?: string, teamId?: string, signal?: AbortSignal): Promise<string> {
+    if (flowId != null && teamId != null) throw new ControlError(controlErrorCode.flowInvalid, 'Specify either a Flow or a Team for the connection page.')
     if (flowId != null) this.getFlow(flowId)
+    const connector = this.resolveConnector()
+    if (connector instanceof ConnectorClient && connector.teamSupported()) {
+      try {
+        return await connector.hostedConnectionPage(serviceId, flowId == null ? teamId : await this.resolveConnectorScope(flowId), signal)
+      } catch (error) {
+        if (!(error instanceof ConnectorTaskError)) throw error
+        throw new ControlError(error.code, error.message)
+      }
+    }
+    if (teamId != null) await this.resolveConnectorTeam(teamId)
     const origin = this.resolveConnectorConsoleOrigin()
-    if (origin == null) throw new ControlError(controlErrorCode.connectorUnavailable, 'The Connector request could not be completed.')
+    if (origin == null) {
+      throw new ControlError(
+        controlErrorCode.connectorConsoleUnconfigured,
+        'Connector authorization console URL is not configured. Set OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN or configure the Connector authorization console URL in deployment Settings.',
+      )
+    }
     return new URL(`providers/${encodeURIComponent(serviceId)}`, origin).href
   }
 

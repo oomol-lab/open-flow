@@ -8,6 +8,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ServerService } from '../node/application/service.ts'
 import { ConnectorClient, ConnectorTaskError } from '../node/deployment/connector.ts'
+import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { acceptRun, storeRevision } from './runFixture.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
@@ -309,7 +310,7 @@ describe('Server Connector host', () => {
     await expect(service.control.searchConnectorActions('echo')).resolves.toEqual(combined)
     await expect(service.control.getConnectorAction('example.echo')).resolves.toEqual(combined[0])
     await expect(service.control.listConnectorConnections('example')).resolves.toEqual(connections)
-    expect(service.control.connectorConnectionPage('example')).toBe('https://connector.example/providers/example')
+    expect(await service.control.connectorConnectionPage('example')).toBe('https://connector.example/providers/example')
   })
 
   it('executes managed Connector Tasks through the injected host', async () => {
@@ -591,4 +592,32 @@ describe('Server Connector host', () => {
       payload: { error: { code: 'node.failed', message: 'Node "connector" timed out.' } },
     })
   })
+})
+
+it('opens hosted connection pages in the Flow team or explicitly selected team', async () => {
+  const connector = new ConnectorClient('https://connector.oomol.com', 'runtime-token')
+  vi.spyOn(connector, 'listTeams').mockResolvedValue([
+    { id: 'team-a-id', name: 'team_a', systemCreated: false },
+    { id: 'team-b-id', name: 'team_b', systemCreated: true },
+  ])
+  const service = await openService(':memory:', {
+    capabilities: {
+      connector: () => connector,
+      connectorConsoleOrigin: () => new URL('https://connector.oomol.com'),
+    },
+  })
+  const { flow } = await service.control.createFlow('operator', 'A', 'create-team-a', 'team-a-id')
+  const app = createServerApp(service, { resolveControlActor: () => 'operator' })
+  for (const query of [`flowId=${flow.flowId}`, 'teamId=team-a-id']) {
+    const response = await app.request(`/v1/connector/connections/feishu_app_bot/page?${query}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1 }),
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ version: 1, url: 'https://console.oomol.com/team/team_a/connections/feishu_app_bot' })
+  }
+  expect(await service.control.connectorConnectionPage('feishu_app_bot')).toBe('https://console.oomol.com/team/team_b/connections/feishu_app_bot')
+  await expect(service.control.connectorConnectionPage('feishu_app_bot', undefined, 'unknown-team')).rejects.toThrow('Team')
+  await expect(service.control.connectorConnectionPage('feishu_app_bot', flow.flowId, 'team-b-id')).rejects.toThrow('either a Flow or a Team')
 })

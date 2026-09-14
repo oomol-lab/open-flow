@@ -3,6 +3,18 @@ import { mcpTools } from '../src/control/common/mcp.ts'
 import { controlRequests, controlRequestSchema } from '../src/control/common/requests.ts'
 
 const samples = {
+  createEventSource: {
+    version: 1,
+    name: 'Feishu',
+    connectionId: 'connection',
+    teamId: null,
+    verificationToken: 'token',
+    encryptKey: 'key',
+    eventTypes: ['im.message.receive_v1'],
+    manageSubscriptions: true,
+  },
+  updateEventSource: { version: 1, expectedRevision: 1, name: 'Feishu', enabled: true, eventTypes: ['im.message.receive_v1'] },
+  eventSourceRevision: { version: 1, expectedRevision: 1 },
   createFlow: { name: 'Flow', version: 1 },
   renameFlow: { name: 'Flow', version: 1 },
   changeDraft: {

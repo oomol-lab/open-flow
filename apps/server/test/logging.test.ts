@@ -260,3 +260,30 @@ it('logs Run lifecycle metadata without copying user errors or Run payloads', as
   )
   expect(captured.output()).not.toContain('user-secret-must-not-leak')
 })
+
+it('identifies missing Connector console configuration in the request log without logging credentials', async () => {
+  const captured = capture('info')
+  const service = await openService(await databaseFile())
+  services.push(service)
+  const app = createServerApp(service, { logger: captured.logger, resolveControlActor: () => 'operator' })
+  const response = await app.request('http://server.local/v1/connector/connections/feishu_app_bot/page', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'authorization': 'Bearer private-credential', 'x-request-id': 'console-request' },
+    body: JSON.stringify({ version: 1 }),
+  })
+  expect(response.status).toBe(503)
+  const body = await response.json()
+  expect(body.error.message).toContain('OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN')
+  expect(captured.entries()).toContainEqual(
+    expect.objectContaining({
+      category: 'http.request.completed',
+      level: 40,
+      requestId: 'console-request',
+      path: '/v1/connector/connections/feishu_app_bot/page',
+      errorCode: 'connector.console-unconfigured',
+      errorMessage: body.error.message,
+      status: 503,
+    }),
+  )
+  expect(captured.output()).not.toContain('private-credential')
+})

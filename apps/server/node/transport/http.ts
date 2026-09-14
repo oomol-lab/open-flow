@@ -64,6 +64,7 @@ interface ServerAppOptions {
 interface AppEnv {
   readonly Variables: {
     readonly errorCode?: string
+    readonly errorMessage?: string
     readonly requestId: string
   }
 }
@@ -95,6 +96,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
       category: 'http.request.completed',
       durationMs: Math.round(performance.now() - startedAt),
       ...(context.get('errorCode') == null ? {} : { errorCode: context.get('errorCode') }),
+      ...(context.get('errorMessage') == null ? {} : { errorMessage: context.get('errorMessage') }),
       method: context.req.method,
       path: logPath(context.req.path),
       requestId,
@@ -115,6 +117,14 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     }
     return callbackRetryAfter(callbackWindows, key, callbackRequestsPerMinute, now)
   }
+  app.all('/v1/event-sources/:sourceId/events', async (context) => {
+    const sourceId = context.req.param('sourceId')
+    const retry = admitCallback(`event-source:${sourceId}`)
+    if (retry != null) return new Response(null, { status: 429, headers: { 'retry-after': String(retry) } })
+    const response = await service.receiveSourceEvent(sourceId, context.req.raw)
+    response.headers.set('cache-control', 'no-store')
+    return response
+  })
   app.all('/v1/integrations', (context) => integration(service, context.req.raw, logger, context.get('requestId'), admitCallback))
   app.all('/v1/integrations/*', (context) => integration(service, context.req.raw, logger, context.get('requestId'), admitCallback))
   app.all('/v1/webhooks', (context) => webhook(service, context.req.raw, logger, context.get('requestId'), admitCallback))
@@ -223,6 +233,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
   app.onError((error, context) => {
     if (error instanceof ControlError) {
       context.set('errorCode', error.code)
+      if (error.status >= 500) context.set('errorMessage', error.message)
       if (error.cause != null) {
         logger.warn(
           {

@@ -59,7 +59,8 @@
     },
     "title": "設定",
     "token": "Token",
-    "tokenHint": "既存の token は表示されません。保存すると置き換えられます。"
+    "tokenHint": "既存の token は表示されません。保存すると置き換えられます。",
+    "eventSources": "イベントソース"
   },
   "team": {
     "createFailed": "この Connector チームで Flow を作成できませんでした。",

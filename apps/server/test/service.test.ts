@@ -1551,12 +1551,12 @@ describe('Server application service', () => {
     })
 
     expect(await service.control.listConnectorProviders()).toEqual([{ serviceId: 'first', serviceName: 'First' }])
-    expect(service.control.connectorConnectionPage('mail')).toBe('https://first.example.com/providers/mail')
+    expect(await service.control.connectorConnectionPage('mail')).toBe('https://first.example.com/providers/mail')
 
     connector = createConnectorHost({ listProviders: async () => [{ serviceId: 'second', serviceName: 'Second' }] })
     consoleOrigin = new URL('https://second.example.com')
     expect(await service.control.listConnectorProviders()).toEqual([{ serviceId: 'second', serviceName: 'Second' }])
-    expect(service.control.connectorConnectionPage('mail')).toBe('https://second.example.com/providers/mail')
+    expect(await service.control.connectorConnectionPage('mail')).toBe('https://second.example.com/providers/mail')
   })
 
   it('ignores unreferenced LLM Tasks when the deployment has no LLM host', async () => {

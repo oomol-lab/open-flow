@@ -7,6 +7,7 @@ import { cardStories } from './cards.tsx'
 import { commentPropertiesStory } from './commentProperties.tsx'
 import { conditionEditorStory } from './conditionEditor.tsx'
 import { connectionPathsStory } from './connectionPaths.tsx'
+import { eventSourcesStory, createEventSourceStory, eventSourceSetupStory, feishuFiltersStory, feishuSummaryStory, eventPickerStory } from './eventSources.tsx'
 import { formStory } from './form.tsx'
 import { historyStory, historyControlsStory, historyKeyboardStory } from './history.tsx'
 import { inspectorPanelStory } from './inspectorPanel.tsx'
@@ -83,6 +84,12 @@ export const labStories: readonly FrontendStory[] = [
   webhookStory,
   conditionEditorStory,
   variablesStory,
+  eventSourcesStory,
+  createEventSourceStory,
+  eventSourceSetupStory,
+  feishuFiltersStory,
+  feishuSummaryStory,
+  eventPickerStory,
   nodeInputStory,
   valueNodeStory,
   additionalInputsStory,
