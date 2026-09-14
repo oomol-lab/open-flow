@@ -68,6 +68,8 @@
       "other": "其他"
     },
     "choiceOptions": "选项",
+    "editOptions": "编辑选项…",
+    "backToChoices": "返回选择",
     "addOption": "添加选项",
     "component": "组件"
   }

@@ -68,6 +68,8 @@
       "other": "Other"
     },
     "choiceOptions": "Options",
+    "editOptions": "Edit options…",
+    "backToChoices": "Back to choices",
     "addOption": "Add option",
     "component": "Component"
   }
