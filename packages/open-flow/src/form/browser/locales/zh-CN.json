@@ -1,5 +1,7 @@
 {
   "valueEditor": {
+    "editRawData": "编辑原始数据",
+    "editAsForm": "切换表单编辑",
     "advancedSettings": "高级设置",
     "invalidSchema": "请输入有效的 JSON Schema。",
     "invalidJson": "请输入有效的 JSON。",
