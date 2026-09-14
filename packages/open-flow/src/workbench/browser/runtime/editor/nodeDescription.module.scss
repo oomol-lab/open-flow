@@ -5,6 +5,7 @@
 
   textarea {
     margin-left: geometry.$name-inset - 12px;
-    width: calc(100% - (#{geometry.$name-inset} - 12px));
+    margin-right: 8px;
+    width: calc(100% - (#{geometry.$name-inset} - 12px) - 8px);
   }
 }
