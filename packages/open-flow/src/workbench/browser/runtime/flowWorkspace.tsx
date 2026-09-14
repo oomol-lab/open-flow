@@ -335,6 +335,7 @@ function Editor({
       />
       {contextPanelVisible && (
         <ContextPanel
+          resizable
           heading={
             contextPanelMode === 'inspector' && selection != null ? (
               <NodeHeading

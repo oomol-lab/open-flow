@@ -25,6 +25,7 @@ import { cycleContextPanelFocus, observeContextPanelOverlay } from './contextPan
 import { NodePickerContent } from './nodePicker.tsx'
 
 interface ContextPanelProps {
+  readonly resizable?: boolean
   readonly heading?: ReactNode
   readonly actions?: ReactNode
   readonly children: ReactNode
@@ -96,11 +97,31 @@ function useOverlayPanel(panel: RefObject<HTMLElement | null>): boolean {
   return overlay
 }
 
-export function ContextPanel({ children, focusOnOpen, actions, heading, icon, onClose, theme, title }: ContextPanelProps): ReactElement {
+export function ContextPanel({ children, focusOnOpen, actions, heading, icon, onClose, theme, title, resizable = false }: ContextPanelProps): ReactElement {
   const t = useTranslate()
   const panel = useRef<HTMLElement>(null)
   const overlay = useOverlayPanel(panel)
   const titleId = useId()
+  const [width, setWidth] = useState<number>()
+  const [availableWidth, setAvailableWidth] = useState(0)
+  const drag = useRef<{ x: number; width: number }>()
+  const maximumWidth = Math.max(320, Math.min(960, availableWidth - 320))
+  const panelWidth = Math.min(maximumWidth, Math.max(320, width ?? Math.min(520, Math.max(400, availableWidth * 0.34))))
+  useEffect(() => {
+    const parent = panel.current?.parentElement
+    if (parent == null || !resizable) return
+    const observer = new ResizeObserver(([entry]) => setAvailableWidth(entry.contentRect.width))
+    observer.observe(parent)
+    return () => observer.disconnect()
+  }, [resizable])
+  useEffect(() => {
+    const parent = panel.current?.parentElement
+    if (parent == null || overlay || !resizable) return
+    parent.style.setProperty('--context-panel-width', `${panelWidth}px`)
+    return () => {
+      parent.style.removeProperty('--context-panel-width')
+    }
+  }, [panelWidth, overlay, resizable])
 
   useEffect(() => {
     if (overlay && focusOnOpen) panel.current?.focus({ preventScroll: true })
@@ -133,7 +154,7 @@ export function ContextPanel({ children, focusOnOpen, actions, heading, icon, on
       ...current.querySelectorAll<HTMLElement>(
         'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
       ),
-    ]
+    ].filter((element) => element.getClientRects().length > 0)
     if (cycleContextPanelFocus(current, focusable, current.ownerDocument.activeElement, event.shiftKey)) event.preventDefault()
   }
 
@@ -155,6 +176,46 @@ export function ContextPanel({ children, focusOnOpen, actions, heading, icon, on
         role={overlay ? 'dialog' : 'complementary'}
         tabIndex={-1}
       >
+        {resizable && !overlay && (
+          <div
+            className="context-panel-resizer"
+            role="separator"
+            tabIndex={0}
+            aria-label={t('contextPanel.resize')}
+            aria-orientation="vertical"
+            aria-valuemin={320}
+            aria-valuemax={maximumWidth}
+            aria-valuenow={Math.round(panelWidth)}
+            onPointerDown={(event) => {
+              if (event.button != 0 || !event.isPrimary) return
+              event.preventDefault()
+              event.currentTarget.focus()
+              event.currentTarget.setPointerCapture(event.pointerId)
+              drag.current = { x: event.clientX, width: panelWidth }
+            }}
+            onPointerMove={(event) => {
+              if (drag.current != null) setWidth(Math.min(maximumWidth, Math.max(320, drag.current.width + drag.current.x - event.clientX)))
+            }}
+            onPointerUp={(event) => {
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+              drag.current = undefined
+            }}
+            onPointerCancel={() => {
+              drag.current = undefined
+            }}
+            onLostPointerCapture={() => {
+              drag.current = undefined
+            }}
+            onDoubleClick={() => setWidth(undefined)}
+            onKeyDown={(event) => {
+              const step = event.shiftKey ? 40 : 10
+              const next = { ArrowLeft: panelWidth + step, ArrowRight: panelWidth - step, Home: 320, End: maximumWidth }[event.key]
+              if (next == null) return
+              event.preventDefault()
+              setWidth(Math.min(maximumWidth, Math.max(320, next)))
+            }}
+          />
+        )}
         <header>
           {heading == null ? (
             <>

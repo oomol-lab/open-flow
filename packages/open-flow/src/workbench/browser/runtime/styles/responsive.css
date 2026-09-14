@@ -66,9 +66,11 @@
   }
 
   @container open-flow-workbench (width <= 720px) {
-    .editor-grid {
+    .editor-grid,
+    .editor-grid.context-panel-closed {
       position: relative;
       grid-template-columns: minmax(0, 1fr);
+      transition: none;
     }
 
     .editor-grid > .context-panel {

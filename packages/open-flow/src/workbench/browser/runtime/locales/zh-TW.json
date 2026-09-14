@@ -92,7 +92,8 @@
     "retry": "重試",
     "search": "搜尋節點",
     "searchPlaceholder": "搜尋節點…",
-    "catalogRefreshFailed": "無法重新整理觸發器清單，仍可使用已快取的結果。"
+    "catalogRefreshFailed": "無法重新整理觸發器清單，仍可使用已快取的結果。",
+    "resize": "調整屬性面板寬度"
   },
   "empty": {
     "loadFailedDescription": "請檢查 API 設定，並確認部署端點可以連線。",
@@ -915,7 +916,12 @@
     "missingStatuses": "部分已選狀態不再可用，請移除或重新選擇。"
   },
   "nodePicker": {
-    "actionGroups": { "read": "讀取介面", "write": "寫入介面", "destructive": "高風險介面", "other": "其他介面" },
+    "actionGroups": {
+      "read": "讀取介面",
+      "write": "寫入介面",
+      "destructive": "高風險介面",
+      "other": "其他介面"
+    },
     "builtInNodes": "內建節點",
     "configured": "已設定",
     "configuredDescription": "已設定帳號，可直接使用。",

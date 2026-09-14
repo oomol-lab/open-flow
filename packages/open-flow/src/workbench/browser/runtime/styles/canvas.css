@@ -3,12 +3,24 @@
     display: grid;
     min-width: 0;
     min-height: 0;
-    grid-template-columns: minmax(0, 1fr) clamp(400px, 34cqi, 520px);
+    grid-template-columns: minmax(0, 1fr) var(--context-panel-width, clamp(400px, 34cqi, 520px));
     grid-template-rows: minmax(0, 1fr) auto;
+    transition: grid-template-columns 220ms ease-out;
   }
 
   .editor-grid.context-panel-closed {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 0px;
+  }
+
+  .editor-grid:has(.context-panel-resizer:active),
+  .editor-grid:has(.context-panel-resizer:focus-visible) {
+    transition: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .editor-grid {
+      transition: none;
+    }
   }
 
   .canvas-panel {

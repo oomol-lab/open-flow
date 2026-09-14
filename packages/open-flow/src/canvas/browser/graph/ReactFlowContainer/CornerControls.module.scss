@@ -3,6 +3,8 @@
   right: 0;
   width: 200px;
   height: 150px;
+  overflow: hidden;
+  border-radius: var(--ui-radius);
 }
 
 .surface.surface.surface {
