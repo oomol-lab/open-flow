@@ -35,6 +35,10 @@
     "nullable": "null を許可",
     "group": "グループ",
     "addGroup": "グループを追加",
-    "collapsed": "折りたたむ"
+    "collapsed": "折りたたむ",
+    "options": "{{name}} の値オプション",
+    "hours": "時",
+    "minutes": "分",
+    "seconds": "秒"
   }
 }

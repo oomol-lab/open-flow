@@ -12,7 +12,6 @@ import { I18nProvider } from 'val-i18n-react'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '../../src/ui/browser/empty.tsx'
-import { NodeHeading } from '../../src/workbench/browser/runtime/editor/nodeHeading.tsx'
 import { NodeInspector } from '../../src/workbench/browser/runtime/editor/nodeInspector.tsx'
 import { TriggerSummary } from '../../src/workbench/browser/runtime/editor/triggerSummary.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
@@ -21,6 +20,7 @@ import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.
 import { RunInputPanel } from '../../src/workbench/browser/runtime/runs/runInputPanel.tsx'
 import { RunRequestStore } from '../../src/workbench/browser/runtime/runs/runRequestStore.ts'
 import { designerGraph } from '../../src/workbench/browser/runtime/workspace.ts'
+import { InspectorSamplePanel } from './inspectorSamplePanel.tsx'
 import { useStorySidebar } from './storySidebar.tsx'
 import { TriggerCatalogStory } from './triggerCatalogStory.tsx'
 import { triggerDraft, triggerFixtures } from './triggerFixtures.ts'
@@ -357,7 +357,7 @@ function RunStory(props: StoryProps) {
 type SidebarState = 'missing-status' | 'options-error' | 'created-with-default' | 'display' | 'edit' | 'unconfigured' | 'connection-error' | 'description'
 function SidebarSample({ fixture, dark, language, log, state, framed = true }: StoryProps & { state: SidebarState; framed?: boolean }) {
   const [session, setSession] = useState<ReturnType<typeof createTriggerSession>>()
-  const sidebar = useRef<HTMLElement>(null)
+  const sidebar = useRef<HTMLDivElement>(null)
   const logRef = useRef(log)
   logRef.current = log
   useEffect(() => {
@@ -402,51 +402,44 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
   return (
     <section className="trigger-case">
       {framed && <h3>{state.replaceAll('-', ' ')}</h3>}
-      <aside className={framed ? 'trigger-sidebar inspector' : 'trigger-sidebar-content inspector'} ref={sidebar}>
-        <header className="trigger-sidebar-heading">
-          <NodeHeading
-            title={selection?.node.name ?? fixture.trigger.name}
-            titleReadOnly={fixture.trigger.kind === 'manual'}
-            disabled={state === 'display'}
-            fallback={null}
-            validate={() => undefined}
-            onRename={(name) => {
-              if (session && selection) void session.workspace.saveNodeTitle(selection.id, name)
-            }}
-            onIconChange={(icon) => {
-              if (session && selection) void session.workspace.saveNodeIcon(selection.id, icon)
-            }}
-          />
-        </header>
+      <div className={framed ? 'trigger-properties-panel' : 'trigger-sidebar-content'} ref={sidebar}>
         {session && revision && (
-          <NodeInspector
-            variables={{
-              enabled: false,
-              loaded: true,
-              loading: false,
-              names: [],
-              onOpen: () => {},
-            }}
-            connectorAuthorizationPending={false}
-            connectorLoading={false}
-            connectors={session.connectors}
-            diagnostics={[]}
+          <InspectorSamplePanel
             disabled={state === 'display'}
-            onChooseWaitNotification={() => {}}
             revision={revision}
             selection={selection}
             store={session.workspace}
             theme={dark ? 'dark' : 'light'}
-            target={{ kind: 'flow' }}
-            triggerActiveConnections={state === 'unconfigured' ? [] : [session.account]}
-            triggerAuthorizationPending={false}
-            triggerConnection={state === 'unconfigured' ? undefined : state === 'created-with-default' ? createdConnection : session.account}
-            triggerConnectionError={state === 'connection-error' ? 'Unable to load accounts. Sample network failure.' : undefined}
-            triggerConnectionLoading={false}
-            triggers={session.triggers}
-          />
+          >
+            <NodeInspector
+              variables={{
+                enabled: false,
+                loaded: true,
+                loading: false,
+                names: [],
+                onOpen: () => {},
+              }}
+              connectorAuthorizationPending={false}
+              connectorLoading={false}
+              connectors={session.connectors}
+              diagnostics={[]}
+              disabled={state === 'display'}
+              onChooseWaitNotification={() => {}}
+              revision={revision}
+              selection={selection}
+              store={session.workspace}
+              theme={dark ? 'dark' : 'light'}
+              target={{ kind: 'flow' }}
+              triggerActiveConnections={state === 'unconfigured' ? [] : [session.account]}
+              triggerAuthorizationPending={false}
+              triggerConnection={state === 'unconfigured' ? undefined : state === 'created-with-default' ? createdConnection : session.account}
+              triggerConnectionError={state === 'connection-error' ? 'Unable to load accounts. Sample network failure.' : undefined}
+              triggerConnectionLoading={false}
+              triggers={session.triggers}
+            />
+          </InspectorSamplePanel>
         )}
-      </aside>
+      </div>
     </section>
   )
 }
@@ -454,9 +447,9 @@ function SidebarStory(props: StoryProps) {
   const provider = props.fixture.trigger.kind === 'poll' || props.fixture.trigger.kind === 'integration'
   const states: SidebarState[] = provider
     ? [
-        'created-with-default',
         'display',
         'edit',
+        'created-with-default',
         'unconfigured',
         'connection-error',
         ...(props.fixture.trigger.kind === 'poll' && props.fixture.trigger.definition.provider === 'linear'
@@ -640,7 +633,7 @@ export const triggerStories: readonly FrontendStory[] = [
       {
         group: `Trigger ${fixture.trigger.name}`,
         id: `trigger-${fixture.id}-sidebar`,
-        title: 'Sidebar display & edit',
+        title: 'Properties',
         description: `${fixture.trigger.name} · Node properties in display and edit states. Changes stay in this Lab session.`,
         standalone: true,
         render: (log, dark, language) => <SidebarStory fixture={fixture} log={log} dark={dark} language={language} />,
@@ -656,7 +649,7 @@ export const triggerStories: readonly FrontendStory[] = [
             ? 'Provider payloads, validation and run states.'
             : 'Provider properties, account states and optional configuration.',
       id: `trigger-provider-${view}`,
-      title: view === 'nodes' ? 'Node states' : view === 'run' ? 'Run menu states' : 'Sidebar display & edit',
+      title: view === 'nodes' ? 'Node states' : view === 'run' ? 'Run menu states' : 'Properties',
       standalone: true,
       render: (log, dark, language) => <ProviderStory view={view} log={log} dark={dark} language={language} />,
     }),

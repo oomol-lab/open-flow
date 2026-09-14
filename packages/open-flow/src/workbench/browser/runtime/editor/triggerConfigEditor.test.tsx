@@ -47,10 +47,9 @@ describe('Trigger configuration editor', () => {
         />
       </I18nProvider>,
     )
-    expect(markup).toContain('aria-checked="true"')
-    expect(markup).toContain('aria-checked="false"')
     expect(markup).toContain('issues')
-    expect(markup).toContain('push')
+    expect(markup).not.toContain('>push<')
+    expect(markup).toContain('aria-label="events"')
     const controls = markup.match(/<(?:input|button|select|textarea)\b[^>]*>/g) ?? []
     expect(controls.length).toBeGreaterThan(0)
     expect(controls.every((control) => /\bdisabled(?:=|\s|>)/.test(control))).toBe(true)

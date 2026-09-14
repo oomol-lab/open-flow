@@ -38,7 +38,7 @@ function ConditionEditorStory({ dark, language, log }: { dark: boolean; language
   )
 }
 export const conditionEditorStory: FrontendStory = {
-  group: 'Workbench',
+  group: 'Node Condition',
   id: 'condition-editor',
   title: 'Condition Editor',
   standalone: true,

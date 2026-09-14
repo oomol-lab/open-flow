@@ -3,6 +3,7 @@ import type { Draft } from '../api.ts'
 import { describe, expect, it } from 'vitest'
 import { setTriggerConnection, updateTriggerSchedule } from '../../../../flow/common/nodeChanges.ts'
 import { revisionView } from '../revisionView.ts'
+import { designerGraph } from '../workspace.ts'
 import {
   addNode,
   updateNodeDescription,
@@ -21,6 +22,7 @@ import {
   updateTaskAdditionalInputs,
   updateWait,
 } from './flowChanges.ts'
+import { movePort } from './portOrder.ts'
 
 function draft(source: string): Draft {
   return {
@@ -822,4 +824,53 @@ it('keeps manual trigger names fixed while allowing other trigger names to chang
       expect.objectContaining({ kind: 'graph.node.field.set', field: 'name', nodeId, value: 'Renamed' }),
     ])
   }
+})
+
+const field = (handle: string) => ({ handle, jsonSchema: {}, nullable: true })
+
+describe('Inspector port ordering persistence', () => {
+  it('retains values, bindings and edges after reordering both sides and rebuilding the canvas', () => {
+    const base = draft('export default () => ({})')
+    const current: Draft = {
+      ...base,
+      content: {
+        ...base.content,
+        document: {
+          ...base.content.document,
+          graph: {
+            edges: [
+              { source: 'source', target: 'task', sourceHandle: 'value' },
+              { source: 'task', target: 'sink', sourceHandle: 'first' },
+            ],
+            nodes: {
+              source: { kind: 'value', inputs: {}, values: [{ ...field('value'), value: 42 }] },
+              task: {
+                kind: 'task',
+                name: 'Code',
+                task: { name: 'Code', moduleId: 'module', inputs: [field('a'), field('b')], outputs: [field('first'), field('second')] },
+                inputs: { a: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] }, b: { kind: 'value', value: 'B' } },
+              },
+              sink: { kind: 'value', inputs: {}, values: [] },
+            },
+          },
+        },
+      },
+    }
+    const changes = updateTaskPorts(revisionView(current), { kind: 'flow' }, 'task', {
+      inputs: movePort([field('a'), field('b')], 0, 1),
+      outputs: movePort([field('first'), field('second')], 1, 0),
+    })!
+    const saved = applyFlowChanges(current, changes)
+    const reloaded = JSON.parse(JSON.stringify(saved)) as Draft
+    expect(reloaded.content.document.graph.edges).toEqual(current.content.document.graph.edges)
+    const originalTask = current.content.document.graph.nodes.task!
+    const savedTask = reloaded.content.document.graph.nodes.task!
+    if (originalTask.kind !== 'task' || savedTask.kind !== 'task') throw new Error('Expected tasks')
+    expect(savedTask.inputs).toEqual(originalTask.inputs)
+    expect(reloaded.content.modules).toEqual(current.content.modules)
+    const node = designerGraph(reloaded, { kind: 'flow' }).nodes.find((entry) => entry.id === 'task')!
+    if (node.kind !== 'task') throw new Error('Expected canvas task')
+    expect(node.inputs.map((entry) => ('handle' in entry ? entry.handle : entry.group))).toEqual(['b', 'a'])
+    expect(node.outputs.map((entry) => ('handle' in entry ? entry.handle : entry.group))).toEqual(['second', 'first'])
+  })
 })

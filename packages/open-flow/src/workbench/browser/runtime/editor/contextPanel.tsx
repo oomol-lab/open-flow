@@ -25,6 +25,7 @@ import { cycleContextPanelFocus, observeContextPanelOverlay } from './contextPan
 import { NodePickerContent } from './nodePicker.tsx'
 
 interface ContextPanelProps {
+  readonly className?: string
   readonly resizable?: boolean
   readonly heading?: ReactNode
   readonly actions?: ReactNode
@@ -97,7 +98,18 @@ function useOverlayPanel(panel: RefObject<HTMLElement | null>): boolean {
   return overlay
 }
 
-export function ContextPanel({ children, focusOnOpen, actions, heading, icon, onClose, theme, title, resizable = false }: ContextPanelProps): ReactElement {
+export function ContextPanel({
+  className,
+  children,
+  focusOnOpen,
+  actions,
+  heading,
+  icon,
+  onClose,
+  theme,
+  title,
+  resizable = false,
+}: ContextPanelProps): ReactElement {
   const t = useTranslate()
   const panel = useRef<HTMLElement>(null)
   const overlay = useOverlayPanel(panel)
@@ -170,7 +182,7 @@ export function ContextPanel({ children, focusOnOpen, actions, heading, icon, on
       <aside
         aria-labelledby={titleId}
         aria-modal={overlay || undefined}
-        className="context-panel"
+        className={cn('context-panel', className)}
         data-theme={theme}
         ref={panel}
         role={overlay ? 'dialog' : 'complementary'}

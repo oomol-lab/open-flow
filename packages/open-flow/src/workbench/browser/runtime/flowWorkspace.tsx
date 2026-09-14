@@ -6,7 +6,6 @@ import type { WorkbenchCanvasHandle } from './editor/workbenchCanvas.tsx'
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
-import { NodeActions } from '../../../canvas/browser/nodeActions.tsx'
 import { useIgnoredNodes } from '../../../canvas/browser/useIgnoredNodes.ts'
 import { nodeNameIssue } from '../../../flow/common/change.ts'
 import { Button } from '../../../ui/browser/button.tsx'
@@ -14,8 +13,8 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { IconifyProvider } from '../../../ui/browser/icons/iconifyContext.tsx'
 import { CanvasHistoryScope } from './editor/canvasHistoryScope.tsx'
 import { CommentInspector } from './editor/commentInspector.tsx'
-import { BlockLibrary, ContextPanel } from './editor/contextPanel.tsx'
-import { NodeHeading } from './editor/nodeHeading.tsx'
+import { BlockLibrary } from './editor/contextPanel.tsx'
+import { EditorContextPanel } from './editor/editorContextPanel.tsx'
 import { inspectorIcon, NodeInspector } from './editor/nodeInspector.tsx'
 import { NodePickerPopover } from './editor/nodePickerPopover.tsx'
 import { WorkbenchCanvas } from './editor/workbenchCanvas.tsx'
@@ -334,42 +333,42 @@ function Editor({
         theme={theme}
       />
       {contextPanelVisible && (
-        <ContextPanel
+        <EditorContextPanel
           resizable
-          heading={
-            contextPanelMode === 'inspector' && selection != null ? (
-              <NodeHeading
-                key={selection.id}
-                titleReadOnly={selection.kind === 'trigger' && selection.trigger.kind === 'manual'}
-                title={selection.node.name ?? selectedDesignerNode?.title ?? ''}
-                icon={selectedDesignerNode != null && 'icon' in selectedDesignerNode ? selectedDesignerNode.icon : undefined}
-                disabled={authoringDisabled}
-                fallback={<Icon name={inspectorIcon(selection, target)} />}
-                onRename={(name) => {
-                  void store.workspace.saveNodeTitle(selection.id, name)
-                }}
-                onIconChange={(icon) => {
-                  void store.workspace.saveNodeIcon(selection.id, icon)
-                }}
-                validate={(name) => {
-                  if (revision == null || target == null) return
-                  const graph = revision.graph(target)
-                  if (graph == null) return
-                  const issue = nodeNameIssue(graph, selection.id, name)
-                  return issue == null ? undefined : t(`inspector.node.${issue === 'empty' ? 'nameEmpty' : 'nameDuplicate'}`)
-                }}
-              />
-            ) : undefined
+          nodeId={selection?.id}
+          nodeHeading={
+            contextPanelMode === 'inspector' && selection != null
+              ? {
+                  titleReadOnly: selection.kind === 'trigger' && selection.trigger.kind === 'manual',
+                  title: selection.node.name ?? selectedDesignerNode?.title ?? '',
+                  icon: selectedDesignerNode != null && 'icon' in selectedDesignerNode ? selectedDesignerNode.icon : undefined,
+                  disabled: authoringDisabled,
+                  fallback: <Icon name={inspectorIcon(selection, target)} />,
+                  onRename: (name) => {
+                    void store.workspace.saveNodeTitle(selection.id, name)
+                  },
+                  onIconChange: (icon) => {
+                    void store.workspace.saveNodeIcon(selection.id, icon)
+                  },
+                  validate: (name) => {
+                    if (revision == null || target == null) return
+                    const graph = revision.graph(target)
+                    if (graph == null) return
+                    const issue = nodeNameIssue(graph, selection.id, name)
+                    return issue == null ? undefined : t(`inspector.node.${issue === 'empty' ? 'nameEmpty' : 'nameDuplicate'}`)
+                  },
+                }
+              : undefined
           }
-          actions={
-            contextPanelMode == 'inspector' && selectedDesignerNode != null && selectedDesignerNode.kind != 'comment' ? (
-              <NodeActions
-                ignored={ignoredNodeIds.includes(selectedDesignerNode.id)}
-                onIgnore={(ignored) => onIgnoreNodes([selectedDesignerNode.id], ignored)}
-                onDuplicate={selectedDesignerNode.kind == 'trigger' ? undefined : () => void store.workspace.duplicateSelectedNodes()}
-                onDelete={authoringDisabled ? undefined : () => void store.workspace.deleteSelectedNodes()}
-              />
-            ) : undefined
+          nodeActions={
+            contextPanelMode == 'inspector' && selectedDesignerNode != null && selectedDesignerNode.kind != 'comment'
+              ? {
+                  ignored: ignoredNodeIds.includes(selectedDesignerNode.id),
+                  onIgnore: (ignored) => onIgnoreNodes([selectedDesignerNode.id], ignored),
+                  onDuplicate: selectedDesignerNode.kind == 'trigger' ? undefined : () => void store.workspace.duplicateSelectedNodes(),
+                  onDelete: authoringDisabled ? undefined : () => void store.workspace.deleteSelectedNodes(),
+                }
+              : undefined
           }
           focusOnOpen={contextPanelMode == 'inspector' && focusInspectorOnOpen.current}
           icon={contextPanelMode == 'blocks' ? 'plus' : contextPanelMode == 'notification' ? 'connection' : inspectorIcon(selection, target)}
@@ -464,7 +463,7 @@ function Editor({
               />
             )
           )}
-        </ContextPanel>
+        </EditorContextPanel>
       )}
       <RunDrawerContainer
         onClose={onCloseRuns}

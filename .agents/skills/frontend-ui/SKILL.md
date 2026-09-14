@@ -58,6 +58,21 @@ without relying on ancestors to supply default styles.
 
 ## Visual Balance and Spacing
 
+Property-panel controls use a 6px corner-radius baseline. The editor panel owns
+`--ui-control-radius`; shared buttons, inputs, textareas, and select triggers consume it.
+Keep this control radius separate from panel surfaces and structural branch curves.
+Property panels share the canvas node's outer surface color, and their input controls share
+the node content surface color. Reuse the theme's node surface tokens for both appearances.
+
+Prefer standard component variants, sizes, and layout conventions when changing appearance.
+Do not patch visual defects with arbitrary padding, margins, offsets, hard-coded dimensions,
+or increasingly specific overrides. Trace the mismatch to its owning component or layout and
+correct it there. When resizing a control, use its standard size variant and let the surrounding
+layout accommodate it; do not independently resize its icon, highlight, or hit area to imitate
+a different size. Remove obsolete compensating styles as part of the correction. Introduce a
+custom dimension only when a concrete product requirement cannot be met by existing conventions,
+and keep that dimension owned and consistently consumed rather than scattering magic numbers.
+
 Adjust control padding according to the visual weight of icons and text. A leading-icon button may
 need slightly more space after its label than before its icon. Judge balance from the rendered
 result without requiring numerically equal padding. Keep spacing between peer controls consistent

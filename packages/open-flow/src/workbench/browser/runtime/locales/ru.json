@@ -284,6 +284,16 @@
       "preview": "Предпросмотр",
       "duplicate": "Дублировать",
       "delete": "Удалить"
+    },
+    "ports": {
+      "reorder": "Изменить порядок {{name}}",
+      "reorderHint": "Перетащите внутри группы или используйте стрелки вверх / вниз при фокусе.",
+      "moved": "{{name}} перемещён на позицию {{position}}.",
+      "groupSettings": "Настройки группы",
+      "connected": "Подключено",
+      "columnName": "Имя",
+      "columnType": "Тип",
+      "columnValue": "Значение"
     }
   },
   "language": {

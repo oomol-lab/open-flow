@@ -1,38 +1,74 @@
 .root {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) var(--field-actions-width, 28px);
+  align-items: start;
+  column-gap: 4px;
+  color: var(--ui-foreground);
+}
+.body {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 6px;
-  color: var(--ui-foreground);
+  grid-column: 1;
+  grid-row: 1;
 }
-.toolbar,
+.options {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  color: var(--ui-muted-foreground);
+}
+.toolbar {
+  --ui-control-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  min-width: 140px;
+}
+.toolbar > button {
+  justify-content: flex-start;
+  gap: 8px;
+  height: 28px;
+  padding: 4px 8px;
+}
+.toolbar > .presence:empty {
+  display: none;
+}
 .actions {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
 }
 .presence {
-  margin-right: auto;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ui-muted-foreground);
 }
 .collection {
+  container: value-fields / inline-size;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.field {
   min-width: 0;
-  margin: 0;
-  padding: 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
+  flex-direction: column;
+  gap: 8px;
 }
-.field > legend {
-  padding: 0 4px;
-  font-size: 12px;
+.fieldName {
+  flex: 1;
+  min-width: 0;
   overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 500;
+}
+.fieldType {
+  color: var(--ui-muted-foreground);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
 }
 .json {
   min-height: 110px;
@@ -41,7 +77,9 @@
 .description {
   margin: 4px 0;
   font-size: 12px;
+  line-height: 1.5;
   color: var(--ui-muted-foreground);
+  overflow-wrap: anywhere;
 }
 .error {
   margin: 0;
@@ -58,11 +96,282 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-
 .option {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 13px;
   overflow-wrap: anywhere;
+}
+
+/* Every field uses the same name / type / value / actions tracks. */
+.root[data-header] {
+  position: relative;
+  grid-template-columns: 24px minmax(0, 1fr) minmax(64px, 0.48fr) minmax(0, 1.5fr) var(--field-actions-width, 28px);
+  gap: 4px;
+  align-items: start;
+}
+.header {
+  display: contents;
+}
+.header > button {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  color: var(--ui-muted-foreground);
+}
+.header [data-field-name],
+.header > .fieldName {
+  grid-column: 2;
+  grid-row: 1;
+}
+.header [data-field-type],
+.header > .fieldType {
+  grid-column: 3;
+  grid-row: 1;
+}
+.header [data-field-name],
+.header [data-field-type],
+.header > .fieldName,
+.header > .fieldType {
+  display: block;
+  min-width: 0;
+  height: 30px;
+  padding: 6px 7px;
+  border-radius: var(--ui-control-radius, var(--ui-radius));
+  background: transparent;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+}
+.root[data-header] > .options {
+  grid-column: 5;
+  grid-row: 1;
+}
+.root[data-header] > .body {
+  grid-column: 4;
+  grid-row: 1;
+  min-height: 30px;
+  gap: 4px;
+}
+.summary {
+  grid-column: 4;
+  grid-row: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 5px 7px;
+  border: 1px solid var(--ui-input);
+  text-align: left;
+  color: var(--ui-foreground);
+  background: var(--ui-control-background, var(--ui-muted));
+  border-radius: var(--ui-control-radius, var(--ui-radius));
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  &:hover {
+    background: var(--ui-accent);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--ui-ring);
+  }
+}
+.root[data-header][data-collection] > .body {
+  position: relative;
+  grid-column: 2 / -1;
+  grid-row: 2;
+  margin: 0 0 4px;
+  padding: 4px 0 0 8px;
+  &::before {
+    content: '';
+    position: absolute;
+    left: -16px;
+    top: 0;
+    width: 20px;
+    height: 20px;
+    border-left: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
+    border-bottom: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
+    border-bottom-left-radius: 10px;
+  }
+}
+.body[hidden] {
+  display: none !important;
+}
+.root[data-header] > .body > input,
+.root[data-header] > .body > textarea,
+.root[data-header] > .body > select {
+  min-height: 30px;
+  height: 30px;
+  padding: 5px 7px;
+  border: 1px solid var(--ui-input);
+  border-radius: var(--ui-control-radius, var(--ui-radius));
+  font-size: 12px;
+}
+.root[data-header] > .body > textarea {
+  height: 60px;
+  resize: vertical;
+}
+.root[data-header] > .body > p:not([role='alert']) {
+  margin: 0;
+  padding: 6px 7px;
+  min-height: 30px;
+  border-radius: var(--ui-control-radius, var(--ui-radius));
+  background: var(--ui-control-background, var(--ui-muted));
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.root[data-output] {
+  grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) var(--field-actions-width, 28px);
+}
+.root[data-output] > .options {
+  grid-column: 4;
+}
+.root[data-output] > .body {
+  display: none;
+}
+.actions > button {
+  justify-content: flex-start;
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+}
+
+.root[data-collection]:not([data-header]) > .options {
+  align-self: end;
+  margin: 0;
+}
+
+/* Expanded text uses the value area once; collections keep a count on their parent row. */
+.root[data-header][data-expanded]:not([data-structured]) > .summary {
+  display: none;
+}
+.root[data-header][data-expanded]:not([data-structured]) > .body {
+  grid-column: 2 / -2;
+}
+.root[data-header][data-expanded]:not([data-structured]) .header [data-field-name] {
+  grid-column: 2 / 4;
+}
+.root[data-header][data-expanded]:not([data-structured]) .header [data-field-type] {
+  grid-column: 4;
+  text-align: right;
+}
+.root[data-header] > .body [data-slot='native-select-wrapper'] {
+  min-width: 0;
+  width: 100%;
+}
+.root[data-header] > .body [data-slot='native-select'] {
+  height: 30px;
+  padding: 4px 22px 4px 7px;
+  border-color: var(--ui-input);
+  border-radius: var(--ui-control-radius, var(--ui-radius));
+  background: var(--ui-control-background, var(--ui-muted));
+  font-size: 12px;
+}
+.root[data-header] > .body :is(input, textarea, select)[aria-invalid='true'] {
+  border-color: var(--ui-destructive);
+}
+
+.body .root {
+  --field-actions-width: 28px;
+}
+
+.nullValue {
+  justify-content: flex-start;
+  height: 30px;
+  padding: 5px 7px;
+  border-radius: var(--ui-control-radius, var(--ui-radius));
+  background: var(--ui-control-background, var(--ui-muted));
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+}
+
+@container value-fields (max-width: 340px) {
+  .root[data-header]:not([data-output]),
+  .root[data-header][data-expanded]:not([data-structured]) {
+    grid-template-columns: 24px minmax(0, 1fr) 64px var(--field-actions-width, 28px);
+    > .header [data-field-name],
+    > .header > .fieldName {
+      grid-column: 2;
+      padding-right: 7px;
+    }
+    > .header [data-field-type],
+    > .header > .fieldType {
+      grid-column: 3;
+      text-align: right;
+    }
+    > .options {
+      grid-column: 4;
+    }
+    > .body,
+    > .summary {
+      grid-column: 2 / -1;
+      grid-row: 2;
+    }
+    &[data-structured] > .body {
+      grid-row: 3;
+    }
+  }
+}
+
+/* Value forms prioritize the editable value; schema controls live in field settings. */
+.root[data-header][data-layout='values'] {
+  grid-template-columns: 24px minmax(90px, 0.85fr) minmax(0, 1.5fr) var(--field-actions-width, 28px);
+  > .header [data-field-type],
+  > .header > .fieldType {
+    display: none;
+  }
+  > .header [data-field-name],
+  > .header > .fieldName {
+    grid-column: 2;
+    padding: 0;
+    overflow: visible;
+  }
+  > .options {
+    grid-column: 4;
+  }
+  > .body,
+  > .summary {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  &[data-collection] > .body {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+  &[data-expanded]:not([data-structured]) {
+    > .header [data-field-name],
+    > .body {
+      grid-column: 2 / -2;
+    }
+  }
+  > .header [data-field-name] input {
+    width: 100%;
+    height: 30px;
+    min-height: 30px;
+    padding: 4px 7px;
+    border: 1px solid var(--ui-input);
+    border-radius: var(--ui-control-radius, var(--ui-radius));
+    font: inherit;
+    color: var(--ui-foreground);
+  }
+}
+
+.root[data-inline] {
+  grid-template-columns: minmax(0, 1fr);
+  > .body > input,
+  > .body > textarea {
+    height: 30px;
+    min-height: 30px;
+    border-radius: var(--ui-control-radius, var(--ui-radius));
+    padding: 5px 7px;
+    font-size: 12px;
+  }
 }

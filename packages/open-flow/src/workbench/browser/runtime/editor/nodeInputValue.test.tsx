@@ -22,7 +22,7 @@ describe('Independent node inputs', () => {
         />
       </I18nProvider>,
     )
-    expect(markup).toMatch(/<option value="false" selected="">false<\/option>/)
+    expect(markup).toMatch(/data-slot="select-value"[^>]*>false<\/span>/)
     expect(onValue).not.toHaveBeenCalled()
   })
 

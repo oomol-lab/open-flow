@@ -35,6 +35,10 @@
     "nullable": "Разрешить null",
     "group": "Группа",
     "addGroup": "Добавить группу",
-    "collapsed": "Свёрнута"
+    "collapsed": "Свёрнута",
+    "options": "Параметры значения {{name}}",
+    "hours": "Часы",
+    "minutes": "Минуты",
+    "seconds": "Секунды"
   }
 }

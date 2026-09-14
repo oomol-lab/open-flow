@@ -39,7 +39,7 @@ function ScheduleStory({ dark, language, log }: { dark: boolean; language: UiLan
 }
 
 export const scheduleStory: FrontendStory = {
-  group: 'Workbench',
+  group: 'Trigger Schedule',
   id: 'trigger-schedule',
   title: 'Trigger Schedule',
   standalone: true,

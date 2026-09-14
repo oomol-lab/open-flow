@@ -284,6 +284,16 @@
       "preview": "Preview",
       "duplicate": "Duplicate",
       "delete": "Delete"
+    },
+    "ports": {
+      "reorder": "Reorder {{name}}",
+      "reorderHint": "Drag to reorder within the group, or use Up / Down while focused.",
+      "moved": "{{name}} moved to position {{position}}.",
+      "groupSettings": "Group settings",
+      "connected": "Connected",
+      "columnName": "Name",
+      "columnType": "Type",
+      "columnValue": "Value"
     }
   },
   "language": {

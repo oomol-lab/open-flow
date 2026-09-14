@@ -35,6 +35,10 @@
     "nullable": "允許空值",
     "group": "群組",
     "addGroup": "新增群組",
-    "collapsed": "預設摺疊"
+    "collapsed": "預設摺疊",
+    "options": "{{name}} 的值選項",
+    "hours": "時",
+    "minutes": "分",
+    "seconds": "秒"
   }
 }

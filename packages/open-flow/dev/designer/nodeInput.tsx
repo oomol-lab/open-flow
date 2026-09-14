@@ -52,7 +52,7 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
   )
 }
 export const nodeInputStory: FrontendStory = {
-  group: 'Workbench',
+  group: 'Node Task',
   id: 'node-input',
   title: 'Node Input',
   standalone: true,

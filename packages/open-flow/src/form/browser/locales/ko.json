@@ -35,6 +35,10 @@
     "nullable": "null 허용",
     "group": "그룹",
     "addGroup": "그룹 추가",
-    "collapsed": "접힘"
+    "collapsed": "접힘",
+    "options": "{{name}} 값 옵션",
+    "hours": "시",
+    "minutes": "분",
+    "seconds": "초"
   }
 }

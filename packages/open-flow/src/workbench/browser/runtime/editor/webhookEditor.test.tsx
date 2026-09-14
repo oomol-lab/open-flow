@@ -32,6 +32,8 @@ describe('Webhook configuration', () => {
     expect(markup).toContain('X-Example')
     const controls = markup.match(/<(?:input|button|select|textarea)\b[^>]*>/g) ?? []
     expect(controls.length).toBeGreaterThan(0)
-    expect(controls.every((control) => /\bdisabled(?:=|\s|>)/.test(control))).toBe(true)
+    // Expanding a structured value only changes the view; editing remains disabled.
+    const editingControls = controls.filter((control) => !control.includes('aria-expanded='))
+    expect(editingControls.every((control) => /\bdisabled(?:=|\s|>)/.test(control))).toBe(true)
   })
 })

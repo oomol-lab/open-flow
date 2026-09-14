@@ -38,7 +38,7 @@ function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; lan
 export const valueNodeStory: FrontendStory = {
   id: 'value-node-editor',
   title: 'Fixed Values Editor',
-  group: 'Workbench',
+  group: 'Node Fixed Values',
   standalone: true,
   render: (log, dark, language) => <ValueStory log={log} dark={dark} language={language} />,
 }
@@ -46,7 +46,7 @@ export const valueNodeStory: FrontendStory = {
 export const additionalInputsStory: FrontendStory = {
   id: 'additional-inputs',
   title: 'Additional Inputs',
-  group: 'Workbench',
+  group: 'Node Task',
   standalone: true,
   render: (log, dark, language) => <ValueStory log={log} dark={dark} language={language} reservedNames={['value1', 'message']} />,
 }
@@ -82,7 +82,7 @@ function GroupedInputsStory({ dark, language, log, output = false }: { dark: boo
 export const groupedInputsStory: FrontendStory = {
   id: 'grouped-inputs',
   title: 'Grouped Inputs',
-  group: 'Workbench',
+  group: 'Node Task',
   standalone: true,
   render: (log, dark, language) => <GroupedInputsStory log={log} dark={dark} language={language} />,
 }
@@ -90,7 +90,7 @@ export const groupedInputsStory: FrontendStory = {
 export const outputPortsStory: FrontendStory = {
   id: 'output-ports',
   title: 'Output Ports',
-  group: 'Workbench',
+  group: 'Node Task',
   standalone: true,
   render: (log, dark, language) => <GroupedInputsStory log={log} dark={dark} language={language} output />,
 }

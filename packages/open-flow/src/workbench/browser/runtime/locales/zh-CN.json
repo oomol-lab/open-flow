@@ -284,6 +284,16 @@
       "preview": "预览",
       "duplicate": "克隆",
       "delete": "删除"
+    },
+    "ports": {
+      "reorder": "调整 {{name}} 的顺序",
+      "reorderHint": "拖动调整组内顺序，或聚焦后使用上、下方向键。",
+      "moved": "{{name}} 已移至第 {{position}} 位。",
+      "groupSettings": "分组设置",
+      "connected": "已连接",
+      "columnName": "名称",
+      "columnType": "类型",
+      "columnValue": "值"
     }
   },
   "language": {
