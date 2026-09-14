@@ -1,8 +1,9 @@
+import styles from './nodeInputValue.module.scss'
 import type { ValueEditorProps } from '../../../../form/browser/valueEditor.tsx'
 import type { VariablePickerProps } from '../../../../ui/browser/variable-picker.tsx'
 import type { InputPort, JsonValue } from '../api.ts'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { variableInputCompatible } from '../../../../flow/common/schema.ts'
 import { ValueEditor } from '../../../../form/browser/valueEditor.tsx'
@@ -78,6 +79,7 @@ export function NodeInputValue({
   readonly onVariable: (name: string | undefined) => void
 }) {
   const t = useTranslate()
+  const sourceErrorId = useId()
   const [sourceContainer, setSourceContainer] = useState<HTMLDivElement | null>(null)
   const llm = supportsLlmInput(definition.jsonSchema, value)
   const bound = variableName != null
@@ -257,11 +259,13 @@ export function NodeInputValue({
   )
   const editor =
     connected || bound ? (
-      <div>
+      <div className={styles.sourceValue}>
         <div
           data-value-control
           className="flex h-[30px] min-w-0 items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-[7px] text-xs aria-invalid:border-destructive"
           aria-invalid={sourceIssue != null}
+          aria-describedby={sourceIssue ? sourceErrorId : undefined}
+          tabIndex={sourceIssue ? 0 : undefined}
         >
           {bound ? (
             <i aria-hidden="true" className="i-heroicons:variable-20-solid mr-2 size-3.5 shrink-0 text-muted-foreground" />
@@ -278,7 +282,7 @@ export function NodeInputValue({
           <span className="truncate">{sourceLabel}</span>
         </div>
         {sourceIssue && (
-          <p role="alert" className="mt-1 text-xs text-destructive">
+          <p id={sourceErrorId} role="alert" className={styles.sourceError}>
             {sourceIssue}
           </p>
         )}

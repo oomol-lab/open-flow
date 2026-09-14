@@ -1,0 +1,36 @@
+.sourceValue {
+  position: relative;
+  min-width: 0;
+  &:hover,
+  &:focus-within {
+    z-index: 10;
+    > .sourceError {
+      visibility: visible;
+    }
+  }
+  > [data-value-control] {
+    position: relative;
+    z-index: 1;
+    outline: none;
+    &:focus-visible {
+      outline: 2px solid var(--ui-destructive);
+      outline-offset: -1px;
+    }
+  }
+}
+
+.sourceError {
+  position: absolute;
+  top: calc(100% - var(--ui-control-radius, var(--ui-radius)));
+  inset-inline: 0;
+  margin: 0;
+  padding: calc(var(--ui-control-radius, var(--ui-radius)) + 6px) 8px 8px;
+  border: 1px solid var(--ui-destructive);
+  border-radius: 0 0 var(--ui-control-radius, var(--ui-radius)) var(--ui-control-radius, var(--ui-radius));
+  background: color-mix(in srgb, var(--ui-destructive) 6%, var(--ui-control-background, var(--ui-background)));
+  color: var(--ui-destructive);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  visibility: hidden;
+}
