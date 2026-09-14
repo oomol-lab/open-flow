@@ -1,5 +1,7 @@
 {
   "valueEditor": {
+    "editRawData": "Modifier les données brutes",
+    "editAsForm": "Passer à l’édition par formulaire",
     "advancedSettings": "Paramètres avancés",
     "invalidSchema": "Saisissez un JSON Schema valide.",
     "invalidJson": "Saisissez un JSON valide.",

@@ -1,5 +1,7 @@
 {
   "valueEditor": {
+    "editRawData": "원시 데이터 편집",
+    "editAsForm": "양식 편집으로 전환",
     "advancedSettings": "고급 설정",
     "invalidSchema": "유효한 JSON Schema를 입력하세요.",
     "invalidJson": "유효한 JSON을 입력하세요.",

@@ -1,5 +1,7 @@
 {
   "valueEditor": {
+    "editRawData": "Редактировать исходные данные",
+    "editAsForm": "Переключиться на редактирование формы",
     "advancedSettings": "Дополнительные настройки",
     "invalidSchema": "Введите корректную JSON Schema.",
     "invalidJson": "Введите корректный JSON.",

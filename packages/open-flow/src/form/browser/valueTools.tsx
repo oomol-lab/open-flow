@@ -19,6 +19,7 @@ export function ValueTools({
   onToggleJson?: () => void
 }) {
   const t = useTranslate()
+  const toggleLabel = t(raw ? 'valueEditor.editAsForm' : 'valueEditor.editRawData')
   if (!onClear && !onToggleJson) return null
   return (
     <div className={styles.valueTools}>
@@ -44,11 +45,11 @@ export function ValueTools({
       {onToggleJson && (
         <Tooltip>
           <TooltipTrigger
-            render={<Button type="button" variant="ghost" size="icon-xs" aria-label={`${label} JSON`} aria-pressed={raw} onClick={onToggleJson} />}
+            render={<Button type="button" variant="ghost" size="icon-xs" aria-label={`${label} ${toggleLabel}`} aria-pressed={raw} onClick={onToggleJson} />}
           >
             <i aria-hidden="true" className="i-lucide-light:braces" />
           </TooltipTrigger>
-          <TooltipContent container={container}>{t('valueEditor.components.json')}</TooltipContent>
+          <TooltipContent container={container}>{toggleLabel}</TooltipContent>
         </Tooltip>
       )}
     </div>

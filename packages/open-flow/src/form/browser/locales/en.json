@@ -1,5 +1,7 @@
 {
   "valueEditor": {
+    "editRawData": "Edit raw data",
+    "editAsForm": "Switch to form editing",
     "advancedSettings": "Advanced settings",
     "invalidSchema": "Enter a valid JSON Schema.",
     "invalidJson": "Enter valid JSON.",
