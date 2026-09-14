@@ -49,6 +49,36 @@ function PortName({ value, disabled, names, onChange }: { value: string; disable
   )
 }
 
+function PortType({
+  value,
+  disabled,
+  onChange,
+  name = 'Schema',
+}: {
+  value: InputPort['jsonSchema']
+  disabled: boolean
+  onChange: (value: InputPort['jsonSchema']) => void
+  name?: string
+}) {
+  const t = useTranslate()
+  return (
+    <FieldSelect
+      aria-label={t('valueEditor.type', { name })}
+      disabled={disabled}
+      value={String(objectValue(value)?.type ?? '')}
+      onChange={(nextValue) => {
+        const { type: _type, ...rest } = objectValue(value) ?? {}
+        onChange({ ...rest, ...(nextValue ? { type: nextValue } : {}) } as InputPort['jsonSchema'])
+      }}
+    >
+      <option value="">JSON</option>
+      {['string', 'number', 'integer', 'boolean', 'object', 'array', 'null'].map((type) => (
+        <option key={type}>{type}</option>
+      ))}
+    </FieldSelect>
+  )
+}
+
 function PortSchema({ value, disabled, onChange }: { value: InputPort['jsonSchema']; disabled: boolean; onChange: (value: InputPort['jsonSchema']) => void }) {
   const t = useTranslate()
   const lastValue = useRef(value)
@@ -62,20 +92,7 @@ function PortSchema({ value, disabled, onChange }: { value: InputPort['jsonSchem
   }, [value])
   return (
     <>
-      <FieldSelect
-        aria-label={t('valueEditor.type', { name: 'Schema' })}
-        disabled={disabled}
-        value={String(objectValue(value)?.type ?? '')}
-        onChange={(nextValue) => {
-          const { type: _type, ...rest } = objectValue(value) ?? {}
-          onChange({ ...rest, ...(nextValue ? { type: nextValue } : {}) } as InputPort['jsonSchema'])
-        }}
-      >
-        <option value="">JSON</option>
-        {['string', 'number', 'integer', 'boolean', 'object', 'array', 'null'].map((type) => (
-          <option key={type}>{type}</option>
-        ))}
-      </FieldSelect>
+      <PortType value={value} disabled={disabled} onChange={onChange} />
       <details className={styles.schema}>
         <summary>JSON Schema</summary>
         <Textarea
@@ -243,7 +260,11 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           )}
         </span>
         <span data-field-type className={styles.type} title={portType(port)}>
-          {portType(port)}
+          {props.layout === 'values' ? (
+            <PortType name={port.handle} value={port.jsonSchema} disabled={!!disabled} onChange={(jsonSchema) => update(index, { ...port, jsonSchema })} />
+          ) : (
+            portType(port)
+          )}
         </span>
       </div>
     )

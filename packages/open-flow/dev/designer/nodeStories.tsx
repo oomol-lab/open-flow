@@ -610,7 +610,7 @@ export const nodeStories: readonly FrontendStory[] = [
   {
     group: 'Node Comment',
     id: 'node-comment',
-    description: 'Comment cards · Selection, long titles, Markdown, tables and empty content. Use the source button to edit.',
+    description: 'Comment cards · Markdown, tables and empty content. Select text in the focused source editor; drag the title to move the card.',
     title: 'Node States',
     standalone: true,
     render: (log, dark, language) => <CommentStory dark={dark} language={language} log={log} />,

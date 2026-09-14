@@ -3,7 +3,7 @@ import type { ReactNode, ReactElement, ComponentProps } from 'react'
 import { Children, isValidElement, useState } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/browser/select.tsx'
 
-export const fieldSelectTriggerClass = 'h-[30px] w-full min-w-0 px-2 text-xs font-normal'
+export const fieldSelectTriggerClass = 'w-full min-w-0 px-2 text-xs font-normal text-foreground'
 
 /** The field editor uses the product selection surface instead of the browser menu. */
 export function FieldSelect({
@@ -37,7 +37,7 @@ export function FieldSelect({
         disabled={disabled}
         items={options}
       >
-        <SelectTrigger aria-label={label} className={fieldSelectTriggerClass}>
+        <SelectTrigger size="field" aria-label={label} className={fieldSelectTriggerClass}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent container={container} align="start" alignItemWithTrigger={false} className="p-1">
