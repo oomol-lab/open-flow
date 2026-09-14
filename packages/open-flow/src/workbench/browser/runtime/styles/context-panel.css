@@ -470,7 +470,30 @@
     border: 0;
   }
 
-  .node-settings,
+  .node-settings {
+    [data-slot='field-group'] {
+      gap: 12px;
+    }
+
+    [data-slot='field'] {
+      gap: 6px;
+    }
+
+    [data-slot='field-label'] {
+      color: var(--ui-muted-foreground);
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 18px;
+    }
+
+    [data-slot='input'],
+    [data-slot='native-select'] {
+      height: 30px;
+      border-radius: var(--ui-control-radius);
+      font-size: 12px;
+    }
+  }
+
   .agent-form,
   .wait-form {
     [data-slot='field-group'] {
