@@ -10,7 +10,7 @@ The default **Cards · Content & records** gallery uses the production card, exe
 
 **Workflow components** shows the single execution canvas with a bottom command dock. It does not add an inspector or reserve a sidebar column. It includes Task, Trigger, Condition, Value, Subflow and Comment nodes, grouped inputs and connected ports. **Reset samples** restores the sample layout and selection.
 
-**Comment / Properties** (`?story=comment-properties`) displays the production `CommentInspector` directly, with editable, empty-content and read-only samples side by side. Each editable sample keeps its saved title and Markdown in local state. Trigger-specific property panels live under Triggers / [type] / Properties.
+**Comment / Properties** (`?story=comment-properties`) displays the production `EditorContextPanel` heading and `CommentInspector` Source/Markdown tabs, with editable, empty-content and read-only samples side by side. Each editable sample keeps its saved title and Markdown in local state. Trigger-specific property panels live under Triggers / [type] / Properties.
 
 The **Nodes** section collects production canvas nodes under boundary inputs. Its **Condition / Node States** story covers empty, single and multiple cases, plus long rule labels, long output labels and both sides overflowing together.
 

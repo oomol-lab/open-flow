@@ -23,7 +23,7 @@ const tabsListVariants = cva(
       variant: {
         default: 'bg-muted',
         line: 'gap-1 bg-transparent',
-        flat: 'gap-1 bg-[color-mix(in_srgb,var(--ui-foreground)_4%,var(--ui-popover))]',
+        flat: 'gap-1 bg-[color-mix(in_srgb,var(--ui-foreground)_8%,var(--ui-popover))] dark:bg-[color-mix(in_srgb,black_16%,var(--ui-popover))]',
       },
     },
     defaultVariants: {

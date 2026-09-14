@@ -280,10 +280,8 @@
       "chooseAccounts": "Manage accounts"
     },
     "comment": {
-      "source": "View source",
-      "preview": "Preview",
-      "duplicate": "Duplicate",
-      "delete": "Delete"
+      "source": "Source",
+      "preview": "Markdown"
     },
     "ports": {
       "reorder": "Reorder {{name}}",

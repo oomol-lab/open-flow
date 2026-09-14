@@ -23,7 +23,7 @@ export function NodeHeading({
   readonly disabled: boolean
   readonly validate: (name: string) => string | undefined
   readonly onRename: (name: string) => void
-  readonly onIconChange: (icon: string) => void
+  readonly onIconChange?: (icon: string) => void
 }) {
   const t = useTranslate()
   const errorId = useId()
@@ -41,11 +41,19 @@ export function NodeHeading({
   }
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
-      <IconPickerButton size="icon-lg" label={t('inspector.node.icon')} disabled={disabled} onChange={onIconChange}>
-        <span className="flex size-6 shrink-0 items-center justify-center text-2xl [&>svg]:size-full!">
-          <ContentIcon src={icon} fallback={fallback} />
+      {onIconChange ? (
+        <IconPickerButton size="icon-lg" label={t('inspector.node.icon')} disabled={disabled} onChange={onIconChange}>
+          <span className="flex size-6 shrink-0 items-center justify-center text-2xl [&>svg]:size-full!">
+            <ContentIcon src={icon} fallback={fallback} />
+          </span>
+        </IconPickerButton>
+      ) : (
+        <span className="flex size-9 shrink-0 items-center justify-center" aria-hidden="true">
+          <span className="flex size-6 items-center justify-center text-2xl [&>svg]:size-full!">
+            <ContentIcon src={icon} fallback={fallback} />
+          </span>
         </span>
-      </IconPickerButton>
+      )}
       <div className="min-w-0 flex-1">
         <Input
           aria-label={t('inspector.node.name')}

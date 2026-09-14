@@ -280,10 +280,8 @@
       "chooseAccounts": "管理账号"
     },
     "comment": {
-      "source": "显示源文本",
-      "preview": "预览",
-      "duplicate": "克隆",
-      "delete": "删除"
+      "source": "源码",
+      "preview": "Markdown"
     },
     "ports": {
       "reorder": "调整 {{name}} 的顺序",

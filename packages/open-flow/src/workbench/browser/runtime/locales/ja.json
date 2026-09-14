@@ -280,10 +280,8 @@
       "chooseAccounts": "アカウントを管理"
     },
     "comment": {
-      "source": "ソースを表示",
-      "preview": "プレビュー",
-      "duplicate": "複製",
-      "delete": "削除"
+      "source": "ソースコード",
+      "preview": "Markdown"
     },
     "ports": {
       "reorder": "{{name}} の順序を変更",

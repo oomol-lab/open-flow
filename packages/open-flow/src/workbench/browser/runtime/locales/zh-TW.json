@@ -280,10 +280,8 @@
       "chooseAccounts": "管理帳號"
     },
     "comment": {
-      "source": "檢視原始文字",
-      "preview": "預覽",
-      "duplicate": "建立副本",
-      "delete": "刪除"
+      "source": "原始碼",
+      "preview": "Markdown"
     },
     "ports": {
       "reorder": "調整 {{name}} 的順序",
