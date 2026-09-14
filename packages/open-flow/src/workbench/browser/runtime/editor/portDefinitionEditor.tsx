@@ -5,16 +5,19 @@ import type { Group, InputPort } from '../api.ts'
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
-import { FieldSelect } from '../../../../form/browser/fieldSelect.tsx'
+import { EditorComponentSelect } from '../../../../form/browser/editorComponentSelect.tsx'
 import { ValueEditor } from '../../../../form/browser/valueEditor.tsx'
+import { valueForEditor } from '../../../../form/common/editorComponent.ts'
 import { compile } from '../../../../form/common/validation/validator.ts'
 import { objectValue } from '../../../../form/common/value.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
+import { FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
 import { Popover, PopoverPanelContent } from '../../../../ui/browser/popover.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { movePort } from './portOrder.ts'
 
 export function portType(port: InputPort): string {
@@ -60,23 +63,7 @@ function PortType({
   onChange: (value: InputPort['jsonSchema']) => void
   name?: string
 }) {
-  const t = useTranslate()
-  return (
-    <FieldSelect
-      aria-label={t('valueEditor.type', { name })}
-      disabled={disabled}
-      value={String(objectValue(value)?.type ?? '')}
-      onChange={(nextValue) => {
-        const { type: _type, ...rest } = objectValue(value) ?? {}
-        onChange({ ...rest, ...(nextValue ? { type: nextValue } : {}) } as InputPort['jsonSchema'])
-      }}
-    >
-      <option value="">JSON</option>
-      {['string', 'number', 'integer', 'boolean', 'object', 'array', 'null'].map((type) => (
-        <option key={type}>{type}</option>
-      ))}
-    </FieldSelect>
-  )
+  return <EditorComponentSelect schema={value} name={name} disabled={disabled} onChange={(next) => onChange(next as InputPort['jsonSchema'])} />
 }
 
 function PortSchema({ value, disabled, onChange }: { value: InputPort['jsonSchema']; disabled: boolean; onChange: (value: InputPort['jsonSchema']) => void }) {
@@ -147,6 +134,32 @@ export function PortDefinitionEditor(props: PortEditorProps) {
   const update = (index: number, port: InputPort | Group) => onChange(values.map((entry, i) => (i === index ? port : entry)))
   const listId = useId()
   const list = useRef<HTMLDivElement>(null)
+  const heading = useRef<HTMLDivElement>(null)
+  const pendingName = useRef<string>()
+  useEffect(() => {
+    if (!pendingName.current) return
+    const row = Array.from(list.current?.querySelectorAll<HTMLElement>('[data-port]') ?? []).find((element) => element.dataset.port === pendingName.current)
+    const input = row?.querySelector<HTMLInputElement>('input')
+    if (!input) return
+    pendingName.current = undefined
+    let scrollRoot = row!.parentElement
+    while (scrollRoot && !/(auto|scroll)/.test(getComputedStyle(scrollRoot).overflowY)) scrollRoot = scrollRoot.parentElement
+    if (scrollRoot) {
+      const bounds = scrollRoot.getBoundingClientRect()
+      const field = row!.getBoundingClientRect()
+      const top = bounds.top + (heading.current?.offsetHeight ?? 0)
+      if (field.bottom > bounds.bottom) scrollRoot.scrollBy({ top: field.bottom - bounds.bottom })
+      else if (field.top < top) scrollRoot.scrollBy({ top: field.top - top })
+    }
+    input.focus({ preventScroll: true })
+    input.select()
+  }, [values])
+  const addField = () => {
+    let index = 1
+    while (reservedNames.includes(`value${index}`) || values.some((port) => 'handle' in port && port.handle === `value${index}`)) index++
+    pendingName.current = `value${index}`
+    onChange([...values, { handle: `value${index}`, jsonSchema: {}, nullable: defaultNullable }])
+  }
   const dragging = useRef<{ index: number; values: typeof values; x: number; y: number }>()
   const dropTarget = useRef<{ index: number; after: boolean }>()
   const [dragIndex, setDragIndex] = useState<number>()
@@ -260,7 +273,18 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         </span>
         <span data-field-type className={styles.type} title={portType(port)}>
           {props.layout === 'values' ? (
-            <PortType name={port.handle} value={port.jsonSchema} disabled={!!disabled} onChange={(jsonSchema) => update(index, { ...port, jsonSchema })} />
+            <PortType
+              name={port.handle}
+              value={port.jsonSchema}
+              disabled={!!disabled}
+              onChange={(jsonSchema) =>
+                update(index, {
+                  ...port,
+                  jsonSchema,
+                  ...(port.value === undefined ? {} : { value: valueForEditor(jsonSchema, port.value) as InputPort['value'] }),
+                })
+              }
+            />
           ) : (
             portType(port)
           )}
@@ -315,7 +339,17 @@ export function PortDefinitionEditor(props: PortEditorProps) {
               <Checkbox disabled={disabled} checked={port.nullable} onCheckedChange={(nullable) => update(index, { ...port, nullable: nullable === true })} />
               {t('valueEditor.nullable')}
             </Label>
-            <PortSchema value={port.jsonSchema} disabled={disabled} onChange={(jsonSchema) => update(index, { ...port, jsonSchema })} />
+            <PortSchema
+              value={port.jsonSchema}
+              disabled={disabled}
+              onChange={(jsonSchema) =>
+                update(index, {
+                  ...port,
+                  jsonSchema,
+                  ...(port.value === undefined ? {} : { value: valueForEditor(jsonSchema, port.value) as InputPort['value'] }),
+                })
+              }
+            />
             {!disabled && (
               <Button
                 type="button"
@@ -361,6 +395,18 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             editor={props.output ? null : undefined}
             path={`/${index}`}
             onDraftIssue={onDraftIssue}
+            onDefinitionChange={
+              props.layout === 'values'
+                ? (jsonSchema, value) => {
+                    const { value: _value, ...rest } = port
+                    update(index, {
+                      ...rest,
+                      jsonSchema: jsonSchema as InputPort['jsonSchema'],
+                      ...(value === undefined ? {} : { value: value as InputPort['value'] }),
+                    })
+                  }
+                : undefined
+            }
             onChange={(value) => {
               const { value: _value, ...rest } = port
               update(index, { ...rest, ...(value === undefined ? {} : { value: value as InputPort['value'] }) })
@@ -372,80 +418,86 @@ export function PortDefinitionEditor(props: PortEditorProps) {
     )
   }
   return (
-    <div className={styles.list} data-layout={props.layout} data-inputs={props.renderValue != null || undefined} ref={list}>
-      <div className={styles.columns} data-output={props.output || undefined}>
-        <span>{t(props.layout === 'values' ? 'inspector.ports.columnHandle' : 'inspector.ports.columnName')}</span>
-        <span>{t('inspector.ports.columnType')}</span>
-        {!props.output && <span>{t('inspector.ports.columnValue')}</span>}
-      </div>
-      <span className="sr-only" role="status" aria-live="polite">
-        {announcement}
-      </span>
-      {sections.map((section, sectionIndex) =>
-        section.group == null ? (
-          <div key="ungrouped">{section.ports.map(renderPort)}</div>
-        ) : (
-          <details key={`group:${sectionIndex}`} className={styles.group} open={section.group.collapsed !== true}>
-            <summary>
-              <i aria-hidden="true" className="i-lucide-light:chevron-down" />
-              <span>{section.group.group}</span>
-            </summary>
-            {section.ports.map(renderPort)}
-            {!disabled && (
-              <details className={styles.groupSettings}>
-                <summary aria-label={t('inspector.ports.groupSettings')} title={t('inspector.ports.groupSettings')}>
-                  <i aria-hidden="true" className="i-lucide-light:settings-2" />
-                </summary>
-                <div className={styles.branch}>
-                  <Input
-                    aria-label={t('valueEditor.group')}
-                    value={section.group.group}
-                    onChange={(event) => update(section.index!, { ...section.group!, group: event.target.value })}
-                  />
-                  <Label className="flex items-center gap-2 text-xs font-normal">
-                    <Checkbox
-                      checked={section.group.collapsed === true}
-                      onCheckedChange={(collapsed) => update(section.index!, { ...section.group!, collapsed: collapsed === true })}
-                    />
-                    {t('valueEditor.collapsed')}
-                  </Label>
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="ghost"
-                    className="self-start"
-                    onClick={() => onChange(values.filter((_, index) => index !== section.index))}
-                  >
-                    {t('valueEditor.remove')}
-                  </Button>
-                </div>
-              </details>
-            )}
-          </details>
-        ),
-      )}
-      {!disabled && (
-        <div className={styles.actions}>
-          <Button
-            type="button"
-            size="xs"
-            variant="ghost"
-            onClick={() => {
-              let index = 1
-              while (reservedNames.includes(`value${index}`) || values.some((port) => 'handle' in port && port.handle === `value${index}`)) index++
-              onChange([...values, { handle: `value${index}`, jsonSchema: {}, nullable: defaultNullable }])
-            }}
-          >
-            <i aria-hidden="true" className="i-lucide-light:plus" />
-            {t('valueEditor.addField')}
-          </Button>
-          {props.groups && props.allowAddGroup !== false && (
-            <Button type="button" size="xs" variant="ghost" onClick={() => onChange([...values, { group: t('valueEditor.group') }])}>
-              {t('valueEditor.addGroup')}
-            </Button>
+    <>
+      {props.layout === 'values' && (
+        <div ref={heading} className={styles.valuesTitle}>
+          <FieldLabel>{t('inspector.ports.valuesTitle')}</FieldLabel>
+          {!disabled && (
+            <Tooltip>
+              <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label={t('valueEditor.addField')} onClick={addField} />}>
+                <i aria-hidden="true" className="i-ph:plus-light text-lg" />
+              </TooltipTrigger>
+              <TooltipContent>{t('valueEditor.addField')}</TooltipContent>
+            </Tooltip>
           )}
         </div>
       )}
-    </div>
+      <div className={styles.list} data-layout={props.layout} data-inputs={props.renderValue != null || undefined} ref={list}>
+        <div className={styles.columns} data-layout={props.layout} data-output={props.output || undefined}>
+          <span>{t(props.layout === 'values' ? 'inspector.ports.columnHandle' : 'inspector.ports.columnName')}</span>
+          <span>{t(props.layout === 'values' ? 'valueEditor.component' : 'inspector.ports.columnType')}</span>
+          {!props.output && <span>{t('inspector.ports.columnValue')}</span>}
+        </div>
+        <span className="sr-only" role="status" aria-live="polite">
+          {announcement}
+        </span>
+        {sections.map((section, sectionIndex) =>
+          section.group == null ? (
+            <div key="ungrouped">{section.ports.map(renderPort)}</div>
+          ) : (
+            <details key={`group:${sectionIndex}`} className={styles.group} open={section.group.collapsed !== true}>
+              <summary>
+                <i aria-hidden="true" className="i-lucide-light:chevron-down" />
+                <span>{section.group.group}</span>
+              </summary>
+              {section.ports.map(renderPort)}
+              {!disabled && (
+                <details className={styles.groupSettings}>
+                  <summary aria-label={t('inspector.ports.groupSettings')} title={t('inspector.ports.groupSettings')}>
+                    <i aria-hidden="true" className="i-lucide-light:settings-2" />
+                  </summary>
+                  <div className={styles.branch}>
+                    <Input
+                      aria-label={t('valueEditor.group')}
+                      value={section.group.group}
+                      onChange={(event) => update(section.index!, { ...section.group!, group: event.target.value })}
+                    />
+                    <Label className="flex items-center gap-2 text-xs font-normal">
+                      <Checkbox
+                        checked={section.group.collapsed === true}
+                        onCheckedChange={(collapsed) => update(section.index!, { ...section.group!, collapsed: collapsed === true })}
+                      />
+                      {t('valueEditor.collapsed')}
+                    </Label>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="ghost"
+                      className="self-start"
+                      onClick={() => onChange(values.filter((_, index) => index !== section.index))}
+                    >
+                      {t('valueEditor.remove')}
+                    </Button>
+                  </div>
+                </details>
+              )}
+            </details>
+          ),
+        )}
+        {!disabled && props.layout !== 'values' && (
+          <div className={styles.actions}>
+            <Button type="button" size="xs" variant="ghost" onClick={addField}>
+              <i aria-hidden="true" className="i-lucide-light:plus" />
+              {t('valueEditor.addField')}
+            </Button>
+            {props.groups && props.allowAddGroup !== false && (
+              <Button type="button" size="xs" variant="ghost" onClick={() => onChange([...values, { group: t('valueEditor.group') }])}>
+                {t('valueEditor.addGroup')}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   )
 }

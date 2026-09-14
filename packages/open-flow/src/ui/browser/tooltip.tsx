@@ -26,7 +26,7 @@ function TooltipContent({
 }: TooltipPrimitive.Popup.Props &
   Pick<TooltipPrimitive.Positioner.Props, 'align' | 'alignOffset' | 'side' | 'sideOffset'> & { container?: HTMLElement | null }) {
   return (
-    <TooltipPrimitive.Portal container={container}>
+    <TooltipPrimitive.Portal container={container} className="contents">
       <TooltipPrimitive.Positioner align={align} alignOffset={alignOffset} side={side} sideOffset={sideOffset} className="isolate z-50">
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"

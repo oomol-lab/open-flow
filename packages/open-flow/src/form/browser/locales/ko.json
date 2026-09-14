@@ -39,6 +39,33 @@
     "options": "{{name}} 값 옵션",
     "hours": "시",
     "minutes": "분",
-    "seconds": "초"
+    "seconds": "초",
+    "components": {
+      "string": "한 줄",
+      "text": "여러 줄",
+      "number": "숫자",
+      "integer": "정수",
+      "select": "단일 선택",
+      "multiSelect": "다중 선택",
+      "boolean": "불리언",
+      "date": "날짜",
+      "time": "시간",
+      "dateTime": "날짜와 시간",
+      "color": "색상",
+      "object": "객체",
+      "array": "배열",
+      "json": "JSON",
+      "null": "Null"
+    },
+    "componentGroups": {
+      "strings": "문자열",
+      "numbers": "숫자",
+      "choices": "선택",
+      "dates": "날짜와 시간",
+      "other": "기타"
+    },
+    "choiceOptions": "옵션",
+    "addOption": "옵션 추가",
+    "component": "컴포넌트"
   }
 }

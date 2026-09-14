@@ -25,11 +25,16 @@ const values: readonly InputPort[] = [
   {
     ...field('payload', 'object'),
     jsonSchema: { type: 'object', properties: { name: { type: 'string' }, active: { type: 'boolean' } } },
-    value: { name: 'Ada', active: true },
+    value: { name: 'Ada', active: true, extra: 'Editable field' },
   },
   { ...field('tags', 'array'), jsonSchema: { type: 'array', items: { type: 'string' } }, value: ['design', 'review'] },
   { ...field('choice'), jsonSchema: { 'oneOf': [{ type: 'string' }, { type: 'number' }], 'ui:options': { labels: ['Text', 'Number'] } }, value: 'hello' },
   { ...field('note'), nullable: true, value: null },
+  { ...field('nullValue', 'null'), value: null },
+  field('unsetNull', 'null'),
+  { ...field('unsetNullable'), nullable: true },
+  field('unsetBoolean', 'boolean'),
+  { ...field('unsetSelect'), jsonSchema: { enum: ['first', 'second'] } },
   field('unset'),
 ]
 

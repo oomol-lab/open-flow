@@ -22,6 +22,7 @@ import { nodePropertiesStories } from './nodeProperties.tsx'
 import { nodeStories } from './nodeStories.tsx'
 import { notificationsStory } from './notifications.tsx'
 import { overviewStories } from './overview.tsx'
+import { popupLayoutStory } from './popupLayout.tsx'
 import { scheduleStory } from './schedule.tsx'
 import { stories } from './stories.tsx'
 import { triggerConfigStory } from './triggerConfig.tsx'
@@ -71,6 +72,7 @@ export const labStories: readonly FrontendStory[] = [
   connectionPathsStory,
   ...stories,
   formStory,
+  popupLayoutStory,
   libraryStory,
   nodePickerPreviewStory,
   agentStory,

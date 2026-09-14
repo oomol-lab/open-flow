@@ -10,7 +10,7 @@
     "object": "Object",
     "array": "Array",
     "null": "Null",
-    "unset": "Not set",
+    "unset": "Unset",
     "clear": "Clear",
     "select": "Select a value",
     "setValue": "Set value",
@@ -39,6 +39,33 @@
     "options": "Value options for {{name}}",
     "hours": "Hours",
     "minutes": "Minutes",
-    "seconds": "Seconds"
+    "seconds": "Seconds",
+    "components": {
+      "string": "Text",
+      "text": "Multiline",
+      "number": "Number",
+      "integer": "Integer",
+      "select": "Select",
+      "multiSelect": "Multi-select",
+      "boolean": "Boolean",
+      "date": "Date",
+      "time": "Time",
+      "dateTime": "Date/time",
+      "color": "Color",
+      "object": "Object",
+      "array": "Array",
+      "json": "JSON",
+      "null": "Null"
+    },
+    "componentGroups": {
+      "strings": "Strings",
+      "numbers": "Numbers",
+      "choices": "Choices",
+      "dates": "Date & time",
+      "other": "Other"
+    },
+    "choiceOptions": "Options",
+    "addOption": "Add option",
+    "component": "Component"
   }
 }

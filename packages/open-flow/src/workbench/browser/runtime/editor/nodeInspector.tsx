@@ -1343,9 +1343,6 @@ export function NodeInspector({
         )}
         {selection?.kind === 'value' && (
           <div className="inspector-values-section">
-            <div className="px-3 pt-3 pb-1">
-              <FieldLabel>{t('inspector.ports.valuesTitle')}</FieldLabel>
-            </div>
             <PortDefinitionEditor
               layout="values"
               values={selection.node.values}

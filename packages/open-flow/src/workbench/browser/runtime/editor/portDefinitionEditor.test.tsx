@@ -42,3 +42,30 @@ describe('Output definitions', () => {
     expect(controls.every((control) => control.includes('disabled'))).toBe(true)
   })
 })
+
+describe('Nested field definition editing', () => {
+  it.each(['values', 'definition'] as const)('keeps schema editing scoped to the %s layout', (layout) => {
+    const onChange = vi.fn()
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <PortDefinitionEditor
+          layout={layout}
+          disabled={false}
+          values={[
+            {
+              handle: 'payload',
+              nullable: false,
+              jsonSchema: { type: 'object', properties: { name: { type: 'string' } } },
+              value: { name: 'Ada' },
+            },
+          ]}
+          onChange={onChange}
+        />
+      </I18nProvider>,
+    )
+    const trigger = (markup.match(/<button\b[^>]*>/g) ?? []).find((tag) => tag.includes('aria-label="payload.name type"'))
+    expect(trigger).toBeDefined()
+    expect(trigger!.includes('disabled=""')).toBe(layout !== 'values')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+})
