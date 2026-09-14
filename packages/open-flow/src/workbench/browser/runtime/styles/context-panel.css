@@ -8,7 +8,7 @@
     --ui-card: var(--open-flow-node-surface);
     --ui-background: var(--open-flow-node-surface);
     --ui-control-background: var(--open-flow-node-content);
-    --ui-control-hover-background: color-mix(in srgb, var(--open-flow-secondary) 50%, var(--ui-control-background));
+    --ui-control-hover-background: color-mix(in srgb, var(--open-flow-secondary) 25%, var(--ui-control-background));
     --ui-readonly-focus-outline: 1px solid color-mix(in srgb, var(--ui-ring) 40%, var(--ui-input));
 
     :is(input, textarea):is([readonly], :disabled)::placeholder {
