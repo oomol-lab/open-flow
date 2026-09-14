@@ -66,12 +66,12 @@ export function EditableChoices({
             <Button
               type="button"
               size="field"
-              variant="outline"
+              variant="field"
               data-field-control
               disabled={disabled}
               aria-label={label}
               aria-invalid={invalid || danger}
-              className="w-full min-w-0 justify-between bg-[var(--ui-control-background,var(--ui-muted))]"
+              className="w-full min-w-0 justify-between"
             />
           }
         >

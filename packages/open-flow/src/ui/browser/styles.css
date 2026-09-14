@@ -107,6 +107,11 @@
   background-color: var(--ui-control-hover-background, var(--ui-muted));
 }
 
+/* Selection popups retain the same surface feedback while open. */
+:is([data-slot='select-trigger'], [data-field-control])[aria-expanded='true'] {
+  background-color: var(--ui-control-hover-background, var(--ui-muted));
+}
+
 /* Tint the control surface once, including grouped inputs and code editors. */
 :is([data-slot='input'], [data-slot='textarea'], [data-slot='native-select'], [data-slot='select-trigger'], button)[aria-invalid='true'],
 [data-slot='input-group']:has([data-slot][aria-invalid='true']),
