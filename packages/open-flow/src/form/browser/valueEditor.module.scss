@@ -107,9 +107,17 @@
 /* Every field uses the same name / type / value / actions tracks. */
 .root[data-header] {
   position: relative;
-  grid-template-columns: 24px minmax(0, 1fr) minmax(64px, 0.48fr) minmax(0, 1.5fr) var(--field-actions-width, 28px);
+  grid-template-columns: var(--field-toggle-width, 24px) minmax(0, 1fr) minmax(64px, 0.48fr) minmax(0, 1.5fr) var(--field-actions-width, 28px);
   gap: 4px;
   align-items: start;
+}
+.leadingControl {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  display: flex;
+  justify-content: flex-end;
+  width: 0;
 }
 .header {
   display: contents;
@@ -229,7 +237,7 @@
   white-space: nowrap;
 }
 .root[data-output] {
-  grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) var(--field-actions-width, 28px);
+  grid-template-columns: var(--field-toggle-width, 24px) minmax(0, 1fr) minmax(0, 1fr) var(--field-actions-width, 28px);
 }
 .root[data-output] > .options {
   grid-column: 4;
@@ -296,7 +304,7 @@
 @container value-fields (max-width: 340px) {
   .root[data-header]:not([data-output]):not([data-layout='values']),
   .root[data-header][data-expanded]:not([data-structured]):not([data-layout='values']) {
-    grid-template-columns: 24px minmax(0, 1fr) 64px var(--field-actions-width, 28px);
+    grid-template-columns: var(--field-toggle-width, 24px) minmax(0, 1fr) 64px var(--field-actions-width, 28px);
     > .header [data-field-name],
     > .header > .fieldName {
       grid-column: 2;
@@ -323,11 +331,19 @@
 
 /* Editable schema types remain visible alongside field names. */
 .root[data-header][data-layout='values'] {
-  --field-type-width: 84px;
-  grid-template-columns: 24px minmax(90px, 1fr) var(--field-type-width) minmax(0, 1.5fr) var(--field-actions-width, 28px);
+  column-gap: 0;
+  > .header [data-field-type],
+  > .header > .fieldType,
+  > .body,
+  > .summary,
+  > .options {
+    margin-left: 4px;
+  }
+  grid-template-columns: var(--field-toggle-width, 24px) minmax(90px, 1fr) var(--field-type-width) minmax(0, 1.5fr) var(--field-actions-width, 28px);
   > .header [data-field-name],
   > .header > .fieldName {
     grid-column: 2;
+    margin-left: 1px;
     padding: 0;
     overflow: visible;
   }
@@ -379,7 +395,7 @@
 
 @container value-fields (max-width: 340px) {
   .root[data-header][data-layout='values'] {
-    grid-template-columns: 24px minmax(0, 1fr) var(--field-type-width) var(--field-actions-width, 28px);
+    grid-template-columns: var(--field-toggle-width, 24px) minmax(0, 1fr) var(--field-type-width) var(--field-actions-width, 28px);
     > .options {
       grid-column: 4;
     }

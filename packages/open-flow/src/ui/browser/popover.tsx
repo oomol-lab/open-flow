@@ -27,7 +27,7 @@ function PopoverContent({
     container?: HTMLElement | null
   }) {
   return (
-    <PopoverPrimitive.Portal container={container}>
+    <PopoverPrimitive.Portal container={container} className="contents">
       <PopoverPrimitive.Positioner
         collisionBoundary={collisionBoundary}
         positionMethod={positionMethod}

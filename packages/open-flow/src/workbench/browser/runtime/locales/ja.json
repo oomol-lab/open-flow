@@ -291,6 +291,8 @@
       "moved": "{{name}} を {{position}} 番目に移動しました。",
       "groupSettings": "グループ設定",
       "connected": "接続済み",
+      "valuesTitle": "値",
+      "columnHandle": "Handle",
       "columnName": "名前",
       "columnType": "型",
       "columnValue": "値"

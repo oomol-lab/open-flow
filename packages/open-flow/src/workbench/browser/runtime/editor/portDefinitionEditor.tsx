@@ -130,7 +130,7 @@ type PortEditorProps = {
   disabled: boolean
   allowAddGroup?: boolean
   output?: boolean
-  renderValue?: (port: InputPort, presentation: Pick<ValueEditorProps, 'header' | 'description' | 'options'>) => ReactNode
+  renderValue?: (port: InputPort, presentation: Pick<ValueEditorProps, 'header' | 'leadingControl' | 'description' | 'options'>) => ReactNode
 } & (
   | { groups: true; values: readonly (InputPort | Group)[]; onChange: (values: readonly (InputPort | Group)[]) => void }
   | { groups?: false; values: readonly InputPort[]; onChange: (values: readonly InputPort[]) => void }
@@ -175,75 +175,74 @@ export function PortDefinitionEditor(props: PortEditorProps) {
     else sections[sections.length - 1]!.ports.push({ port: entry, index })
   })
   const renderPort = ({ port, index }: { port: InputPort; index: number }) => {
+    const leadingControl = !disabled ? (
+      <Button
+        onClick={(event) => event.preventDefault()}
+        type="button"
+        size="icon-xs"
+        variant="disclosure"
+        className={`${styles.grip} w-[var(--field-toggle-width,24px)]`}
+        aria-label={t('inspector.ports.reorder', { name: port.handle })}
+        title={t('inspector.ports.reorderHint')}
+        onPointerDown={(event) => {
+          if (event.button !== 0 || disabled) return
+          event.stopPropagation()
+          dragging.current = { index, values, x: event.clientX, y: event.clientY }
+          event.currentTarget.setPointerCapture(event.pointerId)
+        }}
+        onPointerMove={(event) => {
+          const source = dragging.current
+          if (source == null || source.index !== index) return
+          if (disabled || source.values !== values) {
+            cancelDrag()
+            return
+          }
+          if (Math.hypot(event.clientX - source.x, event.clientY - source.y) < 5) return
+          setDragIndex(index)
+          const row = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-port-index]')
+          const target = row == null || !list.current?.contains(row) ? -1 : Number(row.dataset.portIndex)
+          const rect = row?.getBoundingClientRect()
+          const insertion = target < 0 || rect == null ? -1 : target + (event.clientY > rect.top + rect.height / 2 ? 1 : 0)
+          const destination = insertion > index ? insertion - 1 : insertion
+          if (insertion < 0 || movePort(values, index, destination) === values) {
+            dropTarget.current = undefined
+            setDrop(undefined)
+            return
+          }
+          // A boundary has one owner, whether reached from the row above or below.
+          const next = values[insertion] != null && 'handle' in values[insertion]! ? { index: insertion, after: false } : { index: insertion - 1, after: true }
+          dropTarget.current = next
+          setDrop(next)
+        }}
+        onPointerUp={(event) => {
+          const source = dragging.current
+          const target = dropTarget.current
+          if (source != null && target != null && source.values === values) {
+            const insertion = target.index + (target.after ? 1 : 0)
+            reorder(source.index, insertion > source.index ? insertion - 1 : insertion)
+          }
+          cancelDrag()
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+        }}
+        onPointerCancel={cancelDrag}
+        onLostPointerCapture={cancelDrag}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            cancelDrag()
+            return
+          }
+          if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+          event.preventDefault()
+          event.stopPropagation()
+          reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1))
+        }}
+      >
+        <i aria-hidden="true" className="i-lucide-light:grip-vertical" />
+      </Button>
+    ) : undefined
     const header = (
       <div className={styles.heading}>
-        {!disabled && (
-          <Button
-            onClick={(event) => event.preventDefault()}
-            type="button"
-            size="icon-xs"
-            variant="ghost"
-            className={styles.grip}
-            aria-label={t('inspector.ports.reorder', { name: port.handle })}
-            title={t('inspector.ports.reorderHint')}
-            onPointerDown={(event) => {
-              if (event.button !== 0 || disabled) return
-              event.stopPropagation()
-              dragging.current = { index, values, x: event.clientX, y: event.clientY }
-              event.currentTarget.setPointerCapture(event.pointerId)
-            }}
-            onPointerMove={(event) => {
-              const source = dragging.current
-              if (source == null || source.index !== index) return
-              if (disabled || source.values !== values) {
-                cancelDrag()
-                return
-              }
-              if (Math.hypot(event.clientX - source.x, event.clientY - source.y) < 5) return
-              setDragIndex(index)
-              const row = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-port-index]')
-              const target = row == null || !list.current?.contains(row) ? -1 : Number(row.dataset.portIndex)
-              const rect = row?.getBoundingClientRect()
-              const insertion = target < 0 || rect == null ? -1 : target + (event.clientY > rect.top + rect.height / 2 ? 1 : 0)
-              const destination = insertion > index ? insertion - 1 : insertion
-              if (insertion < 0 || movePort(values, index, destination) === values) {
-                dropTarget.current = undefined
-                setDrop(undefined)
-                return
-              }
-              // A boundary has one owner, whether reached from the row above or below.
-              const next =
-                values[insertion] != null && 'handle' in values[insertion]! ? { index: insertion, after: false } : { index: insertion - 1, after: true }
-              dropTarget.current = next
-              setDrop(next)
-            }}
-            onPointerUp={(event) => {
-              const source = dragging.current
-              const target = dropTarget.current
-              if (source != null && target != null && source.values === values) {
-                const insertion = target.index + (target.after ? 1 : 0)
-                reorder(source.index, insertion > source.index ? insertion - 1 : insertion)
-              }
-              cancelDrag()
-              if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-            }}
-            onPointerCancel={cancelDrag}
-            onLostPointerCapture={cancelDrag}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.preventDefault()
-                cancelDrag()
-                return
-              }
-              if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
-              event.preventDefault()
-              event.stopPropagation()
-              reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1))
-            }}
-          >
-            <i aria-hidden="true" className="i-lucide-light:grip-vertical" />
-          </Button>
-        )}
         <span data-field-name className={styles.name} title={[port.handle, port.description].filter(Boolean).join(' — ')}>
           {props.layout === 'values' && !disabled ? (
             <PortName
@@ -345,9 +344,10 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         data-dragging={dragIndex === index || undefined}
       >
         {props.renderValue ? (
-          props.renderValue(port, { header, options, description: port.description })
+          props.renderValue(port, { header, leadingControl, options, description: port.description })
         ) : (
           <ValueEditor
+            leadingControl={leadingControl}
             layout={props.layout}
             header={header}
             options={options}
@@ -374,7 +374,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
   return (
     <div className={styles.list} data-layout={props.layout} data-inputs={props.renderValue != null || undefined} ref={list}>
       <div className={styles.columns} data-output={props.output || undefined}>
-        <span>{t('inspector.ports.columnName')}</span>
+        <span>{t(props.layout === 'values' ? 'inspector.ports.columnHandle' : 'inspector.ports.columnName')}</span>
         <span>{t('inspector.ports.columnType')}</span>
         {!props.output && <span>{t('inspector.ports.columnValue')}</span>}
       </div>

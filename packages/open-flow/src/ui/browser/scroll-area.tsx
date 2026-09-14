@@ -12,6 +12,7 @@ export type ScrollAreaRef = OverlayScrollbarsComponentRef<'div'>
 export interface ScrollAreaProps {
   className?: string
   defer?: boolean
+  autoHide?: 'leave' | 'never'
   events?: EventListeners
   style?: React.CSSProperties
   tabIndex?: number
@@ -29,7 +30,7 @@ const options: PartialOptions = {
 }
 
 export const ScrollArea: React.ForwardRefExoticComponent<ScrollAreaProps & React.RefAttributes<ScrollAreaRef>> = forwardRef<ScrollAreaRef, ScrollAreaProps>(
-  ({ className, defer = true, events, style, tabIndex, onClick, children }, ref) => {
+  ({ className, defer = true, autoHide = 'leave', events, style, tabIndex, onClick, children }, ref) => {
     return (
       <OverlayScrollbarsComponent
         defer={defer}
@@ -37,7 +38,7 @@ export const ScrollArea: React.ForwardRefExoticComponent<ScrollAreaProps & React
         ref={ref}
         className={clsx(styles.container, className)}
         style={style}
-        options={options}
+        options={{ ...options, scrollbars: { ...options.scrollbars, autoHide } }}
         tabIndex={tabIndex}
         onClick={onClick}
       >

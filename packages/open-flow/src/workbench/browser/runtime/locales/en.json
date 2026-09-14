@@ -291,6 +291,8 @@
       "moved": "{{name}} moved to position {{position}}.",
       "groupSettings": "Group settings",
       "connected": "Connected",
+      "valuesTitle": "Values",
+      "columnHandle": "Handle",
       "columnName": "Name",
       "columnType": "Type",
       "columnValue": "Value"

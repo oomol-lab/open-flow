@@ -116,6 +116,10 @@
     }
   }
 
+  .inspector-values-section {
+    border-block: 1px solid var(--ui-border);
+  }
+
   .inspector-content > .inspector-port-section {
     margin: 8px;
   }
@@ -139,6 +143,7 @@
   }
 
   .inspector-content {
+    padding-right: 8px;
     font-size: 12px;
     display: flex;
     min-height: 100%;
