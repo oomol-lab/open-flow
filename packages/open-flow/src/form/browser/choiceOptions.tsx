@@ -1,9 +1,23 @@
+import { useEffect } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../ui/browser/button.tsx'
 import { Input } from '../../ui/browser/input.tsx'
 
 export function ChoiceOptions({ options, disabled, onChange }: { options: readonly unknown[]; disabled?: boolean; onChange: (options: unknown[]) => void }) {
   const t = useTranslate()
+  const createOptionLabel = (list: readonly unknown[], offset: number) => {
+    let index = offset
+    let label = t('valueEditor.option', { index })
+    while (list.includes(label)) {
+      index++
+      label = t('valueEditor.option', { index })
+    }
+    return label
+  }
+  useEffect(() => {
+    if (disabled || options.length > 0) return
+    onChange([createOptionLabel([], 1)])
+  }, [disabled, onChange, options.length, createOptionLabel, t])
   return (
     <div className="flex flex-col gap-1 text-xs">
       {options.map((option, index) => (
@@ -21,32 +35,30 @@ export function ChoiceOptions({ options, disabled, onChange }: { options: readon
           />
           <Button
             type="button"
-            size="icon-sm"
+            size="icon-xs"
+            variant="ghost"
+            disabled={disabled}
+            aria-label={`${t('valueEditor.addOption')} ${t('valueEditor.option', { index: index + 1 })}`}
+            onClick={() => {
+              const next = [...options]
+              next.splice(index + 1, 0, createOptionLabel(next, index + 2))
+              onChange(next)
+            }}
+          >
+            <i aria-hidden="true" className="i-tabler-light:square-rounded-plus text-lg" />
+          </Button>
+          <Button
+            type="button"
+            size="icon-xs"
             variant="ghost"
             disabled={disabled}
             aria-label={`${t('valueEditor.remove')} ${t('valueEditor.option', { index: index + 1 })}`}
-            onClick={() => onChange(options.filter((_, at) => at !== index))}
+            onClick={() => onChange(options.toSpliced(index, 1))}
           >
-            <i aria-hidden="true" className="i-lucide-light:minus" />
+            <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg" />
           </Button>
         </div>
       ))}
-      <Button
-        type="button"
-        variant="ghost"
-        className="bg-foreground/5"
-        size="field"
-        disabled={disabled}
-        onClick={() => {
-          let index = options.length + 1
-          let label = t('valueEditor.option', { index })
-          while (options.includes(label)) label = t('valueEditor.option', { index: ++index })
-          onChange([...options, label])
-        }}
-      >
-        <i aria-hidden="true" className="i-lucide-light:plus" />
-        {t('valueEditor.addOption')}
-      </Button>
     </div>
   )
 }
