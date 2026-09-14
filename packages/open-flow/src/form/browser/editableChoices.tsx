@@ -93,7 +93,7 @@ export function EditableChoices({
             {editing ? (
               <>
                 <div>
-                  <Button type="button" variant="ghost" size="xs" onClick={() => setEditing(false)}>
+                  <Button type="button" variant="ghost" size="field" onClick={() => setEditing(false)}>
                     <i aria-hidden="true" data-icon="inline-start" className="i-lucide:chevron-left" />
                     {t('valueEditor.backToChoices')}
                   </Button>
