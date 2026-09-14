@@ -8,7 +8,6 @@ import { Button } from '../../ui/browser/button.tsx'
 import { Input } from '../../ui/browser/input.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../ui/browser/popover.tsx'
 import { Textarea } from '../../ui/browser/textarea.tsx'
-import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/tooltip.tsx'
 import { enumIndex, schemaChoices } from '../common/choices.ts'
 import { isDateFormat } from '../common/dateValue.ts'
 import { editorComponent, valueForEditor } from '../common/editorComponent.ts'
@@ -24,6 +23,7 @@ import { FieldSelect } from './fieldSelect.tsx'
 import { FieldSorting } from './fieldSorting.ts'
 import { JsonEditor } from './jsonEditor.tsx'
 import { ObjectFieldList } from './objectFieldList.tsx'
+import { ValueTools } from './valueTools.tsx'
 
 export interface ValueEditorProps {
   readonly layout?: 'values' | 'definition'
@@ -57,6 +57,13 @@ function PropertyName({ name, onRename, disabled }: { name: string; onRename: (n
   const t = useTranslate()
   const [draft, setDraft] = useState(name)
   const [invalid, setInvalid] = useState(false)
+  useEffect(() => {
+    setDraft(name)
+    setInvalid(false)
+  }, [name])
+  const save = () => {
+    if (!disabled && draft !== name) setInvalid(!onRename(draft))
+  }
   return (
     <Input
       aria-label={t('valueEditor.fieldName')}
@@ -67,11 +74,11 @@ function PropertyName({ name, onRename, disabled }: { name: string; onRename: (n
         setDraft(event.target.value)
         setInvalid(false)
       }}
-      onBlur={() => setInvalid(!onRename(draft))}
+      onBlur={save}
       onKeyDown={(event) => {
         if (event.key === 'Enter') {
           event.preventDefault()
-          setInvalid(!onRename(draft))
+          save()
         }
         if (event.key === 'Escape') {
           setDraft(name)
@@ -90,7 +97,7 @@ export function ValueEditor(props: ValueEditorProps) {
   const id = useId()
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const [raw, setRaw] = useState(false)
-  const [editingUnset, setEditingUnset] = useState(false)
+  const focusCreatedValue = useRef(false)
   const [expanded, setExpanded] = useState(false)
   const [editorFocusRequest, setEditorFocusRequest] = useState(0)
   const [optionsOpen, setOptionsOpen] = useState(false)
@@ -127,14 +134,11 @@ export function ValueEditor(props: ValueEditorProps) {
     !editableOptions &&
     !complex &&
     value === undefined &&
-    !editingUnset &&
     props.editor === undefined &&
     props.valueEditable !== false
   useEffect(() => {
-    setEditingUnset(false)
-  }, [value, path, schema])
-  useEffect(() => {
-    if (!editingUnset || !container) return
+    if (!focusCreatedValue.current || value === undefined || !container) return
+    focusCreatedValue.current = false
     const body = container.querySelector<HTMLElement>('[data-value-body]')
     const input = body?.querySelector<HTMLInputElement | HTMLTextAreaElement>('input:not([type="hidden"]), textarea')
     const popup = body?.querySelector<HTMLButtonElement>('button[aria-haspopup]')
@@ -143,7 +147,7 @@ export function ValueEditor(props: ValueEditorProps) {
       popup.click()
     } else if (input) input.focus()
     else body?.querySelector<HTMLButtonElement>('button')?.focus()
-  }, [editingUnset, container])
+  }, [value, expanded, container])
   const optionLabels = objectValue(source['ui:options'])?.labels
   const child = (
     key: string | number,
@@ -313,9 +317,9 @@ export function ValueEditor(props: ValueEditorProps) {
           disabled={disabled}
           onClick={() => {
             const next = getDefaultValue(typeOfSchema(schema), schema)
+            focusCreatedValue.current = true
             onChange(next === undefined ? getDefaultValue(type) : next)
             if (type === 'object' || type === 'array' || source['ui:widget'] === 'text') setExpanded(true)
-            setEditingUnset(true)
           }}
         >
           {allowsNull ? <span className={styles.nullChip}>null</span> : <span>{t('valueEditor.setValue')}</span>}
@@ -704,13 +708,8 @@ export function ValueEditor(props: ValueEditorProps) {
     <div
       className={styles.root}
       ref={setContainer}
-      onBlur={(event) => {
-        if (editingUnset && value === undefined && event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget))
-          setEditingUnset(false)
-      }}
       data-inline={(props.hideOptions && !props.header) || undefined}
       data-value-tools={canClear || canToggleJson || undefined}
-      data-boolean={type === 'boolean' || undefined}
       data-array-child={props.arrayChild || undefined}
       data-object-child={props.objectChild || undefined}
       data-nested-field={depth > 0 || undefined}
@@ -794,57 +793,29 @@ export function ValueEditor(props: ValueEditorProps) {
         )
       )}
       {!expandable && body}
-      {(canClear || canToggleJson) && (
-        <div className={styles.valueTools}>
-          {canClear && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    className={styles.clearValue}
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={`${t('valueEditor.clear')} ${label}`}
-                    onClick={() => {
-                      onChange(undefined)
-                      setExpanded(false)
-                      setRaw(false)
-                      setEditorFocusRequest(0)
-                    }}
-                  />
-                }
-              >
-                <i aria-hidden="true" className="i-lucide-light:x" />
-              </TooltipTrigger>
-              <TooltipContent container={container}>{t('valueEditor.clear')}</TooltipContent>
-            </Tooltip>
-          )}
-          {canToggleJson && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={`${label} JSON`}
-                    aria-pressed={raw}
-                    onClick={() => {
-                      setRaw(!raw)
-                      setExpanded(true)
-                      if (!raw) setEditorFocusRequest((request) => request + 1)
-                    }}
-                  />
-                }
-              >
-                <i aria-hidden="true" className="i-lucide-light:braces" />
-              </TooltipTrigger>
-              <TooltipContent container={container}>{t('valueEditor.components.json')}</TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-      )}
+      <ValueTools
+        label={label}
+        container={container}
+        raw={raw}
+        onClear={
+          canClear
+            ? () => {
+                onChange(undefined)
+                setExpanded(false)
+                setRaw(false)
+                setEditorFocusRequest(0)
+              }
+            : undefined
+        }
+        onToggleJson={
+          canToggleJson
+            ? () => {
+                setRaw(!raw)
+                if (!raw) setEditorFocusRequest((request) => request + 1)
+              }
+            : undefined
+        }
+      />
       {props.trailingControl}
       {(!props.hideOptions || props.actions) && (
         <div className={styles.options}>

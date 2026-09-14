@@ -32,7 +32,7 @@ function PortName({ value, disabled, names, onChange }: { value: string; disable
   const invalid = draft.trim() === '' || (draft !== value && names.includes(draft))
   useEffect(() => setDraft(value), [value])
   const save = () => {
-    if (!invalid && draft !== value) onChange(draft)
+    if (!disabled && !invalid && draft !== value) onChange(draft)
   }
   return (
     <Input
