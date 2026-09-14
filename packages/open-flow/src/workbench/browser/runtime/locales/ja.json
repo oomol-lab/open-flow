@@ -284,6 +284,16 @@
       "preview": "プレビュー",
       "duplicate": "複製",
       "delete": "削除"
+    },
+    "ports": {
+      "reorder": "{{name}} の順序を変更",
+      "reorderHint": "ドラッグでグループ内の順序を変更。フォーカス時は上下キーでも移動できます。",
+      "moved": "{{name}} を {{position}} 番目に移動しました。",
+      "groupSettings": "グループ設定",
+      "connected": "接続済み",
+      "columnName": "名前",
+      "columnType": "型",
+      "columnValue": "値"
     }
   },
   "language": {

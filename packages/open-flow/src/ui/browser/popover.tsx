@@ -1,5 +1,6 @@
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
 import * as React from 'react'
+import { Button } from './button.tsx'
 import { cn } from './utils.ts'
 
 function Popover({ ...props }: PopoverPrimitive.Root.Props) {
@@ -14,15 +15,29 @@ function PopoverContent({
   className,
   align = 'center',
   alignOffset = 0,
+  anchor,
+  collisionBoundary,
+  positionMethod,
   container,
   side = 'bottom',
   sideOffset = 4,
   ...props
 }: PopoverPrimitive.Popup.Props &
-  Pick<PopoverPrimitive.Positioner.Props, 'align' | 'alignOffset' | 'side' | 'sideOffset'> & { container?: HTMLElement | null }) {
+  Pick<PopoverPrimitive.Positioner.Props, 'collisionBoundary' | 'positionMethod' | 'anchor' | 'align' | 'alignOffset' | 'side' | 'sideOffset'> & {
+    container?: HTMLElement | null
+  }) {
   return (
     <PopoverPrimitive.Portal container={container}>
-      <PopoverPrimitive.Positioner align={align} alignOffset={alignOffset} side={side} sideOffset={sideOffset} className="isolate z-50">
+      <PopoverPrimitive.Positioner
+        collisionBoundary={collisionBoundary}
+        positionMethod={positionMethod}
+        anchor={anchor}
+        align={align}
+        alignOffset={alignOffset}
+        side={side}
+        sideOffset={sideOffset}
+        className="isolate z-50"
+      >
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(
@@ -49,3 +64,32 @@ function PopoverDescription({ className, ...props }: PopoverPrimitive.Descriptio
 }
 
 export { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger }
+
+/** Additional property controls, anchored beside their owning field. */
+function PopoverPanelContent({
+  title,
+  closeLabel,
+  children,
+  ...props
+}: Omit<React.ComponentProps<typeof PopoverContent>, 'title'> & { title: string; closeLabel: string }) {
+  return (
+    <PopoverContent
+      collisionBoundary={[]}
+      positionMethod="fixed"
+      side="left"
+      align="start"
+      sideOffset={24}
+      {...props}
+      className={cn('w-80 max-w-[calc(100vw-24px)] gap-0 overflow-hidden p-0 text-xs', props.className)}
+    >
+      <div className="flex min-h-10 items-center gap-3 border-b border-border px-3 py-2">
+        <PopoverTitle className="min-w-0 flex-1 truncate text-xs">{title}</PopoverTitle>
+        <PopoverPrimitive.Close render={<Button type="button" variant="ghost" size="icon-xs" aria-label={closeLabel} />}>
+          <i aria-hidden="true" className="i-lucide-light:x" />
+        </PopoverPrimitive.Close>
+      </div>
+      <div className="flex max-h-[min(65vh,560px)] min-h-0 flex-col gap-3 overflow-y-auto p-3">{children}</div>
+    </PopoverContent>
+  )
+}
+export { PopoverPanelContent }

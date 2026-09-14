@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { datePickerChange, datePickerValue } from './dateValue.ts'
+import { calendarChange, calendarDate, datePickerChange, datePickerValue } from './dateValue.ts'
 
 describe('date fields', () => {
   it('preserves date-only values without UTC conversion', () => {
@@ -19,5 +19,23 @@ describe('date fields', () => {
     expect(datePickerValue(undefined, 'date-time')).toBe('')
     expect(datePickerValue('bad', 'time')).toBe('')
     expect(datePickerChange('', '10:20:00Z', 'time', 0)).toBeUndefined()
+  })
+})
+
+describe('calendar wall dates', () => {
+  it('keeps the stored day even when the offset crosses a UTC date boundary', () => {
+    const date = calendarDate('2026-09-14T00:30:12.345+14:00', 'date-time')!
+    expect([date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 8, 14])
+    date.setDate(15)
+    expect(calendarChange(date, '2026-09-14T00:30:12.345+14:00', 'date-time')).toBe('2026-09-15T00:30:12.345+14:00')
+  })
+  it('rejects impossible dates and preserves early years', () => {
+    expect(calendarDate('2026-02-30', 'date')).toBeUndefined()
+    expect(calendarDate('2024-02-29', 'date')?.getDate()).toBe(29)
+    expect(calendarDate('0099-01-01', 'date')?.getFullYear()).toBe(99)
+  })
+  it('selects a date without inventing a timezone for date-only values', () => {
+    expect(calendarChange(new Date(2026, 8, 20), undefined, 'date')).toBe('2026-09-20')
+    expect(calendarDate(undefined, 'date')).toBeUndefined()
   })
 })

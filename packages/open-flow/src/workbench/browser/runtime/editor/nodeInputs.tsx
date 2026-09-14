@@ -1,18 +1,27 @@
-import type { ComponentProps, ReactElement } from 'react'
-import type { Group, JsonValue } from '../api.ts'
+import type { ComponentProps, ReactNode } from 'react'
+import type { Group, InputPort, JsonValue } from '../api.ts'
 import type { InputVariables } from './nodeInputValue.tsx'
 
 import { NodeInputValue } from './nodeInputValue.tsx'
+import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 
 export type NodeInputField = Omit<ComponentProps<typeof NodeInputValue>, 'disabled' | 'variables' | 'onValue' | 'onVariable' | 'handleNames'>
 
 export function NodeInputs({
+  allowAddGroup = true,
   entries,
   variables,
   disabled,
   onValue,
   onVariable,
+  onDefinitions,
+  reservedNames,
+  renderSource,
 }: {
+  allowAddGroup?: boolean
+  onDefinitions?: (values: readonly (InputPort | Group)[]) => void
+  reservedNames?: readonly string[]
+  renderSource?: (handle: string) => ReactNode
   entries: readonly (Group | NodeInputField)[]
   variables: InputVariables
   disabled: boolean
@@ -20,32 +29,34 @@ export function NodeInputs({
   onVariable: (handle: string, name: string | undefined) => void
 }) {
   const handleNames = entries.flatMap((entry) => ('group' in entry ? [] : [entry.definition.handle]))
-  const sections: { group?: Group; children: ReactElement[] }[] = [{ children: [] }]
-  for (const entry of entries) {
-    if ('group' in entry) {
-      sections.push({ group: entry, children: [] })
-      continue
-    }
-    sections[sections.length - 1]!.children.push(
-      <NodeInputValue
-        key={entry.definition.handle}
-        {...entry}
-        handleNames={handleNames}
-        variables={variables}
-        disabled={disabled}
-        onValue={(value) => onValue(entry.definition.handle, value)}
-        onVariable={(name) => onVariable(entry.definition.handle, name)}
-      />,
-    )
-  }
-  return sections.map((section, index) =>
-    section.group == null ? (
-      <div key={index}>{section.children}</div>
-    ) : (
-      <details key={index} className="inspector-disclosure" open={section.group.collapsed !== true}>
-        <summary>{section.group.group}</summary>
-        {section.children}
-      </details>
-    ),
+  return (
+    <PortDefinitionEditor
+      groups
+      allowAddGroup={allowAddGroup}
+      values={entries.map((entry) => ('group' in entry ? entry : entry.definition))}
+      disabled={disabled || onDefinitions == null}
+      reservedNames={reservedNames}
+      onChange={(values) => onDefinitions?.(values)}
+      renderValue={(port, presentation) => {
+        const entry = entries.find((candidate): candidate is NodeInputField => !('group' in candidate) && candidate.definition.handle === port.handle)
+        if (entry == null) return null
+        return (
+          <>
+            <NodeInputValue
+              key={port.handle}
+              {...entry}
+              embedded
+              presentation={presentation}
+              sourceOptions={renderSource?.(port.handle)}
+              handleNames={handleNames}
+              variables={variables}
+              disabled={disabled}
+              onValue={(value) => onValue(port.handle, value)}
+              onVariable={(name) => onVariable(port.handle, name)}
+            />
+          </>
+        )
+      }}
+    />
   )
 }

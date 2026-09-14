@@ -284,6 +284,16 @@
       "preview": "미리 보기",
       "duplicate": "복제",
       "delete": "삭제"
+    },
+    "ports": {
+      "reorder": "{{name}} 순서 변경",
+      "reorderHint": "그룹 안에서 드래그하거나 포커스 후 위 / 아래 키로 순서를 변경하세요.",
+      "moved": "{{name}}이(가) {{position}}번째로 이동했습니다.",
+      "groupSettings": "그룹 설정",
+      "connected": "연결됨",
+      "columnName": "이름",
+      "columnType": "유형",
+      "columnValue": "값"
     }
   },
   "language": {

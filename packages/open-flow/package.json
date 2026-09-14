@@ -166,6 +166,7 @@
     "vitest": "^5.0.0",
     "yaml": "^2.9.0",
     "zod": "4.5.4",
-    "zustand": "^4.4.0"
+    "zustand": "^4.4.0",
+    "react-day-picker": "^9.14.0"
   }
 }

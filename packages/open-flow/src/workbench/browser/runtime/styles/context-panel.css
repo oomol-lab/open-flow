@@ -1,4 +1,13 @@
 .open-flow-workbench {
+  .editor-context-panel {
+    --ui-control-radius: 6px;
+    --ui-input: var(--ui-border);
+    --ui-card: var(--open-flow-node-surface);
+    --ui-background: var(--open-flow-node-surface);
+    --ui-control-background: var(--open-flow-node-content);
+    --ui-control-hover-background: var(--open-flow-secondary);
+  }
+
   .context-panel {
     position: relative;
     display: flex;
@@ -83,7 +92,54 @@
     overscroll-behavior: contain;
   }
 
+  .inspector-field-source {
+    min-width: 0;
+    [data-slot='select-trigger'] {
+      width: 100%;
+      height: 30px;
+      min-height: 30px;
+      padding: 4px 6px;
+      border: 1px solid color-mix(in srgb, var(--ui-border) 65%, var(--ui-background));
+      border-radius: 5px;
+      background: var(--ui-popover);
+      box-shadow: none;
+      font-size: 12px;
+    }
+  }
+
+  .inspector-port-section {
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ui-foreground) 1%, var(--ui-background));
+    > summary {
+      font-size: 12px;
+      font-weight: 500;
+    }
+  }
+
+  .inspector-content > .inspector-port-section {
+    margin: 8px;
+  }
+
+  .inspector-ports-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 12px 10px 4px;
+    font-size: 12px;
+    > h3 {
+      flex: 1;
+      margin: 0;
+      font-size: inherit;
+      font-weight: 500;
+    }
+    > span {
+      color: var(--ui-muted-foreground);
+      font-size: 12px;
+    }
+  }
+
   .inspector-content {
+    font-size: 12px;
     display: flex;
     min-height: 100%;
     flex-direction: column;
@@ -284,7 +340,7 @@
     border-bottom: 1px solid var(--ui-border);
   }
 
-  .inspector-disclosure {
+  .inspector-section-divider {
     border-bottom: 1px solid var(--ui-border);
   }
 
@@ -481,7 +537,6 @@
 
   .inspector-disclosure-compact {
     min-width: 0;
-    border-bottom: 0;
   }
 
   .inspector-disclosure-compact > summary {

@@ -113,15 +113,20 @@ function InputSources({
   selection,
   store,
   disabled,
-}: Pick<Props, 'revision' | 'target' | 'store' | 'disabled'> & { readonly selection: ResolvedNode }): ReactElement | null {
+  handleName,
+}: Pick<Props, 'revision' | 'target' | 'store' | 'disabled'> & { readonly selection: ResolvedNode; readonly handleName?: string }): ReactElement | null {
   const t = useTranslate()
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null)
   const graph = revision.graph(target)!
-  const ports = revision.inputSources(target, selection.id)
+  const ports = revision.inputSources(target, selection.id).filter((port) => handleName == null || port.handle === handleName)
   if (ports.length == 0) return null
-  return (
-    <section className="inspector-section inspector-sources" data-inspector-section="inputs" ref={setPortalRoot}>
-      <h3>{t('inspector.sources.title')}</h3>
+  const content = (
+    <section
+      className={handleName == null ? 'inspector-section inspector-sources' : 'inspector-field-source'}
+      data-inspector-section="inputs"
+      ref={setPortalRoot}
+    >
+      {handleName == null && <h3>{t('inspector.sources.title')}</h3>}
       <FieldGroup className="gap-2">
         {ports.map(({ handle, outputs: options }) => {
           const mapping = selection.node.inputs[handle]
@@ -131,9 +136,9 @@ function InputSources({
           const valid = source != null && options[source.nodeId]?.includes(source.output)
           const fieldId = `source-${selection.id}-${handle}`
           return (
-            <Field key={handle} className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-x-2 gap-y-1">
-              <FieldLabel htmlFor={fieldId} className="min-w-0" title={handle}>
-                <code className="truncate text-xs font-normal text-muted-foreground">{handle}</code>
+            <Field key={handle} className={handleName == null ? 'grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-x-2 gap-y-1' : 'gap-1'}>
+              <FieldLabel htmlFor={fieldId} className={handleName == null ? 'min-w-0' : 'sr-only'} title={handle}>
+                <code className="truncate text-xs font-normal text-muted-foreground">{handleName == null ? handle : t('inspector.sources.title')}</code>
               </FieldLabel>
               <Select
                 disabled={disabled}
@@ -147,23 +152,31 @@ function InputSources({
                   }
                 }}
               >
-                <SelectTrigger id={fieldId} size="sm" variant="subtle" className="min-w-0 w-full" aria-invalid={source != null && !valid}>
+                <SelectTrigger
+                  id={fieldId}
+                  aria-label={`${handle} ${t('inspector.sources.title')}`}
+                  size="sm"
+                  variant="subtle"
+                  className="min-w-0 w-full"
+                  aria-invalid={source != null && !valid}
+                >
                   <SelectValue className="min-w-0">
                     {sources.length == 0 ? (
                       <span className="truncate">{t('inspector.sources.local')}</span>
                     ) : (
                       <span
-                        className="flex min-w-0 items-center gap-1.5"
+                        className="flex min-w-0 items-center gap-1"
                         title={sources.map((item) => `${graph.nodes[item.nodeId]?.name ?? item.nodeId}.${item.output}`).join(' / ')}
                       >
                         {sources.map((item, index) => (
-                          <span key={`${item.nodeId}:${item.output}`} className="flex min-w-0 items-center gap-1.5">
+                          <span key={`${item.nodeId}:${item.output}`} className="min-w-0 truncate">
                             {index > 0 && <span className="text-muted-foreground">/</span>}
                             <span className="truncate">{graph.nodes[item.nodeId]?.name ?? item.nodeId}</span>
                             <span aria-hidden="true" className="text-muted-foreground">
-                              ·
+                              {' '}
+                              ·{' '}
                             </span>
-                            <code className="max-w-1/2 truncate text-xs">{item.output}</code>
+                            <code className="text-[11px]">{item.output}</code>
                           </span>
                         ))}
                       </span>
@@ -203,6 +216,7 @@ function InputSources({
       </FieldGroup>
     </section>
   )
+  return content
 }
 
 function GeneralSettings({
@@ -238,7 +252,7 @@ function GeneralSettings({
   }
 
   return (
-    <details className="inspector-disclosure" data-inspector-section="node">
+    <details className="inspector-disclosure inspector-section-divider" data-inspector-section="node">
       <summary>
         <Icon name="chevron-down" size={14} />
         <span className="inspector-disclosure-summary">
@@ -780,51 +794,11 @@ function TaskDefinition({
         )}
       </form>
     ) : undefined
-  const editablePorts = selection.node.task != null || ('executor' in task && task.executor.kind == 'agent')
   const settingsPanel = (
     <>
       {children}
-      {editablePorts && (
-        <details className="inspector-disclosure">
-          <summary>{t('inspector.task.inputPorts')}</summary>
-          <PortDefinitionEditor
-            groups
-            values={task.inputs}
-            disabled={disabled}
-            onChange={(inputs) => {
-              void store.saveTaskPorts(selection.id, { inputs, outputs: task.outputs })
-            }}
-          />
-        </details>
-      )}
-      <details className="inspector-disclosure">
-        <summary>{t('inspector.task.outputPorts')}</summary>
-        <PortDefinitionEditor
-          groups
-          output
-          values={task.outputs}
-          disabled={disabled || !editablePorts}
-          onChange={(outputs) => {
-            if (editablePorts) void store.saveTaskPorts(selection.id, { inputs: task.inputs, outputs })
-          }}
-        />
-      </details>
-      {!editablePorts && (
-        <details className="inspector-disclosure">
-          <summary>{t('inspector.task.additionalInputs')}</summary>
-          <PortDefinitionEditor
-            values={selection.node.additionalInputs ?? []}
-            reservedNames={task.inputs.flatMap((port) => ('handle' in port ? [port.handle] : []))}
-            disabled={disabled}
-            onChange={(inputs) => {
-              void store.saveTaskAdditionalInputs(selection.id, inputs)
-            }}
-          />
-        </details>
-      )}
-
       {'executor' in task && task.executor.kind != 'agent' && (
-        <details className="inspector-disclosure" data-inspector-section="task">
+        <details className="inspector-disclosure inspector-section-divider" data-inspector-section="task">
           <summary>
             <Icon name="chevron-down" size={14} />
             <span className="inspector-disclosure-summary">
@@ -1261,13 +1235,14 @@ export function NodeInspector({
           (() => {
             const definitions: (InputPort | Group)[] =
               selection.kind === 'task'
-                ? [...(selection.definition?.inputs ?? []), ...(selection.node.additionalInputs ?? [])]
+                ? [...(selection.definition?.inputs ?? [])]
                 : selection.kind === 'subflow'
                   ? [...(selection.definition?.inputs ?? [])]
                   : [selection.node.input]
             const handles = new Set(definitions.flatMap((definition) => ('handle' in definition ? [definition.handle] : [])))
             for (const handle of Object.keys(selection.node.inputs)) {
-              if (!handles.has(handle)) definitions.push({ handle, jsonSchema: {}, nullable: true })
+              if (!handles.has(handle) && !(selection.kind === 'task' && selection.node.additionalInputs?.some((port) => port.handle === handle)))
+                definitions.push({ handle, jsonSchema: {}, nullable: true })
             }
             const entries = definitions.map((definition): Group | NodeInputField => {
               if ('group' in definition) return definition
@@ -1285,6 +1260,16 @@ export function NodeInspector({
               <NodeInputs
                 key={`inputs:${selection.id}`}
                 entries={entries}
+                onDefinitions={
+                  selection.kind === 'task' && selection.definition != null && (selection.node.task != null || isAgent)
+                    ? (inputs) => {
+                        void store.saveTaskPorts(selection.id, { inputs, outputs: selection.definition!.outputs })
+                      }
+                    : undefined
+                }
+                renderSource={(handle) => (
+                  <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} handleName={handle} />
+                )}
                 variables={variables}
                 disabled={disabled}
                 onValue={(handle, value) => {
@@ -1295,20 +1280,52 @@ export function NodeInspector({
                 }}
               />
             )
-            return isAgent ? (
-              <details className="inspector-disclosure">
-                <summary>
-                  <Icon name="chevron-down" size={14} />
-                  <span className="inspector-disclosure-summary">
-                    <strong>{t('agent.ports')}</strong>
-                    <span>{t('agent.portsHint')}</span>
-                  </span>
-                </summary>
+            return (
+              <section className="inspector-port-section" data-inspector-section="inputs">
+                <div className="inspector-ports-title">
+                  <i aria-hidden="true" className="i-lucide-light:arrow-down-to-line" />
+                  <h3>{t('inspector.task.inputPorts')}</h3>
+                </div>
                 {fields}
-                <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} />
-              </details>
-            ) : (
-              fields
+                {selection.kind === 'task' && selection.definition != null && selection.node.task == null && !isAgent && (
+                  <details className="inspector-disclosure inspector-section-divider" open>
+                    <summary>{t('inspector.task.additionalInputs')}</summary>
+                    <NodeInputs
+                      key={`additional:${selection.id}`}
+                      allowAddGroup={false}
+                      entries={(selection.node.additionalInputs ?? []).map((definition) => {
+                        const mapping = selection.node.inputs[definition.handle]
+                        const source = mapping?.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
+                        const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
+                        return {
+                          definition,
+                          value: mapping?.kind === 'value' ? mapping.value : definition.value,
+                          connected: mapping?.kind === 'sources' && binding?.kind !== 'variable',
+                          variableName: binding?.kind === 'variable' ? binding.target : undefined,
+                        }
+                      })}
+                      variables={variables}
+                      disabled={disabled}
+                      reservedNames={selection.definition.inputs.flatMap((port) => ('handle' in port ? [port.handle] : []))}
+                      onDefinitions={(inputs) => {
+                        void store.saveTaskAdditionalInputs(
+                          selection.id,
+                          inputs.filter((port): port is InputPort => 'handle' in port),
+                        )
+                      }}
+                      onValue={(handle, value) => {
+                        void store.setInputValue(selection.id, handle, value)
+                      }}
+                      onVariable={(handle, name) => {
+                        void store.setInputVariable(selection.id, handle, name)
+                      }}
+                      renderSource={(handle) => (
+                        <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} handleName={handle} />
+                      )}
+                    />
+                  </details>
+                )}
+              </section>
             )
           })()}
         {selection?.kind === 'condition' && (
@@ -1323,6 +1340,7 @@ export function NodeInspector({
         )}
         {selection?.kind === 'value' && (
           <PortDefinitionEditor
+            layout="values"
             values={selection.node.values}
             disabled={disabled}
             onChange={(values) => {
@@ -1330,11 +1348,22 @@ export function NodeInspector({
             }}
           />
         )}
-        {selection != null && selection.kind != 'trigger' && !isAgent && (
-          <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} />
+        {selection?.kind === 'task' && selection.definition != null && (
+          <details className="inspector-disclosure inspector-port-section" open>
+            <summary>{t('inspector.task.outputPorts')}</summary>
+            <PortDefinitionEditor
+              groups
+              output
+              values={selection.definition.outputs}
+              disabled={disabled || !(selection.node.task != null || isAgent)}
+              onChange={(outputs) => {
+                void store.saveTaskPorts(selection.id, { inputs: selection.definition!.inputs, outputs })
+              }}
+            />
+          </details>
         )}
         {(selection?.kind === 'subflow' || selection?.kind === 'wait') && (
-          <details className="inspector-disclosure">
+          <details className="inspector-disclosure inspector-port-section">
             <summary>{t('inspector.task.outputPorts')}</summary>
             <PortDefinitionEditor
               groups

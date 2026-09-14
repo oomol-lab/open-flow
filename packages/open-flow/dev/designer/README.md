@@ -10,7 +10,7 @@ The default **Cards · Content & records** gallery uses the production card, exe
 
 **Workflow components** shows the single execution canvas with a bottom command dock. It does not add an inspector or reserve a sidebar column. It includes Task, Trigger, Condition, Value, Subflow and Comment nodes, grouped inputs and connected ports. **Reset samples** restores the sample layout and selection.
 
-**Comment / Properties** (`?story=comment-properties`) displays the production `CommentInspector` directly, with editable, empty-content and read-only samples side by side. Each editable sample keeps its saved title and Markdown in local state. Trigger-specific property panels remain in their existing Sidebar galleries.
+**Comment / Properties** (`?story=comment-properties`) displays the production `CommentInspector` directly, with editable, empty-content and read-only samples side by side. Each editable sample keeps its saved title and Markdown in local state. Trigger-specific property panels live under Triggers / [type] / Properties.
 
 The **Nodes** section collects production canvas nodes under boundary inputs. Its **Condition / Node States** story covers empty, single and multiple cases, plus long rule labels, long output labels and both sides overflowing together.
 
@@ -54,9 +54,9 @@ Add production node boundary cases to `nodeStories.tsx`, layered card examples t
 
 ## Trigger galleries
 
-Each `Trigger [name]` group contains **Node states**, **Run menu states**, and **Sidebar display & edit**. The four groups are Manual, Schedule, Webhook, and Provider. Provider opens representative Integration and Poll cases, including long enums, event arrays, nested payloads, missing configuration and account failures. Its selector exposes every registered provider without repeating their stories in the sidebar. Provider schemas and names come directly from the production registry; the Vite plugin sends only definition snapshots to the browser.
+Each `Trigger [name]` group contains **Node states**, **Run menu states**, and **Properties**. The four groups are Manual, Schedule, Webhook, and Provider. Provider opens representative Integration and Poll cases, including long enums, event arrays, nested payloads, missing configuration and account failures. Its selector exposes every registered provider without repeating their stories in the sidebar. Provider schemas and names come directly from the production registry; the Vite plugin sends only definition snapshots to the browser.
 
-Run panels are laid out open in the page, with empty, ready, invalid, starting and disabled cases. Manual and Schedule also show direct execution and downstream input requests. Sidebar cases use the full production `NodeInspector` with local transport responses and the production change reducer. Display, editing, missing configuration and account errors are separate visible samples; Webhook advanced settings start expanded. Node cases cover selection, diagnostics, execution states and long content. Select one node to view its exact sample configuration in the read-only production inspector beside the canvas; one sample is selected on entry.
+Run panels are laid out open in the page, with empty, ready, invalid, starting and disabled cases. Manual and Schedule also show direct execution and downstream input requests. Property cases use the production `EditorContextPanel` and `NodeInspector` with local transport responses and the production change reducer. Display, editing, missing configuration and account errors are separate visible samples; Webhook advanced settings start expanded. Node cases cover selection, diagnostics, execution states and long content. Select one node to view its exact sample configuration in the read-only production inspector beside the canvas; one sample is selected on entry.
 
 Examples: `?story=trigger-webhook-nodes`, `?story=trigger-webhook-run`, `?story=trigger-webhook-sidebar`, and `?story=trigger-provider-run`. The generic `run-control-states` story remains a control-layout study with placeholder input content; provider-specific visual acceptance belongs in the Provider gallery. A selected provider is shareable through `?story=trigger-provider-run&provider=github-on-repo-event`.
 
@@ -92,3 +92,17 @@ Drag the centered three-dot handle in the 8px gap to resize the sidebar. Focus t
 `?story=node-picker-preview` compares the open node catalog and the button dock popover. Built-in nodes use compact rows with tooltips; the Triggers tab lists real definitions by app, and the Nodes tab browses sample connector actions. Story actions expose loading, errors and disabled controls.
 
 `?story=inspector-panel` shows the production canvas and resizable node properties panel. Run results stay in the canvas card popover. The panel retains its close button.
+
+`?story=inspector-ports` 使用生产 NodeInspector、WorkspaceStore、Flow reducer 和画布展示节点属性。输入与输出支持拖动组内排序，也可聚焦手柄后按上下键；Reload saved data 验证排序持久化。字段保留名称、类型、值和操作列，功能块使用底色，编辑框使用浅色。连接来源在值栏直接选择，本地值旁的链接按钮打开来源选择；字段设置从菜单进入后在原字段下展开，JSON Schema 默认折叠。长文本和 JSON 在主行下展开，省去展开时的重复摘要。下方并排展示结构化 Payload、嵌套数组、只读接口及未设置、空数组、null、false，圆弧线标示嵌套关系。辅助按钮提供只读切换和重置。
+
+## Node and Trigger properties
+
+Nodes / Fixed Values, Task, Condition, Wait, Subflow, Agent, and LLM each have a **Properties** story (`?story=node-[type]-properties`, using `value` for Fixed Values). Comment retains its production CommentInspector story. Read-only and editable samples appear side by side. Workbench and these galleries share `EditorContextPanel`, including NodeHeading, NodeActions, and ContextPanel; sample transports use WorkspaceStore and the production Flow reducer. Close reopens through a sample button; Reset samples restores the fixture, and Reload saved data verifies persisted edits within the session.
+
+Triggers / Manual, Schedule, Webhook, and Provider use the same production panel in **Properties**. Existing `trigger-[type]-sidebar` URLs are retained (`cron` for Schedule). Gallery widths and the read-only-first order are preserved. Trigger Node states also reuse this panel for the selected sample.
+
+Fixed Values now lives under Nodes, including Node States and Fixed Values Editor. Type-specific editors formerly under Workbench now live with their node or trigger: schedule, provider configuration, webhook, condition, Agent tools, LLM inputs, task metadata, input/group/output ports, and code. **Ports & sources** (`?story=inspector-ports`) remains the Task integration story for canvas selection, mappings and persistence. Workbench retains cross-node tools and panel-shell studies.
+
+字段的附加设置与输入来源使用同一个带标题和关闭按钮的浮动面板，锚定字段左侧，按视口避让；在 Ports & sources 中检查打开、关闭、Escape 和主题继承。
+
+Fixed Values 的 Properties 样板使用名称／值布局，名称可原位编辑；多选、颜色和日期通过紧凑入口打开编辑弹层。并排只读样板用于检查禁用状态，Reload saved data 检查改名与值保存。

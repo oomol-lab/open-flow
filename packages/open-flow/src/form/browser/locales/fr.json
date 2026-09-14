@@ -35,6 +35,10 @@
     "nullable": "Autoriser null",
     "group": "Groupe",
     "addGroup": "Ajouter un groupe",
-    "collapsed": "Replié"
+    "collapsed": "Replié",
+    "options": "Options de valeur pour {{name}}",
+    "hours": "Heures",
+    "minutes": "Minutes",
+    "seconds": "Secondes"
   }
 }

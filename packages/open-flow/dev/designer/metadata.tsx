@@ -48,7 +48,7 @@ function MetadataStory({ dark, language, log }: { dark: boolean; language: UiLan
 }
 
 export const metadataStory: FrontendStory = {
-  group: 'Workbench',
+  group: 'Node Task',
   id: 'node-metadata',
   title: 'Node Metadata',
   standalone: true,

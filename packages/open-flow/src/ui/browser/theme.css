@@ -8,6 +8,8 @@
   --open-flow-background: #fafafa;
   --open-flow-foreground: #242424;
   --open-flow-card: #ffffff;
+  --open-flow-node-surface: #f6f6f6;
+  --open-flow-node-content: #ffffff;
   --open-flow-card-foreground: #242424;
   --open-flow-popover: #ffffff;
   --open-flow-popover-foreground: #242424;
@@ -50,6 +52,8 @@
   --open-flow-background: #1c1c1c;
   --open-flow-foreground: #eeeeee;
   --open-flow-card: #242424;
+  --open-flow-node-surface: #2b2b2b;
+  --open-flow-node-content: #242424;
   --open-flow-card-foreground: #eeeeee;
   --open-flow-popover: #2b2b2b;
   --open-flow-popover-foreground: #eeeeee;
@@ -208,7 +212,7 @@
   --brand-highlight-color: #505050;
   --brand-hover-color: color-mix(in srgb, var(--brand-highlight-color) 20%, transparent);
 
-  --node-background-color: var(--fill-1);
+  --node-background-color: var(--open-flow-node-content);
   --node-border-color: var(--border-1);
   --node-selected-border-color: var(--brand-highlight-color);
   --node-head-background-color: var(--fill-3);
@@ -380,7 +384,7 @@
   --ui-ring: var(--open-flow-ring);
   --ui-radius: 6px;
 
-  --node-background-color: var(--fill-1);
+  --node-background-color: var(--open-flow-node-content);
   --node-border-color: var(--border-1);
   --node-selected-border-color: var(--brand-highlight-color);
   --node-head-background-color: var(--fill-3);

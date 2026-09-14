@@ -600,7 +600,7 @@ export const nodeStories: readonly FrontendStory[] = [
     render: (log, dark, language) => <NodeContentStory dark={dark} language={language} log={log} initialModel={contentModel} initialSelection="schedule" />,
   },
   {
-    group: 'Fixed Values',
+    group: 'Node Fixed Values',
     id: 'node-value',
     description: 'Fixed value cards · Collapsed, empty, structured and invalid states, with a Task reference for comparing density and elevation.',
     title: 'Node States',

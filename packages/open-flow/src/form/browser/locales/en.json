@@ -35,6 +35,10 @@
     "nullable": "Allow null",
     "group": "Group",
     "addGroup": "Add group",
-    "collapsed": "Collapsed"
+    "collapsed": "Collapsed",
+    "options": "Value options for {{name}}",
+    "hours": "Hours",
+    "minutes": "Minutes",
+    "seconds": "Seconds"
   }
 }

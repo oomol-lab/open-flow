@@ -46,7 +46,7 @@ function ConfigStory({ dark, language, log }: { dark: boolean; language: UiLangu
   )
 }
 export const triggerConfigStory: FrontendStory = {
-  group: 'Workbench',
+  group: 'Trigger Provider',
   id: 'trigger-config',
   title: 'Trigger Configuration',
   standalone: true,

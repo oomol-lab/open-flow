@@ -170,7 +170,7 @@ function AgentSession({ session, dark }: { session: ReturnType<typeof createSess
 }
 
 export const agentStory: FrontendStory = {
-  group: 'Workbench',
+  group: 'Node Agent',
   id: 'agent-tools',
   title: 'Agent Tools',
   standalone: true,

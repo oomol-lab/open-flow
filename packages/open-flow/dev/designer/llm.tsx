@@ -58,7 +58,7 @@ function LlmStory({ dark, language, log }: { dark: boolean; language: UiLanguage
   )
 }
 export const llmStory: FrontendStory = {
-  group: 'Workbench',
+  group: 'Node LLM',
   id: 'llm-inputs',
   title: 'LLM Inputs',
   standalone: true,

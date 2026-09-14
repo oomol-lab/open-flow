@@ -5,7 +5,7 @@ import { createI18n } from '../i18n.ts'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 
 describe('Output definitions', () => {
-  it('renders schema and groups without offering input value controls or writing on mount', () => {
+  it('renders output summaries with a single options entry and no input value controls', () => {
     const onChange = vi.fn()
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
@@ -21,7 +21,9 @@ describe('Output definitions', () => {
         />
       </I18nProvider>,
     )
-    expect(markup).toContain('JSON Schema')
+    expect(markup).toContain('Value options for answer')
+    expect(markup).toContain('number')
+    expect(markup).not.toContain('JSON Schema')
     expect(markup).toContain('value="Result"')
     expect(markup).not.toContain('Set value')
     expect(markup).not.toContain('Set empty string')

@@ -284,6 +284,16 @@
       "preview": "預覽",
       "duplicate": "建立副本",
       "delete": "刪除"
+    },
+    "ports": {
+      "reorder": "調整 {{name}} 的順序",
+      "reorderHint": "拖動調整組內順序，或聚焦後使用上、下方向鍵。",
+      "moved": "{{name}} 已移至第 {{position}} 位。",
+      "groupSettings": "群組設定",
+      "connected": "已連接",
+      "columnName": "名稱",
+      "columnType": "類型",
+      "columnValue": "值"
     }
   },
   "language": {

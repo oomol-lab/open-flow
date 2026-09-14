@@ -10,12 +10,14 @@ import { connectionPathsStory } from './connectionPaths.tsx'
 import { formStory } from './form.tsx'
 import { historyStory, historyControlsStory, historyKeyboardStory } from './history.tsx'
 import { inspectorPanelStory } from './inspectorPanel.tsx'
+import { inspectorPortsStory } from './inspectorPorts.tsx'
 import { libraryStory } from './library.tsx'
 import { llmStory } from './llm.tsx'
 import { markdownStory } from './markdown.tsx'
 import { metadataStory } from './metadata.tsx'
 import { nodeInputStory } from './nodeInput.tsx'
 import { nodePickerPreviewStory } from './nodePickerPreview.tsx'
+import { nodePropertiesStories } from './nodeProperties.tsx'
 import { nodeStories } from './nodeStories.tsx'
 import { notificationsStory } from './notifications.tsx'
 import { overviewStories } from './overview.tsx'
@@ -47,7 +49,7 @@ const codeEditorSource = `export default async function (inputs, context) {
 `
 
 const codeEditorStory: FrontendStory = {
-  group: 'Workbench',
+  group: 'Node Task',
   id: 'code-editor',
   render: (log, dark) => <CodeEditorStory dark={dark} log={log} />,
   standalone: true,
@@ -60,6 +62,7 @@ export const labStories: readonly FrontendStory[] = [
   historyControlsStory,
   historyKeyboardStory,
   ...nodeStories,
+  ...nodePropertiesStories,
   commentPropertiesStory,
   ...triggerStories,
   ...cardStories,
@@ -73,6 +76,7 @@ export const labStories: readonly FrontendStory[] = [
   llmStory,
   metadataStory,
   inspectorPanelStory,
+  inspectorPortsStory,
   markdownStory,
   scheduleStory,
   triggerConfigStory,

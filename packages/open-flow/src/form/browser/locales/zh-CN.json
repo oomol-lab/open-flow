@@ -35,6 +35,10 @@
     "nullable": "允许空值",
     "group": "分组",
     "addGroup": "添加分组",
-    "collapsed": "默认折叠"
+    "collapsed": "默认折叠",
+    "options": "{{name}} 的值选项",
+    "hours": "时",
+    "minutes": "分",
+    "seconds": "秒"
   }
 }

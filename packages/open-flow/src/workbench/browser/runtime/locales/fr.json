@@ -284,6 +284,16 @@
       "preview": "Aperçu",
       "duplicate": "Dupliquer",
       "delete": "Supprimer"
+    },
+    "ports": {
+      "reorder": "Réordonner {{name}}",
+      "reorderHint": "Glissez dans le groupe ou utilisez les flèches haut / bas au clavier.",
+      "moved": "{{name}} déplacé en position {{position}}.",
+      "groupSettings": "Paramètres du groupe",
+      "connected": "Connecté",
+      "columnName": "Nom",
+      "columnType": "Type",
+      "columnValue": "Valeur"
     }
   },
   "language": {
