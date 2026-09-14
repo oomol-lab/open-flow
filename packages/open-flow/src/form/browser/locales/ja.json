@@ -68,6 +68,8 @@
       "other": "その他"
     },
     "choiceOptions": "選択肢",
+    "editOptions": "選択肢を編集…",
+    "backToChoices": "選択に戻る",
     "addOption": "選択肢を追加",
     "component": "コンポーネント"
   }

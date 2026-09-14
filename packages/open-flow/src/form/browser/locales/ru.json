@@ -68,6 +68,8 @@
       "other": "Другое"
     },
     "choiceOptions": "Варианты",
+    "editOptions": "Изменить варианты…",
+    "backToChoices": "Назад к выбору",
     "addOption": "Добавить вариант",
     "component": "Компонент"
   }

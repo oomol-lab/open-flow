@@ -14,9 +14,9 @@ import { editorComponent, valueForEditor } from '../common/editorComponent.ts'
 import { compile } from '../common/validation/validator.ts'
 import { initialValue, objectValue, renameObjectField, setObjectField, valueType } from '../common/value.ts'
 import { ChoiceEditor, EnumChoices } from './choiceEditor.tsx'
-import { ChoiceOptions } from './choiceOptions.tsx'
 import { ColorEditor } from './colorEditor.tsx'
 import { DateEditor } from './dateEditor.tsx'
+import { EditableChoices } from './editableChoices.tsx'
 import { EditorComponentSelect } from './editorComponentSelect.tsx'
 import { FieldSelect } from './fieldSelect.tsx'
 import { FieldSorting } from './fieldSorting.ts'
@@ -106,7 +106,14 @@ export function ValueEditor(props: ValueEditorProps) {
     source.$ref != null ||
     source.allOf != null ||
     depth > 12
-  const showUnset = !complex && value === undefined && !editingUnset && props.editor === undefined && props.valueEditable !== false
+  const editableOptions =
+    props.onDefinitionChange &&
+    (Array.isArray(source.enum)
+      ? source.enum
+      : source.uniqueItems === true && Array.isArray(objectValue(source.items)?.enum)
+        ? (objectValue(source.items)!.enum as unknown[])
+        : undefined)
+  const showUnset = !editableOptions && !complex && value === undefined && !editingUnset && props.editor === undefined && props.valueEditable !== false
   useEffect(() => {
     setEditingUnset(false)
   }, [value, path, schema])
@@ -353,6 +360,23 @@ export function ValueEditor(props: ValueEditorProps) {
           <JsonEditor {...props} invalid={invalid} />
         ) : props.editor !== undefined ? (
           props.editor
+        ) : editableOptions ? (
+          <EditableChoices
+            options={editableOptions}
+            labels={optionLabels}
+            value={value}
+            label={label}
+            disabled={disabled}
+            invalid={invalid}
+            multiple={!Array.isArray(source.enum)}
+            onChange={onChange}
+            onOptionsChange={(options) => {
+              const nextSchema = Array.isArray(source.enum)
+                ? { ...source, enum: options }
+                : { ...source, items: { ...objectValue(source.items), enum: options } }
+              props.onDefinitionChange!(nextSchema, valueForEditor(nextSchema, value))
+            }}
+          />
         ) : variants ? (
           <ChoiceEditor
             {...props}
@@ -677,18 +701,6 @@ export function ValueEditor(props: ValueEditorProps) {
               </Button>
             )}
           </>
-        )}
-        {props.onDefinitionChange && (Array.isArray(source.enum) || Array.isArray(itemEnumeration)) && (
-          <ChoiceOptions
-            options={Array.isArray(source.enum) ? source.enum : (itemEnumeration as unknown[])}
-            disabled={disabled}
-            onChange={(options) => {
-              const nextSchema = Array.isArray(source.enum)
-                ? { ...source, enum: options }
-                : { ...source, items: { ...objectValue(source.items), enum: options } }
-              props.onDefinitionChange!(nextSchema, valueForEditor(nextSchema, value))
-            }}
-          />
         )}
       </div>
     </div>

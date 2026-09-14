@@ -35,6 +35,8 @@ const values: readonly InputPort[] = [
   { ...field('unsetNullable'), nullable: true },
   field('unsetBoolean', 'boolean'),
   { ...field('unsetSelect'), jsonSchema: { enum: ['first', 'second'] } },
+  { ...field('emptySelect'), jsonSchema: { enum: [] } },
+  { ...field('emptyMultiSelect', 'array'), jsonSchema: { type: 'array', uniqueItems: true, items: { enum: [] } }, value: [] },
   field('unset'),
 ]
 
