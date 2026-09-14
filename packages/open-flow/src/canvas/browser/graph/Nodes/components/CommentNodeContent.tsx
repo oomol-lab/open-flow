@@ -29,6 +29,7 @@ export function CommentNodeContent({ store }: { store: CommentNodeStore }): JSX.
   const restorePreview = useRef(false)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const [composing, setComposing] = useState(false)
+  const [focused, setFocused] = useState(false)
 
   useEffect(() => {
     if (previousSelected.current && !selected) restorePreview.current = true
@@ -51,9 +52,15 @@ export function CommentNodeContent({ store }: { store: CommentNodeStore }): JSX.
             ref={textarea}
             aria-label={t('comment.source')}
             autoFocus={sourceCode || (empty && !!selected)}
-            onFocus={() => store.$$.sourceCode.set(true)}
+            onFocus={() => {
+              setFocused(true)
+              store.$$.sourceCode.set(true)
+            }}
             disabled={!editable}
-            className="min-h-30 resize-y rounded-none border-0 bg-transparent p-0 text-inherit shadow-none focus-visible:outline-none"
+            className={clsx(
+              'min-h-30 resize-y rounded-none border-0 bg-transparent p-0 text-inherit shadow-none focus-visible:outline-none',
+              focused && 'nowheel nodrag',
+            )}
             value={content ?? ''}
             onCompositionStart={() => setComposing(true)}
             onCompositionEnd={(event) => {
@@ -62,6 +69,7 @@ export function CommentNodeContent({ store }: { store: CommentNodeStore }): JSX.
             }}
             onChange={(event) => store.$$.content.set(event.target.value)}
             onBlur={(event) => {
+              setFocused(false)
               if (editable && !composing) store.saveContent(event.target.value)
             }}
           />

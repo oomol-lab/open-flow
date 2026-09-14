@@ -255,10 +255,10 @@
 .root[data-header][data-expanded]:not([data-structured]) > .body {
   grid-column: 2 / -2;
 }
-.root[data-header][data-expanded]:not([data-structured]) .header [data-field-name] {
+.root[data-header][data-expanded]:not([data-structured]):not([data-layout='values']) .header [data-field-name] {
   grid-column: 2 / 4;
 }
-.root[data-header][data-expanded]:not([data-structured]) .header [data-field-type] {
+.root[data-header][data-expanded]:not([data-structured]):not([data-layout='values']) .header [data-field-type] {
   grid-column: 4;
   text-align: right;
 }
@@ -294,8 +294,8 @@
 }
 
 @container value-fields (max-width: 340px) {
-  .root[data-header]:not([data-output]),
-  .root[data-header][data-expanded]:not([data-structured]) {
+  .root[data-header]:not([data-output]):not([data-layout='values']),
+  .root[data-header][data-expanded]:not([data-structured]):not([data-layout='values']) {
     grid-template-columns: 24px minmax(0, 1fr) 64px var(--field-actions-width, 28px);
     > .header [data-field-name],
     > .header > .fieldName {
@@ -321,36 +321,37 @@
   }
 }
 
-/* Value forms prioritize the editable value; schema controls live in field settings. */
+/* Editable schema types remain visible alongside field names. */
 .root[data-header][data-layout='values'] {
-  grid-template-columns: 24px minmax(90px, 0.85fr) minmax(0, 1.5fr) var(--field-actions-width, 28px);
-  > .header [data-field-type],
-  > .header > .fieldType {
-    display: none;
-  }
+  --field-type-width: 84px;
+  grid-template-columns: 24px minmax(90px, 1fr) var(--field-type-width) minmax(0, 1.5fr) var(--field-actions-width, 28px);
   > .header [data-field-name],
   > .header > .fieldName {
     grid-column: 2;
     padding: 0;
     overflow: visible;
   }
+  > .header [data-field-type],
+  > .header > .fieldType {
+    grid-column: 3;
+    padding: 0;
+    font: inherit;
+  }
   > .options {
-    grid-column: 4;
+    grid-column: 5;
   }
   > .body,
   > .summary {
-    grid-column: 3;
+    grid-column: 4;
     grid-row: 1;
   }
   &[data-collection] > .body {
-    grid-column: 2 / -1;
+    grid-column: 2 / -2;
     grid-row: 2;
   }
-  &[data-expanded]:not([data-structured]) {
-    > .header [data-field-name],
-    > .body {
-      grid-column: 2 / -2;
-    }
+  &[data-expanded]:not([data-structured]) > .body {
+    grid-column: 2 / -2;
+    grid-row: 2;
   }
   > .header [data-field-name] input {
     width: 100%;
@@ -373,5 +374,22 @@
     border-radius: var(--ui-control-radius, var(--ui-radius));
     padding: 5px 7px;
     font-size: 12px;
+  }
+}
+
+@container value-fields (max-width: 340px) {
+  .root[data-header][data-layout='values'] {
+    grid-template-columns: 24px minmax(0, 1fr) var(--field-type-width) var(--field-actions-width, 28px);
+    > .options {
+      grid-column: 4;
+    }
+    > .body,
+    > .summary {
+      grid-column: 2 / -2;
+      grid-row: 2;
+    }
+    &[data-structured] > .body {
+      grid-row: 3;
+    }
   }
 }

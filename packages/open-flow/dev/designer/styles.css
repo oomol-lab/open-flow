@@ -434,7 +434,7 @@
 
 .node-properties-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 400px));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   gap: 24px;
   padding: 24px;
