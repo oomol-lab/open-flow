@@ -335,7 +335,7 @@ type PortEditorProps = {
   output?: boolean
   renderValue?: (
     port: InputPort,
-    presentation: Pick<ValueEditorProps, 'layout' | 'header' | 'leadingControl' | 'trailingControl' | 'description' | 'options'>,
+    presentation: Pick<ValueEditorProps, 'layout' | 'header' | 'leadingControl' | 'trailingControl' | 'description' | 'options' | 'onDefinitionChange'>,
   ) => ReactNode
 } & (
   | {
@@ -606,6 +606,16 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           />
         </Popover>
       ) : null
+    const onDefinitionChange = tableLayout
+      ? (jsonSchema: unknown, value: unknown) => {
+          const { value: _value, ...rest } = port
+          update(index, {
+            ...rest,
+            jsonSchema: jsonSchema as InputPort['jsonSchema'],
+            ...(value === undefined ? {} : { value: value as InputPort['value'] }),
+          })
+        }
+      : undefined
     return (
       <div
         key={port.handle}
@@ -624,6 +634,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             trailingControl,
             options,
             description: port.description,
+            onDefinitionChange,
           })
         ) : (
           <ValueEditor
@@ -642,18 +653,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             editor={props.output ? null : undefined}
             path={`/${index}`}
             onDraftIssue={onDraftIssue}
-            onDefinitionChange={
-              tableLayout
-                ? (jsonSchema, value) => {
-                    const { value: _value, ...rest } = port
-                    update(index, {
-                      ...rest,
-                      jsonSchema: jsonSchema as InputPort['jsonSchema'],
-                      ...(value === undefined ? {} : { value: value as InputPort['value'] }),
-                    })
-                  }
-                : undefined
-            }
+            onDefinitionChange={onDefinitionChange}
             onChange={(value) => {
               const { value: _value, ...rest } = port
               update(index, {

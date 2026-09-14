@@ -64,6 +64,30 @@ describe('Property panel port layout', () => {
     expect(markup).toContain('aria-label="message type"')
     expect(markup).not.toContain('message Allow null')
   })
+
+  it('passes definition editing through custom input value renderers', () => {
+    const onChange = vi.fn()
+    let changeDefinition: ((schema: unknown, value: unknown) => void) | undefined
+    renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <PortDefinitionEditor
+          groups
+          layout="ports"
+          disabled={false}
+          values={[{ handle: 'priority', jsonSchema: { type: 'string', enum: ['low', 'normal'] }, nullable: false, value: 'normal' }]}
+          onChange={onChange}
+          renderValue={(_port, presentation) => {
+            changeDefinition = presentation.onDefinitionChange
+            return null
+          }}
+        />
+      </I18nProvider>,
+    )
+
+    expect(changeDefinition).toBeTypeOf('function')
+    changeDefinition?.({ type: 'string', enum: ['high'] }, 'high')
+    expect(onChange).toHaveBeenCalledWith([{ handle: 'priority', jsonSchema: { type: 'string', enum: ['high'] }, nullable: false, value: 'high' }])
+  })
 })
 
 describe('Nested field definition editing', () => {
