@@ -165,26 +165,56 @@
   gap: 4px;
 }
 .summary {
+  --preview-background: var(--ui-control-background, var(--ui-muted));
+  --preview-hover-background: var(--ui-control-hover-background, var(--ui-accent));
+  --preview-border: var(--ui-input);
   min-width: 0;
-  height: 30px;
-  padding: 5px 7px;
-  border: 1px solid var(--ui-input);
+  height: var(--field-control-height);
+  display: block;
   text-align: left;
   color: var(--ui-foreground);
-  background: var(--ui-control-background, var(--ui-muted));
-  border-radius: var(--ui-control-radius, var(--ui-radius));
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 400;
-  cursor: pointer;
+  border-color: var(--preview-border);
+  background: var(--preview-background);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  &:hover {
-    background: var(--ui-accent);
+  &[aria-expanded='true'] {
+    --preview-background: color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-background));
+    --preview-hover-background: color-mix(in srgb, var(--ui-foreground) 6%, var(--ui-background));
+    --preview-border: transparent;
   }
-  &:focus-visible {
-    outline: 2px solid var(--ui-ring);
+  &:hover {
+    background: var(--preview-hover-background);
+  }
+}
+.arrayItemType {
+  grid-column: var(--field-value-column);
+  grid-row: 1;
+  min-width: 0;
+}
+.arrayIndex {
+  position: absolute;
+  left: var(--field-indent);
+  top: 0;
+  height: var(--field-control-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--field-toggle-width, 24px);
+  z-index: 1;
+  pointer-events: none;
+  color: var(--ui-muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.root[data-header][data-array-child] {
+  > .summary,
+  > .arrayItemType,
+  &:not([data-collection]) > .body {
+    grid-column: handle / content-end;
+    grid-row: 1;
+    margin-left: var(--field-indent);
+  }
+  > .header > .toggleControl i {
+    visibility: hidden;
   }
 }
 .root[data-header][data-collection] > .body {
@@ -250,12 +280,9 @@
   margin: 0;
 }
 
-/* Expanded editors occupy the second row; JSON keeps its preview control. */
+/* Expanded editors occupy the second row and retain their preview control. */
 .root[data-header][data-expanded]:not([data-structured]) {
   --field-branch-row: 2;
-  &:not([data-json]) > .summary {
-    display: none;
-  }
 }
 .root[data-header] > .body [data-slot='native-select-wrapper'] {
   min-width: 0;
@@ -402,7 +429,7 @@
     width: 16px;
   }
   &:has(> .collection > [data-object-fields] > [data-object-field]:first-child > [data-object-field-content] > .root > .header > .toggleControl)::before,
-  &:has(> .collection > [data-array-field]:first-child > .root > .header > .toggleControl)::before {
+  &:has(> .collection > [data-array-field]:first-child > .root > .header > :is(.toggleControl, .arrayIndex))::before {
     width: 6px;
   }
   > .collection {

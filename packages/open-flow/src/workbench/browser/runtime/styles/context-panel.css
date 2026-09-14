@@ -1,7 +1,7 @@
 .open-flow-workbench {
   .editor-context-panel {
     --ui-control-radius: 6px;
-    --ui-input: var(--ui-border);
+    --ui-input: color-mix(in srgb, var(--ui-border) 70%, var(--open-flow-node-content));
     --ui-card: var(--open-flow-node-surface);
     --ui-background: var(--open-flow-node-surface);
     --ui-control-background: var(--open-flow-node-content);

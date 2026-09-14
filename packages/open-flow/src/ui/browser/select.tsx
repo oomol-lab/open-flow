@@ -5,6 +5,13 @@ import { cn } from './utils.ts'
 
 const Select = SelectPrimitive.Root
 
+export const SelectChevron = React.forwardRef<SVGSVGElement, React.ComponentProps<typeof ChevronDownIcon>>(function SelectChevron(
+  { className, ...props },
+  ref,
+) {
+  return <ChevronDownIcon {...props} ref={ref} aria-hidden="true" strokeWidth={1.5} className={cn('size-4 shrink-0 text-muted-foreground', className)} />
+})
+
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return <SelectPrimitive.Group data-slot="select-group" className={cn('scroll-my-1 p-1', className)} {...props} />
 }
@@ -37,7 +44,7 @@ function SelectTrigger({
       {...props}
     >
       {children}
-      <SelectPrimitive.Icon render={<ChevronDownIcon strokeWidth={1.5} className="text-muted-foreground" />} />
+      <SelectPrimitive.Icon render={<SelectChevron />} />
     </SelectPrimitive.Trigger>
   )
 }

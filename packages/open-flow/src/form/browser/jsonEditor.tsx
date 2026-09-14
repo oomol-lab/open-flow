@@ -7,7 +7,16 @@ import { createCodeEditor } from '../../ui/browser/code-editor.ts'
 import { Textarea } from '../../ui/browser/textarea.tsx'
 import { isJsonValue } from '../common/value.ts'
 
-export function JsonEditor({ value, onChange, label, disabled, path, onDraftIssue, invalid: schemaInvalid }: ValueEditorProps) {
+export function JsonEditor({
+  value,
+  onChange,
+  label,
+  disabled,
+  path,
+  onDraftIssue,
+  invalid: schemaInvalid,
+  focusRequest = 0,
+}: ValueEditorProps & { focusRequest?: number }) {
   const t = useTranslate()
   const lastValue = useRef(value)
   const [text, setText] = useState(() => (value === undefined ? '' : JSON.stringify(value, null, 2)))
@@ -23,6 +32,12 @@ export function JsonEditor({ value, onChange, label, disabled, path, onDraftIssu
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<Awaited<ReturnType<typeof createCodeEditor>>>()
   const [ready, setReady] = useState(false)
+  const fallback = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    if (!focusRequest || disabled) return
+    if (ready) editor.current?.focus()
+    else fallback.current?.focus()
+  }, [focusRequest, disabled, ready])
   const latest = useRef({ text, disabled, label, change: (_nextText: string) => {} })
   const change = (nextText: string) => {
     setText(nextText)
@@ -85,6 +100,7 @@ export function JsonEditor({ value, onChange, label, disabled, path, onDraftIssu
       <div ref={host} className={styles.jsonCode} hidden={!ready} />
       {!ready && (
         <Textarea
+          ref={fallback}
           aria-label={`${label} JSON`}
           aria-invalid={invalid || schemaInvalid}
           disabled={disabled}
