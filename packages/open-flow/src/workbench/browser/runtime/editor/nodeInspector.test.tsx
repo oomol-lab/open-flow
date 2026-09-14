@@ -138,7 +138,7 @@ describe('Wait Inspector', () => {
 describe('Node timeout settings', () => {
   it('saves timeout on blur, preserves the name, and rejects invalid values', () => {
     const saveNodeSettings = vi.fn()
-    const node = { inputs: {}, kind: 'value', name: 'Review', timeoutMs: 100, values: [] }
+    const node = { inputs: {}, kind: 'subflow', name: 'Review', subflowId: 'review', timeoutMs: 100 }
     const revision = {
       graph: () => ({ nodes: { current: node, other: { inputs: {}, kind: 'value', name: 'Review', values: [] } } }),
       inputSources: () => [],
@@ -153,7 +153,7 @@ describe('Node timeout settings', () => {
       disabled: false,
       onChooseWaitNotification: vi.fn(),
       revision: revision as never,
-      selection: { id: 'current', kind: 'value', node } as never,
+      selection: { id: 'current', kind: 'subflow', node, definition: { inputs: [], outputs: [] } } as never,
       store: { $: { flowId: { value: 'flow' } }, saveNodeSettings } as never,
       target: { kind: 'flow' },
       theme: 'light',

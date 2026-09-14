@@ -44,6 +44,7 @@ describe('Independent node inputs', () => {
       </I18nProvider>,
     )
     expect(markup).toContain('MISSING')
+    expect(markup).toContain('i-heroicons:variable-20-solid')
     expect(markup).toContain('role="alert"')
     expect(onValue).not.toHaveBeenCalled()
     expect(onVariable).not.toHaveBeenCalled()
@@ -90,6 +91,38 @@ describe('Independent node inputs', () => {
     expect(markup).not.toMatch(/<(?:textarea|select)\b/)
     expect(markup).toContain('aria-label="message Input sources"')
     expect(onValue).not.toHaveBeenCalled()
+  })
+
+  it('shows the selected upstream node icon with its value label', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <NodeInputValue
+          definition={{ handle: 'message', jsonSchema: { type: 'string' }, nullable: false }}
+          value={undefined}
+          connected
+          upstream={{
+            current: [
+              {
+                icon: 'data:application/vnd.open-flow.initials,GH',
+                nodeId: 'github',
+                nodeName: 'GitHub issue',
+                output: 'title',
+                valid: true,
+              },
+            ],
+            groups: [],
+            onChange: vi.fn(),
+          }}
+          variables={variables}
+          disabled={false}
+          onValue={vi.fn()}
+          onVariable={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    expect(markup).toContain('data-icon-kind="initials"')
+    expect(markup).toContain('GitHub issue · title')
   })
 })
 

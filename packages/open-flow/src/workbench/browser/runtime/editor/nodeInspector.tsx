@@ -109,11 +109,15 @@ function Diagnostics({ diagnostics }: { readonly diagnostics: readonly Diagnosti
 
 function inputUpstreamSources({
   revision,
+  sourceNodeIcons,
   target,
   selection,
   store,
   handleName,
-}: Pick<Props, 'revision' | 'target' | 'store'> & { readonly selection: ResolvedNode; readonly handleName: string }): NodeInputUpstreamSources | undefined {
+}: Pick<Props, 'revision' | 'sourceNodeIcons' | 'target' | 'store'> & {
+  readonly selection: ResolvedNode
+  readonly handleName: string
+}): NodeInputUpstreamSources | undefined {
   const graph = revision.graph(target)!
   const port = revision.inputSources(target, selection.id).find(({ handle }) => handle === handleName)
   if (port == null) return undefined
@@ -121,12 +125,14 @@ function inputUpstreamSources({
   const sources = mapping?.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node') : []
   return {
     current: sources.map((source) => ({
+      icon: sourceNodeIcons?.[source.nodeId],
       nodeId: source.nodeId,
       nodeName: graph.nodes[source.nodeId]?.name ?? source.nodeId,
       output: source.output,
       valid: port.outputs[source.nodeId]?.includes(source.output) === true,
     })),
     groups: Object.entries(port.outputs).map(([nodeId, outputs]) => ({
+      icon: sourceNodeIcons?.[nodeId],
       nodeId,
       nodeName: graph.nodes[nodeId]?.name ?? nodeId,
       outputs,
@@ -975,6 +981,7 @@ interface Props {
   readonly onChooseWaitNotification: (button: HTMLButtonElement) => void
   readonly revision: RevisionView
   readonly selection: ResolvedSelection | undefined
+  readonly sourceNodeIcons?: Readonly<Record<string, string | undefined>>
   readonly store: WorkspaceStore
   readonly theme: WorkbenchTheme
   readonly target: GraphTarget
@@ -1002,6 +1009,7 @@ export function NodeInspector({
   onChooseWaitNotification,
   revision,
   selection,
+  sourceNodeIcons,
   store,
   theme,
   target,
@@ -1183,7 +1191,7 @@ export function NodeInspector({
                       }
                     : undefined
                 }
-                renderSource={(handle) => inputUpstreamSources({ revision, target, selection, store, handleName: handle })}
+                renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle })}
                 variables={variables}
                 disabled={disabled}
                 onValue={(handle, value) => {
@@ -1229,7 +1237,7 @@ export function NodeInspector({
                       onVariable={(handle, name) => {
                         void store.setInputVariable(selection.id, handle, name)
                       }}
-                      renderSource={(handle) => inputUpstreamSources({ revision, target, selection, store, handleName: handle })}
+                      renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle })}
                     />
                   </section>
                 )}

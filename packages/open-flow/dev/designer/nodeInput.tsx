@@ -6,12 +6,33 @@ import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { NodeInputValue } from '../../src/workbench/browser/runtime/editor/nodeInputValue.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
+import { providerIcon } from '../../src/workbench/browser/runtime/providerIcon.ts'
 function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
   const [mapping, setMapping] = useState<InputMapping | undefined>({ kind: 'value', value: 'hello' })
   const [variableName, setVariableName] = useState<string>()
   const variables = { enabled: true, names: ['API_TOKEN', 'TEAM_NAME'], loaded: true, loading: false, onOpen: () => log('Refresh names') }
   const definition = { handle: 'value', jsonSchema: { type: 'string' }, nullable: true, value: 'default' }
+  const providerSource = {
+    current: [
+      {
+        icon: providerIcon({ icon: ':simple-icons:github:', serviceId: 'github', serviceName: 'GitHub' }, {}),
+        nodeId: 'github',
+        nodeName: 'GitHub issue',
+        output: 'title',
+        valid: true,
+      },
+    ],
+    groups: [
+      {
+        icon: providerIcon({ icon: ':simple-icons:github:', serviceId: 'github', serviceName: 'GitHub' }, {}),
+        nodeId: 'github',
+        nodeName: 'GitHub issue',
+        outputs: ['title'],
+      },
+    ],
+    onChange: () => log('Select upstream source'),
+  }
   return (
     <I18nProvider i18n={i18n}>
       <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ padding: 24, width: 460 }}>
@@ -35,7 +56,16 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
         />
         <output aria-label="Saved input">{JSON.stringify({ mapping, variableName })}</output>
         <h3>Connected source</h3>
-        <NodeInputValue definition={definition} value={undefined} connected variables={variables} disabled={false} onValue={() => {}} onVariable={() => {}} />
+        <NodeInputValue
+          definition={definition}
+          value={undefined}
+          connected
+          upstream={providerSource}
+          variables={variables}
+          disabled={false}
+          onValue={() => {}}
+          onVariable={() => {}}
+        />
         <h3>No available sources</h3>
         <NodeInputValue
           definition={definition}

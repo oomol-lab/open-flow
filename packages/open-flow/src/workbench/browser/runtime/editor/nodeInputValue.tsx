@@ -20,17 +20,20 @@ import {
   DropdownMenuTrigger,
 } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
+import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
 import { LlmInputEditor, supportsLlmInput } from './llmInputEditor.tsx'
 
 export type InputVariables = Pick<VariablePickerProps, 'enabled' | 'loaded' | 'loading' | 'names' | 'onOpen'>
 export interface NodeInputUpstreamSources {
   readonly current: readonly {
+    readonly icon?: string
     readonly nodeId: string
     readonly nodeName: string
     readonly output: string
     readonly valid: boolean
   }[]
   readonly groups: readonly {
+    readonly icon?: string
     readonly nodeId: string
     readonly nodeName: string
     readonly outputs: readonly string[]
@@ -104,6 +107,7 @@ export function NodeInputValue({
         : t('nodeInput.connected')
       : undefined
   const sourceKind = bound ? 'variable' : connected ? 'upstream' : 'literal'
+  const selectedUpstreamIcon = connected && upstream?.current.length === 1 ? upstream.current[0]?.icon : undefined
   const sourcePortal = sourceContainer?.closest<HTMLElement>('.editor-context-panel') ?? sourceContainer
   const sourceControl = (
     <div ref={setSourceContainer}>
@@ -152,7 +156,7 @@ export function NodeInputValue({
           {variableCompatible ? (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className={`${sourceSubTriggerClass} ${sourceKind === 'variable' ? 'bg-accent/60' : ''}`}>
-                <i aria-hidden="true" className="i-lucide-light:braces size-3.5 shrink-0 text-muted-foreground" />
+                <i aria-hidden="true" className="i-heroicons:variable-20-solid size-3.5 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate">{t('nodeInput.variable')}</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="w-48 min-w-48 rounded-[var(--ui-control-radius,var(--ui-radius))] p-1" container={sourcePortal}>
@@ -165,14 +169,14 @@ export function NodeInputValue({
                 >
                   {bound && !variables.names.includes(variableName) && (
                     <DropdownMenuRadioItem className={sourceItemClass} value={variableSource(variableName)} disabled>
-                      <i aria-hidden="true" className="i-lucide-light:braces size-3.5 shrink-0 text-muted-foreground" />
+                      <i aria-hidden="true" className="i-heroicons:variable-20-solid size-3.5 shrink-0 text-muted-foreground" />
                       <span className="min-w-0 flex-1 truncate font-mono">{variableName}</span>
                     </DropdownMenuRadioItem>
                   )}
                   {variables.enabled &&
                     variables.names.map((name) => (
                       <DropdownMenuRadioItem className={sourceItemClass} key={name} value={variableSource(name)} closeOnClick>
-                        <i aria-hidden="true" className="i-lucide-light:braces size-3.5 shrink-0 text-muted-foreground" />
+                        <i aria-hidden="true" className="i-heroicons:variable-20-solid size-3.5 shrink-0 text-muted-foreground" />
                         <span className="min-w-0 flex-1 truncate font-mono">{name}</span>
                       </DropdownMenuRadioItem>
                     ))}
@@ -196,7 +200,7 @@ export function NodeInputValue({
             </DropdownMenuSub>
           ) : (
             <DropdownMenuItem className={`${sourceItemClass} data-disabled:opacity-70 ${sourceKind === 'variable' ? 'bg-accent/60' : ''}`} disabled>
-              <i aria-hidden="true" className="i-lucide-light:braces size-3.5 shrink-0 text-muted-foreground" />
+              <i aria-hidden="true" className="i-heroicons:variable-20-solid size-3.5 shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1 truncate">{t('nodeInput.variable')}</span>
               <span className="ml-auto flex h-4 shrink-0 items-center justify-end text-right text-[10px] leading-4 text-muted-foreground">
                 {t('nodeInput.unsupported')}
@@ -215,7 +219,11 @@ export function NodeInputValue({
               <DropdownMenuSubTrigger
                 className={`${sourceSubTriggerClass} ${connected && upstream.current.some((source) => source.nodeId === group.nodeId) ? 'bg-accent/60' : ''}`}
               >
-                <i aria-hidden="true" className="i-lucide-light:workflow size-3.5 shrink-0 text-muted-foreground" />
+                <ContentIcon
+                  src={group.icon}
+                  className="size-3.5 shrink-0 data-[icon-kind=initials]:text-[16px]"
+                  fallback={<i aria-hidden="true" className="i-lucide-light:workflow size-3.5 shrink-0 text-muted-foreground" />}
+                />
                 <span className="min-w-0 flex-1 truncate">{group.nodeName}</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="w-48 min-w-48 rounded-[var(--ui-control-radius,var(--ui-radius))] p-1" container={sourcePortal}>
@@ -255,6 +263,18 @@ export function NodeInputValue({
           className="flex h-[30px] min-w-0 items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-[7px] text-xs aria-invalid:border-destructive"
           aria-invalid={sourceIssue != null}
         >
+          {bound ? (
+            <i aria-hidden="true" className="i-heroicons:variable-20-solid mr-2 size-3.5 shrink-0 text-muted-foreground" />
+          ) : (
+            connected &&
+            upstream?.current.length === 1 && (
+              <ContentIcon
+                src={selectedUpstreamIcon}
+                className="mr-2 size-3.5 shrink-0 data-[icon-kind=initials]:text-[16px]"
+                fallback={<i aria-hidden="true" className="i-lucide-light:workflow mr-2 size-3.5 shrink-0 text-muted-foreground" />}
+              />
+            )
+          )}
           <span className="truncate">{sourceLabel}</span>
         </div>
         {sourceIssue && (

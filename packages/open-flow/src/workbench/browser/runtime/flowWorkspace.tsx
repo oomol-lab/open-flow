@@ -441,6 +441,7 @@ function Editor({
                 onChooseWaitNotification={openNotification}
                 revision={revision}
                 selection={selection}
+                sourceNodeIcons={Object.fromEntries(designer.nodes.flatMap((node) => ('icon' in node ? [[node.id, node.icon] as const] : [])))}
                 store={store.workspace}
                 target={target}
                 theme={theme}
