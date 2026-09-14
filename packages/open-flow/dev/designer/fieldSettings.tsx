@@ -1,12 +1,12 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { InputPort } from '../../src/workbench/browser/runtime/api.ts'
+import type { Group, InputPort } from '../../src/workbench/browser/runtime/api.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { Popover, PopoverTrigger } from '../../src/ui/browser/popover.tsx'
-import { PortSettingsPanel } from '../../src/workbench/browser/runtime/editor/portDefinitionEditor.tsx'
+import { GroupSettingsPanel, PortSettingsPanel } from '../../src/workbench/browser/runtime/editor/portDefinitionEditor.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { useStoryActions } from './storyActions.tsx'
 
@@ -78,4 +78,48 @@ export const fieldSettingsStory: FrontendStory = {
     'Open production panels with editable and read-only fields. Toggle advanced settings to inspect stable positioning, nullability and Schema validation. Long Schema content scrolls with the panel; reserved is a duplicate field name.',
   standalone: true,
   render: (log, dark, language) => <FieldSettingsStory log={log} dark={dark} language={language} />,
+}
+
+function GroupSettingsStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
+  const i18n = useMemo(() => createI18n(language), [language])
+  const [container, setContainer] = useState<HTMLDivElement | null>(null)
+  const [open, setOpen] = useState(true)
+  const [group, setGroup] = useState<Group>({ group: 'Structured data' })
+  return (
+    <I18nProvider i18n={i18n}>
+      <div className="open-flow-workbench open-flow-theme p-6" data-theme={dark ? 'dark' : 'light'}>
+        <section className="editor-context-panel min-h-[360px] w-[344px] p-3">
+          <h3 className="mb-3 text-xs font-medium">Input / output group</h3>
+          <div ref={setContainer} className="relative">
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger render={<Button variant="outline" size="field" className="w-full" />}>{group.group}</PopoverTrigger>
+              <GroupSettingsPanel
+                container={container}
+                side="bottom"
+                positionMethod="absolute"
+                group={group}
+                onChange={(next) => {
+                  setGroup(next)
+                  log('Save group', next)
+                }}
+                onRemove={() => {
+                  setOpen(false)
+                  log('Remove group', group.group)
+                }}
+              />
+            </Popover>
+          </div>
+        </section>
+      </div>
+    </I18nProvider>
+  )
+}
+
+export const groupSettingsStory: FrontendStory = {
+  id: 'group-settings',
+  title: 'Group Settings',
+  group: 'Node Task',
+  description: 'Edit an input/output group in the production secondary panel and inspect the two-step removal confirmation.',
+  standalone: true,
+  render: (log, dark, language) => <GroupSettingsStory log={log} dark={dark} language={language} />,
 }

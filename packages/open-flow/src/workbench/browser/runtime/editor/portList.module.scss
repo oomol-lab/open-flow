@@ -88,28 +88,15 @@
   margin-top: 6px;
 }
 
-.branch {
-  display: flex;
-  min-width: 0;
-  width: auto;
-  max-width: 100%;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  margin: 8px 0 12px 20px;
-  border: 1px solid var(--ui-border);
-  border-radius: 7px;
-  background: var(--ui-background);
-}
 .group {
   margin-top: 8px;
   position: relative;
 }
 
-.group > summary {
+.group > details > summary {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--field-value-name-gap, 2px);
   min-height: 30px;
   cursor: pointer;
   font-size: 12px;
@@ -119,12 +106,23 @@
   &::-webkit-details-marker {
     display: none;
   }
-  > span:first-of-type {
+  > .groupName {
     flex: 1;
     overflow-wrap: anywhere;
   }
-  > i {
-    transform: rotate(-90deg);
+  > .groupToggle {
+    display: grid;
+    flex: 0 0 var(--field-toggle-width, 24px);
+    height: 24px;
+    place-items: center;
+
+    > i {
+      grid-area: 1 / 1;
+    }
+
+    > [data-expanded] {
+      visibility: hidden;
+    }
   }
   &:focus-visible {
     outline: 2px solid var(--ui-ring);
@@ -133,41 +131,24 @@
   padding-right: 30px;
 }
 
-.group[open] > summary > i {
-  transform: none;
+.group > details[open] > summary > .groupToggle {
+  > [data-collapsed] {
+    visibility: hidden;
+  }
+
+  > [data-expanded] {
+    visibility: visible;
+  }
 }
 
-.group > .row {
+.group > details > .row {
   margin-left: 0;
 }
 
 .groupSettings {
-  font-size: 12px;
-  color: var(--ui-muted-foreground);
-  margin: 0;
-}
-
-.groupSettings > summary {
-  cursor: pointer;
   position: absolute;
   right: 0;
-  top: 3px;
-  display: grid;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  border-radius: 6px;
-  list-style: none;
-  &::-webkit-details-marker {
-    display: none;
-  }
-  &:hover {
-    background: var(--ui-muted);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--ui-ring);
-    outline-offset: 1px;
-  }
+  top: 0;
 }
 
 .actions {
@@ -178,7 +159,7 @@
   color: var(--ui-muted-foreground);
 }
 
-.groupSettings[open] > summary {
+.groupSettings[aria-expanded='true'] {
   background: var(--ui-muted);
 }
 
@@ -262,10 +243,6 @@
   padding-top: 6px;
   border-top: 1px solid color-mix(in srgb, var(--ui-border) 60%, transparent);
 }
-.group + .group > .groupSettings > summary {
-  top: 9px;
-}
-
 .list[data-layout='ports'] {
   padding-top: 2px;
 
@@ -277,21 +254,18 @@
     margin-top: 2px;
   }
 
-  .group > summary {
+  .group > details > summary {
     min-height: 26px;
   }
 
-  .groupSettings > summary {
-    top: 1px;
+  .groupSettings {
+    top: -2px;
   }
 
   .group + .group {
     margin-top: 4px;
     padding-top: 0;
     border-top: 0;
-  }
-  .group + .group > .groupSettings > summary {
-    top: 1px;
   }
 }
 
