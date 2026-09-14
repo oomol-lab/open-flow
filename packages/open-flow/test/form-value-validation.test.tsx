@@ -141,3 +141,27 @@ describe('Nullable field presentation', () => {
     }
   })
 })
+
+describe('Read-only value controls', () => {
+  it.each([
+    ['text', { type: 'string' }, 'Copy this text'],
+    ['multiline', { 'type': 'string', 'ui:widget': 'text' }, 'Copy\nthese lines'],
+    ['number', { type: 'number' }, 42],
+    ['date', { type: 'string', format: 'date' }, '2026-09-14'],
+  ])('keeps %s selectable while preventing edits', (_name, schema, value) => {
+    const i18n = createI18n('en')
+    try {
+      const markup = renderToStaticMarkup(
+        <I18nProvider i18n={i18n}>
+          <ValueEditor label="sample" schema={schema} value={value} disabled path="/sample" onChange={vi.fn()} onDraftIssue={vi.fn()} />
+        </I18nProvider>,
+      )
+      const input = markup.match(/<(?:input|textarea)\b[^>]*(?:aria-label="sample"|id="[^"]+")[^>]*>/)?.[0]
+      expect(input).toBeDefined()
+      expect(input).toContain('readonly=""')
+      expect(input).not.toContain('disabled=""')
+    } finally {
+      i18n.dispose()
+    }
+  })
+})
