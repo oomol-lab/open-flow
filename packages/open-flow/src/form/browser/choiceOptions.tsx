@@ -19,7 +19,7 @@ export function ChoiceOptions({ options, disabled, onChange }: { options: readon
     onChange([createOptionLabel([], 1)])
   }, [disabled, onChange, options.length, createOptionLabel, t])
   return (
-    <div className="flex flex-col gap-1 text-xs">
+    <div className="flex flex-col gap-2 text-xs">
       {options.map((option, index) => (
         <div className="flex items-center gap-1" key={index}>
           <Input
@@ -33,30 +33,33 @@ export function ChoiceOptions({ options, disabled, onChange }: { options: readon
               onChange(next)
             }}
           />
-          <Button
-            type="button"
-            size="icon-xs"
-            variant="ghost"
-            disabled={disabled}
-            aria-label={`${t('valueEditor.addOption')} ${t('valueEditor.option', { index: index + 1 })}`}
-            onClick={() => {
-              const next = [...options]
-              next.splice(index + 1, 0, createOptionLabel(next, index + 2))
-              onChange(next)
-            }}
-          >
-            <i aria-hidden="true" className="i-tabler-light:square-rounded-plus text-lg" />
-          </Button>
-          <Button
-            type="button"
-            size="icon-xs"
-            variant="ghost"
-            disabled={disabled}
-            aria-label={`${t('valueEditor.remove')} ${t('valueEditor.option', { index: index + 1 })}`}
-            onClick={() => onChange(options.toSpliced(index, 1))}
-          >
-            <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg" />
-          </Button>
+          <div className="flex items-center gap-0 -ml-px -mr-0.5">
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              disabled={disabled}
+              aria-label={`${t('valueEditor.addOption')} ${t('valueEditor.option', { index: index + 1 })}`}
+              onClick={() => {
+                const next = [...options]
+                next.splice(index + 1, 0, createOptionLabel(next, index + 2))
+                onChange(next)
+              }}
+            >
+              <i aria-hidden="true" className="i-tabler-light:square-rounded-plus text-lg text-muted-foreground" />
+            </Button>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              disabled={disabled}
+              className="-ml-px -mr-0.5"
+              aria-label={`${t('valueEditor.remove')} ${t('valueEditor.option', { index: index + 1 })}`}
+              onClick={() => onChange(options.toSpliced(index, 1))}
+            >
+              <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg text-muted-foreground" />
+            </Button>
+          </div>
         </div>
       ))}
     </div>
