@@ -39,6 +39,33 @@
     "options": "{{name}} の値オプション",
     "hours": "時",
     "minutes": "分",
-    "seconds": "秒"
+    "seconds": "秒",
+    "components": {
+      "string": "単一行",
+      "text": "複数行",
+      "number": "数値",
+      "integer": "整数",
+      "select": "単一選択",
+      "multiSelect": "複数選択",
+      "boolean": "真偽値",
+      "date": "日付",
+      "time": "時刻",
+      "dateTime": "日時",
+      "color": "色",
+      "object": "オブジェクト",
+      "array": "配列",
+      "json": "JSON",
+      "null": "Null"
+    },
+    "componentGroups": {
+      "strings": "文字列",
+      "numbers": "数値",
+      "choices": "選択",
+      "dates": "日時",
+      "other": "その他"
+    },
+    "choiceOptions": "選択肢",
+    "addOption": "選択肢を追加",
+    "component": "コンポーネント"
   }
 }

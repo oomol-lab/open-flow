@@ -91,3 +91,27 @@ describe('Independent node inputs', () => {
     expect(onValue).not.toHaveBeenCalled()
   })
 })
+
+describe('Unset input presentation', () => {
+  it.each([false, true])('shows nullable=%s without creating a value', (nullable) => {
+    const onValue = vi.fn()
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <NodeInputValue
+          definition={{ handle: 'missing', jsonSchema: { type: 'string' }, nullable }}
+          value={undefined}
+          connected={false}
+          variables={variables}
+          disabled={false}
+          onValue={onValue}
+          onVariable={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    const trigger = (markup.match(/<button\b[^>]*>/g) ?? []).find((tag) => tag.includes('aria-label="missing Set value"'))
+    expect(trigger).toBeDefined()
+    expect(trigger!.includes('data-danger')).toBe(!nullable)
+    expect(markup).toContain(nullable ? '>null</span>' : '>Set value</span>')
+    expect(onValue).not.toHaveBeenCalled()
+  })
+})

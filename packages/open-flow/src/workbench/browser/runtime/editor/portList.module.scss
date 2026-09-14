@@ -1,8 +1,11 @@
+@use '../../../../form/browser/fieldLayout.scss';
+
 .list {
   container: value-fields / inline-size;
   min-width: 0;
-  --field-toggle-width: 22px;
-  padding: 8px 12px 16px calc(var(--field-toggle-width) + 3px);
+  --field-toggle-width: 20px;
+  --field-grip-width: calc(var(--field-toggle-width) - 2px);
+  padding: 8px 12px 16px 3px;
   --field-actions-width: 28px;
   &[data-inputs] {
     --field-actions-width: 54px;
@@ -188,20 +191,25 @@
 }
 
 .columns {
-  display: grid;
-  grid-template-columns: var(--field-toggle-width, 24px) minmax(0, 1fr) minmax(64px, 0.48fr) minmax(0, 1.5fr) var(--field-actions-width, 28px);
-  gap: 4px;
+  @include fieldLayout.columns;
+  row-gap: 4px;
   color: var(--ui-muted-foreground);
   font-size: 12px;
   padding: 4px 0;
   > span {
     padding-left: 7px;
   }
-  > span:first-child {
-    grid-column: 2;
+  > span:nth-child(1) {
+    grid-column: handle;
+    grid-row: 1;
   }
-  &[data-output] {
-    grid-template-columns: var(--field-toggle-width, 24px) minmax(0, 1fr) minmax(0, 1fr) var(--field-actions-width, 28px);
+  > span:nth-child(2) {
+    grid-column: type;
+    grid-row: 1;
+  }
+  > span:nth-child(3) {
+    grid-column: var(--field-value-column);
+    grid-row: var(--field-value-row);
   }
 }
 
@@ -237,29 +245,23 @@
   top: 9px;
 }
 
-@container value-fields (max-width: 340px) {
-  .columns:not([data-output]) {
-    display: none;
-  }
-}
-
 .row[data-editing] [data-value-options] {
   background-color: var(--ui-control-hover-background, var(--ui-muted));
   color: var(--ui-foreground);
 }
 
 .list[data-layout='values'] {
-  --field-type-width: 84px;
-  > .columns {
-    grid-template-columns: var(--field-toggle-width, 24px) minmax(90px, 1fr) var(--field-type-width) minmax(0, 1.5fr) var(--field-actions-width, 28px);
-  }
+  padding-right: 2px;
 }
-@container value-fields (max-width: 340px) {
-  .list[data-layout='values'] > .columns {
-    grid-template-columns: var(--field-toggle-width, 24px) minmax(0, 1fr) var(--field-type-width) var(--field-actions-width, 28px);
-    > span:last-child {
-      grid-column: 2 / -2;
-      grid-row: 2;
-    }
-  }
+
+.valuesTitle {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 8px 12px;
+  background: var(--ui-background);
 }

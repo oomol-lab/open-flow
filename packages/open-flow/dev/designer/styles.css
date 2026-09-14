@@ -435,14 +435,17 @@
 .node-properties-gallery {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
+  grid-template-rows: minmax(0, 1fr);
   gap: 24px;
   padding: 24px;
   height: 100%;
   overflow: auto;
 }
 .node-properties-case {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 .node-properties-case > h3 {
   margin: 0 0 10px;
@@ -450,7 +453,8 @@
   font-weight: 600;
 }
 .node-properties-case > .context-panel {
-  height: 720px;
+  flex: 1;
+  min-height: 0;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
 }

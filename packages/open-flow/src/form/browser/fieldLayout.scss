@@ -1,0 +1,47 @@
+// Column geometry shared by field rows and their headings.
+@mixin columns($wrap-width: 340px) {
+  --field-name-track: minmax(0, 1fr);
+  --field-type-track: minmax(64px, 0.48fr);
+  --field-name-gap: 4px;
+  --field-actions-gap: 4px;
+  --field-value-column: value;
+  --field-value-row: 1;
+  --field-branch-row: 2;
+  display: grid;
+  column-gap: 0;
+  grid-template-columns:
+    [grip] var(--field-grip-width, 0px)
+    [toggle] var(--field-toggle-width, 24px) var(--field-name-gap)
+    [handle] var(--field-name-track) 4px
+    [type] var(--field-type-track) 4px
+    [value] minmax(0, 1.5fr) [content-end] var(--field-actions-gap)
+    [actions] var(--field-actions-width, 28px) [end];
+
+  &[data-layout='values'] {
+    --field-name-track: minmax(90px, 1fr);
+    --field-type-track: var(--field-type-width, 112px);
+    --field-name-gap: 2px;
+    --field-actions-gap: 2px;
+  }
+  &[data-output] {
+    grid-template-columns:
+      [grip] var(--field-grip-width, 0px)
+      [toggle] var(--field-toggle-width, 24px) var(--field-name-gap)
+      [handle] minmax(0, 1fr) 4px
+      [type] minmax(0, 1fr) [content-end] var(--field-actions-gap)
+      [actions] var(--field-actions-width, 28px) [end];
+  }
+  @container value-fields (max-width: $wrap-width) {
+    &:not([data-output]) {
+      --field-value-column: handle / content-end;
+      --field-value-row: 2;
+      --field-branch-row: 3;
+      grid-template-columns:
+        [grip] var(--field-grip-width, 0px)
+        [toggle] var(--field-toggle-width, 24px) var(--field-name-gap)
+        [handle] minmax(0, 1fr) 4px
+        [type] var(--field-type-track) [content-end] var(--field-actions-gap)
+        [actions] var(--field-actions-width, 28px) [end];
+    }
+  }
+}

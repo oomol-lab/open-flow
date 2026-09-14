@@ -13,7 +13,7 @@
     "unset": "未设置",
     "clear": "清除",
     "select": "选择值",
-    "setValue": "设置值",
+    "setValue": "点击设置",
     "remove": "移除",
     "createObject": "创建对象",
     "addField": "添加字段",
@@ -39,6 +39,33 @@
     "options": "{{name}} 的值选项",
     "hours": "时",
     "minutes": "分",
-    "seconds": "秒"
+    "seconds": "秒",
+    "components": {
+      "string": "单行文本",
+      "text": "多行文本",
+      "number": "数值",
+      "integer": "整数",
+      "select": "单选",
+      "multiSelect": "多选",
+      "boolean": "布尔值",
+      "date": "日期",
+      "time": "时间",
+      "dateTime": "日期时间",
+      "color": "颜色",
+      "object": "对象",
+      "array": "数组",
+      "json": "JSON",
+      "null": "空值"
+    },
+    "componentGroups": {
+      "strings": "字符串",
+      "numbers": "数字",
+      "choices": "选择",
+      "dates": "日期与时间",
+      "other": "其他"
+    },
+    "choiceOptions": "选项",
+    "addOption": "添加选项",
+    "component": "组件"
   }
 }

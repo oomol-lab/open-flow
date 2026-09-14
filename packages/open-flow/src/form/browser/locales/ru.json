@@ -39,6 +39,33 @@
     "options": "Параметры значения {{name}}",
     "hours": "Часы",
     "minutes": "Минуты",
-    "seconds": "Секунды"
+    "seconds": "Секунды",
+    "components": {
+      "string": "Одна строка",
+      "text": "Несколько строк",
+      "number": "Число",
+      "integer": "Целое число",
+      "select": "Один вариант",
+      "multiSelect": "Несколько вариантов",
+      "boolean": "Логический",
+      "date": "Дата",
+      "time": "Время",
+      "dateTime": "Дата и время",
+      "color": "Цвет",
+      "object": "Объект",
+      "array": "Массив",
+      "json": "JSON",
+      "null": "Null"
+    },
+    "componentGroups": {
+      "strings": "Строки",
+      "numbers": "Числа",
+      "choices": "Выбор",
+      "dates": "Дата и время",
+      "other": "Другое"
+    },
+    "choiceOptions": "Варианты",
+    "addOption": "Добавить вариант",
+    "component": "Компонент"
   }
 }

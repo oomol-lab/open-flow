@@ -39,6 +39,33 @@
     "options": "Options de valeur pour {{name}}",
     "hours": "Heures",
     "minutes": "Minutes",
-    "seconds": "Secondes"
+    "seconds": "Secondes",
+    "components": {
+      "string": "Une ligne",
+      "text": "Multiligne",
+      "number": "Nombre",
+      "integer": "Entier",
+      "select": "Choix unique",
+      "multiSelect": "Choix multiple",
+      "boolean": "Booléen",
+      "date": "Date",
+      "time": "Heure",
+      "dateTime": "Date et heure",
+      "color": "Couleur",
+      "object": "Objet",
+      "array": "Tableau",
+      "json": "JSON",
+      "null": "Null"
+    },
+    "componentGroups": {
+      "strings": "Texte",
+      "numbers": "Nombres",
+      "choices": "Choix",
+      "dates": "Date et heure",
+      "other": "Autres"
+    },
+    "choiceOptions": "Options",
+    "addOption": "Ajouter une option",
+    "component": "Composant"
   }
 }
