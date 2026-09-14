@@ -23,6 +23,7 @@ export function ChoiceEditor(props: ValueEditorProps & { render: (schema: unknow
     <div className={styles.collection}>
       <FieldSelect
         aria-label={t('valueEditor.variant', { name: label })}
+        aria-invalid={props.invalid}
         disabled={disabled || choices.length === 0}
         value={activeIndex}
         onChange={(nextValue) => {
@@ -52,6 +53,7 @@ export function EnumChoices({
   value,
   label,
   disabled,
+  invalid,
   onChange,
 }: {
   options: readonly unknown[]
@@ -59,6 +61,7 @@ export function EnumChoices({
   value: unknown
   label: string
   disabled?: boolean
+  invalid?: boolean
   onChange: (value: unknown) => void
 }) {
   const t = useTranslate()
@@ -74,7 +77,7 @@ export function EnumChoices({
         value={options.flatMap((option, index) => (Array.isArray(value) && enumIndex(value, option) >= 0 ? [String(index)] : []))}
         onValueChange={(next) => onChange(next.map((index) => structuredClone(options[Number(index)])))}
       >
-        <SelectTrigger aria-label={label} className={fieldSelectTriggerClass}>
+        <SelectTrigger aria-label={label} aria-invalid={invalid} className={fieldSelectTriggerClass}>
           <span className="min-w-0 flex-1 truncate text-left">{value === undefined ? t('valueEditor.unset') : selected.join(', ') || '[]'}</span>
         </SelectTrigger>
         <SelectContent container={container} align="start" alignItemWithTrigger={false} className="p-1">

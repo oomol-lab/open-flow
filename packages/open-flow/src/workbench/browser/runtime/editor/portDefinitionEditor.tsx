@@ -267,7 +267,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           ) : (
             <>
               {port.handle}
-              {port.nullable ? ' ?' : ''}
+              {props.layout !== 'values' && port.nullable ? ' ?' : ''}
             </>
           )}
         </span>
@@ -289,6 +289,16 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             portType(port)
           )}
         </span>
+        {props.layout === 'values' && (
+          <span className={styles.nullableControl}>
+            <Checkbox
+              aria-label={`${port.handle} ${t('valueEditor.nullable')}`}
+              checked={port.nullable === true}
+              disabled={disabled}
+              onCheckedChange={(checked) => update(index, { ...port, nullable: checked === true })}
+            />
+          </span>
+        )}
       </div>
     )
     const options = !disabled ? (
@@ -437,6 +447,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           <span>{t(props.layout === 'values' ? 'inspector.ports.columnHandle' : 'inspector.ports.columnName')}</span>
           <span>{t(props.layout === 'values' ? 'valueEditor.component' : 'inspector.ports.columnType')}</span>
           {!props.output && <span>{t('inspector.ports.columnValue')}</span>}
+          {props.layout === 'values' && <span className={styles.nullableHeading}>{t('valueEditor.nullable')}</span>}
         </div>
         <span className="sr-only" role="status" aria-live="polite">
           {announcement}

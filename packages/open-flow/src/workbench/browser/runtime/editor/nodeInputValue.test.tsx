@@ -115,3 +115,24 @@ describe('Unset input presentation', () => {
     expect(onValue).not.toHaveBeenCalled()
   })
 })
+
+it('restores object field display order without reordering or changing the value', () => {
+  const onValue = vi.fn()
+  const value = { '1': 'one', '2': 'two', 'extra': 'three' }
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={createI18n('en')}>
+      <NodeInputValue
+        definition={{ handle: 'object', nullable: false, jsonSchema: { 'type': 'object', 'ui:order': ['2', 'missing', '2', '1'] } }}
+        value={value}
+        connected={false}
+        variables={variables}
+        disabled={false}
+        onValue={onValue}
+        onVariable={vi.fn()}
+      />
+    </I18nProvider>,
+  )
+  expect([...markup.matchAll(/data-object-field="([^"]+)"/g)].map((match) => match[1])).toEqual(['2', '1', 'extra'])
+  expect(value).toEqual({ '1': 'one', '2': 'two', 'extra': 'three' })
+  expect(onValue).not.toHaveBeenCalled()
+})

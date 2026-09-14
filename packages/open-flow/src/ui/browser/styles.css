@@ -79,8 +79,27 @@
   transition-property: color, background-color;
 }
 
+@utility invalid-text-field-focus {
+  @apply text-field-focus;
+  outline-color: var(--ui-destructive);
+}
+
 .open-flow-code-editor.cm-editor.cm-focused {
   @apply text-field-focus;
+}
+
+/* Tint the control surface once, including grouped inputs and code editors. */
+:is([data-slot='input'], [data-slot='textarea'], [data-slot='native-select'], [data-slot='select-trigger'], [data-slot='button'])[aria-invalid='true'],
+[data-slot='input-group']:has([data-slot][aria-invalid='true']),
+.open-flow-code-editor.cm-editor[data-invalid='true'] {
+  background-color: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
+}
+
+.open-flow-code-editor.cm-editor[data-invalid='true'] {
+  border-color: var(--ui-destructive);
+}
+.open-flow-code-editor.cm-editor.cm-focused[data-invalid='true'] {
+  @apply invalid-text-field-focus;
 }
 
 /* Clarity drag-handle-corner-line, matching the Designer resize handle. */

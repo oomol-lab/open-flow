@@ -1,0 +1,37 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.row {
+  position: relative;
+  min-width: 0;
+  &[data-dragging] {
+    opacity: 0.45;
+  }
+  &[data-drop]::after {
+    content: '';
+    position: absolute;
+    inset: -5px 0 auto;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--ui-ring);
+    pointer-events: none;
+  }
+  &[data-drop='after']::after {
+    inset: auto 0 -5px;
+  }
+}
+.grip {
+  width: var(--field-toggle-width, 24px);
+  opacity: 0;
+  cursor: grab;
+  touch-action: none;
+  &:active {
+    cursor: grabbing;
+  }
+}
+.row:hover .grip,
+.row:focus-within .grip {
+  opacity: 1;
+}

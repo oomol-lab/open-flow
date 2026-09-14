@@ -1,0 +1,103 @@
+import styles from './valueEditor.module.scss'
+import type { ValueEditorProps } from './valueEditor.tsx'
+
+import { useEffect, useRef, useState } from 'react'
+import { useTranslate } from 'val-i18n-react'
+import { createCodeEditor } from '../../ui/browser/code-editor.ts'
+import { Textarea } from '../../ui/browser/textarea.tsx'
+import { isJsonValue } from '../common/value.ts'
+
+export function JsonEditor({ value, onChange, label, disabled, path, onDraftIssue, invalid: schemaInvalid }: ValueEditorProps) {
+  const t = useTranslate()
+  const lastValue = useRef(value)
+  const [text, setText] = useState(() => (value === undefined ? '' : JSON.stringify(value, null, 2)))
+  const [invalid, setInvalid] = useState(false)
+  useEffect(() => {
+    if (lastValue.current === value) return
+    lastValue.current = value
+    setText(value === undefined ? '' : JSON.stringify(value, null, 2))
+    setInvalid(false)
+    onDraftIssue(path, false)
+  }, [value, path, onDraftIssue])
+  useEffect(() => () => onDraftIssue(path, false), [path, onDraftIssue])
+  const host = useRef<HTMLDivElement>(null)
+  const editor = useRef<Awaited<ReturnType<typeof createCodeEditor>>>()
+  const [ready, setReady] = useState(false)
+  const latest = useRef({ text, disabled, label, change: (_nextText: string) => {} })
+  const change = (nextText: string) => {
+    setText(nextText)
+    try {
+      const next: unknown = nextText.trim() === '' ? undefined : JSON.parse(nextText)
+      if (next !== undefined && !isJsonValue(next)) throw new Error('Not JSON')
+      setInvalid(false)
+      onDraftIssue(path, false)
+      lastValue.current = next
+      onChange(next)
+    } catch {
+      setInvalid(true)
+      onDraftIssue(path, true)
+    }
+  }
+  latest.current = { text, disabled, label, change }
+  useEffect(() => {
+    let disposed = false
+    let current: Awaited<ReturnType<typeof createCodeEditor>> | undefined
+    setReady(false)
+    void createCodeEditor(host.current!, `form:${path}`, {
+      language: 'json',
+      setup: 'minimal',
+      theme: 'warm',
+      wordWrap: 'on',
+      value: latest.current.text,
+      readOnly: latest.current.disabled === true,
+      ariaLabel: `${latest.current.label} JSON`,
+    })
+      .then((created) => {
+        if (disposed) {
+          created.dispose()
+          return
+        }
+        current = created
+        editor.current = created
+        created.setValue(latest.current.text)
+        created.updateOptions({ readOnly: latest.current.disabled === true, ariaLabel: `${latest.current.label} JSON` })
+        created.onChange(() => {
+          const next = created.getValue()
+          if (next !== latest.current.text) latest.current.change(next)
+        })
+        setReady(true)
+      })
+      .catch(() => {
+        // The textarea remains usable if the lazy editor bundle cannot load.
+      })
+    return () => {
+      disposed = true
+      current?.dispose()
+      editor.current = undefined
+    }
+  }, [path])
+  useEffect(() => {
+    editor.current?.setValue(text)
+    editor.current?.updateOptions({ readOnly: disabled === true, ariaLabel: `${label} JSON`, invalid: invalid || schemaInvalid === true })
+  }, [text, disabled, label, invalid, schemaInvalid, ready])
+  return (
+    <>
+      <div ref={host} className={styles.jsonCode} hidden={!ready} />
+      {!ready && (
+        <Textarea
+          aria-label={`${label} JSON`}
+          aria-invalid={invalid || schemaInvalid}
+          disabled={disabled}
+          className={styles.json}
+          value={text}
+          onChange={(event) => change(event.target.value)}
+        />
+      )}
+      {invalid && (
+        <p role="alert" className={styles.error}>
+          {t('valueEditor.invalidJson')}
+        </p>
+      )}
+    </>
+  )
+}

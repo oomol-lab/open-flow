@@ -231,7 +231,6 @@
   padding: 6px 7px;
   min-height: 30px;
   border-radius: var(--ui-control-radius, var(--ui-radius));
-  background: var(--ui-control-background, var(--ui-muted));
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -267,7 +266,6 @@
   padding: 4px 22px 4px 7px;
   border-color: var(--ui-input);
   border-radius: var(--ui-control-radius, var(--ui-radius));
-  background: var(--ui-control-background, var(--ui-muted));
   font-size: 12px;
 }
 .root[data-header] > .body :is(input, textarea, select)[aria-invalid='true'] {
@@ -354,7 +352,6 @@
   background: var(--ui-control-background, var(--ui-muted));
   &[data-danger] {
     border-color: color-mix(in srgb, var(--ui-destructive) 55%, var(--ui-input));
-    background: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
     color: color-mix(in srgb, var(--ui-destructive) 70%, var(--ui-muted-foreground));
     font-size: 11px;
   }
@@ -365,4 +362,31 @@
   &:focus-visible > i {
     opacity: 1;
   }
+}
+
+.root[data-object-child]:has(> .header > .leadingControl),
+.collection[data-reorder] > .collectionActions {
+  --field-grip-width: calc(var(--field-toggle-width, 24px) - 2px);
+}
+
+.jsonCode {
+  font-size: 12px;
+  &[hidden] {
+    display: none;
+  }
+  :global(.cm-editor) {
+    overflow: hidden;
+    border: 1px solid var(--ui-input);
+    border-radius: var(--ui-control-radius, var(--ui-radius));
+    background: var(--ui-control-background, var(--ui-background));
+  }
+  :global(.cm-scroller) {
+    min-height: 110px;
+    max-height: 320px;
+    overflow: auto;
+  }
+}
+
+.emptyString::placeholder {
+  opacity: 0.5;
 }

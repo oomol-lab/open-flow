@@ -42,6 +42,8 @@ const surfaceUiTokens = [
 
 const inheritedUiTokens = ['--ui-font-size'] as const
 const sharedUiTokens = [...surfaceUiTokens, ...inheritedUiTokens].toSorted()
+// Panel-specific overrides are optional; shared controls must supply a fallback.
+const controlOverrideTokens = ['--ui-control-background', '--ui-control-hover-background', '--ui-control-radius'] as const
 
 const reactFlowThemeContract = {
   '--xy-controls-box-shadow': 'var(--floating-control-shadow)',
@@ -455,10 +457,13 @@ test('owns product and canvas surface tokens in one theme entry', async () => {
     readFile(new URL('src/ui/browser/theme.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/tokens.css', packageRoot), 'utf8'),
   ])
-  assert.deepEqual(
-    referencedTokens(uiSources.join('\n'), '--ui-'),
-    [...sharedUiTokens, '--ui-control-background', '--ui-control-hover-background', '--ui-control-radius'].toSorted(),
-  )
+  const uiSource = uiSources.join('\n')
+  assert.deepEqual(referencedTokens(uiSource, '--ui-'), [...sharedUiTokens, ...controlOverrideTokens].toSorted())
+  for (const token of controlOverrideTokens) {
+    const references = [...uiSource.matchAll(new RegExp(`var\\(${token}([,)])`, 'g'))]
+    assert.ok(references.length > 0, `${token} must be consumed by shared controls.`)
+    for (const reference of references) assert.equal(reference[1], ',', `${token} requires a fallback outside property panels.`)
+  }
   assert.deepEqual(Object.keys(declarations(theme, '--ui-')).toSorted(), sharedUiTokens)
   const inheritedTheme = theme.match(/:root,\s*\.open-flow-theme\s*\{([^}]+)\}/)
   assert.ok(inheritedTheme, 'Shared inherited tokens must be available to root and themed surfaces.')

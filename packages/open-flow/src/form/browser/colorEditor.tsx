@@ -14,7 +14,7 @@ interface ScreenColorPicker {
   open(options: { signal: AbortSignal }): Promise<{ sRGBHex: string }>
 }
 
-export function ColorEditor({ value, schema, label, disabled, onChange, path, onDraftIssue }: ValueEditorProps) {
+export function ColorEditor({ value, schema, label, disabled, onChange, path, onDraftIssue, invalid: schemaInvalid }: ValueEditorProps) {
   const t = useTranslate()
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const picker = useRef<AbortController>()
@@ -57,7 +57,7 @@ export function ColorEditor({ value, schema, label, disabled, onChange, path, on
         <InputGroupInput
           className="h-full min-w-0 px-2 text-xs md:text-xs"
           aria-label={label}
-          aria-invalid={text !== '' && !valid}
+          aria-invalid={schemaInvalid || (text !== '' && !valid)}
           value={text}
           disabled={disabled}
           onChange={(event) => {

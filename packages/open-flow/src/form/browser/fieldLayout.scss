@@ -1,5 +1,6 @@
 // Column geometry shared by field rows and their headings.
 @mixin columns($wrap-width: 340px) {
+  --field-nullable-width: 0px;
   --field-name-track: minmax(0, 1fr);
   --field-type-track: minmax(64px, 0.48fr);
   --field-name-gap: 4px;
@@ -15,6 +16,7 @@
     [handle] var(--field-name-track) 4px
     [type] var(--field-type-track) 4px
     [value] minmax(0, 1.5fr) [content-end] var(--field-actions-gap)
+    [nullable] var(--field-nullable-width)
     [actions] var(--field-actions-width, 28px) [end];
 
   &[data-layout='values'] {
@@ -41,6 +43,7 @@
         [toggle] var(--field-toggle-width, 24px) var(--field-name-gap)
         [handle] minmax(0, 1fr) 4px
         [type] var(--field-type-track) [content-end] var(--field-actions-gap)
+        [nullable] var(--field-nullable-width)
         [actions] var(--field-actions-width, 28px) [end];
     }
   }

@@ -15,8 +15,9 @@ export function DateEditor({
   onChange,
   label,
   disabled,
+  invalid,
   format,
-}: Pick<ValueEditorProps, 'value' | 'onChange' | 'label' | 'disabled'> & { format: DateFormat }) {
+}: Pick<ValueEditorProps, 'value' | 'onChange' | 'label' | 'disabled' | 'invalid'> & { format: DateFormat }) {
   const t = useTranslate()
   const [open, setOpen] = useState(false)
   const wall = datePickerValue(value, format)
@@ -28,6 +29,7 @@ export function DateEditor({
         <InputGroupInput
           className="h-full min-w-0 px-2 text-xs md:text-xs"
           aria-label={label}
+          aria-invalid={invalid}
           disabled={disabled}
           value={typeof value === 'string' ? value : ''}
           onChange={(event) => onChange(event.target.value)}

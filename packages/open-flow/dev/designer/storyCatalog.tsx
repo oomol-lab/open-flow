@@ -10,8 +10,10 @@ import { connectionPathsStory } from './connectionPaths.tsx'
 import { eventSourcesStory, createEventSourceStory, eventSourceSetupStory, feishuFiltersStory, feishuSummaryStory, eventPickerStory } from './eventSources.tsx'
 import { formStory } from './form.tsx'
 import { historyStory, historyControlsStory, historyKeyboardStory } from './history.tsx'
+import { inputErrorsStory } from './inputErrors.tsx'
 import { inspectorPanelStory } from './inspectorPanel.tsx'
 import { inspectorPortsStory } from './inspectorPorts.tsx'
+import { jsonThemeStory } from './jsonTheme.tsx'
 import { libraryStory } from './library.tsx'
 import { llmStory } from './llm.tsx'
 import { markdownStory } from './markdown.tsx'
@@ -94,6 +96,8 @@ export const labStories: readonly FrontendStory[] = [
   eventPickerStory,
   nodeInputStory,
   valueNodeStory,
+  jsonThemeStory,
+  inputErrorsStory,
   additionalInputsStory,
   groupedInputsStory,
   outputPortsStory,
