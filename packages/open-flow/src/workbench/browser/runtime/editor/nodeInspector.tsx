@@ -156,9 +156,8 @@ function InputSources({
                 <SelectTrigger
                   id={fieldId}
                   aria-label={`${handle} ${t('inspector.sources.title')}`}
-                  size="sm"
-                  variant="subtle"
-                  className="min-w-0 w-full"
+                  size="field"
+                  className="min-w-0 w-full px-2 text-xs font-normal"
                   aria-invalid={source != null && !valid}
                 >
                   <SelectValue className="min-w-0">

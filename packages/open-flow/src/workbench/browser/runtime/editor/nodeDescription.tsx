@@ -22,7 +22,7 @@ export function NodeDescription({ value, disabled, onSave }: Props) {
       <FieldLabel htmlFor={id}>{t('inspector.node.description')}</FieldLabel>
       <Textarea
         id={id}
-        disabled={disabled}
+        readOnly={disabled}
         placeholder={t('inspector.node.describe')}
         value={draft}
         onChange={(event) => setDraft(event.target.value)}

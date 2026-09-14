@@ -17,19 +17,24 @@ function PopoverContent({
   alignOffset = 0,
   anchor,
   collisionBoundary,
+  collisionAvoidance,
   positionMethod,
   container,
   side = 'bottom',
   sideOffset = 4,
   ...props
 }: PopoverPrimitive.Popup.Props &
-  Pick<PopoverPrimitive.Positioner.Props, 'collisionBoundary' | 'positionMethod' | 'anchor' | 'align' | 'alignOffset' | 'side' | 'sideOffset'> & {
+  Pick<
+    PopoverPrimitive.Positioner.Props,
+    'collisionBoundary' | 'collisionAvoidance' | 'positionMethod' | 'anchor' | 'align' | 'alignOffset' | 'side' | 'sideOffset'
+  > & {
     container?: HTMLElement | null
   }) {
   return (
     <PopoverPrimitive.Portal container={container} className="contents">
       <PopoverPrimitive.Positioner
         collisionBoundary={collisionBoundary}
+        collisionAvoidance={collisionAvoidance}
         positionMethod={positionMethod}
         anchor={anchor}
         align={align}
@@ -69,26 +74,40 @@ export { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitl
 function PopoverPanelContent({
   title,
   closeLabel,
+  footer,
   children,
   ...props
-}: Omit<React.ComponentProps<typeof PopoverContent>, 'title'> & { title: string; closeLabel: string }) {
+}: Omit<React.ComponentProps<typeof PopoverContent>, 'title'> & { title: string; closeLabel: string; footer?: React.ReactNode }) {
   return (
     <PopoverContent
       collisionBoundary={[]}
+      collisionAvoidance={{ side: 'flip', align: 'none', fallbackAxisSide: 'none' }}
       positionMethod="fixed"
       side="left"
       align="start"
-      sideOffset={24}
+      sideOffset={2}
       {...props}
-      className={cn('w-80 max-w-[calc(100vw-24px)] gap-0 overflow-hidden p-0 text-xs', props.className)}
+      className={cn(
+        'w-80 max-w-[calc(100vw-24px)] max-h-[min(80vh,680px,var(--available-height))] gap-0 overflow-hidden bg-background p-0 text-xs [--ui-control-radius:6px]',
+        props.className,
+      )}
     >
-      <div className="flex min-h-10 items-center gap-3 border-b border-border px-3 py-2">
+      <div className="flex min-h-10 shrink-0 items-center gap-2 px-3 py-2">
         <PopoverTitle className="min-w-0 flex-1 truncate text-xs">{title}</PopoverTitle>
         <PopoverPrimitive.Close render={<Button type="button" variant="ghost" size="icon-xs" aria-label={closeLabel} />}>
           <i aria-hidden="true" className="i-lucide-light:x" />
         </PopoverPrimitive.Close>
       </div>
-      <div className="flex max-h-[min(65vh,560px)] min-h-0 flex-col gap-3 overflow-y-auto p-3">{children}</div>
+      <div className="mx-2 h-px shrink-0 bg-border/50" />
+      <div className="min-h-0 overflow-y-auto [scrollbar-gutter:stable_both-edges]">
+        <div className="flex flex-col gap-3 p-3">{children}</div>
+      </div>
+      {footer && (
+        <>
+          <div className="mx-2 h-px shrink-0 bg-border/50" />
+          <div className="flex shrink-0 items-center gap-2 p-3">{footer}</div>
+        </>
+      )}
     </PopoverContent>
   )
 }

@@ -16,7 +16,9 @@ export function JsonEditor({
   onDraftIssue,
   invalid: schemaInvalid,
   focusRequest = 0,
-}: ValueEditorProps & { focusRequest?: number }) {
+  autoHeight = false,
+  ariaLabel = `${label} JSON`,
+}: ValueEditorProps & { focusRequest?: number; ariaLabel?: string; autoHeight?: boolean }) {
   const t = useTranslate()
   const lastValue = useRef(value)
   const [text, setText] = useState(() => (value === undefined ? '' : JSON.stringify(value, null, 2)))
@@ -38,7 +40,7 @@ export function JsonEditor({
     if (ready) editor.current?.focus()
     else fallback.current?.focus()
   }, [focusRequest, disabled, ready])
-  const latest = useRef({ text, disabled, label, change: (_nextText: string) => {} })
+  const latest = useRef({ text, disabled, ariaLabel, change: (_nextText: string) => {} })
   const change = (nextText: string) => {
     setText(nextText)
     try {
@@ -53,7 +55,7 @@ export function JsonEditor({
       onDraftIssue(path, true)
     }
   }
-  latest.current = { text, disabled, label, change }
+  latest.current = { text, disabled, ariaLabel, change }
   useEffect(() => {
     let disposed = false
     let current: Awaited<ReturnType<typeof createCodeEditor>> | undefined
@@ -63,9 +65,11 @@ export function JsonEditor({
       setup: 'minimal',
       theme: 'warm',
       wordWrap: 'on',
+      // Leave room for the editor border and the surrounding panel padding.
+      cursorScrollMargin: autoHeight ? 24 : undefined,
       value: latest.current.text,
       readOnly: latest.current.disabled === true,
-      ariaLabel: `${latest.current.label} JSON`,
+      ariaLabel: latest.current.ariaLabel,
     })
       .then((created) => {
         if (disposed) {
@@ -75,7 +79,7 @@ export function JsonEditor({
         current = created
         editor.current = created
         created.setValue(latest.current.text)
-        created.updateOptions({ readOnly: latest.current.disabled === true, ariaLabel: `${latest.current.label} JSON` })
+        created.updateOptions({ readOnly: latest.current.disabled === true, ariaLabel: latest.current.ariaLabel })
         created.onChange(() => {
           const next = created.getValue()
           if (next !== latest.current.text) latest.current.change(next)
@@ -90,21 +94,22 @@ export function JsonEditor({
       current?.dispose()
       editor.current = undefined
     }
-  }, [path])
+  }, [path, autoHeight])
   useEffect(() => {
     editor.current?.setValue(text)
-    editor.current?.updateOptions({ readOnly: disabled === true, ariaLabel: `${label} JSON`, invalid: invalid || schemaInvalid === true })
-  }, [text, disabled, label, invalid, schemaInvalid, ready])
+    editor.current?.updateOptions({ readOnly: disabled === true, ariaLabel, invalid: invalid || schemaInvalid === true })
+  }, [text, disabled, ariaLabel, invalid, schemaInvalid, ready])
   return (
     <>
-      <div ref={host} className={styles.jsonCode} hidden={!ready} />
+      <div ref={host} className={styles.jsonCode} data-auto-height={autoHeight || undefined} hidden={!ready} />
       {!ready && (
         <Textarea
           ref={fallback}
-          aria-label={`${label} JSON`}
+          aria-label={ariaLabel}
           aria-invalid={invalid || schemaInvalid}
           readOnly={disabled}
           className={styles.json}
+          data-auto-height={autoHeight || undefined}
           value={text}
           onChange={(event) => change(event.target.value)}
         />

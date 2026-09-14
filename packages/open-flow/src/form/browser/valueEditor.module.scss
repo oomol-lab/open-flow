@@ -74,7 +74,14 @@
 }
 .json {
   min-height: 110px;
+  max-height: 320px;
+  resize: vertical;
   font-family: monospace;
+  &[data-auto-height] {
+    max-height: none;
+    resize: none;
+    overflow: hidden;
+  }
 }
 .description {
   margin: 4px 0;
@@ -438,15 +445,27 @@
     display: none;
   }
   :global(.cm-editor) {
+    min-height: 110px;
+    max-height: 320px;
+    resize: vertical;
     overflow: hidden;
     border: 1px solid var(--ui-input);
     border-radius: var(--ui-control-radius, var(--ui-radius));
     background: var(--ui-control-background, var(--ui-background));
   }
   :global(.cm-scroller) {
-    min-height: 110px;
-    max-height: 320px;
+    min-height: 0;
     overflow: auto;
+  }
+}
+
+.jsonCode[data-auto-height] {
+  :global(.cm-editor) {
+    max-height: none;
+    resize: none;
+  }
+  :global(.cm-scroller) {
+    overflow: visible;
   }
 }
 

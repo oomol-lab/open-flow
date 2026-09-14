@@ -1,7 +1,7 @@
 @use './inspectorGeometry.scss' as geometry;
 
 .field {
-  padding: 12px;
+  padding: 12px 12px 16px;
 
   textarea {
     margin-left: geometry.$name-inset - 12px;

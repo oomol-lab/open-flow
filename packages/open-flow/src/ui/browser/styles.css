@@ -77,6 +77,10 @@
   outline-offset: -1px;
   box-shadow: none;
   transition-property: color, background-color;
+
+  &[readonly] {
+    outline: var(--ui-readonly-focus-outline, 2px solid var(--ui-ring));
+  }
 }
 
 @utility invalid-text-field-focus {
@@ -97,7 +101,7 @@
   [data-slot='input-group'],
   [data-field-control],
   .open-flow-code-editor.cm-editor
-):not(:disabled):not([readonly]):not([aria-disabled='true']):not(:has(:disabled, [readonly])):hover {
+):not(:disabled):not([readonly]):not([aria-disabled='true']):not(.cm-focused):not(:has(:disabled, [readonly], .cm-content[contenteditable='false'])):hover {
   background-color: var(--ui-control-hover-background, var(--ui-muted));
 }
 
@@ -107,7 +111,7 @@
 .open-flow-code-editor.cm-editor[data-invalid='true'] {
   border-color: var(--ui-destructive);
   background-color: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
-  &:not(:disabled):not([readonly]):not([aria-disabled='true']):not(:has(:disabled, [readonly])):hover {
+  &:not(:disabled):not([readonly]):not([aria-disabled='true']):not(.cm-focused):not(:has(:disabled, [readonly], .cm-content[contenteditable='false'])):hover {
     background-color: color-mix(in srgb, var(--ui-destructive) 8%, var(--ui-control-background, var(--ui-background)));
   }
 }

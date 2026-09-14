@@ -1,5 +1,5 @@
 import styles from './portList.module.scss'
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import type { ValueEditorProps } from '../../../../form/browser/valueEditor.tsx'
 import type { Group, InputPort } from '../api.ts'
 
@@ -7,18 +7,20 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { EditorComponentSelect } from '../../../../form/browser/editorComponentSelect.tsx'
 import { FieldSorting } from '../../../../form/browser/fieldSorting.ts'
+import { JsonEditor } from '../../../../form/browser/jsonEditor.tsx'
 import { ValueEditor } from '../../../../form/browser/valueEditor.tsx'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
 import { compile } from '../../../../form/common/validation/validator.ts'
 import { objectValue } from '../../../../form/common/value.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
-import { FieldLabel } from '../../../../ui/browser/field.tsx'
+import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
 import { Popover, PopoverPanelContent } from '../../../../ui/browser/popover.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
+import { fieldPanelAnchor } from './fieldPanelAnchor.ts'
 import { movePort } from './portOrder.ts'
 
 export function portType(port: InputPort): string {
@@ -26,7 +28,21 @@ export function portType(port: InputPort): string {
   return Array.isArray(type) ? type.join(' | ') : typeof type === 'string' ? type : 'JSON'
 }
 
-function PortName({ value, disabled, names, onChange }: { value: string; disabled: boolean; names: readonly string[]; onChange: (value: string) => void }) {
+function PortName({
+  value,
+  disabled,
+  names,
+  onChange,
+  id,
+  compact,
+}: {
+  id?: string
+  compact?: boolean
+  value: string
+  disabled: boolean
+  names: readonly string[]
+  onChange: (value: string) => void
+}) {
   const t = useTranslate()
   const [draft, setDraft] = useState(value)
   const invalid = draft.trim() === '' || (draft !== value && names.includes(draft))
@@ -36,6 +52,8 @@ function PortName({ value, disabled, names, onChange }: { value: string; disable
   }
   return (
     <Input
+      id={id}
+      controlSize={compact ? 'field' : 'default'}
       aria-label={t('valueEditor.fieldName')}
       aria-invalid={invalid}
       readOnly={disabled}
@@ -58,56 +76,154 @@ function PortType({
   disabled,
   onChange,
   name = 'Schema',
+  id,
 }: {
   value: InputPort['jsonSchema']
   disabled: boolean
   onChange: (value: InputPort['jsonSchema']) => void
   name?: string
+  id?: string
 }) {
-  return <EditorComponentSelect schema={value} name={name} disabled={disabled} onChange={(next) => onChange(next as InputPort['jsonSchema'])} />
+  return <EditorComponentSelect id={id} schema={value} name={name} disabled={disabled} onChange={(next) => onChange(next as InputPort['jsonSchema'])} />
 }
 
 function PortSchema({ value, disabled, onChange }: { value: InputPort['jsonSchema']; disabled: boolean; onChange: (value: InputPort['jsonSchema']) => void }) {
   const t = useTranslate()
-  const lastValue = useRef(value)
-  const [text, setText] = useState(JSON.stringify(value, null, 2))
+  const path = useId()
   const [invalid, setInvalid] = useState(false)
-  useEffect(() => {
-    if (lastValue.current === value) return
-    lastValue.current = value
-    setText(JSON.stringify(value, null, 2))
-    setInvalid(false)
-  }, [value])
+  useEffect(() => setInvalid(false), [value])
+  const onDraftIssue = useCallback((_path: string, syntaxInvalid: boolean) => {
+    if (syntaxInvalid) setInvalid(false)
+  }, [])
+  return (
+    <Field className="gap-1.5">
+      <span className="text-xs text-muted-foreground">JSON Schema</span>
+      <JsonEditor
+        autoHeight
+        schema={true}
+        label="JSON Schema"
+        ariaLabel="JSON Schema"
+        path={path}
+        value={value}
+        disabled={disabled}
+        invalid={invalid}
+        onDraftIssue={onDraftIssue}
+        onChange={(next) => {
+          if ((typeof next !== 'boolean' && objectValue(next) == null) || compile(next)[1]) {
+            setInvalid(true)
+            return
+          }
+          setInvalid(false)
+          onChange(next as InputPort['jsonSchema'])
+        }}
+      />
+      {invalid && (
+        <p role="alert" className="text-xs text-destructive">
+          {t('valueEditor.invalidSchema')}
+        </p>
+      )}
+    </Field>
+  )
+}
+
+function PortSettingsFields({
+  port,
+  names,
+  disabled,
+  showNullable,
+  onChange,
+}: {
+  showNullable: boolean
+  port: InputPort
+  names: readonly string[]
+  disabled: boolean
+  onChange: (port: InputPort) => void
+}) {
+  const t = useTranslate()
+  const id = useId()
+  const updateSchema = (jsonSchema: InputPort['jsonSchema']) =>
+    onChange({
+      ...port,
+      jsonSchema,
+      ...(port.value === undefined ? {} : { value: valueForEditor(jsonSchema, port.value) as InputPort['value'] }),
+    })
   return (
     <>
-      <PortType value={value} disabled={disabled} onChange={onChange} />
-      <details className={styles.schema}>
-        <summary>JSON Schema</summary>
+      <Field className="gap-1.5">
+        <FieldLabel htmlFor={`${id}-name`} className="text-xs font-normal text-muted-foreground">
+          {t('valueEditor.fieldName')}
+        </FieldLabel>
+        <PortName id={`${id}-name`} compact value={port.handle} names={names} disabled={disabled} onChange={(handle) => onChange({ ...port, handle })} />
+      </Field>
+      <Field className="gap-1.5">
+        <FieldLabel htmlFor={`${id}-description`} className="text-xs font-normal text-muted-foreground">
+          {t('inspector.node.description')}
+        </FieldLabel>
         <Textarea
-          aria-label="JSON Schema"
-          aria-invalid={invalid}
+          id={`${id}-description`}
+          rows={2}
+          className="min-h-16 max-h-40 resize-y text-xs md:text-xs"
+          value={port.description ?? ''}
           readOnly={disabled}
-          value={text}
-          onChange={(event) => {
-            setText(event.target.value)
-            try {
-              const next: unknown = JSON.parse(event.target.value)
-              if ((typeof next !== 'boolean' && objectValue(next) == null) || compile(next)[1]) throw new Error('Invalid schema')
-              setInvalid(false)
-              lastValue.current = next as InputPort['jsonSchema']
-              onChange(next as InputPort['jsonSchema'])
-            } catch {
-              setInvalid(true)
-            }
-          }}
+          onChange={(event) => onChange({ ...port, description: event.target.value })}
         />
-        {invalid && (
-          <p role="alert" className="text-sm text-destructive">
-            {t('valueEditor.invalidJson')}
-          </p>
-        )}
+      </Field>
+      <Field className="gap-1.5">
+        <FieldLabel htmlFor={`${id}-type`} className="text-xs font-normal text-muted-foreground">
+          {t('inspector.ports.columnType')}
+        </FieldLabel>
+        <PortType id={`${id}-type`} name={port.handle} value={port.jsonSchema} disabled={disabled} onChange={updateSchema} />
+      </Field>
+      <details className={styles.schema}>
+        <summary>
+          <i aria-hidden="true" className="i-lucide-light:chevron-right" />
+          {t('valueEditor.advancedSettings')}
+        </summary>
+        <div className={styles.advancedContent}>
+          {showNullable && (
+            <Label className="flex items-center gap-2 text-xs font-normal">
+              <Checkbox
+                className="not-data-disabled:cursor-pointer"
+                disabled={disabled}
+                checked={port.nullable}
+                onCheckedChange={(nullable) => onChange({ ...port, nullable: nullable === true })}
+              />
+              {t('valueEditor.nullable')}
+            </Label>
+          )}
+          <PortSchema value={port.jsonSchema} disabled={disabled} onChange={updateSchema} />
+        </div>
       </details>
     </>
+  )
+}
+
+export function PortSettingsPanel({
+  port,
+  names,
+  disabled,
+  onChange,
+  onRemove,
+  showNullable,
+  ...props
+}: ComponentProps<typeof PortSettingsFields> &
+  Pick<ComponentProps<typeof PopoverPanelContent>, 'anchor' | 'container' | 'side' | 'positionMethod'> & { onRemove: () => void }) {
+  const t = useTranslate()
+  return (
+    <PopoverPanelContent
+      {...props}
+      title={t('valueEditor.fieldSettings')}
+      closeLabel={t('common.close')}
+      footer={
+        !disabled && (
+          <Button type="button" size="field" variant="destructive" onClick={onRemove}>
+            {t('valueEditor.remove')}
+          </Button>
+        )
+      }
+    >
+      <PortSettingsFields showNullable={showNullable} port={port} names={names} disabled={disabled} onChange={onChange} />
+    </PopoverPanelContent>
   )
 }
 
@@ -138,7 +254,6 @@ export function PortDefinitionEditor(props: PortEditorProps) {
   const sortingEnabled = sorting && !disabled
   const onDraftIssue = useCallback(() => {}, [])
   const update = (index: number, port: InputPort | Group) => onChange(values.map((entry, i) => (i === index ? port : entry)))
-  const listId = useId()
   const list = useRef<HTMLDivElement>(null)
   const heading = useRef<HTMLDivElement>(null)
   const pendingName = useRef<string>()
@@ -308,7 +423,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         />
       </span>
     )
-    const options = !disabled ? (
+    const options = (
       <Tooltip>
         <TooltipTrigger
           render={
@@ -323,14 +438,14 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             />
           }
         >
-          <i aria-hidden="true" className={props.layout === 'values' ? 'i-carbon:tuning' : 'i-lucide-light:settings-2'} />
+          <i aria-hidden="true" className="i-lucide-light:settings" />
           {props.layout !== 'values' && t('valueEditor.fieldSettings')}
         </TooltipTrigger>
         <TooltipContent container={list.current}>{t('valueEditor.fieldSettings')}</TooltipContent>
       </Tooltip>
-    ) : undefined
+    )
     const settings =
-      editingIndex === index && !disabled ? (
+      editingIndex === index ? (
         <Popover
           open
           onOpenChange={(open) => {
@@ -340,61 +455,19 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             }
           }}
         >
-          <PopoverPanelContent
-            container={list.current}
-            anchor={() => list.current?.querySelector(`[data-port-index="${index}"]`) ?? null}
-            title={`${port.handle} · ${t('valueEditor.fieldSettings')}`}
-            closeLabel={t('common.close')}
-          >
-            <Label>{t('valueEditor.fieldName')}</Label>
-            <PortName
-              value={port.handle}
-              names={[...reservedNames, ...values.flatMap((entry) => ('handle' in entry ? [entry.handle] : []))]}
-              disabled={disabled}
-              onChange={(handle) => update(index, { ...port, handle })}
-            />
-            <Label htmlFor={`${listId}-${index}-description`}>{t('inspector.node.description')}</Label>
-            <Input
-              id={`${listId}-${index}-description`}
-              value={port.description ?? ''}
-              readOnly={disabled}
-              onChange={(event) => update(index, { ...port, description: event.target.value })}
-            />
-            <Label className="flex items-center gap-2 text-xs font-normal">
-              <Checkbox
-                className="not-data-disabled:cursor-pointer"
-                disabled={disabled}
-                checked={port.nullable}
-                onCheckedChange={(nullable) => update(index, { ...port, nullable: nullable === true })}
-              />
-              {t('valueEditor.nullable')}
-            </Label>
-            <PortSchema
-              value={port.jsonSchema}
-              disabled={disabled}
-              onChange={(jsonSchema) =>
-                update(index, {
-                  ...port,
-                  jsonSchema,
-                  ...(port.value === undefined ? {} : { value: valueForEditor(jsonSchema, port.value) as InputPort['value'] }),
-                })
-              }
-            />
-            {!disabled && (
-              <Button
-                type="button"
-                size="xs"
-                variant="destructive"
-                className="self-start"
-                onClick={() => {
-                  setEditingIndex(undefined)
-                  onChange(values.filter((_, i) => i !== index))
-                }}
-              >
-                {t('valueEditor.remove')}
-              </Button>
-            )}
-          </PopoverPanelContent>
+          <PortSettingsPanel
+            showNullable={props.layout !== 'values'}
+            container={list.current?.closest<HTMLElement>('.editor-context-panel') ?? list.current}
+            anchor={() => fieldPanelAnchor(list.current?.querySelector(`[data-port-index="${index}"]`))}
+            port={port}
+            names={[...reservedNames, ...values.flatMap((entry) => ('handle' in entry ? [entry.handle] : []))]}
+            disabled={disabled}
+            onChange={(next) => update(index, next)}
+            onRemove={() => {
+              setEditingIndex(undefined)
+              onChange(values.filter((_, i) => i !== index))
+            }}
+          />
         </Popover>
       ) : null
     return (

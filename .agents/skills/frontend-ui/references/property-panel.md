@@ -116,3 +116,10 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
   rules. Do not retain the older 22px borderless gray control style alongside the value table.
 - Node settings keep their section title and always show their contents, without a disclosure control.
 - Value Node does not show timeout settings or a Node settings section.
+
+## Secondary field settings
+
+- Use a fixed Field settings title; the first control identifies and edits the field name.
+- Order fields as name, multiline purpose, labeled type selector, collapsed advanced settings, and a separate remove footer.
+- Values already expose Allow null in the main row; omit its duplicate in the secondary panel. Input/output definitions retain it under advanced settings.
+- Edit JSON Schema with the shared minimal CodeMirror JSON editor. Preserve invalid drafts, validate the Schema before saving, and keep the type selector synchronized with the same definition.
