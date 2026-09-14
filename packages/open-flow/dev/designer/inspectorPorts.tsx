@@ -158,7 +158,7 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
               onClose={() => setOpen(false)}
             >
               <NodeInspector
-                variables={{ enabled: false, names: [], loaded: true, loading: false, onOpen: () => {} }}
+                variables={{ enabled: true, names: ['API_TOKEN', 'TEAM_NAME'], loaded: true, loading: false, onOpen: () => {} }}
                 connectorAuthorizationPending={false}
                 connectorLoading={false}
                 connectors={session.connectors}

@@ -46,7 +46,7 @@ describe('Output definitions', () => {
 })
 
 describe('Property panel port layout', () => {
-  it('uses the value-table controls without adding the value-only nullable column', () => {
+  it('uses the value-table controls and exposes nullable in the main row', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <PortDefinitionEditor
@@ -62,7 +62,7 @@ describe('Property panel port layout', () => {
     expect(markup).toContain('data-layout="ports"')
     expect(markup).toContain('aria-label="Field name"')
     expect(markup).toContain('aria-label="message type"')
-    expect(markup).not.toContain('message Allow null')
+    expect(markup).toContain('message Allow null')
   })
 
   it('passes definition editing through custom input value renderers', () => {

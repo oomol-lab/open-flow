@@ -109,10 +109,6 @@
     overscroll-behavior: contain;
   }
 
-  .inspector-field-source {
-    min-width: 0;
-  }
-
   .inspector-port-section,
   .inspector-values-section {
     border-block: 1px solid var(--ui-border);
@@ -704,15 +700,6 @@
     justify-content: space-between;
     gap: 8px;
     padding: 4px 12px 0;
-  }
-
-  .inspector-sources {
-    padding-top: 8px;
-  }
-
-  .inspector-sources h3 {
-    font-size: 11px;
-    color: var(--ui-muted-foreground);
   }
 
   .code-action-panel {

@@ -87,7 +87,8 @@ describe('Independent node inputs', () => {
       </I18nProvider>,
     )
     expect(markup).toContain('Connected to an upstream source')
-    expect(markup).not.toMatch(/<(?:input|textarea|select)\b/)
+    expect(markup).not.toMatch(/<(?:textarea|select)\b/)
+    expect(markup).toContain('aria-label="message Input sources"')
     expect(onValue).not.toHaveBeenCalled()
   })
 })

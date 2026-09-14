@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react'
 import type { Group, InputPort, JsonValue } from '../api.ts'
-import type { InputVariables } from './nodeInputValue.tsx'
+import type { InputVariables, NodeInputUpstreamSources } from './nodeInputValue.tsx'
 
 import { NodeInputValue } from './nodeInputValue.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
@@ -22,7 +22,7 @@ export function NodeInputs({
   allowAddGroup?: boolean
   onDefinitions?: (values: readonly (InputPort | Group)[]) => void
   reservedNames?: readonly string[]
-  renderSource?: (handle: string) => ReactNode
+  renderSource?: (handle: string) => NodeInputUpstreamSources | undefined
   title?: ReactNode
   entries: readonly (Group | NodeInputField)[]
   variables: InputVariables
@@ -51,7 +51,7 @@ export function NodeInputs({
               {...entry}
               embedded
               presentation={presentation}
-              sourceOptions={renderSource?.(port.handle)}
+              upstream={renderSource?.(port.handle)}
               handleNames={handleNames}
               variables={variables}
               disabled={disabled}

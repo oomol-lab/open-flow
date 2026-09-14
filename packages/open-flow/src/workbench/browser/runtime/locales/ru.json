@@ -891,6 +891,9 @@
   "nodeInput": {
     "literal": "Литерал",
     "variable": "Variable",
+    "noVariables": "Нет объявленных Variable",
+    "noUpstreamNodes": "Нет предыдущих узлов",
+    "unsupported": "Не поддерживается",
     "mode": "Тип",
     "connected": "Подключён к источнику данных. Измените его в разделе источников входных данных."
   },

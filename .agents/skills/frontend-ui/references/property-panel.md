@@ -46,6 +46,10 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 - Internal popup separators are light and inset: the compact reference is `mx-2 h-px bg-border/50`.
   Apply the same separator treatment above actions and below back controls. Outer panel borders
   have a different role.
+- Empty-state menu rows keep the same font weight as available items. Distinguish them with the
+  muted foreground color rather than reduced opacity or a different weight.
+- Keep the separator above the upstream-source section when it shows its empty-state row so the
+  menu structure remains stable when upstream nodes appear.
 
 ## Danger and interaction states
 
@@ -78,7 +82,8 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
   fields. Use the shared minimal CodeMirror editor with no line numbers or active-line decoration;
   JSON strings use the established warm/orange highlighting.
 - DOM and Tab order follow the visual row: disclosure/ordering control when present, Name, Type,
-  Value and its actions, Allow null, field settings, then expanded content and subsequent rows.
+  the Input source action when present, Value and its actions, Allow null, field settings, then
+  expanded content and subsequent rows.
   Hidden/collapsed descendants do not enter the tab sequence. Closing popups restores focus to the
   corresponding trigger.
 - Reordering is an explicit mode. Drag handles share the left position with disclosure arrows;
@@ -121,7 +126,8 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 
 - Use a fixed Field settings title; the first control identifies and edits the field name.
 - Order fields as name, multiline purpose, labeled type selector, collapsed advanced settings, and a separate remove footer.
-- Values already expose Allow null in the main row; omit its duplicate in the secondary panel. Input/output definitions retain it under advanced settings.
+- Values and editable input/output definitions expose Allow null in the main row; omit its duplicate
+  in the secondary panel.
 - Edit JSON Schema with the shared minimal CodeMirror JSON editor. Preserve invalid drafts, validate the Schema before saving, and keep the type selector synchronized with the same definition.
 - Input/output group settings use the same secondary-panel pattern, opened by a settings control aligned with the field gears. The panel edits the group name and default collapsed state and keeps removal in a separate footer.
 - Removing a field or group requires a second confirmation within its settings panel. Removing a group retains its fields and removes only the group marker.

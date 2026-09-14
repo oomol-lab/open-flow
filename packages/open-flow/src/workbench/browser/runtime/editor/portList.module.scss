@@ -10,7 +10,14 @@
   padding: 8px 12px 16px geometry.$list-inset;
   --field-actions-width: 28px;
   &[data-inputs] {
-    --field-actions-width: 54px;
+    .row [data-header],
+    .columns {
+      --field-source-gap: 2px;
+      --field-source-width: 28px;
+    }
+    .columns {
+      --field-value-heading-column: source / content-end;
+    }
   }
   color: var(--ui-foreground);
 }
@@ -185,7 +192,7 @@
     grid-row: 1;
   }
   > span:nth-child(3) {
-    grid-column: var(--field-value-column);
+    grid-column: var(--field-value-heading-column, var(--field-value-column));
     grid-row: var(--field-value-row);
   }
 }
@@ -306,7 +313,7 @@
   white-space: nowrap;
   overflow: visible;
 }
-.row > [data-header][data-layout='values'],
-.columns[data-layout='values'] {
+.row [data-header]:is([data-layout='values'], [data-layout='ports']),
+.columns:is([data-layout='values'], [data-layout='ports']) {
   --field-nullable-width: 28px;
 }

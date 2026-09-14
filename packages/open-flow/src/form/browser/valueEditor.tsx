@@ -39,6 +39,7 @@ export interface ValueEditorProps {
   readonly onDraftIssue: (path: string, invalid: boolean) => void
   readonly header?: ReactNode
   readonly leadingControl?: ReactNode
+  readonly valueLeadingControl?: ReactNode
   readonly trailingControl?: ReactNode
   readonly description?: string
   readonly editor?: ReactNode
@@ -697,6 +698,7 @@ export function ValueEditor(props: ValueEditorProps) {
       data-header={props.header != null || undefined}
       data-collection={expandable || undefined}
       data-output={props.editor === null || undefined}
+      data-value-leading={props.valueLeadingControl != null || undefined}
       data-expanded={(expandable && expanded) || undefined}
       data-structured={(structured && !showUnset) || undefined}
     >
@@ -766,6 +768,7 @@ export function ValueEditor(props: ValueEditorProps) {
         )
       )}
       {!expandable && body}
+      {props.valueLeadingControl != null && <div className={styles.valueLeadingControl}>{props.valueLeadingControl}</div>}
       <ValueTools
         label={label}
         container={container}

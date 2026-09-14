@@ -891,6 +891,9 @@
   "nodeInput": {
     "literal": "固定值",
     "variable": "Variable",
+    "noVariables": "尚未宣告 Variable",
+    "noUpstreamNodes": "沒有上游節點",
+    "unsupported": "不支援",
     "mode": "類型",
     "connected": "已連接上游來源，可在輸入來源中修改。"
   },
