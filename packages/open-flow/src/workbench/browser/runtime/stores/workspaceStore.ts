@@ -1,5 +1,6 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal } from 'value-enhancer'
+import type { EventSource } from '../../../../control/common/api.ts'
 import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { ConnectorCapability } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
@@ -27,6 +28,7 @@ import type { SetNotice } from './workbenchNotice.ts'
 import type { ModuleEditorDraft, Workspace$, WorkspaceState } from './workspaceModel.ts'
 
 import { dequal } from 'dequal/lite'
+import { isJsonObject } from '../../../../base/common/json.ts'
 import { controlErrorCode } from '../../../../control/common/errors.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { connect as connectFlowNodes, disconnect as disconnectFlowNodes } from '../../../../flow/common/edgeChanges.ts'
@@ -41,6 +43,7 @@ import {
   updateTriggerConfig,
   updateTriggerSchedule,
 } from '../../../../flow/common/nodeChanges.ts'
+import { feishuResourceKind, supportsFeishuChatFilter } from '../../../../trigger/providers/feishu/config.ts'
 import { ApiError } from '../api.ts'
 import { addNodeIntent } from '../editor/addNodeOptions.ts'
 import {
@@ -404,7 +407,7 @@ export class WorkspaceStore {
     const revision = revisionView(draft)
     let intent = addNodeIntent(option, revision, target, this.#i18n.t)
     if (intent == null) return
-    if (intent.kind == 'provider-trigger' && intent.connectionId == null) {
+    if (intent.kind == 'provider-trigger' && intent.connectionId == null && intent.definition.key != 'feishu_app_bot.on_event') {
       try {
         const connections = await resourceValue(this.catalogs.connections.get(intent.definition.provider, draft.flowId))
         intent = { ...intent, connectionId: connectionCatalog(connections).preferred?.connectionId }
@@ -713,6 +716,36 @@ export class WorkspaceStore {
     return changes != null && (await this.#changeDraft(changes)) != null
   }
 
+  public get eventSourceClient() {
+    return this.#client
+  }
+
+  public async loadEventSources(signal: AbortSignal) {
+    const flowId = this.#model.value.flowId
+    if (flowId == null) throw new Error('No Flow selected')
+    return await this.#client.listEventSources(flowId, signal)
+  }
+
+  public async setTriggerEventSource(triggerId: string, source: EventSource): Promise<boolean> {
+    const revision = this.$.revision.value
+    const target = this.#model.value.target
+    if (revision == null || target?.kind != 'flow') return false
+    const trigger = revision.graph(target)?.nodes[triggerId]
+    if (trigger?.kind != 'integration' || trigger.definition.key != 'feishu_app_bot.on_event' || source.provider != trigger.definition.provider) return false
+    const connectionChanges = changeTriggerConnection(revision.revision.content, target, triggerId, source.connectionId)
+    if (connectionChanges == null) return false
+    const changed = trigger.config.sourceId != source.sourceId
+    return (
+      (await this.#changeDraft([
+        ...connectionChanges,
+        ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'sourceId', source.sourceId) ?? []),
+        ...(changed ? (updateTriggerConfig(revision.revision.content, target, triggerId, 'eventTypes', []) ?? []) : []),
+        ...(changed ? (updateTriggerConfig(revision.revision.content, target, triggerId, 'resource', undefined) ?? []) : []),
+        ...(changed ? (updateTriggerConfig(revision.revision.content, target, triggerId, 'chatIds', undefined) ?? []) : []),
+      ])) != null
+    )
+  }
+
   public async loadTriggerConfigOptions(triggerId: string, field: string, signal: AbortSignal) {
     const flowId = this.#model.value.flowId
     const current = this.#draftSession.capture()
@@ -726,9 +759,17 @@ export class WorkspaceStore {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target?.kind != 'flow') return false
-    const changes = updateTriggerConfig(revision.revision.content, target, triggerId, name, value)
+    let changes = updateTriggerConfig(revision.revision.content, target, triggerId, name, value)
     if (changes == null) return false
     const trigger = revision.graph(target)?.nodes[triggerId]
+    if (changes.length > 0 && trigger?.kind == 'integration' && trigger.definition.key == 'feishu_app_bot.on_event' && name == 'eventTypes') {
+      const events = Array.isArray(value) ? value.filter((item): item is string => typeof item == 'string') : []
+      if (!supportsFeishuChatFilter(events))
+        changes = [...changes, ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'chatIds', undefined) ?? [])]
+      if (isJsonObject(trigger.config.resource) && trigger.config.resource.kind != feishuResourceKind(events)) {
+        changes = [...changes, ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'resource', undefined) ?? [])]
+      }
+    }
     if (changes.length > 0 && trigger?.kind == 'poll' && trigger.definition.key == 'linear.on_issue_changed' && name == 'teamId') {
       return (
         (await this.#changeDraft([...changes, ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'stateIds', undefined) ?? [])])) != null

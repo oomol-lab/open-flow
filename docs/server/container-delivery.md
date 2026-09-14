@@ -115,6 +115,10 @@ Server 不发送 `Authorization` header。不能只配置 token 而不配置 ori
 后者不能使用只在容器网络中可访问的地址，也不能包含 credential、path、query 或 fragment；除 loopback 本地开发外必须使用 HTTPS。Connector runtime
 origin 可以在受信任的容器私网使用 HTTP；跨不受信任网络部署时必须由 TLS 保护 bearer token。
 
+使用带 token 的 OOMOL 托管 Connector（`connector.oomol.com` / `connector.oomol.dev`）时，连接入口自动使用相应的
+`console.oomol.com` / `console.oomol.dev`，并按 Flow 或事件源表单的团队生成页面链接；无需配置 `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN`。
+`/providers/:serviceId` 仅用于自部署 OpenConnector Console，不能拼接到托管 runtime 域名上。
+
 `OPEN_FLOW_LLM_ORIGIN` 和 `OPEN_FLOW_LLM_TOKEN` 必须同时提供或同时省略。显式配置优先，origin 必须是不带 credential、path、query 或 fragment 的
 HTTPS origin；只有 loopback 本地开发可以使用 HTTP。Server 在该 origin 下调用 `/v1/chat/completions`。未显式配置时，如果 Connector runtime
 origin 的 hostname 精确为 `connector.oomol.com` 或 `connector.oomol.dev` 且 token 非空，Server 会分别使用

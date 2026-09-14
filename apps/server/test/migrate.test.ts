@@ -27,7 +27,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(16)
+    expect(version(database)).toBe(17)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -43,6 +43,11 @@ it('applies the Flow-first schema without foreign keys', async () => {
     expect(tables.map(({ name }) => name)).toContain('poll_candidates')
     expect(tables.map(({ name }) => name)).toContain('run_waits')
     expect(tables.map(({ name }) => name)).toContain('wait_notifications')
+    expect(tables.map(({ name }) => name)).toContain('event_sources')
+    expect(tables.map(({ name }) => name)).toContain('source_events')
+    expect(tables.map(({ name }) => name)).toContain('source_deliveries')
+    expect(tables.map(({ name }) => name)).toContain('source_subscriptions')
+    expect(tables.map(({ name }) => name)).toContain('source_demands')
     expect(tables.map(({ name }) => name)).not.toContain('projects')
     expect(database.prepare("SELECT name FROM pragma_index_info('publish_work_operation') WHERE seqno = 0").get()).toEqual({ name: 'operation_id' })
     for (const { name } of tables) expect(database.prepare(`PRAGMA foreign_key_list(${name})`).all(), name).toEqual([])
@@ -63,7 +68,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(16)
+    expect(version(reopened)).toBe(17)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -93,7 +98,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(16)
+    expect(version(reopened)).toBe(17)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -141,13 +146,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 17')
+  database.exec('PRAGMA user_version = 18')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 17 is newer than the supported version 16.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 18 is newer than the supported version 17.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(17)
+  expect(version(reopened)).toBe(18)
   reopened.close()
 })
 
@@ -172,6 +177,7 @@ it('removes obsolete Wait ordering while preserving a pending checkpoint', async
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
+  database.exec('DROP TABLE source_demands; DROP TABLE source_subscriptions; DROP TABLE source_deliveries; DROP TABLE source_events; DROP TABLE event_sources')
   database.exec(
     'DROP TABLE listener_work; DROP TABLE run_results; DROP TABLE wait_receipts; ALTER TABLE runs DROP COLUMN llm_config; ALTER TABLE runs DROP COLUMN binding_values',
   )
@@ -197,7 +203,7 @@ it('removes obsolete Wait ordering while preserving a pending checkpoint', async
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(16)
+    expect(version(reopened)).toBe(17)
     expect(reopened.prepare('SELECT * FROM run_waits').get()).toEqual(expected)
   } finally {
     reopened.close()
@@ -208,6 +214,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
+  database.exec('DROP TABLE source_demands; DROP TABLE source_subscriptions; DROP TABLE source_deliveries; DROP TABLE source_events; DROP TABLE event_sources')
   database.exec('DROP TABLE listener_work; ALTER TABLE publish_operations DROP COLUMN next_attempt_at; PRAGMA user_version = 14')
   database.prepare('INSERT INTO revisions (revision_id, digest, content) VALUES (?, ?, ?)').run('legacy-revision', 'legacy-digest', '{ "legacy": true }')
   database
@@ -226,7 +233,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(16)
+    expect(version(upgraded)).toBe(17)
     expect(tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())).toEqual(before)
     expect(upgraded.prepare('SELECT * FROM listener_work').all()).toEqual([])
   } finally {

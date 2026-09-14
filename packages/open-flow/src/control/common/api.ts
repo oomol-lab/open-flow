@@ -1,3 +1,7 @@
+import type { CreateEventSource, UpdateEventSource, EventSource } from './eventSources.ts'
+
+import { decodeEventSource, decodeEventSources } from './eventSources.ts'
+export { decodeEventSource, decodeEventSources, type CreateEventSource, type UpdateEventSource, type EventSource } from './eventSources.ts'
 import type { TriggerCatalogCache } from './triggerCatalog.ts'
 
 import { decodeTriggerCatalog } from './triggerCatalog.ts'
@@ -29,7 +33,7 @@ import type {
 } from '../../flow/common/change.ts'
 
 import { flowCheck } from './checkDecoders.ts'
-import { connectorAction } from './connectorDecoders.ts'
+import { connection, connectorAction } from './connectorDecoders.ts'
 import { allConnectorConnectionsQuery, connectorActionQuery, connectorConnectionsQuery, connectorProvidersQuery } from './connectorQueries.ts'
 import { exact, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 import { flow, flowPage, variable } from './flowDecoders.ts'
@@ -142,6 +146,7 @@ export interface PollTriggerTestResult {
 }
 
 export interface ConnectorConnection {
+  readonly providerAccountId?: string
   readonly builtInAccount?: boolean
   readonly alias?: string
   readonly connectionId: string
@@ -568,6 +573,32 @@ export class ControlClient {
     return flowPage(await this.request(`/v1/flows${query}`))
   }
 
+  async listEventSources(
+    flowId?: string,
+    signal?: AbortSignal,
+  ): Promise<{ readonly version: 1; readonly sources: readonly EventSource[]; readonly teamId?: string | null }> {
+    return decodeEventSources(await this.request('/v1/event-sources' + (flowId == null ? '' : `?flowId=${segment(flowId)}`), { signal }))
+  }
+
+  async listEventSourceConnections(teamId: string | null, signal?: AbortSignal): Promise<readonly ConnectorConnection[]> {
+    const source = record(await this.request(`/v1/event-sources/connections${teamId == null ? '' : `?teamId=${segment(teamId)}`}`, { signal }))
+    exact(source, ['version', 'connections'])
+    if (source.version != 1 || !Array.isArray(source.connections)) return invalidResponse()
+    return source.connections.map(connection)
+  }
+
+  async createEventSource(input: CreateEventSource): Promise<EventSource> {
+    return decodeEventSource(await this.request('/v1/event-sources', { method: 'POST', body: JSON.stringify(input) }))
+  }
+
+  async updateEventSource(sourceId: string, input: UpdateEventSource): Promise<EventSource> {
+    return decodeEventSource(await this.request(`/v1/event-sources/${segment(sourceId)}`, { method: 'PUT', body: JSON.stringify(input) }))
+  }
+
+  async deleteEventSource(sourceId: string, expectedRevision: number): Promise<void> {
+    await this.request(`/v1/event-sources/${segment(sourceId)}`, { method: 'DELETE', body: JSON.stringify({ version: 1, expectedRevision }) })
+  }
+
   async listVariables(): Promise<{ readonly variables: readonly Variable[]; readonly version: 1 }> {
     const source = record(await this.request('/v1/variables'))
     exact(source, ['variables', 'version'])
@@ -792,9 +823,12 @@ export class ControlClient {
     return this.connectorRequest(query.path, 'connections', signal, query.decode, fresh)
   }
 
-  async createConnectorConnectionPage(serviceId: string, flowId?: string): Promise<string> {
+  async createConnectorConnectionPage(serviceId: string, flowId?: string, teamId?: string): Promise<string> {
+    const parameters = new URLSearchParams()
+    if (flowId != null) parameters.set('flowId', flowId)
+    if (teamId != null) parameters.set('teamId', teamId)
     const source = record(
-      await this.request(`/v1/connector/connections/${segment(serviceId)}/page${flowId == null ? '' : `?flowId=${segment(flowId)}`}`, {
+      await this.request(`/v1/connector/connections/${segment(serviceId)}/page${parameters.size == 0 ? '' : `?${parameters}`}`, {
         body: JSON.stringify({ version: 1 }),
         method: 'POST',
       }),

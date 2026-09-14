@@ -10,6 +10,7 @@ import type {
 } from '@oomol-lab/open-flow/integration-trigger'
 import type { Logger } from 'pino'
 import type { ConnectorHost } from '../deployment/connector.ts'
+import type { SourceDelivery } from '../storage/event-source-store.ts'
 import type { IntegrationCandidate } from '../storage/integration-store.ts'
 import type { IntegrationHealth, StoredIntegrationBinding, StoredIntegrationState, StoredIntegrationTarget } from '../storage/trigger-store.ts'
 
@@ -30,6 +31,7 @@ import { ConnectorTaskError } from '../deployment/connector.ts'
 import { AcceptanceError } from '../error.ts'
 import { errorKind } from '../logger.ts'
 import { Store } from '../storage/store.ts'
+import { EventSourceRuntime } from './event-source-runtime.ts'
 
 export interface IntegrationOptions {
   readonly callbackKey: string
@@ -78,6 +80,7 @@ const reconcileTimeoutMs = 30_000
 const retryMs = 1_000
 
 export class IntegrationRuntime {
+  readonly sources: EventSourceRuntime
   readonly #clock: () => number
   readonly #definitions: ReadonlyMap<string, IntegrationDefinition>
   readonly #logger: Logger
@@ -101,6 +104,7 @@ export class IntegrationRuntime {
     runCreated: (flowId: string, runId: string) => void,
     logger: Logger,
   ) {
+    this.sources = new EventSourceRuntime(store, resolveConnector, resolveOptions, clock, wake)
     this.#clock = clock
     this.#definitions = new Map(definitions.map((definition) => [definition.snapshot.key, definition]))
     this.#logger = logger.child({ component: 'integration' })
@@ -133,6 +137,7 @@ export class IntegrationRuntime {
       }
       return {
         connectionId: binding.target,
+        eventSource: definition.eventSource != null,
         listener: definition.listener != null,
         reconcileAt: publishedAt,
         triggerJson: JSON.stringify(trigger),
@@ -202,9 +207,15 @@ export class IntegrationRuntime {
     )
   }
 
+  nextAt(): number | undefined {
+    const at = Math.min(this.#store.integrations.nextIntegrationAt() ?? Infinity, this.#store.eventSources.nextAt() ?? Infinity)
+    return at == Infinity ? undefined : at
+  }
+
   receive(
     target: IntegrationTarget,
     input: {
+      readonly sourceDelivery?: SourceDelivery
       readonly headers: Headers
       readonly method: IntegrationReceiveContext['method']
       readonly payload: JsonValue
@@ -239,6 +250,7 @@ export class IntegrationRuntime {
         const received = yield* Effect.tryPromise({
           try: async (signal) =>
             await target.definition.receive({
+              eventSourceId: input.sourceDelivery?.sourceId,
               admit,
               allow: () => Promise.resolve(true),
               bindingId: target.stored.bindingId,
@@ -313,12 +325,15 @@ export class IntegrationRuntime {
               ),
             catch: (error) => error,
           })
-          const accepted = this.#store.integrations.acceptIntegrationTarget({
-            ...target.stored,
-            occurrenceId,
-            payload: received.payload,
-            requestDigest,
-          })
+          const accepted = this.#store.integrations.acceptIntegrationTarget(
+            {
+              ...target.stored,
+              occurrenceId,
+              payload: received.payload,
+              requestDigest,
+            },
+            input.sourceDelivery == null ? undefined : () => this.#store.eventSources.finish(input.sourceDelivery!, 'delivered'),
+          )
           if (accepted == null) return { status: 404 }
           if (accepted.kind == 'conflict') return { status: 409 }
           if (accepted.kind == 'overloaded') return { status: 429 }
@@ -401,12 +416,10 @@ export class IntegrationRuntime {
     context: Omit<IntegrationReconcileContext, 'connector' | 'signal'>,
   ): Effect.Effect<IntegrationReconcileResult, unknown> {
     return Effect.tryPromise({
-      try: (signal) =>
-        definition.reconcile({
-          ...context,
-          connector: this.#connectorProxy(definition, bindingId, connectionId, flowId, signal),
-          signal,
-        }),
+      try: (signal) => {
+        const input = { ...context, connector: this.#connectorProxy(definition, bindingId, connectionId, flowId, signal), signal }
+        return definition.eventSource == null ? definition.reconcile(input) : this.sources.reconcile(definition, bindingId, connectionId, flowId, input)
+      },
       catch: (error) => error,
     }).pipe(
       Effect.timeoutOrElse({
@@ -703,6 +716,8 @@ export class IntegrationRuntime {
 
   #tick(now: number): Effect.Effect<void, unknown> {
     return Effect.gen({ self: this }, function* () {
+      yield* this.#deliverSources(now)
+      yield* Effect.tryPromise({ try: (signal) => this.sources.cleanup(signal), catch: (error) => error })
       while (true) {
         const candidates = this.#store.integrations.dueCandidates(now, batchSize)
         if (candidates.length == 0) break
@@ -714,6 +729,49 @@ export class IntegrationRuntime {
         for (const binding of bindings) {
           yield* this.#reconcile(binding, now)
         }
+      }
+    })
+  }
+
+  #deliverSources(now: number): Effect.Effect<void, unknown> {
+    return Effect.gen({ self: this }, function* () {
+      for (const delivery of this.#store.eventSources.deliveries(now)) {
+        const source = this.#store.eventSources.get(delivery.sourceId)
+        const target = this.target(delivery.endpointId)
+        if (
+          source == null ||
+          target == null ||
+          'candidate' in target ||
+          target.stored.bindingId != delivery.bindingId ||
+          target.stored.runtimeVersion != delivery.runtimeVersion ||
+          target.stored.currentPublicationId != delivery.publicationId
+        ) {
+          this.#store.eventSources.finish(delivery, 'retired')
+          continue
+        }
+        if (source.enabled != 1 || source.verifiedAt == null || !this.#store.eventSources.deliverable(delivery)) {
+          this.#store.eventSources.retry(delivery, now)
+          continue
+        }
+        yield* this.receive(target, {
+          sourceDelivery: delivery,
+          headers: new Headers(),
+          method: 'POST',
+          payload: JSON.parse(delivery.payloadJson),
+          query: new URLSearchParams(),
+          rawBody: new Uint8Array(),
+        }).pipe(
+          Effect.matchEffect({
+            onFailure: () => Effect.sync(() => this.#store.eventSources.retry(delivery, now)),
+            onSuccess: (result) =>
+              Effect.sync(() => {
+                if (result.status == 200) this.#store.eventSources.finish(delivery, 'delivered')
+                else if (result.status == 404) this.#store.eventSources.finish(delivery, 'retired')
+                else if (result.status == 409) this.#store.eventSources.finish(delivery, 'failed', 'event.conflict')
+                else this.#store.eventSources.retry(delivery, now)
+              }),
+          }),
+        )
       }
     })
   }

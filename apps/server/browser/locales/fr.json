@@ -59,7 +59,8 @@
     },
     "title": "Paramètres",
     "token": "Token",
-    "tokenHint": "Le token existant n’est jamais affiché. L’enregistrement le remplace."
+    "tokenHint": "Le token existant n’est jamais affiché. L’enregistrement le remplace.",
+    "eventSources": "Sources d’événements"
   },
   "team": {
     "createFailed": "Impossible de créer le Flow pour cette équipe du Connector.",

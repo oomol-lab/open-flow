@@ -70,6 +70,7 @@ export interface IntegrationStateContext {
 }
 
 export interface IntegrationReceiveContext {
+  readonly eventSourceId?: string
   readonly signal?: AbortSignal
   readonly admit: boolean
   readonly allow?: () => Promise<boolean>
@@ -104,6 +105,7 @@ export interface IntegrationReconcileResult {
 }
 
 export interface IntegrationDefinition {
+  readonly eventSource?: 'feishu'
   readonly configOptions?: (context: TriggerConfigOptionsContext) => Promise<readonly TriggerConfigOption[]>
   readonly listener?: ListenerSource
   readonly initialState?: { readonly checkpoint: JsonValue; readonly subscription: Readonly<Record<string, JsonValue>> }

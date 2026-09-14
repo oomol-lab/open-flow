@@ -13,6 +13,7 @@ import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
 import { insertTriggerActivity, pruneTriggerActivities } from '../runtime/trigger-activity.ts'
 
 export interface IntegrationPublication {
+  readonly eventSource?: boolean
   readonly listener?: boolean
   readonly connectionId: string
   readonly reconcileAt: number
@@ -60,7 +61,13 @@ export class IntegrationStore {
     operationId: string,
     flowId: string,
     expectedLivePublicationId: string | null,
-    integrations: readonly { readonly listener?: boolean; readonly connectionId: string; readonly triggerJson: string; readonly triggerNodeId: string }[],
+    integrations: readonly {
+      readonly eventSource?: boolean
+      readonly listener?: boolean
+      readonly connectionId: string
+      readonly triggerJson: string
+      readonly triggerNodeId: string
+    }[],
     now: number,
   ): boolean {
     const candidates = []
@@ -68,10 +75,15 @@ export class IntegrationStore {
       const current = this.integrationBinding(flowId, integration.triggerNodeId)
       if (current != null) {
         if (this.#canReuse(current, integration, expectedLivePublicationId)) continue
-        if (current.currentPublicationId != expectedLivePublicationId || this.#matches(current, integration) || !integration.listener) return false
+        if (
+          current.currentPublicationId != expectedLivePublicationId ||
+          this.#matches(current, integration) ||
+          (!integration.listener && !integration.eventSource)
+        )
+          return false
       }
       const trigger = JSON.parse(integration.triggerJson) as TriggerNode
-      if (trigger.kind != 'integration' || (trigger.definition.key != 'stripe.on_event' && !integration.listener)) return false
+      if (trigger.kind != 'integration' || (trigger.definition.key != 'stripe.on_event' && !integration.listener && !integration.eventSource)) return false
       candidates.push(integration)
     }
     for (const integration of candidates) {
@@ -270,7 +282,7 @@ export class IntegrationStore {
         const unchanged = this.#matches(binding, integration)
         if (input.operationId != null && !this.#canReuse(binding, integration, input.expectedLivePublicationId)) {
           if (
-            !integration.listener ||
+            (!integration.listener && !integration.eventSource) ||
             !this.#replaceCandidate(input.operationId, binding.bindingId, input.flowId, publicationId, integration, input.publishedAt)
           ) {
             return false
@@ -380,6 +392,15 @@ export class IntegrationStore {
     ) {
       return false
     }
+    const sourceId = (JSON.parse(integration.triggerJson) as { config?: { sourceId?: string } }).config?.sourceId
+    if (
+      sourceId != null &&
+      (this.#database.prepare('SELECT 1 FROM event_sources WHERE source_id = ? AND enabled = 1 AND verified_at IS NOT NULL').get(sourceId) == null ||
+        this.#database
+          .prepare("SELECT 1 FROM source_demands d JOIN source_subscriptions s USING (source_id, resource_key) WHERE d.binding_id = ? AND s.status != 'ready'")
+          .get(candidate.bindingId) != null)
+    )
+      return false
     this.#database
       .prepare(
         `INSERT INTO integration_bindings (
@@ -483,8 +504,13 @@ export class IntegrationStore {
 
   acceptIntegrationTarget(
     input: StoredIntegrationTarget & { readonly occurrenceId: string; readonly payload: JsonValue; readonly requestDigest: string },
+    completed?: () => void,
   ): RunAdmission | undefined {
-    return this.#transaction(() => this.#acceptIntegrationTarget(input, false))
+    return this.#transaction(() => {
+      const accepted = this.#acceptIntegrationTarget(input, false)
+      if (accepted?.kind == 'accepted') completed?.()
+      return accepted
+    })
   }
 
   #acceptIntegrationTarget(

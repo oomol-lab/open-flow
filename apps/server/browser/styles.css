@@ -362,6 +362,51 @@ body {
   margin-top: 4px;
 }
 
+.settings-layout {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.settings-nav {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+  width: min(720px, calc(100% - 48px));
+  margin: 0 auto;
+  padding-top: 24px;
+}
+
+.settings-nav a {
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--ui-muted-foreground);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.settings-nav a:hover,
+.settings-nav a[aria-current='page'] {
+  color: var(--ui-foreground);
+  background: var(--ui-muted);
+}
+
+.settings-nav a[aria-current='page'] {
+  font-weight: 600;
+}
+
+.settings-nav a:focus-visible {
+  outline: 2px solid var(--ui-ring);
+  outline-offset: 2px;
+}
+
+.settings-body {
+  flex: 1;
+  min-height: 0;
+}
+
 .settings-page {
   width: 100%;
   height: 100%;

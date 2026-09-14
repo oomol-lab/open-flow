@@ -1,0 +1,6 @@
+{
+  "feishu_app_bot.on_event": {
+    "displayName": "Событие приложения",
+    "description": "Получает выбранные события Feishu через общий источник."
+  }
+}

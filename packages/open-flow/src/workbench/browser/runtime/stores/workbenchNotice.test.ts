@@ -60,3 +60,11 @@ describe('Workbench notices', () => {
     })
   })
 })
+
+it('distinguishes a missing authorization console URL from a Connector outage', () => {
+  const t = createI18n('zh-CN').t
+  expect(errorNotice(new ApiError(503, 'connector.console-unconfigured', 'Raw server message.'), t).message).toBe(
+    '尚未配置 Connector 授权控制台地址。请前往“设置 → Connector → 授权控制台地址”完成配置后重试。',
+  )
+  expect(errorNotice(new ApiError(503, 'connector.unavailable', 'Unavailable.'), t).message).toBe('Connector 暂时不可用，请稍后重试。')
+})

@@ -2,6 +2,7 @@ import type { LlmConfig } from '../deployment/llm.ts'
 import type { Database } from './database.ts'
 
 import { ConnectorTeamStore } from './connector-team-store.ts'
+import { EventSourceStore } from './event-source-store.ts'
 import { FlowStore } from './flow-store.ts'
 import { IntegrationStore } from './integration-store.ts'
 import { PollStore } from './poll-store.ts'
@@ -26,6 +27,7 @@ const defaultMaxPendingRuns = 1_000
  */
 export class Store {
   readonly connectorTeams: ConnectorTeamStore
+  readonly eventSources: EventSourceStore
   readonly flows: FlowStore
   readonly integrations: IntegrationStore
   readonly polls: PollStore
@@ -47,6 +49,7 @@ export class Store {
     const connection = database.connection
     const transaction = <Value>(operation: () => Value): Value => database.transaction(operation)
 
+    this.eventSources = new EventSourceStore(connection, transaction, clock)
     this.variables = new VariableStore(connection, transaction, clock)
     this.connectorTeams = new ConnectorTeamStore(connection)
     this.revisions = new RevisionStore(connection, this.variables, llmConfig)

@@ -6,6 +6,7 @@ import { exact, invalidResponse, jsonValue, record, string } from './decoding.ts
 export function connection(value: unknown): ConnectorConnection {
   const source = record(value)
   exact(source, [
+    ...(Object.hasOwn(source, 'providerAccountId') ? ['providerAccountId'] : []),
     ...(Object.hasOwn(source, 'alias') ? ['alias'] : []),
     ...(Object.hasOwn(source, 'builtInAccount') ? ['builtInAccount'] : []),
     'connectionId',
@@ -19,6 +20,7 @@ export function connection(value: unknown): ConnectorConnection {
   if (status != 'active' && status != 'disconnected' && status != 'error' && status != 'reauth_required') return invalidResponse()
   if (typeof source.isDefault != 'boolean') return invalidResponse()
   return {
+    ...(source.providerAccountId === undefined ? {} : { providerAccountId: string(source.providerAccountId) }),
     ...(source.alias === undefined ? {} : { alias: string(source.alias) }),
     ...(source.builtInAccount === undefined ? {} : { builtInAccount: source.builtInAccount }),
     connectionId: string(source.connectionId),

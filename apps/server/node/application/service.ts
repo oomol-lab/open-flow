@@ -239,6 +239,7 @@ export class ServerService {
       this.#resolveConnectorConsoleOrigin,
       this.#resolveWaitPublicOrigin,
       (teamId) => this.#connectorTeam(teamId),
+      this.#integration.sources,
     )
   }
 
@@ -416,6 +417,10 @@ export class ServerService {
 
   integrationEndpoint(flowId: string, triggerNodeId: string): string | undefined {
     return this.#integration.endpoint(flowId, triggerNodeId)
+  }
+
+  receiveSourceEvent(sourceId: string, request: Request): Promise<Response> {
+    return this.#integration.sources.receive(sourceId, request)
   }
 
   integrationState(flowId: string, triggerNodeId: string): IntegrationRuntimeState | undefined {

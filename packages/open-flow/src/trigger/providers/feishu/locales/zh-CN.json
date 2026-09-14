@@ -1,0 +1,6 @@
+{
+  "feishu_app_bot.on_event": {
+    "displayName": "应用事件",
+    "description": "通过共享事件源接收所选飞书应用事件。"
+  }
+}

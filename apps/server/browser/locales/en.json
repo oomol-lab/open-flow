@@ -59,7 +59,8 @@
     },
     "title": "Settings",
     "token": "Token",
-    "tokenHint": "The existing token is never shown. Saving replaces it."
+    "tokenHint": "The existing token is never shown. Saving replaces it.",
+    "eventSources": "Event sources"
   },
   "team": {
     "createFailed": "The Flow could not be created for this Connector Team.",

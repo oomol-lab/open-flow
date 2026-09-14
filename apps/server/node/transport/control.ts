@@ -27,6 +27,7 @@ export type ResolveControlActor = (request: Request) => Promise<string | undefin
 
 type Environment = { Variables: { actorId: string } }
 type InvalidCode =
+  | typeof controlErrorCode.eventSourceInvalid
   | typeof controlErrorCode.flowInvalid
   | typeof controlErrorCode.pageInvalidCursor
   | typeof controlErrorCode.runInvalid
@@ -48,9 +49,46 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     context.set('actorId', actorId)
     await next()
   }
-  for (const route of ['/connector/*', '/flows', '/flows/*', '/runs', '/runs/*', '/trigger-keys', '/trigger-keys/*', '/variables', '/variables/*']) {
+  for (const route of [
+    '/event-sources',
+    '/event-sources/*',
+    '/connector/*',
+    '/flows',
+    '/flows/*',
+    '/runs',
+    '/runs/*',
+    '/trigger-keys',
+    '/trigger-keys/*',
+    '/variables',
+    '/variables/*',
+  ]) {
     app.use(route, authenticate)
   }
+
+  app.get('/event-sources', async (context) => {
+    query(context.req.raw, ['flowId'], controlErrorCode.eventSourceInvalid)
+    return response(200, await service.listEventSources(context.req.query('flowId')))
+  })
+  app.get('/event-sources/connections', async (context) => {
+    query(context.req.raw, ['teamId'], controlErrorCode.eventSourceInvalid)
+    return response(200, await service.listEventSourceConnections(context.req.query('teamId'), context.req.raw.signal))
+  })
+  app.post('/event-sources', async (context) => {
+    query(context.req.raw, [], controlErrorCode.eventSourceInvalid)
+    const body = await decodeRequest(context.req.raw, controlErrorCode.eventSourceInvalid, controlRequests.createEventSource)
+    return response(201, await service.createEventSource(body, context.req.raw.signal))
+  })
+  app.put('/event-sources/:sourceId', async (context) => {
+    query(context.req.raw, [], controlErrorCode.eventSourceInvalid)
+    const body = await decodeRequest(context.req.raw, controlErrorCode.eventSourceInvalid, controlRequests.updateEventSource)
+    return response(200, service.updateEventSource(context.req.param('sourceId'), body))
+  })
+  app.delete('/event-sources/:sourceId', async (context) => {
+    query(context.req.raw, [], controlErrorCode.eventSourceInvalid)
+    const body = await decodeRequest(context.req.raw, controlErrorCode.eventSourceInvalid, controlRequests.eventSourceRevision)
+    service.deleteEventSource(context.req.param('sourceId'), body.expectedRevision)
+    return response(200, { version: 1 })
+  })
 
   app.get('/variables', (context) => {
     query(context.req.raw, [], controlErrorCode.variableInvalid)
@@ -243,12 +281,16 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     })
   })
   app.post('/connector/connections/:serviceId/page', async (context) => {
-    const flowId = query(context.req.raw, ['flowId'], controlErrorCode.flowInvalid).get('flowId')
+    const parameters = query(context.req.raw, ['flowId', 'teamId'], controlErrorCode.flowInvalid)
+    const flowId = parameters.get('flowId')
+    const teamId = parameters.get('teamId')
     await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.versionOnly)
     return response(200, {
-      url: service.connectorConnectionPage(
+      url: await service.connectorConnectionPage(
         connectorService(context.req.param('serviceId')),
         flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
+        teamId == null ? undefined : text(teamId, controlErrorCode.flowInvalid),
+        context.req.raw.signal,
       ),
       version: 1,
     })

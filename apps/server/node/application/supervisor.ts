@@ -134,7 +134,7 @@ export class Supervisor {
       if (!FiberMap.hasUnsafe(this.#tasks, 'cron') && cronAt != null && cronAt <= now) {
         yield* this.#startTask('cron', 'trigger.cron.loop.failed', this.#cron.tick(new Date(now).toISOString()))
       }
-      const integrationAt = this.#store.integrations.nextIntegrationAt()
+      const integrationAt = this.#integration.nextAt()
       if (!FiberMap.hasUnsafe(this.#tasks, 'integration') && integrationAt != null && integrationAt <= now) {
         yield* this.#startTask('integration', 'trigger.integration.loop.failed', this.#integration.tick(new Date(now).toISOString()))
       }
@@ -190,7 +190,7 @@ export class Supervisor {
       if (nextAt != null) deadlines.push(nextAt)
     }
     if (!FiberMap.hasUnsafe(this.#tasks, 'integration')) {
-      const nextAt = this.#store.integrations.nextIntegrationAt()
+      const nextAt = this.#integration.nextAt()
       if (nextAt != null) deadlines.push(nextAt)
     }
     if (!FiberMap.hasUnsafe(this.#tasks, 'listener')) {

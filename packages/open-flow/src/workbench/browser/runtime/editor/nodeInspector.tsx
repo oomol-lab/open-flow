@@ -33,6 +33,7 @@ import { CodeActions } from './codeActions.tsx'
 import { CodeEditor } from './codeEditor.tsx'
 import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
+import { FeishuTriggerConfig } from './feishuTriggerConfig.tsx'
 import { codeTyping } from './flowChanges.ts'
 import { LinearTriggerConfig } from './linearTriggerConfig.tsx'
 import { NodeDescription } from './nodeDescription.tsx'
@@ -41,7 +42,7 @@ import { taskDiagnosticReady, taskInspectorSection } from './nodeInspectorBehavi
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 import { TriggerScheduleEditor } from './triggerScheduleEditor.tsx'
-import { TriggerSummary } from './triggerSummary.tsx'
+import { TriggerInspectorSummary } from './triggerSummary.tsx'
 import { WebhookEditor } from './webhookEditor.tsx'
 
 const InputValues = lazy(async () => {
@@ -1135,7 +1136,7 @@ export function NodeInspector({
     <ScrollArea className="inspector-scroll" defer={false} tabIndex={-1}>
       <div className="inspector-content" ref={content}>
         <Diagnostics key={JSON.stringify([store.$.flowId.value, target, selection?.id])} diagnostics={diagnostics} />
-        {selection?.kind == 'trigger' && (
+        {selection?.kind == 'trigger' && !(selection.trigger.kind == 'integration' && selection.trigger.definition.key == 'feishu_app_bot.on_event') && (
           <TriggerConnection
             activeConnections={triggerActiveConnections}
             authorizationPending={triggerAuthorizationPending}
@@ -1198,7 +1199,9 @@ export function NodeInspector({
         )}
         {selection?.kind === 'trigger' &&
           (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') &&
-          (selection.trigger.definition.key === 'linear.on_issue_changed' ? (
+          (['feishu.on_event', 'feishu_app_bot.on_event'].includes(selection.trigger.definition.key) ? (
+            <FeishuTriggerConfig config={selection.trigger.config} nodeId={selection.id} disabled={disabled} store={store} />
+          ) : selection.trigger.definition.key === 'linear.on_issue_changed' ? (
             <LinearTriggerConfig
               config={selection.trigger.config}
               nodeId={selection.id}
@@ -1230,7 +1233,7 @@ export function NodeInspector({
             }}
           />
         )}
-        {selection?.kind === 'trigger' && <TriggerSummary trigger={selection.trigger} />}
+        {selection?.kind === 'trigger' && <TriggerInspectorSummary trigger={selection.trigger} catalog={triggers.catalog} />}
         {(selection?.kind === 'condition' || selection?.kind === 'wait' || selection?.kind === 'subflow' || selection?.kind === 'task') &&
           (() => {
             const definitions: (InputPort | Group)[] =

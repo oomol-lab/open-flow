@@ -737,11 +737,13 @@ describe('Server Connector client', () => {
       clock: Date.now,
     })
     services.push(configured)
-    expect(configured.control.connectorConnectionPage('mail/work')).toBe('https://connector.example/providers/mail%2Fwork')
+    expect(await configured.control.connectorConnectionPage('mail/work')).toBe('https://connector.example/providers/mail%2Fwork')
 
     const unconfigured = await openService(await databaseFile())
     services.push(unconfigured)
-    expect(() => unconfigured.control.connectorConnectionPage('mail')).toThrow(expect.objectContaining({ code: 'connector.unavailable', status: 503 }))
+    await expect(unconfigured.control.connectorConnectionPage('mail')).rejects.toThrow(
+      expect.objectContaining({ code: 'connector.console-unconfigured', status: 503 }),
+    )
 
     const insecureFile = await databaseFile()
     await expect(
