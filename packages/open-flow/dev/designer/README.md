@@ -106,3 +106,9 @@ Fixed Values now lives under Nodes, including Node States and Fixed Values Edito
 字段的附加设置与输入来源使用同一个带标题和关闭按钮的浮动面板，锚定字段左侧，按视口避让；在 Ports & sources 中检查打开、关闭、Escape 和主题继承。
 
 Fixed Values 的 Properties 样板使用名称／值布局，名称可原位编辑；多选、颜色和日期通过紧凑入口打开编辑弹层。并排只读样板用于检查禁用状态，Reload saved data 检查改名与值保存。
+
+`?story=field-settings` 并排打开生产字段设置面板，展示可编辑与只读状态。检查名称、多行用途说明、带标题的类型选择，以及高级设置中的 Schema 编辑与校验。值节点不重复显示空值开关，输入／输出保留该开关；移除操作独立置底；Reset samples 重置并重新打开样本。
+
+JSON 值编辑器支持通过右下角手柄调整高度，宽度跟随面板；二级面板的 JSON Schema 编辑器按完整内容高度展示，仅由面板统一滚动。
+
+高级设置使用原生折叠，不执行高度动画。展开后面板保持定位并限制可用高度，长内容由面板统一滚动；编辑器保持挂载，收起后不进入 Tab 顺序。

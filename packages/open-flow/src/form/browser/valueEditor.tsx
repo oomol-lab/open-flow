@@ -826,18 +826,9 @@ export function ValueEditor(props: ValueEditorProps) {
             ) : (
               <Popover open={optionsOpen} onOpenChange={setOptionsOpen}>
                 <PopoverTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={disabled}
-                      data-value-options
-                      aria-label={t('valueEditor.options', { name: label })}
-                    />
-                  }
+                  render={<Button type="button" variant="ghost" size="icon-sm" data-value-options aria-label={t('valueEditor.options', { name: label })} />}
                 >
-                  <i aria-hidden="true" className="i-carbon:tuning" />
+                  <i aria-hidden="true" className="i-lucide-light:settings" />
                 </PopoverTrigger>
                 <PopoverContent
                   container={container}

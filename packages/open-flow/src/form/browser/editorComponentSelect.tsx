@@ -8,11 +8,13 @@ import { fieldSelectTriggerClass, selectionMenuRowClass } from './fieldSelect.ts
 
 export function EditorComponentSelect({
   schema,
+  id,
   name,
   disabled,
   onChange,
 }: {
   schema: unknown
+  id?: string
   name: string
   disabled?: boolean
   onChange: (schema: Record<string, unknown>) => void
@@ -32,7 +34,7 @@ export function EditorComponentSelect({
           if (value != null) onChange(schemaForEditor(value as EditorComponent, schema))
         }}
       >
-        <SelectTrigger size="field" aria-label={t('valueEditor.type', { name })} className={fieldSelectTriggerClass}>
+        <SelectTrigger id={id} size="field" aria-label={t('valueEditor.type', { name })} className={fieldSelectTriggerClass}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent container={container} align="start" alignItemWithTrigger={false} className="min-w-44 p-2 [scrollbar-width:thin]">

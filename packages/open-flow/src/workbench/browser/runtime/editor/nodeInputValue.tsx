@@ -12,6 +12,7 @@ import { Field, FieldDescription, FieldLabel } from '../../../../ui/browser/fiel
 import { NativeSelect } from '../../../../ui/browser/native-select.tsx'
 import { Popover, PopoverPanelContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { VariablePicker } from '../../../../ui/browser/variable-picker.tsx'
+import { fieldPanelAnchor } from './fieldPanelAnchor.ts'
 import { LlmInputEditor, supportsLlmInput } from './llmInputEditor.tsx'
 
 export type InputVariables = Pick<VariablePickerProps, 'enabled' | 'loaded' | 'loading' | 'names' | 'onOpen'>
@@ -103,8 +104,8 @@ export function NodeInputValue({
                   <i aria-hidden="true" className="i-lucide-light:link" />
                 </PopoverTrigger>
                 <PopoverPanelContent
-                  container={sourceContainer}
-                  anchor={() => sourceContainer?.closest('[data-port]') ?? sourceContainer}
+                  container={sourceContainer?.closest<HTMLElement>('.editor-context-panel') ?? sourceContainer}
+                  anchor={() => fieldPanelAnchor(sourceContainer?.closest('[data-port]') ?? sourceContainer)}
                   title={`${definition.handle} · ${t('inspector.sources.title')}`}
                   closeLabel={t('common.close')}
                 >

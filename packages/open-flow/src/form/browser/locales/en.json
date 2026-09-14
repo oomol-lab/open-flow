@@ -1,5 +1,7 @@
 {
   "valueEditor": {
+    "advancedSettings": "Advanced settings",
+    "invalidSchema": "Enter a valid JSON Schema.",
     "invalidJson": "Enter valid JSON.",
     "invalidNumber": "Enter a valid number.",
     "fieldName": "Field name",

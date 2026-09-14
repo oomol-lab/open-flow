@@ -43,7 +43,15 @@ const surfaceUiTokens = [
 const inheritedUiTokens = ['--ui-font-size'] as const
 const sharedUiTokens = [...surfaceUiTokens, ...inheritedUiTokens].toSorted()
 // Panel-specific overrides are optional; shared controls must supply a fallback.
-const controlOverrideTokens = ['--ui-control-background', '--ui-control-hover-background', '--ui-control-radius'] as const
+const controlOverrideTokens = [
+  '--ui-control-background',
+  '--ui-control-hover-background',
+  '--ui-control-radius',
+  '--ui-disabled-background',
+  '--ui-disabled-cursor',
+  '--ui-disabled-opacity',
+  '--ui-readonly-focus-outline',
+] as const
 
 const reactFlowThemeContract = {
   '--xy-controls-box-shadow': 'var(--floating-control-shadow)',

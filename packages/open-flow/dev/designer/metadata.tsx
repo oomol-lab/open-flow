@@ -41,6 +41,7 @@ function MetadataStory({ dark, language, log }: { dark: boolean; language: UiLan
           }}
         />
         <NodeDescription value="Read-only node description." disabled onSave={() => log('Unexpected read-only save')} />
+        <NodeDescription value={undefined} disabled onSave={() => log('Unexpected empty read-only save')} />
         <output aria-label="Saved description">{JSON.stringify({ description: value })}</output>
       </div>
     </I18nProvider>

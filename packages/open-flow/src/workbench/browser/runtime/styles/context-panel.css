@@ -9,6 +9,11 @@
     --ui-background: var(--open-flow-node-surface);
     --ui-control-background: var(--open-flow-node-content);
     --ui-control-hover-background: var(--open-flow-secondary);
+    --ui-readonly-focus-outline: 1px solid color-mix(in srgb, var(--ui-ring) 40%, var(--ui-input));
+
+    :is(input, textarea):is([readonly], :disabled)::placeholder {
+      opacity: 0;
+    }
   }
 
   .context-panel {
@@ -101,17 +106,6 @@
 
   .inspector-field-source {
     min-width: 0;
-    [data-slot='select-trigger'] {
-      width: 100%;
-      height: 30px;
-      min-height: 30px;
-      padding: 4px 6px;
-      border: 1px solid color-mix(in srgb, var(--ui-border) 65%, var(--ui-background));
-      border-radius: 5px;
-      background: var(--ui-popover);
-      box-shadow: none;
-      font-size: 12px;
-    }
   }
 
   .inspector-port-section {
@@ -641,20 +635,6 @@
     font-size: 12px;
     font-weight: 600;
     line-height: 20px;
-  }
-
-  .inspector-sources [data-slot='select-trigger'] {
-    height: 22px;
-    min-height: 22px;
-    border-color: transparent;
-    border-radius: 3px;
-    background: var(--ui-muted);
-    font-size: 12px;
-    box-shadow: none;
-
-    &:focus-visible {
-      border-color: var(--ui-ring);
-    }
   }
 
   .wait-mode-switcher {

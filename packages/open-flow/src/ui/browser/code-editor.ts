@@ -9,6 +9,7 @@ export interface CodeEditorOptions {
   readonly invalid?: boolean
   readonly readOnly?: boolean
   readonly value?: string
+  readonly cursorScrollMargin?: number
   readonly wordWrap?: string
 }
 
@@ -191,6 +192,7 @@ class CodeMirrorEditor {
       extensions: [
         options.setup === 'minimal' ? modules.minimalSetup : modules.basicSetup,
         modules.EditorView.editorAttributes.of({ class: 'open-flow-code-editor' }),
+        modules.EditorView.cursorScrollMargin.of(options.cursorScrollMargin ?? 5),
         modules.autocompletion({
           icons: false,
           addToOptions: [

@@ -1,5 +1,7 @@
 {
   "valueEditor": {
+    "advancedSettings": "進階設定",
+    "invalidSchema": "請輸入有效的 JSON Schema。",
     "invalidJson": "請輸入有效的 JSON。",
     "invalidNumber": "請輸入有效的數字。",
     "fieldName": "欄位名稱",
