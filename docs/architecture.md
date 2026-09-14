@@ -86,6 +86,8 @@ RunEvent 明细可以按部署声明的 retention 到期，但唯一 terminal re
 - `apps/server` 拥有 Server application lifecycle、SQLite、HTTP adapter、本地调度、具体 `isolated-vm` host、同源 Workbench host 和 Docker 交付。
 - 其他部署只拥有自己的基础设施接入、认证、application lifecycle、Capability mediation 和正式 Workbench 宿主。
 
+部署的浏览器分析由各自宿主持有，不进入公共 Workbench runtime 或 Control API 身份合同；开源 Server 的自建部署默认不向官方站点的分析项目发送数据。
+
 部署必须消费精确版本的公开 package artifact 并运行其中的 conformance cases，不能通过源码复制、deep import 或同步脚本保留公共实现的第二份
 可编辑副本。Workbench runtime、类型声明和样式只通过 `@oomol-lab/open-flow/workbench`、`workbench.css` 与 `theme.css` 同版本发布。
 `theme.css` 是部署宿主与 Workbench 共用的产品语义主题合同；Canvas Content 的 Designer token 仍由 Designer 独立拥有，只有 Canvas Chrome

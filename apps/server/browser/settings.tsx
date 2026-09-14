@@ -3,6 +3,7 @@ import type { FormEvent, ReactElement } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslate } from 'val-i18n-react'
+import { posthog } from './posthog.ts'
 
 const sources = ['derived', 'environment', 'none', 'settings'] as const
 
@@ -39,6 +40,7 @@ function config(value: unknown) {
 }
 
 function SettingItem({
+  analyticsType,
   body,
   configured,
   description,
@@ -56,6 +58,7 @@ function SettingItem({
   secretRequired = true,
   source,
 }: {
+  readonly analyticsType: 'connector_console' | 'connector_runtime' | 'integration' | 'llm'
   readonly body: (origin: string, secret: string) => Record<string, unknown>
   readonly configured: boolean
   readonly description?: string
@@ -107,6 +110,7 @@ function SettingItem({
       setRemoving(false)
       setSecret('')
       onSaved(value)
+      posthog?.capture(method == 'PUT' ? 'configuration_saved' : 'configuration_deleted', { configuration_type: analyticsType })
     } catch {
       toast.error(t(method == 'PUT' ? 'settings.saveFailed' : 'settings.deleteFailed'))
     } finally {
@@ -304,6 +308,7 @@ export function SettingsPage({
                 <p>{t('settings.connectorDescription')}</p>
               </div>
               <SettingItem
+                analyticsType="connector_runtime"
                 body={(origin, token) => ({ origin, token })}
                 {...current.connector.runtime}
                 description={t('settings.runtimeDescription')}
@@ -323,6 +328,7 @@ export function SettingsPage({
                 secretRequired={false}
               />
               <SettingItem
+                analyticsType="connector_console"
                 body={(origin) => ({ origin })}
                 {...current.connector.console}
                 description={t('settings.consoleDescription')}
@@ -339,6 +345,7 @@ export function SettingsPage({
             </section>
             <section className="settings-section">
               <SettingItem
+                analyticsType="llm"
                 body={(origin, token) => ({ origin, token })}
                 {...current.llm}
                 endpoint="/config/llm"
@@ -354,6 +361,7 @@ export function SettingsPage({
             </section>
             <section className="settings-section">
               <SettingItem
+                analyticsType="integration"
                 body={(publicOrigin, callbackKey) => ({ callbackKey, publicOrigin })}
                 {...current.integration}
                 endpoint="/config/integration"

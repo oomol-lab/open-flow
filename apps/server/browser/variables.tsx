@@ -7,6 +7,7 @@ import { validVariableName } from '@oomol-lab/open-flow/flow-change'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslate } from 'val-i18n-react'
+import { posthog } from './posthog.ts'
 
 const maxCount = 200
 const maxValueBytes = 64 * 1024
@@ -65,6 +66,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
     setPending(true)
     try {
       await client.putVariable(target, value)
+      posthog?.capture(editing == '' ? 'variable_created' : 'variable_updated')
       await load()
       setEditing(undefined)
       setName('')
@@ -81,6 +83,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
     setPending(true)
     try {
       await client.deleteVariable(variableName)
+      posthog?.capture('variable_deleted')
       await load()
       setRemoving(undefined)
       if (editing == variableName) setEditing(undefined)

@@ -17,6 +17,7 @@ import { createBrowserHost } from './host.ts'
 import { createI18n } from './i18n.ts'
 import { idempotencyKey } from './idempotency.ts'
 import { initialLanguage, languagePreference } from './language.ts'
+import { posthog } from './posthog.ts'
 import { parseRoute, routePath } from './route.ts'
 import { SettingsPage } from './settings.tsx'
 import { VariablesPage } from './variables.tsx'
@@ -305,6 +306,7 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
       const response = await fetch('/auth/session', { credentials: 'same-origin', method: 'DELETE' })
       if (!response.ok) throw new Error('Session logout failed.')
       notify(undefined)
+      posthog?.reset()
       setSession({ configured: true, kind: 'signed-out' })
     } catch {
       notify({ kind: 'error', message: t('session.unavailable') })
@@ -334,6 +336,7 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
     setTeam((current) =>
       current.kind == 'ready' ? { ...current, bindings: [...current.bindings.filter((binding) => binding.flowId != flowId), { flowId, teamId }] } : current,
     )
+    posthog?.capture('flow_created')
     return flowId
   }
 

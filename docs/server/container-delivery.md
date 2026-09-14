@@ -192,3 +192,16 @@ Variable value 和 Settings-managed 外部 service credential 以明文存在于
 视为同一信任边界。
 
 不能只复制主 `.sqlite` 文件而遗漏同目录中的 WAL/SHM 状态，也不能在一个仍写入的容器和一个恢复容器之间共享数据卷。Connector 持久化是外部服务自己的备份边界，不属于 `/data/open-flow`。
+
+## PostHog 浏览器分析
+
+Server 的浏览器宿主集成 PostHog；公开 SDK token 对应 `openflow.run` 项目（ID `607951`，US Cloud）。
+默认仅在 `openflow.run` 和 `www.openflow.run` 域名启用，因此普通本地开发和其他自建部署不会向该项目发送事件。
+公开 token 随浏览器源码构建，现有 CI 和 Docker 构建无需额外凭据。
+
+其他部署可在 Vite 构建时设置 `VITE_POSTHOG_KEY` 和 `VITE_POSTHOG_HOST` 使用自己的项目；显式空 key 禁用分析。
+这些是构建配置，容器启动后设置同名环境变量不会修改已构建的静态资源。
+
+分析使用浏览器匿名标识，不将所有部署共用的 Operator 标识作为 PostHog 用户 ID。
+记录页面访问、未处理浏览器异常，以及成功创建 Flow、保存或删除配置、创建或更新或删除 Variable 的事件。
+业务事件不携带 Variable 名称、值、凭据或 Flow 内容；关闭 DOM 自动采集和会话录制。
