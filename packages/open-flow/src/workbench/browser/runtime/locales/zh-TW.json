@@ -153,7 +153,7 @@
   },
   "inspector": {
     "account": {
-      "required": "待連線",
+      "required": "待連線帳號",
       "addConnection": "新增 Connection",
       "authorizationPending": "請在 Connection 頁面完成授權，再回到這裡重新整理這個帳號。",
       "chooseAccount": "選擇帳號",

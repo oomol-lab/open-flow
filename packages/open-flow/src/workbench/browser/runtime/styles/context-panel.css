@@ -123,7 +123,6 @@
   }
 
   .inspector-content {
-    padding-right: 10px;
     font-size: 12px;
     display: flex;
     min-height: 100%;
@@ -1247,26 +1246,33 @@
     color: var(--warning-foreground);
   }
 
-  .connection-status {
-    margin-left: auto;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: var(--warning-surface);
-    color: var(--warning-foreground);
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 16px;
+  .connection-state:has(> .connection-prompt) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 16px;
+
+    > h3,
+    > p {
+      grid-column: 1;
+    }
+
+    &:has(> p) .connection-prompt > [data-slot='button'] {
+      grid-row: 1 / span 3;
+    }
   }
 
   .connection-prompt {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px 16px;
+    display: contents;
 
     > p {
-      flex: 1 1 200px;
+      grid-column: 1;
       text-wrap: pretty;
+    }
+
+    > [data-slot='button'] {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: center;
     }
   }
 
@@ -1323,7 +1329,18 @@
     color: var(--ui-muted-foreground);
   }
 
-  .connection-state [data-slot='button'] {
+  .connection-state.required {
+    border: 0;
+    background: var(--warning-surface);
+    color: var(--warning-foreground);
+
+    h3,
+    p {
+      color: inherit;
+    }
+  }
+
+  .connection-state > [data-slot='button'] {
     align-self: flex-start;
   }
 

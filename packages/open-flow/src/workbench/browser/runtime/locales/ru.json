@@ -153,7 +153,7 @@
   },
   "inspector": {
     "account": {
-      "required": "Требуется подключение",
+      "required": "Требуется подключение аккаунта",
       "addConnection": "Добавить Connection",
       "authorizationPending": "Завершите авторизацию на странице Connection, затем вернитесь сюда, чтобы обновить этот аккаунт.",
       "chooseAccount": "Выберите аккаунт",

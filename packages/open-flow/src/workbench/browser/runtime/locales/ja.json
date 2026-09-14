@@ -153,7 +153,7 @@
   },
   "inspector": {
     "account": {
-      "required": "接続が必要",
+      "required": "アカウント接続が必要",
       "addConnection": "Connection を追加",
       "authorizationPending": "Connection ページで認証を完了してください。ここに戻ると、このアカウントが更新されます。",
       "chooseAccount": "アカウントを選択",

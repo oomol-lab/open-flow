@@ -314,8 +314,7 @@ function ConnectorAccount({
   return (
     <section className={`inspector-section connection-state ${required ? 'required' : ''}`} data-inspector-section="account">
       <h3>
-        <Icon name="connection" size={15} /> {t('inspector.account.title')}
-        {required && <span className="connection-status">{t('inspector.account.required')}</span>}
+        <Icon name="connection" size={15} /> {t(required ? 'inspector.account.required' : 'inspector.account.title')}
       </h3>
       {content}
     </section>
@@ -909,7 +908,7 @@ function TriggerConnection({
     providerTrigger == null ? null : (
       <section className={`inspector-section connection-state ${connection?.status == 'active' ? '' : 'required'}`} data-inspector-section="account">
         <h3>
-          <Icon name="connection" size={15} /> {t('inspector.account.title')}
+          <Icon name="connection" size={15} /> {t(connection?.status == 'active' ? 'inspector.account.title' : 'inspector.account.required')}
         </h3>
         {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
         {connectionLoading ? (
@@ -923,12 +922,12 @@ function TriggerConnection({
             </Button>
           </>
         ) : (activeConnections?.length ?? 0) == 0 ? (
-          <>
+          <div className="connection-prompt">
             <p>{t('inspector.account.connectBeforeRun', { service: providerTrigger.definition.provider })}</p>
             <Button disabled={disabled} onClick={() => void triggers.connect(providerTrigger.definition.provider)} size="sm" type="button">
               {t('inspector.account.connectService', { service: providerTrigger.definition.provider })}
             </Button>
-          </>
+          </div>
         ) : (
           <>
             <Field className="connection-field">

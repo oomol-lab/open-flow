@@ -153,7 +153,7 @@
   },
   "inspector": {
     "account": {
-      "required": "待连接",
+      "required": "待连接账号",
       "addConnection": "添加连接",
       "authorizationPending": "请在 Connection 页面完成授权，返回这里后会刷新当前账号。",
       "chooseAccount": "选择账号",

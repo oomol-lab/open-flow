@@ -153,7 +153,7 @@
   },
   "inspector": {
     "account": {
-      "required": "연결 필요",
+      "required": "계정 연결 필요",
       "addConnection": "Connection 추가",
       "authorizationPending": "Connection 페이지에서 인증을 마친 뒤 여기로 돌아와 이 계정을 새로 고치세요.",
       "chooseAccount": "계정 선택",
