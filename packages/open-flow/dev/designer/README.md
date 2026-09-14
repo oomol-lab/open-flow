@@ -90,3 +90,5 @@ Drag the centered three-dot handle in the 8px gap to resize the sidebar. Focus t
 **Canvas / Node content** (`?story=node-content`) compares collapsible Schedule, Value, Task and Comment content with empty nodes and Condition. Collapse preserves run status and branches.
 
 `?story=node-picker-preview` compares the open node catalog and the button dock popover. Built-in nodes use compact rows with tooltips; the Triggers tab lists real definitions by app, and the Nodes tab browses sample connector actions. Story actions expose loading, errors and disabled controls.
+
+`?story=inspector-panel` shows the production canvas and resizable node properties panel. Run results stay in the canvas card popover. The panel retains its close button.

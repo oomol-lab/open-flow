@@ -92,7 +92,8 @@
     "retry": "再試行",
     "search": "ノードを検索",
     "searchPlaceholder": "ノードを検索…",
-    "catalogRefreshFailed": "トリガー一覧を更新できませんでした。キャッシュ済みの結果は引き続き利用できます。"
+    "catalogRefreshFailed": "トリガー一覧を更新できませんでした。キャッシュ済みの結果は引き続き利用できます。",
+    "resize": "プロパティパネルの幅を変更"
   },
   "empty": {
     "loadFailedDescription": "API 設定を確認し、デプロイ先のエンドポイントに接続できることを確認してください。",
@@ -915,7 +916,12 @@
     "missingStatuses": "選択したステータスの一部は利用できません。削除するか選び直してください。"
   },
   "nodePicker": {
-    "actionGroups": { "read": "読み取り操作", "write": "書き込み操作", "destructive": "高リスク操作", "other": "その他の操作" },
+    "actionGroups": {
+      "read": "読み取り操作",
+      "write": "書き込み操作",
+      "destructive": "高リスク操作",
+      "other": "その他の操作"
+    },
     "builtInNodes": "組み込みノード",
     "configured": "設定済み",
     "configuredDescription": "アカウントが設定済みで、そのまま利用できます。",
