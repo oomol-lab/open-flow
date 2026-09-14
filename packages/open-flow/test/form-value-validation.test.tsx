@@ -65,3 +65,39 @@ describe('Empty string presentation', () => {
     }
   })
 })
+
+describe('JSON component with union schemas', () => {
+  it.each(['oneOf', 'anyOf'])('uses JSON editing for editable definitions while preserving %s validation', (keyword) => {
+    const i18n = createI18n('en')
+    const onChange = vi.fn()
+    const onDefinitionChange = vi.fn()
+    const schema = { [keyword]: [{ type: 'string' }, { type: 'number' }] }
+    const render = (value: unknown, editDefinition: boolean) =>
+      renderToStaticMarkup(
+        <I18nProvider i18n={i18n}>
+          <ValueEditor
+            label="choice"
+            schema={schema}
+            value={value}
+            onChange={onChange}
+            onDefinitionChange={editDefinition ? onDefinitionChange : undefined}
+            path="/choice"
+            onDraftIssue={vi.fn()}
+          />
+        </I18nProvider>,
+      )
+    try {
+      const json = render('hello', true)
+      expect(json).toContain('aria-label="choice JSON"')
+      expect(json).toContain('&quot;hello&quot;')
+      expect(json).not.toContain('choice variant')
+      expect(json).not.toContain('aria-invalid="true"')
+      expect(render(false, true)).toContain('aria-invalid="true"')
+      expect(render('hello', false)).toContain('choice variant')
+      expect(onChange).not.toHaveBeenCalled()
+      expect(onDefinitionChange).not.toHaveBeenCalled()
+    } finally {
+      i18n.dispose()
+    }
+  })
+})

@@ -34,7 +34,8 @@ export function ChoiceOptions({ options, disabled, onChange }: { options: readon
       <Button
         type="button"
         variant="ghost"
-        size="xs"
+        className="bg-foreground/5"
+        size="field"
         disabled={disabled}
         onClick={() => {
           let index = options.length + 1

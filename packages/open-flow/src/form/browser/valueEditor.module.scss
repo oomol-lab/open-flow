@@ -193,13 +193,13 @@
   grid-column: handle / content-end;
   grid-row: var(--field-branch-row);
   margin: 0 0 4px;
-  padding: 4px 0 0 8px;
+  padding: 4px 0 0 calc(var(--field-indent, 0px) + 16px);
   &::before {
     content: '';
     position: absolute;
-    left: calc(0px - var(--branch-offset));
+    left: calc(var(--field-indent, 0px) - var(--branch-offset));
     top: 0;
-    width: calc(var(--branch-offset) + 4px);
+    width: 16px;
     height: 20px;
     border-left: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
     border-bottom: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
@@ -250,10 +250,10 @@
   margin: 0;
 }
 
-/* Text expansions have no summary row; collections retain their summary. */
+/* Expanded editors occupy the second row; JSON keeps its preview control. */
 .root[data-header][data-expanded]:not([data-structured]) {
   --field-branch-row: 2;
-  > .summary {
+  &:not([data-json]) > .summary {
     display: none;
   }
 }
@@ -273,7 +273,6 @@
 }
 
 .body .root {
-  --field-actions-width: 28px;
   --field-grip-width: 0px;
 }
 
@@ -332,17 +331,22 @@
   }
 }
 
-.root[data-object-child] {
-  @include fieldLayout.columns(280px);
-  --field-grip-width: 0px;
-}
 .collectionActions {
   @include fieldLayout.columns(280px);
   --field-grip-width: 0px;
   --field-actions-width: 28px;
+  &:empty {
+    display: none;
+  }
   > * {
     grid-column: handle / content-end;
   }
+}
+
+.emptyObjectAction {
+  margin-left: calc(var(--field-indent, 0px) + 16px);
+  height: var(--field-control-height, 30px);
+  font: inherit;
 }
 
 .unsetValue {
@@ -384,4 +388,60 @@
 
 .emptyString::placeholder {
   opacity: 0.5;
+}
+
+/* Nested fields share their owner's tracks. Only the handle consumes nesting space. */
+.root[data-header][data-structured] > .body {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  margin-bottom: 0;
+  padding-left: 0;
+  &::before {
+    left: calc(var(--field-indent) + var(--field-toggle-width, 24px) / 2);
+    width: 16px;
+  }
+  &:has(> .collection > [data-object-fields] > [data-object-field]:first-child > [data-object-field-content] > .root > .header > .toggleControl)::before,
+  &:has(> .collection > [data-array-field]:first-child > .root > .header > .toggleControl)::before {
+    width: 6px;
+  }
+  > .collection {
+    container-type: normal;
+  }
+  > .collection,
+  > .collection > [data-array-field],
+  > .collection > [data-array-field] > .root,
+  > .collection > [data-object-fields],
+  > .collection > [data-object-fields] > [data-object-field],
+  > .collection > [data-object-fields] > [data-object-field] > [data-object-field-content],
+  > .collection > [data-object-fields] > [data-object-field] > [data-object-field-content] > .root {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  > .collection > .collectionActions,
+  > .collection > .actions {
+    grid-column: 1 / -1;
+  }
+  > .collection > .collectionActions {
+    grid-template-columns: subgrid;
+  }
+  > .collection > [data-object-fields]:empty {
+    display: none;
+  }
+  .root[data-nested-field] {
+    > .header [data-field-name],
+    > .header > .fieldName {
+      padding-left: var(--field-indent);
+    }
+    > .header > .toggleControl,
+    > .header > .leadingControl {
+      transform: translateX(var(--field-indent));
+    }
+  }
+  .root[data-object-child] > .options {
+    grid-column: nullable / end;
+    justify-content: space-around;
+  }
 }

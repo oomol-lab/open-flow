@@ -30,6 +30,19 @@ export default defineConfig({
       warn: true,
       collectionsNodeResolvePath: sourceRoot,
       collections: {
+        'tabler-light': async () => {
+          const collection: IconifyJSON = JSON.parse(await readFile(path.join(sourceRoot, 'node_modules/@iconify/json/json/tabler.json'), 'utf8'))
+          return {
+            ...collection,
+            prefix: 'tabler-light',
+            icons: Object.fromEntries(
+              ['square-rounded-plus', 'square-rounded-minus'].map((name) => {
+                const icon = collection.icons[name]!
+                return [name, { ...icon, body: icon.body.replaceAll('stroke-width="2"', 'stroke-width="1.5"') }]
+              }),
+            ),
+          }
+        },
         'lucide-light': async () => {
           const collection: IconifyJSON = JSON.parse(await readFile(path.join(sourceRoot, 'node_modules/@iconify/json/json/lucide.json'), 'utf8'))
           return {

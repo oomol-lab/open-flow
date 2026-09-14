@@ -1,5 +1,5 @@
 import styles from './valueEditor.module.scss'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { ValueType } from '../common/value.ts'
 
 import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
@@ -102,7 +102,7 @@ export function ValueEditor(props: ValueEditorProps) {
   const enumeration = Array.isArray(source.enum) ? source.enum : Object.hasOwn(source, 'const') ? [source.const] : undefined
   const complex =
     source['ui:widget'] === 'any' ||
-    (editorComponent(schema) === 'json' && !variants && !enumeration) ||
+    (editorComponent(schema) === 'json' && (!variants || props.onDefinitionChange != null) && !enumeration) ||
     source.$ref != null ||
     source.allOf != null ||
     depth > 12
@@ -169,6 +169,21 @@ export function ValueEditor(props: ValueEditorProps) {
     ? source['ui:order'].filter((name): name is string => typeof name === 'string' && availableNames.includes(name))
     : []
   const names = [...new Set([...savedOrder, ...availableNames])]
+  const canAddObjectField = props.onDefinitionChange != null || source.additionalProperties !== false
+  const addObjectField = (after?: string) => {
+    let name = 'field'
+    let index = 1
+    while (names.includes(name)) name = `field${index++}`
+    const order = [...names]
+    order.splice(after == null ? order.length : order.indexOf(after) + 1, 0, name)
+    const fieldSchema = props.onDefinitionChange ? { type: 'string' } : (source.additionalProperties ?? {})
+    const next = setObjectField(value, name, initialValue(fieldSchema))
+    if (props.onDefinitionChange) {
+      props.onDefinitionChange({ ...source, 'properties': { ...properties, [name]: fieldSchema }, 'ui:order': order }, next)
+    } else {
+      onChange(Object.fromEntries(order.filter((key) => Object.hasOwn(next, key)).map((key) => [key, next[key]])))
+    }
+  }
   const array = Array.isArray(value) ? value : []
   const canChooseType = source.type == null || Array.isArray(source.type)
   const availableTypes = Array.isArray(source.type) ? types.filter((candidate) => (source.type as unknown[]).includes(candidate)) : types
@@ -256,11 +271,14 @@ export function ValueEditor(props: ValueEditorProps) {
       }}
       data-inline={(props.hideOptions && !props.header) || undefined}
       data-object-child={props.objectChild || undefined}
+      data-nested-field={depth > 0 || undefined}
+      style={{ '--field-indent': `${depth * 16}px` } as CSSProperties}
       data-layout={props.layout}
       data-header={props.header != null || undefined}
       data-collection={expandable || undefined}
       data-output={props.editor === null || undefined}
       data-expanded={(expandable && expanded) || undefined}
+      data-json={raw || complex || undefined}
       data-structured={(structured && !showUnset) || undefined}
     >
       {props.header != null && (
@@ -293,15 +311,21 @@ export function ValueEditor(props: ValueEditorProps) {
           aria-expanded={expanded}
           onClick={() => setExpanded(!expanded)}
         >
-          {value === undefined
-            ? t('valueEditor.unset')
-            : structured
-              ? `${t(type === 'array' ? 'valueEditor.array' : 'valueEditor.object')} · ${type === 'array' ? array.length : names.length}`
-              : typeof value === 'string'
-                ? value === ''
-                  ? t('valueEditor.emptyStringValue')
-                  : value
-                : JSON.stringify(value)}
+          {expanded && (raw || complex)
+            ? null
+            : value === undefined
+              ? t('valueEditor.unset')
+              : structured
+                ? type === 'object'
+                  ? expanded
+                    ? null
+                    : JSON.stringify(value)
+                  : `${t('valueEditor.array')} · ${array.length}`
+                : typeof value === 'string'
+                  ? value === ''
+                    ? t('valueEditor.emptyStringValue')
+                    : value
+                  : JSON.stringify(value)}
         </button>
       )}
       {(!props.hideOptions || props.actions) && (
@@ -431,7 +455,7 @@ export function ValueEditor(props: ValueEditorProps) {
                 const fieldSource = objectValue(fieldSchema) ?? {}
                 const fieldValue = object && Object.hasOwn(object, name) ? object[name] : undefined
                 return (
-                  <div>
+                  <div data-object-field-content>
                     {child(name, fieldSchema, fieldValue, (next) => onChange(setObjectField(value, name, next)), undefined, {
                       onDefinitionChange: props.onDefinitionChange
                         ? (nextSchema, nextValue) =>
@@ -509,32 +533,44 @@ export function ValueEditor(props: ValueEditorProps) {
                         </>
                       ),
                       actions: (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`${t(Object.hasOwn(properties, name) && !props.onDefinitionChange ? 'valueEditor.clear' : 'valueEditor.remove')} ${name}`}
-                          disabled={
-                            disabled ||
-                            (!props.onDefinitionChange && (fieldValue === undefined || (Array.isArray(source.required) && source.required.includes(name))))
-                          }
-                          onClick={() => {
-                            const next = setObjectField(value, name, undefined)
-                            if (props.onDefinitionChange)
-                              props.onDefinitionChange(
-                                {
-                                  ...source,
-                                  properties: Object.fromEntries(Object.entries(properties).filter(([key]) => key !== name)),
-                                  ...(Array.isArray(source['ui:order']) ? { 'ui:order': source['ui:order'].filter((key) => key !== name) } : {}),
-                                  ...(Array.isArray(source.required) ? { required: source.required.filter((key) => key !== name) } : {}),
-                                },
-                                next,
-                              )
-                            else onChange(next)
-                          }}
-                        >
-                          <i aria-hidden="true" className="i-lucide-light:minus" />
-                        </Button>
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`${t('valueEditor.addField')} ${label}.${name}`}
+                            disabled={disabled || !canAddObjectField}
+                            onClick={() => addObjectField(name)}
+                          >
+                            <i aria-hidden="true" className="i-tabler-light:square-rounded-plus text-lg" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`${t(Object.hasOwn(properties, name) && !props.onDefinitionChange ? 'valueEditor.clear' : 'valueEditor.remove')} ${name}`}
+                            disabled={
+                              disabled ||
+                              (!props.onDefinitionChange && (fieldValue === undefined || (Array.isArray(source.required) && source.required.includes(name))))
+                            }
+                            onClick={() => {
+                              const next = setObjectField(value, name, undefined)
+                              if (props.onDefinitionChange)
+                                props.onDefinitionChange(
+                                  {
+                                    ...source,
+                                    properties: Object.fromEntries(Object.entries(properties).filter(([key]) => key !== name)),
+                                    ...(Array.isArray(source['ui:order']) ? { 'ui:order': source['ui:order'].filter((key) => key !== name) } : {}),
+                                    ...(Array.isArray(source.required) ? { required: source.required.filter((key) => key !== name) } : {}),
+                                  },
+                                  next,
+                                )
+                              else onChange(next)
+                            }}
+                          >
+                            <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg" />
+                          </Button>
+                        </>
                       ),
                     })}
                   </div>
@@ -552,18 +588,15 @@ export function ValueEditor(props: ValueEditorProps) {
                   {t('valueEditor.object')} · {names.length}
                 </span>
               )}
-              {source.additionalProperties !== false && (
+              {canAddObjectField && names.length === 0 && (
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="ghost"
                   size="field"
+                  className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectAction}`}
                   disabled={disabled}
-                  onClick={() => {
-                    let name = 'field'
-                    let index = 1
-                    while (names.includes(name)) name = `field${index++}`
-                    onChange(setObjectField(value, name, initialValue(source.additionalProperties ?? {})))
-                  }}
+                  aria-label={`${t('valueEditor.addField')} ${label}`}
+                  onClick={() => addObjectField()}
                 >
                   <i aria-hidden="true" className="i-lucide-light:plus" />
                   {t('valueEditor.addField')}
@@ -578,7 +611,7 @@ export function ValueEditor(props: ValueEditorProps) {
             {array.map((item, index) => {
               const itemSchema = Array.isArray(source.items) ? (source.items[index] ?? source.additionalItems ?? {}) : (source.items ?? {})
               return (
-                <div key={index}>
+                <div key={index} data-array-field>
                   {child(
                     index,
                     itemSchema,
