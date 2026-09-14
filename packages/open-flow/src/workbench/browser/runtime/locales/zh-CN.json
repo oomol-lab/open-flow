@@ -920,7 +920,7 @@
     "configured": "已配置",
     "configuredDescription": "已配置账号，可直接使用。",
     "builtInAccount": "内置账号",
-    "builtInAccountDescription": "使用 OOMOL 提供的内置账号，使用时会扣除积分。",
+    "builtInAccountDescription": "使用 OOMOL 提供的内置账号，使用时会扣除点数。",
     "noSetup": "免配置",
     "noSetupDescription": "无需配置账号即可使用。",
     "needsSetup": "需要配置",
