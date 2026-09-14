@@ -59,8 +59,14 @@ export const additionalInputsStory: FrontendStory = {
 function GroupedInputsStory({ dark, language, log, output = false }: { dark: boolean; language: UiLanguage; log: LogAction; output?: boolean }) {
   const i18n = useMemo(() => createI18n(language), [language])
   const [values, setValues] = useState<readonly (InputPort | Group)[]>([
-    { group: 'Request', collapsed: true },
+    { group: 'Request', collapsed: !output },
     { handle: 'message', jsonSchema: { type: 'string' }, nullable: false, ...(output ? {} : { value: 'hello' }) },
+    ...(output
+      ? [
+          { handle: 'issues', jsonSchema: { type: 'array', items: { type: 'string' } }, nullable: true },
+          { handle: 'count', jsonSchema: { type: 'integer' }, nullable: false },
+        ]
+      : []),
   ])
   return (
     <I18nProvider i18n={i18n}>
@@ -71,6 +77,7 @@ function GroupedInputsStory({ dark, language, log, output = false }: { dark: boo
       >
         <PortDefinitionEditor
           groups
+          layout={output ? 'ports' : undefined}
           output={output}
           values={values}
           disabled={false}

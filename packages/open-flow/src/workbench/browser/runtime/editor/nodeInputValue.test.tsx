@@ -7,6 +7,28 @@ import { NodeInputValue } from './nodeInputValue.tsx'
 const variables = { enabled: true, names: ['API_TOKEN'], loaded: true, loading: false, onOpen: vi.fn() }
 
 describe('Independent node inputs', () => {
+  it('keeps a standalone array source on its collapsed preview, including enum item schemas', () => {
+    const onValue = vi.fn()
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <NodeInputValue
+          definition={{ handle: 'items', jsonSchema: { type: 'array', items: { enum: ['one', 'two'] } }, nullable: false }}
+          value={['one']}
+          connected={false}
+          variables={variables}
+          disabled={false}
+          onValue={onValue}
+          onVariable={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('aria-label="items Set value"')
+    expect(markup).toContain('aria-expanded="false"')
+    expect(markup).toMatch(/data-value-body="true" hidden=""/)
+    expect(markup.indexOf('aria-label="items Input sources"')).toBeLessThan(markup.indexOf('aria-label="items Set value"'))
+    expect(onValue).not.toHaveBeenCalled()
+  })
+
   it('renders an explicit false value without replacing it with the definition default', () => {
     const onValue = vi.fn()
     const markup = renderToStaticMarkup(

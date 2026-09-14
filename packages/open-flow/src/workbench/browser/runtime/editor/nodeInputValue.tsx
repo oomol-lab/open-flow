@@ -63,7 +63,7 @@ export function NodeInputValue({
 }: {
   readonly presentation?: Pick<
     ValueEditorProps,
-    'layout' | 'header' | 'leadingControl' | 'valueLeadingControl' | 'trailingControl' | 'description' | 'options' | 'onDefinitionChange'
+    'layout' | 'header' | 'leadingControl' | 'valueAddon' | 'trailingControl' | 'description' | 'options' | 'onDefinitionChange'
   >
   readonly upstream?: NodeInputUpstreamSources
   readonly embedded?: boolean
@@ -110,7 +110,7 @@ export function NodeInputValue({
   const selectedUpstreamIcon = connected && upstream?.current.length === 1 ? upstream.current[0]?.icon : undefined
   const sourcePortal = sourceContainer?.closest<HTMLElement>('.editor-context-panel') ?? sourceContainer
   const sourceControl = (
-    <div ref={setSourceContainer}>
+    <div ref={setSourceContainer} className="flex items-center after:translate-x-px after:h-3.5 after:w-px after:bg-border/50 after:content-['']">
       <DropdownMenu
         onOpenChange={(open) => {
           if (open && variables.enabled) variables.onOpen()
@@ -120,9 +120,9 @@ export function NodeInputValue({
           render={
             <Button
               type="button"
-              variant="outline"
-              size="icon-sm"
-              className="w-7 aria-pressed:bg-[var(--ui-control-hover-background,var(--ui-muted))] aria-pressed:text-foreground"
+              variant="ghost"
+              size="icon-xs"
+              className="aria-pressed:bg-[var(--ui-control-hover-background,var(--ui-muted))] aria-pressed:text-foreground"
               aria-label={`${definition.handle} ${t('inspector.sources.title')}`}
               aria-invalid={sourceIssue != null}
               aria-pressed={sourceKind !== 'literal'}
@@ -260,6 +260,7 @@ export function NodeInputValue({
     connected || bound ? (
       <div>
         <div
+          data-value-control
           className="flex h-[30px] min-w-0 items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-[7px] text-xs aria-invalid:border-destructive"
           aria-invalid={sourceIssue != null}
         >
@@ -284,14 +285,14 @@ export function NodeInputValue({
         )}
       </div>
     ) : llm ? (
-      <LlmInputEditor schema={definition.jsonSchema} value={value} disabled={disabled} handleNames={handleNames} onChange={onValue} />
+      <LlmInputEditor addon={sourceControl} schema={definition.jsonSchema} value={value} disabled={disabled} handleNames={handleNames} onChange={onValue} />
     ) : undefined
   return (
     <Field className={embedded ? 'gap-0' : 'p-3'}>
       {!embedded && <FieldLabel>{definition.handle}</FieldLabel>}
       <ValueEditor
         {...presentation}
-        valueLeadingControl={sourceControl}
+        valueAddon={llm && !connected && !bound ? undefined : sourceControl}
         description={presentation?.description ?? definition.description}
         schema={definition.jsonSchema}
         nullable={definition.nullable}

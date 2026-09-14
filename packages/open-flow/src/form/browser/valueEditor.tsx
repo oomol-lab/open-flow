@@ -39,7 +39,7 @@ export interface ValueEditorProps {
   readonly onDraftIssue: (path: string, invalid: boolean) => void
   readonly header?: ReactNode
   readonly leadingControl?: ReactNode
-  readonly valueLeadingControl?: ReactNode
+  readonly valueAddon?: ReactNode
   readonly trailingControl?: ReactNode
   readonly description?: string
   readonly editor?: ReactNode
@@ -92,6 +92,7 @@ function PropertyName({ name, onRename, disabled }: { name: string; onRename: (n
 
 /** Controlled JSON value editing. It has no graph, port, persistence, or theme context. */
 export function ValueEditor(props: ValueEditorProps) {
+  const compactValue = props.header != null || props.valueAddon != null
   const sorting = useContext(FieldSorting)
   const { schema, value: storedValue, onChange, label, nullable, disabled, path, onDraftIssue, depth = 0 } = props
   const t = useTranslate()
@@ -121,7 +122,7 @@ export function ValueEditor(props: ValueEditorProps) {
       : source.uniqueItems === true && Array.isArray(objectValue(source.items)?.enum)
         ? (objectValue(source.items)!.enum as unknown[])
         : undefined)
-  const itemEnumeration = objectValue(source.items)?.enum
+  const itemEnumeration = source.uniqueItems === true ? objectValue(source.items)?.enum : undefined
   const showUnset =
     type !== 'boolean' &&
     !enumeration &&
@@ -295,8 +296,8 @@ export function ValueEditor(props: ValueEditorProps) {
     </div>
   )
   const body = (
-    <div id={`${id}-body`} className={styles.body} data-value-body hidden={props.header != null && expandable && !expanded}>
-      {!showUnset && props.header == null && props.valueEditable !== false && (value === undefined || value === null) && (
+    <div id={`${id}-body`} className={styles.body} data-value-body hidden={compactValue && expandable && !expanded}>
+      {!showUnset && !compactValue && props.valueEditable !== false && (value === undefined || value === null) && (
         <span className={styles.presence}>{value === null ? 'null' : t('valueEditor.unset')}</span>
       )}
       {showUnset ? (
@@ -668,7 +669,7 @@ export function ValueEditor(props: ValueEditorProps) {
               onChange={(event) => onChange(event.target.value)}
             />
           )}
-          {value === undefined && props.header == null && (
+          {value === undefined && !compactValue && (
             <Button type="button" size="xs" variant="ghost" disabled={disabled} onClick={() => onChange('')}>
               <i aria-hidden="true" className="i-lucide-light:text-cursor-input" />
               {t('valueEditor.emptyString')}
@@ -698,7 +699,7 @@ export function ValueEditor(props: ValueEditorProps) {
       data-header={props.header != null || undefined}
       data-collection={expandable || undefined}
       data-output={props.editor === null || undefined}
-      data-value-leading={props.valueLeadingControl != null || undefined}
+      data-value-addon={props.valueAddon != null || undefined}
       data-expanded={(expandable && expanded) || undefined}
       data-structured={(structured && !showUnset) || undefined}
     >
@@ -724,6 +725,11 @@ export function ValueEditor(props: ValueEditorProps) {
           {props.header}
         </div>
       )}
+      {props.valueAddon != null && (
+        <div className={styles.valueAddon} data-value-addon-control>
+          {props.valueAddon}
+        </div>
+      )}
       {props.header != null && expandable && structured && type === 'array' && !Array.isArray(source.items) ? (
         <div className={styles.arrayItemType}>
           <EditorComponentSelect
@@ -739,7 +745,7 @@ export function ValueEditor(props: ValueEditorProps) {
           />
         </div>
       ) : (
-        props.header != null &&
+        compactValue &&
         expandable && (
           <Button
             type="button"
@@ -768,7 +774,6 @@ export function ValueEditor(props: ValueEditorProps) {
         )
       )}
       {!expandable && body}
-      {props.valueLeadingControl != null && <div className={styles.valueLeadingControl}>{props.valueLeadingControl}</div>}
       <ValueTools
         label={label}
         container={container}
