@@ -35,7 +35,7 @@ export function ObjectFieldList({
     onReorder(next)
   }
   return (
-    <div ref={list} className={styles.list}>
+    <div ref={list} className={styles.list} data-object-fields>
       {names.map((name, index) => (
         <div
           key={name}

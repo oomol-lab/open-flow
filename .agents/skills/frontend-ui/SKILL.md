@@ -64,6 +64,13 @@ Keep this control radius separate from panel surfaces and structural branch curv
 Property panels share the canvas node's outer surface color, and their input controls share
 the node content surface color. Reuse the theme's node surface tokens for both appearances.
 
+Keep internal separators in menus and editing popovers light and inset from both sides.
+Use the theme border color at reduced opacity; `mx-2 h-px bg-border/50` is the current
+reference for compact popovers. Apply this consistently below back/header controls and
+above footer actions, including alternate views of the same popup. Judge contrast and
+insets in the actual panel in both themes; these dividers should remain quieter than
+control borders. This guidance concerns internal dividers, not the panel's outer border.
+
 Prefer standard component variants, sizes, and layout conventions when changing appearance.
 Do not patch visual defects with arbitrary padding, margins, offsets, hard-coded dimensions,
 or increasingly specific overrides. Trace the mismatch to its owning component or layout and

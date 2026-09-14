@@ -85,12 +85,13 @@ export function EditableChoices({
           <div ref={popup} className="flex flex-col gap-1">
             {editing ? (
               <>
-                <div className="border-b border-border pb-1">
+                <div>
                   <Button type="button" variant="ghost" size="xs" onClick={() => setEditing(false)}>
-                    <i aria-hidden="true" data-icon="inline-start" className="i-lucide-light:arrow-left" />
+                    <i aria-hidden="true" data-icon="inline-start" className="i-lucide:chevron-left" />
                     {t('valueEditor.backToChoices')}
                   </Button>
                 </div>
+                <div role="separator" className="mx-2 h-px bg-border/50" />
                 <div className="max-h-[min(60vh,360px)] overflow-y-auto p-1">
                   <ChoiceOptions options={options} disabled={disabled} onChange={onOptionsChange} />
                 </div>

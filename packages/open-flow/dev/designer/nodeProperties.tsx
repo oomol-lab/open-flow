@@ -24,8 +24,11 @@ const values: readonly InputPort[] = [
   { ...field('timestamp'), jsonSchema: { type: 'string', format: 'date-time' }, value: '2026-09-14T09:30:00+08:00' },
   {
     ...field('payload', 'object'),
-    jsonSchema: { type: 'object', properties: { name: { type: 'string' }, active: { type: 'boolean' } } },
-    value: { name: 'Ada', active: true, extra: 'Editable field' },
+    jsonSchema: {
+      type: 'object',
+      properties: { name: { type: 'string' }, active: { type: 'boolean' }, details: { type: 'object', properties: { count: { type: 'integer' } } } },
+    },
+    value: { name: 'Ada', active: true, details: { count: 2 }, extra: 'Editable field' },
   },
   { ...field('tags', 'array'), jsonSchema: { type: 'array', items: { type: 'string' } }, value: ['design', 'review'] },
   { ...field('choice'), jsonSchema: { 'oneOf': [{ type: 'string' }, { type: 'number' }], 'ui:options': { labels: ['Text', 'Number'] } }, value: 'hello' },
@@ -35,6 +38,7 @@ const values: readonly InputPort[] = [
   { ...field('unsetNullable'), nullable: true },
   field('unsetBoolean', 'boolean'),
   { ...field('unsetSelect'), jsonSchema: { enum: ['first', 'second'] } },
+  { ...field('emptyObject', 'object'), value: {} },
   { ...field('emptySelect'), jsonSchema: { enum: [] } },
   { ...field('emptyMultiSelect', 'array'), jsonSchema: { type: 'array', uniqueItems: true, items: { enum: [] } }, value: [] },
   field('unset'),

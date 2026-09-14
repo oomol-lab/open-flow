@@ -33,7 +33,7 @@
       [type] minmax(0, 1fr) [content-end] var(--field-actions-gap)
       [actions] var(--field-actions-width, 28px) [end];
   }
-  @container value-fields (max-width: $wrap-width) {
+  @container value-fields (max-width: #{$wrap-width}) {
     &:not([data-output]) {
       --field-value-column: handle / content-end;
       --field-value-row: 2;
