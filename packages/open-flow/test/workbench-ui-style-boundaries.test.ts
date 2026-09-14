@@ -243,7 +243,7 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
     readFile(new URL('src/workbench/browser/runtime/styles/responsive.css', packageRoot), 'utf8'),
   ])
 
-  assert.match(button, /aria-current:bg-muted aria-current:text-foreground/)
+  assert.ok(button.includes('aria-current:bg-[var(--ui-control-hover-background,var(--ui-muted))] aria-current:text-foreground'))
   assert.match(skeleton, /motion-reduce:animate-none/)
   assert.match(diagnostics, /className="flex flex-col gap-2\.5 p-4"/)
   assert.match(diagnostics, /<Skeleton className="h-\[76px\]"/)
@@ -455,7 +455,10 @@ test('owns product and canvas surface tokens in one theme entry', async () => {
     readFile(new URL('src/ui/browser/theme.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/tokens.css', packageRoot), 'utf8'),
   ])
-  assert.deepEqual(referencedTokens(uiSources.join('\n'), '--ui-'), sharedUiTokens)
+  assert.deepEqual(
+    referencedTokens(uiSources.join('\n'), '--ui-'),
+    [...sharedUiTokens, '--ui-control-background', '--ui-control-hover-background', '--ui-control-radius'].toSorted(),
+  )
   assert.deepEqual(Object.keys(declarations(theme, '--ui-')).toSorted(), sharedUiTokens)
   const inheritedTheme = theme.match(/:root,\s*\.open-flow-theme\s*\{([^}]+)\}/)
   assert.ok(inheritedTheme, 'Shared inherited tokens must be available to root and themed surfaces.')
