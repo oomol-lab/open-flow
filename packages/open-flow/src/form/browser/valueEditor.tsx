@@ -90,6 +90,21 @@ function PropertyName({ name, onRename, disabled }: { name: string; onRename: (n
   )
 }
 
+/** A custom value control uses the same attached source layout as schema editors. */
+export function ValueControl({ addon, children }: { addon?: ReactNode; children: ReactNode }) {
+  if (addon == null) return children
+  return (
+    <div className={styles.root} data-inline data-value-addon={addon != null || undefined}>
+      {addon != null && (
+        <div className={styles.valueAddon} data-value-addon-control>
+          {addon}
+        </div>
+      )}
+      <div className={styles.body}>{children}</div>
+    </div>
+  )
+}
+
 /** Controlled JSON value editing. It has no graph, port, persistence, or theme context. */
 export function ValueEditor(props: ValueEditorProps) {
   const compactValue = props.header != null || props.valueAddon != null

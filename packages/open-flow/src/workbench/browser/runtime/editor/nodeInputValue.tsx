@@ -110,7 +110,7 @@ export function NodeInputValue({
   const selectedUpstreamIcon = connected && upstream?.current.length === 1 ? upstream.current[0]?.icon : undefined
   const sourcePortal = sourceContainer?.closest<HTMLElement>('.editor-context-panel') ?? sourceContainer
   const sourceControl = (
-    <div ref={setSourceContainer} className="flex items-center after:translate-x-px after:h-3.5 after:w-px after:bg-border/50 after:content-['']">
+    <div ref={setSourceContainer} className="flex items-center">
       <DropdownMenu
         onOpenChange={(open) => {
           if (open && variables.enabled) variables.onOpen()
@@ -124,7 +124,6 @@ export function NodeInputValue({
               size="icon-xs"
               className="aria-pressed:bg-[var(--ui-control-hover-background,var(--ui-muted))] aria-pressed:text-foreground"
               aria-label={`${definition.handle} ${t('inspector.sources.title')}`}
-              aria-invalid={sourceIssue != null}
               aria-pressed={sourceKind !== 'literal'}
               disabled={disabled}
               title={t('inspector.sources.title')}

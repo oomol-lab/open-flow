@@ -171,7 +171,7 @@
 .root[data-header] > .body {
   gap: 4px;
 }
-/* The addon shares the value control's surface and precedes it in Tab order. */
+/* The rounded value control sits in front of the attached addon base. */
 .valueAddon {
   color: var(--ui-muted-foreground);
   grid-column: var(--field-value-column, 1);
@@ -181,8 +181,12 @@
   display: flex;
   align-items: center;
   height: var(--field-control-height, 30px);
+  width: calc(var(--value-addon-width) + var(--ui-control-radius, var(--ui-radius)));
   padding-left: 2px;
-  z-index: 1;
+  border: 1px solid var(--ui-input);
+  border-right: 0;
+  border-radius: var(--ui-control-radius, var(--ui-radius)) 0 0 var(--ui-control-radius, var(--ui-radius));
+  background: color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-control-background, var(--ui-background)));
 }
 .root:not([data-header])[data-value-addon] {
   --field-value-column: 1;
@@ -192,26 +196,16 @@
   }
 }
 .root[data-value-addon] {
-  --value-addon-inset: 34px;
-  &:has(> .body > [aria-invalid='true'], > .body > div > [aria-invalid='true']) > .valueAddon {
-    color: var(--ui-destructive);
-    > div > button {
-      color: inherit;
-      &:is(:hover, [aria-expanded='true'], [aria-pressed='true']) {
-        background-color: color-mix(in srgb, var(--ui-destructive) 8%, var(--ui-control-background, var(--ui-background)));
-      }
-      &:focus-visible {
-        outline-color: var(--ui-destructive);
-      }
-    }
-  }
+  --value-addon-width: 28px;
   > .summary,
-  > .body > .nullValue,
-  > .arrayItemType [data-slot='select-trigger'],
-  &:not([data-collection]) > .body > :is(input, button, select, textarea, [role='button']),
-  &:not([data-collection]) > .body > div > :is([data-slot='select-trigger'], [data-field-control], [data-value-control]),
-  &:not([data-collection]) > .body [data-slot='input-group'] input {
-    padding-left: var(--value-addon-inset);
+  > .arrayItemType,
+  &:not([data-collection]) > .body {
+    position: relative;
+    margin-left: var(--value-addon-width);
+  }
+  &:has(> .summary[aria-expanded='true']) > .valueAddon {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-background));
   }
 }
 .summary {
@@ -435,6 +429,14 @@
     border-radius: var(--ui-control-radius, var(--ui-radius));
     font: inherit;
     color: var(--ui-foreground);
+  }
+}
+
+.root[data-inline][data-value-addon] {
+  flex: 1;
+  > .body > [data-slot='button'],
+  > .body [data-slot='native-select'] {
+    height: var(--field-control-height);
   }
 }
 
