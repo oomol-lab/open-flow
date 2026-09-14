@@ -44,6 +44,11 @@ const values: readonly InputPort[] = [
   { ...field('emptyMultiSelect', 'array'), jsonSchema: { type: 'array', uniqueItems: true, items: { enum: [] } }, value: [] },
   field('unset'),
 ]
+const taskFields = [...values.slice(0, 6), ...values.slice(10)]
+const taskInputValues = Object.fromEntries(
+  taskFields.flatMap((port) => (port.value === undefined ? [] : [[port.handle, { kind: 'value' as const, value: port.value }]])),
+)
+const taskInputDefinitions = taskFields.map(({ value: _value, ...definition }) => definition)
 
 type Fixture = { id: string; group: string; node: GraphNode; content?: Partial<RevisionContent['document']> }
 const fixtures: readonly Fixture[] = [
@@ -55,11 +60,11 @@ const fixtures: readonly Fixture[] = [
       kind: 'task',
       name: 'Prepare report',
       description: 'Transform the request into a release report.',
-      inputs: {},
+      inputs: taskInputValues,
       task: {
         name: 'Prepare report',
         moduleId: 'module',
-        inputs: [{ group: 'Content' }, ...values.slice(0, 6), { group: 'Structured data' }, ...values.slice(10)],
+        inputs: [{ group: 'Content' }, ...taskInputDefinitions.slice(0, 6), { group: 'Structured data' }, ...taskInputDefinitions.slice(6)],
         outputs: [field('report'), field('count', 'integer')],
       },
     },
