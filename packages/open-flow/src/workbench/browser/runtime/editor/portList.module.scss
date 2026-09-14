@@ -7,7 +7,7 @@
   --field-toggle-width: #{geometry.$toggle-width};
   --field-value-name-gap: #{geometry.$value-name-gap};
   --field-grip-width: 0px;
-  padding: 8px 12px 16px geometry.$list-inset;
+  padding: 8px 8px 16px geometry.$list-inset;
   --field-actions-width: 28px;
   color: var(--ui-foreground);
 }
@@ -269,10 +269,6 @@
 .row[data-editing] [data-value-options] {
   background-color: var(--ui-control-hover-background, var(--ui-muted));
   color: var(--ui-foreground);
-}
-
-.list:is([data-layout='values'], [data-layout='ports']) {
-  padding-right: 2px;
 }
 
 .valuesTitle {
