@@ -293,6 +293,8 @@
       "connected": "接続済み",
       "sort": "並べ替え",
       "finishSorting": "並べ替えを完了",
+      "inputsTitle": "入力",
+      "outputsTitle": "出力",
       "valuesTitle": "値",
       "columnHandle": "Handle",
       "columnName": "名前",

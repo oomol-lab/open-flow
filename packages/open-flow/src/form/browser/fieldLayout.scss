@@ -19,7 +19,8 @@
     [nullable] var(--field-nullable-width)
     [actions] var(--field-actions-width, 28px) [end];
 
-  &[data-layout='values'] {
+  &[data-layout='values'],
+  &[data-layout='ports'] {
     --field-name-track: minmax(90px, 1fr);
     --field-type-track: var(--field-type-width, 112px);
     --field-name-gap: var(--field-value-name-gap, 2px);

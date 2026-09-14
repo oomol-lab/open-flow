@@ -266,12 +266,23 @@
   top: 9px;
 }
 
+.list[data-layout='ports'] {
+  .group + .group {
+    margin-top: 8px;
+    padding-top: 0;
+    border-top: 0;
+  }
+  .group + .group > .groupSettings > summary {
+    top: 3px;
+  }
+}
+
 .row[data-editing] [data-value-options] {
   background-color: var(--ui-control-hover-background, var(--ui-muted));
   color: var(--ui-foreground);
 }
 
-.list[data-layout='values'] {
+.list:is([data-layout='values'], [data-layout='ports']) {
   padding-right: 2px;
 }
 

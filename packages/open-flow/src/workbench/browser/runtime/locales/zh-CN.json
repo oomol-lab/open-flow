@@ -293,6 +293,8 @@
       "connected": "已连接",
       "sort": "排序",
       "finishSorting": "完成排序",
+      "inputsTitle": "输入",
+      "outputsTitle": "输出",
       "valuesTitle": "数据",
       "columnHandle": "Handle",
       "columnName": "名称",

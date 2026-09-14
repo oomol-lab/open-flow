@@ -31,7 +31,6 @@
     "required": "この入力に値を設定してください。",
     "schema": "値がスキーマに一致しません。",
     "json": "JSON 値を入力してください。",
-    "variant": "{{name}} の選択肢",
     "option": "選択肢 {{index}}",
     "colorPickerError": "画面の色を取得できませんでした。もう一度お試しください。",
     "chooseColor": "色を選択",

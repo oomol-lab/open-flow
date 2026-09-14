@@ -293,6 +293,8 @@
       "connected": "Connecté",
       "sort": "Réordonner",
       "finishSorting": "Terminer",
+      "inputsTitle": "Entrées",
+      "outputsTitle": "Sorties",
       "valuesTitle": "Valeurs",
       "columnHandle": "Handle",
       "columnName": "Nom",

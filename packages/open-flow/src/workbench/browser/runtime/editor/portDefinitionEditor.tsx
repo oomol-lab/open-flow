@@ -228,7 +228,8 @@ export function PortSettingsPanel({
 }
 
 type PortEditorProps = {
-  layout?: 'values' | 'definition'
+  layout?: 'values' | 'ports' | 'definition'
+  title?: ReactNode
   defaultNullable?: boolean
   reservedNames?: readonly string[]
   disabled: boolean
@@ -236,7 +237,7 @@ type PortEditorProps = {
   output?: boolean
   renderValue?: (
     port: InputPort,
-    presentation: Pick<ValueEditorProps, 'header' | 'leadingControl' | 'trailingControl' | 'description' | 'options'>,
+    presentation: Pick<ValueEditorProps, 'layout' | 'header' | 'leadingControl' | 'trailingControl' | 'description' | 'options'>,
   ) => ReactNode
 } & (
   | { groups: true; values: readonly (InputPort | Group)[]; onChange: (values: readonly (InputPort | Group)[]) => void }
@@ -287,6 +288,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
   const [drop, setDrop] = useState<{ index: number; after: boolean }>()
   const [announcement, setAnnouncement] = useState('')
   const [editingIndex, setEditingIndex] = useState<number>()
+  const tableLayout = props.layout === 'values' || props.layout === 'ports'
   const cancelDrag = () => {
     dragging.current = undefined
     dropTarget.current = undefined
@@ -378,7 +380,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
     const header = (
       <div className={styles.heading}>
         <span data-field-name className={styles.name} title={[port.handle, port.description].filter(Boolean).join(' — ')}>
-          {props.layout === 'values' ? (
+          {tableLayout ? (
             <PortName
               value={port.handle}
               names={[...reservedNames, ...values.flatMap((entry) => ('handle' in entry ? [entry.handle] : []))]}
@@ -393,7 +395,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           )}
         </span>
         <span data-field-type className={styles.type} title={portType(port)}>
-          {props.layout === 'values' ? (
+          {tableLayout ? (
             <PortType
               name={port.handle}
               value={port.jsonSchema}
@@ -429,7 +431,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           render={
             <Button
               type="button"
-              size={props.layout === 'values' ? 'icon-sm' : 'xs'}
+              size={tableLayout ? 'icon-sm' : 'xs'}
               variant="ghost"
               data-value-options
               aria-label={`${port.handle} ${t('valueEditor.fieldSettings')}`}
@@ -439,7 +441,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           }
         >
           <i aria-hidden="true" className="i-lucide-light:settings" />
-          {props.layout !== 'values' && t('valueEditor.fieldSettings')}
+          {!tableLayout && t('valueEditor.fieldSettings')}
         </TooltipTrigger>
         <TooltipContent container={list.current}>{t('valueEditor.fieldSettings')}</TooltipContent>
       </Tooltip>
@@ -481,11 +483,18 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         data-dragging={dragIndex === index || undefined}
       >
         {props.renderValue ? (
-          props.renderValue(port, { header, leadingControl, trailingControl, options, description: port.description })
+          props.renderValue(port, {
+            layout: tableLayout ? props.layout : undefined,
+            header,
+            leadingControl,
+            trailingControl,
+            options,
+            description: port.description,
+          })
         ) : (
           <ValueEditor
             leadingControl={leadingControl}
-            layout={props.layout}
+            layout={tableLayout ? props.layout : undefined}
             header={header}
             trailingControl={trailingControl}
             options={options}
@@ -500,7 +509,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             path={`/${index}`}
             onDraftIssue={onDraftIssue}
             onDefinitionChange={
-              props.layout === 'values'
+              tableLayout
                 ? (jsonSchema, value) => {
                     const { value: _value, ...rest } = port
                     update(index, {
@@ -523,9 +532,9 @@ export function PortDefinitionEditor(props: PortEditorProps) {
   }
   return (
     <FieldSorting.Provider value={sortingEnabled}>
-      {(props.layout === 'values' || !disabled) && (
+      {(props.title != null || props.layout === 'values' || !disabled) && (
         <div ref={heading} className={styles.valuesTitle}>
-          {props.layout === 'values' ? <FieldLabel>{t('inspector.ports.valuesTitle')}</FieldLabel> : <span />}
+          {props.title != null || props.layout === 'values' ? <FieldLabel>{props.title ?? t('inspector.ports.valuesTitle')}</FieldLabel> : <span />}
           {!disabled && (
             <div className="ml-auto flex items-center gap-1">
               <Tooltip>
@@ -612,7 +621,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             </details>
           ),
         )}
-        {!disabled && props.layout !== 'values' && (
+        {!disabled && !tableLayout && (
           <div className={styles.actions}>
             <Button type="button" size="xs" variant="ghost" onClick={addField}>
               <i aria-hidden="true" className="i-lucide-light:plus" />

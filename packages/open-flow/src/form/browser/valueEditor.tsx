@@ -8,17 +8,17 @@ import { Button } from '../../ui/browser/button.tsx'
 import { Input } from '../../ui/browser/input.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../ui/browser/popover.tsx'
 import { Textarea } from '../../ui/browser/textarea.tsx'
-import { enumIndex, schemaChoices } from '../common/choices.ts'
+import { enumIndex } from '../common/choices.ts'
 import { isDateFormat } from '../common/dateValue.ts'
 import { editorComponent, valueForEditor } from '../common/editorComponent.ts'
 import { getDefaultValue, typeOfSchema } from '../common/schemaWidget.ts'
 import { compile } from '../common/validation/validator.ts'
 import { initialValue, objectValue, renameObjectField, setObjectField, valueType } from '../common/value.ts'
-import { ChoiceEditor, EnumChoices } from './choiceEditor.tsx'
 import { ColorEditor } from './colorEditor.tsx'
 import { DateEditor } from './dateEditor.tsx'
 import { EditableChoices } from './editableChoices.tsx'
 import { EditorComponentSelect } from './editorComponentSelect.tsx'
+import { EnumChoices } from './enumChoices.tsx'
 import { FieldSelect } from './fieldSelect.tsx'
 import { FieldSorting } from './fieldSorting.ts'
 import { JsonEditor } from './jsonEditor.tsx'
@@ -26,7 +26,7 @@ import { ObjectFieldList } from './objectFieldList.tsx'
 import { ValueTools } from './valueTools.tsx'
 
 export interface ValueEditorProps {
-  readonly layout?: 'values' | 'definition'
+  readonly layout?: 'values' | 'ports' | 'definition'
   readonly schema: unknown
   readonly value: unknown
   readonly onChange: (value: unknown) => void
@@ -111,14 +111,8 @@ export function ValueEditor(props: ValueEditorProps) {
   const type = valueType(schema, value)
   const validator = useMemo(() => compile(schema)[0], [schema])
   const invalid = props.invalid === true || (value !== undefined && !(value === null && allowsNull) && validator?.(value) === false)
-  const variants = schemaChoices(schema)
   const enumeration = Array.isArray(source.enum) ? source.enum : Object.hasOwn(source, 'const') ? [source.const] : undefined
-  const complex =
-    source['ui:widget'] === 'any' ||
-    (editorComponent(schema) === 'json' && (!variants || props.onDefinitionChange != null) && !enumeration) ||
-    source.$ref != null ||
-    source.allOf != null ||
-    depth > 12
+  const complex = source['ui:widget'] === 'any' || editorComponent(schema) === 'json' || depth > 12
   const editableOptions =
     props.onDefinitionChange &&
     (Array.isArray(source.enum)
@@ -209,14 +203,13 @@ export function ValueEditor(props: ValueEditorProps) {
   const array = Array.isArray(value) ? value : []
   const canChooseType = source.type == null || Array.isArray(source.type)
   const availableTypes = Array.isArray(source.type) ? types.filter((candidate) => (source.type as unknown[]).includes(candidate)) : types
-  const structured =
-    !raw && !complex && !variants && !enumeration && (type === 'object' || (type === 'array' && !itemEnumeration)) && props.editor === undefined
+  const structured = !raw && !complex && !enumeration && (type === 'object' || (type === 'array' && !itemEnumeration)) && props.editor === undefined
   const expandable = !showUnset && (structured || (props.valueEditable !== false && (raw || complex || (type === 'string' && source['ui:widget'] === 'text'))))
   useEffect(() => {
     if (!expanded || !editorFocusRequest || disabled || raw || complex) return
     container?.querySelector<HTMLTextAreaElement>(':scope > [data-value-body] > textarea')?.focus()
   }, [expanded, editorFocusRequest, disabled, raw, complex, container])
-  const inlineTools = props.layout === 'values' && props.header != null && props.valueEditable !== false && !disabled && !sorting
+  const inlineTools = (props.layout === 'values' || props.layout === 'ports') && props.header != null && props.valueEditable !== false && !disabled && !sorting
   const canClear = inlineTools && value !== undefined
   const canToggleJson = inlineTools && expanded && !complex && !enumeration && !itemEnumeration && !showUnset && (type === 'object' || type === 'array')
   const valueSuffix =
@@ -238,7 +231,7 @@ export function ValueEditor(props: ValueEditorProps) {
     >
       {props.valueEditable !== false && (
         <>
-          {canChooseType && !complex && !enumeration && !variants && (
+          {canChooseType && !complex && !enumeration && (
             <FieldSelect
               size="sm"
               aria-label={t('valueEditor.type', { name: label })}
@@ -343,26 +336,6 @@ export function ValueEditor(props: ValueEditorProps) {
             const nextSchema = Array.isArray(source.enum) ? { ...source, enum: options } : { ...source, items: { ...objectValue(source.items), enum: options } }
             props.onDefinitionChange!(nextSchema, valueForEditor(nextSchema, value))
           }}
-        />
-      ) : variants ? (
-        <ChoiceEditor
-          {...props}
-          value={value}
-          invalid={invalid}
-          render={(selectedSchema, index) => (
-            <ValueEditor
-              {...props}
-              value={value}
-              hideOptions
-              header={undefined}
-              description={undefined}
-              options={undefined}
-              actions={undefined}
-              key={index}
-              schema={selectedSchema}
-              depth={depth + 1}
-            />
-          )}
         />
       ) : enumeration ? (
         <FieldSelect
@@ -821,7 +794,7 @@ export function ValueEditor(props: ValueEditorProps) {
         <div className={styles.options}>
           {props.actions}
           {!props.hideOptions &&
-            (props.options && props.layout === 'values' ? (
+            (props.options && (props.layout === 'values' || props.layout === 'ports') ? (
               props.options
             ) : (
               <Popover open={optionsOpen} onOpenChange={setOptionsOpen}>

@@ -31,7 +31,6 @@
     "required": "請為此輸入設定值。",
     "schema": "值不符合 Schema。",
     "json": "請輸入 JSON 值。",
-    "variant": "{{name}} 分支",
     "option": "選項 {{index}}",
     "colorPickerError": "無法擷取螢幕顏色，請重試。",
     "chooseColor": "選擇顏色",

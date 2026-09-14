@@ -17,11 +17,13 @@ export function NodeInputs({
   onDefinitions,
   reservedNames,
   renderSource,
+  title,
 }: {
   allowAddGroup?: boolean
   onDefinitions?: (values: readonly (InputPort | Group)[]) => void
   reservedNames?: readonly string[]
   renderSource?: (handle: string) => ReactNode
+  title?: ReactNode
   entries: readonly (Group | NodeInputField)[]
   variables: InputVariables
   disabled: boolean
@@ -32,6 +34,8 @@ export function NodeInputs({
   return (
     <PortDefinitionEditor
       groups
+      layout="ports"
+      title={title}
       allowAddGroup={allowAddGroup}
       values={entries.map((entry) => ('group' in entry ? entry : entry.definition))}
       disabled={disabled || onDefinitions == null}

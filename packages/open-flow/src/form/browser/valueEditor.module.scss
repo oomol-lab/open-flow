@@ -376,7 +376,7 @@
 }
 
 /* Editable names and types already supply their own control padding. */
-.root[data-header][data-layout='values'] {
+.root[data-header]:is([data-layout='values'], [data-layout='ports']) {
   > .header [data-field-name],
   > .header [data-field-type] {
     padding: 0;

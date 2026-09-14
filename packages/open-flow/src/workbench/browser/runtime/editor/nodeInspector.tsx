@@ -1256,6 +1256,7 @@ export function NodeInspector({
             const fields = (
               <NodeInputs
                 key={`inputs:${selection.id}`}
+                title={t('inspector.ports.inputsTitle')}
                 entries={entries}
                 onDefinitions={
                   selection.kind === 'task' && selection.definition != null && (selection.node.task != null || isAgent)
@@ -1279,16 +1280,12 @@ export function NodeInspector({
             )
             return (
               <section className="inspector-port-section" data-inspector-section="inputs">
-                <div className="inspector-ports-title">
-                  <i aria-hidden="true" className="i-lucide-light:arrow-down-to-line" />
-                  <h3>{t('inspector.task.inputPorts')}</h3>
-                </div>
                 {fields}
                 {selection.kind === 'task' && selection.definition != null && selection.node.task == null && !isAgent && (
-                  <details className="inspector-disclosure inspector-section-divider" open>
-                    <summary>{t('inspector.task.additionalInputs')}</summary>
+                  <section className="inspector-nested-port-section">
                     <NodeInputs
                       key={`additional:${selection.id}`}
+                      title={t('inspector.task.additionalInputs')}
                       allowAddGroup={false}
                       entries={(selection.node.additionalInputs ?? []).map((definition) => {
                         const mapping = selection.node.inputs[definition.handle]
@@ -1320,7 +1317,7 @@ export function NodeInspector({
                         <InputSources revision={revision} target={target} selection={selection} store={store} disabled={disabled} handleName={handle} />
                       )}
                     />
-                  </details>
+                  </section>
                 )}
               </section>
             )
@@ -1348,10 +1345,11 @@ export function NodeInspector({
           </div>
         )}
         {selection?.kind === 'task' && selection.definition != null && (
-          <details className="inspector-disclosure inspector-port-section" open>
-            <summary>{t('inspector.task.outputPorts')}</summary>
+          <section className="inspector-port-section">
             <PortDefinitionEditor
               groups
+              layout="ports"
+              title={t('inspector.ports.outputsTitle')}
               output
               values={selection.definition.outputs}
               disabled={disabled || !(selection.node.task != null || isAgent)}
@@ -1359,13 +1357,14 @@ export function NodeInspector({
                 void store.saveTaskPorts(selection.id, { inputs: selection.definition!.inputs, outputs })
               }}
             />
-          </details>
+          </section>
         )}
         {(selection?.kind === 'subflow' || selection?.kind === 'wait') && (
-          <details className="inspector-disclosure inspector-port-section">
-            <summary>{t('inspector.task.outputPorts')}</summary>
+          <section className="inspector-port-section">
             <PortDefinitionEditor
               groups
+              layout="ports"
+              title={t('inspector.ports.outputsTitle')}
               output
               disabled
               values={
@@ -1375,7 +1374,7 @@ export function NodeInspector({
               }
               onChange={() => {}}
             />
-          </details>
+          </section>
         )}
         {selection == null ? (
           target.kind == 'subflow' ? (

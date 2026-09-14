@@ -293,6 +293,8 @@
       "connected": "연결됨",
       "sort": "순서 변경",
       "finishSorting": "순서 변경 완료",
+      "inputsTitle": "입력",
+      "outputsTitle": "출력",
       "valuesTitle": "값",
       "columnHandle": "Handle",
       "columnName": "이름",
