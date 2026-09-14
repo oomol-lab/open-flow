@@ -284,7 +284,7 @@ async function verifyConsumer(): Promise<void> {
         {
           dependencies: {
             '@oomol-lab/open-flow': `file:${tarballPath}`,
-            'effect': manifest.devDependencies.effect,
+            'effect': (packedManifest.peerDependencies as { effect: string }).effect,
             'react': manifest.devDependencies.react,
             'react-dom': manifest.devDependencies['react-dom'],
           },
@@ -313,11 +313,12 @@ async function verifyConsumer(): Promise<void> {
         "import type { UiLanguage } from '@oomol-lab/open-flow/localization'",
         "import { resolveUiLanguage } from '@oomol-lab/open-flow/localization'",
         "import { maximumPollEventsPerPage } from '@oomol-lab/open-flow/poll-trigger'",
-        "import { triggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'",
+        "import { triggerDefinitions, receiveFeishuEvent, matchesFeishuEvent, feishuSubscriptions } from '@oomol-lab/open-flow/provider-triggers'",
         "import { createValue } from '@oomol-lab/open-flow/flow-authoring'",
         "import type { Task } from '@oomol-lab/open-flow'",
         "import { mcpTools } from '@oomol-lab/open-flow/mcp'",
         "import { controlRequests } from '@oomol-lab/open-flow/control-requests'",
+        "import { EventSourcesPage } from '@oomol-lab/open-flow/workbench'",
         "import { verifyWorkbenchHost } from '@oomol-lab/open-flow/workbench-host-conformance'",
         "import { encodeRevision, decodeRevision, decodeRevisionContent } from '@oomol-lab/open-flow/flow-encoding'",
         "import { prepareFlow } from '@oomol-lab/open-flow/flow-semantics'",
