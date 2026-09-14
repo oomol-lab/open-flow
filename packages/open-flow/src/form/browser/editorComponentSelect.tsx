@@ -39,7 +39,7 @@ export function EditorComponentSelect({
           container={container}
           align="start"
           alignItemWithTrigger={false}
-          className="min-w-44 px-0 py-2 [scrollbar-width:thin] [scrollbar-gutter:stable_both-edges]"
+          className="min-w-44 p-2 [scrollbar-width:thin]"
         >
           {Object.entries(editorGroups).map(([group, components], index) => (
             <Fragment key={group}>
