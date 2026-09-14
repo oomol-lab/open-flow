@@ -9,7 +9,16 @@ export const SelectChevron = React.forwardRef<SVGSVGElement, React.ComponentProp
   { className, ...props },
   ref,
 ) {
-  return <ChevronDownIcon {...props} ref={ref} aria-hidden="true" strokeWidth={1.5} className={cn('size-4 shrink-0 text-muted-foreground', className)} />
+  return (
+    <ChevronDownIcon
+      {...props}
+      ref={ref}
+      data-slot="select-chevron"
+      aria-hidden="true"
+      strokeWidth={1.5}
+      className={cn('size-4 shrink-0 text-muted-foreground', className)}
+    />
+  )
 })
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
