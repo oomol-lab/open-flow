@@ -252,9 +252,9 @@ function GeneralSettings({
   }
 
   return (
-    <section className="inspector-section" data-inspector-section="node">
-      <h3>{t('inspector.node.title')}</h3>
-      <div className="node-settings">
+    <section className="px-3 pt-3 pb-4" data-inspector-section="node">
+      <FieldLabel>{t('inspector.node.title')}</FieldLabel>
+      <div className="node-settings pt-4 pl-3 pr-4.5">
         <Field data-invalid={error != null}>
           <FieldLabel htmlFor={inputId}>{t('inspector.node.timeout')}</FieldLabel>
           <Input
