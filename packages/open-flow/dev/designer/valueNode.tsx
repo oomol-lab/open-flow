@@ -14,6 +14,17 @@ function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; lan
   const [values, setValues] = useState<readonly InputPort[]>([
     { handle: 'emptyText', jsonSchema: { type: 'string' }, nullable: false, value: '' },
     { handle: 'emptyMultiline', jsonSchema: { 'type': 'string', 'ui:widget': 'text' }, nullable: false, value: '' },
+    { handle: 'number', jsonSchema: { type: 'number' }, nullable: false, value: 1.5 },
+    { handle: 'integer', jsonSchema: { type: 'integer' }, nullable: false, value: 3 },
+    { handle: 'select', jsonSchema: { enum: ['small', 'large'] }, nullable: false, value: 'small' },
+    { handle: 'multiSelect', jsonSchema: { type: 'array', uniqueItems: true, items: { enum: ['red', 'blue'] } }, nullable: false, value: ['red'] },
+    { handle: 'boolean', jsonSchema: { type: 'boolean' }, nullable: false, value: false },
+    { handle: 'date', jsonSchema: { type: 'string', format: 'date' }, nullable: false, value: '2026-09-15' },
+    { handle: 'time', jsonSchema: { type: 'string', format: 'time' }, nullable: false, value: '10:30:00+08:00' },
+    { handle: 'dateTime', jsonSchema: { type: 'string', format: 'date-time' }, nullable: false, value: '2026-09-15T10:30:00+08:00' },
+    { handle: 'color', jsonSchema: { 'type': 'string', 'ui:widget': 'color' }, nullable: false, value: '#7d7fe9' },
+    { handle: 'array', jsonSchema: { type: 'array', items: { type: 'string' } }, nullable: false, value: ['hello'] },
+    { handle: 'null', jsonSchema: { type: 'null' }, nullable: true, value: null },
     { handle: 'unsetText', jsonSchema: { type: 'string' }, nullable: false },
     { handle: 'jsonEmpty', jsonSchema: {}, nullable: false },
     { handle: 'jsonObject', jsonSchema: {}, nullable: true, value: { enabled: true, tags: ['sample'], count: 2 } },
@@ -28,6 +39,7 @@ function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; lan
       <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ height: '100%', overflow: 'auto', padding: 24 }}>
         <div style={{ maxWidth: 520 }}>
           <PortDefinitionEditor
+            layout="values"
             reservedNames={reservedNames}
             values={values}
             disabled={disabled}
@@ -45,6 +57,7 @@ function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; lan
 export const valueNodeStory: FrontendStory = {
   id: 'value-node-editor',
   title: 'Fixed Values Editor',
+  description: 'All 15 field types, nested fields, and empty values. Compare type icons, menus, field settings, and read-only controls.',
   group: 'Node Fixed Values',
   standalone: true,
   render: (log, dark, language) => <ValueStory log={log} dark={dark} language={language} />,

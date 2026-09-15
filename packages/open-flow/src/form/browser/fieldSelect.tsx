@@ -2,6 +2,7 @@ import type { ReactNode, ReactElement, ComponentProps } from 'react'
 
 import { Children, isValidElement, useState } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/browser/select.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/tooltip.tsx'
 
 export const selectionMenuRowClass = 'min-h-7 py-1 text-xs leading-5 font-normal'
 
@@ -15,6 +16,7 @@ export function FieldSelect({
   children,
   disabled,
   danger,
+  icons,
   'aria-label': label,
   'aria-invalid': invalid,
 }: {
@@ -24,6 +26,7 @@ export function FieldSelect({
   'children': ReactNode
   'disabled'?: boolean
   'danger'?: boolean
+  'icons'?: Readonly<Record<string, string>>
   'size'?: string
   'aria-label': string
   'aria-invalid'?: boolean
@@ -36,6 +39,19 @@ export function FieldSelect({
       const props = (child as ReactElement<ComponentProps<'option'>>).props
       return { value: String(props.value ?? props.children), label: props.children, disabled: props.disabled }
     })
+  const selected = options.find((option) => option.value === String(value))
+  const trigger = (
+    <SelectTrigger id={id} size="field" aria-label={label} aria-invalid={invalid || danger} className={fieldSelectTriggerClass}>
+      <SelectValue>
+        {icons?.[value] ? (
+          <>
+            <i aria-hidden="true" className={`${icons[value]} inline-block shrink-0 text-base`} />
+            <span className="sr-only">{selected?.label}</span>
+          </>
+        ) : undefined}
+      </SelectValue>
+    </SelectTrigger>
+  )
   return (
     <div ref={setContainer} className="min-w-0">
       <Select
@@ -48,14 +64,20 @@ export function FieldSelect({
         disabled={disabled}
         items={options}
       >
-        <SelectTrigger id={id} size="field" aria-label={label} aria-invalid={invalid || danger} className={fieldSelectTriggerClass}>
-          <SelectValue />
-        </SelectTrigger>
+        {icons ? (
+          <Tooltip>
+            <TooltipTrigger render={trigger} />
+            <TooltipContent container={container}>{selected?.label}</TooltipContent>
+          </Tooltip>
+        ) : (
+          trigger
+        )}
         <SelectContent container={container} align="start" alignItemWithTrigger={false} className="p-1">
           {options
             .filter((option) => !option.disabled)
             .map((option) => (
               <SelectItem key={option.value} value={option.value} disabled={option.disabled} className={selectionMenuRowClass}>
+                {icons?.[option.value] && <i aria-hidden="true" className={`${icons[option.value]} inline-block shrink-0 text-base`} />}
                 {option.label}
               </SelectItem>
             ))}

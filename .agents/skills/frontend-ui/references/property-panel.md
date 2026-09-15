@@ -78,6 +78,9 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 - Type, Boolean, Select, and Multi-select triggers share the dropdown chevron implementation,
   dimensions, stroke, and trailing inset. Verify rendered dimensions: Iconify's em-based sizing can
   differ from SVG sizing despite apparently equivalent size classes.
+- Field-table type selectors show a 16px type icon and the shared chevron in a 56px column, with a
+  localized type-name tooltip. Menus and secondary field settings retain the icon and full name.
+  Null uses `i-lucide-light:circle-dashed`; the shared editor component icon map owns all type icons.
 - Add actions have a shallow neutral default fill and a slightly stronger hover fill. Preserve the
   established text and icon colors rather than changing the whole palette to obtain a background.
 
