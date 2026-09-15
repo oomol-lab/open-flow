@@ -23,6 +23,8 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
   Check the collapsed preview after a type change as well as the expanded editor.
 - Opening a panel or inspecting an unset field must not silently create a value. Value creation and
   type changes use the existing shared rules rather than local guesses about defaults.
+- A non-nullable field containing `null` exposes the same explicit value-repair action as an unset
+  field. Repair prefers the schema default and otherwise uses the shared type default.
 
 ## Geometry and surfaces
 
@@ -82,10 +84,12 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 ## Disclosure, focus, and keyboard order
 
 - All expandable fields, including nested fields, start collapsed when the panel opens.
-- Object, JSON, and Multiline use a preview when collapsed. When expanded, retain a visible shallow
-  neutral block of the same size, without preview text and with the standard control border retained.
+- Object, JSON, and Multiline use a compact preview in both collapsed and expanded states. The
+  expanded preview retains the same shallow neutral block, current value text, and standard control border.
   The attached source addon also retains its border. It remains a real,
   keyboard-accessible button that can collapse the editor and has appropriate hover/focus feedback.
+  When the preview has no separate disclosure control, show a directional chevron in the preview so
+  its expand and collapse behavior remains identifiable in both states.
   Neither invisible layout space nor an empty-looking input satisfies this contract.
 - Arrays keep their shared item-type selector in the parent value region rather than substituting
   the object-style preview for it.

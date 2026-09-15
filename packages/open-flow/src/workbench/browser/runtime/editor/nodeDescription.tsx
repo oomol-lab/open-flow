@@ -1,5 +1,3 @@
-import styles from './nodeDescription.module.scss'
-
 import { useEffect, useId, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
@@ -18,8 +16,10 @@ export function NodeDescription({ value, disabled, onSave }: Props) {
   const [draft, setDraft] = useState(value ?? '')
   useEffect(() => setDraft(value ?? ''), [value])
   return (
-    <Field className={styles.field}>
-      <FieldLabel htmlFor={id}>{t('inspector.node.description')}</FieldLabel>
+    <Field className="inspector-field-section">
+      <FieldLabel className="inspector-section-title" htmlFor={id}>
+        {t('inspector.node.description')}
+      </FieldLabel>
       <Textarea
         id={id}
         readOnly={disabled}

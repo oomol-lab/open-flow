@@ -26,6 +26,7 @@ import { ObjectFieldList } from './objectFieldList.tsx'
 import { ValueTools } from './valueTools.tsx'
 
 export interface ValueEditorProps {
+  readonly compact?: boolean
   readonly layout?: 'values' | 'ports' | 'definition'
   readonly schema: unknown
   readonly value: unknown
@@ -107,7 +108,7 @@ export function ValueControl({ addon, children }: { addon?: ReactNode; children:
 
 /** Controlled JSON value editing. It has no graph, port, persistence, or theme context. */
 export function ValueEditor(props: ValueEditorProps) {
-  const compactValue = props.header != null || props.valueAddon != null
+  const compactValue = props.compact === true || props.header != null || props.valueAddon != null
   const sorting = useContext(FieldSorting)
   const { schema, value: storedValue, onChange, label, nullable, disabled, path, onDraftIssue, depth = 0 } = props
   const t = useTranslate()
@@ -144,7 +145,7 @@ export function ValueEditor(props: ValueEditorProps) {
     !itemEnumeration &&
     !editableOptions &&
     !complex &&
-    value === undefined &&
+    (value === undefined || (value === null && !allowsNull)) &&
     props.editor === undefined &&
     props.valueEditable !== false
   useEffect(() => {
@@ -676,6 +677,7 @@ export function ValueEditor(props: ValueEditorProps) {
           ) : (
             <Input
               id={id}
+              controlSize="field"
               aria-invalid={invalid}
               className={value === '' ? styles.emptyString : undefined}
               placeholder={t(value === '' ? 'valueEditor.emptyStringValue' : 'valueEditor.unset')}
@@ -699,6 +701,7 @@ export function ValueEditor(props: ValueEditorProps) {
       className={styles.root}
       ref={setContainer}
       data-inline={(props.hideOptions && !props.header) || undefined}
+      data-compact={props.compact || undefined}
       data-value-tools={canClear || canToggleJson || undefined}
       data-array-child={props.arrayChild || undefined}
       data-object-child={props.objectChild || undefined}
@@ -774,9 +777,8 @@ export function ValueEditor(props: ValueEditorProps) {
             aria-controls={`${id}-body`}
             onClick={toggleExpanded}
           >
-            {expanded
-              ? null
-              : value === undefined
+            <span className={styles.summaryText}>
+              {value === undefined
                 ? t('valueEditor.unset')
                 : structured
                   ? JSON.stringify(value)
@@ -785,6 +787,8 @@ export function ValueEditor(props: ValueEditorProps) {
                       ? t('valueEditor.emptyStringValue')
                       : value
                     : JSON.stringify(value)}
+            </span>
+            {props.header == null && <i aria-hidden="true" className={expanded ? 'i-lucide-light:chevron-up' : 'i-lucide-light:chevron-down'} />}
           </Button>
         )
       )}
@@ -860,6 +864,7 @@ function NumberEditor(props: ValueEditorProps & { integer: boolean }) {
     <>
       <Input
         type="text"
+        controlSize="field"
         placeholder={t('valueEditor.unset')}
         inputMode={integer ? 'numeric' : 'decimal'}
         aria-label={label}
