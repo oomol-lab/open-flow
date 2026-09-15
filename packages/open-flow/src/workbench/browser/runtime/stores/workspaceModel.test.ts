@@ -1,6 +1,7 @@
 import type { Draft } from '../api.ts'
 
 import { describe, expect, it, vi } from 'vitest'
+import * as graph from '../../../../flow/common/graph.ts'
 import { WorkbenchClient } from '../api.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
@@ -77,6 +78,30 @@ describe('Inspector input source derivation', () => {
       expect(notify).not.toHaveBeenCalled()
     } finally {
       unsubscribe()
+      session.dispose()
+    }
+  })
+
+  it('reuses compatibility calculations when returning to a node in the same revision', () => {
+    const session = setup()
+    const source = draft()
+    const calculate = vi.spyOn(graph, 'availableOutputs')
+    try {
+      session.model.set({ draft: source, target: { kind: 'flow' }, selectedNodeIds: ['task'] })
+      expect(session.model.$.inputSources.value.input0?.outputs).toEqual({ source: ['text'] })
+      expect(calculate).toHaveBeenCalledTimes(16)
+      session.model.set({ selectedNodeIds: ['other'] })
+      expect(session.model.$.inputSources.value.input0?.outputs).toEqual({})
+      expect(calculate).toHaveBeenCalledTimes(32)
+      for (let index = 0; index < 3; index++) {
+        session.model.set({ selectedNodeIds: ['task'] })
+        expect(session.model.$.inputSources.value.input0?.outputs).toEqual({ source: ['text'] })
+        session.model.set({ selectedNodeIds: ['other'] })
+        expect(session.model.$.inputSources.value.input0?.outputs).toEqual({})
+      }
+      expect(calculate).toHaveBeenCalledTimes(32)
+    } finally {
+      calculate.mockRestore()
       session.dispose()
     }
   })

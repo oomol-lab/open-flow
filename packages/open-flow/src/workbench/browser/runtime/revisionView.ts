@@ -53,6 +53,7 @@ export class RevisionView {
   readonly #document: FlowDocument
   readonly #modules: Draft['content']['modules']
   readonly #resolvedNodes = new WeakMap<GraphNode, Map<string, ResolvedSelection>>()
+  readonly #inputSourcesByGraph = new WeakMap<Graph, Map<string, { handle: string; outputs: ReturnType<typeof availableOutputs> }[]>>()
   readonly #taskNodesByGraph = new WeakMap<Graph, readonly TaskNodeReference[]>()
 
   public constructor(public readonly revision: Draft) {
@@ -79,10 +80,16 @@ export class RevisionView {
 
   public inputSources(target: GraphTarget, nodeId: string) {
     const graph = this.graph(target)!
-    return Object.keys(nodeInputPorts(this.#document, graph.nodes[nodeId]!)).map((handle) => ({
+    let byNode = this.#inputSourcesByGraph.get(graph)
+    const cached = byNode?.get(nodeId)
+    if (cached != null) return cached
+    const sources = Object.keys(nodeInputPorts(this.#document, graph.nodes[nodeId]!)).map((handle) => ({
       handle,
       outputs: availableOutputs(this.#document, graph, nodeId, handle),
     }))
+    if (byNode == null) this.#inputSourcesByGraph.set(graph, (byNode = new Map()))
+    byNode.set(nodeId, sources)
+    return sources
   }
 
   public designerInputs(target: GraphTarget): readonly unknown[] {
