@@ -19,7 +19,6 @@ import { Input } from '../../../../ui/browser/input.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
 import { Popover, PopoverPanelContent } from '../../../../ui/browser/popover.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
-import { Toggle } from '../../../../ui/browser/toggle.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { fieldPanelAnchor } from './fieldPanelAnchor.ts'
 import { movePort } from './portOrder.ts'
@@ -446,7 +445,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         onClick={(event) => event.preventDefault()}
         type="button"
         size="icon-xs"
-        variant="outline"
+        variant="disclosure"
         className={`${styles.grip} w-[var(--field-toggle-width,24px)]`}
         aria-label={t('inspector.ports.reorder', { name: port.handle })}
         title={t('inspector.ports.reorderHint')}
@@ -509,7 +508,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1))
         }}
       >
-        <i aria-hidden="true" className="i-lucide-light:grip text-base" />
+        <i aria-hidden="true" className="i-lucide-light:grip-vertical" />
       </Button>
     ) : undefined
     const header = (
@@ -681,19 +680,20 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         <div ref={heading} className="inspector-section-title justify-between">
           {props.title != null || props.layout === 'values' ? <FieldLabel>{props.title ?? t('inspector.ports.valuesTitle')}</FieldLabel> : <span />}
           {!disabled && (
-            <div className="ml-auto flex items-center gap-1">
+            <div className="ml-auto flex items-center">
               {hasFields && (
                 <Tooltip>
                   <TooltipTrigger
                     render={
-                      <Toggle
-                        variant="outline"
-                        size="sm"
-                        pressed={sortingEnabled}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        aria-pressed={sortingEnabled}
                         aria-label={t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}
-                        onPressedChange={(pressed) => {
+                        onClick={() => {
                           cancelDrag()
-                          setSorting(pressed)
+                          setSorting(!sortingEnabled)
                         }}
                       />
                     }

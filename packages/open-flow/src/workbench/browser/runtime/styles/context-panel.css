@@ -111,11 +111,7 @@
 
   .inspector-port-section,
   .inspector-values-section {
-    border-block: 1px solid var(--ui-border);
-  }
-
-  .inspector-port-section + .inspector-port-section {
-    border-top: 0;
+    border-bottom: 1px solid var(--ui-border);
   }
 
   .inspector-nested-port-section {
@@ -347,6 +343,10 @@
     font-weight: 500;
     line-height: 20px;
     margin: 0;
+
+    > [data-slot='field-label'] {
+      font-size: inherit;
+    }
   }
 
   .condition-editor {
