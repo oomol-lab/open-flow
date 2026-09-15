@@ -85,6 +85,31 @@ export interface FlowRunResult {
   }[]
 }
 
+function inputSourceState(
+  node: ExecutableNode,
+  settled: (id: string) => boolean,
+  outputs: (id: string) => Readonly<Record<string, JsonValue>> | undefined,
+): 'ready' | 'pending' | 'missing' {
+  let pending = false
+  for (const mapping of Object.values(node.inputs)) {
+    if (mapping.kind != 'sources') continue
+    let available = false
+    let unresolved = false
+    for (const source of mapping.sources) {
+      if (source.kind != 'node') {
+        available = true
+        continue
+      }
+      const values = outputs(source.nodeId)
+      if (values != null && Object.hasOwn(values, source.output)) available = true
+      else if (!settled(source.nodeId)) unresolved = true
+    }
+    if (!available && !unresolved) return 'missing'
+    pending ||= unresolved
+  }
+  return pending ? 'pending' : 'ready'
+}
+
 function usesNotification(graph: Graph, nodeId: string): boolean {
   return (
     graph.edges.some((edge) => edge.source == nodeId && edge.sourceHandle == 'notification') ||
@@ -578,7 +603,14 @@ function validateCheckpoint(
     if (!settled(id)) continue
     const edges = incoming.get(id) ?? []
     if (!edges.every(edgeSettled)) throw new Error('Checkpoint node dependencies are incomplete.')
-    const runnable = (edges.length == 0 && target.kind == 'subflow') || edges.some(selected)
+    const branchSelected = (edges.length == 0 && target.kind == 'subflow') || edges.some(selected)
+    const sourceState = inputSourceState(
+      node,
+      settled,
+      (source) => completed.get(source)?.outputs ?? (notifications.has(source) ? { notification: notifications.get(source)! } : undefined),
+    )
+    if (branchSelected && sourceState == 'pending') throw new Error('Checkpoint node input sources are incomplete.')
+    const runnable = branchSelected && sourceState == 'ready'
     if (completed.has(id) != runnable) throw new Error('Checkpoint node state conflicts with its execution branches.')
     const result = completed.get(id)
     if (result != null) {
@@ -905,12 +937,37 @@ function runGraph(
         if (!('inputs' in node)) return
         const edges = incoming.get(nodeId) ?? []
         if (!edges.every(edgeSettled)) return
-        if ((edges.length == 0 && target.kind == 'flow') || (edges.length > 0 && !edges.some(selected))) {
+        const branchClosed = (edges.length == 0 && target.kind == 'flow') || (edges.length > 0 && !edges.some(selected))
+        const sourceState = branchClosed
+          ? 'missing'
+          : inputSourceState(
+              node,
+              settled,
+              (source) => completed.get(source)?.outputs ?? (notifications.has(source) ? { notification: notifications.get(source)! } : undefined),
+            )
+        if (sourceState == 'pending') return
+        if (sourceState == 'missing') {
           skipped.add(nodeId)
           runNode(
-            Effect.sync(() => {
+            Effect.gen(function* () {
+              if (!branchClosed)
+                yield* context.emit({
+                  type: 'node.log',
+                  runId,
+                  nodeId,
+                  jobId: context.createId(),
+                  level: 'info',
+                  message: 'Node skipped because an input source did not produce a value on this execution path.',
+                })
               for (const child of children.get(nodeId) ?? []) scheduleReady(child)
-            }),
+            }).pipe(
+              Effect.tapCause((cause) =>
+                Effect.sync(() => {
+                  firstCause ??= cause
+                }),
+              ),
+              Effect.ensuring(Queue.offer(changes, undefined)),
+            ),
           )
           return
         }

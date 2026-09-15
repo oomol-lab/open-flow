@@ -47,7 +47,7 @@ describe('Execution graph contract', () => {
     if (result.kind == 'flow-invalid') expect(result.validation.diagnostics.some((item) => item.code == 'graph.source-unavailable')).toBe(true)
   })
 
-  it('distinguishes parallel ancestors from possibly skipped branch results', () => {
+  it('offers ancestor outputs even when their branch may be skipped', () => {
     const graph: Graph = {
       edges: [
         { source: 'a', sourceHandle: 'yes', target: 'b' },
@@ -68,8 +68,8 @@ describe('Execution graph contract', () => {
         d: task,
       },
     }
-    expect(availableOutputs(revision(graph).document, graph, 'd')).toEqual({})
-    expect(availableOutputs(revision(graph).document, graph, 'b')).toEqual({ a: ['yes'] })
+    expect(availableOutputs(revision(graph).document, graph, 'd')).toEqual({ a: ['yes', 'no'], b: ['value'], c: ['value'] })
+    expect(availableOutputs(revision(graph).document, graph, 'b')).toEqual({ a: ['yes', 'no'] })
     const parallel = {
       ...graph,
       edges: [
@@ -278,4 +278,109 @@ it('does not treat eventual action values as available on the notification path'
   const result = await prepareFlow(content, currentEngineContract)
   expect(result.kind).toBe('flow-invalid')
   expect(availableOutputs(content.document, graph, 'notify')).toEqual({ start: ['payload'], wait: ['notification'] })
+})
+
+it.each([true, false])('runs with an available nullable source or skips a missing branch source: %s', async (takeSource) => {
+  const prepared = await prepareFlow(
+    revision({
+      nodes: {
+        start: { kind: 'manual', name: 'Start' },
+        choice: {
+          kind: 'condition',
+          inputs: { input: { kind: 'value', value: takeSource } },
+          input: { ...port, handle: 'input' },
+          cases: [{ output: 'yes', relation: 'all', expressions: [{ input: 'input', operator: 'isTrue' }] }],
+          defaultOutput: 'no',
+        },
+        source: { ...value, values: [{ ...port, handle: 'value', value: null }] },
+        bypass: value,
+        join: { ...task, inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } } },
+        after: task,
+        independent: task,
+        pause: { kind: 'wait', inputs: {}, input: { ...port, handle: 'value', value: null }, actions: ['continue'], prompt: 'Continue?' },
+      },
+      edges: [
+        { source: 'start', target: 'choice' },
+        { source: 'choice', sourceHandle: 'yes', target: 'source' },
+        { source: 'choice', sourceHandle: 'no', target: 'bypass' },
+        { source: 'source', target: 'join' },
+        { source: 'bypass', target: 'join' },
+        { source: 'join', target: 'after' },
+        { source: 'start', target: 'independent' },
+        { source: 'start', target: 'pause' },
+      ],
+    }),
+    currentEngineContract,
+  )
+  if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
+  const calls: { nodeId: string; input: unknown }[] = []
+  const logs: string[] = []
+  let id = 0
+  const options = {
+    createId: () => String(++id),
+    flowId: 'main',
+    runId: 'run',
+    waits: waitHost(),
+    invokeTask: (call: { nodeId: string; input: unknown }) =>
+      Effect.sync(() => {
+        calls.push(call)
+        return {}
+      }),
+    emit: (event: import('../src/execution/common/scheduler.ts').SchedulerEvent) =>
+      Effect.sync(() => {
+        if (event.type == 'node.log') logs.push(event.message)
+      }),
+  }
+  const first = await advanceWaiting(runFlow(prepared.flow, { ...options, trigger: { nodeId: 'start', payload: null } }))
+  if (first.kind != 'waiting') throw new Error('Expected waiting')
+  expect(calls.map((call) => call.nodeId).toSorted()).toEqual(takeSource ? ['after', 'independent', 'join'] : ['independent'])
+  if (takeSource) expect(calls.find((call) => call.nodeId == 'join')?.input).toEqual({ input: null })
+  else {
+    expect(first.checkpoint.skipped).toEqual(expect.arrayContaining(['source', 'join', 'after']))
+    expect(logs).toEqual(['Node skipped because an input source did not produce a value on this execution path.'])
+  }
+  calls.length = 0
+  const resumed = await Effect.runPromise(
+    runFlow(prepared.flow, {
+      ...options,
+      resume: { checkpoint: first.checkpoint },
+      waits: waitHost({ [first.checkpoint.waits[0]!.waitId]: 'continue' }),
+    }),
+  )
+  expect(resumed.kind).toBe('node-results')
+  expect(calls).toEqual([])
+})
+
+it('skips a shared descendant when its only input source belongs to another trigger', async () => {
+  const content = revision({
+    nodes: {
+      first: { kind: 'manual', name: 'First' },
+      second: { kind: 'manual', name: 'Second' },
+      source: value,
+      join: { ...task, inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } } },
+    },
+    edges: [
+      { source: 'first', target: 'source' },
+      { source: 'source', target: 'join' },
+      { source: 'second', target: 'join' },
+    ],
+  })
+  const prepared = await prepareFlow(content, currentEngineContract, 'second')
+  if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
+  let invoked = false
+  const result = await Effect.runPromise(
+    runFlow(prepared.flow, {
+      createId: () => 'job',
+      flowId: 'main',
+      runId: 'run',
+      trigger: { nodeId: 'second', payload: null },
+      invokeTask: () =>
+        Effect.sync(() => {
+          invoked = true
+          return {}
+        }),
+    }),
+  )
+  expect(result.kind).toBe('node-results')
+  expect(invoked).toBe(false)
 })
