@@ -5,6 +5,7 @@ import path from 'node:path'
 import { defineConfig } from 'vite'
 import { generateScopedName } from '../../src/build/node/cssModules.ts'
 import designerUnoConfig from '../../src/build/node/designerUnoConfig.ts'
+import { fullReloadPlugin } from '../../src/build/node/fullReload.ts'
 import { providerIconsPlugin } from '../../src/build/node/providerIcons.ts'
 import { triggerLocalesPlugin } from '../../src/build/node/triggerLocales.ts'
 import { twemojiCollectionPlugin } from '../../src/build/node/twemojiCollection.ts'
@@ -47,6 +48,7 @@ export default defineConfig({
       ],
     }),
     react(),
+    fullReloadPlugin(),
   ],
   resolve: { alias: { '@lab': path.resolve(import.meta.dirname) } },
   server: { open: false },
