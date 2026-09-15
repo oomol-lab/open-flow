@@ -1,7 +1,8 @@
 import type { ConditionalResult } from '../../../../control/common/api.ts'
 
+import { compute } from 'value-enhancer'
 import { afterEach, expect, it, vi } from 'vitest'
-import { Resource, resourceValue } from './resource.ts'
+import { Resource, resourceData, resourceValue } from './resource.ts'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -125,4 +126,80 @@ it('rejects a cold 304 and prevents late writes after disposal', async () => {
   pending.resolve({ modified: true, data: ['late'], etag: null })
   await request
   expect(storage.setItem).not.toHaveBeenCalled()
+})
+
+it('isolates data computations from refresh status, errors and unchanged responses', async () => {
+  const read = vi.fn<() => Promise<ConditionalResult<string[]>>>().mockResolvedValueOnce({ modified: true, data: ['one'], etag: '"one"' })
+  const resource = new Resource(read, 30_000)
+  await resource.refresh()
+  const data = resourceData(resource.state)
+  expect(resourceData(resource.state)).toBe(data)
+  const project = vi.fn((items: string[] | undefined) => items?.join(','))
+  const derived = compute((get) => project(get(data)))
+  const stop = derived.subscribe(() => {})
+  expect(derived.value).toBe('one')
+  project.mockClear()
+  try {
+    const pending = Promise.withResolvers<ConditionalResult<string[]>>()
+    read.mockReturnValueOnce(pending.promise)
+    const refresh = resource.refresh()
+    await Promise.resolve()
+    expect(resource.state.value.refreshing).toBe(true)
+    expect(derived.value).toBe('one')
+    pending.resolve({ modified: false, etag: '"one"' })
+    await refresh
+    expect(derived.value).toBe('one')
+    expect(project).not.toHaveBeenCalled()
+
+    read.mockRejectedValueOnce(new Error('offline'))
+    await resource.refresh()
+    expect(resource.state.value.error).toEqual(new Error('offline'))
+    expect(derived.value).toBe('one')
+    expect(project).not.toHaveBeenCalled()
+
+    read.mockResolvedValueOnce({ modified: true, data: ['two'], etag: '"two"' })
+    await resource.refresh()
+    expect(derived.value).toBe('two')
+    expect(project).toHaveBeenCalledOnce()
+  } finally {
+    stop()
+    derived.dispose()
+    resource.dispose()
+  }
+})
+
+it('does not subscribe when cached data already satisfies the consumer', async () => {
+  const resource = new Resource(async () => ({ modified: true as const, data: ['one'], etag: null }), 30_000)
+  await resource.refresh()
+  const subscribe = vi.spyOn(resource.state, 'subscribe')
+  try {
+    expect(await resourceValue(resource.state)).toEqual(['one'])
+    expect(await resourceValue(resource.state, undefined, true)).toEqual(['one'])
+    const controller = new AbortController()
+    controller.abort()
+    await expect(resourceValue(resource.state, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+    expect(subscribe).not.toHaveBeenCalled()
+  } finally {
+    resource.dispose()
+  }
+})
+
+it('skips persistence for unchanged 304 responses but saves a replacement ETag', async () => {
+  const storage = { getItem: () => null, setItem: vi.fn() }
+  const read = vi
+    .fn<() => Promise<ConditionalResult<string[]>>>()
+    .mockResolvedValueOnce({ modified: true, data: ['one'], etag: '"one"' })
+    .mockResolvedValueOnce({ modified: false, etag: '"one"' })
+    .mockResolvedValueOnce({ modified: false, etag: '"two"' })
+  const resource = new Resource(read, 30_000, { key: 'test', storage: () => storage, decode: (data) => data as string[] })
+  try {
+    await resource.refresh()
+    storage.setItem.mockClear()
+    await resource.refresh()
+    expect(storage.setItem).not.toHaveBeenCalled()
+    await resource.refresh()
+    expect(storage.setItem).toHaveBeenCalledExactlyOnceWith('test', JSON.stringify({ data: ['one'], etag: '"two"' }))
+  } finally {
+    resource.dispose()
+  }
 })

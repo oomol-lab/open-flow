@@ -24,6 +24,7 @@ import { CatalogStores } from './catalogStores.ts'
 import { ConnectorStore } from './connectorStore.ts'
 import { Latest } from './latest.ts'
 import { combineSources } from './optionSource.ts'
+import { resourceData } from './resource.ts'
 import { TriggerStore } from './triggerStore.ts'
 import { errorNotice } from './workbenchNotice.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
@@ -163,7 +164,7 @@ export class WorkbenchStore {
       const target = get(this.workspace.$.target)
       const presentation = get(this.workspace.$.presentation)?.value
       const designerDiagnostics = get(diagnostics)?.diagnostics ?? get(this.connectors.$.diagnostics)
-      const providerEntries = draft == null ? undefined : get(this.workspace.catalogs.providers.get(draft.flowId, i18n.lang)).data
+      const providerEntries = draft == null ? undefined : get(resourceData(this.workspace.catalogs.providers.get(draft.flowId, i18n.lang)))
       const providerCatalog = Object.fromEntries((providerEntries ?? []).map((provider) => [provider.serviceId, provider]))
       const actions = get(this.connectors.$.actions)
       const catalogs = get(this.connectors.$.catalogs)
