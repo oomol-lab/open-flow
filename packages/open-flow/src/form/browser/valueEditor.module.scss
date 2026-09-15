@@ -549,8 +549,16 @@
     left: calc(var(--field-indent) + var(--field-toggle-width, 24px) / 2);
     width: 16px;
   }
-  &:has(> .collection > [data-object-fields] > [data-object-field]:first-child > [data-object-field-content] > .root > .header > .toggleControl)::before,
-  &:has(> .collection > [data-array-field]:first-child > .root > .header > :is(.toggleControl, .arrayIndex))::before {
+  &:has(
+    > .collection
+      > [data-object-fields]
+      > [data-object-field]:first-child
+      > [data-object-field-content]
+      > .root
+      > .header
+      > :is(.toggleControl, .leadingControl:not(:empty))
+  )::before,
+  &:has(> .collection > [data-array-field]:first-child > .root > .header > :is(.toggleControl, .leadingControl:not(:empty), .arrayIndex))::before {
     width: 6px;
   }
   > .collection {

@@ -40,7 +40,7 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 - Expanded Multiline and JSON editors follow the same cumulative nesting baseline as object
   children without a disclosure arrow. Array item values align to that child-field baseline, and
   their zero-based indices are centered at the corresponding disclosure-arrow position.
-- Connectors stop earlier before an arrow or array index than before an ordinary child field.
+- Connectors stop earlier before an arrow, sorting drag handle, or array index than before an ordinary child field.
   Reuse the same endpoint rule for arrows and indices. Keep curves, indentation, and row geometry
   coherent at multiple nesting levels; do not tune one screenshot with independent offsets.
 - Adjacent field/action rows use the same 8px gap. Avoid adding a second bottom margin to an expanded
@@ -81,6 +81,11 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 - Field-table type selectors show a 16px type icon and the shared chevron in a 56px column, with a
   localized type-name tooltip. Menus and secondary field settings retain the icon and full name.
   Null uses `i-lucide-light:circle-dashed`; the shared editor component icon map owns all type icons.
+- Fixed and read-only types use non-focusable type labels in a 32px column (16px icon and 8px
+  padding on each side), normal muted text color, and a type-name tooltip. Table headings and
+  nested rows share this column width, releasing the unused selector space. They have no visible control border,
+  fill, dropdown arrow, or click feedback. Temporary disabling retains the selector's disabled
+  appearance; it is separate from the read-only type contract.
 - Add actions have a shallow neutral default fill and a slightly stronger hover fill. Preserve the
   established text and icon colors rather than changing the whole palette to obtain a background.
 

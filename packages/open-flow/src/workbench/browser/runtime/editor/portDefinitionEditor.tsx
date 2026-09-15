@@ -92,7 +92,7 @@ function PortType({
       compact={compact}
       schema={value}
       name={name}
-      disabled={disabled}
+      readOnly={disabled}
       onChange={(next) => onChange(next as InputPort['jsonSchema'])}
     />
   )
@@ -592,7 +592,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             />
           }
         >
-          <i aria-hidden="true" className="i-lucide-light:settings" />
+          <i aria-hidden="true" className="i-lucide-light:settings text-base" />
           {!tableLayout && t('valueEditor.fieldSettings')}
         </TooltipTrigger>
         <TooltipContent container={list.current}>{t('valueEditor.fieldSettings')}</TooltipContent>
@@ -730,6 +730,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
       <div
         className={styles.list}
         data-layout={props.layout}
+        data-fixed-types={disabled || undefined}
         data-inputs={props.renderValue != null || undefined}
         data-empty={(values.length === 0 && (tableLayout || disabled)) || undefined}
         ref={list}
@@ -785,7 +786,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
                         />
                       }
                     >
-                      <i aria-hidden="true" className="i-lucide-light:settings-2" />
+                      <i aria-hidden="true" className="i-lucide-light:settings-2 text-base" />
                     </TooltipTrigger>
                     <TooltipContent container={list.current}>{t('inspector.ports.groupSettings')}</TooltipContent>
                   </Tooltip>

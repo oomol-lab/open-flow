@@ -3,6 +3,7 @@ import type { ReactNode, ReactElement, ComponentProps } from 'react'
 import { Children, isValidElement, useState } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/browser/select.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/tooltip.tsx'
+import { FieldTypeDisplay } from './fieldTypeDisplay.tsx'
 
 export const selectionMenuRowClass = 'min-h-7 py-1 text-xs leading-5 font-normal'
 
@@ -15,6 +16,7 @@ export function FieldSelect({
   onChange,
   children,
   disabled,
+  readOnly,
   danger,
   icons,
   'aria-label': label,
@@ -25,6 +27,7 @@ export function FieldSelect({
   'onChange': (value: string) => void
   'children': ReactNode
   'disabled'?: boolean
+  'readOnly'?: boolean
   'danger'?: boolean
   'icons'?: Readonly<Record<string, string>>
   'size'?: string
@@ -40,6 +43,16 @@ export function FieldSelect({
       return { value: String(props.value ?? props.children), label: props.children, disabled: props.disabled }
     })
   const selected = options.find((option) => option.value === String(value))
+  if (readOnly && icons?.[value]) {
+    return (
+      <FieldTypeDisplay
+        id={id}
+        label={selected?.label}
+        accessibleLabel={`${label}: ${selected?.label ?? value}`}
+        icon={<i aria-hidden="true" className={`${icons[value]} inline-block shrink-0 text-base`} />}
+      />
+    )
+  }
   const trigger = (
     <SelectTrigger id={id} size="field" aria-label={label} aria-invalid={invalid || danger} className={fieldSelectTriggerClass}>
       <SelectValue>
@@ -61,7 +74,7 @@ export function FieldSelect({
         onValueChange={(next) => {
           if (next != null) onChange(next)
         }}
-        disabled={disabled}
+        disabled={disabled || readOnly}
         items={options}
       >
         {icons ? (

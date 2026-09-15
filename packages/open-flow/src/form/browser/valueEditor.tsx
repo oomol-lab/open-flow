@@ -449,7 +449,7 @@ export function ValueEditor(props: ValueEditorProps) {
                             <EditorComponentSelect
                               schema={fieldSchema}
                               name={`${label}.${name}`}
-                              disabled={disabled}
+                              readOnly={disabled}
                               onChange={(nextSchema) =>
                                 props.onDefinitionChange!(
                                   { ...source, properties: { ...properties, [name]: nextSchema } },
@@ -462,7 +462,7 @@ export function ValueEditor(props: ValueEditorProps) {
                               icons={editorComponentIcons}
                               aria-label={t('valueEditor.type', { name: `${label}.${name}` })}
                               value={valueType(fieldSchema, fieldValue)}
-                              disabled={disabled || typeof fieldSource.type === 'string' || fieldSource.enum != null || fieldSource.const !== undefined}
+                              readOnly={disabled || typeof fieldSource.type === 'string' || fieldSource.enum != null || fieldSource.const !== undefined}
                               onChange={(next) => {
                                 onChange(setObjectField(value, name, initialValue(fieldSchema, next as ValueType)))
                               }}
@@ -763,7 +763,7 @@ export function ValueEditor(props: ValueEditorProps) {
           <EditorComponentSelect
             schema={source.items ?? {}}
             name={`${label}[]`}
-            disabled={disabled || !props.onDefinitionChange}
+            readOnly={disabled || !props.onDefinitionChange}
             onChange={(items) =>
               props.onDefinitionChange?.(
                 { ...source, items },
@@ -838,7 +838,7 @@ export function ValueEditor(props: ValueEditorProps) {
                 <PopoverTrigger
                   render={<Button type="button" variant="ghost" size="icon-sm" data-value-options aria-label={t('valueEditor.options', { name: label })} />}
                 >
-                  <i aria-hidden="true" className="i-lucide-light:settings" />
+                  <i aria-hidden="true" className="i-lucide-light:settings text-base" />
                 </PopoverTrigger>
                 <PopoverContent
                   container={container}

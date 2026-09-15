@@ -7,12 +7,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/toolti
 import { editorComponent, editorGroups, schemaForEditor } from '../common/editorComponent.ts'
 import { EditorComponentIcon } from './editorComponentIcon.tsx'
 import { fieldSelectTriggerClass, selectionMenuRowClass } from './fieldSelect.tsx'
+import { FieldTypeDisplay } from './fieldTypeDisplay.tsx'
 
 export function EditorComponentSelect({
   schema,
   id,
   name,
   disabled,
+  readOnly,
   compact = true,
   onChange,
 }: {
@@ -20,6 +22,7 @@ export function EditorComponentSelect({
   id?: string
   name: string
   disabled?: boolean
+  readOnly?: boolean
   compact?: boolean
   onChange: (schema: Record<string, unknown>) => void
 }) {
@@ -27,6 +30,17 @@ export function EditorComponentSelect({
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const selectedComponent = editorComponent(schema)
   const label = t(`valueEditor.components.${selectedComponent}`)
+  if (readOnly) {
+    return (
+      <FieldTypeDisplay
+        id={id}
+        label={label}
+        accessibleLabel={`${t('valueEditor.type', { name })}: ${label}`}
+        icon={<EditorComponentIcon component={selectedComponent} />}
+        compact={compact}
+      />
+    )
+  }
   const items = Object.values(editorGroups)
     .flat()
     .map((value) => ({ value, label: t(`valueEditor.components.${value}`) }))
