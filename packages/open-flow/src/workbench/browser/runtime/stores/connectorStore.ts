@@ -154,8 +154,7 @@ function connectionDiagnostics(
     if (task?.executor.kind != 'connector') continue
     const action = actions[task.executor.action]
     if (action?.authenticated != true) continue
-    let connection = task.executor.connectionId == null ? undefined : catalogs[action.serviceId]?.byId.get(task.executor.connectionId)
-    if (connection == null && action.defaultConnection?.connectionId == task.executor.connectionId) connection = action.defaultConnection
+    const connection = task.executor.connectionId == null ? undefined : catalogs[action.serviceId]?.byId.get(task.executor.connectionId)
     if (task.executor.connectionId != null && (catalogs[action.serviceId] == null || connection?.status == 'active')) continue
     diagnostics.push({
       code: 'task.connector-connection-required',
@@ -231,8 +230,7 @@ export class ConnectorStore {
       const catalog = action == null ? undefined : get(catalogs)[action.serviceId]
       const actionFailure = get(this.data.actions.detail(target.actionId, get(workspace.$.flowId), this.#language)).error
       const connectionFailure = action == null ? undefined : get(this.data.connections.get(action.serviceId, get(workspace.$.flowId))).error
-      let connection = target.connectionId == null ? undefined : catalog?.byId.get(target.connectionId)
-      if (connection == null && action?.defaultConnection?.connectionId == target.connectionId) connection = action.defaultConnection
+      const connection = target.connectionId == null ? undefined : catalog?.byId.get(target.connectionId)
       return {
         action,
         actionError: actionFailure == null ? undefined : errorNotice(actionFailure, this.#i18n.t).message,

@@ -14,8 +14,13 @@ import type {
   WaitNode,
 } from './api.ts'
 
-import { availableOutputs, nodeInputPorts } from '../../../flow/common/graph.ts'
+import { availableOutputs, inputSourceAvailable } from '../../../flow/common/graph.ts'
 import { agentActions, codeActions } from '../../../flow/common/semantics.ts'
+
+export interface InputSourceQuery {
+  readonly check: () => readonly boolean[]
+  readonly candidates: () => Readonly<Record<string, readonly string[]>>
+}
 
 type SubflowDefinition = FlowDocument['subflows'][string]
 
@@ -53,7 +58,7 @@ export class RevisionView {
   readonly #document: FlowDocument
   readonly #modules: Draft['content']['modules']
   readonly #resolvedNodes = new WeakMap<GraphNode, Map<string, ResolvedSelection>>()
-  readonly #inputSourcesByGraph = new WeakMap<Graph, Map<string, { handle: string; outputs: ReturnType<typeof availableOutputs> }[]>>()
+  readonly #inputSourcesByGraph = new WeakMap<Graph, Map<string, InputSourceQuery>>()
   readonly #taskNodesByGraph = new WeakMap<Graph, readonly TaskNodeReference[]>()
 
   public constructor(public readonly revision: Draft) {
@@ -78,18 +83,24 @@ export class RevisionView {
     }
   }
 
-  public inputSources(target: GraphTarget, nodeId: string) {
+  public inputSource(target: GraphTarget, nodeId: string, handle: string): InputSourceQuery {
     const graph = this.graph(target)!
-    let byNode = this.#inputSourcesByGraph.get(graph)
-    const cached = byNode?.get(nodeId)
+    let queries = this.#inputSourcesByGraph.get(graph)
+    const key = JSON.stringify([nodeId, handle])
+    const cached = queries?.get(key)
     if (cached != null) return cached
-    const sources = Object.keys(nodeInputPorts(this.#document, graph.nodes[nodeId]!)).map((handle) => ({
-      handle,
-      outputs: availableOutputs(this.#document, graph, nodeId, handle),
-    }))
-    if (byNode == null) this.#inputSourcesByGraph.set(graph, (byNode = new Map()))
-    byNode.set(nodeId, sources)
-    return sources
+    const node = graph.nodes[nodeId]!
+    const mapping = 'inputs' in node ? node.inputs[handle] : undefined
+    const sources = mapping?.kind === 'sources' ? mapping.sources.filter((source) => source.kind === 'node') : []
+    let checks: readonly boolean[] | undefined
+    let candidates: ReturnType<typeof availableOutputs> | undefined
+    const query: InputSourceQuery = {
+      check: () => (checks ??= sources.map((source) => inputSourceAvailable(this.#document, graph, nodeId, handle, source))),
+      candidates: () => (candidates ??= availableOutputs(this.#document, graph, nodeId, handle)),
+    }
+    if (queries == null) this.#inputSourcesByGraph.set(graph, (queries = new Map()))
+    queries.set(key, query)
+    return query
   }
 
   public designerInputs(target: GraphTarget): readonly unknown[] {

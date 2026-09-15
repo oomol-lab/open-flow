@@ -2,6 +2,7 @@ import styles from './nodeInputValue.module.scss'
 import type { ValueEditorProps } from '../../../../form/browser/valueEditor.tsx'
 import type { VariablePickerProps } from '../../../../ui/browser/variable-picker.tsx'
 import type { InputPort, JsonValue } from '../api.ts'
+import type { InputSourceQuery } from '../revisionView.ts'
 
 import { useId, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
@@ -23,15 +24,18 @@ import {
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
 import { LlmInputEditor, supportsLlmInput } from './llmInputEditor.tsx'
+import { useInputSourceQuery } from './useInputSourceQuery.ts'
 
 export type InputVariables = Pick<VariablePickerProps, 'enabled' | 'loaded' | 'loading' | 'names' | 'onOpen'>
 export interface NodeInputUpstreamSources {
+  readonly query?: InputSourceQuery
+  readonly describeGroups?: (outputs: Readonly<Record<string, readonly string[]>>) => NodeInputUpstreamSources['groups']
   readonly current: readonly {
     readonly icon?: string
     readonly nodeId: string
     readonly nodeName: string
     readonly output: string
-    readonly valid: boolean
+    readonly valid: boolean | undefined
   }[]
   readonly groups: readonly {
     readonly icon?: string
@@ -51,7 +55,7 @@ const sourceSubTriggerClass = 'min-h-8 gap-2 px-2 py-1 text-xs'
 export function NodeInputValue({
   definition,
   presentation,
-  upstream,
+  upstream: providedUpstream,
   embedded = false,
   handleNames = [],
   value,
@@ -80,6 +84,17 @@ export function NodeInputValue({
 }) {
   const t = useTranslate()
   const sourceErrorId = useId()
+  const [sourceOpen, setSourceOpen] = useState(false)
+  const checks = useInputSourceQuery(providedUpstream?.query?.check, (providedUpstream?.current.length ?? 0) > 0)
+  const candidates = useInputSourceQuery(providedUpstream?.query?.candidates, sourceOpen)
+  const upstream =
+    providedUpstream?.query == null
+      ? providedUpstream
+      : {
+          ...providedUpstream,
+          current: providedUpstream.current.map((source, index) => ({ ...source, valid: checks.value?.[index] })),
+          groups: candidates.value == null ? [] : (providedUpstream.describeGroups?.(candidates.value) ?? []),
+        }
   const [sourceContainer, setSourceContainer] = useState<HTMLDivElement | null>(null)
   const llm = supportsLlmInput(definition.jsonSchema, value)
   const bound = variableName != null
@@ -93,7 +108,7 @@ export function NodeInputValue({
         ? JSON.stringify(['upstream'])
         : literalSource
   const missingVariable = bound && (!variables.enabled || (variables.loaded && !variables.names.includes(variableName)))
-  const invalidUpstream = connected && (upstream?.current.length ?? 0) > 0 && upstream!.current.some((source) => !source.valid)
+  const invalidUpstream = connected && (upstream?.current.length ?? 0) > 0 && upstream!.current.some((source) => source.valid === false)
   const sourceIssue = missingVariable
     ? !variables.enabled
       ? t('variablePicker.variableUnavailableHelp')
@@ -115,6 +130,7 @@ export function NodeInputValue({
     <div ref={setSourceContainer} className="flex items-center">
       <DropdownMenu
         onOpenChange={(open) => {
+          setSourceOpen(open)
           if (open && variables.enabled) variables.onOpen()
         }}
       >
@@ -209,11 +225,17 @@ export function NodeInputValue({
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator className="mx-1 bg-border/50" />
-          {(upstream?.groups.length ?? 0) === 0 && (
+          {candidates.pending || candidates.failed ? (
             <DropdownMenuItem className={sourceEmptyItemClass} disabled>
-              <i aria-hidden="true" className="i-lucide-light:workflow size-3.5 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate">{t('nodeInput.noUpstreamNodes')}</span>
+              {t(candidates.failed ? 'inspector.sources.loadFailed' : 'inspector.sources.loading')}
             </DropdownMenuItem>
+          ) : (
+            (upstream?.groups.length ?? 0) === 0 && (
+              <DropdownMenuItem className={sourceEmptyItemClass} disabled>
+                <i aria-hidden="true" className="i-lucide-light:workflow size-3.5 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate">{t('nodeInput.noUpstreamNodes')}</span>
+              </DropdownMenuItem>
+            )
           )}
           {upstream?.groups.map((group) => (
             <DropdownMenuSub key={group.nodeId}>
@@ -236,7 +258,7 @@ export function NodeInputValue({
                   }}
                 >
                   {upstream.current
-                    .filter((source) => source.nodeId === group.nodeId && !source.valid)
+                    .filter((source) => source.nodeId === group.nodeId && source.valid === false)
                     .map((source) => (
                       <DropdownMenuRadioItem className={sourceItemClass} key={source.output} value={upstreamSource(source.nodeId, source.output)} disabled>
                         <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
@@ -263,6 +285,7 @@ export function NodeInputValue({
         <div
           data-value-control
           className="flex h-[30px] min-w-0 items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-[7px] text-xs aria-invalid:border-destructive"
+          aria-busy={checks.pending || undefined}
           aria-invalid={sourceIssue != null}
           aria-describedby={sourceIssue ? sourceErrorId : undefined}
           tabIndex={sourceIssue ? 0 : undefined}
@@ -281,6 +304,11 @@ export function NodeInputValue({
           )}
           <span className="truncate">{sourceLabel}</span>
         </div>
+        {(checks.pending || checks.failed) && (
+          <p role="status" className="text-xs text-muted-foreground">
+            {t(checks.failed ? 'inspector.sources.checkFailed' : 'inspector.sources.checking')}
+          </p>
+        )}
         {sourceIssue && (
           <p id={sourceErrorId} role="alert" className={styles.sourceError}>
             {sourceIssue}

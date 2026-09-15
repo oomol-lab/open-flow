@@ -171,3 +171,38 @@ describe('Unset input presentation', () => {
     expect(onValue).not.toHaveBeenCalled()
   })
 })
+
+it('renders a saved binding as pending without running compatibility or candidate queries', () => {
+  const i18n = createI18n('en')
+  const check = vi.fn(() => [false])
+  const candidates = vi.fn(() => ({}))
+  try {
+    const html = renderToStaticMarkup(
+      <I18nProvider i18n={i18n}>
+        <NodeInputValue
+          definition={{ handle: 'message', jsonSchema: { type: 'string' }, nullable: false }}
+          value={undefined}
+          connected
+          disabled={false}
+          variables={{ enabled: true, loaded: false, loading: false, names: [], onOpen: vi.fn() }}
+          upstream={{
+            current: [{ nodeId: 'source', nodeName: 'Saved source', output: 'text', valid: undefined }],
+            query: { check, candidates },
+            groups: [],
+            onChange: vi.fn(),
+          }}
+          onValue={vi.fn()}
+          onVariable={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(html).toContain('Saved source · text')
+    expect(html).toContain('Checking source…')
+    expect(html).toContain('aria-busy="true"')
+    expect(html).not.toContain('aria-invalid="true"')
+    expect(check).not.toHaveBeenCalled()
+    expect(candidates).not.toHaveBeenCalled()
+  } finally {
+    i18n.dispose()
+  }
+})

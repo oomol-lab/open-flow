@@ -237,6 +237,10 @@
     },
     "title": "檢查器",
     "sources": {
+      "loading": "正在載入來源…",
+      "checking": "正在檢查來源…",
+      "loadFailed": "無法載入來源，請重新開啟選單重試。",
+      "checkFailed": "無法檢查此來源。",
       "title": "輸入來源",
       "local": "本機值 / 變數",
       "unavailable": "無法保證此來源先於目前節點完成，或輸出類型不符。"
