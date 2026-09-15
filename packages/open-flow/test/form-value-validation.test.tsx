@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it, vi } from 'vitest'
 import { ValueEditor } from '../src/form/browser/valueEditor.tsx'
+import { ajv } from '../src/form/common/validation/validator.ts'
 import { createI18n } from '../src/workbench/browser/runtime/i18n.ts'
 
 const cases = [
@@ -233,4 +234,34 @@ it('offers to repair a non-nullable array item cleared to null', () => {
   )
   expect(markup).toContain('aria-label="items.0 Set value"')
   expect(markup).toContain('>Set value<')
+})
+
+describe('Lazy schema compilation', () => {
+  it('compiles only when a value needs schema validation', () => {
+    const i18n = createI18n('en')
+    const compile = vi.spyOn(ajv, 'compile')
+    const onChange = vi.fn()
+    const schema = { type: 'string', minLength: 5 }
+    const render = (value: unknown, nullable = false, invalid = false) =>
+      renderToStaticMarkup(
+        <I18nProvider i18n={i18n}>
+          <ValueEditor label="sample" compact schema={schema} value={value} nullable={nullable} invalid={invalid} onChange={onChange} />
+        </I18nProvider>,
+      )
+    try {
+      render(undefined)
+      render(null, true)
+      expect(render('abc', false, true)).toContain('aria-invalid="true"')
+      expect(compile).not.toHaveBeenCalled()
+      expect(render('abc')).toContain('aria-invalid="true"')
+      expect(compile).toHaveBeenCalledWith(schema)
+      expect(render('valid text')).not.toContain('aria-invalid="true"')
+      expect(render(null)).toContain('aria-invalid="true"')
+      expect(render('')).toContain('aria-invalid="true"')
+      expect(onChange).not.toHaveBeenCalled()
+    } finally {
+      compile.mockRestore()
+      i18n.dispose()
+    }
+  })
 })

@@ -131,7 +131,7 @@ describe('WorkbenchStore diagnostics', () => {
           success: true,
         })
       }
-      if (path == `/v1/connector/proxy/apps?flowId=${flow.flowId}`) {
+      if (path.startsWith(`/v1/connector/proxy/apps?flowId=${flow.flowId}`)) {
         return Response.json({
           data: [
             {
@@ -193,6 +193,39 @@ describe('WorkbenchStore diagnostics', () => {
         expect(iconUpdates).toHaveBeenCalledOnce()
       } finally {
         stop()
+      }
+      store.workspace.selectNodes(['connected'])
+      await store.connectors.refresh()
+      const graph = store.$.designer.value
+      const actions = store.connectors.$.actions.value
+      const catalogs = store.connectors.$.catalogs.value
+      const updates = vi.fn()
+      const stops = [
+        store.$.designer,
+        store.connectors.$.actions,
+        store.connectors.$.catalogs,
+        store.connectors.$.actionLoading,
+        store.connectors.$.connectionLoading,
+      ].map((source) => source.reaction(updates, true))
+      const requestCount = requests.length
+      try {
+        for (let index = 0; index < 3; index++) {
+          store.workspace.selectNodes([])
+          await store.connectors.refresh()
+          store.workspace.selectNodes(['connected'])
+          await store.connectors.refresh()
+        }
+        expect(requests).toHaveLength(requestCount)
+        expect(updates).not.toHaveBeenCalled()
+        expect(store.$.designer.value).toBe(graph)
+        expect(store.connectors.$.actions.value).toBe(actions)
+        expect(store.connectors.$.catalogs.value).toBe(catalogs)
+        await store.connectors.refresh(true)
+        expect(requests.length).toBeGreaterThan(requestCount)
+        expect(store.connectors.$.selectedConnection.value?.connectionId).toBe('connection-1')
+        expect(store.connectors.$.connectionLoading.value).toBeUndefined()
+      } finally {
+        stops.forEach((dispose) => dispose())
       }
     } finally {
       store.dispose()

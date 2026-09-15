@@ -133,8 +133,9 @@ export function ValueEditor(props: ValueEditorProps) {
     (Array.isArray(source.enum) && source.enum.includes(null))
   const value = storedValue === null && allowsNull && source.type !== 'null' && !source.enum && !Object.hasOwn(source, 'const') ? undefined : storedValue
   const type = valueType(schema, value)
-  const validator = useMemo(() => compile(schema)[0], [schema])
-  const invalid = props.invalid === true || (value !== undefined && !(value === null && allowsNull) && validator?.(value) === false)
+  const needsValidation = props.invalid !== true && value !== undefined && !(value === null && allowsNull)
+  const validator = useMemo(() => (needsValidation ? compile(schema)[0] : undefined), [schema, needsValidation])
+  const invalid = props.invalid === true || validator?.(value) === false
   const enumeration = Array.isArray(source.enum) ? source.enum : Object.hasOwn(source, 'const') ? [source.const] : undefined
   const complex = source['ui:widget'] === 'any' || editorComponent(schema) === 'json' || depth > 12
   const editableOptions =

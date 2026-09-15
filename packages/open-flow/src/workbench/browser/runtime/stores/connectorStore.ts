@@ -1,6 +1,6 @@
 import type { I18n, TFunction } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { WorkbenchClient, ConnectorActionMetadata, ConnectorConnection, ConnectorProvider, Diagnostic, JsonValue } from '../api.ts'
+import type { WorkbenchClient, ConnectorConnection, ConnectorProvider, Diagnostic, JsonValue } from '../api.ts'
 import type { WorkbenchHost } from '../contract.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
 import type { ResolvedSelection, RevisionView } from '../revisionView.ts'
@@ -23,11 +23,9 @@ import { errorNotice } from './workbenchNotice.ts'
 interface ConnectorState {
   readonly actionError?: { readonly actionId: string; readonly message: string }
   readonly actionLoading?: string
-  readonly actionIds: readonly string[]
   readonly authorizationServiceId?: string
   readonly connectionError?: { readonly message: string; readonly serviceId: string }
   readonly connectionLoading?: string
-  readonly services: readonly string[]
 }
 
 interface Selection {
@@ -61,10 +59,7 @@ export interface Connector$ {
   readonly selectedConnectionError: ReadonlyVal<string | undefined>
 }
 
-const initialState: ConnectorState = {
-  actionIds: [],
-  services: [],
-}
+const initialState: ConnectorState = {}
 
 function ports(values: Readonly<Record<string, { readonly description?: string; readonly jsonSchema: JsonValue }>>): AddNodeOption['inputs'] {
   return Object.entries(values).map(([handle, value]) => ({ description: value.description, handle, jsonSchema: value.jsonSchema }))
@@ -187,6 +182,9 @@ export class ConnectorStore {
   readonly #selected: ReadonlyVal<Selection>
   readonly #setNotice: SetNotice
   readonly #state: Val<ConnectorState> = val(initialState)
+  // Membership is independent of transient request state, so loading cannot invalidate the graph.
+  readonly #actionIds = val<readonly string[]>([])
+  readonly #services = val<readonly string[]>([])
   readonly #workspace: WorkspaceStore
   #authorization?: { readonly connectionIds: ReadonlySet<string>; readonly serviceId: string }
   #disposed = false
@@ -210,7 +208,7 @@ export class ConnectorStore {
     const actions = compute((get) => {
       const flowId = get(workspace.$.flowId)
       return Object.fromEntries(
-        get(this.#state).actionIds.flatMap((id) => {
+        get(this.#actionIds).flatMap((id) => {
           const action = get(this.data.actions.detail(id, flowId, this.#language)).data
           return action == null ? [] : [[id, actionWithConnections(action, get(this.data.connections.get(action.serviceId, flowId)).data)]]
         }),
@@ -219,7 +217,7 @@ export class ConnectorStore {
     const catalogs = compute((get) => {
       const flowId = get(workspace.$.flowId)
       return Object.fromEntries(
-        get(this.#state).services.flatMap((service) => {
+        get(this.#services).flatMap((service) => {
           const connections = get(this.data.connections.get(service, flowId)).data
           return connections == null ? [] : [[service, connectionCatalog(connections)]]
         }),
@@ -274,6 +272,8 @@ export class ConnectorStore {
     for (const value of Object.values(this.$)) value.dispose()
     this.#selected.dispose()
     this.#state.dispose()
+    this.#actionIds.dispose()
+    this.#services.dispose()
   }
 
   public setLanguage(language: string): void {
@@ -290,6 +290,8 @@ export class ConnectorStore {
     this.#authorization = undefined
     this.#loadingActions.clear()
     this.#state.set(initialState)
+    this.#actionIds.set([])
+    this.#services.set([])
   }
 
   public readonly loadConnections = async (signal: AbortSignal): Promise<void> => {
@@ -373,11 +375,17 @@ export class ConnectorStore {
       }
       return
     }
-    this.#set({ actionError: undefined, actionLoading: target.actionId, connectionError: undefined, connectionLoading: undefined })
+    const actionState = this.data.actions.detail(target.actionId, flowId, this.#language)
+    this.#set({
+      actionError: undefined,
+      actionLoading: actionState.value.data == null ? target.actionId : undefined,
+      connectionError: undefined,
+      connectionLoading: undefined,
+    })
     try {
-      const action = await this.#loadAction(target.actionId, false)
+      const action = await resourceValue(actionState)
       if (!this.#isCurrent(current, flowId)) return
-      this.#set({ actionIds: [...new Set([...this.#state.value.actionIds, action.actionId])] })
+      this.#remember(this.#actionIds, [action.actionId])
       if (action.authenticated) await this.#refreshConnections(flowId, target, action.serviceId, force, current)
     } catch (error) {
       if (this.#isCurrent(current, flowId)) {
@@ -393,7 +401,7 @@ export class ConnectorStore {
     if (flowId == null || this.#disposed) return
     await resourceValue(this.data.connections.get(serviceId, flowId), signal)
     if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
-    this.#set({ services: [...new Set([...this.#state.value.services, serviceId])] })
+    this.#remember(this.#services, [serviceId])
   }
 
   public async loadCodeAction(actionId: string, signal: AbortSignal): Promise<void> {
@@ -402,7 +410,7 @@ export class ConnectorStore {
     if (flowId == null || this.#disposed) return
     await resourceValue(this.data.actions.detail(actionId, flowId, language), signal)
     if (signal.aborted || this.#disposed || language != this.#language || flowId != this.#workspace.$.flowId.value) return
-    this.#set({ actionIds: [...new Set([...this.#state.value.actionIds, actionId])] })
+    this.#remember(this.#actionIds, [actionId])
   }
 
   public async connect(serviceId: string): Promise<void> {
@@ -436,14 +444,9 @@ export class ConnectorStore {
     if (!this.#disposed && this.#authorization?.serviceId == serviceId) this.#authorization = undefined
   }
 
-  async #loadAction(actionId: string, force: boolean): Promise<ConnectorActionMetadata> {
-    const state = this.data.actions.detail(actionId, this.#workspace.$.flowId.value, this.#language, force)
-    await Promise.resolve()
-    return await resourceValue(state, undefined, force)
-  }
-
   async #refreshConnections(flowId: string, target: ConnectorTarget, serviceId: string, force: boolean, current: Current): Promise<void> {
-    this.#set({ connectionLoading: serviceId })
+    const connections = this.data.connections.get(serviceId, flowId)
+    this.#set({ connectionLoading: force || connections.value.data == null ? serviceId : undefined })
     try {
       const catalog = await this.#loadCatalog(flowId, serviceId, force, current)
       if (catalog == null || !this.#isCurrent(current, flowId)) return
@@ -465,7 +468,7 @@ export class ConnectorStore {
     }
     if (!this.#isCurrent(current, flowId)) return
     const catalog = connectionCatalog(connections)
-    this.#set({ services: [...new Set([...this.#state.value.services, serviceId])] })
+    this.#remember(this.#services, [serviceId])
     return catalog
   }
 
@@ -486,8 +489,12 @@ export class ConnectorStore {
     }
   }
 
+  #remember(source: Val<readonly string[]>, ids: readonly string[]): void {
+    if (ids.some((id) => !source.value.includes(id))) source.set([...new Set([...source.value, ...ids])])
+  }
+
   #set(patch: Partial<ConnectorState>): void {
-    if (this.#disposed) return
+    if (this.#disposed || Object.entries(patch).every(([key, value]) => this.#state.value[key as keyof ConnectorState] === value)) return
     this.#state.set({ ...this.#state.value, ...patch })
   }
 
@@ -510,7 +517,10 @@ export class ConnectorStore {
       try {
         const actions = await Promise.all(missing.map((actionId) => resourceValue(this.data.actions.detail(actionId, flowId, this.#language))))
         if (!this.#isCurrent(current, flowId)) return
-        this.#set({ actionIds: [...new Set([...this.#state.value.actionIds, ...actions.map((action) => action.actionId)])] })
+        this.#remember(
+          this.#actionIds,
+          actions.map((action) => action.actionId),
+        )
       } catch {
         return
       } finally {
