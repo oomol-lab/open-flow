@@ -89,6 +89,43 @@ export function nodeInputPorts(document: FlowDocument, node: GraphNode): Readonl
   }
 }
 
+export function waitOutputPorts(node: Extract<GraphNode, { readonly kind: 'wait' }>): Readonly<Record<string, PortDefinition>> {
+  return {
+    notification: {
+      nullable: false,
+      jsonSchema: {
+        type: 'object',
+        properties: {
+          value: node.input.nullable ? { anyOf: [node.input.jsonSchema, { type: 'null' }] } : node.input.jsonSchema,
+          prompt: { type: 'string' },
+          actions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { action: { enum: node.actions }, url: { type: 'string' } },
+              required: ['action', 'url'],
+              additionalProperties: false,
+            },
+          },
+          expiresAt: { type: 'string' },
+        },
+        required: ['value', 'prompt', 'actions', 'expiresAt'],
+        additionalProperties: false,
+      },
+    },
+    ...Object.fromEntries(
+      node.actions.map((action) => [
+        action,
+        {
+          jsonSchema: node.input.jsonSchema,
+          nullable: node.input.nullable,
+          ...(node.input.description == null ? {} : { description: node.input.description }),
+        },
+      ]),
+    ),
+  }
+}
+
 function nodeOutputPorts(document: FlowDocument, node: GraphNode): Readonly<Record<string, PortDefinition>> {
   switch (node.kind) {
     case 'condition': {
@@ -102,7 +139,7 @@ function nodeOutputPorts(document: FlowDocument, node: GraphNode): Readonly<Reco
     case 'task':
       return portsByHandle(node.task != null ? node.task.outputs : (document.tasks[node.taskId]?.outputs ?? []))
     case 'wait':
-      return Object.fromEntries(node.actions.map((action) => [action, node.input]))
+      return waitOutputPorts(node)
     case 'cron':
     case 'integration':
     case 'poll':
@@ -219,6 +256,7 @@ const pathsByGraph = new WeakMap<
   {
     readonly paths: Map<string, readonly Route[]>
     readonly ancestors: Map<string, Set<string>>
+    readonly resolvedWaits: Map<string, Set<string>>
   }
 >()
 
@@ -239,6 +277,7 @@ function graphPaths(graph: Graph) {
   if (cached != null) return cached
   const paths = new Map<string, readonly Route[]>()
   const ancestors = new Map<string, Set<string>>()
+  const resolvedWaits = new Map<string, Set<string>>()
   const incoming = new Map<string, Graph['edges'][number][]>()
   for (const edge of graph.edges) {
     const edges = incoming.get(edge.target) ?? []
@@ -249,12 +288,18 @@ function graphPaths(graph: Graph) {
     const node = graph.nodes[id]!
     const edges = incoming.get(id) ?? []
     const parents = new Set<string>()
+    const decisions = new Set<string>()
     const routes: Route[] = []
     for (const edge of edges) {
       parents.add(edge.source)
+      for (const waitId of resolvedWaits.get(edge.source) ?? []) decisions.add(waitId)
+      if (graph.nodes[edge.source]?.kind == 'wait' && edge.sourceHandle != 'notification') decisions.add(edge.source)
       for (const parent of ancestors.get(edge.source) ?? []) parents.add(parent)
       for (const route of paths.get(edge.source) ?? []) {
-        const next = edge.sourceHandle == null ? route : { ...route, [edge.source]: edge.sourceHandle }
+        const next =
+          edge.sourceHandle == null || (graph.nodes[edge.source]?.kind == 'wait' && edge.sourceHandle == 'notification')
+            ? route
+            : { ...route, [edge.source]: edge.sourceHandle }
         if (routes.some((known) => routeCovers(known, next))) continue
         for (let index = routes.length - 1; index >= 0; index--) {
           if (routeCovers(next, routes[index]!)) routes.splice(index, 1)
@@ -263,9 +308,10 @@ function graphPaths(graph: Graph) {
       }
     }
     ancestors.set(id, parents)
+    resolvedWaits.set(id, decisions)
     paths.set(id, edges.length == 0 ? ('inputs' in node ? [{}] : [{ $trigger: id }]) : routes)
   }
-  const analysis = { ancestors, paths }
+  const analysis = { ancestors, paths, resolvedWaits }
   pathsByGraph.set(graph, analysis)
   return analysis
 }
@@ -274,7 +320,9 @@ function sourcePaths(graph: Graph, paths: ReturnType<typeof graphPaths>['paths']
   if (source.kind != 'node') return [{}]
   const node = graph.nodes[source.nodeId]
   const routes = paths.get(source.nodeId) ?? []
-  return node?.kind == 'condition' || node?.kind == 'wait' ? routes.map((route) => ({ ...route, [source.nodeId]: source.output })) : routes
+  return node?.kind == 'condition' || (node?.kind == 'wait' && source.output != 'notification')
+    ? routes.map((route) => ({ ...route, [source.nodeId]: source.output }))
+    : routes
 }
 
 function covers(routes: readonly Route[], target: Route, graph: Graph): boolean {
@@ -298,6 +346,17 @@ function mappingAvailable(graph: Graph, target: string | undefined, mapping: Inp
   const { ancestors, paths } = analysis
   if (mapping.sources.length == 0) return false
   if (target != null && mapping.sources.some((source) => source.kind == 'node' && !ancestors.get(target)?.has(source.nodeId))) return false
+  if (
+    target != null &&
+    mapping.sources.some(
+      (source) =>
+        source.kind == 'node' &&
+        graph.nodes[source.nodeId]?.kind == 'wait' &&
+        source.output != 'notification' &&
+        !analysis.resolvedWaits.get(target)?.has(source.nodeId),
+    )
+  )
+    return false
   const sources = mapping.sources.map((source) => sourcePaths(graph, paths, source))
   const targetPaths = target == null ? [{}] : (paths.get(target) ?? [])
   if (!targetPaths.every((route) => covers(sources.flat(), route, graph))) return false
@@ -332,17 +391,8 @@ export function availableOutputs(document: FlowDocument, graph: Graph, target: s
   )
 }
 
-function validateWait(
-  nodeId: string,
-  node: Extract<GraphNode, { readonly kind: 'wait' }>,
-  graph: Graph,
-  document: FlowDocument,
-  flowInputs: Readonly<Record<string, InputPortDefinition>> | undefined,
-  allowed: boolean,
-  path: string,
-  diagnostics: Diagnostic[],
-): void {
-  const fields = new Set(['actions', 'description', 'icon', 'input', 'inputs', 'kind', 'name', 'notification', 'prompt'])
+function validateWait(nodeId: string, node: Extract<GraphNode, { readonly kind: 'wait' }>, allowed: boolean, path: string, diagnostics: Diagnostic[]): void {
+  const fields = new Set(['actions', 'description', 'icon', 'input', 'inputs', 'kind', 'name', 'prompt'])
   const unsupported = Object.keys(node).filter((field) => !fields.has(field))
   if (unsupported.length > 0) {
     diagnostics.push(
@@ -362,78 +412,6 @@ function validateWait(
     !((node.actions.length == 1 && node.actions[0] == 'continue') || (node.actions.length == 2 && node.actions[0] == 'approve' && node.actions[1] == 'reject'))
   ) {
     diagnostics.push(graphDiagnostic('wait.actions-invalid', 'Wait actions must be ["continue"] or ["approve", "reject"].', `${path}/actions`))
-  }
-  if (node.notification == null) return
-  const notification = node.notification as unknown
-  if (typeof notification != 'object' || Array.isArray(notification)) {
-    diagnostics.push(graphDiagnostic('wait.notification-invalid', 'Wait notification must be an object.', `${path}/notification`))
-    return
-  }
-  const source = notification as Readonly<Record<string, unknown>>
-  if (
-    Object.keys(source).length != 3 ||
-    !Object.hasOwn(source, 'inputs') ||
-    !Object.hasOwn(source, 'messageHandle') ||
-    !Object.hasOwn(source, 'taskId') ||
-    typeof source.taskId != 'string' ||
-    typeof source.messageHandle != 'string' ||
-    source.inputs == null ||
-    typeof source.inputs != 'object' ||
-    Array.isArray(source.inputs)
-  ) {
-    diagnostics.push(graphDiagnostic('wait.notification-invalid', 'Wait notification has an invalid shape.', `${path}/notification`))
-    return
-  }
-  const task = document.tasks[source.taskId]
-  if (task == null) {
-    diagnostics.push(
-      graphDiagnostic('graph.target-missing', `Task "${source.taskId}" does not exist.`, `${path}/notification/taskId`, {
-        taskId: source.taskId,
-        variant: 'task',
-      }),
-    )
-    return
-  }
-  if (task.executor.kind != 'connector') {
-    diagnostics.push(graphDiagnostic('wait.notification-task-invalid', 'Wait notification must use a Connector Task.', `${path}/notification/taskId`))
-  }
-  const ports = portsByHandle(task.inputs)
-  if (ports[source.messageHandle] == null) {
-    diagnostics.push(
-      graphDiagnostic(
-        'wait.notification-message-missing',
-        `Notification Task "${source.taskId}" does not expose input "${source.messageHandle}".`,
-        `${path}/notification/messageHandle`,
-      ),
-    )
-  }
-  const inputs = source.inputs as Readonly<Record<string, InputMapping>>
-  if (Object.hasOwn(inputs, source.messageHandle)) {
-    diagnostics.push(
-      graphDiagnostic('wait.notification-message-mapped', 'The notification message input is populated by the system.', `${path}/notification/inputs`),
-    )
-  }
-  for (const [handle, mapping] of Object.entries(inputs)) {
-    const inputPath = `${path}/notification/inputs/${handle}`
-    const port = ports[handle]
-    if (port == null) {
-      diagnostics.push(
-        graphDiagnostic('graph.input-missing', `Notification Task "${source.taskId}" does not expose input "${handle}".`, inputPath, {
-          handle,
-          nodeId,
-        }),
-      )
-      continue
-    }
-    if (mapping.kind == 'sources') for (const candidate of mapping.sources) checkSource(candidate, graph, document, flowInputs, port, inputPath, diagnostics)
-  }
-  for (const [handle, port] of Object.entries(ports)) {
-    if (handle == source.messageHandle || Object.hasOwn(inputs, handle) || Object.hasOwn(port, 'value')) continue
-    diagnostics.push(
-      graphDiagnostic('wait.notification-input-missing', `Notification input "${handle}" requires a mapping or default value.`, `${path}/notification/inputs`, {
-        handle,
-      }),
-    )
   }
 }
 
@@ -461,7 +439,9 @@ function validateGraph(
       diagnostics.push(graphDiagnostic('graph.edge-invalid', 'Execution edges require an existing source and an executable target.', edgePath))
     } else if (source.kind == 'condition' || source.kind == 'wait') {
       const exits =
-        source.kind == 'wait' ? source.actions : [...source.cases.map((item) => item.output), ...(source.defaultOutput == null ? [] : [source.defaultOutput])]
+        source.kind == 'wait'
+          ? ['notification', ...source.actions]
+          : [...source.cases.map((item) => item.output), ...(source.defaultOutput == null ? [] : [source.defaultOutput])]
       if (edge.sourceHandle == null || !exits.some((exit) => exit == edge.sourceHandle)) {
         diagnostics.push(graphDiagnostic('graph.edge-invalid', 'Choose a declared execution branch.', edgePath))
       }
@@ -513,18 +493,6 @@ function validateGraph(
           ),
         )
     }
-    if (node.kind == 'wait' && node.notification != null) {
-      for (const [handle, mapping] of Object.entries(node.notification.inputs)) {
-        if (!mappingAvailable(graph, nodeId, mapping, analysis))
-          diagnostics.push(
-            graphDiagnostic(
-              'graph.source-unavailable',
-              'Notification sources must provide exactly one value from completed ancestors.',
-              `${nodePath}/notification/inputs/${handle}`,
-            ),
-          )
-      }
-    }
     const inputPorts = nodeInputPorts(document, node)
     if (node.kind == 'task') {
       const ports = [...(node.task != null ? node.task.inputs : (document.tasks[node.taskId]?.inputs ?? [])), ...(node.additionalInputs ?? [])]
@@ -560,7 +528,7 @@ function validateGraph(
         for (const source of mapping.sources) checkSource(source, graph, document, flowInputs, inputPorts[handle], mappingPath, diagnostics)
       }
     }
-    if (node.kind == 'wait') validateWait(nodeId, node, graph, document, flowInputs, allowTriggers, nodePath, diagnostics)
+    if (node.kind == 'wait') validateWait(nodeId, node, allowTriggers, nodePath, diagnostics)
     if (node.kind != 'condition') continue
     const outputs = new Set<string>()
     for (const [index, condition] of node.cases.entries()) {

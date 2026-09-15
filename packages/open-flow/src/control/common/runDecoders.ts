@@ -57,8 +57,15 @@ export function runDetails(value: unknown): RunDetails {
   const summary = run(source)
   const eventsExpiresAt = source.eventsExpiresAt
   if (eventsExpiresAt != null && typeof eventsExpiresAt != 'string') return invalidResponse()
-  if (summary.status != 'waiting' && source.waiting !== undefined) return invalidResponse()
-  const state = summary.status == 'waiting' ? { status: 'waiting' as const, waiting: runWaiting(source.waiting) } : { status: summary.status }
+  if (source.waiting !== undefined || !Array.isArray(source.waits)) return invalidResponse()
+  const waits = source.waits.map(runWaiting)
+  if (
+    new Set(waits.map((wait) => wait.waitId)).size != waits.length ||
+    (summary.status == 'waiting' && waits.length == 0) ||
+    (['completed', 'failed', 'canceled', 'indeterminate'].includes(summary.status) && waits.length > 0)
+  )
+    return invalidResponse()
+  const state = { status: summary.status, waits }
   const details = {
     ...summary,
     closureDigest: string(source.closureDigest),

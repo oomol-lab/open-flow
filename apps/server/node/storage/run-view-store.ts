@@ -94,6 +94,7 @@ export class RunViewStore {
     options: {
       readonly after?: { readonly createdAt: number; readonly runId: string }
       readonly status?: RunStatus
+      readonly pendingWait?: boolean
     } = {},
   ): readonly StoredControlRun[] {
     const conditions = ['runs.flow_id = ?']
@@ -105,6 +106,11 @@ export class RunViewStore {
     if (options.status != null) {
       conditions.push('runs.status = ?')
       parameters.push(options.status)
+    }
+    if (options.pendingWait != null) {
+      conditions.push(
+        `${options.pendingWait ? '' : 'NOT '}EXISTS (SELECT 1 FROM wait_receipts WHERE wait_receipts.run_id = runs.run_id AND action IS NULL AND runs.status IN ('running', 'waiting', 'queued', 'starting'))`,
+      )
     }
     parameters.push(limit)
     return this.#controlRuns(conditions.join(' AND '), parameters, 'ORDER BY runs.created_at DESC, runs.run_id DESC LIMIT ?')
@@ -159,12 +165,12 @@ export class RunViewStore {
     return row?.eventsExpiresAt != null && row.eventsExpiresAt <= now
   }
 
-  activeWait(runId: string) {
-    const active = this.#database
-      .prepare(`SELECT wait_id AS waitId FROM run_waits JOIN runs USING (run_id)
-      WHERE run_id = ? AND runs.status = 'waiting'`)
-      .get(runId) as { readonly waitId: string } | undefined
-    return active == null ? undefined : this.waitReceipt(runId, active.waitId)
+  activeWaits(runId: string) {
+    const rows = this.#database
+      .prepare(`SELECT wait_id AS waitId FROM wait_receipts JOIN runs USING (run_id)
+      WHERE run_id = ? AND action IS NULL AND runs.status IN ('running', 'waiting', 'queued', 'starting') ORDER BY waiting_since, wait_id`)
+      .all(runId) as { waitId: string }[]
+    return rows.map(({ waitId }) => this.waitReceipt(runId, waitId)!)
   }
 
   waitReceipt(runId: string, waitId: string) {

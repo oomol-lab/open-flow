@@ -1,7 +1,7 @@
 import type { ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RuntimeCapabilityResponse, RuntimeInvocation, RuntimeProgram } from '@oomol-lab/open-flow/runtime-contract'
-import type { FlowRunOutcome, RunLaunch, SchedulerEvent, SchedulerFailure, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
+import type { FlowRunOutcome, RunLaunch, WaitOperation, SchedulerEvent, SchedulerFailure, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
 import type { ChildProcess, ChildProcessByStdio } from 'node:child_process'
 import type { Readable } from 'node:stream'
 
@@ -34,7 +34,7 @@ export const isolatedVmLimits: IsolatedVmLimits = {
   wallMs: 30_000,
 }
 
-export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/2 isolated-vm/7.0.1 node/26 web-globals/2 actions/1').digest('hex')}`
+export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/3 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 local-waits/3').digest('hex')}`
 
 export class IsolatedVmError extends Error {
   readonly code: 'canceled' | 'executor-crashed' | 'invalid-program' | 'limit-exceeded' | 'task-failed'
@@ -68,6 +68,7 @@ export type InvokeRequest =
       readonly flow: RunLaunch & {
         readonly flowId: string
         readonly prepared: PreparedFlow
+        readonly remainingMs?: number
         readonly runId: string
       }
       readonly limits: IsolatedVmLimits
@@ -87,6 +88,7 @@ export interface CapabilityResult {
 }
 
 export type ExecutorMessage =
+  | { readonly executionId: number; readonly id: number; readonly type: 'wait'; readonly operation: WaitOperation }
   | {
       readonly capabilities?: readonly ConnectorCapability[]
       readonly executionId: number
@@ -124,6 +126,7 @@ interface PendingInvocation {
   readonly activeCalls: Map<number, Fiber.Fiber<void, never>>
   readonly cancel: () => void
   readonly emit?: (event: SchedulerEvent) => void | Promise<void>
+  readonly wait?: (operation: WaitOperation, signal: AbortSignal) => Promise<unknown>
   readonly invokeTask?: (invocation: TaskInvocation & { readonly signal: AbortSignal }) => Promise<unknown>
   readonly limits: IsolatedVmLimits
   readonly projectFailure: (error: unknown) => SchedulerFailure
@@ -232,13 +235,15 @@ export class IsolatedVmHost {
       ) => Promise<RuntimeCapabilityResponse>
       readonly emit?: (event: SchedulerEvent) => void | Promise<void>
       readonly flowId: string
+      readonly wait?: (operation: WaitOperation, signal: AbortSignal) => Promise<unknown>
+      readonly remainingMs?: number
       readonly invokeTask: (invocation: TaskInvocation & { readonly signal: AbortSignal }) => Promise<unknown>
       readonly projectFailure: (error: unknown) => SchedulerFailure
       readonly runId: string
     },
     limits: IsolatedVmLimits = isolatedVmLimits,
   ): Effect.Effect<FlowRunOutcome, Error> {
-    const { capability, emit, invokeTask, projectFailure, ...flow } = options
+    const { capability, emit, invokeTask, projectFailure, wait, ...flow } = options
     return Effect.suspend(() => {
       if (this.#closed) return Effect.fail(new IsolatedVmError('executor-crashed', 'Runtime Host is closed.'))
       if (serializedBytes(prepared) > limits.maxProgramBytes) {
@@ -257,6 +262,7 @@ export class IsolatedVmHost {
           activeCalls: new Map(),
           cancel: interrupt,
           emit,
+          wait,
           invokeTask,
           limits,
           projectFailure,
@@ -343,6 +349,20 @@ export class IsolatedVmHost {
         if (pending.emit == null) throw new IsolatedVmError('executor-crashed', 'Runtime Executor emitted an event outside a Flow Run.')
         return pending.emit(message.event)
       })
+      return
+    }
+    if (message.type == 'wait') {
+      this.#call(
+        child,
+        message.executionId,
+        message.id,
+        pending,
+        (signal) => {
+          if (pending.wait == null) throw new Error('Wait host is unavailable.')
+          return pending.wait(message.operation, signal)
+        },
+        16 * 1024 * 1024,
+      )
       return
     }
     if (message.type == 'task') {

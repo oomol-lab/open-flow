@@ -176,7 +176,7 @@ describe('Designer port projection', () => {
     expect(authenticatedNode).toMatchObject({ diagnostics: 1, executorName: 'connector · Hacker News', connectionRequired: true })
   })
 
-  it('projects a Wait notification summary from its Connector Action', () => {
+  it.each([['approve', 'reject'], ['continue']] as const)('projects notification first and active waiting state for %j', (...actions) => {
     const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
       actorId: 'actor',
       content: {
@@ -186,12 +186,11 @@ describe('Designer port projection', () => {
             edges: [],
             nodes: {
               wait: {
-                actions: ['approve', 'reject'],
+                actions,
 
                 input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
                 inputs: {},
                 kind: 'wait',
-                notification: { inputs: {}, messageHandle: 'text', taskId: 'notify' },
                 prompt: 'Review this request.',
               },
             },
@@ -217,29 +216,14 @@ describe('Designer port projection', () => {
       revisionId: 'revision',
       version: 1,
     }
-    const action = {
-      actionId: 'feishu.send-text-message',
-      authenticated: true,
-      description: 'Send a text message.',
-      inputs: {},
-      name: 'Send text message',
-      outputs: {},
-      serviceId: 'feishu-custom-bot',
-      serviceName: 'Feishu Custom Bot',
-    }
-
-    expect(designerGraph(draft, { kind: 'flow' }).nodes[0]).toMatchObject({ notice: { text: 'Notification · send text message' } })
-    expect(designerGraph(draft, { kind: 'flow' }, {}, [], { [action.actionId]: action }).nodes[0]).toMatchObject({
-      notice: {
-        icon: providerIcon(action),
-        text: 'Notification · Feishu Custom Bot · Send text message',
-      },
-    })
+    const projected = designerGraph(draft, { kind: 'flow' }).nodes[0]!
+    if (projected.kind != 'wait') throw new Error('Expected Wait')
+    expect(projected.outputs.flatMap((port) => ('handle' in port ? [port.handle] : []))).toEqual(['notification', ...actions])
 
     const waiting = {
       closureDigest: 'closure',
       createdAt: '2026-09-02T00:00:00.000Z',
-      engineContract: 'open-flow-engine/v2',
+      engineContract: 'open-flow-engine/v3',
       engineDigest: 'sha256:engine',
       flowId: draft.flowId,
       modelVersion: 1,
@@ -250,14 +234,16 @@ describe('Designer port projection', () => {
       startedAt: '2026-09-02T00:00:01.000Z',
       status: 'waiting',
       version: 1,
-      waiting: {
-        actions: ['approve', 'reject'],
-        expiresAt: '2026-09-09T00:00:02.000Z',
-        nodeId: 'wait',
-        prompt: 'Review this request.',
-        waitId: '123456789012345678901',
-        waitingSince: '2026-09-02T00:00:02.000Z',
-      },
+      waits: [
+        {
+          actions,
+          expiresAt: '2026-09-09T00:00:02.000Z',
+          nodeId: 'wait',
+          prompt: 'Review this request.',
+          waitId: '123456789012345678901',
+          waitingSince: '2026-09-02T00:00:02.000Z',
+        },
+      ],
     } as const
     expect(designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, undefined, waiting).nodes[0]).toMatchObject({ run: { status: 'waiting' } })
   })

@@ -30,7 +30,7 @@ describe('Trigger configuration editor', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
-  it('preserves enum multi-selection and disables all read-only controls', () => {
+  it('preserves enum multi-selection and prevents editing read-only controls', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <TriggerConfigEditor
@@ -52,6 +52,14 @@ describe('Trigger configuration editor', () => {
     expect(markup).toContain('aria-label="events"')
     const controls = markup.match(/<(?:input|button|select|textarea)\b[^>]*>/g) ?? []
     expect(controls.length).toBeGreaterThan(0)
-    expect(controls.every((control) => /\bdisabled(?:=|\s|>)/.test(control))).toBe(true)
+    // Opening value options only reveals controls; the actions inside remain disabled.
+    const editingControls = controls.filter((control) => !control.includes('data-value-options="true"'))
+    const editable = editingControls.filter((control) => {
+      if (/\bdisabled(?:=|\s|>)/.test(control)) return false
+      const readOnlyText =
+        /^<(?:input|textarea)\b/.test(control) && !/\btype="(?:checkbox|radio|range|file|color)"/.test(control) && /\breadonly(?:=|\s|>)/.test(control)
+      return !readOnlyText
+    })
+    expect(editable).toEqual([])
   })
 })

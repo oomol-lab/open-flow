@@ -826,24 +826,27 @@ export default () => value`,
     expect(invalidNameResult.diagnostics).toEqual([expect.objectContaining({ code: 'binding.variable-invalid' })])
   })
 
-  it('validates a root Wait notification and includes its dependencies', async () => {
+  it('validates ordinary notification descendants and includes their dependencies', async () => {
     const source: RevisionFixture = {
       document: {
         bindings: { recipient: { kind: 'variable', target: 'RECIPIENT' } },
         graph: {
-          edges: [],
+          edges: [{ source: 'wait', sourceHandle: 'notification', target: 'notify' }],
           nodes: {
+            notify: {
+              kind: 'task',
+              taskId: 'notify',
+              inputs: {
+                recipient: { kind: 'sources', sources: [{ bindingId: 'recipient', kind: 'binding' }] },
+                message: { kind: 'value', value: 'Review requested' },
+              },
+            },
             wait: {
               actions: ['approve', 'reject'],
 
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: null } },
               kind: 'wait',
-              notification: {
-                inputs: { recipient: { kind: 'sources', sources: [{ bindingId: 'recipient', kind: 'binding' }] } },
-                messageHandle: 'message',
-                taskId: 'notify',
-              },
               prompt: 'Approve this request?',
             },
           },
@@ -938,7 +941,7 @@ export default () => value`,
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code }))
   })
 
-  it('rejects Wait in a Subflow and invalid notification targets', async () => {
+  it('rejects Wait in a Subflow', async () => {
     const source: RevisionFixture = {
       document: {
         bindings: {},
@@ -956,7 +959,6 @@ export default () => value`,
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: null } },
               kind: 'wait',
-              notification: { inputs: {}, messageHandle: 'missing', taskId: 'notify' },
               prompt: 'Continue?',
             },
           },
@@ -996,11 +998,7 @@ export default () => value`,
 
     const result = await validateFlow(source, engine)
     expect(result.diagnostics).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'wait.notification-message-missing' }),
-        expect.objectContaining({ code: 'wait.notification-task-invalid' }),
-        expect.objectContaining({ code: 'wait.not-allowed', path: '/document/subflows/child/graph/nodes/wait' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ code: 'wait.not-allowed', path: '/document/subflows/child/graph/nodes/wait' })]),
     )
   })
 })

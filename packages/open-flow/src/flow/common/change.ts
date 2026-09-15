@@ -98,11 +98,6 @@ export interface WaitNode extends GraphNodeBase {
   readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
   readonly input: InputPort
   readonly kind: 'wait'
-  readonly notification?: {
-    readonly inputs: Readonly<Record<string, InputMapping>>
-    readonly messageHandle: string
-    readonly taskId: string
-  }
   readonly prompt: string
   readonly timeoutMs?: never
 }
@@ -460,11 +455,11 @@ export type ChangeOperation =
       readonly value: readonly InputPort[]
     }
   | {
-      readonly before: Pick<WaitNode, 'actions' | 'notification' | 'prompt'>
+      readonly before: Pick<WaitNode, 'actions' | 'prompt'>
       readonly kind: 'graph.node.wait.set'
       readonly nodeId: string
       readonly target: Extract<GraphTarget, { readonly kind: 'flow' }>
-      readonly value: Pick<WaitNode, 'actions' | 'notification' | 'prompt'>
+      readonly value: Pick<WaitNode, 'actions' | 'prompt'>
     }
   | {
       readonly before: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'inputsDef' | 'options'>
@@ -735,7 +730,6 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
           !dequal(
             {
               actions: node.actions,
-              ...(node.notification == null ? {} : { notification: node.notification }),
               prompt: node.prompt,
             },
             operation.before,
@@ -743,8 +737,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         ) {
           invalid('The Wait Node changed before this operation was applied.')
         }
-        const { notification: _, ...rest } = node
-        const updated: WaitNode = operation.value.notification == null ? { ...rest, ...operation.value } : { ...node, ...operation.value }
+        const updated: WaitNode = { ...node, ...operation.value }
         document.graph = { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }
         break
       }

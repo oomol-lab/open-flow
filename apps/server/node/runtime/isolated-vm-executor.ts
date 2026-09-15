@@ -1,6 +1,6 @@
-import type { ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { ConnectorCapability, JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { RuntimeCapabilityResponse, RuntimeProgram } from '@oomol-lab/open-flow/runtime-contract'
-import type { FlowRunOutcome, SchedulerEvent, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
+import type { FlowRunOutcome, SchedulerEvent, TaskInvocation, WaitOperation } from '@oomol-lab/open-flow/scheduler'
 import type * as Scope from 'effect/Scope'
 import type IsolatedVM from 'isolated-vm'
 import type { CapabilityResult, ExecutorMessage, InvokeContext, InvokeRequest, IsolatedVmLimits, ParentMessage } from './isolated-vm.ts'
@@ -563,7 +563,8 @@ function executeFlow(
           readonly type: 'capability'
         }
       | { readonly event: SchedulerEvent; readonly type: 'event' }
-      | { readonly invocation: TaskInvocation; readonly type: 'task' },
+      | { readonly invocation: TaskInvocation; readonly type: 'task' }
+      | { readonly operation: WaitOperation; readonly type: 'wait' },
   ) => Effect.Effect<CapabilityResult, Error>,
 ): Effect.Effect<FlowRunOutcome, Error> {
   if (!('flow' in request)) return Effect.fail(new IsolatedVmError('invalid-program', 'Flow Runtime invocation is incomplete.'))
@@ -571,6 +572,19 @@ function executeFlow(
   return runFlow(prepared, {
     ...flow,
     createId: randomUUID,
+    waits: {
+      create: (wait) =>
+        remote(call({ operation: { kind: 'create', wait }, type: 'wait' })).pipe(Effect.map((value) => (value == null ? undefined : (value as JsonValue)))),
+      resolutions: (waitIds, block) =>
+        remote(call({ operation: { kind: 'resolutions', waitIds, block }, type: 'wait' })).pipe(
+          Effect.map((value) => {
+            if (value == null || typeof value != 'object' || Array.isArray(value)) throw new Error('Invalid Wait resolutions.')
+            for (const [id, action] of Object.entries(value))
+              if (!waitIds.includes(id) || !['approve', 'reject', 'continue'].includes(String(action))) throw new Error('Invalid Wait resolution.')
+            return value as Readonly<Record<string, WaitAction>>
+          }),
+        ),
+    },
     emit: (event) => remote(call({ event, type: 'event' })).pipe(Effect.asVoid),
     invokeTask: (invocation) =>
       Effect.gen(function* () {
@@ -639,7 +653,8 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
           readonly type: 'capability'
         }
       | { readonly event: SchedulerEvent; readonly type: 'event' }
-      | { readonly invocation: TaskInvocation; readonly type: 'task' },
+      | { readonly invocation: TaskInvocation; readonly type: 'task' }
+      | { readonly operation: WaitOperation; readonly type: 'wait' },
   ): Effect.Effect<CapabilityResult, Error> =>
     Effect.gen(function* () {
       const id = ++nextId

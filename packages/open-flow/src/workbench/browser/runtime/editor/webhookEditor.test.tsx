@@ -17,7 +17,7 @@ describe('Webhook configuration', () => {
     expect(markup).toContain('aria-checked="true"')
     for (const method of allowedMethods ?? ['POST']) expect(markup).toContain(method)
   })
-  it('disables configuration controls while retaining existing response values', () => {
+  it('prevents configuration edits while retaining existing response values', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <WebhookEditor
@@ -34,6 +34,12 @@ describe('Webhook configuration', () => {
     expect(controls.length).toBeGreaterThan(0)
     // Expanding a structured value only changes the view; editing remains disabled.
     const editingControls = controls.filter((control) => !control.includes('aria-expanded='))
-    expect(editingControls.every((control) => /\bdisabled(?:=|\s|>)/.test(control))).toBe(true)
+    const editable = editingControls.filter((control) => {
+      if (/\bdisabled(?:=|\s|>)/.test(control)) return false
+      const readOnlyText =
+        /^<(?:input|textarea)\b/.test(control) && !/\btype="(?:checkbox|radio|range|file|color)"/.test(control) && /\breadonly(?:=|\s|>)/.test(control)
+      return !readOnlyText
+    })
+    expect(editable).toEqual([])
   })
 })

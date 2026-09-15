@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
 import type { GraphTarget } from '../../../../flow/common/change.ts'
-import type { ConnectorAction, ConnectorConnection, Diagnostic, Group, InputPort, JsonValue } from '../api.ts'
+import type { ConnectorAction, ConnectorConnection, Diagnostic, Group, InputPort } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from '../revisionView.ts'
@@ -14,9 +14,10 @@ import type { SubflowSettings } from './flowChanges.ts'
 import type { NodeInputField } from './nodeInputs.tsx'
 import type { InputVariables, NodeInputUpstreamSources } from './nodeInputValue.tsx'
 
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
-import { useLang, useTranslate } from 'val-i18n-react'
+import { useTranslate } from 'val-i18n-react'
+import { waitOutputPorts } from '../../../../flow/common/graph.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
@@ -43,11 +44,6 @@ import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 import { TriggerScheduleEditor } from './triggerScheduleEditor.tsx'
 import { TriggerInspectorSummary } from './triggerSummary.tsx'
 import { WebhookEditor } from './webhookEditor.tsx'
-
-const InputValues = lazy(async () => {
-  const module = await import('./inputValues.tsx')
-  return { default: module.InputValues }
-})
 
 export function inspectorIcon(node: ResolvedSelection | undefined, target: GraphTarget): IconName {
   if (node?.kind == 'trigger') return 'trigger'
@@ -324,310 +320,78 @@ function ConnectorAccount({
 }
 
 function WaitDefinition({
-  activeConnectorConnections,
-  connectorAction,
-  connectorActionError,
-  connectorAuthorizationPending,
-  connectorConnection,
-  connectorConnectionError,
-  connectorLoading,
-  connectors,
   disabled,
-  onChooseNotification,
-  revision,
   selection,
   store,
-  theme,
 }: {
-  readonly activeConnectorConnections: readonly ConnectorConnection[] | undefined
-  readonly connectorAction: ConnectorAction | undefined
-  readonly connectorActionError: string | undefined
-  readonly connectorAuthorizationPending: boolean
-  readonly connectorConnection: ConnectorConnection | undefined
-  readonly connectorConnectionError: string | undefined
-  readonly connectorLoading: boolean
-  readonly connectors: ConnectorStore
   readonly disabled: boolean
-  readonly onChooseNotification: (button: HTMLButtonElement) => void
-  readonly revision: RevisionView
   readonly selection: Extract<ResolvedNode, { readonly kind: 'wait' }>
   readonly store: WorkspaceStore
-  readonly theme: WorkbenchTheme
 }): ReactElement {
-  const language = useLang()
   const t = useTranslate()
   const node = selection.node
-  const [mode, setMode] = useState<'approval' | 'continue'>(node.actions.length == 1 ? 'continue' : 'approval')
-  const [notificationTaskId, setNotificationTaskId] = useState(node.notification?.taskId ?? '')
-  const [messageHandle, setMessageHandle] = useState(node.notification?.messageHandle ?? '')
   const [prompt, setPrompt] = useState(node.prompt)
   const [error, setError] = useState<string>()
-  const [inputAttempted, setInputAttempted] = useState(false)
-  const fieldIdPrefix = `wait-${selection.id}`
-  const savedMode = node.actions.length == 1 ? 'continue' : 'approval'
-  const notificationTask = notificationTaskId == '' ? undefined : revision.task(notificationTaskId)
-  const notificationName = (connectorAction?.name ?? notificationTask?.name ?? '').replaceAll('_', ' ')
-  const ports = useMemo(() => notificationTask?.inputs.flatMap((port) => ('handle' in port ? [port] : [])) ?? [], [notificationTask])
-  const messageHandles = ports.map((port) => port.handle)
-  const currentInputs = useMemo(
-    () => (node.notification?.taskId == notificationTaskId ? node.notification.inputs : {}),
-    [node.notification, notificationTaskId],
-  )
-  const mappedHandles = useMemo(
-    () => Object.entries(currentInputs).flatMap(([handle, mapping]) => (mapping.kind == 'sources' ? [handle] : [])),
-    [currentInputs],
-  )
-  const inputDefinitions = useMemo(
-    () =>
-      ports.flatMap((port) =>
-        port.handle == messageHandle || Object.hasOwn(port, 'value') || mappedHandles.includes(port.handle)
-          ? []
-          : [
-              {
-                ...(port.description == null ? {} : { description: port.description }),
-                handle: port.handle,
-                jsonSchema: port.jsonSchema,
-                nullable: port.nullable ?? false,
-              },
-            ],
-      ),
-    [mappedHandles, messageHandle, ports],
-  )
-  const savedValues = Object.fromEntries(
-    Object.entries(currentInputs).flatMap(([handle, mapping]) => (mapping.kind == 'value' ? [[handle, mapping.value] as const] : [])),
-  )
-  const [notificationValues, setNotificationValues] = useState<Readonly<Record<string, JsonValue>>>(savedValues)
-  const [inputsValid, setInputsValid] = useState(inputDefinitions.length == 0)
-
   useEffect(() => {
-    setMode(node.actions.length == 1 ? 'continue' : 'approval')
-    setNotificationTaskId(node.notification?.taskId ?? '')
-    setMessageHandle(node.notification?.messageHandle ?? '')
-    setNotificationValues(
-      Object.fromEntries(
-        Object.entries(node.notification?.inputs ?? {}).flatMap(([handle, mapping]) => (mapping.kind == 'value' ? [[handle, mapping.value] as const] : [])),
-      ),
-    )
     setPrompt(node.prompt)
     setError(undefined)
-    setInputAttempted(false)
   }, [node])
-
-  useEffect(() => setInputsValid(inputDefinitions.length == 0), [inputDefinitions])
-
-  const save = async ({
-    validateInputs = true,
-    nextMode = mode,
-    taskId = notificationTaskId,
-    text = prompt,
-    handle = messageHandle,
-    values = notificationValues,
-    valid = inputsValid,
-  }: {
-    readonly validateInputs?: boolean
-    readonly nextMode?: 'approval' | 'continue'
-    readonly taskId?: string
-    readonly text?: string
-    readonly handle?: string
-    readonly values?: Readonly<Record<string, JsonValue>>
-    readonly valid?: boolean
-  } = {}): Promise<boolean> => {
+  const save = async (actions = node.actions, text = prompt): Promise<void> => {
     const value = text.trim()
-    if (value.length == 0 || [...value].length > 1_000) {
+    if (value.length == 0 || [...value].length > 1000) {
       setError(t('inspector.wait.promptError'))
-      return false
-    }
-    let notification: typeof node.notification
-    if (taskId != '') {
-      if (notificationTask?.executor.kind != 'connector' || !messageHandles.includes(handle)) {
-        setError(t('inspector.wait.notificationUnavailable'))
-        return false
-      }
-      if (validateInputs && !valid) {
-        setInputAttempted(true)
-        setError(t('inspector.wait.inputsInvalid'))
-        return false
-      }
-      const mappedInputs = Object.fromEntries(Object.entries(currentInputs).filter(([, mapping]) => mapping.kind == 'sources'))
-      notification = {
-        inputs: {
-          ...mappedInputs,
-          ...Object.fromEntries(Object.entries(values).map(([key, input]) => [key, { kind: 'value' as const, value: input }])),
-        },
-        messageHandle: handle,
-        taskId,
-      }
-    }
-    setError(undefined)
-    return await store.saveWait(selection.id, {
-      actions: nextMode == 'continue' ? ['continue'] : ['approve', 'reject'],
-      name: node.name,
-      notification,
-      prompt: value,
-    })
-  }
-
-  const chooseNotification = async (button: HTMLButtonElement): Promise<void> => {
-    if (prompt.trim() == node.prompt && mode == savedMode) {
-      onChooseNotification(button)
       return
     }
-    if (await save({ validateInputs: false })) onChooseNotification(button)
+    setError(undefined)
+    await store.saveWait(selection.id, { actions, name: node.name, prompt: value })
   }
-
   return (
-    <>
-      <form
-        className="inspector-form wait-form"
-        data-inspector-section="wait"
-        onSubmit={(event) => {
-          event.preventDefault()
-          void save()
-        }}
-      >
-        <FieldGroup>
-          <Field className="inspector-field-section">
-            <FieldLabel className="inspector-section-title" htmlFor={`${fieldIdPrefix}-prompt`}>
-              {t('inspector.wait.prompt')}
-            </FieldLabel>
-            <Textarea
-              readOnly={disabled}
-              id={`${fieldIdPrefix}-prompt`}
-              onChange={(event) => setPrompt(event.target.value)}
-              onBlur={(event) => {
-                if (event.currentTarget.value.trim() != node.prompt) void save({ validateInputs: false, text: event.currentTarget.value })
-              }}
-              rows={3}
-              value={prompt}
-            />
-          </Field>
-          <Field className="inspector-field-section">
-            <FieldLabel className="inspector-section-title">{t('inspector.wait.mode')}</FieldLabel>
-            <ToggleGroup<'approval' | 'continue'>
-              aria-label={t('inspector.wait.mode')}
-              className="wait-mode-switcher"
-              disabled={disabled}
-              onValueChange={(values) => {
-                const value = values.at(-1)
-                if (value == null || value == mode) return
-                setMode(value)
-                void save({ validateInputs: false, nextMode: value }).then((saved) => {
-                  if (!saved) setMode(savedMode)
-                })
-              }}
-              spacing={0}
-              size="sm"
-              value={[mode]}
-              variant="default"
-            >
-              <ToggleGroupItem value="continue">{t('inspector.wait.continue')}</ToggleGroupItem>
-              <ToggleGroupItem value="approval">{t('inspector.wait.approval')}</ToggleGroupItem>
-            </ToggleGroup>
-          </Field>
-          <Field className="inspector-field-section">
-            <FieldLabel className="inspector-section-title">{t('inspector.wait.notificationTask')}</FieldLabel>
-            {notificationTask == null ? (
-              <Button
-                className="self-start"
-                disabled={disabled}
-                onClick={(event) => void chooseNotification(event.currentTarget)}
-                size="xs"
-                type="button"
-                variant="ghost"
-              >
-                <Icon data-icon="inline-start" name="plus" /> {t('inspector.wait.chooseNotification')}
-              </Button>
-            ) : (
-              <div className="wait-notification-summary">
-                <Icon name="connection" size={16} />
-                <span>{connectorAction == null ? notificationName : `${connectorAction.serviceName} · ${notificationName}`}</span>
-                <Button disabled={disabled} onClick={(event) => void chooseNotification(event.currentTarget)} size="sm" type="button" variant="ghost">
-                  {t('inspector.wait.changeNotification')}
-                </Button>
-                <Button
-                  aria-label={t('inspector.wait.removeNotification')}
-                  disabled={disabled}
-                  onClick={() => {
-                    void save({ validateInputs: false, taskId: '' }).then((saved) => {
-                      if (!saved) return
-                      setNotificationTaskId('')
-                      setMessageHandle('')
-                      setNotificationValues({})
-                    })
-                  }}
-                  size="icon-sm"
-                  title={t('inspector.wait.removeNotification')}
-                  type="button"
-                  variant="ghost"
-                >
-                  <Icon name="close" />
-                </Button>
-              </div>
-            )}
-          </Field>
-          {notificationTask != null && messageHandles.length > 1 && (
-            <Field className="inspector-field-section">
-              <FieldLabel className="inspector-section-title" htmlFor={`${fieldIdPrefix}-message-handle`}>
-                {t('inspector.wait.messageHandle')}
-              </FieldLabel>
-              <NativeSelect
-                disabled={disabled}
-                id={`${fieldIdPrefix}-message-handle`}
-                onChange={(event) => {
-                  setMessageHandle(event.target.value)
-                  void save({ validateInputs: false, handle: event.target.value })
-                }}
-                value={messageHandle}
-              >
-                {messageHandles.map((handle) => (
-                  <NativeSelectOption key={handle} value={handle}>
-                    {handle}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </Field>
-          )}
-          {notificationTask != null && inputDefinitions.length > 0 && (
-            <Field className="inspector-field-section">
-              <FieldLabel className="inspector-section-title">{t('inspector.wait.inputs')}</FieldLabel>
-              <fieldset className="wait-notification-inputs" disabled={disabled}>
-                <Suspense fallback={<FieldDescription>{t('inspector.wait.inputsLoading')}</FieldDescription>}>
-                  <InputValues
-                    definitions={inputDefinitions}
-                    key={`${notificationTaskId}:${messageHandle}`}
-                    language={language}
-                    onChange={setNotificationValues}
-                    onCommit={(values, valid) => void save({ values, valid })}
-                    onValidChange={setInputsValid}
-                    showErrors={inputAttempted}
-                    theme={theme}
-                    values={notificationValues}
-                  />
-                </Suspense>
-              </fieldset>
-            </Field>
-          )}
-          {error != null && <FieldError>{error}</FieldError>}
-        </FieldGroup>
-      </form>
-      {notificationTask?.executor.kind == 'connector' && connectorAction?.authenticated !== false && (
-        <ConnectorAccount
-          action={connectorAction}
-          actionError={connectorActionError}
-          actionId={notificationTask.executor.action}
-          activeConnections={activeConnectorConnections}
-          authorizationPending={connectorAuthorizationPending}
-          connection={connectorConnection}
-          connectionError={connectorConnectionError}
-          connectionId={notificationTask.executor.connectionId}
-          connectors={connectors}
-          disabled={disabled}
-          fieldIdPrefix={fieldIdPrefix}
-          loading={connectorLoading}
-          taskId={notificationTaskId}
-        />
-      )}
-    </>
+    <form
+      className="inspector-form wait-form"
+      data-inspector-section="wait"
+      onSubmit={(event) => {
+        event.preventDefault()
+        void save()
+      }}
+    >
+      <FieldGroup>
+        <Field className="inspector-field-section">
+          <FieldLabel className="inspector-section-title" htmlFor={`wait-${selection.id}-prompt`}>
+            {t('inspector.wait.prompt')}
+          </FieldLabel>
+          <Textarea
+            id={`wait-${selection.id}-prompt`}
+            readOnly={disabled}
+            rows={3}
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            onBlur={(event) => {
+              if (event.currentTarget.value.trim() != node.prompt) void save(node.actions, event.currentTarget.value)
+            }}
+          />
+        </Field>
+        <Field className="inspector-field-section">
+          <FieldLabel className="inspector-section-title">{t('inspector.wait.mode')}</FieldLabel>
+          <ToggleGroup<'approval' | 'continue'>
+            aria-label={t('inspector.wait.mode')}
+            className="wait-mode-switcher"
+            disabled={disabled}
+            spacing={0}
+            size="sm"
+            value={[node.actions.length == 1 ? 'continue' : 'approval']}
+            onValueChange={(values) => {
+              const mode = values.at(-1)
+              if (mode != null) void save(mode == 'continue' ? ['continue'] : ['approve', 'reject'])
+            }}
+          >
+            <ToggleGroupItem value="continue">{t('inspector.wait.continue')}</ToggleGroupItem>
+            <ToggleGroupItem value="approval">{t('inspector.wait.approval')}</ToggleGroupItem>
+          </ToggleGroup>
+          <FieldDescription>{t('inspector.wait.notificationDescription')}</FieldDescription>
+        </Field>
+        {error != null && <FieldError>{error}</FieldError>}
+      </FieldGroup>
+    </form>
   )
 }
 
@@ -985,7 +749,6 @@ interface Props {
   readonly diagnostics: readonly Diagnostic[]
   readonly disabled: boolean
   readonly focus?: DiagnosticFocus
-  readonly onChooseWaitNotification: (button: HTMLButtonElement) => void
   readonly revision: RevisionView
   readonly selection: ResolvedSelection | undefined
   readonly sourceNodeIcons?: Readonly<Record<string, string | undefined>>
@@ -1013,7 +776,6 @@ export function NodeInspector({
   diagnostics,
   disabled,
   focus,
-  onChooseWaitNotification,
   revision,
   selection,
   sourceNodeIcons,
@@ -1301,7 +1063,7 @@ export function NodeInspector({
               values={
                 selection.kind === 'subflow'
                   ? (selection.definition?.outputs ?? [])
-                  : selection.node.actions.map((handle) => ({ ...selection.node.input, handle }))
+                  : Object.entries(waitOutputPorts(selection.node)).map(([handle, port]) => Object.assign({ handle }, port))
               }
               onChange={() => {}}
             />
@@ -1330,22 +1092,7 @@ export function NodeInspector({
                 <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
               </TaskDefinition>
             ) : selection.kind == 'wait' ? (
-              <WaitDefinition
-                activeConnectorConnections={activeConnectorConnections}
-                connectorAction={connectorAction}
-                connectorActionError={connectorActionError}
-                connectorAuthorizationPending={connectorAuthorizationPending}
-                connectorConnection={connectorConnection}
-                connectorConnectionError={connectorConnectionError}
-                connectorLoading={connectorLoading}
-                connectors={connectors}
-                disabled={disabled}
-                onChooseNotification={onChooseWaitNotification}
-                revision={revision}
-                selection={selection}
-                store={store}
-                theme={theme}
-              />
+              <WaitDefinition disabled={disabled} selection={selection} store={store} />
             ) : selection.kind == 'subflow' ? (
               <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
             ) : null}

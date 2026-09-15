@@ -108,7 +108,7 @@ describe('Workbench Diagnostic messages', () => {
     const check = {
       closureDigest: 'closure',
       diagnostics: [diagnostic, flowDiagnostic],
-      engineContract: 'open-flow-engine/v2',
+      engineContract: 'open-flow-engine/v3',
       flowId: 'flow',
       modelVersion: 1,
       revisionDigest: 'digest',

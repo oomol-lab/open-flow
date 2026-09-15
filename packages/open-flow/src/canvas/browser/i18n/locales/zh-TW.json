@@ -554,6 +554,7 @@
   "view": "檢視",
   "canvasCard": {
     "waitBranch": {
+      "notification": "通知",
       "approve": "通過",
       "reject": "拒絕",
       "continue": "繼續"

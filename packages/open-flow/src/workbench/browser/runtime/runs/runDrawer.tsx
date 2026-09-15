@@ -83,14 +83,14 @@ interface Props {
   readonly onConfigureConnector?: (() => void) | undefined
   readonly onEventFilterChange: (filter: RunEventFilter) => void
   readonly onLocateEvent: (sequence: number) => void
-  readonly onLocateWait: () => void
-  readonly onResolve: (action: WaitAction) => void
+  readonly onLocateWait: (nodeId: string) => void
+  readonly onResolve: (waitId: string, action: WaitAction) => void
   readonly onRetryObservation: () => void
   readonly onToggle: () => void
   readonly open: boolean
   readonly observationFailed: boolean
   readonly result: RunResult | undefined
-  readonly resolvingAction: WaitAction | undefined
+  readonly resolvingActions: ReadonlyMap<string, WaitAction>
   readonly run: Run | RunDetails | undefined
   readonly submitting: boolean
   readonly visible: boolean
@@ -115,43 +115,47 @@ function waitActionLabel(action: WaitAction, t: TFunction): string {
 function ActiveWait({
   onLocate,
   onResolve,
-  resolvingAction,
+  resolvingActions,
   run,
 }: {
-  readonly onLocate: () => void
-  readonly onResolve: (action: WaitAction) => void
-  readonly resolvingAction: WaitAction | undefined
+  readonly onLocate: (nodeId: string) => void
+  readonly onResolve: (waitId: string, action: WaitAction) => void
+  readonly resolvingActions: ReadonlyMap<string, WaitAction>
   readonly run: Run | RunDetails
 }): ReactElement | null {
   const language = useLang()
   const t = useTranslate()
-  const waiting = run.status == 'waiting' && 'waiting' in run ? run.waiting : undefined
-  if (waiting == null) return null
+  const waits = 'waits' in run ? run.waits : []
   return (
-    <Alert className="mx-2 mt-2 shrink-0">
-      <Icon name="wait" />
-      <AlertTitle>{waiting.prompt}</AlertTitle>
-      <AlertDescription>
-        <div>{t('run.waitExpires', { date: new Date(waiting.expiresAt).toLocaleString(language) })}</div>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {waiting.actions.map((action) => (
-            <Button
-              disabled={resolvingAction != null}
-              key={action}
-              onClick={() => onResolve(action)}
-              size="sm"
-              type="button"
-              variant={action == 'reject' ? 'destructive' : 'default'}
-            >
-              {resolvingAction == action ? t('run.resolving') : waitActionLabel(action, t)}
-            </Button>
-          ))}
-          <Button onClick={onLocate} size="sm" type="button" variant="secondary">
-            <Icon name="fit" /> {t('run.locateWait')}
-          </Button>
-        </div>
-      </AlertDescription>
-    </Alert>
+    <>
+      {' '}
+      {waits.map((waiting) => (
+        <Alert key={waiting.waitId} className="mx-2 mt-2 shrink-0">
+          <Icon name="wait" />
+          <AlertTitle>{waiting.prompt}</AlertTitle>
+          <AlertDescription>
+            <div>{t('run.waitExpires', { date: new Date(waiting.expiresAt).toLocaleString(language) })}</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {waiting.actions.map((action) => (
+                <Button
+                  disabled={resolvingActions.has(waiting.waitId)}
+                  key={action}
+                  onClick={() => onResolve(waiting.waitId, action)}
+                  size="sm"
+                  type="button"
+                  variant={action == 'reject' ? 'destructive' : 'default'}
+                >
+                  {resolvingActions.get(waiting.waitId) == action ? t('run.resolving') : waitActionLabel(action, t)}
+                </Button>
+              ))}
+              <Button onClick={() => onLocate(waiting.nodeId)} size="sm" type="button" variant="secondary">
+                <Icon name="fit" /> {t('run.locateWait')}
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ))}
+    </>
   )
 }
 
@@ -180,6 +184,7 @@ function eventCategory(event: RunEvent): EventCategory {
     case 'run.queued':
     case 'run.resolved':
     case 'run.started':
+    case 'wait.created':
     case 'run.waiting':
       return 'lifecycle'
   }
@@ -309,6 +314,7 @@ function eventSummary(event: RunEvent, t: TFunction): string {
       return t('run.eventEnqueued')
     case 'run.resolved':
       return t('run.eventWaitResolved')
+    case 'wait.created':
     case 'run.waiting':
       return t('run.statusWaiting')
     case 'run.started':
@@ -650,7 +656,7 @@ export function RunDrawer({
   observationFailed,
   open,
   result,
-  resolvingAction,
+  resolvingActions,
   run,
   submitting,
   visible,
@@ -768,7 +774,7 @@ export function RunDrawer({
       )}
       {open && (
         <div className="run-content">
-          {run != null && <ActiveWait onLocate={onLocateWait} onResolve={onResolve} resolvingAction={resolvingAction} run={run} />}
+          {run != null && <ActiveWait onLocate={onLocateWait} onResolve={onResolve} resolvingActions={resolvingActions} run={run} />}
           <RunLog
             raw={raw}
             events={events}

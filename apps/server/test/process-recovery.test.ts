@@ -168,7 +168,7 @@ it('recovers a process crash after the start barrier as one indeterminate termin
   )
   const accepted = await json<{ readonly runId: string }>(
     await fetch(`${app.origin}/v1/flows/${flow.flowId}/revisions/${changed.revision.revisionId}/runs`, {
-      body: JSON.stringify({ engineContract: 'open-flow-engine/v2', inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
+      body: JSON.stringify({ engineContract: 'open-flow-engine/v3', inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
       headers: { 'content-type': 'application/json', cookie, 'idempotency-key': 'crash' },
       method: 'POST',
     }),

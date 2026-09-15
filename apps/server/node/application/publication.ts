@@ -145,8 +145,7 @@ export class Publisher {
       throw new AcceptanceError('revision-conflict', 'The fixed Revision digest does not match its content.')
     }
     if (
-      (Object.values(fixed.prepared.graph.nodes).some((node) => node.kind == 'wait' && node.notification != null) ||
-        Object.values(fixed.prepared.tasks).some((task) => task.executor.kind == 'agent' && task.executor.notification != null)) &&
+      Object.values(fixed.prepared.tasks).some((task) => task.executor.kind == 'agent' && task.executor.notification != null) &&
       this.#resolveWaitPublicOrigin() == null
     ) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')

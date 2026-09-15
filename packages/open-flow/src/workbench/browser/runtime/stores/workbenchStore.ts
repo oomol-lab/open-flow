@@ -320,11 +320,10 @@ export class WorkbenchStore {
     return nodeId != null && this.workspace.locateNode(nodeId)
   }
 
-  public locateRunWait(): boolean {
+  public locateRunWait(nodeId: string): boolean {
     const run = this.runs.$.run.value
-    if (run?.status != 'waiting' || !('waiting' in run) || run.waiting == null) return false
-    if (!this.workspace.selectTarget({ kind: 'flow' })) return false
-    return this.workspace.locateNode(run.waiting.nodeId)
+    if (run == null || !('waits' in run) || !run.waits.some((wait) => wait.nodeId == nodeId)) return false
+    return this.workspace.locateNode(nodeId)
   }
 
   public async addNode(option: AddNodeOption, position: Point, connection?: (nodeId: string) => Omit<DesignerEdge, 'id'>): Promise<string | undefined> {

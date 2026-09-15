@@ -70,13 +70,14 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
   const [operation, ...references] = operands
   switch (operation) {
     case 'list': {
-      requireCount(references, 0, 'oo flow runs list --flow <flow> [--status <status>] [--cursor <cursor>] [--limit <count>] [--json]')
+      requireCount(references, 0, 'oo flow runs list --flow <flow> [--status <status>] [--pending-wait] [--cursor <cursor>] [--limit <count>] [--json]')
       if (args.flow == null) throw new CliError('cli.invalid-arguments', 'oo flow runs list requires --flow <flow>.')
       const flow = await referencedFlow(client, args.flow)
       const page = await client.listRuns(flow.flowId, {
         ...(args.cursor == null ? {} : { cursor: args.cursor }),
         limit: args.limit ?? runPageLimit,
         ...(args.status == null ? {} : { status: args.status }),
+        ...(args.pendingWait == null ? {} : { pendingWait: args.pendingWait }),
       })
       write(runtime, args.json, { kind: 'run.list', ...page, version: 1 }, page.runs.map(runSummaryText).join('\n'))
       return
@@ -132,7 +133,7 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
           if (!args.follow) return
           run = await client.getRun(runId, AbortSignal.timeout(Math.max(1, deadline - Date.now())))
           if (page.done) return runExitCode(run)
-          if (run.status == 'waiting') {
+          if (run.waits.length > 0) {
             write(runtime, args.json, { kind: 'run.wait', runId, run, nextAfter: after, timedOut: false, version: 1 }, runText(run))
             return 2
           }

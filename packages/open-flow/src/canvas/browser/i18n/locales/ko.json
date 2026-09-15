@@ -554,6 +554,7 @@
   "view": "보기",
   "canvasCard": {
     "waitBranch": {
+      "notification": "알림",
       "approve": "승인",
       "reject": "거부",
       "continue": "계속"

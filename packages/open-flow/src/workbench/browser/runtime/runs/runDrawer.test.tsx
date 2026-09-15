@@ -46,7 +46,7 @@ function renderFailure(status: 'failed' | 'indeterminate', events: readonly RunE
         onToggle={() => undefined}
         open
         result={result}
-        resolvingAction={undefined}
+        resolvingActions={new Map()}
         run={run}
         submitting={false}
         visible
@@ -82,7 +82,7 @@ describe('RunDrawer terminal result', () => {
     const run: RunDetails = {
       closureDigest: 'closure',
       createdAt: '2026-08-27T10:00:00.000Z',
-      engineContract: 'open-flow-engine/v2',
+      engineContract: 'open-flow-engine/v3',
       engineDigest: 'sha256:engine',
       flowId: 'flow',
       modelVersion: 1,
@@ -93,14 +93,16 @@ describe('RunDrawer terminal result', () => {
       startedAt: '2026-08-27T10:00:01.000Z',
       status: 'waiting',
       version: 1,
-      waiting: {
-        actions: ['approve', 'reject'],
-        expiresAt: '2026-09-03T10:00:02.000Z',
-        nodeId: 'approval',
-        prompt: 'Approve the production release?',
-        waitId: '123456789012345678901',
-        waitingSince: '2026-08-27T10:00:02.000Z',
-      },
+      waits: [
+        {
+          actions: ['approve', 'reject'],
+          expiresAt: '2026-09-03T10:00:02.000Z',
+          nodeId: 'approval',
+          prompt: 'Approve the production release?',
+          waitId: '123456789012345678901',
+          waitingSince: '2026-08-27T10:00:02.000Z',
+        },
+      ],
     }
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
@@ -123,7 +125,7 @@ describe('RunDrawer terminal result', () => {
           onToggle={() => undefined}
           open
           result={undefined}
-          resolvingAction={undefined}
+          resolvingActions={new Map()}
           run={run}
           submitting={false}
           visible
@@ -131,9 +133,9 @@ describe('RunDrawer terminal result', () => {
       </I18nProvider>,
     )
 
-    if (run.waiting == null) throw new Error('Waiting fixture is missing.')
+    if (run.waits[0] == null) throw new Error('Waiting fixture is missing.')
     expect(markup).toContain('Approve the production release?')
-    expect(markup).toContain(`Expires ${new Date(run.waiting.expiresAt).toLocaleString('en')}`)
+    expect(markup).toContain(`Expires ${new Date(run.waits[0]!.expiresAt).toLocaleString('en')}`)
     expect(markup).toContain('>Approve<')
     expect(markup).toContain('>Reject<')
     expect(markup).toContain('Locate Wait node')
@@ -170,7 +172,7 @@ it.each(['all', 'output', 'lifecycle'] as const)('shows all final handles once i
         onToggle={() => undefined}
         open
         result={undefined}
-        resolvingAction={undefined}
+        resolvingActions={new Map()}
         run={undefined}
         submitting={false}
         visible

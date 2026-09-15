@@ -93,7 +93,6 @@ const condition = {
 const wait = {
   actions: z.union([z.tuple([z.literal('continue')]), z.tuple([z.literal('approve'), z.literal('reject')])]),
   prompt: text,
-  notification: z.object({ inputs, messageHandle: text, taskId: text }).optional(),
 }
 const webhook = {
   inputsDef: z.array(input),
@@ -145,7 +144,7 @@ const node = z.union([
   z.object({ ...base, kind: z.literal('subflow'), subflowId: text }),
   z.object({ ...base, kind: z.literal('task'), task: inline, additionalInputs: z.array(input).optional() }),
   z.object({ ...base, kind: z.literal('task'), taskId: text, additionalInputs: z.array(input).optional() }),
-  z.object({ ...base, kind: z.literal('wait'), input, ...wait }).omit({ timeoutMs: true }),
+  z.strictObject({ ...base, kind: z.literal('wait'), input, ...wait }).omit({ timeoutMs: true }),
   z.object({ ...trigger, kind: z.literal('manual') }),
   z.object({ ...trigger, kind: z.literal('webhook'), ...webhook }),
   z.object({ ...trigger, kind: z.literal('cron'), cronTimes: schedule }),

@@ -219,7 +219,6 @@ function PropertySample({
             connectors={session.connectors}
             diagnostics={[]}
             disabled={disabled}
-            onChooseWaitNotification={() => log('Choose notification')}
             revision={revision}
             selection={selection}
             store={session.store}

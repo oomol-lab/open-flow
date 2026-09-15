@@ -22,7 +22,7 @@ function fixture() {
     content: '{}',
     crons: [],
     expectedLivePublicationId: null,
-    engineContract: 'open-flow-engine/v2',
+    engineContract: 'open-flow-engine/v3',
     flowId: 'flow',
     idempotencyKey: 'publish',
     integrations: [

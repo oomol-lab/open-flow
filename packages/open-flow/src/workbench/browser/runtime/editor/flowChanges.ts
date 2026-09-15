@@ -37,7 +37,6 @@ import {
   setInputVariable as setGraphInputVariable,
   updateSettings,
 } from '../../../../flow/common/nodeChanges.ts'
-import { flowDependencies } from '../../../../flow/common/semantics.ts'
 import { generateTyping, typescriptOf } from '../../../../manifest/common/meta/block/generateTyping.ts'
 
 export interface NodeClipboard {
@@ -168,22 +167,6 @@ export function agentTool(action: ConnectorActionView, approval: boolean, id: st
   }
 }
 
-function messageHandle(action: ConnectorActionView): string | undefined {
-  const inputs = Object.entries(action.inputs)
-  return (
-    inputs.find(([, port]) => {
-      const schema = port.jsonSchema
-      return schema != null && typeof schema == 'object' && !Array.isArray(schema) && 'type' in schema && schema.type == 'string'
-    })?.[0] ?? inputs[0]?.[0]
-  )
-}
-
-function cleanTask(revision: RevisionView, changes: FlowChanges, taskId: string | undefined): FlowChanges {
-  if (taskId == null) return changes
-  const changed = reduceFlowChanges(revision.revision.content, changes)
-  return flowDependencies(changed).tasks.has(taskId) ? changes : [...changes, { kind: 'task.delete', taskId }]
-}
-
 export function createResource(id: string, name: string): FlowChanges {
   return [
     {
@@ -290,7 +273,7 @@ export function copyNodes(revision: RevisionView, target: GraphTarget, nodeIds: 
     bindings: Object.fromEntries(
       Object.values(copied).flatMap((node) => {
         if (!('inputs' in node)) return []
-        const inputs = [...Object.values(node.inputs), ...(node.kind == 'wait' && node.notification != null ? Object.values(node.notification.inputs) : [])]
+        const inputs = Object.values(node.inputs)
         return inputs.flatMap((mapping) =>
           mapping.kind == 'sources'
             ? mapping.sources.flatMap((source) => {
@@ -328,7 +311,7 @@ export function pasteNodes(revision: RevisionView, target: GraphTarget, clipboar
   const bindingIds = new Map<string, string>()
   for (const [, node] of entries) {
     if (!('inputs' in node)) continue
-    const inputs = [...Object.values(node.inputs), ...(node.kind == 'wait' && node.notification != null ? Object.values(node.notification.inputs) : [])]
+    const inputs = Object.values(node.inputs)
     for (const mapping of inputs) {
       if (mapping.kind != 'sources') continue
       for (const source of mapping.sources) {
@@ -383,7 +366,6 @@ export function pasteNodes(revision: RevisionView, target: GraphTarget, clipboar
     let copy: GraphNode = {
       ...node,
       inputs,
-      ...(node.kind == 'wait' && node.notification != null ? { notification: { ...node.notification, inputs: remapInputs(node.notification.inputs) } } : {}),
     }
     if (node.kind == 'task' && node.task != null) {
       const moduleId = nodeId
@@ -544,7 +526,6 @@ export function updateWait(
   nodeId: string,
   settings: Pick<Extract<GraphNode, { readonly kind: 'wait' }>, 'actions' | 'prompt'> & {
     readonly name?: string
-    readonly notification: Extract<GraphNode, { readonly kind: 'wait' }>['notification']
   },
 ): FlowChanges | undefined {
   if (target.kind != 'flow') return
@@ -553,15 +534,13 @@ export function updateWait(
   if (graph == null || current?.kind != 'wait') return
   const before = {
     actions: current.actions,
-    ...(current.notification == null ? {} : { notification: current.notification }),
     prompt: current.prompt,
   }
   const value = {
     actions: settings.actions,
-    ...(settings.notification == null ? {} : { notification: settings.notification }),
     prompt: settings.prompt,
   }
-  const outputs = new Set<string>(settings.actions)
+  const outputs = new Set<string>(['notification', ...settings.actions])
   const changes: ChangeOperation[] = []
   for (const edge of graph.edges) {
     if (edge.source == nodeId && edge.sourceHandle != null && !outputs.has(edge.sourceHandle)) changes.push({ kind: 'graph.edge.disconnect', edge, target })
@@ -586,49 +565,10 @@ export function updateWait(
         value: sources.length == 0 ? undefined : { kind: 'sources', sources },
       })
     }
-    if (node.kind != 'wait' || node.notification == null) continue
-    const inputs: Record<string, InputMapping> = { ...node.notification.inputs }
-    for (const [handle, mapping] of Object.entries(inputs)) {
-      if (mapping.kind != 'sources') continue
-      const sources = mapping.sources.filter((source) => source.kind != 'node' || source.nodeId != nodeId || outputs.has(source.output))
-      if (sources.length == mapping.sources.length) continue
-      if (sources.length == 0) delete inputs[handle]
-      else inputs[handle] = { kind: 'sources', sources }
-    }
-    if (dequal(inputs, node.notification.inputs)) continue
-    changes.push({
-      before: { actions: node.actions, notification: node.notification, prompt: node.prompt },
-      kind: 'graph.node.wait.set',
-      nodeId: currentNodeId,
-      target,
-      value: { actions: node.actions, notification: { ...node.notification, inputs }, prompt: node.prompt },
-    })
   }
   if (changes.length == 0) return []
   const cleaned = cleanVariableBindings(revision.revision.content, changes)
-  return cleanTask(revision, cleaned, current.notification?.taskId == settings.notification?.taskId ? undefined : current.notification?.taskId)
-}
-
-export function setWaitNotification(revision: RevisionView, nodeId: string, action: ConnectorActionView, taskId: string): FlowChanges | undefined {
-  const graph = revision.graph({ kind: 'flow' })
-  const current = graph?.nodes[nodeId]
-  const handle = messageHandle(action)
-  if (current?.kind != 'wait' || handle == null) return
-  const changes: ChangeOperation[] = [
-    { kind: 'task.create', task: connectorTask(action), taskId },
-    {
-      before: {
-        actions: current.actions,
-        ...(current.notification == null ? {} : { notification: current.notification }),
-        prompt: current.prompt,
-      },
-      kind: 'graph.node.wait.set',
-      nodeId,
-      target: { kind: 'flow' },
-      value: { actions: current.actions, notification: { inputs: {}, messageHandle: handle, taskId }, prompt: current.prompt },
-    },
-  ]
-  return cleanTask(revision, changes, current.notification?.taskId)
+  return cleaned
 }
 
 export function updateTask(revision: RevisionView, target: GraphTarget, nodeId: string, settings: TaskSettings): FlowChanges | undefined {

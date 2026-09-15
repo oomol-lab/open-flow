@@ -74,7 +74,10 @@ export class Maintenance {
         if (!Number.isFinite(now)) return yield* Effect.fail(new TypeError('Maintenance tick time must be an ISO timestamp.'))
         this.#maintenanceAt = Infinity
         const runs = this.#store.runs.maintain(now, maintenanceBatchSize, waitNotificationLeaseMs)
-        for (const { flowId, runId } of runs.expiredWaits) this.#runChanged(flowId, runId)
+        for (const { flowId, runId } of runs.expiredWaits) {
+          this.#interrupt(runId)
+          this.#runChanged(flowId, runId)
+        }
         const notification = runs.notification
         if (notification != null) {
           const connector = this.#resolveConnector()

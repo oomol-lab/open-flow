@@ -39,7 +39,6 @@ function waitDefinition(node: unknown, revision: unknown, saveWait: ReturnType<t
     connectors: {} as never,
     diagnostics: [],
     disabled: false,
-    onChooseWaitNotification: vi.fn(),
     revision: view as never,
     selection: { id: 'wait', kind: 'wait', node } as never,
     store: { $: { flowId: { value: 'flow' }, inputSources: { value: {} } }, saveWait } as never,
@@ -70,7 +69,6 @@ describe('Wait Inspector', () => {
     expect(saveWait).toHaveBeenCalledWith('wait', {
       actions: ['approve', 'reject'],
       name: 'Wait',
-      notification: undefined,
       prompt: 'Continue?',
     })
   })
@@ -91,49 +89,11 @@ describe('Wait Inspector', () => {
     expect(saveWait).toHaveBeenCalledWith('wait', {
       actions: ['continue'],
       name: 'Renamed',
-      notification: undefined,
       prompt: 'Review this request',
     })
     saveWait.mockClear()
     blur({ currentTarget: { value: '  ' } })
     expect(saveWait).not.toHaveBeenCalled()
-  })
-
-  it('removes a notification immediately', () => {
-    const saveWait = vi.fn().mockResolvedValue(true)
-    const node = {
-      actions: ['continue'],
-
-      input: { handle: 'value', jsonSchema: {}, nullable: true },
-      inputs: {},
-      kind: 'wait',
-      name: 'Wait',
-      notification: { inputs: {}, messageHandle: 'text', taskId: 'notify' },
-      prompt: 'Continue?',
-    }
-    const definition = waitDefinition(
-      node,
-      {
-        task: () => ({
-          executor: { action: 'send', kind: 'connector' },
-          inputs: [{ handle: 'text', jsonSchema: {}, nullable: false }],
-          name: 'Send',
-          outputs: [],
-        }),
-      },
-      saveWait,
-    )
-    const remove = find(definition, (item) => (item.props as { readonly 'aria-label'?: string })['aria-label'] == 'inspector.wait.removeNotification')
-    if (remove == null) throw new Error('Expected remove notification button.')
-
-    ;(remove.props as { readonly onClick: () => void }).onClick()
-
-    expect(saveWait).toHaveBeenCalledWith('wait', {
-      actions: ['continue'],
-      name: 'Wait',
-      notification: undefined,
-      prompt: 'Continue?',
-    })
   })
 })
 
@@ -153,7 +113,6 @@ describe('Node timeout settings', () => {
       connectors: {} as never,
       diagnostics: [],
       disabled: false,
-      onChooseWaitNotification: vi.fn(),
       revision: revision as never,
       selection: { id: 'current', kind: 'subflow', node, definition: { inputs: [], outputs: [] } } as never,
       store: { $: { flowId: { value: 'flow' }, inputSources: { value: {} } }, saveNodeSettings } as never,
@@ -186,7 +145,6 @@ it('renders diagnostics directly and removes them when cleared', () => {
     connectors: {} as never,
     diagnostics: [],
     disabled: false,
-    onChooseWaitNotification: vi.fn(),
     revision: {} as never,
     selection: undefined,
     store: { $: { flowId: { value: 'flow' }, inputSources: { value: {} } } } as never,
@@ -223,7 +181,6 @@ describe('Node input ownership', () => {
       connectors: {} as never,
       diagnostics: [],
       disabled: false,
-      onChooseWaitNotification: vi.fn(),
       revision: {
         binding: () => ({ kind: 'variable', target: 'API_TOKEN' }),
         graph: () => ({ nodes: { upstream: { name: 'Source' } } }),

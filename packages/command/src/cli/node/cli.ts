@@ -25,7 +25,7 @@ function help(runtime: Runtime, args: readonly string[]) {
       exitCodes: {
         0: 'Success or accepted asynchronous operation.',
         1: 'Error or unsuccessful terminal Run.',
-        2: 'Run is waiting for an explicit action; inspect run.waiting.',
+        2: 'Run is waiting for an explicit action; inspect run.waits.',
         3: 'Waiting timed out or publication is pending; the operation continues.',
       },
       notes: [

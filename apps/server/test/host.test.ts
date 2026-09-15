@@ -472,7 +472,7 @@ it('streams independent Flow catalog and current Flow invalidations', async () =
     expect(new TextDecoder().decode(notification.value)).toBe(
       `data: ${JSON.stringify({ kind: 'draft.changed', flowId: created.flowId, revisionId: changed.revision.revisionId, version: 1 })}\n\n`,
     )
-    const accepted = await service.control.createDraftRun(created.flowId, changed.revision.revisionId, currentEngineContract, {}, 'notification-run', {
+    const accepted = await service.control.runs.createDraftRun(created.flowId, changed.revision.revisionId, currentEngineContract, {}, 'notification-run', {
       nodeId: 'marker',
       payload: {},
     })

@@ -105,7 +105,7 @@ describe('ControlClient Flow API', () => {
           values: { taskId: 'missing', variant: 'task' },
         },
       ],
-      engineContract: 'open-flow-engine/v2',
+      engineContract: 'open-flow-engine/v3',
       flowId: flow.flowId,
       modelVersion: 1,
       revisionDigest: 'revision-digest-1',
@@ -150,7 +150,7 @@ describe('ControlClient Publish API', () => {
       1,
       '/v1/flows/flow%2F1/revisions/revision-1/publications',
       expect.objectContaining({
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v2', expectedLivePublicationId: null, version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v3', expectedLivePublicationId: null, version: 1 }),
         method: 'POST',
       }),
     )
@@ -221,7 +221,7 @@ describe('ControlClient Wait API', () => {
   const waiting = {
     closureDigest: 'closure-1',
     createdAt: '2026-09-01T00:00:00.000Z',
-    engineContract: 'open-flow-engine/v2',
+    engineContract: 'open-flow-engine/v3',
     engineDigest: 'engine-1',
     flowId: flow.flowId,
     modelVersion: 1,
@@ -232,14 +232,16 @@ describe('ControlClient Wait API', () => {
     startedAt: '2026-09-01T00:00:01.000Z',
     status: 'waiting',
     version: 1,
-    waiting: {
-      actions: ['approve', 'reject'],
-      expiresAt: '2026-09-08T00:00:02.000Z',
-      nodeId: 'approval',
-      prompt: 'Approve deployment?',
-      waitId: 'abcdefghijklmnopqrstu',
-      waitingSince: '2026-09-01T00:00:02.000Z',
-    },
+    waits: [
+      {
+        actions: ['approve', 'reject'],
+        expiresAt: '2026-09-08T00:00:02.000Z',
+        nodeId: 'approval',
+        prompt: 'Approve deployment?',
+        waitId: 'abcdefghijklmnopqrstu',
+        waitingSince: '2026-09-01T00:00:02.000Z',
+      },
+    ],
   } as const
 
   it('decodes the active waiting projection and resolves a fixed action', async () => {
@@ -250,27 +252,27 @@ describe('ControlClient Wait API', () => {
       runId: waiting.runId,
       status: 'queued',
       version: 1,
-      waitId: waiting.waiting.waitId,
+      waitId: waiting.waits[0].waitId,
     } as const
     const request = vi.fn(async (path: string, init?: RequestInit) => {
       if (path == `/v1/runs/${waiting.runId}`) return Response.json(waiting)
-      if (path == `/v1/runs/${waiting.runId}/waits/${waiting.waiting.waitId}/resolve` && init?.method == 'POST') return Response.json(response)
+      if (path == `/v1/runs/${waiting.runId}/waits/${waiting.waits[0].waitId}/resolve` && init?.method == 'POST') return Response.json(response)
       throw new Error(path)
     })
     const client = new ControlClient(request)
 
     await expect(client.getRun(waiting.runId)).resolves.toEqual(waiting)
-    await expect(client.resolveRunWait(waiting.runId, waiting.waiting.waitId, 'approve')).resolves.toEqual(response)
+    await expect(client.resolveRunWait(waiting.runId, waiting.waits[0].waitId, 'approve')).resolves.toEqual(response)
     expect(request).toHaveBeenLastCalledWith(
-      `/v1/runs/${waiting.runId}/waits/${waiting.waiting.waitId}/resolve`,
+      `/v1/runs/${waiting.runId}/waits/${waiting.waits[0].waitId}/resolve`,
       expect.objectContaining({ body: JSON.stringify({ action: 'approve', version: 1 }), method: 'POST' }),
     )
   })
 
   it.each([
-    ['a waiting Run without active wait data', { ...waiting, waiting: undefined }],
-    ['a non-waiting Run with stale wait data', { ...waiting, status: 'running' }],
-    ['an unknown action combination', { ...waiting, waiting: { ...waiting.waiting, actions: ['approve'] } }],
+    ['a waiting Run without active wait data', { ...waiting, waits: undefined }],
+    ['a terminal Run with stale wait data', { ...waiting, status: 'completed' }],
+    ['an unknown action combination', { ...waiting, waits: [{ ...waiting.waits[0], actions: ['approve'] }] }],
   ])('rejects %s', async (_name, response) => {
     const client = new ControlClient(async () => Response.json(response))
     await expect(client.getRun(waiting.runId)).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
@@ -354,7 +356,8 @@ describe('Run event contract', () => {
     ['run.queued', {}],
     ['run.started', { flowId: 'flow', scopeId: 'scope' }],
     ['run.progress', { flowId: 'flow', scopeId: 'scope', progress: 25 }],
-    ['run.waiting', { expiresAt: 'later', nodeId: 'node', waitId: 'wait', waitingSince: 'now' }],
+    ['run.waiting', { waitIds: ['wait'] }],
+    ['wait.created', { expiresAt: 'later', nodeId: 'node', waitId: 'wait', waitingSince: 'now' }],
     ['run.resolved', { action: 'approve', resolvedAt: 'now', waitId: 'wait' }],
     ['run.completed', { result: { nested: [null, true, 1, 'value'] } }],
     ['run.failed', { result: { error: { code: 'run.failed', message: 'Failed.' } } }],

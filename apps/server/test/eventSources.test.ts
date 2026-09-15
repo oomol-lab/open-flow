@@ -94,7 +94,7 @@ async function publish(context: Awaited<ReturnType<typeof setup>>, name: string,
     { kind: 'binding.create', bindingId: 'connection', binding: { kind: 'connection', target: input.connectionId } },
     { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'feishu', node },
   ])
-  const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, 'open-flow-engine/v2', null, `publish-${name}`)
+  const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, 'open-flow-engine/v3', null, `publish-${name}`)
   await service.tickIntegration()
   await service.tickMaintenance()
   const completed = service.control.getPublishOperation(flowId, operation.operationId)
@@ -152,9 +152,9 @@ it('durably fans out to current Flows and does not add later Flows when a messag
   const c = await publish(context, 'C')
   expect((await context.app.request(context.endpoint, delivery({ ...event, header: { ...event.header, event_id: 'retry' } }))).status).toBe(200)
   await context.service.tickIntegration()
-  expect(context.service.control.listRuns(a, 20).page.runs).toHaveLength(1)
-  expect(context.service.control.listRuns(b, 20).page.runs).toHaveLength(1)
-  expect(context.service.control.listRuns(c, 20).page.runs).toHaveLength(0)
+  expect(context.service.control.runs.listRuns(a, 20).page.runs).toHaveLength(1)
+  expect(context.service.control.runs.listRuns(b, 20).page.runs).toHaveLength(1)
+  expect(context.service.control.runs.listRuns(c, 20).page.runs).toHaveLength(0)
   const forged = delivery(event)
   forged.headers['x-lark-signature'] = '0'.repeat(64)
   expect((await context.app.request(context.endpoint, forged)).status).toBe(401)

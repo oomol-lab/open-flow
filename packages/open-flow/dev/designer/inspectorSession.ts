@@ -59,7 +59,7 @@ export function createInspectorSession(language: UiLanguage, log: LogAction, ini
       return Response.json({
         closureDigest: 'lab',
         diagnostics: [],
-        engineContract: 'open-flow-engine/v2',
+        engineContract: 'open-flow-engine/v3',
         flowId: flow.flowId,
         modelVersion: 1,
         revisionDigest: revision().digest,

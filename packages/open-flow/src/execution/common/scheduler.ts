@@ -4,14 +4,15 @@ import type { ConnectorCapability, Graph, GraphNode, InputMapping, InputPortDefi
 import type { PreparedFlow } from '../../flow/common/semantics.ts'
 import type { AgentCheckpoint, AgentResult } from './runtime.ts'
 
+import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
-import * as Exit from 'effect/Exit'
 import * as FiberSet from 'effect/FiberSet'
+import * as Queue from 'effect/Queue'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { agentInput } from '../../flow/common/agent.ts'
 import { portsByHandle } from '../../flow/common/change.ts'
-import { graphOrder } from '../../flow/common/graph.ts'
+import { graphOrder, waitOutputPorts } from '../../flow/common/graph.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
 
 type ExecutableNode = Exclude<GraphNode, TriggerNode>
@@ -84,13 +85,61 @@ export interface FlowRunResult {
   }[]
 }
 
+function usesNotification(graph: Graph, nodeId: string): boolean {
+  return (
+    graph.edges.some((edge) => edge.source == nodeId && edge.sourceHandle == 'notification') ||
+    Object.values(graph.nodes).some(
+      (node) =>
+        'inputs' in node &&
+        Object.values(node.inputs).some(
+          (mapping) =>
+            mapping.kind == 'sources' && mapping.sources.some((source) => source.kind == 'node' && source.nodeId == nodeId && source.output == 'notification'),
+        ),
+    )
+  )
+}
+
+export interface PendingWait {
+  readonly jobId: string
+  readonly nodeId: string
+  readonly value: JsonValue
+  readonly waitId: string
+  readonly notification?: JsonValue
+}
+
+export interface WaitRequest {
+  readonly jobId: string
+  readonly nodeId: string
+  readonly value: JsonValue
+  readonly waitId: string
+  readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
+  readonly prompt: string
+  readonly notify: boolean
+  readonly notification?: {
+    readonly input: Readonly<Record<string, JsonValue>>
+    readonly messageHandle: string
+    readonly taskId: string
+  }
+}
+
+export type WaitOperation =
+  | { readonly kind: 'create'; readonly wait: WaitRequest }
+  | { readonly kind: 'resolutions'; readonly waitIds: readonly string[]; readonly block: boolean }
+
+export interface WaitHost {
+  readonly create: (wait: WaitRequest) => Effect.Effect<JsonValue | undefined, Error>
+  readonly resolutions: (waitIds: readonly string[], block: boolean) => Effect.Effect<Readonly<Record<string, WaitAction>>, Error>
+}
+
+export const waitRetentionMs = 120_000
+
 export interface FlowRunCheckpoint {
   readonly bindingValues: Readonly<Record<string, string>>
   readonly inputs: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>
   readonly results: Readonly<Record<string, { readonly jobId: string; readonly outputs: Readonly<Record<string, JsonValue>> }>>
   readonly skipped: readonly string[]
-  readonly version: 2
-  readonly queue: readonly FlowRunCheckpoint['wait'][]
+  readonly version: 3
+  readonly waits: readonly PendingWait[]
   readonly agents: Readonly<
     Record<
       string,
@@ -102,12 +151,6 @@ export interface FlowRunCheckpoint {
       }
     >
   >
-  readonly wait: {
-    readonly jobId: string
-    readonly nodeId: string
-    readonly value: JsonValue
-    readonly waitId: string
-  }
 }
 
 export type FlowRunOutcome =
@@ -115,18 +158,7 @@ export type FlowRunOutcome =
   | {
       readonly checkpoint: FlowRunCheckpoint
       readonly kind: 'waiting'
-      readonly notification?: {
-        readonly input: Readonly<Record<string, JsonValue>>
-        readonly messageHandle: string
-        readonly taskId: string
-      }
-      readonly wait: {
-        readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
-        readonly prompt: string
-        readonly jobId: string
-        readonly nodeId: string
-        readonly waitId: string
-      }
+      readonly remainingMs?: number
     }
 
 export interface SubflowRunResult {
@@ -167,6 +199,8 @@ export type FlowRunOptions = {
   readonly invokeTask: (invocation: TaskInvocation) => Effect.Effect<unknown, Error>
   readonly projectFailure?: (error: unknown) => SchedulerFailure
   readonly runId: string
+  readonly waits?: WaitHost
+  readonly remainingMs?: number
 } & RunLaunch
 
 export type RunLaunch =
@@ -177,7 +211,7 @@ export type RunLaunch =
       readonly resume?: never
     }
   | {
-      readonly resume: { readonly action: WaitAction; readonly checkpoint: unknown }
+      readonly resume: { readonly checkpoint: unknown }
       readonly bindingValues?: never
       readonly inputs?: never
       readonly trigger?: never
@@ -205,20 +239,8 @@ interface RunContext {
   readonly invokeTask: FlowRunOptions['invokeTask']
   readonly prepared: PreparedFlow
   readonly projectFailure: FlowRunOptions['projectFailure']
-}
-
-const notificationPrefix = 'notification:'
-
-function notificationInput(handle: string): string {
-  return `${notificationPrefix}${handle}`
-}
-
-function nodeMappings(node: ExecutableNode): Readonly<Record<string, InputMapping>> {
-  if (node.kind != 'wait' || node.notification == null) return node.inputs
-  return {
-    ...node.inputs,
-    ...Object.fromEntries(Object.entries(node.notification.inputs).map(([handle, mapping]) => [notificationInput(handle), mapping])),
-  }
+  readonly waits: WaitHost | undefined
+  readonly remainingMs: number | undefined
 }
 
 function nodePorts(prepared: PreparedFlow, node: ExecutableNode): Readonly<Record<string, InputPortDefinition>> {
@@ -231,18 +253,8 @@ function nodePorts(prepared: PreparedFlow, node: ExecutableNode): Readonly<Recor
       return portsByHandle(prepared.subflows[node.subflowId]!.inputs)
     case 'task':
       return portsByHandle([...(node.task != null ? node.task.inputs : prepared.tasks[node.taskId]!.inputs), ...(node.additionalInputs ?? [])])
-    case 'wait': {
-      const notification = node.notification
-      const task = notification == null ? undefined : prepared.tasks[notification.taskId]
-      return {
-        [node.input.handle]: node.input,
-        ...(notification == null || task == null
-          ? {}
-          : Object.fromEntries(
-              task.inputs.flatMap((port) => ('handle' in port && port.handle != notification.messageHandle ? [[notificationInput(port.handle), port]] : [])),
-            )),
-      }
-    }
+    case 'wait':
+      return { [node.input.handle]: node.input }
   }
 }
 
@@ -306,8 +318,8 @@ const agentResultSchema = z.union([
 
 export function decodeFlowRunCheckpoint(input: unknown): FlowRunCheckpoint {
   const source = checkpointRecord(input, 'Flow Run checkpoint')
-  checkpointExact(source, ['agents', 'bindingValues', 'inputs', 'queue', 'results', 'skipped', 'version', 'wait'], 'Flow Run checkpoint')
-  if (source.version != 2) throw new Error('Flow Run checkpoint version is unsupported.')
+  checkpointExact(source, ['agents', 'bindingValues', 'inputs', 'results', 'skipped', 'version', 'waits'], 'Flow Run checkpoint')
+  if (source.version != 3) throw new Error('Flow Run checkpoint version is unsupported.')
   const bindingValues = Object.fromEntries(
     Object.entries(checkpointRecord(source.bindingValues, 'Checkpoint bindings')).map(([id, value]) => {
       if (typeof value != 'string') throw new Error('Checkpoint binding must be a string.')
@@ -340,9 +352,14 @@ export function decodeFlowRunCheckpoint(input: unknown): FlowRunCheckpoint {
   if (!Array.isArray(source.skipped)) throw new Error('Checkpoint skipped nodes must be an array.')
   const skipped = source.skipped.map((id) => checkpointString(id, 'Checkpoint skipped node'))
   if (new Set(skipped).size != skipped.length || skipped.some((id) => results[id] != null)) throw new Error('Checkpoint node states conflict.')
-  const savedWait = z.strictObject({ jobId: z.string().min(1), nodeId: z.string().min(1), value: z.json(), waitId: z.string().min(1) })
-  const wait = savedWait.parse(source.wait)
-  const queue = z.array(savedWait).parse(source.queue)
+  const savedWait = z.strictObject({
+    jobId: z.string().min(1),
+    nodeId: z.string().min(1),
+    value: z.json(),
+    waitId: z.string().min(1),
+    notification: z.json().optional(),
+  })
+  const pendingWaits = z.array(savedWait).min(1).parse(source.waits)
   const agents = z
     .record(
       z.string(),
@@ -356,7 +373,7 @@ export function decodeFlowRunCheckpoint(input: unknown): FlowRunCheckpoint {
     .parse(source.agents)
   const nodes = new Set<string>()
   const waits = new Set<string>()
-  for (const pending of [wait, ...queue]) {
+  for (const pending of pendingWaits) {
     if (results[pending.nodeId] != null || skipped.includes(pending.nodeId) || nodes.has(pending.nodeId) || waits.has(pending.waitId)) {
       throw new Error('Checkpoint waiting node states conflict.')
     }
@@ -364,7 +381,7 @@ export function decodeFlowRunCheckpoint(input: unknown): FlowRunCheckpoint {
     waits.add(pending.waitId)
   }
   if (Object.keys(agents).some((id) => !nodes.has(id))) throw new Error('Checkpoint Agent has no waiting node.')
-  return { agents, bindingValues, inputs, queue, results, skipped, version: 2, wait }
+  return { agents, bindingValues, inputs, results, skipped, version: 3, waits: pendingWaits }
 }
 
 function jsonEqual(left: JsonValue, right: JsonValue): boolean {
@@ -495,18 +512,17 @@ function agentApproval(config: AgentConfig, checkpoint: AgentCheckpoint, inputs:
 function validateOutputs(prepared: PreparedFlow, nodeId: string, node: ExecutableNode, value: unknown): Readonly<Record<string, JsonValue>> {
   const outputs = outputRecord(checkpointJson(value === undefined ? {} : value, `Node "${nodeId}" outputs`), nodeId)
   const ports =
-    node.kind == 'task'
-      ? portsByHandle(node.task != null ? node.task.outputs : prepared.tasks[node.taskId]!.outputs)
-      : node.kind == 'subflow'
-        ? portsByHandle(prepared.subflows[node.subflowId]!.outputs)
-        : node.kind == 'value'
-          ? portsByHandle(node.values)
-          : Object.fromEntries(
-              (node.kind == 'wait'
-                ? node.actions
-                : [...node.cases.map((item) => item.output), ...(node.defaultOutput == null ? [] : [node.defaultOutput])]
-              ).map((handle) => [handle, node.input]),
-            )
+    node.kind == 'wait'
+      ? waitOutputPorts(node)
+      : node.kind == 'task'
+        ? portsByHandle(node.task != null ? node.task.outputs : prepared.tasks[node.taskId]!.outputs)
+        : node.kind == 'subflow'
+          ? portsByHandle(prepared.subflows[node.subflowId]!.outputs)
+          : node.kind == 'value'
+            ? portsByHandle(node.values)
+            : Object.fromEntries(
+                [...node.cases.map((item) => item.output), ...(node.defaultOutput == null ? [] : [node.defaultOutput])].map((handle) => [handle, node.input]),
+              )
   for (const [handle, output] of Object.entries(outputs)) {
     const port = ports[handle]
     if (port == null || (!(output === null && port.nullable) && !matchesSchema(output, port.jsonSchema)))
@@ -530,9 +546,14 @@ function validateCheckpoint(
   const launch = checkpoint.inputs
   const agents = checkpoint.agents
   const settled = (id: string) => completed.has(id) || skipped.has(id)
+  const notifications = new Map(checkpoint.waits.filter((wait) => wait.notification != null).map((wait) => [wait.nodeId, wait.notification!]))
+  const edgeSettled = (edge: Graph['edges'][number]) => settled(edge.source) || (edge.sourceHandle == 'notification' && notifications.has(edge.source))
   const selected = (edge: Graph['edges'][number]) => {
     const result = completed.get(edge.source)
-    return result != null && (edge.sourceHandle == null || Object.hasOwn(result.outputs, edge.sourceHandle))
+    return (
+      (edge.sourceHandle == 'notification' && notifications.has(edge.source)) ||
+      (result != null && (edge.sourceHandle == null || Object.hasOwn(result.outputs, edge.sourceHandle)))
+    )
   }
   if ([...completed.keys(), ...skipped, ...Object.keys(launch)].some((id) => target.graph.nodes[id] == null))
     throw new Error('Checkpoint nodes do not match the prepared graph.')
@@ -549,14 +570,17 @@ function validateCheckpoint(
     }
     if (!settled(id)) continue
     const edges = incoming.get(id) ?? []
-    if (!edges.every((edge) => settled(edge.source))) throw new Error('Checkpoint node dependencies are incomplete.')
+    if (!edges.every(edgeSettled)) throw new Error('Checkpoint node dependencies are incomplete.')
     const runnable = (edges.length == 0 && target.kind == 'subflow') || edges.some(selected)
     if (completed.has(id) != runnable) throw new Error('Checkpoint node state conflicts with its execution branches.')
     const result = completed.get(id)
     if (result != null) {
       validateOutputs(prepared, id, node, result.outputs)
       const count = Object.keys(result.outputs).length
-      if ((node.kind == 'condition' && (count > 1 || (node.defaultOutput != null && count != 1))) || (node.kind == 'wait' && count != 1))
+      if (
+        (node.kind == 'condition' && (count > 1 || (node.defaultOutput != null && count != 1))) ||
+        (node.kind == 'wait' && node.actions.filter((action) => Object.hasOwn(result.outputs, action)).length != 1)
+      )
         throw new Error('Checkpoint branch result is invalid.')
     }
   }
@@ -567,7 +591,7 @@ function validateCheckpoint(
       throw new Error('Checkpoint launch inputs do not match the prepared graph.')
   }
 
-  for (const waiting of [checkpoint.wait, ...checkpoint.queue]) {
+  for (const waiting of checkpoint.waits) {
     const node = target.graph.nodes[waiting.nodeId]
     if (node == null || !('inputs' in node)) throw new Error('Checkpoint waiting node is missing.')
     const config = agentConfig(prepared, node)
@@ -581,9 +605,16 @@ function validateCheckpoint(
       const approval = agentApproval(config, saved.checkpoint, saved.input)
       if (!jsonEqual(waiting.value, approval)) throw new Error('Checkpoint Agent approval does not match its saved call.')
       if (!jsonEqual(resolveInputs(waiting.nodeId, node), saved.input)) throw new Error('Checkpoint Agent inputs changed.')
-    } else if (saved != null) throw new Error('Checkpoint Wait contains Agent state.')
+    } else {
+      if (saved != null) throw new Error('Checkpoint Wait contains Agent state.')
+      if (node.kind != 'wait' || !jsonEqual(resolveInputs(waiting.nodeId, node)[node.input.handle]!, waiting.value))
+        throw new Error('Checkpoint Wait input changed.')
+      const notify = usesNotification(target.graph, waiting.nodeId)
+      if (notify != (waiting.notification != null)) throw new Error('Checkpoint Wait notification is missing or unexpected.')
+      if (waiting.notification != null) validateOutputs(prepared, waiting.nodeId, node, { notification: waiting.notification })
+    }
     const waitEdges = incoming.get(waiting.nodeId) ?? []
-    if (!waitEdges.every((edge) => settled(edge.source)) || waitEdges.length == 0 || !waitEdges.some(selected)) {
+    if (!waitEdges.every(edgeSettled) || waitEdges.length == 0 || !waitEdges.some(selected)) {
       throw new Error('Flow Run checkpoint Wait dependencies are incomplete.')
     }
   }
@@ -593,38 +624,6 @@ type NodeResult =
   | { readonly kind: 'completed'; readonly outputs: Readonly<Record<string, JsonValue>> }
   | { readonly kind: 'suspended'; readonly value: JsonValue; readonly agent: FlowRunCheckpoint['agents'][string] }
 
-function suspendGraph(
-  context: RunContext,
-  target: GraphTarget,
-  runId: string,
-  checkpoint: FlowRunCheckpoint,
-  notification: Extract<FlowRunOutcome, { readonly kind: 'waiting' }>['notification'],
-): Effect.Effect<FlowRunOutcome, Error> {
-  return Effect.gen(function* () {
-    const { jobId, nodeId, waitId, value } = checkpoint.wait
-    const node = target.graph.nodes[nodeId] as ExecutableNode
-    const encoded = JSON.stringify(checkpoint)
-    if (new TextEncoder().encode(encoded).byteLength > 16 * 1024 * 1024) {
-      const message = 'Flow Run checkpoint exceeds 16 MiB.'
-      yield* context.emit({ code: 'run.checkpoint-too-large', jobId, message, nodeId, runId, type: 'node.failed' })
-      yield* context.emit({ message, runId, type: 'run.failed' })
-      return yield* Effect.fail(new Error(`run.checkpoint-too-large: ${message}`))
-    }
-    return {
-      kind: 'waiting',
-      wait: {
-        actions: node.kind == 'wait' ? node.actions : ['approve', 'reject'],
-        prompt: node.kind == 'wait' ? node.prompt : JSON.stringify(value, null, 2),
-        jobId,
-        nodeId,
-        waitId,
-      },
-      ...(notification == null ? {} : { notification }),
-      checkpoint: decodeFlowRunCheckpoint(JSON.parse(encoded)),
-    }
-  })
-}
-
 function runGraph(
   context: RunContext,
   target: GraphTarget,
@@ -633,7 +632,7 @@ function runGraph(
   parent?: ParentRun,
   launchInputs: Readonly<Record<string, Readonly<Record<string, JsonValue>>>> = {},
   trigger?: TriggerSeed,
-  resume?: { readonly action: WaitAction; readonly checkpoint: FlowRunCheckpoint },
+  resume?: { readonly checkpoint: FlowRunCheckpoint },
 ): Effect.Effect<FlowRunOutcome | Readonly<Record<string, JsonValue>>, Error> {
   return Effect.scoped(
     Effect.gen(function* () {
@@ -672,14 +671,24 @@ function runGraph(
       const runNode = yield* FiberSet.runtime(active)()
       let firstCause: Cause.Cause<Error> | undefined
       let firstFailure: Error | undefined
-      let suspending = resume != null
-      const pendingWaits: FlowRunCheckpoint['wait'][] = resume == null ? [] : [...resume.checkpoint.queue]
+      const pendingWaits = new Map((resume?.checkpoint.waits ?? []).map((wait) => [wait.nodeId, wait]))
+      const notifications = new Map(
+        (resume?.checkpoint.waits ?? []).filter((wait) => wait.notification != null).map((wait) => [wait.nodeId, wait.notification!]),
+      )
+      const changes = yield* Queue.unbounded<void>()
+      let remainingMs = context.remainingMs
+      let measuredAt = yield* Clock.currentTimeMillis
+      let idleSince: number | undefined
       const agents: Record<string, FlowRunCheckpoint['agents'][string]> = { ...resume?.checkpoint.agents }
-      for (const pending of resume == null ? [] : [resume.checkpoint.wait, ...resume.checkpoint.queue]) started.add(pending.nodeId)
+      for (const pending of pendingWaits.values()) started.add(pending.nodeId)
       const settled = (id: string) => completed.has(id) || skipped.has(id)
+      const edgeSettled = (edge: Graph['edges'][number]) => settled(edge.source) || (edge.sourceHandle == 'notification' && notifications.has(edge.source))
       const selected = (edge: Graph['edges'][number]) => {
         const result = completed.get(edge.source)
-        return result != null && (edge.sourceHandle == null || Object.hasOwn(result.outputs, edge.sourceHandle))
+        return (
+          (edge.sourceHandle == 'notification' && notifications.has(edge.source)) ||
+          (result != null && (edge.sourceHandle == null || Object.hasOwn(result.outputs, edge.sourceHandle)))
+        )
       }
       const resolveInput = (mapping: InputMapping | undefined, port: InputPortDefinition, supplied: JsonValue | undefined, description: string): JsonValue => {
         let value = mapping?.kind == 'value' ? mapping.value : supplied === undefined ? port.value : supplied
@@ -687,7 +696,8 @@ function runGraph(
           const values = mapping.sources.flatMap((source) => {
             if (source.kind == 'binding') return Object.hasOwn(context.bindingValues, source.bindingId) ? [context.bindingValues[source.bindingId]!] : []
             if (source.kind == 'flow') return Object.hasOwn(inputs, source.input) ? [inputs[source.input]!] : []
-            const outputs = completed.get(source.nodeId)?.outputs
+            const outputs =
+              completed.get(source.nodeId)?.outputs ?? (notifications.has(source.nodeId) ? { notification: notifications.get(source.nodeId)! } : undefined)
             return outputs != null && Object.hasOwn(outputs, source.output) ? [outputs[source.output]!] : []
           })
           if (values.length != 1) throw new Error(`${description} requires exactly one available source.`)
@@ -699,7 +709,7 @@ function runGraph(
         return value
       }
       const resolveInputs = (nodeId: string, node: ExecutableNode): Readonly<Record<string, JsonValue>> => {
-        const mappings = nodeMappings(node)
+        const mappings = node.inputs
         return Object.fromEntries(
           Object.entries(nodePorts(context.prepared, node)).map(([handle, port]) => [
             handle,
@@ -725,7 +735,7 @@ function runGraph(
       ): Effect.Effect<NodeResult, Error> => {
         const config = agentConfig(context.prepared, node)
         const saved = agents[nodeId]
-        const remainingMs = saved?.remainingMs ?? node.timeoutMs
+        const nodeRemainingMs = saved?.remainingMs ?? node.timeoutMs
         const startedAt = performance.now()
         const execution = Effect.gen(function* () {
           const kind = nodeKind(context.prepared, node)
@@ -799,7 +809,7 @@ function runGraph(
                   if (target.kind != 'flow') return yield* Effect.fail(new Error('Subflow Agent is not supported.'))
                   const checkpoint = response.checkpoint
                   const value = agentApproval(config, checkpoint, nodeInputs)
-                  const left = remainingMs == null ? undefined : remainingMs - (performance.now() - startedAt)
+                  const left = nodeRemainingMs == null ? undefined : nodeRemainingMs - (performance.now() - startedAt)
                   if (left != null && left <= 0) throw new Error(`Node "${nodeId}" timed out.`)
                   return {
                     kind: 'suspended' as const,
@@ -824,25 +834,47 @@ function runGraph(
             catch: (error) => (error instanceof Error ? error : new Error(String(error))),
           })
         })
-        return remainingMs == null
+        return nodeRemainingMs == null
           ? execution
           : execution.pipe(
               Effect.timeoutOrElse({
-                duration: remainingMs,
+                duration: nodeRemainingMs,
                 orElse: () => Effect.fail(new Error(`Node "${nodeId}" timed out.`)),
               }),
             )
       }
 
+      const createWait = (nodeId: string, jobId: string, value: JsonValue) =>
+        Effect.gen(function* () {
+          if (target.kind != 'flow' || context.waits == null) return yield* Effect.fail(new Error('Wait host is unavailable.'))
+          const node = target.graph.nodes[nodeId] as ExecutableNode
+          const waitId = nanoid()
+          const notify = node.kind == 'wait' && usesNotification(target.graph, nodeId)
+          const notification = yield* context.waits.create({
+            jobId,
+            nodeId,
+            value,
+            waitId,
+            notify,
+            actions: node.kind == 'wait' ? node.actions : ['approve', 'reject'],
+            prompt: node.kind == 'wait' ? node.prompt : JSON.stringify(value, null, 2),
+            ...(node.kind == 'wait' ? {} : { notification: agentNotice(context.prepared, node, agents[nodeId]!.input) }),
+          })
+          if (notify) {
+            validateOutputs(context.prepared, nodeId, node, { notification: notification! })
+            notifications.set(nodeId, notification!)
+          }
+          pendingWaits.set(nodeId, { jobId, nodeId, value, waitId, ...(notify ? { notification: notification! } : {}) })
+          for (const child of children.get(nodeId) ?? []) scheduleReady(child)
+          yield* Queue.offer(changes, undefined)
+        })
       const settleNode = (nodeId: string, jobId: string, result: NodeResult): Effect.Effect<void, Error> => {
         if (result.kind == 'completed') {
           delete agents[nodeId]
           return commit(nodeId, jobId, result.outputs)
         }
         agents[nodeId] = result.agent
-        pendingWaits.push({ jobId, nodeId, waitId: context.createId(), value: result.value })
-        suspending = true
-        return Effect.void
+        return createWait(nodeId, jobId, result.value)
       }
 
       const observe = (nodeId: string, jobId: string, effect: Effect.Effect<void, Error>) =>
@@ -861,11 +893,11 @@ function runGraph(
           ),
         )
       scheduleReady = (nodeId) => {
-        if (firstCause != null || suspending || started.has(nodeId) || skipped.has(nodeId)) return
+        if (firstCause != null || started.has(nodeId) || skipped.has(nodeId)) return
         const node = target.graph.nodes[nodeId]!
         if (!('inputs' in node)) return
         const edges = incoming.get(nodeId) ?? []
-        if (!edges.every((edge) => settled(edge.source))) return
+        if (!edges.every(edgeSettled)) return
         if ((edges.length == 0 && target.kind == 'flow') || (edges.length > 0 && !edges.some(selected))) {
           skipped.add(nodeId)
           runNode(
@@ -877,7 +909,6 @@ function runGraph(
         }
         started.add(nodeId)
         const jobId = context.createId()
-        if (node.kind == 'wait') suspending = true
         runNode(
           observe(
             nodeId,
@@ -901,8 +932,7 @@ function runGraph(
                   runId,
                   type: 'node.started',
                 })
-                const waitId = nanoid()
-                pendingWaits.push({ jobId, nodeId, waitId, value: nodeInputs[node.input.handle]! })
+                yield* createWait(nodeId, jobId, nodeInputs[node.input.handle]!)
                 return
               }
               const result = yield* executeNode(nodeId, node, jobId, nodeInputs)
@@ -911,7 +941,7 @@ function runGraph(
                 for (const child of children.get(nodeId) ?? []) scheduleReady(child)
               }
             }),
-          ),
+          ).pipe(Effect.ensuring(Queue.offer(changes, undefined))),
         )
       }
       if (resume != null) {
@@ -919,71 +949,94 @@ function runGraph(
           try: () => validateCheckpoint(context.prepared, target, resume.checkpoint, incoming, resolveInputs),
           catch: (error) => (error instanceof Error ? error : new Error(String(error))),
         })
-        const saved = resume.checkpoint.wait
-        const node = target.graph.nodes[saved.nodeId] as ExecutableNode
-        yield* observe(
-          saved.nodeId,
-          saved.jobId,
-          Effect.gen(function* () {
-            if (node.kind == 'wait') {
-              if (!node.actions.some((action) => action == resume.action))
-                return yield* Effect.fail(new Error('Checkpoint resolution does not match Wait actions.'))
-              yield* commit(saved.nodeId, saved.jobId, validateOutputs(context.prepared, saved.nodeId, node, { [resume.action]: saved.value }))
-            } else {
-              if (resume.action == 'continue') return yield* Effect.fail(new Error('Agent requires approve or reject.'))
-              const result = yield* executeNode(saved.nodeId, node, saved.jobId, agents[saved.nodeId]!.input, resume.action)
-              yield* settleNode(saved.nodeId, saved.jobId, result)
-            }
-          }),
-        ).pipe(Effect.exit)
-        suspending = pendingWaits.length > 0
       }
       for (const nodeId of order) scheduleReady(nodeId)
 
-      const activeExit = yield* Effect.raceFirst(FiberSet.awaitEmpty(active), FiberSet.join(active)).pipe(Effect.exit)
-      if (firstFailure != null) {
-        yield* FiberSet.clear(active)
-        yield* context.emit({ message: firstFailure.message, runId, type: 'run.failed' }).pipe(Effect.ignore)
-        return yield* Effect.fail(firstFailure)
-      }
-      if (firstCause != null) {
-        yield* FiberSet.clear(active)
-        return yield* Effect.failCause(firstCause)
-      }
-      if (Exit.isFailure(activeExit)) return yield* Effect.failCause(activeExit.cause)
-      if (pendingWaits.length > 0) {
-        if (target.kind != 'flow') return yield* Effect.fail(new Error('Subflow Wait is not supported.'))
-        if (resume == null) pendingWaits.sort((a, b) => (a.nodeId < b.nodeId ? -1 : a.nodeId > b.nodeId ? 1 : 0))
-        const [pendingWait, ...queue] = pendingWaits
-        const { jobId, nodeId, waitId, value } = pendingWait!
-        const node = target.graph.nodes[nodeId] as ExecutableNode
-        let notification =
-          node.kind == 'wait' && node.notification != null
-            ? {
-                taskId: node.notification.taskId,
-                messageHandle: node.notification.messageHandle,
-                input: Object.fromEntries(
-                  Object.entries(nodePorts(context.prepared, node))
-                    .filter(([handle]) => handle.startsWith(notificationPrefix))
-                    .map(([handle, port]) => [
-                      handle.slice(notificationPrefix.length),
-                      resolveInput(nodeMappings(node)[handle], port, launch[nodeId]?.[handle], `Wait notification ${handle}`),
-                    ]),
-                ),
-              }
-            : undefined
-        if (agents[nodeId] != null) notification = agentNotice(context.prepared, node, agents[nodeId]!.input)
-        const checkpointSource: FlowRunCheckpoint = {
-          bindingValues: context.bindingValues,
-          inputs: launch,
-          results: Object.fromEntries(completed),
-          skipped: [...skipped].toSorted(),
-          version: 2,
-          agents,
-          queue,
-          wait: { jobId, nodeId, value, waitId },
+      const applyResolutions = (resolutions: Readonly<Record<string, WaitAction>>, now: number) => {
+        for (const saved of pendingWaits.values()) {
+          const action = resolutions[saved.waitId]
+          if (action == null) continue
+          if (idleSince != null) {
+            idleSince = undefined
+            measuredAt = now
+          }
+          pendingWaits.delete(saved.nodeId)
+          const node = target.graph.nodes[saved.nodeId] as ExecutableNode
+          runNode(
+            observe(
+              saved.nodeId,
+              saved.jobId,
+              Effect.gen(function* () {
+                if (node.kind == 'wait') {
+                  if (!node.actions.some((candidate) => candidate == action)) return yield* Effect.fail(new Error('Resolution does not match Wait actions.'))
+                  yield* commit(
+                    saved.nodeId,
+                    saved.jobId,
+                    validateOutputs(context.prepared, saved.nodeId, node, {
+                      ...(saved.notification == null ? {} : { notification: saved.notification }),
+                      [action]: saved.value,
+                    }),
+                  )
+                } else {
+                  if (action == 'continue') return yield* Effect.fail(new Error('Agent requires approve or reject.'))
+                  yield* settleNode(saved.nodeId, saved.jobId, yield* executeNode(saved.nodeId, node, saved.jobId, agents[saved.nodeId]!.input, action))
+                }
+                for (const child of children.get(saved.nodeId) ?? []) scheduleReady(child)
+              }),
+            ).pipe(Effect.ensuring(Queue.offer(changes, undefined))),
+          )
         }
-        return yield* suspendGraph(context, target, runId, checkpointSource, notification)
+      }
+      while (true) {
+        const now = yield* Clock.currentTimeMillis
+        if (idleSince == null && remainingMs != null) remainingMs -= now - measuredAt
+        measuredAt = now
+        if (remainingMs != null && remainingMs <= 0) return yield* Effect.fail(new Error('Run exceeded its execution deadline.'))
+        if (firstCause != null) {
+          yield* FiberSet.clear(active)
+          yield* context.emit({ message: firstFailure?.message ?? 'Execution failed.', runId, type: 'run.failed' }).pipe(Effect.ignore)
+          return yield* Effect.failCause(firstCause)
+        }
+        if (pendingWaits.size > 0 && context.waits != null)
+          applyResolutions(
+            yield* context.waits.resolutions(
+              [...pendingWaits.values()].map((wait) => wait.waitId),
+              false,
+            ),
+            now,
+          )
+        for (const nodeId of order) scheduleReady(nodeId)
+        const running = yield* FiberSet.size(active)
+        if (running == 0 && pendingWaits.size == 0) break
+        if (running > 0) idleSince = undefined
+        else idleSince ??= now
+        const left = idleSince == null ? remainingMs : waitRetentionMs - (now - idleSince)
+        if (idleSince != null && left! <= 0) {
+          const checkpoint: FlowRunCheckpoint = {
+            bindingValues: context.bindingValues,
+            inputs: launch,
+            results: Object.fromEntries(completed),
+            skipped: [...skipped].toSorted(),
+            version: 3,
+            agents,
+            waits: [...pendingWaits.values()],
+          }
+          const encoded = JSON.stringify(checkpoint)
+          if (new TextEncoder().encode(encoded).byteLength > 16 * 1024 * 1024) return yield* Effect.fail(new Error('Flow Run checkpoint exceeds 16 MiB.'))
+          return { kind: 'waiting', checkpoint: decodeFlowRunCheckpoint(JSON.parse(encoded)), ...(remainingMs == null ? {} : { remainingMs }) }
+        }
+        const activity = Queue.take(changes).pipe(Effect.as({}))
+        const decision =
+          pendingWaits.size == 0 || context.waits == null
+            ? Effect.never
+            : context.waits.resolutions(
+                [...pendingWaits.values()].map((wait) => wait.waitId),
+                true,
+              )
+        let next = Effect.raceFirst(activity, decision)
+        if (left != null) next = Effect.raceFirst(next, Effect.sleep(Math.max(0, left)).pipe(Effect.as({})))
+        const resolutions = yield* next
+        applyResolutions(resolutions, yield* Clock.currentTimeMillis)
       }
       if (!order.every(settled)) return yield* Effect.fail(new Error('Execution graph contains unresolved dependencies.'))
       if (target.kind == 'subflow') {
@@ -1039,6 +1092,8 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
         invokeTask: options.invokeTask,
         prepared,
         projectFailure: options.projectFailure,
+        waits: options.waits,
+        remainingMs: options.remainingMs,
       },
       { flowId: options.flowId, graph: prepared.graph, kind: 'flow' },
       options.runId,
@@ -1046,7 +1101,7 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
       undefined,
       options.inputs,
       options.trigger,
-      checkpoint == null ? undefined : { action: options.resume!.action, checkpoint },
+      checkpoint == null ? undefined : { checkpoint },
     )) as FlowRunOutcome
   })
   return program

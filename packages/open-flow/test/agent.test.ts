@@ -11,6 +11,7 @@ import { decodeRevision, digestBytes, encodeRevision } from '../src/flow/common/
 import { matchesSchema } from '../src/flow/common/schema.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
 import { flowDependencies, validateFlow } from '../src/flow/common/semantics.ts'
+import { advanceWaiting, waitHost } from './waitHost.ts'
 
 const tool: AgentTool = {
   id: 'send',
@@ -269,15 +270,14 @@ async function execute(
   const prepared = await prepareFlow(source, currentEngineContract)
   if (prepared.kind != 'prepared') throw new Error(`Preparation failed: ${JSON.stringify(prepared)}`)
   let id = 0
-  return Effect.runPromise(
+  return advanceWaiting(
     runFlow(prepared.flow, {
+      waits: waitHost(suspended == null ? {} : { [suspended.checkpoint.waits[0]!.waitId]: action }),
       flowId: 'flow',
       runId: 'run',
-      createId: () => `${suspended?.wait.waitId ?? 'first'}-${++id}`,
+      createId: () => `${suspended?.checkpoint.waits[0]?.waitId ?? 'first'}-${++id}`,
       invokeTask,
-      ...(suspended == null
-        ? { trigger: { nodeId: 'trigger', payload: {} } }
-        : { resume: { action, checkpoint: JSON.parse(JSON.stringify(suspended.checkpoint)) } }),
+      ...(suspended == null ? { trigger: { nodeId: 'trigger', payload: {} } } : { resume: { checkpoint: JSON.parse(JSON.stringify(suspended.checkpoint)) } }),
     }),
   )
 }
@@ -321,14 +321,14 @@ describe('Agent Scheduler continuation', () => {
         return agent.checkpoint.callId == 'A1' ? pause('A2') : { kind: 'completed', output: nodeId }
       })
     const first = waiting(await execute(value, invoke))
-    expect(first.wait.nodeId).toBe('A')
-    expect(first.checkpoint.queue.map((item) => item.nodeId)).toEqual(['B'])
+    expect(first.checkpoint.waits[0]!.nodeId).toBe('A')
+    expect(first.checkpoint.waits.slice(1).map((item) => item.nodeId)).toEqual(['B'])
     expect(Object.keys(first.checkpoint.results)).toContain('sibling')
     const second = waiting(await execute(value, invoke, first))
-    expect(second.wait.nodeId).toBe('B')
-    expect(second.checkpoint.queue.map((item) => item.nodeId)).toEqual(['A'])
+    expect(second.checkpoint.waits[0]!.nodeId).toBe('B')
+    expect(second.checkpoint.waits.slice(1).map((item) => item.nodeId)).toEqual(['A'])
     const third = waiting(await execute(value, invoke, second, 'reject'))
-    expect(third.wait.nodeId).toBe('A')
+    expect(third.checkpoint.waits[0]!.nodeId).toBe('A')
     const result = await execute(value, invoke, third)
     expect(result.kind).toBe('node-results')
     expect(calls).toEqual(['A:start', 'B:start', 'sibling:start', 'A1:approve', 'B1:reject', 'A2:approve'])
@@ -418,16 +418,18 @@ describe('Agent Scheduler continuation', () => {
           checkpoint: {
             ...first.checkpoint,
             agents: { agent: { ...saved, checkpoint: { ...saved.checkpoint, input } } },
-            wait: {
-              ...first.checkpoint.wait,
-              value: {
-                callId: saved.checkpoint.callId,
-                toolId: tool.id,
-                action: tool.action,
-                connectionId: tool.connectionId!,
-                input,
+            waits: [
+              {
+                ...first.checkpoint.waits[0]!,
+                value: {
+                  callId: saved.checkpoint.callId,
+                  toolId: tool.id,
+                  action: tool.action,
+                  connectionId: tool.connectionId!,
+                  input,
+                },
               },
-            },
+            ],
           },
         },
       ),
@@ -437,7 +439,7 @@ describe('Agent Scheduler continuation', () => {
 
   it('rejects duplicate waiting identities and modified approved parameters', async () => {
     const first = waiting(await execute(revision(), () => Effect.succeed(pause('call'))))
-    expect(() => decodeFlowRunCheckpoint({ ...first.checkpoint, queue: [first.checkpoint.wait] })).toThrow(/conflict/)
+    expect(() => decodeFlowRunCheckpoint({ ...first.checkpoint, waits: [first.checkpoint.waits[0]!, first.checkpoint.waits[0]!] })).toThrow(/conflict/)
     let invoked = false
     await expect(
       execute(
@@ -449,7 +451,7 @@ describe('Agent Scheduler continuation', () => {
           }),
         {
           ...first,
-          checkpoint: { ...first.checkpoint, wait: { ...first.checkpoint.wait, value: {} } },
+          checkpoint: { ...first.checkpoint, waits: [{ ...first.checkpoint.waits[0]!, value: {} }] },
         },
       ),
     ).rejects.toThrow(/saved call/)

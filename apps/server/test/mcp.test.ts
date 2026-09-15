@@ -235,8 +235,8 @@ it('keeps admitted Runs across client disconnects and exposes Wait and cancellat
   await expect
     .poll(async () => (await other.callTool({ name: 'run_get', arguments: { runId: run.runId } })).structuredContent)
     .toMatchObject({
-      status: 'waiting',
-      waiting: { actions: ['approve', 'reject'] },
+      status: 'running',
+      waits: [{ actions: ['approve', 'reject'] }],
     })
   expect((await other.callTool({ name: 'run_result', arguments: { runId: run.runId } })).structuredContent).toMatchObject({
     error: { code: 'run.not-terminal' },
@@ -280,12 +280,12 @@ it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait w
   })
   const runId = z.string().parse(run.runId)
   await startService(service)
-  await expect.poll(async () => (await control.getRun(runId)).status).toBe('waiting')
-  const waiting = (await control.getRun(runId)).waiting!
+  await expect.poll(async () => (await control.getRun(runId)).waits.length).toBe(1)
+  const waiting = (await control.getRun(runId)).waits[0]!
   const args = { runId, waitId: waiting.waitId, action }
   const invalid = await client.callTool({ name: 'run_resolve_wait', arguments: { ...args, action: action == 'continue' ? 'approve' : 'continue' } })
   expect(invalid.structuredContent).toMatchObject({ error: { code: 'run.invalid' } })
-  expect((await control.getRun(runId)).status).toBe('waiting')
+  expect((await control.getRun(runId)).status).toBe('running')
   const decision = await call('run_resolve_wait', args)
   expect(decision).toMatchObject({ action, resolutionAccepted: true, runId, waitId: waiting.waitId })
   await expect.poll(async () => (await control.getRun(runId)).status).toBe('completed')

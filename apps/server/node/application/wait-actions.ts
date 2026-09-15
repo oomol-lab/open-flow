@@ -29,7 +29,7 @@ export class WaitActions {
     if (receipt == null) return
     const wait = this.#store.runViews.waitReceipt(receipt.runId, receipt.waitId)
     if (wait == null || !wait.actions.some((action) => action == requested) || receipt.expiresAt <= this.#clock()) return
-    if (receipt.action == null && (receipt.status != 'waiting' || receipt.expiresAt <= this.#clock())) return
+    if (receipt.action == null && (!['running', 'waiting', 'queued', 'starting'].includes(receipt.status) || receipt.expiresAt <= this.#clock())) return
     const retryAfter = admit(digest)
     if (retryAfter != null) return { retryAfter }
     if (receipt.action != null) {
@@ -68,7 +68,7 @@ export class WaitActions {
       action: result.action,
       resolutionAccepted: result.resolutionAccepted,
       resolvedAt: result.resolvedAt == null ? null : new Date(result.resolvedAt).toISOString(),
-      state: result.action != null ? 'resolved' : result.status == 'waiting' ? 'waiting' : 'unavailable',
+      state: result.action != null ? 'resolved' : ['running', 'waiting', 'queued', 'starting'].includes(result.status) ? 'waiting' : 'unavailable',
     }
   }
 }

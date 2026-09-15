@@ -227,19 +227,12 @@
     "wait": {
       "approval": "Approve or reject",
       "changeNotification": "Change",
-      "chooseNotification": "Add notification",
-      "chooseNotificationTitle": "Choose notification",
       "continue": "Continue",
-      "inputs": "Parameters",
-      "inputsInvalid": "Fill in all required notification parameters.",
-      "inputsLoading": "Loading notification parameters…",
-      "messageHandle": "Write message to",
       "mode": "Resolution",
-      "notificationTask": "Notification",
-      "notificationUnavailable": "The notification is unavailable. Choose it again.",
+      "inputsLoading": "Loading notification parameters…",
+      "notificationDescription": "Connect the notification output to send a message or run other steps while waiting.",
       "prompt": "Prompt",
-      "promptError": "Prompt must contain 1 to 1,000 characters.",
-      "removeNotification": "Remove notification"
+      "promptError": "Prompt must contain 1 to 1,000 characters."
     },
     "title": "Inspector",
     "sources": {
