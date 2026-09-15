@@ -124,14 +124,16 @@ credential value、Provider 当前状态、调用权限或部署资源。非确�
 准入、队列执行和 Wait 恢复必须使用同一入口范围，固定完整 Revision 身份及本次执行 closure。全图 check 和 Publish 仍检查完整 Flow，Workbench 不得用全图诊断禁用草稿入口测试。
 
 Engine Contract、部署中立 Runtime invocation、Scheduler 图执行语义、RunEvent 投影和 conformance 属于 `packages/open-flow`。具体执行隔离、
-Engine digest、资源限制和恢复属于部署实现；`isolated-vm` RuntimeHost 只属于 Server。
+隔离运行时 digest、资源限制和恢复编排属于部署实现；`isolated-vm` RuntimeHost 只属于 Server。
+`engineContract` 约束公共图执行语义；`engineDigest` 标识具体 RuntimeHost 的隔离环境与宿主能力，不编码分支、Wait 或输入来源调度规则。
+checkpoint 的格式版本和状态一致性由 Scheduler decoder 校验，恢复时同时检查所需 Engine Contract 与隔离运行时是否受支持。
 
 Flow 与每次 Subflow invocation 使用无环执行图。连线表示节点之间的执行依赖，输入映射独立声明数据来源；保存或删除执行边不会隐式创建或删除输入映射。
 每个节点在一次图调用内最多运行一次。节点等待全部直接前驱完成或跳过，在至少一条入边被选中时执行；Flow Run 必须固定一个 Trigger 起始节点，未连接入口的普通根节点跳过；Subflow 的普通根节点由调用启动，无依赖的分支可以并行。
 Condition 只选择首个匹配分支或 default，Wait 登记后释放 notification，决议后释放所选 action；未选中的分支传播跳过状态。Trigger occurrence 只选择对应 Trigger，其他 Trigger 分支跳过。
 未执行节点的跳过状态仅属于内部调度和恢复，不创建节点执行身份、不产生公开节点事件，也不进入最终节点执行结果。
 
-节点输入只能引用本图中经执行边可达、且在当前节点执行路径上保证已完成的祖先 output。多个 source 表示互斥分支的备选值，每次执行必须恰有一个可用值，
+节点输入只能引用本图中经执行边可达的祖先 output，不要求来源覆盖目标的所有路径。多个 source 表示互斥分支的备选值；来源尚未确定时等待，任一输入确定无来源时跳过节点并记录原因日志，有值时执行，禁止同时有多个值。实际输出 `null` 与来源缺失不同。
 不能按值到达次数重复启动节点。Subflow 的输入和最终输出保持显式声明，不能越过图边界直接引用内部或外部节点。
 
 Task 仅通过返回对象一次性提交最终 output，全部声明和可序列化性校验成功后才向下游提供结果。声明 output 的 Task 必须返回完整结果；无 output 的 Task 可以返回空对象或

@@ -48,3 +48,17 @@
 本次 beta 同步升级公共包、Command、Server，Engine 为 v3、checkpoint 为 version 3。Control API 保留 /v1 信封，详情改为必需 waits 数组，新增 wait.created，run.waiting 改为 waitIds；这些是本次 beta 的显式不兼容变更，客户端和部署须一起升级。
 SQLite migration 18 分离 run_checkpoints 与 wait_receipts，将 Agent 通知 work 主键改为 runId/waitId。旧 checkpoint 保留原始字节供恢复校验，当前 Engine 不执行旧 checkpoint，标记 indeterminate；不得自动重放或改写旧 Revision。
 发布前需完成或取消旧活动 Run，或者保留匹配的旧执行环境。当前工作只验证本地 fixture，未读取或升级任何已部署数据库。
+
+## 执行语义与隔离运行时标识
+
+`engineContract` 属于公共执行合同；`engineDigest` 字段保留现有名称，标识部署的隔离运行时与宿主能力。
+Server 的 `isolatedVmEngineDigest` 由隔离执行器协议、isolated-vm／Node 版本、Web globals 和 Action host 能力版本构成，
+不包含 Wait、分支汇合或输入来源等 Scheduler 规则。图规则变更不单独修改该 digest。
+checkpoint 使用自己的格式版本和状态一致性校验，不能用隔离运行时 digest 代替这些检查。
+
+输入来源的路径覆盖放宽是 Engine v3 的兼容扩展：原先合法图的输入仍然恰好有一个来源，其执行结果不变；
+新允许的图可以在来源确定缺失时跳过节点。新增可接受图不代表旧实现能执行新图，部署仍须锁定匹配的公共包版本。
+未来若修改已有合法图的默认行为或执行结果，仍按上文要求升级公共执行合同或明确声明 beta 断点。
+
+本次移除 digest 中历史的图语义标签会使隔离运行时标识变化一次。固定旧 digest 的 Run 沿用既有不匹配拒绝路径；
+不重写历史 Run 的标识，也不增加旧标识别名。此后仅修改 Scheduler 规则不会再造成隔离运行时 digest 变化。

@@ -294,7 +294,12 @@ function runRevision(revision: RevisionContent, triggerId: string): RevisionCont
   for (const nodeId of reachable) {
     for (const edge of graph.edges) if (edge.source == nodeId) reachable.add(edge.target)
   }
-  function inputs(mappings: Readonly<Record<string, InputMapping>>): Readonly<Record<string, InputMapping>> {
+  function inputs(nodeId: string, mappings: Readonly<Record<string, InputMapping>>): Readonly<Record<string, InputMapping>> {
+    const ancestors = new Set<string>()
+    for (const edge of graph.edges) if (edge.target == nodeId) ancestors.add(edge.source)
+    for (const ancestor of ancestors) {
+      for (const edge of graph.edges) if (edge.target == ancestor) ancestors.add(edge.source)
+    }
     return Object.fromEntries(
       Object.entries(mappings).map(([handle, mapping]) => [
         handle,
@@ -302,7 +307,9 @@ function runRevision(revision: RevisionContent, triggerId: string): RevisionCont
           ? mapping
           : {
               ...mapping,
-              sources: mapping.sources.filter((source) => source.kind != 'node' || graph.nodes[source.nodeId] == null || reachable.has(source.nodeId)),
+              sources: mapping.sources.filter(
+                (source) => source.kind != 'node' || graph.nodes[source.nodeId] == null || reachable.has(source.nodeId) || !ancestors.has(source.nodeId),
+              ),
             },
       ]),
     )
@@ -315,7 +322,7 @@ function runRevision(revision: RevisionContent, triggerId: string): RevisionCont
       ? node
       : {
           ...node,
-          inputs: inputs(node.inputs),
+          inputs: inputs(nodeId, node.inputs),
         }
   }
   const content = { ...revision, document: { ...revision.document, graph: { nodes, edges: graph.edges.filter((edge) => reachable.has(edge.source)) } } }

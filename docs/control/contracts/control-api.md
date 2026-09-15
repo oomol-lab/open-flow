@@ -164,7 +164,9 @@ Value Node 没有数据输入端口。解码时将其 `inputs` 统一归一化�
 
 `inputs[handle]` 使用 `{ kind: 'value', value }` 或 `{ kind: 'sources', sources }`。Node source 使用
 `{ kind: 'node', nodeId, output }`；Flow input 与 Variable binding 的 source 形式保持不变。Node source 必须指向经执行边可达的祖先，
-并在目标的每一条可执行路径上保证可用。多个 source 必须互斥且完整覆盖目标路径，每次执行恰好选择一个；并行前驱的两个结果不能合并到同一个 input。
+不要求覆盖目标的每一条执行路径。多个 source 必须互斥，不能在同一路径同时产生多个值；并行前驱的两个结果不能合并到同一个 input。
+来源尚未确定时等待；任一输入的所有来源确定不会产生值时跳过该节点，并传播普通分支关闭状态、记录跳过原因日志。`nullable` 不会把缺失来源转换为 `null`；实际输出 `null` 仍算一个已提供的值。
+Subflow 的最终输出仍须完整覆盖其返回路径；本规则仅放宽节点输入的路径覆盖。
 `graph.edge.connect` 与 `graph.edge.disconnect` 只修改执行边，`graph.node.input.set` 独立修改数据映射。节点不保存 `concurrency`。
 
 CLI 分开设置执行顺序与输入来源：
@@ -327,7 +329,7 @@ Draft Run body 是 `{ engineContract, inputs, trigger, version: 1 }`。Live Run 
 `trigger` 必填，形如 `{ nodeId: string, payload: JsonValue }`，固定本次运行的起始 Trigger 和输入。缺少入口、入口不是固定 Revision 中的 Trigger，或 payload 不符合其 schema 时返回 `run.invalid`。入口及 payload 参与幂等 request digest，并随 Run 持久化；不会自动选择入口或退回整图运行。
 
 Draft Run 只对选中 Trigger 沿执行边可达的节点及其依赖进行语义校验、能力检查和 Variable 准入检查。其他分支的未配置 Trigger、无效代码和缺失资源仍出现在全图 check 中，但不阻断此次测试。
-共享下游输入的多来源映射忽略本次不可达的已有节点来源；剩余来源仍须在每条执行路径上恰好提供一个值。缺失节点引用、选中分支内的环、无效代码及实际使用的 Subflow 错误仍返回 `flow.invalid`。
+共享下游输入的多来源映射忽略本次不可达的已有节点来源；剩余来源在本次路径有值时执行，确定缺失时跳过目标节点；不能同时提供多个值。缺失节点引用、选中分支内的环、无效代码及实际使用的 Subflow 错误仍返回 `flow.invalid`。
 Draft Run 的 `revisionDigest` 标识完整 Revision，`closureDigest` 标识本次入口的执行 closure，可以与全图 check 的 `closureDigest` 不同。读取和恢复 Run 不修改原 Revision。
 Publish 和 Live Run 保持完整 Flow 校验。
 

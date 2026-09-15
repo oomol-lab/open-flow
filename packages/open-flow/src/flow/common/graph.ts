@@ -344,7 +344,6 @@ function covers(routes: readonly Route[], target: Route, graph: Graph): boolean 
 function mappingAvailable(graph: Graph, target: string | undefined, mapping: InputMapping, analysis: ReturnType<typeof graphPaths>): boolean {
   if (mapping.kind == 'value') return true
   const { ancestors, paths } = analysis
-  if (mapping.sources.length == 0) return false
   if (target != null && mapping.sources.some((source) => source.kind == 'node' && !ancestors.get(target)?.has(source.nodeId))) return false
   if (
     target != null &&
@@ -359,7 +358,7 @@ function mappingAvailable(graph: Graph, target: string | undefined, mapping: Inp
     return false
   const sources = mapping.sources.map((source) => sourcePaths(graph, paths, source))
   const targetPaths = target == null ? [{}] : (paths.get(target) ?? [])
-  if (!targetPaths.every((route) => covers(sources.flat(), route, graph))) return false
+  if (target == null && !targetPaths.every((route) => covers(sources.flat(), route, graph))) return false
   // Available sources must cover every target path and never overlap on the same path.
   for (const [index, routes] of sources.entries()) {
     for (const other of sources.slice(index + 1)) {
@@ -488,7 +487,7 @@ function validateGraph(
         diagnostics.push(
           graphDiagnostic(
             'graph.source-unavailable',
-            'Input sources must provide exactly one value from completed ancestors on every execution path.',
+            'Input sources must reference execution ancestors, respect pending Wait decisions, and never provide multiple values on the same path.',
             `${nodePath}/inputs/${handle}`,
           ),
         )
