@@ -321,14 +321,14 @@ export const IconPicker = ({
           }}
           className="min-w-0 flex-1"
         >
-          <TabsList variant="flat" className="w-full p-0.5 group-data-[orientation=horizontal]/tabs:h-6">
+          <TabsList variant="flat" className="w-full rounded-[6px] p-0.5 group-data-[orientation=horizontal]/tabs:h-6">
             {emoji && (
-              <TabsTrigger className="text-[11px]" value="twemoji">
+              <TabsTrigger className="text-[11px] group-data-[variant=flat]/tabs-list:rounded-[4px]" value="twemoji">
                 {t('emoji')}
               </TabsTrigger>
             )}
             {carbon && (
-              <TabsTrigger className="text-[11px]" value="carbon">
+              <TabsTrigger className="text-[11px] group-data-[variant=flat]/tabs-list:rounded-[4px]" value="carbon">
                 {t('carbon')}
               </TabsTrigger>
             )}
