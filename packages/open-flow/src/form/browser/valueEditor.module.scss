@@ -558,15 +558,25 @@
       > .header
       > :is(.toggleControl, .leadingControl:not(:empty))
   )::before,
-  &:has(> .collection > [data-array-field]:first-child > .root > .header > :is(.toggleControl, .leadingControl:not(:empty), .arrayIndex))::before {
+  &:has(
+    > .collection
+      > [data-array-fields]
+      > [data-array-field]:first-child
+      > [data-array-field-content]
+      > .root
+      > .header
+      > :is(.toggleControl, .leadingControl:not(:empty), .arrayIndex)
+  )::before {
     width: 6px;
   }
   > .collection {
     container-type: normal;
   }
   > .collection,
-  > .collection > [data-array-field],
-  > .collection > [data-array-field] > .root,
+  > .collection > [data-array-fields],
+  > .collection > [data-array-fields] > [data-array-field],
+  > .collection > [data-array-fields] > [data-array-field] > [data-array-field-content],
+  > .collection > [data-array-fields] > [data-array-field] > [data-array-field-content] > .root,
   > .collection > [data-object-fields],
   > .collection > [data-object-fields] > [data-object-field],
   > .collection > [data-object-fields] > [data-object-field] > [data-object-field-content],
@@ -583,7 +593,8 @@
   > .collection > .collectionActions {
     grid-template-columns: subgrid;
   }
-  > .collection > [data-object-fields]:empty {
+  > .collection > [data-object-fields]:empty,
+  > .collection > [data-array-fields]:empty {
     display: none;
   }
   .root[data-nested-field] {
@@ -599,5 +610,30 @@
   .root[data-object-child] > .options {
     grid-column: nullable / end;
     justify-content: space-around;
+  }
+}
+
+.booleanControl {
+  position: relative;
+  > [data-field-control] {
+    width: 100%;
+    justify-content: flex-start;
+    padding-right: 44px;
+  }
+  > .booleanIndicator {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    > [data-slot='switch-thumb'] {
+      background: light-dark(color-mix(in srgb, var(--ui-foreground) 2%, var(--ui-popover)), var(--ui-primary-foreground));
+      &[data-unchecked] {
+        background: light-dark(
+          color-mix(in srgb, var(--ui-foreground) 2%, var(--ui-popover)),
+          color-mix(in srgb, var(--ui-background) 6%, var(--ui-foreground))
+        );
+      }
+    }
   }
 }

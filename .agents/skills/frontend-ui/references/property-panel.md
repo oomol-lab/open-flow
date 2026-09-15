@@ -75,12 +75,14 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 - Verify default, hover, open, and focus states. A generic placeholder, hover, or expanded utility
   must not override the danger foreground or remove its tint. Check actual computed colors when
   multiple utility classes or ancestor selectors compete.
-- Type, Boolean, Select, and Multi-select triggers share the dropdown chevron implementation,
+- Type, Select, and Multi-select triggers share the dropdown chevron implementation,
   dimensions, stroke, and trailing inset. Verify rendered dimensions: Iconify's em-based sizing can
   differ from SVG sizing despite apparently equivalent size classes.
 - Field-table type selectors show a 16px type icon and the shared chevron in a 56px column, with a
   localized type-name tooltip. Menus and secondary field settings retain the icon and full name.
   Null uses `i-lucide-light:circle-dashed`; the shared editor component icon map owns all type icons.
+- Type-icon and static-label simplification applies only to the Type column. Controls in the Value
+  column retain their full labels and existing control appearance, including disabled states.
 - Fixed and read-only types use non-focusable type labels in a 32px column (16px icon and 8px
   padding on each side), normal muted text color, and a type-name tooltip. Table headings and
   nested rows share this column width, releasing the unused selector space. They have no visible control border,
@@ -100,7 +102,8 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
   its expand and collapse behavior remains identifiable in both states.
   Neither invisible layout space nor an empty-looking input satisfies this contract.
 - Arrays keep their shared item-type selector in the parent value region rather than substituting
-  the object-style preview for it.
+  the object-style preview for it. This selector shows the full type name without an icon and
+  retains its control border and dropdown arrow. Non-editable item types use the disabled selector.
 - Manually expanding JSON or Multiline focuses its editor. Initial rendering does not steal focus.
   Handle lazy CodeMirror initialization and its textarea fallback, repeated expansion, and disabled
   fields. Use the shared minimal CodeMirror editor with no line numbers or active-line decoration;
@@ -128,8 +131,12 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
   receives keyboard focus. Focusing the editor alone does not reveal them. Keep hidden buttons in
   the natural Tab order and preserve pointer clicks when focus moves. Reserve space for existing date,
   color, or selection affordances, and keep action order consistent with keyboard order.
-- Boolean, Select, and Multi-select menus omit Clear. Value rows use the shared inline clear x
+- Select and Multi-select menus omit Clear. Value rows use the shared inline clear x
   with hover and keyboard focus visibility; clearing produces undefined.
+- Boolean uses a full-frame toggle with True/False on the left and a small Switch on the right.
+  The shared clear x sits before the Switch and keeps its existing visibility and unset semantics.
+  Clicking the frame or using Space/Enter toggles the value; clicking clear only clears.
+  Unset retains its selection prompt and clicking sets true.
 - Boolean and Select use "Select a value" when unset; Multi-select uses "Select values". These
   prompts have danger styling. An explicitly empty multi-selection remains distinct from unset.
 - Missing choice definitions show a danger "Edit options…" entry point. Choice editing shares the
@@ -141,6 +148,9 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 - Arrays choose the common item type in the parent row. Child rows show a zero-based index and the
   value, with no repeated per-item type selector. Reuse existing schema/value rules for add, remove,
   conversion, nested definitions, and constraints.
+- During sorting, editable array items replace their indices with drag handles. Dragging or the
+  up/down arrow keys moves the complete value to its new index. Item editor state follows the moved
+  item; leaving sorting restores indices. Fixed item schemas do not prevent sorting editable values.
 - Node settings reuse the panel's current field controls, typography, radius, and border/surface
   rules. Do not retain the older 22px borderless gray control style alongside the value table.
 - Node settings keep their section title and always show their contents, without a disclosure control.

@@ -23,6 +23,7 @@ import {
 } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { LlmInputEditor, supportsLlmInput } from './llmInputEditor.tsx'
 import { useInputSourceQuery } from './useInputSourceQuery.ts'
 
@@ -134,22 +135,28 @@ export function NodeInputValue({
           if (open && variables.enabled) variables.onOpen()
         }}
       >
-        <DropdownMenuTrigger
-          render={
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="aria-pressed:bg-[var(--ui-control-hover-background,var(--ui-muted))] aria-pressed:text-foreground"
-              aria-label={`${definition.handle} ${t('inspector.sources.title')}`}
-              aria-pressed={sourceKind !== 'literal'}
-              disabled={disabled}
-              title={t('inspector.sources.title')}
-            >
-              <i aria-hidden="true" className="i-lucide-light:link" />
-            </Button>
-          }
-        />
+        <Tooltip disabled={sourceOpen}>
+          <TooltipTrigger
+            render={
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    className="aria-pressed:bg-[var(--ui-control-hover-background,var(--ui-muted))] aria-pressed:text-foreground"
+                    aria-label={`${definition.handle} ${t('inspector.sources.title')}`}
+                    aria-pressed={sourceKind !== 'literal'}
+                    disabled={disabled}
+                  >
+                    <i aria-hidden="true" className="i-lucide-light:link" />
+                  </Button>
+                }
+              />
+            }
+          />
+          <TooltipContent container={sourcePortal}>{t('inspector.sources.title')}</TooltipContent>
+        </Tooltip>
         <DropdownMenuContent
           align="start"
           sideOffset={6}

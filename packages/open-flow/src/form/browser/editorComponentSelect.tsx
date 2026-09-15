@@ -16,6 +16,7 @@ export function EditorComponentSelect({
   disabled,
   readOnly,
   compact = true,
+  showIcon = true,
   onChange,
 }: {
   schema: unknown
@@ -24,6 +25,7 @@ export function EditorComponentSelect({
   disabled?: boolean
   readOnly?: boolean
   compact?: boolean
+  showIcon?: boolean
   onChange: (schema: Record<string, unknown>) => void
 }) {
   const t = useTranslate()
@@ -36,7 +38,7 @@ export function EditorComponentSelect({
         id={id}
         label={label}
         accessibleLabel={`${t('valueEditor.type', { name })}: ${label}`}
-        icon={<EditorComponentIcon component={selectedComponent} />}
+        icon={showIcon && <EditorComponentIcon component={selectedComponent} />}
         compact={compact}
       />
     )
@@ -59,7 +61,7 @@ export function EditorComponentSelect({
             render={<SelectTrigger id={id} size="field" aria-label={`${t('valueEditor.type', { name })}: ${label}`} className={fieldSelectTriggerClass} />}
           >
             <SelectValue>
-              <EditorComponentIcon component={selectedComponent} />
+              {showIcon && <EditorComponentIcon component={selectedComponent} />}
               <span className={compact ? 'sr-only' : undefined}>{label}</span>
             </SelectValue>
           </TooltipTrigger>
@@ -72,7 +74,7 @@ export function EditorComponentSelect({
               <SelectGroup aria-label={t(`valueEditor.componentGroups.${group}`)} className="p-0">
                 {components.map((component) => (
                   <SelectItem key={component} value={component} className={selectionMenuRowClass}>
-                    <EditorComponentIcon component={component} />
+                    {showIcon && <EditorComponentIcon component={component} />}
                     {t(`valueEditor.components.${component}`)}
                   </SelectItem>
                 ))}
