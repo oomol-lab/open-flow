@@ -9,6 +9,7 @@ import type { DesignerEdge, DesignerNode, DesignerGraph, Point } from '../worksp
 import type { Notice } from './workbenchNotice.ts'
 import type { WorkspaceBusy } from './workspaceModel.ts'
 
+import { dequal } from 'dequal'
 import { compute, derive, val } from 'value-enhancer'
 import { randomId } from '../../../../control/common/random.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
@@ -37,6 +38,7 @@ export interface Workbench$ {
   readonly designerNodeById: ReadonlyVal<ReadonlyMap<string, DesignerNode>>
   readonly notice: ReadonlyVal<Notice | undefined>
   readonly runEventNodes: ReadonlyVal<ReadonlyMap<number, string>>
+  readonly sourceNodeIcons: ReadonlyVal<Readonly<Record<string, string | undefined>>>
   readonly selectedDesignerNode: ReadonlyVal<DesignerNode | undefined>
   readonly variableNames: ReadonlyVal<readonly string[]>
   readonly variableNamesLoaded: ReadonlyVal<boolean>
@@ -202,6 +204,9 @@ export class WorkbenchStore {
       diagnostics,
       designer,
       designerNodeById,
+      sourceNodeIcons: derive(designer, (graph) => Object.fromEntries(graph.nodes.flatMap((node) => ('icon' in node ? [[node.id, node.icon] as const] : []))), {
+        equal: dequal,
+      }),
       notice: this.#notice,
       runEventNodes: compute((get) =>
         indexRunEventNodes(get(this.workspace.$.draft), get(this.workspace.$.target), get(this.runs.$.run), get(this.runs.$.events), get(designerNodeById)),

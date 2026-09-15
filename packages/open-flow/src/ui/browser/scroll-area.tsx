@@ -29,6 +29,11 @@ const options: PartialOptions = {
   overflow: { x: 'hidden' },
 }
 
+const alwaysVisibleOptions: PartialOptions = {
+  ...options,
+  scrollbars: { ...options.scrollbars, autoHide: 'never' },
+}
+
 export const ScrollArea: React.ForwardRefExoticComponent<ScrollAreaProps & React.RefAttributes<ScrollAreaRef>> = forwardRef<ScrollAreaRef, ScrollAreaProps>(
   ({ className, defer = true, autoHide = 'leave', events, style, tabIndex, onClick, children }, ref) => {
     return (
@@ -38,7 +43,7 @@ export const ScrollArea: React.ForwardRefExoticComponent<ScrollAreaProps & React
         ref={ref}
         className={clsx(styles.container, className)}
         style={style}
-        options={{ ...options, scrollbars: { ...options.scrollbars, autoHide } }}
+        options={autoHide === 'never' ? alwaysVisibleOptions : options}
         tabIndex={tabIndex}
         onClick={onClick}
       >
