@@ -22,7 +22,7 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
-import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
+import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { ToggleGroup, ToggleGroupItem } from '../../../../ui/browser/toggle-group.tsx'
@@ -80,7 +80,6 @@ function codeStatusLabel(status: ModuleEditorStatus, t: TFunction): string {
 }
 
 function inputUpstreamSources({
-  inputSources,
   revision,
   sourceNodeIcons,
   target,
@@ -89,12 +88,9 @@ function inputUpstreamSources({
   handleName,
 }: Pick<Props, 'revision' | 'sourceNodeIcons' | 'target' | 'store'> & {
   readonly selection: ResolvedNode
-  readonly inputSources: WorkspaceStore['$']['inputSources']['value']
   readonly handleName: string
 }): NodeInputUpstreamSources | undefined {
   const graph = revision.graph(target)!
-  const port = Object.hasOwn(inputSources, handleName) ? inputSources[handleName] : undefined
-  if (port == null) return undefined
   const mapping = selection.node.inputs[handleName]
   const sources = mapping?.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node') : []
   return {
@@ -103,14 +99,17 @@ function inputUpstreamSources({
       nodeId: source.nodeId,
       nodeName: graph.nodes[source.nodeId]?.name ?? source.nodeId,
       output: source.output,
-      valid: port.outputs[source.nodeId]?.includes(source.output) === true,
+      valid: undefined,
     })),
-    groups: Object.entries(port.outputs).map(([nodeId, outputs]) => ({
-      icon: sourceNodeIcons?.[nodeId],
-      nodeId,
-      nodeName: graph.nodes[nodeId]?.name ?? nodeId,
-      outputs,
-    })),
+    query: revision.inputSource(target, selection.id, handleName),
+    groups: [],
+    describeGroups: (candidates) =>
+      Object.entries(candidates).map(([nodeId, outputs]) => ({
+        icon: sourceNodeIcons?.[nodeId],
+        nodeId,
+        nodeName: graph.nodes[nodeId]?.name ?? nodeId,
+        outputs,
+      })),
     onChange: (source) => {
       void store.setInputSource(selection.id, handleName, source)
     },
@@ -765,7 +764,6 @@ export function NodeInspector({
 }: Props): ReactElement {
   const t = useTranslate()
   const content = useRef<HTMLDivElement>(null)
-  const inputSources = useVal(store.$.inputSources)
   const task = selection?.kind == 'task' ? selection.definition : undefined
   const isAgent = task != null && 'executor' in task && task.executor.kind == 'agent'
   const isLlm = task != null && 'executor' in task && task.executor.kind == 'llm'
@@ -798,7 +796,7 @@ export function NodeInspector({
   }, [focus, selection?.id, selection?.kind, taskSection])
 
   return (
-    <ScrollArea className="inspector-scroll" autoHide="never" tabIndex={-1}>
+    <NativeScrollArea className="inspector-scroll" tabIndex={-1}>
       <div className="inspector-content" ref={content}>
         {selection?.kind == 'trigger' && !(selection.trigger.kind == 'integration' && selection.trigger.definition.key == 'feishu_app_bot.on_event') && (
           <TriggerConnection
@@ -935,7 +933,7 @@ export function NodeInspector({
                       }
                     : undefined
                 }
-                renderSource={(handle) => inputUpstreamSources({ inputSources, revision, sourceNodeIcons, target, selection, store, handleName: handle })}
+                renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle })}
                 variables={variables}
                 disabled={disabled}
                 onValue={(handle, value) => {
@@ -981,7 +979,7 @@ export function NodeInspector({
                       onVariable={(handle, name) => {
                         void store.setInputVariable(selection.id, handle, name)
                       }}
-                      renderSource={(handle) => inputUpstreamSources({ inputSources, revision, sourceNodeIcons, target, selection, store, handleName: handle })}
+                      renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle })}
                     />
                   </section>
                 )}
@@ -1078,6 +1076,6 @@ export function NodeInspector({
           </>
         )}
       </div>
-    </ScrollArea>
+    </NativeScrollArea>
   )
 }

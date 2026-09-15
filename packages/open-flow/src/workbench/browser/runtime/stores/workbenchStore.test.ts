@@ -33,6 +33,7 @@ describe('WorkbenchStore Variables', () => {
 describe('WorkbenchStore diagnostics', () => {
   it('includes missing Connector connections without changing the deterministic Flow check', async () => {
     let providerIcon = 'https://example.com/amap.svg'
+    const actionReady = Promise.withResolvers<void>()
     const flow = {
       createdAt: timestamp,
       draftRevisionId: 'revision-1',
@@ -115,6 +116,7 @@ describe('WorkbenchStore diagnostics', () => {
       if (path.startsWith('/v1/connector/proxy/providers?'))
         return Response.json({ success: true, data: [{ service: 'amap', displayName: 'AMap', authTypes: ['api_key'], iconUrl: providerIcon }] })
       if (path == `/v1/connector/proxy/actions?flowId=${flow.flowId}&service=amap&locale=en`) {
+        await actionReady.promise
         return Response.json({
           data: [
             {
@@ -159,6 +161,18 @@ describe('WorkbenchStore diagnostics', () => {
 
     try {
       await store.start(flow.flowId)
+      store.workspace.selectNodes(['connector'])
+      expect(store.connectors.$.selectedAction.value).toBeUndefined()
+      expect(store.connectors.$.selectedConnection.value).toBeUndefined()
+      store.workspace.selectNodes(['connected'])
+      expect(store.connectors.$.selectedConnection.value).toBeUndefined()
+      expect(store.workspace.$.selection.value?.id).toBe('connected')
+      actionReady.resolve()
+      await store.connectors.refresh()
+      await vi.waitFor(() => expect(store.connectors.$.selectedConnection.value?.connectionId).toBe('connection-1'))
+      store.workspace.selectNodes(['connector'])
+      expect(store.connectors.$.selectedAction.value?.defaultConnection?.connectionId).toBe('connection-1')
+      expect(store.connectors.$.selectedConnection.value).toBeUndefined()
       await vi.waitFor(() => expect(store.$.diagnostics.value?.valid).toBe(false))
       await vi.waitFor(() => expect(requests).toContain(`/v1/connector/proxy/apps?flowId=${flow.flowId}`))
 

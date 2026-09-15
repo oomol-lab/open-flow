@@ -21,6 +21,7 @@ const inputs: (Group | InputPort)[] = [
   { group: 'Request' },
   { ...port('trackings', 'array'), jsonSchema: { type: 'array', items: { type: 'string' } }, description: '要注册的追踪号。' },
   port('message'),
+  port('missing_source'),
   port('language'),
   { group: 'Options' },
   {
@@ -54,6 +55,7 @@ const portsContent: RevisionContent = {
           task: { name: 'Summarize', moduleId: 'module', inputs, outputs },
           inputs: {
             message: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'text' }] },
+            missing_source: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'removed' }] },
             language: { kind: 'value', value: 'English' },
             instructions_for_the_summary: { kind: 'value', value: 'Use bullet points. Include issue identifiers and next steps.' },
           },
@@ -233,6 +235,7 @@ export const inspectorPortsStory: FrontendStory = {
   id: 'inspector-ports',
   title: 'Ports & sources',
   standalone: true,
-  description: 'Grouped surfaces, inline sources and field settings. Compare nested values and empty states below; reload checks saved values and ordering.',
+  description:
+    'Saved sources render before their checks. Compare valid and missing bindings; open each source menu to load compatible outputs. Reload checks saved values and ordering.',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
 }

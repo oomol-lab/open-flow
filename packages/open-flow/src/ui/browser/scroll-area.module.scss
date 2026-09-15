@@ -14,3 +14,11 @@
   --os-handle-bg-hover: light-dark(rgb(0 0 0 / 38%), rgb(255 255 255 / 42%));
   --os-handle-bg-active: light-dark(rgb(0 0 0 / 50%), rgb(255 255 255 / 54%));
 }
+
+.native {
+  min-height: 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: light-dark(rgb(0 0 0 / 24%), rgb(255 255 255 / 28%)) transparent;
+}

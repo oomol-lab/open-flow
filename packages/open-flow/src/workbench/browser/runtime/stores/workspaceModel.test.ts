@@ -2,11 +2,7 @@ import type { Draft } from '../api.ts'
 
 import { describe, expect, it, vi } from 'vitest'
 import * as graph from '../../../../flow/common/graph.ts'
-import { WorkbenchClient } from '../api.ts'
-import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
-import { FlowCatalog } from './flowCatalog.ts'
-import { WorkspaceModel } from './workspaceModel.ts'
 
 function draft(): Draft {
   return {
@@ -45,129 +41,109 @@ function draft(): Draft {
   }
 }
 
-function setup() {
-  const i18n = createI18n('en')
-  const catalog = new FlowCatalog(new WorkbenchClient(vi.fn()), vi.fn(), i18n)
-  const model = new WorkspaceModel(i18n, catalog)
-  return {
-    model,
-    dispose() {
-      model.dispose()
-      catalog.dispose()
-      i18n.dispose()
-    },
-  }
-}
-
-describe('Inspector input source derivation', () => {
-  it('computes all fields once and skips unrelated workspace updates', () => {
-    const session = setup()
-    const source = draft()
-    const calculate = vi.spyOn(revisionView(source), 'inputSources')
-    const notify = vi.fn()
-    const unsubscribe = session.model.$.inputSources.subscribe(notify)
-    try {
-      session.model.set({ draft: source, target: { kind: 'flow' }, selectedNodeIds: ['task'] })
-      for (let index = 0; index < 16; index++) expect(session.model.$.inputSources.value[`input${index}`]?.outputs).toEqual({ source: ['text'] })
-      expect(calculate).toHaveBeenCalledTimes(1)
-      notify.mockClear()
-      session.model.set({ busy: 'designer' })
-      session.model.set({ checkLoading: true, nodeFocus: { nodeId: 'task', requestId: 1 } })
-      expect(session.model.$.inputSources.value.input0?.outputs).toEqual({ source: ['text'] })
-      expect(calculate).toHaveBeenCalledTimes(1)
-      expect(notify).not.toHaveBeenCalled()
-    } finally {
-      unsubscribe()
-      session.dispose()
-    }
-  })
-
-  it('reuses compatibility calculations when returning to a node in the same revision', () => {
-    const session = setup()
-    const source = draft()
+describe('Per-field input sources', () => {
+  it('does no compatibility work until requested and caches each field independently', () => {
     const calculate = vi.spyOn(graph, 'availableOutputs')
+    const check = vi.spyOn(graph, 'inputSourceAvailable')
     try {
-      session.model.set({ draft: source, target: { kind: 'flow' }, selectedNodeIds: ['task'] })
-      expect(session.model.$.inputSources.value.input0?.outputs).toEqual({ source: ['text'] })
-      expect(calculate).toHaveBeenCalledTimes(16)
-      session.model.set({ selectedNodeIds: ['other'] })
-      expect(session.model.$.inputSources.value.input0?.outputs).toEqual({})
-      expect(calculate).toHaveBeenCalledTimes(32)
-      for (let index = 0; index < 3; index++) {
-        session.model.set({ selectedNodeIds: ['task'] })
-        expect(session.model.$.inputSources.value.input0?.outputs).toEqual({ source: ['text'] })
-        session.model.set({ selectedNodeIds: ['other'] })
-        expect(session.model.$.inputSources.value.input0?.outputs).toEqual({})
-      }
-      expect(calculate).toHaveBeenCalledTimes(32)
+      const view = revisionView(draft())
+      const query = view.inputSource({ kind: 'flow' }, 'task', 'input0')
+      expect(calculate).not.toHaveBeenCalled()
+      expect(check).not.toHaveBeenCalled()
+      expect(query.check()).toEqual([])
+      expect(check).not.toHaveBeenCalled()
+      expect(query.candidates()).toEqual({ source: ['text'] })
+      expect(calculate).toHaveBeenCalledTimes(1)
+      expect(view.inputSource({ kind: 'flow' }, 'task', 'input0')).toBe(query)
+      expect(query.candidates()).toBe(query.candidates())
+      expect(calculate).toHaveBeenCalledTimes(1)
+      view.inputSource({ kind: 'flow' }, 'task', 'input1').candidates()
+      expect(calculate).toHaveBeenCalledTimes(2)
     } finally {
       calculate.mockRestore()
-      session.dispose()
+      check.mockRestore()
     }
   })
 
-  it('retains equal results across revisions and invalidates changed edges and schemas', () => {
-    const session = setup()
-    const source = draft()
-    const unsubscribe = session.model.$.inputSources.subscribe(() => {})
+  it('checks only saved bindings, including missing and incompatible ports', () => {
+    const base = draft()
+    const source: Draft = {
+      ...base,
+      content: {
+        ...base.content,
+        document: {
+          ...base.content.document,
+          graph: {
+            ...base.content.document.graph,
+            nodes: {
+              ...base.content.document.graph.nodes,
+              task: {
+                kind: 'task',
+                taskId: 'task',
+                inputs: {
+                  input0: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'text' }] },
+                  input1: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'missing' }] },
+                },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    const calculate = vi.spyOn(graph, 'availableOutputs')
+    const check = vi.spyOn(graph, 'inputSourceAvailable')
     try {
-      session.model.set({ draft: source, target: { kind: 'flow' }, selectedNodeIds: ['task'] })
-      const before = session.model.$.inputSources.value
-      session.model.set({ draft: { ...source, revisionId: 'r2' } })
-      expect(session.model.$.inputSources.value).toBe(before)
-      const disconnected: Draft = {
-        ...source,
-        content: { ...source.content, document: { ...source.content.document, graph: { ...source.content.document.graph, edges: [] } } },
-      }
-      session.model.set({ draft: disconnected })
-      expect(session.model.$.inputSources.value.input0?.outputs).toEqual({})
-      const task = source.content.document.tasks.task!
+      const view = revisionView(source)
+      expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual([true])
+      expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual([true])
+      expect(check).toHaveBeenCalledTimes(1)
+      expect(view.inputSource({ kind: 'flow' }, 'task', 'input1').check()).toEqual([false])
+      expect(calculate).not.toHaveBeenCalled()
       const changed: Draft = {
         ...source,
         content: {
           ...source.content,
           document: {
             ...source.content.document,
-            tasks: { task: { ...task, inputs: [{ handle: 'number', jsonSchema: { type: 'number' }, nullable: true }] } },
+            tasks: {
+              ...source.content.document.tasks,
+              task: { ...source.content.document.tasks.task!, inputs: [{ handle: 'input0', jsonSchema: { type: 'number' }, nullable: true }] },
+            },
           },
         },
       }
-      session.model.set({ draft: changed })
-      expect(session.model.$.inputSources.value).toEqual({ number: { handle: 'number', outputs: {} } })
+
+      expect(revisionView(changed).inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual([false])
     } finally {
-      unsubscribe()
-      session.dispose()
+      calculate.mockRestore()
+      check.mockRestore()
     }
   })
 
-  it('keeps node selection and graph scope distinct and clears absent selections', () => {
-    const session = setup()
-    const source = draft()
-    const scoped: Draft = {
-      ...source,
+  it('isolates node, graph and revision results', () => {
+    const base = draft()
+    const source: Draft = {
+      ...base,
       content: {
-        ...source.content,
+        ...base.content,
         document: {
-          ...source.content.document,
-          subflows: { nested: { name: 'Nested', inputs: [], outputs: [], graph: { ...source.content.document.graph, edges: [] } } },
+          ...base.content.document,
+          subflows: {
+            nested: { name: 'Nested', inputs: [], outputs: [], graph: { ...base.content.document.graph, edges: [] } },
+          },
         },
       },
     }
-    try {
-      session.model.set({ draft: scoped, target: { kind: 'flow' }, selectedNodeIds: ['task'] })
-      expect(session.model.$.inputSources.value.input0?.outputs).toEqual({ source: ['text'] })
-      session.model.set({ selectedNodeIds: ['other'] })
-      expect(session.model.$.inputSources.value.input0?.outputs).toEqual({})
-      session.model.set({ target: { kind: 'subflow', id: 'nested' }, selectedNodeIds: ['task'] })
-      expect(session.model.$.inputSources.value.input0?.outputs).toEqual({})
-      session.model.set({ selectedNodeIds: [] })
-      expect(session.model.$.inputSources.value).toEqual({})
-      session.model.set({ selectedNodeIds: ['task', 'other'] })
-      expect(session.model.$.inputSources.value).toEqual({})
-      session.model.set({ selectedNodeIds: ['source'] })
-      expect(session.model.$.inputSources.value).toEqual({})
-    } finally {
-      session.dispose()
+
+    const view = revisionView(source)
+    expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({ source: ['text'] })
+    expect(view.inputSource({ kind: 'flow' }, 'other', 'input0').candidates()).toEqual({})
+    expect(view.inputSource({ kind: 'subflow', id: 'nested' }, 'task', 'input0').candidates()).toEqual({})
+    const changed: Draft = {
+      ...source,
+      content: { ...source.content, document: { ...source.content.document, graph: { ...source.content.document.graph, edges: [] } } },
     }
+    expect(revisionView(changed).inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({})
   })
 })

@@ -237,6 +237,10 @@
     },
     "title": "Inspector",
     "sources": {
+      "loading": "Loading sources…",
+      "checking": "Checking source…",
+      "loadFailed": "Could not load sources. Reopen the menu to retry.",
+      "checkFailed": "Could not check this source.",
       "title": "Input sources",
       "local": "Local value / variable",
       "unavailable": "This source is not guaranteed to complete before this node, or its type does not match."

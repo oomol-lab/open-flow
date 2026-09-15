@@ -40,7 +40,7 @@ function waitDefinition(node: unknown, revision: unknown, saveWait: ReturnType<t
     disabled: false,
     revision: view as never,
     selection: { id: 'wait', kind: 'wait', node } as never,
-    store: { $: { flowId: { value: 'flow' }, inputSources: { value: {} } }, saveWait } as never,
+    store: { $: { flowId: { value: 'flow' } }, saveWait } as never,
     target: { kind: 'flow' },
     theme: 'light',
     triggerAuthorizationPending: false,
@@ -102,7 +102,6 @@ describe('Node timeout settings', () => {
     const node = { inputs: {}, kind: 'subflow', name: 'Review', subflowId: 'review', timeoutMs: 100 }
     const revision = {
       graph: () => ({ nodes: { current: node, other: { inputs: {}, kind: 'value', name: 'Review', values: [] } } }),
-      inputSources: () => [],
     }
     const element = NodeInspector({
       variables: { enabled: true, names: [], loaded: false, loading: false, onOpen: vi.fn() },
@@ -113,7 +112,7 @@ describe('Node timeout settings', () => {
       disabled: false,
       revision: revision as never,
       selection: { id: 'current', kind: 'subflow', node, definition: { inputs: [], outputs: [] } } as never,
-      store: { $: { flowId: { value: 'flow' }, inputSources: { value: {} } }, saveNodeSettings } as never,
+      store: { $: { flowId: { value: 'flow' } }, saveNodeSettings } as never,
       target: { kind: 'flow' },
       theme: 'light',
       triggerAuthorizationPending: false,
@@ -156,13 +155,11 @@ describe('Node input ownership', () => {
       revision: {
         binding: () => ({ kind: 'variable', target: 'API_TOKEN' }),
         graph: () => ({ nodes: { upstream: { name: 'Source' } } }),
-        inputSources: () => {
-          throw new Error('Input sources must come from the workspace derivation')
-        },
+        inputSource: () => ({ check: vi.fn(), candidates: vi.fn() }),
       } as never,
       selection: { id: 'condition', kind, node: { ...node, kind, actions: ['continue'] }, definition: { inputs: [node.input] } } as never,
       store: {
-        $: { flowId: { value: 'flow' }, inputSources: { value: { message: { handle: 'message', outputs: { upstream: ['text'] } } } } },
+        $: { flowId: { value: 'flow' } },
         setInputSource,
         setInputValue,
         setInputVariable,
@@ -176,13 +173,18 @@ describe('Node input ownership', () => {
     const input = find(element, (item) => typeof item.type === 'function' && item.type.name === 'NodeInputs')
     expect(input).toBeDefined()
     const props = input!.props as {
-      renderSource: (handle: string) => { groups: unknown[]; onChange: (source: { nodeId: string; output: string }) => void }
+      renderSource: (handle: string) => {
+        groups: unknown[]
+        describeGroups: (outputs: Record<string, string[]>) => unknown[]
+        onChange: (source: { nodeId: string; output: string }) => void
+      }
       entries: { variableName: string; connected: boolean }[]
       onValue: (handle: string, value: unknown) => void
       onVariable: (handle: string, name: string | undefined) => void
     }
     const upstream = props.renderSource('message')
-    expect(upstream.groups).toEqual([{ icon: undefined, nodeId: 'upstream', nodeName: 'Source', outputs: ['text'] }])
+    expect(upstream.groups).toEqual([])
+    expect(upstream.describeGroups({ upstream: ['text'] })).toEqual([{ icon: undefined, nodeId: 'upstream', nodeName: 'Source', outputs: ['text'] }])
     upstream.onChange({ nodeId: 'upstream', output: 'text' })
     expect(setInputSource).toHaveBeenCalledWith('condition', 'message', { nodeId: 'upstream', output: 'text' })
     expect(props.entries[0]!.variableName).toBe('API_TOKEN')

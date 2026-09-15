@@ -52,3 +52,7 @@ export const ScrollArea: React.ForwardRefExoticComponent<ScrollAreaProps & React
     )
   },
 )
+
+export const NativeScrollArea = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
+  <div {...props} ref={ref} className={clsx(styles.container, styles.native, className)} />
+))

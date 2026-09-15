@@ -237,6 +237,10 @@
     },
     "title": "Inspecteur",
     "sources": {
+      "loading": "Chargement des sources…",
+      "checking": "Vérification de la source…",
+      "loadFailed": "Impossible de charger les sources. Rouvrez le menu pour réessayer.",
+      "checkFailed": "Impossible de vérifier cette source.",
       "title": "Sources des entrées",
       "local": "Valeur locale / variable",
       "unavailable": "Cette source ne termine pas nécessairement avant ce nœud, ou son type est incompatible."

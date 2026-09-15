@@ -105,10 +105,6 @@
     min-height: 0;
   }
 
-  .inspector-scroll [data-overlayscrollbars-viewport] {
-    overscroll-behavior: contain;
-  }
-
   .inspector-port-section,
   .inspector-values-section {
     border-bottom: 1px solid var(--ui-border);
@@ -160,9 +156,7 @@
     padding: 0 8px;
   }
 
-  .inspector-scroll > .os-scrollbar-vertical,
-  .block-library-list .os-scrollbar-vertical,
-  .code-action-panel .os-scrollbar-vertical {
+  .block-library-list .os-scrollbar-vertical {
     --os-size: 10px;
     --os-padding-perpendicular: 2px;
     --os-padding-axis: 4px;
@@ -770,10 +764,6 @@
     padding: 4px 0;
     border-bottom: 1px solid var(--ui-border);
     font-size: 12px;
-  }
-
-  .code-action-panel [data-overlayscrollbars-viewport] {
-    overscroll-behavior: contain;
   }
 
   .code-action-toolbar,

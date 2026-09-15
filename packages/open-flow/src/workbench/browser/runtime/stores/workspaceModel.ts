@@ -7,7 +7,6 @@ import type { DiagnosticFocus, DiagnosticItem } from '../editor/diagnostics.ts'
 import type { ResolvedSelection, RevisionView } from '../revisionView.ts'
 import type { FlowCatalog } from './flowCatalog.ts'
 
-import { dequal } from 'dequal/lite'
 import { compute, derive, val } from 'value-enhancer'
 import { deriveAddNodeOptions } from '../editor/addNodeOptions.ts'
 import { diagnosticItems, deriveInspectorDiagnostics } from '../editor/diagnostics.ts'
@@ -75,7 +74,6 @@ export interface Workspace$ {
   readonly flowRefreshing: ReadonlyVal<boolean>
   readonly flowTotal: ReadonlyVal<number | undefined>
   readonly flows: ReadonlyVal<readonly Flow[]>
-  readonly inputSources: ReadonlyVal<Readonly<Record<string, ReturnType<RevisionView['inputSources']>[number]>>>
   readonly inspectorDiagnostics: ReadonlyVal<readonly Diagnostic[]>
   readonly live: ReadonlyVal<Live | undefined>
   readonly moduleEditor: ReadonlyVal<ModuleEditor | undefined>
@@ -197,22 +195,6 @@ export class WorkspaceModel {
       flowRefreshing: flows.$.refreshing,
       flowTotal: flows.$.total,
       flows: flows.$.flows,
-      inputSources: compute(
-        (get) => {
-          const currentSelection = get(selection)
-          const { revision: currentRevision, target: currentTarget } = get(this.#revisionContext)
-          if (
-            currentSelection == null ||
-            currentSelection.kind === 'trigger' ||
-            currentSelection.kind === 'value' ||
-            currentRevision == null ||
-            currentTarget == null
-          )
-            return {}
-          return Object.fromEntries(currentRevision.inputSources(currentTarget, currentSelection.id).map((port) => [port.handle, port]))
-        },
-        { equal: dequal },
-      ),
       inspectorDiagnostics: derive(this.#state, (state) =>
         deriveInspectorDiagnostics(state.draft == null ? undefined : revisionView(state.draft), state.target, state.diagnostics, selection.value),
       ),

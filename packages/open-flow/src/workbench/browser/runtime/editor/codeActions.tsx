@@ -11,7 +11,7 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
 import { Field, FieldLabel, FieldError } from '../../../../ui/browser/field.tsx'
 import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
-import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
+import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { ToggleGroup, ToggleGroupItem } from '../../../../ui/browser/toggle-group.tsx'
 import { ActionPicker } from './actionPicker.tsx'
 
@@ -92,7 +92,7 @@ export function CodeActions({
   }
   const locked = disabled || saving
   return (
-    <ScrollArea className="code-action-panel" defer={false} tabIndex={-1}>
+    <NativeScrollArea className="code-action-panel" tabIndex={-1}>
       <section aria-label={t('inspector.actions.title')} aria-busy={saving}>
         <div className="code-action-toolbar">
           <span className="code-action-caption">
@@ -423,6 +423,6 @@ export function CodeActions({
           </FieldError>
         )}
       </section>
-    </ScrollArea>
+    </NativeScrollArea>
   )
 }

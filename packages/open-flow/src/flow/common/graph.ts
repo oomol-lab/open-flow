@@ -374,6 +374,28 @@ function mappingAvailable(graph: Graph, target: string | undefined, mapping: Inp
   return true
 }
 
+/** Check one saved binding without enumerating candidate ports. */
+export function inputSourceAvailable(
+  document: FlowDocument,
+  graph: Graph,
+  target: string,
+  handle: string,
+  source: { nodeId: string; output: string },
+): boolean {
+  const node = graph.nodes[source.nodeId]
+  const targetNode = graph.nodes[target]
+  if (node == null || targetNode == null) return false
+  const output = nodeOutputPorts(document, node)[source.output]
+  const input = nodeInputPorts(document, targetNode)[handle]
+  if (output == null || input == null) return false
+  const analysis = graphPaths(graph)
+  return (
+    analysis.ancestors.get(target)?.has(source.nodeId) === true &&
+    mappingAvailable(graph, target, { kind: 'sources', sources: [{ kind: 'node', ...source }] }, analysis) &&
+    portsAssignable(output, input)
+  )
+}
+
 export function availableOutputs(document: FlowDocument, graph: Graph, target: string, handle?: string): Readonly<Record<string, readonly string[]>> {
   const analysis = graphPaths(graph)
   return Object.fromEntries(
