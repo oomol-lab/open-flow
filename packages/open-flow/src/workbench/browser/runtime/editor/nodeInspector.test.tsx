@@ -4,6 +4,8 @@ import { Children, isValidElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { NodeInspector } from './nodeInspector.tsx'
 
+vi.mock('use-value-enhancer', () => ({ useVal: (value: { value: unknown }) => value.value }))
+
 vi.mock('react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react')>()),
   useEffect: vi.fn(),
@@ -40,7 +42,7 @@ function waitDefinition(node: unknown, revision: unknown, saveWait: ReturnType<t
     onChooseWaitNotification: vi.fn(),
     revision: view as never,
     selection: { id: 'wait', kind: 'wait', node } as never,
-    store: { $: { flowId: { value: 'flow' } }, saveWait } as never,
+    store: { $: { flowId: { value: 'flow' }, inputSources: { value: {} } }, saveWait } as never,
     target: { kind: 'flow' },
     theme: 'light',
     triggerAuthorizationPending: false,
@@ -154,7 +156,7 @@ describe('Node timeout settings', () => {
       onChooseWaitNotification: vi.fn(),
       revision: revision as never,
       selection: { id: 'current', kind: 'subflow', node, definition: { inputs: [], outputs: [] } } as never,
-      store: { $: { flowId: { value: 'flow' } }, saveNodeSettings } as never,
+      store: { $: { flowId: { value: 'flow' }, inputSources: { value: {} } }, saveNodeSettings } as never,
       target: { kind: 'flow' },
       theme: 'light',
       triggerAuthorizationPending: false,
@@ -187,7 +189,7 @@ it('renders diagnostics directly and removes them when cleared', () => {
     onChooseWaitNotification: vi.fn(),
     revision: {} as never,
     selection: undefined,
-    store: { $: { flowId: { value: 'flow' } } } as never,
+    store: { $: { flowId: { value: 'flow' }, inputSources: { value: {} } } } as never,
     target: { kind: 'flow' },
     theme: 'light',
     triggerAuthorizationPending: false,
@@ -204,6 +206,7 @@ it('renders diagnostics directly and removes them when cleared', () => {
 
 describe('Node input ownership', () => {
   it.each(['condition', 'wait', 'subflow', 'task'] as const)('resolves %s variable bindings and sends edits directly to the workspace', (kind) => {
+    const setInputSource = vi.fn()
     const setInputValue = vi.fn()
     const setInputVariable = vi.fn()
     const node = {
@@ -221,9 +224,20 @@ describe('Node input ownership', () => {
       diagnostics: [],
       disabled: false,
       onChooseWaitNotification: vi.fn(),
-      revision: { binding: () => ({ kind: 'variable', target: 'API_TOKEN' }) } as never,
+      revision: {
+        binding: () => ({ kind: 'variable', target: 'API_TOKEN' }),
+        graph: () => ({ nodes: { upstream: { name: 'Source' } } }),
+        inputSources: () => {
+          throw new Error('Input sources must come from the workspace derivation')
+        },
+      } as never,
       selection: { id: 'condition', kind, node: { ...node, kind, actions: ['continue'] }, definition: { inputs: [node.input] } } as never,
-      store: { $: { flowId: { value: 'flow' } }, setInputValue, setInputVariable } as never,
+      store: {
+        $: { flowId: { value: 'flow' }, inputSources: { value: { message: { handle: 'message', outputs: { upstream: ['text'] } } } } },
+        setInputSource,
+        setInputValue,
+        setInputVariable,
+      } as never,
       target: { kind: 'flow' },
       theme: 'light',
       triggerAuthorizationPending: false,
@@ -233,10 +247,15 @@ describe('Node input ownership', () => {
     const input = find(element, (item) => typeof item.type === 'function' && item.type.name === 'NodeInputs')
     expect(input).toBeDefined()
     const props = input!.props as {
+      renderSource: (handle: string) => { groups: unknown[]; onChange: (source: { nodeId: string; output: string }) => void }
       entries: { variableName: string; connected: boolean }[]
       onValue: (handle: string, value: unknown) => void
       onVariable: (handle: string, name: string | undefined) => void
     }
+    const upstream = props.renderSource('message')
+    expect(upstream.groups).toEqual([{ icon: undefined, nodeId: 'upstream', nodeName: 'Source', outputs: ['text'] }])
+    upstream.onChange({ nodeId: 'upstream', output: 'text' })
+    expect(setInputSource).toHaveBeenCalledWith('condition', 'message', { nodeId: 'upstream', output: 'text' })
     expect(props.entries[0]!.variableName).toBe('API_TOKEN')
     expect(props.entries[0]!.connected).toBe(false)
     props.onValue('message', null)

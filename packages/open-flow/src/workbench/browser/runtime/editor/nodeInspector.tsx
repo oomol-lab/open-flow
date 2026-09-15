@@ -108,6 +108,7 @@ function Diagnostics({ diagnostics }: { readonly diagnostics: readonly Diagnosti
 }
 
 function inputUpstreamSources({
+  inputSources,
   revision,
   sourceNodeIcons,
   target,
@@ -116,10 +117,11 @@ function inputUpstreamSources({
   handleName,
 }: Pick<Props, 'revision' | 'sourceNodeIcons' | 'target' | 'store'> & {
   readonly selection: ResolvedNode
+  readonly inputSources: WorkspaceStore['$']['inputSources']['value']
   readonly handleName: string
 }): NodeInputUpstreamSources | undefined {
   const graph = revision.graph(target)!
-  const port = revision.inputSources(target, selection.id).find(({ handle }) => handle === handleName)
+  const port = Object.hasOwn(inputSources, handleName) ? inputSources[handleName] : undefined
   if (port == null) return undefined
   const mapping = selection.node.inputs[handleName]
   const sources = mapping?.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node') : []
@@ -1027,6 +1029,7 @@ export function NodeInspector({
 }: Props): ReactElement {
   const t = useTranslate()
   const content = useRef<HTMLDivElement>(null)
+  const inputSources = useVal(store.$.inputSources)
   const task = selection?.kind == 'task' ? selection.definition : undefined
   const isAgent = task != null && 'executor' in task && task.executor.kind == 'agent'
   const isLlm = task != null && 'executor' in task && task.executor.kind == 'llm'
@@ -1059,7 +1062,7 @@ export function NodeInspector({
   }, [focus, selection?.id, selection?.kind, taskSection])
 
   return (
-    <ScrollArea className="inspector-scroll" autoHide="never" defer={false} tabIndex={-1}>
+    <ScrollArea className="inspector-scroll" autoHide="never" tabIndex={-1}>
       <div className="inspector-content" ref={content}>
         <Diagnostics key={JSON.stringify([store.$.flowId.value, target, selection?.id])} diagnostics={diagnostics} />
         {selection?.kind == 'trigger' && !(selection.trigger.kind == 'integration' && selection.trigger.definition.key == 'feishu_app_bot.on_event') && (
@@ -1197,7 +1200,7 @@ export function NodeInspector({
                       }
                     : undefined
                 }
-                renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle })}
+                renderSource={(handle) => inputUpstreamSources({ inputSources, revision, sourceNodeIcons, target, selection, store, handleName: handle })}
                 variables={variables}
                 disabled={disabled}
                 onValue={(handle, value) => {
@@ -1243,7 +1246,7 @@ export function NodeInspector({
                       onVariable={(handle, name) => {
                         void store.setInputVariable(selection.id, handle, name)
                       }}
-                      renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle })}
+                      renderSource={(handle) => inputUpstreamSources({ inputSources, revision, sourceNodeIcons, target, selection, store, handleName: handle })}
                     />
                   </section>
                 )}

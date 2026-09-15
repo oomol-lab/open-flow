@@ -1,9 +1,9 @@
-import type { ReactElement } from 'react'
+import type { ComponentProps, ReactElement } from 'react'
 import type { WorkbenchLocation, WorkbenchTheme } from './contract.ts'
 import type { AddNodeOption } from './editor/addNodeOptions.ts'
 import type { WorkbenchCanvasHandle } from './editor/workbenchCanvas.tsx'
 
-import { useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { useIgnoredNodes } from '../../../canvas/browser/useIgnoredNodes.ts'
@@ -90,6 +90,76 @@ function RunDrawerContainer({
   )
 }
 
+// Keep inspector-only data updates out of the canvas render path.
+const NodeInspectorContainer = memo(function NodeInspectorContainer({
+  store,
+  focus,
+  disabled,
+  onChooseWaitNotification,
+  revision,
+  selection,
+  target,
+  theme,
+}: Pick<ComponentProps<typeof NodeInspector>, 'focus' | 'disabled' | 'onChooseWaitNotification' | 'revision' | 'selection' | 'target' | 'theme'> & {
+  readonly store: WorkbenchStore
+}): ReactElement {
+  const variableNames = useVal(store.$.variableNames)
+  const variableNamesLoaded = useVal(store.$.variableNamesLoaded)
+  const variableNamesLoading = useVal(store.$.variableNamesLoading)
+  const inspectorDiagnostics = useVal(store.workspace.$.inspectorDiagnostics)
+  const connectorAction = useVal(store.connectors.$.selectedAction)
+  const connectorActionError = useVal(store.connectors.$.selectedActionError)
+  const connectorActionLoading = useVal(store.connectors.$.actionLoading)
+  const connectorAuthorizationPending = useVal(store.connectors.$.selectedAuthorizationPending)
+  const connectorConnection = useVal(store.connectors.$.selectedConnection)
+  const connectorConnectionError = useVal(store.connectors.$.selectedConnectionError)
+  const connectorConnectionLoading = useVal(store.connectors.$.connectionLoading)
+  const activeConnectorConnections = useVal(store.connectors.$.selectedActiveConnections)
+  const triggerAuthorizationPending = useVal(store.triggers.$.selectedAuthorizationPending)
+  const triggerConnection = useVal(store.triggers.$.selectedConnection)
+  const triggerConnectionError = useVal(store.triggers.$.selectedConnectionError)
+  const triggerConnectionLoading = useVal(store.triggers.$.connectionLoading)
+  const triggerActiveConnections = useVal(store.triggers.$.selectedActiveConnections)
+  const sourceNodeIcons = useVal(store.$.sourceNodeIcons)
+  return (
+    <NodeInspector
+      variables={{
+        enabled: store.variablesEnabled,
+        names: variableNames,
+        loaded: variableNamesLoaded,
+        loading: variableNamesLoading,
+        onOpen: () => {
+          void store.refreshVariableNames()
+        },
+      }}
+      connectorAction={connectorAction}
+      connectorActionError={connectorActionError}
+      connectorAuthorizationPending={connectorAuthorizationPending}
+      connectorConnection={connectorConnection}
+      connectorConnectionError={connectorConnectionError}
+      activeConnectorConnections={activeConnectorConnections}
+      connectors={store.connectors}
+      connectorLoading={connectorActionLoading != null || connectorConnectionLoading != null}
+      diagnostics={inspectorDiagnostics}
+      focus={focus}
+      disabled={disabled}
+      onChooseWaitNotification={onChooseWaitNotification}
+      revision={revision}
+      selection={selection}
+      sourceNodeIcons={sourceNodeIcons}
+      store={store.workspace}
+      target={target}
+      theme={theme}
+      triggerActiveConnections={triggerActiveConnections}
+      triggerAuthorizationPending={triggerAuthorizationPending}
+      triggerConnection={triggerConnection}
+      triggerConnectionError={triggerConnectionError}
+      triggerConnectionLoading={triggerConnectionLoading != null}
+      triggers={store.triggers}
+    />
+  )
+})
+
 function Editor({
   onRun,
   onRunStarted,
@@ -120,14 +190,10 @@ function Editor({
   const busy = useVal(store.$.busy)
   const history = useVal(store.workspace.history$)
   const designer = useVal(store.$.designer)
-  const variableNames = useVal(store.$.variableNames)
-  const variableNamesLoaded = useVal(store.$.variableNamesLoaded)
-  const variableNamesLoading = useVal(store.$.variableNamesLoading)
   const triggers = designer.nodes.filter((node) => node.kind == 'trigger')
   const selectedTrigger = triggers.find((node) => node.id == startId) ?? triggers[0]
   const diagnosticFocus = useVal(store.workspace.$.diagnosticFocus)
   const draft = useVal(store.workspace.$.draft)
-  const inspectorDiagnostics = useVal(store.workspace.$.inspectorDiagnostics)
   const nodeFocus = useVal(store.workspace.$.nodeFocus)
   const flowId = useVal(store.workspace.$.flowId)
   const revision = useVal(store.workspace.$.revision)
@@ -137,19 +203,6 @@ function Editor({
   const target = useVal(store.workspace.$.target)
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(`${flowId}:${target?.kind}:${target?.kind == 'subflow' ? target.id : ''}`)
   const targetName = useVal(store.workspace.$.targetName)
-  const connectorAction = useVal(store.connectors.$.selectedAction)
-  const connectorActionError = useVal(store.connectors.$.selectedActionError)
-  const connectorActionLoading = useVal(store.connectors.$.actionLoading)
-  const connectorAuthorizationPending = useVal(store.connectors.$.selectedAuthorizationPending)
-  const connectorConnection = useVal(store.connectors.$.selectedConnection)
-  const connectorConnectionError = useVal(store.connectors.$.selectedConnectionError)
-  const connectorConnectionLoading = useVal(store.connectors.$.connectionLoading)
-  const activeConnectorConnections = useVal(store.connectors.$.selectedActiveConnections)
-  const triggerAuthorizationPending = useVal(store.triggers.$.selectedAuthorizationPending)
-  const triggerConnection = useVal(store.triggers.$.selectedConnection)
-  const triggerConnectionError = useVal(store.triggers.$.selectedConnectionError)
-  const triggerConnectionLoading = useVal(store.triggers.$.connectionLoading)
-  const triggerActiveConnections = useVal(store.triggers.$.selectedActiveConnections)
   const [contextPanelMode, setContextPanelMode] = useState<ContextPanelMode>()
   const [blocksFocusRequest, setBlocksFocusRequest] = useState(0)
   const designerRef = useRef<WorkbenchCanvasHandle>(null)
@@ -205,12 +258,12 @@ function Editor({
     focusInspectorOnOpen.current = false
     setContextPanelMode('inspector')
   }
-  const openNotification = (button: HTMLButtonElement): void => {
+  const openNotification = useCallback((button: HTMLButtonElement): void => {
     opener.current = button
     focusInspectorOnOpen.current = false
     setContextPanelMode('notification')
     setBlocksFocusRequest((request) => request + 1)
-  }
+  }, [])
   const toggleInspector = (button: HTMLButtonElement): void => {
     if (contextPanelMode == 'inspector') {
       closeContextPanel(button)
@@ -425,40 +478,15 @@ function Editor({
             />
           ) : (
             revision != null && (
-              <NodeInspector
-                variables={{
-                  enabled: store.variablesEnabled,
-                  names: variableNames,
-                  loaded: variableNamesLoaded,
-                  loading: variableNamesLoading,
-                  onOpen: () => {
-                    void store.refreshVariableNames()
-                  },
-                }}
-                connectorAction={connectorAction}
-                connectorActionError={connectorActionError}
-                connectorAuthorizationPending={connectorAuthorizationPending}
-                connectorConnection={connectorConnection}
-                connectorConnectionError={connectorConnectionError}
-                activeConnectorConnections={activeConnectorConnections}
-                connectors={store.connectors}
-                connectorLoading={connectorActionLoading != null || connectorConnectionLoading != null}
-                diagnostics={inspectorDiagnostics}
+              <NodeInspectorContainer
+                store={store}
                 focus={diagnosticFocus}
                 disabled={authoringDisabled}
                 onChooseWaitNotification={openNotification}
                 revision={revision}
                 selection={selection}
-                sourceNodeIcons={Object.fromEntries(designer.nodes.flatMap((node) => ('icon' in node ? [[node.id, node.icon] as const] : [])))}
-                store={store.workspace}
                 target={target}
                 theme={theme}
-                triggerActiveConnections={triggerActiveConnections}
-                triggerAuthorizationPending={triggerAuthorizationPending}
-                triggerConnection={triggerConnection}
-                triggerConnectionError={triggerConnectionError}
-                triggerConnectionLoading={triggerConnectionLoading != null}
-                triggers={store.triggers}
               />
             )
           )}

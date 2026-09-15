@@ -68,13 +68,13 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
   const [generation, reset] = useState(0)
   const [disabled, setDisabled] = useState(false)
   const [open, setOpen] = useState(true)
-  const [selected, setSelected] = useState<readonly string[]>(['summarize'])
+  const selected = useVal(session?.store.$.selectedNodeIds) ?? []
   const logRef = useRef(log)
   logRef.current = log
   useEffect(() => {
     const next = createInspectorSession(language, (name, value) => logRef.current(name, value), portsContent)
     setSession(next)
-    void next.start()
+    void next.start().then(() => next.store.selectNodes(['summarize']))
     return () => next.dispose()
   }, [language, generation])
   const revision = useVal(session?.store.$.revision)
@@ -93,19 +93,18 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
         setPayload({ body: {}, deliveryId: 'sample', event: 'sample' })
         setItems([{ name: 'Issue summary', labels: ['design', 'review'] }])
         setEmptyValues(valueStates)
-        setSelected(['summarize'])
         setOpen(true)
       },
     },
     {
       label: 'Reload saved data',
       onClick: () => {
-        void session?.start()
+        void session?.start().then(() => session.store.selectNodes(selected))
       },
     },
   ])
   if (session == null || revision == null) return null
-  const selection = revision.selection(target, selected[0])
+  const selection = session.store.$.selection.value
   const model = designerGraph(revision.revision, target, presentation?.value, [], {}, {}, session.i18n.t)
   return (
     <I18nProvider i18n={session.i18n}>
@@ -125,7 +124,7 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
             onIgnoreNodes={() => {}}
             selectedNodeIds={selected}
             onSelectNodes={(ids) => {
-              setSelected(ids)
+              session.store.selectNodes(ids)
               if (ids.length > 0) setOpen(true)
             }}
             onConnect={(edge) => {

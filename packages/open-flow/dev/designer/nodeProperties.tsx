@@ -181,6 +181,7 @@ function PropertySample({
   log,
   disabled,
   reload,
+  mount,
 }: {
   fixture: Fixture
   dark: boolean
@@ -188,6 +189,7 @@ function PropertySample({
   log: LogAction
   disabled: boolean
   reload: number
+  mount: number
 }) {
   const [session, setSession] = useState<ReturnType<typeof createInspectorSession>>()
   const logRef = useRef(log)
@@ -195,11 +197,11 @@ function PropertySample({
   useEffect(() => {
     const next = createInspectorSession(language, (name, value) => logRef.current(name, value), contentFor(fixture))
     setSession(next)
-    void next.start()
+    void next.start().then(() => next.store.selectNodes(['sample']))
     return () => next.dispose()
   }, [fixture, language])
   useEffect(() => {
-    if (reload > 0) void session?.start()
+    if (reload > 0) void session?.start().then(() => session.store.selectNodes(['sample']))
   }, [reload, session])
   const revision = useVal(session?.store.$.revision)
   const selection = revision?.selection({ kind: 'flow' }, 'sample')
@@ -210,6 +212,7 @@ function PropertySample({
         <h3>{disabled ? 'Read only' : 'Editable'}</h3>
         <InspectorSamplePanel disabled={disabled} revision={revision} selection={selection} store={session.store} theme={dark ? 'dark' : 'light'}>
           <NodeInspector
+            key={mount}
             variables={{ enabled: true, names: ['API_TOKEN', 'TEAM_NAME'], loaded: true, loading: false, onOpen: () => {} }}
             connectorAuthorizationPending={false}
             connectorLoading={false}
@@ -235,14 +238,25 @@ function PropertySample({
 function PropertiesStory({ fixture, dark, language, log }: { fixture: Fixture; dark: boolean; language: UiLanguage; log: LogAction }) {
   const [generation, reset] = useState(0)
   const [reload, setReload] = useState(0)
+  const [mount, setMount] = useState(0)
   useStoryActions([
     { label: 'Reset samples', onClick: () => reset((value) => value + 1) },
+    { label: 'Reopen panels', onClick: () => setMount((value) => value + 1) },
     { label: 'Reload saved data', onClick: () => setReload((value) => value + 1) },
   ])
   return (
     <div className="node-properties-gallery open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'}>
       {[true, false].map((disabled) => (
-        <PropertySample key={`${generation}-${disabled}`} fixture={fixture} dark={dark} language={language} log={log} disabled={disabled} reload={reload} />
+        <PropertySample
+          key={`${generation}-${disabled}`}
+          fixture={fixture}
+          dark={dark}
+          language={language}
+          log={log}
+          disabled={disabled}
+          reload={reload}
+          mount={mount}
+        />
       ))}
     </div>
   )

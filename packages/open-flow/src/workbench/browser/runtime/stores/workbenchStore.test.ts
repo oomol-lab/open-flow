@@ -32,6 +32,7 @@ describe('WorkbenchStore Variables', () => {
 
 describe('WorkbenchStore diagnostics', () => {
   it('includes missing Connector connections without changing the deterministic Flow check', async () => {
+    let providerIcon = 'https://example.com/amap.svg'
     const flow = {
       createdAt: timestamp,
       draftRevisionId: 'revision-1',
@@ -112,7 +113,7 @@ describe('WorkbenchStore diagnostics', () => {
         })
       }
       if (path.startsWith('/v1/connector/proxy/providers?'))
-        return Response.json({ success: true, data: [{ service: 'amap', displayName: 'AMap', authTypes: ['api_key'] }] })
+        return Response.json({ success: true, data: [{ service: 'amap', displayName: 'AMap', authTypes: ['api_key'], iconUrl: providerIcon }] })
       if (path == `/v1/connector/proxy/actions?flowId=${flow.flowId}&service=amap&locale=en`) {
         return Response.json({
           data: [
@@ -172,6 +173,27 @@ describe('WorkbenchStore diagnostics', () => {
       expect(store.$.diagnosticItems.value).toEqual([expect.objectContaining({ location: { nodeId: 'connector', section: 'account' }, scope: 'task' })])
       expect(store.$.designerNodeById.value.get('connector')).toMatchObject({ diagnostics: 1, executorName: 'connector · AMap', connectionRequired: true })
       expect(store.$.designerNodeById.value.get('connected')).toMatchObject({ diagnostics: 0, executorName: 'connector · AMap' })
+      const icons = store.$.sourceNodeIcons.value
+      expect(icons.connector).toContain(encodeURIComponent(providerIcon))
+      const iconUpdates = vi.fn()
+      const stop = store.$.sourceNodeIcons.reaction(iconUpdates, true)
+      try {
+        store.workspace.selectNodes(['connector'])
+        expect(store.$.sourceNodeIcons.value).toBe(icons)
+        const providerRequests = () => requests.filter((path) => path.startsWith('/v1/connector/proxy/providers?')).length
+        const beforeRefresh = providerRequests()
+        const providers = store.workspace.catalogs.providers.get(flow.flowId, 'en', true)
+        await vi.waitFor(() => expect(providerRequests()).toBeGreaterThan(beforeRefresh))
+        await vi.waitFor(() => expect(providers.value.refreshing).toBe(false))
+        expect(store.$.sourceNodeIcons.value).toBe(icons)
+        expect(iconUpdates).not.toHaveBeenCalled()
+        providerIcon = 'https://example.com/amap-updated.svg'
+        store.workspace.catalogs.providers.get(flow.flowId, 'en', true)
+        await vi.waitFor(() => expect(store.$.sourceNodeIcons.value.connector).toContain(encodeURIComponent(providerIcon)))
+        expect(iconUpdates).toHaveBeenCalledOnce()
+      } finally {
+        stop()
+      }
     } finally {
       store.dispose()
     }
