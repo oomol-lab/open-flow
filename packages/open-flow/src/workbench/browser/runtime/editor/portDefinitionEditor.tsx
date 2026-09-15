@@ -704,14 +704,14 @@ export function PortDefinitionEditor(props: PortEditorProps) {
                   <TooltipContent>{t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}</TooltipContent>
                 </Tooltip>
               )}
-              {!sortingEnabled && (
+              {
                 <Tooltip>
                   <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('valueEditor.addField')} onClick={addField} />}>
                     <i aria-hidden="true" className="i-lucide-light:plus text-lg" />
                   </TooltipTrigger>
                   <TooltipContent>{t('valueEditor.addField')}</TooltipContent>
                 </Tooltip>
-              )}
+              }
             </div>
           )}
         </div>
