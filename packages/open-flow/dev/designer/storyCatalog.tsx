@@ -11,6 +11,7 @@ import { eventSourcesStory, createEventSourceStory, eventSourceSetupStory, feish
 import { fieldSettingsStory, groupSettingsStory } from './fieldSettings.tsx'
 import { formStory } from './form.tsx'
 import { historyStory, historyControlsStory, historyKeyboardStory } from './history.tsx'
+import { iconPickerStory } from './iconPicker.tsx'
 import { inputErrorsStory } from './inputErrors.tsx'
 import { inspectorPanelStory } from './inspectorPanel.tsx'
 import { inspectorPortsStory } from './inspectorPorts.tsx'
@@ -63,6 +64,7 @@ const codeEditorStory: FrontendStory = {
 
 export const labStories: readonly FrontendStory[] = [
   notificationsStory,
+  iconPickerStory,
   historyStory,
   historyControlsStory,
   historyKeyboardStory,
