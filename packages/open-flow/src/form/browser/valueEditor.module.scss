@@ -117,8 +117,9 @@
 /* The main row has explicit slots. Expanded editors occupy their own row. */
 .root[data-header] {
   @include fieldLayout.columns;
+  --field-row-gap: 4px;
   position: relative;
-  row-gap: 4px;
+  row-gap: var(--field-row-gap);
 }
 .header {
   display: contents;
@@ -243,7 +244,7 @@
 }
 .arrayItemType {
   grid-column: var(--field-value-column);
-  grid-row: 1;
+  grid-row: var(--field-value-row);
   min-width: 0;
 }
 .valueTools {
@@ -321,6 +322,7 @@
 }
 .root[data-header][data-collection] > .body {
   --branch-offset: calc(var(--field-toggle-width, 24px) / 2 + var(--field-name-gap));
+  --branch-extension: 0px;
   position: relative;
   grid-column: handle / content-end;
   grid-row: var(--field-branch-row);
@@ -330,12 +332,17 @@
     content: '';
     position: absolute;
     left: calc(var(--field-indent, 0px) - var(--branch-offset));
-    top: 0;
+    top: calc(-1 * var(--branch-extension));
     width: 16px;
-    height: 20px;
+    height: calc(20px + var(--branch-extension));
     border-left: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
     border-bottom: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
     border-bottom-left-radius: 10px;
+  }
+}
+@container value-fields (max-width: #{fieldLayout.$wrap-width}) {
+  .root[data-header][data-structured]:not([data-array-child], [data-output]) > .body {
+    --branch-extension: calc(var(--field-control-height) + var(--field-row-gap));
   }
 }
 .root[data-header][data-structured] > .body {

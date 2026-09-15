@@ -37,6 +37,8 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
   introducing local shades to compensate for a mismatch in the shared state styling.
 - Rows share column tracks. Object nesting consumes 16px per level inside the Name/Handle region;
   Type, Value, nullable, and action columns stay aligned with their parent rows.
+- Hide column headings when the field editor switches to its wrapped layout at the shared
+  container-width breakpoint; restore them when the rows fit on one line.
 - Expanded Multiline and JSON editors follow the same cumulative nesting baseline as object
   children without a disclosure arrow. Array item values align to that child-field baseline, and
   their zero-based indices are centered at the corresponding disclosure-arrow position.
