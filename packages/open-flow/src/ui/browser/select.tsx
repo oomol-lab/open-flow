@@ -29,18 +29,16 @@ function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
   return <SelectPrimitive.Value data-slot="select-value" className={cn('flex flex-1 text-left', className)} {...props} />
 }
 
-function SelectTrigger({
-  children,
-  className,
-  size = 'default',
-  variant = 'default',
-  ...props
-}: SelectPrimitive.Trigger.Props & {
-  readonly size?: 'default' | 'sm' | 'field'
-  readonly variant?: 'default' | 'subtle'
-}) {
+const SelectTrigger = React.forwardRef<
+  HTMLButtonElement,
+  SelectPrimitive.Trigger.Props & {
+    readonly size?: 'default' | 'sm' | 'field'
+    readonly variant?: 'default' | 'subtle'
+  }
+>(function SelectTrigger({ children, className, size = 'default', variant = 'default', ...props }, ref) {
   return (
     <SelectPrimitive.Trigger
+      ref={ref}
       data-slot="select-trigger"
       data-size={size}
       data-variant={variant}
@@ -56,7 +54,7 @@ function SelectTrigger({
       <SelectPrimitive.Icon render={<SelectChevron />} />
     </SelectPrimitive.Trigger>
   )
-}
+})
 
 function SelectContent({
   align = 'center',

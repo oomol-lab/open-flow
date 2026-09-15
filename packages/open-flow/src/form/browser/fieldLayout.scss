@@ -22,7 +22,7 @@
   &[data-layout='values'],
   &[data-layout='ports'] {
     --field-name-track: minmax(90px, 1fr);
-    --field-type-track: var(--field-type-width, 112px);
+    --field-type-track: var(--field-type-width, 56px);
     --field-name-gap: var(--field-value-name-gap, 2px);
     --field-actions-gap: 2px;
   }
@@ -31,7 +31,7 @@
       [grip] var(--field-grip-width, 0px)
       [toggle] var(--field-toggle-width, 24px) var(--field-name-gap)
       [handle] minmax(0, 1fr) 4px
-      [type] minmax(0, 1fr) [content-end] var(--field-actions-gap)
+      [type] var(--field-type-track) [content-end] var(--field-actions-gap)
       [nullable] var(--field-nullable-width)
       [actions] var(--field-actions-width, 28px) [end];
   }

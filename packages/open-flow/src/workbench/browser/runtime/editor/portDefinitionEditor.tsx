@@ -77,14 +77,25 @@ function PortType({
   onChange,
   name = 'Schema',
   id,
+  compact = true,
 }: {
   value: InputPort['jsonSchema']
   disabled: boolean
   onChange: (value: InputPort['jsonSchema']) => void
   name?: string
   id?: string
+  compact?: boolean
 }) {
-  return <EditorComponentSelect id={id} schema={value} name={name} disabled={disabled} onChange={(next) => onChange(next as InputPort['jsonSchema'])} />
+  return (
+    <EditorComponentSelect
+      id={id}
+      compact={compact}
+      schema={value}
+      name={name}
+      disabled={disabled}
+      onChange={(next) => onChange(next as InputPort['jsonSchema'])}
+    />
+  )
 }
 
 function PortSchema({ value, disabled, onChange }: { value: InputPort['jsonSchema']; disabled: boolean; onChange: (value: InputPort['jsonSchema']) => void }) {
@@ -176,7 +187,7 @@ function PortSettingsFields({
         <FieldLabel htmlFor={`${id}-type`} className="text-xs font-normal text-muted-foreground">
           {t('inspector.ports.columnType')}
         </FieldLabel>
-        <PortType id={`${id}-type`} name={port.handle} value={port.jsonSchema} disabled={disabled} onChange={updateSchema} />
+        <PortType id={`${id}-type`} compact={false} name={port.handle} value={port.jsonSchema} disabled={disabled} onChange={updateSchema} />
       </Field>
       <details className={styles.schema}>
         <summary>
@@ -528,7 +539,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             </>
           )}
         </span>
-        <span data-field-type className={styles.type} title={portType(port)}>
+        <span data-field-type className={styles.type} title={tableLayout ? undefined : portType(port)}>
           {tableLayout ? (
             <PortType
               name={port.handle}

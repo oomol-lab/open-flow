@@ -17,6 +17,7 @@ import { initialValue, objectValue, renameObjectField, setObjectField, valueType
 import { ColorEditor } from './colorEditor.tsx'
 import { DateEditor } from './dateEditor.tsx'
 import { EditableChoices } from './editableChoices.tsx'
+import { editorComponentIcons } from './editorComponentIcon.tsx'
 import { EditorComponentSelect } from './editorComponentSelect.tsx'
 import { EnumChoices } from './enumChoices.tsx'
 import { FieldSelect } from './fieldSelect.tsx'
@@ -458,6 +459,7 @@ export function ValueEditor(props: ValueEditorProps) {
                             />
                           ) : (
                             <FieldSelect
+                              icons={editorComponentIcons}
                               aria-label={t('valueEditor.type', { name: `${label}.${name}` })}
                               value={valueType(fieldSchema, fieldValue)}
                               disabled={disabled || typeof fieldSource.type === 'string' || fieldSource.enum != null || fieldSource.const !== undefined}
