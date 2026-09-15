@@ -372,7 +372,6 @@ function WaitDefinition({
 
 function TaskDefinition({
   children,
-  connectorAction,
   connectors,
   disabled,
   focus,
@@ -383,7 +382,6 @@ function TaskDefinition({
   theme,
 }: {
   readonly children: ReactElement
-  readonly connectorAction: ConnectorAction | undefined
   readonly connectors: ConnectorStore
   readonly disabled: boolean
   readonly focus?: DiagnosticFocus
@@ -460,7 +458,7 @@ function TaskDefinition({
   const settingsPanel = (
     <>
       {children}
-      {'executor' in task && task.executor.kind != 'agent' && (
+      {'executor' in task && task.executor.kind != 'agent' && llm != null && (
         <details className="inspector-disclosure inspector-section-divider" data-inspector-section="task">
           <summary>
             <Icon name="chevron-down" size={14} />
@@ -488,26 +486,6 @@ function TaskDefinition({
                     <NativeSelectOption value="json">{t('inspector.task.structuredJson')}</NativeSelectOption>
                   </NativeSelect>
                 </Field>
-              )}
-              {'executor' in task && task.executor.kind == 'connector' && (
-                <>
-                  <Field>
-                    <FieldLabel>{t('inspector.task.connectorAction')}</FieldLabel>
-                    <FieldDescription className="reference-value">{connectorAction?.name ?? task.executor.action}</FieldDescription>
-                  </Field>
-                  <Field>
-                    <FieldLabel>{t('inspector.task.inputPorts')}</FieldLabel>
-                    <FieldDescription className="reference-value">
-                      {task.inputs.flatMap((port) => ('handle' in port ? [port.handle] : [])).join(', ') || t('common.none')}
-                    </FieldDescription>
-                  </Field>
-                  <Field>
-                    <FieldLabel>{t('inspector.task.outputPorts')}</FieldLabel>
-                    <FieldDescription className="reference-value">
-                      {task.outputs.flatMap((port) => ('handle' in port ? [port.handle] : [])).join(', ') || t('common.none')}
-                    </FieldDescription>
-                  </Field>
-                </>
               )}
             </FieldGroup>
           </div>
@@ -1050,7 +1028,6 @@ export function NodeInspector({
           <>
             {selection.kind == 'trigger' ? null : selection.kind == 'task' ? (
               <TaskDefinition
-                connectorAction={connectorAction}
                 connectors={connectors}
                 disabled={disabled}
                 focus={focus}
