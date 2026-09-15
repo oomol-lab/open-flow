@@ -12,6 +12,23 @@ const base = {
 } as const
 
 describe('Workbench Diagnostic messages', () => {
+  it('resolves structured node references to user-facing titles', () => {
+    const i18n = createI18n('zh-CN')
+    const diagnostic: Diagnostic = {
+      code: 'graph.node-output-incompatible',
+      column: 0,
+      line: 1,
+      message: 'Upstream node "source" output "hits" is not compatible with this input.',
+      path: '/document/graph/nodes/target/inputs/value',
+      values: { nodeId: 'source', output: 'hits' },
+    }
+
+    expect(diagnosticMessage(diagnostic, i18n.t, (nodeId) => (nodeId == 'source' ? 'Search records' : undefined))).toBe(
+      '上游节点“Search records”的输出“hits”与此输入不兼容。',
+    )
+    i18n.dispose()
+  })
+
   it('translates code variants with structured values', () => {
     const i18n = createI18n('zh-CN')
     const diagnostic: Diagnostic = {

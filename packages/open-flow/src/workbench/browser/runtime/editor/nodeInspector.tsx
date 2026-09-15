@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
 import type { GraphTarget } from '../../../../flow/common/change.ts'
-import type { ConnectorAction, ConnectorConnection, Diagnostic, Group, InputPort } from '../api.ts'
+import type { ConnectorAction, ConnectorConnection, Group, InputPort } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from '../revisionView.ts'
@@ -32,7 +32,6 @@ import { AgentSettings } from './agentSettings.tsx'
 import { CodeActions } from './codeActions.tsx'
 import { CodeEditor } from './codeEditor.tsx'
 import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
-import { diagnosticMessage } from './diagnostics.ts'
 import { FeishuTriggerConfig } from './feishuTriggerConfig.tsx'
 import { codeTyping } from './flowChanges.ts'
 import { LinearTriggerConfig } from './linearTriggerConfig.tsx'
@@ -78,29 +77,6 @@ function codeStatusLabel(status: ModuleEditorStatus, t: TFunction): string {
     case 'saving':
       return t('inspector.task.codeSaving')
   }
-}
-
-function Diagnostics({ diagnostics }: { readonly diagnostics: readonly Diagnostic[] }): ReactElement | null {
-  const t = useTranslate()
-  if (diagnostics.length == 0) return null
-  const incomplete = diagnostics.every((diagnostic) => diagnostic.code == 'trigger.config-incomplete')
-  return (
-    <section className={`inspector-section diagnostics-section ${incomplete ? 'incomplete' : ''}`}>
-      <h3>
-        <Icon name="alert" size={15} /> {t(incomplete ? 'inspector.configurationRequired' : 'inspector.diagnostics')}
-      </h3>
-      <div className="diagnostic-list">
-        {diagnostics.map((diagnostic, index) => (
-          <div className="diagnostic-item" key={`${diagnostic.path}:${diagnostic.line}:${diagnostic.column}:${index}`}>
-            <strong>{diagnosticMessage(diagnostic, t)}</strong>
-            <code>
-              {diagnostic.code} · {diagnostic.line}:{diagnostic.column}
-            </code>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
 }
 
 function inputUpstreamSources({
@@ -174,9 +150,9 @@ function GeneralSettings({
   }
 
   return (
-    <section className="px-3 pt-3 pb-4" data-inspector-section="node">
-      <FieldLabel>{t('inspector.node.title')}</FieldLabel>
-      <div className="node-settings pt-4 pl-3 pr-4.5">
+    <Field className="inspector-field-section" data-inspector-section="node">
+      <FieldLabel className="inspector-section-title">{t('inspector.node.title')}</FieldLabel>
+      <div className="node-settings">
         <Field data-invalid={error != null}>
           <FieldLabel htmlFor={inputId}>{t('inspector.node.timeout')}</FieldLabel>
           <Input
@@ -193,7 +169,7 @@ function GeneralSettings({
           {error != null && <FieldError>{error}</FieldError>}
         </Field>
       </div>
-    </section>
+    </Field>
   )
 }
 
@@ -746,7 +722,6 @@ interface Props {
   readonly activeConnectorConnections?: readonly ConnectorConnection[]
   readonly connectors: ConnectorStore
   readonly connectorLoading: boolean
-  readonly diagnostics: readonly Diagnostic[]
   readonly disabled: boolean
   readonly focus?: DiagnosticFocus
   readonly revision: RevisionView
@@ -773,7 +748,6 @@ export function NodeInspector({
   activeConnectorConnections,
   connectors,
   connectorLoading,
-  diagnostics,
   disabled,
   focus,
   revision,
@@ -826,7 +800,6 @@ export function NodeInspector({
   return (
     <ScrollArea className="inspector-scroll" autoHide="never" tabIndex={-1}>
       <div className="inspector-content" ref={content}>
-        <Diagnostics key={JSON.stringify([store.$.flowId.value, target, selection?.id])} diagnostics={diagnostics} />
         {selection?.kind == 'trigger' && !(selection.trigger.kind == 'integration' && selection.trigger.definition.key == 'feishu_app_bot.on_event') && (
           <TriggerConnection
             activeConnections={triggerActiveConnections}

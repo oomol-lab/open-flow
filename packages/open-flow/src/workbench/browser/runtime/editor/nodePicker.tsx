@@ -335,7 +335,7 @@ export function NodePickerContent({
           )}
           <div
             ref={list}
-            className="min-h-0 flex-1 overflow-y-scroll overscroll-contain py-2 pl-2 pr-1"
+            className="min-h-0 flex-1 overflow-y-scroll overscroll-contain px-2 py-2"
             onKeyDown={(event) => {
               if (event.key != 'ArrowDown' && event.key != 'ArrowUp') return
               const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]

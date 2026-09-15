@@ -15,6 +15,7 @@ import { CanvasHistoryScope } from './editor/canvasHistoryScope.tsx'
 import { CommentInspector } from './editor/commentInspector.tsx'
 import { BlockLibrary } from './editor/contextPanel.tsx'
 import { EditorContextPanel } from './editor/editorContextPanel.tsx'
+import { FlowNodeList } from './editor/flowNodeList.tsx'
 import { inspectorIcon, NodeInspector } from './editor/nodeInspector.tsx'
 import { NodePickerPopover } from './editor/nodePickerPopover.tsx'
 import { WorkbenchCanvas } from './editor/workbenchCanvas.tsx'
@@ -104,7 +105,6 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   const variableNames = useVal(store.$.variableNames)
   const variableNamesLoaded = useVal(store.$.variableNamesLoaded)
   const variableNamesLoading = useVal(store.$.variableNamesLoading)
-  const inspectorDiagnostics = useVal(store.workspace.$.inspectorDiagnostics)
   const connectorAction = useVal(store.connectors.$.selectedAction)
   const connectorActionError = useVal(store.connectors.$.selectedActionError)
   const connectorActionLoading = useVal(store.connectors.$.actionLoading)
@@ -138,7 +138,6 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
       activeConnectorConnections={activeConnectorConnections}
       connectors={store.connectors}
       connectorLoading={connectorActionLoading != null || connectorConnectionLoading != null}
-      diagnostics={inspectorDiagnostics}
       focus={focus}
       disabled={disabled}
       revision={revision}
@@ -268,7 +267,15 @@ function Editor({
     return designerRef.current?.addNode(option)
   }
 
+  const focusNode = (nodeId: string): void => {
+    store.selectNodes([nodeId])
+    store.workspace.locateNode(nodeId)
+  }
+
   const contextPanelVisible = contextPanelMode != null && target != null && (contextPanelMode == 'blocks' || revision != null)
+  const flowSelected = selection == null && target?.kind == 'flow'
+  const contextPanelIcon = contextPanelMode == 'blocks' ? 'plus' : target == null || flowSelected ? 'flow' : inspectorIcon(selection, target)
+  const contextPanelTitle = contextPanelMode == 'blocks' ? t('contextPanel.blocks') : (selectedDesignerNode?.title ?? targetName ?? t('inspector.title'))
 
   const historyControls = {
     state: history,
@@ -398,7 +405,7 @@ function Editor({
                 ? {
                     title: selectedDesignerNode.title,
                     disabled: authoringDisabled,
-                    fallback: <i aria-hidden="true" className="i-lucide-light:sticky-note" />,
+                    fallback: <i aria-hidden="true" className="i-codicon:note" />,
                     validate: () => undefined,
                     onRename: (title) => {
                       void store.workspace.saveComment(selectedDesignerNode.id, { title, content: selectedDesignerNode.content ?? '' })
@@ -407,10 +414,10 @@ function Editor({
                 : undefined
           }
           focusOnOpen={contextPanelMode == 'inspector' && focusInspectorOnOpen.current}
-          icon={contextPanelMode == 'blocks' ? 'plus' : inspectorIcon(selection, target)}
+          icon={contextPanelIcon}
           onClose={() => closeContextPanel()}
           theme={theme}
-          title={contextPanelMode == 'blocks' ? t('contextPanel.blocks') : (selectedDesignerNode?.title ?? targetName ?? t('inspector.title'))}
+          title={contextPanelTitle}
         >
           {contextPanelMode == 'blocks' ? (
             <BlockLibrary
@@ -425,6 +432,8 @@ function Editor({
               options={addNodeOptions}
               provideChoices={store.provideAddNodeOptionChoices}
             />
+          ) : flowSelected ? (
+            <FlowNodeList nodes={designer.nodes} onFocusNode={focusNode} onSelect={(nodeId) => store.selectNodes([nodeId])} />
           ) : selectedDesignerNode?.kind == 'comment' ? (
             <CommentInspector
               key={selectedDesignerNode.id}

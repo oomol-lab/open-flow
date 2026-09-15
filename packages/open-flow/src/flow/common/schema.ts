@@ -5,7 +5,14 @@ import { Validator } from '@cfworker/json-schema'
 import { compareJSONSchema } from '../../manifest/common/schemaCompare.ts'
 export function triggerPayloadSchema(trigger: TriggerNode): JsonValue {
   if (trigger.kind == 'poll' || trigger.kind == 'integration') return trigger.definition.payloadSchema
-  if (trigger.kind == 'cron' || trigger.kind == 'manual') return { additionalProperties: false, type: 'object' }
+  if (trigger.kind == 'manual') return { additionalProperties: false, type: 'object' }
+  if (trigger.kind == 'cron') {
+    return {
+      additionalProperties: false,
+      properties: { scheduledAt: { format: 'date-time', type: 'string' } },
+      type: 'object',
+    }
+  }
   return {
     additionalProperties: false,
     properties: Object.fromEntries(trigger.inputsDef.map((input) => [input.handle, input.jsonSchema])),

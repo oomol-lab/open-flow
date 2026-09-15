@@ -172,19 +172,22 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
       operationDetail = <span>{t('publication.publishingDescription')}</span>
       operationLabel = t('workspace.publishing')
       break
-    case 'failed':
+    case 'failed': {
       operationClass = 'danger'
+      const nodeId = operation.issue.nodeId
+      const nodeTitle = nodeId == null ? undefined : revision?.node({ kind: 'flow' }, nodeId)?.node.name
       operationDetail = (
         <>
           <span>{operation.issue.message}</span>
           <span className="publication-progress-meta">
             <code>{operation.issue.code}</code>
-            {operation.issue.nodeId != null && <code>{t('publication.failureNode', { id: operation.issue.nodeId })}</code>}
+            {nodeId != null && <code title={nodeId}>{t('publication.failureNode', { id: nodeTitle ?? nodeId })}</code>}
           </span>
         </>
       )
       operationLabel = t('publication.failed')
       break
+    }
     case undefined:
       break
   }

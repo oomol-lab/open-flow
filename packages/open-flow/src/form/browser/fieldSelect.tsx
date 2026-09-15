@@ -9,6 +9,7 @@ export const fieldSelectTriggerClass = 'w-full min-w-0 px-2 text-xs font-normal 
 
 /** The field editor uses the product selection surface instead of the browser menu. */
 export function FieldSelect({
+  id,
   value,
   onChange,
   children,
@@ -17,6 +18,7 @@ export function FieldSelect({
   'aria-label': label,
   'aria-invalid': invalid,
 }: {
+  'id'?: string
   'value': string | number
   'onChange': (value: string) => void
   'children': ReactNode
@@ -46,7 +48,7 @@ export function FieldSelect({
         disabled={disabled}
         items={options}
       >
-        <SelectTrigger size="field" aria-label={label} aria-invalid={invalid || danger} className={fieldSelectTriggerClass}>
+        <SelectTrigger id={id} size="field" aria-label={label} aria-invalid={invalid || danger} className={fieldSelectTriggerClass}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent container={container} align="start" alignItemWithTrigger={false} className="p-1">

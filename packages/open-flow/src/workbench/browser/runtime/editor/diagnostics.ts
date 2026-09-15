@@ -22,11 +22,19 @@ export interface DiagnosticFocus extends DiagnosticLocation {
   readonly requestId: number
 }
 
-export function diagnosticMessage(diagnostic: Diagnostic, t: TFunction): string {
+export function diagnosticNodeId(diagnostic: Diagnostic): string | undefined {
+  const nodeId = diagnostic.values?.nodeId
+  return typeof nodeId == 'string' ? nodeId : undefined
+}
+
+export function diagnosticMessage(diagnostic: Diagnostic, t: TFunction, nodeTitle?: (nodeId: string) => string | undefined): string {
   if (diagnostic.code == 'agent.config-invalid' && diagnostic.message == 'Declare between 1 and 64 Agent tools.') return t('agent.toolsRequired')
   const variant = diagnostic.values?.variant
   const key = `diagnostics.messages.${diagnostic.code}${typeof variant == 'string' ? `.${variant}` : ''}`
-  const translated = t(key, diagnostic.values)
+  const nodeId = diagnosticNodeId(diagnostic)
+  const title = nodeId == null ? undefined : nodeTitle?.(nodeId)
+  const values = title == null ? diagnostic.values : { ...diagnostic.values, nodeId: title }
+  const translated = t(key, values)
   return translated == key ? diagnostic.message : translated
 }
 

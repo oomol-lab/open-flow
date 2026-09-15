@@ -202,6 +202,10 @@ export function WorkspaceHeader({
             onOpenDesign()
             if (store.workspace.locateDiagnostic(item)) setDiagnosticsOpen(false)
           }}
+          onSelectNode={(nodeId) => {
+            onOpenDesign()
+            if (store.workspace.locateNode(nodeId)) setDiagnosticsOpen(false)
+          }}
         />
       )}
     </header>

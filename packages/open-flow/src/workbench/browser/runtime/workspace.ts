@@ -141,11 +141,22 @@ function nodeTitle(node: ResolvedNode, t?: TFunction): string {
 }
 
 function nodeIcon(node: ResolvedNode): string | undefined {
-  if (node.kind == 'value') return ':oomol:value:'
-  if (node.kind != 'task') return undefined
-  const task = node.definition
-  if (task == null || 'moduleId' in task) return undefined
-  return task.executor.kind == 'connector' ? ':carbon:connection-signal:' : ':carbon:machine-learning-model:'
+  switch (node.kind) {
+    case 'condition':
+      return ':carbon:child-node:'
+    case 'subflow':
+      return ':carbon:subflow:'
+    case 'value':
+      return ':oomol:value:'
+    case 'wait':
+      return ':carbon:time:'
+    case 'task': {
+      const task = node.definition
+      if (task == null) return
+      if ('moduleId' in task) return ':carbon:code:'
+      return task.executor.kind == 'connector' ? ':carbon:connection-signal:' : ':carbon:machine-learning-model:'
+    }
+  }
 }
 
 function record(value: JsonValue | undefined): Readonly<Record<string, JsonValue>> | undefined {

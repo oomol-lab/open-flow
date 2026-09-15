@@ -194,6 +194,7 @@
       "name": "标题"
     },
     "selectNode": "选择一个草稿节点以查看和编辑。",
+    "locateNode": "在画布中定位{{name}}",
     "subflow": {
       "definition": "Subflow 定义",
       "inputPorts": "输入端口（JSON）",
@@ -801,7 +802,7 @@
     "scheduleExpression": "Cron 表达式",
     "scheduleTimezone": "时区",
     "scheduleMissing": "尚未配置计划",
-    "scheduleTestHint": "草稿测试会立即执行一次；发布后按计划自动运行。"
+    "scheduleTestHint": "测试发送 {}，线上运行发送 { scheduledAt }。"
   },
   "triggerConfig": {
     "configuration": "配置",
@@ -837,7 +838,7 @@
     "webhookDescription": "通过部署后生成的 HTTP 地址接收 JSON 对象。"
   },
   "triggerSummary": {
-    "manualSummary": "点击运行，从这里开始执行。"
+    "manualPayloadHint": "下游节点会收到空对象 {}。"
   },
   "conditionEditor": {
     "addCondition": "添加条件",

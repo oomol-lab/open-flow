@@ -356,94 +356,37 @@
     scrollbar-gutter: stable;
   }
 
-  .diagnostic-group {
-    border-bottom: 1px solid var(--ui-border);
-  }
-
-  .diagnostic-group > ol {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .diagnostic-group > ol > li + li {
+  .diagnostics-list > li + li {
     border-top: 1px solid var(--ui-border);
   }
 
-  .diagnostic-group-heading {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    padding: 12px 16px 0;
-    color: var(--ui-muted-foreground);
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 16px;
-  }
-
-  .diagnostic-group-heading > strong {
-    overflow: hidden;
-    color: var(--ui-foreground);
-    font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .diagnostic-group-heading > span {
-    flex: none;
-  }
-
-  .diagnostic-group-heading + ol .diagnostic-row {
-    padding-top: 10px;
-  }
-
-  .diagnostic-row {
-    display: flex;
+  .diagnostics-list > li {
     width: 100%;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 7px;
-    padding: 13px 16px;
-    text-align: left;
+    padding: 15px 16px;
   }
 
-  .diagnostic-row-heading {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 7px;
-    color: var(--ui-muted-foreground);
-    font-size: 10px;
-  }
-
-  .diagnostic-row-heading code {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .diagnostic-row-heading [data-slot='badge'] {
-    flex: none;
-  }
-  .diagnostic-row > strong {
+  .diagnostics-list .diagnostic-message {
+    display: block;
+    width: 100%;
     color: var(--ui-foreground);
     font-size: 12px;
     font-weight: 500;
     line-height: 18px;
+    text-align: left;
   }
 
-  .diagnostic-path {
-    overflow: hidden;
-    color: var(--ui-muted-foreground);
-    font-size: 10px;
-    line-height: 15px;
-    overflow-wrap: anywhere;
+  .diagnostic-message {
+    cursor: pointer;
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    text-align: left;
   }
 
-  .diagnostic-row-note {
-    color: var(--ui-muted-foreground);
-    font-size: 10px;
-    font-weight: 500;
+  .diagnostic-message:hover,
+  .diagnostic-message:focus-visible {
+    text-decoration: underline;
   }
 
   .saved-state {

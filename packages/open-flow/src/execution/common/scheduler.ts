@@ -511,6 +511,7 @@ function agentApproval(config: AgentConfig, checkpoint: AgentCheckpoint, inputs:
 
 function validateOutputs(prepared: PreparedFlow, nodeId: string, node: ExecutableNode, value: unknown): Readonly<Record<string, JsonValue>> {
   const outputs = outputRecord(checkpointJson(value === undefined ? {} : value, `Node "${nodeId}" outputs`), nodeId)
+  const discardUndeclared = node.kind == 'task' && node.taskId != null && prepared.tasks[node.taskId]!.executor.kind == 'connector'
   const ports =
     node.kind == 'wait'
       ? waitOutputPorts(node)
@@ -523,15 +524,21 @@ function validateOutputs(prepared: PreparedFlow, nodeId: string, node: Executabl
             : Object.fromEntries(
                 [...node.cases.map((item) => item.output), ...(node.defaultOutput == null ? [] : [node.defaultOutput])].map((handle) => [handle, node.input]),
               )
+  const validated: Record<string, JsonValue> = {}
   for (const [handle, output] of Object.entries(outputs)) {
     const port = ports[handle]
-    if (port == null || (!(output === null && port.nullable) && !matchesSchema(output, port.jsonSchema)))
+    if (port == null) {
+      if (discardUndeclared) continue
       throw new Error(`Node "${nodeId}" output "${handle}" does not match its declaration.`)
+    }
+    if (!(output === null && port.nullable) && !matchesSchema(output, port.jsonSchema))
+      throw new Error(`Node "${nodeId}" output "${handle}" does not match its declaration.`)
+    validated[handle] = output
   }
   if (node.kind != 'condition' && node.kind != 'wait') {
     for (const handle of Object.keys(ports)) if (!Object.hasOwn(outputs, handle)) throw new Error(`Node "${nodeId}" did not return output "${handle}".`)
   }
-  return outputs
+  return validated
 }
 
 function validateCheckpoint(

@@ -231,8 +231,10 @@ export function ContextPanel({
         <header>
           {heading == null ? (
             <>
-              <span className="node-icon small">
-                <Icon name={icon} size={16} />
+              <span className="flex size-9 shrink-0 items-center justify-center" aria-hidden="true">
+                <span className="flex size-6 items-center justify-center text-2xl [&>svg]:size-full!">
+                  <Icon name={icon} />
+                </span>
               </span>
               <strong id={titleId}>{title}</strong>
             </>

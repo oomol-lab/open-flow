@@ -161,7 +161,6 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
                 connectorAuthorizationPending={false}
                 connectorLoading={false}
                 connectors={session.connectors}
-                diagnostics={[]}
                 disabled={disabled}
                 revision={revision}
                 selection={selection}

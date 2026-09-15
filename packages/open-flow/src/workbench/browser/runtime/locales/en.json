@@ -194,6 +194,7 @@
       "name": "Title"
     },
     "selectNode": "Select one Draft node to inspect and edit it.",
+    "locateNode": "Locate {{name}} on the canvas",
     "subflow": {
       "definition": "Subflow definition",
       "inputPorts": "Input ports (JSON)",
@@ -801,7 +802,7 @@
     "scheduleExpression": "Cron expression",
     "scheduleTimezone": "Time zone",
     "scheduleMissing": "No schedule configured",
-    "scheduleTestHint": "Draft tests run once immediately. After publishing, the workflow runs on schedule."
+    "scheduleTestHint": "Tests send {}; live runs send { scheduledAt }."
   },
   "triggerConfig": {
     "configuration": "Configuration",
@@ -837,7 +838,7 @@
     "webhookDescription": "Receive a JSON object through a generated HTTP endpoint."
   },
   "triggerSummary": {
-    "manualSummary": "Click Run to start execution here."
+    "manualPayloadHint": "Downstream nodes receive an empty object ({})."
   },
   "conditionEditor": {
     "addCondition": "Add condition",
