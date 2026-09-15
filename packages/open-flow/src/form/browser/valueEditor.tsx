@@ -116,7 +116,13 @@ export function ValueEditor(props: ValueEditorProps) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const [raw, setRaw] = useState(false)
   const focusCreatedValue = useRef(false)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpandedState] = useState(false)
+  const [bodyMounted, setBodyMounted] = useState(false)
+  const setExpanded = (next: boolean) => {
+    setExpandedState(next)
+    // Keep drafts and editor history alive after the first expansion.
+    if (next) setBodyMounted(true)
+  }
   const [editorFocusRequest, setEditorFocusRequest] = useState(0)
   const [optionsOpen, setOptionsOpen] = useState(false)
   const source = objectValue(schema) ?? {}
@@ -311,7 +317,8 @@ export function ValueEditor(props: ValueEditorProps) {
       {props.options}
     </div>
   )
-  const body = (
+  const shouldMountBody = !compactValue || !expandable || expanded || bodyMounted
+  const body = shouldMountBody && (
     <div id={`${id}-body`} className={styles.body} data-value-body hidden={compactValue && expandable && !expanded}>
       {!showUnset && !compactValue && props.valueEditable !== false && (value === undefined || value === null) && (
         <span className={styles.presence}>{value === null ? 'null' : t('valueEditor.unset')}</span>

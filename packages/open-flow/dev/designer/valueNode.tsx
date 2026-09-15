@@ -1,9 +1,11 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { Group, InputPort } from '../../src/workbench/browser/runtime/api.ts'
+import type { Group, InputPort, JsonValue } from '../../src/workbench/browser/runtime/api.ts'
+import type { NodeInputField } from '../../src/workbench/browser/runtime/editor/nodeInputs.tsx'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
+import { NodeInputs } from '../../src/workbench/browser/runtime/editor/nodeInputs.tsx'
 import { PortDefinitionEditor } from '../../src/workbench/browser/runtime/editor/portDefinitionEditor.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { useStoryActions } from './storyActions.tsx'
@@ -121,4 +123,125 @@ export const outputPortsStory: FrontendStory = {
   group: 'Node Task',
   standalone: true,
   render: (log, dark, language) => <GroupedInputsStory log={log} dark={dark} language={language} output />,
+}
+
+function LazyFieldsStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
+  const i18n = useMemo(() => createI18n(language), [language])
+  const [generation, setGeneration] = useState(0)
+  useStoryActions([{ label: 'Reset samples', onClick: () => setGeneration((value) => value + 1) }])
+  return (
+    <I18nProvider i18n={i18n}>
+      <div
+        className="open-flow-workbench open-flow-theme"
+        data-theme={dark ? 'dark' : 'light'}
+        style={{ display: 'flex', flexWrap: 'wrap', alignContent: 'start', gap: 16, padding: 16, overflow: 'auto', height: '100%' }}
+      >
+        {['A', 'B'].map((sample) => (
+          <LazyFieldsSample key={`${generation}:${sample}`} sample={sample} log={log} />
+        ))}
+        <FlatInputsSample key={`flat:${generation}`} log={log} />
+      </div>
+    </I18nProvider>
+  )
+}
+
+function FlatInputsSample({ log }: { log: LogAction }) {
+  const [values, setValues] = useState<Readonly<Record<string, JsonValue | undefined>>>({})
+  const handles = [
+    'receiveId',
+    'receiveIdType',
+    'contentKind',
+    'text',
+    'markdown',
+    'imageKey',
+    'imageUrl',
+    'fileKey',
+    'fileUrl',
+    'fileName',
+    'fileType',
+    'videoCoverKey',
+    'videoCoverUrl',
+    'rawMsgType',
+    'rawContent',
+    'idempotency',
+  ]
+  return (
+    <section aria-label="Flat inputs" style={{ width: 520, flexShrink: 0 }}>
+      <h3>Flat inputs</h3>
+      <NodeInputs
+        title="Inputs"
+        disabled={false}
+        variables={{ enabled: false, names: [], loaded: true, loading: false, onOpen: () => {} }}
+        entries={handles.map(
+          (handle): NodeInputField => ({
+            definition: {
+              handle,
+              nullable: !['receiveId', 'contentKind'].includes(handle),
+              jsonSchema:
+                handle === 'rawContent'
+                  ? { 'ui:widget': 'any' }
+                  : ['receiveIdType', 'contentKind', 'fileType'].includes(handle)
+                    ? { type: 'string', enum: ['text', 'image', 'file'] }
+                    : { type: 'string' },
+            },
+            value: Object.hasOwn(values, handle)
+              ? values[handle]
+              : ['receiveId', 'contentKind', 'receiveIdType', 'fileType', 'rawContent'].includes(handle)
+                ? undefined
+                : null,
+            connected: false,
+          }),
+        )}
+        onValue={(handle, value) => {
+          setValues((previous) => ({ ...previous, [handle]: value }))
+          log('Save flat input', { handle, value })
+        }}
+        onVariable={() => {}}
+      />
+    </section>
+  )
+}
+
+function LazyFieldsSample({ sample, log }: { sample: string; log: LogAction }) {
+  const [values, setValues] = useState<readonly InputPort[]>((): readonly InputPort[] => [
+    { nullable: false, handle: 'text', jsonSchema: { type: 'string' }, value: `Sample ${sample}` },
+    {
+      nullable: false,
+      handle: 'object',
+      jsonSchema: { type: 'object', properties: Object.fromEntries(Array.from({ length: 40 }, (_, index) => [`field${index}`, { type: 'string' }])) },
+      value: Object.fromEntries(Array.from({ length: 40 }, (_, index) => [`field${index}`, `${sample}-${index}`])),
+    },
+    {
+      nullable: false,
+      handle: 'array',
+      jsonSchema: { type: 'array', items: { type: 'string' } },
+      value: Array.from({ length: 40 }, (_, index) => `${sample}-${index}`),
+    },
+    { nullable: false, handle: 'json', jsonSchema: { 'ui:widget': 'any' }, value: { sample, enabled: true } },
+    { nullable: false, handle: 'multiline', jsonSchema: { 'type': 'string', 'ui:widget': 'text' }, value: `Sample ${sample}\nSecond line` },
+    { nullable: false, handle: 'unsetObject', jsonSchema: { type: 'object', properties: { name: { type: 'string' } } } },
+  ])
+  return (
+    <section aria-label={`Sample ${sample}`} style={{ width: 520, flexShrink: 0 }}>
+      <h3>Sample {sample}</h3>
+      <PortDefinitionEditor
+        disabled={false}
+        layout="values"
+        values={values}
+        onChange={(next) => {
+          setValues(next)
+          log(`Save ${sample}`, next)
+        }}
+      />
+    </section>
+  )
+}
+
+export const lazyFieldsStory: FrontendStory = {
+  id: 'lazy-fields',
+  title: 'Collapsed Fields',
+  description: 'Compare 40-entry collections with flat connector inputs. Expand to edit; reset to inspect initial mounting.',
+  group: 'Node Fixed Values',
+  standalone: true,
+  render: (log, dark, language) => <LazyFieldsStory log={log} dark={dark} language={language} />,
 }
