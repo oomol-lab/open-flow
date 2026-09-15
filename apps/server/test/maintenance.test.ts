@@ -46,18 +46,20 @@ function pause(store: Store, clock: () => number, flowId: string, notify = false
   expect(store.runs.claim()?.runId).toBe(runId)
   expect(store.runs.start(runId, { kind: 'run.started', payload: { flowId, scopeId: runId } })).toBe(true)
   const wait = { jobId: 'job', nodeId: 'wait', waitId: 'wait' }
-  const waiting = store.runs.wait(
+  store.runs.createWait(
     runId,
-    {
-      kind: 'waiting',
-      wait: { ...wait, actions: ['continue'], prompt: 'Continue?' },
-      checkpoint: { bindingValues: {}, inputs: {}, results: {}, skipped: [], version: 2, agents: {}, queue: [], wait: { ...wait, value: null } },
-    },
-    1_000,
-    notify ? { action: 'send', input: {}, messageHandle: 'message', prompt: 'Continue?', publicOrigin: 'https://flows.example', taskId: 'send' } : undefined,
+    { ...wait, value: null, actions: ['continue'], prompt: 'Continue?', notify: false },
+    'https://flows.example',
+    notify ? { action: 'send', input: {}, messageHandle: 'message', taskId: 'send' } : undefined,
   )
-  if (waiting == null) throw new Error('Run did not pause.')
-  return { ...waiting, flowId, runId }
+  expect(
+    store.runs.wait(
+      runId,
+      { kind: 'waiting', checkpoint: { bindingValues: {}, inputs: {}, results: {}, skipped: [], version: 3, agents: {}, waits: [{ ...wait, value: null }] } },
+      1000,
+    ),
+  ).toBe(true)
+  return { ...store.runViews.waitReceipt(runId, wait.waitId)!, flowId, runId }
 }
 
 it('schedules and expires a Wait without notifications before the periodic maintenance deadline', async () => {

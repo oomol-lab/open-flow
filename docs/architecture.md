@@ -130,7 +130,7 @@ Engine digest、资源限制和恢复属于部署实现；`isolated-vm` RuntimeH
 
 Flow 与每次 Subflow invocation 使用无环执行图。连线表示节点之间的执行依赖，输入映射独立声明数据来源；保存或删除执行边不会隐式创建或删除输入映射。
 每个节点在一次图调用内最多运行一次。节点等待全部直接前驱完成或跳过，在至少一条入边被选中时执行；Flow Run 必须固定一个 Trigger 起始节点，未连接入口的普通根节点跳过；Subflow 的普通根节点由调用启动，无依赖的分支可以并行。
-Condition 只选择首个匹配分支或 default，Wait 只选择已决议的 action；未选中的分支传播跳过状态。Trigger occurrence 只选择对应 Trigger，其他 Trigger 分支跳过。
+Condition 只选择首个匹配分支或 default，Wait 登记后释放 notification，决议后释放所选 action；未选中的分支传播跳过状态。Trigger occurrence 只选择对应 Trigger，其他 Trigger 分支跳过。
 未执行节点的跳过状态仅属于内部调度和恢复，不创建节点执行身份、不产生公开节点事件，也不进入最终节点执行结果。
 
 节点输入只能引用本图中经执行边可达、且在当前节点执行路径上保证已完成的祖先 output。多个 source 表示互斥分支的备选值，每次执行必须恰有一个可用值，
@@ -156,11 +156,13 @@ scope 内唯一资源 identity。用户代码开始执行后不能通过重试�
 部署必须限制并行 Run 数量和单个 Run 的总执行时间。同一 Flow 的 Run 串行 claim，不同 Flow 在全局并发上限内按最早可执行顺序推进，避免一个
 Flow 的长 Run 阻塞其他 Flow。
 
-Wait 是同一个 Run 内的持久化暂停点，不是新的 Run、子流程或长驻 Runtime session。Run 到达 Wait 时，部署必须原子保存 Scheduler checkpoint、
-固定 Revision 身份、当前 Wait 和剩余执行预算，再把 Run 置为 `waiting`；暂停期间不持有 Executor session 或同 Flow 的执行槽。合法 action 只把
-该 Run 重新排队，恢复时从 checkpoint 继续，并保持已完成节点的最终结果、跳过状态、启动输入、Variable 快照和同一 `runId`。
-暂停前必须等待正在运行的并行节点结束，恢复时不能重跑已完成或已跳过的节点。进程恢复不能重跑已完成 segment，也不能重置
-Run 的总执行预算。checkpoint 缺失、损坏或与固定 Wait 不一致时必须 fail closed，不能从 Flow 起点猜测性重放。
+Wait 在同一个 Run 内局部等待。Run owner 先持久化独立等待记录，再向 Scheduler 返回通知输出；通知后续节点按普通图执行，批准不会取消它们。
+所有等待同时可决议，未确定的 action 边阻止其下游，其他就绪工作照常执行。汇合仍要求所有入边确定且至少一条被选中。
+图没有运行中或可执行工作且仍有等待时，固定在内存中驻留 120,000 ms，保留 session 与同 Flow 执行槽，Run 状态仍为 running。
+窗口内决议原地推进，不序列化或保存完整 checkpoint；纯等待不扣 Run 执行预算。图再次静止重新计时，无效唤醒不续期。
+到期重新检查权威决议，仍静止才原子提交完整 checkpoint 和剩余预算并释放 session。冻结与决议竞争时重新排队，不能丢失工作。
+已冻结 Run 收到决议进入 queued；queued、starting 中其他等待仍可决议和过期。恢复读取最新决议，保留结果、跳过状态、通知输出及 Agent continuation，不重放副作用。
+活动执行或内存等待期间崩溃，无安全 checkpoint 时按既有规则标记 indeterminate。损坏、不完整或旧版 checkpoint 均不得从起点猜测性重放。
 
 Approval 是 Wait 对 action 集合 `approve/reject` 的一种产品语义，不是独立执行节点或部署认证机制。部署内部的 Control API resolve 使用 Operator
 认证；外部通知可以携带只绑定一个 Wait 的 opaque capability。公开 hook 只提供 JSON inspection 和显式 POST action，不拥有 HTML 页面或特定消费端
@@ -168,8 +170,7 @@ Approval 是 Wait 对 action 集合 `approve/reject` 的一种产品语义，不
 各等待保留独立决议事实，后续等待和 Run terminal 不覆盖旧决议；这些事实不受 RunEvent retention 影响，随 Flow 物理删除清理。
 
 Agent 是根 Flow 中的 Managed Task，拥有显式输入、固定模型、Connector 工具与可选代码计算能力声明。模型不能改变工具 Action、Connection、固定参数或审批策略。
-Agent 的工具批次串行处理，批准或拒绝只处理该次固定调用。框架 continuation 属于部署私有数据；Run owner 原子提交 continuation、Scheduler
-状态、审批等待与通知 work，框架不拥有另一套 Run 状态机。并行分支的暂停统一收敛为单个可决议等待及其后续队列，恢复不重跑已完成节点。
+Agent 的工具批次串行处理，批准或拒绝只处理该次固定调用。框架 continuation 属于部署私有数据；Run owner 持久化审批等待与通知 work，在安全冻结时保存完整 continuation 和 Scheduler 状态。并行 Agent 的等待独立可决议，框架不拥有另一套 Run 状态机。
 Agent 节点超时累计各次实际执行段，审批与排队不消耗节点预算；Run 总预算独立保留。执行结果不明时终止为不确定失败，不能让模型自动重试。
 
 Agent 临时代码属于此次 Run 的调用数据，不修改 Revision 或图结构。宿主只注入当前节点输入、明确值和当前 invocation 已取得的结果，
@@ -180,9 +181,10 @@ Agent 工具的完整结果属于 Run，由部署独立持久化，不依赖日�
 不能通过复制完整正文传递恢复事实。宿主结果读取工具仅可访问当前 invocation 已取得的结果；Operator 通过同一 Run 读取权限查看和下载。
 恢复必须验证引用与完整性，不能通过重新调用外部工具补回缺失结果。结果随所属 Flow 的物理删除清理。
 
-Wait 通知复用固定 Revision 中显式选择的 Connector action。部署必须先持久化 `waiting` 和通知 work，再在事务外调用 Connector；外部调用至少一次，
-稳定 invocation identity 由 Connector 幂等处理。通知发送失败不能自动批准、拒绝或结束 Run。通知正文中的 capability 只以不可逆摘要进入持久化存储，
-完整 URL 属于 bearer credential；公开 origin 是部署 capability 配置，不进入 Flow Revision。
+普通 Wait 只有固定 notification 出口，输出包含 value、prompt、actions 中的完整 action/url 和 expiresAt。用户将通知处理连接为普通图节点；其失败、取消、超时和恢复遵守普通执行规则。
+公开 origin 由部署提供，普通 Wait 不在 Run/Publish 准入阶段特判；实际需要输出链接却缺少 origin 时执行失败。没有连接或引用通知出口时不生成链接。
+完整通知输出属于有权限边界的 Run 恢复数据；公开 capability 查找索引只存摘要，URL 不写入 Revision 或普通服务日志。
+Agent 仍可使用内联 Connector 通知，先登记等待和通知 work，再在事务外至少一次发送，稳定 invocation identity 支持幂等。Agent 通知发送失败不自动决议，原有重试和次数上限保留。
 
 用户代码只在隔离 realm 中获得目标 closure、固定 platform module、所选 Engine Contract 声明的内置模块和当前 Task invocation 明确声明的窄 Capability。内置模块不授予宿主存储、身份或外部访问权限。
 部署只声明自己实现的 Engine Contract；Node 兼容合同的内存文件系统属于单次 Task invocation，不在 Task 之间共享或持久化。Capability host 必须校验当前

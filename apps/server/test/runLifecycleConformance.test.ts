@@ -58,9 +58,7 @@ for (const conformance of runLifecycleConformanceCases) {
           const run = store.runViews.controlRun(runId)
           if (run == null) throw new Error('Run is missing.')
           const started =
-            run.startedAt == null
-              ? store.runs.start(runId, { kind: 'run.started', payload: { flowId: 'flow', scopeId: runId } })
-              : store.runs.resume(runId, 'wait')
+            run.startedAt == null ? store.runs.start(runId, { kind: 'run.started', payload: { flowId: 'flow', scopeId: runId } }) : store.runs.resume(runId)
           if (started) return { kind: 'started', status: 'running' }
           return run.status == 'running' ? { kind: 'already-started', status: 'running' } : { kind: 'stale', status: run.status }
         },
@@ -96,13 +94,13 @@ for (const conformance of runLifecycleConformanceCases) {
         },
         async wait(runId) {
           const wait = { jobId: 'job', nodeId: 'wait', waitId: 'wait' }
+          store.runs.createWait(runId, { ...wait, value: null, actions: ['continue'], prompt: 'Continue', notify: false }, undefined)
           return (
             store.runs.wait(
               runId,
               {
                 kind: 'waiting',
-                wait: { ...wait, actions: ['continue'], prompt: 'Continue' },
-                checkpoint: { bindingValues: {}, inputs: {}, results: {}, skipped: [], version: 2, agents: {}, queue: [], wait: { ...wait, value: null } },
+                checkpoint: { bindingValues: {}, inputs: {}, results: {}, skipped: [], version: 3, agents: {}, waits: [{ ...wait, value: null }] },
               },
               1_000,
             ) != null

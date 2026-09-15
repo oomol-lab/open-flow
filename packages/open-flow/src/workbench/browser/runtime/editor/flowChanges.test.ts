@@ -16,7 +16,6 @@ import {
   pasteNodes,
   setInputValue,
   setInputVariable,
-  setWaitNotification,
   updateTaskPorts,
   updateCondition,
   updateTaskAdditionalInputs,
@@ -315,20 +314,6 @@ describe('Wait changes', () => {
           inputs: { value: { kind: 'value', value: null } },
           kind: 'wait',
           name: 'Review',
-          notification: {
-            inputs: {
-              message: {
-                kind: 'sources',
-                sources: [
-                  { kind: 'node', nodeId: 'wait', output: 'continue' },
-                  { kind: 'node', nodeId: 'task', output: 'result' },
-                ],
-              },
-              title: { kind: 'value', value: 'Review' },
-            },
-            messageHandle: 'message',
-            taskId: 'notify',
-          },
           prompt: 'Review?',
         },
         nodeId: 'review',
@@ -342,7 +327,6 @@ describe('Wait changes', () => {
     const updated = updateWait(revisionView(changed), { kind: 'flow' }, 'wait', {
       actions: ['approve', 'reject'],
       name: 'Approval',
-      notification: undefined,
       prompt: 'Approve this request?',
     })
     if (updated == null) throw new Error('Expected updated Wait changes.')
@@ -351,133 +335,7 @@ describe('Wait changes', () => {
     expect(changed.content.document.graph.edges).toEqual([])
     expect(changed.content.document.graph.nodes.wait).toMatchObject({ actions: ['approve', 'reject'], name: 'Approval', prompt: 'Approve this request?' })
     expect(changed.content.document.graph.nodes.task).toMatchObject({ inputs: {} })
-    expect(changed.content.document.graph.nodes.review).toMatchObject({
-      notification: {
-        inputs: {
-          message: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'task', output: 'result' }] },
-          title: { kind: 'value', value: 'Review' },
-        },
-      },
-    })
     expect(addNode(revisionView(changed), { id: 'child', kind: 'subflow' }, 'nested-wait', { kind: 'wait', name: 'Wait' }, () => 'unused')).toBeUndefined()
-  })
-
-  it('creates a Connector notification without adding a graph node', () => {
-    const current = applyFlowChanges(draft('export default () => ({ result: null })\n'), [
-      {
-        kind: 'graph.node.create',
-        node: {
-          actions: ['continue'],
-
-          input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
-          inputs: { value: { kind: 'value', value: null } },
-          kind: 'wait',
-          name: 'Wait',
-          prompt: 'Continue?',
-        },
-        nodeId: 'wait',
-        target: { kind: 'flow' },
-      },
-    ])
-
-    const updated = setWaitNotification(
-      revisionView(current),
-      'wait',
-      {
-        actionId: 'message.send',
-        authenticated: true,
-        defaultConnection: { connectionId: 'connection-1', displayName: 'Bot', isDefault: true, serviceId: 'message', status: 'active' },
-        description: 'Send message.',
-        inputs: { text: { jsonSchema: { type: 'string' }, nullable: false } },
-        name: 'Send message',
-        outputs: {},
-        serviceId: 'message',
-        serviceName: 'Message',
-      },
-      'notify',
-    )
-    if (updated == null) throw new Error('Expected notification changes.')
-    const changed = applyFlowChanges(current, updated)
-
-    expect(Object.keys(changed.content.document.graph.nodes)).toEqual(['task', 'wait'])
-    expect(changed.content.document.graph.nodes.wait).toMatchObject({
-      notification: { inputs: {}, messageHandle: 'text', taskId: 'notify' },
-    })
-    expect(changed.content.document.tasks.notify).toMatchObject({
-      executor: { action: 'message.send', connectionId: 'connection-1', kind: 'connector' },
-    })
-
-    expect(
-      updateWait(revisionView(changed), { kind: 'flow' }, 'wait', {
-        actions: ['continue'],
-        name: 'Wait',
-        notification: changed.content.document.graph.nodes.wait?.kind == 'wait' ? changed.content.document.graph.nodes.wait.notification : undefined,
-        prompt: 'Continue?',
-      }),
-    ).toEqual([])
-
-    const removed = updateWait(revisionView(changed), { kind: 'flow' }, 'wait', {
-      actions: ['continue'],
-      name: 'Wait',
-      notification: undefined,
-      prompt: 'Continue?',
-    })
-    if (removed == null) throw new Error('Expected notification removal changes.')
-    expect(applyFlowChanges(changed, removed).content.document.tasks.notify).toBeUndefined()
-  })
-
-  it('remaps notification bindings when a Wait is copied', () => {
-    const current = applyFlowChanges(draft('export default () => ({ result: null })\n'), [
-      { binding: { kind: 'variable', target: 'RECIPIENT' }, bindingId: 'recipient', kind: 'binding.create' },
-      {
-        kind: 'task.create',
-        task: {
-          executor: { action: 'mail.send', connectionId: 'connection-1', kind: 'connector' },
-          inputs: [
-            { handle: 'recipient', jsonSchema: { type: 'string' }, nullable: false },
-            { handle: 'message', jsonSchema: { type: 'string' }, nullable: false },
-          ],
-          name: 'Notify',
-          outputs: [],
-        },
-        taskId: 'notify',
-      },
-      {
-        kind: 'graph.node.create',
-        node: {
-          actions: ['continue'],
-
-          input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
-          inputs: { value: { kind: 'value', value: null } },
-          kind: 'wait',
-          name: 'Wait',
-          notification: {
-            inputs: { recipient: { kind: 'sources', sources: [{ bindingId: 'recipient', kind: 'binding' }] } },
-            messageHandle: 'message',
-            taskId: 'notify',
-          },
-          prompt: 'Continue?',
-        },
-        nodeId: 'wait',
-        target: { kind: 'flow' },
-      },
-    ])
-    const clipboard = copyNodes(revisionView(current), { kind: 'flow' }, ['wait'])
-    const ids = ['wait-copy', 'recipient-copy']
-    const pasted = pasteNodes(revisionView(current), { kind: 'flow' }, clipboard, () => {
-      const id = ids.shift()
-      if (id == null) throw new Error('Expected a clipboard identity.')
-      return id
-    })
-    const changed = applyFlowChanges(current, pasted.changes)
-
-    expect(changed.content.document.bindings['recipient-copy']).toEqual({ kind: 'variable', target: 'RECIPIENT' })
-    expect(changed.content.document.graph.nodes['wait-copy']).toMatchObject({
-      notification: {
-        inputs: { recipient: { sources: [{ bindingId: 'recipient-copy', kind: 'binding' }] } },
-        taskId: 'notify',
-      },
-    })
   })
 })
 

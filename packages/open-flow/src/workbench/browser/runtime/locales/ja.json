@@ -227,19 +227,12 @@
     "wait": {
       "approval": "承認または拒否",
       "changeNotification": "変更",
-      "chooseNotification": "通知を追加",
-      "chooseNotificationTitle": "通知を選択",
       "continue": "続行",
-      "inputs": "パラメーター",
-      "inputsInvalid": "必須の通知パラメーターをすべて入力してください。",
-      "inputsLoading": "通知パラメーターを読み込んでいます…",
-      "messageHandle": "メッセージの書き込み先",
       "mode": "処理方法",
-      "notificationTask": "通知",
-      "notificationUnavailable": "通知設定を利用できません。選択し直してください。",
+      "inputsLoading": "通知パラメーターを読み込んでいます…",
+      "notificationDescription": "通知出力に接続すると、待機中にメッセージの送信や他のステップを実行できます。",
       "prompt": "プロンプト",
-      "promptError": "プロンプトは1〜1,000文字で入力してください。",
-      "removeNotification": "通知を削除"
+      "promptError": "プロンプトは1〜1,000文字で入力してください。"
     },
     "title": "インスペクター",
     "sources": {

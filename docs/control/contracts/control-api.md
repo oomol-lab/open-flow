@@ -201,7 +201,7 @@ interface FlowCheck {
 }
 ```
 
-Check body 是 `{ engineContract: 'open-flow-engine/v2', version: 1 }`，始终验证 path 中固定的 Flow Revision。
+Check body 是 `{ engineContract: 'open-flow-engine/v3', version: 1 }`，始终验证 path 中固定的 Flow Revision。
 `message` 是稳定的 canonical English fallback；Workbench 可以使用 `code`、可选 `values.variant` 和其余 `values` 显示本地化文案，未知 code 或 variant
 必须回退到 `message`。
 
@@ -305,22 +305,21 @@ interface Run {
 Run detail 增加固定的 `closureDigest`、`engineContract`、`engineDigest`、`modelVersion` 和 `revisionDigest`。Live Run 增加
 `publicationId`；Trigger Run 增加 `publicationId`、`occurrenceId` 和 `triggerNodeId`。
 
-`RunStatus` 包含 `queued | starting | running | waiting | canceled | completed | failed | indeterminate`。处于 `waiting` 的 Run detail
-还包含当前暂停点：
+`RunStatus` 包含 `queued | starting | running | waiting | canceled | completed | failed | indeterminate`。所有 Run detail 必须返回待决议集合：
 
 ```ts
-waiting: {
-  actions: readonly['continue'] | readonly[('approve', 'reject')]
+waits: readonly {
+  actions: readonly ['continue'] | readonly ['approve', 'reject']
   expiresAt: string
   nodeId: string
   prompt: string
   waitId: string
   waitingSince: string
-}
+}[]
 ```
 
-这是当前 active Wait 的投影，不是历史列表。客户端用 `nodeId` 定位 Flow 中的 Wait node，用 `waitId` 提交一次固定暂停的决议。
-Run 离开 `waiting` 后不再返回该投影；历史由 RunEvent 表达。
+集合只包含未决议等待，按登记时间和 waitId 排序。running、waiting、queued、starting 都可能包含多个等待；终态返回空集合。
+客户端用 nodeId 定位、用 waitId 决议。waiting 状态要求集合非空，旧单个 waiting 字段不再接受。历史由 RunEvent 表达。
 
 Draft Run body 是 `{ engineContract, inputs, trigger, version: 1 }`。Live Run body 是 `{ publicationId, inputs, trigger, version: 1 }`。首次接受返回 `202`，
 幂等重放返回 `200`。Run 接受后不受后续 Draft change、Publish 或 Rollback 影响。
@@ -357,7 +356,7 @@ interface RunEvents {
 }
 ```
 
-Run list 按 `createdAt`、`runId` 逆序稳定分页，`status=waiting` 可以只查询当前暂停的 Run。
+Run list 按 `createdAt`、`runId` 逆序稳定分页，`status=waiting` 只查询已冻结 Run；`pendingWait=true` 查询所有有待决议项的非终态 Run，包含运行中和排队中，`false` 查询其补集。可与 status 组合，分页时保持过滤条件。
 
 `after` 是已观察的最后 sequence，只返回更大的事件。terminal Run 最多有一个 terminal event。非 terminal Run 的 result 返回
 `run.not-terminal`；取消成功与重复取消分别返回 `cancelAccepted: true` 和 `false`。
@@ -385,9 +384,10 @@ Node context 固定为 `{ flowId, scopeId, nodeId, executionId }`，各 identity
 `nodeKind` 为 `agent / condition / connector / javascript / llm / subflow / value / wait`。
 Runtime projector 不接受旧的 `node.cache-hit`、`node.preview` 或 `run.output` 事件。
 
-Wait 进入和离开暂停状态分别追加事件：
+等待登记、整图冻结和决议分别追加事件：
 
-- `run.waiting` payload 为 `{ expiresAt, nodeId, waitId, waitingSince }`；
+- `wait.created` payload 为 `{ expiresAt, nodeId, waitId, waitingSince }`；
+- `run.waiting` payload 为 `{ waitIds }`，仅在完整 checkpoint 提交时产生；
 - `run.resolved` payload 为 `{ action, resolvedAt, waitId }`。
 
 已认证客户端通过 `POST /v1/runs/:runId/waits/:waitId/resolve` 决议当前 Wait，body 固定为
@@ -405,20 +405,19 @@ Wait 进入和离开暂停状态分别追加事件：
 }
 ```
 
-同一 `waitId` 只有第一个合法、未过期的决议能把 Run 从 `waiting` 推进到 `queued`。同一 action 重放返回
+同一 waitId 接受第一个合法、未过期的决议；running 中唤醒原 session，waiting 进入 queued，queued/starting 保持状态并由执行者读取最新决议。同一 action 重放返回
 `resolutionAccepted: true`，竞争的另一 action 返回 `false`，两者都返回已经提交的 `action` 和 `resolvedAt`。不存在的 Wait 返回
 `run.wait-not-found`，不属于该 Wait 的 action 返回 `run.invalid`。Wait 到期后 Run 以 `run.wait-expired` 失败，不产生新的 Run。
 
 ### Run lifecycle conformance
 
 `run-lifecycle` 的状态模型包含 `fail-start` 与 `fail-resume`：两者仅能在 `starting` 提交，分别产生 `failed` 与
-`indeterminate`。普通 `commit` 在 `running` 接受 terminal，在任意非 terminal 状态接受取消，并在 `waiting` 接受失败。
+`indeterminate`。普通 `commit` 在 `running` 接受 terminal，在任意非 terminal 状态接受取消，并在任意非 terminal 状态接受失败。
 已经提交的 terminal 不可覆盖。部署的 lifecycle conformance 必须操作真实权威 store，覆盖首次启动、Wait 恢复、启动失败、
 恢复失败、幂等准入与 terminal 竞争；不能以另一套测试专用持久化实现代替部署实现。
 
 公共 Scheduler 的 `RunLaunch` 为首次启动与 Wait 恢复的互斥联合。首次启动必须包含 `trigger`，可包含 `inputs` 和
-`bindingValues`；恢复只能包含 `resume: { action, checkpoint }`，不能重新提供这三项启动数据。`RunDetails` 在
-`status: 'waiting'` 时必须包含 `waiting`，其他状态不包含该字段；Run list 的摘要不包含等待详情。
+`bindingValues`；恢复只能包含 `resume: { checkpoint }`，不能重新提供这三项启动数据。决议通过 WaitHost 的权威读取接口取得。Run list 摘要不包含等待详情。
 
 ## 6. Trigger 与 Connector
 
@@ -664,6 +663,14 @@ capability 摘要；完整 capability 是 bearer credential，消费端不得把
 仍返回胜出 action 与原 resolvedAt；相同决议 `resolutionAccepted: true`，相反决议为 `false`，均不再排队执行。
 未决议的取消或到期等待不生成决议事实。外部 capability 到期后不能因 receipt 保留而继续授权。
 
+### Wait 局部执行与冻结
+
+Wait 移除内联 notification 配置，声明固定 notification 出口。该输出为 `{ value, prompt, actions: [{ action, url }], expiresAt }`，actions 使用节点固定操作集合，value 保持输入 schema。
+通知边和所选 action 边可同时执行，不互斥；approve/reject 互斥。通知后续按普通节点执行，决议不取消通知，没有通知专属时限。
+图静止且尚有等待时保留 session 120,000 ms，期间不序列化或保存完整 checkpoint、不扣执行预算。再次静止重新计时，无效唤醒不续期。
+到期重新读取决议再提交 checkpoint，竞争中的已决议 Run 重新排队。Wait 记录及决议立即持久化；原地批准无需保存 checkpoint。
+Scheduler WaitHost 提供 `create(WaitRequest)`、`resolutions(waitIds, block)`；部署保证固定输入、权限、持久化与唤醒。恢复时读取最新决议，不依赖 claim 时快照。
+
 ### Scheduler checkpoint 与节点事件
 
 Scheduler checkpoint 的精确对象为：
@@ -674,29 +681,28 @@ Scheduler checkpoint 的精确对象为：
   "inputs": {},
   "results": { "source": { "jobId": "job-1", "outputs": { "value": 42 } } },
   "skipped": [],
-  "version": 2,
+  "version": 3,
   "agents": {},
-  "queue": [],
-  "wait": { "jobId": "job-2", "nodeId": "approval", "value": 42, "waitId": "opaque-id" }
+  "waits": [{ "jobId": "job-2", "nodeId": "approval", "value": 42, "waitId": "opaque-id" }]
 }
 ```
 
 `inputs` 保存按 node ID 和 input handle 索引的启动输入，`bindingValues` 保存本次 Run 的 Variable binding 快照。
-`results` 保存已完成节点的最终 output，`skipped` 保存已跳过节点。`wait` 是当前等待；`queue` 保存尚未激活的等待，字段与 `wait` 相同。`agents` 按 node ID 保存
+`results` 保存已完成节点的最终 output，`skipped` 保存已跳过节点。`waits` 保存所有待应用决议的等待，已发布通知时每项还保存完整 `notification` 输出。`agents` 按 node ID 保存
 `{ invocationId, input, remainingMs?, checkpoint }`，其中 checkpoint 是 Agent continuation 合同。配置了节点 timeoutMs 时，
 remainingMs 必须为正且不得超过原上限。总 JSON 大小不得超过 16 MiB。
 恢复必须验证精确字段、节点状态不冲突、结果符合声明、依赖完整且符合分支选择；当前 Wait 不能已经完成或跳过。
 
 未进入执行路径的节点不创建 job 或 execution identity，也不产生节点事件；分支跳过状态只用于内部调度和 checkpoint 恢复。
 `node.completed` 仅在节点完整 output 校验成功后产生，payload 的 `outputs` 是按 handle 索引的完整最终结果对象，无输出时为 `{}`。
-每次节点 invocation 只产生一条完成事件，且先于下游节点的 `node.started`；不再产生逐 handle 的 `node.output`，也不支持运行中的中间 output。
+每次节点 invocation 只产生一条完成事件，且先于下游节点的 `node.started`；不再产生逐 handle 的 `node.output`，普通 Task 不支持运行中的中间 output。Wait 的 notification 出口在登记后可用，Wait 本身仍只在决议后完成一次。
 
 Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保存已执行完成的图末端节点，按 node ID 排序。
 每项为 `{ nodeId, status: 'completed', jobId, outputs }`，不包含未执行节点或重复执行的 jobs 数组；没有已执行完成的末端节点时为 `[]`。
 
 ## 10. Code Action 合同
 
-当前脚本合同为 `open-flow-engine/v2`。它用 `context.actions` 替代 v1 的 `context.connector`，不提供旧名转发；
+当前脚本合同为 `open-flow-engine/v3`。它用 `context.actions` 替代 v1 的 `context.connector`，不提供旧名转发；
 固定为 v1 的 Publication / Run 必须由相应 Engine 执行，当前 Server 对 v1 明确返回不支持。
 升级已有 Code Task 时，将单账号 capability 改为以下允许集合，并更新源码后创建 v2 Publication。
 
@@ -873,7 +879,7 @@ Action 与 Connection 固定在 Revision；无需认证的 Action 可以省略 `
 
 可选 `executor.notification` 为 `{ taskId, messageHandle, inputs }`。`taskId` 引用 Connector Task；通知输入的 source
 只能是固定值或此次节点输入，消息字段由宿主填写。通知 Task 属于 closure，独立进行 Action、Connection 和公共通知 origin 检查。
-待审批的完整调用以 JSON 展示在 `RunDetails.waiting.prompt`，包含 `callId`、`toolId`、Action、可选 Connection 和完整 `input`。
+待审批的完整调用以 JSON 展示在 `RunDetails.waits[].prompt`，包含 `callId`、`toolId`、Action、可选 Connection 和完整 `input`。
 通知消息追加原等待的到期时间和决议链接。
 
 修改 Agent 使用 change operation `{ kind: "task.agent.set", taskId, before, value }`。

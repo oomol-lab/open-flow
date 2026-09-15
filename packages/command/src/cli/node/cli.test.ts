@@ -175,7 +175,7 @@ describe('CLI', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v2',
+          engineContract: 'open-flow-engine/v3',
           flowId: flow.flowId,
           modelVersion: 1,
           revisionDigest: 'digest-1',
@@ -274,8 +274,9 @@ it.each([
         source: 'draft',
         status: 'queued',
         version: 1,
+        waits: [],
         closureDigest: 'closure',
-        engineContract: 'open-flow-engine/v2',
+        engineContract: 'open-flow-engine/v3',
         engineDigest: 'engine',
         modelVersion: 1,
         revisionDigest: 'digest',
@@ -300,8 +301,9 @@ const runFixture = {
   source: 'draft',
   status: 'running',
   version: 1,
+  waits: [],
   closureDigest: 'closure',
-  engineContract: 'open-flow-engine/v2',
+  engineContract: 'open-flow-engine/v3',
   engineDigest: 'engine',
   modelVersion: 1,
   revisionDigest: 'digest',
@@ -346,9 +348,9 @@ describe('agent command contract', () => {
       waitId: 'wait-1',
       waitingSince: flow.createdAt,
     }
-    const request = vi.fn(async () => Response.json({ ...runFixture, status: 'waiting', waiting }))
+    const request = vi.fn(async () => Response.json({ ...runFixture, status: 'running', waits: [waiting] }))
     expect(await runCli(['runs', 'wait', 'run-1', '--json'], { request }, output.value)).toBe(2)
-    expect(JSON.parse(output.stdout())).toMatchObject({ run: { waiting }, timedOut: false })
+    expect(JSON.parse(output.stdout())).toMatchObject({ run: { waits: [waiting] }, timedOut: false })
     expect(request).toHaveBeenCalledOnce()
   })
 
@@ -501,9 +503,10 @@ describe('agent command contract', () => {
       Response.json(
         path.endsWith('/check')
           ? {
+              waits: [],
               closureDigest: 'closure',
               diagnostics: [],
-              engineContract: 'open-flow-engine/v2',
+              engineContract: 'open-flow-engine/v3',
               flowId: flow.flowId,
               modelVersion: 1,
               revisionDigest: 'digest',
@@ -572,9 +575,10 @@ it('applies a complete operation batch atomically and reports validation separat
     }
     if (path.endsWith('/check'))
       return Response.json({
+        waits: [],
         closureDigest: 'closure',
         diagnostics: [],
-        engineContract: 'open-flow-engine/v2',
+        engineContract: 'open-flow-engine/v3',
         flowId: flow.flowId,
         modelVersion: 1,
         revisionDigest: 'digest',

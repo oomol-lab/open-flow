@@ -103,7 +103,7 @@ describe('WorkbenchStore diagnostics', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v2',
+          engineContract: 'open-flow-engine/v3',
           flowId: flow.flowId,
           modelVersion: 1,
           revisionDigest: draft.digest,

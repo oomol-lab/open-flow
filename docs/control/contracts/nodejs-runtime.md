@@ -1,7 +1,7 @@
 # Node compatibility runtime contract
 
-`open-flow-engine/v2/nodejs-compat-v1` extends the v2 execution model with a fixed builtin module
-allowlist. The existing `open-flow-engine/v2` contract is unchanged. Deployments advertise this
+`open-flow-engine/v3/nodejs-compat-v1` extends the v2 execution model with a fixed builtin module
+allowlist. The existing `open-flow-engine/v3` contract is unchanged. Deployments advertise this
 additional contract only when they implement it; Server does not automatically opt into it.
 
 `EngineContract.builtinModules` declares accepted builtin specifiers. Both prefixed and bare forms

@@ -3,7 +3,7 @@ import type { WorkbenchLocation, WorkbenchTheme } from './contract.ts'
 import type { AddNodeOption } from './editor/addNodeOptions.ts'
 import type { WorkbenchCanvasHandle } from './editor/workbenchCanvas.tsx'
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { useIgnoredNodes } from '../../../canvas/browser/useIgnoredNodes.ts'
@@ -27,10 +27,9 @@ import { RunInputPanel } from './runs/runInputPanel.tsx'
 import { RunResults } from './runs/runResults.tsx'
 import { RunsView } from './runs/runsView.tsx'
 import { WorkspaceHeader } from './shell/workspaceHeader.tsx'
-import { mapSource } from './stores/optionSource.ts'
 import { WorkbenchStore } from './stores/workbenchStore.ts'
 
-type ContextPanelMode = 'blocks' | 'inspector' | 'notification' | undefined
+type ContextPanelMode = 'blocks' | 'inspector' | undefined
 
 function RunDrawerContainer({
   onClose,
@@ -55,7 +54,7 @@ function RunDrawerContainer({
   const historyComplete = useVal(store.runs.$.historyComplete)
   const observationFailed = useVal(store.runs.$.observationFailed)
   const result = useVal(store.runs.$.result)
-  const resolvingAction = useVal(store.runs.$.resolvingAction)
+  const resolvingActions = useVal(store.runs.$.resolvingActions)
   const run = useVal(store.runs.$.run)
   const submitting = useVal(store.runRequests.$.submitting)
   return (
@@ -73,16 +72,16 @@ function RunDrawerContainer({
       onConfigureConnector={onConfigureConnector}
       onEventFilterChange={(filter) => store.runs.setEventFilter(filter)}
       onLocateEvent={(sequence) => store.locateRunEvent(sequence)}
-      onLocateWait={() => {
-        if (store.locateRunWait()) onClose()
+      onLocateWait={(nodeId) => {
+        if (store.locateRunWait(nodeId)) onClose()
       }}
-      onResolve={(action) => void store.runs.resolve(action)}
+      onResolve={(waitId, action) => void store.runs.resolve(waitId, action)}
       onRetryObservation={() => store.runs.retryObservation()}
       onToggle={onToggle}
       observationFailed={observationFailed}
       open={open}
       result={result}
-      resolvingAction={resolvingAction}
+      resolvingActions={resolvingActions}
       run={run}
       submitting={submitting != null}
       visible={visible}
@@ -95,12 +94,11 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   store,
   focus,
   disabled,
-  onChooseWaitNotification,
   revision,
   selection,
   target,
   theme,
-}: Pick<ComponentProps<typeof NodeInspector>, 'focus' | 'disabled' | 'onChooseWaitNotification' | 'revision' | 'selection' | 'target' | 'theme'> & {
+}: Pick<ComponentProps<typeof NodeInspector>, 'focus' | 'disabled' | 'revision' | 'selection' | 'target' | 'theme'> & {
   readonly store: WorkbenchStore
 }): ReactElement {
   const variableNames = useVal(store.$.variableNames)
@@ -143,7 +141,6 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
       diagnostics={inspectorDiagnostics}
       focus={focus}
       disabled={disabled}
-      onChooseWaitNotification={onChooseWaitNotification}
       revision={revision}
       selection={selection}
       sourceNodeIcons={sourceNodeIcons}
@@ -258,12 +255,6 @@ function Editor({
     focusInspectorOnOpen.current = false
     setContextPanelMode('inspector')
   }
-  const openNotification = useCallback((button: HTMLButtonElement): void => {
-    opener.current = button
-    focusInspectorOnOpen.current = false
-    setContextPanelMode('notification')
-    setBlocksFocusRequest((request) => request + 1)
-  }, [])
   const toggleInspector = (button: HTMLButtonElement): void => {
     if (contextPanelMode == 'inspector') {
       closeContextPanel(button)
@@ -275,14 +266,6 @@ function Editor({
   }
   const addFromBlocks = async (option: AddNodeOption): Promise<string | undefined> => {
     return designerRef.current?.addNode(option)
-  }
-
-  const setNotification = async (option: AddNodeOption): Promise<string | undefined> => {
-    if (selection?.kind != 'wait' || option.kind != 'connector') return
-    if (!(await store.workspace.setWaitNotification(selection.id, option.connector))) return
-    await store.refreshSelectedConnector()
-    setContextPanelMode('inspector')
-    return selection.id
   }
 
   const contextPanelVisible = contextPanelMode != null && target != null && (contextPanelMode == 'blocks' || revision != null)
@@ -424,16 +407,10 @@ function Editor({
                 : undefined
           }
           focusOnOpen={contextPanelMode == 'inspector' && focusInspectorOnOpen.current}
-          icon={contextPanelMode == 'blocks' ? 'plus' : contextPanelMode == 'notification' ? 'connection' : inspectorIcon(selection, target)}
-          onClose={() => (contextPanelMode == 'notification' ? setContextPanelMode('inspector') : closeContextPanel())}
+          icon={contextPanelMode == 'blocks' ? 'plus' : inspectorIcon(selection, target)}
+          onClose={() => closeContextPanel()}
           theme={theme}
-          title={
-            contextPanelMode == 'blocks'
-              ? t('contextPanel.blocks')
-              : contextPanelMode == 'notification'
-                ? t('inspector.wait.chooseNotificationTitle')
-                : (selectedDesignerNode?.title ?? targetName ?? t('inspector.title'))
-          }
+          title={contextPanelMode == 'blocks' ? t('contextPanel.blocks') : (selectedDesignerNode?.title ?? targetName ?? t('inspector.title'))}
         >
           {contextPanelMode == 'blocks' ? (
             <BlockLibrary
@@ -447,25 +424,6 @@ function Editor({
               onRegisterDragOption={(option) => designerRef.current?.registerAddNodeOption(option)}
               options={addNodeOptions}
               provideChoices={store.provideAddNodeOptionChoices}
-            />
-          ) : contextPanelMode == 'notification' ? (
-            <BlockLibrary
-              browseOptions={store.connectors.browseAddNodeOptions}
-              searchOptions={(query, signal) =>
-                mapSource(store.connectors.provideAddNodeOptions(query, signal), signal, (options) =>
-                  options.filter((option) => option.kind == 'connector' && option.inputs.length > 0),
-                )
-              }
-              disabled={authoringDisabled}
-              draggable={false}
-              focusRequest={blocksFocusRequest}
-              onAdd={setNotification}
-              options={[]}
-              provideChoices={(optionId, signal) =>
-                mapSource(store.connectors.provideAddNodeOptionChoices(optionId, signal), signal, (options) =>
-                  options.filter((option) => option.kind == 'connector' && option.inputs.length > 0),
-                )
-              }
             />
           ) : selectedDesignerNode?.kind == 'comment' ? (
             <CommentInspector
@@ -482,7 +440,6 @@ function Editor({
                 store={store}
                 focus={diagnosticFocus}
                 disabled={authoringDisabled}
-                onChooseWaitNotification={openNotification}
                 revision={revision}
                 selection={selection}
                 target={target}

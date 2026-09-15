@@ -426,7 +426,7 @@ function bindingReferences(document: RevisionContent['document']): Map<string, n
     for (const node of Object.values(currentGraph.nodes)) {
       if (node.kind == 'poll' || node.kind == 'integration') add(node.bindingId)
       if (!('inputs' in node)) continue
-      const inputs = [...Object.values(node.inputs), ...(node.kind == 'wait' && node.notification != null ? Object.values(node.notification.inputs) : [])]
+      const inputs = Object.values(node.inputs)
       for (const mapping of inputs) {
         if (mapping.kind != 'sources') continue
         for (const source of mapping.sources) if (source.kind == 'binding') add(source.bindingId)

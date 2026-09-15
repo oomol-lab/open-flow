@@ -70,7 +70,7 @@ function webhookFlow(): RevisionContent {
 
 async function publishedWebhook(service: ServerService, key = 'webhook') {
   const stored = await storeRevision(service, webhookFlow(), `revision-${key}`)
-  await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v2', null, `publication-${key}`)
+  await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v3', null, `publication-${key}`)
   await service.tickMaintenance()
   const binding = service.control.getFlowTriggerBinding(stored.flowId, 'incoming', 'http://server.local')
   const endpointId = binding.endpointUrl == null ? undefined : webhookEndpointId(new URL(binding.endpointUrl))
@@ -141,7 +141,7 @@ describe('Server Webhook Trigger admission', () => {
       status: 'queued',
     })
     await expect(
-      service.control.createDraftRun(target.flowId, target.revisionId, target.engineContract, {}, 'manual-run', {
+      service.control.runs.createDraftRun(target.flowId, target.revisionId, target.engineContract, {}, 'manual-run', {
         nodeId: target.triggerNodeId,
         payload: { message: 'hello' },
       }),
@@ -191,7 +191,7 @@ describe('Server Webhook Trigger admission', () => {
     })
 
     expect(response.status).toBe(400)
-    expect(service.control.listRuns(target.flowId, 10).page.runs).toHaveLength(0)
+    expect(service.control.runs.listRuns(target.flowId, 10).page.runs).toHaveLength(0)
   })
 
   it('reclaims expired callback windows without resetting active limits', async () => {

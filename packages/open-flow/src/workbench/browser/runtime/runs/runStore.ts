@@ -31,7 +31,7 @@ interface RunState {
   readonly observationFailed: boolean
   readonly refreshing: boolean
   readonly result?: RunResult
-  readonly resolvingAction?: WaitAction
+  readonly resolvingActions: ReadonlyMap<string, WaitAction>
   readonly runById: ReadonlyMap<string, Run | RunDetails>
   readonly runIds: readonly string[]
   readonly selectedRunId?: string
@@ -55,7 +55,7 @@ export interface Run$ {
   readonly observationFailed: ReadonlyVal<boolean>
   readonly refreshing: ReadonlyVal<boolean>
   readonly result: ReadonlyVal<RunResult | undefined>
-  readonly resolvingAction: ReadonlyVal<WaitAction | undefined>
+  readonly resolvingActions: ReadonlyVal<ReadonlyMap<string, WaitAction>>
   readonly run: ReadonlyVal<Run | RunDetails | undefined>
   readonly runs: ReadonlyVal<readonly Run[]>
 }
@@ -74,6 +74,7 @@ const initialState: RunState = {
   loadingMore: false,
   observationFailed: false,
   refreshing: false,
+  resolvingActions: new Map(),
   runById: new Map(),
   runIds: [],
 }
@@ -137,7 +138,7 @@ export class RunStore {
       observationFailed: derive(this.#state, (state) => state.observationFailed),
       refreshing: derive(this.#state, (state) => state.refreshing),
       result: derive(this.#state, (state) => state.result),
-      resolvingAction: derive(this.#state, (state) => state.resolvingAction),
+      resolvingActions: derive(this.#state, (state) => state.resolvingActions),
       run: derive(this.#state, selectedRun),
       runs: derive(
         this.#state,
@@ -274,7 +275,7 @@ export class RunStore {
 
   public async cancel(): Promise<void> {
     const run = selectedRun(this.#state.value)
-    if (!canCancelRun(run) || this.#state.value.cancelingRunId != null || this.#state.value.resolvingAction != null) return
+    if (!canCancelRun(run) || this.#state.value.cancelingRunId != null || this.#state.value.resolvingActions.size > 0) return
     const current = this.#cancellation.begin()
     this.#set({ cancelingRunId: run.runId })
     try {
@@ -296,25 +297,24 @@ export class RunStore {
     }
   }
 
-  public async resolve(action: WaitAction): Promise<void> {
+  public async resolve(waitId: string, action: WaitAction): Promise<void> {
     const run = selectedRun(this.#state.value)
-    const waiting = run?.status == 'waiting' && 'waiting' in run ? run.waiting : undefined
+    const waiting = run != null && 'waits' in run ? run.waits.find((wait) => wait.waitId == waitId) : undefined
     if (
       run == null ||
       waiting == null ||
       this.#state.value.cancelingRunId != null ||
-      this.#state.value.resolvingAction != null ||
+      this.#state.value.resolvingActions.has(waitId) ||
       !waiting.actions.some((candidate) => candidate == action)
     )
       return
-    this.#set({ resolvingAction: action })
+    this.#set({ resolvingActions: new Map(this.#state.value.resolvingActions).set(waitId, action) })
     try {
       const resolution = await this.#client.resolveRunWait(run.runId, waiting.waitId, action)
       const state = this.#state.value
       const selected = selectedRun(state)
-      if (selected?.runId != run.runId || !('waiting' in selected) || selected.waiting?.waitId != waiting.waitId) return
-      const { waiting: _, ...rest } = selected
-      const next = { ...rest, status: resolution.status }
+      if (selected?.runId != run.runId || !('waits' in selected)) return
+      const next = { ...selected, waits: selected.waits.filter((wait) => wait.waitId != waitId), status: resolution.status }
       this.#set({ runById: replaceRun(state, next) })
       this.retryObservation()
       const target = this.#state.value.target
@@ -322,7 +322,9 @@ export class RunStore {
     } catch (error) {
       if (this.#state.value.selectedRunId == run.runId) this.#setNotice(errorNotice(error, this.#i18n.t))
     } finally {
-      if (this.#state.value.resolvingAction == action) this.#set({ resolvingAction: undefined })
+      const resolvingActions = new Map(this.#state.value.resolvingActions)
+      resolvingActions.delete(waitId)
+      this.#set({ resolvingActions })
     }
   }
 
@@ -380,7 +382,7 @@ export class RunStore {
       eventsExpiresAt: undefined,
       historyComplete: true,
       observationFailed: false,
-      resolvingAction: undefined,
+      resolvingActions: new Map(),
       result: undefined,
       runById: replaceRun(state, run),
       selectedRunId: run.runId,

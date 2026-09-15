@@ -347,7 +347,7 @@ export function publicationText(publication: Publication): string {
 
 export function runText(run: RunDetails): string {
   const publication = run.source == 'draft' ? '' : `\t${run.publicationId}`
-  return `${run.source}\t${run.status}\t${run.runId}\t${run.revisionId}${publication}${run.waiting == null ? '' : `\n${JSON.stringify(run.waiting)}`}`
+  return `${run.source}\t${run.status}\t${run.runId}\t${run.revisionId}${publication}${run.waits.length == 0 ? '' : `\n${JSON.stringify(run.waits)}`}`
 }
 
 export function runSummaryText(run: { readonly revisionId: string; readonly runId: string; readonly source: string; readonly status: string }): string {
@@ -487,7 +487,7 @@ export async function publicationById(client: ControlClient, flowId: string, pub
 export async function waitForRun(client: ControlClient, created: RunDetails, runtime: Runtime, timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs
   let current = created
-  while (!terminalRunStatuses.has(current.status) && current.status != 'waiting') {
+  while (!terminalRunStatuses.has(current.status) && current.waits.length == 0) {
     const remaining = deadline - Date.now()
     if (remaining <= 0) return { run: current, timedOut: true }
     await runtime.wait(Math.min(1_000, remaining))
@@ -504,7 +504,7 @@ export async function waitForRun(client: ControlClient, created: RunDetails, run
 
 export function runExitCode(run: RunDetails, timedOut = false): number {
   if (timedOut) return 3
-  if (run.status == 'waiting') return 2
+  if (run.waits.length > 0) return 2
   return run.status == 'failed' || run.status == 'canceled' || run.status == 'indeterminate' ? 1 : 0
 }
 

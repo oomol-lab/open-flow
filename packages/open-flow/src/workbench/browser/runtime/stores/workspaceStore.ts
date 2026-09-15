@@ -19,7 +19,6 @@ import type {
   WebhookSettings,
 } from '../editor/flowChanges.ts'
 import type { RevisionView } from '../revisionView.ts'
-import type { ConnectorActionView } from '../workspace.ts'
 import type { DesignerEdge, DesignerGraph, DesignerViewport, Point } from '../workspace.ts'
 import type { CanvasAction } from './canvasHistory.ts'
 import type { DraftChangeContext } from './draftChanges.ts'
@@ -55,7 +54,6 @@ import {
   pasteNodes,
   setInputVariable as changeInputVariable,
   setInputValue as changeInputValue,
-  setWaitNotification,
   updateCondition,
   updateTaskPorts,
   updateTaskAdditionalInputs,
@@ -646,19 +644,12 @@ export class WorkspaceStore {
     nodeId: string,
     settings: Pick<Extract<GraphNode, { readonly kind: 'wait' }>, 'actions' | 'prompt'> & {
       readonly name?: string
-      readonly notification: Extract<GraphNode, { readonly kind: 'wait' }>['notification']
     },
   ): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target?.kind != 'flow') return false
     const changes = updateWait(revision, target, nodeId, settings)
-    return changes != null && (await this.#changeDraft(changes)) != null
-  }
-
-  public async setWaitNotification(nodeId: string, action: ConnectorActionView): Promise<boolean> {
-    const revision = this.$.revision.value
-    const changes = revision == null ? undefined : setWaitNotification(revision, nodeId, action, this.#identity())
     return changes != null && (await this.#changeDraft(changes)) != null
   }
 

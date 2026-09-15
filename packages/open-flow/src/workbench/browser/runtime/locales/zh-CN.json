@@ -227,19 +227,12 @@
     "wait": {
       "approval": "通过或拒绝",
       "changeNotification": "更换",
-      "chooseNotification": "添加通知",
-      "chooseNotificationTitle": "选择通知方式",
       "continue": "继续",
-      "inputs": "参数",
-      "inputsInvalid": "请填写所有必需的通知参数。",
-      "inputsLoading": "正在加载通知参数…",
-      "messageHandle": "消息内容写入",
       "mode": "处理方式",
-      "notificationTask": "通知",
-      "notificationUnavailable": "通知配置不可用，请重新选择。",
+      "inputsLoading": "正在加载通知参数…",
+      "notificationDescription": "连接通知出口，可在等待期间发送消息或执行其他步骤。",
       "prompt": "提示",
-      "promptError": "提示必须包含 1 到 1,000 个字符。",
-      "removeNotification": "移除通知"
+      "promptError": "提示必须包含 1 到 1,000 个字符。"
     },
     "title": "检查器",
     "sources": {

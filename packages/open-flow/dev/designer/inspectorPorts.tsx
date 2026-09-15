@@ -163,7 +163,6 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
                 connectors={session.connectors}
                 diagnostics={[]}
                 disabled={disabled}
-                onChooseWaitNotification={() => {}}
                 revision={revision}
                 selection={selection}
                 store={session.store}

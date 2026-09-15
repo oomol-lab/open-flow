@@ -356,7 +356,6 @@ describe('Flow changes', () => {
           inputs: {},
           kind: 'wait',
           name: 'Wait',
-          notification: { inputs: {}, messageHandle: 'text', taskId: 'notify' },
           prompt: 'Continue?',
         },
         nodeId: 'wait',
@@ -367,7 +366,6 @@ describe('Flow changes', () => {
       {
         before: {
           actions: ['continue'],
-          notification: { inputs: {}, messageHandle: 'text', taskId: 'notify' },
           prompt: 'Continue?',
         },
         kind: 'graph.node.wait.set',

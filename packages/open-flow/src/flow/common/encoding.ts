@@ -138,15 +138,6 @@ function canonicalNode(value: GraphNode): JsonValue {
         actions: value.actions,
         input: { handle: value.input.handle, ...canonicalPort(value.input) },
         kind: value.kind,
-        ...(value.notification == null
-          ? {}
-          : {
-              notification: {
-                inputs: canonicalInputs(value.notification.inputs),
-                messageHandle: value.notification.messageHandle,
-                taskId: value.notification.taskId,
-              },
-            }),
         prompt: value.prompt,
       }
   }

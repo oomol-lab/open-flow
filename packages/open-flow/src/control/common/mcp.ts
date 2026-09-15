@@ -114,7 +114,7 @@ export const mcpTools = {
   ),
   run_list: tool(
     'List Runs for a Flow, optionally filtered by status. Continue with nextCursor; cursors are compatible with the Control API.',
-    z.strictObject({ flowId: flow, status: z.enum(runStatuses).optional(), cursor: id.optional(), limit: pageLimit }),
+    z.strictObject({ flowId: flow, pendingWait: z.boolean().optional(), status: z.enum(runStatuses).optional(), cursor: id.optional(), limit: pageLimit }),
     true,
   ),
   run_get: tool(

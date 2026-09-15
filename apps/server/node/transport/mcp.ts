@@ -139,26 +139,27 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
     if (source == 'draft') {
       if (flowId == null || revisionId == null || publicationId != null)
         throw new ControlError(controlErrorCode.runInvalid, 'Draft requires flowId and revisionId, without publicationId.')
-      return (await control.createDraftRun(flowId, revisionId, currentEngineContract, inputs, idempotencyKey, trigger)).run
+      return (await control.runs.createDraftRun(flowId, revisionId, currentEngineContract, inputs, idempotencyKey, trigger)).run
     }
     if (publicationId == null || flowId != null || revisionId != null)
       throw new ControlError(controlErrorCode.runInvalid, 'Live requires publicationId, without flowId or revisionId.')
-    return (await control.createLiveRun(publicationId, inputs, idempotencyKey, trigger)).run
+    return (await control.runs.createLiveRun(publicationId, inputs, idempotencyKey, trigger)).run
   })
-  register('run_list', mcpTools.run_list, ({ flowId, status, cursor, limit }) => {
-    const { next, page } = control.listRuns(flowId, limit, {
+  register('run_list', mcpTools.run_list, ({ flowId, status, cursor, limit, pendingWait }) => {
+    const { next, page } = control.runs.listRuns(flowId, limit, {
       ...(status == null ? {} : { status }),
+      ...(pendingWait == null ? {} : { pendingWait }),
       ...(cursor == null ? {} : { after: decodeRunCursor(cursor, flowId) }),
     })
     return { ...page, ...(next == null ? {} : { nextCursor: encodeRunCursor(flowId, next) }) }
   })
-  register('run_get', mcpTools.run_get, ({ runId }) => control.getRun(runId))
-  register('run_events', mcpTools.run_events, ({ runId, after, limit }) => control.getRunEvents(runId, after, limit))
-  register('run_result', mcpTools.run_result, ({ runId }) => control.getRunResult(runId))
-  register('run_results', mcpTools.run_results, ({ runId, after }) => control.listRunResults(runId, after))
-  register('run_result_read', mcpTools.run_result_read, ({ runId, resultId, ...query }) => control.readRunResult(runId, resultId, query))
-  register('run_resolve_wait', mcpTools.run_resolve_wait, ({ runId, waitId, action }) => control.resolveRunWait(runId, waitId, action))
-  register('run_cancel', mcpTools.run_cancel, ({ runId }) => control.cancelRun(runId))
+  register('run_get', mcpTools.run_get, ({ runId }) => control.runs.getRun(runId))
+  register('run_events', mcpTools.run_events, ({ runId, after, limit }) => control.runs.getRunEvents(runId, after, limit))
+  register('run_result', mcpTools.run_result, ({ runId }) => control.runs.getRunResult(runId))
+  register('run_results', mcpTools.run_results, ({ runId, after }) => control.runs.listRunResults(runId, after))
+  register('run_result_read', mcpTools.run_result_read, ({ runId, resultId, ...query }) => control.runs.readRunResult(runId, resultId, query))
+  register('run_resolve_wait', mcpTools.run_resolve_wait, ({ runId, waitId, action }) => control.runs.resolveRunWait(runId, waitId, action))
+  register('run_cancel', mcpTools.run_cancel, ({ runId }) => control.runs.cancelRun(runId))
   register('connector_teams', mcpTools.connector_teams, (_, context) => service.connectorTeams(context.mcpReq.signal))
   register('connector_list', mcpTools.connector_list, async ({ flowId }, context) => ({
     providers: await control.listConnectorProviders(flowId, context.mcpReq.signal),

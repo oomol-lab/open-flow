@@ -250,8 +250,9 @@ function RunSample({ fixture, dark, language, log, state, downstream = false }: 
         source: 'draft',
         status: 'running',
         version: 1,
+        waits: [],
         closureDigest: 'lab',
-        engineContract: 'open-flow-engine/v2',
+        engineContract: 'open-flow-engine/v3',
         engineDigest: 'lab',
         modelVersion: 1,
         revisionDigest: draft.digest,
@@ -424,7 +425,6 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
               connectors={session.connectors}
               diagnostics={[]}
               disabled={state === 'display'}
-              onChooseWaitNotification={() => {}}
               revision={revision}
               selection={selection}
               store={session.workspace}

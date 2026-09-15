@@ -394,7 +394,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.post('/flows/:flowId/revisions/:revisionId/runs', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.runInvalid, controlRequests.createDraftRun)
-    const accepted = await service.createDraftRun(
+    const accepted = await service.runs.createDraftRun(
       context.req.param('flowId'),
       context.req.param('revisionId'),
       text(body.engineContract, controlErrorCode.runInvalid),
@@ -407,7 +407,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
 
   app.post('/runs', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.runInvalid, controlRequests.createLiveRun)
-    const accepted = await service.createLiveRun(
+    const accepted = await service.runs.createLiveRun(
       text(body.publicationId, controlErrorCode.runInvalid),
       body.inputs,
       idempotencyKey(context.req.raw, controlErrorCode.runInvalid),
@@ -416,24 +416,27 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     return response(accepted.created ? 202 : 200, accepted.run)
   })
   app.get('/flows/:flowId/runs', (context) => {
-    const parameters = query(context.req.raw, ['cursor', 'limit', 'status'], controlErrorCode.runInvalid)
+    const parameters = query(context.req.raw, ['cursor', 'limit', 'status', 'pendingWait'], controlErrorCode.runInvalid)
     const flowId = context.req.param('flowId')
     const cursor = parameters.get('cursor')
     const after = cursor == null ? undefined : decodeRunCursor(cursor, flowId)
+    const pendingWait = parameters.get('pendingWait')
+    if (pendingWait != null && pendingWait != 'true' && pendingWait != 'false') invalid(controlErrorCode.runInvalid, 'pendingWait must be true or false.')
     const status = parameters.get('status')
     if (status != null && !runStatusSet.has(status)) invalid(controlErrorCode.runInvalid, 'Run status is invalid.')
-    const { next, page } = service.listRuns(flowId, pageSize(parameters, controlErrorCode.runInvalid), {
+    const { next, page } = service.runs.listRuns(flowId, pageSize(parameters, controlErrorCode.runInvalid), {
       ...(after == null ? {} : { after }),
       ...(status == null ? {} : { status: status as RunStatus }),
+      ...(pendingWait == null ? {} : { pendingWait: pendingWait == 'true' }),
     })
     return response(200, { ...page, ...(next == null ? {} : { nextCursor: encodeRunCursor(flowId, next) }) })
   })
-  app.get('/runs/:runId', (context) => response(200, service.getRun(context.req.param('runId'))))
+  app.get('/runs/:runId', (context) => response(200, service.runs.getRun(context.req.param('runId'))))
   app.get('/runs/:runId/events', (context) => {
     const parameters = query(context.req.raw, ['after', 'limit'], controlErrorCode.runInvalid)
     return response(
       200,
-      service.getRunEvents(
+      service.runs.getRunEvents(
         context.req.param('runId'),
         nonnegativeInteger(parameters.get('after'), 0, controlErrorCode.runInvalid),
         pageSize(parameters, controlErrorCode.runInvalid),
@@ -442,10 +445,10 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.get('/runs/:runId/results', (context) => {
     const parameters = query(context.req.raw, ['after'], controlErrorCode.runInvalid)
-    return response(200, service.listRunResults(context.req.param('runId'), parameters.get('after') ?? undefined))
+    return response(200, service.runs.listRunResults(context.req.param('runId'), parameters.get('after') ?? undefined))
   })
   app.get('/runs/:runId/results/:resultId/content', (context) => {
-    const stored = service.runResultContent(context.req.param('runId'), context.req.param('resultId'))
+    const stored = service.runs.runResultContent(context.req.param('runId'), context.req.param('resultId'))
     return new Response(stored.content, {
       headers: {
         'content-type': 'application/json; charset=utf-8',
@@ -468,17 +471,17 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     } catch {
       invalid(controlErrorCode.runInvalid, 'Invalid result page query.')
     }
-    return response(200, service.readRunResult(context.req.param('runId'), context.req.param('resultId'), parsed))
+    return response(200, service.runs.readRunResult(context.req.param('runId'), context.req.param('resultId'), parsed))
   })
-  app.get('/runs/:runId/result', (context) => response(200, service.getRunResult(context.req.param('runId'))))
+  app.get('/runs/:runId/result', (context) => response(200, service.runs.getRunResult(context.req.param('runId'))))
   app.post('/runs/:runId/cancel', async (context) => {
     await versionOnly(context.req.raw, controlErrorCode.runInvalid)
-    return response(200, service.cancelRun(context.req.param('runId')))
+    return response(200, service.runs.cancelRun(context.req.param('runId')))
   })
   app.post('/runs/:runId/waits/:waitId/resolve', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.runInvalid, controlRequests.resolveWait)
     const action = body.action
-    return response(200, service.resolveRunWait(context.req.param('runId'), context.req.param('waitId'), action))
+    return response(200, service.runs.resolveRunWait(context.req.param('runId'), context.req.param('waitId'), action))
   })
   return app
 }

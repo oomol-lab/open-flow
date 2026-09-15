@@ -7,6 +7,7 @@ import { runFlow } from '../src/execution/common/scheduler.ts'
 import { applyFlowChanges } from '../src/flow/common/change.ts'
 import { availableOutputs } from '../src/flow/common/graph.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
+import { advanceWaiting, waitHost } from './waitHost.ts'
 
 const port = { jsonSchema: {}, nullable: true }
 const value = { inputs: {}, kind: 'value' as const, values: [{ ...port, handle: 'value', value: 1 }] }
@@ -186,8 +187,8 @@ describe('Execution graph scheduling', () => {
     )
     if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
     let id = 0
-    const options = { createId: () => String(++id), flowId: 'main', runId: 'run' }
-    const first = await Effect.runPromise(
+    const options = { waits: waitHost(), createId: () => String(++id), flowId: 'main', runId: 'run' }
+    const first = await advanceWaiting(
       runFlow(prepared.flow, { ...options, trigger: { nodeId: 'start', payload: {} }, invokeTask: () => Effect.succeed({ value: 42 }) }),
     )
     if (first.kind != 'waiting') throw new Error('Expected Wait.')
@@ -195,7 +196,8 @@ describe('Execution graph scheduling', () => {
     await Effect.runPromise(
       runFlow(prepared.flow, {
         ...options,
-        resume: { action: 'continue', checkpoint: JSON.parse(JSON.stringify(first.checkpoint)) },
+        waits: waitHost({ [first.checkpoint.waits[0]!.waitId]: 'continue' }),
+        resume: { checkpoint: JSON.parse(JSON.stringify(first.checkpoint)) },
         invokeTask: (invocation) =>
           Effect.sync(() => {
             calls.push({ nodeId: invocation.nodeId, input: invocation.input })
@@ -216,7 +218,7 @@ describe('Execution graph scheduling', () => {
         Effect.runPromise(
           runFlow(prepared.flow, {
             ...options,
-            resume: { action: 'continue', checkpoint },
+            resume: { checkpoint },
             invokeTask: () => Effect.die('No work should run.'),
           }),
         ),
@@ -240,4 +242,40 @@ describe('Execution graph scheduling', () => {
       expect((await prepareFlow(revision({ edges, nodes: { a: value, b: task } }), currentEngineContract)).kind).toBe('flow-invalid')
     }
   })
+})
+
+it('does not treat eventual action values as available on the notification path', async () => {
+  const wait = {
+    kind: 'wait' as const,
+    inputs: {},
+    input: { ...port, handle: 'value', value: null },
+    actions: ['approve', 'reject'] as const,
+    prompt: 'Approve?',
+  }
+  const graph: Graph = {
+    nodes: {
+      start: { kind: 'manual', name: 'Start' },
+      wait,
+      notify: {
+        ...task,
+        inputs: {
+          input: {
+            kind: 'sources',
+            sources: [
+              { kind: 'node', nodeId: 'wait', output: 'approve' },
+              { kind: 'node', nodeId: 'wait', output: 'reject' },
+            ],
+          },
+        },
+      },
+    },
+    edges: [
+      { source: 'start', target: 'wait' },
+      { source: 'wait', sourceHandle: 'notification', target: 'notify' },
+    ],
+  }
+  const content = revision(graph)
+  const result = await prepareFlow(content, currentEngineContract)
+  expect(result.kind).toBe('flow-invalid')
+  expect(availableOutputs(content.document, graph, 'notify')).toEqual({ start: ['payload'], wait: ['notification'] })
 })

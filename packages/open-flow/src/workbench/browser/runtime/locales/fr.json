@@ -227,19 +227,12 @@
     "wait": {
       "approval": "Approuver ou refuser",
       "changeNotification": "Changer",
-      "chooseNotification": "Ajouter une notification",
-      "chooseNotificationTitle": "Choisir une notification",
       "continue": "Continuer",
-      "inputs": "Paramètres",
-      "inputsInvalid": "Renseignez tous les paramètres de notification requis.",
-      "inputsLoading": "Chargement des paramètres de notification…",
-      "messageHandle": "Écrire le message dans",
       "mode": "Traitement",
-      "notificationTask": "Notification",
-      "notificationUnavailable": "La notification est indisponible. Choisissez-la à nouveau.",
+      "inputsLoading": "Chargement des paramètres de notification…",
+      "notificationDescription": "Reliez la sortie de notification pour envoyer un message ou exécuter d’autres étapes pendant l’attente.",
       "prompt": "Invite",
-      "promptError": "L’invite doit contenir entre 1 et 1 000 caractères.",
-      "removeNotification": "Supprimer la notification"
+      "promptError": "L’invite doit contenir entre 1 et 1 000 caractères."
     },
     "title": "Inspecteur",
     "sources": {

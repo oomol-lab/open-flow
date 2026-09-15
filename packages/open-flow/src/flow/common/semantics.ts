@@ -82,10 +82,6 @@ export function flowDependencies(content: RevisionContent, triggerId?: string): 
         case 'value':
           break
         case 'wait':
-          if (node.notification != null) {
-            tasks.add(node.notification.taskId)
-            visitInputMappings(node.notification.inputs)
-          }
           break
         case 'poll':
         case 'integration':
@@ -320,7 +316,6 @@ function runRevision(revision: RevisionContent, triggerId: string): RevisionCont
       : {
           ...node,
           inputs: inputs(node.inputs),
-          ...(node.kind == 'wait' && node.notification != null ? { notification: { ...node.notification, inputs: inputs(node.notification.inputs) } } : {}),
         }
   }
   const content = { ...revision, document: { ...revision.document, graph: { nodes, edges: graph.edges.filter((edge) => reachable.has(edge.source)) } } }

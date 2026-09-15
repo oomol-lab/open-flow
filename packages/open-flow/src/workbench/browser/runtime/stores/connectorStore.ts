@@ -135,8 +135,7 @@ function providerOption(provider: ConnectorProvider, t: TFunction): AddNodeOptio
 
 function connectorTarget(selection: ResolvedSelection | undefined, revision: RevisionView | undefined): ConnectorTarget | undefined {
   if (selection == null) return
-  const taskId =
-    selection.kind == 'wait' ? selection.node.notification?.taskId : selection.kind == 'task' && selection.node.task == null ? selection.node.taskId : undefined
+  const taskId = selection.kind == 'task' && selection.node.task == null ? selection.node.taskId : undefined
   if (taskId == null) return
   const task = selection.kind == 'task' ? selection.definition : revision?.task(taskId)
   if (task == null || !('executor' in task) || task.executor.kind != 'connector') return

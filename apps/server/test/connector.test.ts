@@ -249,19 +249,19 @@ describe('Server Connector host', () => {
     ])
     const stored = await storeRevision(service, revision, 'multi-account-publish')
     active = false
-    await expect(service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v2', null, 'publish')).rejects.toMatchObject({
+    await expect(service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v3', null, 'publish')).rejects.toMatchObject({
       code: 'connector.connection-required',
     })
     await expect(
-      service.control.createDraftRun(stored.flowId, stored.revisionId, 'open-flow-engine/v2', {}, 'run', { nodeId: 'start', payload: {} }),
+      service.control.runs.createDraftRun(stored.flowId, stored.revisionId, 'open-flow-engine/v3', {}, 'run', { nodeId: 'start', payload: {} }),
     ).rejects.toMatchObject({
       code: 'connector.connection-required',
     })
     active = true
-    const accepted = await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v2', null, 'publish')
+    const accepted = await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v3', null, 'publish')
     const checks = listConnections.mock.calls.length
     active = false
-    const replay = await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v2', null, 'publish')
+    const replay = await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v3', null, 'publish')
     expect(replay.operationId).toBe(accepted.operationId)
     expect(listConnections).toHaveBeenCalledTimes(checks)
   })
@@ -452,7 +452,7 @@ describe('Server Connector host', () => {
       },
       { kind: 'graph.edge.connect', edge: { source: 'start', target: 'connector' }, target: { kind: 'flow' } },
     ])
-    const accepted = await service.control.createDraftRun(created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v2', {}, 'team-run', {
+    const accepted = await service.control.runs.createDraftRun(created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v3', {}, 'team-run', {
       nodeId: 'start',
       payload: {},
     })

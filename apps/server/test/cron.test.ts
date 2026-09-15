@@ -217,23 +217,22 @@ describe('Server Cron Trigger', () => {
     now = Date.parse('2026-08-21T00:01:00.000Z')
     await service.tickCron(new Date(now).toISOString())
     await startService(service)
-    await service.waitForIdle()
-
     const database = new DatabaseSync(file)
     try {
+      await expect.poll(() => database.prepare('SELECT COUNT(*) AS count FROM wait_receipts').get()).toEqual({ count: 1 })
       const first = database.prepare('SELECT run_id AS runId, status FROM runs').get() as { readonly runId: string; readonly status: string }
-      expect(first.status).toBe('waiting')
+      expect(first.status).toBe('running')
 
       now = Date.parse('2026-08-21T00:03:00.000Z')
       await service.tickCron(new Date(now).toISOString())
       expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 1 })
       expect(database.prepare('SELECT next_at AS nextAt FROM cron_bindings').get()).toEqual({ nextAt: Date.parse('2026-08-21T00:02:00.000Z') })
 
-      expect(service.control.cancelRun(first.runId)).toMatchObject({ cancelAccepted: true, status: 'canceled' })
+      expect(service.control.runs.cancelRun(first.runId)).toMatchObject({ cancelAccepted: true, status: 'canceled' })
 
       now = Date.parse('2026-08-21T00:05:00.000Z')
       await service.tickCron(new Date(now).toISOString())
-      await service.waitForIdle()
+      await expect.poll(() => database.prepare('SELECT COUNT(*) AS count FROM wait_receipts').get()).toEqual({ count: 2 })
       expect(database.prepare('SELECT next_at AS nextAt FROM cron_bindings').get()).toEqual({ nextAt: Date.parse('2026-08-21T00:06:00.000Z') })
       const payloads = database.prepare('SELECT payload FROM trigger_occurrences ORDER BY rowid').all() as unknown as readonly {
         readonly payload: string

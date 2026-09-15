@@ -8,7 +8,7 @@
 | Revision envelope | `kind: open-flow-flow-revision`、`version: 1` | 固定 UTF-8 JSON 信封字段和 canonical bytes 规则。                |
 | Flow model        | `modelVersion: 1`                             | 固定 document、modules、节点和端口的序列化结构。                 |
 | Control API       | `/v1`、JSON `version: 1`                      | 固定请求字段、响应、错误码、CAS 和幂等行为。                     |
-| Engine Contract   | `open-flow-engine/v2`                         | 固定执行、Trigger、Task 返回、Wait 和取消语义。                  |
+| Engine Contract   | `open-flow-engine/v3`                         | 固定执行、Trigger、Task 返回、Wait 和取消语义。                  |
 | MCP               | `2026-07-28`                                  | 固定 Streamable HTTP 协商；工具的产品语义复用 Control API。      |
 
 这些数字相同或不同都不表示兼容。旧版本也可能曾使用 `modelVersion: 1`；不得仅凭版本字段接受其内容。完整结构解码必须先于语义验证和执行。
@@ -23,7 +23,7 @@
 - `decodeRevisionContent(value)`：解码 `{ modelVersion, document, modules }`。
 - `decodeRevision(bytes)`：严格 UTF-8、JSON、信封和内容解码，与 `encodeRevision` 配对。
 
-三者忽略并移除对象中未声明的字段，继续校验已知字段的类型、必填项和支持的版本，嵌套深度上限为 `maxJsonDepth`。JSON 数据值和 JSON Schema 内的自定义键保持不变。结构合法不意味着图可执行：引用、标题、环、端口和模块语义继续由 Flow validation 检查。
+普通对象忽略并移除未声明字段；Wait 节点使用严格字段校验，拒绝旧内联 notification。三者，继续校验已知字段的类型、必填项和支持的版本，嵌套深度上限为 `maxJsonDepth`。JSON 数据值和 JSON Schema 内的自定义键保持不变。结构合法不意味着图可执行：引用、标题、环、端口和模块语义继续由 Flow validation 检查。
 解码不填充缺失字段、不迁移旧节点、不规范化用户源代码。`encodeRevision(decodeRevision(bytes))` 产生 canonical bytes；只有输入不含未知字段且本来就是 canonical bytes 时才保证字节不变。
 
 `@oomol-lab/open-flow/control-requests` 提供 `controlRequests` 解码函数和 `controlRequestSchema`，覆盖 Flow 创建、改名、Draft changes、Live 启停、Presentation、检查、发布、回滚、Draft/Live Run、Wait resolution、Variable 写入和仅版本请求。
@@ -42,3 +42,9 @@
 部署通过全部适用用例才可声明符合该 package 的对应 profile。测试未执行、依赖替身缺失或跳过恢复驱动时，不能声称已经验证这些保证。身份隔离、远程网关和真实基础设施的故障恢复继续由部署集成测试负责。
 
 新增可选响应字段可以在保持现有读语义时增量发布。删除、重命名、改变字段类型、收紧合法输入、改变默认值或执行结果属于兼容性变更；必须明确提升对应合同版本或在预发布版本说明中声明断点，并提供迁移与拒绝路径。不得只升级 npm 版本后沿用旧版本标识而静默接受不同含义的数据。
+
+## Wait 局部执行升级
+
+本次 beta 同步升级公共包、Command、Server，Engine 为 v3、checkpoint 为 version 3。Control API 保留 /v1 信封，详情改为必需 waits 数组，新增 wait.created，run.waiting 改为 waitIds；这些是本次 beta 的显式不兼容变更，客户端和部署须一起升级。
+SQLite migration 18 分离 run_checkpoints 与 wait_receipts，将 Agent 通知 work 主键改为 runId/waitId。旧 checkpoint 保留原始字节供恢复校验，当前 Engine 不执行旧 checkpoint，标记 indeterminate；不得自动重放或改写旧 Revision。
+发布前需完成或取消旧活动 Run，或者保留匹配的旧执行环境。当前工作只验证本地 fixture，未读取或升级任何已部署数据库。

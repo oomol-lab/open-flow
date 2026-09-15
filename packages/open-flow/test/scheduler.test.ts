@@ -1,5 +1,5 @@
 import type { FlowRunOptions, SchedulerEvent, TaskInvocation } from '../src/execution/common/scheduler.ts'
-import type { ConditionOperator, JsonValue, RevisionContent } from '../src/flow/common/change.ts'
+import type { WaitAction, ConditionOperator, JsonValue, RevisionContent } from '../src/flow/common/change.ts'
 import type { PreparedFlow } from '../src/flow/common/semantics.ts'
 
 import * as Deferred from 'effect/Deferred'
@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { currentEngineContract } from '../src/execution/common/runtime.ts'
 import { decodeFlowRunCheckpoint, runFlow as scheduleFlow } from '../src/execution/common/scheduler.ts'
 import { prepareFlow as prepareRevision } from '../src/flow/common/semantics.ts'
+import { advanceWaiting, waitHost } from './waitHost.ts'
 
 const port = { jsonSchema: {}, nullable: false } as const
 const engine = currentEngineContract
@@ -16,9 +17,11 @@ const connectorConnectionRequired = 'connector.connection-required'
 const connectorUnavailable = 'connector.unavailable'
 let nextId = 0
 
-async function runOutcome(prepared: PreparedFlow, options: Omit<FlowRunOptions, 'createId' | 'flowId'>) {
-  const { bindingValues, inputs, resume, trigger, ...rest } = options
-  return await Effect.runPromise(
+async function runOutcome(prepared: PreparedFlow, options: Omit<FlowRunOptions, 'createId' | 'flowId'> & { readonly decision?: WaitAction }) {
+  const { bindingValues, inputs, resume, trigger, decision, ...rest } = options
+  const waits = resume == null ? waitHost() : waitHost({ [decodeFlowRunCheckpoint(resume.checkpoint).waits[0]!.waitId]: decision ?? 'continue' })
+  const execute = Object.values(prepared.graph.nodes).some((node) => node.kind == 'wait') ? advanceWaiting : Effect.runPromise
+  return await execute(
     scheduleFlow(prepared, {
       createId: () => `scheduler-${++nextId}`,
       flowId: 'main',
@@ -26,6 +29,7 @@ async function runOutcome(prepared: PreparedFlow, options: Omit<FlowRunOptions, 
         if (error instanceof TaskError) return { code: error.code, message: error.message }
         return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
       },
+      waits,
       ...rest,
       ...(resume == null ? { bindingValues, inputs, trigger: trigger ?? { nodeId: 'start', payload: {} } } : { resume }),
     }),
@@ -389,8 +393,8 @@ describe('revision graph scheduler', () => {
 
     expect(first.kind).toBe('waiting')
     if (first.kind != 'waiting') throw new Error('Expected the Flow Run to wait.')
-    expect(first.wait).toMatchObject({ actions: ['continue'], nodeId: 'wait' })
-    expect(first.wait.waitId).toMatch(/^[A-Za-z0-9_-]{21}$/)
+    expect(first.checkpoint.waits[0]!).toMatchObject({ nodeId: 'wait' })
+    expect(first.checkpoint.waits[0]!.waitId).toMatch(/^[A-Za-z0-9_-]{21}$/)
     expect(invocations).toEqual([])
     expect(decodeFlowRunCheckpoint(JSON.parse(JSON.stringify(first.checkpoint)))).toEqual(first.checkpoint)
 
@@ -400,7 +404,7 @@ describe('revision graph scheduler', () => {
         flowId: 'main',
         runId: 'run-wait',
         invokeTask: () => Effect.fail(new Error('Invalid resume must not invoke a Task.')),
-        resume: { action: 'continue' as const, checkpoint: first.checkpoint },
+        resume: { checkpoint: first.checkpoint },
         ...launch,
       }
       // @ts-expect-error A resumed Run cannot accept new launch values.
@@ -413,7 +417,7 @@ describe('revision graph scheduler', () => {
           invocations.push(invocation)
           return { result: invocation.input }
         }),
-      resume: { action: 'continue', checkpoint: JSON.parse(JSON.stringify(first.checkpoint)) },
+      resume: { checkpoint: JSON.parse(JSON.stringify(first.checkpoint)) },
       runId: 'run-wait',
     })
 
@@ -462,11 +466,16 @@ describe('revision graph scheduler', () => {
     })
     if (first.kind != 'waiting') throw new Error('Expected the Flow Run to wait.')
     expect(first.checkpoint.results.a).toEqual({ jobId: expect.any(String), outputs: { result: 42 } })
-    expect(first.checkpoint.wait).toEqual({ jobId: first.wait.jobId, nodeId: 'wait', value: null, waitId: first.wait.waitId })
+    expect(first.checkpoint.waits[0]!).toEqual({
+      jobId: first.checkpoint.waits[0]!.jobId,
+      nodeId: 'wait',
+      value: null,
+      waitId: first.checkpoint.waits[0]!.waitId,
+    })
 
     const resumed = await runOutcome(prepared, {
       runId: 'parallel-wait',
-      resume: { action: 'continue', checkpoint: first.checkpoint },
+      resume: { checkpoint: first.checkpoint },
       invokeTask: () => Effect.fail(new Error('Completed siblings must not run again.')),
     })
     expect(resumed).toMatchObject({
@@ -530,7 +539,8 @@ describe('revision graph scheduler', () => {
           invoked.push(invocation.nodeId)
           return {}
         }),
-      resume: { action, checkpoint: first.checkpoint },
+      decision: action,
+      resume: { checkpoint: first.checkpoint },
       runId: `run-${action}`,
     })
 
@@ -579,19 +589,19 @@ describe('revision graph scheduler', () => {
     const second = await runOutcome(prepared, {
       emit,
       invokeTask: () => Effect.succeed({}),
-      resume: { action: 'continue', checkpoint: first.checkpoint },
+      resume: { checkpoint: first.checkpoint },
       runId: 'run-two-waits',
     })
     if (second.kind != 'waiting') throw new Error('Expected the second Wait.')
     const completed = await runOutcome(prepared, {
       emit,
       invokeTask: () => Effect.succeed({}),
-      resume: { action: 'continue', checkpoint: second.checkpoint },
+      resume: { checkpoint: second.checkpoint },
       runId: 'run-two-waits',
     })
 
-    expect(second.wait.nodeId).toBe('second')
-    expect(second.wait.waitId).not.toBe(first.wait.waitId)
+    expect(second.checkpoint.waits[0]!.nodeId).toBe('second')
+    expect(second.checkpoint.waits[0]!.waitId).not.toBe(first.checkpoint.waits[0]!.waitId)
     expect(completed).toEqual({ kind: 'node-results', nodes: [{ status: 'completed', jobId: expect.any(String), outputs: { continue: 1 }, nodeId: 'second' }] })
     expect(events.filter((event) => event.type == 'run.started')).toHaveLength(1)
   })

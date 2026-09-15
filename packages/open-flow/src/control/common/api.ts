@@ -308,27 +308,24 @@ export interface Run {
   readonly version: 1
 }
 
-type RunDetailsBase = Omit<Run, 'status'> & {
+export interface RunWait {
+  readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
+  readonly expiresAt: string
+  readonly nodeId: string
+  readonly prompt: string
+  readonly waitId: string
+  readonly waitingSince: string
+}
+
+type RunDetailsBase = Run & {
   readonly closureDigest: string
   readonly engineContract: string
   readonly engineDigest: string
   readonly eventsExpiresAt?: string
   readonly modelVersion: number
   readonly revisionDigest: string
-} & (
-    | { readonly status: Exclude<RunStatus, 'waiting'>; readonly waiting?: never }
-    | {
-        readonly status: 'waiting'
-        readonly waiting: {
-          readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
-          readonly expiresAt: string
-          readonly nodeId: string
-          readonly prompt: string
-          readonly waitId: string
-          readonly waitingSince: string
-        }
-      }
-  )
+  readonly waits: readonly RunWait[]
+}
 
 export type DraftRun = RunDetailsBase & { readonly source: 'draft' }
 export type LiveRun = RunDetailsBase & { readonly publicationId: string; readonly source: 'live' }
@@ -418,6 +415,9 @@ export function decodeRunEvent(value: unknown) {
         payload: { flowId: string(payload.flowId), scopeId: string(payload.scopeId), progress: eventProgress(payload.progress) },
       } as const
     case 'run.waiting':
+      if (!Array.isArray(payload.waitIds)) return invalidResponse()
+      return { ...base, kind, payload: { waitIds: payload.waitIds.map((id) => string(id)) } } as const
+    case 'wait.created':
       return {
         ...base,
         kind,
@@ -862,7 +862,7 @@ export class ControlClient {
   async checkFlow(flowId: string, revisionId: string): Promise<FlowCheck> {
     return flowCheck(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/check`, {
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v2', version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v3', version: 1 }),
         method: 'POST',
       }),
     )
@@ -888,7 +888,7 @@ export class ControlClient {
   async createDraftRun(flowId: string, revisionId: string, options: RunOptions): Promise<DraftRun> {
     const created = runDetails(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/runs`, {
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v2', inputs: options.inputs ?? {}, trigger: options.trigger, version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v3', inputs: options.inputs ?? {}, trigger: options.trigger, version: 1 }),
         headers: { 'idempotency-key': options.idempotencyKey ?? operationKey('run') },
         method: 'POST',
       }),
@@ -919,7 +919,7 @@ export class ControlClient {
   async publishFlow(flowId: string, revisionId: string, expectedLivePublicationId: string | null, options: PublicationOptions = {}): Promise<PublishOperation> {
     return publishOperation(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/publications`, {
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v2', expectedLivePublicationId, version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v3', expectedLivePublicationId, version: 1 }),
         headers: { 'idempotency-key': options.idempotencyKey ?? operationKey('publication') },
         method: 'POST',
       }),
@@ -944,11 +944,15 @@ export class ControlClient {
     return runDetails(await this.request(`/v1/runs/${segment(runId)}`, { signal }))
   }
 
-  async listRuns(flowId: string, options: { readonly cursor?: string; readonly limit?: number; readonly status?: RunStatus } = {}): Promise<RunPage> {
+  async listRuns(
+    flowId: string,
+    options: { readonly cursor?: string; readonly limit?: number; readonly status?: RunStatus; readonly pendingWait?: boolean } = {},
+  ): Promise<RunPage> {
     const parameters = new URLSearchParams()
     if (options.cursor != null) parameters.set('cursor', options.cursor)
     if (options.limit != null) parameters.set('limit', String(options.limit))
     if (options.status != null) parameters.set('status', options.status)
+    if (options.pendingWait != null) parameters.set('pendingWait', String(options.pendingWait))
     const query = parameters.size == 0 ? '' : `?${parameters}`
     return runPage(await this.request(`/v1/flows/${segment(flowId)}/runs${query}`))
   }

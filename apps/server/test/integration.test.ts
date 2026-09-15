@@ -1085,7 +1085,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
         },
       },
     ])
-    const operation = await service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v2', null, 'publish-drive')
+    const operation = await service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v3', null, 'publish-drive')
     await service.tickIntegration()
     expect(changesRead).toBe(0)
     expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('pending')
@@ -1130,7 +1130,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
       'operator',
       flowId,
       scoped.revision.revisionId,
-      'open-flow-engine/v2',
+      'open-flow-engine/v3',
       live.publication!.publicationId,
       'replace-drive',
     )

@@ -188,70 +188,25 @@ describe('Flow Revision encoding', () => {
     })
   })
 
-  it('canonically encodes Wait actions and notification mappings', () => {
+  it('encodes Wait actions and rejects obsolete inline notification fields', () => {
     const source = revision()
     const wait = {
       actions: ['approve', 'reject'],
-
       input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
       inputs: { value: { kind: 'value', value: { request: 1 } } },
       kind: 'wait',
-      notification: {
-        inputs: {
-          recipient: { kind: 'value', value: 'ops@example.com' },
-          subject: { kind: 'value', value: 'Approval required' },
-        },
-        messageHandle: 'message',
-        taskId: 'notify',
-      },
       prompt: 'Approve request 1?',
     } as const
-    const first: RevisionContent = {
-      ...source,
+    const content = { ...source, document: { ...source.document, graph: { edges: [], nodes: { wait } } } }
+    expect(JSON.parse(decoder.decode(encodeRevision(content))).document.graph.nodes.wait).toEqual(wait)
+    const obsolete = {
+      ...content,
       document: {
-        ...source.document,
-        graph: { edges: [], nodes: { wait } },
+        ...content.document,
+        graph: { edges: [], nodes: { wait: { ...wait, notification: { inputs: {}, messageHandle: 'text', taskId: 'notify' } } } },
       },
     }
-    const second: RevisionContent = {
-      ...first,
-      document: {
-        ...first.document,
-        graph: {
-          edges: [],
-          nodes: {
-            wait: {
-              ...wait,
-              notification: {
-                ...wait.notification,
-                inputs: {
-                  subject: wait.notification.inputs.subject,
-                  recipient: wait.notification.inputs.recipient,
-                },
-              },
-            },
-          },
-        },
-      },
-    }
-
-    expect(encodeRevision(second)).toEqual(encodeRevision(first))
-    expect(JSON.parse(decoder.decode(encodeRevision(first))).document.graph.nodes.wait).toEqual({
-      actions: ['approve', 'reject'],
-
-      input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
-      inputs: { value: { kind: 'value', value: { request: 1 } } },
-      kind: 'wait',
-      notification: {
-        inputs: {
-          recipient: { kind: 'value', value: 'ops@example.com' },
-          subject: { kind: 'value', value: 'Approval required' },
-        },
-        messageHandle: 'message',
-        taskId: 'notify',
-      },
-      prompt: 'Approve request 1?',
-    })
+    expect(() => decodeRevision(new TextEncoder().encode(JSON.stringify(obsolete)))).toThrow()
   })
 })
 

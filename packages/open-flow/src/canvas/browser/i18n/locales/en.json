@@ -554,6 +554,7 @@
   "view": "View",
   "canvasCard": {
     "waitBranch": {
+      "notification": "Notification",
       "approve": "Approved",
       "reject": "Rejected",
       "continue": "Continue"

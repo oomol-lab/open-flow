@@ -130,18 +130,6 @@ export class RunExecutor {
         catch: (error) => error,
       })
       if (run.resume != null) {
-        const resume = run.resume
-        const saved = resume.checkpoint.wait
-        const wait = prepared.flow.graph.nodes[saved.nodeId]
-        const actions =
-          wait?.kind == 'wait'
-            ? wait.actions
-            : wait?.kind == 'task' && wait.taskId != null && prepared.flow.tasks[wait.taskId]?.executor.kind == 'agent'
-              ? ['approve', 'reject']
-              : []
-        if (!actions.some((action) => action == resume.action)) {
-          return yield* Effect.fail(new Error('Stored Wait resolution does not match the fixed Flow Revision.'))
-        }
         return {
           bindingValues: run.resume.checkpoint.bindingValues,
           flow: prepared.flow,
@@ -208,8 +196,7 @@ export class RunExecutor {
         return
       }
       if (start == null || start.started == null) return
-      const started =
-        run.resume == null ? this.#store.runs.start(run.runId, start.started) : this.#store.runs.resume(run.runId, run.resume.checkpoint.wait.waitId)
+      const started = run.resume == null ? this.#store.runs.start(run.runId, start.started) : this.#store.runs.resume(run.runId)
       if (!started) return
       return { bindingValues: start.bindingValues, flow: start.flow, projectEvent: start.projectEvent }
     })
@@ -226,8 +213,6 @@ export class RunExecutor {
       const budgetMs = run.remainingMs ?? this.#runTimeoutMs
       this.#logger.info({ category: 'run.started', flowId: run.flowId, runId: run.runId }, 'Run started.')
 
-      const timeoutReason = new Error('Run exceeded its execution deadline.')
-      let timedOut = false
       let indeterminate = false
       let launch: RunLaunch
       if (run.resume != null) launch = { resume: run.resume }
@@ -248,6 +233,37 @@ export class RunExecutor {
           },
           flowId: run.flowId,
           ...launch,
+          remainingMs: budgetMs,
+          wait: async (operation, signal) => {
+            if (operation.kind == 'resolutions')
+              return operation.block
+                ? await this.#store.runs.waitForResolutions(run.runId, operation.waitIds, signal)
+                : this.#store.runs.resolutions(run.runId, operation.waitIds)
+            const request = operation.wait
+            const node = flow.graph.nodes[request.nodeId]
+            if (node == null || !('inputs' in node)) throw new Error('Wait node is unavailable.')
+            let notification:
+              | { action: string; connectionId?: string; input: Readonly<Record<string, JsonValue>>; messageHandle: string; taskId: string }
+              | undefined
+            if (request.notification != null) {
+              const task = flow.tasks[request.notification.taskId]
+              if (task?.executor.kind != 'connector') throw new Error('Agent notification is unavailable.')
+              notification = {
+                action: task.executor.action,
+                connectionId: task.executor.connectionId,
+                taskId: request.notification.taskId,
+                messageHandle: request.notification.messageHandle,
+                input: normalizeConnectorRuntimeInputs(
+                  task.inputs.filter((port) => 'handle' in port),
+                  request.notification.input,
+                ),
+              }
+            }
+            const output = this.#store.runs.createWait(run.runId, request, this.#resolveWaitPublicOrigin()?.href, notification)
+            this.#runChanged(run.flowId, run.runId)
+            this.#wakeMaintenance()
+            return output
+          },
           invokeTask: (invocation) => {
             if (!('taskId' in invocation)) throw new Error('Runtime Executor returned a Code Task to the Host.')
             return this.#invokeTask(flow, invocation, run, async (data) => {
@@ -273,17 +289,10 @@ export class RunExecutor {
           runId: run.runId,
         })
         .pipe(
-          Effect.timeoutOrElse({
-            duration: budgetMs,
-            orElse: () =>
-              Effect.sync(() => {
-                timedOut = true
-              }).pipe(Effect.andThen(Effect.fail(timeoutReason))),
-          }),
           Effect.matchEffect({
-            onFailure: (error) => Effect.sync(() => this.#failRun(run, startedAt, timedOut, error, indeterminate)),
+            onFailure: (error) => Effect.sync(() => this.#failRun(run, startedAt, error.message.includes('execution deadline'), error, indeterminate)),
             onSuccess: (output) =>
-              Effect.try({ try: () => this.#commitOutcome(run, flow, startedAt, budgetMs, output), catch: (error) => error }).pipe(
+              Effect.try({ try: () => this.#commitOutcome(run, startedAt, budgetMs, output), catch: (error) => error }).pipe(
                 Effect.catch((error) => Effect.sync(() => this.#failRun(run, startedAt, false, error))),
               ),
           }),
@@ -291,45 +300,13 @@ export class RunExecutor {
     })
   }
 
-  #commitOutcome(run: StoredRun, flow: PreparedFlow, startedAt: number, budgetMs: number, output: FlowRunOutcome): void {
+  #commitOutcome(run: StoredRun, startedAt: number, budgetMs: number, output: FlowRunOutcome): void {
     if (output.kind == 'waiting') {
-      const remainingMs = Math.max(0, budgetMs - Math.round(performance.now() - startedAt))
-      let notification:
-        | {
-            readonly action: string
-            readonly connectionId?: string
-            readonly input: Readonly<Record<string, JsonValue>>
-            readonly messageHandle: string
-            readonly prompt: string
-            readonly publicOrigin: string
-            readonly taskId: string
-          }
-        | undefined
-      if (output.notification != null) {
-        const task = flow.tasks[output.notification.taskId]
-        const publicOrigin = this.#resolveWaitPublicOrigin()
-        if (task == null || task.executor.kind != 'connector' || publicOrigin == null) {
-          this.#failRun(run, startedAt, false, new Error('Wait notification is unavailable.'))
-          return
-        }
-        notification = {
-          action: task.executor.action,
-          connectionId: task.executor.connectionId,
-          input: normalizeConnectorRuntimeInputs(
-            task.inputs.filter((input) => 'handle' in input),
-            output.notification.input,
-          ),
-          messageHandle: output.notification.messageHandle,
-          prompt: output.wait.prompt,
-          publicOrigin: publicOrigin.href,
-          taskId: output.notification.taskId,
-        }
-      }
-      if (this.#store.runs.wait(run.runId, output, remainingMs, notification) == null) return
+      if (!this.#store.runs.wait(run.runId, output, Math.max(0, Math.floor(output.remainingMs ?? budgetMs)))) return
       this.#runChanged(run.flowId, run.runId)
       this.#wakeMaintenance()
       this.#logger.info(
-        { category: 'run.waiting', durationMs: Math.round(performance.now() - startedAt), flowId: run.flowId, runId: run.runId, waitId: output.wait.waitId },
+        { category: 'run.waiting', durationMs: Math.round(performance.now() - startedAt), flowId: run.flowId, runId: run.runId },
         'Run is waiting.',
       )
       return

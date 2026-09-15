@@ -23,7 +23,7 @@ export type RunTransition =
   | { readonly kind: 'already-started'; readonly status: 'running' }
   | { readonly kind: 'committed'; readonly status: RunTerminalStatus }
   | { readonly kind: 'waited'; readonly status: 'waiting' }
-  | { readonly kind: 'resolved'; readonly status: 'queued' }
+  | { readonly kind: 'resolved'; readonly status: 'queued' | 'starting' | 'running' }
   | { readonly kind: 'stale'; readonly status: RunStatus }
 
 export type RunClaim = Extract<RunTransition, { readonly kind: 'ready' | 'running' | 'terminal' | 'waiting' }>
@@ -67,13 +67,13 @@ export function transitionRun(status: RunStatus, operation: RunOperation): RunTr
     case 'wait':
       return status == 'running' ? { kind: 'waited', status: 'waiting' } : { kind: 'stale', status }
     case 'resolve':
-      return status == 'waiting' ? { kind: 'resolved', status: 'queued' } : { kind: 'stale', status }
+      return isRunTerminal(status) ? { kind: 'stale', status } : { kind: 'resolved', status: status == 'waiting' ? 'queued' : status }
     case 'fail-start':
     case 'fail-resume':
       return status == 'starting' ? { kind: 'committed', status: operation.kind == 'fail-start' ? 'failed' : 'indeterminate' } : { kind: 'stale', status }
     case 'commit':
       if (isRunTerminal(status)) return { kind: 'stale', status }
-      if (operation.status == 'canceled' || status == 'running' || (operation.status == 'failed' && status == 'waiting')) {
+      if (operation.status == 'canceled' || status == 'running' || operation.status == 'failed') {
         return { kind: 'committed', status: operation.status }
       }
       return { kind: 'stale', status }
