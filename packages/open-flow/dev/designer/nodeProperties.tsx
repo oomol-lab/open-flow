@@ -217,7 +217,6 @@ function PropertySample({
             connectorAuthorizationPending={false}
             connectorLoading={false}
             connectors={session.connectors}
-            diagnostics={[]}
             disabled={disabled}
             revision={revision}
             selection={selection}

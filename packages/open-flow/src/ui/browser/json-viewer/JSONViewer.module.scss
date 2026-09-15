@@ -24,6 +24,12 @@
   }
 }
 
+.element-head {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
 .container {
   font-size: 12px;
   line-height: 1.7;

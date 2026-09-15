@@ -1015,6 +1015,38 @@ describe('revision graph scheduler', () => {
     expect(events.filter((event) => event.type == 'node.completed')).toEqual([])
   })
 
+  it('discards undeclared Connector outputs', async () => {
+    const source = revision(
+      {
+        bindings: {},
+        graph: { edges: [], nodes: { news: { inputs: {}, kind: 'task', taskId: 'news' } } },
+        subflows: {},
+        tasks: {
+          news: {
+            executor: { action: 'hacker-news.get-latest-posts', kind: 'connector' },
+            inputs: [],
+            name: 'Get Latest Posts',
+            outputs: [{ handle: 'posts', jsonSchema: { type: 'array' }, nullable: false }],
+          },
+        },
+      },
+      [],
+    )
+    const prepared = await prepareFlow(source, 'main', engine)
+    const result = await runFlow(prepared, {
+      invokeTask: () => Effect.succeed({ exhaustive: true, posts: [] }),
+      runId: 'connector-extra-output',
+    })
+
+    expect(result.nodes).toEqual([{ jobId: expect.any(String), nodeId: 'news', outputs: { posts: [] }, status: 'completed' }])
+    await expect(
+      runFlow(prepared, {
+        invokeTask: () => Effect.succeed({ posts: false }),
+        runId: 'connector-invalid-output',
+      }),
+    ).rejects.toThrow('output "posts" does not match its declaration')
+  })
+
   it('enforces timeout and Fiber interruption for each Task invocation', async () => {
     const source = revision(
       {

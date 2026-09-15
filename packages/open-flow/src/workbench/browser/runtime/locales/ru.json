@@ -194,6 +194,7 @@
       "name": "Заголовок"
     },
     "selectNode": "Выберите один узел черновика, чтобы просмотреть и изменить его.",
+    "locateNode": "Найти {{name}} на холсте",
     "subflow": {
       "definition": "Определение Subflow",
       "inputPorts": "Входные порты (JSON)",
@@ -801,7 +802,7 @@
     "scheduleExpression": "Cron-выражение",
     "scheduleTimezone": "Часовой пояс",
     "scheduleMissing": "Расписание не настроено",
-    "scheduleTestHint": "Тест черновика запускается сразу и выполняется один раз. После публикации рабочий процесс запускается автоматически по расписанию."
+    "scheduleTestHint": "Тесты отправляют {}; рабочие запуски отправляют { scheduledAt }."
   },
   "triggerConfig": {
     "configuration": "Конфигурация",
@@ -837,7 +838,7 @@
     "webhookDescription": "Получать JSON-объект через сгенерированный HTTP-адрес."
   },
   "triggerSummary": {
-    "manualSummary": "Нажмите «Запустить», чтобы начать с этого узла."
+    "manualPayloadHint": "Последующие узлы получают пустой объект ({})."
   },
   "conditionEditor": {
     "addCondition": "Добавить условие",

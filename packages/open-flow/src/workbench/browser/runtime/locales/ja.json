@@ -194,6 +194,7 @@
       "name": "タイトル"
     },
     "selectNode": "ドラフトのノードを 1 つ選択すると、内容を確認して編集できます。",
+    "locateNode": "キャンバス上で {{name}} を表示",
     "subflow": {
       "definition": "Subflow 定義",
       "inputPorts": "入力ポート（JSON）",
@@ -801,7 +802,7 @@
     "scheduleExpression": "Cron 式",
     "scheduleTimezone": "タイムゾーン",
     "scheduleMissing": "スケジュールが未設定です",
-    "scheduleTestHint": "下書きのテストはすぐに1回実行されます。公開後はスケジュールに従って自動実行されます。"
+    "scheduleTestHint": "テストは {}、本番実行は { scheduledAt } を送信します。"
   },
   "triggerConfig": {
     "configuration": "設定",
@@ -837,7 +838,7 @@
     "webhookDescription": "生成された HTTP エンドポイントで JSON オブジェクトを受信します。"
   },
   "triggerSummary": {
-    "manualSummary": "実行をクリックすると、ここから開始します。"
+    "manualPayloadHint": "後続ノードは空のオブジェクト（{}）を受け取ります。"
   },
   "conditionEditor": {
     "addCondition": "条件を追加",

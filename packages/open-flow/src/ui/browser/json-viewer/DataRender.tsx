@@ -74,32 +74,32 @@ function ExpandableObject({
 
   return (
     <div className={styles['basic-element-style']} role="list">
-      <button
-        className={`${styles.inlineButton} ${expanderIconStyle}`}
-        onClick={toggleExpanded}
-        type="button"
-        aria-label={ariaLabel}
-        aria-expanded={expanded}
-        aria-controls={expanded ? contentsId : undefined}
-      />
-      {field != null &&
-        (clickToExpandNode ? (
-          <button
-            aria-controls={expanded ? contentsId : undefined}
-            aria-expanded={expanded}
-            aria-label={ariaLabel}
-            className={`${styles.inlineButton} ${isNumber(field) ? styles['clickable-index-label'] : styles['clickable-label']}`}
-            onClick={toggleExpanded}
-            tabIndex={-1}
-            type="button"
-          >
-            {field}:
-          </button>
-        ) : (
-          <span className={isNumber(field) ? styles['index-label'] : styles['label']}>{field}:</span>
-        ))}
-      {expanded ? (
-        <>
+      <span className={styles['element-head']}>
+        <button
+          className={`${styles.inlineButton} ${expanderIconStyle}`}
+          onClick={toggleExpanded}
+          type="button"
+          aria-label={ariaLabel}
+          aria-expanded={expanded}
+          aria-controls={expanded ? contentsId : undefined}
+        />
+        {field != null &&
+          (clickToExpandNode ? (
+            <button
+              aria-controls={expanded ? contentsId : undefined}
+              aria-expanded={expanded}
+              aria-label={ariaLabel}
+              className={`${styles.inlineButton} ${isNumber(field) ? styles['clickable-index-label'] : styles['clickable-label']}`}
+              onClick={toggleExpanded}
+              tabIndex={-1}
+              type="button"
+            >
+              {field}:
+            </button>
+          ) : (
+            <span className={isNumber(field) ? styles['index-label'] : styles['label']}>{field}:</span>
+          ))}
+        {expanded ? (
           <button
             aria-controls={contentsId}
             aria-expanded
@@ -111,11 +111,30 @@ function ExpandableObject({
           >
             {openBracket}
           </button>
-          {data.length > (groupSize || 0) && pseudoGroupIndex == null && (
-            <span className={styles['item-count']}>
-              {data.length} {data.length > 1 ? 'items' : 'item'}
-            </span>
-          )}
+        ) : (
+          <button
+            className={`${styles.inlineButton} ${styles['collapsed-content']}`}
+            onClick={toggleExpanded}
+            tabIndex={-1}
+            type="button"
+            aria-label={ariaLabel}
+            aria-expanded={expanded}
+          >
+            {pseudoGroupIndex != null && groupSize != null ? (
+              `${groupSize * pseudoGroupIndex} ~ ${groupSize * pseudoGroupIndex + data.length - 1}`
+            ) : (
+              <CompactValue value={value} />
+            )}
+          </button>
+        )}
+        {expanded && data.length > (groupSize || 0) && pseudoGroupIndex == null && (
+          <span className={styles['item-count']}>
+            {data.length} {data.length > 1 ? 'items' : 'item'}
+          </span>
+        )}
+      </span>
+      {expanded ? (
+        <>
           <div id={contentsId}>
             {pseudoGroupIndex == null && groupSize != null && data.length > groupSize
               ? cluster(data, groupSize).map((group, index, groupArr) => (
@@ -160,22 +179,7 @@ function ExpandableObject({
             {closeBracket}
           </button>
         </>
-      ) : (
-        <button
-          className={`${styles.inlineButton} ${styles['collapsed-content']}`}
-          onClick={toggleExpanded}
-          tabIndex={-1}
-          type="button"
-          aria-label={ariaLabel}
-          aria-expanded={expanded}
-        >
-          {pseudoGroupIndex != null && groupSize != null ? (
-            `${groupSize * pseudoGroupIndex} ~ ${groupSize * pseudoGroupIndex + data.length - 1}`
-          ) : (
-            <CompactValue value={value} />
-          )}
-        </button>
-      )}
+      ) : null}
       {!lastElement && pseudoGroupIndex == null && <span className={styles['punctuation']}>,</span>}
     </div>
   )

@@ -194,6 +194,7 @@
       "name": "Titre"
     },
     "selectNode": "Sélectionnez un nœud du Brouillon pour l'inspecter et le modifier.",
+    "locateNode": "Localiser {{name}} sur le canevas",
     "subflow": {
       "definition": "Définition du Subflow",
       "inputPorts": "Ports d'entrée (JSON)",
@@ -801,7 +802,7 @@
     "scheduleExpression": "Expression Cron",
     "scheduleTimezone": "Fuseau horaire",
     "scheduleMissing": "Aucune planification configurée",
-    "scheduleTestHint": "Le test du brouillon s’exécute immédiatement, une seule fois. Après publication, le workflow s’exécute selon le calendrier défini."
+    "scheduleTestHint": "Les tests envoient {} ; les exécutions en ligne envoient { scheduledAt }."
   },
   "triggerConfig": {
     "configuration": "Configuration",
@@ -837,7 +838,7 @@
     "webhookDescription": "Recevoir un objet JSON via un point de terminaison HTTP généré."
   },
   "triggerSummary": {
-    "manualSummary": "Cliquez sur Exécuter pour démarrer ici."
+    "manualPayloadHint": "Les nœuds en aval reçoivent un objet vide ({})."
   },
   "conditionEditor": {
     "addCondition": "Ajouter une condition",

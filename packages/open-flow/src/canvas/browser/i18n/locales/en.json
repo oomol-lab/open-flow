@@ -192,6 +192,7 @@
     "toggleDefault": "Default condition"
   },
   "copy": "Copy",
+  "copied": "Copied",
   "close": "Close",
   "create": "Create",
   "delete": "Delete",

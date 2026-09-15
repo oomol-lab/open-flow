@@ -80,7 +80,6 @@
 
   .run-id {
     overflow: hidden;
-    max-width: 240px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

@@ -37,7 +37,6 @@ function waitDefinition(node: unknown, revision: unknown, saveWait: ReturnType<t
     connectorAuthorizationPending: false,
     connectorLoading: false,
     connectors: {} as never,
-    diagnostics: [],
     disabled: false,
     revision: view as never,
     selection: { id: 'wait', kind: 'wait', node } as never,
@@ -111,7 +110,6 @@ describe('Node timeout settings', () => {
       connectorAuthorizationPending: false,
       connectorLoading: false,
       connectors: {} as never,
-      diagnostics: [],
       disabled: false,
       revision: revision as never,
       selection: { id: 'current', kind: 'subflow', node, definition: { inputs: [], outputs: [] } } as never,
@@ -137,31 +135,6 @@ describe('Node timeout settings', () => {
   })
 })
 
-it('renders diagnostics directly and removes them when cleared', () => {
-  const element = NodeInspector({
-    variables: { enabled: true, names: [], loaded: false, loading: false, onOpen: vi.fn() },
-    connectorAuthorizationPending: false,
-    connectorLoading: false,
-    connectors: {} as never,
-    diagnostics: [],
-    disabled: false,
-    revision: {} as never,
-    selection: undefined,
-    store: { $: { flowId: { value: 'flow' }, inputSources: { value: {} } } } as never,
-    target: { kind: 'flow' },
-    theme: 'light',
-    triggerAuthorizationPending: false,
-    triggerConnectionLoading: false,
-    triggers: {} as never,
-  })
-  const item = find(element, (node) => typeof node.type == 'function' && node.type.name == 'Diagnostics')
-  if (item == null || typeof item.type != 'function') throw new Error('Expected diagnostics.')
-  const render = item.type as (props: unknown) => ReactElement | null
-  const previous = [{ code: 'trigger.config-incomplete', message: 'Missing events', path: '/document/graph/nodes/github', line: 1, column: 0 }]
-  expect(JSON.stringify(render({ diagnostics: previous }))).toContain('trigger.config-incomplete')
-  expect(render({ diagnostics: [] })).toBeNull()
-})
-
 describe('Node input ownership', () => {
   it.each(['condition', 'wait', 'subflow', 'task'] as const)('resolves %s variable bindings and sends edits directly to the workspace', (kind) => {
     const setInputSource = vi.fn()
@@ -179,7 +152,6 @@ describe('Node input ownership', () => {
       connectorAuthorizationPending: false,
       connectorLoading: false,
       connectors: {} as never,
-      diagnostics: [],
       disabled: false,
       revision: {
         binding: () => ({ kind: 'variable', target: 'API_TOKEN' }),

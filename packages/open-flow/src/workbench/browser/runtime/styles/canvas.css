@@ -1,5 +1,6 @@
 .open-flow-workbench {
   .editor-grid {
+    position: relative;
     display: grid;
     min-width: 0;
     min-height: 0;
@@ -10,6 +11,33 @@
 
   .editor-grid.context-panel-closed {
     grid-template-columns: minmax(0, 1fr) 0px;
+  }
+
+  .editor-grid:not(.context-panel-closed)::after {
+    position: absolute;
+    inset: 0;
+    grid-column: 2;
+    grid-row: 2;
+    border-left: 1px solid var(--ui-border);
+    background: var(--open-flow-node-surface);
+    content: '';
+    pointer-events: none;
+  }
+
+  .editor-grid:not(.context-panel-closed)::before {
+    position: absolute;
+    z-index: 4;
+    inset: 0 auto 0 1px;
+    width: 5px;
+    grid-column: 2;
+    grid-row: 2;
+    content: '';
+    pointer-events: none;
+  }
+
+  .editor-grid:has(.context-panel-resizer:hover)::before,
+  .editor-grid:has(.context-panel-resizer:focus-visible)::before {
+    background: var(--ui-ring);
   }
 
   .editor-grid > .context-panel {

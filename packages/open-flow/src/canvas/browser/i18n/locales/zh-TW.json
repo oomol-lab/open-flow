@@ -192,6 +192,7 @@
     "toggleDefault": "預設條件"
   },
   "copy": "複製",
+  "copied": "已複製",
   "close": "關閉",
   "create": "建立",
   "delete": "刪除",

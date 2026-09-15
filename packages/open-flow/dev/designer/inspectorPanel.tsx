@@ -1,13 +1,15 @@
-import type { FlowCanvasViewNodeRun } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
+import type { FlowCanvasViewNodeRun, FlowCanvasViewTaskNode } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { FrontendStory } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
-import { ContextPanel } from '../../src/workbench/browser/runtime/editor/contextPanel.tsx'
+import { EditorContextPanel } from '../../src/workbench/browser/runtime/editor/editorContextPanel.tsx'
+import { FlowNodeList } from '../../src/workbench/browser/runtime/editor/flowNodeList.tsx'
 import { NodeDescription } from '../../src/workbench/browser/runtime/editor/nodeDescription.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
+import { Icon } from '../../src/workbench/browser/runtime/icons.tsx'
 import { useStoryActions } from './storyActions.tsx'
 
 const success: FlowCanvasViewNodeRun = {
@@ -16,12 +18,35 @@ const success: FlowCanvasViewNodeRun = {
   finishedAt: '2026-09-14T02:30:00Z',
   outputs: { summary: 'Three issues need review.', issues: [{ id: 'FLOW-42', title: 'Review sidebar', labels: ['design', 'workflow'] }], count: 3 },
 }
+const reviewNode: FlowCanvasViewTaskNode = {
+  icon: ':carbon:code:',
+  id: 'review',
+  kind: 'task',
+  reference: 'lab/review',
+  title: 'Review issues',
+  inputs: [],
+  outputs: [],
+  position: { x: 60, y: 100 },
+  run: success,
+}
 function CanvasSample({ dark, language }: { dark: boolean; language: UiLanguage }) {
   const [selected, setSelected] = useState<readonly string[]>(['review'])
   const [open, setOpen] = useState(true)
   const [description, setDescription] = useState<string | undefined>(
     'Fetch the issues that need review, group them by priority, and include enough context for the reviewer to decide what needs attention.',
   )
+  const nodeSelected = selected.length > 0
+  const nodeHeading = nodeSelected
+    ? {
+        disabled: false,
+        fallback: <Icon name="task" />,
+        icon: reviewNode.icon,
+        onIconChange: () => {},
+        onRename: () => {},
+        title: reviewNode.title,
+        validate: () => undefined,
+      }
+    : undefined
   useStoryActions([{ label: open ? 'Close properties' : 'Open properties', onClick: () => setOpen(!open) }])
   return (
     <div className={`editor-grid col-span-full h-[480px] overflow-hidden rounded-lg border border-border ${open ? '' : 'context-panel-closed'}`}>
@@ -31,9 +56,7 @@ function CanvasSample({ dark, language }: { dark: boolean; language: UiLanguage 
         dark={dark}
         language={language}
         model={{
-          nodes: [
-            { id: 'review', kind: 'task', reference: 'lab/review', title: 'Review issues', inputs: [], outputs: [], position: { x: 60, y: 100 }, run: success },
-          ],
+          nodes: [reviewNode],
           edges: [],
           viewport: { x: 0, y: 0, zoom: 1 },
         }}
@@ -55,9 +78,22 @@ function CanvasSample({ dark, language }: { dark: boolean; language: UiLanguage 
         }}
       />
       {open && (
-        <ContextPanel resizable icon="task" title="Review issues" theme={dark ? 'dark' : 'light'} focusOnOpen={false} onClose={() => setOpen(false)}>
-          <NodeDescription value={description} disabled={false} onSave={setDescription} />
-        </ContextPanel>
+        <EditorContextPanel
+          resizable
+          icon={nodeSelected ? 'task' : 'flow'}
+          title={nodeSelected ? reviewNode.title : 'Properties'}
+          theme={dark ? 'dark' : 'light'}
+          focusOnOpen={false}
+          nodeId={selected[0]}
+          nodeHeading={nodeHeading}
+          onClose={() => setOpen(false)}
+        >
+          {nodeSelected ? (
+            <NodeDescription value={description} disabled={false} onSave={setDescription} />
+          ) : (
+            <FlowNodeList nodes={[reviewNode]} onFocusNode={(nodeId) => setSelected([nodeId])} onSelect={(nodeId) => setSelected([nodeId])} />
+          )}
+        </EditorContextPanel>
       )}
     </div>
   )
@@ -82,6 +118,6 @@ export const inspectorPanelStory: FrontendStory = {
   id: 'inspector-panel',
   title: 'Properties Panel',
   standalone: true,
-  description: 'Toggle properties to inspect the panel sliding at a fixed width without text reflow; drag the divider to resize directly.',
+  description: 'Select or clear the node to compare matching panel headers; toggle properties or drag the divider to inspect resizing.',
   render: (_log, dark, language) => <Gallery dark={dark} language={language} />,
 }

@@ -1293,20 +1293,6 @@
     line-height: 15px;
   }
 
-  .diagnostics-section {
-    background: var(--danger-surface);
-    color: var(--danger-foreground);
-  }
-
-  .diagnostics-section.incomplete {
-    background: var(--warning-surface);
-    color: var(--warning-foreground);
-  }
-
-  .diagnostics-section.incomplete .diagnostic-item code {
-    color: var(--warning-foreground);
-  }
-
   .connection-state-content:has(> .connection-prompt) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1413,29 +1399,6 @@
 
   .connection-state-content > [data-slot='button'] {
     align-self: flex-start;
-  }
-
-  .diagnostic-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .diagnostic-item {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    font-size: 11px;
-    line-height: 16px;
-  }
-
-  .diagnostic-item strong {
-    font-weight: 500;
-  }
-
-  .diagnostic-item code {
-    color: var(--danger-foreground);
-    font-size: 10px;
   }
 
   .advanced-row {

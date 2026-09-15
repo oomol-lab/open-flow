@@ -73,6 +73,11 @@
       transition: none;
     }
 
+    .editor-grid::before,
+    .editor-grid::after {
+      display: none;
+    }
+
     .editor-grid > .context-panel {
       margin: 0;
       border-radius: 0;

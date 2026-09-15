@@ -194,6 +194,7 @@
       "name": "제목"
     },
     "selectNode": "확인하고 편집할 초안 노드를 하나 선택하세요.",
+    "locateNode": "캔버스에서 {{name}} 위치 보기",
     "subflow": {
       "definition": "Subflow 정의",
       "inputPorts": "입력 포트(JSON)",
@@ -801,7 +802,7 @@
     "scheduleExpression": "Cron 표현식",
     "scheduleTimezone": "시간대",
     "scheduleMissing": "설정된 일정이 없습니다",
-    "scheduleTestHint": "초안 테스트는 즉시 한 번 실행됩니다. 게시 후에는 설정한 일정에 따라 자동으로 실행됩니다."
+    "scheduleTestHint": "테스트는 {}를, 라이브 실행은 { scheduledAt }을 전송합니다."
   },
   "triggerConfig": {
     "configuration": "구성",
@@ -837,7 +838,7 @@
     "webhookDescription": "생성된 HTTP 엔드포인트로 JSON 객체를 수신합니다."
   },
   "triggerSummary": {
-    "manualSummary": "실행을 클릭하면 여기에서 시작합니다."
+    "manualPayloadHint": "다운스트림 노드는 빈 객체({})를 받습니다."
   },
   "conditionEditor": {
     "addCondition": "조건 추가",

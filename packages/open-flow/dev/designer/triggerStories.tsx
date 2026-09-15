@@ -423,7 +423,6 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
               connectorAuthorizationPending={false}
               connectorLoading={false}
               connectors={session.connectors}
-              diagnostics={[]}
               disabled={state === 'display'}
               revision={revision}
               selection={selection}

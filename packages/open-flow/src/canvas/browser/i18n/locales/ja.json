@@ -192,6 +192,7 @@
     "toggleDefault": "デフォルトの条件"
   },
   "copy": "コピー",
+  "copied": "コピー済み",
   "close": "閉じる",
   "create": "作成",
   "delete": "削除",

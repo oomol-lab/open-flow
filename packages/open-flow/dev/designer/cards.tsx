@@ -4,12 +4,14 @@ import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { FrontendStory } from './stories.tsx'
 
 import { useRef, useMemo } from 'react'
+import { Toaster } from 'sonner'
 import { I18nProvider } from 'val-i18n-react'
 import { CanvasCard } from '../../src/canvas/browser/graph/Nodes/components/CanvasCard.tsx'
 import { RunChips } from '../../src/canvas/browser/graph/Nodes/components/RunChips.tsx'
 import { GetPopupContainerContext } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
 import { ContentIcon, initialsIcon } from '../../src/ui/browser/icons/ContentIcon.tsx'
+import { notificationToasterProps } from '../../src/ui/browser/public.ts'
 
 // Local snapshots of the providers' favicons keep the visual comparison deterministic.
 const trackingAppIcon = new URL('./fixtures/17track.png', import.meta.url).href
@@ -17,7 +19,7 @@ const sheetsAppIcon = new URL('./fixtures/google-sheets.ico', import.meta.url).h
 
 const completed: FlowCanvasViewNodeRun = {
   status: 'success',
-  runId: 'lab-run-042',
+  runId: '20e8b7ed-502b-4844-a148-450047b0f2c6',
   startedAt: '2026-09-05T01:00:00Z',
   finishedAt: '2026-09-05T01:00:08.200Z',
   outputs: { customers: 128, qualified: 42 },
@@ -57,6 +59,7 @@ function CardStage({ dark, language, children }: { readonly dark: boolean; reado
     <I18nProvider i18n={i18n}>
       <div ref={root} className={`open-flow-canvas-root open-flow-theme card-studies`} data-surface="canvas" data-theme={dark ? 'dark' : 'light'}>
         <GetPopupContainerContext.Provider value={popup}>{children}</GetPopupContainerContext.Provider>
+        <Toaster {...notificationToasterProps} />
       </div>
     </I18nProvider>
   )
