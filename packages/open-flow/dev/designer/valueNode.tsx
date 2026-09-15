@@ -29,7 +29,12 @@ function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; lan
     { handle: 'jsonEmpty', jsonSchema: {}, nullable: false },
     { handle: 'jsonObject', jsonSchema: {}, nullable: true, value: { enabled: true, tags: ['sample'], count: 2 } },
     { handle: 'jsonNull', jsonSchema: { 'ui:widget': 'any' }, nullable: true, value: null },
-    { handle: 'value', jsonSchema: { type: 'object', properties: { count: { type: 'number' } } }, nullable: true, value: { count: 1 } },
+    {
+      handle: 'value',
+      jsonSchema: { type: 'object', properties: { details: { type: 'object', properties: { count: { type: 'number' } } }, count: { type: 'number' } } },
+      nullable: true,
+      value: { details: { count: 1 }, count: 1 },
+    },
   ])
   const [disabled, setDisabled] = useState(false)
   useStoryActions([{ label: disabled ? 'Enable editing' : 'Read only', onClick: () => setDisabled(!disabled) }])

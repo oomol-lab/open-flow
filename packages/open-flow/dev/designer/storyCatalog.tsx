@@ -9,6 +9,7 @@ import { conditionEditorStory } from './conditionEditor.tsx'
 import { connectionPathsStory } from './connectionPaths.tsx'
 import { eventSourcesStory, createEventSourceStory, eventSourceSetupStory, feishuFiltersStory, feishuSummaryStory, eventPickerStory } from './eventSources.tsx'
 import { fieldSettingsStory, groupSettingsStory } from './fieldSettings.tsx'
+import { fieldTypesStory } from './fieldTypes.tsx'
 import { formStory } from './form.tsx'
 import { historyStory, historyControlsStory, historyKeyboardStory } from './history.tsx'
 import { iconPickerStory } from './iconPicker.tsx'
@@ -101,6 +102,7 @@ export const labStories: readonly FrontendStory[] = [
   eventPickerStory,
   nodeInputStory,
   valueNodeStory,
+  fieldTypesStory,
   lazyFieldsStory,
   fieldSettingsStory,
   groupSettingsStory,

@@ -164,6 +164,10 @@
   opacity: 0.45;
 }
 
+.list[data-fixed-types] {
+  --field-type-width: 32px;
+}
+
 .columns {
   @include fieldLayout.columns;
   row-gap: 4px;
@@ -180,6 +184,9 @@
   > span:nth-child(2) {
     grid-column: type;
     grid-row: 1;
+    .list[data-fixed-types] & {
+      padding-left: 0;
+    }
   }
   > .valueHeading {
     grid-column: var(--field-value-heading-column, var(--field-value-column));
