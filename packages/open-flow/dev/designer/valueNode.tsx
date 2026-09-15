@@ -27,6 +27,7 @@ function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; lan
     { handle: 'dateTime', jsonSchema: { type: 'string', format: 'date-time' }, nullable: false, value: '2026-09-15T10:30:00+08:00' },
     { handle: 'color', jsonSchema: { 'type': 'string', 'ui:widget': 'color' }, nullable: false, value: '#7d7fe9' },
     { handle: 'array', jsonSchema: { type: 'array', items: { type: 'string' } }, nullable: false, value: ['first', 'second', 'third'] },
+    { handle: 'emptyArray', jsonSchema: { type: 'array', items: {} }, nullable: false, value: [] },
     {
       handle: 'objectArray',
       jsonSchema: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } } } },
@@ -49,12 +50,16 @@ function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; lan
     },
   ])
   const [disabled, setDisabled] = useState(false)
-  useStoryActions([{ label: disabled ? 'Enable editing' : 'Read only', onClick: () => setDisabled(!disabled) }])
+  const [wrapped, setWrapped] = useState(false)
+  useStoryActions([
+    { label: disabled ? 'Enable editing' : 'Read only', onClick: () => setDisabled(!disabled) },
+    { label: wrapped ? 'Single-line layout' : 'Wrapped layout', onClick: () => setWrapped(!wrapped) },
+  ])
   const i18n = useMemo(() => createI18n(language), [language])
   return (
     <I18nProvider i18n={i18n}>
       <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ height: '100%', overflow: 'auto', padding: 24 }}>
-        <div style={{ maxWidth: 520 }}>
+        <div style={{ maxWidth: wrapped ? 340 : 520 }}>
           <PortDefinitionEditor
             layout="values"
             reservedNames={reservedNames}

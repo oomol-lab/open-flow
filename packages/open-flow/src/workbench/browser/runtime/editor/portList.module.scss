@@ -170,6 +170,11 @@
 
 .columns {
   @include fieldLayout.columns;
+  @container value-fields (max-width: #{fieldLayout.$wrap-width}) {
+    &:not([data-output]) {
+      display: none;
+    }
+  }
   row-gap: 4px;
   color: var(--ui-muted-foreground);
   font-size: 12px;
