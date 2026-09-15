@@ -1,13 +1,25 @@
 import type { ReadonlyVal } from 'value-enhancer'
 import type { ConditionalResult } from '../../../../control/common/api.ts'
 
-import { val } from 'value-enhancer'
+import { derive, val } from 'value-enhancer'
 
 export interface ResourceState<T> {
   readonly data: T | undefined
   readonly refreshing: boolean
   readonly error: unknown
 }
+// One selector per source: loading/error changes must not invalidate data-only consumers.
+const dataSources = new WeakMap<ReadonlyVal<ResourceState<unknown>>, ReadonlyVal<unknown>>()
+
+export function resourceData<T>(source: ReadonlyVal<ResourceState<T>>): ReadonlyVal<T | undefined> {
+  let data = dataSources.get(source)
+  if (data == null) {
+    data = derive(source, (state) => state.data)
+    dataSources.set(source, data)
+  }
+  return data as ReadonlyVal<T | undefined>
+}
+
 export interface ResourceStorage {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
@@ -80,10 +92,13 @@ export class Resource<T> {
             if (this.#refreshAgain) continue
             const data = result.modified ? result.data : this.#state.value.data
             if (data === undefined) throw new Error('Received 304 without cached data.')
+            const previousEtag = this.#etag
             this.#etag = result.modified ? result.etag : (result.etag ?? this.#etag)
             this.#nextCheck = Date.now() + this.interval
             try {
-              this.persistence?.storage().setItem(this.persistence.key, JSON.stringify({ data, etag: this.#etag }))
+              if (this.persistence != null && (result.modified || this.#etag !== previousEtag)) {
+                this.persistence.storage().setItem(this.persistence.key, JSON.stringify({ data, etag: this.#etag }))
+              }
             } catch {
               /* Storage is optional. */
             }
@@ -127,17 +142,21 @@ export function resourceValue<T>(state: ReadonlyVal<ResourceState<T>>, signal?: 
       const value = state.value
       if (signal?.aborted) {
         aborted()
-        return
+        return true
       }
-      if (settled && value.refreshing) return
+      if (settled && value.refreshing) return false
       if (value.error != null && (settled || value.data === undefined)) {
         finish()
         reject(value.error)
+        return true
       } else if (value.data !== undefined) {
         finish()
         resolve(value.data)
+        return true
       }
+      return false
     }
+    if (check()) return
     stop = state.subscribe(check)
     signal?.addEventListener('abort', aborted, { once: true })
     check()

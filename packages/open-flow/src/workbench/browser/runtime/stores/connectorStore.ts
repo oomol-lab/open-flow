@@ -17,7 +17,7 @@ import { providerIcon } from '../providerIcon.ts'
 import { connectionCatalog, actionWithConnections } from '../workspace.ts'
 import { Latest } from './latest.ts'
 import { scopedValue } from './optionSource.ts'
-import { resourceValue } from './resource.ts'
+import { resourceData, resourceValue } from './resource.ts'
 import { errorNotice } from './workbenchNotice.ts'
 
 interface ConnectorState {
@@ -208,8 +208,8 @@ export class ConnectorStore {
       const flowId = get(workspace.$.flowId)
       return Object.fromEntries(
         get(this.#actionIds).flatMap((id) => {
-          const action = get(this.data.actions.detail(id, flowId, this.#language)).data
-          return action == null ? [] : [[id, actionWithConnections(action, get(this.data.connections.get(action.serviceId, flowId)).data)]]
+          const action = get(resourceData(this.data.actions.detail(id, flowId, this.#language)))
+          return action == null ? [] : [[id, actionWithConnections(action, get(resourceData(this.data.connections.get(action.serviceId, flowId))))]]
         }),
       )
     })
@@ -217,7 +217,7 @@ export class ConnectorStore {
       const flowId = get(workspace.$.flowId)
       return Object.fromEntries(
         get(this.#services).flatMap((service) => {
-          const connections = get(this.data.connections.get(service, flowId)).data
+          const connections = get(resourceData(this.data.connections.get(service, flowId)))
           return connections == null ? [] : [[service, connectionCatalog(connections)]]
         }),
       )
@@ -243,7 +243,7 @@ export class ConnectorStore {
     this.$ = {
       connections: compute((get) => {
         const flowId = get(workspace.$.flowId)
-        return flowId == null ? [] : (get(this.data.connections.get(undefined, flowId)).data ?? [])
+        return flowId == null ? [] : (get(resourceData(this.data.connections.get(undefined, flowId))) ?? [])
       }),
       actionLoading: derive(this.#state, (state) => state.actionLoading),
       actions,
@@ -351,7 +351,7 @@ export class ConnectorStore {
       const t = get(this.#i18n.t$)
       return {
         ...state,
-        data: state.data?.map((action) => option(actionWithConnections(action, get(this.data.connections.get(action.serviceId, flowId)).data), t)),
+        data: state.data?.map((action) => option(actionWithConnections(action, get(resourceData(this.data.connections.get(action.serviceId, flowId)))), t)),
       }
     })
   }
