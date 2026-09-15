@@ -10,6 +10,10 @@ import { useVal } from 'use-value-enhancer'
 import { useI18n } from 'val-i18n-react'
 import { Virtualizer } from 'virtua'
 import { resolveUiLanguage } from '../../../../localization/common/languages.ts'
+import { Button } from '../../button.tsx'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '../../input-group.tsx'
+import { ScrollArea } from '../../scroll-area.tsx'
+import { Tabs, TabsList, TabsTrigger } from '../../tabs.tsx'
 import { useIconifyCollectionLoader, useIconifyData } from '../iconifyContext.tsx'
 import { IconifyIcon } from '../IconifyIcon.tsx'
 import en from './locales/en.json'
@@ -61,16 +65,9 @@ export interface IconPickerProps {
   onCancel?: () => void
 }
 
-const SIZE = 18
-const MARGIN = 4
-const PADDING = 4
-const SPACING = 4
 const COLUMNS = 9
 const ROWS = 10
-
-const WIDTH = MARGIN * 2 + (SIZE + PADDING * 2 + SPACING) * COLUMNS - SPACING
-const HEIGHT = 336
-const CONTAINER_STYLE = { width: WIDTH, height: HEIGHT }
+const CONTAINER_STYLE = { width: 308, height: 360 }
 
 // Used for searching.
 const MAX_ITEMS_INIT = COLUMNS * ROWS * 2
@@ -124,9 +121,8 @@ function computeRows(
   return rows
 }
 
-const ICON_SIZE = SIZE + PADDING * 2 + SPACING / 2
+const ICON_SIZE = 32
 const ROW_STYLE = { height: ICON_SIZE }
-const ICON_STYLE = { width: ICON_SIZE, height: ICON_SIZE }
 
 const LazyIcon = (props: IconifyIconProps) => {
   const [show, setShow] = useState(false)
@@ -144,9 +140,9 @@ function renderRow(index: number, row: Row, collection: string, color?: string):
     <div key={index} className={styles.row} style={ROW_STYLE}>
       {Array.isArray(row) ? (
         row.map((icon) => (
-          <button aria-label={icon} data-icon={icon} title={icon} key={icon} style={ICON_STYLE} type="button">
-            <LazyIcon collection={collection} icon={icon} color={color} className={styles.icon} />
-          </button>
+          <Button variant="ghost" size="icon-sm" aria-label={icon} data-icon={icon} title={icon} key={icon} type="button">
+            <LazyIcon collection={collection} icon={icon} color={color} className="text-lg" />
+          </Button>
         ))
       ) : (
         <div className={styles.subtitle}>{row}</div>
@@ -159,27 +155,17 @@ function renderRow(index: number, row: Row, collection: string, color?: string):
 const IconPickerIconsPanel = ({ filteredIcons, collection, color, categories, onClick }: IconPickerPanelProps) => {
   const iconifyData = useIconifyData(true)
 
+  const [viewport, setViewport] = useState<HTMLElement | null>(null)
   const rows = useMemo(() => computeRows(iconifyData, filteredIcons, categories, collection), [iconifyData, filteredIcons, categories, collection])
 
   return (
-    <div
-      className={styles.panel}
-      style={
-        {
-          '--size': SIZE + 'px',
-          '--padding': PADDING + 'px',
-          '--gap': SPACING / 2 + 'px',
-          'overflowX': 'clip',
-          'overflowY': 'scroll',
-          'contain': 'strict',
-        } as any
-      }
-      onClick={onClick}
-    >
-      <Virtualizer data={rows} itemSize={ICON_SIZE}>
-        {(row, index) => renderRow(index, row, collection, color)}
-      </Virtualizer>
-    </div>
+    <ScrollArea className={styles.panel} defer={false} events={{ initialized: (instance) => setViewport(instance.elements().viewport) }} onClick={onClick}>
+      {viewport && (
+        <Virtualizer data={rows} itemSize={ICON_SIZE} scrollRef={{ current: viewport }}>
+          {(row, index) => renderRow(index, row, collection, color)}
+        </Virtualizer>
+      )}
+    </ScrollArea>
   )
 }
 
@@ -257,21 +243,6 @@ export const IconPicker = ({
     }
   }, [fzf, searchText])
 
-  const onClickTabs = useCallback((event: React.MouseEvent) => {
-    const target = event.target as HTMLButtonElement
-    const selectedTab = target.dataset.tab as IconPickerTab
-    if (selectedTab) {
-      setTab((rememberLastTab = selectedTab))
-      setColorsPanel(false)
-    }
-  }, [])
-
-  const onClickClose = useCallback(() => {
-    if (onCancel) {
-      onCancel()
-    }
-  }, [onCancel])
-
   const onClickShuffle = useCallback(() => {
     const collection = iconifyData?.[tab]
     if (onChange && collection) {
@@ -321,44 +292,60 @@ export const IconPicker = ({
 
   const children = (
     <div className={clsx(styles.container, className)} style={CONTAINER_STYLE} tabIndex={-1} onKeyDown={onKeyDown}>
-      <div className={styles.tabs} onClick={onClickTabs}>
-        {emoji && (
-          <button aria-pressed={tab === 'twemoji'} data-tab="twemoji" className={clsx(styles.tab, tab === 'twemoji' && 'is-active')} type="button">
-            {t('emoji')}
-          </button>
-        )}
-        {carbon && (
-          <button
-            aria-pressed={tab === 'carbon'}
-            data-tab="carbon"
-            className={clsx(styles.tab, tab === 'carbon' && 'is-active')}
-            title={t('carbon')}
+      <div className={styles.filter}>
+        <InputGroup className="h-6">
+          <InputGroupAddon>
+            <i aria-hidden="true" className="i-lucide-light:search text-sm" />
+          </InputGroupAddon>
+          <InputGroupInput
+            className="h-full py-0 text-[11px] md:text-[11px]"
+            aria-label={t('filter')}
+            autoComplete="off"
+            type="search"
+            placeholder={t('filter')}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            autoFocus
+          />
+        </InputGroup>
+        <Button variant="ghost" size="icon-xs" aria-label={t('random')} onClick={onClickShuffle} title={t('random')} type="button">
+          <i aria-hidden="true" className="i-lucide-light:shuffle text-sm" />
+        </Button>
+      </div>
+      <div className={styles.tabs}>
+        <Tabs
+          value={tab}
+          onValueChange={(value) => {
+            setTab((rememberLastTab = value as IconPickerTab))
+            setColorsPanel(false)
+          }}
+          className="min-w-0 flex-1"
+        >
+          <TabsList variant="flat" className="w-full p-0.5 group-data-[orientation=horizontal]/tabs:h-6">
+            {emoji && (
+              <TabsTrigger className="text-[11px]" value="twemoji">
+                {t('emoji')}
+              </TabsTrigger>
+            )}
+            {carbon && (
+              <TabsTrigger className="text-[11px]" value="carbon">
+                {t('carbon')}
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </Tabs>
+        {hasColors && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-expanded={colorsPanel}
+            aria-label={t('color')}
+            onClick={toggleColorsPanel}
+            title={t('color')}
             type="button"
           >
-            {t('carbon')}
-          </button>
-        )}
-        <button aria-label={t('close')} className={styles.close} onClick={onClickClose} type="button">
-          <IconifyIcon collection="carbon" icon="close" />
-        </button>
-      </div>
-      <div className={styles.filter}>
-        <input
-          aria-label={t('filter')}
-          autoComplete="off"
-          type="search"
-          placeholder={t('filter')}
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          autoFocus
-        />
-        <button aria-label={t('random')} className={styles.shuffle} onClick={onClickShuffle} title={t('random')} type="button">
-          <IconifyIcon collection="carbon" icon="shuffle" />
-        </button>
-        {hasColors && (
-          <button aria-expanded={colorsPanel} aria-label={t('color')} className={styles['pick-colors']} onClick={toggleColorsPanel} type="button">
-            <IconifyIcon collection="carbon" icon="color-palette" color={selectedColor} />
-          </button>
+            <i aria-hidden="true" className="i-lucide-light:palette text-sm" style={{ color: selectedColor }} />
+          </Button>
         )}
         <div onClick={onClickColors} className={styles.colors} style={hasColors && colorsPanel ? {} : { display: 'none' }}>
           {COLORS.map((color) => (
@@ -390,9 +377,9 @@ export const IconPicker = ({
         </div>
       )}
       {filteredIcons && filteredIcons.length > maxItems && (
-        <button className={styles.more} onClick={loadMore} type="button">
+        <Button variant="ghost" size="xs" className="mx-3 mb-2 shrink-0 text-[11px]" onClick={loadMore} type="button">
           {t('more')}
-        </button>
+        </Button>
       )}
     </div>
   )

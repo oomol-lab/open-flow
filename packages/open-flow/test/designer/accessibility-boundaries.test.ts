@@ -8,7 +8,6 @@ const traverse = ((traverseModule as unknown as { readonly default?: typeof trav
 test('keeps Icon Picker controls named and stateful', async () => {
   const source = await readFile('src/ui/browser/icons/picker/IconPicker.tsx', 'utf8')
 
-  expect(source).toMatch(/aria-label=\{t\('close'\)\}/)
   expect(source).toMatch(/aria-label=\{t\('random'\)\}/)
   expect(source).toMatch(/aria-expanded=\{colorsPanel\}/)
   expect(source).toMatch(/aria-pressed=\{selectedColor === color\}/)
