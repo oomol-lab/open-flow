@@ -168,3 +168,69 @@ describe('Read-only value controls', () => {
     }
   })
 })
+
+describe('Collapsed field mounting', () => {
+  it.each([
+    [{ type: 'object', properties: { child: { type: 'string' } } }, { child: 'hello' }],
+    [{ type: 'array', items: { type: 'string' } }, ['hello']],
+    [{ 'ui:widget': 'any' }, { child: 'hello' }],
+    [{ 'type': 'string', 'ui:widget': 'text' }, 'hello'],
+  ])('defers compact bodies while keeping standalone editors mounted', (schema, value) => {
+    const i18n = createI18n('en')
+    const onChange = vi.fn()
+    const render = (compact: boolean) =>
+      renderToStaticMarkup(
+        <I18nProvider i18n={i18n}>
+          <ValueEditor compact={compact} label="sample" schema={schema} value={value} onChange={onChange} path="/sample" onDraftIssue={vi.fn()} />
+        </I18nProvider>,
+      )
+    try {
+      const collapsed = render(true)
+      expect(collapsed).toContain('aria-expanded="false"')
+      expect(collapsed).not.toContain('data-value-body')
+      expect(collapsed).not.toContain('<textarea')
+      expect(render(false)).toContain('data-value-body')
+      expect(onChange).not.toHaveBeenCalled()
+    } finally {
+      i18n.dispose()
+    }
+  })
+})
+
+it('restores object field display order without reordering or changing the value', () => {
+  const onValue = vi.fn()
+  const value = { '1': 'one', '2': 'two', 'extra': 'three' }
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={createI18n('en')}>
+      <ValueEditor
+        label="object"
+        path="/object"
+        schema={{ 'type': 'object', 'ui:order': ['2', 'missing', '2', '1'] }}
+        value={value}
+        disabled={false}
+        onChange={onValue}
+        onDraftIssue={vi.fn()}
+      />
+    </I18nProvider>,
+  )
+  expect([...markup.matchAll(/data-object-field="([^"]+)"/g)].map((match) => match[1])).toEqual(['2', '1', 'extra'])
+  expect(value).toEqual({ '1': 'one', '2': 'two', 'extra': 'three' })
+  expect(onValue).not.toHaveBeenCalled()
+})
+
+it('offers to repair a non-nullable array item cleared to null', () => {
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={createI18n('en')}>
+      <ValueEditor
+        label="items"
+        path="/items"
+        schema={{ type: 'array', items: { type: 'object', default: { enabled: true } } }}
+        value={[null]}
+        onChange={vi.fn()}
+        onDraftIssue={vi.fn()}
+      />
+    </I18nProvider>,
+  )
+  expect(markup).toContain('aria-label="items.0 Set value"')
+  expect(markup).toContain('>Set value<')
+})

@@ -91,33 +91,13 @@ describe('Property panel port layout', () => {
 })
 
 describe('Nested field definition editing', () => {
-  it('offers to repair a non-nullable array item cleared to null', () => {
-    const markup = renderToStaticMarkup(
-      <I18nProvider i18n={createI18n('en')}>
-        <PortDefinitionEditor
-          layout="values"
-          disabled={false}
-          values={[
-            {
-              handle: 'items',
-              nullable: false,
-              jsonSchema: { type: 'array', items: { type: 'object', default: { enabled: true } } },
-              value: [null],
-            },
-          ]}
-          onChange={vi.fn()}
-        />
-      </I18nProvider>,
-    )
-    expect(markup).toContain('aria-label="items.0 Set value"')
-    expect(markup).toContain('>Set value<')
-  })
-
   it.each(['values', 'definition'] as const)('keeps schema editing scoped to the %s layout', (layout) => {
     const onChange = vi.fn()
-    const markup = renderToStaticMarkup(
+    const renderValue = vi.fn((_port: unknown, _presentation: unknown) => null)
+    renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <PortDefinitionEditor
+          renderValue={renderValue}
           layout={layout}
           disabled={false}
           values={[
@@ -132,9 +112,9 @@ describe('Nested field definition editing', () => {
         />
       </I18nProvider>,
     )
-    const trigger = (markup.match(/<button\b[^>]*>/g) ?? []).find((tag) => tag.includes('aria-label="payload.name type"'))
-    expect(trigger).toBeDefined()
-    expect(trigger!.includes('disabled=""')).toBe(layout !== 'values')
+    const presentation = renderValue.mock.calls[0]?.[1] as { onDefinitionChange?: unknown } | undefined
+    expect(presentation).toBeDefined()
+    expect(typeof presentation?.onDefinitionChange).toBe(layout === 'values' ? 'function' : 'undefined')
     expect(onChange).not.toHaveBeenCalled()
   })
 })
