@@ -89,7 +89,9 @@
 }
 
 .open-flow-code-editor.cm-editor.cm-focused {
-  @apply text-field-focus;
+  border-color: var(--ui-ring);
+  outline: none;
+  box-shadow: none;
 }
 
 /* Field surfaces share hover feedback, regardless of their editor implementation. */
@@ -132,7 +134,7 @@
   }
 }
 .open-flow-code-editor.cm-editor.cm-focused[data-invalid='true'] {
-  @apply invalid-text-field-focus;
+  border-color: var(--ui-destructive);
 }
 
 /* Clarity drag-handle-corner-line, matching the Designer resize handle. */

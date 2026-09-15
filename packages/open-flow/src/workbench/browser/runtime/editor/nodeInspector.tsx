@@ -312,11 +312,11 @@ function ConnectorAccount({
     )
   }
   return (
-    <section className={`inspector-section connection-state ${required ? 'required' : ''}`} data-inspector-section="account">
-      <h3>
+    <section className={`connection-state ${required ? 'required' : ''}`} data-inspector-section="account">
+      <h3 className="inspector-section-title">
         <Icon name="connection" size={15} /> {t(required ? 'inspector.account.required' : 'inspector.account.title')}
       </h3>
-      {content}
+      <div className="connection-state-content">{content}</div>
     </section>
   )
 }
@@ -476,7 +476,7 @@ function WaitDefinition({
   return (
     <>
       <form
-        className="inspector-section inspector-form wait-form"
+        className="inspector-form wait-form"
         data-inspector-section="wait"
         onSubmit={(event) => {
           event.preventDefault()
@@ -484,8 +484,10 @@ function WaitDefinition({
         }}
       >
         <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor={`${fieldIdPrefix}-prompt`}>{t('inspector.wait.prompt')}</FieldLabel>
+          <Field className="inspector-field-section">
+            <FieldLabel className="inspector-section-title" htmlFor={`${fieldIdPrefix}-prompt`}>
+              {t('inspector.wait.prompt')}
+            </FieldLabel>
             <Textarea
               readOnly={disabled}
               id={`${fieldIdPrefix}-prompt`}
@@ -497,8 +499,8 @@ function WaitDefinition({
               value={prompt}
             />
           </Field>
-          <Field>
-            <FieldLabel>{t('inspector.wait.mode')}</FieldLabel>
+          <Field className="inspector-field-section">
+            <FieldLabel className="inspector-section-title">{t('inspector.wait.mode')}</FieldLabel>
             <ToggleGroup<'approval' | 'continue'>
               aria-label={t('inspector.wait.mode')}
               className="wait-mode-switcher"
@@ -520,8 +522,8 @@ function WaitDefinition({
               <ToggleGroupItem value="approval">{t('inspector.wait.approval')}</ToggleGroupItem>
             </ToggleGroup>
           </Field>
-          <Field>
-            <FieldLabel>{t('inspector.wait.notificationTask')}</FieldLabel>
+          <Field className="inspector-field-section">
+            <FieldLabel className="inspector-section-title">{t('inspector.wait.notificationTask')}</FieldLabel>
             {notificationTask == null ? (
               <Button
                 className="self-start"
@@ -562,8 +564,10 @@ function WaitDefinition({
             )}
           </Field>
           {notificationTask != null && messageHandles.length > 1 && (
-            <Field>
-              <FieldLabel htmlFor={`${fieldIdPrefix}-message-handle`}>{t('inspector.wait.messageHandle')}</FieldLabel>
+            <Field className="inspector-field-section">
+              <FieldLabel className="inspector-section-title" htmlFor={`${fieldIdPrefix}-message-handle`}>
+                {t('inspector.wait.messageHandle')}
+              </FieldLabel>
               <NativeSelect
                 disabled={disabled}
                 id={`${fieldIdPrefix}-message-handle`}
@@ -582,8 +586,8 @@ function WaitDefinition({
             </Field>
           )}
           {notificationTask != null && inputDefinitions.length > 0 && (
-            <Field>
-              <FieldLabel>{t('inspector.wait.inputs')}</FieldLabel>
+            <Field className="inspector-field-section">
+              <FieldLabel className="inspector-section-title">{t('inspector.wait.inputs')}</FieldLabel>
               <fieldset className="wait-notification-inputs" disabled={disabled}>
                 <Suspense fallback={<FieldDescription>{t('inspector.wait.inputsLoading')}</FieldDescription>}>
                   <InputValues
@@ -906,58 +910,60 @@ function TriggerConnection({
   const fieldIdPrefix = `trigger-${selection.id}`
   const connectionSection =
     providerTrigger == null ? null : (
-      <section className={`inspector-section connection-state ${connection?.status == 'active' ? '' : 'required'}`} data-inspector-section="account">
-        <h3>
+      <section className={`connection-state ${connection?.status == 'active' ? '' : 'required'}`} data-inspector-section="account">
+        <h3 className="inspector-section-title">
           <Icon name="connection" size={15} /> {t(connection?.status == 'active' ? 'inspector.account.title' : 'inspector.account.required')}
         </h3>
-        {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
-        {connectionLoading ? (
-          <p>{t('inspector.account.loading')}</p>
-        ) : connectionError != null ? (
-          <>
-            <p>{t('inspector.account.refreshFailed')}</p>
-            <p className="connection-detail">{connectionError}</p>
-            <Button disabled={disabled} onClick={() => void triggers.refresh(true)} size="sm" type="button" variant="secondary">
-              {t('inspector.account.retry')}
-            </Button>
-          </>
-        ) : (activeConnections?.length ?? 0) == 0 ? (
-          <div className="connection-prompt">
-            <p>{t('inspector.account.connectBeforeRun', { service: providerTrigger.definition.provider })}</p>
-            <Button disabled={disabled} onClick={() => void triggers.connect(providerTrigger.definition.provider)} size="sm" type="button">
-              {t('inspector.account.connectService', { service: providerTrigger.definition.provider })}
-            </Button>
-          </div>
-        ) : (
-          <>
-            <Field className="connection-field">
-              <FieldLabel className="sr-only" htmlFor={`${fieldIdPrefix}-connection`}>
-                {t('inspector.account.connection')}
-              </FieldLabel>
-              <NativeSelect
-                disabled={disabled}
-                id={`${fieldIdPrefix}-connection`}
-                onChange={(event) => void triggers.setConnection(selection.id, event.target.value)}
-                value={connection?.connectionId ?? ''}
-              >
-                {connection == null && (
-                  <NativeSelectOption disabled value="">
-                    {t('inspector.account.chooseAccount')}
-                  </NativeSelectOption>
-                )}
-                {activeConnections!.map((candidate) => (
-                  <NativeSelectOption key={candidate.connectionId} value={candidate.connectionId}>
-                    {candidate.displayName}
-                    {candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </Field>
-            <Button disabled={disabled} onClick={() => void triggers.connect(providerTrigger.definition.provider)} size="xs" type="button" variant="ghost">
-              <Icon data-icon="inline-start" name="plus" /> {t('inspector.account.addConnection')}
-            </Button>
-          </>
-        )}
+        <div className="connection-state-content">
+          {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
+          {connectionLoading ? (
+            <p>{t('inspector.account.loading')}</p>
+          ) : connectionError != null ? (
+            <>
+              <p>{t('inspector.account.refreshFailed')}</p>
+              <p className="connection-detail">{connectionError}</p>
+              <Button disabled={disabled} onClick={() => void triggers.refresh(true)} size="sm" type="button" variant="secondary">
+                {t('inspector.account.retry')}
+              </Button>
+            </>
+          ) : (activeConnections?.length ?? 0) == 0 ? (
+            <div className="connection-prompt">
+              <p>{t('inspector.account.connectBeforeRun', { service: providerTrigger.definition.provider })}</p>
+              <Button disabled={disabled} onClick={() => void triggers.connect(providerTrigger.definition.provider)} size="sm" type="button">
+                {t('inspector.account.connectService', { service: providerTrigger.definition.provider })}
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Field className="connection-field">
+                <FieldLabel className="sr-only" htmlFor={`${fieldIdPrefix}-connection`}>
+                  {t('inspector.account.connection')}
+                </FieldLabel>
+                <NativeSelect
+                  disabled={disabled}
+                  id={`${fieldIdPrefix}-connection`}
+                  onChange={(event) => void triggers.setConnection(selection.id, event.target.value)}
+                  value={connection?.connectionId ?? ''}
+                >
+                  {connection == null && (
+                    <NativeSelectOption disabled value="">
+                      {t('inspector.account.chooseAccount')}
+                    </NativeSelectOption>
+                  )}
+                  {activeConnections!.map((candidate) => (
+                    <NativeSelectOption key={candidate.connectionId} value={candidate.connectionId}>
+                      {candidate.displayName}
+                      {candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </Field>
+              <Button disabled={disabled} onClick={() => void triggers.connect(providerTrigger.definition.provider)} size="xs" type="button" variant="ghost">
+                <Icon data-icon="inline-start" name="plus" /> {t('inspector.account.addConnection')}
+              </Button>
+            </>
+          )}
+        </div>
       </section>
     )
 

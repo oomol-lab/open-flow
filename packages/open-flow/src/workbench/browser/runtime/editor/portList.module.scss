@@ -275,18 +275,6 @@
   color: var(--ui-foreground);
 }
 
-.valuesTitle {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 44px;
-  padding: 8px 12px;
-  background: var(--ui-background);
-}
-
 .nullableControl,
 .columns > .nullableHeading {
   display: flex;

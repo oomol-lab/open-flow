@@ -19,6 +19,7 @@ import { Input } from '../../../../ui/browser/input.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
 import { Popover, PopoverPanelContent } from '../../../../ui/browser/popover.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
+import { Toggle } from '../../../../ui/browser/toggle.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { fieldPanelAnchor } from './fieldPanelAnchor.ts'
 import { movePort } from './portOrder.ts'
@@ -445,7 +446,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         onClick={(event) => event.preventDefault()}
         type="button"
         size="icon-xs"
-        variant="disclosure"
+        variant="outline"
         className={`${styles.grip} w-[var(--field-toggle-width,24px)]`}
         aria-label={t('inspector.ports.reorder', { name: port.handle })}
         title={t('inspector.ports.reorderHint')}
@@ -508,7 +509,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1))
         }}
       >
-        <i aria-hidden="true" className="i-lucide-light:grip-vertical" />
+        <i aria-hidden="true" className="i-lucide-light:grip text-base" />
       </Button>
     ) : undefined
     const header = (
@@ -677,7 +678,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
   return (
     <FieldSorting.Provider value={sortingEnabled}>
       {(props.title != null || props.layout === 'values' || !disabled) && (
-        <div ref={heading} className={styles.valuesTitle}>
+        <div ref={heading} className="inspector-section-title justify-between">
           {props.title != null || props.layout === 'values' ? <FieldLabel>{props.title ?? t('inspector.ports.valuesTitle')}</FieldLabel> : <span />}
           {!disabled && (
             <div className="ml-auto flex items-center gap-1">
@@ -685,26 +686,27 @@ export function PortDefinitionEditor(props: PortEditorProps) {
                 <Tooltip>
                   <TooltipTrigger
                     render={
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
+                      <Toggle
+                        variant="outline"
+                        size="sm"
+                        pressed={sortingEnabled}
                         aria-label={t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}
-                        onClick={() => {
+                        onPressedChange={(pressed) => {
                           cancelDrag()
-                          setSorting(!sortingEnabled)
+                          setSorting(pressed)
                         }}
                       />
                     }
                   >
-                    <i aria-hidden="true" className={sortingEnabled ? 'i-lucide-light:check text-lg' : 'i-lucide-light:grip-vertical text-lg'} />
+                    <i aria-hidden="true" data-icon="inline-start" className={sortingEnabled ? 'i-lucide-light:check' : 'i-lucide-light:list-ordered'} />
+                    {t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}
                   </TooltipTrigger>
                   <TooltipContent>{t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}</TooltipContent>
                 </Tooltip>
               )}
               {!sortingEnabled && (
                 <Tooltip>
-                  <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label={t('valueEditor.addField')} onClick={addField} />}>
+                  <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('valueEditor.addField')} onClick={addField} />}>
                     <i aria-hidden="true" className="i-lucide-light:plus text-lg" />
                   </TooltipTrigger>
                   <TooltipContent>{t('valueEditor.addField')}</TooltipContent>

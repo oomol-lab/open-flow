@@ -98,7 +98,7 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
             definition={{ ...definition, handle: 'invalidUpstream' }}
             value={undefined}
             connected
-            upstream={{ ...providerSource, current: providerSource.current.map((source) => ({ ...source, valid: false })) }}
+            upstream={{ ...providerSource, current: providerSource.current.map((source) => Object.assign({}, source, { valid: false })) }}
             variables={variables}
             disabled={false}
             onValue={() => {}}

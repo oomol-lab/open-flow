@@ -92,15 +92,15 @@ function PopoverPanelContent({
         props.className,
       )}
     >
-      <div className="flex min-h-10 shrink-0 items-center gap-2 px-3 py-2">
-        <PopoverTitle className="min-w-0 flex-1 truncate text-xs">{title}</PopoverTitle>
-        <PopoverPrimitive.Close render={<Button type="button" variant="ghost" size="icon-xs" aria-label={closeLabel} />}>
-          <i aria-hidden="true" className="i-lucide-light:x" />
+      <div className="flex h-10 shrink-0 items-center gap-2 px-3">
+        <PopoverTitle className="min-w-0 flex-1 truncate text-sm">{title}</PopoverTitle>
+        <PopoverPrimitive.Close render={<Button type="button" variant="ghost" size="icon-sm" aria-label={closeLabel} />}>
+          <i aria-hidden="true" className="i-lucide-light:x text-base" />
         </PopoverPrimitive.Close>
       </div>
       <div className="mx-2 h-px shrink-0 bg-border/50" />
-      <div className="min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
-        <div className="flex flex-col gap-3 py-3 pe-0.5 ps-3">{children}</div>
+      <div className="min-h-0 overflow-y-auto">
+        <div className="flex flex-col gap-3 p-3">{children}</div>
       </div>
       {footer && (
         <>

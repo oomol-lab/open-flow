@@ -3,13 +3,13 @@ import type { ConditionSettings } from './flowChanges.ts'
 
 import { useEffect, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { FieldSelect } from '../../../../form/browser/fieldSelect.tsx'
 import { ValueEditor } from '../../../../form/browser/valueEditor.tsx'
 import { objectValue } from '../../../../form/common/value.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
-import { NativeSelect } from '../../../../ui/browser/native-select.tsx'
 
 const operators: readonly ConditionOperator[] = [
   '==',
@@ -99,55 +99,62 @@ export function ConditionBranchesEditor({
     return name
   }
   return (
-    <section className="inspector-section" data-inspector-section="condition">
-      <h3>{t('conditionEditor.title')}</h3>
-      <div className="flex flex-col gap-4">
+    <section className="condition-editor" data-inspector-section="condition">
+      <h3 className="inspector-section-title">{t('conditionEditor.title')}</h3>
+      <div className="condition-editor-content">
         {value.cases.map((item, index) => {
           const save = (next: typeof item) => onChange({ ...value, cases: value.cases.with(index, next) })
           return (
-            <fieldset className="flex min-w-0 flex-col gap-3 rounded-lg border border-border p-3" key={item.output}>
+            <fieldset className="condition-branch" key={item.output}>
               <legend>{item.output}</legend>
               <OutputName value={item.output} names={names} disabled={disabled} onChange={(output) => save({ ...item, output })} />
-              <NativeSelect
+              <FieldSelect
                 aria-label={t('conditionEditor.handleLogicalTitle')}
                 disabled={disabled}
                 value={item.relation}
-                onChange={(event) => save({ ...item, relation: event.target.value as 'all' | 'any' })}
+                onChange={(relation) => save({ ...item, relation: relation as 'all' | 'any' })}
               >
                 <option value="all">{t('conditionEditor.logical.AND')}</option>
                 <option value="any">{t('conditionEditor.logical.OR')}</option>
-              </NativeSelect>
+              </FieldSelect>
               {item.expressions.map((expression, expressionIndex) => {
                 const change = (next: typeof expression) => save({ ...item, expressions: item.expressions.with(expressionIndex, next) })
                 return (
-                  <div className="flex min-w-0 flex-col gap-2" key={expressionIndex}>
-                    <NativeSelect
-                      aria-label={t('conditionEditor.handleKeyTitle')}
-                      disabled={disabled}
-                      value={expression.input}
-                      onChange={(event) => change({ ...expression, input: event.target.value })}
-                    >
-                      {expression.input !== value.input.handle && <option value={expression.input}>{expression.input}</option>}
-                      <option value={value.input.handle}>{value.input.handle}</option>
-                    </NativeSelect>
-                    <NativeSelect
-                      aria-label={t('conditionEditor.label')}
-                      disabled={disabled}
-                      value={expression.operator}
-                      onChange={(event) => {
-                        const operator = event.target.value as ConditionOperator
-                        const { value: previous, ...base } = expression
-                        change({ ...base, operator, ...(!operator.startsWith('is') && previous !== undefined ? { value: previous } : {}) })
-                      }}
-                    >
-                      {[...new Set([expression.operator, ...available])].map((operator) => (
-                        <option key={operator} value={operator}>
-                          {t(`conditionEditor.operator.${operator}`)}
-                        </option>
-                      ))}
-                    </NativeSelect>
+                  <div className="condition-expression" key={expressionIndex}>
+                    <div className="condition-expression-select">
+                      <FieldSelect
+                        aria-label={t('conditionEditor.handleKeyTitle')}
+                        disabled={disabled}
+                        value={expression.input}
+                        onChange={(input) => change({ ...expression, input })}
+                      >
+                        {expression.input !== value.input.handle && <option value={expression.input}>{expression.input}</option>}
+                        <option value={value.input.handle}>{value.input.handle}</option>
+                      </FieldSelect>
+                    </div>
+                    <div className="condition-expression-select">
+                      <FieldSelect
+                        aria-label={t('conditionEditor.label')}
+                        disabled={disabled}
+                        value={expression.operator}
+                        onChange={(next) => {
+                          const operator = next as ConditionOperator
+                          const { value: previous, ...base } = expression
+                          change({ ...base, operator, ...(!operator.startsWith('is') && previous !== undefined ? { value: previous } : {}) })
+                        }}
+                      >
+                        {[...new Set([expression.operator, ...available])].map((operator) => (
+                          <option key={operator} value={operator}>
+                            {t(`conditionEditor.operator.${operator}`)}
+                          </option>
+                        ))}
+                      </FieldSelect>
+                    </div>
                     {!expression.operator.startsWith('is') && (
                       <ValueEditor
+                        key={expression.operator}
+                        compact
+                        hideOptions
                         schema={parameterSchema(inputType, expression.operator)}
                         value={expression.value}
                         label={item.output}
@@ -161,6 +168,7 @@ export function ConditionBranchesEditor({
                       />
                     )}
                     <Button
+                      className="justify-self-end hover:bg-destructive/10 hover:text-destructive focus-visible:bg-destructive/10 focus-visible:text-destructive"
                       type="button"
                       size="xs"
                       variant="ghost"
@@ -173,6 +181,7 @@ export function ConditionBranchesEditor({
                 )
               })}
               <Button
+                className="w-full"
                 type="button"
                 size="sm"
                 variant="outline"
@@ -181,7 +190,7 @@ export function ConditionBranchesEditor({
               >
                 {t('conditionEditor.addCondition')}
               </Button>
-              <div className="flex gap-2">
+              <div className="flex items-center justify-between gap-2">
                 <Button
                   type="button"
                   size="xs"
@@ -196,6 +205,7 @@ export function ConditionBranchesEditor({
                   {t('valueEditor.moveUp')}
                 </Button>
                 <Button
+                  className="hover:bg-destructive/10 hover:text-destructive focus-visible:bg-destructive/10 focus-visible:text-destructive"
                   type="button"
                   size="xs"
                   variant="ghost"

@@ -91,6 +91,28 @@ describe('Property panel port layout', () => {
 })
 
 describe('Nested field definition editing', () => {
+  it('offers to repair a non-nullable array item cleared to null', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <PortDefinitionEditor
+          layout="values"
+          disabled={false}
+          values={[
+            {
+              handle: 'items',
+              nullable: false,
+              jsonSchema: { type: 'array', items: { type: 'object', default: { enabled: true } } },
+              value: [null],
+            },
+          ]}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('aria-label="items.0 Set value"')
+    expect(markup).toContain('>Set value<')
+  })
+
   it.each(['values', 'definition'] as const)('keeps schema editing scoped to the %s layout', (layout) => {
     const onChange = vi.fn()
     const markup = renderToStaticMarkup(
