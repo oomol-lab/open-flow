@@ -66,7 +66,7 @@ export interface CronConformanceFixture {
 
 export interface CronConformanceHarness {
   dispose(): Promise<void>
-  payloads(): Promise<readonly JsonValue[]>
+  outputs(): Promise<readonly Readonly<Record<string, JsonValue>>[]>
   republish(at: string, rules: readonly TriggerSchedule[]): Promise<void>
   retire(at: string): Promise<void>
   tick(at: string): Promise<void>
@@ -88,7 +88,7 @@ export const cronConformanceCases: readonly CronConformanceCase[] = [
     async verify(harness) {
       await harness.tick('2026-08-21T01:00:00.000Z')
       await harness.tick('2026-08-21T01:00:00.000Z')
-      equal(await harness.payloads(), [{ scheduledAt: '2026-08-21T01:00:00.000Z' }], 'Exact schedule payloads')
+      equal(await harness.outputs(), [{ scheduledAt: '2026-08-21T01:00:00.000Z' }], 'Exact schedule outputs')
     },
   },
   {
@@ -96,9 +96,9 @@ export const cronConformanceCases: readonly CronConformanceCase[] = [
     name: 'coalesces missed grids and preserves the earliest due time',
     async verify(harness) {
       await harness.tick('2026-08-21T00:03:30.000Z')
-      equal(await harness.payloads(), [{ scheduledAt: '2026-08-21T00:01:00.000Z' }], 'Delayed schedule payloads')
+      equal(await harness.outputs(), [{ scheduledAt: '2026-08-21T00:01:00.000Z' }], 'Delayed schedule outputs')
       await harness.tick('2026-08-21T00:04:00.000Z')
-      equal(await harness.payloads(), [{ scheduledAt: '2026-08-21T00:01:00.000Z' }, { scheduledAt: '2026-08-21T00:04:00.000Z' }], 'Advanced schedule payloads')
+      equal(await harness.outputs(), [{ scheduledAt: '2026-08-21T00:01:00.000Z' }, { scheduledAt: '2026-08-21T00:04:00.000Z' }], 'Advanced schedule outputs')
     },
   },
   {
@@ -107,9 +107,9 @@ export const cronConformanceCases: readonly CronConformanceCase[] = [
     async verify(harness) {
       await harness.republish('2026-08-21T00:00:45.000Z', hourly)
       await harness.tick('2026-08-21T00:01:00.000Z')
-      equal(await harness.payloads(), [], 'Payloads from the previous publication')
+      equal(await harness.outputs(), [], 'Outputs from the previous publication')
       await harness.tick('2026-08-21T01:00:00.000Z')
-      equal(await harness.payloads(), [{ scheduledAt: '2026-08-21T01:00:00.000Z' }], 'Republished schedule payloads')
+      equal(await harness.outputs(), [{ scheduledAt: '2026-08-21T01:00:00.000Z' }], 'Republished schedule outputs')
     },
   },
   {
@@ -118,7 +118,7 @@ export const cronConformanceCases: readonly CronConformanceCase[] = [
     async verify(harness) {
       await harness.retire('2026-08-21T00:45:00.000Z')
       await harness.tick('2026-08-21T01:00:00.000Z')
-      equal(await harness.payloads(), [], 'Retired schedule payloads')
+      equal(await harness.outputs(), [], 'Retired schedule outputs')
     },
   },
 ]

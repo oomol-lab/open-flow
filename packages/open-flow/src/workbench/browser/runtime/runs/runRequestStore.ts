@@ -141,7 +141,7 @@ function groupValues(groups: readonly RunInputGroup[]): Readonly<Record<string, 
 
 function testOutputs(revision: Draft, triggerId: string): Readonly<Record<string, JsonValue>> {
   const node = revisionView(revision).graph({ kind: 'flow' })?.nodes[triggerId]
-  return node?.kind === 'cron' ? Object.fromEntries(triggerOutputDefinitions(node).map((port) => [port.handle, {}])) : {}
+  return node?.kind === 'cron' ? { scheduledAt: new Date().toISOString() } : {}
 }
 
 function runValues(groups: readonly RunInputGroup[], triggerId: string, revision: Draft) {

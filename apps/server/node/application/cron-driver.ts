@@ -80,7 +80,7 @@ export class CronDriver {
         return yield* Effect.fail(new Error('Fixed Cron Trigger target does not match its Publication.'))
       }
       const scheduledAt = new Date(target.nextAt).toISOString()
-      const outputs = { payload: { scheduledAt } }
+      const outputs = { scheduledAt }
       if (!matchesTriggerOutputs(trigger, outputs)) return yield* Effect.fail(new Error('Invalid Cron Trigger outputs.'))
       const occurrenceId = yield* Effect.tryPromise({
         try: () => scheduledTriggerOccurrenceId(target.bindingId, target.runtimeVersion, scheduledAt),

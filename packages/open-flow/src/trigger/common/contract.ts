@@ -11,8 +11,9 @@ export const webhookOutputs: readonly Port[] = [
 ]
 const cronOutputs: readonly Port[] = [
   {
-    handle: 'payload',
-    jsonSchema: { type: 'object', additionalProperties: false, properties: { scheduledAt: { type: 'string', format: 'date-time' } } },
+    description: 'The scheduled time that triggered this run, in ISO 8601 format.',
+    handle: 'scheduledAt',
+    jsonSchema: { type: 'string', format: 'date-time' },
     nullable: false,
   },
 ]

@@ -14,7 +14,7 @@ it('renders schedule outputs with the standard output section', () => {
   )
   expect(html).toContain('data-inspector-section="outputs"')
   expect(html).toContain('输出')
-  expect(html).toContain('payload')
+  expect(html).toContain('scheduledAt')
 })
 
 it('uses translated provider copy without changing the stored trigger definition', async () => {

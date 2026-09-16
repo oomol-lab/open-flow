@@ -144,7 +144,7 @@ it.each([false, true])('starts a cron test immediately with an explicit selectio
     expect(client.createDraftRun).toHaveBeenCalledExactlyOnceWith(
       'flow',
       'revision',
-      expect.objectContaining({ trigger: { nodeId: 'start', outputs: { payload: {} } }, inputs: {} }),
+      expect.objectContaining({ trigger: { nodeId: 'start', outputs: { scheduledAt: expect.any(String) } }, inputs: {} }),
     )
     expect(client.createLiveRun).not.toHaveBeenCalled()
   } finally {
@@ -152,7 +152,7 @@ it.each([false, true])('starts a cron test immediately with an explicit selectio
   }
 })
 
-it('collects downstream inputs for a cron test without asking for a trigger payload', async () => {
+it('collects downstream inputs for a cron test without asking for trigger outputs', async () => {
   const { client, store } = harness()
   const revision = cronDraft(draft)
   try {
@@ -166,7 +166,7 @@ it('collects downstream inputs for a cron test without asking for a trigger payl
     expect(client.createDraftRun).toHaveBeenCalledExactlyOnceWith(
       'flow',
       'revision',
-      expect.objectContaining({ trigger: { nodeId: 'start', outputs: { payload: {} } }, inputs: { task: { value: 'test' } } }),
+      expect.objectContaining({ trigger: { nodeId: 'start', outputs: { scheduledAt: expect.any(String) } }, inputs: { task: { value: 'test' } } }),
     )
   } finally {
     store.dispose()

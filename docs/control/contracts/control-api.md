@@ -339,7 +339,7 @@ Draft Run 只对选中 Trigger 沿执行边可达的节点及其依赖进行语�
 Draft Run 的 `revisionDigest` 标识完整 Revision，`closureDigest` 标识本次入口的执行 closure，可以与全图 check 的 `closureDigest` 不同。读取和恢复 Run 不修改原 Revision。
 Publish 和 Live Run 保持完整 Flow 校验。
 
-Manual Trigger 的节点结构为 `{ kind: "manual", name: string, description?: string, icon?: string }`，无输入和调度配置。其执行出口沿普通执行边连接下游，不提供数据输出字段，运行请求中的 `trigger.outputs` 和执行结果均为 `{}`。Cron、Poll 和 Integration 通过各自定义声明 `payload` 端口。其他 Trigger 可通过显式 outputs 模拟执行，仍保留 Draft/Live Run source，不伪造外部 occurrence。
+Manual Trigger 的节点结构为 `{ kind: "manual", name: string, description?: string, icon?: string }`，无输入和调度配置。其执行出口沿普通执行边连接下游，不提供数据输出字段，运行请求中的 `trigger.outputs` 和执行结果均为 `{}`。Cron 直接声明 `scheduledAt` 字符串端口；Poll 和 Integration 通过各自定义声明输出端口。其他 Trigger 可通过显式 outputs 模拟执行，仍保留 Draft/Live Run source，不伪造外部 occurrence。
 
 Webhook 声明四个必需输出，顺序为 `headers`、`query`、`body`、`webhookUrl`。headers 为小写名称的字符串映射；query 单值为字符串，重复值为有序字符串数组；body 是由 `bodyFields` 定义的严格 JSON 对象；webhookUrl 是服务端 Request URL 去除 query 和 fragment 后的绝对地址。空请求体按 `{}` 校验，不填充字段默认值。请求头完整保存，不在 Trigger 层脱敏。
 

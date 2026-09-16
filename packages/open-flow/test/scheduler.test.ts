@@ -262,7 +262,7 @@ describe('revision graph scheduler', () => {
               task: task('capture', ['event'], ['event']),
             },
             ignored: {
-              inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'scheduled', output: 'payload' }] } },
+              inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'scheduled', output: 'scheduledAt' }] } },
               kind: 'task',
               task: task('ignored', ['event'], ['event']),
             },

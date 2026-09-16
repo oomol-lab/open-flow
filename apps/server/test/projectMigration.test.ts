@@ -31,7 +31,7 @@ function revision() {
                 kind: 'task',
                 name: 'Echo',
                 concurrency: 1,
-                inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'clock', output: 'payload' }] } },
+                inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'clock', output: 'scheduledAt' }] } },
                 task: {
                   name: 'Echo',
                   moduleId: 'code',

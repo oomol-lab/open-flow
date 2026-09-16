@@ -13,10 +13,18 @@ const ports = [
 
 it('declares ordered built-in ports', () => {
   expect(triggerOutputDefinitions({ kind: 'manual', name: 'Manual' })).toEqual([])
-  expect(triggerOutputDefinitions({ kind: 'cron', name: 'Cron', cronTimes: [] }).map((port) => port.handle)).toEqual(['payload'])
+  expect(triggerOutputDefinitions({ kind: 'cron', name: 'Cron', cronTimes: [] }).map((port) => port.handle)).toEqual(['scheduledAt'])
   expect(triggerOutputDefinitions(webhook).map((port) => port.handle)).toEqual(['headers', 'query', 'body', 'webhookUrl'])
   expect(matchesTriggerOutputs({ kind: 'manual', name: 'Manual' }, {})).toBe(true)
   expect(matchesTriggerOutputs({ kind: 'manual', name: 'Manual' }, { payload: null })).toBe(false)
+})
+
+it('validates the Cron scheduled time as a direct output', () => {
+  const trigger: TriggerNode = { kind: 'cron', name: 'Cron', cronTimes: [] }
+  expect(triggerOutputDefinitions(trigger)[0]?.description).toBe('The scheduled time that triggered this run, in ISO 8601 format.')
+  expect(matchesTriggerOutputs(trigger, { scheduledAt: '2026-08-21T00:01:00.000Z' })).toBe(true)
+  expect(matchesTriggerOutputs(trigger, { scheduledAt: 1 })).toBe(false)
+  expect(matchesTriggerOutputs(trigger, { payload: { scheduledAt: '2026-08-21T00:01:00.000Z' } })).toBe(false)
 })
 
 it.each([

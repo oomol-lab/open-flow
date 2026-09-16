@@ -135,11 +135,11 @@ describe('Server Cron Trigger', () => {
       expect(binding.nextAt).toBe(Date.parse('2026-08-21T00:04:00.000Z'))
       const occurrence = database
         .prepare(
-          `SELECT trigger_occurrences.occurrence_id AS occurrenceId, trigger_occurrences.outputs AS payload
+          `SELECT trigger_occurrences.occurrence_id AS occurrenceId, trigger_occurrences.outputs AS outputsJson
            FROM cron_admissions JOIN trigger_occurrences USING (run_id)`,
         )
-        .get() as { readonly occurrenceId: string; readonly payload: string }
-      expect(JSON.parse(occurrence.payload).payload).toEqual({ scheduledAt: '2026-08-21T00:01:00.000Z' })
+        .get() as { readonly occurrenceId: string; readonly outputsJson: string }
+      expect(JSON.parse(occurrence.outputsJson)).toEqual({ scheduledAt: '2026-08-21T00:01:00.000Z' })
       await expect(scheduledTriggerOccurrenceId(binding.bindingId, binding.runtimeVersion, '2026-08-21T00:01:00.000Z')).resolves.toBe(occurrence.occurrenceId)
       expect(database.prepare('SELECT status FROM runs').get()).toEqual({ status: 'queued' })
       expect(database.prepare('SELECT COUNT(*) AS count FROM work').get()).toEqual({ count: 1 })
@@ -171,8 +171,8 @@ describe('Server Cron Trigger', () => {
     const database = new DatabaseSync(file, { readOnly: true })
     try {
       expect(database.prepare('SELECT status FROM runs').get()).toEqual({ status: 'completed' })
-      expect(database.prepare('SELECT outputs AS payload FROM trigger_occurrences').get()).toEqual({
-        payload: JSON.stringify({ payload: { scheduledAt: '2026-08-21T00:01:00.000Z' } }),
+      expect(database.prepare('SELECT outputs AS outputsJson FROM trigger_occurrences').get()).toEqual({
+        outputsJson: JSON.stringify({ scheduledAt: '2026-08-21T00:01:00.000Z' }),
       })
       expect(database.prepare('SELECT COUNT(*) AS count FROM work').get()).toEqual({ count: 0 })
     } finally {
@@ -198,7 +198,7 @@ describe('Server Cron Trigger', () => {
               actions: ['continue'],
 
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
-              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'scheduled', output: 'payload' }] } },
+              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'scheduled', output: 'scheduledAt' }] } },
               kind: 'wait',
               prompt: 'Continue?',
             },
@@ -234,13 +234,10 @@ describe('Server Cron Trigger', () => {
       await service.tickCron(new Date(now).toISOString())
       await expect.poll(() => database.prepare('SELECT COUNT(*) AS count FROM wait_receipts').get()).toEqual({ count: 2 })
       expect(database.prepare('SELECT next_at AS nextAt FROM cron_bindings').get()).toEqual({ nextAt: Date.parse('2026-08-21T00:06:00.000Z') })
-      const payloads = database.prepare('SELECT outputs AS payload FROM trigger_occurrences ORDER BY rowid').all() as unknown as readonly {
-        readonly payload: string
+      const outputs = database.prepare('SELECT outputs AS outputsJson FROM trigger_occurrences ORDER BY rowid').all() as unknown as readonly {
+        readonly outputsJson: string
       }[]
-      expect(payloads.map(({ payload }) => JSON.parse(payload).payload)).toEqual([
-        { scheduledAt: '2026-08-21T00:01:00.000Z' },
-        { scheduledAt: '2026-08-21T00:02:00.000Z' },
-      ])
+      expect(outputs.map(({ outputsJson }) => JSON.parse(outputsJson).scheduledAt)).toEqual(['2026-08-21T00:01:00.000Z', '2026-08-21T00:02:00.000Z'])
     } finally {
       database.close()
       await closeService(service)

@@ -63,19 +63,19 @@ async function createHarness(fixture: CronConformanceFixture): Promise<CronConfo
       await closeService(service)
       await rm(directory, { force: true, recursive: true })
     },
-    async payloads() {
+    async outputs() {
       const database = new DatabaseSync(file, { readOnly: true })
       try {
         const rows = database
           .prepare(
-            `SELECT trigger_occurrences.outputs AS payload
+            `SELECT trigger_occurrences.outputs AS outputsJson
              FROM cron_admissions
              JOIN trigger_occurrences USING (run_id)
              JOIN runs USING (run_id)
              ORDER BY runs.rowid`,
           )
-          .all() as { readonly payload: string }[]
-        return rows.map((row) => (JSON.parse(row.payload) as { payload: JsonValue }).payload)
+          .all() as { readonly outputsJson: string }[]
+        return rows.map((row) => JSON.parse(row.outputsJson) as Readonly<Record<string, JsonValue>>)
       } finally {
         database.close()
       }

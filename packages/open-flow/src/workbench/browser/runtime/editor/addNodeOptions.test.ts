@@ -39,8 +39,9 @@ it('offers a manual trigger again after the existing one is removed', () => {
   expect(cron.outputs).toEqual(triggerOutputDefinitions({ kind: 'cron', name: 'Cron', cronTimes: [] }))
   expect(cron.outputs).toEqual([
     {
-      handle: 'payload',
-      jsonSchema: { type: 'object', additionalProperties: false, properties: { scheduledAt: { type: 'string', format: 'date-time' } } },
+      description: 'The scheduled time that triggered this run, in ISO 8601 format.',
+      handle: 'scheduledAt',
+      jsonSchema: { type: 'string', format: 'date-time' },
       nullable: false,
     },
   ])
