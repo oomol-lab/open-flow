@@ -46,5 +46,6 @@ export function useInputSourceQuery<T>(calculate: (() => T) | undefined, enabled
     return () => controller.abort()
   }, [calculate, enabled])
   const current = result?.calculate === calculate ? result : undefined
-  return { value: current?.value, failed: current?.failed === true, pending: enabled && calculate != null && current == null }
+  const visible = enabled && calculate != null ? (current ?? result) : undefined
+  return { value: visible?.value, failed: visible?.failed === true, pending: enabled && calculate != null && result == null }
 }
