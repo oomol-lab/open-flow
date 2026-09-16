@@ -742,8 +742,8 @@ export function ValueEditor(props: ValueEditorProps) {
       {props.header != null && (
         <div className={styles.header} title={props.description}>
           {props.leadingControl != null && <div className={styles.leadingControl}>{props.leadingControl}</div>}
-          {expandable && !sorting && (
-            <div className={styles.toggleControl}>
+          <div className={styles.toggleControl}>
+            {expandable && !sorting && (
               <Button
                 type="button"
                 size="icon-xs"
@@ -756,8 +756,8 @@ export function ValueEditor(props: ValueEditorProps) {
               >
                 <i aria-hidden="true" className={expanded ? 'i-lucide-light:chevron-down' : 'i-lucide-light:chevron-right'} />
               </Button>
-            </div>
-          )}
+            )}
+          </div>
           {props.header}
         </div>
       )}

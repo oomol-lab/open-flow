@@ -238,7 +238,6 @@
     "title": "인스펙터",
     "sources": {
       "loading": "사용 가능한 데이터 불러오는 중…",
-      "checking": "매핑 확인 중…",
       "loadFailed": "소스를 불러올 수 없습니다. 메뉴를 다시 열어 주세요.",
       "checkFailed": "이 소스를 확인할 수 없습니다.",
       "title": "데이터 선택",

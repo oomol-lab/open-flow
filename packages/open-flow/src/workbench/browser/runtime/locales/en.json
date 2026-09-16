@@ -238,7 +238,6 @@
     "title": "Inspector",
     "sources": {
       "loading": "Loading available data…",
-      "checking": "Checking mapping…",
       "loadFailed": "Could not load sources. Reopen the menu to retry.",
       "checkFailed": "Could not check this source.",
       "title": "Select data",

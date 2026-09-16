@@ -238,7 +238,6 @@
     "title": "检查器",
     "sources": {
       "loading": "正在加载可用数据…",
-      "checking": "正在检查映射…",
       "loadFailed": "无法加载来源，请重新打开菜单重试。",
       "checkFailed": "无法检查此来源。",
       "title": "选择数据",

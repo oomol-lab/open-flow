@@ -1,6 +1,6 @@
 import styles from './nodeInputValue.module.scss'
 import type { TFunction } from 'val-i18n'
-import type { InputSourceCheck } from '../../../../flow/common/graph.ts'
+import type { InputSourceCheck, InputSourcesCheck } from '../../../../flow/common/graph.ts'
 import type { ValueEditorProps } from '../../../../form/browser/valueEditor.tsx'
 import type { VariablePickerProps } from '../../../../ui/browser/variable-picker.tsx'
 import type { InputPort, JsonValue } from '../api.ts'
@@ -89,15 +89,23 @@ function SelectedSourceValue({
 }) {
   const t = useTranslate()
   const sourceErrorId = useId()
-  const checks = useInputSourceQuery(upstream?.query?.check, (upstream?.current.length ?? 0) > 0)
-  const current = upstream?.query == null ? upstream?.current : upstream.current.map((source, index) => ({ ...source, check: checks.value?.sources[index] }))
+  let checks: InputSourcesCheck | undefined
+  let checkFailed = false
+  if (upstream?.query != null && upstream.current.length > 0) {
+    try {
+      checks = upstream.query.check()
+    } catch {
+      checkFailed = true
+    }
+  }
+  const current = upstream?.query == null ? upstream?.current : upstream.current.map((source, index) => ({ ...source, check: checks?.sources[index] }))
   const missingVariable = variableName != null && (!variables.enabled || (variables.loaded && !variables.names.includes(variableName)))
   const invalidUpstream = connected ? current?.find((source) => source.check != null && source.check.kind != 'available') : undefined
   const sourceIssue = missingVariable
     ? !variables.enabled
       ? t('variablePicker.variableUnavailableHelp')
       : t('variablePicker.variableMissingHelp', { name: variableName })
-    : checks.value?.conflict
+    : checks?.conflict
       ? t('inspector.sources.sourceConflict', { sources: current?.map((source) => `${source.nodeName} ${source.output}`).join(', ') })
       : invalidUpstream != null
         ? inputSourceIssue(invalidUpstream.check, invalidUpstream, t)
@@ -113,7 +121,6 @@ function SelectedSourceValue({
       <div
         data-value-control
         className="flex h-[30px] min-w-0 items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-[7px] text-xs aria-invalid:border-destructive"
-        aria-busy={checks.pending || undefined}
         aria-invalid={sourceIssue != null}
         aria-describedby={sourceIssue ? sourceErrorId : undefined}
         tabIndex={sourceIssue ? 0 : undefined}
@@ -132,9 +139,9 @@ function SelectedSourceValue({
         )}
         <span className="truncate">{sourceLabel}</span>
       </div>
-      {(checks.pending || checks.failed) && (
+      {checkFailed && (
         <p role="status" className="text-xs text-muted-foreground">
-          {t(checks.failed ? 'inspector.sources.checkFailed' : 'inspector.sources.checking')}
+          {t('inspector.sources.checkFailed')}
         </p>
       )}
       {sourceIssue && (

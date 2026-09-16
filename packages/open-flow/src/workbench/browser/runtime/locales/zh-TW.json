@@ -238,7 +238,6 @@
     "title": "檢查器",
     "sources": {
       "loading": "正在載入可用資料…",
-      "checking": "正在檢查映射…",
       "loadFailed": "無法載入來源，請重新開啟選單重試。",
       "checkFailed": "無法檢查此來源。",
       "title": "選擇資料",

@@ -253,7 +253,7 @@ describe('Unset input presentation', () => {
   })
 })
 
-it('renders a saved binding as pending without running compatibility or candidate queries', () => {
+it('checks a saved binding synchronously without enumerating candidates', () => {
   const i18n = createI18n('en')
   const check = vi.fn(() => ({ conflict: false, sources: [{ kind: 'not-ready' }] as readonly InputSourceCheck[] }))
   const candidates = vi.fn(() => ({}))
@@ -278,10 +278,11 @@ it('renders a saved binding as pending without running compatibility or candidat
       </I18nProvider>,
     )
     expect(html).toContain('Saved source text')
-    expect(html).toContain('Checking mapping…')
-    expect(html).toContain('aria-busy="true"')
-    expect(html).not.toContain('aria-invalid="true"')
-    expect(check).not.toHaveBeenCalled()
+    expect(html).not.toContain('Checking mapping…')
+    expect(html).not.toContain('aria-busy')
+    expect(html).toContain('aria-invalid="true"')
+    expect(html).toContain('“Saved source text” may not have a value when this step runs.')
+    expect(check).toHaveBeenCalledOnce()
     expect(candidates).not.toHaveBeenCalled()
   } finally {
     i18n.dispose()
