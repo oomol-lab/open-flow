@@ -9,9 +9,9 @@ import type {
   NodeSource,
   PortDefinition,
   RevisionContent,
+  SchemaMismatch,
   TriggerNode,
 } from './change.ts'
-import type { SchemaMismatch } from './schema.ts'
 import type { Diagnostic, SemanticClosure } from './semantics.ts'
 
 import { portsByHandle, validVariableName } from './change.ts'

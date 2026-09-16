@@ -1,7 +1,7 @@
-import type { SchemaMismatch } from '../../flow/common/schema.ts'
+import type { SchemaMismatch } from '../../flow/common/change.ts'
 import type { Diagnostic, FlowCheck } from './api.ts'
 
-import { isSchemaKeyword } from '../../flow/common/schema.ts'
+import { isSchemaKeyword } from '../../flow/common/change.ts'
 import { integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 
 function schemaPath(value: unknown): readonly (string | number)[] {

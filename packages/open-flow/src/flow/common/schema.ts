@@ -1,9 +1,9 @@
 import type { Schema, SchemaDraft } from '@cfworker/json-schema'
-import type { CompareErrorResult, CompatibleCompareResult, IncompatibleCompareResult } from '../../manifest/common/schemaCompare.ts'
-import type { JsonValue, PortDefinition, TriggerNode } from './change.ts'
+import type { JsonValue, PortDefinition, SchemaKeyword, SchemaMismatch, TriggerNode } from './change.ts'
 
 import { Validator } from '@cfworker/json-schema'
 import { compareJSONSchema, normalizeNullableSchemaPath } from '../../manifest/common/schemaCompare.ts'
+import { isSchemaKeyword } from './change.ts'
 
 export function triggerPayloadSchema(trigger: TriggerNode): JsonValue {
   if (trigger.kind == 'poll' || trigger.kind == 'integration') return trigger.definition.payloadSchema
@@ -72,43 +72,20 @@ export function matchesSchema(value: JsonValue, schema: JsonValue): boolean {
   }
 }
 
-export type SchemaKeyword =
-  | 'const'
-  | 'enum'
-  | 'exclusiveMaximum'
-  | 'exclusiveMinimum'
-  | 'maximum'
-  | 'maxItems'
-  | 'maxLength'
-  | 'maxProperties'
-  | 'minimum'
-  | 'minItems'
-  | 'minLength'
-  | 'minProperties'
-  | 'multipleOf'
-  | 'pattern'
-  | 'required'
-  | 'type'
+interface IncompatibleCompareResult {
+  readonly kind: 'incompatible'
+  readonly error?: string
+  readonly errorPath?: readonly (string | number)[]
+}
 
-export type SchemaMismatch =
-  | { readonly kind: 'artifact' | 'binary' | 'nullable' }
-  | {
-      readonly kind: 'keyword'
-      readonly keyword: SchemaKeyword
-      readonly path: readonly (string | number)[]
-      readonly source: JsonValue | undefined
-      readonly target: JsonValue | undefined
-    }
-  | { readonly kind: 'schema'; readonly path?: readonly (string | number)[] }
+type SchemaCompareResult = { readonly kind: 'compatible' } | { readonly kind: 'compare-error'; readonly message: string } | IncompatibleCompareResult
 
-export type PortCompareResult = CompatibleCompareResult | CompareErrorResult | { readonly kind: 'incompatible'; readonly mismatch: SchemaMismatch }
+export type PortCompareResult =
+  | { readonly kind: 'compatible' }
+  | { readonly kind: 'compare-error'; readonly message: string }
+  | { readonly kind: 'incompatible'; readonly mismatch: SchemaMismatch }
 
-function compareSchemas(
-  sourceSchema: JsonValue,
-  targetSchema: JsonValue,
-  sourceNullable = false,
-  targetNullable = false,
-): IncompatibleCompareResult | CompatibleCompareResult | CompareErrorResult {
+function compareSchemas(sourceSchema: JsonValue, targetSchema: JsonValue, sourceNullable = false, targetNullable = false): SchemaCompareResult {
   if (targetSchema === true || jsonEqual(targetSchema, {})) return { kind: 'compatible' }
   if (sourceSchema === true || jsonEqual(sourceSchema, {})) return { kind: 'incompatible' }
   if (sourceSchema === false || targetSchema === false) return { kind: 'incompatible' }
@@ -174,29 +151,6 @@ const schemaConstraintKeywords: readonly SchemaKeyword[] = [
   'minProperties',
   'maxProperties',
 ]
-
-const schemaKeywords: ReadonlySet<string> = new Set<SchemaKeyword>([
-  'const',
-  'enum',
-  'exclusiveMaximum',
-  'exclusiveMinimum',
-  'maximum',
-  'maxItems',
-  'maxLength',
-  'maxProperties',
-  'minimum',
-  'minItems',
-  'minLength',
-  'minProperties',
-  'multipleOf',
-  'pattern',
-  'required',
-  'type',
-])
-
-export function isSchemaKeyword(value: string): value is SchemaKeyword {
-  return schemaKeywords.has(value)
-}
 
 export function comparePorts(source: PortDefinition, target: PortDefinition): PortCompareResult {
   const result = compareSchemas(source.jsonSchema, target.jsonSchema, source.nullable, target.nullable)

@@ -1,7 +1,6 @@
 import type { EngineContract } from '../../execution/common/engineContract.ts'
 import type { RuntimeProgram } from '../../execution/common/runtime.ts'
-import type { ConnectorCapability, FlowDocument, Graph, InputMapping, JsonValue, RevisionContent } from './change.ts'
-import type { SchemaMismatch } from './schema.ts'
+import type { ConnectorCapability, FlowDocument, Graph, InputMapping, JsonValue, RevisionContent, SchemaMismatch } from './change.ts'
 
 import { findEngineContract } from '../../execution/common/engineContract.ts'
 import { agentConfigIssues } from './agent.ts'

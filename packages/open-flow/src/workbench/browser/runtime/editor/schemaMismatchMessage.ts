@@ -1,6 +1,5 @@
 import type { TFunction } from 'val-i18n'
-import type { JsonValue } from '../../../../flow/common/change.ts'
-import type { SchemaMismatch } from '../../../../flow/common/schema.ts'
+import type { JsonValue, SchemaMismatch } from '../../../../flow/common/change.ts'
 
 function schemaPath(path: readonly (string | number)[]): string | undefined {
   const parts: string[] = []

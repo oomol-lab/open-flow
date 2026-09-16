@@ -1,4 +1,4 @@
-import type { SchemaMismatch } from '../../flow/common/schema.ts'
+import type { SchemaMismatch } from '../../flow/common/change.ts'
 import type { CreateEventSource, UpdateEventSource, EventSource } from './eventSources.ts'
 
 import { decodeEventSource, decodeEventSources } from './eventSources.ts'
