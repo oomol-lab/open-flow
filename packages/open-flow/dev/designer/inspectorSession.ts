@@ -12,8 +12,7 @@ import { setNodePositions } from '../../src/workbench/browser/runtime/workspace.
 
 const target = { kind: 'flow' } as const
 // Only transport responses are fixtures; saves use the production Store and Flow reducer.
-export function createInspectorSession(language: UiLanguage, log: LogAction, initialContent: RevisionContent) {
-  const i18n = createI18n(language)
+export function createInspectorTransport(log: LogAction, initialContent: RevisionContent) {
   const timestamp = '2026-09-14T00:00:00.000Z'
   let sequence = 1
   let content = initialContent
@@ -36,6 +35,10 @@ export function createInspectorSession(language: UiLanguage, log: LogAction, ini
   })
   const client = new WorkbenchClient(async (path, init) => {
     const url = new URL(path instanceof Request ? path.url : path, 'https://lab.invalid')
+    if (url.pathname.endsWith('/connector/proxy/providers')) return Response.json({ success: true, data: [] })
+    if (url.pathname.endsWith('/connector/proxy/apps')) return Response.json({ success: true, data: [] })
+    if (url.pathname === '/v1/trigger-keys/catalog')
+      return Response.json({ version: 1, locale: url.searchParams.get('locale') ?? 'en', definitions: [], display: {} })
     if (url.pathname === '/v1/flows') return Response.json({ flows: [{ ...flow, draftRevisionId: revision().revisionId }], total: 1, version: 1 })
     if (url.pathname.endsWith('/editor'))
       return Response.json({
@@ -69,6 +72,12 @@ export function createInspectorSession(language: UiLanguage, log: LogAction, ini
       })
     throw new Error(`Unexpected inspector Lab request: ${url.pathname}`)
   })
+  return { client, flowId: flow.flowId }
+}
+
+export function createInspectorSession(language: UiLanguage, log: LogAction, initialContent: RevisionContent) {
+  const { client, flowId } = createInspectorTransport(log, initialContent)
+  const i18n = createI18n(language)
   const notice = (value: unknown) => log('inspector.notice', value)
   const store = new WorkspaceStore(client, notice, undefined, i18n)
   const host = { openExternalPage: async () => false }
@@ -79,7 +88,7 @@ export function createInspectorSession(language: UiLanguage, log: LogAction, ini
     connectors,
     triggers,
     i18n,
-    start: () => store.start(flow.flowId),
+    start: () => store.start(flowId),
     dispose() {
       triggers.dispose()
       connectors.dispose()

@@ -44,6 +44,44 @@ const editor = {
 } as const
 
 describe('WorkspaceStore', () => {
+  it('locates a selected node without changing the multi-selection when requested', async () => {
+    const sourceDraft = {
+      ...draft,
+      content: {
+        ...draft.content,
+        document: {
+          ...draft.content.document,
+          graph: {
+            edges: [],
+            nodes: {
+              a: { inputs: {}, kind: 'value', name: 'First', values: [] },
+              b: { inputs: {}, kind: 'value', name: 'Second', values: [] },
+            },
+          },
+        },
+      },
+    } as const
+    const request = vi.fn(async (path: string) => {
+      if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [flow], total: 1, version: 1 })
+      if (path == `/v1/flows/${flow.flowId}/editor`) return Response.json({ ...editor, draft: sourceDraft })
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const store = new WorkspaceStore(new WorkbenchClient(request), vi.fn())
+    try {
+      await store.start(flow.flowId)
+      store.selectNodes(['a', 'b'])
+      expect(store.locateNode('b', { preserveSelection: true })).toBe(true)
+      expect(store.$.selectedNodeIds.value).toEqual(['a', 'b'])
+      expect(store.$.nodeFocus.value?.nodeId).toBe('b')
+      expect(store.locateNode('missing', { preserveSelection: true })).toBe(false)
+      expect(store.$.selectedNodeIds.value).toEqual(['a', 'b'])
+      expect(store.locateNode('a')).toBe(true)
+      expect(store.$.selectedNodeIds.value).toEqual(['a'])
+    } finally {
+      store.dispose()
+    }
+  })
+
   it('repairs missing and duplicate Node names after opening a Draft', async () => {
     const sourceDraft = {
       ...draft,

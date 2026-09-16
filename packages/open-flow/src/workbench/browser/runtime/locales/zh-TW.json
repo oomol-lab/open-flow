@@ -152,6 +152,10 @@
     "deleteDescription": "此操作將刪除工作流程及其執行記錄，並停止線上觸發，無法復原。"
   },
   "inspector": {
+    "outline": "節點大綱",
+    "backToOutline": "返回節點大綱",
+    "emptyOutline": "還沒有節點",
+    "multipleSelected": "已選擇 {{count}} 個節點",
     "account": {
       "required": "待連線帳號",
       "addConnection": "新增 Connection",
@@ -194,7 +198,7 @@
       "name": "標題"
     },
     "selectNode": "選取一個草稿節點即可檢視並編輯它。",
-    "locateNode": "在畫布上定位 {{name}}",
+    "locateNode": "在畫布上定位此節點",
     "subflow": {
       "definition": "Subflow 定義",
       "inputPorts": "輸入埠（JSON）",

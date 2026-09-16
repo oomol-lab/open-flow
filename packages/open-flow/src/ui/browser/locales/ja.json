@@ -44,6 +44,7 @@
     "messageRole": "メッセージの役割"
   },
   "nodeActions": {
+    "inspect": "プロパティを表示",
     "configSharedBlock": "共有ブロックの設定",
     "delete": "削除",
     "deleteConfirm": "{{name}} を削除しますか？\n{{shortcut}} で直接削除できます",

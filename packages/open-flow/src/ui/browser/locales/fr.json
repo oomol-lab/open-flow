@@ -44,6 +44,7 @@
     "messageRole": "Rôle du message"
   },
   "nodeActions": {
+    "inspect": "Afficher les propriétés",
     "configSharedBlock": "Configuration du bloc partagé",
     "delete": "Supprimer",
     "deleteConfirm": "Voulez-vous vraiment supprimer {{name}} ?\n{{shortcut}} pour supprimer directement",

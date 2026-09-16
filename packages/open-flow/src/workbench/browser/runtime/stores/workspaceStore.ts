@@ -926,10 +926,12 @@ export class WorkspaceStore {
     if (live.flowId == this.#model.value.flowId) this.#set({ live })
   }
 
-  public locateNode(nodeId: string): boolean {
+  public locateNode(nodeId: string, { preserveSelection = false }: { readonly preserveSelection?: boolean } = {}): boolean {
     const revision = this.$.revision.value
     const target = this.#model.value.target
-    if (revision == null || target == null || revision.node(target, nodeId) == null || !this.selectNodes([nodeId])) return false
+    if (revision == null || target == null) return false
+    if (revision.node(target, nodeId) == null && !commentIds(this.#model.value.presentation?.value ?? {}, target).has(nodeId)) return false
+    if (!preserveSelection && !this.selectNodes([nodeId])) return false
     this.#set({ nodeFocus: { nodeId, requestId: ++this.#nodeFocusId } })
     return true
   }

@@ -27,12 +27,14 @@ import { NodePickerContent } from './nodePicker.tsx'
 interface ContextPanelProps {
   readonly className?: string
   readonly resizable?: boolean
+  readonly leading?: ReactNode
   readonly heading?: ReactNode
   readonly actions?: ReactNode
   readonly children: ReactNode
   readonly focusOnOpen: boolean
   readonly icon: IconName
   readonly onClose: () => void
+  readonly showClose?: boolean
   readonly theme: WorkbenchTheme
   readonly title: string
 }
@@ -104,8 +106,10 @@ export function ContextPanel({
   focusOnOpen,
   actions,
   heading,
+  leading,
   icon,
   onClose,
+  showClose = true,
   theme,
   title,
   resizable = false,
@@ -229,6 +233,7 @@ export function ContextPanel({
           />
         )}
         <header>
+          {leading}
           {heading == null ? (
             <>
               <span className="flex size-9 shrink-0 items-center justify-center" aria-hidden="true">
@@ -247,9 +252,11 @@ export function ContextPanel({
             </>
           )}
           {actions}
-          <Button aria-label={t('contextPanel.close')} onClick={onClose} size="icon-sm" type="button" variant="ghost">
-            <Icon name="close" />
-          </Button>
+          {(showClose || overlay) && (
+            <Button aria-label={t('contextPanel.close')} onClick={onClose} size="icon-sm" type="button" variant="ghost">
+              <Icon name="close" />
+            </Button>
+          )}
         </header>
         <div className="context-panel-content">{children}</div>
       </aside>

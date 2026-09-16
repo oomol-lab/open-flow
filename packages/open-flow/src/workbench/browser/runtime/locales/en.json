@@ -152,6 +152,10 @@
     "deleteDescription": "This deletes the flow and its run history and stops live triggers. This cannot be undone."
   },
   "inspector": {
+    "outline": "Node outline",
+    "backToOutline": "Back to node outline",
+    "emptyOutline": "No nodes yet",
+    "multipleSelected": "{{count}} nodes selected",
     "account": {
       "required": "Account connection required",
       "addConnection": "Add connection",
@@ -194,7 +198,7 @@
       "name": "Title"
     },
     "selectNode": "Select one Draft node to inspect and edit it.",
-    "locateNode": "Locate {{name}} on the canvas",
+    "locateNode": "Locate this node on the canvas",
     "subflow": {
       "definition": "Subflow definition",
       "inputPorts": "Input ports (JSON)",

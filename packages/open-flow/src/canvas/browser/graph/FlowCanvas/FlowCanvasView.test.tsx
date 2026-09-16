@@ -768,3 +768,18 @@ describe('FlowCanvasView model synchronization', () => {
     store.dispose()
   })
 })
+
+it('reports repeated activation and the final canvas selection before selection effects run', () => {
+  const onActivateSelection = vi.fn()
+  const onSelectionEnd = vi.fn()
+  const view = FlowCanvasView(
+    props(model([source, task([])]), { selectedNodeIds: ['source'], onActivateSelection, onSelectionEnd }),
+  ) as React.ReactElement<FlowCanvasProps>
+  view.props.onActivateSelection?.()
+  view.props.onActivateSelection?.()
+  expect(onActivateSelection.mock.calls).toEqual([[['source']], [['source']]])
+  const store = view.props.flowCanvasStore
+  store.handleNodesChange(store.$.rfNodes.value.map((node) => ({ type: 'select', id: node.id, selected: node.data.store.nodeId === 'target' })))
+  view.props.onSelectionEnd?.()
+  expect(onSelectionEnd).toHaveBeenCalledExactlyOnceWith(['target'])
+})

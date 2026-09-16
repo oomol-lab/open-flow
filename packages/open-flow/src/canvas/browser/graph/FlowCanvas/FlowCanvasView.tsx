@@ -106,6 +106,8 @@ export function FlowCanvasView(props: FlowCanvasViewProps): ReactElement {
     }
   }, [store, props.focusNodeRequest])
 
+  const selectionIds = (): string[] => store.$.rfNodes.value.flatMap((node) => (node.selected && node.data?.store ? [node.data.store.nodeId] : []))
+
   return (
     <FlowCanvas
       cornerTools={props.cornerTools}
@@ -124,6 +126,10 @@ export function FlowCanvasView(props: FlowCanvasViewProps): ReactElement {
       onNodeDragStop={onNodeDragStop}
       onDropAddItem={onDropAddItem}
       onSelectionChange={onSelectionChange}
+      onActivateSelection={() => propsRef.current.onActivateSelection?.(selectionIds())}
+      onSelectionStart={props.onSelectionStart}
+      onSelectionEnd={() => propsRef.current.onSelectionEnd?.(selectionIds())}
+      onInspectSelection={props.onInspectSelection}
     />
   )
 }

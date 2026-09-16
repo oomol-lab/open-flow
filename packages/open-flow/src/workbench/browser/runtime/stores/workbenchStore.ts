@@ -96,6 +96,7 @@ export class WorkbenchStore {
   #variableRequest: Promise<void> | undefined
   #disposed = false
 
+  public readonly preferences: WorkbenchPreferences
   public readonly $: Workbench$
   public readonly connectors: ConnectorStore
   public readonly publications: PublicationStore
@@ -112,6 +113,7 @@ export class WorkbenchStore {
     host: Pick<WorkbenchHost, 'openExternalPage' | 'connectorCache' | 'triggerCatalogCache'> = blockedExternalPages,
     variables = true,
   ) {
+    this.preferences = preferences
     this.#client = client
     this.results = client
     this.#i18n = i18n

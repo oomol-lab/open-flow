@@ -107,7 +107,7 @@ Drag the centered three-dot handle in the 8px gap to resize the sidebar. Focus t
 
 `?story=node-picker-preview` compares the open node catalog and the button dock popover. Built-in nodes use compact rows with tooltips; the Triggers tab lists real definitions by app, and the Nodes tab browses sample connector actions. Story actions expose loading, errors and disabled controls.
 
-`?story=inspector-panel` shows the production canvas and resizable node properties panel. Run results stay in the canvas card popover. The panel retains its close button.
+`?story=inspector-panel` uses the production Workbench editor and stores with a deterministic transport. Verify persistent panel visibility, toolbar opening, return-to-outline without deselection, repeat selection, marquee completion, and code draft saves. Empty, outline, single and multiple selection panels appear together below. Its browser preference is isolated under the `lab:` prefix.
 
 `?story=inspector-ports` 使用生产 NodeInspector、WorkspaceStore、Flow reducer 和画布展示节点属性。输入与输出复用 Fixed Values 的区块标题、表头、字段控件和行内设置结构；支持拖动组内排序，也可聚焦手柄后按上下键；Reload saved data 验证排序持久化。字段保留名称、类型、值和操作列，固定定义以只读控件展示。现有连接来源入口保持原行为，本轮不扩展上游选择。长文本和 JSON 在主行下展开，省去展开时的重复摘要。下方并排展示结构化 Payload、嵌套数组、只读接口及未设置、空数组、null、false，圆弧线标示嵌套关系。辅助按钮提供只读切换和重置。
 

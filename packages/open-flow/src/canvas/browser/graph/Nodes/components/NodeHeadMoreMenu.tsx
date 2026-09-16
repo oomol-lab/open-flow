@@ -15,6 +15,7 @@ import { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 import { NodeStore } from '../../../stores/node/node.store.ts'
 import { useCanvasStore } from '../../CanvasStoreContext.tsx'
 import { nodeCardContent } from '../../FlowCanvas/cardContent.ts'
+import { InspectSelectionButton } from '../../inspectSelection.tsx'
 import { useGetStaticPopupContainer } from '../../ReactFlowContainer/useGetPopupContainer.ts'
 import { useNodeStore } from '../NodeStoreContext.tsx'
 
@@ -168,6 +169,7 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
 
   return (
     <NodeToolbar data-tooltip-toolbar className={styles.floatBar} offset={12 - 8 * zoom}>
+      <InspectSelectionButton className={styles.floatBarButton} />
       {floatBarItems.map((item) => {
         return (
           <CanvasTooltip

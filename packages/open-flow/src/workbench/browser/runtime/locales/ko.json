@@ -152,6 +152,10 @@
     "deleteDescription": "워크플로와 실행 기록을 삭제하고 프로덕션 트리거를 중지합니다. 이 작업은 되돌릴 수 없습니다."
   },
   "inspector": {
+    "outline": "노드 목록",
+    "backToOutline": "노드 목록으로 돌아가기",
+    "emptyOutline": "아직 노드가 없습니다",
+    "multipleSelected": "노드 {{count}}개 선택됨",
     "account": {
       "required": "계정 연결 필요",
       "addConnection": "Connection 추가",
@@ -194,7 +198,7 @@
       "name": "제목"
     },
     "selectNode": "확인하고 편집할 초안 노드를 하나 선택하세요.",
-    "locateNode": "캔버스에서 {{name}} 위치 보기",
+    "locateNode": "캔버스에서 이 노드 위치 보기",
     "subflow": {
       "definition": "Subflow 정의",
       "inputPorts": "입력 포트(JSON)",

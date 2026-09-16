@@ -18,6 +18,7 @@ import { EditorContextPanel } from './editor/editorContextPanel.tsx'
 import { FlowNodeList } from './editor/flowNodeList.tsx'
 import { inspectorIcon, NodeInspector } from './editor/nodeInspector.tsx'
 import { NodePickerPopover } from './editor/nodePickerPopover.tsx'
+import { useInspectorPanel } from './editor/useInspectorPanel.ts'
 import { WorkbenchCanvas } from './editor/workbenchCanvas.tsx'
 import { Icon } from './icons.tsx'
 import { NavigationStore } from './navigation.ts'
@@ -29,8 +30,6 @@ import { RunResults } from './runs/runResults.tsx'
 import { RunsView } from './runs/runsView.tsx'
 import { WorkspaceHeader } from './shell/workspaceHeader.tsx'
 import { WorkbenchStore } from './stores/workbenchStore.ts'
-
-type ContextPanelMode = 'blocks' | 'inspector' | undefined
 
 function RunDrawerContainer({
   onClose,
@@ -156,7 +155,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   )
 })
 
-function Editor({
+export function FlowEditor({
   onRun,
   onRunStarted,
   onCloseRuns,
@@ -198,8 +197,13 @@ function Editor({
   const selectedNodeIds = useVal(store.workspace.$.selectedNodeIds)
   const target = useVal(store.workspace.$.target)
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(`${flowId}:${target?.kind}:${target?.kind == 'subflow' ? target.id : ''}`)
-  const targetName = useVal(store.workspace.$.targetName)
-  const [contextPanelMode, setContextPanelMode] = useState<ContextPanelMode>()
+  const panel = useInspectorPanel({
+    identity: JSON.stringify([flowId, target]),
+    preferences: store.preferences,
+    selectedNodeIds,
+    onSelectNodes: (ids) => store.selectNodes(ids),
+  })
+  const contextPanelMode = panel.blocksOpen ? 'blocks' : panel.open ? 'inspector' : undefined
   const [blocksFocusRequest, setBlocksFocusRequest] = useState(0)
   const designerRef = useRef<WorkbenchCanvasHandle>(null)
   useEffect(() => {
@@ -219,14 +223,13 @@ function Editor({
     setStartId(undefined)
     focusInspectorOnOpen.current = false
     opener.current = undefined
-    setContextPanelMode(undefined)
   }, [flowId, target?.kind == 'subflow' ? target.id : undefined, target?.kind])
 
   useEffect(() => {
     if (diagnosticFocus == null) return
     focusInspectorOnOpen.current = false
     opener.current = undefined
-    setContextPanelMode('inspector')
+    panel.openInspector()
   }, [diagnosticFocus])
 
   useEffect(() => {
@@ -235,7 +238,7 @@ function Editor({
 
   const authoringDisabled = draft == null || history.applying || history.failed || (busy != null && busy != 'designer' && busy != 'run')
   const closeContextPanel = (focusTarget = opener.current): void => {
-    setContextPanelMode(undefined)
+    panel.close()
     focusInspectorOnOpen.current = false
     opener.current = undefined
     globalThis.setTimeout(() => {
@@ -246,13 +249,13 @@ function Editor({
   const openBlocks = (button?: HTMLButtonElement): void => {
     opener.current = button
     focusInspectorOnOpen.current = false
-    setContextPanelMode('blocks')
+    panel.openBlocks()
     setBlocksFocusRequest((request) => request + 1)
   }
   const openInspector = (): void => {
     opener.current = undefined
     focusInspectorOnOpen.current = false
-    setContextPanelMode('inspector')
+    panel.openInspector()
   }
   const toggleInspector = (button: HTMLButtonElement): void => {
     if (contextPanelMode == 'inspector') {
@@ -261,21 +264,35 @@ function Editor({
     }
     opener.current = button
     focusInspectorOnOpen.current = true
-    setContextPanelMode('inspector')
+    panel.openInspector()
   }
   const addFromBlocks = async (option: AddNodeOption): Promise<string | undefined> => {
     return designerRef.current?.addNode(option)
   }
 
+  const selectOutlineNode = (nodeId: string): void => {
+    designerRef.current?.focusCanvas()
+    panel.activate([nodeId])
+  }
   const focusNode = (nodeId: string): void => {
-    store.selectNodes([nodeId])
+    selectOutlineNode(nodeId)
     store.workspace.locateNode(nodeId)
   }
 
   const contextPanelVisible = contextPanelMode != null && target != null && (contextPanelMode == 'blocks' || revision != null)
-  const flowSelected = selection == null && target?.kind == 'flow'
-  const contextPanelIcon = contextPanelMode == 'blocks' ? 'plus' : target == null || flowSelected ? 'flow' : inspectorIcon(selection, target)
-  const contextPanelTitle = contextPanelMode == 'blocks' ? t('contextPanel.blocks') : (selectedDesignerNode?.title ?? targetName ?? t('inspector.title'))
+  const flowSelected = panel.page == 'outline'
+  const multipleSelected = !flowSelected && selectedNodeIds.length > 1
+  const singleSelected = !flowSelected && !multipleSelected
+  const contextPanelIcon =
+    contextPanelMode == 'blocks' ? 'plus' : target == null || flowSelected || multipleSelected ? 'flow' : inspectorIcon(selection, target)
+  const contextPanelTitle =
+    contextPanelMode == 'blocks'
+      ? t('contextPanel.blocks')
+      : flowSelected
+        ? t('inspector.outline')
+        : multipleSelected
+          ? t('inspector.multipleSelected', { count: selectedNodeIds.length })
+          : (selectedDesignerNode?.title ?? t('inspector.title'))
 
   const historyControls = {
     state: history,
@@ -368,19 +385,31 @@ function Editor({
         onOpenInspector={openInspector}
         onPaste={() => void store.workspace.pasteNodes()}
         provideAddNodeOptions={store.provideAddNodeOptions}
-        onSelectNodes={(nodeIds) => store.selectNodes(nodeIds)}
+        onSelectNodes={panel.select}
+        onActivateSelection={panel.activate}
+        onSelectionStart={panel.startSelection}
+        onSelectionEnd={panel.endSelection}
         onToggleInspector={toggleInspector}
         ref={designerRef}
-        selectedNodeIds={selectedNodeIds}
+        selectedNodeIds={panel.canvasSelection}
         target={target}
         theme={theme}
       />
       {contextPanelVisible && (
         <EditorContextPanel
           resizable
-          nodeId={selectedDesignerNode?.id}
+          showClose={contextPanelMode == 'blocks'}
+          onBack={
+            contextPanelMode == 'inspector' && !flowSelected
+              ? () => {
+                  panel.back()
+                  designerRef.current?.focusCanvas()
+                }
+              : undefined
+          }
+          nodeId={singleSelected ? selectedDesignerNode?.id : undefined}
           nodeHeading={
-            contextPanelMode === 'inspector' && selection != null
+            contextPanelMode === 'inspector' && singleSelected && selection != null
               ? {
                   titleReadOnly: selection.kind === 'trigger' && selection.trigger.kind === 'manual',
                   title: selection.node.name ?? selectedDesignerNode?.title ?? '',
@@ -401,7 +430,7 @@ function Editor({
                     return issue == null ? undefined : t(`inspector.node.${issue === 'empty' ? 'nameEmpty' : 'nameDuplicate'}`)
                   },
                 }
-              : contextPanelMode === 'inspector' && selectedDesignerNode?.kind === 'comment'
+              : contextPanelMode === 'inspector' && singleSelected && selectedDesignerNode?.kind === 'comment'
                 ? {
                     title: selectedDesignerNode.title,
                     disabled: authoringDisabled,
@@ -419,6 +448,15 @@ function Editor({
           theme={theme}
           title={contextPanelTitle}
         >
+          <div hidden={contextPanelMode != 'inspector' || !flowSelected} className="h-full">
+            <FlowNodeList
+              key={JSON.stringify([flowId, target])}
+              nodes={designer.nodes}
+              onFocusNode={focusNode}
+              onSelect={selectOutlineNode}
+              onAdd={authoringDisabled ? undefined : () => openBlocks()}
+            />
+          </div>
           {contextPanelMode == 'blocks' ? (
             <BlockLibrary
               catalogFailed={triggerCatalogState.error != null}
@@ -432,9 +470,15 @@ function Editor({
               options={addNodeOptions}
               provideChoices={store.provideAddNodeOptionChoices}
             />
-          ) : flowSelected ? (
-            <FlowNodeList nodes={designer.nodes} onFocusNode={focusNode} onSelect={(nodeId) => store.selectNodes([nodeId])} />
-          ) : selectedDesignerNode?.kind == 'comment' ? (
+          ) : multipleSelected ? (
+            <FlowNodeList
+              nodes={designer.nodes.filter((node) => selectedNodeIds.includes(node.id))}
+              onSelect={selectOutlineNode}
+              onFocusNode={(nodeId) => {
+                store.workspace.locateNode(nodeId, { preserveSelection: true })
+              }}
+            />
+          ) : flowSelected ? null : selectedDesignerNode?.kind == 'comment' ? (
             <CommentInspector
               key={selectedDesignerNode.id}
               title={selectedDesignerNode.title}
@@ -595,7 +639,7 @@ export default function FlowWorkspace({
             </section>
           </div>
         ) : view == 'design' ? (
-          <Editor
+          <FlowEditor
             onRun={(triggerId) => void run(triggerId)}
             onRunStarted={revealRun}
             onCloseRuns={() => setRunDrawerVisible(false)}

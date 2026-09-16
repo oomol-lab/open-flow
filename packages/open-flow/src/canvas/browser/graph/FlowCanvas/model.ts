@@ -232,6 +232,13 @@ export interface FlowCanvasViewProps {
   readonly onCopy: (nodeIds: readonly string[]) => void
   readonly onPaste: (position?: FlowCanvasViewPosition) => void
   readonly onSelectionChange: (nodeIds: readonly string[], edge: FlowCanvasViewEdge | undefined) => void
+  /** Explicit activation also fires when clicking an already selected node. */
+  readonly onActivateSelection?: (nodeIds: readonly string[]) => void
+  readonly onSelectionStart?: () => void
+  /** Includes the final canvas selection, even before selection effects have run. */
+  readonly onSelectionEnd?: (nodeIds: readonly string[]) => void
+  /** Omit to hide the node and multi-selection toolbar entry. */
+  readonly onInspectSelection?: () => void
   readonly selectedNodeIds: readonly string[]
 }
 

@@ -44,6 +44,7 @@
     "messageRole": "Message role"
   },
   "nodeActions": {
+    "inspect": "View properties",
     "configSharedBlock": "Shared Block config",
     "delete": "Delete",
     "deleteConfirm": "Are you sure to delete {{name}} ?\n{{shortcut}} to delete directly",

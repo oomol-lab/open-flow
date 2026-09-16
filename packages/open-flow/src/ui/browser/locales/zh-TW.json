@@ -44,6 +44,7 @@
     "messageRole": "訊息角色"
   },
   "nodeActions": {
+    "inspect": "檢視屬性",
     "configSharedBlock": "共享區塊設定",
     "delete": "刪除",
     "deleteConfirm": "確定要刪除 {{name}} 嗎？\n按 {{shortcut}} 可直接刪除",

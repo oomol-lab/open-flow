@@ -13,6 +13,7 @@ export function IconPickerButton({
   onChange,
   side = 'bottom',
   size = 'icon-xs',
+  variant = 'ghost',
 }: {
   readonly children: ReactNode
   readonly className?: string
@@ -21,13 +22,16 @@ export function IconPickerButton({
   readonly onChange: (icon: string) => void
   readonly side?: 'top' | 'bottom'
   readonly size?: ComponentProps<typeof Button>['size']
+  readonly variant?: ComponentProps<typeof Button>['variant']
 }) {
   const [open, setOpen] = useState(false)
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   return (
     <div className="inline-flex" ref={setContainer}>
       <Popover open={open && !disabled} onOpenChange={setOpen}>
-        <PopoverTrigger render={<Button aria-label={label} className={className} disabled={disabled} size={size} variant="ghost" />}>{children}</PopoverTrigger>
+        <PopoverTrigger render={<Button aria-label={label} className={className} disabled={disabled} size={size} variant={variant} />}>
+          {children}
+        </PopoverTrigger>
         <PopoverContent aria-label={label} container={container} side={side} className="w-auto overflow-hidden border border-foreground/10 p-0 ring-0">
           <IconPicker
             emoji

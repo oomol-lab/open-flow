@@ -42,8 +42,8 @@ export function NodeHeading({
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
       {onIconChange ? (
-        <IconPickerButton size="icon-lg" label={t('inspector.node.icon')} disabled={disabled} onChange={onIconChange}>
-          <span className="flex size-6 shrink-0 items-center justify-center text-2xl [&>svg]:size-full!">
+        <IconPickerButton size="icon" variant="outline" label={t('inspector.node.icon')} disabled={disabled} onChange={onIconChange}>
+          <span className="flex size-4.5 shrink-0 items-center justify-center text-lg [&>svg]:size-full!">
             <ContentIcon src={icon} fallback={fallback} />
           </span>
         </IconPickerButton>

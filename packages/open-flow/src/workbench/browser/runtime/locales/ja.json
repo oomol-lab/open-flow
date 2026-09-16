@@ -152,6 +152,10 @@
     "deleteDescription": "フローと実行履歴を削除し、本番のトリガーを停止します。この操作は取り消せません。"
   },
   "inspector": {
+    "outline": "ノード一覧",
+    "backToOutline": "ノード一覧に戻る",
+    "emptyOutline": "ノードはまだありません",
+    "multipleSelected": "{{count}} 個のノードを選択中",
     "account": {
       "required": "アカウント接続が必要",
       "addConnection": "Connection を追加",
@@ -194,7 +198,7 @@
       "name": "タイトル"
     },
     "selectNode": "ドラフトのノードを 1 つ選択すると、内容を確認して編集できます。",
-    "locateNode": "キャンバス上で {{name}} を表示",
+    "locateNode": "キャンバス上でこのノードを表示",
     "subflow": {
       "definition": "Subflow 定義",
       "inputPorts": "入力ポート（JSON）",

@@ -50,6 +50,9 @@ interface Props {
   readonly onOpenInspector: () => void
   readonly onPaste: () => void
   readonly provideAddNodeOptions: (searchTerm: string, signal: AbortSignal) => ResourceSource<readonly AddNodeOption[]>
+  readonly onActivateSelection?: FlowCanvasViewProps['onActivateSelection']
+  readonly onSelectionStart?: FlowCanvasViewProps['onSelectionStart']
+  readonly onSelectionEnd?: FlowCanvasViewProps['onSelectionEnd']
   readonly onSelectNodes: (nodeIds: readonly string[]) => void
   readonly onToggleInspector: (opener: HTMLButtonElement) => void
   readonly selectedNodeIds: readonly string[]
@@ -96,6 +99,9 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     onPaste,
     provideAddNodeOptions,
     onSelectNodes,
+    onActivateSelection,
+    onSelectionStart,
+    onSelectionEnd,
     onToggleInspector,
     ignoredNodeIds,
     onIgnoreNodes,
@@ -350,10 +356,18 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           onCopy()
         }}
         onPaste={() => onPaste()}
-        onSelectionChange={(nodeIds) => {
-          onSelectNodes(nodeIds)
-          if (nodeIds.some((nodeId) => model.nodes.some((node) => node.id == nodeId && node.kind != 'comment'))) onOpenInspector()
-        }}
+        onSelectionChange={onSelectNodes}
+        onActivateSelection={onActivateSelection}
+        onSelectionStart={onSelectionStart}
+        onSelectionEnd={onSelectionEnd}
+        onInspectSelection={
+          inspectorOpen
+            ? undefined
+            : () => {
+                canvas.current?.focus({ preventScroll: true })
+                onOpenInspector()
+              }
+        }
         selectedNodeIds={selectedNodeIds}
       />
       {pickerRequest && !disabled && (

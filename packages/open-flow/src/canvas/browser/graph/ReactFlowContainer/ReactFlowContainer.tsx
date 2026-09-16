@@ -46,6 +46,7 @@ import {
   useNodes,
   useReactFlow,
   useStore,
+  useStoreApi,
   useUpdateNodeInternals,
   useViewport,
   ViewportPortal,
@@ -69,6 +70,7 @@ import { CanvasTooltip } from '../../components/tooltip.tsx'
 import { CommentNodeStore } from '../../stores/node/commentNode.store.ts'
 import { FITTING_VIEW_CLASSNAME } from '../../stores/node/constants.ts'
 import { NodeStore } from '../../stores/node/node.store.ts'
+import { InspectSelectionButton } from '../inspectSelection.tsx'
 import { NodePlaceholder, NodePlaceholderQueue } from '../Nodes/useNodePlaceholder.ts'
 import { getPaneRect, PaneRectContext } from '../Nodes/usePaneRect.ts'
 import { CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from './CanvasControls.tsx'
@@ -102,6 +104,9 @@ const isSizeEqual = (a: Dimensions, b: Dimensions) => a.width === b.width && a.h
 const isRectEqual = (a: Rect, b: Rect) => isSizeEqual(a, b) && a.x === b.x && a.y === b.y
 
 export interface ReactFlowContainerProps {
+  onActivateSelection?: () => void
+  onSelectionStart?: () => void
+  onSelectionEnd?: () => void
   onRequestAddNode?: FlowCanvasViewProps['onRequestAddNode']
   className?: string
   cornerTools?: React.ReactNode
@@ -271,6 +276,35 @@ interface SelectionContextMenuData {
 
 // Isolate the inner component because React Flow updates frequently.
 const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
+  const flowState = useStoreApi()
+  const selecting = useRef(false)
+  const selectionEnd = useRef(props.onSelectionEnd)
+  selectionEnd.current = props.onSelectionEnd
+  const endSelection = useCallback(() => {
+    if (!selecting.current) return
+    selecting.current = false
+    flowState.setState({ userSelectionActive: false, userSelectionRect: null })
+    selectionEnd.current?.()
+  }, [flowState])
+  useEffect(() => {
+    const keyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape' && selecting.current) {
+        event.preventDefault()
+        event.stopPropagation()
+        endSelection()
+      }
+    }
+    window.addEventListener('blur', endSelection)
+    window.addEventListener('pointercancel', endSelection)
+    window.addEventListener('pointerup', endSelection)
+    window.addEventListener('keydown', keyDown, true)
+    return () => {
+      window.removeEventListener('blur', endSelection)
+      window.removeEventListener('pointercancel', endSelection)
+      window.removeEventListener('pointerup', endSelection)
+      window.removeEventListener('keydown', keyDown, true)
+    }
+  }, [endSelection])
   const rf = useReactFlow()
   const updateNodeInternals = useUpdateNodeInternals()
   const mounted = useRef(true)
@@ -549,6 +583,9 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
       <PaneRectContext.Provider value={paneRect$}>
         <ReactFlow
           onKeyDown={(event) => {
+            if ((event.key === 'Enter' || event.key === ' ') && event.target instanceof Element && event.target.matches('.react-flow__node')) {
+              props.onActivateSelection?.()
+            }
             if (!editable || event.defaultPrevented || event.nativeEvent.isComposing || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey)
               return
             if (!(event.target instanceof Element) || !event.currentTarget.contains(event.target)) return
@@ -618,6 +655,15 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           onMoveEnd={props.onMoveEnd}
           onNodeDragStop={props.onNodeDragStop}
           onSelectionChange={props.onSelectionChange}
+          onSelectionStart={() => {
+            selecting.current = true
+            props.onSelectionStart?.()
+          }}
+          onSelectionEnd={endSelection}
+          onNodeClick={(event) => {
+            if (event.target instanceof Element && event.target.closest('button, input, textarea, a, [contenteditable="true"]')) return
+            props.onActivateSelection?.()
+          }}
           onFocus={(event) => setRfFocused(event.currentTarget.contains(event.target))}
           onBlur={() => setRfFocused(false)}
           deleteKeyCode={editable && focused && (props.canDeleteNodes ?? true) ? ['Backspace', 'Delete'] : null}
@@ -845,6 +891,7 @@ function SelectionFloatBar(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
 
   return (
     <NodeToolbar data-tooltip-toolbar className={nodeHeadStyles.floatBar} isVisible nodeId={props.nodes.map((node) => node.id)} offset={12 - 8 * zoom}>
+      <InspectSelectionButton className={nodeHeadStyles.floatBarButton} />
       {items
         .filter((item) => props.editable || (item.key !== '$delete' && item.key !== '$duplicate'))
         .map((item) => (

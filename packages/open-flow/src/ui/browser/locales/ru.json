@@ -44,6 +44,7 @@
     "messageRole": "Роль сообщения"
   },
   "nodeActions": {
+    "inspect": "Показать свойства",
     "configSharedBlock": "Настройки общего блока",
     "delete": "Удалить",
     "deleteConfirm": "Удалить {{name}}?\n{{shortcut}} — удалить сразу",

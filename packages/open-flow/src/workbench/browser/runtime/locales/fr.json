@@ -152,6 +152,10 @@
     "deleteDescription": "Le flux et son historique seront supprimés et les déclencheurs arrêtés. Cette action est irréversible."
   },
   "inspector": {
+    "outline": "Liste des nœuds",
+    "backToOutline": "Retour à la liste des nœuds",
+    "emptyOutline": "Aucun nœud pour le moment",
+    "multipleSelected": "{{count}} nœuds sélectionnés",
     "account": {
       "required": "Compte à connecter",
       "addConnection": "Ajouter une Connection",
@@ -194,7 +198,7 @@
       "name": "Titre"
     },
     "selectNode": "Sélectionnez un nœud du Brouillon pour l'inspecter et le modifier.",
-    "locateNode": "Localiser {{name}} sur le canevas",
+    "locateNode": "Localiser ce nœud sur le canevas",
     "subflow": {
       "definition": "Définition du Subflow",
       "inputPorts": "Ports d'entrée (JSON)",

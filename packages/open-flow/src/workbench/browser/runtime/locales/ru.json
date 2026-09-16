@@ -152,6 +152,10 @@
     "deleteDescription": "Поток и история запусков будут удалены, рабочие триггеры остановлены. Это действие нельзя отменить."
   },
   "inspector": {
+    "outline": "Список узлов",
+    "backToOutline": "Вернуться к списку узлов",
+    "emptyOutline": "Узлов пока нет",
+    "multipleSelected": "Выбрано узлов: {{count}}",
     "account": {
       "required": "Требуется подключение аккаунта",
       "addConnection": "Добавить Connection",
@@ -194,7 +198,7 @@
       "name": "Заголовок"
     },
     "selectNode": "Выберите один узел черновика, чтобы просмотреть и изменить его.",
-    "locateNode": "Найти {{name}} на холсте",
+    "locateNode": "Найти этот узел на холсте",
     "subflow": {
       "definition": "Определение Subflow",
       "inputPorts": "Входные порты (JSON)",

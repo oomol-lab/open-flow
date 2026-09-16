@@ -33,7 +33,8 @@
 
   .context-panel > header {
     position: sticky;
-    z-index: 2;
+    /* Header popovers must paint above the content's sticky section titles. */
+    z-index: 3;
     top: 0;
     display: flex;
     min-height: 56px;
