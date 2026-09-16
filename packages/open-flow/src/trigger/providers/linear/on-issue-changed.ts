@@ -3,7 +3,7 @@ import type { TriggerConfigOption, TriggerConfigOptionsContext } from '../../com
 import type { PollContext, PollDefinition } from '../../common/poll.ts'
 
 import { isJsonObject } from '../../../base/common/json.ts'
-import { PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 const uuidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 const uuid = new RegExp(uuidPattern)
@@ -49,18 +49,24 @@ const snapshot = {
     required: ['teamId'],
     title: 'Linear Issue Changes',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description:
     'Watches new and updated issues in a Linear team with periodic checks. Starts from now without running existing issues. Reports observed current states, not deletions or every intermediate status change.',
   displayName: 'Issue Created or Updated',
   key: 'linear.on_issue_changed',
   name: 'on_issue_changed',
-  payloadSchema: {
-    type: 'object',
-    additionalProperties: false,
-    properties: { events: { type: 'array', items: issueSchema } },
-    required: ['events'],
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: { events: { type: 'array', items: issueSchema } },
+        required: ['events'],
+      },
+      nullable: false,
+    },
+  ],
   provider: 'linear',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
@@ -73,6 +79,7 @@ interface Checkpoint {
 }
 
 export const linearIssueChanged: PollDefinition = {
+  buildOutputs: payloadPollOutputs,
   snapshot,
   configOptions: options,
   async poll(context) {

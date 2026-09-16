@@ -95,7 +95,7 @@ const wait = {
   prompt: text,
 }
 const webhook = {
-  inputsDef: z.array(input),
+  bodyFields: z.array(input),
   options: z
     .object({
       allowedMethods: strings.optional(),
@@ -115,12 +115,14 @@ const schedule = z.array(
 )
 const definition = {
   configSchema: json,
-  definitionVersion: z.number(),
+  definitionVersion: z.literal(2),
   description: text,
   displayName: text,
   key: text,
   name: text,
-  payloadSchema: json,
+  outputs: z
+    .array(port)
+    .refine((definitions) => new Set(definitions.map((output) => output.handle)).size === definitions.length, 'Duplicate Trigger output handle.'),
   provider: text,
 }
 const endpoint = z.object({
@@ -177,7 +179,7 @@ const document = z.object({
   subflows: z.record(text, subflow.extend({ graph })),
   tasks: z.record(text, managed),
 })
-const revision = z.object({ modelVersion: z.literal(1), document, modules: z.record(text, module) })
+const revision = z.object({ modelVersion: z.literal(2), document, modules: z.record(text, module) })
 const envelope = revision.extend({ kind: z.literal('open-flow-flow-revision'), version: z.literal(1) })
 
 export function decodeFlowDocument(value: unknown): FlowDocument {

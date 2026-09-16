@@ -18,7 +18,7 @@ function revision(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
   }
 }
@@ -264,7 +264,7 @@ describe('Flow changes', () => {
     { kind: 'module.delete', moduleId: 'missing' },
     { kind: 'subflow.delete', subflowId: 'missing' },
     { kind: 'task.delete', taskId: 'missing' },
-    { kind: 'graph.node.create', node: { inputsDef: [], kind: 'webhook', name: 'Invalid' }, nodeId: 'trigger', target: { id: 'missing', kind: 'subflow' } },
+    { kind: 'graph.node.create', node: { bodyFields: [], kind: 'webhook', name: 'Invalid' }, nodeId: 'trigger', target: { id: 'missing', kind: 'subflow' } },
   ] satisfies readonly ChangeOperation[])('rejects invalid operation %#', (operation) => {
     expect(() => applyFlowChanges(revision(), [operation])).toThrow(FlowChangeError)
   })

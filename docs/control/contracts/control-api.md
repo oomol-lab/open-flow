@@ -324,17 +324,21 @@ waits: readonly {
 集合只包含未决议等待，按登记时间和 waitId 排序。running、waiting、queued、starting 都可能包含多个等待；终态返回空集合。
 客户端用 nodeId 定位、用 waitId 决议。waiting 状态要求集合非空，旧单个 waiting 字段不再接受。历史由 RunEvent 表达。
 
-Draft Run body 是 `{ engineContract, inputs, trigger, version: 1 }`。Live Run body 是 `{ publicationId, inputs, trigger, version: 1 }`。首次接受返回 `202`，
+Draft Run body 是 `{ engineContract, inputs, trigger, version: 2 }`。Live Run body 是 `{ publicationId, inputs, trigger, version: 2 }`。首次接受返回 `202`，
 幂等重放返回 `200`。Run 接受后不受后续 Draft change、Publish 或 Rollback 影响。
 
-`trigger` 必填，形如 `{ nodeId: string, payload: JsonValue }`，固定本次运行的起始 Trigger 和输入。缺少入口、入口不是固定 Revision 中的 Trigger，或 payload 不符合其 schema 时返回 `run.invalid`。入口及 payload 参与幂等 request digest，并随 Run 持久化；不会自动选择入口或退回整图运行。
+`trigger` 必填，形如 `{ nodeId: string, outputs: Record<string, JsonValue> }`，固定本次运行的起始 Trigger 和完整输出。缺少入口、入口不是固定 Revision 中的 Trigger，或 outputs 缺失、包含额外端口或不符合各端口 schema 时返回 `run.invalid`。nullable 允许端口值为 null，不允许缺失端口。入口及完整 outputs 参与 Control API 幂等 request digest，并随 Run 持久化；不会自动选择入口或退回整图运行。
 
 Draft Run 只对选中 Trigger 沿执行边可达的节点及其依赖进行语义校验、能力检查和 Variable 准入检查。其他分支的未配置 Trigger、无效代码和缺失资源仍出现在全图 check 中，但不阻断此次测试。
 共享下游输入的多来源映射忽略本次不可达的已有节点来源；剩余来源缺失时补 `null` 并校验，不影响执行边调度；不能同时提供多个值。缺失节点引用、选中分支内的环、无效代码及实际使用的 Subflow 错误仍返回 `flow.invalid`。
 Draft Run 的 `revisionDigest` 标识完整 Revision，`closureDigest` 标识本次入口的执行 closure，可以与全图 check 的 `closureDigest` 不同。读取和恢复 Run 不修改原 Revision。
 Publish 和 Live Run 保持完整 Flow 校验。
 
-Manual Trigger 的节点结构为 `{ kind: "manual", name: string, description?: string, icon?: string }`，无输入和调度配置，`payload` 固定为空对象 `{}`。其执行出口沿普通执行边连接下游，不提供数据输出字段，执行结果的 `outputs` 为空对象 `{}`；运行请求中的 `trigger.payload` 仍固定为 `{}`，不暴露为节点输出。引用 Manual Trigger 的 `payload` 输出会被图校验拒绝。其他 Trigger 可通过显式 payload 模拟执行，仍保留 Draft/Live Run source，不伪造外部 occurrence。
+Manual Trigger 的节点结构为 `{ kind: "manual", name: string, description?: string, icon?: string }`，无输入和调度配置。其执行出口沿普通执行边连接下游，不提供数据输出字段，运行请求中的 `trigger.outputs` 和执行结果均为 `{}`。Cron、Poll 和 Integration 通过各自定义声明 `payload` 端口。其他 Trigger 可通过显式 outputs 模拟执行，仍保留 Draft/Live Run source，不伪造外部 occurrence。
+
+Webhook 声明四个必需输出，顺序为 `headers`、`query`、`body`、`webhookUrl`。headers 为小写名称的字符串映射；query 单值为字符串，重复值为有序字符串数组；body 是由 `bodyFields` 定义的严格 JSON 对象；webhookUrl 是服务端 Request URL 去除 query 和 fragment 后的绝对地址。空请求体按 `{}` 校验，不填充字段默认值。请求头完整保存，不在 Trigger 层脱敏。
+
+Webhook HTTP 准入的幂等规则独立于 Control API：没有 `Idempotency-Key` 时每次创建 Run；有 key 时在 endpoint 和运行版本范围内查重。摘要包含固定目标身份、协议版本及规范化后的 method、query、body，排除 headers 和 webhookUrl。相同 key 与摘要重放原 Run，摘要不同返回 409。重试不覆盖首次保存的 outputs；并发准入由数据库事务和唯一约束协调。通过请求头区分业务事件的调用方必须使用不同的 key。
 
 首次 Run admission 在创建 Run 的权威 transaction 中确认固定 closure 使用的 Variable 均存在；缺失返回 `binding.unresolved`。幂等重放先于
 该 eligibility 检查。Run 真正开始时再在一个读取 snapshot 中解析所有 Variable value，所以排队期间的更新会用于本次执行；开始后的更新不影响

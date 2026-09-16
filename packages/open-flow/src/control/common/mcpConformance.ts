@@ -73,7 +73,7 @@ export const mcpConformanceCases: readonly ControlApiConformanceCase[] = [
         source: 'draft',
         flowId: flow.flowId,
         revisionId: changed.revision.revisionId,
-        trigger: { nodeId: 'start', payload: {} },
+        trigger: { nodeId: 'start', outputs: {} },
       }
       const runs: string[] = []
       for (let index = 0; index < 2; index++) {

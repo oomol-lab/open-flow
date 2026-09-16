@@ -2,7 +2,7 @@ import type { ConnectorProxyRequest, ConnectorProxyResult } from '../../../conne
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent, PollResult } from '../../common/poll.ts'
 
-import { PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 type EventKind = 'page_added' | 'page_updated'
 type CursorField = 'created_time' | 'last_edited_time'
@@ -87,23 +87,30 @@ const snapshot = {
     title: 'Notion Database Page Event Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Polls a Notion database and triggers when a page is added to it or an existing page is edited.',
   displayName: 'Database Page Added or Updated',
   key: 'notion.on_database_page_event',
   name: 'on_database_page_event',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: eventSchema, type: 'array' } },
-    required: ['events'],
-    title: 'Notion Database Page Event Payload',
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: eventSchema, type: 'array' } },
+        required: ['events'],
+        title: 'Notion Database Page Event Payload',
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'notion',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const notionDatabasePageEvent: PollDefinition = {
+  buildOutputs: payloadPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)

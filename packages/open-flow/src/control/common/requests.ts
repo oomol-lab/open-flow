@@ -9,7 +9,7 @@ const id = z.string().min(1)
 const version = z.literal(1)
 const flowName = id.refine((value) => value == value.trim() && resourceNameIssue(value) == null, 'Flow name is invalid.')
 const inputs = z.record(z.string(), z.record(z.string(), json))
-const trigger = z.strictObject({ nodeId: id, payload: json })
+const trigger = z.strictObject({ nodeId: id, outputs: z.record(z.string(), json) })
 const schemas = {
   createEventSource: createEventSourceSchema,
   updateEventSource: updateEventSourceSchema,
@@ -22,8 +22,8 @@ const schemas = {
   checkFlow: z.strictObject({ engineContract: id, version }),
   publishFlow: z.strictObject({ engineContract: id, expectedLivePublicationId: id.nullable(), version }),
   rollbackFlow: z.strictObject({ expectedLivePublicationId: id, version }),
-  createDraftRun: z.strictObject({ engineContract: id, inputs, trigger, version }),
-  createLiveRun: z.strictObject({ publicationId: id, inputs, trigger, version }),
+  createDraftRun: z.strictObject({ engineContract: id, inputs, trigger, version: z.literal(2) }),
+  createLiveRun: z.strictObject({ publicationId: id, inputs, trigger, version: z.literal(2) }),
   resolveWait: z.strictObject({ action: z.enum(['approve', 'continue', 'reject']), version }),
   putVariable: z.strictObject({ value: z.string().refine((value) => new TextEncoder().encode(value).byteLength <= 65_536, 'Variable value is too large.') }),
   versionOnly: z.strictObject({ version }),

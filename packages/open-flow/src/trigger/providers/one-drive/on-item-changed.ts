@@ -3,7 +3,7 @@ import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.
 import type { PollContext, PollDefinition, PollEvent } from '../../common/poll.ts'
 
 import { canonicalJsonBytes, digestBytes } from '../../../flow/common/encoding.ts'
-import { PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 type Change = 'created' | 'deleted' | 'updated'
 type ItemType = 'file' | 'folder'
@@ -102,23 +102,30 @@ const snapshot = {
     title: 'OneDrive Item Change Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Polls the OneDrive change feed and triggers when a file or folder is created, updated or deleted.',
   displayName: 'File or Folder Changed',
   key: 'one_drive.on_item_changed',
   name: 'on_item_changed',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: eventSchema, type: 'array' } },
-    required: ['events'],
-    title: 'OneDrive Item Change Payload',
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: eventSchema, type: 'array' } },
+        required: ['events'],
+        title: 'OneDrive Item Change Payload',
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'one_drive',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const oneDriveItemChanged: PollDefinition = {
+  buildOutputs: payloadPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)

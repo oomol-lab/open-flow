@@ -38,7 +38,7 @@ function task(tools: readonly AgentTool[] = [tool]): ManagedTaskDefinition {
 
 function revision(agent = task()): RevisionContent {
   return {
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
     document: {
       bindings: {},
@@ -277,7 +277,7 @@ async function execute(
       runId: 'run',
       createId: () => `${suspended?.checkpoint.waits[0]?.waitId ?? 'first'}-${++id}`,
       invokeTask,
-      ...(suspended == null ? { trigger: { nodeId: 'trigger', payload: {} } } : { resume: { checkpoint: JSON.parse(JSON.stringify(suspended.checkpoint)) } }),
+      ...(suspended == null ? { trigger: { nodeId: 'trigger', outputs: {} } } : { resume: { checkpoint: JSON.parse(JSON.stringify(suspended.checkpoint)) } }),
     }),
   )
 }

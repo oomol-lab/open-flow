@@ -186,7 +186,7 @@ export function AgentSettings({
         const definition = current?.kind == 'task' ? current.definition : undefined
         if (definition == null || !('executor' in definition) || !dequal(definition.executor, before)) return false
         const decoded = decodeRevisionContent({
-          modelVersion: 1,
+          modelVersion: 2,
           modules: {},
           document: { bindings: {}, subflows: {}, graph: { nodes: {}, edges: [] }, tasks: { agent: { ...definition, executor: value } } },
         }).document.tasks.agent!

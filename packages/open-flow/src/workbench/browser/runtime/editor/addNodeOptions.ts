@@ -5,6 +5,7 @@ import type { RevisionView } from '../revisionView.ts'
 import type { ConnectorActionView } from '../workspace.ts'
 import type { AddNodeIntent } from './flowChanges.ts'
 
+import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 import { revisionView } from '../revisionView.ts'
 
 interface AddNodePort {
@@ -187,7 +188,7 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
       inputs: [],
       kind: 'trigger',
       label: t('addNode.webhook'),
-      outputs: [{ handle: 'payload', jsonSchema: {} }],
+      outputs: triggerOutputDefinitions({ kind: 'webhook', name: 'Webhook', bodyFields: [] }),
       trigger: { kind: 'webhook' },
     },
     {
@@ -198,12 +199,7 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
       inputs: [],
       kind: 'trigger',
       label: t('addNode.cron'),
-      outputs: [
-        {
-          handle: 'payload',
-          jsonSchema: { additionalProperties: false, type: 'object' },
-        },
-      ],
+      outputs: triggerOutputDefinitions({ kind: 'cron', name: 'Cron', cronTimes: [] }),
       trigger: { kind: 'cron' },
     },
     {

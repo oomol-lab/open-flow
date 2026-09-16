@@ -421,7 +421,7 @@ export type TriggerDefinition = {
       }
     | undefined
   config_schema: JsonObject
-  payload_schema: JsonObject
+  outputs: { handle: string; json_schema?: JsonValue; description?: string; nullable?: boolean; kind?: string }[]
 }
 
 export type TriggerDescriptor = {

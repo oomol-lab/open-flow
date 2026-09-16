@@ -2,7 +2,7 @@ import type { ConnectorProxyResult } from '../../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent } from '../../common/poll.ts'
 
-import { PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 interface Config {
   readonly baseId: string
@@ -70,23 +70,30 @@ const snapshot = {
     title: 'Airtable Record Change Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Polls an Airtable table and triggers when a record is created or updated, ordered by a time field.',
   displayName: 'Record Created or Updated',
   key: 'airtable.on_record_changed',
   name: 'on_record_changed',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: eventSchema, type: 'array' } },
-    required: ['events'],
-    title: 'Airtable Record Change Payload',
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: eventSchema, type: 'array' } },
+        required: ['events'],
+        title: 'Airtable Record Change Payload',
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'airtable',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const airtableRecordChanged: PollDefinition = {
+  buildOutputs: payloadPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)

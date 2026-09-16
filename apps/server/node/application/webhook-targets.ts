@@ -4,7 +4,7 @@ import type { RunAdmission } from '../storage/trigger-store.ts'
 import type { RevisionValidator } from './flow-validation.ts'
 
 import { canonicalJsonBytes, decodeRevision, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
-import { matchesSchema, triggerPayloadSchema } from '@oomol-lab/open-flow/flow-semantics'
+import { matchesTriggerOutputs } from '@oomol-lab/open-flow/flow-semantics'
 import { isDeepStrictEqual } from 'node:util'
 import { AcceptanceError } from '../error.ts'
 
@@ -35,7 +35,7 @@ export class WebhookTargets {
     this.#validate = validate
   }
 
-  async accept(target: WebhookTarget, occurrenceId: string, payload: JsonValue): Promise<RunAdmission | undefined> {
+  async accept(target: WebhookTarget, occurrenceId: string, method: string, outputs: Readonly<Record<string, JsonValue>>): Promise<RunAdmission | undefined> {
     const fixed = await this.#validate(target.revision)
     const trigger = fixed.prepared.graph.nodes[target.triggerNodeId]
     if (
@@ -46,8 +46,8 @@ export class WebhookTargets {
     ) {
       return
     }
-    if (!matchesSchema(payload, triggerPayloadSchema(trigger))) {
-      throw new AcceptanceError('trigger-payload-invalid', 'Webhook payload does not match the fixed Trigger schema.')
+    if (!matchesTriggerOutputs(trigger, outputs)) {
+      throw new AcceptanceError('trigger-outputs-invalid', 'Webhook outputs do not match the fixed Trigger schema.')
     }
     const requestDigest = await digestBytes(
       canonicalJsonBytes({
@@ -55,7 +55,10 @@ export class WebhookTargets {
         flowId: target.flowId,
         kind: 'webhook',
         occurrenceId,
-        payload,
+        method,
+        query: outputs.query!,
+        body: outputs.body!,
+        protocolVersion: 2,
         publicationId: target.publicationId,
         revisionDigest: fixed.revisionDigest,
         runtimeVersion: target.runtimeVersion,
@@ -70,7 +73,7 @@ export class WebhookTargets {
       flowId: target.flowId,
       modelVersion: target.revision.modelVersion,
       occurrenceId,
-      payload,
+      outputs,
       publicationId: target.publicationId,
       requestDigest,
       revisionDigest: fixed.revisionDigest,

@@ -2,7 +2,7 @@ import type { ConnectorProxyResult } from '../../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent } from '../../common/poll.ts'
 
-import { PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 interface Config {
   readonly channelId: string
@@ -98,50 +98,57 @@ const snapshot = {
     title: 'Slack New Channel Message Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Polls one Slack conversation and triggers when a new message is posted to it.',
   displayName: 'New Channel Message',
   key: 'slack.on_message_posted',
   name: 'on_message_posted',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: {
-      events: {
-        items: {
-          additionalProperties: false,
-          properties: {
-            botId: { type: ['string', 'null'] },
-            channelId: { type: 'string' },
-            files: {
-              items: {
-                additionalProperties: false,
-                properties: { id: { type: 'string' }, mimetype: { type: 'string' }, name: { type: 'string' } },
-                required: ['id', 'name', 'mimetype'],
-                type: 'object',
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: {
+          events: {
+            items: {
+              additionalProperties: false,
+              properties: {
+                botId: { type: ['string', 'null'] },
+                channelId: { type: 'string' },
+                files: {
+                  items: {
+                    additionalProperties: false,
+                    properties: { id: { type: 'string' }, mimetype: { type: 'string' }, name: { type: 'string' } },
+                    required: ['id', 'name', 'mimetype'],
+                    type: 'object',
+                  },
+                  type: 'array',
+                },
+                messageTs: { type: 'string' },
+                subtype: { type: ['string', 'null'] },
+                text: { type: 'string' },
+                threadTs: { type: ['string', 'null'] },
+                userId: { type: ['string', 'null'] },
               },
-              type: 'array',
+              required: ['channelId', 'messageTs', 'threadTs', 'userId', 'botId', 'subtype', 'text', 'files'],
+              type: 'object',
             },
-            messageTs: { type: 'string' },
-            subtype: { type: ['string', 'null'] },
-            text: { type: 'string' },
-            threadTs: { type: ['string', 'null'] },
-            userId: { type: ['string', 'null'] },
+            type: 'array',
           },
-          required: ['channelId', 'messageTs', 'threadTs', 'userId', 'botId', 'subtype', 'text', 'files'],
-          type: 'object',
         },
-        type: 'array',
+        required: ['events'],
+        title: 'Slack New Channel Message Payload',
+        type: 'object',
       },
+      nullable: false,
     },
-    required: ['events'],
-    title: 'Slack New Channel Message Payload',
-    type: 'object',
-  },
+  ],
   provider: 'slack',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const slackMessagePosted: PollDefinition = {
+  buildOutputs: payloadPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)

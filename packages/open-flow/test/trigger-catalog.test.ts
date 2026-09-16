@@ -18,7 +18,9 @@ function catalogItem(
   displayName: string,
   configSchema: TriggerDefinition['config_schema'] = { additionalProperties: false, type: 'object' },
   type: 'integration' | 'poll' = 'poll',
-  payloadSchema: TriggerDefinition['payload_schema'] = { additionalProperties: true, type: 'object' },
+  outputs: readonly import('../src/flow/common/change.ts').Port[] = [
+    { handle: 'payload', jsonSchema: { additionalProperties: true, type: 'object' }, nullable: false },
+  ],
 ): Readonly<Record<string, unknown>> {
   const item = {
     configSchema,
@@ -29,7 +31,7 @@ function catalogItem(
     provider,
     type,
   }
-  return type == 'integration' ? { ...item, payloadSchema } : item
+  return { ...item, outputs }
 }
 
 function catalogSource(items: readonly Readonly<Record<string, unknown>>[]): TriggerCatalogSource {
@@ -40,7 +42,7 @@ function catalogSource(items: readonly Readonly<Record<string, unknown>>[]): Tri
       return item
     },
     async list() {
-      return { keys: items.map(({ configSchema: _configSchema, payloadSchema: _payloadSchema, ...item }) => item) }
+      return { keys: items.map(({ configSchema: _configSchema, outputs: _outputs, ...item }) => item) }
     },
   }
 }
@@ -51,19 +53,28 @@ test('normalizes provider poll and integration Triggers', async () => {
   if (!poll.compatible) throw new Error('Expected a compatible poll Trigger.')
   assert.deepEqual(poll.trigger.poll_times, [{ type: 'every', unit: 'minute', value: 5 }])
 
-  const payloadSchema = {
-    additionalProperties: false,
-    properties: { action: { type: 'string' } },
-    required: ['action'],
-    type: 'object',
-  } as const
+  const outputs = [
+    {
+      handle: 'payload',
+      nullable: false,
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { action: { type: 'string' } },
+        required: ['action'],
+        type: 'object',
+      },
+    },
+  ] as const
   const integration = await normalizeTriggerCatalogSourceItem(
-    catalogItem('github', 'github.on_repo_event', 'Repository event', { additionalProperties: false, type: 'object' }, 'integration', payloadSchema),
+    catalogItem('github', 'github.on_repo_event', 'Repository event', { additionalProperties: false, type: 'object' }, 'integration', outputs),
   )
   assert.equal(integration.compatible, true)
   if (!integration.compatible) throw new Error('Expected a compatible Integration Trigger.')
   assert.equal(integration.trigger.definition.provisioning.kind, 'integration')
-  assert.deepEqual(integration.trigger.definition.payload_schema, payloadSchema)
+  assert.deepEqual(
+    integration.trigger.definition.outputs,
+    outputs.map(({ jsonSchema, ...port }) => Object.assign({}, port, { json_schema: jsonSchema })),
+  )
   assert.equal(integration.trigger.poll_times, undefined)
   assert.deepEqual(await decodeTriggerCatalogItem(integration), integration)
 })
@@ -100,6 +111,6 @@ test('rejects incompatible definitions and unsupported identities', async () => 
   assert.match(normalized.reason, /oneOf/i)
   assert.ok(normalized.reason.length <= 500)
 
-  await assert.rejects(getTriggerCatalogItem(catalogSource([unsupported]), { revision: '2', type: 'github.on_push' }), /revision "1"/)
-  assert.equal(encodeTriggerCatalogIdentity({ revision: TRIGGER_CATALOG_REVISION, type: 'github.on_push' }), '["github.on_push","1"]')
+  await assert.rejects(getTriggerCatalogItem(catalogSource([unsupported]), { revision: 'unsupported', type: 'github.on_push' }), /revision "2"/)
+  assert.equal(encodeTriggerCatalogIdentity({ revision: TRIGGER_CATALOG_REVISION, type: 'github.on_push' }), '["github.on_push","2"]')
 })

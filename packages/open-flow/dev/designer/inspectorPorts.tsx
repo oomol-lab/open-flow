@@ -39,7 +39,7 @@ const valueStates: InputPort[] = [
   { ...port('enabled', 'boolean'), value: false },
 ]
 const portsContent: RevisionContent = {
-  modelVersion: 1,
+  modelVersion: 2,
   modules: { module: { name: 'Summarize', imports: [], source: 'export default (inputs) => ({ summary: inputs.message, issues: [], count: 0 })' } },
   document: {
     bindings: {},

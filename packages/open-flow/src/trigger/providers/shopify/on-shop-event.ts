@@ -203,21 +203,27 @@ const snapshot = {
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'shopify.on_shop_event',
   name: 'on_shop_event',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: {
-      apiVersion: { type: 'string' },
-      body: { type: 'object' },
-      eventId: { type: 'string' },
-      shopDomain: { type: 'string' },
-      topic: { type: 'string' },
-      triggeredAt: { type: 'string' },
-      webhookId: { type: 'string' },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: {
+          apiVersion: { type: 'string' },
+          body: { type: 'object' },
+          eventId: { type: 'string' },
+          shopDomain: { type: 'string' },
+          topic: { type: 'string' },
+          triggeredAt: { type: 'string' },
+          webhookId: { type: 'string' },
+        },
+        required: ['topic', 'webhookId', 'eventId', 'shopDomain', 'apiVersion', 'triggeredAt', 'body'],
+        title: 'Shopify Store Event Payload',
+        type: 'object',
+      },
+      nullable: false,
     },
-    required: ['topic', 'webhookId', 'eventId', 'shopDomain', 'apiVersion', 'triggeredAt', 'body'],
-    title: 'Shopify Store Event Payload',
-    type: 'object',
-  },
+  ],
   provider: 'shopify',
   type: 'integration',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'integration' }
@@ -236,14 +242,16 @@ export const shopifyShopEvent: IntegrationDefinition = {
     return {
       dedupeKey: webhookId.length == 0 ? undefined : webhookId,
       outcome: 'event',
-      payload: {
-        apiVersion: context.header('x-shopify-api-version') ?? '',
-        body: context.payload as Readonly<Record<string, JsonValue>>,
-        eventId: context.header('x-shopify-event-id') ?? '',
-        shopDomain: context.header('x-shopify-shop-domain') ?? '',
-        topic,
-        triggeredAt: context.header('x-shopify-triggered-at') ?? '',
-        webhookId,
+      outputs: {
+        payload: {
+          apiVersion: context.header('x-shopify-api-version') ?? '',
+          body: context.payload as Readonly<Record<string, JsonValue>>,
+          eventId: context.header('x-shopify-event-id') ?? '',
+          shopDomain: context.header('x-shopify-shop-domain') ?? '',
+          topic,
+          triggeredAt: context.header('x-shopify-triggered-at') ?? '',
+          webhookId,
+        },
       },
     }
   },

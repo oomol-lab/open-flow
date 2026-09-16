@@ -5,6 +5,7 @@ import type { PollPublication } from './poll-store.ts'
 
 import { randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
+import { z } from 'zod'
 import { AcceptanceError } from '../error.ts'
 import { insert } from './insert.ts'
 import { IntegrationStore } from './integration-store.ts'
@@ -527,7 +528,8 @@ export class PublicationStore {
           throw new AcceptanceError('publication-live-conflict', 'The Flow Live pointer no longer matches the expected Publication.')
         }
 
-        this.#ensureRevision(input)
+        const content = this.#ensureRevision(input)
+        const modelVersion = input.metadata?.modelVersion ?? z.object({ modelVersion: z.number().int().positive() }).parse(JSON.parse(content)).modelVersion
         const publicationId = `publication_${randomUUID().replaceAll('-', '')}`
         insert(this.#database, 'publications', {
           publication_id: publicationId,
@@ -541,7 +543,7 @@ export class PublicationStore {
           actor_id: input.metadata?.actorId ?? 'legacy',
           operation: input.metadata?.operation ?? 'publish',
           source_publication_id: input.metadata?.operation == 'rollback' ? input.metadata.sourcePublicationId : null,
-          model_version: input.metadata?.modelVersion ?? 1,
+          model_version: modelVersion,
           created_at: input.publishedAt,
         })
         this.#database
@@ -697,9 +699,9 @@ export class PublicationStore {
       .get(flowId, revisionId) as StoredFlowRevision | undefined
   }
 
-  #ensureRevision(input: { readonly content: string; readonly revisionDigest: string; readonly revisionId: string }): void {
-    const revision = this.#database.prepare('SELECT digest FROM revisions WHERE revision_id = ?').get(input.revisionId) as
-      | { readonly digest: string }
+  #ensureRevision(input: { readonly content: string; readonly revisionDigest: string; readonly revisionId: string }): string {
+    const revision = this.#database.prepare('SELECT digest, content FROM revisions WHERE revision_id = ?').get(input.revisionId) as
+      | { readonly digest: string; readonly content: string }
       | undefined
     if (revision != null && revision.digest != input.revisionDigest) {
       throw new AcceptanceError('revision-conflict', 'Revision identity already refers to different content.')
@@ -707,5 +709,6 @@ export class PublicationStore {
     if (revision == null) {
       this.#database.prepare('INSERT INTO revisions (revision_id, digest, content) VALUES (?, ?, ?)').run(input.revisionId, input.revisionDigest, input.content)
     }
+    return revision?.content ?? input.content
   }
 }

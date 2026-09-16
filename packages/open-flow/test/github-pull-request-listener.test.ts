@@ -58,14 +58,14 @@ describe('GitHub pull request listener', () => {
   it('baselines without delivering current state, then detects changes without a notification', async () => {
     const { state, connector } = await setup()
     const first = await definition.listener!.read({ checkpoint: state.checkpoint, config, connector, now })
-    expect(first.payload).toBeNull()
+    expect(first.outputs).toBeNull()
     const changed: ConnectorProxy = { execute: async () => ({ status: 200, data: { ...pullRequest, draft: false, head: { sha: 'next' } } }) }
     const next = await definition.listener!.read({ checkpoint: state.checkpoint, config, connector: changed, now })
-    expect(next.payload).toMatchObject({ pullRequest: { number: 114, draft: false, headSha: 'next' } })
+    expect(next.outputs?.payload).toMatchObject({ pullRequest: { number: 114, draft: false, headSha: 'next' } })
     expect(await definition.listener!.read({ checkpoint: state.checkpoint, config, connector: changed, now })).toEqual(next)
-    expect((await definition.listener!.read({ checkpoint: next.checkpoint, config, connector: changed, now })).payload).toBeNull()
+    expect((await definition.listener!.read({ checkpoint: next.checkpoint, config, connector: changed, now })).outputs).toBeNull()
     const returned = await definition.listener!.read({ checkpoint: next.checkpoint, config, connector, now })
-    expect(returned.payload).toMatchObject({ pullRequest: { draft: true } })
+    expect(returned.outputs?.payload).toMatchObject({ pullRequest: { draft: true } })
     expect(returned.dedupeKey).not.toEqual(first.dedupeKey)
   })
 
@@ -89,7 +89,7 @@ describe('GitHub pull request listener', () => {
       }),
     ).rejects.toThrow()
     expect(state.checkpoint).toEqual(checkpoint)
-    expect((await definition.listener!.read({ checkpoint, config, connector, now })).payload).toBeNull()
+    expect((await definition.listener!.read({ checkpoint, config, connector, now })).outputs).toBeNull()
   })
 
   it.each([401, 403, 404, 429, 500])('does not reset progress after HTTP %s', async (status) => {

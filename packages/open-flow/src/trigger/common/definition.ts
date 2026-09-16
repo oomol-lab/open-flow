@@ -1,5 +1,6 @@
 import type { Schema } from '@cfworker/json-schema'
 import type { JsonObject, JsonValue } from '../../base/common/json.ts'
+import type { Port } from '../../flow/common/change.ts'
 
 import { Validator } from '@cfworker/json-schema'
 import { dequal } from 'dequal/lite'
@@ -113,13 +114,13 @@ function validateSchemaNode(schema: JsonObject, path: string): void {
   }
 }
 
-function inspectSchema(schema: JsonObject, label: string): SchemaStats {
+function inspectSchema(schema: JsonObject, label: string, objectRoot = false): SchemaStats {
   if (encoder.encode(stringify(schema)).byteLength > maxSchemaBytes) {
     throw new TypeError(`${label} exceeds the ${maxSchemaBytes}-byte limit.`)
   }
   validateSchemaNode(schema, label)
   const rootType = Reflect.get(schema, 'type')
-  if (rootType != null && rootType != 'object' && !(Array.isArray(rootType) && rootType.includes('object'))) {
+  if (objectRoot && rootType != null && rootType != 'object' && !(Array.isArray(rootType) && rootType.includes('object'))) {
     throw new TypeError(`${label} must allow an object at its root.`)
   }
 
@@ -167,15 +168,25 @@ function inspectSchema(schema: JsonObject, label: string): SchemaStats {
 }
 
 export function validateTriggerDefinitionSchemas(
-  definition: { readonly configSchema: JsonObject; readonly payloadSchema: JsonObject },
+  definition: { readonly configSchema: JsonObject; readonly outputs: readonly Port[] },
   label = 'Trigger definition',
 ): void {
-  const configStats = inspectSchema(definition.configSchema, `${label} configSchema`)
-  const payloadStats = inspectSchema(definition.payloadSchema, `${label} payloadSchema`)
-  if (configStats.properties + payloadStats.properties > maxDefinitionProperties) {
+  const configStats = inspectSchema(definition.configSchema, `${label} configSchema`, true)
+  if (new Set(definition.outputs.map((port) => port.handle)).size !== definition.outputs.length) throw new TypeError(`${label} has duplicate output handles.`)
+  if (definition.outputs.length > maxDefinitionProperties || encoder.encode(stringify(definition.outputs)).byteLength > maxSchemaBytes)
+    throw new TypeError(`${label} output definitions exceed the size limit.`)
+  const outputStats = definition.outputs.reduce(
+    (total, port) => {
+      if (!isJsonObject(port.jsonSchema)) throw new TypeError(`${label} output schema must be an object.`)
+      const stats = inspectSchema(port.jsonSchema, `${label} outputs.${port.handle}`)
+      return { properties: total.properties + stats.properties, enumValues: total.enumValues + stats.enumValues }
+    },
+    { properties: 0, enumValues: 0 },
+  )
+  if (configStats.properties + outputStats.properties > maxDefinitionProperties) {
     throw new TypeError(`${label} schemas exceed the ${maxDefinitionProperties}-property limit.`)
   }
-  if (configStats.enumValues + payloadStats.enumValues > maxDefinitionEnumValues) {
+  if (configStats.enumValues + outputStats.enumValues > maxDefinitionEnumValues) {
     throw new TypeError(`${label} schemas exceed the ${maxDefinitionEnumValues}-enum-value limit.`)
   }
 }
@@ -184,7 +195,7 @@ export function validateTriggerDefinition(
   definition: {
     readonly config: JsonObject
     readonly configSchema: JsonObject
-    readonly payloadSchema: JsonObject
+    readonly outputs: readonly Port[]
   },
   label = 'Trigger definition',
 ): void {
@@ -210,7 +221,7 @@ export function validateTriggerDefinition(
 export async function computeTriggerDefinitionDigest(declaration: {
   readonly configSchema: JsonObject
   readonly connector?: { readonly accountRequired: true; readonly serviceId: string }
-  readonly payloadSchema: JsonObject
+  readonly outputs: readonly Port[]
   readonly provisioning: 'integration' | 'poll' | 'webhook'
   readonly revision: string
   readonly serviceId: string
@@ -219,9 +230,9 @@ export async function computeTriggerDefinitionDigest(declaration: {
   const source = stringify({
     configSchema: declaration.configSchema,
     ...(declaration.connector == null ? {} : { connector: declaration.connector }),
-    payloadSchema: declaration.payloadSchema,
+    outputs: declaration.outputs,
     provisioning: declaration.provisioning,
-    protocolVersion: 1,
+    protocolVersion: 2,
     revision: declaration.revision,
     serviceId: declaration.serviceId,
     type: declaration.type,

@@ -52,7 +52,7 @@ function revision(reverse = false): RevisionContent {
         },
       },
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: reverse ? { main: modules.main, helper: modules.helper } : modules,
   }
 }
@@ -97,11 +97,11 @@ describe('Flow Revision encoding', () => {
         tasks: { managed: { executor: { kind: 'llm', mode: 'json' }, name: 'LLM' } },
       },
       kind: 'open-flow-flow-revision',
-      modelVersion: 1,
+      modelVersion: 2,
       modules: { helper: { imports: [] }, main: { imports: ['helper'] } },
       version: 1,
     })
-    await expect(digestBytes(first)).resolves.toBe('sha256:9cea46b687eacdcf1ff19c131197d737d345e90b848a4679b6604dd77c2edd56')
+    await expect(digestBytes(first)).resolves.toBe('sha256:7b012e2b374aa09762b3a37c2573f4eebe3059ade582990b0ce56dd5bf904abe')
   })
 
   it('changes the encoded Revision when workflow semantics change', () => {
@@ -276,7 +276,7 @@ describe('Revision decoding', () => {
 
   it('ignores unknown fields before validation and canonical encoding', () => {
     const content = {
-      modelVersion: 1,
+      modelVersion: 2,
       modules: {},
       document: { bindings: {}, subflows: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
     } as const
@@ -299,7 +299,7 @@ describe('Revision decoding', () => {
 
   it.each([
     { version: 2 },
-    { modelVersion: 2 },
+    { modelVersion: 1 },
     { kind: 'other' },
     { modules: { bad: { name: 'Bad', imports: [3], source: '' } } },
     { document: { ...revision().document, graph: { nodes: {}, edges: [{ source: 'a' }] } } },

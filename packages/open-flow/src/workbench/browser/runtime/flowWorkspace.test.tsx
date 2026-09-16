@@ -152,7 +152,7 @@ describe('FlowWorkspace run drawer', () => {
     expect(await designer.props.onAddNode(option, position)).toBe(nodeId)
     expect(store.addNode).toHaveBeenCalledWith(option, position, undefined)
     if (nodeId == null) expect(mocks.setOpen).not.toHaveBeenCalled()
-    else expect(mocks.setOpen).toHaveBeenCalledWith('inspector')
+    else expect(mocks.setOpen).toHaveBeenCalledWith('properties')
   })
 
   it('hides execution when the graph has no trigger', () => {

@@ -27,7 +27,7 @@ export async function createRunCommand(client: ControlClient, operands: readonly
   requireCount(
     operands,
     1,
-    'oo flow run <flow> [--source draft|live] [--trigger <name|id>] [--payload <json|@file|->] [--input <json|@file|->] [--wait] [--json]',
+    'oo flow run <flow> [--source draft|live] [--trigger <name|id>] [--outputs <json|@file|->] [--input <json|@file|->] [--wait] [--json]',
   )
   const flow = await referencedFlow(client, operands[0]!)
   const inputs = await runInputs(args, runtime)
@@ -48,16 +48,18 @@ export async function createRunCommand(client: ControlClient, operands: readonly
       candidates: triggers.map(([triggerId, node]) => ({ triggerId, name: node.name })),
     })
   const selected = exactTrigger(revision.content, reference)
-  let payload: JsonValue = {}
-  if (args.payload != null) {
-    const text = await argumentText(args.payload, '--payload', 'run.input-unreadable', runtime)
+  let outputs: Readonly<Record<string, JsonValue>> = {}
+  if (args.outputs != null) {
+    const text = await argumentText(args.outputs, '--outputs', 'run.input-unreadable', runtime)
     try {
-      payload = JSON.parse(text) as JsonValue
+      const value = JSON.parse(text) as JsonValue
+      if (value == null || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected output object.')
+      outputs = value as Readonly<Record<string, JsonValue>>
     } catch {
-      throw new CliError('run.input-invalid', 'Trigger payload must be valid JSON.')
+      throw new CliError('run.input-invalid', 'Trigger outputs must be valid JSON.')
     }
   }
-  const trigger = { nodeId: selected.triggerId, payload }
+  const trigger = { nodeId: selected.triggerId, outputs }
   let created: RunDetails
   if (live?.publication != null) created = await client.createLiveRun(live.publication.publicationId, { inputs, trigger, idempotencyKey: args.idempotencyKey })
   else created = await client.createDraftRun(flow.flowId, revisionId, { inputs, trigger, idempotencyKey: args.idempotencyKey })

@@ -136,7 +136,7 @@ const fixtures: readonly Fixture[] = [
 
 function contentFor(fixture: Fixture): RevisionContent {
   return {
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { module: { name: 'Prepare report', imports: [], source: 'export default (inputs) => ({ report: inputs.message, count: inputs.count })' } },
     document: { bindings: {}, tasks: {}, subflows: {}, ...fixture.content, graph: { nodes: { sample: fixture.node }, edges: [] } },
   }

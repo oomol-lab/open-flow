@@ -200,7 +200,7 @@ function canonicalTriggerDefinition(snapshot: TriggerKeySnapshot): JsonValue {
       : {}),
     key: snapshot.key,
     name: snapshot.name,
-    payloadSchema: snapshot.payloadSchema,
+    outputs: canonicalPorts(snapshot.outputs),
     provider: snapshot.provider,
     type: snapshot.type,
   }
@@ -239,7 +239,7 @@ function canonicalTriggerNode(trigger: TriggerNode): JsonValue {
     case 'webhook':
       return {
         ...common(trigger.kind),
-        inputsDef: trigger.inputsDef.map((input) => ({ handle: input.handle, ...canonicalPort(input) })),
+        bodyFields: trigger.bodyFields.map((input) => ({ handle: input.handle, ...canonicalPort(input) })),
         ...(trigger.options == null ? {} : { options: canonicalWebhookOptions(trigger.options) }),
       }
     case 'cron':
@@ -335,7 +335,7 @@ const legacyProject = z
   .object({
     kind: z.literal('open-flow-project-revision'),
     version: z.literal(1),
-    modelVersion: z.literal(1),
+    modelVersion: z.union([z.literal(1), z.literal(2)]),
     modules: z.record(z.string(), z.object({ name: z.string(), source: z.string(), imports: z.array(z.string()) }).strict()),
     document: z.object({ bindings: object, flows: object, subflows: object, tasks: object }).strict(),
   })
@@ -376,7 +376,7 @@ export function convertProjectFlow(value: unknown, flowId: string): { name: stri
     }),
   )
   const revision = decodeRevisionContent({
-    modelVersion: 1,
+    modelVersion: 2,
     modules: source.modules,
     document: { bindings: {}, subflows: {}, tasks: {}, graph: { nodes, edges: [] } },
   })

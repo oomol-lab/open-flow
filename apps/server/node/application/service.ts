@@ -320,8 +320,13 @@ export class ServerService {
     return selected.id
   }
 
-  acceptWebhookTarget(target: WebhookTarget, occurrenceId: string, payload: JsonValue): Promise<RunAdmission | undefined> {
-    return this.#webhookTargets.accept(target, occurrenceId, payload)
+  acceptWebhookTarget(
+    target: WebhookTarget,
+    occurrenceId: string,
+    method: string,
+    outputs: Readonly<Record<string, JsonValue>>,
+  ): Promise<RunAdmission | undefined> {
+    return this.#webhookTargets.accept(target, occurrenceId, method, outputs)
   }
 
   cancel(runId: string): boolean {

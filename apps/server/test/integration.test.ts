@@ -5,6 +5,7 @@ import type { DestinationStream, Logger } from 'pino'
 import type { ServerServiceOptions } from '../node/application/service.ts'
 
 import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '@oomol-lab/open-flow/integration-trigger'
+import { payloadPollOutputs } from '@oomol-lab/open-flow/poll-trigger'
 import { integrationDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
@@ -57,18 +58,24 @@ const snapshot = {
     required: ['mode'],
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Integration runtime test definition.',
   displayName: 'Integration runtime test',
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'test.on_event',
   name: 'on_event',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { body: { type: 'object' }, deliveryId: { type: 'string' }, event: { type: 'string' } },
-    required: ['body', 'deliveryId', 'event'],
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { body: { type: 'object' }, deliveryId: { type: 'string' }, event: { type: 'string' } },
+        required: ['body', 'deliveryId', 'event'],
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'test',
   type: 'integration',
 } as const
@@ -85,7 +92,7 @@ const connector = createConnectorHost({
   ],
 })
 
-function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient'): RevisionContent {
+function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient', definition: IntegrationDefinition['snapshot'] = snapshot): RevisionContent {
   return {
     document: {
       bindings: { connection: { kind: 'connection', target: 'connection-main' } },
@@ -95,15 +102,15 @@ function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient'): Rev
           integration: {
             bindingId: 'connection',
             config: { mode },
-            definition: snapshot,
+            definition,
             kind: 'integration',
             name: 'Integration runtime test',
           },
           task: {
-            inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'integration', output: 'payload' }] } },
+            inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'integration', output: definition.outputs[0]!.handle }] } },
             kind: 'task',
             task: {
-              inputs: [{ handle: 'event', jsonSchema: snapshot.payloadSchema, nullable: false }],
+              inputs: [{ handle: 'event', jsonSchema: definition.outputs[0]!.jsonSchema, nullable: false }],
               moduleId: 'module-main',
               name: 'Main',
               outputs: [],
@@ -114,7 +121,7 @@ function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient'): Rev
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { 'module-main': { imports: [], name: 'Main', source: 'export default function run() { return {} }' } },
   }
 }
@@ -493,7 +500,7 @@ describe('Server Integration callback fencing', () => {
           checkpoint: { deliveryId: 'delivery-main' },
           dedupeKey: 'delivery-main',
           outcome: 'event',
-          payload: { body: {}, deliveryId: 'delivery-main', event: 'test' },
+          outputs: { payload: { body: {}, deliveryId: 'delivery-main', event: 'test' } },
         }
       },
       async reconcile(context) {
@@ -574,7 +581,7 @@ it.each(['request', 'service', 'deadline'] as const)('interrupts callback delive
       } catch (error) {
         saved.resolve(error)
       }
-      return { outcome: 'event', dedupeKey: 'late', payload: { body: {}, deliveryId: 'late', event: 'test' } }
+      return { outcome: 'event', dedupeKey: 'late', outputs: { payload: { body: {}, deliveryId: 'late', event: 'test' } } }
     },
   }
   const scope = await Effect.runPromise(Scope.make())
@@ -624,7 +631,7 @@ it('rejects an Integration target captured before its Flow was disabled', async 
     initialState: { checkpoint: null, subscription: {} },
     snapshot,
     reconcile: async () => ({ outcome: 'ready' }),
-    receive: () => ({ outcome: 'event', dedupeKey: 'disabled', payload: { body: {}, deliveryId: 'disabled', event: 'test' } }),
+    receive: () => ({ outcome: 'event', dedupeKey: 'disabled', outputs: { payload: { body: {}, deliveryId: 'disabled', event: 'test' } } }),
   }
   const service = await openService(
     file,
@@ -691,19 +698,20 @@ describe('Server change listener', () => {
     const reads: { kind: 'poll' | 'listener'; checkpoint: JsonValue }[] = []
     const definition = listener(async ({ checkpoint }) => {
       reads.push({ kind: 'listener', checkpoint })
-      return { checkpoint: Number(checkpoint) + 1, dedupeKey: String(checkpoint), hasMore: continuing, payload: null }
+      return { checkpoint: Number(checkpoint) + 1, dedupeKey: String(checkpoint), hasMore: continuing, outputs: null }
     })
     const poll: PollDefinition = {
+      buildOutputs: payloadPollOutputs,
       snapshot: {
         configSchema: { type: 'object' },
-        definitionVersion: 1,
+        definitionVersion: 2,
         description: 'Poll reader',
         displayName: 'Poll reader',
         key: 'test.poll',
         name: 'poll',
         provider: 'test',
         type: 'poll',
-        payloadSchema: { type: 'object' },
+        outputs: [{ handle: 'payload', jsonSchema: { type: 'object' }, nullable: false }],
       },
       async poll({ checkpoint }) {
         reads.push({ kind: 'poll', checkpoint })
@@ -720,7 +728,7 @@ describe('Server change listener', () => {
         idempotencyKey: next('publish'),
         revisionId: next('revision'),
         revision: {
-          modelVersion: 1,
+          modelVersion: 2,
           modules: {},
           document: {
             bindings: { connection: { kind: 'connection', target: 'connection-main' } },
@@ -790,7 +798,7 @@ describe('Server change listener', () => {
       cursors.push(checkpoint)
       return Number(checkpoint) < 7
         ? page(Number(checkpoint), Number(checkpoint) < 6)
-        : { checkpoint, dedupeKey: String(checkpoint), hasMore: false, payload: null }
+        : { checkpoint, dedupeKey: String(checkpoint), hasMore: false, outputs: null }
     })
     let service = await openService(
       file,
@@ -827,7 +835,7 @@ describe('Server change listener', () => {
         entered.resolve()
         await release.promise
       }
-      return cursors.length == 1 ? page(Number(checkpoint)) : { checkpoint, dedupeKey: String(checkpoint), hasMore: false, payload: null }
+      return cursors.length == 1 ? page(Number(checkpoint)) : { checkpoint, dedupeKey: String(checkpoint), hasMore: false, outputs: null }
     })
     const service = await openService(
       file,
@@ -984,7 +992,7 @@ describe('Server change listener', () => {
     const definition = listener(async ({ checkpoint }) => ({
       checkpoint: mode == 'stalled' ? checkpoint : Number(checkpoint) + 1,
       hasMore: mode == 'stalled',
-      payload: null,
+      outputs: null,
       dedupeKey: mode == 'stalled' ? 'invalid' : '',
     }))
     const service = await openService(
@@ -1170,7 +1178,12 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
 })
 
 function page(checkpoint: number, hasMore = false) {
-  return { checkpoint: checkpoint + 1, dedupeKey: String(checkpoint), hasMore, payload: { body: {}, deliveryId: String(checkpoint), event: 'change' } }
+  return {
+    checkpoint: checkpoint + 1,
+    dedupeKey: String(checkpoint),
+    hasMore,
+    outputs: { payload: { body: {}, deliveryId: String(checkpoint), event: 'change' } },
+  }
 }
 
 async function wake(service: ServerService) {
@@ -1183,3 +1196,62 @@ async function wake(service: ServerService) {
     rawBody: new Uint8Array(),
   })
 }
+
+it.each(['callback', 'listener'] as const)('preserves declared Integration outputs through %s admission', async (source) => {
+  const file = await databaseFile()
+  const outputs = { message: 'changed', ids: ['one', 'two'], optional: null }
+  const definition: IntegrationDefinition = {
+    snapshot: {
+      ...snapshot,
+      outputs: [
+        { handle: 'message', jsonSchema: { type: 'string' }, nullable: false },
+        { handle: 'ids', jsonSchema: { type: 'array', items: { type: 'string' } }, nullable: false },
+        { handle: 'optional', jsonSchema: { type: 'number' }, nullable: true },
+      ],
+    },
+    initialState: { checkpoint: null, subscription: {} },
+    reconcile: async ({ state, now }) => {
+      await state!.saveCheckpoint(0)
+      await state!.saveSubscription({}, new Date(now.getTime() + 60_000))
+      return { outcome: 'ready' }
+    },
+    receive: () => ({ outcome: 'event', dedupeKey: 'one', outputs }),
+    ...(source == 'listener' ? { listener: { intervalMs: 60_000, read: async () => ({ checkpoint: 1, dedupeKey: 'one', hasMore: false, outputs }) } } : {}),
+  }
+  const service = await openService(
+    file,
+    options(() => 0, [definition]),
+  )
+  const database = new DatabaseSync(file)
+  try {
+    const result = await service.publisher.publish({
+      expectedLivePublicationId: null,
+      flowId: 'main',
+      idempotencyKey: next('publish'),
+      revision: revision('ready', definition.snapshot),
+      revisionId: next('revision'),
+    })
+    if (result.kind != 'published') throw new Error('Publication conflicted.')
+    await service.tickIntegration(new Date(0).toISOString())
+    if (source == 'listener') {
+      database
+        .prepare(`INSERT INTO flows (flow_id, name, status, draft_revision_id, create_idempotency_key, create_request_digest, created_at, updated_at)
+        SELECT 'main', 'Listener test', 'active', revision_id, 'create-main', 'create-main', 0, 0 FROM publications WHERE publication_id = ?`)
+        .run(result.publicationId)
+      await service.tickListeners(new Date(60_000).toISOString())
+    } else {
+      const endpoint = service.integrationEndpoint('main', 'integration')!
+      const response = await createServerApp(service).request(`http://server.local/v1/integrations/${endpoint}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      })
+      expect(response.status).toBe(definition.snapshot.endpoint.successStatus)
+    }
+    const runs = database.prepare('SELECT trigger_outputs FROM runs').all() as { trigger_outputs: string }[]
+    expect(runs.map((row) => JSON.parse(row.trigger_outputs))).toEqual([outputs])
+  } finally {
+    database.close()
+    await closeService(service)
+  }
+})

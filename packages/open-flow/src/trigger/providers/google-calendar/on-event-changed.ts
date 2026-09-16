@@ -2,7 +2,7 @@ import type { ConnectorProxyResult } from '../../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent, PollResult } from '../../common/poll.ts'
 
-import { PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 type Change = 'cancelled' | 'created' | 'updated'
 
@@ -111,23 +111,30 @@ const snapshot = {
     title: 'Google Calendar Event Change Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Polls a Google Calendar and triggers when an event is created, updated or cancelled.',
   displayName: 'Event Changed',
   key: 'googlecalendar.on_event_changed',
   name: 'on_event_changed',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: eventSchema, type: 'array' } },
-    required: ['events'],
-    title: 'Google Calendar Event Change Payload',
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: eventSchema, type: 'array' } },
+        required: ['events'],
+        title: 'Google Calendar Event Change Payload',
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'googlecalendar',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const googleCalendarEventChanged: PollDefinition = {
+  buildOutputs: payloadPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)

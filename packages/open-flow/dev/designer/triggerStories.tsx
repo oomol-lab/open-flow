@@ -125,9 +125,9 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
         else if (sample.kind === 'poll' && entry.schedules) sample = { ...sample, pollTimes: entry.schedules }
         if (entry.id === 'unconfigured') {
           if (sample.kind === 'poll' || sample.kind === 'integration') sample = { ...sample, config: {} }
-          else if (sample.kind === 'webhook') sample = { ...sample, inputsDef: [], options: {} }
+          else if (sample.kind === 'webhook') sample = { ...sample, bodyFields: [], options: {} }
         }
-        samples.set(entry.id, { id: `${fixture.id}-${entry.id}`, trigger: sample, payload: fixture.payload })
+        samples.set(entry.id, { id: `${fixture.id}-${entry.id}`, trigger: sample, outputs: fixture.outputs })
         const base = designerGraph(
           triggerDraft(sample).draft,
           { kind: 'flow' },
@@ -158,7 +158,7 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
             ? {
                 status: entry.status,
                 error: entry.status === 'error' ? { message: 'Sample trigger failed' } : undefined,
-                outputs: entry.status === 'success' ? { payload: fixture.payload } : undefined,
+                outputs: entry.status === 'success' ? fixture.outputs : undefined,
               }
             : undefined,
         })
@@ -255,7 +255,7 @@ function RunSample({ fixture, dark, language, log, state, downstream = false, la
         closureDigest: 'lab',
         engineContract: 'open-flow-engine/v4',
         engineDigest: 'lab',
-        modelVersion: 1,
+        modelVersion: 2,
         revisionDigest: draft.digest,
       }
     }
@@ -282,7 +282,11 @@ function RunSample({ fixture, dark, language, log, state, downstream = false, la
         if (disposed) return
         for (const group of state === 'empty' ? [] : (store.$.inputRequest.value?.groups ?? [])) {
           group.editor.replaceValues(
-            group.nodeId === 'trigger' ? { payload: state === 'invalid' ? null : fixture.payload } : { message: state === 'invalid' ? 123 : 'Test message' },
+            group.nodeId === 'trigger'
+              ? state === 'invalid'
+                ? Object.fromEntries(Object.keys(fixture.outputs).map((handle) => [handle, null]))
+                : fixture.outputs
+              : { message: state === 'invalid' ? 123 : 'Test message' },
           )
         }
         if (state === 'invalid' || state === 'starting') void store.confirmInputs()
@@ -376,7 +380,7 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
     if (state === 'unconfigured') {
       if (trigger.kind === 'poll' || trigger.kind === 'integration') trigger = { ...trigger, config: {} }
       else if (trigger.kind === 'cron') trigger = { ...trigger, cronTimes: [] }
-      else if (trigger.kind === 'webhook') trigger = { ...trigger, inputsDef: [], options: {} }
+      else if (trigger.kind === 'webhook') trigger = { ...trigger, bodyFields: [], options: {} }
     }
     if (trigger.kind === 'poll' && trigger.definition.provider === 'linear') {
       if (state === 'missing-status') trigger = { ...trigger, config: { ...trigger.config, stateIds: ['00000000-0000-4000-8000-000000000098'] } }

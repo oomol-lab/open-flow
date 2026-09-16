@@ -10,7 +10,7 @@ import type { RunStore } from './runStore.ts'
 import { compute, derive, val } from 'value-enhancer'
 import { randomId } from '../../../../control/common/random.ts'
 import { portsByHandle } from '../../../../flow/common/change.ts'
-import { triggerPayloadSchema } from '../../../../flow/common/schema.ts'
+import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
 import { Latest } from '../stores/latest.ts'
@@ -100,7 +100,7 @@ function inputSpecs(draft: Draft, triggerId: string) {
         if (resolved.trigger.kind == 'manual' || resolved.trigger.kind == 'cron') return []
         return [
           {
-            definitions: [{ handle: 'payload', jsonSchema: triggerPayloadSchema(resolved.trigger), nullable: false }],
+            definitions: triggerOutputDefinitions(resolved.trigger),
             nodeId,
             title: resolved.trigger.name,
           },
@@ -139,12 +139,17 @@ function groupValues(groups: readonly RunInputGroup[]): Readonly<Record<string, 
   return Object.fromEntries(groups.map((group) => [group.nodeId, group.editor.values()]))
 }
 
-function runValues(groups: readonly RunInputGroup[], triggerId: string) {
+function testOutputs(revision: Draft, triggerId: string): Readonly<Record<string, JsonValue>> {
+  const node = revisionView(revision).graph({ kind: 'flow' })?.nodes[triggerId]
+  return node?.kind === 'cron' ? Object.fromEntries(triggerOutputDefinitions(node).map((port) => [port.handle, {}])) : {}
+}
+
+function runValues(groups: readonly RunInputGroup[], triggerId: string, revision: Draft) {
   return {
     inputs: Object.fromEntries(groups.filter((group) => group.nodeId != triggerId).map((group) => [group.nodeId, group.editor.values()])) as Readonly<
       Record<string, Readonly<Record<string, JsonValue>>>
     >,
-    payload: (groups.find((group) => group.nodeId == triggerId)?.editor.values().payload ?? {}) as JsonValue,
+    outputs: (groups.find((group) => group.nodeId == triggerId)?.editor.values() ?? testOutputs(revision, triggerId)) as Readonly<Record<string, JsonValue>>,
   }
 }
 
@@ -273,8 +278,8 @@ export class RunRequestStore {
       return false
     }
     this.#rememberInputs(request)
-    const { inputs, payload } = runValues(request.groups, request.triggerId)
-    const started = await this.#start(request.source, request.flow, request.revisionId, { nodeId: request.triggerId, payload }, inputs, request.publicationId)
+    const { inputs, outputs } = runValues(request.groups, request.triggerId, request.revision)
+    const started = await this.#start(request.source, request.flow, request.revisionId, { nodeId: request.triggerId, outputs }, inputs, request.publicationId)
     if (started && this.#state.value.inputRequest === request) this.dismissInputs()
     return started
   }
@@ -339,12 +344,14 @@ export class RunRequestStore {
       return 'unavailable'
     }
     if (!edit && only != null && groups.length == 0) {
-      return (await this.#start(source, flow, revisionId, { nodeId: only.nodeId, payload: {} }, {}, publicationId)) ? 'started' : 'unavailable'
+      return (await this.#start(source, flow, revisionId, { nodeId: only.nodeId, outputs: testOutputs(revision, only.nodeId) }, {}, publicationId))
+        ? 'started'
+        : 'unavailable'
     }
     if (!edit && only != null && saved?.valid == true && saved.signature == signature && groups.every((group) => group.editor.valid$.value)) {
-      const values = runValues(groups, only.nodeId)
+      const values = runValues(groups, only.nodeId, revision)
       for (const group of groups) group.editor.dispose()
-      return (await this.#start(source, flow, revisionId, { nodeId: only.nodeId, payload: values.payload }, values.inputs, publicationId))
+      return (await this.#start(source, flow, revisionId, { nodeId: only.nodeId, outputs: values.outputs }, values.inputs, publicationId))
         ? 'started'
         : 'unavailable'
     }
@@ -372,7 +379,7 @@ export class RunRequestStore {
     source: RunSource,
     flow: Flow,
     revisionId: string,
-    trigger: { readonly nodeId: string; readonly payload: JsonValue },
+    trigger: { readonly nodeId: string; readonly outputs: Readonly<Record<string, JsonValue>> },
     inputs: Readonly<Record<string, Readonly<Record<string, JsonValue>>>> = {},
     publicationId?: string,
   ): Promise<boolean> {

@@ -16,7 +16,7 @@ const result = await Effect.runPromise(
       tasks: {},
     },
     {
-      trigger: { nodeId: 'start', payload: {} },
+      trigger: { nodeId: 'start', outputs: {} },
       createId: () => 'consumer-job',
       flowId: 'main',
       invokeTask: () => Effect.fail(new Error('Unexpected Task invocation.')),
@@ -46,7 +46,7 @@ if (typeof cron.nextTriggerScheduledAt !== 'function') throw new Error('Missing 
 const integration = await import('@oomol-lab/open-flow/integration-trigger')
 if (integration.integrationConformanceCases.length === 0) throw new Error('Missing Integration Trigger contract.')
 if (integration.listenerConformanceCases.length === 0) throw new Error('Missing listener conformance contract.')
-integration.validateListenerPage({ checkpoint: 'cursor', dedupeKey: 'page', hasMore: false, payload: null })
+integration.validateListenerPage({ checkpoint: 'cursor', dedupeKey: 'page', hasMore: false, outputs: null })
 const poll = await import('@oomol-lab/open-flow/poll-trigger')
 if (poll.maximumPollEventsPerPage !== 100) throw new Error('Missing Poll Trigger contract.')
 const providers = await import('@oomol-lab/open-flow/provider-triggers')
@@ -83,6 +83,13 @@ const encoding = await import('@oomol-lab/open-flow/flow-encoding')
 if (typeof encoding.encodeRevision !== 'function') throw new Error('Missing Flow encoding runtime.')
 const semantics = await import('@oomol-lab/open-flow/flow-semantics')
 if (typeof semantics.prepareFlow !== 'function') throw new Error('Missing Flow semantics runtime.')
+const manual = { kind: 'manual', name: 'Manual' }
+if (!semantics.matchesTriggerOutputs(manual, {}) || semantics.matchesTriggerOutputs(manual, { payload: null })) {
+  throw new Error('Invalid Trigger output validation.')
+}
+if (semantics.triggerOutputDefinitions(manual).length !== 0 || Object.keys(semantics.triggerOutputPorts(manual)).length !== 0) {
+  throw new Error('Invalid Manual Trigger output definitions.')
+}
 const localization = await import('@oomol-lab/open-flow/localization')
 if (localization.resolveUiLanguage(['zh-Hant-HK']) !== 'zh-TW') throw new Error('Missing UI language registry.')
 const workbench = await import('@oomol-lab/open-flow/workbench')

@@ -123,7 +123,7 @@ const host = {
         diagnostics: [],
         engineContract: 'open-flow-engine/v4',
         flowId: 'flow-1',
-        modelVersion: 1,
+        modelVersion: 2,
         revisionDigest: 'digest-revision-1',
         revisionId: 'revision-1',
         valid: true,

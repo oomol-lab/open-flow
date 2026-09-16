@@ -30,12 +30,22 @@ export function triggerKey(value: unknown): TriggerKeySnapshot {
   const summary = triggerKeySummary(source)
   const base = {
     configSchema: jsonValue(source.configSchema),
-    definitionVersion: integer(source.definitionVersion),
+    definitionVersion: source.definitionVersion === 2 ? 2 : invalidResponse(),
     description: summary.description,
     displayName: summary.displayName,
     key: summary.key,
     name: summary.name,
-    payloadSchema: jsonValue(source.payloadSchema),
+    outputs: (Array.isArray(source.outputs) ? source.outputs : invalidResponse()).map((entry) => {
+      const port = record(entry)
+      return Object.assign(
+        {
+          handle: string(port.handle),
+          jsonSchema: jsonValue(port.jsonSchema),
+          nullable: typeof port.nullable === 'boolean' ? port.nullable : invalidResponse(),
+        },
+        port.description == null ? {} : { description: string(port.description) },
+      )
+    }),
     provider: summary.provider,
   }
   if (summary.type == 'poll') return { ...base, type: 'poll' }

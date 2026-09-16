@@ -11,7 +11,7 @@ import { Store } from '../node/storage/store.ts'
 /** An Agent Run whose closure reads a deployment Variable. */
 function revision(): RevisionContent {
   return {
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
     document: {
       bindings: { email: { kind: 'variable', target: 'TOKEN' } },
@@ -64,11 +64,11 @@ describe('Agent Run admission with a deployment Variable', () => {
         flowId: 'flow',
         idempotencyKey: 'run',
         inputs: {},
-        modelVersion: 1,
+        modelVersion: 2,
         requestDigest: 'run',
         revisionDigest: 'revision',
         revisionId: 'revision',
-        trigger: { nodeId: 'trigger', payload: {} },
+        trigger: { nodeId: 'trigger', outputs: {} },
         variableNames: ['TOKEN'],
       })
 

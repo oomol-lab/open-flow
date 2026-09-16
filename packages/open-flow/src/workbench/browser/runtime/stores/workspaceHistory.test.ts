@@ -13,7 +13,7 @@ async function session() {
   const flow = { flowId: 'flow', name: 'Flow', status: 'active', createdAt: timestamp, updatedAt: timestamp, draftRevisionId: 'r1', version: 1 } as const
   let draft: Draft = {
     actorId: 'test',
-    content: applyFlowChanges({ modelVersion: 1, document: { graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {}, bindings: {} }, modules: {} }, [
+    content: applyFlowChanges({ modelVersion: 2, document: { graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {}, bindings: {} }, modules: {} }, [
       ...createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Code'),
       ...createValue(target, 'value', 'Value'),
       { kind: 'graph.edge.connect', target, edge: { source: 'value', target: 'code' } },
@@ -21,7 +21,7 @@ async function session() {
     createdAt: timestamp,
     digest: 'digest',
     flowId: 'flow',
-    modelVersion: 1,
+    modelVersion: 2,
     parentRevisionId: null,
     revisionId: 'r1',
     version: 1,
@@ -63,7 +63,7 @@ async function session() {
     diagnostics: [],
     engineContract: 'open-flow-engine/v4',
     flowId: 'flow',
-    modelVersion: 1,
+    modelVersion: 2,
     revisionDigest: 'digest',
     revisionId: 'r1',
     valid: true,

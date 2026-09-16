@@ -19,7 +19,7 @@ const details = {
   closureDigest: 'closure-1',
   engineContract: 'open-flow-engine/v4',
   engineDigest: 'engine-1',
-  modelVersion: 1,
+  modelVersion: 2,
   revisionDigest: 'digest-1',
 } as const
 

@@ -73,48 +73,54 @@ const snapshot = {
     title: 'Google Drive Changes Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Uses a Google Drive changes.watch channel and triggers when Drive changes are available.',
   displayName: 'Changes Detected',
   endpoint: { body: { allowArray: false, allowEmpty: true, formats: ['json'] }, methods: ['POST'], successStatus: 204 },
   key: 'googledrive.changes_detected',
   name: 'changes_detected',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: {
-      events: {
-        items: {
-          additionalProperties: false,
-          properties: {
-            changeId: { type: 'string' },
-            changeType: { type: ['string', 'null'] },
-            driveId: { type: ['string', 'null'] },
-            file: { type: ['object', 'null'] },
-            fileId: { type: ['string', 'null'] },
-            notification: {
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: {
+          events: {
+            items: {
               additionalProperties: false,
               properties: {
-                changedTypes: { items: { type: 'string' }, type: 'array' },
-                messageNumber: { type: ['string', 'null'] },
-                resourceState: { type: 'string' },
-                resourceUri: { type: ['string', 'null'] },
+                changeId: { type: 'string' },
+                changeType: { type: ['string', 'null'] },
+                driveId: { type: ['string', 'null'] },
+                file: { type: ['object', 'null'] },
+                fileId: { type: ['string', 'null'] },
+                notification: {
+                  additionalProperties: false,
+                  properties: {
+                    changedTypes: { items: { type: 'string' }, type: 'array' },
+                    messageNumber: { type: ['string', 'null'] },
+                    resourceState: { type: 'string' },
+                    resourceUri: { type: ['string', 'null'] },
+                  },
+                  required: ['resourceState', 'changedTypes', 'messageNumber', 'resourceUri'],
+                  type: 'object',
+                },
+                removed: { type: 'boolean' },
+                time: { type: ['string', 'null'] },
               },
-              required: ['resourceState', 'changedTypes', 'messageNumber', 'resourceUri'],
+              required: ['changeId', 'changeType', 'removed', 'time', 'fileId', 'driveId', 'file', 'notification'],
               type: 'object',
             },
-            removed: { type: 'boolean' },
-            time: { type: ['string', 'null'] },
+            type: 'array',
           },
-          required: ['changeId', 'changeType', 'removed', 'time', 'fileId', 'driveId', 'file', 'notification'],
-          type: 'object',
         },
-        type: 'array',
+        required: ['events'],
+        title: 'Google Drive Changes Payload',
+        type: 'object',
       },
+      nullable: false,
     },
-    required: ['events'],
-    title: 'Google Drive Changes Payload',
-    type: 'object',
-  },
+  ],
   provider: 'googledrive',
   type: 'integration',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'integration' }
@@ -152,7 +158,7 @@ export const googleDriveChanges: IntegrationDefinition = {
     }
     return events.length == 0
       ? { ...delivery, outcome: 'ignored', reason: 'Google Drive change page is empty.' }
-      : { ...delivery, outcome: 'event', payload: { events } }
+      : { ...delivery, outcome: 'event', outputs: { payload: { events } } }
   },
   async reconcile(context) {
     const state = requireState(context.state)
@@ -562,7 +568,7 @@ export const googleDriveChangeListener: IntegrationDefinition = {
         checkpoint: page.checkpoint,
         dedupeKey: page.dedupeKey,
         hasMore: page.hasMore,
-        payload: page.changes.length == 0 ? null : { events: page.changes },
+        outputs: page.changes.length == 0 ? null : { payload: { events: page.changes } },
       }
     },
   },
@@ -573,11 +579,17 @@ export const googleDriveChangeListener: IntegrationDefinition = {
     name: 'watch_changes',
     displayName: 'Watch Changes',
     description: 'Monitors Drive changes using notifications and periodic scans of the same change stream.',
-    payloadSchema: {
-      type: 'object',
-      additionalProperties: false,
-      properties: { events: { type: 'array', items: { type: 'object' } } },
-      required: ['events'],
-    },
+    outputs: [
+      {
+        handle: 'payload',
+        jsonSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { events: { type: 'array', items: { type: 'object' } } },
+          required: ['events'],
+        },
+        nullable: false,
+      },
+    ],
   },
 }

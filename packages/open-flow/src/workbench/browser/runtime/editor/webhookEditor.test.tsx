@@ -8,10 +8,10 @@ describe('Webhook configuration', () => {
   it.each([undefined, ['PUT', 'CUSTOM']])('renders effective and custom methods for %j without a Designer provider', (allowedMethods) => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
-        <WebhookEditor inputs={[]} options={{ allowedMethods }} disabled={false} onChange={() => {}} />
+        <WebhookEditor bodyFields={[]} options={{ allowedMethods }} disabled={false} onChange={() => {}} />
       </I18nProvider>,
     )
-    expect(markup).toContain('Request data')
+    expect(markup).toContain('Request body fields')
     expect(markup).toContain('Allowed methods')
     expect(markup).toContain('Status code')
     expect(markup).toContain('aria-checked="true"')
@@ -21,7 +21,7 @@ describe('Webhook configuration', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <WebhookEditor
-          inputs={[{ handle: 'event', jsonSchema: { type: 'object' }, nullable: false }]}
+          bodyFields={[{ handle: 'event', jsonSchema: { type: 'object' }, nullable: false }]}
           options={{ responseStatusCode: 202, responseData: 'accepted', responseHeaders: { 'X-Example': 'yes' } }}
           disabled
           onChange={() => {}}

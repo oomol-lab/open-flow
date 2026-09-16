@@ -83,7 +83,9 @@ export const FlowSchema = /* @__PURE__ */ z
           validateTriggerDefinitionSchemas(
             {
               configSchema: definition.config_schema,
-              payloadSchema: definition.payload_schema,
+              outputs: definition.outputs.map(({ json_schema, ...port }) =>
+                Object.assign({}, port, { nullable: port.nullable ?? false, jsonSchema: json_schema ?? {} }),
+              ),
             },
             `Trigger definition "${node.trigger.type}" revision "${node.trigger.revision}"`,
           )
@@ -102,10 +104,16 @@ export const FlowSchema = /* @__PURE__ */ z
       for (const [inputIndex, input] of (node.inputs_from ?? []).entries()) {
         for (const [sourceIndex, source] of (input.from_node ?? []).entries()) {
           const sourceNode = nodes.get(source.node_id)
-          if (sourceNode != null && 'trigger' in sourceNode && source.output_handle != 'payload') {
+          if (
+            sourceNode != null &&
+            'trigger' in sourceNode &&
+            !definitions
+              .get(JSON.stringify([sourceNode.trigger.type, sourceNode.trigger.revision]))
+              ?.definition.outputs.some((port) => port.handle === source.output_handle)
+          ) {
             context.addIssue({
               code: 'custom',
-              message: `Trigger "${source.node_id}" only exposes the "payload" output.`,
+              message: `Trigger "${source.node_id}" does not declare output "${source.output_handle}".`,
               path: ['nodes', nodeIndex, 'inputs_from', inputIndex, 'from_node', sourceIndex, 'output_handle'],
             })
           }

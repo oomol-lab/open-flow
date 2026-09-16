@@ -10,7 +10,7 @@ const publication = {
   createdAt: timestamp,
   engineContract: 'open-flow-engine/v4',
   flowId: 'flow-1',
-  modelVersion: 1,
+  modelVersion: 2,
   operation: 'publish',
   publicationId: 'publication-1',
   revisionDigest: 'digest-1',

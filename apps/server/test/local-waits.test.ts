@@ -25,11 +25,11 @@ function fixture() {
     flowId: 'flow',
     idempotencyKey: 'run',
     inputs: {},
-    modelVersion: 1,
+    modelVersion: 2,
     requestDigest: 'run',
     revisionDigest: 'revision',
     revisionId: 'revision',
-    trigger: { nodeId: 'start', payload: null },
+    trigger: { nodeId: 'start', outputs: {} },
     variableNames: [],
   })
   if (accepted.kind != 'accepted') throw new Error('Expected acceptance')
@@ -40,7 +40,7 @@ function fixture() {
     (waitId): WaitRequest => ({ waitId, nodeId: waitId, jobId: waitId, actions: ['approve', 'reject'], prompt: waitId, value: null, notify: true }),
   )
   const checkpoint: FlowRunCheckpoint = {
-    version: 3,
+    version: 4,
     agents: {},
     results: {},
     skipped: [],
@@ -163,11 +163,11 @@ it('releases the same-flow queue after freezing while honoring active worker exc
     flowId: 'flow',
     idempotencyKey: 'next',
     inputs: {},
-    modelVersion: 1,
+    modelVersion: 2,
     requestDigest: 'next',
     revisionDigest: 'revision',
     revisionId: 'revision',
-    trigger: { nodeId: 'start', payload: null },
+    trigger: { nodeId: 'start', outputs: {} },
     variableNames: [],
   })
   if (accepted.kind != 'accepted') throw new Error('Expected acceptance')

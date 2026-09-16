@@ -20,11 +20,11 @@ const pickerDraft: Draft = {
   createdAt: '2026-09-13T00:00:00.000Z',
   digest: 'lab',
   flowId: 'lab',
-  modelVersion: 1,
+  modelVersion: 2,
   parentRevisionId: null,
   revisionId: 'lab',
   version: 1,
-  content: { modelVersion: 1, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } } },
+  content: { modelVersion: 2, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } } },
 }
 
 const workflowViewport = { x: 35, y: 40, zoom: 0.9 }

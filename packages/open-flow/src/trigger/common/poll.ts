@@ -28,7 +28,13 @@ export interface PollContext {
   readonly signal?: AbortSignal
 }
 
+export function payloadPollOutputs(events: readonly PollEvent[]): Readonly<Record<string, JsonValue>> {
+  return { payload: { events: events.map((event) => event.payload) } }
+}
+
 export interface PollDefinition {
+  /** Constructs one Run's outputs from a nonempty batch of fresh, deduplicated events. */
+  readonly buildOutputs: (events: readonly PollEvent[]) => Readonly<Record<string, JsonValue>>
   readonly configOptions?: (context: TriggerConfigOptionsContext) => Promise<readonly TriggerConfigOption[]>
   readonly poll: (context: PollContext) => Promise<PollResult>
   readonly snapshot: TriggerKeySnapshot & { readonly type: 'poll' }

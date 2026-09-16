@@ -2,7 +2,7 @@ import type { ConnectorProxyResult } from '../../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent } from '../../common/poll.ts'
 
-import { PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 interface Config {
   readonly includeDrafts: boolean
@@ -78,23 +78,30 @@ const snapshot = {
     title: 'Gmail Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Polls the Gmail mailbox and triggers when a new message is received.',
   displayName: 'New Message Received',
   key: 'gmail.on_message_received',
   name: 'on_message_received',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: eventSchema, type: 'array' } },
-    required: ['events'],
-    title: 'Gmail New Message Payload',
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: eventSchema, type: 'array' } },
+        required: ['events'],
+        title: 'Gmail New Message Payload',
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'gmail',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const gmailMessageReceived: PollDefinition = {
+  buildOutputs: payloadPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)

@@ -36,7 +36,7 @@ function hangingFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { main: { imports: [], name: 'Main', source: 'export default async () => await new Promise(() => {})' } },
   }
 }
@@ -168,7 +168,7 @@ it('recovers a process crash after the start barrier as one indeterminate termin
   )
   const accepted = await json<{ readonly runId: string }>(
     await fetch(`${app.origin}/v1/flows/${flow.flowId}/revisions/${changed.revision.revisionId}/runs`, {
-      body: JSON.stringify({ engineContract: 'open-flow-engine/v4', inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
+      body: JSON.stringify({ engineContract: 'open-flow-engine/v4', inputs: {}, trigger: { nodeId: 'start', outputs: {} }, version: 2 }),
       headers: { 'content-type': 'application/json', cookie, 'idempotency-key': 'crash' },
       method: 'POST',
     }),

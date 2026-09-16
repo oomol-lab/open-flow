@@ -161,7 +161,7 @@ interface TriggerOccurrence {
   readonly content: string
   readonly flowId: string
   readonly occurrenceId: string
-  readonly payload: JsonValue
+  readonly outputs: Readonly<Record<string, JsonValue>>
   readonly requestDigest: string
   readonly revisionDigest: string
   readonly revisionId: string
@@ -334,7 +334,7 @@ export class TriggerStore {
     readonly flowId: string
     readonly modelVersion: number
     readonly occurrenceId: string
-    readonly payload: JsonValue
+    readonly outputs: Readonly<Record<string, JsonValue>>
     readonly publicationId: string
     readonly requestDigest: string
     readonly revisionDigest: string
@@ -393,7 +393,12 @@ export class TriggerStore {
   }
 
   acceptCronTarget(
-    input: StoredCronTarget & { readonly nextScheduledAt: number; readonly occurrenceId: string; readonly requestDigest: string },
+    input: StoredCronTarget & {
+      readonly outputs: Readonly<Record<string, JsonValue>>
+      readonly nextScheduledAt: number
+      readonly occurrenceId: string
+      readonly requestDigest: string
+    },
   ): RunAdmission | undefined {
     return this.#transaction(() => {
       const current = this.#database
@@ -461,7 +466,7 @@ export class TriggerStore {
         flowId: input.flowId,
         modelVersion: input.modelVersion,
         occurrenceId: input.occurrenceId,
-        payload: { scheduledAt },
+        outputs: input.outputs,
         publicationId: input.publicationId,
         requestDigest: input.requestDigest,
         revisionDigest: input.revisionDigest,

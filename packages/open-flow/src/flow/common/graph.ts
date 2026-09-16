@@ -14,18 +14,9 @@ import type {
 } from './change.ts'
 import type { Diagnostic, SemanticClosure } from './semantics.ts'
 
+import { triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/common/contract.ts'
 import { portsByHandle, validVariableName } from './change.ts'
-import {
-  triggerPayloadSchema,
-  triggerOutputPorts,
-  schemaObject,
-  schemaList,
-  matchesSchema,
-  comparePorts,
-  portsAssignable,
-  variableInputCompatible,
-  hasRetiredRef,
-} from './schema.ts'
+import { schemaObject, schemaList, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
 function graphDiagnostic(
   code: string,
   message: string,
@@ -37,15 +28,18 @@ function graphDiagnostic(
 }
 
 function validateTrigger(triggerId: string, trigger: TriggerNode, document: FlowDocument, path: string, diagnostics: Diagnostic[]): void {
+  const outputHandles = triggerOutputDefinitions(trigger).map((port) => port.handle)
+  if (new Set(outputHandles).size !== outputHandles.length)
+    diagnostics.push(graphDiagnostic('graph.port-duplicate', 'Trigger output handles must be unique.', `${path}/definition/outputs`))
   if (trigger.kind == 'webhook') {
     const handles = new Set<string>()
-    for (const [index, input] of trigger.inputsDef.entries()) {
+    for (const [index, input] of trigger.bodyFields.entries()) {
       if (handles.has(input.handle)) {
         diagnostics.push(
           graphDiagnostic(
             'trigger.input-duplicate',
             `Webhook Trigger input "${input.handle}" is declared more than once.`,
-            `${path}/inputsDef/${index}/handle`,
+            `${path}/bodyFields/${index}/handle`,
             { input: input.handle },
           ),
         )
@@ -520,7 +514,7 @@ function validateGraph(
   for (const [nodeId, node] of Object.entries(graph.nodes)) {
     const nodePath = `${path}/nodes/${nodeId}`
     if (!('inputs' in node)) {
-      if (hasRetiredRef(triggerPayloadSchema(node))) {
+      if (triggerOutputDefinitions(node).some((port) => hasRetiredRef(port.jsonSchema))) {
         diagnostics.push(graphDiagnostic('graph.schema-unsupported', 'Runtime Ref schemas are not supported.', nodePath))
       }
       if (!allowTriggers) {

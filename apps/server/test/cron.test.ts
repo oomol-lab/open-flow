@@ -42,7 +42,7 @@ function revision(rules: readonly TriggerSchedule[]): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
   }
 }
@@ -135,11 +135,11 @@ describe('Server Cron Trigger', () => {
       expect(binding.nextAt).toBe(Date.parse('2026-08-21T00:04:00.000Z'))
       const occurrence = database
         .prepare(
-          `SELECT trigger_occurrences.occurrence_id AS occurrenceId, trigger_occurrences.payload
+          `SELECT trigger_occurrences.occurrence_id AS occurrenceId, trigger_occurrences.outputs AS payload
            FROM cron_admissions JOIN trigger_occurrences USING (run_id)`,
         )
         .get() as { readonly occurrenceId: string; readonly payload: string }
-      expect(JSON.parse(occurrence.payload)).toEqual({ scheduledAt: '2026-08-21T00:01:00.000Z' })
+      expect(JSON.parse(occurrence.payload).payload).toEqual({ scheduledAt: '2026-08-21T00:01:00.000Z' })
       await expect(scheduledTriggerOccurrenceId(binding.bindingId, binding.runtimeVersion, '2026-08-21T00:01:00.000Z')).resolves.toBe(occurrence.occurrenceId)
       expect(database.prepare('SELECT status FROM runs').get()).toEqual({ status: 'queued' })
       expect(database.prepare('SELECT COUNT(*) AS count FROM work').get()).toEqual({ count: 1 })
@@ -171,8 +171,8 @@ describe('Server Cron Trigger', () => {
     const database = new DatabaseSync(file, { readOnly: true })
     try {
       expect(database.prepare('SELECT status FROM runs').get()).toEqual({ status: 'completed' })
-      expect(database.prepare('SELECT payload FROM trigger_occurrences').get()).toEqual({
-        payload: JSON.stringify({ scheduledAt: '2026-08-21T00:01:00.000Z' }),
+      expect(database.prepare('SELECT outputs AS payload FROM trigger_occurrences').get()).toEqual({
+        payload: JSON.stringify({ payload: { scheduledAt: '2026-08-21T00:01:00.000Z' } }),
       })
       expect(database.prepare('SELECT COUNT(*) AS count FROM work').get()).toEqual({ count: 0 })
     } finally {
@@ -234,10 +234,10 @@ describe('Server Cron Trigger', () => {
       await service.tickCron(new Date(now).toISOString())
       await expect.poll(() => database.prepare('SELECT COUNT(*) AS count FROM wait_receipts').get()).toEqual({ count: 2 })
       expect(database.prepare('SELECT next_at AS nextAt FROM cron_bindings').get()).toEqual({ nextAt: Date.parse('2026-08-21T00:06:00.000Z') })
-      const payloads = database.prepare('SELECT payload FROM trigger_occurrences ORDER BY rowid').all() as unknown as readonly {
+      const payloads = database.prepare('SELECT outputs AS payload FROM trigger_occurrences ORDER BY rowid').all() as unknown as readonly {
         readonly payload: string
       }[]
-      expect(payloads.map(({ payload }) => JSON.parse(payload))).toEqual([
+      expect(payloads.map(({ payload }) => JSON.parse(payload).payload)).toEqual([
         { scheduledAt: '2026-08-21T00:01:00.000Z' },
         { scheduledAt: '2026-08-21T00:02:00.000Z' },
       ])

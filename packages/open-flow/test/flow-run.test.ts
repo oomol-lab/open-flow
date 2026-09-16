@@ -7,17 +7,17 @@ import { runFlow } from '../src/execution/common/scheduler.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
 
 const port = { handle: 'value', jsonSchema: {}, nullable: false } as const
-const start = { kind: 'webhook', name: 'Start', inputsDef: [] } as const
-const other = { kind: 'webhook', name: 'Other', inputsDef: [{ handle: 'entry', jsonSchema: { type: 'string' }, nullable: false }] } as const
+const start = { kind: 'webhook', name: 'Start', bodyFields: [] } as const
+const other = { kind: 'webhook', name: 'Other', bodyFields: [{ handle: 'entry', jsonSchema: { type: 'string' }, nullable: false }] } as const
 const task = {
   kind: 'task',
-  inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'start', output: 'payload' }] } },
+  inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'start', output: 'body' }] } },
   task: { name: 'Code', moduleId: 'main', inputs: [port], outputs: [] },
 } as const
 
 function revision(graph: Graph): RevisionContent {
   return {
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { main: { name: 'Main', imports: [], source: 'export default () => ({})' } },
     document: { bindings: {}, subflows: {}, tasks: {}, graph },
   }
@@ -42,8 +42,8 @@ it('prepares and executes an entry while unrelated nodes remain invalid', async 
         pollTimes: [],
         definition: {
           configSchema: {},
-          payloadSchema: {},
-          definitionVersion: 1,
+          outputs: [{ handle: 'payload', jsonSchema: {}, nullable: false }],
+          definitionVersion: 2,
           description: '',
           displayName: 'Other',
           key: 'example.event',
@@ -64,7 +64,7 @@ it('prepares and executes an entry while unrelated nodes remain invalid', async 
       createId: () => crypto.randomUUID(),
       flowId: 'flow',
       runId: 'run',
-      trigger: { nodeId: 'start', payload: {} },
+      trigger: { nodeId: 'start', outputs: { headers: {}, query: {}, body: {}, webhookUrl: 'http://example.com/webhook' } },
       invokeTask: (invocation) =>
         Effect.sync(() => {
           calls.push(invocation.input)
@@ -93,8 +93,8 @@ it('uses only the selected trigger source at a join shared by multiple triggers'
           value: {
             kind: 'sources',
             sources: [
-              { kind: 'node', nodeId: 'start', output: 'payload' },
-              { kind: 'node', nodeId: 'other', output: 'payload' },
+              { kind: 'node', nodeId: 'start', output: 'body' },
+              { kind: 'node', nodeId: 'other', output: 'body' },
             ],
           },
         },
@@ -111,7 +111,7 @@ it('uses only the selected trigger source at a join shared by multiple triggers'
         createId: () => crypto.randomUUID(),
         flowId: 'flow',
         runId: 'run',
-        trigger: { nodeId, payload },
+        trigger: { nodeId, outputs: { headers: {}, query: {}, body: payload, webhookUrl: 'http://example.com/webhook' } },
         invokeTask: (invocation) =>
           Effect.sync(() => {
             calls.push(invocation.input)
@@ -126,7 +126,7 @@ it('uses only the selected trigger source at a join shared by multiple triggers'
 it.each(['other', 'missing', 'code'])('rejects a required input from unavailable node %s', async (nodeId) => {
   const content = revision({
     edges: [{ source: 'start', target: 'code' }],
-    nodes: { start, other, code: { ...task, inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId, output: 'payload' }] } } } },
+    nodes: { start, other, code: { ...task, inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId, output: 'body' }] } } } },
   })
   expect((await prepareFlow(content, currentEngineContract, 'start')).kind).toBe('flow-invalid')
 })
@@ -175,6 +175,6 @@ it('rejects references to the removed manual trigger payload output', async () =
   expect(result.kind).toBe('flow-invalid')
   if (result.kind !== 'flow-invalid') throw new Error('Expected invalid output reference.')
   expect(result.validation.diagnostics).toEqual(
-    expect.arrayContaining([expect.objectContaining({ code: 'graph.source-missing', values: { nodeId: 'start', output: 'payload', variant: 'output' } })]),
+    expect.arrayContaining([expect.objectContaining({ code: 'graph.source-missing', values: { nodeId: 'start', output: 'body', variant: 'output' } })]),
   )
 })

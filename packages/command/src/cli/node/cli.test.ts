@@ -48,7 +48,7 @@ function runtime(language: UiLanguage = 'en') {
 describe('CLI', () => {
   it('edits execution order and input sources independently through revision changes', async () => {
     let content: RevisionContent = {
-      modelVersion: 1,
+      modelVersion: 2,
       modules: {},
       document: {
         bindings: {},
@@ -70,7 +70,7 @@ describe('CLI', () => {
       createdAt: flow.createdAt,
       digest: 'digest',
       flowId: flow.flowId,
-      modelVersion: 1,
+      modelVersion: 2,
       parentRevisionId: null,
       revisionId: `revision-${sequence}`,
       version: 1,
@@ -177,7 +177,7 @@ describe('CLI', () => {
           diagnostics: [],
           engineContract: 'open-flow-engine/v4',
           flowId: flow.flowId,
-          modelVersion: 1,
+          modelVersion: 2,
           revisionDigest: 'digest-1',
           revisionId: flow.draftRevisionId,
           valid: true,
@@ -231,7 +231,7 @@ it.each([
   { multiple: false, options: [], selected: 'start', status: 0 },
   { multiple: true, options: [], selected: undefined, status: 1 },
   { multiple: true, options: ['--trigger', 'Other'], selected: 'other', status: 0 },
-  { multiple: true, options: ['--trigger=other', '--payload={}'], selected: 'other', status: 0 },
+  { multiple: true, options: ['--trigger=other', '--outputs={}'], selected: 'other', status: 0 },
 ])('runs only an explicit entry or the sole manual trigger: %j', async ({ multiple, options, selected, status }) => {
   const output = runtime()
   const bodies: unknown[] = []
@@ -243,12 +243,12 @@ it.each([
         createdAt: flow.createdAt,
         digest: 'digest',
         flowId: flow.flowId,
-        modelVersion: 1,
+        modelVersion: 2,
         parentRevisionId: null,
         revisionId: 'revision-1',
         version: 1,
         content: {
-          modelVersion: 1,
+          modelVersion: 2,
           modules: {},
           document: {
             bindings: {},
@@ -278,7 +278,7 @@ it.each([
         closureDigest: 'closure',
         engineContract: 'open-flow-engine/v4',
         engineDigest: 'engine',
-        modelVersion: 1,
+        modelVersion: 2,
         revisionDigest: 'digest',
       })
     }
@@ -289,7 +289,7 @@ it.each([
     expect(bodies).toEqual([])
     expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'run.trigger-required' } })
   } else {
-    expect(bodies).toEqual([expect.objectContaining({ trigger: { nodeId: selected, payload: {} } })])
+    expect(bodies).toEqual([expect.objectContaining({ trigger: { nodeId: selected, outputs: {} } })])
   }
 })
 
@@ -305,7 +305,7 @@ const runFixture = {
   closureDigest: 'closure',
   engineContract: 'open-flow-engine/v4',
   engineDigest: 'engine',
-  modelVersion: 1,
+  modelVersion: 2,
   revisionDigest: 'digest',
 } as const
 const revisionFixture = {
@@ -313,12 +313,12 @@ const revisionFixture = {
   createdAt: flow.createdAt,
   digest: 'digest',
   flowId: flow.flowId,
-  modelVersion: 1,
+  modelVersion: 2,
   parentRevisionId: null,
   revisionId: 'revision-1',
   version: 1,
   content: {
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
     document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
   },
@@ -508,7 +508,7 @@ describe('agent command contract', () => {
               diagnostics: [],
               engineContract: 'open-flow-engine/v4',
               flowId: flow.flowId,
-              modelVersion: 1,
+              modelVersion: 2,
               revisionDigest: 'digest',
               revisionId: 'revision-1',
               valid: false,
@@ -580,7 +580,7 @@ it('applies a complete operation batch atomically and reports validation separat
         diagnostics: [],
         engineContract: 'open-flow-engine/v4',
         flowId: flow.flowId,
-        modelVersion: 1,
+        modelVersion: 2,
         revisionDigest: 'digest',
         revisionId: 'revision-2',
         valid: false,
@@ -665,4 +665,10 @@ it('reads and downloads saved results through the public API', async () => {
     else expect(JSON.parse(io.stdout()).runId).toBe('run')
   }
   expect(routes).toEqual(['/v1/runs/run/results', '/v1/runs/run/results/result?pointer=%2Fok&offset=0', '/v1/runs/run/results/result/content'])
+})
+
+it('describes Trigger outputs as a JSON object in the CLI schema', async () => {
+  const result = runtime()
+  expect(await runCli(['schema', 'outputs'], { request: vi.fn() }, result.value)).toBe(0)
+  expect(JSON.parse(result.stdout())).toMatchObject({ type: 'object' })
 })

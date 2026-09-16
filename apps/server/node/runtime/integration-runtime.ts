@@ -16,6 +16,7 @@ import type { IntegrationHealth, StoredIntegrationBinding, StoredIntegrationStat
 
 import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
+import { matchesTriggerOutputs } from '@oomol-lab/open-flow/flow-semantics'
 import {
   integrationCallbackSecret,
   integrationOccurrenceId,
@@ -311,13 +312,15 @@ export class IntegrationRuntime {
               integrationOccurrenceId(target.stored.bindingId, target.stored.runtimeVersion, target.definition.snapshot.key, received.dedupeKey ?? null),
             catch: (error) => error,
           })
+          const outputs = received.outputs
+          if (!matchesTriggerOutputs(target.trigger, outputs)) throw new Error('Invalid Integration Trigger outputs.')
           const requestDigest = yield* Effect.tryPromise({
             try: () =>
               digestBytes(
                 canonicalJsonBytes({
                   bindingId: target.stored.bindingId,
                   occurrenceId,
-                  payload: received.payload,
+                  outputs,
                   publicationId: target.stored.currentPublicationId,
                   revisionDigest: target.stored.revisionDigest,
                   runtimeVersion: target.stored.runtimeVersion,
@@ -329,7 +332,7 @@ export class IntegrationRuntime {
             {
               ...target.stored,
               occurrenceId,
-              payload: received.payload,
+              outputs,
               requestDigest,
             },
             input.sourceDelivery == null ? undefined : () => this.#store.eventSources.finish(input.sourceDelivery!, 'delivered'),

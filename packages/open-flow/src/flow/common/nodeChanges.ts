@@ -87,7 +87,7 @@ interface TriggerSettingsBase {
 export type TriggerSettings =
   | (TriggerSettingsBase & { readonly kind: 'manual' })
   | (TriggerSettingsBase & {
-      readonly inputs: Extract<TriggerNode, { readonly kind: 'webhook' }>['inputsDef']
+      readonly bodyFields: Extract<TriggerNode, { readonly kind: 'webhook' }>['bodyFields']
       readonly kind: 'webhook'
       readonly options: WebhookOptions
     })
@@ -464,8 +464,8 @@ export function updateTrigger(
       break
     case 'webhook': {
       if (trigger.kind != 'webhook') return
-      const value = { inputsDef: settings.inputs, options: Object.keys(settings.options).length == 0 ? undefined : settings.options }
-      const before = { inputsDef: trigger.inputsDef, options: trigger.options }
+      const value = { bodyFields: settings.bodyFields, options: Object.keys(settings.options).length == 0 ? undefined : settings.options }
+      const before = { bodyFields: trigger.bodyFields, options: trigger.options }
       if (!dequal(before, value)) operations.push({ before, kind: 'graph.node.webhook.set', nodeId, target, value })
       break
     }

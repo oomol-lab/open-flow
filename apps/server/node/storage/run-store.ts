@@ -208,11 +208,11 @@ export class RunStore {
       ...input,
       idempotencyKey: `trigger:${randomUUID()}`,
       inputs: {},
-      trigger: { nodeId: input.triggerNodeId, payload: input.payload },
+      trigger: { nodeId: input.triggerNodeId, outputs: input.outputs },
     })
     this.#database
-      .prepare('INSERT INTO trigger_occurrences (occurrence_id, run_id, trigger_node_id, payload) VALUES (?, ?, ?, ?)')
-      .run(input.occurrenceId, runId, input.triggerNodeId, JSON.stringify(input.payload))
+      .prepare('INSERT INTO trigger_occurrences (occurrence_id, run_id, trigger_node_id, outputs) VALUES (?, ?, ?, ?)')
+      .run(input.occurrenceId, runId, input.triggerNodeId, JSON.stringify(input.outputs))
     return { created: true, kind: 'accepted', runId, status: 'queued' }
   }
 
@@ -239,7 +239,7 @@ export class RunStore {
                   run_checkpoints.checkpoint_json AS checkpointJson,
                   run_checkpoints.remaining_ms AS remainingMs, run_checkpoints.run_id AS checkpointRunId,
                   run_checkpoints.checkpoint_digest AS checkpointDigest, run_checkpoints.checkpoint_bytes AS checkpointBytes,
-                  runs.trigger_payload AS triggerPayload, runs.trigger_node_id AS triggerNodeId
+                  runs.trigger_outputs AS triggerOutputs, runs.trigger_node_id AS triggerNodeId
            FROM runs JOIN revisions USING (revision_id)
            LEFT JOIN trigger_occurrences USING (run_id)
            LEFT JOIN run_checkpoints USING (run_id)
@@ -262,7 +262,7 @@ export class RunStore {
         readonly runId: string
         readonly source: StoredRun['source']
         readonly triggerNodeId: string | null
-        readonly triggerPayload: string | null
+        readonly triggerOutputs: string | null
         readonly checkpointRunId: string | null
       }
       let resumeUnavailable = row.checkpointRunId != null && !this.#checkpointValid(row.checkpointJson, row.checkpointDigest, row.checkpointBytes)
@@ -291,9 +291,9 @@ export class RunStore {
         revisionDigest: row.revisionDigest,
         runId: row.runId,
         source: row.source,
-        ...(row.triggerNodeId == null || row.triggerPayload == null
+        ...(row.triggerNodeId == null || row.triggerOutputs == null
           ? {}
-          : { trigger: { nodeId: row.triggerNodeId, payload: JSON.parse(row.triggerPayload) as JsonValue } }),
+          : { trigger: { nodeId: row.triggerNodeId, outputs: JSON.parse(row.triggerOutputs) as Readonly<Record<string, JsonValue>> } }),
       }
     })
   }
@@ -876,7 +876,7 @@ export class RunStore {
         `INSERT INTO runs (
            run_id, idempotency_key, request_digest, revision_id, revision_digest, flow_id,
            engine_contract, engine_digest, inputs, status, source, closure_digest,
-           model_version, created_at, publication_id, connector_team_id, trigger_node_id, trigger_payload, llm_config, binding_values
+           model_version, created_at, publication_id, connector_team_id, trigger_node_id, trigger_outputs, llm_config, binding_values
          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
@@ -896,7 +896,7 @@ export class RunStore {
         input.publicationId ?? null,
         connectorTeamId ?? null,
         input.trigger.nodeId,
-        JSON.stringify(input.trigger.payload),
+        JSON.stringify(input.trigger.outputs),
         JSON.stringify(snapshot?.model) ?? null,
         JSON.stringify(snapshot?.bindings) ?? null,
       )

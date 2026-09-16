@@ -315,7 +315,7 @@ interface TriggerKeySnapshotBase {
   readonly displayName: string
   readonly key: string
   readonly name: string
-  readonly payloadSchema: JsonValue
+  readonly outputs: readonly Port[]
   readonly provider: string
 }
 
@@ -337,7 +337,7 @@ export type TriggerKeySnapshot =
   | (TriggerKeySnapshotBase & { readonly type: 'poll' })
   | (TriggerKeySnapshotBase & { readonly endpoint: IntegrationEndpointDeclaration; readonly type: 'integration' })
 
-export interface WebhookInputDefinition extends InputPort {}
+export interface WebhookBodyField extends InputPort {}
 
 export interface WebhookOptions {
   readonly allowedMethods?: readonly string[]
@@ -357,7 +357,7 @@ interface TriggerNodeBase {
 export type TriggerNode =
   | (TriggerNodeBase & { readonly kind: 'manual' })
   | (TriggerNodeBase & {
-      readonly inputsDef: readonly WebhookInputDefinition[]
+      readonly bodyFields: readonly WebhookBodyField[]
       readonly kind: 'webhook'
       readonly options?: WebhookOptions
     })
@@ -403,7 +403,7 @@ export interface CodeModule {
 
 export interface RevisionContent {
   readonly document: FlowDocument
-  readonly modelVersion: 1
+  readonly modelVersion: 2
   readonly modules: Readonly<Record<string, CodeModule>>
 }
 
@@ -514,11 +514,11 @@ export type ChangeOperation =
       readonly value: Pick<WaitNode, 'actions' | 'prompt'>
     }
   | {
-      readonly before: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'inputsDef' | 'options'>
+      readonly before: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'bodyFields' | 'options'>
       readonly kind: 'graph.node.webhook.set'
       readonly nodeId: string
       readonly target: Extract<GraphTarget, { readonly kind: 'flow' }>
-      readonly value: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'inputsDef' | 'options'>
+      readonly value: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'bodyFields' | 'options'>
     }
   | {
       readonly before?: JsonValue
@@ -797,11 +797,11 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const graph = selectedGraph(document, operation.target)
         const node = graph.nodes[operation.nodeId]
         if (node?.kind != 'webhook') invalid('The Webhook Node does not exist.')
-        if (!dequal(node.inputsDef, operation.before.inputsDef) || !dequal(node.options, operation.before.options)) {
+        if (!dequal(node.bodyFields, operation.before.bodyFields) || !dequal(node.options, operation.before.options)) {
           invalid('The Webhook Node changed before this operation was applied.')
         }
         const { options: _, ...rest } = node
-        const updated: TriggerNode = operation.value.options == null ? { ...rest, inputsDef: operation.value.inputsDef } : { ...node, ...operation.value }
+        const updated: TriggerNode = operation.value.options == null ? { ...rest, bodyFields: operation.value.bodyFields } : { ...node, ...operation.value }
         Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
         break
       }

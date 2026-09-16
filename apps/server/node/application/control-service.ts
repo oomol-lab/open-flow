@@ -755,7 +755,7 @@ export class ControlService {
       case 'flow-invalid':
       case 'revision-invalid':
       case 'trigger-invalid':
-      case 'trigger-payload-invalid':
+      case 'trigger-outputs-invalid':
         throw new ControlError(controlErrorCode.flowInvalid, error.message)
     }
   }
@@ -776,7 +776,7 @@ export class ControlService {
 function emptyRevision(): RevisionContent {
   return {
     document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
   }
 }

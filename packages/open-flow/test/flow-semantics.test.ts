@@ -21,7 +21,7 @@ function revision(source: string, imports: readonly string[] = [], modules: Revi
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {
       'module-main': { imports, name: 'Main', source },
       ...modules,
@@ -78,7 +78,7 @@ function triggerRevision(config: Readonly<Record<string, JsonValue>>, jsonSchema
                 required: ['event'],
                 type: 'object',
               },
-              definitionVersion: 1,
+              definitionVersion: 2,
               description: 'Runs when a repository changes.',
               displayName: 'Repository event',
               endpoint: {
@@ -88,7 +88,7 @@ function triggerRevision(config: Readonly<Record<string, JsonValue>>, jsonSchema
               },
               key: 'github.on_repo_event',
               name: 'on_repo_event',
-              payloadSchema: { description: 'Repository name.', type: 'string' },
+              outputs: [{ handle: 'payload', jsonSchema: { description: 'Repository name.', type: 'string' }, nullable: false }],
               provider: 'github',
               type: 'integration',
             },
@@ -312,7 +312,7 @@ export default () => value`,
           },
         },
       },
-      modelVersion: 1,
+      modelVersion: 2,
       modules: {},
     }
 
@@ -331,7 +331,7 @@ export default () => value`,
               config: {},
               definition: {
                 configSchema: { additionalProperties: false, type: 'object' },
-                definitionVersion: 1,
+                definitionVersion: 2,
                 description: 'Runs when a repository changes.',
                 displayName: 'Repository event',
                 endpoint: {
@@ -341,7 +341,7 @@ export default () => value`,
                 },
                 key: 'github.on_repo_event',
                 name: 'on_repo_event',
-                payloadSchema: { additionalProperties: true, type: 'object' },
+                outputs: [{ handle: 'payload', jsonSchema: { additionalProperties: true, type: 'object' }, nullable: false }],
                 provider: 'github',
                 type: 'integration',
               },
@@ -353,7 +353,7 @@ export default () => value`,
         subflows: {},
         tasks: {},
       },
-      modelVersion: 1,
+      modelVersion: 2,
       modules: {},
     }
 
@@ -650,7 +650,7 @@ export default () => value`,
         },
         tasks: {},
       },
-      modelVersion: 1,
+      modelVersion: 2,
       modules: {},
     }
 
@@ -870,7 +870,7 @@ export default () => value`,
           },
         },
       },
-      modelVersion: 1,
+      modelVersion: 2,
       modules: {},
     }
 
@@ -939,7 +939,7 @@ export default () => value`,
         subflows: {},
         tasks: {},
       },
-      modelVersion: 1,
+      modelVersion: 2,
       modules: {},
     }
 
@@ -998,7 +998,7 @@ export default () => value`,
           },
         },
       },
-      modelVersion: 1,
+      modelVersion: 2,
       modules: {},
     }
 

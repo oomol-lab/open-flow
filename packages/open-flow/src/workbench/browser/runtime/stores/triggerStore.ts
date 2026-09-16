@@ -72,7 +72,7 @@ function option(definition: TriggerKeySnapshot, i18n: I18n, display?: TriggerDis
     inputs: [],
     kind: 'trigger',
     label: display?.displayName ?? definition.displayName,
-    outputs: [{ handle: 'payload', jsonSchema: definition.payloadSchema }],
+    outputs: definition.outputs,
     trigger: { definition, kind: 'catalog' },
   }
 }

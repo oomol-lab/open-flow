@@ -43,7 +43,7 @@ export interface TriggerCatalogDescriptor extends TriggerDescriptor {
   readonly definition: TriggerDefinition
 }
 
-export const TRIGGER_CATALOG_REVISION = '1'
+export const TRIGGER_CATALOG_REVISION = '2'
 
 const identitySchema = {
   revision: z.string().min(1),
@@ -63,9 +63,10 @@ const sourceKeySchema = z.discriminatedUnion('type', [
   z.strictObject({ ...sourceKeyFields, type: z.literal('integration') }),
   z.strictObject({ ...sourceKeyFields, type: z.literal('poll') }),
 ])
+const outputSchema = z.strictObject({ handle: z.string().min(1), jsonSchema: jsonObjectSchema, nullable: z.boolean(), description: z.string().optional() })
 const sourceItemSchema = z.discriminatedUnion('type', [
-  z.strictObject({ ...sourceKeyFields, configSchema: jsonObjectSchema, payloadSchema: jsonObjectSchema, type: z.literal('integration') }),
-  z.strictObject({ ...sourceKeyFields, configSchema: jsonObjectSchema, type: z.literal('poll') }),
+  z.strictObject({ ...sourceKeyFields, configSchema: jsonObjectSchema, outputs: z.array(outputSchema), type: z.literal('integration') }),
+  z.strictObject({ ...sourceKeyFields, configSchema: jsonObjectSchema, outputs: z.array(outputSchema), type: z.literal('poll') }),
 ])
 const sourceListSchema = z.strictObject({ keys: z.array(sourceKeySchema) })
 const compatibleItemSchema = z.strictObject({
@@ -104,7 +105,7 @@ function triggerDescriptor(item: z.infer<typeof sourceItemSchema>): TriggerCatal
       config_schema: item.configSchema,
       connector: { account_required: true, service_id: item.provider },
       name: item.displayName,
-      payload_schema: item.type == 'integration' ? item.payloadSchema : { additionalProperties: true, type: 'object' },
+      outputs: item.outputs.map(({ jsonSchema, ...port }) => Object.assign({}, port, { json_schema: jsonSchema })),
       provisioning: { kind: item.type },
       service_id: item.provider,
       service_name: item.provider,
@@ -122,7 +123,9 @@ function compatibilityReason(error: unknown): string {
 async function validateDescriptor(trigger: TriggerCatalogDescriptor, definitionDigest: string): Promise<void> {
   const definition = {
     configSchema: trigger.definition.config_schema,
-    payloadSchema: trigger.definition.payload_schema,
+    outputs: trigger.definition.outputs.map(({ json_schema, ...port }) =>
+      Object.assign({}, port, { nullable: port.nullable ?? false, jsonSchema: json_schema ?? {} }),
+    ),
   }
   const label = `Trigger Catalog item "${trigger.type}" revision "${trigger.revision}"`
   if (trigger.definition.provisioning.kind == 'integration') validateTriggerDefinitionSchemas(definition, label)
@@ -145,7 +148,9 @@ async function validateDescriptor(trigger: TriggerCatalogDescriptor, definitionD
             accountRequired: trigger.definition.connector.account_required,
             serviceId: trigger.definition.connector.service_id,
           },
-    payloadSchema: trigger.definition.payload_schema,
+    outputs: trigger.definition.outputs.map(({ json_schema, ...port }) =>
+      Object.assign({}, port, { nullable: port.nullable ?? false, jsonSchema: json_schema ?? {} }),
+    ),
     provisioning: trigger.definition.provisioning.kind,
     revision: trigger.revision,
     serviceId: trigger.definition.service_id,
@@ -172,7 +177,9 @@ export async function normalizeTriggerCatalogSourceItem(value: unknown): Promise
   const definitionDigest = await computeTriggerDefinitionDigest({
     configSchema: trigger.definition.config_schema,
     connector: { accountRequired: true, serviceId: item.provider },
-    payloadSchema: trigger.definition.payload_schema,
+    outputs: trigger.definition.outputs.map(({ json_schema, ...port }) =>
+      Object.assign({}, port, { nullable: port.nullable ?? false, jsonSchema: json_schema ?? {} }),
+    ),
     provisioning: item.type,
     revision: TRIGGER_CATALOG_REVISION,
     serviceId: item.provider,

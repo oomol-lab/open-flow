@@ -8,7 +8,7 @@ export interface ParsedArguments {
   readonly idempotencyKey: string
   readonly expectedPublication?: string
   readonly trigger?: string
-  readonly payload?: string
+  readonly outputs?: string
   readonly after?: number
   readonly code?: string
   readonly connection?: string
@@ -46,7 +46,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
   const positionals: string[] = []
   const options: string[] = []
   let trigger: string | undefined
-  let payload: string | undefined
+  let outputs: string | undefined
   let after: number | undefined
   let code: string | undefined
   let connection: string | undefined
@@ -112,7 +112,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       argument == '--source' ||
       argument == '--input' ||
       argument == '--trigger' ||
-      argument == '--payload' ||
+      argument == '--outputs' ||
       argument == '--status' ||
       argument == '--cursor' ||
       argument == '--limit' ||
@@ -137,7 +137,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       else if (argument == '--name') name = value
       else if (argument == '--input') input = value
       else if (argument == '--trigger') trigger = value
-      else if (argument == '--payload') payload = value
+      else if (argument == '--outputs') outputs = value
       else if (argument == '--cursor') cursor = value
       else if (argument == '--timezone') timezone = value
       else if (argument == '--set') sets.push(value)
@@ -186,7 +186,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     positionals,
     options,
     ...(trigger == null ? {} : { trigger }),
-    ...(payload == null ? {} : { payload }),
+    ...(outputs == null ? {} : { outputs }),
     sets,
     source,
     ...(status == null ? {} : { status }),

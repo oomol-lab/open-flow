@@ -25,18 +25,24 @@ const snapshot = {
     required: ['source'],
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Integration conformance definition.',
   displayName: 'Integration conformance',
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'conformance.on_event',
   name: 'on_event',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { body: { type: 'object' }, deliveryId: { type: 'string' }, event: { type: 'string' } },
-    required: ['body', 'deliveryId', 'event'],
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { body: { type: 'object' }, deliveryId: { type: 'string' }, event: { type: 'string' } },
+        required: ['body', 'deliveryId', 'event'],
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'conformance',
   type: 'integration',
 } as const
@@ -60,7 +66,7 @@ function revision(fixture: IntegrationConformanceFixture, enabled = true): Revis
                 inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'integration', output: 'payload' }] } },
                 kind: 'task',
                 task: {
-                  inputs: [{ handle: 'event', jsonSchema: snapshot.payloadSchema, nullable: false }],
+                  inputs: [{ handle: 'event', jsonSchema: snapshot.outputs[0]!.jsonSchema, nullable: false }],
                   moduleId: 'module-main',
                   name: 'Main',
                   outputs: [],
@@ -72,7 +78,7 @@ function revision(fixture: IntegrationConformanceFixture, enabled = true): Revis
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { 'module-main': { imports: [], name: 'Main', source: 'export default function run() { return {} }' } },
   }
 }
@@ -195,7 +201,7 @@ async function createHarness(fixture: IntegrationConformanceFixture): Promise<In
       try {
         const rows = database
           .prepare(
-            `SELECT trigger_occurrences.payload
+            `SELECT trigger_occurrences.outputs AS payload
              FROM integration_admissions JOIN trigger_occurrences USING (run_id)
              ORDER BY integration_admissions.rowid`,
           )
@@ -203,7 +209,7 @@ async function createHarness(fixture: IntegrationConformanceFixture): Promise<In
         return {
           checkpoint: state.checkpoint,
           health: state.health,
-          payloads: rows.map((row) => JSON.parse(row.payload) as JsonValue),
+          payloads: rows.map((row) => (JSON.parse(row.payload) as { payload: JsonValue }).payload),
           receiveCalls,
           reconcileCalls,
           runtimeVersion: state.runtimeVersion,

@@ -12,7 +12,7 @@ const timestamp = '2026-09-07T00:00:00.000Z'
 async function setup() {
   const flow = { createdAt: timestamp, updatedAt: timestamp, draftRevisionId: 'r0', flowId: 'flow', name: 'Flow', status: 'active', version: 1 } as const
   const target = { kind: 'flow' } as const
-  const content = applyFlowChanges({ modelVersion: 1, document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: {}, edges: [] } }, modules: {} }, [
+  const content = applyFlowChanges({ modelVersion: 2, document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: {}, edges: [] } }, modules: {} }, [
     ...createCodeTask(target, { moduleId: 'a', nodeId: 'a' }, 'A'),
     ...createCodeTask(target, { moduleId: 'b', nodeId: 'b' }, 'B'),
   ])
@@ -22,7 +22,7 @@ async function setup() {
     createdAt: timestamp,
     digest: 'd0',
     flowId: 'flow',
-    modelVersion: 1,
+    modelVersion: 2,
     parentRevisionId: null,
     revisionId: 'r0',
     version: 1,
@@ -57,7 +57,7 @@ async function setup() {
         diagnostics: [],
         engineContract: 'engine',
         flowId: 'flow',
-        modelVersion: 1,
+        modelVersion: 2,
         revisionDigest: revision.digest,
         revisionId: revision.revisionId,
         valid: true,

@@ -111,7 +111,7 @@ Flow、Run 分页游标与 Control API 相同；Run cursor 绑定 Flow。`run_li
    轮询 `flow_publish_status`，`pending` 表示仍在进行，`succeeded` 才确认发布成功，`failed` 返回 `issue`。
    用 `flow_set_enabled` 控制已发布 Flow 的启停；`expectedPublicationId` 防止误操作已被替换的 Live。
 5. Draft Run 使用 `source: "draft"`、`flowId`、`revisionId`；Live Run 使用 `source: "live"`、`publicationId`。
-   两种 source 的版本字段不能混用。`trigger` 必须包含 `nodeId` 和 `payload`；`inputs` 是 node ID 到输入值的映射，默认 `{}`。
+   两种 source 的版本字段不能混用。`trigger` 必须包含 `nodeId` 和 `outputs`；`inputs` 是 node ID 到输入值的映射，默认 `{}`。
 6. `flow_run` 返回 `runId`；也可以通过 `run_list` 找到已有运行。查询 `run_get`，终态后调用 `run_result`。
    `waiting` 返回 Wait identity 和允许的 actions；通过显式 `run_resolve_wait` 提交 `approve`、`reject` 或 `continue` 中的合法动作，不自动批准。
    一次 Wait 的首次决议生效，检查 `resolutionAccepted` 与返回的权威 `action`；恢复后继续查询同一个 Run，不重新调用 `flow_run`。

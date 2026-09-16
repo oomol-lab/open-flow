@@ -11,7 +11,7 @@ export const feishuEvents: readonly IntegrationDefinition[] = [
       name: 'on_event',
       displayName: 'Application Event',
       description: 'Receives selected Feishu application events through a shared event source.',
-      definitionVersion: 1,
+      definitionVersion: 2,
       type: 'integration',
       endpoint: { methods: ['POST'], body: { formats: ['json'], allowArray: false, allowEmpty: false }, successStatus: 200 },
       configSchema: {
@@ -49,24 +49,30 @@ export const feishuEvents: readonly IntegrationDefinition[] = [
         },
         required: ['sourceId', 'eventTypes'],
       },
-      payloadSchema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          event: { type: 'string' },
-          deliveryId: { type: 'string' },
-          appId: { type: 'string' },
-          tenantKey: { type: 'string' },
-          occurredAt: { type: ['string', 'null'] },
-          body: { type: 'object' },
+      outputs: [
+        {
+          handle: 'payload',
+          jsonSchema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              event: { type: 'string' },
+              deliveryId: { type: 'string' },
+              appId: { type: 'string' },
+              tenantKey: { type: 'string' },
+              occurredAt: { type: ['string', 'null'] },
+              body: { type: 'object' },
+            },
+            required: ['event', 'deliveryId', 'appId', 'tenantKey', 'occurredAt', 'body'],
+          },
+          nullable: false,
         },
-        required: ['event', 'deliveryId', 'appId', 'tenantKey', 'occurredAt', 'body'],
-      },
+      ],
     },
     receive(context) {
       if (context.eventSourceId !== context.config.sourceId) return { outcome: 'respond', status: 404, body: '', contentType: 'text/plain' }
       const payload = context.payload as Record<string, import('../../../flow/common/change.ts').JsonValue>
-      return { outcome: 'event', dedupeKey: payload.deliveryId as string, payload }
+      return { outcome: 'event', dedupeKey: payload.deliveryId as string, outputs: { payload } }
     },
     async reconcile() {
       throw new PermanentIntegrationError('This deployment does not support shared Feishu event sources.')

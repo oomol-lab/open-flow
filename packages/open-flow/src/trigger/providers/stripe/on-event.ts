@@ -39,18 +39,24 @@ const snapshot = {
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'stripe.on_event',
   name: 'on_event',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: {
-      body: { type: 'object' },
-      event: { type: 'string' },
-      eventId: { type: 'string' },
-      livemode: { type: 'boolean' },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: {
+          body: { type: 'object' },
+          event: { type: 'string' },
+          eventId: { type: 'string' },
+          livemode: { type: 'boolean' },
+        },
+        required: ['event', 'eventId', 'livemode', 'body'],
+        title: 'Stripe Event Payload',
+        type: 'object',
+      },
+      nullable: false,
     },
-    required: ['event', 'eventId', 'livemode', 'body'],
-    title: 'Stripe Event Payload',
-    type: 'object',
-  },
+  ],
   provider: 'stripe',
   type: 'integration',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'integration' }
@@ -75,7 +81,7 @@ export const stripeEvent: IntegrationDefinition = {
     return {
       dedupeKey: eventId,
       outcome: 'event',
-      payload: { body: payload, event, eventId, livemode: payload.livemode === true },
+      outputs: { payload: { body: payload, event, eventId, livemode: payload.livemode === true } },
     }
   },
   async reconcile(context) {

@@ -75,18 +75,24 @@ const snapshot = {
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'gitlab.on_project_event',
   name: 'on_project_event',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: {
-      body: { type: 'object' },
-      deliveryId: { type: 'string' },
-      event: { type: 'string' },
-      gitlabEvent: { type: 'string' },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: {
+          body: { type: 'object' },
+          deliveryId: { type: 'string' },
+          event: { type: 'string' },
+          gitlabEvent: { type: 'string' },
+        },
+        required: ['event', 'gitlabEvent', 'deliveryId', 'body'],
+        title: 'GitLab Project Event Payload',
+        type: 'object',
+      },
+      nullable: false,
     },
-    required: ['event', 'gitlabEvent', 'deliveryId', 'body'],
-    title: 'GitLab Project Event Payload',
-    type: 'object',
-  },
+  ],
   provider: 'gitlab',
   type: 'integration',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'integration' }
@@ -107,7 +113,7 @@ export const gitlabProjectEvent: IntegrationDefinition = {
     return {
       dedupeKey: deliveryId.length == 0 ? undefined : deliveryId,
       outcome: 'event',
-      payload: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event, gitlabEvent },
+      outputs: { payload: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event, gitlabEvent } },
     }
   },
   async reconcile(context) {

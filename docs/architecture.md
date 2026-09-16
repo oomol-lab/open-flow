@@ -237,6 +237,12 @@ LLM host。自建或自定义 Connector origin 不隐含模型能力，未配置
 Trigger 是 Flow graph 中的 source node。每张图最多有一个 Manual Trigger，由用户显式启动，不建立外部订阅或调度 binding。Webhook、Cron、Poll 和 Integration 的确定性协议、Provider definitions、Registry 与 conformance 属于公共
 package；subscription、checkpoint、调度持久化、endpoint routing 和 admission 事务属于部署实现。
 
+Trigger 的有序数据输出由公共 contract 统一定义和校验。接入适配器在准入前构造完整输出；Scheduler 和 checkpoint 只消费通用端口映射，不承担 Webhook 或 Provider 的事件投影。HTTP 请求重试身份由 Webhook 准入层定义，与 Flow 可见输出的数据范围分别管理。
+
+Integration 的事件型 callback 返回 `outputs`，listener 页面返回 `outputs` 或 `null`（无事件）。两者都由 Provider 构造完整端口映射，Server 按固定 Trigger contract 校验后原样准入。
+Poll 保留原始事件和逐事件去重，Provider 的 `buildOutputs(events)` 将非空的已去重事件批次转换为一次 Run 的完整输出；基线、空页面与全部重复的页面不调用它。
+现有 Poll Provider 显式使用 `payloadPollOutputs` 保留 `{ payload: { events } }` 形状；通用运行时不预设输出端口名称，也不合并不同事件的端口值。
+
 一次有效 Trigger occurrence 只能准入普通 Flow Run，之后复用相同的 Run、执行、事件、取消和 terminal 语义。重投 occurrence 必须通过稳定 identity
 和权威 store 约束为最多一个 Run。
 
@@ -245,7 +251,7 @@ Integration callback 的处理生命周期同时受请求取消、部署关闭�
 
 具有 `listener` 能力的 Integration 定义将已验证通知转为持久唤醒；通知与定期扫描共用同一 cursor reader，
 回调不能推进扫描游标。Server 在同一事务中提交页面准入、checkpoint 与工作完成，并保留领取后新增的通知。
-扫描使用独立租约和健康状态；订阅故障不能单独撤销仍然可用的扫描准入资格。旧事件型 Integration 的 callback/payload 语义保持不变。
+扫描使用独立租约和健康状态；订阅故障不能单独撤销仍然可用的扫描准入资格。事件型 Integration callback 返回完整 `outputs`，由准入层按声明端口校验。
 
 Server 的 Poll 读取与 Integration listener 扫描由同一个监听运行时调度，共用 Connector 作用域、取消与读取 deadline。
 订阅准备、续期与事件型 callback 由 Integration owner 处理，不能持有扫描调度锁。已有 Poll 的调度配置、checkpoint 与事件级去重继续作为其权威持久状态，
