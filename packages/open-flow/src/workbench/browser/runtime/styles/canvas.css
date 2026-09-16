@@ -33,11 +33,20 @@
     grid-row: 2;
     content: '';
     pointer-events: none;
+    background: var(--ui-ring);
+    opacity: 0;
+    transition: opacity 160ms ease;
   }
 
-  .editor-grid:has(.context-panel-resizer:hover)::before,
+  .editor-grid:has(.context-panel-resizer:hover)::before {
+    opacity: 1;
+    transition-delay: 500ms;
+  }
+
+  .editor-grid:has(.context-panel-resizer:active)::before,
   .editor-grid:has(.context-panel-resizer:focus-visible)::before {
-    background: var(--ui-ring);
+    opacity: 1;
+    transition: none;
   }
 
   .editor-grid > .context-panel {
@@ -51,6 +60,10 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .editor-grid:not(.context-panel-closed)::before {
+      transition-duration: 0s;
+    }
+
     .editor-grid {
       transition: none;
     }

@@ -18,12 +18,27 @@
     z-index: 4;
     cursor: col-resize;
     touch-action: none;
+    background: var(--ui-ring);
+    opacity: 0;
+    transition: opacity 160ms ease;
   }
 
-  .context-panel-resizer:hover,
-  .context-panel-resizer:focus-visible {
-    background: var(--ui-ring);
+  .context-panel-resizer:hover {
+    opacity: 1;
+    transition-delay: 500ms;
+  }
+
+  .context-panel-resizer:focus-visible,
+  .context-panel-resizer:active {
+    opacity: 1;
+    transition: none;
     outline: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .context-panel-resizer {
+      transition-duration: 0s;
+    }
   }
 
   .context-panel:focus-visible {

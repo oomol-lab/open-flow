@@ -237,7 +237,7 @@ export function ContextPanel({
           {heading == null ? (
             <>
               <span className="flex size-9 shrink-0 items-center justify-center" aria-hidden="true">
-                <span className="flex size-6 items-center justify-center text-2xl [&>svg]:size-full!">
+                <span className={`flex items-center justify-center text-2xl [&>svg]:size-full! ${icon === 'flow' ? 'size-5' : 'size-6'}`}>
                   <Icon name={icon} />
                 </span>
               </span>

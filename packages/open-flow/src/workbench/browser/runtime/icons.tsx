@@ -1,5 +1,7 @@
 import type { ReactElement, ReactNode, SVGProps } from 'react'
 
+import { Network } from 'lucide-react'
+
 export type IconName =
   | 'alert'
   | 'check'
@@ -91,15 +93,6 @@ function glyph(name: IconName): ReactNode {
       )
     case 'filter':
       return <path d="M4 6h16l-6 7v5l-4 2v-7z" />
-    case 'flow':
-      return (
-        <>
-          <circle cx="12" cy="5" r="2" />
-          <circle cx="6" cy="18" r="2" />
-          <circle cx="18" cy="18" r="2" />
-          <path d="M12 7v4M6 16v-3h12v3" />
-        </>
-      )
     case 'hand':
       return <path d="M8 11V6a1.5 1.5 0 0 1 3 0v4-6a1.5 1.5 0 0 1 3 0v6-4a1.5 1.5 0 0 1 3 0v5-2a1.5 1.5 0 0 1 3 0v4a8 8 0 0 1-16 0v-2a2 2 0 0 1 4 0Z" />
     case 'logo':
@@ -232,6 +225,10 @@ function glyph(name: IconName): ReactNode {
 }
 
 export function Icon({ name, size = 18, ...props }: { readonly name: IconName; readonly size?: number } & SVGProps<SVGSVGElement>): ReactElement {
+  if (name === 'flow') {
+    return <Network aria-hidden="true" size={size} strokeWidth={1.5} {...props} />
+  }
+
   return (
     <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 24 24" width={size} {...props}>
       <g stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7">

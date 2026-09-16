@@ -219,7 +219,7 @@ function RemoveFooter({ confirmLabel, onRemove }: { confirmLabel: string; onRemo
   const [confirming, setConfirming] = useState(false)
   if (!confirming) {
     return (
-      <Button type="button" size="field" variant="destructive" onClick={() => setConfirming(true)}>
+      <Button type="button" size="field" variant="destructive" className="ml-auto" onClick={() => setConfirming(true)}>
         {t('valueEditor.remove')}
       </Button>
     )
@@ -373,11 +373,13 @@ export function PortDefinitionEditor(props: PortEditorProps) {
   }
   const t = useTranslate()
   const [sorting, setSorting] = useState(false)
-  const hasFields = values.some((port) => 'handle' in port)
-  const sortingEnabled = sorting && !disabled && hasFields
+  const fieldCount = values.filter((port) => 'handle' in port).length
+  const hasFields = fieldCount > 0
+  const canSort = fieldCount > 1
+  const sortingEnabled = sorting && !disabled && canSort
   useEffect(() => {
-    if (!hasFields) setSorting(false)
-  }, [hasFields])
+    if (!canSort) setSorting(false)
+  }, [canSort])
   const onDraftIssue = useCallback(() => {}, [])
   const update = (index: number, port: InputPort | Group) => onChange(values.map((entry, i) => (i === index ? port : entry)))
   const list = useRef<HTMLDivElement>(null)
@@ -686,7 +688,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           {props.title != null || props.layout === 'values' ? <FieldLabel>{props.title ?? t('inspector.ports.valuesTitle')}</FieldLabel> : <span />}
           {!disabled && (
             <div className="ml-auto flex items-center">
-              {hasFields && (
+              {canSort && (
                 <Tooltip>
                   <TooltipTrigger
                     render={

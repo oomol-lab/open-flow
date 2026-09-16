@@ -7,7 +7,7 @@ import { NODE_TYPE } from '../../../stores/node/constants.ts'
 export const defaultNodeIcon = 'i-carbon:hexagon-vertical-outline'
 export const defaultConditionIcon = 'i-carbon:child-node'
 export const defaultSubflowIcon = 'i-carbon:subflow'
-export const defaultFlowIcon = 'i-carbon:flow-connection'
+export const defaultFlowIcon = 'i-lucide-light:network'
 export const defaultTriggerIcon = 'i-codicon:symbol-event'
 
 export const iconForNodeType = (nodeType: NodeType): string =>

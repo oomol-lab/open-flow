@@ -96,6 +96,10 @@ export const additionalInputsStory: FrontendStory = {
 function GroupedInputsStory({ dark, language, log, output = false }: { dark: boolean; language: UiLanguage; log: LogAction; output?: boolean }) {
   const i18n = useMemo(() => createI18n(language), [language])
   const [emptyValues, setEmptyValues] = useState<readonly (InputPort | Group)[]>([])
+  const [singleValue, setSingleValue] = useState<readonly (InputPort | Group)[]>([
+    { group: 'Request' },
+    { handle: 'message', jsonSchema: { type: 'string' }, nullable: false },
+  ])
   const [values, setValues] = useState<readonly (InputPort | Group)[]>([
     { group: 'Request', collapsed: !output },
     { handle: 'message', jsonSchema: { type: 'string' }, nullable: false, ...(output ? {} : { value: 'hello' }) },
@@ -123,6 +127,16 @@ function GroupedInputsStory({ dark, language, log, output = false }: { dark: boo
             setValues(next)
             log('Save grouped inputs', next)
           }}
+        />
+        <h3>Single field {output ? 'output' : 'input'}</h3>
+        <PortDefinitionEditor
+          groups
+          layout="ports"
+          title={output ? 'Outputs' : 'Inputs'}
+          output={output}
+          disabled={false}
+          values={singleValue}
+          onChange={setSingleValue}
         />
         <h3>Empty {output ? 'outputs' : 'inputs'}</h3>
         <PortDefinitionEditor
