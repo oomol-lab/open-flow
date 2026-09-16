@@ -7,7 +7,6 @@ import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import {
   createBuiltinTrigger,
   createManagedTask,
-  createProviderTrigger,
   deleteNodes,
   setConnectorConnection,
   setInputValues,
@@ -250,7 +249,7 @@ export async function triggerCommand(
       const values = await settingValues(args, runtime)
       const config = Object.fromEntries(Object.entries(values).filter((entry): entry is [string, JsonValue] => entry[1] !== undefined))
       const triggerId = authoringId(args, 'trigger')
-      let operations
+      let operations: Parameters<ControlClient['changeDraft']>[2]
       let name: string
       let kind: TriggerNode['kind']
       if (second == 'manual') {
@@ -282,12 +281,18 @@ export async function triggerCommand(
         const connection = await preferredConnection(client, definition.provider, args.connection, undefined, true, flow?.flowId)
         name = args.name?.trim() ?? definition.displayName
         kind = definition.type
-        operations = createProviderTrigger(selected.target, { bindingId: authoringId(args, 'binding'), nodeId: triggerId }, definition, {
-          config,
-          connectionId: connection!.connectionId,
-          name,
-          ...(configuredSchedule == null ? {} : { schedule: configuredSchedule }),
-        })
+        operations = [
+          {
+            kind: 'graph.trigger.create',
+            bindingId: authoringId(args, 'binding'),
+            nodeId: triggerId,
+            key: second,
+            config,
+            connectionId: connection!.connectionId,
+            name,
+            ...(configuredSchedule == null ? {} : { schedule: configuredSchedule }),
+          },
+        ]
       }
       if (name.length == 0) throw new CliError('cli.invalid-arguments', 'Trigger name cannot be empty.')
       const target = { flowId: selected.flow.flowId, kind: 'trigger', triggerId }

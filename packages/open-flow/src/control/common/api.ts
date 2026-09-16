@@ -1,3 +1,6 @@
+import type { DraftOperation } from './draftOperations.ts'
+export { inspectFlowDraft } from './flowInspection.ts'
+export type { DraftOperation } from './draftOperations.ts'
 import type { SchemaMismatch } from '../../flow/common/change.ts'
 import type { CreateEventSource, UpdateEventSource, EventSource } from './eventSources.ts'
 
@@ -23,15 +26,7 @@ export {
   type ResultQuery,
 } from './results.ts'
 import type { RunStatus } from '../../execution/common/runLifecycle.ts'
-import type {
-  ChangeOperation,
-  InputPortDefinition,
-  JsonValue,
-  PortDefinition,
-  RevisionContent,
-  TriggerKeySnapshot,
-  WaitAction,
-} from '../../flow/common/change.ts'
+import type { InputPortDefinition, JsonValue, PortDefinition, RevisionContent, TriggerKeySnapshot, WaitAction } from '../../flow/common/change.ts'
 
 import { flowCheck } from './checkDecoders.ts'
 import { connection, connectorAction } from './connectorDecoders.ts'
@@ -848,7 +843,7 @@ export class ControlClient {
   async changeDraft(
     flowId: string,
     expectedRevisionId: string,
-    operations: readonly ChangeOperation[],
+    operations: readonly DraftOperation[],
     changeId = operationKey('change'),
   ): Promise<DraftChange> {
     return draftChange(

@@ -6,10 +6,11 @@
 
 - `oo flow --help --json` 返回命令索引；`oo flow node add --help --json` 等子命令返回参数、选项、退出码和示例。Help、schema、version 不需要已配置的宿主。
 - `oo flow schema apply --json` 返回完整事务输入的 JSON Schema；`schema operations` 返回 ChangeOperation 数组的 schema；`schema graph.node.input.set` 等返回单个操作的独立 schema。
-- `schema input` 描述 Run 输入覆盖（node ID → handle → JSON value）；`schema payload` 描述 Trigger payload。节点实际端口与 Trigger 合同仍由 Revision 决定。
+- `schema input` 描述 Run 输入覆盖（node ID → handle → JSON value）；`schema outputs` 描述 Trigger 输出对象。节点实际端口与 Trigger 合同仍由 Revision 决定。
 - `inspect <flow> --json` 返回完整 `content`、Revision metadata 和 `revisionId`，包含 modules、tasks、subflows、bindings 和 graph。`--summary` 改为紧凑的 nodes、triggers、edges。Inspect 不执行 check。
 - `check <flow> --json` 单独校验当前 Draft，返回 `valid`、`revisionId` 和 `check`。无效时退出码为 1，诊断只随 stdout 的这一份结果返回。
 - Flow 引用接受 ID 或唯一的完整名称。名称歧义返回候选 identity；保存后续调用所需的 ID 可以避免名称查找。
+- `inspect` 遇到不可读的 Draft 时返回 `flow`、`draft: null` 和 `draftIssue`（code、message、revisionId）。`flow.live` 仍保留已发布版本身份；不能从缺失内容推断流程用途。权限、网络和其他调用错误仍然报错。只需元信息时使用 `show`。
 - `list`、`runs list`、`publications list` 一次只返回一页，支持 `--cursor` 和 `--limit`（1–100）。继续时传入 `nextCursor`，并保持同样的过滤条件。
 
 有值的选项统一支持 `--option value` 和 `--option=value`。不支持的选项及重复的单值选项会报错；`--set`、`--unset` 可以重复。
@@ -43,6 +44,38 @@ oo flow apply FLOW_ID --file changes.json \
 `operations` 按顺序原子提交，`before` 必须匹配指定 Revision 在前序操作执行后的值。执行边和数据映射是独立操作；节点 ID 显式指定。
 Server 使用公共 decoder 校验请求结构；操作的图语义和并发条件由底层变更合同验证。
 
+### 创建示例与 Provider Trigger
+
+CLI 与 MCP 共用创建示例。先用 `oo flow schema examples --json` 或 MCP `flow_schema {"example":"index"}` 查看索引，按需获取一个完整批次：
+
+```bash
+oo flow schema example.connector --json
+oo flow schema example.poll-notification --json > changes.json
+```
+
+MCP 对应 `flow_schema {"example":"connector"}` 和 `flow_schema {"example":"poll-notification"}`。返回的 `{version,operations}` 可直接作为 CLI apply 文件；MCP flow_apply 使用其中的 operations，并另传 flowId、expectedRevisionId 和 idempotencyKey。
+示例中的 `ACTION_ID`、`CONNECTION_ID` 必须替换为目标 Flow 作用域内的真实 identity，Connector 输入输出端口必须按 `connector show` / `connector_get` 的定义调整。示例通过结构和图语义检查，不证明外部账号可用。
+
+已有 Connector Action 使用 `task.create`（executor.kind 为 connector）与引用 taskId 的节点。JavaScript 计算使用 `module.create` 与引用 moduleId 的 Code Task；仅做已有 Action 调用时无需写 JS。`poll-notification` 示例展示 events 数组转换为文本、执行连线及独立输入映射。
+
+`graph.trigger.create` 是 Draft 请求操作，用 key 创建 Provider Trigger：
+
+```json
+{
+  "kind": "graph.trigger.create",
+  "nodeId": "mail",
+  "bindingId": "mail-account",
+  "key": "gmail.on_message_received",
+  "connectionId": "CONNECTION_ID",
+  "config": {},
+  "schedule": [{ "type": "every", "unit": "minute", "value": 5 }]
+}
+```
+
+它固定作用于根 Flow。传入 connectionId 时同时创建 binding；省略时引用该批次中已存在的 bindingId。schedule 仅供 Poll 使用，省略时每五分钟轮询。Integration 不接受 schedule。
+服务端在提交时解析 key，并将完整 definition 固定进 Revision；check 不动态替换定义。同 key、同请求重试先返回原提交结果，不再读取当前目录。一个批次仍只产生一个 Revision。需要显式固定定义时仍可使用原有 graph.node.create。
+CLI `trigger add` 也使用此操作；快速建图形式仍支持原有 Provider 配置。
+
 原有 `{version,nodes,triggers,edges}` 快速建图输入继续用于创建节点和连接；它不能与 `operations` 混用。
 `schema apply` 描述的是完整的 operations 形式。两种形式都是一次事务，重新用新 key 调用会发起新事务，不表示声明式同步。
 
@@ -57,6 +90,26 @@ Server 使用公共 decoder 校验请求结构；操作的图语义和并发条�
 Draft 编辑结果统一包含 `changed`、`revisionId`；真正提交的变更还包含 `baseRevisionId` 和 `idempotencyKey`。
 Apply 的提交成功与校验结果分开：`changed: true` 表示变更已接受，`valid: false` 表示仍有诊断，`valid: null` 表示后续 check 不可用。
 已接受的 Apply 返回 0，Agent 应在运行前处理 `valid` 或显式调用 `check`。不要因为 check 失败而用新 key 重复创建节点。
+
+## Wait 节点
+
+Wait 节点通过 `apply` 的 `operations` 创建和配置，目前没有 `node add wait` 便捷命令。
+创建使用 `graph.node.create`（`node.kind` 为 `wait`），修改提示和操作使用 `graph.node.wait.set`。
+先读取对应 schema，再按当前 Revision 提交事务：
+
+```bash
+oo flow schema graph.node.create --json
+oo flow schema graph.node.wait.set --json
+oo flow apply FLOW_ID --file changes.json --expected-revision REVISION_ID --json
+```
+
+Wait 的通知出口固定为 `notification`，可用 `connect FLOW_ID WAIT_NODE NOTIFY_NODE notification` 连接后续通知节点。
+操作出口为 `continue` 或 `approve/reject`，同样通过 `connect` 的最后一个参数选择。
+执行连线与输入映射独立；传递通知数据时，还需使用 `node input` 或 `graph.node.input.set` 配置输入来源。
+`notification` 不是可决议的操作，不能传给 `runs resolve`。
+
+查询待处理等待使用 `runs list --flow FLOW_ID --pending-wait --json`；`--pending-wait` 是无参数开关。
+Run 即使仍为 `running`，也可能包含需要决议的 `waits`。决议时必须指定其中的 `waitId`。
 
 ## Agent 节点
 

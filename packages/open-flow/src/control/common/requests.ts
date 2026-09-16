@@ -1,7 +1,10 @@
-import type { ChangeOperation, JsonValue } from '../../flow/common/change.ts'
+import type { JsonValue } from '../../flow/common/change.ts'
+import type { DraftOperation } from './draftOperations.ts'
 
+import { decodeDraftOperations, draftOperationsSchema } from './draftOperations.ts'
+export { decodeDraftOperations, draftOperationsSchema, resolveDraftOperations, type DraftOperation } from './draftOperations.ts'
 import { z } from 'zod'
-import { changeOperationsSchema, decodeChangeOperations, resourceNameIssue } from '../../flow/common/change.ts'
+import { resourceNameIssue } from '../../flow/common/change.ts'
 import { createEventSourceSchema, updateEventSourceSchema, eventSourceRevisionSchema } from './eventSourceSchemas.ts'
 
 const json: z.ZodType<JsonValue> = z.json()
@@ -40,9 +43,9 @@ export const controlRequests = {
   eventSourceRevision: decoder(schemas.eventSourceRevision),
   createFlow: decoder(schemas.createFlow),
   renameFlow: decoder(schemas.renameFlow),
-  changeDraft(value: unknown): { expectedRevisionId: string; operations: readonly ChangeOperation[]; version: 1 } {
+  changeDraft(value: unknown): { expectedRevisionId: string; operations: readonly DraftOperation[]; version: 1 } {
     const body = schemas.changeDraft.parse(value)
-    return { ...body, operations: decodeChangeOperations(body.operations) }
+    return { ...body, operations: decodeDraftOperations(body.operations) }
   },
   repairDraft: decoder(schemas.repairDraft),
   setEnabled: decoder(schemas.setEnabled),
@@ -59,6 +62,8 @@ export const controlRequests = {
 
 export function controlRequestSchema(name: keyof typeof controlRequests): JsonValue {
   const schema = z.toJSONSchema(schemas[name])
-  if (name == 'changeDraft') return { ...schema, properties: { ...schema.properties, operations: changeOperationsSchema() } } as unknown as JsonValue
+  if (name == 'changeDraft') return { ...schema, properties: { ...schema.properties, operations: draftOperationsSchema() } } as unknown as JsonValue
   return schema as JsonValue
 }
+
+export { authoringExample, authoringExamples } from './authoringExamples.ts'

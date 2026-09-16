@@ -51,13 +51,15 @@ export const mcpTools = {
     true,
   ),
   flow_get: tool(
-    'Read Flow metadata, the full Draft and current Live publication. Use draft.revisionId as the base of an edit.',
+    'Read Flow metadata, the full Draft and current Live publication. Unreadable Drafts return draft=null and draftIssue; flow.live still identifies the published version. Use draft.revisionId as the base of an edit.',
     z.strictObject({ flowId: flow }),
     true,
   ),
   flow_schema: tool(
-    'Get the JSON Schema for atomic change operations, optionally one operation kind. Node titles must be non-empty and unique within a graph.',
-    z.strictObject({ kind: id.optional() }),
+    'Get an operation schema by kind, or a complete apply batch by example (connector, poll, poll-notification, code, wait). Use example=index to list examples. graph.trigger.create resolves a provider key into a fixed definition at commit.',
+    z
+      .strictObject({ kind: id.optional(), example: id.optional() })
+      .refine((value) => value.kind == null || value.example == null, 'Choose kind or example, not both.'),
     true,
   ),
   flow_create: tool(

@@ -3,7 +3,7 @@ import type { TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { ParsedArguments } from './arguments.ts'
 import type { Runtime, SemanticNode } from './support.ts'
 
-import { ApiError, ControlClient } from '@oomol-lab/open-flow/control-api'
+import { ApiError, ControlClient, inspectFlowDraft } from '@oomol-lab/open-flow/control-api'
 import {
   setInputSources,
   connect as connectEdge,
@@ -477,7 +477,17 @@ export async function inspectFlowCommand(
   runtime: Runtime,
 ): Promise<void> {
   requireCount(operands, 1, 'oo flow inspect <flow> [--summary] [--json]')
-  const selected = await selectedDraftFlow(client, flow, args)
+  const inspected = await inspectFlowDraft(flow, () => client.getRevision(flow.flowId, flow.draftRevisionId))
+  if (inspected.draft == null) {
+    write(
+      runtime,
+      args.json,
+      { ...inspected, kind: 'flow.inspect' },
+      `${flow.name}\t${flow.flowId}\n${inspected.draftIssue.code}\t${inspected.draftIssue.message}`,
+    )
+    return
+  }
+  const selected = { flow, draft: inspected.draft, graph: inspected.draft.content.document.graph }
   const nodeEntries = Object.entries(selected.graph.nodes).filter((entry): entry is [string, SemanticNode] => 'inputs' in entry[1])
   const nodes = nodeEntries.map(([nodeId, node]) => inspectedNodeSummary(selected.draft.content, nodeId, node))
   const triggers = Object.entries(selected.graph.nodes)
@@ -672,12 +682,9 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
   )
   const nodeIdentities = preparedNodes.map((node) => node.identity)
   const triggerIdentities = preparedTriggers.map((trigger) => trigger.identity)
-  const operations = [
-    ...(spec.operations ?? []),
-    ...preparedNodes.flatMap((node) => node.operations),
-    ...preparedTriggers.flatMap((trigger) => trigger.operations),
-  ]
-  let content = operations.length == 0 ? selected.draft.content : applyFlowChanges(selected.draft.content, operations)
+  const preparedOperations = [...preparedNodes.flatMap((node) => node.operations), ...preparedTriggers.flatMap((trigger) => trigger.operations)]
+  const operations = [...(spec.operations ?? []), ...preparedOperations]
+  let content = preparedOperations.length == 0 ? selected.draft.content : applyFlowChanges(selected.draft.content, preparedOperations)
   const nodeReferences = new Map(nodeIdentities.map((identity) => [identity.reference, identity.nodeId]))
   const triggerReferences = new Map(triggerIdentities.map((identity) => [identity.reference, identity.triggerId]))
   const edges = []

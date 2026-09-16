@@ -107,7 +107,7 @@ const webhook = {
     })
     .optional(),
 }
-const schedule = z.array(
+export const triggerScheduleSchema = z.array(
   z.union([
     z.object({ type: z.literal('cron'), expression: text, timezone: text }),
     z.object({ type: z.literal('every'), unit: z.enum(['day', 'hour', 'minute', 'month', 'week']), value: z.number() }),
@@ -149,14 +149,14 @@ const node = z.union([
   z.strictObject({ ...base, kind: z.literal('wait'), input, ...wait }).omit({ timeoutMs: true }),
   z.object({ ...trigger, kind: z.literal('manual') }),
   z.object({ ...trigger, kind: z.literal('webhook'), ...webhook }),
-  z.object({ ...trigger, kind: z.literal('cron'), cronTimes: schedule }),
+  z.object({ ...trigger, kind: z.literal('cron'), cronTimes: triggerScheduleSchema }),
   z.object({
     ...trigger,
     kind: z.literal('poll'),
     bindingId: text,
     config: z.record(text, json),
     definition: z.object({ ...definition, type: z.literal('poll') }),
-    pollTimes: schedule,
+    pollTimes: triggerScheduleSchema,
   }),
   z.object({
     ...trigger,
@@ -313,7 +313,7 @@ const shapes = {
   'graph.node.task.name.set': { ...at, before: text, value: text },
   'graph.node.task.capabilities.set': { ...at, before: z.array(capability).optional(), value: z.array(capability).optional() },
   'graph.trigger.config.set': { nodeId: text, name: text, before: json.optional(), value: json.optional() },
-  'graph.trigger.schedule.set': { nodeId: text, before: schedule, value: schedule },
+  'graph.trigger.schedule.set': { nodeId: text, before: triggerScheduleSchema, value: triggerScheduleSchema },
   'module.create': { moduleId: text, module },
   'module.delete': { moduleId: text },
   'module.rename': { moduleId: text, before: text, name: text },

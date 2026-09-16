@@ -1,4 +1,4 @@
-import { changeOperationsSchema } from '@oomol-lab/open-flow/flow-change'
+import { authoringExample, authoringExamples, draftOperationsSchema } from '@oomol-lab/open-flow/control-requests'
 
 const edit = ['expected-revision', 'idempotency-key']
 const page = ['cursor', 'limit']
@@ -54,7 +54,7 @@ const commands = [
   ['rollback', '<flow> <publication>', ['expected-publication', 'idempotency-key']],
   ['open', '[flow]', []],
   ['workbench', '[flow]', []],
-  ['schema', '[operations|apply|input|outputs|operation-kind]', []],
+  ['schema', '[operations|apply|input|outputs|examples|example.name|operation-kind]', []],
 ] as const
 
 const optionDetails: Record<
@@ -116,7 +116,7 @@ export function commandHelp(path: readonly string[]) {
         Object.assign(
           {
             name: `--${flag}`,
-            value: !['json', 'help', 'wait', 'follow', 'summary', 'yes'].includes(flag),
+            value: !['json', 'help', 'wait', 'follow', 'summary', 'yes', 'pending-wait'].includes(flag),
             repeatable: flag == 'set' || flag == 'unset',
           },
           optionDetails[flag],
@@ -131,7 +131,15 @@ export function commandOptions(positionals: readonly string[]): readonly string[
 }
 
 export function commandSchema(name = 'apply') {
-  if (name == 'operations') return changeOperationsSchema()
+  if (name == 'examples') return { examples: authoringExamples }
+  if (name.startsWith('example.')) {
+    try {
+      return authoringExample(name.slice('example.'.length))
+    } catch {
+      return undefined
+    }
+  }
+  if (name == 'operations') return draftOperationsSchema()
   if (name == 'outputs')
     return {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -147,12 +155,12 @@ export function commandSchema(name = 'apply') {
     }
   if (name != 'apply') {
     try {
-      return changeOperationsSchema(name)
+      return draftOperationsSchema(name)
     } catch {
       return undefined
     }
   }
-  const { $defs, $schema: _, ...operations } = changeOperationsSchema() as Record<string, unknown>
+  const { $defs, $schema: _, ...operations } = draftOperationsSchema() as Record<string, unknown>
   return {
     $defs,
     $schema: 'https://json-schema.org/draft/2020-12/schema',

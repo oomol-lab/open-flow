@@ -1,7 +1,7 @@
 import type { Draft, Presentation } from '../api.ts'
 
 import { describe, expect, it, vi } from 'vitest'
-import { applyFlowChanges } from '../../../../flow/common/change.ts'
+import { applyFlowChanges, decodeChangeOperations } from '../../../../flow/common/change.ts'
 import { createCodeTask, createValue } from '../../../../flow/common/nodeChanges.ts'
 import { ApiError, WorkbenchClient } from '../api.ts'
 import { designerGraph, setComment, setNodePositions } from '../workspace.ts'
@@ -47,7 +47,7 @@ async function session() {
   }))
   const change = vi.spyOn(client, 'changeDraft').mockImplementation(async (_flowId, expected, operations) => {
     expect(expected).toBe(draft.revisionId)
-    draft = { ...draft, content: applyFlowChanges(draft.content, operations), parentRevisionId: expected, revisionId: `r${++sequence}` }
+    draft = { ...draft, content: applyFlowChanges(draft.content, decodeChangeOperations(operations)), parentRevisionId: expected, revisionId: `r${++sequence}` }
     const { content: _content, ...revision } = draft
     return { revision, version: 1 }
   })

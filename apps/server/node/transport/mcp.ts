@@ -3,8 +3,8 @@ import type { Logger } from 'pino'
 import type { ServerService } from '../application/service.ts'
 
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
-import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { changeOperationsSchema, decodeChangeOperations } from '@oomol-lab/open-flow/flow-change'
+import { controlErrorCode, inspectFlowDraft } from '@oomol-lab/open-flow/control-api'
+import { authoringExample, authoringExamples, draftOperationsSchema, decodeDraftOperations } from '@oomol-lab/open-flow/control-requests'
 import { mcpTools, mcpProtocolVersion, mcpInstructions } from '@oomol-lab/open-flow/mcp'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { Hono } from 'hono'
@@ -100,17 +100,15 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
   })
   register('flow_get', mcpTools.flow_get, async ({ flowId }) => {
     const metadata = control.getFlow(flowId)
-    const draft = control.getDraft(flowId)
-    return { flow: metadata, draft, live: await control.getLive(flowId), version: 1 }
+    const inspected = await inspectFlowDraft(metadata, () => control.getRevision(flowId, metadata.draftRevisionId))
+    return inspected.draft == null ? inspected : { ...inspected, live: await control.getLive(flowId) }
   })
-  register('flow_schema', mcpTools.flow_schema, ({ kind }) => {
+  register('flow_schema', mcpTools.flow_schema, ({ kind, example }) => {
     try {
-      return {
-        operations: changeOperationsSchema(kind),
-        example: [{ kind: 'graph.node.create', nodeId: 'start', target: { kind: 'flow' }, node: { kind: 'manual', name: 'Start' } }],
-      }
+      if (example != null) return example == 'index' ? { examples: authoringExamples } : authoringExample(example)
+      return { operations: draftOperationsSchema(kind), examples: authoringExamples }
     } catch {
-      throw new ControlError(controlErrorCode.flowInvalid, 'Unknown change operation kind.')
+      throw new ControlError(controlErrorCode.flowInvalid, 'Unknown change operation kind or example.')
     }
   })
   register(
@@ -121,7 +119,7 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
   register('flow_apply', mcpTools.flow_apply, async ({ flowId, expectedRevisionId, operations, idempotencyKey }) => {
     let changes
     try {
-      changes = decodeChangeOperations(operations)
+      changes = decodeDraftOperations(operations)
     } catch (error) {
       throw new ControlError(controlErrorCode.flowInvalid, error instanceof Error ? error.message : 'Invalid change operations.')
     }

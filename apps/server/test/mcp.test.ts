@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
+import { authoringExample } from '@oomol-lab/open-flow/control-requests'
 import { mcpConformanceCases } from '@oomol-lab/open-flow/mcp'
 import { once } from 'node:events'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -19,6 +20,68 @@ import { closeService, openService, startService } from './serviceFixture.ts'
 const token = 'mcp-test-operator-token-000000000001'
 const version = '2026-07-28'
 const start = { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'start', node: { kind: 'manual', name: 'Start' } }
+
+it('shares compact trigger transactions and example discovery between MCP and REST', async () => {
+  const { call, control, service, client } = await fixture()
+  expect(await call('flow_schema', { example: 'poll' })).toEqual(authoringExample('poll'))
+  const created = await control.createFlow('Compact trigger')
+  const operations = authoringExample('poll').operations
+  const args = { flowId: created.flowId, expectedRevisionId: created.draftRevisionId, operations, idempotencyKey: 'compact-trigger' }
+  const changed = await call('flow_apply', args)
+  const current = await control.getDraft(created.flowId)
+  expect(current.content.document.graph.nodes.mail).toMatchObject({
+    kind: 'poll',
+    definition: { key: 'gmail.on_message_received', payloadSchema: { required: ['events'] } },
+  })
+  expect(current.content.document.bindings['mail-account']).toEqual({ kind: 'connection', target: 'CONNECTION_ID' })
+  const lookup = vi.spyOn(service.control, 'getTriggerKey').mockImplementation(() => {
+    throw new Error('Catalog changed')
+  })
+  expect(await control.changeDraft(created.flowId, created.draftRevisionId, operations, 'compact-trigger')).toEqual(changed)
+  expect(await call('flow_apply', args)).toEqual(changed)
+  expect(lookup).not.toHaveBeenCalled()
+  const conflicting = await client.callTool({ name: 'flow_apply', arguments: { ...args, operations: [{ ...operations[0], config: { search: 'new' } }] } })
+  expect(conflicting.structuredContent).toMatchObject({ error: { code: 'flow.conflict' } })
+})
+
+it.each(['flow.invalid', 'flow.revision-upgrade-required'])('keeps Flow identity readable when its Draft reports %s', async (code) => {
+  const { call, control, service } = await fixture()
+  const created = await control.createFlow('Old Draft')
+  vi.spyOn(service.control, 'getRevision').mockImplementation(() => {
+    throw Object.assign(new Error('Draft needs attention'), { code })
+  })
+  expect(await call('flow_get', { flowId: created.flowId })).toMatchObject({
+    flow: { flowId: created.flowId, name: 'Old Draft' },
+    draft: null,
+    draftIssue: { code, revisionId: created.draftRevisionId },
+  })
+})
+
+it('does not commit partial compact trigger batches or accept unknown keys', async () => {
+  const { control } = await fixture()
+  const created = await control.createFlow('Atomic trigger')
+  const operations = authoringExample('poll').operations
+  await expect(
+    control.changeDraft(
+      created.flowId,
+      created.draftRevisionId,
+      [...operations, { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'mail', target: 'missing' } }],
+      'invalid-edge',
+    ),
+  ).rejects.toMatchObject({ code: 'flow.invalid' })
+  await expect(
+    control.changeDraft(
+      created.flowId,
+      created.draftRevisionId,
+      [{ kind: 'graph.trigger.create', key: 'unknown', nodeId: 'mail', bindingId: 'account', config: {} }],
+      'unknown-key',
+    ),
+  ).rejects.toMatchObject({ code: 'trigger-key.not-found' })
+  expect(await control.getDraft(created.flowId)).toMatchObject({
+    revisionId: created.draftRevisionId,
+    content: { document: { bindings: {}, graph: { nodes: {}, edges: [] } } },
+  })
+})
 
 it('preserves default accounts for CLI and MCP while browser metadata stays independent', async () => {
   const action = {

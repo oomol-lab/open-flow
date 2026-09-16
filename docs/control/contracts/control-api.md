@@ -129,6 +129,12 @@ Draft sync 始终返回当前完整 snapshot，不接受 revision cursor，也�
 当前模型可读取的资源，丢弃无法读取的 collection entry，并以旧 Draft 为 parent 创建新 Revision；原 Revision、Live、Publication、Run 和
 Presentation 不变。高于当前模型的版本、无效信封及无法解析的内容返回 `flow.invalid`。
 
+Draft 请求的 operations 使用 `@oomol-lab/open-flow/control-requests` 的 `DraftOperation`：包含完整 ChangeOperation，以及 `graph.trigger.create`。
+后者接受 `nodeId`、`bindingId`、Provider `key`、`config` 和可选的 `connectionId`、`name`、`schedule`。仅在根 Flow 创建 Poll/Integration；schedule 仅供 Poll 使用，默认每五分钟。
+提供 connectionId 时创建 Connection binding，否则引用已有 bindingId。服务端在提交时解析 Provider 定义，转换为完整 ChangeOperation 并保存定义快照；持久化 Revision 格式不变。
+幂等请求摘要按原始 DraftOperation 计算，已提交请求在解析目录之前重放，目录变更不改变重试结果。未知 key 或批次后续操作失败时，不提交部分变更。
+CLI `schema`、MCP `flow_schema` 与 REST Draft decoder 使用同一个输入合同；底层离线 `applyFlowChanges` 仍只接受已解析的 ChangeOperation。
+
 Presentation 独立于 Draft head：
 
 ```ts
