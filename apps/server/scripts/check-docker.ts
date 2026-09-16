@@ -59,7 +59,9 @@ try {
         expectedRevisionId: flow.draftRevisionId,
         operations: [
           { kind: 'module.create', module: revision.modules.code, moduleId: 'code' },
+          { kind: 'graph.node.create', node: revision.document.graph.nodes.start, nodeId: 'start', target: { kind: 'flow' } },
           { kind: 'graph.node.create', node: revision.document.graph.nodes.code, nodeId: 'code', target: { kind: 'flow' } },
+          { kind: 'graph.edge.connect', edge: revision.document.graph.edges[0], target: { kind: 'flow' } },
         ],
         version: 1,
       }),
@@ -90,7 +92,7 @@ try {
     firstOrigin,
     '/v1/runs',
     {
-      body: JSON.stringify({ inputs: {}, publicationId: operation.publicationId, version: 1 }),
+      body: JSON.stringify({ inputs: {}, publicationId: operation.publicationId, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
       headers: { 'content-type': 'application/json', 'cookie': firstCookie, 'idempotency-key': `run-${suffix}` },
       method: 'POST',
     },
@@ -101,7 +103,7 @@ try {
   const events = await requestJson<{
     readonly events: readonly { readonly kind: string; readonly payload: Record<string, unknown>; readonly value?: unknown }[]
   }>(firstOrigin, `/v1/runs/${accepted.runId}/events`, { headers: { cookie: firstCookie } }, 200)
-  const output = events.events.find((event) => event.kind == 'node.completed')
+  const output = events.events.find((event) => event.kind == 'node.completed' && event.payload.nodeId == 'code')
   assert.deepEqual(output?.payload.outputs, { result: 42 })
 
   await stopContainer(firstContainer)
@@ -228,8 +230,9 @@ function codeFlow(): RevisionContent {
     document: {
       bindings: {},
       graph: {
-        edges: [],
+        edges: [{ source: 'start', target: 'code' }],
         nodes: {
+          start: { kind: 'manual', name: 'Start' },
           code: {
             inputs: {},
             kind: 'task',
