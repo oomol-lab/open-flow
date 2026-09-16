@@ -10,9 +10,9 @@ describe('Webhook Trigger protocol', () => {
     expect(webhookEndpointId(new URL('https://flow.example/v1/webhooks/endpoint_0123456789abcdef0123456789abcdef/'))).toBeUndefined()
   })
 
-  it('preserves the deployed keyed occurrence identity', async () => {
+  it('versions the keyed occurrence identity', async () => {
     await expect(webhookOccurrenceId('endpoint_0123456789abcdef0123456789abcdef', 7, 'delivery-1')).resolves.toBe(
-      'a398c8e440d2dd9b3ab39ea685982b85797e61f9e476e92ab77f274a7c4d9b71',
+      '6a671295c7f20d463ae19b712f85b5e2b669f3f917f3287751243979e8a5ad7e',
     )
   })
 

@@ -112,7 +112,7 @@ export const TriggerDefinitionSchema = /* @__PURE__ */ z.strictObject({
     })
     .optional(),
   config_schema: JsonObjectSchema,
-  payload_schema: JsonObjectSchema,
+  outputs: z.array(OutputHandleDefSchema).refine((ports) => new Set(ports.map((port) => port.handle)).size === ports.length),
 })
 
 export const TriggerPollTimeSchema = /* @__PURE__ */ z.discriminatedUnion('type', [

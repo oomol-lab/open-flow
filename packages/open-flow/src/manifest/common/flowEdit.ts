@@ -202,7 +202,7 @@ function sameTriggerSemantics(left: TriggerDefinitionSnapshot, right: TriggerDef
     dequal(left.definition.provisioning, right.definition.provisioning) &&
     dequal(left.definition.connector, right.definition.connector) &&
     dequal(left.definition.config_schema, right.definition.config_schema) &&
-    dequal(left.definition.payload_schema, right.definition.payload_schema)
+    dequal(left.definition.outputs, right.definition.outputs)
   )
 }
 
@@ -224,8 +224,13 @@ function connect(manifest: WritableFlowManifest, connection: z.infer<typeof conn
   if (!sourceNode) fail('node.not-found', `Source node "${sourceId}" does not exist.`, operationPath)
   const target = manifest.nodeManifests.get(targetId)
   if (!target) fail('node.not-found', `Target node "${targetId}" does not exist.`, operationPath)
-  if (WritableTriggerNodeManifest.is(sourceNode) && connection.from.handle != 'payload') {
-    fail('connection.invalid-source-handle', `Trigger "${sourceId}" only exposes the "payload" output.`, operationPath)
+  if (WritableTriggerNodeManifest.is(sourceNode)) {
+    const identity = sourceNode.$.trigger.value
+    const definition = manifest.$.trigger_definitions.value?.find(
+      (snapshot) => snapshot.type === identity?.type && snapshot.revision === identity?.revision,
+    )?.definition
+    if (!definition?.outputs.some((port) => port.handle === connection.from.handle))
+      fail('connection.invalid-source-handle', `Trigger "${sourceId}" does not declare output "${connection.from.handle}".`, operationPath)
   }
   if (WritableTriggerNodeManifest.is(target)) {
     fail('connection.invalid-target', `Trigger "${targetId}" does not accept input connections.`, operationPath)

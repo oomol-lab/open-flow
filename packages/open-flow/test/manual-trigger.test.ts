@@ -10,7 +10,7 @@ import { prepareFlow } from '../src/flow/common/semantics.ts'
 
 it('requires an entry and skips unrelated roots and other trigger branches', async () => {
   const content: RevisionContent = {
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
     document: {
       bindings: {},
@@ -47,7 +47,7 @@ it('requires an entry and skips unrelated roots and other trigger branches', asy
   await Effect.runPromise(
     runFlow(prepared.flow, {
       ...options,
-      trigger: { nodeId: 'manual', payload: {} },
+      trigger: { nodeId: 'manual', outputs: {} },
       emit: (event) =>
         Effect.sync(() => {
           if (event.type == 'node.started') started.push(event.nodeId)
@@ -55,12 +55,12 @@ it('requires an entry and skips unrelated roots and other trigger branches', asy
     }),
   )
   expect(started).toEqual(['selected'])
-  await expect(Effect.runPromise(runFlow(prepared.flow, { ...options, trigger: { nodeId: 'orphan', payload: {} } }))).rejects.toThrow('not a TriggerNode')
+  await expect(Effect.runPromise(runFlow(prepared.flow, { ...options, trigger: { nodeId: 'orphan', outputs: {} } }))).rejects.toThrow('not a TriggerNode')
 })
 
 it('rejects adding a second manual trigger and allows replacing the existing one', () => {
   const content: RevisionContent = {
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
     document: { bindings: {}, subflows: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
   }
@@ -73,7 +73,7 @@ it('rejects adding a second manual trigger and allows replacing the existing one
 
 it('rejects imported graphs with multiple manual triggers during preparation', async () => {
   const content: RevisionContent = {
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
     document: {
       bindings: {},

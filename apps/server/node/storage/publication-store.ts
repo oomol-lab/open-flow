@@ -541,7 +541,7 @@ export class PublicationStore {
           actor_id: input.metadata?.actorId ?? 'legacy',
           operation: input.metadata?.operation ?? 'publish',
           source_publication_id: input.metadata?.operation == 'rollback' ? input.metadata.sourcePublicationId : null,
-          model_version: input.metadata?.modelVersion ?? 1,
+          model_version: input.metadata?.modelVersion ?? 2,
           created_at: input.publishedAt,
         })
         this.#database

@@ -49,18 +49,24 @@ const snapshot = {
     required: ['teamId'],
     title: 'Linear Issue Changes',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description:
     'Watches new and updated issues in a Linear team with periodic checks. Starts from now without running existing issues. Reports observed current states, not deletions or every intermediate status change.',
   displayName: 'Issue Created or Updated',
   key: 'linear.on_issue_changed',
   name: 'on_issue_changed',
-  payloadSchema: {
-    type: 'object',
-    additionalProperties: false,
-    properties: { events: { type: 'array', items: issueSchema } },
-    required: ['events'],
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: { events: { type: 'array', items: issueSchema } },
+        required: ['events'],
+      },
+      nullable: false,
+    },
+  ],
   provider: 'linear',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }

@@ -88,7 +88,7 @@ export function createTriggerSession(
         diagnostics: [],
         engineContract: 'open-flow-engine/v4',
         flowId: flow.flowId,
-        modelVersion: 1,
+        modelVersion: 2,
         revisionDigest: revision().digest,
         revisionId: revision().revisionId,
         check: { kind: 'available' },

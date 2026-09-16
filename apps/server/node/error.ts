@@ -58,7 +58,7 @@ export class AcceptanceError extends Error {
     | 'revision-conflict'
     | 'revision-invalid'
     | 'trigger-invalid'
-    | 'trigger-payload-invalid'
+    | 'trigger-outputs-invalid'
 
   constructor(code: AcceptanceError['code'], message: string) {
     super(message)

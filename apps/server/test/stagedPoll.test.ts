@@ -20,17 +20,23 @@ const snapshot = {
     required: ['source'],
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Poll staging test definition.',
   displayName: 'Poll staging test',
   key: 'test.staged_poll',
   name: 'staged_poll',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: { type: 'object' }, type: 'array' } },
-    required: ['events'],
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: { type: 'object' }, type: 'array' } },
+        required: ['events'],
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'test',
   type: 'poll',
 } as const

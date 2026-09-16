@@ -865,7 +865,7 @@ export function NodeInspector({
         {selection?.kind === 'trigger' && selection.trigger.kind === 'webhook' && (
           <WebhookEditor
             key={`webhook:${selection.id}`}
-            inputs={selection.trigger.inputsDef}
+            bodyFields={selection.trigger.bodyFields}
             options={selection.trigger.options ?? {}}
             disabled={disabled}
             onChange={(settings) => {

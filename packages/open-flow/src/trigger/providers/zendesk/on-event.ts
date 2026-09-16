@@ -95,13 +95,19 @@ const snapshot = {
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'zendesk.on_event',
   name: 'on_event',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { body: { type: 'object' }, deliveryId: { type: 'string' }, event: { type: 'string' }, subject: { type: 'string' } },
-    required: ['event', 'deliveryId', 'body'],
-    title: 'Zendesk Event Payload',
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { body: { type: 'object' }, deliveryId: { type: 'string' }, event: { type: 'string' }, subject: { type: 'string' } },
+        required: ['event', 'deliveryId', 'body'],
+        title: 'Zendesk Event Payload',
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'zendesk',
   type: 'integration',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'integration' }

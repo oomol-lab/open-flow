@@ -87,18 +87,24 @@ const snapshot = {
     title: 'Notion Database Page Event Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Polls a Notion database and triggers when a page is added to it or an existing page is edited.',
   displayName: 'Database Page Added or Updated',
   key: 'notion.on_database_page_event',
   name: 'on_database_page_event',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: eventSchema, type: 'array' } },
-    required: ['events'],
-    title: 'Notion Database Page Event Payload',
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: eventSchema, type: 'array' } },
+        required: ['events'],
+        title: 'Notion Database Page Event Payload',
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'notion',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }

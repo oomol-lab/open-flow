@@ -237,6 +237,8 @@ LLM host。自建或自定义 Connector origin 不隐含模型能力，未配置
 Trigger 是 Flow graph 中的 source node。每张图最多有一个 Manual Trigger，由用户显式启动，不建立外部订阅或调度 binding。Webhook、Cron、Poll 和 Integration 的确定性协议、Provider definitions、Registry 与 conformance 属于公共
 package；subscription、checkpoint、调度持久化、endpoint routing 和 admission 事务属于部署实现。
 
+Trigger 的有序数据输出由公共 contract 统一定义和校验。接入适配器在准入前构造完整输出；Scheduler 和 checkpoint 只消费通用端口映射，不承担 Webhook 或 Provider 的事件投影。HTTP 请求重试身份由 Webhook 准入层定义，与 Flow 可见输出的数据范围分别管理。
+
 一次有效 Trigger occurrence 只能准入普通 Flow Run，之后复用相同的 Run、执行、事件、取消和 terminal 语义。重投 occurrence 必须通过稳定 identity
 和权威 store 约束为最多一个 Run。
 

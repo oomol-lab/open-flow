@@ -1,31 +1,9 @@
 import type { Schema, SchemaDraft } from '@cfworker/json-schema'
-import type { JsonValue, PortDefinition, SchemaKeyword, SchemaMismatch, TriggerNode } from './change.ts'
+import type { JsonValue, PortDefinition, SchemaKeyword, SchemaMismatch } from './change.ts'
 
 import { Validator } from '@cfworker/json-schema'
 import { compareJSONSchema, normalizeNullableSchemaPath } from '../../manifest/common/schemaCompare.ts'
 import { isSchemaKeyword } from './change.ts'
-
-export function triggerOutputPorts(trigger: TriggerNode): Readonly<Record<string, PortDefinition>> {
-  return trigger.kind === 'manual' ? {} : { payload: { jsonSchema: triggerPayloadSchema(trigger), nullable: false } }
-}
-
-export function triggerPayloadSchema(trigger: TriggerNode): JsonValue {
-  if (trigger.kind == 'poll' || trigger.kind == 'integration') return trigger.definition.payloadSchema
-  if (trigger.kind == 'manual') return { additionalProperties: false, type: 'object' }
-  if (trigger.kind == 'cron') {
-    return {
-      additionalProperties: false,
-      properties: { scheduledAt: { format: 'date-time', type: 'string' } },
-      type: 'object',
-    }
-  }
-  return {
-    additionalProperties: false,
-    properties: Object.fromEntries(trigger.inputsDef.map((input) => [input.handle, input.jsonSchema])),
-    required: trigger.inputsDef.filter((input) => !input.nullable && !Object.hasOwn(input, 'value')).map((input) => input.handle),
-    type: 'object',
-  }
-}
 
 function jsonEqual(left: JsonValue, right: JsonValue): boolean {
   if (left === right) return true

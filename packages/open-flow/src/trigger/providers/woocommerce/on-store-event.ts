@@ -46,21 +46,27 @@ const snapshot = {
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'woocommerce.on_store_event',
   name: 'on_store_event',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: {
-      body: { type: 'object' },
-      deliveryId: { type: 'string' },
-      event: { type: 'string' },
-      resource: { type: 'string' },
-      source: { type: 'string' },
-      topic: { type: 'string' },
-      webhookId: { type: 'string' },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: {
+          body: { type: 'object' },
+          deliveryId: { type: 'string' },
+          event: { type: 'string' },
+          resource: { type: 'string' },
+          source: { type: 'string' },
+          topic: { type: 'string' },
+          webhookId: { type: 'string' },
+        },
+        required: ['topic', 'resource', 'event', 'webhookId', 'deliveryId', 'source', 'body'],
+        title: 'WooCommerce Store Event Payload',
+        type: 'object',
+      },
+      nullable: false,
     },
-    required: ['topic', 'resource', 'event', 'webhookId', 'deliveryId', 'source', 'body'],
-    title: 'WooCommerce Store Event Payload',
-    type: 'object',
-  },
+  ],
   provider: 'woocommerce',
   type: 'integration',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'integration' }

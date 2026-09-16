@@ -70,18 +70,24 @@ const snapshot = {
     title: 'Airtable Record Change Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Polls an Airtable table and triggers when a record is created or updated, ordered by a time field.',
   displayName: 'Record Created or Updated',
   key: 'airtable.on_record_changed',
   name: 'on_record_changed',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: eventSchema, type: 'array' } },
-    required: ['events'],
-    title: 'Airtable Record Change Payload',
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: eventSchema, type: 'array' } },
+        required: ['events'],
+        title: 'Airtable Record Change Payload',
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'airtable',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }

@@ -36,7 +36,7 @@ const snapshot = {
     required: ['owner', 'repo', 'number'],
     title: 'Watch a Pull Request',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description:
     'Watches one pull request using notifications and periodic checks. Starts from its current state; reports observed changes, not every intermediate transition or review event.',
   displayName: 'Watch Pull Request',
@@ -45,12 +45,18 @@ const snapshot = {
   name: 'watch_pull_request',
   provider: 'github',
   type: 'integration',
-  payloadSchema: {
-    type: 'object',
-    additionalProperties: false,
-    properties: { pullRequest: pullRequestSchema, version: { type: 'string' } },
-    required: ['pullRequest', 'version'],
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: { pullRequest: pullRequestSchema, version: { type: 'string' } },
+        required: ['pullRequest', 'version'],
+      },
+      nullable: false,
+    },
+  ],
 } as const satisfies TriggerKeySnapshot & { readonly type: 'integration' }
 
 function hookConfig(config: Readonly<Record<string, JsonValue>>) {

@@ -87,23 +87,29 @@ const snapshot = {
     title: 'Telegram Bot Update Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Triggers when the connected Telegram bot receives a selected update.',
   displayName: 'Bot Update',
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 200 },
   key: 'telegram.on_update',
   name: 'on_update',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: {
-      body: { type: 'object' },
-      deliveryId: { type: 'string' },
-      event: { type: 'string' },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: {
+          body: { type: 'object' },
+          deliveryId: { type: 'string' },
+          event: { type: 'string' },
+        },
+        required: ['event', 'deliveryId', 'body'],
+        title: 'Telegram Bot Update Payload',
+        type: 'object',
+      },
+      nullable: false,
     },
-    required: ['event', 'deliveryId', 'body'],
-    title: 'Telegram Bot Update Payload',
-    type: 'object',
-  },
+  ],
   provider: 'telegram',
   type: 'integration',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'integration' }

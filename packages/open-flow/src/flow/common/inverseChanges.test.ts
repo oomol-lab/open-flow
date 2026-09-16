@@ -6,7 +6,7 @@ import { inverseFlowChanges } from './inverseChanges.ts'
 import { createCodeTask, createValue, deleteNodes } from './nodeChanges.ts'
 
 const target = { kind: 'flow' } as const
-const empty: RevisionContent = { modelVersion: 1, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {} } }
+const empty: RevisionContent = { modelVersion: 2, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {} } }
 function roundTrip(before: RevisionContent, operations: readonly ChangeOperation[]) {
   const after = applyFlowChanges(before, operations)
   const restored = applyFlowChanges(after, inverseFlowChanges(before, operations))

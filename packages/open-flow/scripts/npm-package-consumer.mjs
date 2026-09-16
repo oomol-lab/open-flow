@@ -16,7 +16,7 @@ const result = await Effect.runPromise(
       tasks: {},
     },
     {
-      trigger: { nodeId: 'start', payload: {} },
+      trigger: { nodeId: 'start', outputs: {} },
       createId: () => 'consumer-job',
       flowId: 'main',
       invokeTask: () => Effect.fail(new Error('Unexpected Task invocation.')),

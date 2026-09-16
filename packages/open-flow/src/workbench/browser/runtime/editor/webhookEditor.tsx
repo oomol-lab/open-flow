@@ -52,12 +52,12 @@ function TextField({
 const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
 
 export function WebhookEditor({
-  inputs,
+  bodyFields,
   options,
   disabled,
   onChange,
 }: {
-  readonly inputs: readonly InputPort[]
+  readonly bodyFields: readonly InputPort[]
   readonly options: WebhookOptions
   readonly disabled: boolean
   readonly onChange: (settings: WebhookSettings) => void
@@ -68,7 +68,7 @@ export function WebhookEditor({
     const next = { ...options }
     if (value === undefined) delete next[key]
     else next[key] = value
-    onChange({ inputs, options: next })
+    onChange({ bodyFields, options: next })
   }
   const changeHeaders = (next: Readonly<Record<string, string>>) => changeOption('responseHeaders', Object.keys(next).length === 0 ? undefined : next)
   return (
@@ -95,14 +95,14 @@ export function WebhookEditor({
           </div>
         </Field>
         <Field>
-          {inputs.length === 0 && <p className="text-sm text-muted-foreground">{t('webhookEditor.webhookNoPayloadFields')}</p>}
+          {bodyFields.length === 0 && <p className="text-sm text-muted-foreground">{t('webhookEditor.webhookNoBodyFields')}</p>}
           <PortDefinitionEditor
             layout="ports"
-            title={t('webhookEditor.webhookPayloadFields')}
-            values={inputs}
+            title={t('webhookEditor.webhookBodyFields')}
+            values={bodyFields}
             defaultNullable={false}
             disabled={disabled}
-            onChange={(next) => onChange({ inputs: next, options })}
+            onChange={(next) => onChange({ bodyFields: next, options })}
           />
         </Field>
         <p className="text-sm text-muted-foreground">{t('webhookEditor.webhookTestHint')}</p>

@@ -85,7 +85,7 @@ describe('RunDrawer terminal result', () => {
       engineContract: 'open-flow-engine/v4',
       engineDigest: 'sha256:engine',
       flowId: 'flow',
-      modelVersion: 1,
+      modelVersion: 2,
       revisionDigest: 'sha256:revision',
       revisionId: 'revision',
       runId: 'run',

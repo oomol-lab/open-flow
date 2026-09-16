@@ -17,7 +17,7 @@ function deferred<T>() {
 
 async function fixture(notify = true) {
   const content: RevisionContent = {
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
     document: {
       bindings: {},
@@ -73,7 +73,7 @@ async function fixture(notify = true) {
       createId: () => `job-${++nextId}`,
       flowId: 'main',
       runId: 'run',
-      trigger: { nodeId: 'start', payload: null },
+      trigger: { nodeId: 'start', outputs: {} },
       remainingMs: 1000,
       emit: (event: SchedulerEvent) =>
         Effect.sync(() => {

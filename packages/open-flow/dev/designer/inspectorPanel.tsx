@@ -35,7 +35,7 @@ const triggerNode: FlowCanvasViewTriggerNode = {
   presentation: { kind: 'manual', schedules: [] },
 }
 const content: RevisionContent = {
-  modelVersion: 1,
+  modelVersion: 2,
   modules: { review: { name: 'Review', imports: [], source: 'export default () => ({ summary: "Ready for review" })' } },
   document: {
     bindings: {},

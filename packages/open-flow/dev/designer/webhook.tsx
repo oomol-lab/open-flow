@@ -12,7 +12,7 @@ import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
   const [disabled, setDisabled] = useState(false)
-  const [webhook, setWebhook] = useState<WebhookSettings>({ inputs: [{ handle: 'event', jsonSchema: { type: 'object' }, nullable: false }], options: {} })
+  const [webhook, setWebhook] = useState<WebhookSettings>({ bodyFields: [{ handle: 'event', jsonSchema: { type: 'object' }, nullable: false }], options: {} })
   return (
     <I18nProvider i18n={i18n}>
       <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ padding: 24, maxWidth: 520 }}>
@@ -28,7 +28,7 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
             log('Save webhook', next)
           }}
         />
-        <TriggerSummary trigger={{ kind: 'webhook', name: 'Webhook', inputsDef: webhook.inputs, options: webhook.options }} />
+        <TriggerSummary trigger={{ kind: 'webhook', name: 'Webhook', bodyFields: webhook.bodyFields, options: webhook.options }} />
         <output aria-label="Saved webhook" style={{ overflowWrap: 'anywhere' }}>
           {JSON.stringify(webhook)}
         </output>

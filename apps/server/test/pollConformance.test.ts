@@ -30,17 +30,23 @@ const snapshot = {
     required: ['source'],
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Poll conformance definition.',
   displayName: 'Poll conformance',
   key: 'conformance.on_event',
   name: 'on_event',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: { type: 'object' }, type: 'array' } },
-    required: ['events'],
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: { type: 'object' }, type: 'array' } },
+        required: ['events'],
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'conformance',
   type: 'poll',
 } as const
@@ -65,7 +71,7 @@ function revision(config: Readonly<Record<string, JsonValue>>, connectionId: str
                 inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'poll', output: 'payload' }] } },
                 kind: 'task',
                 task: {
-                  inputs: [{ handle: 'event', jsonSchema: snapshot.payloadSchema, nullable: false }],
+                  inputs: [{ handle: 'event', jsonSchema: snapshot.outputs[0]!.jsonSchema, nullable: false }],
                   moduleId: 'module-main',
                   name: 'Main',
                   outputs: [],
@@ -77,7 +83,7 @@ function revision(config: Readonly<Record<string, JsonValue>>, connectionId: str
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { 'module-main': { imports: [], name: 'Main', source: 'export default function run() { return {} }' } },
   }
 }
@@ -173,12 +179,12 @@ async function createHarness(fixture: PollConformanceFixture): Promise<PollConfo
       try {
         const rows = database
           .prepare(
-            `SELECT trigger_occurrences.payload
+            `SELECT trigger_occurrences.outputs AS payload
              FROM poll_admissions JOIN trigger_occurrences USING (run_id)
              ORDER BY poll_admissions.rowid`,
           )
           .all() as { readonly payload: string }[]
-        return { calls, checkpoint: state.checkpoint, health: state.health, payloads: rows.map((row) => JSON.parse(row.payload)) }
+        return { calls, checkpoint: state.checkpoint, health: state.health, payloads: rows.map((row) => JSON.parse(row.payload).payload) }
       } finally {
         database.close()
       }

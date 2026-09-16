@@ -111,18 +111,24 @@ const snapshot = {
     title: 'Google Calendar Event Change Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Polls a Google Calendar and triggers when an event is created, updated or cancelled.',
   displayName: 'Event Changed',
   key: 'googlecalendar.on_event_changed',
   name: 'on_event_changed',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: eventSchema, type: 'array' } },
-    required: ['events'],
-    title: 'Google Calendar Event Change Payload',
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: eventSchema, type: 'array' } },
+        required: ['events'],
+        title: 'Google Calendar Event Change Payload',
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'googlecalendar',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }

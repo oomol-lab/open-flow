@@ -5,6 +5,7 @@ import type { RevisionValidator } from './flow-validation.ts'
 
 import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId } from '@oomol-lab/open-flow/cron-trigger'
 import { canonicalJsonBytes, decodeRevision, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
+import { matchesTriggerOutputs } from '@oomol-lab/open-flow/flow-semantics'
 import * as Effect from 'effect/Effect'
 import { isDeepStrictEqual } from 'node:util'
 
@@ -79,6 +80,8 @@ export class CronDriver {
         return yield* Effect.fail(new Error('Fixed Cron Trigger target does not match its Publication.'))
       }
       const scheduledAt = new Date(target.nextAt).toISOString()
+      const outputs = { payload: { scheduledAt } }
+      if (!matchesTriggerOutputs(trigger, outputs)) return yield* Effect.fail(new Error('Invalid Cron Trigger outputs.'))
       const occurrenceId = yield* Effect.tryPromise({
         try: () => scheduledTriggerOccurrenceId(target.bindingId, target.runtimeVersion, scheduledAt),
         catch: (error) => error,
@@ -91,7 +94,8 @@ export class CronDriver {
               flowId: target.flowId,
               kind: 'cron',
               occurrenceId,
-              payload: { scheduledAt },
+              outputs,
+              protocolVersion: 2,
               publicationId: target.publicationId,
               revisionDigest: fixed.revisionDigest,
               runtimeVersion: target.runtimeVersion,
@@ -102,6 +106,7 @@ export class CronDriver {
       })
       const accepted = this.#store.triggers.acceptCronTarget({
         ...target,
+        outputs,
         nextScheduledAt: nextTriggerScheduledAt(trigger.cronTimes, now),
         occurrenceId,
         requestDigest,

@@ -474,7 +474,7 @@ it('streams independent Flow catalog and current Flow invalidations', async () =
     )
     const accepted = await service.control.runs.createDraftRun(created.flowId, changed.revision.revisionId, currentEngineContract, {}, 'notification-run', {
       nodeId: 'marker',
-      payload: {},
+      outputs: {},
     })
     const runNotification = await reader.read()
     expect(new TextDecoder().decode(runNotification.value)).toBe(

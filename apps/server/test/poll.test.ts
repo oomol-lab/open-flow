@@ -49,17 +49,23 @@ const snapshot = {
     required: ['source'],
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Poll test definition.',
   displayName: 'Poll test',
   key: 'test.on_event',
   name: 'on_event',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: { type: 'object' }, type: 'array' } },
-    required: ['events'],
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: { type: 'object' }, type: 'array' } },
+        required: ['events'],
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'test',
   type: 'poll',
 } as const
@@ -83,7 +89,7 @@ function revision(source = 'primary'): RevisionContent {
             inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'poll', output: 'payload' }] } },
             kind: 'task',
             task: {
-              inputs: [{ handle: 'event', jsonSchema: snapshot.payloadSchema, nullable: false }],
+              inputs: [{ handle: 'event', jsonSchema: snapshot.outputs[0]!.jsonSchema, nullable: false }],
               moduleId: 'module-main',
               name: 'Main',
               outputs: [],
@@ -94,7 +100,7 @@ function revision(source = 'primary'): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { 'module-main': { imports: [], name: 'Main', source: 'export default function run() { return {} }' } },
   }
 }

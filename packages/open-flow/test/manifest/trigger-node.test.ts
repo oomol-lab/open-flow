@@ -30,14 +30,20 @@ const triggerDefinition = {
       },
     },
     provisioning: { kind: 'webhook' },
-    payload_schema: {
-      type: 'object',
-      additionalProperties: true,
-      required: ['ref'],
-      properties: {
-        ref: { type: 'string' },
+    outputs: [
+      {
+        handle: 'payload',
+        json_schema: {
+          type: 'object',
+          additionalProperties: true,
+          required: ['ref'],
+          properties: {
+            ref: { type: 'string' },
+          },
+        },
+        nullable: false,
       },
-    },
+    ],
   },
 } as const
 
@@ -125,7 +131,7 @@ describe('Trigger node authoring', () => {
         trigger_definitions: [
           {
             ...triggerDefinition,
-            definition: { ...triggerDefinition.definition, payload_schema: { type: 'string' } },
+            definition: { ...triggerDefinition.definition, outputs: [{ handle: 'payload', json_schema: { type: 'invalid' }, nullable: false }] },
           },
         ],
         nodes: [triggerNode],
@@ -303,7 +309,7 @@ describe('Trigger node authoring', () => {
               ...triggerDefinition,
               definition: {
                 ...triggerDefinition.definition,
-                payload_schema: { additionalProperties: false, type: 'object' },
+                outputs: [{ handle: 'payload', json_schema: { additionalProperties: false, type: 'object' }, nullable: false }],
               },
             },
           },
@@ -373,7 +379,7 @@ describe('Trigger node authoring', () => {
           },
         ]),
       ),
-    ).toThrow('only exposes the "payload" output')
+    ).toThrow('does not declare output "unknown"')
     expect(() =>
       planFlowEdit(
         source,
@@ -409,7 +415,8 @@ describe('Trigger node authoring', () => {
       expect(node?.$.allOutputHandleDefs.value).toEqual([
         {
           handle: 'payload',
-          json_schema: triggerDefinition.definition.payload_schema,
+          json_schema: triggerDefinition.definition.outputs[0]!.json_schema,
+          nullable: false,
         },
       ])
     } finally {
@@ -417,4 +424,27 @@ describe('Trigger node authoring', () => {
       context.dispose()
     }
   })
+})
+
+it('connects every declared Trigger output through schema validation and shared Flow edits', () => {
+  const snapshot = {
+    ...triggerDefinition,
+    definition: {
+      ...triggerDefinition.definition,
+      outputs: [
+        { handle: 'message', json_schema: { type: 'string' }, nullable: false },
+        { handle: 'count', json_schema: { type: 'number' }, nullable: false },
+      ],
+    },
+  }
+  for (const handle of ['message', 'count']) {
+    const source = stringify({ trigger_definitions: [snapshot], nodes: [triggerNode, taskNode] })
+    const result = planFlowEdit(
+      source,
+      FlowEditOperationsSchema.parse([
+        { type: 'connect', connection: { from: { nodeId: 'github-push', handle }, to: { nodeId: 'consume', handle: 'event' } } },
+      ]),
+    )
+    expect(() => FlowSchema.parse(result.flow)).not.toThrow()
+  }
 })

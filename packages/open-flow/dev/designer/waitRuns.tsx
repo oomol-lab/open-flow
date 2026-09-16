@@ -38,7 +38,7 @@ const base: RunDetails = {
   closureDigest: 'lab',
   engineContract: 'open-flow-engine/v4',
   engineDigest: 'lab',
-  modelVersion: 1,
+  modelVersion: 2,
   revisionDigest: 'lab',
   waits,
 }

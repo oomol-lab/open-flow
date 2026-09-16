@@ -63,7 +63,7 @@ function connectorFlow(options: { readonly action?: string; readonly connectionI
         },
       },
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
   }
 }
@@ -102,7 +102,7 @@ function capabilityFlow(declared = true): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {
       capability: {
         imports: [],

@@ -94,18 +94,24 @@ const snapshot = {
     title: 'Google Drive Folder Change Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Polls one Google Drive folder and triggers when a file or folder directly inside it is created or updated.',
   displayName: 'File or Folder Change in a Folder',
   key: 'googledrive.on_file_change',
   name: 'on_file_change',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: eventSchema, type: 'array' } },
-    required: ['events'],
-    title: 'Google Drive File Change Payload',
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: eventSchema, type: 'array' } },
+        required: ['events'],
+        title: 'Google Drive File Change Payload',
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'googledrive',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }

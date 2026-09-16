@@ -173,7 +173,7 @@ function rollbackRequest(harness: ControlApiConformanceHarness, flowId: string, 
 
 function liveRunRequest(harness: ControlApiConformanceHarness, publicationId: string, key: string): Promise<Response> {
   return request(harness, '/v1/runs', {
-    body: JSON.stringify({ inputs: {}, trigger: { nodeId: 'start', payload: {} }, publicationId, version: 1 }),
+    body: JSON.stringify({ inputs: {}, trigger: { nodeId: 'start', outputs: {} }, publicationId, version: 2 }),
     headers: { 'idempotency-key': key },
     method: 'POST',
   })
@@ -190,7 +190,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
         request(harness, `/v1/flows/${flowId}/revisions/${revisionId}/runs`, {
           method: 'POST',
           headers: { 'idempotency-key': 'concurrent-run' },
-          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', payload }, version: 1 }),
+          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', outputs: payload }, version: 2 }),
         })
       const responses = await Promise.all([submit(), submit(), submit(), submit()])
       equal(responses.map((response) => response.status).toSorted(), [200, 200, 200, 202], 'One Run is admitted')
@@ -432,7 +432,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       const initial = await addManualTrigger(harness, flowId, requiredString(flow.draftRevisionId, 'Partial Draft identity'))
       const changed = await json(
         await changeRequest(harness, flowId, initial, [
-          { kind: 'graph.node.create', nodeId: 'other', target: { kind: 'flow' }, node: { kind: 'webhook', name: 'Other', inputsDef: [] } },
+          { kind: 'graph.node.create', nodeId: 'other', target: { kind: 'flow' }, node: { kind: 'webhook', name: 'Other', bodyFields: [] } },
           {
             kind: 'graph.node.create',
             nodeId: 'broken',
@@ -459,7 +459,12 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
         request(harness, `${path}/runs`, {
           method: 'POST',
           headers: { 'idempotency-key': `partial-${nodeId}` },
-          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId, payload: {} }, version: 1 }),
+          body: JSON.stringify({
+            engineContract,
+            inputs: {},
+            trigger: { nodeId, outputs: nodeId === 'start' ? {} : { headers: {}, query: {}, body: {}, webhookUrl: 'http://example.com/webhook' } },
+            version: 2,
+          }),
         })
       await json(await run('start'), 202, 'Run valid entry')
       await error(await run('other'), 400, 'flow.invalid', 'Reject invalid entry branch')
@@ -482,10 +487,10 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       )
       equal(checked.valid, true, 'Flow validity')
       const runPath = `/v1/flows/${flowId}/revisions/${draftRevisionId}/runs`
-      for (const trigger of [undefined, { nodeId: 'missing', payload: {} }, { nodeId: 'start', payload: { unexpected: true } }]) {
+      for (const trigger of [undefined, { nodeId: 'missing', outputs: {} }, { nodeId: 'start', outputs: { payload: { unexpected: true } } }]) {
         await error(
           await request(harness, runPath, {
-            body: JSON.stringify({ engineContract, inputs: {}, trigger, version: 1 }),
+            body: JSON.stringify({ engineContract, inputs: {}, trigger, version: 2 }),
             headers: { 'idempotency-key': `invalid-entry-${JSON.stringify(trigger)}` },
             method: 'POST',
           }),
@@ -496,7 +501,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       }
       const create = () =>
         request(harness, runPath, {
-          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
+          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', outputs: {} }, version: 2 }),
           headers: { 'idempotency-key': 'draft-run' },
           method: 'POST',
         })
@@ -505,7 +510,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       equal(await json(await create(), 200, 'Replay Draft Run'), run, 'Replayed Draft Run')
       await error(
         await request(harness, runPath, {
-          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'another', payload: {} }, version: 1 }),
+          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'another', outputs: {} }, version: 2 }),
           headers: { 'idempotency-key': 'draft-run' },
           method: 'POST',
         }),
@@ -517,7 +522,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       await error(await request(harness, `/v1/runs/${runId}/result`), 409, 'run.not-terminal', 'Read queued Run result')
       const secondRun = await json(
         await request(harness, runPath, {
-          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
+          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', outputs: {} }, version: 2 }),
           headers: { 'idempotency-key': 'draft-run-second' },
           method: 'POST',
         }),
@@ -603,7 +608,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       const create = async (key: string, message: string) =>
         json(
           await request(harness, runPath, {
-            body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
+            body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', outputs: {} }, version: 2 }),
             headers: { 'idempotency-key': key },
             method: 'POST',
           }),
@@ -740,7 +745,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       await error(await check(missingRevision, engineContract), 404, 'flow.not-found', 'Check missing Revision')
       const run = (targetRevision: string, contract: string, key: string) =>
         request(harness, `/v1/flows/${flowId}/revisions/${targetRevision}/runs`, {
-          body: JSON.stringify({ engineContract: contract, inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
+          body: JSON.stringify({ engineContract: contract, inputs: {}, trigger: { nodeId: 'start', outputs: {} }, version: 2 }),
           headers: { 'idempotency-key': key },
           method: 'POST',
         })
@@ -775,7 +780,7 @@ export const publicationControlApiConformanceCases: readonly ControlApiConforman
         await request(harness, `/v1/flows/${flowId}/revisions/${revisionId}/runs`, {
           method: 'POST',
           headers: { 'idempotency-key': 'disabled-draft' },
-          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
+          body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', outputs: {} }, version: 2 }),
         }),
         202,
         'Disabled Flow permits Draft test',
@@ -918,7 +923,7 @@ export const triggerControlApiConformanceCases: readonly ControlApiConformanceCa
             nodeId: 'cron',
             target: { kind: 'flow' },
           },
-          { kind: 'graph.node.create', node: { inputsDef: [], kind: 'webhook', name: 'Incoming' }, nodeId: 'webhook', target: { kind: 'flow' } },
+          { kind: 'graph.node.create', node: { bodyFields: [], kind: 'webhook', name: 'Incoming' }, nodeId: 'webhook', target: { kind: 'flow' } },
         ]),
         200,
         'Create Trigger nodes',

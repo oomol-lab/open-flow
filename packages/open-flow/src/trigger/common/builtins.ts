@@ -1,12 +1,14 @@
 import type { TriggerCatalogCompatibleItem, TriggerCatalogIdentity } from './catalog.ts'
 
+import { webhookOutputs } from './contract.ts'
+
 export const BUILT_IN_TRIGGER_NAMESPACE = 'open-flow.'
 export const WEBHOOK_TYPE = 'open-flow.webhook'
-export const WEBHOOK_REVISION = '1'
+export const WEBHOOK_REVISION = '2'
 
 export const webhookTrigger: TriggerCatalogCompatibleItem = {
   compatible: true,
-  definitionDigest: 'sha256:7012e189e7b95977c347af49bba04f523e45ccdcbfcfe45d295efa2e7a7051e8',
+  definitionDigest: 'sha256:be38773c7273ed490be13a5c30abbc3300c4262b96614d73fb351e01fb36d9dc',
   icon: ':carbon:webhook:',
   revision: WEBHOOK_REVISION,
   trigger: {
@@ -18,10 +20,7 @@ export const webhookTrigger: TriggerCatalogCompatibleItem = {
       },
       name: 'Webhook',
       provisioning: { kind: 'webhook' },
-      payload_schema: {
-        additionalProperties: true,
-        type: 'object',
-      },
+      outputs: webhookOutputs.map(({ jsonSchema, ...port }) => Object.assign({}, port, { json_schema: jsonSchema })),
       service_id: 'open-flow',
       service_name: 'Open Flow',
     },

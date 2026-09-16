@@ -13,7 +13,11 @@ test('publishes a stable built-in Webhook definition without provider configurat
     webhookTrigger.definitionDigest,
     await computeTriggerDefinitionDigest({
       configSchema: webhookTrigger.trigger.definition.config_schema,
-      payloadSchema: webhookTrigger.trigger.definition.payload_schema,
+      outputs: webhookTrigger.trigger.definition.outputs.map(({ json_schema, ...port }) => ({
+        ...port,
+        nullable: port.nullable ?? false,
+        jsonSchema: json_schema ?? {},
+      })),
       provisioning: 'webhook',
       revision: WEBHOOK_REVISION,
       serviceId: webhookTrigger.trigger.definition.service_id,
@@ -54,6 +58,7 @@ test('publishes a stable built-in Webhook definition without provider configurat
 test('keeps the built-in Trigger namespace out of provider Catalog responses', async () => {
   const item = await normalizeTriggerCatalogSourceItem({
     configSchema: { additionalProperties: false, type: 'object' },
+    outputs: [],
     description: 'Webhook event',
     displayName: 'Webhook',
     key: webhookTrigger.type,

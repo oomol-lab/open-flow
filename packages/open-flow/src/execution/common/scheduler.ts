@@ -14,6 +14,7 @@ import { agentInput } from '../../flow/common/agent.ts'
 import { portsByHandle } from '../../flow/common/change.ts'
 import { graphOrder, waitOutputPorts } from '../../flow/common/graph.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
+import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
 
 type ExecutableNode = Exclude<GraphNode, TriggerNode>
 
@@ -138,7 +139,7 @@ export interface FlowRunCheckpoint {
   readonly inputs: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>
   readonly results: Readonly<Record<string, { readonly jobId: string; readonly outputs: Readonly<Record<string, JsonValue>> }>>
   readonly skipped: readonly string[]
-  readonly version: 3
+  readonly version: 4
   readonly waits: readonly PendingWait[]
   readonly agents: Readonly<
     Record<
@@ -184,7 +185,7 @@ export type TaskInvocation = TaskInvocationBase &
 
 export interface TriggerSeed {
   readonly nodeId: string
-  readonly payload: JsonValue
+  readonly outputs: Readonly<Record<string, JsonValue>>
 }
 
 export interface SchedulerFailure {
@@ -319,7 +320,7 @@ const agentResultSchema = z.union([
 export function decodeFlowRunCheckpoint(input: unknown): FlowRunCheckpoint {
   const source = checkpointRecord(input, 'Flow Run checkpoint')
   checkpointExact(source, ['agents', 'bindingValues', 'inputs', 'results', 'skipped', 'version', 'waits'], 'Flow Run checkpoint')
-  if (source.version != 3) throw new Error('Flow Run checkpoint version is unsupported.')
+  if (source.version != 4) throw new Error('Flow Run checkpoint version is unsupported.')
   const bindingValues = Object.fromEntries(
     Object.entries(checkpointRecord(source.bindingValues, 'Checkpoint bindings')).map(([id, value]) => {
       if (typeof value != 'string') throw new Error('Checkpoint binding must be a string.')
@@ -381,7 +382,7 @@ export function decodeFlowRunCheckpoint(input: unknown): FlowRunCheckpoint {
     waits.add(pending.waitId)
   }
   if (Object.keys(agents).some((id) => !nodes.has(id))) throw new Error('Checkpoint Agent has no waiting node.')
-  return { agents, bindingValues, inputs, results, skipped, version: 3, waits: pendingWaits }
+  return { agents, bindingValues, inputs, results, skipped, version: 4, waits: pendingWaits }
 }
 
 function jsonEqual(left: JsonValue, right: JsonValue): boolean {
@@ -577,11 +578,7 @@ function validateCheckpoint(
       const result = completed.get(id)
       if (result != null) {
         triggers++
-        const validOutputs =
-          node.kind === 'manual'
-            ? Object.keys(result.outputs).length === 0
-            : Object.keys(result.outputs).length === 1 && Object.hasOwn(result.outputs, 'payload')
-        if (!validOutputs) throw new Error('Checkpoint Trigger output is invalid.')
+        if (!matchesTriggerOutputs(node, result.outputs)) throw new Error('Checkpoint Trigger output is invalid.')
       }
       continue
     }
@@ -678,9 +675,13 @@ function runGraph(
       const started = new Set(completed.keys())
       const launch = resume?.checkpoint.inputs ?? launchInputs
       if (resume == null) {
+        if (trigger != null) {
+          const node = target.graph.nodes[trigger.nodeId]
+          if (node == null || 'inputs' in node || !matchesTriggerOutputs(node, trigger.outputs)) throw new Error('Trigger outputs are invalid.')
+        }
         for (const [id, node] of Object.entries(target.graph.nodes)) {
           if ('inputs' in node) continue
-          if (trigger?.nodeId == id) completed.set(id, { jobId: id, outputs: node.kind === 'manual' ? {} : { payload: trigger.payload } })
+          if (trigger?.nodeId == id) completed.set(id, { jobId: id, outputs: trigger.outputs })
           else skipped.add(id)
         }
       }
@@ -1041,7 +1042,7 @@ function runGraph(
             inputs: launch,
             results: Object.fromEntries(completed),
             skipped: [...skipped].toSorted(),
-            version: 3,
+            version: 4,
             agents,
             waits: [...pendingWaits.values()],
           }

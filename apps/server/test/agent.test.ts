@@ -470,7 +470,7 @@ it('resumes a streamed gateway batch after restart and retains earlier receipts 
       idempotencyKey: 'agent-run',
       revisionId: 'revision',
       revision: {
-        modelVersion: 1,
+        modelVersion: 2,
         modules: {},
         document: {
           bindings: {},
@@ -706,7 +706,7 @@ it('runs a code-only Agent through the service without a Connector deployment', 
       idempotencyKey: 'code-run',
       revisionId: 'revision',
       revision: {
-        modelVersion: 1,
+        modelVersion: 2,
         modules: {},
         document: {
           bindings: {},

@@ -2,14 +2,14 @@
 
 公共入口、序列化格式、Control API 和运行语义分别拥有版本，不能互相替代。
 
-| 版本              | 当前值                                        | 约束                                                             |
-| ----------------- | --------------------------------------------- | ---------------------------------------------------------------- |
-| npm package       | package manifest 的精确版本                   | 固定实现、类型、Workbench 资产和一致性测试集。部署锁定同一版本。 |
-| Revision envelope | `kind: open-flow-flow-revision`、`version: 1` | 固定 UTF-8 JSON 信封字段和 canonical bytes 规则。                |
-| Flow model        | `modelVersion: 1`                             | 固定 document、modules、节点和端口的序列化结构。                 |
-| Control API       | `/v1`、JSON `version: 1`                      | 固定请求字段、响应、错误码、CAS 和幂等行为。                     |
-| Engine Contract   | `open-flow-engine/v4`                         | 固定执行、Trigger、Task 返回、Wait 和取消语义。                  |
-| MCP               | `2026-07-28`                                  | 固定 Streamable HTTP 协商；工具的产品语义复用 Control API。      |
+| 版本              | 当前值                                              | 约束                                                             |
+| ----------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
+| npm package       | package manifest 的精确版本                         | 固定实现、类型、Workbench 资产和一致性测试集。部署锁定同一版本。 |
+| Revision envelope | `kind: open-flow-flow-revision`、`version: 1`       | 固定 UTF-8 JSON 信封字段和 canonical bytes 规则。                |
+| Flow model        | `modelVersion: 2`                                   | 固定 document、modules、节点和端口的序列化结构。                 |
+| Control API       | `/v1`、Run 创建请求 `version: 2`，其他 `version: 1` | 固定请求字段、响应、错误码、CAS 和幂等行为。                     |
+| Engine Contract   | `open-flow-engine/v4`                               | 固定执行、Trigger、Task 返回、Wait 和取消语义。                  |
+| MCP               | `2026-07-28`                                        | 固定 Streamable HTTP 协商；工具的产品语义复用 Control API。      |
 
 这些数字相同或不同都不表示兼容。旧版本也可能曾使用 `modelVersion: 1`；不得仅凭版本字段接受其内容。完整结构解码必须先于语义验证和执行。
 已有不符合当前结构的 Revision 不得在读取时改写或重新计算其原有 digest；必须拒绝执行，并通过独立、可审核的数据迁移或重建产生新 Revision。
@@ -61,3 +61,5 @@ checkpoint 使用自己的格式版本和状态一致性校验，不能用隔离
 
 本次移除 digest 中历史的图语义标签会使隔离运行时标识变化一次。固定旧 digest 的 Run 沿用既有不匹配拒绝路径；
 不重写历史 Run 的标识，也不增加旧标识别名。此后仅修改 Scheduler 规则不会再造成隔离运行时 digest 变化。
+
+Trigger 输出协议使用有序 outputs 定义，Provider definitionVersion 和 Webhook revision 为 2；定义摘要协议版本为 2。Scheduler checkpoint 版本为 4，拒绝旧版本恢复。SQLite migration 19 只重命名输出存储列，不将旧内容转换成新契约。

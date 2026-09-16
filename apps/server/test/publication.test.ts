@@ -38,7 +38,7 @@ function revision(name = 'Incoming', webhook = true): RevisionContent {
           ...(webhook
             ? {
                 incoming: {
-                  inputsDef: [{ handle: 'message', ...message }],
+                  bodyFields: [{ handle: 'message', ...message }],
                   kind: 'webhook' as const,
                   name,
                   options: { responseData: name, responseStatusCode: 202 },
@@ -50,7 +50,7 @@ function revision(name = 'Incoming', webhook = true): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
   }
 }
@@ -77,7 +77,7 @@ function variableRevision(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { main: { imports: [], name: 'Main', source: 'export default () => ({})' } },
   }
 }
@@ -308,8 +308,20 @@ describe('Server Publication and Webhook target', () => {
     })
     if (second.kind != 'published') throw new Error('Second Publication unexpectedly conflicted.')
 
-    await expect(service.acceptWebhookTarget(stale, 'delivery-during-publish', { message: 'hello' })).resolves.toBeUndefined()
-    const accepted = await service.acceptWebhookTarget(service.webhookTarget(endpointId)!, 'delivery-during-publish', { message: 'hello' })
+    await expect(
+      service.acceptWebhookTarget(stale, 'delivery-during-publish', 'POST', {
+        headers: {},
+        query: {},
+        body: { message: 'hello' },
+        webhookUrl: 'http://server.local/webhook',
+      }),
+    ).resolves.toBeUndefined()
+    const accepted = await service.acceptWebhookTarget(service.webhookTarget(endpointId)!, 'delivery-during-publish', 'POST', {
+      headers: {},
+      query: {},
+      body: { message: 'hello' },
+      webhookUrl: 'http://server.local/webhook',
+    })
     expect(accepted).toMatchObject({ created: true, kind: 'accepted', status: 'queued' })
   })
 })

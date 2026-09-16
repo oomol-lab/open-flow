@@ -67,7 +67,7 @@ export class RunControl {
     const stored = this.store.flows.revision(flowId, revisionId)
     if (stored == null) notFound()
     const content = revisionContent(stored)
-    if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and payload.')
+    if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and outputs.')
     const fixed = await this.prepareRun(content, engineContract, trigger.nodeId)
     await this.checkRunActions(fixed.flow, flowId)
     if (validateFlowInputs(content, inputs) != 'valid') throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
@@ -115,7 +115,7 @@ export class RunControl {
     }
     const content = revisionContent(stored)
     const fixed = await this.prepareRun(content, livePublication.engineContract)
-    if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and payload.')
+    if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and outputs.')
     const inputsValid = validateFlowInputs(content, inputs) == 'valid'
     if (!inputsValid) throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
     if (fixed.flow.closureDigest != livePublication.closureDigest || content.modelVersion != livePublication.modelVersion) {

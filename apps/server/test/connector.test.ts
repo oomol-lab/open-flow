@@ -60,7 +60,7 @@ function connectorFlow(timeoutMs?: number, optionalNull = false): RevisionConten
         },
       },
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
   }
 }
@@ -103,7 +103,7 @@ function capabilityFlow(
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {
       capability: {
         imports: [],
@@ -253,7 +253,7 @@ describe('Server Connector host', () => {
       code: 'connector.connection-required',
     })
     await expect(
-      service.control.runs.createDraftRun(stored.flowId, stored.revisionId, 'open-flow-engine/v4', {}, 'run', { nodeId: 'start', payload: {} }),
+      service.control.runs.createDraftRun(stored.flowId, stored.revisionId, 'open-flow-engine/v4', {}, 'run', { nodeId: 'start', outputs: {} }),
     ).rejects.toMatchObject({
       code: 'connector.connection-required',
     })
@@ -454,7 +454,7 @@ describe('Server Connector host', () => {
     ])
     const accepted = await service.control.runs.createDraftRun(created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v4', {}, 'team-run', {
       nodeId: 'start',
-      payload: {},
+      outputs: {},
     })
     await service.waitForIdle()
 

@@ -478,7 +478,7 @@ export class PollStore {
     readonly nextContinuationPage: number
     readonly nextContinuationRootId: string | null
     readonly page: number
-    readonly payload: JsonValue | null
+    readonly outputs: Readonly<Record<string, JsonValue>> | null
     readonly providerEventIds: readonly string[]
     readonly requestDigest: string | null
     readonly rootOccurrenceId: string
@@ -530,14 +530,14 @@ export class PollStore {
       if (current == null) return { kind: 'ignored' }
 
       let accepted: RunAcceptance | undefined
-      if (input.payload != null && input.requestDigest != null) {
+      if (input.outputs != null && input.requestDigest != null) {
         const admission = this.#acceptTriggerOccurrence({
           content: input.target.content,
           closureDigest: input.target.closureDigest,
           flowId: input.target.flowId,
           modelVersion: input.target.modelVersion,
           occurrenceId: input.claimId,
-          payload: input.payload,
+          outputs: input.outputs,
           publicationId: input.target.publicationId,
           requestDigest: input.requestDigest,
           revisionDigest: input.target.revisionDigest,
@@ -566,7 +566,7 @@ export class PollStore {
               .run(input.target.bindingId, providerEventId, accepted.runId, input.completedAt, input.claimExpiresAt)
           }
         }
-      } else if (input.payload != null || input.requestDigest != null || input.providerEventIds.length != 0) {
+      } else if (input.outputs != null || input.requestDigest != null || input.providerEventIds.length != 0) {
         throw new TypeError('Poll page Run input is incomplete.')
       }
 

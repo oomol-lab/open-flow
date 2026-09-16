@@ -4,7 +4,7 @@ import { applyFlowChanges, changeOperationsSchema, decodeChangeOperations } from
 
 const target = { kind: 'flow' }
 const operations = [
-  { kind: 'graph.node.create', target, nodeId: 'start', node: { kind: 'webhook', name: 'Start', inputsDef: [] } },
+  { kind: 'graph.node.create', target, nodeId: 'start', node: { kind: 'webhook', name: 'Start', bodyFields: [] } },
   {
     kind: 'graph.node.create',
     target,
@@ -23,7 +23,7 @@ const operations = [
 
 describe('ChangeOperation wire contract', () => {
   it('decodes an atomic creation and mapping batch without changing its meaning', () => {
-    const content = { modelVersion: 1 as const, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } } }
+    const content = { modelVersion: 2 as const, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } } }
     expect(applyFlowChanges(content, decodeChangeOperations(operations)).document.graph.nodes.pause).toMatchObject({
       kind: 'wait',
       inputs: { value: operations[3]?.value },

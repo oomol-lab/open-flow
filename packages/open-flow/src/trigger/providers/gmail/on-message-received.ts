@@ -78,18 +78,24 @@ const snapshot = {
     title: 'Gmail Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Polls the Gmail mailbox and triggers when a new message is received.',
   displayName: 'New Message Received',
   key: 'gmail.on_message_received',
   name: 'on_message_received',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: eventSchema, type: 'array' } },
-    required: ['events'],
-    title: 'Gmail New Message Payload',
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: eventSchema, type: 'array' } },
+        required: ['events'],
+        title: 'Gmail New Message Payload',
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'gmail',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }

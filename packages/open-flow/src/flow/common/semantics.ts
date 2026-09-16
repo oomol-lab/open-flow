@@ -1,6 +1,8 @@
+import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
+export { matchesTriggerOutputs, triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/common/contract.ts'
 import type { EngineContract } from '../../execution/common/engineContract.ts'
 import type { RuntimeProgram } from '../../execution/common/runtime.ts'
-import type { ConnectorCapability, FlowDocument, Graph, InputMapping, JsonValue, RevisionContent, SchemaMismatch } from './change.ts'
+import type { ConnectorCapability, FlowDocument, Graph, InputMapping, RevisionContent, SchemaMismatch } from './change.ts'
 
 import { findEngineContract } from '../../execution/common/engineContract.ts'
 import { agentConfigIssues } from './agent.ts'
@@ -8,10 +10,10 @@ import { decodeConnectorCapabilities } from './change.ts'
 import { canonicalGraph, canonicalJsonBytes, canonicalModule, canonicalOutputs, canonicalPorts, canonicalTask, digestBytes } from './encoding.ts'
 import { nodeInputPorts, validateFlowGraph } from './graph.ts'
 import { compareDiagnostics, validateModuleGraph } from './modules.ts'
-import { hasRetiredRef, matchesSchema, triggerPayloadSchema } from './schema.ts'
+import { hasRetiredRef } from './schema.ts'
 export { availableOutputs, graphOrder, nodeInputPorts } from './graph.ts'
 export { validateModules } from './modules.ts'
-export { matchesSchema, triggerPayloadSchema, variableInputCompatible } from './schema.ts'
+export { matchesSchema, variableInputCompatible } from './schema.ts'
 export { agentInput, agentToolInput, agentToolSchema } from './agent.ts'
 
 export interface SemanticClosure {
@@ -133,7 +135,7 @@ export async function flowClosure(content: RevisionContent): Promise<SemanticClo
         ]
       }),
     ),
-    version: 1,
+    version: 2,
   })
   return { dependencies, digest: await digestBytes(bytes) }
 }
@@ -168,10 +170,10 @@ export type FlowInputsValidation = 'invalid' | 'valid'
 export function validRunTrigger(revision: RevisionContent, value: unknown): boolean {
   if (value == null || typeof value != 'object' || Array.isArray(value)) return false
   const trigger = value as Readonly<Record<string, unknown>>
-  if (Object.keys(trigger).some((key) => key != 'nodeId' && key != 'payload') || typeof trigger.nodeId != 'string' || !Object.hasOwn(trigger, 'payload'))
+  if (Object.keys(trigger).some((key) => key != 'nodeId' && key != 'outputs') || typeof trigger.nodeId != 'string' || !Object.hasOwn(trigger, 'outputs'))
     return false
   const node = revision.document.graph.nodes[trigger.nodeId]
-  return node != null && !('inputs' in node) && matchesSchema(trigger.payload as JsonValue, triggerPayloadSchema(node))
+  return node != null && !('inputs' in node) && matchesTriggerOutputs(node, trigger.outputs)
 }
 
 export function validateFlowInputs(revision: RevisionContent, value: unknown): FlowInputsValidation {

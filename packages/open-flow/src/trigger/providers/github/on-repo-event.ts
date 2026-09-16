@@ -88,13 +88,19 @@ const snapshot = {
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'github.on_repo_event',
   name: 'on_repo_event',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { body: { type: 'object' }, deliveryId: { type: 'string' }, event: { type: 'string' } },
-    required: ['event', 'deliveryId', 'body'],
-    title: 'GitHub Repo Event Payload',
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { body: { type: 'object' }, deliveryId: { type: 'string' }, event: { type: 'string' } },
+        required: ['event', 'deliveryId', 'body'],
+        title: 'GitHub Repo Event Payload',
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'github',
   type: 'integration',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'integration' }

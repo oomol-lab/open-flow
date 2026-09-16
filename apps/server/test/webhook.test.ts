@@ -42,7 +42,7 @@ function webhookFlow(): RevisionContent {
         edges: [{ source: 'incoming', target: 'capture' }],
         nodes: {
           capture: {
-            inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'incoming', output: 'payload' }] } },
+            inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'incoming', output: 'body' }] } },
             kind: 'task',
             task: {
               inputs: [{ ...payloadPort, handle: 'event' }],
@@ -52,7 +52,7 @@ function webhookFlow(): RevisionContent {
             },
           },
           incoming: {
-            inputsDef: [{ handle: 'message', ...stringPort }],
+            bodyFields: [{ handle: 'message', ...stringPort }],
             kind: 'webhook',
             name: 'Incoming',
           },
@@ -61,7 +61,7 @@ function webhookFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {
       capture: { imports: [], name: 'Capture', source: 'export default ({ event }) => ({ message: event.message })' },
     },
@@ -100,8 +100,18 @@ describe('Server Webhook Trigger admission', () => {
     const target = await publishedWebhook(service)
 
     const [first, second] = await Promise.all([
-      service.acceptWebhookTarget(target, 'delivery-1', { message: 'hello' }),
-      service.acceptWebhookTarget(target, 'delivery-1', { message: 'hello' }),
+      service.acceptWebhookTarget(target, 'delivery-1', 'POST', {
+        headers: {},
+        query: {},
+        body: { message: 'hello' },
+        webhookUrl: 'http://server.local/webhook',
+      }),
+      service.acceptWebhookTarget(target, 'delivery-1', 'POST', {
+        headers: {},
+        query: {},
+        body: { message: 'hello' },
+        webhookUrl: 'http://server.local/webhook',
+      }),
     ])
     if (first == null || second == null) throw new Error('Concurrent matching occurrences lost their current target.')
     if (first.kind != 'accepted' || second.kind != 'accepted') throw new Error('Concurrent matching occurrences unexpectedly conflicted.')
@@ -118,13 +128,27 @@ describe('Server Webhook Trigger admission', () => {
     })
     expect(service.events(accepted.runId).some((event) => event.payload.nodeId == 'incoming')).toBe(false)
 
-    await expect(service.acceptWebhookTarget(target, 'delivery-1', { message: 'hello' })).resolves.toMatchObject({
+    await expect(
+      service.acceptWebhookTarget(target, 'delivery-1', 'POST', {
+        headers: {},
+        query: {},
+        body: { message: 'hello' },
+        webhookUrl: 'http://server.local/webhook',
+      }),
+    ).resolves.toMatchObject({
       created: false,
       runId: accepted.runId,
       status: 'completed',
     })
 
-    await expect(service.acceptWebhookTarget(target, 'delivery-1', { message: 'different' })).resolves.toEqual({ kind: 'conflict' })
+    await expect(
+      service.acceptWebhookTarget(target, 'delivery-1', 'POST', {
+        headers: {},
+        query: {},
+        body: { message: 'different' },
+        webhookUrl: 'http://server.local/webhook',
+      }),
+    ).resolves.toEqual({ kind: 'conflict' })
   })
 
   it('bounds pending Runs without blocking idempotent replay', async () => {
@@ -132,10 +156,29 @@ describe('Server Webhook Trigger admission', () => {
     services.push(service)
     const target = await publishedWebhook(service)
 
-    const first = await service.acceptWebhookTarget(target, 'delivery-1', { message: 'hello' })
+    const first = await service.acceptWebhookTarget(target, 'delivery-1', 'POST', {
+      headers: {},
+      query: {},
+      body: { message: 'hello' },
+      webhookUrl: 'http://server.local/webhook',
+    })
     if (first == null || first.kind != 'accepted') throw new Error('Initial Webhook occurrence was not accepted.')
-    await expect(service.acceptWebhookTarget(target, 'delivery-2', { message: 'hello' })).resolves.toEqual({ kind: 'overloaded' })
-    await expect(service.acceptWebhookTarget(target, 'delivery-1', { message: 'hello' })).resolves.toMatchObject({
+    await expect(
+      service.acceptWebhookTarget(target, 'delivery-2', 'POST', {
+        headers: {},
+        query: {},
+        body: { message: 'hello' },
+        webhookUrl: 'http://server.local/webhook',
+      }),
+    ).resolves.toEqual({ kind: 'overloaded' })
+    await expect(
+      service.acceptWebhookTarget(target, 'delivery-1', 'POST', {
+        headers: {},
+        query: {},
+        body: { message: 'hello' },
+        webhookUrl: 'http://server.local/webhook',
+      }),
+    ).resolves.toMatchObject({
       created: false,
       runId: first.runId,
       status: 'queued',
@@ -143,7 +186,7 @@ describe('Server Webhook Trigger admission', () => {
     await expect(
       service.control.runs.createDraftRun(target.flowId, target.revisionId, target.engineContract, {}, 'manual-run', {
         nodeId: target.triggerNodeId,
-        payload: { message: 'hello' },
+        outputs: { headers: {}, query: {}, body: { message: 'hello' }, webhookUrl: 'http://server.local/webhook' },
       }),
     ).rejects.toMatchObject({
       code: 'run.overloaded',
@@ -239,7 +282,12 @@ describe('Server Webhook Trigger admission', () => {
     let service = await openService(file)
     services.push(service)
     const target = await publishedWebhook(service)
-    const accepted = await service.acceptWebhookTarget(target, 'delivery-1', { message: 'hello' })
+    const accepted = await service.acceptWebhookTarget(target, 'delivery-1', 'POST', {
+      headers: {},
+      query: {},
+      body: { message: 'hello' },
+      webhookUrl: 'http://server.local/webhook',
+    })
     if (accepted == null) throw new Error('Initial Webhook target disappeared.')
     if (accepted.kind != 'accepted') throw new Error('Initial Webhook occurrence unexpectedly conflicted.')
     expect(service.run(accepted.runId)?.status).toBe('queued')
@@ -251,7 +299,14 @@ describe('Server Webhook Trigger admission', () => {
     await service.waitForIdle()
     expect(service.run(accepted.runId)?.status).toBe('completed')
     expect(service.events(accepted.runId).filter((event) => event.kind == 'run.completed')).toHaveLength(1)
-    await expect(service.acceptWebhookTarget(target, 'delivery-1', { message: 'hello' })).resolves.toMatchObject({
+    await expect(
+      service.acceptWebhookTarget(target, 'delivery-1', 'POST', {
+        headers: {},
+        query: {},
+        body: { message: 'hello' },
+        webhookUrl: 'http://server.local/webhook',
+      }),
+    ).resolves.toMatchObject({
       created: false,
       runId: accepted.runId,
       status: 'completed',
@@ -263,7 +318,16 @@ describe('Server Webhook Trigger admission', () => {
     services.push(service)
     const target = await publishedWebhook(service)
 
-    await expect(service.acceptWebhookTarget(target, 'delivery-1', { message: 42 })).rejects.toMatchObject({ code: 'trigger-payload-invalid' })
-    await expect(service.acceptWebhookTarget({ ...target, triggerNodeId: 'capture' }, 'delivery-1', { message: 'hello' })).resolves.toBeUndefined()
+    await expect(
+      service.acceptWebhookTarget(target, 'delivery-1', 'POST', { headers: {}, query: {}, body: { message: 42 }, webhookUrl: 'http://server.local/webhook' }),
+    ).rejects.toMatchObject({ code: 'trigger-outputs-invalid' })
+    await expect(
+      service.acceptWebhookTarget({ ...target, triggerNodeId: 'capture' }, 'delivery-1', 'POST', {
+        headers: {},
+        query: {},
+        body: { message: 'hello' },
+        webhookUrl: 'http://server.local/webhook',
+      }),
+    ).resolves.toBeUndefined()
   })
 })

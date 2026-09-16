@@ -15,7 +15,7 @@ const task = { inputs: {}, kind: 'task' as const, task: { inputs: [{ ...port, ha
 function revision(graph: Graph): RevisionContent {
   return {
     document: { bindings: {}, graph, subflows: {}, tasks: {} },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { main: { imports: [], name: 'Main', source: 'export default () => ({})' } },
   }
 }
@@ -136,7 +136,7 @@ describe('Execution graph scheduling', () => {
         createId: () => String(++id),
         flowId: 'main',
         runId: 'run',
-        trigger: { nodeId: 'start', payload: {} },
+        trigger: { nodeId: 'start', outputs: {} },
         emit: (event) =>
           Effect.sync(() => {
             if ('nodeId' in event) eventNodes.push(event.nodeId)
@@ -189,7 +189,7 @@ describe('Execution graph scheduling', () => {
     let id = 0
     const options = { waits: waitHost(), createId: () => String(++id), flowId: 'main', runId: 'run' }
     const first = await advanceWaiting(
-      runFlow(prepared.flow, { ...options, trigger: { nodeId: 'start', payload: {} }, invokeTask: () => Effect.succeed({ value: 42 }) }),
+      runFlow(prepared.flow, { ...options, trigger: { nodeId: 'start', outputs: {} }, invokeTask: () => Effect.succeed({ value: 42 }) }),
     )
     if (first.kind != 'waiting') throw new Error('Expected Wait.')
     const calls: unknown[] = []
@@ -277,7 +277,7 @@ it('does not treat eventual action values as available on the notification path'
   const content = revision(graph)
   const result = await prepareFlow(content, currentEngineContract)
   expect(result.kind).toBe('flow-invalid')
-  expect(availableOutputs(content.document, graph, 'notify')).toEqual({ start: ['payload'], wait: ['notification'] })
+  expect(availableOutputs(content.document, graph, 'notify')).toEqual({ wait: ['notification'] })
 })
 
 it.each([true, false])('runs with null from either an available nullable source or a missing branch source: %s', async (takeSource) => {
@@ -331,7 +331,7 @@ it.each([true, false])('runs with null from either an available nullable source 
         if (event.type == 'node.log') logs.push(event.message)
       }),
   }
-  const first = await advanceWaiting(runFlow(prepared.flow, { ...options, trigger: { nodeId: 'start', payload: null } }))
+  const first = await advanceWaiting(runFlow(prepared.flow, { ...options, trigger: { nodeId: 'start', outputs: {} } }))
   if (first.kind != 'waiting') throw new Error('Expected waiting')
   expect(calls.map((call) => call.nodeId).toSorted()).toEqual(['after', 'independent', 'join'])
   expect(calls.find((call) => call.nodeId == 'join')?.input).toEqual({ input: null })
@@ -385,7 +385,7 @@ it('runs a shared descendant with null when its only input source belongs to ano
       createId: () => 'job',
       flowId: 'main',
       runId: 'run',
-      trigger: { nodeId: 'second', payload: null },
+      trigger: { nodeId: 'second', outputs: {} },
       invokeTask: () =>
         Effect.sync(() => {
           invoked = true

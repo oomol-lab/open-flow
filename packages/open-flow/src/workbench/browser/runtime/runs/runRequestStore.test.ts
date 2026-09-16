@@ -39,13 +39,13 @@ const draft: Draft = {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { module: { imports: [], name: 'Code', source: 'export default () => ({})' } },
   },
   createdAt: timestamp,
   digest: 'digest',
   flowId: flow.flowId,
-  modelVersion: 1,
+  modelVersion: 2,
   parentRevisionId: null,
   revisionId: flow.draftRevisionId,
   version: 1,
@@ -109,7 +109,7 @@ it('starts directly from the only manual trigger', async () => {
   const { client, store } = harness()
   try {
     expect(await store.requestDraft(flow, entryDraft())).toBe('started')
-    expect(client.createDraftRun).toHaveBeenCalledWith('flow', 'revision', expect.objectContaining({ trigger: { nodeId: 'start', payload: {} } }))
+    expect(client.createDraftRun).toHaveBeenCalledWith('flow', 'revision', expect.objectContaining({ trigger: { nodeId: 'start', outputs: {} } }))
     expect(store.$.inputRequest.value).toBeUndefined()
   } finally {
     store.dispose()
@@ -144,7 +144,7 @@ it.each([false, true])('starts a cron test immediately with an explicit selectio
     expect(client.createDraftRun).toHaveBeenCalledExactlyOnceWith(
       'flow',
       'revision',
-      expect.objectContaining({ trigger: { nodeId: 'start', payload: {} }, inputs: {} }),
+      expect.objectContaining({ trigger: { nodeId: 'start', outputs: { payload: {} } }, inputs: {} }),
     )
     expect(client.createLiveRun).not.toHaveBeenCalled()
   } finally {
@@ -166,7 +166,7 @@ it('collects downstream inputs for a cron test without asking for a trigger payl
     expect(client.createDraftRun).toHaveBeenCalledExactlyOnceWith(
       'flow',
       'revision',
-      expect.objectContaining({ trigger: { nodeId: 'start', payload: {} }, inputs: { task: { value: 'test' } } }),
+      expect.objectContaining({ trigger: { nodeId: 'start', outputs: { payload: {} } }, inputs: { task: { value: 'test' } } }),
     )
   } finally {
     store.dispose()
@@ -178,7 +178,7 @@ it('auto-selects the first entry when a graph has multiple triggers', async () =
   try {
     expect(await store.requestDraft(flow, entryDraft(true))).toBe('started')
     expect(store.$.inputRequest.value).toBeUndefined()
-    expect(client.createDraftRun).toHaveBeenCalledWith('flow', 'revision', expect.objectContaining({ trigger: { nodeId: 'start', payload: {} } }))
+    expect(client.createDraftRun).toHaveBeenCalledWith('flow', 'revision', expect.objectContaining({ trigger: { nodeId: 'start', outputs: {} } }))
   } finally {
     store.dispose()
   }
@@ -205,7 +205,7 @@ it('uses the fixed Live revision and its first entry', async () => {
   try {
     expect(await store.requestLive(flow)).toBe('started')
     expect(client.getRevision).toHaveBeenCalledWith('flow', 'published')
-    expect(client.createLiveRun).toHaveBeenCalledWith('publication', expect.objectContaining({ trigger: { nodeId: 'start', payload: {} } }))
+    expect(client.createLiveRun).toHaveBeenCalledWith('publication', expect.objectContaining({ trigger: { nodeId: 'start', outputs: {} } }))
   } finally {
     store.dispose()
   }
@@ -216,7 +216,7 @@ it('runs the manual entry selected on the canvas without reopening entry selecti
   try {
     expect(await store.requestDraft(flow, entryDraft(true), 'other')).toBe('started')
     expect(store.$.inputRequest.value).toBeUndefined()
-    expect(client.createDraftRun).toHaveBeenCalledWith('flow', 'revision', expect.objectContaining({ trigger: { nodeId: 'other', payload: {} } }))
+    expect(client.createDraftRun).toHaveBeenCalledWith('flow', 'revision', expect.objectContaining({ trigger: { nodeId: 'other', outputs: {} } }))
   } finally {
     store.dispose()
   }
@@ -251,7 +251,7 @@ it('flushes pending code again before confirming inputs and uses the saved revis
     expect(createDraftRun).toHaveBeenCalledWith(
       'flow',
       'saved-revision',
-      expect.objectContaining({ inputs: { task: { value: 'test' } }, trigger: { nodeId: 'start', payload: {} } }),
+      expect.objectContaining({ inputs: { task: { value: 'test' } }, trigger: { nodeId: 'start', outputs: {} } }),
     )
   } finally {
     store.dispose()
@@ -271,7 +271,7 @@ it('remembers valid test data for the selected trigger and reuses it on the next
     expect(client.createDraftRun).toHaveBeenCalledWith(
       'flow',
       'revision',
-      expect.objectContaining({ inputs: { task: { value: 'remembered' } }, trigger: { nodeId: 'start', payload: {} } }),
+      expect.objectContaining({ inputs: { task: { value: 'remembered' } }, trigger: { nodeId: 'start', outputs: {} } }),
     )
   } finally {
     store.dispose()
@@ -326,7 +326,7 @@ function webhookDraft(): Draft {
       ...revision.content,
       document: {
         ...revision.content.document,
-        graph: { edges: [], nodes: { start: { kind: 'webhook', name: 'Webhook', inputsDef: [], options: {} } } },
+        graph: { edges: [], nodes: { start: { kind: 'webhook', name: 'Webhook', bodyFields: [], options: {} } } },
       },
     },
   }
@@ -367,23 +367,24 @@ it('preserves missing webhook data across untouched open/close cycles', async ()
   }
 })
 
-it('remembers explicitly entered empty payloads and keeps cleared data missing', async () => {
+it('remembers explicitly entered empty bodies and keeps cleared data missing', async () => {
   const { client, store } = harness()
   const revision = webhookDraft()
   try {
     await store.editDraft(flow, revision, 'start')
-    store.$.inputRequest.value?.groups[0]?.editor.setValue('payload', {})
+    const outputs = { headers: {}, query: {}, body: {}, webhookUrl: 'http://example.com/webhook' }
+    store.$.inputRequest.value?.groups[0]?.editor.replaceValues(outputs)
     store.dismissInputs()
     expect(store.inputStatus(flow.flowId, revision, 'start')).toBe('ready')
     expect(await store.requestDraft(flow, revision, 'start')).toBe('started')
-    expect(client.createDraftRun).toHaveBeenCalledWith('flow', 'revision', expect.objectContaining({ trigger: { nodeId: 'start', payload: {} } }))
+    expect(client.createDraftRun).toHaveBeenCalledWith('flow', 'revision', expect.objectContaining({ trigger: { nodeId: 'start', outputs } }))
     await store.editDraft(flow, revision, 'start')
-    expect(store.$.inputRequest.value?.groups[0]?.editor.values()).toEqual({ payload: {} })
-    store.$.inputRequest.value?.groups[0]?.editor.setValue('payload', undefined)
+    expect(store.$.inputRequest.value?.groups[0]?.editor.values()).toEqual(outputs)
+    store.$.inputRequest.value?.groups[0]?.editor.setValue('body', undefined)
     store.dismissInputs()
     expect(store.inputStatus(flow.flowId, revision, 'start')).toBe('missing')
     await store.editDraft(flow, revision, 'start')
-    expect(store.$.inputRequest.value?.groups[0]?.editor.values()).toEqual({})
+    expect(store.$.inputRequest.value?.groups[0]?.editor.values()).toEqual({ headers: {}, query: {}, webhookUrl: outputs.webhookUrl })
   } finally {
     store.dispose()
   }

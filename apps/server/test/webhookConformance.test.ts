@@ -26,7 +26,7 @@ function revision(fixture: WebhookConformanceFixture, enabled = true): RevisionC
         nodes: enabled
           ? {
               webhook: {
-                inputsDef: fixture.inputsDef,
+                bodyFields: fixture.bodyFields,
                 kind: 'webhook',
                 name: 'Incoming webhook',
                 ...(fixture.options == null ? {} : { options: fixture.options }),
@@ -37,7 +37,7 @@ function revision(fixture: WebhookConformanceFixture, enabled = true): RevisionC
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
   }
 }
@@ -66,20 +66,20 @@ async function createHarness(fixture: WebhookConformanceFixture): Promise<Webhoo
       await closeService(service)
       await rm(directory, { force: true, recursive: true })
     },
-    async payloads() {
+    async outputs() {
       const database = new DatabaseSync(file, { readOnly: true })
       try {
         const rows = database
           .prepare(
-            `SELECT trigger_occurrences.payload
+            `SELECT trigger_occurrences.outputs
              FROM webhook_admissions
              JOIN trigger_occurrences USING (run_id)
              JOIN runs USING (run_id)
              WHERE webhook_admissions.endpoint_id = ?
              ORDER BY runs.rowid`,
           )
-          .all(endpointId) as { readonly payload: string }[]
-        return rows.map((row) => JSON.parse(row.payload) as JsonValue)
+          .all(endpointId) as { readonly outputs: string }[]
+        return rows.map((row) => JSON.parse(row.outputs) as Readonly<Record<string, JsonValue>>)
       } finally {
         database.close()
       }

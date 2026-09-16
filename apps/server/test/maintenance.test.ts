@@ -34,11 +34,11 @@ function pause(store: Store, clock: () => number, flowId: string, notify = false
     flowId,
     idempotencyKey: `run:${flowId}`,
     inputs: {},
-    modelVersion: 1,
+    modelVersion: 2,
     requestDigest: flowId,
     revisionDigest: 'revision',
     revisionId,
-    trigger: { nodeId: 'start', payload: {} },
+    trigger: { nodeId: 'start', outputs: {} },
     variableNames: [],
   })
   if (accepted.kind != 'accepted') throw new Error('Run was not accepted.')
@@ -55,7 +55,7 @@ function pause(store: Store, clock: () => number, flowId: string, notify = false
   expect(
     store.runs.wait(
       runId,
-      { kind: 'waiting', checkpoint: { bindingValues: {}, inputs: {}, results: {}, skipped: [], version: 3, agents: {}, waits: [{ ...wait, value: null }] } },
+      { kind: 'waiting', checkpoint: { bindingValues: {}, inputs: {}, results: {}, skipped: [], version: 4, agents: {}, waits: [{ ...wait, value: null }] } },
       1000,
     ),
   ).toBe(true)

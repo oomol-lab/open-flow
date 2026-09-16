@@ -2,7 +2,8 @@ import type { JsonValue, TriggerNode } from '../../src/flow/common/change.ts'
 import type { Draft, Flow } from '../../src/workbench/browser/runtime/api.ts'
 
 import snapshots from 'virtual:lab-trigger-snapshots'
-import { schemaObject, triggerPayloadSchema } from '../../src/flow/common/schema.ts'
+import { schemaObject } from '../../src/flow/common/schema.ts'
+import { triggerOutputDefinitions } from '../../src/trigger/common/contract.ts'
 
 // Sample values only; schemas and validation remain owned by production code.
 function sample(schema: JsonValue): JsonValue {
@@ -46,7 +47,7 @@ const configExamples: Readonly<Record<string, Readonly<Record<string, JsonValue>
 export interface TriggerFixture {
   readonly id: string
   readonly trigger: TriggerNode
-  readonly payload: JsonValue
+  readonly outputs: Readonly<Record<string, JsonValue>>
 }
 
 const builtins: readonly TriggerNode[] = [
@@ -62,7 +63,7 @@ const builtins: readonly TriggerNode[] = [
   {
     kind: 'webhook',
     name: 'Webhook',
-    inputsDef: [
+    bodyFields: [
       { handle: 'event', jsonSchema: { type: 'string' }, nullable: false },
       { handle: 'orderId', jsonSchema: { type: 'string' }, nullable: false },
     ],
@@ -72,7 +73,14 @@ const builtins: readonly TriggerNode[] = [
 
 export const triggerFixtures: readonly TriggerFixture[] = [
   ...builtins.map(
-    (trigger): TriggerFixture => ({ id: trigger.kind, trigger, payload: trigger.kind === 'webhook' ? { event: 'order.created', orderId: 'order_123' } : {} }),
+    (trigger): TriggerFixture => ({
+      id: trigger.kind,
+      trigger,
+      outputs:
+        trigger.kind === 'webhook'
+          ? { headers: {}, query: {}, body: { event: 'order.created', orderId: 'order_123' }, webhookUrl: 'https://example.com/webhook' }
+          : Object.fromEntries(triggerOutputDefinitions(trigger).map((port) => [port.handle, sample(port.jsonSchema)])),
+    }),
   ),
   ...snapshots.map((definition): TriggerFixture => {
     const properties = schemaObject(schemaObject(definition.configSchema)?.properties as JsonValue) ?? {}
@@ -83,7 +91,11 @@ export const triggerFixtures: readonly TriggerFixture[] = [
       definition.type === 'poll'
         ? { ...common, kind: 'poll', definition, pollTimes: [{ type: 'every', unit: 'minute', value: 5 }] }
         : { ...common, kind: 'integration', definition }
-    return { id: definition.key.replaceAll('.', '-').replaceAll('_', '-'), trigger, payload: sample(triggerPayloadSchema(trigger)) }
+    return {
+      id: definition.key.replaceAll('.', '-').replaceAll('_', '-'),
+      trigger,
+      outputs: Object.fromEntries(triggerOutputDefinitions(trigger).map((port) => [port.handle, sample(port.jsonSchema)])),
+    }
   }),
 ]
 
@@ -103,12 +115,12 @@ export function triggerDraft(trigger: TriggerNode, downstream = false): { flow: 
     createdAt: timestamp,
     digest: 'lab',
     flowId: flow.flowId,
-    modelVersion: 1,
+    modelVersion: 2,
     parentRevisionId: null,
     revisionId: flow.draftRevisionId,
     version: 1,
     content: {
-      modelVersion: 1,
+      modelVersion: 2,
       modules: {},
       document: {
         bindings: { account: { kind: 'connection', target: 'lab-account' } },
@@ -140,16 +152,20 @@ export function triggerDraft(trigger: TriggerNode, downstream = false): { flow: 
   return { flow, draft }
 }
 
-// Boundary samples use production Webhook definitions and payload schema derivation.
+// Boundary samples use production Webhook definitions and output contract derivation.
 export const webhookValueFixtures: readonly TriggerFixture[] = [
-  { id: 'Empty fixed object', trigger: { kind: 'webhook', name: 'Empty request', inputsDef: [], options: {} }, payload: {} },
+  {
+    id: 'Empty fixed object',
+    trigger: { kind: 'webhook', name: 'Empty request', bodyFields: [], options: {} },
+    outputs: { headers: {}, query: {}, body: {}, webhookUrl: 'https://example.com/webhook' },
+  },
   {
     id: 'Nested objects and arrays',
     trigger: {
       kind: 'webhook',
       name: 'Nested request',
       options: {},
-      inputsDef: [
+      bodyFields: [
         {
           handle: 'data',
           nullable: false,
@@ -166,6 +182,6 @@ export const webhookValueFixtures: readonly TriggerFixture[] = [
         },
       ],
     },
-    payload: { data: { empty: {}, fields: {}, items: [{ name: 'One' }] } },
+    outputs: { headers: {}, query: {}, body: { data: { empty: {}, fields: {}, items: [{ name: 'One' }] } }, webhookUrl: 'https://example.com/webhook' },
   },
 ]

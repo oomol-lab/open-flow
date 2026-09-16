@@ -57,18 +57,24 @@ const snapshot = {
     required: ['mode'],
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Integration runtime test definition.',
   displayName: 'Integration runtime test',
   endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 202 },
   key: 'test.on_event',
   name: 'on_event',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { body: { type: 'object' }, deliveryId: { type: 'string' }, event: { type: 'string' } },
-    required: ['body', 'deliveryId', 'event'],
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { body: { type: 'object' }, deliveryId: { type: 'string' }, event: { type: 'string' } },
+        required: ['body', 'deliveryId', 'event'],
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'test',
   type: 'integration',
 } as const
@@ -103,7 +109,7 @@ function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient'): Rev
             inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'integration', output: 'payload' }] } },
             kind: 'task',
             task: {
-              inputs: [{ handle: 'event', jsonSchema: snapshot.payloadSchema, nullable: false }],
+              inputs: [{ handle: 'event', jsonSchema: snapshot.outputs[0]!.jsonSchema, nullable: false }],
               moduleId: 'module-main',
               name: 'Main',
               outputs: [],
@@ -114,7 +120,7 @@ function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient'): Rev
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { 'module-main': { imports: [], name: 'Main', source: 'export default function run() { return {} }' } },
   }
 }
@@ -696,14 +702,14 @@ describe('Server change listener', () => {
     const poll: PollDefinition = {
       snapshot: {
         configSchema: { type: 'object' },
-        definitionVersion: 1,
+        definitionVersion: 2,
         description: 'Poll reader',
         displayName: 'Poll reader',
         key: 'test.poll',
         name: 'poll',
         provider: 'test',
         type: 'poll',
-        payloadSchema: { type: 'object' },
+        outputs: [{ handle: 'payload', jsonSchema: { type: 'object' }, nullable: false }],
       },
       async poll({ checkpoint }) {
         reads.push({ kind: 'poll', checkpoint })
@@ -720,7 +726,7 @@ describe('Server change listener', () => {
         idempotencyKey: next('publish'),
         revisionId: next('revision'),
         revision: {
-          modelVersion: 1,
+          modelVersion: 2,
           modules: {},
           document: {
             bindings: { connection: { kind: 'connection', target: 'connection-main' } },

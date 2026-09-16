@@ -68,7 +68,7 @@ export async function acceptRun(service: ServerService, input: Input): Promise<R
       input.idempotencyKey,
       {
         nodeId: 'start',
-        payload: {},
+        outputs: {},
       },
     )
     return { created: accepted.created, kind: 'accepted', runId: accepted.run.runId, status: accepted.run.status }

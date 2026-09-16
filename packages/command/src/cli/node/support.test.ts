@@ -11,7 +11,7 @@ describe('Flow apply Code Actions', () => {
     const node = spec.nodes.code
     if (node?.kind != 'code') throw new Error('Expected Code node.')
     const content = applyFlowChanges(
-      { modelVersion: 1, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } } },
+      { modelVersion: 2, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } } },
       createCodeTask({ kind: 'flow' }, { moduleId: 'main', nodeId: 'code' }, node.name, undefined, {
         inputs: [],
         outputs: [],

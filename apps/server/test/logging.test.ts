@@ -61,7 +61,7 @@ function failingFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { main: { imports: [], name: 'Main', source: "export default () => { throw new Error('user-secret-must-not-leak') }" } },
   }
 }
@@ -184,7 +184,7 @@ it('logs the cause of an invalid Draft structure without copying the request bod
       operations: [
         {
           kind: 'graph.node.create',
-          node: { inputsDef: 'request-body-secret', kind: 'webhook', name: 'Webhook' },
+          node: { bodyFields: 'request-body-secret', kind: 'webhook', name: 'Webhook' },
           nodeId: 'webhook',
           target: { kind: 'flow' },
         },

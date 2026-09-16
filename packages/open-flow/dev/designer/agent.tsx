@@ -42,7 +42,7 @@ function createSession(language: UiLanguage, log: LogAction) {
     version: 1,
   }
   let content: RevisionContent = applyFlowChanges(
-    { modelVersion: 1, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] }, subflows: {}, tasks: {} } },
+    { modelVersion: 2, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] }, subflows: {}, tasks: {} } },
     createAgentTask({ kind: 'flow' }, { nodeId: 'agent', taskId: 'agent-task' }, 'Research agent'),
   )
   let sequence = 1
@@ -51,7 +51,7 @@ function createSession(language: UiLanguage, log: LogAction) {
     createdAt: timestamp,
     digest: `digest-${sequence}`,
     flowId: flow.flowId,
-    modelVersion: 1,
+    modelVersion: 2,
     parentRevisionId: sequence === 1 ? null : `revision-${sequence - 1}`,
     revisionId: `revision-${sequence}`,
     version: 1,
@@ -80,7 +80,7 @@ function createSession(language: UiLanguage, log: LogAction) {
         diagnostics: [],
         engineContract: 'open-flow-engine/v4',
         flowId: flow.flowId,
-        modelVersion: 1,
+        modelVersion: 2,
         revisionDigest: revision().digest,
         revisionId: revision().revisionId,
         check: { kind: 'available' },

@@ -48,13 +48,13 @@ function draft(source: string): Draft {
         subflows: {},
         tasks: {},
       },
-      modelVersion: 1,
+      modelVersion: 2,
       modules: { module: { imports: [], name: 'Code', source } },
     },
     createdAt: '2026-08-26T00:00:00.000Z',
     digest: 'digest',
     flowId: 'flow',
-    modelVersion: 1,
+    modelVersion: 2,
     parentRevisionId: null,
     revisionId: 'revision',
     version: 1,
@@ -416,7 +416,7 @@ describe('Provider Trigger changes', () => {
       {
         definition: {
           configSchema: { additionalProperties: false, type: 'object' },
-          definitionVersion: 1,
+          definitionVersion: 2,
           description: 'Runs when a repository changes.',
           displayName: 'Repository event',
           endpoint: {
@@ -426,7 +426,7 @@ describe('Provider Trigger changes', () => {
           },
           key: 'github.on_repo_event',
           name: 'on_repo_event',
-          payloadSchema: { additionalProperties: true, type: 'object' },
+          outputs: [{ handle: 'payload', jsonSchema: { additionalProperties: true, type: 'object' }, nullable: false }],
           provider: 'github',
           type: 'integration',
         },
@@ -632,22 +632,22 @@ describe('Webhook product editing', () => {
           ...base.content.document,
           graph: {
             edges: [],
-            nodes: { hook: { kind: 'webhook' as const, name: 'Inbound', inputsDef: [] } },
+            nodes: { hook: { kind: 'webhook' as const, name: 'Inbound', bodyFields: [] } },
           },
         },
       },
     }
     const settings = {
-      inputs: [{ handle: 'event', jsonSchema: { type: 'object' }, nullable: false }],
+      bodyFields: [{ handle: 'event', jsonSchema: { type: 'object' }, nullable: false }],
       options: { allowedMethods: ['PUT'], responseStatusCode: 202, responseHeaders: { 'X-Example': 'yes' } },
     }
     const changes = updateWebhook(revisionView(current), { kind: 'flow' }, 'hook', settings)
     expect(changes).toBeDefined()
     const updated = applyFlowChanges(current, changes!)
-    expect(updated.content.document.graph.nodes.hook).toEqual({ kind: 'webhook', name: 'Inbound', inputsDef: settings.inputs, options: settings.options })
+    expect(updated.content.document.graph.nodes.hook).toEqual({ kind: 'webhook', name: 'Inbound', bodyFields: settings.bodyFields, options: settings.options })
     expect(updateWebhook(revisionView(updated), { kind: 'flow' }, 'hook', settings)).toEqual([])
-    const cleared = applyFlowChanges(updated, updateWebhook(revisionView(updated), { kind: 'flow' }, 'hook', { inputs: settings.inputs, options: {} })!)
-    expect(cleared.content.document.graph.nodes.hook).toEqual({ kind: 'webhook', name: 'Inbound', inputsDef: settings.inputs })
+    const cleared = applyFlowChanges(updated, updateWebhook(revisionView(updated), { kind: 'flow' }, 'hook', { bodyFields: settings.bodyFields, options: {} })!)
+    expect(cleared.content.document.graph.nodes.hook).toEqual({ kind: 'webhook', name: 'Inbound', bodyFields: settings.bodyFields })
   })
 })
 
@@ -672,7 +672,7 @@ it('keeps manual trigger names fixed while allowing other trigger names to chang
   const target = { kind: 'flow' } as const
   Object.assign(current.content.document.graph.nodes, {
     manual: { kind: 'manual', name: 'Manual trigger' },
-    webhook: { kind: 'webhook', name: 'Webhook', inputsDef: [] },
+    webhook: { kind: 'webhook', name: 'Webhook', bodyFields: [] },
     schedule: { kind: 'cron', name: 'Schedule', cronTimes: [] },
   })
   const revision = revisionView(current)

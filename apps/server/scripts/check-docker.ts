@@ -92,7 +92,7 @@ try {
     firstOrigin,
     '/v1/runs',
     {
-      body: JSON.stringify({ inputs: {}, publicationId: operation.publicationId, trigger: { nodeId: 'start', payload: {} }, version: 1 }),
+      body: JSON.stringify({ inputs: {}, publicationId: operation.publicationId, trigger: { nodeId: 'start', outputs: {} }, version: 2 }),
       headers: { 'content-type': 'application/json', 'cookie': firstCookie, 'idempotency-key': `run-${suffix}` },
       method: 'POST',
     },
@@ -244,7 +244,7 @@ function codeFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { code: { imports: [], name: 'Code', source: 'export default () => ({ result: 42 })' } },
   }
 }

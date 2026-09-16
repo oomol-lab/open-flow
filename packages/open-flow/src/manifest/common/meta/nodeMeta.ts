@@ -202,7 +202,7 @@ export class NodeMeta<TNodeManifest extends WritableNodeManifest = WritableNodeM
         ? derive(
             triggerDefinition$,
             (definition): OutputHandleDef[] | undefined =>
-              definition == null ? undefined : [{ handle: 'payload' as HandleName, json_schema: definition.payload_schema }],
+              definition == null ? undefined : definition.outputs.map((port) => ({ ...port, handle: port.handle as HandleName })),
             { equal: isEqual },
           )
         : flatten(blockMeta$, (blockMeta) => (ValueBlockMeta.is(blockMeta) ? blockMeta.manifest.$.values : blockMeta?.$.outputHandleDefs)),

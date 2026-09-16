@@ -408,17 +408,27 @@ async function webhook(
     const method = request.method
     if (!methods.includes(method)) return plain(405, { allow: methods.join(', ') }, origin)
 
-    const payload = await readWebhookPayload(request)
+    const body = await readWebhookBody(request)
+    const url = new URL(request.url)
+    const query = Object.fromEntries(
+      [...new Set(url.searchParams.keys())].map((key) => {
+        const values = url.searchParams.getAll(key)
+        return [key, values.length === 1 ? values[0]! : values]
+      }),
+    )
+    url.search = ''
+    url.hash = ''
+    const outputs = { headers: Object.fromEntries(request.headers), query, body, webhookUrl: url.href }
     const occurrenceId = await webhookOccurrenceId(endpointId, target.runtimeVersion, requestHeader(request, 'idempotency-key') ?? null)
     if (occurrenceId == null) throw new WebhookRequestInvalid()
-    const accepted = await service.acceptWebhookTarget(target, occurrenceId, payload)
+    const accepted = await service.acceptWebhookTarget(target, occurrenceId, method, outputs)
     if (accepted == null) return plain(404)
     if (accepted.kind == 'conflict') return plain(409, undefined, origin)
     if (accepted.kind == 'overloaded') return plain(429, undefined, origin)
     return webhookSuccess(method, target.trigger, origin)
   } catch (error) {
     if (error instanceof WebhookBodyTooLarge) return plain(413, undefined, origin)
-    if (error instanceof WebhookRequestInvalid || (error instanceof AcceptanceError && error.code == 'trigger-payload-invalid')) {
+    if (error instanceof WebhookRequestInvalid || (error instanceof AcceptanceError && error.code == 'trigger-outputs-invalid')) {
       return plain(400, undefined, origin)
     }
     logger.error({ category: 'webhook.request.failed', requestId, ...errorKind(error) }, 'Webhook request failed.')
@@ -496,7 +506,7 @@ function requestHeader(request: Request, name: string): string | undefined {
   return request.headers.get(name) ?? undefined
 }
 
-async function readWebhookPayload(request: Request): Promise<JsonValue> {
+async function readWebhookBody(request: Request): Promise<JsonValue> {
   const bytes = await readBody(request, maximumWebhookBodyBytes, () => new WebhookBodyTooLarge())
   try {
     const source = webhookDecoder.decode(bytes)

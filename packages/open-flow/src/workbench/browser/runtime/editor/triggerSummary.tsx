@@ -5,7 +5,8 @@ import type { TriggerCatalogStore } from '../stores/triggerCatalog.ts'
 import { useEffect } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
-import { schemaObject, triggerPayloadSchema } from '../../../../flow/common/schema.ts'
+import { schemaObject } from '../../../../flow/common/schema.ts'
+import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 
 export function TriggerSummary({ trigger, display }: { readonly trigger: TriggerNode; readonly display?: TriggerDisplay }) {
@@ -13,23 +14,31 @@ export function TriggerSummary({ trigger, display }: { readonly trigger: Trigger
   if (trigger.kind === 'manual') {
     return (
       <section className="inspector-port-section" data-inspector-section="outputs">
-        <PortDefinitionEditor layout="ports" title={t('inspector.ports.outputsTitle')} output disabled values={[]} onChange={() => {}} />
+        <PortDefinitionEditor
+          layout="ports"
+          title={t('inspector.ports.outputsTitle')}
+          output
+          disabled
+          values={triggerOutputDefinitions(trigger)}
+          onChange={() => {}}
+        />
       </section>
     )
   }
-  if (trigger.kind === 'cron') return null
-  const schema = schemaObject(triggerPayloadSchema(trigger))
-  const type = schema?.type
-  const payloadType = typeof type === 'string' ? type : Array.isArray(type) ? type.join(' | ') : 'JSON'
   const source = trigger.kind === 'integration' || trigger.kind === 'poll' ? trigger.definition.provider : undefined
   return (
     <section className="inspector-section">
       {(trigger.kind === 'integration' || trigger.kind === 'poll') && <p>{display?.description ?? trigger.definition.description}</p>}
       {source != null && <p className="text-sm text-muted-foreground">{source}</p>}
-      <div className="flex items-center justify-between gap-3 text-sm">
-        <code>payload</code>
-        <span className="text-muted-foreground">{payloadType}</span>
-      </div>
+      {triggerOutputDefinitions(trigger).map((port) => {
+        const type = schemaObject(port.jsonSchema)?.type
+        return (
+          <div key={port.handle} className="flex items-center justify-between gap-3 text-sm">
+            <code>{port.handle}</code>
+            <span className="text-muted-foreground">{typeof type === 'string' ? type : Array.isArray(type) ? type.join(' | ') : 'JSON'}</span>
+          </div>
+        )
+      })}
     </section>
   )
 }

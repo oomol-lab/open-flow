@@ -80,18 +80,24 @@ const snapshot = {
     title: 'Google Sheets New Row Config',
     type: 'object',
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   description: 'Polls a sheet and triggers once for every new row appended below the last row already seen.',
   displayName: 'New Row Added',
   key: 'googlesheets.on_row_added',
   name: 'on_row_added',
-  payloadSchema: {
-    additionalProperties: false,
-    properties: { events: { items: eventSchema, type: 'array' } },
-    required: ['events'],
-    title: 'Google Sheets New Row Payload',
-    type: 'object',
-  },
+  outputs: [
+    {
+      handle: 'payload',
+      jsonSchema: {
+        additionalProperties: false,
+        properties: { events: { items: eventSchema, type: 'array' } },
+        required: ['events'],
+        title: 'Google Sheets New Row Payload',
+        type: 'object',
+      },
+      nullable: false,
+    },
+  ],
   provider: 'googlesheets',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }

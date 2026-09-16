@@ -33,10 +33,10 @@ for (const conformance of runLifecycleConformanceCases) {
             closureDigest: 'closure',
             flowId: 'flow',
             inputs: {},
-            modelVersion: 1,
+            modelVersion: 2,
             revisionDigest: 'revision',
             revisionId: 'revision',
-            trigger: { nodeId: 'start', payload: {} },
+            trigger: { nodeId: 'start', outputs: {} },
             variableNames: [],
           })
           if (result.kind != 'accepted' && result.kind != 'conflict') throw new Error(`Unexpected admission: ${result.kind}`)
@@ -100,7 +100,7 @@ for (const conformance of runLifecycleConformanceCases) {
               runId,
               {
                 kind: 'waiting',
-                checkpoint: { bindingValues: {}, inputs: {}, results: {}, skipped: [], version: 3, agents: {}, waits: [{ ...wait, value: null }] },
+                checkpoint: { bindingValues: {}, inputs: {}, results: {}, skipped: [], version: 4, agents: {}, waits: [{ ...wait, value: null }] },
               },
               1_000,
             ) != null

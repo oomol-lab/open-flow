@@ -15,7 +15,7 @@ function revision() {
   return {
     kind: 'open-flow-project-revision',
     version: 1,
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { code: { name: 'Echo', imports: [], source: 'export default (input) => ({ result: input.value })' } },
     document: {
       bindings: {},

@@ -30,7 +30,7 @@ function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) 
   let sequence = 1
   let layoutRevision = 1
   let content: RevisionContent = applyFlowChanges(
-    { modelVersion: 1, document: { graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {}, bindings: {} }, modules: {} },
+    { modelVersion: 2, document: { graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {}, bindings: {} }, modules: {} },
     [
       ...createBuiltinTrigger(target, 'trigger', { kind: 'cron', name: 'Schedule', cronTimes: [] }),
       ...createValue(target, 'value', 'Input'),
@@ -64,7 +64,7 @@ function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) 
     createdAt: timestamp,
     digest: `digest-${sequence}`,
     flowId: flow.flowId,
-    modelVersion: 1,
+    modelVersion: 2,
     parentRevisionId: sequence == 1 ? null : `r${sequence - 1}`,
     revisionId: `r${sequence}`,
     version: 1,
@@ -120,7 +120,7 @@ function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) 
               ],
         engineContract: 'open-flow-engine/v4',
         flowId: flow.flowId,
-        modelVersion: 1,
+        modelVersion: 2,
         revisionDigest: revision().digest,
         revisionId: revision().revisionId,
         valid: content.document.graph.nodes.code == null,

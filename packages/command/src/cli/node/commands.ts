@@ -35,7 +35,7 @@ const commands = [
   ['trigger add', '<flow> <manual|webhook|cron|provider-key>', [...edit, 'name', 'connection', 'cron', 'every', 'timezone', 'set']],
   ['trigger set', '<flow> <trigger>', [...edit, 'name', 'description', 'connection', 'cron', 'every', 'timezone', 'set', 'unset']],
   ['trigger remove', '<flow> <trigger> --yes', [...edit, 'yes']],
-  ['run', '<flow>', [...edit, 'expected-publication', 'source', 'trigger', 'payload', 'input', 'wait', 'timeout']],
+  ['run', '<flow>', [...edit, 'expected-publication', 'source', 'trigger', 'outputs', 'input', 'wait', 'timeout']],
   ['runs list', '--flow <flow>', ['flow', 'status', 'pending-wait', ...page]],
   ['runs show', '<run>', []],
   ['runs wait', '<run>', ['timeout']],
@@ -54,7 +54,7 @@ const commands = [
   ['rollback', '<flow> <publication>', ['expected-publication', 'idempotency-key']],
   ['open', '[flow]', []],
   ['workbench', '[flow]', []],
-  ['schema', '[operations|apply|input|payload|operation-kind]', []],
+  ['schema', '[operations|apply|input|outputs|operation-kind]', []],
 ] as const
 
 const optionDetails: Record<
@@ -87,7 +87,7 @@ const optionDetails: Record<
   'file': { description: 'Apply JSON file path, @path, or - for stdin. See schema apply for complete atomic edits.', type: 'string' },
   'code': { description: 'JavaScript source, @file, or - for stdin.', type: 'string' },
   'input': { description: 'JSON object keyed by node ID then input handle; literal JSON, @file, or -.', type: 'string' },
-  'payload': { description: 'Trigger payload: literal JSON, @file, or -. Defaults to {}.', type: 'string' },
+  'outputs': { description: 'Trigger outputs: literal JSON, @file, or -. Defaults to {}.', type: 'string' },
   'set': { description: 'handle=value; repeat for multiple fields. Values use port schemas, JSON, @file, or -.', type: 'string' },
   'unset': { description: 'Input/config handle to remove; repeat for multiple fields.', type: 'string' },
   'connection': { description: 'Exact active Connection ID, unambiguous display name, or default.', type: 'string' },
@@ -132,10 +132,10 @@ export function commandOptions(positionals: readonly string[]): readonly string[
 
 export function commandSchema(name = 'apply') {
   if (name == 'operations') return changeOperationsSchema()
-  if (name == 'payload')
+  if (name == 'outputs')
     return {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
-      description: 'Any JSON trigger payload. The selected trigger defines its payload contract.',
+      description: 'Any JSON trigger outputs. The selected trigger defines its outputs contract.',
     }
   if (name == 'input')
     return {

@@ -85,7 +85,7 @@ oo flow runs wait RUN_ID --json
 oo flow runs events RUN_ID --after 0 --follow --timeout 60000 --json
 ```
 
-Run 固定一个 Trigger。图中仅有一个 Manual Trigger 时自动选择，否则使用 `--trigger`。`--payload` 默认为 `{}`。
+Run 固定一个 Trigger。图中仅有一个 Manual Trigger 时自动选择，否则使用 `--trigger`。`--outputs` 接受按端口名索引的 JSON 对象，默认为 `{}`，适用于 Manual；其他 Trigger 必须提供完整输出。
 检测到待决议项后，等待命令返回 Run detail 的 `waits` 数组，其中各项包含 `waitId`、`nodeId`、`prompt`、`actions` 和过期时间；Run 此时可以仍为 running。使用 `runs list --pending-wait` 查询所有有待处理等待的 Run。
 `runs resolve` 显式指定 run、wait 和 action（continue/approve/reject），不自动替用户决议。
 

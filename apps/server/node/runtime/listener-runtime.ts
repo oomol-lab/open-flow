@@ -13,6 +13,7 @@ import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { scheduledTriggerOccurrenceId, nextTriggerScheduledAt } from '@oomol-lab/open-flow/cron-trigger'
 import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
+import { matchesTriggerOutputs } from '@oomol-lab/open-flow/flow-semantics'
 import {
   integrationOccurrenceId,
   IntegrationConnectionError,
@@ -290,8 +291,10 @@ export class ListenerRuntime {
         { checkpoint, config: trigger.config, now: new Date(now) },
         new TransientIntegrationError('Listener scan exceeded its execution deadline.'),
       )
-      let event: { occurrenceId: string; payload: JsonValue; requestDigest: string } | undefined
+      let event: { occurrenceId: string; outputs: Readonly<Record<string, JsonValue>>; requestDigest: string } | undefined
       if (page.payload != null) {
+        const outputs = { payload: page.payload }
+        if (!matchesTriggerOutputs(trigger, outputs)) throw new Error('Invalid Integration Trigger outputs.')
         const occurrenceId = yield* Effect.tryPromise({
           try: () => integrationOccurrenceId(target.bindingId, target.runtimeVersion, definition.snapshot.key, page.dedupeKey),
           catch: (error) => error,
@@ -302,7 +305,7 @@ export class ListenerRuntime {
               canonicalJsonBytes({
                 bindingId: target.bindingId,
                 occurrenceId,
-                payload: page.payload,
+                outputs,
                 publicationId: target.currentPublicationId,
                 revisionDigest: target.revisionDigest,
                 runtimeVersion: target.runtimeVersion,
@@ -310,7 +313,7 @@ export class ListenerRuntime {
             ),
           catch: (error) => error,
         })
-        event = { occurrenceId, payload: page.payload, requestDigest }
+        event = { occurrenceId, outputs, requestDigest }
       }
       const completed = this.#store.integrations.finishListenerPage(
         lease,
@@ -469,8 +472,10 @@ export class ListenerRuntime {
           return true
         })
         const payload = fresh.length == 0 ? null : ({ events: fresh.map((item) => item.event.payload) } satisfies JsonValue)
+        const outputs = payload == null ? null : { payload }
+        if (outputs != null && !matchesTriggerOutputs(trigger, outputs)) throw new Error('Invalid Poll Trigger outputs.')
         const requestDigest =
-          payload == null
+          outputs == null
             ? null
             : yield* Effect.tryPromise({
                 try: () =>
@@ -478,7 +483,7 @@ export class ListenerRuntime {
                     canonicalJsonBytes({
                       bindingId: target.bindingId,
                       claimId,
-                      payload,
+                      outputs,
                       revisionDigest: target.revisionDigest,
                       runtimeVersion: target.runtimeVersion,
                     }),
@@ -497,7 +502,7 @@ export class ListenerRuntime {
           nextContinuationPage: hasMore ? page + 1 : 0,
           nextContinuationRootId: hasMore ? rootOccurrenceId : null,
           page,
-          payload,
+          outputs,
           providerEventIds: fresh.map((item) => item.id),
           requestDigest,
           rootOccurrenceId,

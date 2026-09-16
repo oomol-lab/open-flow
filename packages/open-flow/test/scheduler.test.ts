@@ -31,7 +31,7 @@ async function runOutcome(prepared: PreparedFlow, options: Omit<FlowRunOptions, 
       },
       waits,
       ...rest,
-      ...(resume == null ? { bindingValues, inputs, trigger: trigger ?? { nodeId: 'start', payload: {} } } : { resume }),
+      ...(resume == null ? { bindingValues, inputs, trigger: trigger ?? { nodeId: 'start', outputs: {} } } : { resume }),
     }),
   )
 }
@@ -80,7 +80,7 @@ function revision(document: RevisionContent['document'], exports: readonly strin
         ],
       },
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {
       'module-main': {
         imports: [],
@@ -241,7 +241,7 @@ describe('revision graph scheduler', () => {
       runFlow(prepared, {
         invokeTask: () => Effect.fail(new Error('Invalid Trigger input must not invoke a Task.')),
         runId: `run-invalid-trigger-${nodeId}`,
-        trigger: { nodeId, payload: null },
+        trigger: { nodeId, outputs: { payload: null } },
       }),
     ).rejects.toThrow(`Node "${nodeId}" is not a TriggerNode`)
   })
@@ -257,7 +257,7 @@ describe('revision graph scheduler', () => {
           ],
           nodes: {
             capture: {
-              inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'incoming', output: 'payload' }] } },
+              inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'incoming', output: 'body' }] } },
               kind: 'task',
               task: task('capture', ['event'], ['event']),
             },
@@ -266,7 +266,7 @@ describe('revision graph scheduler', () => {
               kind: 'task',
               task: task('ignored', ['event'], ['event']),
             },
-            incoming: { inputsDef: [], kind: 'webhook', name: 'Incoming' },
+            incoming: { bodyFields: [{ handle: 'action', jsonSchema: { type: 'string' }, nullable: false }], kind: 'webhook', name: 'Incoming' },
             scheduled: { cronTimes: [{ type: 'every', unit: 'minute', value: 1 }], kind: 'cron', name: 'Scheduled' },
           },
         },
@@ -286,7 +286,7 @@ describe('revision graph scheduler', () => {
           return { event: invocation.input.event }
         }),
       runId: 'run-trigger',
-      trigger: { nodeId: 'incoming', payload: { action: 'opened' } },
+      trigger: { nodeId: 'incoming', outputs: { headers: {}, query: {}, body: { action: 'opened' }, webhookUrl: 'http://example.com/webhook' } },
     })
 
     expect(invoked).toEqual(['capture'])
@@ -403,7 +403,7 @@ describe('revision graph scheduler', () => {
     expect(invocations).toEqual([])
     expect(decodeFlowRunCheckpoint(JSON.parse(JSON.stringify(first.checkpoint)))).toEqual(first.checkpoint)
 
-    for (const launch of [{ bindingValues: { token: 'changed' } }, { inputs: {} }, { trigger: { nodeId: 'start', payload: {} } }]) {
+    for (const launch of [{ bindingValues: { token: 'changed' } }, { inputs: {} }, { trigger: { nodeId: 'start', outputs: {} } }]) {
       const invalid = {
         createId: () => 'unused',
         flowId: 'main',
@@ -1092,7 +1092,7 @@ describe('revision graph scheduler', () => {
               ),
             ),
           runId: 'run-cancel',
-          trigger: { nodeId: 'start', payload: {} },
+          trigger: { nodeId: 'start', outputs: {} },
         },
       ),
     )
@@ -1360,4 +1360,48 @@ it.each([true, false])('normalizes absent Subflow outputs with nullable=%s', asy
   const running = runFlow(prepared, { runId: 'subflow-null', invokeTask: () => Effect.die('Unexpected Task') })
   if (nullable) expect((await running).nodes).toEqual([expect.objectContaining({ nodeId: 'nested', outputs: { result: null } })])
   else await expect(running).rejects.toThrow('Subflow output "result" does not match its declared schema')
+})
+
+it('validates formed Webhook outputs at launch and checkpoint recovery without projection', async () => {
+  const source = revision(
+    {
+      bindings: {},
+      subflows: {},
+      tasks: {},
+      graph: {
+        nodes: {
+          start: { kind: 'webhook', name: 'Webhook', bodyFields: [] },
+          wait: {
+            kind: 'wait',
+            actions: ['continue'],
+            prompt: 'Continue?',
+            inputs: {},
+            input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+          },
+        },
+        edges: [{ source: 'start', target: 'wait' }],
+      },
+    },
+    [],
+  )
+  const prepared = await prepareFlow(source, 'main', engine)
+  const outputs = { headers: { test: 'original' }, query: { tag: ['a', 'b'] }, body: {}, webhookUrl: 'https://example.com/webhook' }
+  const first = await runOutcome(prepared, { runId: 'webhook-checkpoint', trigger: { nodeId: 'start', outputs }, invokeTask: () => Effect.succeed({}) })
+  if (first.kind !== 'waiting') throw new Error('Expected a checkpoint.')
+  expect(first.checkpoint.version).toBe(4)
+  expect(first.checkpoint.results.start?.outputs).toEqual(outputs)
+  expect(() => decodeFlowRunCheckpoint({ ...first.checkpoint, version: 3 })).toThrow(/version/)
+  const invalidOutputs: readonly Readonly<Record<string, JsonValue>>[] = [{ payload: outputs }, { ...outputs, webhookUrl: 2 }, { ...outputs, extra: null }]
+  for (const invalid of invalidOutputs) {
+    await expect(
+      runOutcome(prepared, { runId: 'invalid', trigger: { nodeId: 'start', outputs: invalid }, invokeTask: () => Effect.succeed({}) }),
+    ).rejects.toThrow('Trigger outputs are invalid')
+    const checkpoint = { ...first.checkpoint, results: { ...first.checkpoint.results, start: { ...first.checkpoint.results.start!, outputs: invalid } } }
+    await expect(runOutcome(prepared, { runId: 'invalid-resume', resume: { checkpoint }, invokeTask: () => Effect.succeed({}) })).rejects.toThrow(
+      'Checkpoint Trigger output is invalid',
+    )
+  }
+  expect(
+    (await runOutcome(prepared, { runId: 'webhook-checkpoint', resume: { checkpoint: first.checkpoint }, invokeTask: () => Effect.succeed({}) })).kind,
+  ).toBe('node-results')
 })

@@ -106,7 +106,7 @@ export const mcpTools = {
       flowId: flow.optional(),
       revisionId: id.optional(),
       publicationId: id.optional(),
-      trigger: z.strictObject({ nodeId: id, payload: json }),
+      trigger: z.strictObject({ nodeId: id, outputs: z.record(z.string(), json) }),
       inputs: z.record(z.string(), z.record(z.string(), json)).default({}),
       idempotencyKey: mutationKey,
     }),

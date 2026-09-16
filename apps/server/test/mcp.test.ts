@@ -143,7 +143,7 @@ it('serves discovery and an atomic authoring, validation and execution workflow 
   const revisionId = z.object({ revisionId: z.string() }).parse(changed.revision).revisionId
   expect((await control.getDraft(flowId)).revisionId).toBe(revisionId)
   expect(await call('flow_check', { flowId, revisionId })).toMatchObject({ valid: true, revisionId })
-  const runArgs = { source: 'draft', flowId, revisionId, trigger: { nodeId: 'start', payload: {} }, idempotencyKey: 'run' }
+  const runArgs = { source: 'draft', flowId, revisionId, trigger: { nodeId: 'start', outputs: {} }, idempotencyKey: 'run' }
   const run = await call('flow_run', runArgs)
   const runId = z.string().parse(run.runId)
   expect(await call('flow_run', runArgs)).toEqual(run)
@@ -223,7 +223,7 @@ it('keeps admitted Runs across client disconnects and exposes Wait and cancellat
     source: 'draft',
     flowId: flow.flowId,
     revisionId: z.object({ revisionId: z.string() }).parse(changed.revision).revisionId,
-    trigger: { nodeId: 'start', payload: {} },
+    trigger: { nodeId: 'start', outputs: {} },
     idempotencyKey: 'wait-run',
   }
   const run = await call('flow_run', args)
@@ -275,7 +275,7 @@ it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait w
     source: 'draft',
     flowId: flow.flowId,
     revisionId: z.object({ revisionId: z.string() }).parse(changed.revision).revisionId,
-    trigger: { nodeId: 'start', payload: {} },
+    trigger: { nodeId: 'start', outputs: {} },
     idempotencyKey: 'resolve-run',
   })
   const runId = z.string().parse(run.runId)
@@ -313,7 +313,7 @@ it('pages stored tool results through MCP and REST and isolates results by Run',
     source: 'draft',
     flowId: flow.flowId,
     revisionId: z.object({ revisionId: z.string() }).parse(changed.revision).revisionId,
-    trigger: { nodeId: 'start', payload: {} },
+    trigger: { nodeId: 'start', outputs: {} },
   }
   const runId = z.string().parse((await call('flow_run', { ...args, idempotencyKey: 'results-run' })).runId)
   const opened = Database.open(file)
@@ -456,7 +456,7 @@ it('executes fixed Live code revisions and keeps old Run retries stable after re
   expect(await call('flow_set_enabled', { flowId, expectedPublicationId: publication.publicationId, enabled: true })).toMatchObject({
     live: { enabled: true },
   })
-  const args = { source: 'live', publicationId: publication.publicationId, trigger: { nodeId: 'start', payload: {} }, idempotencyKey: 'live-run' }
+  const args = { source: 'live', publicationId: publication.publicationId, trigger: { nodeId: 'start', outputs: {} }, idempotencyKey: 'live-run' }
   const run = await call('flow_run', args)
   await startService(service)
   await expect.poll(async () => (await call('run_get', { runId: run.runId })).status).toBe('completed')

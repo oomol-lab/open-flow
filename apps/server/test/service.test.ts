@@ -84,7 +84,7 @@ function fullFlow(value = 2): RevisionContent {
       },
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {
       double: { imports: [], name: 'Double', source: 'export default ({ value }) => ({ value: value * 2 })' },
       increment: {
@@ -119,7 +119,7 @@ function hangingFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {
       main: {
         imports: [],
@@ -148,7 +148,7 @@ function oversizedOutputsFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {
       main: { imports: [], name: 'Main', source: "export default async () => ({ value: 'x'.repeat(2_000_000) })" },
     },
@@ -177,7 +177,7 @@ function variableFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: { main: { imports: [], name: 'Main', source: 'export default ({ token }) => ({ token })' } },
   }
 }
@@ -203,7 +203,7 @@ function waitFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
   }
 }
@@ -285,7 +285,7 @@ function llmFlow(): RevisionContent {
         },
       },
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
   }
 }
@@ -316,7 +316,7 @@ function connectorFlow(): RevisionContent {
         },
       },
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
   }
 }
@@ -347,8 +347,8 @@ describe('Server application service', () => {
           pollTimes: [],
           definition: {
             configSchema: {},
-            payloadSchema: {},
-            definitionVersion: 1,
+            outputs: [{ handle: 'payload', jsonSchema: {}, nullable: false }],
+            definitionVersion: 2,
             description: '',
             displayName: 'Other',
             key: 'example.event',
@@ -394,10 +394,10 @@ describe('Server application service', () => {
     expect((await service.control.checkFlow(stored.flowId, revisionId, 'open-flow-engine/v4')).valid).toBe(false)
     const accepted = await service.control.runs.createDraftRun(stored.flowId, revisionId, 'open-flow-engine/v4', {}, 'partial-run', {
       nodeId: 'start',
-      payload: {},
+      outputs: {},
     })
     await expect(
-      service.control.runs.createDraftRun(stored.flowId, revisionId, 'open-flow-engine/v4', {}, 'invalid-entry', { nodeId: 'other', payload: {} }),
+      service.control.runs.createDraftRun(stored.flowId, revisionId, 'open-flow-engine/v4', {}, 'invalid-entry', { nodeId: 'other', outputs: { payload: {} } }),
     ).rejects.toMatchObject({ code: 'flow.invalid' })
     await closeService(service)
     service = await openService(file)

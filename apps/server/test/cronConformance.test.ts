@@ -36,7 +36,7 @@ function revision(rules?: readonly TriggerSchedule[]): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 1,
+    modelVersion: 2,
     modules: {},
   }
 }
@@ -68,14 +68,14 @@ async function createHarness(fixture: CronConformanceFixture): Promise<CronConfo
       try {
         const rows = database
           .prepare(
-            `SELECT trigger_occurrences.payload
+            `SELECT trigger_occurrences.outputs AS payload
              FROM cron_admissions
              JOIN trigger_occurrences USING (run_id)
              JOIN runs USING (run_id)
              ORDER BY runs.rowid`,
           )
           .all() as { readonly payload: string }[]
-        return rows.map((row) => JSON.parse(row.payload) as JsonValue)
+        return rows.map((row) => (JSON.parse(row.payload) as { payload: JsonValue }).payload)
       } finally {
         database.close()
       }

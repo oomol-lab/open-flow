@@ -28,7 +28,7 @@ import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionVi
 
 import { dequal } from 'dequal/lite'
 import { waitOutputPorts } from '../../../flow/common/graph.ts'
-import { triggerOutputPorts } from '../../../flow/common/schema.ts'
+import { triggerOutputPorts } from '../../../trigger/common/contract.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
 

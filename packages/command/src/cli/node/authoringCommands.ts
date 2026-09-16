@@ -630,7 +630,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
           const name = trigger.name ?? 'Webhook'
           return {
             identity: { kind: trigger.kind, name, reference, triggerId },
-            operations: createBuiltinTrigger(selected.target, triggerId, { inputsDef: [], kind: trigger.kind, name }),
+            operations: createBuiltinTrigger(selected.target, triggerId, { bodyFields: [], kind: trigger.kind, name }),
           }
         }
         case 'cron': {

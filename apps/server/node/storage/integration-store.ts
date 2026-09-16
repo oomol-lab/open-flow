@@ -503,7 +503,7 @@ export class IntegrationStore {
   }
 
   acceptIntegrationTarget(
-    input: StoredIntegrationTarget & { readonly occurrenceId: string; readonly payload: JsonValue; readonly requestDigest: string },
+    input: StoredIntegrationTarget & { readonly occurrenceId: string; readonly outputs: Readonly<Record<string, JsonValue>>; readonly requestDigest: string },
     completed?: () => void,
   ): RunAdmission | undefined {
     return this.#transaction(() => {
@@ -514,7 +514,7 @@ export class IntegrationStore {
   }
 
   #acceptIntegrationTarget(
-    input: StoredIntegrationTarget & { readonly occurrenceId: string; readonly payload: JsonValue; readonly requestDigest: string },
+    input: StoredIntegrationTarget & { readonly occurrenceId: string; readonly outputs: Readonly<Record<string, JsonValue>>; readonly requestDigest: string },
     listener: boolean,
   ): RunAdmission | undefined {
     const current = this.#database
@@ -566,7 +566,7 @@ export class IntegrationStore {
       flowId: input.flowId,
       modelVersion: input.modelVersion,
       occurrenceId: input.occurrenceId,
-      payload: input.payload,
+      outputs: input.outputs,
       publicationId: input.currentPublicationId,
       requestDigest: input.requestDigest,
       revisionDigest: input.revisionDigest,
@@ -651,7 +651,7 @@ export class IntegrationStore {
     checkpoint: string,
     nextAt: number,
     now: number,
-    event?: { readonly occurrenceId: string; readonly payload: JsonValue; readonly requestDigest: string },
+    event?: { readonly occurrenceId: string; readonly outputs: Readonly<Record<string, JsonValue>>; readonly requestDigest: string },
   ): RunAdmission | 'advanced' | undefined {
     return this.#transaction(() => {
       const work = this.#database

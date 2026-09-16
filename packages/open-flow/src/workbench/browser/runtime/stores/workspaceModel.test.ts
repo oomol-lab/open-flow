@@ -10,12 +10,12 @@ function draft(): Draft {
     createdAt: '2026-09-15T00:00:00.000Z',
     digest: 'd1',
     flowId: 'flow',
-    modelVersion: 1,
+    modelVersion: 2,
     parentRevisionId: null,
     revisionId: 'r1',
     version: 1,
     content: {
-      modelVersion: 1,
+      modelVersion: 2,
       modules: {},
       document: {
         bindings: {},

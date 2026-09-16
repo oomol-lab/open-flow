@@ -16,7 +16,7 @@ const action: ConnectorCapability = {
 }
 function revision(): RevisionContent {
   return applyFlowChanges(
-    { document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} }, modules: {}, modelVersion: 1 },
+    { document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} }, modules: {}, modelVersion: 2 },
     createCodeTask(target, { nodeId: 'code', moduleId: 'code' }, 'Code'),
   )
 }
