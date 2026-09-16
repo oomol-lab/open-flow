@@ -1,5 +1,6 @@
 import { glob, readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
+import { timeZoneLocales } from '../../src/canvas/browser/i18n/timeZoneLocales.ts'
 
 /** The shipped UI languages, pinned here so an unbuilt locale file fails loudly instead of silently. */
 const uiLanguageTags = ['en', 'zh-CN', 'zh-TW', 'ja', 'ko', 'ru', 'fr'] as const
@@ -34,11 +35,16 @@ function placeholdersOf(message: string): readonly string[] {
   return [...new Set([...message.matchAll(placeholderPattern)].map((match) => match[1]!))].toSorted()
 }
 
-async function loadBundle(name: string, dirs: readonly string[], sources: string): Promise<LocaleBundle> {
+async function loadBundle(
+  name: string,
+  dirs: readonly string[],
+  sources: string,
+  supplementalLocales?: Readonly<Record<string, object>>,
+): Promise<LocaleBundle> {
   const locales = new Map<string, LocaleMap>()
   for (const lang of uiLanguageTags) {
     const parts = await Promise.all(dirs.map(async (dir) => JSON.parse(await readFile(`${dir}/${lang}.json`, 'utf8'))))
-    locales.set(lang, flattenLocale(Object.assign({}, ...parts)))
+    locales.set(lang, flattenLocale(Object.assign({}, ...parts, supplementalLocales?.[lang])))
   }
   return { locales, name, sources }
 }
@@ -48,7 +54,7 @@ const form = 'src/form/browser/locales'
 const bundles: readonly LocaleBundle[] = [
   await loadBundle('canvas', ['src/canvas/browser/i18n/locales', shared], 'src/canvas/browser/**/*.{ts,tsx}'),
   await loadBundle('IconPicker', ['src/ui/browser/icons/picker/locales'], 'src/ui/browser/icons/picker/**/*.{ts,tsx}'),
-  await loadBundle('workbench', ['src/workbench/browser/runtime/locales', shared, form], 'src/workbench/browser/**/*.{ts,tsx}'),
+  await loadBundle('workbench', ['src/workbench/browser/runtime/locales', shared, form], 'src/workbench/browser/**/*.{ts,tsx}', timeZoneLocales),
   await loadBundle('shared UI', [shared], 'src/ui/browser/**/*.{ts,tsx}'),
   await loadBundle('form', [shared, form], 'src/form/browser/**/*.{ts,tsx}'),
 ]
