@@ -3,6 +3,8 @@ import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { Diagnostic, FlowCheck, GraphNode } from '../api.ts'
 import type { ResolvedSelection, RevisionView } from '../revisionView.ts'
 
+import { schemaMismatchMessage } from './schemaMismatchMessage.ts'
+
 export type InspectorSection = 'account' | 'condition' | 'inputs' | 'module' | 'node' | 'task' | 'trigger'
 export type DiagnosticScope = 'code' | 'flow' | 'node' | 'task'
 
@@ -29,6 +31,28 @@ export function diagnosticNodeId(diagnostic: Diagnostic): string | undefined {
 
 export function diagnosticMessage(diagnostic: Diagnostic, t: TFunction, nodeTitle?: (nodeId: string) => string | undefined): string {
   if (diagnostic.code == 'agent.config-invalid' && diagnostic.message == 'Declare between 1 and 64 Agent tools.') return t('agent.toolsRequired')
+  if (diagnostic.mismatch != null) {
+    const issue = schemaMismatchMessage(diagnostic.mismatch, t)
+    const input = /\/graph\/nodes\/([^/]+)\/inputs\/([^/]+)$/.exec(diagnostic.path)
+    const target = input == null ? undefined : `${nodeTitle?.(input[1]!) ?? input[1]} ${input[2]}`
+    if (diagnostic.code == 'graph.node-output-incompatible' && target != null) {
+      const sourceId = diagnosticNodeId(diagnostic)
+      const output = diagnostic.values?.output
+      if (sourceId != null && typeof output == 'string') {
+        return t('diagnostics.messages.graph.node-output-schema-incompatible', {
+          issue,
+          source: `${nodeTitle?.(sourceId) ?? sourceId} ${output}`,
+          target,
+        })
+      }
+    }
+    if (diagnostic.code == 'graph.flow-input-incompatible' && target != null && typeof diagnostic.values?.input == 'string') {
+      return t('diagnostics.messages.graph.flow-input-schema-incompatible', { input: diagnostic.values.input, issue, target })
+    }
+    if (diagnostic.code == 'graph.subflow-output-incompatible' && typeof diagnostic.values?.output == 'string') {
+      return t('diagnostics.messages.graph.subflow-output-schema-incompatible', { issue, output: diagnostic.values.output })
+    }
+  }
   const variant = diagnostic.values?.variant
   const key = `diagnostics.messages.${diagnostic.code}${typeof variant == 'string' ? `.${variant}` : ''}`
   const nodeId = diagnosticNodeId(diagnostic)

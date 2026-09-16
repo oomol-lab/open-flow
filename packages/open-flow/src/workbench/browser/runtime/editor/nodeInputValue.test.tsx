@@ -1,3 +1,5 @@
+import type { InputSourceCheck } from '../../../../flow/common/graph.ts'
+
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it, vi } from 'vitest'
@@ -25,7 +27,7 @@ describe('Independent node inputs', () => {
     expect(markup).toContain('aria-label="items Set value"')
     expect(markup).toContain('aria-expanded="false"')
     expect(markup).not.toContain('data-value-body')
-    expect(markup.indexOf('aria-label="items Input sources"')).toBeLessThan(markup.indexOf('aria-label="items Set value"'))
+    expect(markup.indexOf('aria-label="items Select data"')).toBeLessThan(markup.indexOf('aria-label="items Set value"'))
     expect(onValue).not.toHaveBeenCalled()
   })
 
@@ -112,9 +114,9 @@ describe('Independent node inputs', () => {
         />
       </I18nProvider>,
     )
-    expect(markup).toContain('Connected to an upstream source')
+    expect(markup).toContain('Data selected')
     expect(markup).not.toMatch(/<(?:textarea|select)\b/)
-    expect(markup).toContain('aria-label="message Input sources"')
+    expect(markup).toContain('aria-label="message Select data"')
     expect(onValue).not.toHaveBeenCalled()
   })
 
@@ -132,7 +134,7 @@ describe('Independent node inputs', () => {
                 nodeId: 'github',
                 nodeName: 'GitHub issue',
                 output: 'title',
-                valid: true,
+                check: { kind: 'available' },
               },
             ],
             groups: [],
@@ -147,7 +149,83 @@ describe('Independent node inputs', () => {
     )
 
     expect(markup).toContain('data-icon-kind="initials"')
-    expect(markup).toContain('GitHub issue · title')
+    expect(markup).toContain('GitHub issue title')
+  })
+
+  const sourceIssues: readonly { readonly check: InputSourceCheck; readonly message: string }[] = [
+    { check: { kind: 'source-missing' }, message: '“Source” could not be found. Choose again.' },
+    { check: { kind: 'output-missing' }, message: '“result” could not be found in “Source”. Choose again.' },
+    { check: { kind: 'not-ready' }, message: '“Source result” may not have a value when this step runs.' },
+    {
+      check: { kind: 'schema', mismatch: { kind: 'keyword', keyword: 'type', path: ['properties', 'name'], source: 'string', target: 'number' } },
+      message: '“name” must be Number, but it is String.',
+    },
+    {
+      check: { kind: 'schema', mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' } },
+      message: 'Expected Number, but the selected field is String.',
+    },
+    {
+      check: { kind: 'schema', mismatch: { kind: 'keyword', keyword: 'minLength', path: ['properties', 'name'], source: undefined, target: 2 } },
+      message: '“name” must contain at least 2 characters.',
+    },
+    {
+      check: { kind: 'schema-error' },
+      message: 'Could not check the data format.',
+    },
+  ]
+
+  it.each(sourceIssues)('explains an invalid source ($check.kind)', ({ check, message }) => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <NodeInputValue
+          definition={{ handle: 'message', jsonSchema: { type: 'string' }, nullable: false }}
+          value={undefined}
+          connected
+          upstream={{
+            current: [{ nodeId: 'source', nodeName: 'Source', output: 'result', check }],
+            groups: [],
+            onChange: vi.fn(),
+          }}
+          variables={variables}
+          disabled={false}
+          onValue={vi.fn()}
+          onVariable={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    expect(markup).toContain('role="alert"')
+    expect(markup).toContain(message)
+  })
+
+  it('uses concise field-context copy for a type mismatch', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('zh-CN')}>
+        <NodeInputValue
+          definition={{ handle: '数量', jsonSchema: { type: 'number' }, nullable: false }}
+          value={undefined}
+          connected
+          upstream={{
+            current: [
+              {
+                nodeId: 'source',
+                nodeName: '读取商品',
+                output: 'price',
+                check: { kind: 'schema', mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' } },
+              },
+            ],
+            groups: [],
+            onChange: vi.fn(),
+          }}
+          variables={variables}
+          disabled={false}
+          onValue={vi.fn()}
+          onVariable={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    expect(markup).toContain('需要数字，但所选字段是字符串。')
   })
 })
 
@@ -175,9 +253,9 @@ describe('Unset input presentation', () => {
   })
 })
 
-it('renders a saved binding as pending without running compatibility or candidate queries', () => {
+it('checks a saved binding synchronously without enumerating candidates', () => {
   const i18n = createI18n('en')
-  const check = vi.fn(() => [false])
+  const check = vi.fn(() => ({ conflict: false, sources: [{ kind: 'not-ready' }] as readonly InputSourceCheck[] }))
   const candidates = vi.fn(() => ({}))
   try {
     const html = renderToStaticMarkup(
@@ -189,7 +267,7 @@ it('renders a saved binding as pending without running compatibility or candidat
           disabled={false}
           variables={{ enabled: true, loaded: false, loading: false, names: [], onOpen: vi.fn() }}
           upstream={{
-            current: [{ nodeId: 'source', nodeName: 'Saved source', output: 'text', valid: undefined }],
+            current: [{ nodeId: 'source', nodeName: 'Saved source', output: 'text', check: undefined }],
             query: { check, candidates },
             groups: [],
             onChange: vi.fn(),
@@ -199,11 +277,12 @@ it('renders a saved binding as pending without running compatibility or candidat
         />
       </I18nProvider>,
     )
-    expect(html).toContain('Saved source · text')
-    expect(html).toContain('Checking source…')
-    expect(html).toContain('aria-busy="true"')
-    expect(html).not.toContain('aria-invalid="true"')
-    expect(check).not.toHaveBeenCalled()
+    expect(html).toContain('Saved source text')
+    expect(html).not.toContain('Checking mapping…')
+    expect(html).not.toContain('aria-busy')
+    expect(html).toContain('aria-invalid="true"')
+    expect(html).toContain('“Saved source text” may not have a value when this step runs.')
+    expect(check).toHaveBeenCalledOnce()
     expect(candidates).not.toHaveBeenCalled()
   } finally {
     i18n.dispose()

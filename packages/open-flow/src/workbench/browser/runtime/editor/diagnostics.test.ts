@@ -19,12 +19,13 @@ describe('Workbench Diagnostic messages', () => {
       column: 0,
       line: 1,
       message: 'Upstream node "source" output "hits" is not compatible with this input.',
+      mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' },
       path: '/document/graph/nodes/target/inputs/value',
       values: { nodeId: 'source', output: 'hits' },
     }
 
-    expect(diagnosticMessage(diagnostic, i18n.t, (nodeId) => (nodeId == 'source' ? 'Search records' : undefined))).toBe(
-      '上游节点“Search records”的输出“hits”与此输入不兼容。',
+    expect(diagnosticMessage(diagnostic, i18n.t, (nodeId) => ({ source: 'Search records', target: 'Rank records' })[nodeId])).toBe(
+      '“Search records hits”不能用于“Rank records value”：需要数字，但所选字段是字符串。',
     )
     i18n.dispose()
   })

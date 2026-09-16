@@ -99,7 +99,7 @@ function inputUpstreamSources({
       nodeId: source.nodeId,
       nodeName: graph.nodes[source.nodeId]?.name ?? source.nodeId,
       output: source.output,
-      valid: undefined,
+      check: undefined,
     })),
     query: revision.inputSource(target, selection.id, handleName),
     groups: [],

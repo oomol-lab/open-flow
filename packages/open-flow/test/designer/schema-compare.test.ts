@@ -1,5 +1,41 @@
 import { describe, expect, it } from 'vitest'
+import { comparePorts } from '../../src/flow/common/schema.ts'
 import { compareJSONSchema, normalizeNullableSchemaPath } from '../../src/manifest/common/schemaCompare.ts'
+
+const port = (jsonSchema: Parameters<typeof comparePorts>[0]['jsonSchema'], nullable = false) => ({ handle: 'value', jsonSchema, nullable })
+
+describe('Port compatibility diagnostics', () => {
+  it('describes a root type mismatch even when a nullable wrapper hides the comparison path', () => {
+    expect(comparePorts(port({ type: 'string' }), port({ type: 'number' }, true))).toEqual({
+      kind: 'incompatible',
+      mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' },
+    })
+  })
+
+  it('describes nested constraints and missing required properties', () => {
+    expect(
+      comparePorts(
+        port({ type: 'object', properties: { name: { type: 'string' } }, required: ['name'] }),
+        port({ type: 'object', properties: { name: { type: 'string', minLength: 2 } }, required: ['name'] }),
+      ),
+    ).toEqual({
+      kind: 'incompatible',
+      mismatch: { kind: 'keyword', keyword: 'minLength', path: ['properties', 'name'], source: undefined, target: 2 },
+    })
+    expect(comparePorts(port({ type: 'object', properties: { name: { type: 'string' } } }), port({ type: 'object', required: ['name'] }))).toEqual({
+      kind: 'incompatible',
+      mismatch: { kind: 'keyword', keyword: 'required', path: [], source: undefined, target: ['name'] },
+    })
+  })
+
+  it('distinguishes nullable and special data mismatches', () => {
+    expect(comparePorts(port({ type: 'string' }, true), port({ type: 'string' }))).toEqual({ kind: 'incompatible', mismatch: { kind: 'nullable' } })
+    expect(comparePorts(port({ contentMediaType: 'oomol/bin', type: 'string' }), port({ type: 'string' }))).toEqual({
+      kind: 'incompatible',
+      mismatch: { kind: 'binary' },
+    })
+  })
+})
 
 describe('In-process schema compare', () => {
   it('uses the extracted comparer for compatible and incompatible schemas', () => {

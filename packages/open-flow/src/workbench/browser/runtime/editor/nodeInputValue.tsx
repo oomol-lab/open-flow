@@ -1,4 +1,6 @@
 import styles from './nodeInputValue.module.scss'
+import type { TFunction } from 'val-i18n'
+import type { InputSourceCheck, InputSourcesCheck } from '../../../../flow/common/graph.ts'
 import type { ValueEditorProps } from '../../../../form/browser/valueEditor.tsx'
 import type { VariablePickerProps } from '../../../../ui/browser/variable-picker.tsx'
 import type { InputPort, JsonValue } from '../api.ts'
@@ -25,6 +27,7 @@ import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { LlmInputEditor, supportsLlmInput } from './llmInputEditor.tsx'
+import { schemaMismatchMessage } from './schemaMismatchMessage.ts'
 import { useInputSourceQuery } from './useInputSourceQuery.ts'
 
 export type InputVariables = Pick<VariablePickerProps, 'enabled' | 'loaded' | 'loading' | 'names' | 'onOpen'>
@@ -36,7 +39,7 @@ export interface NodeInputUpstreamSources {
     readonly nodeId: string
     readonly nodeName: string
     readonly output: string
-    readonly valid: boolean | undefined
+    readonly check: InputSourceCheck | undefined
   }[]
   readonly groups: readonly {
     readonly icon?: string
@@ -52,6 +55,103 @@ const upstreamSource = (nodeId: string, output: string) => JSON.stringify(['upst
 const sourceItemClass = 'min-h-8 gap-2 px-2 py-1 text-xs'
 const sourceEmptyItemClass = `${sourceItemClass} font-normal text-muted-foreground data-disabled:opacity-100`
 const sourceSubTriggerClass = 'min-h-8 gap-2 px-2 py-1 text-xs'
+
+function inputSourceIssue(check: InputSourceCheck | undefined, source: NodeInputUpstreamSources['current'][number], t: TFunction): string | undefined {
+  switch (check?.kind) {
+    case undefined:
+    case 'available':
+      return
+    case 'source-missing':
+      return t('inspector.sources.sourceMissing', { source: source.nodeName })
+    case 'output-missing':
+      return t('inspector.sources.outputMissing', { output: source.output, source: source.nodeName })
+    case 'not-ready':
+      return t('inspector.sources.notReady', { handle: source.output, source: source.nodeName })
+    case 'schema':
+      return schemaMismatchMessage(check.mismatch, t)
+    case 'schema-error':
+      return t('inspector.sources.schemaCompareFailed')
+  }
+}
+
+function SelectedSourceValue({
+  bound,
+  connected,
+  upstream,
+  variableName,
+  variables,
+}: {
+  readonly bound: boolean
+  readonly connected: boolean
+  readonly upstream?: NodeInputUpstreamSources
+  readonly variableName?: string
+  readonly variables: InputVariables
+}) {
+  const t = useTranslate()
+  const sourceErrorId = useId()
+  let checks: InputSourcesCheck | undefined
+  let checkFailed = false
+  if (upstream?.query != null && upstream.current.length > 0) {
+    try {
+      checks = upstream.query.check()
+    } catch {
+      checkFailed = true
+    }
+  }
+  const current = upstream?.query == null ? upstream?.current : upstream.current.map((source, index) => ({ ...source, check: checks?.sources[index] }))
+  const missingVariable = variableName != null && (!variables.enabled || (variables.loaded && !variables.names.includes(variableName)))
+  const invalidUpstream = connected ? current?.find((source) => source.check != null && source.check.kind != 'available') : undefined
+  const sourceIssue = missingVariable
+    ? !variables.enabled
+      ? t('variablePicker.variableUnavailableHelp')
+      : t('variablePicker.variableMissingHelp', { name: variableName })
+    : checks?.conflict
+      ? t('inspector.sources.sourceConflict', { sources: current?.map((source) => `${source.nodeName} ${source.output}`).join(', ') })
+      : invalidUpstream != null
+        ? inputSourceIssue(invalidUpstream.check, invalidUpstream, t)
+        : undefined
+  const sourceLabel = bound
+    ? variableName
+    : current?.length
+      ? current.map((source) => `${source.nodeName} ${source.output}`).join(' / ')
+      : t('nodeInput.connected')
+  const selectedUpstreamIcon = connected && current?.length === 1 ? current[0]?.icon : undefined
+  return (
+    <div className={styles.sourceValue}>
+      <div
+        data-value-control
+        className="flex h-[30px] min-w-0 items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-[7px] text-xs aria-invalid:border-destructive"
+        aria-invalid={sourceIssue != null}
+        aria-describedby={sourceIssue ? sourceErrorId : undefined}
+        tabIndex={sourceIssue ? 0 : undefined}
+      >
+        {bound ? (
+          <i aria-hidden="true" className="i-heroicons:variable-20-solid mr-2 size-3.5 shrink-0 text-muted-foreground" />
+        ) : (
+          connected &&
+          current?.length === 1 && (
+            <ContentIcon
+              src={selectedUpstreamIcon}
+              className="mr-2 size-3.5 shrink-0 data-[icon-kind=initials]:text-[16px]"
+              fallback={<i aria-hidden="true" className="i-lucide-light:workflow mr-2 size-3.5 shrink-0 text-muted-foreground" />}
+            />
+          )
+        )}
+        <span className="truncate">{sourceLabel}</span>
+      </div>
+      {checkFailed && (
+        <p role="status" className="text-xs text-muted-foreground">
+          {t('inspector.sources.checkFailed')}
+        </p>
+      )}
+      {sourceIssue && (
+        <p id={sourceErrorId} role="alert" className={styles.sourceError}>
+          {sourceIssue}
+        </p>
+      )}
+    </div>
+  )
+}
 
 export function NodeInputValue({
   definition,
@@ -84,16 +184,13 @@ export function NodeInputValue({
   readonly onVariable: (name: string | undefined) => void
 }) {
   const t = useTranslate()
-  const sourceErrorId = useId()
   const [sourceOpen, setSourceOpen] = useState(false)
-  const checks = useInputSourceQuery(providedUpstream?.query?.check, (providedUpstream?.current.length ?? 0) > 0)
   const candidates = useInputSourceQuery(providedUpstream?.query?.candidates, sourceOpen)
   const upstream =
     providedUpstream?.query == null
       ? providedUpstream
       : {
           ...providedUpstream,
-          current: providedUpstream.current.map((source, index) => ({ ...source, valid: checks.value?.[index] })),
           groups: candidates.value == null ? [] : (providedUpstream.describeGroups?.(candidates.value) ?? []),
         }
   const [sourceContainer, setSourceContainer] = useState<HTMLDivElement | null>(null)
@@ -108,24 +205,7 @@ export function NodeInputValue({
       : connected
         ? JSON.stringify(['upstream'])
         : literalSource
-  const missingVariable = bound && (!variables.enabled || (variables.loaded && !variables.names.includes(variableName)))
-  const invalidUpstream = connected && (upstream?.current.length ?? 0) > 0 && upstream!.current.some((source) => source.valid === false)
-  const sourceIssue = missingVariable
-    ? !variables.enabled
-      ? t('variablePicker.variableUnavailableHelp')
-      : t('variablePicker.variableMissingHelp', { name: variableName })
-    : invalidUpstream
-      ? t('inspector.sources.unavailable')
-      : undefined
-  const sourceLabel = bound
-    ? variableName
-    : connected
-      ? upstream?.current.length
-        ? upstream.current.map((source) => `${source.nodeName} · ${source.output}`).join(' / ')
-        : t('nodeInput.connected')
-      : undefined
   const sourceKind = bound ? 'variable' : connected ? 'upstream' : 'literal'
-  const selectedUpstreamIcon = connected && upstream?.current.length === 1 ? upstream.current[0]?.icon : undefined
   const sourcePortal = sourceContainer?.closest<HTMLElement>('.editor-context-panel') ?? sourceContainer
   const sourceControl = disabled ? undefined : (
     <div ref={setSourceContainer} className="flex items-center">
@@ -265,7 +345,7 @@ export function NodeInputValue({
                   }}
                 >
                   {upstream.current
-                    .filter((source) => source.nodeId === group.nodeId && source.valid === false)
+                    .filter((source) => source.nodeId === group.nodeId && source.check != null && source.check.kind != 'available')
                     .map((source) => (
                       <DropdownMenuRadioItem className={sourceItemClass} key={source.output} value={upstreamSource(source.nodeId, source.output)} disabled>
                         <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
@@ -288,40 +368,7 @@ export function NodeInputValue({
   )
   const editor =
     connected || bound ? (
-      <div className={styles.sourceValue}>
-        <div
-          data-value-control
-          className="flex h-[30px] min-w-0 items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-[7px] text-xs aria-invalid:border-destructive"
-          aria-busy={checks.pending || undefined}
-          aria-invalid={sourceIssue != null}
-          aria-describedby={sourceIssue ? sourceErrorId : undefined}
-          tabIndex={sourceIssue ? 0 : undefined}
-        >
-          {bound ? (
-            <i aria-hidden="true" className="i-heroicons:variable-20-solid mr-2 size-3.5 shrink-0 text-muted-foreground" />
-          ) : (
-            connected &&
-            upstream?.current.length === 1 && (
-              <ContentIcon
-                src={selectedUpstreamIcon}
-                className="mr-2 size-3.5 shrink-0 data-[icon-kind=initials]:text-[16px]"
-                fallback={<i aria-hidden="true" className="i-lucide-light:workflow mr-2 size-3.5 shrink-0 text-muted-foreground" />}
-              />
-            )
-          )}
-          <span className="truncate">{sourceLabel}</span>
-        </div>
-        {(checks.pending || checks.failed) && (
-          <p role="status" className="text-xs text-muted-foreground">
-            {t(checks.failed ? 'inspector.sources.checkFailed' : 'inspector.sources.checking')}
-          </p>
-        )}
-        {sourceIssue && (
-          <p id={sourceErrorId} role="alert" className={styles.sourceError}>
-            {sourceIssue}
-          </p>
-        )}
-      </div>
+      <SelectedSourceValue bound={bound} connected={connected} upstream={providedUpstream} variableName={variableName} variables={variables} />
     ) : llm ? (
       <LlmInputEditor addon={sourceControl} schema={definition.jsonSchema} value={value} disabled={disabled} handleNames={handleNames} onChange={onValue} />
     ) : undefined

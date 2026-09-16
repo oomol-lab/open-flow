@@ -1,6 +1,6 @@
 import type { EngineContract } from '../../execution/common/engineContract.ts'
 import type { RuntimeProgram } from '../../execution/common/runtime.ts'
-import type { ConnectorCapability, FlowDocument, Graph, InputMapping, JsonValue, RevisionContent } from './change.ts'
+import type { ConnectorCapability, FlowDocument, Graph, InputMapping, JsonValue, RevisionContent, SchemaMismatch } from './change.ts'
 
 import { findEngineContract } from '../../execution/common/engineContract.ts'
 import { agentConfigIssues } from './agent.ts'
@@ -152,6 +152,7 @@ export interface Diagnostic {
   readonly column: number
   readonly line: number
   readonly message: string
+  readonly mismatch?: SchemaMismatch
   readonly path: string
   readonly values?: Readonly<Record<string, string | number>>
 }

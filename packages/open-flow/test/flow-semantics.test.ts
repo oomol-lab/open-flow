@@ -373,7 +373,13 @@ export default () => value`,
     await expect(validateFlow(triggerRevision({ event: 'push' }, { type: 'string' }), engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
 
     await expect(validateFlow(triggerRevision({ event: 'push' }, { type: 'number' }), engine)).resolves.toMatchObject({
-      diagnostics: [expect.objectContaining({ code: 'graph.node-output-incompatible', path: '/document/graph/nodes/task/inputs/input' })],
+      diagnostics: [
+        expect.objectContaining({
+          code: 'graph.node-output-incompatible',
+          mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' },
+          path: '/document/graph/nodes/task/inputs/input',
+        }),
+      ],
       valid: false,
     })
 
