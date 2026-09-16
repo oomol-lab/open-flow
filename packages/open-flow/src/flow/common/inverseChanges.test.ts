@@ -72,6 +72,40 @@ describe('inverse canvas changes', () => {
     roundTrip(content, deleteNodes(content, subTarget, ['a']))
   })
 
+  it('restores optional fields, input values and code port definitions across a batch', () => {
+    const content = applyFlowChanges(empty, createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Code'))
+    const node = content.document.graph.nodes.code!
+    if (node.kind != 'task' || node.task == null) throw new Error('Expected inline task')
+    roundTrip(content, [
+      { kind: 'graph.node.field.set', target, nodeId: 'code', field: 'description', value: 'Description' },
+      { kind: 'graph.node.field.set', target, nodeId: 'code', field: 'description', before: 'Description' },
+      { kind: 'graph.node.field.set', target, nodeId: 'code', field: 'timeoutMs', value: 2000 },
+      { kind: 'graph.node.task.name.set', target, nodeId: 'code', before: 'Code', value: 'Renamed' },
+      { kind: 'graph.node.task.capabilities.set', target, nodeId: 'code', value: [] },
+      { kind: 'graph.node.additional-inputs.set', target, nodeId: 'code', value: [{ handle: 'extra', jsonSchema: {}, nullable: false }] },
+      {
+        kind: 'graph.node.task.ports.set',
+        target,
+        nodeId: 'code',
+        before: { inputs: node.task.inputs, outputs: node.task.outputs },
+        value: { inputs: [], outputs: [] },
+      },
+      { kind: 'graph.node.input.set', target, nodeId: 'code', handle: 'value', before: node.inputs.value, value: { kind: 'value', value: '' } },
+    ])
+  })
+
+  it('restores binding targets and subflow definitions', () => {
+    const definition = { name: 'Sub', inputs: [], outputs: [] }
+    const content = applyFlowChanges(empty, [
+      { kind: 'binding.create', bindingId: 'connection', binding: { kind: 'connection', target: 'old' } },
+      { kind: 'subflow.create', subflowId: 'sub', subflow: { ...definition, graph: { nodes: {}, edges: [] } } },
+    ])
+    roundTrip(content, [
+      { kind: 'binding.target.set', bindingId: 'connection', before: 'old', value: 'new' },
+      { kind: 'subflow.definition.set', subflowId: 'sub', before: definition, definition: { ...definition, name: 'Renamed' } },
+    ])
+  })
+
   it('replays creation using the same node and module identities', () => {
     roundTrip(empty, [
       ...createValue(target, 'a', 'A'),

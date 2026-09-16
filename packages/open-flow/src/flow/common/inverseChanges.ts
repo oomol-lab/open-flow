@@ -70,6 +70,57 @@ export function inverseFlowChanges(content: RevisionContent, operations: readonl
       case 'graph.node.input.set':
         restore.push({ ...operation, before: operation.value, value: operation.before })
         break
+      case 'binding.target.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'graph.node.additional-inputs.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'graph.node.condition.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'graph.node.field.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'graph.node.task.ports.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'graph.node.task.name.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'graph.node.task.capabilities.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'graph.node.values.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'graph.node.wait.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'graph.node.webhook.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'graph.trigger.config.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'graph.trigger.schedule.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'task.connector.connection.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'task.agent.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'task.llm.mode.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'task.name.set':
+        restore.push({ ...operation, before: operation.value, value: operation.before })
+        break
+      case 'subflow.definition.set':
+        restore.push({ ...operation, before: operation.definition, definition: operation.before })
+        break
       default:
         throw new Error(`Unsupported canvas history operation: ${operation.kind}`)
     }

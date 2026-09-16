@@ -937,6 +937,7 @@
     "connected": "Data selected. Use Select data to change it."
   },
   "history": {
+    "edit": "Edit node properties",
     "undo": "Undo",
     "redo": "Redo",
     "add": "Add {{count}} nodes",

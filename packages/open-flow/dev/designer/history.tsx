@@ -344,6 +344,7 @@ function HistorySession({
               onConnect={(edge) => void store.connect(edge)}
               onDeleteEdge={(edge) => void store.disconnect(edge)}
               onDeleteNodes={() => void store.deleteSelectedNodes()}
+              onChangeNodeContentHidden={(id, hidden) => void store.saveNodeContentHidden(id, hidden)}
               onChangeComment={(id, comment) => void store.saveComment(id, comment)}
               onCopy={() => store.copySelectedNodes()}
               onDuplicate={(...args) => void store.duplicateSelectedNodes(...args)}
@@ -373,7 +374,7 @@ function HistoryCanvasActions({ session }: { session: ReturnType<typeof createSe
   const history = useVal(store.history$)
   useStoryActions([
     { label: 'Select mixed group', onClick: () => store.selectNodes(['trigger', 'value', 'code', 'note']) },
-    { label: 'Edit title (clear history)', disabled: history.failed || history.applying, onClick: () => void store.saveNodeTitle('code', 'Edited transform') },
+    { label: 'Edit title (undoable)', disabled: history.failed || history.applying, onClick: () => void store.saveNodeTitle('code', 'Edited transform') },
     { label: 'Hold saves', onClick: () => session.hold() },
     { label: 'Release saves', onClick: () => session.release() },
   ])

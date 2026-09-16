@@ -171,7 +171,7 @@ describe('Workspace canvas history', () => {
     }
   })
 
-  it('keeps history for selection, no-op settings and viewport; clears it for content edits', async () => {
+  it('keeps history for selection and no-ops, records settings, and isolates code editing', async () => {
     const { store } = await session()
     try {
       await store.moveNodes({ code: { x: 400, y: 0 } })
@@ -180,11 +180,95 @@ describe('Workspace canvas history', () => {
       await store.moveViewport({ x: 20, y: 20, zoom: 1 })
       expect(store.history$.value.canUndo).toBe(true)
       await store.saveNodeTitle('code', 'Renamed')
-      expect(store.history$.value.canUndo).toBe(false)
+      expect(store.history$.value.undo?.action).toBe('edit')
+      await store.undo()
+      expect(store.$.draft.value?.content.document.graph.nodes.code?.name).toBe('Code')
+      expect(store.history$.value.canUndo).toBe(true)
       await store.moveNodes({ code: { x: 500, y: 0 } })
       store.updateModuleSource('export default () => ({result: 1})')
       expect(store.history$.value.canUndo).toBe(false)
     } finally {
+      store.dispose()
+    }
+  })
+
+  it('undoes visibility, properties and comments in order without losing earlier moves', async () => {
+    const { store, saved, notices } = await session()
+    try {
+      const initial = saved()
+      await store.moveNodes({ value: { x: 100, y: 50 } })
+      const moved = saved()
+      await store.saveNodeContentHidden('value', true)
+      const hidden = saved()
+      await store.saveValue('value', [{ handle: 'result', value: 42, jsonSchema: { type: 'number' } }])
+      const configured = saved()
+      await store.saveComment('note', { title: 'Updated', content: 'New body' })
+      const edited = saved()
+      await store.undo()
+      expect(saved().presentation.value).toEqual(configured.presentation.value)
+      await store.undo()
+      expect(saved().draft.content).toEqual(hidden.draft.content)
+      await store.undo()
+      expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.find((node) => node.id == 'value')).toMatchObject({
+        contentHidden: false,
+        position: { x: 100, y: 50 },
+      })
+      expect(store.history$.value.undo?.action).toBe('move')
+      await store.undo()
+      expect(designerGraph(saved().draft, target, saved().presentation.value)).toEqual(designerGraph(initial.draft, target, initial.presentation.value))
+      expect(store.history$.value.canUndo).toBe(false)
+      await store.redo()
+      expect(designerGraph(saved().draft, target, saved().presentation.value)).toEqual(designerGraph(moved.draft, target, moved.presentation.value))
+      await store.redo()
+      await store.redo()
+      await store.redo()
+      expect(saved().draft.content).toEqual(edited.draft.content)
+      expect(saved().presentation.value).toEqual(edited.presentation.value)
+      expect(notices).not.toHaveBeenCalled()
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('keeps no-op visibility out of history and replaces redo with a new property edit', async () => {
+    const { store } = await session()
+    try {
+      await store.moveNodes({ value: { x: 100, y: 50 } })
+      await store.saveNodeContentHidden('value', false)
+      expect(store.history$.value.undo?.action).toBe('move')
+      await store.saveNodeTitle('value', 'Renamed')
+      await store.undo()
+      await store.saveNodeDescription('value', 'Description')
+      expect(store.history$.value.canRedo).toBe(false)
+      await store.undo()
+      expect(store.history$.value.undo?.action).toBe('move')
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('waits for queued property saves and restores each saved value', async () => {
+    const { store, change, saved } = await session()
+    const gate = Promise.withResolvers<void>()
+    const original = change.getMockImplementation()!
+    change.mockImplementationOnce(async (...args) => {
+      await gate.promise
+      return original(...args)
+    })
+    try {
+      await store.moveNodes({ code: { x: 400, y: 0 } })
+      const first = store.saveNodeTitle('code', 'First')
+      const second = store.saveNodeTitle('code', 'Second')
+      expect(store.history$.value.canUndo).toBe(false)
+      gate.resolve()
+      expect(await Promise.all([first, second])).toEqual([true, true])
+      await store.undo()
+      expect(saved().draft.content.document.graph.nodes.code?.name).toBe('First')
+      await store.undo()
+      expect(saved().draft.content.document.graph.nodes.code?.name).toBe('Code')
+      expect(store.history$.value.undo?.action).toBe('move')
+    } finally {
+      gate.resolve()
       store.dispose()
     }
   })

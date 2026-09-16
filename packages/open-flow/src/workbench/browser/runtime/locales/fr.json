@@ -937,6 +937,7 @@
     "connected": "Données sélectionnées. Utilisez Sélectionner des données pour les modifier."
   },
   "history": {
+    "edit": "Modifier les propriétés du nœud",
     "undo": "Annuler",
     "redo": "Rétablir",
     "add": "Ajouter {{count}} nœuds",

@@ -607,7 +607,7 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateNodeSettings(revision, target, nodeId, settings)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveNodeDescription(nodeId: string, description: string | undefined): Promise<boolean> {
@@ -615,7 +615,7 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateNodeDescription(revision, target, nodeId, description)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveNodeIcon(nodeId: string, icon: string | undefined): Promise<boolean> {
@@ -623,7 +623,7 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateNodeIcon(revision, target, nodeId, icon)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveNodeTitle(nodeId: string, title: string | undefined): Promise<boolean> {
@@ -631,7 +631,7 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateNodeName(revision, target, nodeId, title)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async setInputValue(nodeId: string, handle: string, value: JsonValue | undefined): Promise<boolean> {
@@ -639,14 +639,14 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = changeInputValue(revision, target, nodeId, handle, value)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async setInputSource(nodeId: string, handle: string, source: { readonly nodeId: string; readonly output: string }): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null) return false
-    return (await this.#changeDraft(setInputSources(revision.revision.content, target, nodeId, handle, [{ kind: 'node', ...source }]))) != null
+    return (await this.#editDraft(setInputSources(revision.revision.content, target, nodeId, handle, [{ kind: 'node', ...source }]))) != null
   }
 
   public async setInputVariable(nodeId: string, handle: string, name: string | undefined): Promise<boolean> {
@@ -657,7 +657,7 @@ export class WorkspaceStore {
       name == null
         ? changeInputValue(revision, target, nodeId, handle, undefined)
         : changeInputVariable(revision, target, nodeId, handle, name, this.#identity())
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveCondition(nodeId: string, settings: ConditionSettings): Promise<boolean> {
@@ -665,7 +665,7 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateCondition(revision, target, nodeId, settings)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveValue(nodeId: string, values: readonly ValueSettings[]): Promise<boolean> {
@@ -673,7 +673,7 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateValue(revision, target, nodeId, values)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveWait(
@@ -686,14 +686,14 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target?.kind != 'flow') return false
     const changes = updateWait(revision, target, nodeId, settings)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveNodeContentHidden(nodeId: string, hidden: boolean): Promise<void> {
     const target = this.#model.value.target
     const node = this.#designer().nodes.find((candidate) => candidate.id == nodeId)
     if (target == null || node == null || node.kind == 'condition') return
-    await this.#changePresentation((value) => setNodeContentHidden(value, target, nodeId, hidden))
+    await this.#canvasChange('edit', 1, [], (value) => setNodeContentHidden(value, target, nodeId, hidden))
   }
 
   public async saveComment(nodeId: string, comment: { readonly content: string; readonly title: string }): Promise<void> {
@@ -701,7 +701,7 @@ export class WorkspaceStore {
     if (target == null) return
     const position = this.#designer().nodes.find((node) => node.id == nodeId)?.position
     if (position == null) return
-    await this.#changePresentation((value) => setComment(value, target, nodeId, { ...comment, position }))
+    await this.#canvasChange('edit', 1, [], (value) => setComment(value, target, nodeId, { ...comment, position }))
   }
 
   public async saveTaskSettings(nodeId: string, settings: TaskSettings): Promise<boolean> {
@@ -709,7 +709,7 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateTask(revision, target, nodeId, settings)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveCodeActions(nodeId: string, capabilities: readonly ConnectorCapability[]): Promise<boolean> {
@@ -717,7 +717,7 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = setCodeActions(revision.revision.content, target, nodeId, capabilities)
-    return changes == null || (await this.#changeDraft(changes)) != null
+    return changes == null || (await this.#editDraft(changes)) != null
   }
 
   public async saveTaskPorts(nodeId: string, ports: TaskPorts): Promise<boolean> {
@@ -725,7 +725,7 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateTaskPorts(revision, target, nodeId, ports)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveTaskAdditionalInputs(nodeId: string, inputs: readonly InputPort[]): Promise<boolean> {
@@ -733,14 +733,14 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateTaskAdditionalInputs(revision, target, nodeId, inputs)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async setConnectorConnection(taskId: string, connectionId: string): Promise<boolean> {
     const revision = this.$.revision.value
     if (revision == null) return false
     const changes = changeConnectorConnection(revision.revision.content, taskId, connectionId)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public get eventSourceClient() {
@@ -763,7 +763,7 @@ export class WorkspaceStore {
     if (connectionChanges == null) return false
     const changed = trigger.config.sourceId != source.sourceId
     return (
-      (await this.#changeDraft([
+      (await this.#editDraft([
         ...connectionChanges,
         ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'sourceId', source.sourceId) ?? []),
         ...(changed ? (updateTriggerConfig(revision.revision.content, target, triggerId, 'eventTypes', []) ?? []) : []),
@@ -798,11 +798,9 @@ export class WorkspaceStore {
       }
     }
     if (changes.length > 0 && trigger?.kind == 'poll' && trigger.definition.key == 'linear.on_issue_changed' && name == 'teamId') {
-      return (
-        (await this.#changeDraft([...changes, ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'stateIds', undefined) ?? [])])) != null
-      )
+      return (await this.#editDraft([...changes, ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'stateIds', undefined) ?? [])])) != null
     }
-    return (await this.#changeDraft(changes)) != null
+    return (await this.#editDraft(changes)) != null
   }
 
   public async saveTriggerSchedule(triggerId: string, schedule: readonly TriggerSchedule[]): Promise<boolean> {
@@ -810,7 +808,7 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target?.kind != 'flow') return false
     const changes = updateTriggerSchedule(revision.revision.content, target, triggerId, schedule)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveWebhook(triggerId: string, settings: WebhookSettings): Promise<boolean> {
@@ -818,7 +816,7 @@ export class WorkspaceStore {
     const target = this.#model.value.target
     if (revision == null || target?.kind != 'flow') return false
     const changes = updateWebhook(revision, target, triggerId, settings)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async setTriggerConnection(triggerId: string, connectionId: string): Promise<boolean> {
@@ -830,20 +828,20 @@ export class WorkspaceStore {
     const trigger = revision.graph(target)?.nodes[triggerId]
     if (changes.length > 0 && trigger?.kind == 'poll' && trigger.definition.key == 'linear.on_issue_changed') {
       return (
-        (await this.#changeDraft([
+        (await this.#editDraft([
           ...changes,
           ...['teamId', 'stateIds'].flatMap((field) => updateTriggerConfig(revision.revision.content, target, triggerId, field, undefined) ?? []),
         ])) != null
       )
     }
-    return (await this.#changeDraft(changes)) != null
+    return (await this.#editDraft(changes)) != null
   }
 
   public async saveSubflowSettings(subflowId: string, settings: SubflowSettings): Promise<boolean> {
     const revision = this.$.revision.value
     if (revision == null) return false
     const changes = updateSubflow(revision, subflowId, settings)
-    return changes != null && (await this.#changeDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public updateModuleSource(source: string): void {
@@ -1007,6 +1005,10 @@ export class WorkspaceStore {
     )
     if (!(await change) || this.#disposed) return
     return nodeId
+  }
+
+  async #editDraft(changes: FlowChanges): Promise<Draft | undefined> {
+    return (await this.#canvasChange('edit', 1, changes)) ? this.#model.value.draft : undefined
   }
 
   async #changeDraft(changes: FlowChanges, manageBusy = true, historyOwned = false): Promise<Draft | undefined> {

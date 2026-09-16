@@ -4,7 +4,7 @@ import type { CanvasPresentationChange } from '../workspace.ts'
 
 import { val } from 'value-enhancer'
 
-export type CanvasAction = 'add' | 'delete' | 'paste' | 'connect' | 'disconnect' | 'move'
+export type CanvasAction = 'add' | 'delete' | 'paste' | 'connect' | 'disconnect' | 'move' | 'edit'
 export interface CanvasHistoryEntry {
   readonly action: CanvasAction
   readonly count: number

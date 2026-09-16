@@ -192,10 +192,22 @@ the Draft head.
 
 Draft and Presentation changes for one canvas action share a single history entry. Undo becomes
 available only after all saves complete. History covers node addition and deletion, pasting,
-connections, movement, and layout; it excludes viewport changes, selection, and text editors' own
-history.
+connections, movement, layout, node configuration, title, comment body, and content visibility;
+it excludes viewport changes, selection, and text editors' own history.
 
-Configuration, title, comment body, and code edits clear canvas history, as do canvas switching,
+When adding or changing persisted editing behavior in node/trigger property panels, canvas menus,
+or toolbars, preserve this history contract. Route edits through WorkspaceStore's history-aware
+operations; UI components must not maintain their own canvas history or clear it to accommodate
+a missing inverse operation. New Flow change operations used by these edits need inverse support
+in `flow/common/inverseChanges.ts`. Related field changes caused by one user action, such as
+changing a connection and clearing dependent configuration, belong in one history entry.
+
+Verify edit → undo → redo restores both the edited values and their dependent state, preserves
+earlier history, and invalidates redo after a new edit. Cover queued saves or combined Draft and
+Presentation changes when the affected operation uses them. Reusing an existing save operation
+does not require a separate history implementation in the panel.
+
+Code edits clear canvas history, as do canvas switching,
 refreshing, and external updates. After a save failure, clear history and reload the actual state.
 The two save channels do not guarantee atomic commits and do not automatically compensate for
 partial success.
