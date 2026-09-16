@@ -273,10 +273,10 @@ export function FlowEditor({
   const selectOutlineNode = (nodeId: string): void => {
     designerRef.current?.focusCanvas()
     panel.activate([nodeId])
+    store.workspace.locateNode(nodeId, { preserveSelection: true })
   }
   const focusNode = (nodeId: string): void => {
-    selectOutlineNode(nodeId)
-    store.workspace.locateNode(nodeId)
+    store.workspace.locateNode(nodeId, { preserveSelection: true })
   }
 
   const contextPanelVisible = contextPanelMode != null && target != null && (contextPanelMode == 'blocks' || revision != null)
@@ -472,13 +472,7 @@ export function FlowEditor({
               provideChoices={store.provideAddNodeOptionChoices}
             />
           ) : multipleSelected ? (
-            <FlowNodeList
-              nodes={designer.nodes.filter((node) => selectedNodeIds.includes(node.id))}
-              onSelect={selectOutlineNode}
-              onFocusNode={(nodeId) => {
-                store.workspace.locateNode(nodeId, { preserveSelection: true })
-              }}
-            />
+            <FlowNodeList nodes={designer.nodes.filter((node) => selectedNodeIds.includes(node.id))} onSelect={selectOutlineNode} onFocusNode={focusNode} />
           ) : flowSelected ? null : selectedDesignerNode?.kind == 'comment' ? (
             <CommentInspector
               key={selectedDesignerNode.id}

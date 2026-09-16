@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   setOpen: vi.fn(),
   setVisible: vi.fn(),
   stateCall: 0,
+  stateValues: new Map<number, unknown>(),
 }))
 
 vi.mock('react', async (importOriginal) => ({
@@ -16,7 +17,11 @@ vi.mock('react', async (importOriginal) => ({
   useEffect: vi.fn(),
   useCallback: (callback: unknown) => callback,
   useRef: vi.fn(() => ({ current: undefined })),
-  useState: vi.fn(() => (mocks.stateCall++ == 0 ? [false, mocks.setVisible] : [false, mocks.setOpen])),
+  useState: vi.fn((initial: unknown) => {
+    const call = mocks.stateCall++
+    const value = mocks.stateValues.has(call) ? mocks.stateValues.get(call) : typeof initial == 'function' ? initial() : initial
+    return [value, call == 0 ? mocks.setVisible : mocks.setOpen]
+  }),
 }))
 
 vi.mock('use-value-enhancer', async (importOriginal) => ({
@@ -33,7 +38,7 @@ vi.mock('./editor/workbenchCanvas.tsx', () => ({ WorkbenchCanvas: () => null }))
 
 const value = <T,>(current: T): { readonly value: T } => ({ value: current })
 
-function renderWorkspace(busy?: string, withTrigger = true, invalid = false) {
+function renderWorkspace(busy?: string, withTrigger = true, invalid = false, selectedNodeIds: readonly string[] = []) {
   const navigation = {
     $: { view: value('design') },
     open: vi.fn(),
@@ -64,6 +69,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false) {
       },
     },
     addNode: vi.fn().mockResolvedValue('new-node'),
+    selectNodes: vi.fn(),
     editDraftRunInputs: vi.fn().mockResolvedValue('input'),
     requestDraftRun: vi.fn().mockResolvedValue('started'),
     requestLiveRun: vi.fn().mockResolvedValue('started'),
@@ -93,7 +99,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false) {
         inspectorDiagnostics: value([]),
         nodeFocus: value(undefined),
         revision: value({}),
-        selectedNodeIds: value([]),
+        selectedNodeIds: value(selectedNodeIds),
         selection: value(undefined),
         target: value({ kind: 'flow' }),
         targetName: value('Flow'),
@@ -102,6 +108,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false) {
         workspaceLoading: value(false),
         workspaceRepairing: value(false),
       },
+      locateNode: vi.fn(),
       repairWorkspace: vi.fn(),
     },
   } as unknown as WorkbenchStore
@@ -121,6 +128,7 @@ describe('FlowWorkspace run drawer', () => {
     mocks.setOpen.mockReset()
     mocks.setVisible.mockReset()
     mocks.stateCall = 0
+    mocks.stateValues.clear()
   })
 
   it.each([false, true])('runs from the canvas and opens logs despite unrelated diagnostics (invalid: %s)', async (invalid) => {
@@ -183,5 +191,41 @@ describe('FlowWorkspace run drawer', () => {
     const designer = (view.props.children as ReactElement[])[0]!
 
     expect(designer.props.disabled).toBe(false)
+  })
+
+  it.each([
+    { page: 'outline', selectedNodeIds: [] },
+    { page: 'properties', selectedNodeIds: ['start', 'task'] },
+  ])('focuses a node selected from the $page node list', ({ page, selectedNodeIds }) => {
+    mocks.stateValues.set(4, true)
+    mocks.stateValues.set(5, page)
+    const { editor, store } = renderWorkspace(undefined, true, false, selectedNodeIds)
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const contextPanel = (view.props.children as ReactElement[])[1]!
+    const panelChildren = contextPanel.props.children as ReactElement[]
+    const nodeList = page == 'outline' ? panelChildren[0]!.props.children : panelChildren[1]!
+
+    nodeList.props.onSelect('start')
+
+    expect(store.selectNodes).toHaveBeenCalledWith(['start'])
+    expect(store.workspace.locateNode).toHaveBeenCalledWith('start', { preserveSelection: true })
+  })
+
+  it.each([
+    { page: 'outline', selectedNodeIds: [] },
+    { page: 'properties', selectedNodeIds: ['start', 'task'] },
+  ])('keeps the $page node list open when locating a node', ({ page, selectedNodeIds }) => {
+    mocks.stateValues.set(4, true)
+    mocks.stateValues.set(5, page)
+    const { editor, store } = renderWorkspace(undefined, true, false, selectedNodeIds)
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const contextPanel = (view.props.children as ReactElement[])[1]!
+    const panelChildren = contextPanel.props.children as ReactElement[]
+    const nodeList = page == 'outline' ? panelChildren[0]!.props.children : panelChildren[1]!
+
+    nodeList.props.onFocusNode('start')
+
+    expect(store.selectNodes).not.toHaveBeenCalled()
+    expect(store.workspace.locateNode).toHaveBeenCalledWith('start', { preserveSelection: true })
   })
 })
