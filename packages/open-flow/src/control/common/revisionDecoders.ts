@@ -1,7 +1,7 @@
 import type { Draft, DraftChange, DraftSync, Presentation, RevisionMetadata } from './api.ts'
 
 import { decodeRevisionContent } from '../../flow/common/encoding.ts'
-import { exact, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
+import { integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 
 function revisionMetadata(value: unknown): RevisionMetadata {
   const source = record(value)
@@ -30,7 +30,6 @@ export function draft(value: unknown): Draft {
 
 export function presentation(value: unknown): Presentation {
   const source = record(value)
-  exact(source, ['revision', 'updatedAt', 'value', 'version'])
   if (source.version != 1 || integer(source.revision) < 1) return invalidResponse()
   return {
     revision: integer(source.revision),

@@ -305,13 +305,31 @@ it('loads an encoded Flow editor in one request', async () => {
   expect(request).toHaveBeenCalledWith('/v1/flows/flow%2F1/editor', expect.anything())
 })
 
+it('ignores additional editor and Presentation response fields', async () => {
+  const presentation = { ...editor.presentation, createdAt: flow.createdAt }
+  const client = new ControlClient(async (path) => Response.json(path.endsWith('/editor') ? { ...editor, extra: true, presentation } : presentation))
+
+  await expect(client.getEditor(flow.flowId)).resolves.toEqual(editor)
+  await expect(client.getPresentation(flow.flowId)).resolves.toEqual(editor.presentation)
+})
+
+it.each(['revision', 'updatedAt', 'value', 'version'] as const)('rejects a Presentation missing %s', async (field) => {
+  const presentation = { ...editor.presentation }
+  Reflect.deleteProperty(presentation, field)
+  const client = new ControlClient(async () => Response.json(presentation))
+
+  await expect(client.getPresentation(flow.flowId)).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
+})
+
 it.each([
   { ...editor, version: 2 },
-  { ...editor, extra: true },
   { ...editor, flow: { ...flow, flowId: 'other' } },
   { ...editor, draft: { ...editor.draft, revisionId: 'stale' } },
   { ...editor, draft: { ...editor.draft, flowId: 'other' } },
   { ...editor, live: { ...editor.live, flowId: 'other' } },
+  { ...editor, presentation: undefined },
+  { ...editor, presentation: { ...editor.presentation, version: 2 } },
+  { ...editor, presentation: { ...editor.presentation, updatedAt: 123 } },
   { ...editor, presentation: { ...editor.presentation, revision: 0 } },
   { ...editor, presentation: { ...editor.presentation, value: [] } },
 ])('rejects an invalid or mismatched editor snapshot %#', async (value) => {

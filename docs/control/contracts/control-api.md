@@ -152,7 +152,8 @@ interface Presentation {
 各字段复用对应资源读取的合同。`flow.flowId`、`draft.flowId` 和 `live.flowId` 必须匹配请求的 Flow，
 `flow.draftRevisionId` 必须等于 `draft.revisionId`；Live 的 `hasUnpublishedChanges` 对应该 Draft。
 该操作只读，不创建 Revision、不改变 Presentation revision，也不执行 check；不存在的 Flow 返回 `flow.not-found`。
-各资源的独立读取与修改接口继续有效。
+各资源的独立读取与修改接口继续有效。客户端忽略 editor 响应顶层与 Presentation 响应中的额外字段，
+但仍校验必需字段、字段类型、版本及上述资源一致性。
 
 ### 执行图与输入来源
 

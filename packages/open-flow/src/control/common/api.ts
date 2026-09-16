@@ -751,7 +751,6 @@ export class ControlClient {
     flowId: string,
   ): Promise<{ readonly flow: Flow; readonly draft: Draft; readonly live: Live; readonly presentation: Presentation; readonly version: 1 }> {
     const source = record(await this.request(`/v1/flows/${segment(flowId)}/editor`))
-    exact(source, ['flow', 'draft', 'live', 'presentation', 'version'])
     if (source.version != 1) return invalidResponse()
     const result = {
       flow: flow(source.flow),
