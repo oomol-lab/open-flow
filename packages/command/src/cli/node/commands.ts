@@ -135,7 +135,8 @@ export function commandSchema(name = 'apply') {
   if (name == 'outputs')
     return {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
-      description: 'Any JSON trigger outputs. The selected trigger defines its outputs contract.',
+      type: 'object',
+      description: 'Named JSON trigger outputs. The selected trigger defines its outputs contract.',
     }
   if (name == 'input')
     return {

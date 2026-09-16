@@ -63,8 +63,8 @@ async function fixture(content: unknown = revision()) {
   return { database, sourceFile, output: path.join(directory, 'converted') }
 }
 
-it('imports a valid draft while archiving the complete WAL-backed source and leaving Live unset', async () => {
-  const f = await fixture()
+it.each([1, 2])('imports a version %s draft while archiving the complete WAL-backed source and leaving Live unset', async (modelVersion) => {
+  const f = await fixture({ ...revision(), modelVersion })
   try {
     const before = await readFile(f.sourceFile)
     const report = await migrateProjectDatabase(f.sourceFile, f.output)
@@ -80,6 +80,7 @@ it('imports a valid draft while archiving the complete WAL-backed source and lea
       expect(target.prepare('SELECT * FROM flow_live').all()).toEqual([])
       expect(target.prepare('SELECT flow_id, name FROM flows').all()).toEqual([{ flow_id: 'main', name: 'Original Flow' }])
       const content = JSON.parse((target.prepare('SELECT content FROM revisions').get() as { content: string }).content)
+      expect(content.modelVersion).toBe(2)
       expect(content.document.graph.edges).toEqual([{ source: 'clock', target: 'echo' }])
       expect(content.modules).toEqual(revision().modules)
     } finally {

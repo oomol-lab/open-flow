@@ -335,7 +335,7 @@ const legacyProject = z
   .object({
     kind: z.literal('open-flow-project-revision'),
     version: z.literal(1),
-    modelVersion: z.literal(2),
+    modelVersion: z.union([z.literal(1), z.literal(2)]),
     modules: z.record(z.string(), z.object({ name: z.string(), source: z.string(), imports: z.array(z.string()) }).strict()),
     document: z.object({ bindings: object, flows: object, subflows: object, tasks: object }).strict(),
   })

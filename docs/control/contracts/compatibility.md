@@ -57,7 +57,7 @@ Server 的 `isolatedVmEngineDigest` 由隔离执行器协议、isolated-vm／Nod
 checkpoint 使用自己的格式版本和状态一致性校验，不能用隔离运行时 digest 代替这些检查。
 
 当前 Engine v4 将执行调度与输入来源分离。节点仅因执行分支关闭而跳过；缺失输入及普通数据输出补 `null` 后按端口声明校验，实际 `null` 仍算一个可用来源。
-本次直接替换 v3，不提供旧执行合同或旧运行迁移。公共包、Command、Server 和客户端同步升级；checkpoint 结构仍为 version 3，恢复验证采用 v4 语义并要求完整的归一化输出。
+本次直接替换 v3，不提供旧执行合同或旧运行迁移。公共包、Command、Server 和客户端同步升级；checkpoint 结构为 version 4，恢复验证采用 v4 语义并要求完整的归一化输出。
 
 本次移除 digest 中历史的图语义标签会使隔离运行时标识变化一次。固定旧 digest 的 Run 沿用既有不匹配拒绝路径；
 不重写历史 Run 的标识，也不增加旧标识别名。此后仅修改 Scheduler 规则不会再造成隔离运行时 digest 变化。

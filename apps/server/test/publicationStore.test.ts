@@ -8,7 +8,7 @@ function fixture() {
   const store = new Store(database, () => 1_000)
   store.flows.createFlow({
     actorId: 'operator',
-    content: '{}',
+    content: '{"modelVersion":2}',
     createdAt: 1_000,
     digest: 'digest',
     flowId: 'flow',
@@ -19,7 +19,7 @@ function fixture() {
   })
   const input = {
     closureDigest: 'closure',
-    content: '{}',
+    content: '{"modelVersion":2}',
     crons: [],
     expectedLivePublicationId: null,
     engineContract: 'open-flow-engine/v4',
@@ -115,4 +115,21 @@ it('schedules preparation deadlines, readiness, retries, and failures from durab
   database.exec('UPDATE publish_operations SET deadline_at = 1_500')
   expect(store.publications.nextPublishAt()).toBe(1_500)
   expect(store.publications.nextPublishOperation(1_500)).toMatchObject({ kind: 'failed', code: 'publication.deadline-exceeded' })
+})
+
+it.each([1, 2])('preserves a stored model version when publishing without metadata: %s', (modelVersion) => {
+  const { database, store, input, poll, integration } = fixture()
+  database.prepare('UPDATE revisions SET content = ? WHERE revision_id = ?').run(JSON.stringify({ modelVersion }), input.revisionId)
+  store.polls.completeCandidate(poll, '{}', false, 1_000)
+  store.integrations.markCandidateReady(integration, 1_000)
+  expect(store.publications.publish(input).kind).toBe('published')
+  expect(store.publications.live('flow')?.publication.modelVersion).toBe(modelVersion)
+})
+
+it('preserves explicit publication model version metadata', () => {
+  const { store, input, poll, integration } = fixture()
+  store.polls.completeCandidate(poll, '{}', false, 1_000)
+  store.integrations.markCandidateReady(integration, 1_000)
+  expect(store.publications.publish({ ...input, metadata: { actorId: 'operator', operation: 'publish', modelVersion: 7 } }).kind).toBe('published')
+  expect(store.publications.live('flow')?.publication.modelVersion).toBe(7)
 })

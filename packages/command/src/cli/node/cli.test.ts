@@ -666,3 +666,9 @@ it('reads and downloads saved results through the public API', async () => {
   }
   expect(routes).toEqual(['/v1/runs/run/results', '/v1/runs/run/results/result?pointer=%2Fok&offset=0', '/v1/runs/run/results/result/content'])
 })
+
+it('describes Trigger outputs as a JSON object in the CLI schema', async () => {
+  const result = runtime()
+  expect(await runCli(['schema', 'outputs'], { request: vi.fn() }, result.value)).toBe(0)
+  expect(JSON.parse(result.stdout())).toMatchObject({ type: 'object' })
+})
