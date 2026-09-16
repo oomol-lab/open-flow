@@ -98,8 +98,11 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false) {
         target: value({ kind: 'flow' }),
         targetName: value('Flow'),
         workspaceLoadFailed: value(false),
+        workspaceLoadProblem: value(undefined),
         workspaceLoading: value(false),
+        workspaceRepairing: value(false),
       },
+      repairWorkspace: vi.fn(),
     },
   } as unknown as WorkbenchStore
   const element = FlowWorkspace({

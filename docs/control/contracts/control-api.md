@@ -124,6 +124,11 @@ Revision 是完整 immutable snapshot。Draft change 使用 `expectedRevisionId`
 要求 `Idempotency-Key`；相同 key 与相同 batch 返回第一次提交的 Revision，相同 key 与不同 batch 返回 `flow.conflict`。幂等重放先于 Draft head CAS。
 Draft sync 始终返回当前完整 snapshot，不接受 revision cursor，也不返回 authoring operation history。
 
+无法按当前模型读取但可以宽容恢复的 Draft 分别返回 `flow.upgrade-required` 或 `flow.repair-required`。客户端可以调用
+`POST /v1/flows/{flowId}/draft/repair`，body 为 `{ expectedRevisionId, version: 1 }` 并提供 `Idempotency-Key`。修复逐项保留
+当前模型可读取的资源，丢弃无法读取的 collection entry，并以旧 Draft 为 parent 创建新 Revision；原 Revision、Live、Publication、Run 和
+Presentation 不变。高于当前模型的版本、无效信封及无法解析的内容返回 `flow.invalid`。
+
 Presentation 独立于 Draft head：
 
 ```ts
@@ -560,6 +565,7 @@ type FlowChangeEvent =
 | `GET`     | `/v1/flows/:flowId/draft`                                  |      200 | 当前 Draft snapshot                               |
 | `GET`     | `/v1/flows/:flowId/draft/sync`                             |      200 | 当前完整 snapshot                                 |
 | `POST`    | `/v1/flows/:flowId/draft/changes`                          |      200 | `Idempotency-Key` 与 change batch                 |
+| `POST`    | `/v1/flows/:flowId/draft/repair`                           |      200 | 宽容修复并创建新的 Draft Revision                 |
 | `GET`     | `/v1/flows/:flowId/revisions/:revisionId`                  |      200 | immutable Revision                                |
 | `GET/PUT` | `/v1/flows/:flowId/presentation`                           |      200 | Presentation CAS                                  |
 | `POST`    | `/v1/flows/:flowId/revisions/:revisionId/check`            |      200 | 固定 Revision validation                          |

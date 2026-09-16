@@ -752,6 +752,20 @@
     "liveAndDraft": "本番 + ドラフト",
     "loadFailed": "ドラフトを読み込めませんでした",
     "loadFailedDescription": "デプロイ先への接続を確認してから、もう一度お試しください。",
+    "recovery": {
+      "failed": { "title": "このワークフローを開けません", "description": "ドラフトを利用できないか、安全に修復できません。" },
+      "repair": {
+        "title": "ワークフローが破損しています",
+        "description": "読み取れない部分を破棄して、修復ドラフトを作成できます。",
+        "action": "修復して開く"
+      },
+      "upgrade": {
+        "title": "ワークフローのアップグレードが必要です",
+        "description": "このワークフローは古いバージョンです。アップグレードすると編集を続けられます。",
+        "action": "アップグレードして開く"
+      },
+      "repairing": "ドラフトを準備中…"
+    },
     "notChecked": "未検査",
     "publish": "公開",
     "publishing": "公開中…",

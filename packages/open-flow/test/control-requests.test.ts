@@ -22,6 +22,7 @@ const samples = {
     operations: [{ kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'start', node: { kind: 'manual', name: 'Start' } }],
     version: 1,
   },
+  repairDraft: { expectedRevisionId: 'r1', version: 1 },
   setEnabled: { enabled: false, expectedPublicationId: 'p1', version: 1 },
   updatePresentation: { expectedRevision: 1, value: {}, version: 1 },
   checkFlow: { engineContract: 'open-flow-engine/v4', version: 1 },

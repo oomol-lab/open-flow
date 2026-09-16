@@ -182,6 +182,87 @@ const document = z.object({
 const revision = z.object({ modelVersion: z.literal(2), document, modules: z.record(text, module) })
 const envelope = revision.extend({ kind: z.literal('open-flow-flow-revision'), version: z.literal(1) })
 
+function record(value: unknown): Record<string, unknown> {
+  return value != null && typeof value == 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
+}
+
+function repairedEntries<Value>(value: unknown, schema: z.ZodType<Value>, repair?: (value: unknown) => unknown): Record<string, Value> {
+  return Object.fromEntries(
+    Object.entries(record(value)).flatMap(([key, candidate]) => {
+      const result = schema.safeParse(repair?.(candidate) ?? candidate)
+      return result.success ? [[key, result.data] as const] : []
+    }),
+  )
+}
+
+function repairTriggerNode(value: unknown): unknown {
+  const candidate = record(value)
+  if (candidate.kind == 'webhook' && candidate.bodyFields == null && candidate.inputsDef != null) {
+    return { ...candidate, bodyFields: candidate.inputsDef, inputsDef: undefined }
+  }
+  if ((candidate.kind == 'poll' || candidate.kind == 'integration') && candidate.definition != null) {
+    const legacyDefinition = record(candidate.definition)
+    if (legacyDefinition.outputs == null && legacyDefinition.payloadSchema != null) {
+      return {
+        ...candidate,
+        definition: {
+          ...legacyDefinition,
+          definitionVersion: 2,
+          outputs: [{ handle: 'payload', jsonSchema: legacyDefinition.payloadSchema, nullable: false }],
+          payloadSchema: undefined,
+        },
+      }
+    }
+  }
+  return candidate
+}
+
+function repairGraph(value: unknown): z.infer<typeof graph> {
+  const candidate = record(value)
+  const nodes = repairedEntries(candidate.nodes, node, repairTriggerNode)
+  const webhookIds = new Set(Object.entries(nodes).flatMap(([id, graphNode]) => (graphNode.kind == 'webhook' ? [id] : [])))
+  for (const graphNode of Object.values(nodes)) {
+    if (!('inputs' in graphNode)) continue
+    for (const inputMapping of Object.values(graphNode.inputs)) {
+      if (inputMapping.kind != 'sources') continue
+      for (const inputSource of inputMapping.sources) {
+        if (inputSource.kind == 'node' && inputSource.output == 'payload' && webhookIds.has(inputSource.nodeId)) inputSource.output = 'body'
+      }
+    }
+  }
+  return {
+    nodes,
+    edges: Array.isArray(candidate.edges) ? candidate.edges.flatMap((edgeCandidate) => edge.safeParse(edgeCandidate).data ?? []) : [],
+  }
+}
+
+/** Best-effort recovery for a parseable Revision envelope. Invalid collection entries are discarded. */
+export function repairRevisionEnvelope(value: unknown): RevisionContent {
+  checkJsonDepth(value)
+  const envelopeSource = record(value)
+  if (envelopeSource.kind != 'open-flow-flow-revision' || envelopeSource.version != 1) throw new TypeError('The value is not an Open Flow Revision envelope.')
+  if (typeof envelopeSource.modelVersion == 'number' && envelopeSource.modelVersion > 2) throw new TypeError('The Flow model is newer than this package.')
+  const sourceDocument = record(envelopeSource.document)
+  const sourceGraph = repairGraph(sourceDocument.graph)
+  const subflows = Object.fromEntries(
+    Object.entries(record(sourceDocument.subflows)).flatMap(([id, subflowCandidate]) => {
+      const legacySubflow = record(subflowCandidate)
+      const result = subflow.extend({ graph }).safeParse({ ...legacySubflow, graph: repairGraph(legacySubflow.graph) })
+      return result.success ? [[id, result.data] as const] : []
+    }),
+  )
+  return decodeRevisionContent({
+    modelVersion: 2,
+    document: {
+      bindings: repairedEntries(sourceDocument.bindings, binding),
+      graph: sourceGraph,
+      subflows,
+      tasks: repairedEntries(sourceDocument.tasks, managed),
+    },
+    modules: repairedEntries(envelopeSource.modules, module),
+  })
+}
+
 export function decodeFlowDocument(value: unknown): FlowDocument {
   checkJsonDepth(value)
   return document.parse(value) as FlowDocument

@@ -25,6 +25,8 @@ const errorKeys = {
   [controlErrorCode.engineUnavailable]: 'notice.error.engineUnavailable',
   [controlErrorCode.engineUnsupported]: 'notice.error.engineUnsupported',
   [controlErrorCode.flowInvalid]: 'notice.error.flowInvalid',
+  [controlErrorCode.flowRepairRequired]: 'notice.error.flowInvalid',
+  [controlErrorCode.flowUpgradeRequired]: 'notice.error.flowInvalid',
   [controlErrorCode.flowNotFound]: 'notice.error.flowNotFound',
   [controlErrorCode.flowBusy]: 'notice.error.flowBusy',
   [controlErrorCode.flowConflict]: 'notice.error.flowConflict',

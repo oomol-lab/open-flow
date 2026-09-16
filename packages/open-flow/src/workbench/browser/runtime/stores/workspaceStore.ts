@@ -128,6 +128,7 @@ export class WorkspaceStore {
   #disposed = false
   #draftSyncQueued = false
   #nodeFocusId = 0
+  #pendingRepair?: { readonly changeId: string; readonly expectedRevisionId: string }
   #stopCatalogWatch?: () => void
   #stopFlowWatch?: () => void
   public readonly $: Workspace$
@@ -212,6 +213,7 @@ export class WorkspaceStore {
     if (this.#history.applying) return false
     if (!(await this.saveModuleEditor()) || this.#disposed) return false
     this.#history.clear()
+    this.#pendingRepair = undefined
     this.#history.failed = false
     this.#history.publish()
     const current = this.#draftSession.begin()
@@ -235,7 +237,9 @@ export class WorkspaceStore {
       selectedNodeIds: [],
       target: flowId == null ? undefined : { kind: 'flow' },
       workspaceLoadFailed: false,
+      workspaceLoadProblem: undefined,
       workspaceLoading: flowId != null,
+      workspaceRepairing: false,
     })
     if (flowId == null) return true
     try {
@@ -270,6 +274,7 @@ export class WorkspaceStore {
         presentation,
         target: { kind: 'flow' },
         workspaceLoadFailed: false,
+        workspaceLoadProblem: undefined,
         workspaceLoading: false,
       })
       await this.#repairDraftNodeNames(current)
@@ -278,16 +283,47 @@ export class WorkspaceStore {
       if (!current()) return false
       this.#stopFlowWatch?.()
       this.#stopFlowWatch = undefined
-      const missing = error instanceof ApiError && error.code == controlErrorCode.flowNotFound
-      this.#set(
-        missing
-          ? { flowId: undefined, target: undefined, workspaceLoadFailed: false, workspaceLoading: false }
-          : { workspaceLoadFailed: true, workspaceLoading: false },
-      )
-      this.#setNotice(missing ? { kind: 'error', message: this.#i18n.t('notice.flowMissing') } : errorNotice(error, this.#i18n.t))
+      const kind =
+        error instanceof ApiError && error.code == controlErrorCode.flowUpgradeRequired
+          ? 'upgrade'
+          : error instanceof ApiError && error.code == controlErrorCode.flowRepairRequired
+            ? 'repair'
+            : 'failed'
+      this.#set({
+        workspaceLoadFailed: true,
+        workspaceLoadProblem: { kind, ...(kind == 'failed' ? { message: errorNotice(error, this.#i18n.t).message } : {}) },
+        workspaceLoading: false,
+      })
       return false
     }
     return true
+  }
+
+  public async repairWorkspace(): Promise<void> {
+    const flowId = this.#model.value.flowId
+    const flow = flowId == null ? undefined : this.#flows.flow(flowId)
+    if (flowId == null || flow == null || this.#model.value.workspaceRepairing) return
+    const repair = (this.#pendingRepair ??= { changeId: this.#identity(), expectedRevisionId: flow.draftRevisionId })
+    this.#set({ workspaceRepairing: true, workspaceLoadProblem: this.#model.value.workspaceLoadProblem })
+    try {
+      await this.#client.repairDraft(flowId, repair.expectedRevisionId, repair.changeId)
+      this.#pendingRepair = undefined
+      await this.selectFlow(flowId)
+    } catch (error) {
+      if (this.#disposed) return
+      if (error instanceof ApiError && error.code == controlErrorCode.flowRevisionConflict) {
+        this.#pendingRepair = undefined
+        await this.selectFlow(flowId)
+        return
+      }
+      this.#set({
+        workspaceLoadProblem: {
+          kind: this.#model.value.workspaceLoadProblem?.kind == 'upgrade' ? 'upgrade' : 'repair',
+          message: errorNotice(error, this.#i18n.t).message,
+        },
+        workspaceRepairing: false,
+      })
+    }
   }
 
   public selectTarget(target: GraphTarget | undefined): boolean {

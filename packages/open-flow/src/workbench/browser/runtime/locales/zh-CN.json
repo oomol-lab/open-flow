@@ -752,6 +752,12 @@
     "liveAndDraft": "线上 + 草稿",
     "loadFailed": "无法加载草稿",
     "loadFailedDescription": "请检查部署连接，然后重试。",
+    "recovery": {
+      "failed": { "title": "无法打开此工作流", "description": "草稿暂时不可用，或无法安全修复。" },
+      "repair": { "title": "工作流内容已损坏", "description": "Open Flow 可以丢弃无法读取的部分并创建修复草稿。", "action": "修复并打开" },
+      "upgrade": { "title": "此工作流需要升级", "description": "此工作流使用的是旧版本，升级后即可继续编辑。", "action": "升级并打开" },
+      "repairing": "正在准备草稿…"
+    },
     "notChecked": "未检查",
     "publish": "发布",
     "publishing": "发布中…",

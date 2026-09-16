@@ -860,6 +860,16 @@ export class ControlClient {
     )
   }
 
+  async repairDraft(flowId: string, expectedRevisionId: string, changeId = operationKey('repair')): Promise<DraftChange> {
+    return draftChange(
+      await this.request(`/v1/flows/${segment(flowId)}/draft/repair`, {
+        body: JSON.stringify({ expectedRevisionId, version: 1 }),
+        headers: { 'idempotency-key': changeId },
+        method: 'POST',
+      }),
+    )
+  }
+
   async checkFlow(flowId: string, revisionId: string): Promise<FlowCheck> {
     return flowCheck(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/check`, {

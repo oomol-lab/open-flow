@@ -752,6 +752,20 @@
     "liveAndDraft": "Live + Draft",
     "loadFailed": "Couldn’t load the Draft",
     "loadFailedDescription": "Check the deployment connection, then try again.",
+    "recovery": {
+      "failed": { "title": "Couldn’t open this workflow", "description": "The Draft is unavailable or cannot be repaired safely." },
+      "repair": {
+        "title": "This workflow is damaged",
+        "description": "Open Flow can discard unreadable parts and create a repair Draft.",
+        "action": "Repair and open"
+      },
+      "upgrade": {
+        "title": "This workflow needs an upgrade",
+        "description": "This workflow uses an older version. Upgrade it to continue editing.",
+        "action": "Upgrade and open"
+      },
+      "repairing": "Preparing Draft…"
+    },
     "notChecked": "Not checked",
     "publish": "Publish",
     "publishing": "Publishing…",

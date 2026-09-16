@@ -752,6 +752,20 @@
     "liveAndDraft": "En ligne + Brouillon",
     "loadFailed": "Impossible de charger le Brouillon",
     "loadFailedDescription": "Vérifiez la connexion au déploiement, puis réessayez.",
+    "recovery": {
+      "failed": { "title": "Impossible d’ouvrir ce workflow", "description": "Le brouillon est indisponible ou ne peut pas être réparé en toute sécurité." },
+      "repair": {
+        "title": "Ce workflow est endommagé",
+        "description": "Open Flow peut supprimer les parties illisibles et créer un brouillon réparé.",
+        "action": "Réparer et ouvrir"
+      },
+      "upgrade": {
+        "title": "Ce workflow doit être mis à niveau",
+        "description": "Ce workflow utilise une ancienne version. Mettez-le à niveau pour continuer à le modifier.",
+        "action": "Mettre à niveau et ouvrir"
+      },
+      "repairing": "Préparation du brouillon…"
+    },
     "notChecked": "Non vérifié",
     "publish": "Publier",
     "publishing": "Publication…",

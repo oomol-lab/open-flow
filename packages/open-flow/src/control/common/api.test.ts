@@ -74,6 +74,31 @@ describe('ControlClient Flow API', () => {
     expect(new Headers(request.mock.calls[0]![1]?.headers).get('idempotency-key')).toBe('change-1')
   })
 
+  it('repairs the current Draft with CAS and an idempotency key', async () => {
+    const change = {
+      revision: {
+        actorId: 'actor-1',
+        createdAt: flow.updatedAt,
+        digest: 'digest-2',
+        flowId: flow.flowId,
+        modelVersion: 2,
+        parentRevisionId: flow.draftRevisionId,
+        revisionId: 'revision-2',
+        version: 1,
+      },
+      version: 1,
+    } as const
+    const request = vi.fn(async (_path: string, _init?: RequestInit) => Response.json(change))
+    const client = new ControlClient(request)
+
+    await expect(client.repairDraft(flow.flowId, flow.draftRevisionId, 'repair-1')).resolves.toEqual(change)
+    expect(request).toHaveBeenCalledWith(
+      '/v1/flows/flow%2F1/draft/repair',
+      expect.objectContaining({ body: JSON.stringify({ expectedRevisionId: flow.draftRevisionId, version: 1 }), method: 'POST' }),
+    )
+    expect(new Headers(request.mock.calls[0]![1]?.headers).get('idempotency-key')).toBe('repair-1')
+  })
+
   it('scopes Connector resources to an encoded Flow identity', async () => {
     const request = vi.fn(async (path: string, _init?: RequestInit) => {
       if (path == '/v1/connector/providers?flowId=flow%2F1') {

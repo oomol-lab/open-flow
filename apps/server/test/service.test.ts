@@ -3,6 +3,7 @@ import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { InvokeLlmTask } from '@oomol-lab/open-flow/runtime-contract'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
+import { digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import * as Effect from 'effect/Effect'
 import { TestClock } from 'effect/testing'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -1336,6 +1337,43 @@ describe('Server application service', () => {
       await expect(service.control.checkFlow(revision.flowId, revision.revisionId, 'open-flow-engine/v4')).rejects.toMatchObject({
         code: controlErrorCode.flowInvalid,
         status: 400,
+      })
+    } finally {
+      database.close()
+    }
+  })
+
+  it('repairs an older Draft into a new Revision without changing its source', async () => {
+    const file = await databaseFile()
+    const service = await openService(file)
+    const created = await service.control.createFlow('test', 'Repairable', 'repairable')
+    const source = service.control.getRevision(created.flow.flowId, created.flow.draftRevisionId)
+    const legacy = JSON.stringify({
+      ...source.content,
+      kind: 'open-flow-flow-revision',
+      modelVersion: 1,
+      version: 1,
+      document: {
+        ...source.content.document,
+        graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' }, broken: { kind: 'unknown' } } },
+      },
+    })
+    const database = new DatabaseSync(file)
+    try {
+      database
+        .prepare('UPDATE revisions SET content = ?, digest = ? WHERE revision_id = ?')
+        .run(legacy, await digestBytes(new TextEncoder().encode(legacy)), source.revisionId)
+      await expect(service.control.getEditor(source.flowId)).rejects.toMatchObject({ code: controlErrorCode.flowUpgradeRequired, status: 409 })
+
+      const repaired = await service.control.repairDraft('test', source.flowId, source.revisionId, 'repair-request')
+      expect(repaired.revision.parentRevisionId).toBe(source.revisionId)
+      expect(await service.control.getEditor(source.flowId)).toMatchObject({
+        draft: { revisionId: repaired.revision.revisionId, content: { modelVersion: 2, document: { graph: { nodes: { start: {} } } } } },
+      })
+      expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(source.revisionId)).toEqual({ content: legacy })
+      await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'repair-request')).resolves.toEqual(repaired)
+      await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'another-repair')).rejects.toMatchObject({
+        code: controlErrorCode.flowRevisionConflict,
       })
     } finally {
       database.close()

@@ -1,7 +1,16 @@
 import type { JsonValue, RevisionContent } from '../src/flow/common/change.ts'
 
 import { describe, expect, it } from 'vitest'
-import { canonicalJsonBytes, digestBytes, encodeRevision, decodeRevision, decodeRevisionContent, decodeFlowDocument } from '../src/flow/common/encoding.ts'
+import {
+  canonicalJsonBytes,
+  digestBytes,
+  encodeRevision,
+  decodeRevision,
+  decodeRevisionContent,
+  decodeFlowDocument,
+  repairRevision,
+  revisionRepairKind,
+} from '../src/flow/common/encoding.ts'
 
 const decoder = new TextDecoder()
 const port = { jsonSchema: { type: 'number' }, nullable: false } as const
@@ -217,6 +226,58 @@ describe('Revision decoding', () => {
     expect(encodeRevision(decodeRevision(bytes))).toEqual(bytes)
     expect(decodeRevisionContent(revision())).toEqual(revision())
     expect(decodeFlowDocument(revision().document)).toEqual(revision().document)
+  })
+
+  it('repairs an older Trigger contract and drops invalid collection entries', () => {
+    const legacy = JSON.parse(decoder.decode(encodeRevision(revision())))
+    legacy.modelVersion = 1
+    legacy.document.graph.nodes.hook = {
+      kind: 'webhook',
+      name: 'Webhook',
+      inputsDef: [{ handle: 'value', jsonSchema: { type: 'number' }, nullable: false }],
+    }
+    legacy.document.graph.nodes.condition.inputs.value = {
+      kind: 'sources',
+      sources: [{ kind: 'node', nodeId: 'hook', output: 'payload' }],
+    }
+    legacy.document.graph.nodes.broken = { kind: 'unknown' }
+    legacy.modules.broken = { name: 1 }
+    const bytes = new TextEncoder().encode(JSON.stringify(legacy))
+
+    expect(revisionRepairKind(bytes)).toBe('upgrade')
+    const repaired = repairRevision(bytes)
+    expect(repaired.modelVersion).toBe(2)
+    expect(repaired.document.graph.nodes).not.toHaveProperty('broken')
+    expect(repaired.modules).not.toHaveProperty('broken')
+    expect(repaired.document.graph.nodes.hook).toMatchObject({ kind: 'webhook', bodyFields: [{ handle: 'value' }] })
+    const condition = repaired.document.graph.nodes.condition
+    if (condition?.kind != 'condition') throw new Error('Expected the Condition node to be preserved.')
+    expect(condition.inputs.value).toEqual({
+      kind: 'sources',
+      sources: [{ kind: 'node', nodeId: 'hook', output: 'body' }],
+    })
+    expect(decodeRevision(encodeRevision(repaired))).toEqual(repaired)
+  })
+
+  it('repairs damaged current content with empty containers but refuses unsafe envelopes', () => {
+    const damaged = {
+      kind: 'open-flow-flow-revision',
+      version: 1,
+      modelVersion: 2,
+      document: { graph: { nodes: { valid: { kind: 'manual', name: 'Start' }, invalid: null }, edges: [null] } },
+    }
+    const bytes = new TextEncoder().encode(JSON.stringify(damaged))
+    expect(revisionRepairKind(bytes)).toBe('repair')
+    expect(repairRevision(bytes)).toEqual({
+      modelVersion: 2,
+      document: { bindings: {}, graph: { nodes: { valid: { kind: 'manual', name: 'Start' } }, edges: [] }, subflows: {}, tasks: {} },
+      modules: {},
+    })
+    for (const value of [{ ...damaged, modelVersion: 3 }, { ...damaged, kind: 'other' }, 'not json']) {
+      const candidate = new TextEncoder().encode(typeof value == 'string' ? value : JSON.stringify(value))
+      expect(revisionRepairKind(candidate)).toBeUndefined()
+      expect(() => repairRevision(candidate)).toThrow()
+    }
   })
 
   it('defaults missing legacy graph edges without mutating the input', () => {

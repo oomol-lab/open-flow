@@ -20,7 +20,7 @@ import type {
 
 import { nextNodeName } from '@oomol-lab/open-flow/flow-change'
 import { z } from 'zod'
-import { decodeRevisionContent, decodeRevisionEnvelope } from './changeSchema.ts'
+import { decodeRevisionContent, decodeRevisionEnvelope, repairRevisionEnvelope } from './changeSchema.ts'
 export { maxJsonDepth } from './json.ts'
 
 export { decodeFlowDocument, decodeRevisionContent } from './changeSchema.ts'
@@ -307,6 +307,34 @@ export function encodeRevision(content: RevisionContent): Uint8Array {
 export function decodeRevision(bytes: Uint8Array): RevisionContent {
   const value: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
   return decodeRevisionEnvelope(value)
+}
+
+function revisionValue(bytes: Uint8Array): unknown {
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+}
+
+export type RevisionRepairKind = 'repair' | 'upgrade'
+
+export function revisionRepairKind(bytes: Uint8Array): RevisionRepairKind | undefined {
+  let value: unknown
+  try {
+    value = revisionValue(bytes)
+    decodeRevisionEnvelope(value)
+    return
+  } catch {
+    // A failed current decode may still be recoverable from its immutable source bytes.
+  }
+  try {
+    repairRevisionEnvelope(value)
+  } catch {
+    return
+  }
+  const source = value as { readonly modelVersion?: unknown }
+  return typeof source.modelVersion == 'number' && source.modelVersion < 2 ? 'upgrade' : 'repair'
+}
+
+export function repairRevision(bytes: Uint8Array): RevisionContent {
+  return repairRevisionEnvelope(revisionValue(bytes))
 }
 
 const object = z.record(z.string(), z.unknown())

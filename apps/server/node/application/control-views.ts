@@ -5,7 +5,7 @@ import type { StoredPublication } from '../storage/publication-store.ts'
 import type { StoredTriggerActivity, StoredTriggerBinding } from '../storage/trigger-store.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
+import { decodeRevision, revisionRepairKind } from '@oomol-lab/open-flow/flow-encoding'
 import { ControlError } from '../error.ts'
 
 export function timestamp(value: number): string {
@@ -42,6 +42,9 @@ export function revisionContent(stored: { readonly content: string }): RevisionC
     return decodeRevision(new TextEncoder().encode(stored.content))
   } catch (error) {
     if (error instanceof ControlError) throw error
+    const kind = revisionRepairKind(new TextEncoder().encode(stored.content))
+    if (kind == 'upgrade') throw new ControlError(controlErrorCode.flowUpgradeRequired, 'The stored Flow Revision uses an older model.')
+    if (kind == 'repair') throw new ControlError(controlErrorCode.flowRepairRequired, 'The stored Flow Revision can be repaired.')
     throw new ControlError(controlErrorCode.flowInvalid, 'The stored Flow Revision is not structurally valid.', { cause: error })
   }
 }

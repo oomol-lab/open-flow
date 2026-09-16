@@ -37,6 +37,7 @@ import { variablesStory } from './variables.tsx'
 import { waitRunsStory } from './waitRuns.tsx'
 import { webhookStory } from './webhook.tsx'
 import { workflowStories } from './workflow.tsx'
+import { workspaceRecoveryStory } from './workspaceRecovery.tsx'
 
 const codeEditorTyping = `/**
  * @typedef {{
@@ -77,6 +78,7 @@ export const labStories: readonly FrontendStory[] = [
   ...triggerStories,
   ...cardStories,
   ...workflowStories,
+  workspaceRecoveryStory,
   connectionPathsStory,
   ...stories,
   formStory,

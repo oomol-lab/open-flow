@@ -48,7 +48,9 @@ export interface WorkspaceState {
   readonly selectedNodeIds: readonly string[]
   readonly target?: GraphTarget
   readonly workspaceLoadFailed: boolean
+  readonly workspaceLoadProblem?: { readonly kind: 'failed' | 'repair' | 'upgrade'; readonly message?: string }
   readonly workspaceLoading: boolean
+  readonly workspaceRepairing: boolean
 }
 
 interface RevisionContext {
@@ -87,7 +89,9 @@ export interface Workspace$ {
   readonly targetFlow: ReadonlyVal<Flow | undefined>
   readonly targetName: ReadonlyVal<string | undefined>
   readonly workspaceLoadFailed: ReadonlyVal<boolean>
+  readonly workspaceLoadProblem: ReadonlyVal<WorkspaceState['workspaceLoadProblem']>
   readonly workspaceLoading: ReadonlyVal<boolean>
+  readonly workspaceRepairing: ReadonlyVal<boolean>
 }
 
 const initialState: WorkspaceState = {
@@ -95,6 +99,7 @@ const initialState: WorkspaceState = {
   selectedNodeIds: [],
   workspaceLoadFailed: false,
   workspaceLoading: false,
+  workspaceRepairing: false,
 }
 
 function status(state: WorkspaceState): WorkspaceStatus {
@@ -154,7 +159,9 @@ export class WorkspaceModel {
     const selectedNodeIds = derive(this.#state, (state) => state.selectedNodeIds)
     const target = derive(this.#state, (state) => state.target)
     const workspaceLoadFailed = derive(this.#state, (state) => state.workspaceLoadFailed)
+    const workspaceLoadProblem = derive(this.#state, (state) => state.workspaceLoadProblem)
     const workspaceLoading = derive(this.#state, (state) => state.workspaceLoading)
+    const workspaceRepairing = derive(this.#state, (state) => state.workspaceRepairing)
     this.#revisionContext = derive(
       this.#state,
       (state) => ({
@@ -216,7 +223,9 @@ export class WorkspaceModel {
         return currentRevision.subflow(state.target.id)?.name ?? state.target.id
       }),
       workspaceLoadFailed,
+      workspaceLoadProblem,
       workspaceLoading,
+      workspaceRepairing,
     }
     this.#catalogValues = new Set(Object.values(flows.$))
   }

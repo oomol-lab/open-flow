@@ -28,7 +28,7 @@ import type { StoredTriggerBinding } from '../storage/trigger-store.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { applyFlowChanges, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
-import { canonicalJsonBytes, digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
+import { canonicalJsonBytes, digestBytes, encodeRevision, repairRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { flowClosure, validateFlow } from '@oomol-lab/open-flow/flow-semantics'
 import { PermanentPollError, PollConnectionError } from '@oomol-lab/open-flow/poll-trigger'
 import { triggerDefinitions as providerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
@@ -471,6 +471,48 @@ export class ControlService {
         throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
       case 'request-conflict':
         throw new ControlError(controlErrorCode.flowConflict, 'The change identity refers to another Draft change.')
+      case 'not-found':
+        return notFound()
+      case 'committed':
+        this.triggersChanged()
+        this.flowCatalogChanged()
+        this.flowChanged({ kind: 'draft.changed', flowId, revisionId: stored.revision.revisionId, version: 1 })
+        return { revision: revisionMetadata(stored.revision), version: 1 }
+    }
+  }
+
+  async repairDraft(actorId: string, flowId: string, expectedRevisionId: string, changeId: string = randomUUID()): Promise<DraftChange> {
+    this.requireDraft(flowId)
+    const base = this.store.flows.revision(flowId, expectedRevisionId)
+    if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
+    let bytes: Uint8Array
+    try {
+      const source = new TextEncoder().encode(base.content)
+      if ((await digestBytes(source)) != base.digest) throw new TypeError('The stored Draft digest does not match its content.')
+      bytes = encodeRevision(repairRevision(source))
+    } catch (error) {
+      throw new ControlError(controlErrorCode.flowInvalid, 'The Draft cannot be repaired safely.', { cause: error })
+    }
+    const digest = await digestBytes(bytes)
+    const requestDigest = await digestBytes(canonicalJsonBytes({ expectedRevisionId, version: 1 }))
+    const stored = this.store.flows.commitRevision({
+      actorId,
+      changeId,
+      content: new TextDecoder().decode(bytes),
+      createdAt: this.clock(),
+      digest,
+      expectedRevisionId,
+      flowId,
+      requestDigest,
+      revisionId: identity('revision'),
+    })
+    switch (stored.kind) {
+      case 'busy':
+        throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
+      case 'conflict':
+        throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
+      case 'request-conflict':
+        throw new ControlError(controlErrorCode.flowConflict, 'The repair identity refers to another Draft repair.')
       case 'not-found':
         return notFound()
       case 'committed':

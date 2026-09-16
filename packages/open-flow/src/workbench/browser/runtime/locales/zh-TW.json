@@ -752,6 +752,12 @@
     "liveAndDraft": "線上 + 草稿",
     "loadFailed": "無法載入草稿",
     "loadFailedDescription": "請檢查部署連線，然後再試一次。",
+    "recovery": {
+      "failed": { "title": "無法開啟此工作流程", "description": "草稿暫時無法使用，或無法安全修復。" },
+      "repair": { "title": "工作流程內容已損壞", "description": "Open Flow 可以捨棄無法讀取的部分並建立修復草稿。", "action": "修復並開啟" },
+      "upgrade": { "title": "此工作流程需要升級", "description": "此工作流程使用的是舊版本，升級後即可繼續編輯。", "action": "升級並開啟" },
+      "repairing": "正在準備草稿…"
+    },
     "notChecked": "尚未檢查",
     "publish": "發布",
     "publishing": "發布中…",

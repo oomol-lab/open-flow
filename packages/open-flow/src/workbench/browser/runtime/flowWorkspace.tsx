@@ -8,8 +8,7 @@ import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { useIgnoredNodes } from '../../../canvas/browser/useIgnoredNodes.ts'
 import { nodeNameIssue } from '../../../flow/common/change.ts'
-import { Button } from '../../../ui/browser/button.tsx'
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../ui/browser/empty.tsx'
+import { Empty, EmptyHeader, EmptyTitle } from '../../../ui/browser/empty.tsx'
 import { IconifyProvider } from '../../../ui/browser/icons/iconifyContext.tsx'
 import { CanvasHistoryScope } from './editor/canvasHistoryScope.tsx'
 import { CommentInspector } from './editor/commentInspector.tsx'
@@ -29,6 +28,7 @@ import { RunInputPanel } from './runs/runInputPanel.tsx'
 import { RunResults } from './runs/runResults.tsx'
 import { RunsView } from './runs/runsView.tsx'
 import { WorkspaceHeader } from './shell/workspaceHeader.tsx'
+import { WorkspaceRecovery } from './shell/workspaceRecovery.tsx'
 import { WorkbenchStore } from './stores/workbenchStore.ts'
 
 function RunDrawerContainer({
@@ -542,7 +542,9 @@ export default function FlowWorkspace({
   const draft = useVal(store.workspace.$.draft)
   const flowId = useVal(store.workspace.$.flowId)
   const workspaceLoadFailed = useVal(store.workspace.$.workspaceLoadFailed)
+  const workspaceLoadProblem = useVal(store.workspace.$.workspaceLoadProblem)
   const workspaceLoading = useVal(store.workspace.$.workspaceLoading)
+  const workspaceRepairing = useVal(store.workspace.$.workspaceRepairing)
   const submitting = useVal(store.runRequests.$.submitting)
   const externalRunId = useVal(store.runs.$.externalRunId)
   const draftReady = draft != null
@@ -616,20 +618,13 @@ export default function FlowWorkspace({
           <div aria-labelledby="workspace-tab-design" className="editor-grid context-panel-closed" id="workspace-panel-design" role="tabpanel" tabIndex={0}>
             <section aria-busy={!workspaceLoadFailed} className="canvas-panel workbench-canvas">
               {workspaceLoadFailed ? (
-                <Empty className="h-full rounded-none border-0" role="alert">
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <Icon name="alert" size={20} />
-                    </EmptyMedia>
-                    <EmptyTitle>{t('workspace.loadFailed')}</EmptyTitle>
-                    <EmptyDescription>{t('workspace.loadFailedDescription')}</EmptyDescription>
-                  </EmptyHeader>
-                  <EmptyContent>
-                    <Button onClick={() => flowId != null && void store.selectFlow(flowId)} variant="outline">
-                      {t('empty.retry')}
-                    </Button>
-                  </EmptyContent>
-                </Empty>
+                <WorkspaceRecovery
+                  kind={workspaceLoadProblem?.kind ?? 'failed'}
+                  message={workspaceLoadProblem?.message}
+                  repairing={workspaceRepairing}
+                  onRepair={() => void store.workspace.repairWorkspace()}
+                  onRetry={() => flowId != null && void store.selectFlow(flowId)}
+                />
               ) : (
                 <Empty className="h-full rounded-none border-0">
                   <EmptyHeader>

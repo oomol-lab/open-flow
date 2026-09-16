@@ -152,7 +152,7 @@ describe('WorkspaceStore', () => {
     }
   })
 
-  it('returns to the Flow catalog when the selected Flow is not found', async () => {
+  it('keeps a missing Flow error on the workspace page without a notice', async () => {
     const setNotice = vi.fn()
     const request = vi.fn(async (path: string) => {
       if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [], total: 0, version: 1 })
@@ -163,13 +163,11 @@ describe('WorkspaceStore', () => {
     try {
       await store.start('missing-flow')
 
-      expect(store.$.flowId.value).toBeUndefined()
-      expect(store.$.target.value).toBeUndefined()
-      expect(store.$.workspaceLoadFailed.value).toBe(false)
-      expect(setNotice).toHaveBeenLastCalledWith({
-        kind: 'error',
-        message: 'This Flow does not exist or was deleted. Returned to the Flow list.',
-      })
+      expect(store.$.flowId.value).toBe('missing-flow')
+      expect(store.$.target.value).toEqual({ kind: 'flow' })
+      expect(store.$.workspaceLoadFailed.value).toBe(true)
+      expect(store.$.workspaceLoadProblem.value).toMatchObject({ kind: 'failed' })
+      expect(setNotice).not.toHaveBeenCalled()
     } finally {
       store.dispose()
     }
@@ -187,6 +185,82 @@ describe('WorkspaceStore', () => {
 
       expect(store.$.flowId.value).toBe('flow-1')
       expect(store.$.workspaceLoadFailed.value).toBe(true)
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('repairs an older Draft from the page state without emitting notices', async () => {
+    const setNotice = vi.fn()
+    let repaired = false
+    const repairedFlow = { ...flow, draftRevisionId: 'revision-2' }
+    const repairedDraft = { ...draft, parentRevisionId: draft.revisionId, revisionId: 'revision-2' }
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [flow], total: 1, version: 1 })
+      if (path == `/v1/flows/${flow.flowId}/editor`) {
+        return repaired
+          ? Response.json({ ...editor, flow: repairedFlow, draft: repairedDraft })
+          : Response.json({ error: { code: 'flow.upgrade-required', message: 'Upgrade required.' }, version: 1 }, { status: 409 })
+      }
+      if (path == `/v1/flows/${flow.flowId}/draft/repair`) {
+        expect(JSON.parse(String(init?.body))).toEqual({ expectedRevisionId: flow.draftRevisionId, version: 1 })
+        expect(new Headers(init?.headers).get('idempotency-key')).toBeTruthy()
+        repaired = true
+        return Response.json({ revision: repairedDraft, version: 1 })
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const store = new WorkspaceStore(new WorkbenchClient(request), setNotice)
+
+    try {
+      await store.start(flow.flowId)
+      expect(store.$.workspaceLoadProblem.value).toEqual({ kind: 'upgrade' })
+
+      await store.repairWorkspace()
+
+      expect(store.$.draft.value?.revisionId).toBe('revision-2')
+      expect(store.$.workspaceLoadProblem.value).toBeUndefined()
+      expect(setNotice).not.toHaveBeenCalled()
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('reuses the original Draft head when retrying a repair whose response was lost', async () => {
+    const repairedFlow = { ...flow, draftRevisionId: 'revision-2' }
+    const repairedDraft = { ...draft, parentRevisionId: draft.revisionId, revisionId: 'revision-2' }
+    let committed = false
+    let repairRequests = 0
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path == '/v1/flows?limit=50&includeTotal=true') {
+        return Response.json({ flows: [committed ? repairedFlow : flow], total: 1, version: 1 })
+      }
+      if (path == `/v1/flows/${flow.flowId}/editor`) {
+        return committed
+          ? Response.json({ ...editor, flow: repairedFlow, draft: repairedDraft })
+          : Response.json({ error: { code: 'flow.upgrade-required', message: 'Upgrade required.' }, version: 1 }, { status: 409 })
+      }
+      if (path == `/v1/flows/${flow.flowId}/draft/repair`) {
+        repairRequests += 1
+        expect(JSON.parse(String(init?.body))).toEqual({ expectedRevisionId: flow.draftRevisionId, version: 1 })
+        expect(new Headers(init?.headers).get('idempotency-key')).toBe('repair-change')
+        committed = true
+        if (repairRequests == 1) throw new TypeError('The response was lost.')
+        return Response.json({ revision: repairedDraft, version: 1 })
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const store = new WorkspaceStore(new WorkbenchClient(request), vi.fn(), () => 'repair-change')
+
+    try {
+      await store.start(flow.flowId)
+      await store.repairWorkspace()
+      await store.reloadFlows()
+      await store.repairWorkspace()
+
+      expect(repairRequests).toBe(2)
+      expect(store.$.draft.value?.revisionId).toBe(repairedDraft.revisionId)
+      expect(store.$.workspaceLoadProblem.value).toBeUndefined()
     } finally {
       store.dispose()
     }
