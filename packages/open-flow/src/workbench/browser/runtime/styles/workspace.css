@@ -375,20 +375,6 @@
     text-align: left;
   }
 
-  .diagnostic-message {
-    cursor: pointer;
-    padding: 0;
-    border: 0;
-    color: inherit;
-    background: transparent;
-    text-align: left;
-  }
-
-  .diagnostic-message:hover,
-  .diagnostic-message:focus-visible {
-    text-decoration: underline;
-  }
-
   .saved-state {
     width: 112px;
     flex: 0 0 112px;

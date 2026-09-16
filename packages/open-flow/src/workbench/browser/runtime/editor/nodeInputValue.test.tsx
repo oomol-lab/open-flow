@@ -44,7 +44,10 @@ describe('Independent node inputs', () => {
         />
       </I18nProvider>,
     )
-    expect(markup).toMatch(/data-slot="select-value"[^>]*>false<\/span>/)
+    const toggle = (markup.match(/<button\b[^>]*>[^<]*<\/button>/g) ?? []).find((tag) => tag.includes('role="switch"'))
+    expect(toggle).toContain('aria-label="enabled"')
+    expect(toggle).toContain('aria-checked="false"')
+    expect(toggle).toContain('>False</button>')
     expect(onValue).not.toHaveBeenCalled()
   })
 

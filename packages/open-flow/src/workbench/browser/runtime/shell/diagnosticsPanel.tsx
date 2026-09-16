@@ -86,13 +86,26 @@ export function DiagnosticsPanel({ checked, checking, items, nodes, onClose, onR
             return (
               <li key={`${item.diagnostic.path}:${item.diagnostic.line}:${item.diagnostic.column}:${item.diagnostic.code}:${index}`}>
                 {referencedNodeId != null && referencedNode != null ? (
-                  <button className="diagnostic-message" onClick={() => onSelectNode(referencedNodeId)} title={referencedNodeId} type="button">
+                  <Button
+                    variant="link"
+                    size="xs"
+                    className="diagnostic-message h-auto whitespace-normal p-0 hover:underline focus-visible:underline"
+                    onClick={() => onSelectNode(referencedNodeId)}
+                    title={referencedNodeId}
+                    type="button"
+                  >
                     {message}
-                  </button>
+                  </Button>
                 ) : item.location != null ? (
-                  <button className="diagnostic-message" onClick={() => onSelect(item)} type="button">
+                  <Button
+                    variant="link"
+                    size="xs"
+                    className="diagnostic-message h-auto whitespace-normal p-0 hover:underline focus-visible:underline"
+                    onClick={() => onSelect(item)}
+                    type="button"
+                  >
                     {message}
-                  </button>
+                  </Button>
                 ) : (
                   <span className="diagnostic-message">{message}</span>
                 )}
