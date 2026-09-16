@@ -203,7 +203,7 @@ export function FrontendLab() {
     <div className="lab-shell">
       <header className="lab-header">
         <h1 className="lab-brand">
-          Open Flow <span>Lab</span>
+          Open Flow <span>Design Lab</span>
         </h1>
         <nav className="lab-path" aria-label="Breadcrumb" title={path.join(' / ')}>
           <ol>
@@ -288,6 +288,17 @@ function LabPreferences({
   const ThemeIcon = currentTheme.icon
   return (
     <div className="lab-preferences">
+      <Button
+        className="mr-2 text-foreground"
+        nativeButton={false}
+        render={<a href="https://github.com/oomol-lab/open-flow" target="_blank" rel="noreferrer" />}
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Open Flow on GitHub"
+        title="Open Flow on GitHub"
+      >
+        <i aria-hidden="true" className="i-simple-icons:github text-base" />
+      </Button>
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger
           render={<Button variant="ghost" size="icon-sm" />}
