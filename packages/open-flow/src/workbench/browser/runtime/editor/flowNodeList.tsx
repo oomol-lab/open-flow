@@ -31,14 +31,14 @@ function FlowNodeRow({
   const [tooltipContainer, setTooltipContainer] = useState<HTMLDivElement | null>(null)
   const locateLabel = t('inspector.locateNode')
   return (
-    <div ref={setTooltipContainer} className="flex min-w-0 items-center rounded-lg hover:bg-accent focus-within:bg-accent">
+    <div ref={setTooltipContainer} className="flex min-w-0 items-center rounded-lg bg-foreground/[0.03] hover:bg-accent focus-within:bg-accent">
       <Button
         className="h-auto min-w-0 flex-1 justify-start gap-2.5 rounded-lg bg-transparent px-2.5 py-2 text-left font-normal hover:bg-transparent dark:hover:bg-transparent"
         onClick={() => onSelect(node.id)}
         type="button"
         variant="ghost"
       >
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-[9px] bg-foreground/5 text-lg has-[>img]:border has-[>img]:bg-background has-[>[data-icon-kind=initials]]:border has-[>[data-icon-kind=initials]]:bg-background border-foreground/10 [--content-icon-initials-background:transparent] [&>svg]:size-[18px]">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-[9px] text-lg has-[>img]:border has-[>img]:bg-background has-[>[data-icon-kind=initials]]:border has-[>[data-icon-kind=initials]]:bg-background border-foreground/10 [--content-icon-initials-background:transparent] [&>svg]:size-[18px]">
           <ContentIcon className="size-[18px]" fallback={fallbackIcon(node)} src={'icon' in node ? node.icon : undefined} />
         </span>
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-5">{node.title}</span>
@@ -48,7 +48,7 @@ function FlowNodeRow({
           render={
             <Button
               aria-label={locateLabel}
-              className="mr-1 text-muted-foreground hover:bg-foreground/10 hover:text-foreground dark:hover:bg-foreground/10"
+              className="mr-1 text-muted-foreground/70 hover:bg-foreground/10 hover:text-foreground dark:hover:bg-foreground/10"
               onClick={() => onFocusNode(node.id)}
               size="icon-sm"
               type="button"
