@@ -59,22 +59,17 @@
     "unset": "未設定"
   },
   "designer": {
-    "addFirstNode": "最初のノードを追加",
     "addNode": "ノードを追加",
     "delete": "削除",
     "draftBadge": "{{kind}} ドラフト",
-    "emptyDescription": "タスクや条件を追加して、グラフの作成を始めましょう。",
-    "emptyTitle": "この {{kind}} にはノードがありません",
     "executorConnectionRequired": "接続が必要",
     "executorConnector": "Connector",
     "executorJavaScript": "JavaScript",
     "executorLlm": "LLM",
     "flowCanvas": "Flow デザイナー",
     "openBlocks": "ノードを参照",
-    "quickSearchHint": "A キーでクイック検索できます。",
+    "quickAddHint": "A キーですばやく追加できます",
     "toggleInspector": "インスペクターを切り替え",
-    "triggerTitle": "Flow の開始方法を選択",
-    "triggerDescription": "トリガーを追加してタスクに接続します。手動トリガーを使うと、クリックして実行できます。",
     "addTriggerToRun": "実行するためにトリガーを追加"
   },
   "contextPanel": {

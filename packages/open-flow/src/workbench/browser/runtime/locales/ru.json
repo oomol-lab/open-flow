@@ -59,22 +59,17 @@
     "unset": "Не задано"
   },
   "designer": {
-    "addFirstNode": "Добавить первый узел",
     "addNode": "Добавить узел",
     "delete": "Удалить",
     "draftBadge": "Черновик {{kind}}",
-    "emptyDescription": "Добавьте задачу или условие, чтобы начать построение графа.",
-    "emptyTitle": "В этом {{kind}} нет узлов",
     "executorConnectionRequired": "требуется Connection",
     "executorConnector": "Connector",
     "executorJavaScript": "JavaScript",
     "executorLlm": "LLM",
     "flowCanvas": "Конструктор Flow",
     "openBlocks": "Обзор узлов",
-    "quickSearchHint": "Нажмите A для быстрого поиска.",
+    "quickAddHint": "Нажмите A для быстрого добавления",
     "toggleInspector": "Переключить инспектор",
-    "triggerTitle": "Выберите способ запуска Flow",
-    "triggerDescription": "Добавьте триггер и соедините его с задачей. Ручной триггер позволяет запускать Flow нажатием кнопки.",
     "addTriggerToRun": "Добавить триггер для запуска"
   },
   "contextPanel": {

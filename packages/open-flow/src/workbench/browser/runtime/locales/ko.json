@@ -59,22 +59,17 @@
     "unset": "설정 안 됨"
   },
   "designer": {
-    "addFirstNode": "첫 노드 추가",
     "addNode": "노드 추가",
     "delete": "삭제",
     "draftBadge": "{{kind}} 초안",
-    "emptyDescription": "태스크나 조건을 추가해 그래프를 시작하세요.",
-    "emptyTitle": "이 {{kind}}에는 노드가 없습니다",
     "executorConnectionRequired": "Connection 필요",
     "executorConnector": "Connector",
     "executorJavaScript": "JavaScript",
     "executorLlm": "LLM",
     "flowCanvas": "Flow 디자이너",
     "openBlocks": "블록 찾아보기",
-    "quickSearchHint": "A 키를 누르면 빠른 검색이 열립니다.",
+    "quickAddHint": "A 키를 누르면 빠르게 추가할 수 있습니다",
     "toggleInspector": "인스펙터 표시 전환",
-    "triggerTitle": "Flow 시작 방식 선택",
-    "triggerDescription": "트리거를 추가한 다음 작업에 연결하세요. 수동 트리거를 사용하면 클릭하여 실행할 수 있습니다.",
     "addTriggerToRun": "실행하려면 트리거 추가"
   },
   "contextPanel": {

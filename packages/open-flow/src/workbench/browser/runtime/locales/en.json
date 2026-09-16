@@ -59,22 +59,17 @@
     "unset": "Unset"
   },
   "designer": {
-    "addFirstNode": "Add first node",
     "addNode": "Add node",
     "delete": "Delete",
     "draftBadge": "{{kind}} Draft",
-    "emptyDescription": "Add a task or condition to start the graph.",
-    "emptyTitle": "This {{kind}} has no nodes",
     "executorConnectionRequired": "connection required",
     "executorConnector": "connector",
     "executorJavaScript": "javascript",
     "executorLlm": "llm",
     "flowCanvas": "Flow Designer",
     "openBlocks": "Browse blocks",
-    "quickSearchHint": "Press A for quick search.",
+    "quickAddHint": "Press A to add quickly",
     "toggleInspector": "Toggle inspector",
-    "triggerTitle": "Choose how this Flow starts",
-    "triggerDescription": "Add a trigger, then connect it to a task. Use a manual trigger to run the Flow yourself.",
     "addTriggerToRun": "Add a trigger to run"
   },
   "contextPanel": {

@@ -113,8 +113,12 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
   ref,
 ): ReactElement {
   const [pickerRequest, setPickerRequest] = useState<Parameters<NonNullable<FlowCanvasViewProps['onRequestAddNode']>>[0]>()
+  const [pickerCentered, setPickerCentered] = useState(false)
   useEffect(() => {
-    if (disabled) setPickerRequest(undefined)
+    if (disabled) {
+      setPickerRequest(undefined)
+      setPickerCentered(false)
+    }
   }, [disabled])
   const language = useLang()
   const t = useTranslate()
@@ -180,6 +184,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
 
   useEffect(() => {
     setPickerRequest(undefined)
+    setPickerCentered(false)
     setAddNodeRequest(undefined)
     setAddItemRequest(undefined)
     pendingAdd.current?.(undefined)
@@ -234,6 +239,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
 
   const openAddNode = () => {
     const canvasPosition = canvasCenter()
+    setPickerCentered(true)
     setAddNodeRequest({
       onComplete: () => setAddNodeRequest(undefined),
       position: defaultPosition(canvasPosition),
@@ -242,10 +248,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
   }
   const manualTrigger = staticOptions.get('trigger:manual')
   const needsTrigger = target?.kind == 'flow' && !model.nodes.some((node) => node.kind == 'trigger')
-  const recommendedOptions = (target?.kind == 'flow' ? ['trigger:webhook', 'trigger:cron'] : ['javascript', 'llm:chat']).flatMap((id) => {
-    const option = staticOptions.get(id)
-    return option == null ? [] : [option]
-  })
   const addRecommended = async (option: AddNodeOption): Promise<void> => {
     if (addingRecommended.current) return
     addingRecommended.current = true
@@ -287,7 +289,10 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
       tabIndex={0}
     >
       <FlowCanvasView
-        onRequestAddNode={setPickerRequest}
+        onRequestAddNode={(request) => {
+          if (addNodeRequest == null) setPickerCentered(false)
+          setPickerRequest(request)
+        }}
         ignoredNodeIds={ignoredNodeIds}
         onIgnoreNodes={onIgnoreNodes}
         addItemRequest={addItemRequest}
@@ -384,8 +389,10 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           disabled={disabled}
           focusRequest={0}
           request={pickerRequest}
+          centered={pickerCentered}
           onClose={() => {
             setPickerRequest(undefined)
+            setPickerCentered(false)
             canvas.current?.focus({ preventScroll: true })
           }}
           onAdd={(option) => onAddNode(option, pickerRequest.position, pickerRequest.connection)}
@@ -399,34 +406,13 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
       </Badge>
       {target != null && model.nodes.length == 0 && (
         <div className="canvas-empty">
-          <span className="empty-icon">
-            <Icon name={target.kind == 'flow' ? 'flow' : 'subflow'} size={22} />
-          </span>
-          <strong>
-            {t(target.kind == 'flow' ? 'designer.triggerTitle' : 'designer.emptyTitle', {
-              kind: t(target.kind == 'flow' ? 'common.flow' : 'common.subflow'),
-            })}
-          </strong>
-          <span className="canvas-empty-description">{t(target.kind == 'flow' ? 'designer.triggerDescription' : 'designer.emptyDescription')}</span>
-          {target.kind == 'flow' ? (
-            <Button disabled={disabled || manualTrigger == null} onClick={() => manualTrigger != null && void addRecommended(manualTrigger)} type="button">
-              <Icon data-icon="inline-start" name="plus" /> {t('addNode.manual')}
-            </Button>
-          ) : (
-            <Button disabled={disabled} onClick={openAddNode} type="button">
-              <Icon data-icon="inline-start" name="plus" /> {t('designer.addFirstNode')}
-            </Button>
-          )}
-          {recommendedOptions.length > 0 && (
-            <div className="canvas-empty-recommendations">
-              {recommendedOptions.map((option) => (
-                <Button disabled={disabled} key={option.id} onClick={() => void addRecommended(option)} size="sm" type="button" variant="outline">
-                  {option.label}
-                </Button>
-              ))}
-            </div>
-          )}
-          <span className="canvas-empty-shortcut">{t('designer.quickSearchHint')}</span>
+          <Button className="canvas-empty-add" disabled={disabled} onClick={openAddNode} type="button" variant="outline">
+            <span className="canvas-empty-add-icon">
+              <Icon name="plus" />
+            </span>
+            <span>{t('designer.addNode')}</span>
+          </Button>
+          <span className="canvas-empty-shortcut">{t('designer.quickAddHint')}</span>
         </div>
       )}
     </section>
@@ -471,7 +457,7 @@ export function WorkbenchCanvasActions({
       )}
       {runControl}
       {onAddTrigger != null && (
-        <CanvasTooltip placement="top" title={t('designer.triggerDescription')}>
+        <CanvasTooltip placement="top" title={t('designer.addTriggerToRun')}>
           <Button className="text-[13px]" size="default" disabled={disabled} onClick={onAddTrigger} type="button" variant="default">
             <Icon data-icon="inline-start" name="plus" /> {t('designer.addTriggerToRun')}
           </Button>

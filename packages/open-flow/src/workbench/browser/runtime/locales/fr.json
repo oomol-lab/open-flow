@@ -59,22 +59,17 @@
     "unset": "Non défini"
   },
   "designer": {
-    "addFirstNode": "Ajouter le premier nœud",
     "addNode": "Ajouter un nœud",
     "delete": "Supprimer",
     "draftBadge": "Brouillon {{kind}}",
-    "emptyDescription": "Ajoutez une tâche ou une condition pour commencer le graphe.",
-    "emptyTitle": "Ce {{kind}} n'a aucun nœud",
     "executorConnectionRequired": "Connection requise",
     "executorConnector": "Connector",
     "executorJavaScript": "JavaScript",
     "executorLlm": "LLM",
     "flowCanvas": "Designer de Flow",
     "openBlocks": "Parcourir les blocs",
-    "quickSearchHint": "Appuyez sur A pour la recherche rapide.",
+    "quickAddHint": "Appuyez sur A pour ajouter rapidement",
     "toggleInspector": "Afficher ou masquer l'inspecteur",
-    "triggerTitle": "Choisissez comment démarrer ce Flow",
-    "triggerDescription": "Ajoutez un déclencheur, puis reliez-le à une tâche. Un déclencheur manuel permet de lancer le Flow vous-même.",
     "addTriggerToRun": "Ajouter un déclencheur pour exécuter"
   },
   "contextPanel": {

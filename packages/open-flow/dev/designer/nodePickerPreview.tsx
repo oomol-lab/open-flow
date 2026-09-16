@@ -10,7 +10,7 @@ import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { BlockLibrary } from '../../src/workbench/browser/runtime/editor/contextPanel.tsx'
 import { NodePickerContent } from '../../src/workbench/browser/runtime/editor/nodePicker.tsx'
 import { NodePickerPopover } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
-import { WorkbenchCanvasActions } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
+import { WorkbenchCanvas, WorkbenchCanvasActions } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
 import { CatalogStores } from '../../src/workbench/browser/runtime/stores/catalogStores.ts'
 import { ConnectorStore } from '../../src/workbench/browser/runtime/stores/connectorStore.ts'
 import { combineSources, mapSource } from '../../src/workbench/browser/runtime/stores/optionSource.ts'
@@ -245,6 +245,47 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
     <I18nProvider i18n={session.i18n}>
       <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ height: '100%', overflow: 'auto', padding: 24 }}>
         <div className="grid gap-8 min-[1100px]:grid-cols-2">
+          <section className="min-[1100px]:col-span-2">
+            <h3 className="mb-3 text-sm font-medium">Empty canvas · centered picker</h3>
+            <div className="editor-grid context-panel-closed h-[560px] max-h-[70vh] overflow-hidden rounded-xl border border-[var(--ui-border)]">
+              <WorkbenchCanvas
+                addNodeOptions={options}
+                blocksOpen={false}
+                disabled={disabled}
+                ignoredNodeIds={[]}
+                inspectorOpen={false}
+                model={{ edges: [], nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }}
+                nodePicker={{
+                  browseOptions: data.browseOptions,
+                  connections,
+                  loadConnections: connectors.loadConnections,
+                  provideChoices: connectors.provideAddNodeOptionChoices,
+                }}
+                provideAddNodeOptions={data.searchOptions}
+                selectedNodeIds={[]}
+                target={{ kind: 'flow' }}
+                theme={dark ? 'dark' : 'light'}
+                onAddNode={async (option) => {
+                  log('Add node from empty canvas', option.id)
+                  return option.id
+                }}
+                onChangeComment={() => {}}
+                onConnect={() => {}}
+                onCopy={() => {}}
+                onDeleteEdge={() => {}}
+                onDeleteNodes={() => {}}
+                onDuplicate={() => {}}
+                onIgnoreNodes={() => {}}
+                onMoveNodes={() => {}}
+                onMoveViewport={() => {}}
+                onOpenBlocks={() => {}}
+                onOpenInspector={() => {}}
+                onPaste={() => {}}
+                onSelectNodes={() => {}}
+                onToggleInspector={() => {}}
+              />
+            </div>
+          </section>
           <section>
             <h3 className="mb-3 text-sm font-medium">Catalog · open preview</h3>
             <div className="h-[560px] max-h-[70vh] w-[440px] max-w-full overflow-hidden rounded-xl border border-[var(--ui-border)] bg-popover text-popover-foreground shadow-md">
@@ -284,6 +325,6 @@ export const nodePickerPreviewStory: FrontendStory = {
   title: 'Add Node Popover',
   standalone: true,
   description:
-    'Provider details use a centered title and quiet back arrow, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Open search samples compare Provider-only and action matches, app navigation and return. Includes cached loading and 1,000-app scrolling.',
+    'The production empty canvas opens the centered picker from its Add node button or the A key. Provider details use a centered title and quiet back arrow, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Open search samples compare Provider-only and action matches, app navigation and return. Includes cached loading and 1,000-app scrolling.',
   render: (log, dark, language) => <Preview dark={dark} language={language} log={log} />,
 }

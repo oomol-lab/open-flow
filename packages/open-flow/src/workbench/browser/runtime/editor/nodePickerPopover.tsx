@@ -9,15 +9,21 @@ import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../../
 import { Icon } from '../icons.tsx'
 import { BlockLibrary } from './contextPanel.tsx'
 
-export function NodePickerPopover(props: BlockLibraryProps & { readonly anchor?: { readonly x: number; readonly y: number }; readonly onClose?: () => void }) {
+export function NodePickerPopover(
+  props: BlockLibraryProps & { readonly anchor?: { readonly x: number; readonly y: number }; readonly centered?: boolean; readonly onClose?: () => void },
+) {
   const t = useTranslate()
   const [open, setOpen] = useState(props.anchor != null)
   const [adding, setAdding] = useState(false)
   const [root, setRoot] = useState<HTMLElement | null>(null)
-  const mount = useCallback((element: HTMLDivElement | null) => setRoot(element?.closest<HTMLElement>('.open-flow-workbench') ?? null), [])
+  const mount = useCallback(
+    (element: HTMLDivElement | null) => setRoot(element?.closest<HTMLElement>(props.centered ? '.canvas-panel' : '.open-flow-workbench') ?? null),
+    [props.centered],
+  )
+  const canvas = () => (root?.matches('.workbench-canvas, .react-flow') ? root : root?.querySelector<HTMLElement>('.workbench-canvas, .react-flow'))
   const close = () => {
     props.onClose?.()
-    if (props.anchor) root?.querySelector<HTMLElement>('.workbench-canvas, .react-flow')?.focus({ preventScroll: true })
+    if (props.anchor) canvas()?.focus({ preventScroll: true })
   }
   return (
     <div ref={mount}>
@@ -42,12 +48,15 @@ export function NodePickerPopover(props: BlockLibraryProps & { readonly anchor?:
           </PopoverTrigger>
         )}
         <PopoverContent
-          finalFocus={props.anchor ? () => root?.querySelector<HTMLElement>('.workbench-canvas, .react-flow') ?? false : undefined}
+          finalFocus={props.anchor ? () => canvas() ?? false : undefined}
           container={root}
+          positionerClassName={props.centered ? 'node-picker-centered-positioner' : undefined}
+          positionerStyle={props.centered ? { position: 'absolute', inset: 0, transform: 'none' } : undefined}
           side={props.anchor ? 'bottom' : 'top'}
           align="start"
           sideOffset={props.anchor ? 4 : 12}
           className="h-[min(560px,var(--available-height))] max-h-[calc(100dvh-32px)] w-[440px] max-w-[calc(100vw-32px)] gap-0 overflow-hidden p-0"
+          style={props.centered ? { height: 'min(560px, calc(100% - 32px))', maxHeight: 'calc(100% - 32px)' } : undefined}
         >
           <PopoverTitle className="sr-only">{t('designer.addNode')}</PopoverTitle>
           {open && (
@@ -77,11 +86,16 @@ export function NodePickerPopover(props: BlockLibraryProps & { readonly anchor?:
 
 export type CanvasNodePickerRequest = Parameters<NonNullable<FlowCanvasViewProps['onRequestAddNode']>>[0]
 
-export function CanvasNodePicker({ request, ...props }: BlockLibraryProps & { readonly request: CanvasNodePickerRequest; readonly onClose: () => void }) {
+export function CanvasNodePicker({
+  request,
+  centered,
+  ...props
+}: BlockLibraryProps & { readonly request: CanvasNodePickerRequest; readonly centered?: boolean; readonly onClose: () => void }) {
   return (
     <NodePickerPopover
       {...props}
       anchor={request.screenPosition}
+      centered={centered}
       isOptionDisabled={(option) =>
         request.connectionSide != null &&
         (option.kind == 'trigger' || option.kind == 'comment' || (request.connectionSide == 'left' && (option.kind == 'condition' || option.kind == 'wait')))

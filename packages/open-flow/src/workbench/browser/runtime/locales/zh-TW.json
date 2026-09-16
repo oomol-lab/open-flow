@@ -59,22 +59,17 @@
     "unset": "未設定"
   },
   "designer": {
-    "addFirstNode": "新增第一個節點",
     "addNode": "新增節點",
     "delete": "刪除",
     "draftBadge": "{{kind}} 草稿",
-    "emptyDescription": "新增任務或條件即可開始建構流程圖。",
-    "emptyTitle": "這個 {{kind}} 還沒有節點",
     "executorConnectionRequired": "需要 Connection",
     "executorConnector": "Connector",
     "executorJavaScript": "JavaScript",
     "executorLlm": "LLM",
     "flowCanvas": "Flow 設計工具",
     "openBlocks": "瀏覽節點",
-    "quickSearchHint": "按 A 可快速搜尋。",
+    "quickAddHint": "按 A 快速新增",
     "toggleInspector": "切換檢查器",
-    "triggerTitle": "先選擇 Flow 的啟動方式",
-    "triggerDescription": "新增觸發器，再連接到任務。使用手動觸發器，即可點擊執行。",
     "addTriggerToRun": "新增觸發器以執行"
   },
   "contextPanel": {

@@ -59,22 +59,17 @@
     "unset": "未设置"
   },
   "designer": {
-    "addFirstNode": "添加第一个节点",
     "addNode": "添加节点",
     "delete": "删除",
     "draftBadge": "{{kind}} 草稿",
-    "emptyDescription": "添加任务或条件来开始构建流程图。",
-    "emptyTitle": "此 {{kind}} 还没有节点",
     "executorConnectionRequired": "需要连接",
     "executorConnector": "连接器",
     "executorJavaScript": "JavaScript",
     "executorLlm": "LLM",
     "flowCanvas": "Flow 设计器",
     "openBlocks": "浏览节点",
-    "quickSearchHint": "按 A 快速搜索。",
+    "quickAddHint": "按 A 快速添加",
     "toggleInspector": "切换检查器",
-    "triggerTitle": "先选择 Flow 的启动方式",
-    "triggerDescription": "添加触发器，再连接到任务。使用手动触发器，即可点击运行。",
     "addTriggerToRun": "添加触发器以运行"
   },
   "contextPanel": {

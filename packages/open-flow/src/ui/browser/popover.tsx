@@ -13,6 +13,8 @@ const PopoverTrigger = React.forwardRef<HTMLButtonElement, PopoverPrimitive.Trig
 
 function PopoverContent({
   className,
+  positionerClassName,
+  positionerStyle,
   align = 'center',
   alignOffset = 0,
   anchor,
@@ -29,6 +31,8 @@ function PopoverContent({
     'collisionBoundary' | 'collisionAvoidance' | 'positionMethod' | 'anchor' | 'align' | 'alignOffset' | 'side' | 'sideOffset'
   > & {
     container?: HTMLElement | null
+    positionerClassName?: string
+    positionerStyle?: React.CSSProperties
   }) {
   return (
     <PopoverPrimitive.Portal container={container} className="contents">
@@ -41,7 +45,8 @@ function PopoverContent({
         alignOffset={alignOffset}
         side={side}
         sideOffset={sideOffset}
-        className="isolate z-50"
+        className={cn('isolate z-50', positionerClassName)}
+        style={positionerStyle}
       >
         <PopoverPrimitive.Popup
           data-slot="popover-content"

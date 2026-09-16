@@ -133,54 +133,59 @@
     align-items: center;
     justify-content: center;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
+    padding: 32px;
     color: var(--ui-muted-foreground);
     text-align: center;
     pointer-events: none;
   }
 
-  .canvas-empty [data-slot='button'],
-  .canvas-empty-recommendations {
-    margin-top: 4px;
+  .canvas-empty [data-slot='button'] {
     pointer-events: auto;
   }
 
-  .canvas-empty strong {
-    color: var(--ui-foreground);
-    font-size: 22px;
-    font-weight: 600;
+  .canvas-empty .canvas-empty-add {
+    min-width: 116px;
+    height: 40px;
+    gap: 7px;
+    padding-inline: 14px;
+    border-color: var(--ui-primary);
+    border-radius: 999px;
+    background: var(--ui-primary);
+    color: var(--ui-primary-foreground);
+    box-shadow: none;
   }
 
-  .canvas-empty-description {
-    max-width: 380px;
-    font-size: 13px;
-    line-height: 21px;
+  .canvas-empty .canvas-empty-add:hover {
+    border-color: color-mix(in srgb, var(--ui-primary) 88%, transparent);
+    background: color-mix(in srgb, var(--ui-primary) 88%, transparent);
+    color: var(--ui-primary-foreground);
+    box-shadow: none;
   }
 
-  .canvas-empty-recommendations {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 4px;
+  .canvas-empty-add-icon {
+    display: grid;
+    width: 16px;
+    height: 16px;
+    place-items: center;
+    color: currentColor;
   }
 
   .canvas-empty-shortcut {
-    margin-top: 2px;
     color: var(--ui-muted-foreground);
-    font-size: 11px;
+    font-size: 12px;
+    line-height: 18px;
     pointer-events: auto;
   }
 
-  .empty-icon {
-    display: inline-grid;
-    width: 40px;
-    height: 40px;
+  .node-picker-centered-positioner {
+    display: grid;
     place-items: center;
-    margin-bottom: 4px;
-    border: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius);
-    background: var(--ui-card);
-    color: var(--ui-muted-foreground);
+    pointer-events: none;
+  }
+
+  .node-picker-centered-positioner > [data-slot='popover-content'] {
+    max-height: calc(100% - 32px);
+    pointer-events: auto;
   }
 }
