@@ -28,7 +28,7 @@
     position: absolute;
     z-index: 4;
     inset: 0 auto 0 1px;
-    width: 5px;
+    width: 2px;
     grid-column: 2;
     grid-row: 2;
     content: '';

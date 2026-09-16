@@ -18,9 +18,17 @@
     z-index: 4;
     cursor: col-resize;
     touch-action: none;
-    background: var(--ui-ring);
     opacity: 0;
     transition: opacity 160ms ease;
+  }
+
+  .context-panel-resizer::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 2px;
+    background: var(--ui-ring);
+    content: '';
+    pointer-events: none;
   }
 
   .context-panel-resizer:hover {
