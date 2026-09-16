@@ -338,6 +338,8 @@ export function FlowEditor({
             disabled={authoringDisabled || target == null}
             focusRequest={0}
             onAdd={addFromPicker}
+            onRegisterDragOption={(option) => designerRef.current?.registerDraggedNode(option)}
+            onDragEnd={() => designerRef.current?.clearDraggedNode()}
           />
         }
         nodePicker={{

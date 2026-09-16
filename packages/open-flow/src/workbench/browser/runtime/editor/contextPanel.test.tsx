@@ -44,6 +44,28 @@ describe('Context Panel', () => {
     expect(indexAddNodeOptions([group]).get(connector.id)).toBe(connector)
   })
 
+  it('makes concrete picker options draggable while leaving disabled options inert', () => {
+    const renderPicker = (disabled: boolean) =>
+      renderToStaticMarkup(
+        <I18nProvider i18n={createI18n('en')}>
+          <BlockLibrary
+            browseOptions={async () => []}
+            searchOptions={async () => []}
+            disabled={disabled}
+            focusRequest={0}
+            onAdd={async () => undefined}
+            onRegisterDragOption={() => undefined}
+            options={[connector]}
+            presentation="picker"
+            provideChoices={async () => []}
+          />
+        </I18nProvider>,
+      )
+
+    expect(renderPicker(false)).toContain('draggable="true"')
+    expect(renderPicker(true)).not.toContain('draggable="true"')
+  })
+
   it.each(['Connector actions', 'App triggers'])('keeps %s collapsed so common nodes remain visible', (label) => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>

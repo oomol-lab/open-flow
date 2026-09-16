@@ -45,6 +45,7 @@ interface LibraryItemProps {
   readonly item: LibraryNodeItem
   readonly onAdd: (itemId: string) => void
   readonly onDrag: (event: ReactDragEvent, itemId: string) => void
+  readonly onDragEnd: () => void
   readonly onRetry?: () => void
   readonly onLoadChoices: (itemId: string, signal: AbortSignal) => ResourceSource<readonly LibraryChoice[]>
   readonly onOpenChange: (itemId: string, open: boolean) => void
@@ -83,7 +84,9 @@ export interface BlockLibraryProps {
   readonly draggable?: boolean
   readonly focusRequest: number
   readonly onAdd: (option: AddNodeOption) => Promise<string | undefined>
-  readonly onRegisterDragOption?: (option: AddNodeOption) => void
+  readonly onRegisterDragOption?: (option: AddNodeOption) => string | void
+  readonly onDragStart?: () => void
+  readonly onDragEnd?: () => void
   readonly options: readonly AddNodeOption[]
   readonly provideChoices: (optionId: string, signal: AbortSignal) => ResourceSource<readonly AddNodeOption[]>
 }
@@ -363,7 +366,7 @@ function LibraryGroup({
   )
 }
 
-function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices, onOpenChange, onRetry }: LibraryItemProps): ReactElement {
+function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onDragEnd, onLoadChoices, onOpenChange, onRetry }: LibraryItemProps): ReactElement {
   const t = useTranslate()
   const details = useRef<HTMLDetailsElement>(null)
   const connectionChoices = item.type == 'trigger'
@@ -439,6 +442,7 @@ function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices, 
                 key={choice.data}
                 onClick={() => onAdd(choice.data)}
                 onDragStart={(event) => onDrag(event, choice.data)}
+                onDragEnd={onDragEnd}
                 type="button"
                 variant="ghost"
               >
@@ -479,6 +483,7 @@ function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onLoadChoices, 
       draggable={draggable && !disabled}
       onClick={() => item.data != null && onAdd(item.data)}
       onDragStart={(event) => item.data != null && onDrag(event, item.data)}
+      onDragEnd={onDragEnd}
       type="button"
       variant="ghost"
     >
@@ -499,6 +504,8 @@ function SidebarBlockLibrary({
   draggable = true,
   focusRequest,
   onAdd,
+  onDragStart,
+  onDragEnd,
   onRegisterDragOption,
   options,
   provideChoices,
@@ -647,8 +654,8 @@ function SidebarBlockLibrary({
   const drag = (event: ReactDragEvent, itemId: string): void => {
     const option = resolve(itemId)
     if (option == null || busy) return
-    onRegisterDragOption?.(option)
-    setAddItemId(event.dataTransfer, itemId)
+    setAddItemId(event.dataTransfer, onRegisterDragOption?.(option) ?? itemId)
+    onDragStart?.()
   }
 
   const feedback = loading ? (
@@ -713,6 +720,7 @@ function SidebarBlockLibrary({
             item={item}
             onAdd={(id) => void add(id)}
             onDrag={drag}
+            onDragEnd={() => onDragEnd?.()}
             onLoadChoices={loadChoices}
             onOpenChange={setOpen}
           />

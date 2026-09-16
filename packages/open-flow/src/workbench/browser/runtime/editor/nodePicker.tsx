@@ -1,10 +1,11 @@
 import styles from './nodePicker.module.scss'
-import type { ReactElement } from 'react'
+import type { DragEvent as ReactDragEvent, ReactElement } from 'react'
 import type { AddNodeOption } from './addNodeOptions.ts'
 import type { BlockLibraryProps } from './contextPanel.tsx'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { setAddItemId } from '../../../../canvas/browser/addItemDrag.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { useDebouncedValue } from '../../../../ui/browser/hooks.ts'
 import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
@@ -33,6 +34,10 @@ export function NodePickerContent({
   searchOptions,
   provideChoices,
   onAdd,
+  onDragStart,
+  onDragEnd,
+  onRegisterDragOption,
+  draggable = true,
   disabled,
   isOptionDisabled,
   catalogFailed,
@@ -73,7 +78,6 @@ export function NodePickerContent({
   const mount = useCallback((element: HTMLDivElement | null) => {
     setRoot(element?.closest<HTMLElement>('.open-flow-workbench') ?? element?.closest<HTMLElement>('.open-flow-theme') ?? null)
   }, [])
-
   useEffect(() => {
     const controller = new AbortController()
     setCatalogError(false)
@@ -166,13 +170,21 @@ export function NodePickerContent({
       setAdding(false)
     }
   }
+  const drag = (event: ReactDragEvent, item: AddNodeOption) => {
+    if (disabled || adding || isOptionDisabled?.(item)) return
+    setAddItemId(event.dataTransfer, onRegisterDragOption?.(item) ?? item.id)
+    onDragStart?.()
+  }
   const row = (item: AddNodeOption, compact = false, index = 0) => {
     const button = (
       <Button
         variant="ghost"
         type="button"
         disabled={disabled || adding || isOptionDisabled?.(item)}
+        draggable={draggable && !disabled && !adding && !isOptionDisabled?.(item)}
         onClick={() => void add(item)}
+        onDragStart={(event) => drag(event, item)}
+        onDragEnd={onDragEnd}
         className={`group/app h-auto justify-start whitespace-normal font-normal flex min-w-0 items-start gap-2.5 rounded-lg px-2.5 py-1.5 text-left outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${compact ? '' : '[&>span:first-child]:translate-y-[2px]'}`}
       >
         {item.kind == 'connector' || (item.kind == 'trigger' && 'trigger' in item && (item.trigger.kind == 'catalog' || item.trigger.kind == 'connect')) ? (

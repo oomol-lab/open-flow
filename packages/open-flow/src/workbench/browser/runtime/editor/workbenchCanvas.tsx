@@ -17,6 +17,7 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { Icon } from '../icons.tsx'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
 import { CanvasHistoryControls } from './canvasHistoryControls.tsx'
+import { NodePickerDragSession } from './nodePickerDrag.ts'
 import { CanvasNodePicker } from './nodePickerPopover.tsx'
 
 interface Props {
@@ -59,6 +60,8 @@ interface Props {
 
 export interface WorkbenchCanvasHandle {
   readonly addNode: (option: AddNodeOption, canvasPosition?: Point) => Promise<string | undefined>
+  readonly registerDraggedNode: (option: AddNodeOption) => string
+  readonly clearDraggedNode: () => void
   readonly focusCanvas: () => void
 }
 
@@ -132,6 +135,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
   const canvas = useRef<HTMLElement>(null)
   const inspectorOpenedAt = useRef(0)
   const dynamicOptions = useRef(new Map<string, AddNodeOption>())
+  const draggedNode = useRef(new NodePickerDragSession())
   const pendingAdd = useRef<((nodeId: string | undefined) => void) | undefined>(undefined)
   const staticOptions = useMemo(() => indexAddNodeOptions(addNodeOptions), [addNodeOptions])
 
@@ -185,6 +189,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     pendingAdd.current?.(undefined)
     pendingAdd.current = undefined
     dynamicOptions.current.clear()
+    draggedNode.current.clear()
   }, [target?.kind == 'subflow' ? target.id : undefined, target?.kind])
 
   const canvasCenter = (): Point => ({
@@ -226,6 +231,12 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     ref,
     () => ({
       addNode: requestAddNode,
+      registerDraggedNode: (option) => {
+        return draggedNode.current.register(option)
+      },
+      clearDraggedNode: () => {
+        draggedNode.current.clear()
+      },
       focusCanvas: () => canvas.current?.focus({ preventScroll: true }),
     }),
     [requestAddNode],
@@ -328,9 +339,10 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           />
         }
         onAddNode={async (itemId, position, connection) => {
-          const option = staticOptions.get(itemId) ?? dynamicOptions.current.get(itemId)
+          const dragged = draggedNode.current.consume(itemId)
+          const option = dragged?.option ?? staticOptions.get(itemId) ?? dynamicOptions.current.get(itemId)
           if (option == null) return
-          return await onAddNode(option, position, connection)
+          return await onAddNode(option, position, connection ?? dragged?.connection)
         }}
         onConnect={onConnect}
         onChangeNodeContentHidden={onChangeNodeContentHidden}
@@ -390,6 +402,12 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
             canvas.current?.focus({ preventScroll: true })
           }}
           onAdd={(option) => onAddNode(option, pickerRequest.position, pickerRequest.connection)}
+          onRegisterDragOption={(option) => {
+            return draggedNode.current.register(option, pickerRequest.connection)
+          }}
+          onDragEnd={() => {
+            draggedNode.current.clear()
+          }}
         />
       )}
       <Badge className="designer-overlay top-left" variant="secondary">

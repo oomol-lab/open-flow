@@ -1,7 +1,7 @@
 import type { FlowCanvasViewProps } from '../../../../canvas/browser/graph/FlowCanvas/model.ts'
 import type { BlockLibraryProps } from './contextPanel.tsx'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
@@ -15,6 +15,8 @@ export function NodePickerPopover(
   const t = useTranslate()
   const [open, setOpen] = useState(props.anchor != null)
   const [adding, setAdding] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const dragFrame = useRef(0)
   const [root, setRoot] = useState<HTMLElement | null>(null)
   const mount = useCallback(
     (element: HTMLDivElement | null) => setRoot(element?.closest<HTMLElement>(props.centered ? '.canvas-panel' : '.open-flow-workbench') ?? null),
@@ -25,11 +27,19 @@ export function NodePickerPopover(
     props.onClose?.()
     if (props.anchor) canvas()?.focus({ preventScroll: true })
   }
+  useEffect(() => () => cancelAnimationFrame(dragFrame.current), [])
+  const finishDrag = () => {
+    cancelAnimationFrame(dragFrame.current)
+    props.onDragEnd?.()
+    setOpen(false)
+    close()
+  }
   return (
     <div ref={mount}>
       <Popover
         open={open && !props.disabled}
         onOpenChange={(value) => {
+          if (value) setDragging(false)
           setOpen(value)
           if (!value) close()
         }}
@@ -51,19 +61,28 @@ export function NodePickerPopover(
           finalFocus={props.anchor ? () => canvas() ?? false : undefined}
           container={root}
           positionerClassName={props.centered ? 'node-picker-centered-positioner' : undefined}
-          positionerStyle={props.centered ? { position: 'absolute', inset: 0, transform: 'none' } : undefined}
+          positionerStyle={props.centered ? { position: 'absolute', inset: 0, transform: 'none', pointerEvents: dragging ? 'none' : undefined } : undefined}
           side={props.anchor ? 'bottom' : 'top'}
           align="start"
           sideOffset={props.anchor ? 4 : 12}
           className="h-[min(560px,var(--available-height))] max-h-[calc(100dvh-32px)] w-[440px] max-w-[calc(100vw-32px)] gap-0 overflow-hidden p-0"
-          style={props.centered ? { height: 'min(560px, calc(100% - 32px))', maxHeight: 'calc(100% - 32px)' } : undefined}
+          style={{
+            ...(props.centered ? { height: 'min(560px, calc(100% - 32px))', maxHeight: 'calc(100% - 32px)' } : undefined),
+            ...(dragging ? { opacity: 0, pointerEvents: 'none' } : undefined),
+          }}
         >
           <PopoverTitle className="sr-only">{t('designer.addNode')}</PopoverTitle>
           {open && (
             <BlockLibrary
               {...props}
               presentation="picker"
-              draggable={false}
+              draggable
+              onDragStart={() => {
+                props.onDragStart?.()
+                cancelAnimationFrame(dragFrame.current)
+                dragFrame.current = requestAnimationFrame(() => setDragging(true))
+              }}
+              onDragEnd={finishDrag}
               onAdd={async (option) => {
                 flushSync(() => {
                   setAdding(true)

@@ -323,6 +323,6 @@ export const nodePickerPreviewStory: FrontendStory = {
   title: 'Add Node Popover',
   standalone: true,
   description:
-    'The production empty canvas opens the centered picker from its Add node button or the A key. Provider details use a centered title and quiet back arrow, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Open search samples compare Provider-only and action matches, app navigation and return. Includes cached loading and 1,000-app scrolling.',
+    'The production empty canvas opens the centered picker from its Add node button or the A key. Picker items support click-to-add and dragging onto the canvas. Provider details use a centered title and quiet back arrow, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Open search samples compare Provider-only and action matches, app navigation and return. Includes cached loading and 1,000-app scrolling.',
   render: (log, dark, language) => <Preview dark={dark} language={language} log={log} />,
 }
