@@ -1,7 +1,7 @@
 import type { TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { PollDefinition } from '@oomol-lab/open-flow/poll-trigger'
 
-import { PermanentPollError, TransientPollError } from '@oomol-lab/open-flow/poll-trigger'
+import { payloadPollOutputs, PermanentPollError, TransientPollError } from '@oomol-lab/open-flow/poll-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -114,6 +114,7 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
   let call = 0
   let failOnce = true
   const definition: PollDefinition = {
+    buildOutputs: payloadPollOutputs,
     snapshot,
     async poll(context) {
       call += 1
@@ -228,6 +229,7 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
 it('fails a permanent Poll baseline before activation and preserves the old Live Publication', async () => {
   const file = await databaseFile()
   const definition: PollDefinition = {
+    buildOutputs: payloadPollOutputs,
     snapshot,
     async poll() {
       throw new PermanentPollError('The fixed Poll configuration is invalid.')
@@ -273,7 +275,11 @@ it('fails a permanent Poll baseline before activation and preserves the old Live
 
 it('rolls back a changed Poll candidate, lets another Flow publish, and resumes its retry after restart', async () => {
   const file = await databaseFile()
-  const definition: PollDefinition = { snapshot, poll: async () => ({ checkpoint: { ready: true }, events: [] }) }
+  const definition: PollDefinition = {
+    buildOutputs: payloadPollOutputs,
+    snapshot,
+    poll: async () => ({ checkpoint: { ready: true }, events: [] }),
+  }
   const options = {
     capabilities: { connector: () => connector },
     clock: () => Date.parse('2026-08-31T12:00:00.000Z'),
@@ -323,6 +329,7 @@ it('publishes promptly when asynchronous baseline preparation finishes after mai
   const baseline = Promise.withResolvers<void>()
   const entered = Promise.withResolvers<void>()
   const definition: PollDefinition = {
+    buildOutputs: payloadPollOutputs,
     snapshot,
     async poll() {
       entered.resolve()

@@ -239,6 +239,10 @@ package；subscription、checkpoint、调度持久化、endpoint routing 和 adm
 
 Trigger 的有序数据输出由公共 contract 统一定义和校验。接入适配器在准入前构造完整输出；Scheduler 和 checkpoint 只消费通用端口映射，不承担 Webhook 或 Provider 的事件投影。HTTP 请求重试身份由 Webhook 准入层定义，与 Flow 可见输出的数据范围分别管理。
 
+Integration 的事件型 callback 返回 `outputs`，listener 页面返回 `outputs` 或 `null`（无事件）。两者都由 Provider 构造完整端口映射，Server 按固定 Trigger contract 校验后原样准入。
+Poll 保留原始事件和逐事件去重，Provider 的 `buildOutputs(events)` 将非空的已去重事件批次转换为一次 Run 的完整输出；基线、空页面与全部重复的页面不调用它。
+现有 Poll Provider 显式使用 `payloadPollOutputs` 保留 `{ payload: { events } }` 形状；通用运行时不预设输出端口名称，也不合并不同事件的端口值。
+
 一次有效 Trigger occurrence 只能准入普通 Flow Run，之后复用相同的 Run、执行、事件、取消和 terminal 语义。重投 occurrence 必须通过稳定 identity
 和权威 store 约束为最多一个 Run。
 

@@ -312,7 +312,7 @@ export class IntegrationRuntime {
               integrationOccurrenceId(target.stored.bindingId, target.stored.runtimeVersion, target.definition.snapshot.key, received.dedupeKey ?? null),
             catch: (error) => error,
           })
-          const outputs = { payload: received.payload }
+          const outputs = received.outputs
           if (!matchesTriggerOutputs(target.trigger, outputs)) throw new Error('Invalid Integration Trigger outputs.')
           const requestDigest = yield* Effect.tryPromise({
             try: () =>

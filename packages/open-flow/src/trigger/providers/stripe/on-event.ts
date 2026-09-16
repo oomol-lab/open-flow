@@ -81,7 +81,7 @@ export const stripeEvent: IntegrationDefinition = {
     return {
       dedupeKey: eventId,
       outcome: 'event',
-      payload: { body: payload, event, eventId, livemode: payload.livemode === true },
+      outputs: { payload: { body: payload, event, eventId, livemode: payload.livemode === true } },
     }
   },
   async reconcile(context) {

@@ -3,7 +3,7 @@ import type { TriggerConfigOption, TriggerConfigOptionsContext } from '../../com
 import type { PollContext, PollDefinition } from '../../common/poll.ts'
 
 import { isJsonObject } from '../../../base/common/json.ts'
-import { PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 const uuidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 const uuid = new RegExp(uuidPattern)
@@ -79,6 +79,7 @@ interface Checkpoint {
 }
 
 export const linearIssueChanged: PollDefinition = {
+  buildOutputs: payloadPollOutputs,
   snapshot,
   configOptions: options,
   async poll(context) {

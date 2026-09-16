@@ -2,7 +2,7 @@ import type { JsonValue, RevisionContent, TriggerSchedule } from '@oomol-lab/ope
 import type { PollConformanceFixture, PollConformanceHarness, PollDefinition, PollResult } from '@oomol-lab/open-flow/poll-trigger'
 
 import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId } from '@oomol-lab/open-flow/cron-trigger'
-import { pollConformanceCases } from '@oomol-lab/open-flow/poll-trigger'
+import { payloadPollOutputs, pollConformanceCases } from '@oomol-lab/open-flow/poll-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -95,6 +95,7 @@ async function createHarness(fixture: PollConformanceFixture): Promise<PollConfo
   let staged: PollResult[] = []
   let calls = 0
   const definition: PollDefinition = {
+    buildOutputs: payloadPollOutputs,
     snapshot,
     async poll() {
       calls += 1

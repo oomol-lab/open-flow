@@ -141,7 +141,7 @@ export const telegramUpdate: IntegrationDefinition = {
     return {
       dedupeKey: deliveryId,
       outcome: 'event',
-      payload: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event },
+      outputs: { payload: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event } },
     }
   },
   async reconcile(context) {

@@ -283,7 +283,7 @@ export class ListenerRuntime {
         async (context) => {
           const result = await source.read(context)
           validateListenerPage(result)
-          if ((result.hasMore || result.payload != null) && isDeepStrictEqual(result.checkpoint, checkpoint)) {
+          if ((result.hasMore || result.outputs != null) && isDeepStrictEqual(result.checkpoint, checkpoint)) {
             throw new PermanentIntegrationError('Listener continuation must advance the checkpoint.')
           }
           return result
@@ -292,8 +292,8 @@ export class ListenerRuntime {
         new TransientIntegrationError('Listener scan exceeded its execution deadline.'),
       )
       let event: { occurrenceId: string; outputs: Readonly<Record<string, JsonValue>>; requestDigest: string } | undefined
-      if (page.payload != null) {
-        const outputs = { payload: page.payload }
+      if (page.outputs != null) {
+        const outputs = page.outputs
         if (!matchesTriggerOutputs(trigger, outputs)) throw new Error('Invalid Integration Trigger outputs.')
         const occurrenceId = yield* Effect.tryPromise({
           try: () => integrationOccurrenceId(target.bindingId, target.runtimeVersion, definition.snapshot.key, page.dedupeKey),
@@ -471,8 +471,7 @@ export class ListenerRuntime {
           known.add(item.id)
           return true
         })
-        const payload = fresh.length == 0 ? null : ({ events: fresh.map((item) => item.event.payload) } satisfies JsonValue)
-        const outputs = payload == null ? null : { payload }
+        const outputs = fresh.length == 0 ? null : definition.buildOutputs(fresh.map((item) => item.event))
         if (outputs != null && !matchesTriggerOutputs(trigger, outputs)) throw new Error('Invalid Poll Trigger outputs.')
         const requestDigest =
           outputs == null

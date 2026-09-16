@@ -1,9 +1,15 @@
-import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
+import type { JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { PollDefinition, PollResult } from '@oomol-lab/open-flow/poll-trigger'
 import type { DestinationStream, Logger } from 'pino'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { maximumPollCheckpointBytes, maximumPollEventsPerPage, PollConnectionError, TransientPollError } from '@oomol-lab/open-flow/poll-trigger'
+import {
+  payloadPollOutputs,
+  maximumPollCheckpointBytes,
+  maximumPollEventsPerPage,
+  PollConnectionError,
+  TransientPollError,
+} from '@oomol-lab/open-flow/poll-trigger'
 import { triggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import * as Effect from 'effect/Effect'
 import { TestClock } from 'effect/testing'
@@ -70,7 +76,7 @@ const snapshot = {
   type: 'poll',
 } as const
 
-function revision(source = 'primary'): RevisionContent {
+function revision(source = 'primary', definition: PollDefinition['snapshot'] = snapshot): RevisionContent {
   return {
     document: {
       bindings: { connection: { kind: 'connection', target: 'connection-main' } },
@@ -80,16 +86,16 @@ function revision(source = 'primary'): RevisionContent {
           poll: {
             bindingId: 'connection',
             config: { source },
-            definition: snapshot,
+            definition,
             kind: 'poll',
             name: 'Poll test trigger',
             pollTimes: [{ type: 'every', unit: 'minute', value: 1 }],
           },
           task: {
-            inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'poll', output: 'payload' }] } },
+            inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'poll', output: definition.outputs[0]!.handle }] } },
             kind: 'task',
             task: {
-              inputs: [{ handle: 'event', jsonSchema: snapshot.outputs[0]!.jsonSchema, nullable: false }],
+              inputs: [{ handle: 'event', jsonSchema: definition.outputs[0]!.jsonSchema, nullable: false }],
               moduleId: 'module-main',
               name: 'Main',
               outputs: [],
@@ -236,6 +242,7 @@ describe('Server Poll Trigger', () => {
     const file = await databaseFile()
     let calls = 0
     const definition: PollDefinition = {
+      buildOutputs: payloadPollOutputs,
       snapshot,
       poll: async () => {
         calls++
@@ -278,6 +285,7 @@ describe('Server Poll Trigger', () => {
       },
     })
     const definition: PollDefinition = {
+      buildOutputs: payloadPollOutputs,
       snapshot,
       async poll(context): Promise<PollResult> {
         providerSignal = context.signal
@@ -313,6 +321,7 @@ describe('Server Poll Trigger', () => {
           const entered = Promise.withResolvers<void>()
           const canceled = Promise.withResolvers<void>()
           const definition: PollDefinition = {
+            buildOutputs: payloadPollOutputs,
             snapshot,
             async poll(context) {
               const signal = context.signal
@@ -358,6 +367,7 @@ describe('Server Poll Trigger', () => {
     let calls = 0
     let checkpoint: unknown
     const definition: PollDefinition = {
+      buildOutputs: payloadPollOutputs,
       snapshot,
       async poll(context): Promise<PollResult> {
         calls += 1
@@ -425,6 +435,7 @@ describe('Server Poll Trigger', () => {
   ] as const)('reports %s preview failures without changing the live checkpoint or health', async (mode, code) => {
     let preview = false
     const definition: PollDefinition = {
+      buildOutputs: payloadPollOutputs,
       snapshot,
       async poll() {
         if (!preview) return { checkpoint: { cursor: 'baseline' }, events: [] }
@@ -466,6 +477,7 @@ describe('Server Poll Trigger', () => {
     const file = await databaseFile()
     let calls = 0
     const definition: PollDefinition = {
+      buildOutputs: payloadPollOutputs,
       snapshot,
       async poll(): Promise<PollResult> {
         calls += 1
@@ -494,6 +506,7 @@ describe('Server Poll Trigger', () => {
   it('bounds continuation pages processed by one Poll tick', async () => {
     let calls = 0
     const definition: PollDefinition = {
+      buildOutputs: payloadPollOutputs,
       snapshot,
       async poll() {
         calls += 1
@@ -518,6 +531,7 @@ describe('Server Poll Trigger', () => {
     const file = await databaseFile()
     const captured = captureLogger()
     const definition: PollDefinition = {
+      buildOutputs: payloadPollOutputs,
       snapshot,
       async poll() {
         throw new PollConnectionError('Connection requires reauthorization.')
@@ -550,6 +564,7 @@ describe('Server Poll Trigger', () => {
     const file = await databaseFile()
     let calls = 0
     const definition: PollDefinition = {
+      buildOutputs: payloadPollOutputs,
       snapshot,
       async poll() {
         calls += 1
@@ -579,6 +594,7 @@ describe('Server Poll Trigger', () => {
     const file = await databaseFile()
     const checkpoints: unknown[] = []
     const definition: PollDefinition = {
+      buildOutputs: payloadPollOutputs,
       snapshot,
       async poll({ checkpoint }) {
         checkpoints.push(checkpoint)
@@ -605,6 +621,7 @@ describe('Server Poll Trigger', () => {
     const entered = Promise.withResolvers<void>()
     const page = Promise.withResolvers<PollResult>()
     const definition: PollDefinition = {
+      buildOutputs: payloadPollOutputs,
       snapshot,
       async poll() {
         entered.resolve()
@@ -632,7 +649,11 @@ describe('Server Poll Trigger', () => {
 
   it('allows an expired durable claim lease to be reacquired', async () => {
     const file = await databaseFile()
-    const definition: PollDefinition = { snapshot, poll: () => Promise.resolve({ checkpoint: null, events: [] }) }
+    const definition: PollDefinition = {
+      buildOutputs: payloadPollOutputs,
+      snapshot,
+      poll: () => Promise.resolve({ checkpoint: null, events: [] }),
+    }
     const service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
     await publish(service)
     await closeService(service)
@@ -652,4 +673,46 @@ describe('Server Poll Trigger', () => {
     expect(reacquired.leaseToken).not.toBe(first.leaseToken)
     opened.close()
   })
+})
+
+it.each([false, true])('admits Provider-defined Poll outputs after deduplication (multiple: %s)', async (multiple) => {
+  const file = await databaseFile()
+  const declared: PollDefinition['snapshot']['outputs'] = [
+    { handle: 'items', jsonSchema: { type: 'array', items: { type: 'string' } }, nullable: false },
+    ...(multiple ? [{ handle: 'count', jsonSchema: { type: 'number' }, nullable: false }] : []),
+  ]
+  const batches: string[][] = []
+  const definition: PollDefinition = {
+    snapshot: { ...snapshot, outputs: declared },
+    poll: async ({ checkpoint }) => ({
+      checkpoint: Number(checkpoint) + 1,
+      events:
+        checkpoint == null
+          ? []
+          : [
+              { dedupeKey: 'one', payload: { value: 'first' } },
+              { dedupeKey: 'one', payload: { value: 'first' } },
+              { dedupeKey: 'two', payload: { value: 'second' } },
+            ],
+    }),
+    buildOutputs: (events): Readonly<Record<string, JsonValue>> => {
+      const items = events.map((event) => String(event.payload.value))
+      batches.push(items)
+      return multiple ? { items, count: items.length } : { items }
+    },
+  }
+  const service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
+  const database = new DatabaseSync(file)
+  try {
+    await publish(service, revision('primary', definition.snapshot))
+    await service.tickListeners('2026-08-21T00:01:00.000Z')
+    await service.tickListeners('2026-08-21T00:02:00.000Z')
+    await service.tickListeners('2026-08-21T00:03:00.000Z')
+    expect(batches).toEqual([['first', 'second']])
+    const runs = database.prepare('SELECT trigger_outputs FROM runs').all() as { trigger_outputs: string }[]
+    expect(runs.map((row) => JSON.parse(row.trigger_outputs))).toEqual([multiple ? { items: ['first', 'second'], count: 2 } : { items: ['first', 'second'] }])
+  } finally {
+    database.close()
+    await closeService(service)
+  }
 })

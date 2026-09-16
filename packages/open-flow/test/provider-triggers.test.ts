@@ -408,7 +408,7 @@ describe('provider Integration Trigger definitions', () => {
         ),
         rawBody: githubBody,
       }),
-    ).toMatchObject({ dedupeKey: 'd1', outcome: 'event', payload: { event: 'push' } })
+    ).toMatchObject({ dedupeKey: 'd1', outcome: 'event', outputs: { payload: { event: 'push' } } })
     expect(
       await integration('gitlab.on_project_event').receive(
         receiveContext(
@@ -417,13 +417,13 @@ describe('provider Integration Trigger definitions', () => {
           {},
         ),
       ),
-    ).toMatchObject({ dedupeKey: 'd2', outcome: 'event', payload: { event: 'pipeline' } })
+    ).toMatchObject({ dedupeKey: 'd2', outcome: 'event', outputs: { payload: { event: 'pipeline' } } })
     expect(
       await integration('shopify.on_shop_event').receive({
         ...receiveContext({ topics: ['orders/create'] }, { 'x-shopify-topic': 'orders/create', 'x-shopify-webhook-id': 'd3' }, { id: 1 }),
         query: (name) => (name == 'open_flow_callback' ? 'secret' : undefined),
       }),
-    ).toMatchObject({ dedupeKey: 'd3', outcome: 'event', payload: { topic: 'orders/create' } })
+    ).toMatchObject({ dedupeKey: 'd3', outcome: 'event', outputs: { payload: { topic: 'orders/create' } } })
     const stripePayload = { id: 'evt_1', livemode: true, type: 'invoice.paid' }
     const stripeBody = encoder.encode(JSON.stringify(stripePayload))
     const stripeTimestamp = String(Date.parse('2026-08-20T12:34:20.000Z') / 1_000)
@@ -439,7 +439,7 @@ describe('provider Integration Trigger definitions', () => {
         rawBody: stripeBody,
         state: state({ subscription: { endpointId: 'we_4', signingSecret: 'whsec_test' } }).value,
       }),
-    ).toMatchObject({ dedupeKey: 'evt_1', outcome: 'event', payload: { event: 'invoice.paid', livemode: true } })
+    ).toMatchObject({ dedupeKey: 'evt_1', outcome: 'event', outputs: { payload: { event: 'invoice.paid', livemode: true } } })
     const wooPayload = { id: 1 }
     const wooBody = encoder.encode(JSON.stringify(wooPayload))
     expect(
@@ -455,7 +455,7 @@ describe('provider Integration Trigger definitions', () => {
         ),
         rawBody: wooBody,
       }),
-    ).toMatchObject({ dedupeKey: 'd5', outcome: 'event', payload: { topic: 'order.created' } })
+    ).toMatchObject({ dedupeKey: 'd5', outcome: 'event', outputs: { payload: { topic: 'order.created' } } })
     const zendeskPayload = { id: 'd6', type: 'zen:event-type:ticket.created' }
     const zendeskBody = encoder.encode(JSON.stringify(zendeskPayload))
     const zendeskTimestamp = '2026-08-20T12:34:20.000Z'
@@ -472,7 +472,7 @@ describe('provider Integration Trigger definitions', () => {
         rawBody: zendeskBody,
         state: state({ subscription: { signingSecret: 'zendesk-secret', webhookId: 'wh_6' } }).value,
       }),
-    ).toMatchObject({ dedupeKey: 'd6', outcome: 'event', payload: { event: 'zen:event-type:ticket.created' } })
+    ).toMatchObject({ dedupeKey: 'd6', outcome: 'event', outputs: { payload: { event: 'zen:event-type:ticket.created' } } })
   })
 
   it('creates and persists one remote subscription for each provider', async () => {
@@ -590,7 +590,7 @@ describe('provider Integration Trigger definitions', () => {
     expect(await definition.receive(receiveContext(config, { 'x-telegram-bot-api-secret-token': 'secret' }, { message, update_id: 9 }))).toMatchObject({
       dedupeKey: '9',
       outcome: 'event',
-      payload: { deliveryId: '9', event: 'message' },
+      outputs: { payload: { deliveryId: '9', event: 'message' } },
     })
 
     const target = connector((_request, index) =>
@@ -662,13 +662,15 @@ describe('provider Integration Trigger definitions', () => {
       continue: false,
       dedupeKey: 'my-drive:page-1',
       outcome: 'event',
-      payload: {
-        events: [
-          {
-            changeId: 'drive-1:file-1:2026-08-20T12:35:00.000Z:file:present',
-            notification: { changedTypes: ['content', 'parents'], messageNumber: '2', resourceState: 'change' },
-          },
-        ],
+      outputs: {
+        payload: {
+          events: [
+            {
+              changeId: 'drive-1:file-1:2026-08-20T12:35:00.000Z:file:present',
+              notification: { changedTypes: ['content', 'parents'], messageNumber: '2', resourceState: 'change' },
+            },
+          ],
+        },
       },
     })
     await expect(

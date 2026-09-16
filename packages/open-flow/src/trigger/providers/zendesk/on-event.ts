@@ -140,11 +140,13 @@ export const zendeskEvent: IntegrationDefinition = {
     return {
       dedupeKey: deliveryId.length == 0 ? undefined : deliveryId,
       outcome: 'event',
-      payload: {
-        body: payload,
-        deliveryId,
-        event,
-        ...(typeof subject == 'string' ? { subject } : {}),
+      outputs: {
+        payload: {
+          body: payload,
+          deliveryId,
+          event,
+          ...(typeof subject == 'string' ? { subject } : {}),
+        },
       },
     }
   },

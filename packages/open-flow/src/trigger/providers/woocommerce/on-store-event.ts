@@ -85,14 +85,16 @@ export const wooCommerceStoreEvent: IntegrationDefinition = {
     return {
       dedupeKey: deliveryId.length == 0 ? undefined : deliveryId,
       outcome: 'event',
-      payload: {
-        body: context.payload as Readonly<Record<string, JsonValue>>,
-        deliveryId,
-        event: context.header('x-wc-webhook-event') ?? '',
-        resource: context.header('x-wc-webhook-resource') ?? '',
-        source: context.header('x-wc-webhook-source') ?? '',
-        topic,
-        webhookId: context.header('x-wc-webhook-id') ?? '',
+      outputs: {
+        payload: {
+          body: context.payload as Readonly<Record<string, JsonValue>>,
+          deliveryId,
+          event: context.header('x-wc-webhook-event') ?? '',
+          resource: context.header('x-wc-webhook-resource') ?? '',
+          source: context.header('x-wc-webhook-source') ?? '',
+          topic,
+          webhookId: context.header('x-wc-webhook-id') ?? '',
+        },
       },
     }
   },

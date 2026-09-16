@@ -23,7 +23,7 @@ export interface ListenerPage {
   readonly checkpoint: JsonValue
   readonly dedupeKey: string
   readonly hasMore: boolean
-  readonly payload: Readonly<Record<string, JsonValue>> | null
+  readonly outputs: Readonly<Record<string, JsonValue>> | null
 }
 
 export interface ListenerSource {
@@ -38,7 +38,7 @@ export function validateListenerPage(value: unknown): asserts value is ListenerP
   if (typeof value.dedupeKey != 'string' || value.dedupeKey.length == 0 || encoder.encode(value.dedupeKey).byteLength > 1024) {
     throw new TypeError('Listener page identity must contain between 1 and 1024 bytes.')
   }
-  if (value.payload !== null && !isJsonObject(value.payload)) throw new TypeError('Listener page payload must be an object or null.')
+  if (value.outputs !== null && !isJsonObject(value.outputs)) throw new TypeError('Listener page outputs must be an object or null.')
   if (encoder.encode(JSON.stringify(value.checkpoint)).byteLength > 64 * 1024) {
     throw new TypeError('Listener checkpoint exceeds 64 KiB.')
   }
@@ -51,7 +51,7 @@ export type IntegrationReceiveResult =
       readonly continue?: boolean
       readonly dedupeKey?: string
       readonly outcome: 'event'
-      readonly payload: Readonly<Record<string, JsonValue>>
+      readonly outputs: Readonly<Record<string, JsonValue>>
     }
   | { readonly checkpoint?: JsonValue; readonly continue?: boolean; readonly outcome: 'ignored'; readonly reason: string }
   | {
@@ -209,7 +209,7 @@ const conformanceDefinition: IntegrationConformanceFixture['definition'] = {
         continue: page < pages,
         dedupeKey: `${deliveryId}:${page}`,
         outcome: 'event',
-        payload: { body: { page }, deliveryId, event: 'conformance' },
+        outputs: { payload: { body: { page }, deliveryId, event: 'conformance' } },
       }
     }
     const deliveryId = typeof value?.deliveryId == 'string' ? value.deliveryId : 'delivery'
@@ -218,7 +218,7 @@ const conformanceDefinition: IntegrationConformanceFixture['definition'] = {
       checkpoint: { deliveryId },
       dedupeKey: deliveryId,
       outcome: 'event',
-      payload: { body, deliveryId, event: 'conformance' },
+      outputs: { payload: { body, deliveryId, event: 'conformance' } },
     }
   },
   async reconcile(context) {
@@ -405,9 +405,9 @@ const listenerFixture: IntegrationConformanceFixture = {
               checkpoint: cursor + 1,
               dedupeKey: String(cursor),
               hasMore: cursor + 1 < available,
-              payload: { body: {}, deliveryId: String(cursor), event: 'change' },
+              outputs: { payload: { body: {}, deliveryId: String(cursor), event: 'change' } },
             }
-          : { checkpoint, dedupeKey: String(cursor), hasMore: false, payload: null }
+          : { checkpoint, dedupeKey: String(cursor), hasMore: false, outputs: null }
       },
     },
   },

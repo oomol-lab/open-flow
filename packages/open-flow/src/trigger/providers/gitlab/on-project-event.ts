@@ -113,7 +113,7 @@ export const gitlabProjectEvent: IntegrationDefinition = {
     return {
       dedupeKey: deliveryId.length == 0 ? undefined : deliveryId,
       outcome: 'event',
-      payload: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event, gitlabEvent },
+      outputs: { payload: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event, gitlabEvent } },
     }
   },
   async reconcile(context) {

@@ -2,7 +2,7 @@ import type { ConnectorProxyRequest, ConnectorProxyResult } from '../../../conne
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent, PollResult } from '../../common/poll.ts'
 
-import { PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 type EventKind = 'page_added' | 'page_updated'
 type CursorField = 'created_time' | 'last_edited_time'
@@ -110,6 +110,7 @@ const snapshot = {
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const notionDatabasePageEvent: PollDefinition = {
+  buildOutputs: payloadPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)

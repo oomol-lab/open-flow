@@ -124,7 +124,7 @@ export const githubRepoEvent: IntegrationDefinition = {
     return {
       dedupeKey: deliveryId.length == 0 ? undefined : deliveryId,
       outcome: 'event',
-      payload: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event },
+      outputs: { payload: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event } },
     }
   },
   async reconcile(context) {

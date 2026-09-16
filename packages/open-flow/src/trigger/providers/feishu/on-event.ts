@@ -72,7 +72,7 @@ export const feishuEvents: readonly IntegrationDefinition[] = [
     receive(context) {
       if (context.eventSourceId !== context.config.sourceId) return { outcome: 'respond', status: 404, body: '', contentType: 'text/plain' }
       const payload = context.payload as Record<string, import('../../../flow/common/change.ts').JsonValue>
-      return { outcome: 'event', dedupeKey: payload.deliveryId as string, payload }
+      return { outcome: 'event', dedupeKey: payload.deliveryId as string, outputs: { payload } }
     },
     async reconcile() {
       throw new PermanentIntegrationError('This deployment does not support shared Feishu event sources.')

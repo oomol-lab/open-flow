@@ -158,7 +158,7 @@ export const googleDriveChanges: IntegrationDefinition = {
     }
     return events.length == 0
       ? { ...delivery, outcome: 'ignored', reason: 'Google Drive change page is empty.' }
-      : { ...delivery, outcome: 'event', payload: { events } }
+      : { ...delivery, outcome: 'event', outputs: { payload: { events } } }
   },
   async reconcile(context) {
     const state = requireState(context.state)
@@ -568,7 +568,7 @@ export const googleDriveChangeListener: IntegrationDefinition = {
         checkpoint: page.checkpoint,
         dedupeKey: page.dedupeKey,
         hasMore: page.hasMore,
-        payload: page.changes.length == 0 ? null : { events: page.changes },
+        outputs: page.changes.length == 0 ? null : { payload: { events: page.changes } },
       }
     },
   },

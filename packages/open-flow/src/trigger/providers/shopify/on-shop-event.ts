@@ -242,14 +242,16 @@ export const shopifyShopEvent: IntegrationDefinition = {
     return {
       dedupeKey: webhookId.length == 0 ? undefined : webhookId,
       outcome: 'event',
-      payload: {
-        apiVersion: context.header('x-shopify-api-version') ?? '',
-        body: context.payload as Readonly<Record<string, JsonValue>>,
-        eventId: context.header('x-shopify-event-id') ?? '',
-        shopDomain: context.header('x-shopify-shop-domain') ?? '',
-        topic,
-        triggeredAt: context.header('x-shopify-triggered-at') ?? '',
-        webhookId,
+      outputs: {
+        payload: {
+          apiVersion: context.header('x-shopify-api-version') ?? '',
+          body: context.payload as Readonly<Record<string, JsonValue>>,
+          eventId: context.header('x-shopify-event-id') ?? '',
+          shopDomain: context.header('x-shopify-shop-domain') ?? '',
+          topic,
+          triggeredAt: context.header('x-shopify-triggered-at') ?? '',
+          webhookId,
+        },
       },
     }
   },

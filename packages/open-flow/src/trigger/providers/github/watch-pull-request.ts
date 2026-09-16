@@ -94,9 +94,9 @@ export const githubPullRequestListener: IntegrationDefinition = {
         throw new PermanentIntegrationError('GitHub listener checkpoint is invalid.')
       }
       const current = await readPullRequest(context)
-      if (current.version == checkpoint.version) return { checkpoint, dedupeKey: current.version, hasMore: false, payload: null }
+      if (current.version == checkpoint.version) return { checkpoint, dedupeKey: current.version, hasMore: false, outputs: null }
       const sequence = Number(checkpoint.sequence) + 1
-      return { checkpoint: { version: current.version, sequence }, dedupeKey: `${sequence}:${current.version}`, hasMore: false, payload: current }
+      return { checkpoint: { version: current.version, sequence }, dedupeKey: `${sequence}:${current.version}`, hasMore: false, outputs: { payload: current } }
     },
   },
 }
