@@ -21,7 +21,6 @@ import { DateEditor } from './dateEditor.tsx'
 import { EditableChoices } from './editableChoices.tsx'
 import { editorComponentIcons } from './editorComponentIcon.tsx'
 import { EditorComponentSelect } from './editorComponentSelect.tsx'
-import { EnumChoices } from './enumChoices.tsx'
 import { FieldSelect } from './fieldSelect.tsx'
 import { FieldSorting } from './fieldSorting.ts'
 import { JsonEditor } from './jsonEditor.tsx'
@@ -141,19 +140,17 @@ export function ValueEditor(props: ValueEditorProps) {
   const invalid = props.invalid === true || validator?.(value) === false
   const enumeration = Array.isArray(source.enum) ? source.enum : Object.hasOwn(source, 'const') ? [source.const] : undefined
   const complex = source['ui:widget'] === 'any' || editorComponent(schema) === 'json' || depth > 12
-  const editableOptions =
-    props.onDefinitionChange &&
-    (Array.isArray(source.enum)
-      ? source.enum
-      : source.uniqueItems === true && Array.isArray(objectValue(source.items)?.enum)
-        ? (objectValue(source.items)!.enum as unknown[])
-        : undefined)
+  const choiceOptions = Array.isArray(source.enum)
+    ? source.enum
+    : source.uniqueItems === true && Array.isArray(objectValue(source.items)?.enum)
+      ? (objectValue(source.items)!.enum as unknown[])
+      : undefined
   const itemEnumeration = source.uniqueItems === true ? objectValue(source.items)?.enum : undefined
   const showUnset =
     type !== 'boolean' &&
     !enumeration &&
     !itemEnumeration &&
-    !editableOptions &&
+    !choiceOptions &&
     !complex &&
     (value === undefined || (value === null && !allowsNull)) &&
     props.editor === undefined &&
@@ -353,9 +350,9 @@ export function ValueEditor(props: ValueEditorProps) {
         <JsonEditor {...props} value={value} invalid={invalid} focusRequest={expanded ? editorFocusRequest : 0} />
       ) : props.editor !== undefined ? (
         props.editor
-      ) : editableOptions ? (
+      ) : choiceOptions ? (
         <EditableChoices
-          options={editableOptions}
+          options={choiceOptions}
           labels={optionLabels}
           value={value}
           label={label}
@@ -363,10 +360,16 @@ export function ValueEditor(props: ValueEditorProps) {
           invalid={invalid}
           multiple={!Array.isArray(source.enum)}
           onChange={onChange}
-          onOptionsChange={(options) => {
-            const nextSchema = Array.isArray(source.enum) ? { ...source, enum: options } : { ...source, items: { ...objectValue(source.items), enum: options } }
-            props.onDefinitionChange!(nextSchema, valueForEditor(nextSchema, value))
-          }}
+          onOptionsChange={
+            props.onDefinitionChange
+              ? (options) => {
+                  const nextSchema = Array.isArray(source.enum)
+                    ? { ...source, enum: options }
+                    : { ...source, items: { ...objectValue(source.items), enum: options } }
+                  props.onDefinitionChange!(nextSchema, valueForEditor(nextSchema, value))
+                }
+              : undefined
+          }
         />
       ) : enumeration ? (
         <FieldSelect
@@ -391,7 +394,7 @@ export function ValueEditor(props: ValueEditorProps) {
           ))}
         </FieldSelect>
       ) : value === null && type !== 'null' && type !== 'boolean' ? (
-        <div className={styles.nullValue} aria-label={`${label} null`}>
+        <div className={styles.nullValue} data-field-control data-readonly={disabled || undefined} aria-label={`${label} null`}>
           <span className={styles.nullChip}>null</span>
         </div>
       ) : type === 'object' ? (
@@ -461,12 +464,14 @@ export function ValueEditor(props: ValueEditorProps) {
                                 )
                               }
                             />
+                          ) : typeof fieldSource.type === 'string' || fieldSource.enum != null || fieldSource.const !== undefined ? (
+                            <EditorComponentSelect schema={fieldSchema} name={`${label}.${name}`} readOnly onChange={() => {}} />
                           ) : (
                             <FieldSelect
                               icons={editorComponentIcons}
                               aria-label={t('valueEditor.type', { name: `${label}.${name}` })}
                               value={valueType(fieldSchema, fieldValue)}
-                              readOnly={disabled || typeof fieldSource.type === 'string' || fieldSource.enum != null || fieldSource.const !== undefined}
+                              readOnly={disabled}
                               onChange={(next) => {
                                 onChange(setObjectField(value, name, initialValue(fieldSchema, next as ValueType)))
                               }}
@@ -529,25 +534,22 @@ export function ValueEditor(props: ValueEditorProps) {
             }}
           </SortableFieldList>
           <div className={styles.collectionActions} data-layout="values">
-            {!canAddObjectField && names.length === 0 && <span className={styles.emptyObjectContent}>{t('valueEditor.emptyObject')}</span>}
-            {canAddObjectField && names.length === 0 && (
+            {names.length === 0 && (
               <Button
                 type="button"
                 variant="ghost"
                 size="field"
-                className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectContent}`}
-                disabled={disabled}
-                aria-label={`${t('valueEditor.addField')} ${label}`}
-                onClick={() => addObjectField()}
+                className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectContent} ${canAddObjectField ? '' : styles.emptyObjectConstraint}`}
+                disabled={disabled || !canAddObjectField}
+                aria-label={`${t(canAddObjectField ? 'valueEditor.addField' : 'valueEditor.emptyObject')} ${label}`}
+                onClick={canAddObjectField ? () => addObjectField() : undefined}
               >
-                <i aria-hidden="true" className="i-lucide-light:plus" />
-                {t('valueEditor.addField')}
+                {canAddObjectField && <i aria-hidden="true" className="i-lucide-light:plus" />}
+                {t(canAddObjectField ? 'valueEditor.addField' : 'valueEditor.emptyObject')}
               </Button>
             )}
           </div>
         </div>
-      ) : type === 'array' && source.uniqueItems === true && Array.isArray(itemEnumeration) ? (
-        <EnumChoices invalid={invalid} options={itemEnumeration} labels={optionLabels} value={value} label={label} disabled={disabled} onChange={onChange} />
       ) : type === 'array' ? (
         <div className={styles.collection}>
           <ArrayFieldList values={array} onReorder={!disabled && props.valueEditable !== false ? onChange : undefined} label={label}>
@@ -594,7 +596,7 @@ export function ValueEditor(props: ValueEditorProps) {
                           variant="ghost"
                           size="icon-xs"
                           aria-label={`${t('valueEditor.remove')} ${label}.${index}`}
-                          disabled={disabled}
+                          disabled={disabled || (typeof source.minItems === 'number' && array.length <= source.minItems)}
                           onClick={() => onChange(array.toSpliced(index, 1))}
                         >
                           <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg" />
@@ -652,7 +654,7 @@ export function ValueEditor(props: ValueEditorProps) {
         </div>
       ) : type === 'null' ? (
         value === null ? (
-          <div className={styles.nullValue} aria-label={`${label} null`}>
+          <div className={styles.nullValue} data-field-control data-readonly={disabled || undefined} aria-label={`${label} null`}>
             <span className={styles.nullChip}>null</span>
           </div>
         ) : (
@@ -788,6 +790,7 @@ export function ValueEditor(props: ValueEditorProps) {
             variant="disclosure"
             size="field"
             className={styles.summary}
+            data-readonly={disabled || undefined}
             data-field-control
             disabled={sorting}
             aria-label={`${label} ${t('valueEditor.setValue')}`}

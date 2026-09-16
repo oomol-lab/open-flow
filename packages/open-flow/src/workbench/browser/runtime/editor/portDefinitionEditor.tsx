@@ -617,16 +617,17 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           />
         </Popover>
       ) : null
-    const onDefinitionChange = tableLayout
-      ? (jsonSchema: unknown, value: unknown) => {
-          const { value: _value, ...rest } = port
-          update(index, {
-            ...rest,
-            jsonSchema: jsonSchema as InputPort['jsonSchema'],
-            ...(value === undefined ? {} : { value: value as InputPort['value'] }),
-          })
-        }
-      : undefined
+    const onDefinitionChange =
+      tableLayout && !disabled
+        ? (jsonSchema: unknown, value: unknown) => {
+            const { value: _value, ...rest } = port
+            update(index, {
+              ...rest,
+              jsonSchema: jsonSchema as InputPort['jsonSchema'],
+              ...(value === undefined ? {} : { value: value as InputPort['value'] }),
+            })
+          }
+        : undefined
     return (
       <FieldTableRow
         key={port.handle}

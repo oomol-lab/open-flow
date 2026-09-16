@@ -440,7 +440,7 @@
 
 .node-properties-gallery {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(360px, 1fr));
   grid-template-rows: minmax(0, 1fr);
   gap: 24px;
   padding: 24px;
@@ -472,4 +472,12 @@
   height: 100%;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
+}
+
+.fixed-definition-panel {
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  overflow: auto;
+  background: var(--ui-background);
 }

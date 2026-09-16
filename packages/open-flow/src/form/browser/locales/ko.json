@@ -39,6 +39,7 @@
     "fieldSettings": "필드 설정",
     "reorder": "{{name}} 순서 변경",
     "reorderHint": "드래그하거나 위아래 화살표 키로 순서 변경",
+    "notNullable": "null 허용 안 함",
     "nullable": "null 허용",
     "group": "그룹",
     "groupName": "그룹 이름",
@@ -82,6 +83,7 @@
     "columnName": "이름",
     "columnType": "유형",
     "columnValue": "값",
-    "emptyObject": "빈 객체"
+    "noOptions": "사용 가능한 옵션 없음",
+    "emptyObject": "빈 객체만 허용"
   }
 }

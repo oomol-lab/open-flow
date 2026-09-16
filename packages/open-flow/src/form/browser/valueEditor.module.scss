@@ -496,6 +496,12 @@
   font: inherit;
 }
 
+.emptyObjectConstraint {
+  height: auto;
+  min-height: var(--field-control-height, 30px);
+  white-space: normal;
+}
+
 .unsetValue {
   width: 100%;
   justify-content: space-between;

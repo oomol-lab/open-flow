@@ -39,6 +39,7 @@
     "fieldSettings": "Настройки поля",
     "reorder": "Изменить порядок {{name}}",
     "reorderHint": "Перетащите или используйте стрелки вверх и вниз",
+    "notNullable": "Null не допускается",
     "nullable": "Разрешить null",
     "group": "Группа",
     "groupName": "Название группы",
@@ -82,6 +83,7 @@
     "columnName": "Имя",
     "columnType": "Тип",
     "columnValue": "Значение",
-    "emptyObject": "Пустой объект"
+    "noOptions": "Нет доступных вариантов",
+    "emptyObject": "Только пустой объект"
   }
 }

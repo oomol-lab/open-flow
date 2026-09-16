@@ -39,6 +39,7 @@
     "fieldSettings": "Paramètres du champ",
     "reorder": "Réordonner {{name}}",
     "reorderHint": "Glissez ou utilisez les flèches haut et bas",
+    "notNullable": "Null non autorisé",
     "nullable": "Autoriser null",
     "group": "Groupe",
     "groupName": "Nom du groupe",
@@ -82,6 +83,7 @@
     "columnName": "Nom",
     "columnType": "Type",
     "columnValue": "Valeur",
-    "emptyObject": "Objet vide"
+    "noOptions": "Aucune option disponible",
+    "emptyObject": "Objet vide uniquement"
   }
 }

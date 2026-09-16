@@ -112,3 +112,5 @@ Fixed Values 的 Properties 样板使用名称／值布局，名称可原位编�
 JSON 值编辑器支持通过右下角手柄调整高度，宽度跟随面板；二级面板的 JSON Schema 编辑器按完整内容高度展示，仅由面板统一滚动。
 
 高级设置使用原生折叠，不执行高度动画。展开后面板保持定位并限制可用高度，长内容由面板统一滚动；编辑器保持挂载，收起后不进入 Tab 顺序。
+
+Node and Trigger **Properties** galleries include a **Fixed types · editable values** card using production `NodeInputs`. It compares all shared value editors, empty fixed/open objects, missing choices, nested definitions and array limits without granting schema-editing callbacks. These card edits stay local and Reset samples resets the node-gallery card. Comment has no typed fields.

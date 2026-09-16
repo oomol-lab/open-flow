@@ -39,6 +39,7 @@
     "fieldSettings": "欄位設定",
     "reorder": "調整 {{name}} 順序",
     "reorderHint": "拖動排序，或使用上下方向鍵",
+    "notNullable": "不允許空值",
     "nullable": "允許空值",
     "group": "群組",
     "groupName": "群組名稱",
@@ -82,6 +83,7 @@
     "columnName": "名稱",
     "columnType": "類型",
     "columnValue": "值",
-    "emptyObject": "空物件"
+    "noOptions": "無可用選項",
+    "emptyObject": "僅允許空物件"
   }
 }

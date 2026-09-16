@@ -27,7 +27,7 @@ export function EditableChoices({
   invalid?: boolean
   multiple: boolean
   onChange: (value: unknown) => void
-  onOptionsChange: (options: unknown[]) => void
+  onOptionsChange?: (options: unknown[]) => void
 }) {
   const t = useTranslate()
   const group = useId()
@@ -58,7 +58,7 @@ export function EditableChoices({
         open={open}
         onOpenChange={(next) => {
           setOpen(next)
-          if (next) setEditing(empty)
+          if (next) setEditing(empty && onOptionsChange != null)
         }}
       >
         <PopoverTrigger
@@ -77,7 +77,7 @@ export function EditableChoices({
         >
           <span className={`min-w-0 truncate ${!danger && !summary ? 'text-muted-foreground' : ''}`}>
             {empty
-              ? t('valueEditor.editOptions')
+              ? t(onOptionsChange ? 'valueEditor.editOptions' : 'valueEditor.noOptions')
               : summary ||
                 (value === undefined ? t(multiple ? 'valueEditor.selectMultiple' : 'valueEditor.select') : multiple ? '[]' : t('valueEditor.select'))}
           </span>
@@ -90,7 +90,7 @@ export function EditableChoices({
           className="w-(--anchor-width) min-w-48 max-w-[calc(100vw-24px)] gap-1 rounded-[var(--ui-control-radius,calc(var(--ui-radius)_+_2px))] p-1"
         >
           <div ref={popup} className="flex flex-col">
-            {editing ? (
+            {editing && onOptionsChange ? (
               <>
                 <div>
                   <Button type="button" variant="ghost" size="field" onClick={() => setEditing(false)}>
@@ -117,6 +117,7 @@ export function EditableChoices({
                       >
                         <input
                           type={multiple ? 'checkbox' : 'radio'}
+                          disabled={disabled}
                           name={group}
                           checked={selected(option)}
                           className="sr-only"
@@ -136,21 +137,25 @@ export function EditableChoices({
                     ))}
                   </div>
                 )}
-                {!empty && <div role="separator" className="mx-2 my-1 h-px bg-border/50" />}
-                <div>
-                  <Button
-                    type="button"
-                    variant={empty ? 'destructive' : 'ghost'}
-                    size="sm"
-                    className={`w-full justify-start px-2 ${selectionMenuRowClass}`}
-                    onPointerMove={(event) => {
-                      if (event.pointerType === 'mouse') event.currentTarget.focus({ preventScroll: true })
-                    }}
-                    onClick={() => setEditing(true)}
-                  >
-                    {t('valueEditor.editOptions')}
-                  </Button>
-                </div>
+                {onOptionsChange && !empty && <div role="separator" className="mx-2 my-1 h-px bg-border/50" />}
+                {empty && !onOptionsChange && <span className={`px-2 text-muted-foreground ${selectionMenuRowClass}`}>{t('valueEditor.noOptions')}</span>}
+                {onOptionsChange && (
+                  <div>
+                    <Button
+                      type="button"
+                      variant={empty ? 'destructive' : 'ghost'}
+                      size="sm"
+                      className={`w-full justify-start px-2 ${selectionMenuRowClass}`}
+                      onPointerMove={(event) => {
+                        if (event.pointerType === 'mouse') event.currentTarget.focus({ preventScroll: true })
+                      }}
+                      disabled={disabled}
+                      onClick={() => setEditing(true)}
+                    >
+                      {t('valueEditor.editOptions')}
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </div>

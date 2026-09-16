@@ -1,7 +1,7 @@
 import type { JsonValue } from '../api.ts'
 
 import { useTranslate } from 'val-i18n-react'
-import { EnumChoices } from '../../../../form/browser/enumChoices.tsx'
+import { EditableChoices } from '../../../../form/browser/editableChoices.tsx'
 import { ValueEditor } from '../../../../form/browser/valueEditor.tsx'
 import { isJsonValue, objectValue } from '../../../../form/common/value.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
@@ -55,7 +55,7 @@ export function TriggerConfigEditor({
                       {t('valueEditor.clear')}
                     </Button>
                   )}
-                  <EnumChoices label={label} options={items.enum} labels={undefined} value={value} disabled={disabled} onChange={change} />
+                  <EditableChoices multiple label={label} options={items.enum} labels={undefined} value={value} disabled={disabled} onChange={change} />
                 </>
               ) : (
                 <ValueEditor

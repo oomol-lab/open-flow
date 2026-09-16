@@ -120,3 +120,21 @@ describe('Nested field definition editing', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 })
+
+describe('Fixed definitions with custom value editors', () => {
+  it('does not grant definition editing when only the value is editable', () => {
+    const renderValue = vi.fn((_port: unknown, _presentation: unknown) => null)
+    renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <PortDefinitionEditor
+          layout="ports"
+          disabled
+          values={[{ handle: 'priority', jsonSchema: { enum: ['low', 'high'] }, nullable: false }]}
+          onChange={vi.fn()}
+          renderValue={renderValue}
+        />
+      </I18nProvider>,
+    )
+    expect(renderValue.mock.calls[0]?.[1]).toMatchObject({ onDefinitionChange: undefined })
+  })
+})

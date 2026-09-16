@@ -39,6 +39,7 @@
     "fieldSettings": "フィールド設定",
     "reorder": "{{name}} を並べ替え",
     "reorderHint": "ドラッグまたは上下矢印キーで並べ替え",
+    "notNullable": "null は許可されません",
     "nullable": "null を許可",
     "group": "グループ",
     "groupName": "グループ名",
@@ -82,6 +83,7 @@
     "columnName": "名前",
     "columnType": "型",
     "columnValue": "値",
-    "emptyObject": "空のオブジェクト"
+    "noOptions": "選択肢がありません",
+    "emptyObject": "空のオブジェクトのみ"
   }
 }

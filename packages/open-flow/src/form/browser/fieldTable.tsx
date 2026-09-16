@@ -50,8 +50,10 @@ export function FieldNullable({ name, checked, onChange }: { name: string; check
     <span className={styles.nullableControl}>
       <Checkbox
         className="not-data-disabled:cursor-pointer"
-        aria-label={`${name} ${t('valueEditor.nullable')}`}
+        aria-label={`${name} ${t(!onChange && !checked ? 'valueEditor.notNullable' : 'valueEditor.nullable')}`}
+        aria-checked={checked}
         checked={checked}
+        indeterminate={!onChange && !checked}
         disabled={!onChange}
         onCheckedChange={(next) => onChange?.(next === true)}
       />

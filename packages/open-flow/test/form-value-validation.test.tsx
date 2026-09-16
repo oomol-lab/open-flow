@@ -265,3 +265,35 @@ describe('Lazy schema compilation', () => {
     }
   })
 })
+
+const renderFixedValue = (schema: unknown, value: unknown, compact = true) =>
+  renderToStaticMarkup(
+    <I18nProvider i18n={createI18n('en')}>
+      <ValueEditor compact={compact} label="fixed" schema={schema} value={value} onChange={vi.fn()} path="/fixed" onDraftIssue={vi.fn()} hideOptions />
+    </I18nProvider>,
+  )
+describe('Fixed schema value presentation', () => {
+  it('keeps empty objects expandable and explains the fixed object constraint', () => {
+    const fixed = renderFixedValue({ type: 'object', additionalProperties: false }, {})
+    expect(fixed).toContain('{}')
+    expect(fixed).toContain('aria-expanded="false"')
+    const expandedContent = renderFixedValue({ type: 'object', additionalProperties: false }, {}, false)
+    expect(expandedContent).toContain('Empty object only')
+    expect(expandedContent).toMatch(/disabled=""[^>]*aria-label="Empty object only fixed"/)
+    expect(expandedContent).not.toContain('aria-label="Add field fixed"')
+    expect(renderFixedValue({ type: 'object' }, {})).toContain('aria-expanded="false"')
+    expect(renderFixedValue({ type: 'object', additionalProperties: false }, undefined)).toContain('Set value')
+  })
+  it.each([{ enum: [] }, { type: 'array', uniqueItems: true, items: { enum: [] } }])('does not offer to edit missing fixed options', (schema) => {
+    expect(renderFixedValue(schema, undefined)).toContain('No options available')
+    expect(renderFixedValue(schema, undefined)).not.toContain('Edit options')
+  })
+  it('keeps an empty string choice distinguishable from an unset value', () => {
+    expect(renderFixedValue({ enum: ['', 'other'] }, '')).toContain('Empty string')
+    expect(renderFixedValue({ enum: ['', 'other'] }, undefined)).toContain('Select a value')
+  })
+  it('disables removal at the minimum array length', () => {
+    const markup = renderFixedValue({ type: 'array', items: { type: 'string' }, minItems: 1 }, ['one'], false)
+    expect(markup).toMatch(/aria-label="Remove fixed.0"[^>]*disabled/)
+  })
+})

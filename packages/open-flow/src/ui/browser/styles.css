@@ -109,6 +109,19 @@
   background-color: var(--ui-control-hover-background, var(--ui-muted));
 }
 
+/* Read-only fields retain the same shallow surface as editable fields on hover. */
+:is([data-slot='input'], [data-slot='textarea'])[readonly],
+[data-slot='input-group']:has([data-slot='input-group-control'][readonly]),
+:is([data-slot='input'], [data-slot='textarea'], [data-slot='native-select'], [data-slot='select-trigger'], [data-field-control]):is(
+  :disabled,
+  [aria-disabled='true'],
+  [data-disabled],
+  [data-readonly='true']
+),
+.open-flow-code-editor.cm-editor:has(:where(.cm-content[contenteditable='false'])) {
+  background-color: var(--ui-control-hover-background, var(--ui-muted));
+}
+
 /* Selection popups retain the same surface feedback while open. */
 :is([data-slot='select-trigger'], [data-field-control])[aria-expanded='true'] {
   background-color: var(--ui-control-hover-background, var(--ui-muted));

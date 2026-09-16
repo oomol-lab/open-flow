@@ -6,44 +6,12 @@ import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
 import { NodeInspector } from '../../src/workbench/browser/runtime/editor/nodeInspector.tsx'
+import { FixedDefinitionSample, propertyValues as values } from './fixedDefinitionSample.tsx'
 import { InspectorSamplePanel } from './inspectorSamplePanel.tsx'
 import { createInspectorSession } from './inspectorSession.ts'
 import { useStoryActions } from './storyActions.tsx'
 
 const field = (handle: string, type = 'string'): InputPort => ({ handle, jsonSchema: { type }, nullable: false })
-const values: readonly InputPort[] = [
-  { ...field('message'), value: 'Review the release notes' },
-  { ...field('instructions'), jsonSchema: { 'type': 'string', 'ui:widget': 'text' }, value: 'Keep the summary concise.\nInclude the next steps.' },
-  { ...field('count', 'integer'), value: 3 },
-  { ...field('enabled', 'boolean'), value: false },
-  { ...field('priority'), jsonSchema: { enum: ['low', 'normal', 'high'] }, value: 'normal' },
-  { ...field('channels', 'array'), jsonSchema: { type: 'array', uniqueItems: true, items: { enum: ['email', 'sms'] } }, value: ['email'] },
-  { ...field('color'), jsonSchema: { 'type': 'string', 'ui:widget': 'color', 'ui:options': { colorType: 'HEX8' } }, value: '#7C73E6FF' },
-  { ...field('date'), jsonSchema: { type: 'string', format: 'date' }, value: '2026-09-14' },
-  { ...field('time'), jsonSchema: { type: 'string', format: 'time' }, value: '09:30:00' },
-  { ...field('timestamp'), jsonSchema: { type: 'string', format: 'date-time' }, value: '2026-09-14T09:30:00+08:00' },
-  {
-    ...field('payload', 'object'),
-    jsonSchema: {
-      type: 'object',
-      properties: { name: { type: 'string' }, active: { type: 'boolean' }, details: { type: 'object', properties: { count: { type: 'integer' } } } },
-    },
-    value: { name: 'Ada', active: true, details: { count: 2 }, extra: 'Editable field' },
-  },
-  { ...field('tags', 'array'), jsonSchema: { type: 'array', items: { type: 'string' } }, value: ['design', 'review'] },
-  { ...field('choice'), jsonSchema: { 'oneOf': [{ type: 'string' }, { type: 'number' }], 'ui:options': { labels: ['Text', 'Number'] } }, value: 'hello' },
-  { ...field('note'), nullable: true, value: null },
-  { ...field('nullValue', 'null'), value: null },
-  field('unsetNull', 'null'),
-  { ...field('unsetNullable'), nullable: true },
-  field('unsetBoolean', 'boolean'),
-  { ...field('unsetSelect'), jsonSchema: { enum: ['first', 'second'] } },
-  { ...field('emptyObject', 'object'), value: {} },
-  { ...field('emptyArray', 'array'), value: [] },
-  { ...field('emptySelect'), jsonSchema: { enum: [] } },
-  { ...field('emptyMultiSelect', 'array'), jsonSchema: { type: 'array', uniqueItems: true, items: { enum: [] } }, value: [] },
-  field('unset'),
-]
 const taskFields = [...values.slice(0, 6), ...values.slice(10)]
 const taskInputValues = Object.fromEntries(
   taskFields.flatMap((port) => (port.value === undefined ? [] : [[port.handle, { kind: 'value' as const, value: port.value }]])),
@@ -256,6 +224,7 @@ function PropertiesStory({ fixture, dark, language, log }: { fixture: Fixture; d
           mount={mount}
         />
       ))}
+      <FixedDefinitionSample key={generation} dark={dark} language={language} log={log} />
     </div>
   )
 }
@@ -268,6 +237,6 @@ export const nodePropertiesStories: readonly FrontendStory[] = fixtures.map((fix
   description:
     fixture.id === 'value'
       ? 'Editable and read-only properties, including typed dates, calendar selection, and time editing with timezone preservation. Use Sort to reorder fields and nested object properties; Done sorting restores disclosure arrows. Samples save independently.'
-      : 'Properties panels stretch with the viewport for responsive testing. Edit and read-only samples save independently; reload verifies saved values.',
+      : 'Editable, read-only and fixed-type value panels. Inspector samples save independently; reload verifies saved values.',
   render: (log, dark, language) => <PropertiesStory fixture={fixture} dark={dark} language={language} log={log} />,
 }))

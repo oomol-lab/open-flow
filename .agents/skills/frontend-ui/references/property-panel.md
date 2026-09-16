@@ -90,6 +90,9 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
   nested rows share this column width, releasing the unused selector space. They have no visible control border,
   fill, dropdown arrow, or click feedback. Temporary disabling retains the selector's disabled
   appearance; it is separate from the read-only type contract.
+- Non-editable Allow null cells reuse the shared disabled Checkbox, showing a check when allowed and
+  a minus when disallowed. Preserve the actual boolean in the accessible state and omit tab stops.
+  Editable cells retain the standard interactive checkbox behavior.
 - Add actions have a shallow neutral default fill and a slightly stronger hover fill. Preserve the
   established text and icon colors rather than changing the whole palette to obtain a background.
 
@@ -141,7 +144,11 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
   Unset retains its selection prompt and clicking sets true.
 - Boolean and Select use "Select a value" when unset; Multi-select uses "Select values". These
   prompts have danger styling. An explicitly empty multi-selection remains distinct from unset.
-- Missing choice definitions show a danger "Edit options…" entry point. Choice editing shares the
+- Fixed definitions omit option editing and all nested definition mutations while values remain editable.
+  Empty fixed choices show "No options available". Closed empty objects retain the standard preview
+  and disclosure; the expanded child row uses the disabled add-action surface to explain that an empty
+  object is required and fields cannot be added. Open objects retain their add-field action.
+- Missing editable choice definitions show a danger "Edit options…" entry point. Choice editing shares the
   selection popup, with a back chevron and an Add option button matching the list's typography.
 
 - Object children and array items use the established rounded plus/minus buttons. Plus inserts

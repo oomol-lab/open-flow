@@ -39,6 +39,7 @@
     "fieldSettings": "字段设置",
     "reorder": "调整 {{name}} 顺序",
     "reorderHint": "拖动排序，或使用上下方向键",
+    "notNullable": "不允许空值",
     "nullable": "允许空值",
     "group": "分组",
     "groupName": "分组名称",
@@ -82,6 +83,7 @@
     "columnName": "名称",
     "columnType": "类型",
     "columnValue": "值",
-    "emptyObject": "空对象"
+    "noOptions": "无可用选项",
+    "emptyObject": "仅允许空对象"
   }
 }

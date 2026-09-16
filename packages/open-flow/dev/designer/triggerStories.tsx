@@ -20,6 +20,7 @@ import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.
 import { RunInputPanel } from '../../src/workbench/browser/runtime/runs/runInputPanel.tsx'
 import { RunRequestStore } from '../../src/workbench/browser/runtime/runs/runRequestStore.ts'
 import { designerGraph } from '../../src/workbench/browser/runtime/workspace.ts'
+import { FixedDefinitionSample } from './fixedDefinitionSample.tsx'
 import { InspectorSamplePanel } from './inspectorSamplePanel.tsx'
 import { useStorySidebar } from './storySidebar.tsx'
 import { TriggerCatalogStory } from './triggerCatalogStory.tsx'
@@ -462,6 +463,7 @@ function SidebarStory(props: StoryProps) {
   return (
     <Gallery {...props}>
       <div className="trigger-case-grid">
+        <FixedDefinitionSample dark={props.dark} language={props.language} log={props.log} />
         {states.map((state) => (
           <SidebarSample key={state} {...props} state={state} />
         ))}
@@ -544,6 +546,7 @@ function ProviderStory({ view, ...props }: Omit<StoryProps, 'fixture'> & { reado
                 </>
               ) : (
                 <>
+                  <FixedDefinitionSample dark={props.dark} language={props.language} log={props.log} />
                   <SidebarSample {...props} fixture={integrationExample} state="created-with-default" />
                   <SidebarSample {...props} fixture={pollExample} state="created-with-default" />
                   <SidebarSample {...props} fixture={integrationExample} state="unconfigured" />
