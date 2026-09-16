@@ -42,9 +42,10 @@ export function NodePickerContent({
   isOptionDisabled,
   catalogFailed,
   initialQuery = '',
+  initialTab = 'nodes',
 }: BlockLibraryProps & { readonly initialQuery?: string }): ReactElement {
   const t = useTranslate()
-  const [page, setPage] = useState('nodes')
+  const [page, setPage] = useState(initialTab)
   const [query, setQuery] = useState(initialQuery)
   const [appQuery, setAppQuery] = useState('')
   const searchInput = useRef<HTMLInputElement>(null)
@@ -278,7 +279,7 @@ export function NodePickerContent({
   const inputQuery = app == null ? query : appQuery
   const setInputQuery = app == null ? setQuery : setAppQuery
   return (
-    <Tabs value={page} onValueChange={(value) => setPage(String(value))} className="h-full min-h-0 gap-0" aria-busy={adding}>
+    <Tabs value={page} onValueChange={(value) => setPage(value === 'triggers' ? 'triggers' : 'nodes')} className="h-full min-h-0 gap-0" aria-busy={adding}>
       <div ref={mount} className="shrink-0 px-3 pb-2 pt-3">
         <InputGroup>
           <InputGroupAddon>

@@ -21,7 +21,10 @@ import { NodePickerDragSession } from './nodePickerDrag.ts'
 import { CanvasNodePicker } from './nodePickerPopover.tsx'
 
 interface Props {
-  readonly nodePicker?: Pick<BlockLibraryProps, 'connections' | 'loadConnections' | 'browseOptions' | 'provideChoices' | 'catalogFailed' | 'refreshCatalog'>
+  readonly nodePicker?: Pick<
+    BlockLibraryProps,
+    'connections' | 'loadConnections' | 'browseOptions' | 'provideChoices' | 'catalogFailed' | 'refreshCatalog' | 'initialTab'
+  >
   readonly addNodeControl?: ReactNode
   readonly history?: CanvasHistoryControlsProps
   readonly ignoredNodeIds: readonly string[]
@@ -392,6 +395,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           provideChoices={nodePicker?.provideChoices ?? (async () => [])}
           catalogFailed={nodePicker?.catalogFailed}
           refreshCatalog={nodePicker?.refreshCatalog}
+          initialTab={nodePicker?.initialTab}
           disabled={disabled}
           focusRequest={0}
           request={pickerRequest}

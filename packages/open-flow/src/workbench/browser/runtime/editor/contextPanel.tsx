@@ -74,6 +74,7 @@ export interface BlockLibraryProps {
   readonly connections?: readonly ConnectorConnection[]
   readonly loadConnections?: (signal: AbortSignal) => Promise<void>
   readonly isOptionDisabled?: (option: AddNodeOption) => boolean
+  readonly initialTab?: 'nodes' | 'triggers'
   readonly presentation?: 'picker'
   readonly catalogFailed?: boolean
   readonly refreshCatalog?: () => void

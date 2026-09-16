@@ -195,6 +195,7 @@ export function FlowEditor({
   const selection = useVal(store.workspace.$.selection)
   const selectedNodeIds = useVal(store.workspace.$.selectedNodeIds)
   const target = useVal(store.workspace.$.target)
+  const initialAddNodeTab = target?.kind == 'flow' && triggers.length == 0 ? 'triggers' : 'nodes'
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(`${flowId}:${target?.kind}:${target?.kind == 'subflow' ? target.id : ''}`)
   const panel = useInspectorPanel({
     identity: JSON.stringify([flowId, target]),
@@ -335,6 +336,7 @@ export function FlowEditor({
             provideChoices={store.provideAddNodeOptionChoices}
             catalogFailed={triggerCatalogState.error != null}
             refreshCatalog={store.retryCatalog}
+            initialTab={initialAddNodeTab}
             disabled={authoringDisabled || target == null}
             focusRequest={0}
             onAdd={addFromPicker}
@@ -349,6 +351,7 @@ export function FlowEditor({
           provideChoices: store.provideAddNodeOptionChoices,
           catalogFailed: triggerCatalogState.error != null,
           refreshCatalog: store.retryCatalog,
+          initialTab: initialAddNodeTab,
         }}
         addNodeOptions={addNodeOptions}
         disabled={authoringDisabled}

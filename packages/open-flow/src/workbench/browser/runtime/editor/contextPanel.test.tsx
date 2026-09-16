@@ -66,6 +66,27 @@ describe('Context Panel', () => {
     expect(renderPicker(true)).not.toContain('draggable="true"')
   })
 
+  it('can open the picker on the triggers tab', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <BlockLibrary
+          browseOptions={async () => []}
+          searchOptions={async () => []}
+          disabled={false}
+          focusRequest={0}
+          initialTab="triggers"
+          onAdd={async () => undefined}
+          options={[]}
+          presentation="picker"
+          provideChoices={async () => []}
+        />
+      </I18nProvider>,
+    )
+
+    expect(markup).toMatch(/aria-selected="true"[^>]*>Triggers<\/button>/)
+    expect(markup).toMatch(/aria-selected="false"[^>]*>Blocks<\/button>/)
+  })
+
   it.each(['Connector actions', 'App triggers'])('keeps %s collapsed so common nodes remain visible', (label) => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
