@@ -294,6 +294,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         const declaration = (await readFile(path.join(declarationRoot, `flow/common/${name}.d.ts`), 'utf8'))
           .replaceAll("'../../execution/common/engineContract.ts'", "'./engine-contract.js'")
           .replaceAll("'../../execution/common/runtime.ts'", "'./runtime-contract.js'")
+          .replaceAll("'../../trigger/common/contract.ts'", "'./trigger-contract.js'")
           .replaceAll("'./change.ts'", "'../browser/flow-change.js'")
           .replaceAll("'./semantics.ts'", "'./flow-semantics.js'")
           .replaceAll("'./graph.ts'", "'./flow-graph.js'")
@@ -406,6 +407,13 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(commonOutputPath, 'flow-notifications.d.ts'), flowNotificationsDeclaration),
       writeFile(path.join(commonOutputPath, 'control-api-conformance.d.ts'), controlApiConformanceDeclaration),
       writeFile(path.join(commonOutputPath, 'cron-trigger.d.ts'), cronTriggerDeclaration),
+      writeFile(
+        path.join(commonOutputPath, 'trigger-contract.d.ts'),
+        (await readFile(path.join(declarationRoot, 'trigger/common/contract.d.ts'), 'utf8')).replaceAll(
+          "'../../flow/common/change.ts'",
+          "'../browser/flow-change.js'",
+        ),
+      ),
       writeFile(path.join(commonOutputPath, 'integration-trigger.d.ts'), integrationTriggerDeclaration),
       writeFile(path.join(commonOutputPath, 'poll-trigger.d.ts'), pollTriggerDeclaration),
       writeFile(path.join(commonOutputPath, 'provider-triggers.d.ts'), providerTriggersDeclaration),
