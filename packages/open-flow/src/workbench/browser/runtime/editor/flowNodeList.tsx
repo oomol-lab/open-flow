@@ -11,7 +11,6 @@ import { Icon } from '../icons.tsx'
 
 interface FlowNodeListProps {
   readonly groupTriggers?: boolean
-  readonly onAdd?: () => void
   readonly nodes: readonly FlowCanvasViewNode[]
   readonly onFocusNode: (nodeId: string) => void
   readonly onSelect: (nodeId: string) => void
@@ -66,7 +65,7 @@ function FlowNodeRow({
   )
 }
 
-function FlowNodeGrid({ nodes, onFocusNode, onSelect }: Omit<FlowNodeListProps, 'groupTriggers' | 'onAdd'>): ReactElement {
+function FlowNodeGrid({ nodes, onFocusNode, onSelect }: Omit<FlowNodeListProps, 'groupTriggers'>): ReactElement {
   return (
     <div className="flow-node-list-grid">
       {nodes.map((node) => (
@@ -76,37 +75,29 @@ function FlowNodeGrid({ nodes, onFocusNode, onSelect }: Omit<FlowNodeListProps, 
   )
 }
 
-export function FlowNodeList({ nodes, onFocusNode, onSelect, onAdd, groupTriggers = false }: FlowNodeListProps): ReactElement {
+export function FlowNodeList({ nodes, onFocusNode, onSelect, groupTriggers = false }: FlowNodeListProps): ReactElement {
   const t = useTranslate()
   const triggers = groupTriggers ? nodes.filter((node) => node.kind == 'trigger') : []
   const otherNodes = groupTriggers ? nodes.filter((node) => node.kind != 'trigger') : nodes
+  if (nodes.length == 0) {
+    return <div className="inspector-empty flex h-full items-center justify-center text-center">{t('inspector.emptyOutline')}</div>
+  }
   return (
     <ScrollArea className="h-full" autoHide="never" defer={false} tabIndex={-1}>
-      {nodes.length == 0 ? (
-        <div className="inspector-empty flex flex-col items-center gap-3">
-          <span>{t('inspector.emptyOutline')}</span>
-          {onAdd && (
-            <Button onClick={onAdd} variant="outline">
-              {t('designer.addNode')}
-            </Button>
-          )}
-        </div>
-      ) : (
-        <div className="grid gap-3 px-2 py-3">
-          {triggers.length > 0 && (
-            <section>
-              <h3 className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">{t('inspector.triggers')}</h3>
-              <FlowNodeGrid nodes={triggers} onFocusNode={onFocusNode} onSelect={onSelect} />
-            </section>
-          )}
-          {otherNodes.length > 0 && (
-            <section>
-              {groupTriggers && <h3 className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">{t('inspector.nodes')}</h3>}
-              <FlowNodeGrid nodes={otherNodes} onFocusNode={onFocusNode} onSelect={onSelect} />
-            </section>
-          )}
-        </div>
-      )}
+      <div className="grid gap-3 px-2 py-3">
+        {triggers.length > 0 && (
+          <section>
+            <h3 className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">{t('inspector.triggers')}</h3>
+            <FlowNodeGrid nodes={triggers} onFocusNode={onFocusNode} onSelect={onSelect} />
+          </section>
+        )}
+        {otherNodes.length > 0 && (
+          <section>
+            {groupTriggers && <h3 className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">{t('inspector.nodes')}</h3>}
+            <FlowNodeGrid nodes={otherNodes} onFocusNode={onFocusNode} onSelect={onSelect} />
+          </section>
+        )}
+      </div>
     </ScrollArea>
   )
 }

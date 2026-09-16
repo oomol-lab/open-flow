@@ -34,7 +34,6 @@ export function useInspectorPanel({
 }) {
   const [open, setOpen] = useState(() => readInspectorOpen(preferences))
   const [page, setPage] = useState<'outline' | 'properties'>('outline')
-  const [blocksOpen, setBlocksOpen] = useState(false)
   const [gestureSelection, setGestureSelection] = useState<readonly string[]>()
   const selecting = useRef(false)
 
@@ -42,7 +41,6 @@ export function useInspectorPanel({
     selecting.current = false
     setGestureSelection(undefined)
     setPage('outline')
-    setBlocksOpen(false)
   }, [identity])
 
   useEffect(() => {
@@ -60,17 +58,15 @@ export function useInspectorPanel({
   }
   const activate = (ids: readonly string[]): void => {
     select(ids)
-    if (!selecting.current && open && !blocksOpen) showSelection(ids)
+    if (!selecting.current && open) showSelection(ids)
   }
   const openInspector = (): void => {
     changeOpen(true)
-    setBlocksOpen(false)
     setPage('properties')
   }
 
   return {
     open,
-    blocksOpen,
     page: selectedNodeIds.length === 0 ? ('outline' as const) : page,
     canvasSelection: gestureSelection ?? selectedNodeIds,
     selecting: gestureSelection != null,
@@ -78,11 +74,7 @@ export function useInspectorPanel({
     activate,
     back: () => setPage('outline'),
     openInspector,
-    close: () => {
-      if (blocksOpen) setBlocksOpen(false)
-      else changeOpen(false)
-    },
-    openBlocks: () => setBlocksOpen(true),
+    close: () => changeOpen(false),
     startSelection: () => {
       selecting.current = true
       setGestureSelection(selectedNodeIds)
@@ -92,7 +84,7 @@ export function useInspectorPanel({
       selecting.current = false
       setGestureSelection(undefined)
       onSelectNodes(ids)
-      if (open && !blocksOpen) showSelection(ids)
+      if (open) showSelection(ids)
     },
   }
 }

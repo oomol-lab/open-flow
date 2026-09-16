@@ -337,7 +337,6 @@ function HistorySession({
               selectedNodeIds={selected}
               addNodeOptions={options}
               disabled={draft == null || history.applying || history.failed}
-              blocksOpen={false}
               inspectorOpen={false}
               ignoredNodeIds={ignored}
               onIgnoreNodes={(ids, ignore) => setIgnored(ignore ? [...ignored, ...ids] : ignored.filter((id) => !ids.includes(id)))}
@@ -352,7 +351,6 @@ function HistorySession({
               onMoveNodes={(positions) => void store.moveNodes(positions)}
               onMoveViewport={(viewport) => void store.moveViewport(viewport)}
               onSelectNodes={(ids) => store.selectNodes(ids)}
-              onOpenBlocks={() => {}}
               onOpenInspector={() => {}}
               onToggleInspector={() => {}}
               provideAddNodeOptions={async () => options}

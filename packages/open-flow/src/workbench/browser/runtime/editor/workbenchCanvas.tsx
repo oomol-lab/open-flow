@@ -27,7 +27,6 @@ interface Props {
   readonly onIgnoreNodes: (nodeIds: readonly string[], ignored: boolean) => void
   readonly runControl?: ReactNode
   readonly addNodeOptions: readonly AddNodeOption[]
-  readonly blocksOpen: boolean
   readonly disabled: boolean
   readonly theme: WorkbenchTheme
   readonly focusNodeRequest?: {
@@ -46,7 +45,6 @@ interface Props {
   readonly onDuplicate: (positions?: Readonly<Record<string, Point>>, offset?: Point) => void
   readonly onMoveNodes: (positions: Readonly<Record<string, Point>>) => void
   readonly onMoveViewport: (viewport: DesignerViewport) => void
-  readonly onOpenBlocks: (opener?: HTMLButtonElement) => void
   readonly onOpenInspector: () => void
   readonly onPaste: () => void
   readonly provideAddNodeOptions: (searchTerm: string, signal: AbortSignal) => ResourceSource<readonly AddNodeOption[]>
@@ -62,7 +60,6 @@ interface Props {
 export interface WorkbenchCanvasHandle {
   readonly addNode: (option: AddNodeOption, canvasPosition?: Point) => Promise<string | undefined>
   readonly focusCanvas: () => void
-  readonly registerAddNodeOption: (option: AddNodeOption) => void
 }
 
 const inspectorReflowDelay = 300
@@ -79,7 +76,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     addNodeControl,
     addNodeOptions,
     history,
-    blocksOpen,
     disabled,
     focusNodeRequest,
     inspectorOpen,
@@ -94,7 +90,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     onDuplicate,
     onMoveNodes,
     onMoveViewport,
-    onOpenBlocks,
     onOpenInspector,
     onPaste,
     provideAddNodeOptions,
@@ -232,7 +227,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     () => ({
       addNode: requestAddNode,
       focusCanvas: () => canvas.current?.focus({ preventScroll: true }),
-      registerAddNodeOption: (option) => dynamicOptions.current.set(option.id, option),
     }),
     [requestAddNode],
   )
@@ -326,9 +320,9 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
                   }
             }
             addNodeControl={addNodeControl}
-            blocksOpen={blocksOpen}
+            pickerOpen={pickerRequest != null}
             disabled={disabled || target == null}
-            onOpenBlocks={onOpenBlocks}
+            onOpenNodePicker={openAddNode}
             runControl={runControl}
             onAddTrigger={needsTrigger && model.nodes.length > 0 && manualTrigger != null ? () => void addRecommended(manualTrigger) : undefined}
           />
@@ -422,17 +416,17 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
 export function WorkbenchCanvasActions({
   addNodeControl,
   history,
-  blocksOpen,
+  pickerOpen,
   disabled,
-  onOpenBlocks,
+  onOpenNodePicker,
   runControl,
   onAddTrigger,
 }: {
   readonly addNodeControl?: ReactNode
   readonly history?: CanvasHistoryControlsProps
-  readonly blocksOpen: boolean
+  readonly pickerOpen: boolean
   readonly disabled: boolean
-  readonly onOpenBlocks: (opener: HTMLButtonElement) => void
+  readonly onOpenNodePicker: (opener: HTMLButtonElement) => void
   readonly runControl?: ReactNode
   readonly onAddTrigger?: () => void
 }): ReactElement {
@@ -443,10 +437,10 @@ export function WorkbenchCanvasActions({
       {addNodeControl ?? (
         <CanvasTooltip placement="top" title={t('designer.openBlocks')}>
           <Button
-            aria-expanded={blocksOpen}
+            aria-expanded={pickerOpen}
             className="pr-3 text-[13px]"
             disabled={disabled}
-            onClick={(event) => onOpenBlocks(event.currentTarget)}
+            onClick={(event) => onOpenNodePicker(event.currentTarget)}
             size="default"
             type="button"
             variant="ghost"

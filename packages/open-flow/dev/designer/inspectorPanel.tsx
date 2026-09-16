@@ -76,7 +76,7 @@ function PanelStates({ dark }: { dark: boolean }) {
                 }[state]
               }
             </h3>
-            <div className="h-[300px] overflow-hidden rounded-lg border border-border">
+            <div className="grid h-[300px] overflow-hidden rounded-lg border border-border">
               <EditorContextPanel
                 icon={outline || state === 'multiple' ? 'flow' : 'task'}
                 title={outline ? t('inspector.outline') : state === 'multiple' ? t('inspector.multipleSelected', { count: 2 }) : reviewNode.title}
@@ -91,7 +91,6 @@ function PanelStates({ dark }: { dark: boolean }) {
                     nodes={state === 'empty' ? [] : [triggerNode, reviewNode, providerNode]}
                     onSelect={() => {}}
                     onFocusNode={() => {}}
-                    onAdd={state === 'empty' ? () => {} : undefined}
                   />
                 ) : state === 'multiple' ? (
                   <FlowNodeList nodes={[providerNode, reviewNode]} onSelect={() => {}} onFocusNode={() => {}} />
@@ -140,23 +139,25 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
   ])
   return (
     <I18nProvider i18n={i18n}>
-      <div className="open-flow-workbench open-flow-theme w-full space-y-5 overflow-auto p-5" data-theme={dark ? 'dark' : 'light'}>
-        <div className="grid h-[580px] overflow-hidden rounded-lg border border-border">
-          {store && (
-            <FlowEditor
-              key={generation}
-              store={store}
-              theme={dark ? 'dark' : 'light'}
-              onRun={() => {}}
-              onRunStarted={() => {}}
-              onCloseRuns={() => {}}
-              onToggleRuns={() => {}}
-              runDrawerOpen={false}
-              runDrawerVisible={false}
-            />
-          )}
+      <div className="open-flow-workbench open-flow-theme w-full" data-theme={dark ? 'dark' : 'light'}>
+        <div className="h-full space-y-5 overflow-auto p-5">
+          <PanelStates dark={dark} />
+          <div className="grid h-[580px] overflow-hidden rounded-lg border border-border">
+            {store && (
+              <FlowEditor
+                key={generation}
+                store={store}
+                theme={dark ? 'dark' : 'light'}
+                onRun={() => {}}
+                onRunStarted={() => {}}
+                onCloseRuns={() => {}}
+                onToggleRuns={() => {}}
+                runDrawerOpen={false}
+                runDrawerVisible={false}
+              />
+            )}
+          </div>
         </div>
-        <PanelStates dark={dark} />
       </div>
     </I18nProvider>
   )
@@ -168,6 +169,6 @@ export const inspectorPanelStory: FrontendStory = {
   title: 'Properties Panel',
   standalone: true,
   description:
-    'Production editor: open properties from the node toolbar, return without clearing selection, and marquee-select. Panel states appear together below.',
+    'Production editor: open properties from the node toolbar, return without clearing selection, and marquee-select. Panel states appear together above the editor, including the centered empty outline without add controls.',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
 }

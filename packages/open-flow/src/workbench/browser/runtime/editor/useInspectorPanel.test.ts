@@ -145,20 +145,6 @@ describe('inspector navigation', () => {
     expect(f.selection()).toEqual([])
     expect(f.render().page).toBe('outline')
   })
-  it('treats the block library as temporary without overwriting the preference or page', () => {
-    const f = fixture('true')
-    f.render().activate(['a'])
-    f.render().openBlocks()
-    f.render().activate(['b'])
-    expect(f.render().blocksOpen).toBe(true)
-    f.render().close()
-    expect(f.render().open).toBe(true)
-    expect(f.render().page).toBe('properties')
-    expect(f.preferences.setItem).not.toHaveBeenCalled()
-    f.render().openBlocks()
-    f.render().openInspector()
-    expect(f.render().blocksOpen).toBe(false)
-  })
 })
 
 describe('inspector preferences', () => {

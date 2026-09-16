@@ -250,7 +250,6 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
             <div className="editor-grid context-panel-closed h-[560px] max-h-[70vh] overflow-hidden rounded-xl border border-[var(--ui-border)]">
               <WorkbenchCanvas
                 addNodeOptions={options}
-                blocksOpen={false}
                 disabled={disabled}
                 ignoredNodeIds={[]}
                 inspectorOpen={false}
@@ -278,7 +277,6 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
                 onIgnoreNodes={() => {}}
                 onMoveNodes={() => {}}
                 onMoveViewport={() => {}}
-                onOpenBlocks={() => {}}
                 onOpenInspector={() => {}}
                 onPaste={() => {}}
                 onSelectNodes={() => {}}
@@ -306,9 +304,9 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
             <h3 className="p-4 text-sm font-medium">Button dock · anchored popover</h3>
             <div className="absolute bottom-4 left-4">
               <WorkbenchCanvasActions
-                blocksOpen={false}
+                pickerOpen={false}
+                onOpenNodePicker={() => log('nodePicker.open')}
                 disabled={disabled}
-                onOpenBlocks={() => log('Legacy sidebar')}
                 addNodeControl={<NodePickerPopover {...props} />}
               />
             </div>

@@ -366,7 +366,8 @@ function RunControlSample({
       </div>
       <CanvasChromeStory language={language} log={log} miniMapOpen={miniMapOpen}>
         <WorkbenchCanvasActions
-          blocksOpen={false}
+          pickerOpen={false}
+          onOpenNodePicker={() => log('nodePicker.open')}
           disabled={disabled}
           history={{
             state: {
@@ -381,7 +382,6 @@ function RunControlSample({
             onRedo: () => log('history.redo'),
             onRetry: () => log('history.retry'),
           }}
-          onOpenBlocks={() => log('blocks.open')}
           runControl={
             <RunControl
               disabled={disabled}

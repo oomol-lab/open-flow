@@ -118,7 +118,7 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
             theme={dark ? 'dark' : 'light'}
             disabled={disabled}
             inspectorOpen={open}
-            blocksOpen={false}
+
             addNodeOptions={[]}
             provideAddNodeOptions={async () => []}
             onAddNode={async () => undefined}
@@ -144,7 +144,6 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
             onCopy={() => {}}
             onPaste={() => {}}
             onDuplicate={() => {}}
-            onOpenBlocks={() => {}}
             onOpenInspector={() => setOpen(true)}
             onToggleInspector={() => setOpen(!open)}
           />

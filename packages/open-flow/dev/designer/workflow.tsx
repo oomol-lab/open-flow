@@ -323,9 +323,9 @@ function WorkflowStory({
             model={model}
             toolbar={
               <WorkbenchCanvasActions
-                blocksOpen={addNodeRequest != null}
+                pickerOpen={addNodeRequest != null}
                 disabled={!editable}
-                onOpenBlocks={() =>
+                onOpenNodePicker={() =>
                   setAddNodeRequest({
                     position: { x: 100, y: 100 },
                     onComplete: () => setAddNodeRequest(undefined),
