@@ -61,7 +61,9 @@ describe('Property panel port layout', () => {
     expect(markup).toContain('Input ports')
     expect(markup).toContain('data-layout="ports"')
     expect(markup).toContain('aria-label="Field name"')
-    expect(markup).toContain('aria-label="message type"')
+    const typeDisplay = (markup.match(/<span\b[^>]*>/g) ?? []).find((tag) => tag.includes('aria-label="message type: Text"'))
+    expect(typeDisplay).toContain('role="img"')
+    expect(typeDisplay).not.toContain('tabindex=')
     expect(markup).toContain('message Allow null')
   })
 
