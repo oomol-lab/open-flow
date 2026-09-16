@@ -19,7 +19,8 @@ production branch as `main`, the root directory as `/`, the build command as
 `bun run build:designer`, and the deploy command as
 `bunx wrangler deploy --config packages/open-flow/dev/designer/wrangler.jsonc`. Use
 `bunx wrangler versions upload --config packages/open-flow/dev/designer/wrangler.jsonc` for
-non-production branches.
+non-production branches. Set the build variable `BUN_VERSION` to the version in the root
+`packageManager` field.
 
 The default **Cards · Content & records** gallery uses the production card, execution status and record controls. It compares compact identity-only cards, plain text summaries and framed report previews, alongside schedule, condition, approval, running and failed examples. Empty content creates no placeholder. Execution status appears once in the footer; lightweight record actions open sample results and logs. Preview surfaces are distinct from the card shell in both themes.
 
