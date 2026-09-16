@@ -1,0 +1,15 @@
+{
+  "$schema": "../../../../node_modules/wrangler/config-schema.json",
+  "name": "open-flow-design",
+  "compatibility_date": "2026-09-16",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+  },
+  "routes": [
+    {
+      "pattern": "design.openflow.run",
+      "custom_domain": true,
+    },
+  ],
+}

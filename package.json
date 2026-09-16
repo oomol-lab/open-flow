@@ -9,14 +9,17 @@
     "apps/*"
   ],
   "devDependencies": {
-    "oxfmt": "^0.60.0"
+    "oxfmt": "^0.60.0",
+    "wrangler": "4.132.0"
   },
   "scripts": {
     "build": "bun run --workspaces --if-present build",
+    "build:designer": "bun run --filter @oomol-lab/open-flow designer:build",
     "check": "bun run format -- --check && bun run --workspaces --if-present check",
     "dev": "bun run dev:server",
     "dev:designer": "bun run --filter @oomol-lab/open-flow designer:dev",
     "dev:server": "bun run --cwd apps/server dev",
+    "deploy:designer": "bun run --filter @oomol-lab/open-flow designer:deploy",
     "format": "oxfmt .",
     "lint": "bun run --workspaces --if-present lint",
     "test": "bun run --workspaces --if-present test",

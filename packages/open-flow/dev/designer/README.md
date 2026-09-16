@@ -6,6 +6,21 @@ Run the local-only frontend component playground from the repository root:
 bun run dev:designer
 ```
 
+Build its static deployment or publish it to `design.openflow.run` with:
+
+```bash
+bun run build:designer
+bun run deploy:designer
+```
+
+Deployment uses Cloudflare Workers Static Assets and requires an authenticated Wrangler session.
+Production deployments use Cloudflare Workers Builds with the GitHub repository. Configure the
+production branch as `main`, the root directory as `/`, the build command as
+`bun run build:designer`, and the deploy command as
+`bunx wrangler deploy --config packages/open-flow/dev/designer/wrangler.jsonc`. Use
+`bunx wrangler versions upload --config packages/open-flow/dev/designer/wrangler.jsonc` for
+non-production branches.
+
 The default **Cards · Content & records** gallery uses the production card, execution status and record controls. It compares compact identity-only cards, plain text summaries and framed report previews, alongside schedule, condition, approval, running and failed examples. Empty content creates no placeholder. Execution status appears once in the footer; lightweight record actions open sample results and logs. Preview surfaces are distinct from the card shell in both themes.
 
 **Workflow components** shows the single execution canvas with a bottom command dock. It does not add an inspector or reserve a sidebar column. It includes Task, Trigger, Condition, Value, Subflow and Comment nodes, grouped inputs and connected ports. **Reset samples** restores the sample layout and selection.
@@ -28,7 +43,7 @@ Switch light/dark mode in the toolbar to review both themes. Story URLs are shar
 
 Canvas and product colors share `src/ui/browser/theme.css`. Edits update both previews through Vite.
 
-Add production node boundary cases to `nodeStories.tsx`, layered card examples to `cards.tsx`, individual component scenarios to `stories.tsx`, component overviews to `overview.tsx`, and full graph samples to `workflow.tsx`. Keep scenarios deterministic and use the action logger instead of external services. Component stories render inside a real flow node so canvas scaling and popup placement use the same context as the production canvas. Standalone stories provide their own layout; workflow samples use `FlowCanvasView` and log authoring actions without saving or running a Flow. The Lab is a development tool and has no production build or package entry.
+Add production node boundary cases to `nodeStories.tsx`, layered card examples to `cards.tsx`, individual component scenarios to `stories.tsx`, component overviews to `overview.tsx`, and full graph samples to `workflow.tsx`. Keep scenarios deterministic and use the action logger instead of external services. Component stories render inside a real flow node so canvas scaling and popup placement use the same context as the production canvas. Standalone stories provide their own layout; workflow samples use `FlowCanvasView` and log authoring actions without saving or running a Flow. The Lab is a development tool and has no package entry. Its production build exists only for the static design review deployment.
 
 **Run Inputs** (`?story=run-inputs`) exercises the production input form without a canvas provider. It covers required fields, open objects, arrays, enums, explicit null and invalid JSON drafts.
 
