@@ -61,7 +61,7 @@
     "format": "oxfmt README.md NOTICE src test scripts dev vitest.config.ts package.json tsconfig.json",
     "lint": "oxlint --deny-warnings src test scripts dev vitest.config.ts",
     "test": "bun run test:vitest",
-    "test:coverage": "vitest run --config vitest.config.ts --coverage src/flow/common test/designer/schema-compare.test.ts test/designer/schema-subset-comparer.test.ts test/flow-encoding.test.ts test/flow-semantics.test.ts test/provider-triggers.test.ts test/run-events.test.ts test/scheduler.test.ts",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage src test",
     "test:vitest": "vitest run --config vitest.config.ts src test",
     "test:package": "bun scripts/check-npm-package.ts",
     "generate:trigger-locales": "bun scripts/trigger-locales.ts",

@@ -233,6 +233,7 @@ function codeFlow(): RevisionContent {
           code: {
             inputs: {},
             kind: 'task',
+            name: 'Code',
             task: { inputs: [], moduleId: 'code', name: 'Code', outputs: [{ ...result, handle: 'result' }] },
           },
         },
