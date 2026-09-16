@@ -155,6 +155,8 @@
     "outline": "Список узлов",
     "backToOutline": "Вернуться к списку узлов",
     "emptyOutline": "Узлов пока нет",
+    "triggers": "Триггеры",
+    "nodes": "Узлы",
     "multipleSelected": "Выбрано узлов: {{count}}",
     "account": {
       "required": "Требуется подключение аккаунта",

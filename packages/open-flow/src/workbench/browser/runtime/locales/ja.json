@@ -155,6 +155,8 @@
     "outline": "ノード一覧",
     "backToOutline": "ノード一覧に戻る",
     "emptyOutline": "ノードはまだありません",
+    "triggers": "トリガー",
+    "nodes": "ノード",
     "multipleSelected": "{{count}} 個のノードを選択中",
     "account": {
       "required": "アカウント接続が必要",

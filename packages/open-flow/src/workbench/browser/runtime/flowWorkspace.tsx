@@ -451,6 +451,7 @@ export function FlowEditor({
           <div hidden={contextPanelMode != 'inspector' || !flowSelected} className="h-full">
             <FlowNodeList
               key={JSON.stringify([flowId, target])}
+              groupTriggers
               nodes={designer.nodes}
               onFocusNode={focusNode}
               onSelect={selectOutlineNode}

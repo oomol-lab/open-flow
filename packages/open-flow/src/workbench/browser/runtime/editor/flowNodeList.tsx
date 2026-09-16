@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/
 import { Icon } from '../icons.tsx'
 
 interface FlowNodeListProps {
+  readonly groupTriggers?: boolean
   readonly onAdd?: () => void
   readonly nodes: readonly FlowCanvasViewNode[]
   readonly onFocusNode: (nodeId: string) => void
@@ -30,7 +31,7 @@ function FlowNodeRow({
   const [tooltipContainer, setTooltipContainer] = useState<HTMLDivElement | null>(null)
   const locateLabel = t('inspector.locateNode')
   return (
-    <div ref={setTooltipContainer} className="group/row flex min-w-0 items-center rounded-lg hover:bg-accent focus-within:bg-accent">
+    <div ref={setTooltipContainer} className="flex min-w-0 items-center rounded-lg hover:bg-accent focus-within:bg-accent">
       <Button
         className="h-auto min-w-0 flex-1 justify-start gap-2.5 rounded-lg bg-transparent px-2.5 py-2 text-left font-normal hover:bg-transparent dark:hover:bg-transparent"
         onClick={() => onSelect(node.id)}
@@ -47,7 +48,7 @@ function FlowNodeRow({
           render={
             <Button
               aria-label={locateLabel}
-              className="mr-1 opacity-0 transition-none hover:bg-transparent focus-visible:opacity-100 group-hover/row:opacity-100 dark:hover:bg-transparent"
+              className="mr-1 text-muted-foreground hover:bg-foreground/10 hover:text-foreground dark:hover:bg-foreground/10"
               onClick={() => onFocusNode(node.id)}
               size="icon-sm"
               type="button"
@@ -65,8 +66,20 @@ function FlowNodeRow({
   )
 }
 
-export function FlowNodeList({ nodes, onFocusNode, onSelect, onAdd }: FlowNodeListProps): ReactElement {
+function FlowNodeGrid({ nodes, onFocusNode, onSelect }: Omit<FlowNodeListProps, 'groupTriggers' | 'onAdd'>): ReactElement {
+  return (
+    <div className="flow-node-list-grid">
+      {nodes.map((node) => (
+        <FlowNodeRow key={node.id} node={node} onFocusNode={onFocusNode} onSelect={onSelect} />
+      ))}
+    </div>
+  )
+}
+
+export function FlowNodeList({ nodes, onFocusNode, onSelect, onAdd, groupTriggers = false }: FlowNodeListProps): ReactElement {
   const t = useTranslate()
+  const triggers = groupTriggers ? nodes.filter((node) => node.kind == 'trigger') : []
+  const otherNodes = groupTriggers ? nodes.filter((node) => node.kind != 'trigger') : nodes
   return (
     <ScrollArea className="h-full" autoHide="never" defer={false} tabIndex={-1}>
       {nodes.length == 0 ? (
@@ -79,10 +92,19 @@ export function FlowNodeList({ nodes, onFocusNode, onSelect, onAdd }: FlowNodeLi
           )}
         </div>
       ) : (
-        <div className="grid px-2 py-3">
-          {nodes.map((node) => (
-            <FlowNodeRow key={node.id} node={node} onFocusNode={onFocusNode} onSelect={onSelect} />
-          ))}
+        <div className="grid gap-3 px-2 py-3">
+          {triggers.length > 0 && (
+            <section>
+              <h3 className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">{t('inspector.triggers')}</h3>
+              <FlowNodeGrid nodes={triggers} onFocusNode={onFocusNode} onSelect={onSelect} />
+            </section>
+          )}
+          {otherNodes.length > 0 && (
+            <section>
+              {groupTriggers && <h3 className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">{t('inspector.nodes')}</h3>}
+              <FlowNodeGrid nodes={otherNodes} onFocusNode={onFocusNode} onSelect={onSelect} />
+            </section>
+          )}
         </div>
       )}
     </ScrollArea>

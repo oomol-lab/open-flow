@@ -155,6 +155,8 @@
     "outline": "節點大綱",
     "backToOutline": "返回節點大綱",
     "emptyOutline": "還沒有節點",
+    "triggers": "觸發器",
+    "nodes": "節點",
     "multipleSelected": "已選擇 {{count}} 個節點",
     "account": {
       "required": "待連線帳號",

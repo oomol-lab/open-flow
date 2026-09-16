@@ -155,6 +155,8 @@
     "outline": "Node outline",
     "backToOutline": "Back to node outline",
     "emptyOutline": "No nodes yet",
+    "triggers": "Triggers",
+    "nodes": "Nodes",
     "multipleSelected": "{{count}} nodes selected",
     "account": {
       "required": "Account connection required",

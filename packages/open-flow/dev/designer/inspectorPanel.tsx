@@ -1,4 +1,4 @@
-import type { FlowCanvasViewTaskNode } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
+import type { FlowCanvasViewTaskNode, FlowCanvasViewTriggerNode } from '../../src/canvas/browser/graph/FlowCanvas/model.ts'
 import type { RevisionContent } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
@@ -25,6 +25,15 @@ const reviewNode: FlowCanvasViewTaskNode = {
   position: { x: 60, y: 100 },
 }
 const providerNode: FlowCanvasViewTaskNode = { ...reviewNode, id: 'provider', title: 'Provider action', icon: initialsIcon('PA') }
+const triggerNode: FlowCanvasViewTriggerNode = {
+  id: 'trigger',
+  kind: 'trigger',
+  title: 'Manual trigger',
+  inputs: [],
+  outputs: [],
+  position: { x: 60, y: 20 },
+  presentation: { kind: 'manual', schedules: [] },
+}
 const content: RevisionContent = {
   modelVersion: 1,
   modules: { review: { name: 'Review', imports: [], source: 'export default () => ({ summary: "Ready for review" })' } },
@@ -51,7 +60,7 @@ function PanelStates({ dark }: { dark: boolean }) {
   const t = useTranslate()
   const [description, setDescription] = useState<string | undefined>('Review the current selection without losing the canvas context.')
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,520px),1fr))] gap-4">
       {(['empty', 'outline', 'single', 'multiple', 'returned'] as const).map((state) => {
         const outline = state === 'empty' || state === 'outline' || state === 'returned'
         return (
@@ -78,7 +87,8 @@ function PanelStates({ dark }: { dark: boolean }) {
               >
                 {outline ? (
                   <FlowNodeList
-                    nodes={state === 'empty' ? [] : [reviewNode, providerNode]}
+                    groupTriggers
+                    nodes={state === 'empty' ? [] : [triggerNode, reviewNode, providerNode]}
                     onSelect={() => {}}
                     onFocusNode={() => {}}
                     onAdd={state === 'empty' ? () => {} : undefined}

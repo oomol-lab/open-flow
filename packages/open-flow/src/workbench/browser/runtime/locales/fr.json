@@ -155,6 +155,8 @@
     "outline": "Liste des nœuds",
     "backToOutline": "Retour à la liste des nœuds",
     "emptyOutline": "Aucun nœud pour le moment",
+    "triggers": "Déclencheurs",
+    "nodes": "Nœuds",
     "multipleSelected": "{{count}} nœuds sélectionnés",
     "account": {
       "required": "Compte à connecter",

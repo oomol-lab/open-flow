@@ -155,6 +155,8 @@
     "outline": "노드 목록",
     "backToOutline": "노드 목록으로 돌아가기",
     "emptyOutline": "아직 노드가 없습니다",
+    "triggers": "트리거",
+    "nodes": "노드",
     "multipleSelected": "노드 {{count}}개 선택됨",
     "account": {
       "required": "계정 연결 필요",

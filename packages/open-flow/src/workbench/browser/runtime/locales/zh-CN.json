@@ -155,6 +155,8 @@
     "outline": "节点大纲",
     "backToOutline": "返回节点大纲",
     "emptyOutline": "还没有节点",
+    "triggers": "触发器",
+    "nodes": "节点",
     "multipleSelected": "已选择 {{count}} 个节点",
     "account": {
       "required": "待连接账号",
