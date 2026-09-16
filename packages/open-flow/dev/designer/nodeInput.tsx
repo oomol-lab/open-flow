@@ -46,7 +46,7 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
         nodeId: 'github',
         nodeName: 'GitHub issue',
         output: 'title',
-        valid: true,
+        check: { kind: 'available' as const },
       },
     ],
     groups: [
@@ -92,13 +92,16 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
           onValue={() => {}}
           onVariable={() => {}}
         />
-        <h3>Invalid sources · hover or focus the value</h3>
+        <h3>Invalid sources</h3>
         <div className="editor-context-panel grid grid-cols-2 gap-4">
           <NodeInputValue
             definition={{ ...definition, handle: 'invalidUpstream' }}
             value={undefined}
             connected
-            upstream={{ ...providerSource, current: providerSource.current.map((source) => Object.assign({}, source, { valid: false })) }}
+            upstream={{
+              ...providerSource,
+              current: providerSource.current.map((source) => Object.assign({}, source, { check: { kind: 'not-ready' as const } })),
+            }}
             variables={variables}
             disabled={false}
             onValue={() => {}}

@@ -44,13 +44,13 @@ function draft(): Draft {
 describe('Per-field input sources', () => {
   it('does no compatibility work until requested and caches each field independently', () => {
     const calculate = vi.spyOn(graph, 'availableOutputs')
-    const check = vi.spyOn(graph, 'inputSourceAvailable')
+    const check = vi.spyOn(graph, 'checkInputSources')
     try {
       const view = revisionView(draft())
       const query = view.inputSource({ kind: 'flow' }, 'task', 'input0')
       expect(calculate).not.toHaveBeenCalled()
       expect(check).not.toHaveBeenCalled()
-      expect(query.check()).toEqual([])
+      expect(query.check()).toEqual({ conflict: false, sources: [] })
       expect(check).not.toHaveBeenCalled()
       expect(query.candidates()).toEqual({ source: ['text'] })
       expect(calculate).toHaveBeenCalledTimes(1)
@@ -92,13 +92,13 @@ describe('Per-field input sources', () => {
     }
 
     const calculate = vi.spyOn(graph, 'availableOutputs')
-    const check = vi.spyOn(graph, 'inputSourceAvailable')
+    const check = vi.spyOn(graph, 'checkInputSources')
     try {
       const view = revisionView(source)
-      expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual([true])
-      expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual([true])
+      expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'available' }] })
+      expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'available' }] })
       expect(check).toHaveBeenCalledTimes(1)
-      expect(view.inputSource({ kind: 'flow' }, 'task', 'input1').check()).toEqual([false])
+      expect(view.inputSource({ kind: 'flow' }, 'task', 'input1').check()).toEqual({ conflict: false, sources: [{ kind: 'output-missing' }] })
       expect(calculate).not.toHaveBeenCalled()
       const changed: Draft = {
         ...source,
@@ -114,7 +114,10 @@ describe('Per-field input sources', () => {
         },
       }
 
-      expect(revisionView(changed).inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual([false])
+      expect(revisionView(changed).inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({
+        conflict: false,
+        sources: [{ kind: 'schema', mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' } }],
+      })
     } finally {
       calculate.mockRestore()
       check.mockRestore()
@@ -145,5 +148,73 @@ describe('Per-field input sources', () => {
       content: { ...source.content, document: { ...source.content.document, graph: { ...source.content.document.graph, edges: [] } } },
     }
     expect(revisionView(changed).inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({})
+  })
+
+  it('distinguishes a source that is not upstream from a schema mismatch', () => {
+    const base = draft()
+    const source: Draft = {
+      ...base,
+      content: {
+        ...base.content,
+        document: {
+          ...base.content.document,
+          graph: {
+            ...base.content.document.graph,
+            edges: [],
+            nodes: {
+              ...base.content.document.graph.nodes,
+              task: {
+                kind: 'task',
+                taskId: 'task',
+                inputs: { input0: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'text' }] } },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    expect(revisionView(source).inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'not-ready' }] })
+  })
+
+  it('reports sources that can provide values on the same execution path', () => {
+    const base = draft()
+    const source: Draft = {
+      ...base,
+      content: {
+        ...base.content,
+        document: {
+          ...base.content.document,
+          graph: {
+            edges: [
+              { source: 'source', target: 'task' },
+              { source: 'second', target: 'task' },
+            ],
+            nodes: {
+              ...base.content.document.graph.nodes,
+              second: { kind: 'value', inputs: {}, values: [{ handle: 'text', jsonSchema: { type: 'string' }, nullable: false, value: 'world' }] },
+              task: {
+                kind: 'task',
+                taskId: 'task',
+                inputs: {
+                  input0: {
+                    kind: 'sources',
+                    sources: [
+                      { kind: 'node', nodeId: 'source', output: 'text' },
+                      { kind: 'node', nodeId: 'second', output: 'text' },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    expect(revisionView(source).inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({
+      conflict: true,
+      sources: [{ kind: 'available' }, { kind: 'available' }],
+    })
   })
 })

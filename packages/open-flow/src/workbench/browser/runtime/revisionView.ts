@@ -1,3 +1,4 @@
+import type { InputSourcesCheck } from '../../../flow/common/graph.ts'
 import type {
   CodeModule,
   ConditionNode,
@@ -14,11 +15,11 @@ import type {
   WaitNode,
 } from './api.ts'
 
-import { availableOutputs, inputSourceAvailable } from '../../../flow/common/graph.ts'
+import { availableOutputs, checkInputSources } from '../../../flow/common/graph.ts'
 import { agentActions, codeActions } from '../../../flow/common/semantics.ts'
 
 export interface InputSourceQuery {
-  readonly check: () => readonly boolean[]
+  readonly check: () => InputSourcesCheck
   readonly candidates: () => Readonly<Record<string, readonly string[]>>
 }
 
@@ -92,10 +93,10 @@ export class RevisionView {
     const node = graph.nodes[nodeId]!
     const mapping = 'inputs' in node ? node.inputs[handle] : undefined
     const sources = mapping?.kind === 'sources' ? mapping.sources.filter((source) => source.kind === 'node') : []
-    let checks: readonly boolean[] | undefined
+    let checks: InputSourcesCheck | undefined = sources.length == 0 ? { conflict: false, sources: [] } : undefined
     let candidates: ReturnType<typeof availableOutputs> | undefined
     const query: InputSourceQuery = {
-      check: () => (checks ??= sources.map((source) => inputSourceAvailable(this.#document, graph, nodeId, handle, source))),
+      check: () => (checks ??= checkInputSources(this.#document, graph, nodeId, handle, sources)),
       candidates: () => (candidates ??= availableOutputs(this.#document, graph, nodeId, handle)),
     }
     if (queries == null) this.#inputSourcesByGraph.set(graph, (queries = new Map()))

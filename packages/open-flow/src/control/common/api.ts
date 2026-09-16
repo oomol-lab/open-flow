@@ -1,3 +1,4 @@
+import type { SchemaMismatch } from '../../flow/common/schema.ts'
 import type { CreateEventSource, UpdateEventSource, EventSource } from './eventSources.ts'
 
 import { decodeEventSource, decodeEventSources } from './eventSources.ts'
@@ -264,6 +265,7 @@ export interface Diagnostic {
   readonly column: number
   readonly line: number
   readonly message: string
+  readonly mismatch?: SchemaMismatch
   readonly path: string
   readonly values?: Readonly<Record<string, string | number>>
 }

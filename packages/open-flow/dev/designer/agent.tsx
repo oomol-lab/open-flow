@@ -83,7 +83,7 @@ function createSession(language: UiLanguage, log: LogAction) {
         modelVersion: 1,
         revisionDigest: revision().digest,
         revisionId: revision().revisionId,
-        valid: true,
+        check: { kind: 'available' },
         version: 1,
       })
     if (url.pathname === '/v1/connector/proxy/providers')

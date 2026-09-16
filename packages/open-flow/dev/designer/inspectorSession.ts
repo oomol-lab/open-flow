@@ -64,7 +64,7 @@ export function createInspectorSession(language: UiLanguage, log: LogAction, ini
         modelVersion: 1,
         revisionDigest: revision().digest,
         revisionId: revision().revisionId,
-        valid: true,
+        check: { kind: 'available' },
         version: 1,
       })
     throw new Error(`Unexpected inspector Lab request: ${url.pathname}`)

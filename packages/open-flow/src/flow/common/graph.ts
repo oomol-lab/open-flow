@@ -11,12 +11,28 @@ import type {
   RevisionContent,
   TriggerNode,
 } from './change.ts'
+import type { SchemaMismatch } from './schema.ts'
 import type { Diagnostic, SemanticClosure } from './semantics.ts'
 
 import { portsByHandle, validVariableName } from './change.ts'
-import { triggerPayloadSchema, schemaObject, schemaList, matchesSchema, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
-function graphDiagnostic(code: string, message: string, path: string, values?: Readonly<Record<string, string | number>>): Diagnostic {
-  return { code, column: 0, line: 1, message, path, ...(values == null ? {} : { values }) }
+import {
+  triggerPayloadSchema,
+  schemaObject,
+  schemaList,
+  matchesSchema,
+  comparePorts,
+  portsAssignable,
+  variableInputCompatible,
+  hasRetiredRef,
+} from './schema.ts'
+function graphDiagnostic(
+  code: string,
+  message: string,
+  path: string,
+  values?: Readonly<Record<string, string | number>>,
+  mismatch?: SchemaMismatch,
+): Diagnostic {
+  return { code, column: 0, line: 1, message, mismatch, path, ...(values == null ? {} : { values }) }
 }
 
 function validateTrigger(triggerId: string, trigger: TriggerNode, document: FlowDocument, path: string, diagnostics: Diagnostic[]): void {
@@ -181,12 +197,19 @@ function checkSource(
             variant: 'flow-input',
           }),
         )
-      } else if (targetInput != null && !portsAssignable(input, targetInput)) {
-        diagnostics.push(
-          graphDiagnostic('graph.flow-input-incompatible', `Flow input "${source.input}" is not compatible with this input.`, path, {
-            input: source.input,
-          }),
-        )
+      } else if (targetInput != null) {
+        const comparison = comparePorts(input, targetInput)
+        if (comparison.kind != 'compatible') {
+          diagnostics.push(
+            graphDiagnostic(
+              'graph.flow-input-incompatible',
+              `Flow input "${source.input}" is not compatible with this input.`,
+              path,
+              { input: source.input },
+              comparison.kind == 'incompatible' ? comparison.mismatch : undefined,
+            ),
+          )
+        }
       }
       return input
     }
@@ -210,15 +233,19 @@ function checkSource(
             variant: 'output',
           }),
         )
-      } else if (targetInput != null && !portsAssignable(output, targetInput)) {
-        diagnostics.push(
-          graphDiagnostic(
-            'graph.node-output-incompatible',
-            `Upstream node "${source.nodeId}" output "${source.output}" is not compatible with this input.`,
-            path,
-            { nodeId: source.nodeId, output: source.output },
-          ),
-        )
+      } else if (targetInput != null) {
+        const comparison = comparePorts(output, targetInput)
+        if (comparison.kind != 'compatible') {
+          diagnostics.push(
+            graphDiagnostic(
+              'graph.node-output-incompatible',
+              `Upstream node "${source.nodeId}" output "${source.output}" is not compatible with this input.`,
+              path,
+              { nodeId: source.nodeId, output: source.output },
+              comparison.kind == 'incompatible' ? comparison.mismatch : undefined,
+            ),
+          )
+        }
       }
       return output
     }
@@ -357,26 +384,56 @@ function mappingAvailable(graph: Graph, target: string | undefined, mapping: Inp
   return true
 }
 
+export type InputSourceCheck =
+  | { readonly kind: 'available' }
+  | { readonly kind: 'source-missing' }
+  | { readonly kind: 'output-missing' }
+  | { readonly kind: 'not-ready' }
+  | { readonly kind: 'schema'; readonly mismatch: SchemaMismatch }
+  | { readonly kind: 'schema-error' }
+
+export interface InputSourcesCheck {
+  readonly conflict: boolean
+  readonly sources: readonly InputSourceCheck[]
+}
+
 /** Check one saved binding without enumerating candidate ports. */
-export function inputSourceAvailable(
+export function checkInputSource(
   document: FlowDocument,
   graph: Graph,
   target: string,
   handle: string,
   source: { nodeId: string; output: string },
-): boolean {
+): InputSourceCheck {
   const node = graph.nodes[source.nodeId]
   const targetNode = graph.nodes[target]
-  if (node == null || targetNode == null) return false
+  if (node == null) return { kind: 'source-missing' }
+  if (targetNode == null) return { kind: 'not-ready' }
   const output = nodeOutputPorts(document, node)[source.output]
   const input = nodeInputPorts(document, targetNode)[handle]
-  if (output == null || input == null) return false
+  if (output == null) return { kind: 'output-missing' }
+  if (input == null) return { kind: 'not-ready' }
   const analysis = graphPaths(graph)
-  return (
-    analysis.ancestors.get(target)?.has(source.nodeId) === true &&
-    mappingAvailable(graph, target, { kind: 'sources', sources: [{ kind: 'node', ...source }] }, analysis) &&
-    portsAssignable(output, input)
-  )
+  if (analysis.ancestors.get(target)?.has(source.nodeId) !== true) return { kind: 'not-ready' }
+  if (node.kind == 'wait' && source.output != 'notification' && !analysis.resolvedWaits.get(target)?.has(source.nodeId)) return { kind: 'not-ready' }
+  const result = comparePorts(output, input)
+  if (result.kind == 'compatible') return { kind: 'available' }
+  return result.kind == 'incompatible' ? { kind: 'schema', mismatch: result.mismatch } : { kind: 'schema-error' }
+}
+
+export function checkInputSources(
+  document: FlowDocument,
+  graph: Graph,
+  target: string,
+  handle: string,
+  sources: readonly { readonly nodeId: string; readonly output: string }[],
+): InputSourcesCheck {
+  const checks = sources.map((source) => checkInputSource(document, graph, target, handle, source))
+  const conflict =
+    checks.length > 1 &&
+    checks.every((check) => check.kind == 'available') &&
+    !mappingAvailable(graph, target, { kind: 'sources', sources: sources.map((source) => ({ kind: 'node', ...source })) }, graphPaths(graph))
+  return { conflict, sources: checks }
 }
 
 export function availableOutputs(document: FlowDocument, graph: Graph, target: string, handle?: string): Readonly<Record<string, readonly string[]>> {
@@ -616,13 +673,15 @@ export function validateFlowGraph(revision: RevisionContent, closure: SemanticCl
       }
       for (const source of output.sources) {
         const sourcePort = checkSource(source, subflow.graph, revision.document, inputs, undefined, `${path}/outputs/${output.handle}/sources`, diagnostics)
-        if (sourcePort != null && !portsAssignable(sourcePort, output)) {
+        const comparison = sourcePort == null ? undefined : comparePorts(sourcePort, output)
+        if (comparison != null && comparison.kind != 'compatible') {
           diagnostics.push(
             graphDiagnostic(
               'graph.subflow-output-incompatible',
               `A source is not compatible with Subflow output "${output.handle}".`,
               `${path}/outputs/${output.handle}/sources`,
               { output: output.handle },
+              comparison.kind == 'incompatible' ? comparison.mismatch : undefined,
             ),
           )
         }

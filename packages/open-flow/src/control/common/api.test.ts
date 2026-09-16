@@ -101,6 +101,7 @@ describe('ControlClient Flow API', () => {
           column: 0,
           line: 1,
           message: 'Task "missing" does not exist.',
+          mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' },
           path: '/document/graph/nodes/task/taskId',
           values: { taskId: 'missing', variant: 'task' },
         },
