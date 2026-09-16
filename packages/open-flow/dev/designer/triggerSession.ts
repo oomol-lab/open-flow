@@ -86,7 +86,7 @@ export function createTriggerSession(
       return Response.json({
         closureDigest: 'lab',
         diagnostics: [],
-        engineContract: 'open-flow-engine/v3',
+        engineContract: 'open-flow-engine/v4',
         flowId: flow.flowId,
         modelVersion: 1,
         revisionDigest: revision().digest,

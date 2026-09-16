@@ -280,7 +280,7 @@ it('does not treat eventual action values as available on the notification path'
   expect(availableOutputs(content.document, graph, 'notify')).toEqual({ start: ['payload'], wait: ['notification'] })
 })
 
-it.each([true, false])('runs with an available nullable source or skips a missing branch source: %s', async (takeSource) => {
+it.each([true, false])('runs with null from either an available nullable source or a missing branch source: %s', async (takeSource) => {
   const prepared = await prepareFlow(
     revision({
       nodes: {
@@ -333,11 +333,23 @@ it.each([true, false])('runs with an available nullable source or skips a missin
   }
   const first = await advanceWaiting(runFlow(prepared.flow, { ...options, trigger: { nodeId: 'start', payload: null } }))
   if (first.kind != 'waiting') throw new Error('Expected waiting')
-  expect(calls.map((call) => call.nodeId).toSorted()).toEqual(takeSource ? ['after', 'independent', 'join'] : ['independent'])
-  if (takeSource) expect(calls.find((call) => call.nodeId == 'join')?.input).toEqual({ input: null })
-  else {
-    expect(first.checkpoint.skipped).toEqual(expect.arrayContaining(['source', 'join', 'after']))
-    expect(logs).toEqual(['Node skipped because an input source did not produce a value on this execution path.'])
+  expect(calls.map((call) => call.nodeId).toSorted()).toEqual(['after', 'independent', 'join'])
+  expect(calls.find((call) => call.nodeId == 'join')?.input).toEqual({ input: null })
+  expect(first.checkpoint.skipped).not.toContain('join')
+  expect(logs).toEqual([])
+  if (takeSource) {
+    const checkpoint = structuredClone(first.checkpoint)
+    const result = checkpoint.results.source!
+    const incomplete = { ...checkpoint, results: { ...checkpoint.results, source: { ...result, outputs: {} } } }
+    await expect(
+      Effect.runPromise(
+        runFlow(prepared.flow, {
+          ...options,
+          resume: { checkpoint: incomplete },
+          waits: waitHost({ [first.checkpoint.waits[0]!.waitId]: 'continue' }),
+        }),
+      ),
+    ).rejects.toThrow('Checkpoint node outputs are incomplete')
   }
   calls.length = 0
   const resumed = await Effect.runPromise(
@@ -351,7 +363,7 @@ it.each([true, false])('runs with an available nullable source or skips a missin
   expect(calls).toEqual([])
 })
 
-it('skips a shared descendant when its only input source belongs to another trigger', async () => {
+it('runs a shared descendant with null when its only input source belongs to another trigger', async () => {
   const content = revision({
     nodes: {
       first: { kind: 'manual', name: 'First' },
@@ -382,5 +394,5 @@ it('skips a shared descendant when its only input source belongs to another trig
     }),
   )
   expect(result.kind).toBe('node-results')
-  expect(invoked).toBe(false)
+  expect(invoked).toBe(true)
 })

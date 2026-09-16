@@ -165,8 +165,8 @@ Value Node 没有数据输入端口。解码时将其 `inputs` 统一归一化�
 `inputs[handle]` 使用 `{ kind: 'value', value }` 或 `{ kind: 'sources', sources }`。Node source 使用
 `{ kind: 'node', nodeId, output }`；Flow input 与 Variable binding 的 source 形式保持不变。Node source 必须指向经执行边可达的祖先，
 不要求覆盖目标的每一条执行路径。多个 source 必须互斥，不能在同一路径同时产生多个值；并行前驱的两个结果不能合并到同一个 input。
-来源尚未确定时等待；任一输入的所有来源确定不会产生值时跳过该节点，并传播普通分支关闭状态、记录跳过原因日志。`nullable` 不会把缺失来源转换为 `null`；实际输出 `null` 仍算一个已提供的值。
-Subflow 的最终输出仍须完整覆盖其返回路径；本规则仅放宽节点输入的路径覆盖。
+调度仅依据执行连线及分支状态；输入来源缺失不导致跳过。零个可用来源补 `null`，一个来源取其值，多个来源报错；实际输出 `null` 仍算一个已提供的值。收集后按端口声明校验，失败则报错。
+Subflow 的最终输出采用相同规则，来源可以不覆盖所有返回路径。
 `graph.edge.connect` 与 `graph.edge.disconnect` 只修改执行边，`graph.node.input.set` 独立修改数据映射。节点不保存 `concurrency`。
 
 CLI 分开设置执行顺序与输入来源：
@@ -203,7 +203,7 @@ interface FlowCheck {
 }
 ```
 
-Check body 是 `{ engineContract: 'open-flow-engine/v3', version: 1 }`，始终验证 path 中固定的 Flow Revision。
+Check body 是 `{ engineContract: 'open-flow-engine/v4', version: 1 }`，始终验证 path 中固定的 Flow Revision。
 `message` 是稳定的 canonical English fallback；Workbench 可以使用 `code`、可选 `values.variant` 和其余 `values` 显示本地化文案，未知 code 或 variant
 必须回退到 `message`。
 
@@ -329,7 +329,7 @@ Draft Run body 是 `{ engineContract, inputs, trigger, version: 1 }`。Live Run 
 `trigger` 必填，形如 `{ nodeId: string, payload: JsonValue }`，固定本次运行的起始 Trigger 和输入。缺少入口、入口不是固定 Revision 中的 Trigger，或 payload 不符合其 schema 时返回 `run.invalid`。入口及 payload 参与幂等 request digest，并随 Run 持久化；不会自动选择入口或退回整图运行。
 
 Draft Run 只对选中 Trigger 沿执行边可达的节点及其依赖进行语义校验、能力检查和 Variable 准入检查。其他分支的未配置 Trigger、无效代码和缺失资源仍出现在全图 check 中，但不阻断此次测试。
-共享下游输入的多来源映射忽略本次不可达的已有节点来源；剩余来源在本次路径有值时执行，确定缺失时跳过目标节点；不能同时提供多个值。缺失节点引用、选中分支内的环、无效代码及实际使用的 Subflow 错误仍返回 `flow.invalid`。
+共享下游输入的多来源映射忽略本次不可达的已有节点来源；剩余来源缺失时补 `null` 并校验，不影响执行边调度；不能同时提供多个值。缺失节点引用、选中分支内的环、无效代码及实际使用的 Subflow 错误仍返回 `flow.invalid`。
 Draft Run 的 `revisionDigest` 标识完整 Revision，`closureDigest` 标识本次入口的执行 closure，可以与全图 check 的 `closureDigest` 不同。读取和恢复 Run 不修改原 Revision。
 Publish 和 Live Run 保持完整 Flow 校验。
 
@@ -696,6 +696,8 @@ remainingMs 必须为正且不得超过原上限。总 JSON 大小不得超过 1
 恢复必须验证精确字段、节点状态不冲突、结果符合声明、依赖完整且符合分支选择；当前 Wait 不能已经完成或跳过。
 
 未进入执行路径的节点不创建 job 或 execution identity，也不产生节点事件；分支跳过状态只用于内部调度和 checkpoint 恢复。
+普通 Task 已声明但缺失或为 `undefined` 的 output 补为 `null`；整个返回值为 `undefined` 时按空对象处理，显式非对象返回值仍非法。端口内部的数据不递归归一化，Condition、Wait 未选中的分支端口保持缺失。
+Runtime 在 JSON 传输前校验并复制返回数据；仅允许整个返回值及顶层端口的 `undefined`，拒绝函数、Symbol、BigInt、非有限数字、循环引用、非普通对象及端口内部的 `undefined` 或稀疏数组。传输不调用返回对象的 `toJSON`，不依赖 JSON 序列化静默丢弃或转换非法值。
 `node.completed` 仅在节点完整 output 校验成功后产生，payload 的 `outputs` 是按 handle 索引的完整最终结果对象，无输出时为 `{}`。
 每次节点 invocation 只产生一条完成事件，且先于下游节点的 `node.started`；不再产生逐 handle 的 `node.output`，普通 Task 不支持运行中的中间 output。Wait 的 notification 出口在登记后可用，Wait 本身仍只在决议后完成一次。
 
@@ -704,7 +706,7 @@ Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保�
 
 ## 10. Code Action 合同
 
-当前脚本合同为 `open-flow-engine/v3`。它用 `context.actions` 替代 v1 的 `context.connector`，不提供旧名转发；
+当前脚本合同为 `open-flow-engine/v4`。它用 `context.actions` 替代 v1 的 `context.connector`，不提供旧名转发；
 固定为 v1 的 Publication / Run 必须由相应 Engine 执行，当前 Server 对 v1 明确返回不支持。
 升级已有 Code Task 时，将单账号 capability 改为以下允许集合，并更新源码后创建 v2 Publication。
 

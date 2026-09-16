@@ -7,6 +7,35 @@ export { currentEngineContract, nodejsEngineContract, findEngineContract, type E
 
 export type RuntimeModule = Pick<CodeModule, 'imports' | 'source'>
 
+/** Snapshot a Task result before JSON transport can discard or coerce invalid values. */
+export function snapshotRuntimeResult(value: unknown): JsonValue | undefined {
+  // This function is also serialized into the isolated runtime; keep it self-contained.
+  const parents = new Set<object>()
+  const copy = (item: unknown, depth: number): JsonValue => {
+    if (depth > 64) throw new Error('Task result exceeds the maximum JSON depth.')
+    if (item === null || typeof item == 'string' || typeof item == 'boolean') return item
+    if (typeof item == 'number' && Number.isFinite(item)) return item
+    if (
+      typeof item != 'object' ||
+      parents.has(item) ||
+      (!Array.isArray(item) && Object.getPrototypeOf(item) !== Object.prototype && Object.getPrototypeOf(item) !== null) ||
+      Object.getOwnPropertySymbols(item).length > 0
+    )
+      throw new Error('Task result must contain only JSON values.')
+    parents.add(item)
+    const result = Array.isArray(item)
+      ? Array.from(item, (child) => copy(child, depth + 1))
+      : Object.fromEntries(
+          Object.entries(item)
+            .filter(([, child]) => depth != 0 || child !== undefined)
+            .map(([key, child]) => [key, copy(child, depth + 1)]),
+        )
+    parents.delete(item)
+    return result
+  }
+  return value === undefined ? undefined : copy(value, 0)
+}
+
 export const nodejsRuntimeConformanceCases: readonly RuntimeConformanceCase[] = [
   {
     name: 'supports Node builtin imports and asynchronous virtual file operations',
@@ -165,6 +194,55 @@ async function rejects(operation: Promise<unknown>, pattern: RegExp, message: st
 }
 
 export const runtimeConformanceCases: readonly RuntimeConformanceCase[] = [
+  {
+    name: 'rejects Task results that JSON transport would discard or coerce',
+    async verify(harness) {
+      for (const expression of [
+        '{ value: () => 42 }',
+        '{ value: Symbol("value") }',
+        '{ value: NaN }',
+        '{ value: Infinity }',
+        '{ value: 1n }',
+        '{ value: { nested: undefined } }',
+        '{ value: [undefined] }',
+        '{ value: Array(1) }',
+        '{ value: new Date() }',
+        '{ value: { toJSON() { return "hidden" } } }',
+        '{ [Symbol("key")]: 1 }',
+        '(() => { const value = {}; value.self = value; return { value } })()',
+      ]) {
+        await rejects(
+          harness.invoke({
+            capability: async () => ({ body: null, status: 200 }),
+            input: null,
+            invocationId: 'invalid-task-result',
+            program: program(harness, `export default () => (${expression})`),
+          }),
+          /Task result must contain only JSON values/,
+          `Invalid Task result: ${expression}`,
+        )
+      }
+    },
+  },
+  {
+    name: 'snapshots JSON results while preserving missing ports and shared values',
+    async verify(harness) {
+      const value = await harness.invoke({
+        capability: async () => ({ body: null, status: 200 }),
+        input: null,
+        invocationId: 'json-task-result',
+        program: program(
+          harness,
+          `export default () => {
+            const shared = { text: 'hello', values: [1, true, null] };
+            return { missing: undefined, nullable: null, first: shared, second: shared };
+          }`,
+        ),
+      })
+      const shared = { text: 'hello', values: [1, true, null] }
+      equal(value, { nullable: null, first: shared, second: shared }, 'JSON Task result')
+    },
+  },
   {
     name: 'preserves Action error codes and fixed per-call Connection selection',
     async verify(harness) {

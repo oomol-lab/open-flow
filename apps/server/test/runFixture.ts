@@ -63,7 +63,7 @@ export async function acceptRun(service: ServerService, input: Input): Promise<R
     const accepted = await service.control.runs.createDraftRun(
       stored.flowId,
       stored.revisionId,
-      'open-flow-engine/v3',
+      'open-flow-engine/v4',
       input.inputs ?? {},
       input.idempotencyKey,
       {

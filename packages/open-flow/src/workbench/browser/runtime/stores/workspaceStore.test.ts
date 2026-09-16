@@ -86,7 +86,7 @@ describe('WorkspaceStore', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v3',
+          engineContract: 'open-flow-engine/v4',
           flowId: flow.flowId,
           modelVersion: 1,
           revisionDigest: 'digest-2',
@@ -326,7 +326,7 @@ describe('WorkspaceStore', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v3',
+          engineContract: 'open-flow-engine/v4',
           flowId: flow.flowId,
           modelVersion: 1,
           revisionDigest: path.includes('revision-2') ? 'digest-2' : sourceDraft.digest,
@@ -430,7 +430,7 @@ describe('WorkspaceStore', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v3',
+          engineContract: 'open-flow-engine/v4',
           flowId: flow.flowId,
           modelVersion: 1,
           revisionDigest: revisionId.replace('revision', 'digest'),
@@ -472,7 +472,7 @@ describe('WorkspaceStore', () => {
       actorId: 'actor-1',
       closureDigest: 'closure-1',
       createdAt: timestamp,
-      engineContract: 'open-flow-engine/v3',
+      engineContract: 'open-flow-engine/v4',
       flowId: flow.flowId,
       modelVersion: 1,
       operation: 'publish',
@@ -607,7 +607,7 @@ describe('WorkspaceStore', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v3',
+          engineContract: 'open-flow-engine/v4',
           flowId: flow.flowId,
           modelVersion: 1,
           revisionDigest: draft.digest,
@@ -650,7 +650,7 @@ function checked(revisionId: string): Response {
   return Response.json({
     closureDigest: `closure-${revisionId}`,
     diagnostics: [],
-    engineContract: 'open-flow-engine/v3',
+    engineContract: 'open-flow-engine/v4',
     flowId: flow.flowId,
     modelVersion: 1,
     revisionDigest: `digest-${revisionId}`,
@@ -848,7 +848,7 @@ it.each(['unchanged', 'resolved', 'failed'] as const)('retains diagnostics throu
   const check = (revisionId: string, diagnostics = [diagnostic]) => ({
     closureDigest: `closure-${revisionId}`,
     diagnostics,
-    engineContract: 'open-flow-engine/v3',
+    engineContract: 'open-flow-engine/v4',
     flowId: flow.flowId,
     modelVersion: 1,
     revisionDigest: `digest-${revisionId}`,

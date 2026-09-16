@@ -17,7 +17,7 @@ const details = {
   ...run,
   waits: [],
   closureDigest: 'closure-1',
-  engineContract: 'open-flow-engine/v3',
+  engineContract: 'open-flow-engine/v4',
   engineDigest: 'engine-1',
   modelVersion: 1,
   revisionDigest: 'digest-1',

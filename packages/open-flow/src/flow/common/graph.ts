@@ -325,22 +325,6 @@ function sourcePaths(graph: Graph, paths: ReturnType<typeof graphPaths>['paths']
     : routes
 }
 
-function covers(routes: readonly Route[], target: Route, graph: Graph): boolean {
-  const possible = routes.filter((route) => routesCompatible(route, target))
-  if (possible.some((route) => routeCovers(route, target))) return true
-  const key = possible.flatMap((route) => Object.keys(route)).find((candidate) => target[candidate] == null)
-  if (key == null) return false
-  const node = graph.nodes[key]
-  // The empty choice represents a branch with no emitted output or no selected trigger.
-  const choices =
-    node?.kind == 'condition'
-      ? [...node.cases.map((item) => item.output), node.defaultOutput ?? '']
-      : node?.kind == 'wait'
-        ? node.actions
-        : ['', ...Object.keys(graph.nodes).filter((id) => !('inputs' in graph.nodes[id]!))]
-  return choices.every((value) => covers(possible, { ...target, [key]: value }, graph))
-}
-
 function mappingAvailable(graph: Graph, target: string | undefined, mapping: InputMapping, analysis: ReturnType<typeof graphPaths>): boolean {
   if (mapping.kind == 'value') return true
   const { ancestors, paths } = analysis
@@ -358,8 +342,7 @@ function mappingAvailable(graph: Graph, target: string | undefined, mapping: Inp
     return false
   const sources = mapping.sources.map((source) => sourcePaths(graph, paths, source))
   const targetPaths = target == null ? [{}] : (paths.get(target) ?? [])
-  if (target == null && !targetPaths.every((route) => covers(sources.flat(), route, graph))) return false
-  // Available sources must cover every target path and never overlap on the same path.
+  // Sources may be absent, but must never overlap on the same execution path.
   for (const [index, routes] of sources.entries()) {
     for (const other of sources.slice(index + 1)) {
       for (const left of routes) {
@@ -626,7 +609,7 @@ export function validateFlowGraph(revision: RevisionContent, closure: SemanticCl
         diagnostics.push(
           graphDiagnostic(
             'graph.source-unavailable',
-            'Subflow output sources must provide exactly one final value.',
+            'Subflow output sources must not provide multiple final values.',
             `${path}/outputs/${output.handle}/sources`,
           ),
         )

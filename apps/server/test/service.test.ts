@@ -391,13 +391,13 @@ describe('Server application service', () => {
       },
     ])
     const revisionId = changed.revision.revisionId
-    expect((await service.control.checkFlow(stored.flowId, revisionId, 'open-flow-engine/v3')).valid).toBe(false)
-    const accepted = await service.control.runs.createDraftRun(stored.flowId, revisionId, 'open-flow-engine/v3', {}, 'partial-run', {
+    expect((await service.control.checkFlow(stored.flowId, revisionId, 'open-flow-engine/v4')).valid).toBe(false)
+    const accepted = await service.control.runs.createDraftRun(stored.flowId, revisionId, 'open-flow-engine/v4', {}, 'partial-run', {
       nodeId: 'start',
       payload: {},
     })
     await expect(
-      service.control.runs.createDraftRun(stored.flowId, revisionId, 'open-flow-engine/v3', {}, 'invalid-entry', { nodeId: 'other', payload: {} }),
+      service.control.runs.createDraftRun(stored.flowId, revisionId, 'open-flow-engine/v4', {}, 'invalid-entry', { nodeId: 'other', payload: {} }),
     ).rejects.toMatchObject({ code: 'flow.invalid' })
     await closeService(service)
     service = await openService(file)
@@ -1291,7 +1291,7 @@ describe('Server application service', () => {
     const unavailable = await openService(await databaseFile())
     const stored = await storeRevision(unavailable, llmFlow(), 'llm-check-unavailable')
 
-    expect(await unavailable.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v3')).toMatchObject({
+    expect(await unavailable.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v4')).toMatchObject({
       diagnostics: [
         {
           code: 'llm.unconfigured',
@@ -1308,7 +1308,7 @@ describe('Server application service', () => {
     })
     const configuredStored = await storeRevision(configured, llmFlow(), 'llm-check-configured')
 
-    expect(await configured.control.checkFlow(configuredStored.flowId, configuredStored.revisionId, 'open-flow-engine/v3')).toMatchObject({
+    expect(await configured.control.checkFlow(configuredStored.flowId, configuredStored.revisionId, 'open-flow-engine/v4')).toMatchObject({
       diagnostics: [],
       valid: true,
     })
@@ -1333,7 +1333,7 @@ describe('Server application service', () => {
         }),
         revision.revisionId,
       )
-      await expect(service.control.checkFlow(revision.flowId, revision.revisionId, 'open-flow-engine/v3')).rejects.toMatchObject({
+      await expect(service.control.checkFlow(revision.flowId, revision.revisionId, 'open-flow-engine/v4')).rejects.toMatchObject({
         code: controlErrorCode.flowInvalid,
         status: 400,
       })
@@ -1347,9 +1347,9 @@ describe('Server application service', () => {
     const service = await openService(await databaseFile(), { capabilities: { llm: () => llm }, clock: Date.now })
     const stored = await storeRevision(service, llmFlow(), 'llm-current')
 
-    expect(await service.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v3')).toMatchObject({ valid: false })
+    expect(await service.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v4')).toMatchObject({ valid: false })
     llm = async () => ({ kind: 'completed', value: { answer: 'current' }, version: 1 })
-    expect(await service.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v3')).toMatchObject({ diagnostics: [], valid: true })
+    expect(await service.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v4')).toMatchObject({ diagnostics: [], valid: true })
 
     await startService(service)
     const accepted = await acceptRun(service, { flowId: 'main', idempotencyKey: 'llm-current', revision: llmFlow(), revisionId: 'llm-current' })
@@ -1395,7 +1395,7 @@ describe('Server application service', () => {
       'llm-check-unreferenced',
     )
 
-    expect(await unavailable.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v3')).toMatchObject({
+    expect(await unavailable.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v4')).toMatchObject({
       diagnostics: [],
       valid: true,
     })

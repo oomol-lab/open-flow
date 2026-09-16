@@ -16,7 +16,7 @@ afterAll(async () => await host.close())
 
 function program(source: string): RuntimeProgram {
   return {
-    engineContract: 'open-flow-engine/v3',
+    engineContract: 'open-flow-engine/v4',
     engineDigest: isolatedVmEngineDigest,
     entryModuleId: 'main',
     modules: { main: { imports: [], source } },
@@ -40,6 +40,14 @@ async function executorPid(): Promise<number> {
 }
 
 describe('isolated-vm runtime conformance', () => {
+  it.each(['return {}', 'return { result: undefined }', 'return { result: null }', 'return undefined'])(
+    'transports nullable output candidates for Scheduler normalization: %s',
+    async (body) => {
+      const result = await invoke(`export default () => { ${body} }`)
+      expect(result).toEqual(body.includes('null') ? { result: null } : body == 'return undefined' ? undefined : {})
+    },
+  )
+
   it('preserves catchable Action codes and does not let a caught error replace a later failure', async () => {
     const invocation = {
       capabilities: [{ kind: 'connector' as const, action: 'example.echo', connections: [] }],

@@ -85,31 +85,6 @@ export interface FlowRunResult {
   }[]
 }
 
-function inputSourceState(
-  node: ExecutableNode,
-  settled: (id: string) => boolean,
-  outputs: (id: string) => Readonly<Record<string, JsonValue>> | undefined,
-): 'ready' | 'pending' | 'missing' {
-  let pending = false
-  for (const mapping of Object.values(node.inputs)) {
-    if (mapping.kind != 'sources') continue
-    let available = false
-    let unresolved = false
-    for (const source of mapping.sources) {
-      if (source.kind != 'node') {
-        available = true
-        continue
-      }
-      const values = outputs(source.nodeId)
-      if (values != null && Object.hasOwn(values, source.output)) available = true
-      else if (!settled(source.nodeId)) unresolved = true
-    }
-    if (!available && !unresolved) return 'missing'
-    pending ||= unresolved
-  }
-  return pending ? 'pending' : 'ready'
-}
-
 function usesNotification(graph: Graph, nodeId: string): boolean {
   return (
     graph.edges.some((edge) => edge.source == nodeId && edge.sourceHandle == 'notification') ||
@@ -535,7 +510,7 @@ function agentApproval(config: AgentConfig, checkpoint: AgentCheckpoint, inputs:
 }
 
 function validateOutputs(prepared: PreparedFlow, nodeId: string, node: ExecutableNode, value: unknown): Readonly<Record<string, JsonValue>> {
-  const outputs = outputRecord(checkpointJson(value === undefined ? {} : value, `Node "${nodeId}" outputs`), nodeId)
+  const raw = outputRecord(value, nodeId)
   const discardUndeclared = node.kind == 'task' && node.taskId != null && prepared.tasks[node.taskId]!.executor.kind == 'connector'
   const ports =
     node.kind == 'wait'
@@ -549,8 +524,17 @@ function validateOutputs(prepared: PreparedFlow, nodeId: string, node: Executabl
             : Object.fromEntries(
                 [...node.cases.map((item) => item.output), ...(node.defaultOutput == null ? [] : [node.defaultOutput])].map((handle) => [handle, node.input]),
               )
+  const outputs = outputRecord(
+    checkpointJson(
+      Object.fromEntries(Object.entries(raw).map(([handle, item]) => [handle, Object.hasOwn(ports, handle) && item === undefined ? null : item])),
+      `Node "${nodeId}" outputs`,
+    ),
+    nodeId,
+  )
+  const complete =
+    node.kind == 'condition' || node.kind == 'wait' ? outputs : { ...Object.fromEntries(Object.keys(ports).map((handle) => [handle, null])), ...outputs }
   const validated: Record<string, JsonValue> = {}
-  for (const [handle, output] of Object.entries(outputs)) {
+  for (const [handle, output] of Object.entries(complete)) {
     const port = ports[handle]
     if (port == null) {
       if (discardUndeclared) continue
@@ -559,9 +543,6 @@ function validateOutputs(prepared: PreparedFlow, nodeId: string, node: Executabl
     if (!(output === null && port.nullable) && !matchesSchema(output, port.jsonSchema))
       throw new Error(`Node "${nodeId}" output "${handle}" does not match its declaration.`)
     validated[handle] = output
-  }
-  if (node.kind != 'condition' && node.kind != 'wait') {
-    for (const handle of Object.keys(ports)) if (!Object.hasOwn(outputs, handle)) throw new Error(`Node "${nodeId}" did not return output "${handle}".`)
   }
   return validated
 }
@@ -604,17 +585,10 @@ function validateCheckpoint(
     const edges = incoming.get(id) ?? []
     if (!edges.every(edgeSettled)) throw new Error('Checkpoint node dependencies are incomplete.')
     const branchSelected = (edges.length == 0 && target.kind == 'subflow') || edges.some(selected)
-    const sourceState = inputSourceState(
-      node,
-      settled,
-      (source) => completed.get(source)?.outputs ?? (notifications.has(source) ? { notification: notifications.get(source)! } : undefined),
-    )
-    if (branchSelected && sourceState == 'pending') throw new Error('Checkpoint node input sources are incomplete.')
-    const runnable = branchSelected && sourceState == 'ready'
-    if (completed.has(id) != runnable) throw new Error('Checkpoint node state conflicts with its execution branches.')
+    if (completed.has(id) != branchSelected) throw new Error('Checkpoint node state conflicts with its execution branches.')
     const result = completed.get(id)
     if (result != null) {
-      validateOutputs(prepared, id, node, result.outputs)
+      if (!jsonEqual(validateOutputs(prepared, id, node, result.outputs), result.outputs)) throw new Error('Checkpoint node outputs are incomplete.')
       const count = Object.keys(result.outputs).length
       if (
         (node.kind == 'condition' && (count > 1 || (node.defaultOutput != null && count != 1))) ||
@@ -739,12 +713,11 @@ function runGraph(
               completed.get(source.nodeId)?.outputs ?? (notifications.has(source.nodeId) ? { notification: notifications.get(source.nodeId)! } : undefined)
             return outputs != null && Object.hasOwn(outputs, source.output) ? [outputs[source.output]!] : []
           })
-          if (values.length != 1) throw new Error(`${description} requires exactly one available source.`)
-          value = values[0]
+          if (values.length > 1) throw new Error(`${description} has multiple available sources.`)
+          value = values[0] ?? null
         }
-        if (value === undefined && port.nullable) value = null
-        if (value === undefined || (!(value === null && port.nullable) && !matchesSchema(value, port.jsonSchema)))
-          throw new Error(`${description} does not match its declared schema.`)
+        if (value === undefined) value = null
+        if (!(value === null && port.nullable) && !matchesSchema(value, port.jsonSchema)) throw new Error(`${description} does not match its declared schema.`)
         return value
       }
       const resolveInputs = (nodeId: string, node: ExecutableNode): Readonly<Record<string, JsonValue>> => {
@@ -938,27 +911,10 @@ function runGraph(
         const edges = incoming.get(nodeId) ?? []
         if (!edges.every(edgeSettled)) return
         const branchClosed = (edges.length == 0 && target.kind == 'flow') || (edges.length > 0 && !edges.some(selected))
-        const sourceState = branchClosed
-          ? 'missing'
-          : inputSourceState(
-              node,
-              settled,
-              (source) => completed.get(source)?.outputs ?? (notifications.has(source) ? { notification: notifications.get(source)! } : undefined),
-            )
-        if (sourceState == 'pending') return
-        if (sourceState == 'missing') {
+        if (branchClosed) {
           skipped.add(nodeId)
           runNode(
-            Effect.gen(function* () {
-              if (!branchClosed)
-                yield* context.emit({
-                  type: 'node.log',
-                  runId,
-                  nodeId,
-                  jobId: context.createId(),
-                  level: 'info',
-                  message: 'Node skipped because an input source did not produce a value on this execution path.',
-                })
+            Effect.sync(() => {
               for (const child of children.get(nodeId) ?? []) scheduleReady(child)
             }).pipe(
               Effect.tapCause((cause) =>

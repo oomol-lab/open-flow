@@ -8,7 +8,7 @@
 | Revision envelope | `kind: open-flow-flow-revision`、`version: 1` | 固定 UTF-8 JSON 信封字段和 canonical bytes 规则。                |
 | Flow model        | `modelVersion: 1`                             | 固定 document、modules、节点和端口的序列化结构。                 |
 | Control API       | `/v1`、JSON `version: 1`                      | 固定请求字段、响应、错误码、CAS 和幂等行为。                     |
-| Engine Contract   | `open-flow-engine/v3`                         | 固定执行、Trigger、Task 返回、Wait 和取消语义。                  |
+| Engine Contract   | `open-flow-engine/v4`                         | 固定执行、Trigger、Task 返回、Wait 和取消语义。                  |
 | MCP               | `2026-07-28`                                  | 固定 Streamable HTTP 协商；工具的产品语义复用 Control API。      |
 
 这些数字相同或不同都不表示兼容。旧版本也可能曾使用 `modelVersion: 1`；不得仅凭版本字段接受其内容。完整结构解码必须先于语义验证和执行。
@@ -45,7 +45,7 @@
 
 ## Wait 局部执行升级
 
-本次 beta 同步升级公共包、Command、Server，Engine 为 v3、checkpoint 为 version 3。Control API 保留 /v1 信封，详情改为必需 waits 数组，新增 wait.created，run.waiting 改为 waitIds；这些是本次 beta 的显式不兼容变更，客户端和部署须一起升级。
+Wait 局部执行在此前 beta 同步升级公共包、Command、Server，当时 Engine 为 v3、checkpoint 为 version 3。Control API 保留 /v1 信封，详情改为必需 waits 数组，新增 wait.created，run.waiting 改为 waitIds；这些是本次 beta 的显式不兼容变更，客户端和部署须一起升级。
 SQLite migration 18 分离 run_checkpoints 与 wait_receipts，将 Agent 通知 work 主键改为 runId/waitId。旧 checkpoint 保留原始字节供恢复校验，当前 Engine 不执行旧 checkpoint，标记 indeterminate；不得自动重放或改写旧 Revision。
 发布前需完成或取消旧活动 Run，或者保留匹配的旧执行环境。当前工作只验证本地 fixture，未读取或升级任何已部署数据库。
 
@@ -56,9 +56,8 @@ Server 的 `isolatedVmEngineDigest` 由隔离执行器协议、isolated-vm／Nod
 不包含 Wait、分支汇合或输入来源等 Scheduler 规则。图规则变更不单独修改该 digest。
 checkpoint 使用自己的格式版本和状态一致性校验，不能用隔离运行时 digest 代替这些检查。
 
-输入来源的路径覆盖放宽是 Engine v3 的兼容扩展：原先合法图的输入仍然恰好有一个来源，其执行结果不变；
-新允许的图可以在来源确定缺失时跳过节点。新增可接受图不代表旧实现能执行新图，部署仍须锁定匹配的公共包版本。
-未来若修改已有合法图的默认行为或执行结果，仍按上文要求升级公共执行合同或明确声明 beta 断点。
+当前 Engine v4 将执行调度与输入来源分离。节点仅因执行分支关闭而跳过；缺失输入及普通数据输出补 `null` 后按端口声明校验，实际 `null` 仍算一个可用来源。
+本次直接替换 v3，不提供旧执行合同或旧运行迁移。公共包、Command、Server 和客户端同步升级；checkpoint 结构仍为 version 3，恢复验证采用 v4 语义并要求完整的归一化输出。
 
 本次移除 digest 中历史的图语义标签会使隔离运行时标识变化一次。固定旧 digest 的 Run 沿用既有不匹配拒绝路径；
 不重写历史 Run 的标识，也不增加旧标识别名。此后仅修改 Scheduler 规则不会再造成隔离运行时 digest 变化。

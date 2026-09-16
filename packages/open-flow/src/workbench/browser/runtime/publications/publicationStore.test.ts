@@ -8,7 +8,7 @@ const publication = {
   actorId: 'actor',
   closureDigest: 'closure',
   createdAt: timestamp,
-  engineContract: 'open-flow-engine/v3',
+  engineContract: 'open-flow-engine/v4',
   flowId: 'flow-1',
   modelVersion: 1,
   operation: 'publish',

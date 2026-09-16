@@ -118,7 +118,7 @@ function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) 
                   column: 0,
                 },
               ],
-        engineContract: 'open-flow-engine/v3',
+        engineContract: 'open-flow-engine/v4',
         flowId: flow.flowId,
         modelVersion: 1,
         revisionDigest: revision().digest,

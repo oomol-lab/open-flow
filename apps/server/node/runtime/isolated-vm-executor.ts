@@ -6,7 +6,7 @@ import type IsolatedVM from 'isolated-vm'
 import type { CapabilityResult, ExecutorMessage, InvokeContext, InvokeRequest, IsolatedVmLimits, ParentMessage } from './isolated-vm.ts'
 
 import { createRuntimeProgram } from '@oomol-lab/open-flow/flow-semantics'
-import { createActions, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
+import { createActions, findEngineContract, snapshotRuntimeResult } from '@oomol-lab/open-flow/runtime-contract'
 import { runFlow } from '@oomol-lab/open-flow/scheduler'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
@@ -370,6 +370,7 @@ async function compileProgram(
   const mainModule = await isolate.compileModule(
     `import task from '../user/${program.entryModuleId}.mjs'
 import { capability } from './capability.mjs'
+const snapshotResult = ${snapshotRuntimeResult.toString()}
 const cancellation = new AbortController()
 export function cancelTask() {
   cancellation.abort(new Error('Task invocation was canceled.'))
@@ -384,7 +385,7 @@ export async function invoke(source) {
       inputs,
       signal: cancellation.signal,
     }))
-    const result = await task(inputs, context)
+    const result = snapshotResult(await task(inputs, context))
     return result === undefined
       ? JSON.stringify({ engineDigest: ${JSON.stringify(program.engineDigest)}, ok: true, void: true })
       : JSON.stringify({ engineDigest: ${JSON.stringify(program.engineDigest)}, ok: true, value: result })

@@ -132,9 +132,13 @@ describe('revision graph scheduler', () => {
 
     expect(inputs).toEqual([{ token: 'secret-value' }])
     expect(events.find((event) => event.type == 'node.started')).toMatchObject({ inputs: {}, type: 'node.started' })
-    await expect(runFlow(prepared, { invokeTask: () => Effect.succeed({}), runId: 'run-variable-missing' })).rejects.toThrow(
-      'requires exactly one available source',
-    )
+    await runFlow(prepared, {
+      invokeTask: (call) => {
+        expect(call.input).toEqual({ token: null })
+        return Effect.succeed({})
+      },
+      runId: 'run-variable-missing',
+    })
   })
 
   it('injects the shared Run Variable snapshot into every Subflow invocation', async () => {
@@ -1191,4 +1195,168 @@ describe('revision graph scheduler', () => {
     ).rejects.toMatchObject({ code })
     expect(events.find((event) => event.type == 'node.failed')).toMatchObject({ code, message, type: 'node.failed' })
   })
+})
+
+describe('port null normalization', () => {
+  it.each([{}, { value: undefined }, { value: null }, undefined])('normalizes missing output in %j before declaration validation', async (returned) => {
+    for (const nullable of [true, false]) {
+      const prepared = await prepareFlow(
+        revision(
+          {
+            bindings: {},
+            tasks: {},
+            subflows: {},
+            graph: {
+              edges: [{ source: 'source', target: 'consumer' }],
+              nodes: {
+                source: {
+                  kind: 'task',
+                  inputs: {},
+                  task: { ...task('source', [], []), outputs: [{ handle: 'value', jsonSchema: { type: 'string' }, nullable }] },
+                },
+                consumer: {
+                  kind: 'task',
+                  inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
+                  task: { ...task('consumer', [], []), inputs: [{ handle: 'value', jsonSchema: { type: 'string' }, nullable: true }] },
+                },
+              },
+            },
+          },
+          ['source'],
+        ),
+        'main',
+        engine,
+      )
+      const events: SchedulerEvent[] = []
+      const calls: string[] = []
+      const running = runFlow(prepared, {
+        runId: 'null-output',
+        emit: (event) => Effect.sync(() => void events.push(event)),
+        invokeTask: (call) => {
+          calls.push(call.nodeId)
+          if (call.nodeId == 'consumer') {
+            expect(call.input).toEqual({ value: null })
+            return Effect.succeed({})
+          }
+          // Exercise an in-process host returning an explicit undefined port before JSON transport.
+          return Effect.succeed(returned as Readonly<Record<string, JsonValue>> | undefined)
+        },
+      })
+      if (nullable) {
+        await running
+        expect(calls).toEqual(['source', 'consumer'])
+        expect(events).toContainEqual(expect.objectContaining({ type: 'node.completed', nodeId: 'source', outputs: { value: null } }))
+      } else {
+        await expect(running).rejects.toThrow('does not match its declaration')
+        expect(calls).toEqual(['source'])
+        expect(events.some((event) => event.type == 'node.completed')).toBe(false)
+      }
+    }
+  })
+
+  it.each([null, 42, [], { value: { nested: undefined } }])('rejects invalid output containers and nested undefined: %j', async (returned) => {
+    const prepared = await prepareFlow(
+      revision(
+        {
+          bindings: {},
+          tasks: {},
+          subflows: {},
+          graph: {
+            edges: [],
+            nodes: {
+              source: { kind: 'task', inputs: {}, task: task('source', [], ['value']) },
+            },
+          },
+        },
+        ['source'],
+      ),
+      'main',
+      engine,
+    )
+    await expect(runFlow(prepared, { runId: 'invalid-output', invokeTask: () => Effect.succeed(returned as JsonValue) })).rejects.toThrow()
+  })
+
+  it.each([true, false])('validates absent branch input with nullable=%s', async (nullable) => {
+    const prepared = await prepareFlow(
+      revision(
+        {
+          bindings: {},
+          tasks: {},
+          subflows: {},
+          graph: {
+            edges: [
+              { source: 'choice', sourceHandle: 'yes', target: 'consumer' },
+              { source: 'choice', sourceHandle: 'no', target: 'consumer' },
+            ],
+            nodes: {
+              choice: {
+                kind: 'condition',
+                inputs: {},
+                input: { handle: 'value', jsonSchema: { type: 'string' }, nullable: false, value: 'yes' },
+                cases: [{ output: 'yes', relation: 'all', expressions: [{ input: 'value', operator: '==', value: 'yes' }] }],
+                defaultOutput: 'no',
+              },
+              consumer: {
+                kind: 'task',
+                inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'choice', output: 'no' }] } },
+                task: { ...task('consumer', [], []), inputs: [{ handle: 'value', jsonSchema: { type: 'string' }, nullable }] },
+              },
+            },
+          },
+        },
+        ['consumer'],
+      ),
+      'main',
+      engine,
+    )
+    let invoked = false
+    const running = runFlow(prepared, {
+      runId: 'absent-branch',
+      invokeTask: (call) => {
+        invoked = true
+        expect(call.input).toEqual({ value: null })
+        return Effect.succeed({})
+      },
+    })
+    if (nullable) await running
+    else await expect(running).rejects.toThrow('does not match its declared schema')
+    expect(invoked).toBe(nullable)
+  })
+})
+
+it.each([true, false])('normalizes absent Subflow outputs with nullable=%s', async (nullable) => {
+  const prepared = await prepareFlow(
+    revision(
+      {
+        bindings: {},
+        tasks: {},
+        graph: { edges: [], nodes: { nested: { kind: 'subflow', subflowId: 'branch', inputs: {} } } },
+        subflows: {
+          branch: {
+            name: 'Branch',
+            inputs: [],
+            outputs: [{ handle: 'result', jsonSchema: { type: 'string' }, nullable, sources: [{ kind: 'node', nodeId: 'choice', output: 'no' }] }],
+            graph: {
+              edges: [],
+              nodes: {
+                choice: {
+                  kind: 'condition',
+                  inputs: {},
+                  input: { handle: 'value', jsonSchema: { type: 'string' }, nullable: false, value: 'yes' },
+                  cases: [{ output: 'yes', relation: 'all', expressions: [{ input: 'value', operator: '==', value: 'yes' }] }],
+                  defaultOutput: 'no',
+                },
+              },
+            },
+          },
+        },
+      },
+      [],
+    ),
+    'main',
+    engine,
+  )
+  const running = runFlow(prepared, { runId: 'subflow-null', invokeTask: () => Effect.die('Unexpected Task') })
+  if (nullable) expect((await running).nodes).toEqual([expect.objectContaining({ nodeId: 'nested', outputs: { result: null } })])
+  else await expect(running).rejects.toThrow('Subflow output "result" does not match its declared schema')
 })

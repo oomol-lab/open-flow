@@ -135,11 +135,11 @@ Flow 与每次 Subflow invocation 使用无环执行图。连线表示节点之�
 Condition 只选择首个匹配分支或 default，Wait 登记后释放 notification，决议后释放所选 action；未选中的分支传播跳过状态。Trigger occurrence 只选择对应 Trigger，其他 Trigger 分支跳过。
 未执行节点的跳过状态仅属于内部调度和恢复，不创建节点执行身份、不产生公开节点事件，也不进入最终节点执行结果。
 
-节点输入只能引用本图中经执行边可达的祖先 output，不要求来源覆盖目标的所有路径。多个 source 表示互斥分支的备选值；来源尚未确定时等待，任一输入确定无来源时跳过节点并记录原因日志，有值时执行，禁止同时有多个值。实际输出 `null` 与来源缺失不同。
+节点输入只能引用本图中经执行边可达的祖先 output，不要求来源覆盖目标的所有路径。多个 source 表示互斥分支的备选值；调度仅依据执行边和分支状态。收集输入时，零个来源补 `null`，一个来源取其值，禁止同时有多个值；实际输出 `null` 仍算一个来源。输入按端口声明校验，失败时报错，不跳过节点。
 不能按值到达次数重复启动节点。Subflow 的输入和最终输出保持显式声明，不能越过图边界直接引用内部或外部节点。
 
-Task 仅通过返回对象一次性提交最终 output，全部声明和可序列化性校验成功后才向下游提供结果。声明 output 的 Task 必须返回完整结果；无 output 的 Task 可以返回空对象或
-`undefined`。普通 Flow 数据在 Runtime invocation、Scheduler、Subflow、RunEvent 和 terminal result 边界保持可序列化。
+Task 仅通过返回对象一次性提交最终 output，全部声明和可序列化性校验成功后才向下游提供结果。已声明但缺失或为 `undefined` 的 output 补为 `null` 后按端口声明校验；整个返回值为 `undefined` 时按空对象处理，显式 `null` 等非对象返回值仍非法。
+归一化仅作用于端口值，不改写内部对象字段或数组元素；Condition、Wait 未选中的控制分支不补输出。普通 Flow 数据在 Runtime invocation、Scheduler、Subflow、RunEvent 和 terminal result 边界保持可序列化。
 脚本 `context` 提供取消、日志、进度、Artifact、网络、Connector 等宿主能力、只读运行身份，以及与第一个参数相同的 `inputs`。
 `context` 不提供运行中的 output 提交、跨节点的动态 Run store、Variable 查询或任意节点输出查询。部署可以为调度、调试和恢复私有保存 Run value，
 但不能把内部存储变成第二条用户数据通道。节点最终结果与成功完成通过同一个完成事件发布，先于下游节点启动。

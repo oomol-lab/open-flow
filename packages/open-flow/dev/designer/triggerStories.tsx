@@ -253,7 +253,7 @@ function RunSample({ fixture, dark, language, log, state, downstream = false, la
         version: 1,
         waits: [],
         closureDigest: 'lab',
-        engineContract: 'open-flow-engine/v3',
+        engineContract: 'open-flow-engine/v4',
         engineDigest: 'lab',
         modelVersion: 1,
         revisionDigest: draft.digest,

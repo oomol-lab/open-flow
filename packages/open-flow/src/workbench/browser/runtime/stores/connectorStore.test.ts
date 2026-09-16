@@ -57,7 +57,7 @@ describe('ConnectorStore', () => {
           return Response.json({
             closureDigest: `closure-${index}`,
             diagnostics: [],
-            engineContract: 'open-flow-engine/v3',
+            engineContract: 'open-flow-engine/v4',
             flowId: flow!.flowId,
             modelVersion: 1,
             revisionDigest: `digest-${flow!.flowId}`,

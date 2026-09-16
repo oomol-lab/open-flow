@@ -61,7 +61,7 @@ async function session() {
   vi.spyOn(client, 'checkFlow').mockResolvedValue({
     closureDigest: 'digest',
     diagnostics: [],
-    engineContract: 'open-flow-engine/v3',
+    engineContract: 'open-flow-engine/v4',
     flowId: 'flow',
     modelVersion: 1,
     revisionDigest: 'digest',
