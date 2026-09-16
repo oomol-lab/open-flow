@@ -529,22 +529,13 @@ export function ValueEditor(props: ValueEditorProps) {
             }}
           </SortableFieldList>
           <div className={styles.collectionActions} data-layout="values">
-            {source.additionalProperties === false && value === undefined && names.length === 0 && (
-              <Button type="button" variant="secondary" size="field" disabled={disabled} onClick={() => onChange({})}>
-                {t('valueEditor.createObject')}
-              </Button>
-            )}
-            {source.additionalProperties === false && value !== undefined && (
-              <span className={styles.presence}>
-                {t('valueEditor.object')} · {names.length}
-              </span>
-            )}
+            {!canAddObjectField && names.length === 0 && <span className={styles.emptyObjectContent}>{t('valueEditor.emptyObject')}</span>}
             {canAddObjectField && names.length === 0 && (
               <Button
                 type="button"
                 variant="ghost"
                 size="field"
-                className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectAction}`}
+                className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectContent}`}
                 disabled={disabled}
                 aria-label={`${t('valueEditor.addField')} ${label}`}
                 onClick={() => addObjectField()}
@@ -621,7 +612,7 @@ export function ValueEditor(props: ValueEditorProps) {
                 type="button"
                 variant="ghost"
                 size="field"
-                className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectAction}`}
+                className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectContent}`}
                 aria-label={`${t('valueEditor.addItem')} ${label}`}
                 disabled={disabled || (typeof source.maxItems === 'number' && array.length >= source.maxItems)}
                 onClick={() => onChange([initialValue(Array.isArray(source.items) ? (source.items[0] ?? source.additionalItems ?? {}) : (source.items ?? {}))])}
@@ -744,6 +735,7 @@ export function ValueEditor(props: ValueEditorProps) {
       data-value-addon={props.valueAddon != null || undefined}
       data-expanded={(expandable && expanded) || undefined}
       data-structured={(structured && !showUnset) || undefined}
+      data-branch={(expandable && !(structured && type === 'object' && names.length === 0 && !canAddObjectField)) || undefined}
     >
       {props.header != null && (
         <div className={styles.header} title={props.description}>

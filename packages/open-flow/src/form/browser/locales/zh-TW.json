@@ -78,6 +78,10 @@
     "editOptions": "編輯選項…",
     "backToChoices": "返回選擇",
     "addOption": "新增選項",
-    "component": "元件"
+    "component": "元件",
+    "columnName": "名稱",
+    "columnType": "類型",
+    "columnValue": "值",
+    "emptyObject": "空物件"
   }
 }

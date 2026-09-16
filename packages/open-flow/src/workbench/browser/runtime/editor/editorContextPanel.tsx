@@ -16,7 +16,7 @@ export function EditorContextPanel({
   return (
     <ContextPanel
       {...props}
-      className={['editor-context-panel', className].filter(Boolean).join(' ')}
+      className={['editor-context-panel open-flow-property-panel', className].filter(Boolean).join(' ')}
       heading={nodeHeading && <NodeHeading key={nodeId} {...nodeHeading} />}
     />
   )

@@ -690,19 +690,18 @@
   "runInput": {
     "editMissing": "테스트 데이터 입력",
     "editReady": "저장된 테스트 데이터 편집",
-    "remembered": "테스트 데이터는 이 편집 세션 동안 유지되며 워크플로를 변경하지 않습니다.",
+    "remembered": "현재 편집 세션에서만 저장됩니다.",
     "startTest": "테스트 시작",
     "testTrigger": "테스트 {{name}}",
     "triggerCount": "시작 노드 {{count}}개",
-    "triggerDataHint": "이 Trigger의 샘플 데이터를 입력한 뒤 테스트를 시작하세요.",
-    "triggerData": "트리거 데이터",
-    "close": "실행 입력 닫기",
+    "close": "테스트 데이터 닫기",
     "description": "이번 실행에 필요한 데이터를 입력하세요. 워크플로는 변경되지 않습니다.",
     "invalid": "실행하기 전에 나열된 모든 입력에 유효한 JSON 값을 설정하세요.",
-    "title": "실행 입력",
+    "title": "테스트 데이터",
     "trigger": "시작 노드",
     "selectTrigger": "시작 노드 선택",
-    "noTrigger": "실행하기 전에 시작 노드로 사용할 트리거를 추가하세요."
+    "noTrigger": "실행하기 전에 시작 노드로 사용할 트리거를 추가하세요.",
+    "triggerSubtitle": "트리거 · {{name}}"
   },
   "workspace": {
     "check": "현재 초안 검사",

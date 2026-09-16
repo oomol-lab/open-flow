@@ -1,26 +1,4 @@
 .open-flow-workbench {
-  .editor-context-panel {
-    --ui-control-radius: 6px;
-    --ui-disabled-opacity: 1;
-    --ui-disabled-cursor: default;
-    --ui-disabled-background: var(--ui-control-background);
-    --ui-input: color-mix(in srgb, var(--ui-border) 70%, var(--open-flow-node-content));
-    --ui-card: var(--open-flow-node-surface);
-    --ui-background: var(--open-flow-node-surface);
-    --ui-control-background: var(--open-flow-node-content);
-    --ui-control-hover-background: color-mix(in srgb, var(--open-flow-secondary) 25%, var(--ui-control-background));
-    --ui-readonly-focus-outline: 1px solid color-mix(in srgb, var(--ui-ring) 40%, var(--ui-input));
-
-    :is(input, textarea):is([readonly], :disabled)::placeholder {
-      opacity: 0;
-    }
-
-    :is(:disabled, [aria-disabled='true']) [data-slot='select-chevron'],
-    [data-slot='native-select']:disabled ~ [data-slot='native-select-icon'] {
-      opacity: 0.5;
-    }
-  }
-
   .context-panel {
     position: relative;
     display: flex;

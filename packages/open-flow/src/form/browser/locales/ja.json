@@ -78,6 +78,10 @@
     "editOptions": "選択肢を編集…",
     "backToChoices": "選択に戻る",
     "addOption": "選択肢を追加",
-    "component": "コンポーネント"
+    "component": "コンポーネント",
+    "columnName": "名前",
+    "columnType": "型",
+    "columnValue": "値",
+    "emptyObject": "空のオブジェクト"
   }
 }

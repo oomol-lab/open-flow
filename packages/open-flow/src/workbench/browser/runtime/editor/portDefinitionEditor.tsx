@@ -7,6 +7,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { EditorComponentSelect } from '../../../../form/browser/editorComponentSelect.tsx'
 import { FieldSorting } from '../../../../form/browser/fieldSorting.ts'
+import { FieldNullable, FieldTable, FieldTableRow } from '../../../../form/browser/fieldTable.tsx'
 import { JsonEditor } from '../../../../form/browser/jsonEditor.tsx'
 import { ValueEditor } from '../../../../form/browser/valueEditor.tsx'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
@@ -564,15 +565,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
       </div>
     )
     const trailingControl = tableLayout && (
-      <span className={styles.nullableControl}>
-        <Checkbox
-          className="not-data-disabled:cursor-pointer"
-          aria-label={`${port.handle} ${t('valueEditor.nullable')}`}
-          checked={port.nullable === true}
-          disabled={disabled}
-          onCheckedChange={(checked) => update(index, { ...port, nullable: checked === true })}
-        />
-      </span>
+      <FieldNullable name={port.handle} checked={port.nullable === true} onChange={disabled ? undefined : (nullable) => update(index, { ...port, nullable })} />
     )
     const options = (
       <Tooltip>
@@ -635,7 +628,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         }
       : undefined
     return (
-      <div
+      <FieldTableRow
         key={port.handle}
         className={styles.row}
         data-port={port.handle}
@@ -682,7 +675,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           />
         )}
         {settings}
-      </div>
+      </FieldTableRow>
     )
   }
   return (
@@ -727,22 +720,16 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           )}
         </div>
       )}
-      <div
+      <FieldTable
         className={styles.list}
-        data-layout={props.layout}
-        data-fixed-types={disabled || undefined}
+        layout={props.layout}
+        fixedTypes={disabled}
+        output={props.output}
+        nullable={tableLayout}
+        empty={!hasFields}
         data-inputs={props.renderValue != null || undefined}
-        data-empty={(values.length === 0 && (tableLayout || disabled)) || undefined}
         ref={list}
       >
-        {hasFields && (
-          <div className={styles.columns} data-layout={props.layout} data-output={props.output || undefined}>
-            <span>{t('inspector.ports.columnName')}</span>
-            <span>{t('inspector.ports.columnType')}</span>
-            {!props.output && <span className={styles.valueHeading}>{t('inspector.ports.columnValue')}</span>}
-            {tableLayout && <span className={styles.nullableHeading}>{t('valueEditor.nullable')}</span>}
-          </div>
-        )}
         <span className="sr-only" role="status" aria-live="polite">
           {announcement}
         </span>
@@ -830,7 +817,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             )}
           </div>
         )}
-      </div>
+      </FieldTable>
     </FieldSorting.Provider>
   )
 }

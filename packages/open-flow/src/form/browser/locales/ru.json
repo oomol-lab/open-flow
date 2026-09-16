@@ -78,6 +78,10 @@
     "editOptions": "Изменить варианты…",
     "backToChoices": "Назад к выбору",
     "addOption": "Добавить вариант",
-    "component": "Компонент"
+    "component": "Компонент",
+    "columnName": "Имя",
+    "columnType": "Тип",
+    "columnValue": "Значение",
+    "emptyObject": "Пустой объект"
   }
 }

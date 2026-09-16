@@ -690,19 +690,18 @@
   "runInput": {
     "editMissing": "テストデータを入力",
     "editReady": "保存済みのテストデータを編集",
-    "remembered": "テストデータはこの編集セッション中に保持され、ワークフローは変更されません。",
+    "remembered": "この編集セッションでのみ保存されます。",
     "startTest": "テストを開始",
     "testTrigger": "テスト {{name}}",
     "triggerCount": "開始ノード {{count}} 件",
-    "triggerDataHint": "この Trigger のサンプルデータを入力して、テストを開始します。",
-    "triggerData": "トリガーデータ",
-    "close": "実行入力を閉じる",
+    "close": "テストデータを閉じる",
     "description": "今回の実行に必要なデータを入力してください。ワークフローは変更されません。",
     "invalid": "実行する前に、表示されているすべての入力へ有効な JSON 値を設定してください。",
-    "title": "実行入力",
+    "title": "テストデータ",
     "trigger": "開始ノード",
     "selectTrigger": "開始ノードを選択",
-    "noTrigger": "実行する前に開始ノードとなるトリガーを追加してください。"
+    "noTrigger": "実行する前に開始ノードとなるトリガーを追加してください。",
+    "triggerSubtitle": "トリガー · {{name}}"
   },
   "workspace": {
     "check": "現在のドラフトを検査",

@@ -78,6 +78,10 @@
     "editOptions": "옵션 편집…",
     "backToChoices": "선택으로 돌아가기",
     "addOption": "옵션 추가",
-    "component": "컴포넌트"
+    "component": "컴포넌트",
+    "columnName": "이름",
+    "columnType": "유형",
+    "columnValue": "값",
+    "emptyObject": "빈 객체"
   }
 }

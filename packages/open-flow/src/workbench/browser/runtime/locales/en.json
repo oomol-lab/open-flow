@@ -690,19 +690,18 @@
   "runInput": {
     "editMissing": "Add test data",
     "editReady": "Edit saved test data",
-    "remembered": "Test data is remembered for this editing session and does not change the workflow.",
+    "remembered": "Saved for this editing session only.",
     "startTest": "Start test",
     "testTrigger": "Test {{name}}",
     "triggerCount": "{{count}} start nodes",
-    "triggerDataHint": "Enter sample data for this Trigger, then start the test.",
-    "triggerData": "Trigger data",
-    "close": "Close run inputs",
+    "close": "Close test data",
     "description": "Enter data for this run. Your workflow will not be changed.",
     "invalid": "Set every listed input to a valid JSON value before running.",
-    "title": "Run inputs",
+    "title": "Test data",
     "trigger": "Start node",
     "selectTrigger": "Select a start node",
-    "noTrigger": "Add a trigger as a start node before running."
+    "noTrigger": "Add a trigger as a start node before running.",
+    "triggerSubtitle": "Trigger · {{name}}"
   },
   "workspace": {
     "check": "Check the current Draft",

@@ -1,39 +1,13 @@
 .root {
-  display: flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 16px;
   color: var(--ui-foreground);
-  font-size: 13px;
+  font-size: 12px;
 }
 .field {
   min-width: 0;
   margin: 0;
-  padding: 0 0 14px;
-  border: 0;
-}
-.field:not(:last-child) {
-  border-bottom: 1px solid var(--ui-border);
-}
-.legend {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 6px;
   padding: 0;
-  font-size: 12px;
-  font-weight: 600;
-}
-.optional {
-  color: var(--ui-muted-foreground);
-  font-size: 10px;
-  font-weight: 400;
-}
-.description {
-  margin: 4px 0 8px;
-  color: var(--ui-muted-foreground);
-  font-size: 12px;
-  line-height: 1.5;
+  border: 0;
 }
 .error {
   color: var(--ui-destructive);

@@ -23,7 +23,7 @@ import { designerGraph } from '../../src/workbench/browser/runtime/workspace.ts'
 import { InspectorSamplePanel } from './inspectorSamplePanel.tsx'
 import { useStorySidebar } from './storySidebar.tsx'
 import { TriggerCatalogStory } from './triggerCatalogStory.tsx'
-import { triggerDraft, triggerFixtures } from './triggerFixtures.ts'
+import { triggerDraft, triggerFixtures, webhookValueFixtures } from './triggerFixtures.ts'
 import { createTriggerSession } from './triggerSession.ts'
 
 type StoryProps = {
@@ -225,7 +225,7 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
 }
 
 type RunState = 'closed' | 'empty' | 'ready' | 'invalid' | 'starting' | 'direct' | 'disabled'
-function RunSample({ fixture, dark, language, log, state, downstream = false }: StoryProps & { state: RunState; downstream?: boolean }) {
+function RunSample({ fixture, dark, language, log, state, downstream = false, label }: StoryProps & { state: RunState; downstream?: boolean; label?: string }) {
   const [resource, setResource] = useState<{
     store: RunRequestStore
     inputs: ReturnType<typeof triggerDraft>
@@ -302,7 +302,7 @@ function RunSample({ fixture, dark, language, log, state, downstream = false }: 
     <section className="trigger-case">
       <h3>
         {downstream ? 'Downstream input · ' : ''}
-        {state}
+        {label ?? state}
       </h3>
       {resource && request && state !== 'closed' && (
         <div className="run-input-popover trigger-run-panel">
@@ -348,8 +348,11 @@ function RunStory(props: StoryProps) {
         {(['empty', 'ready', 'invalid', 'starting'] as const).map((state) => (
           <RunSample key={state} {...props} state={state} downstream={direct} />
         ))}
+        {!direct && <RunSample {...props} state="ready" downstream />}
         <RunSample {...props} state="closed" downstream={direct} />
         <RunSample {...props} state="disabled" />
+        {props.fixture.trigger.kind === 'webhook' &&
+          webhookValueFixtures.map((fixture) => <RunSample {...props} key={fixture.id} fixture={fixture} state="ready" label={fixture.id} />)}
       </div>
     </Gallery>
   )

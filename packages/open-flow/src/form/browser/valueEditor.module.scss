@@ -328,17 +328,17 @@
   grid-row: var(--field-branch-row);
   margin: 0 0 4px;
   padding: 4px 0 0 calc(var(--field-indent, 0px) + 16px);
-  &::before {
-    content: '';
-    position: absolute;
-    left: calc(var(--field-indent, 0px) - var(--branch-offset));
-    top: calc(-1 * var(--branch-extension));
-    width: 16px;
-    height: calc(20px + var(--branch-extension));
-    border-left: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
-    border-bottom: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
-    border-bottom-left-radius: 10px;
-  }
+}
+.root[data-header][data-branch] > .body::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--field-indent, 0px) - var(--branch-offset));
+  top: calc(-1 * var(--branch-extension));
+  width: 16px;
+  height: calc(20px + var(--branch-extension));
+  border-left: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
+  border-bottom-left-radius: 10px;
 }
 @container value-fields (max-width: #{fieldLayout.$wrap-width}) {
   .root[data-header][data-structured]:not([data-array-child], [data-output]) > .body {
@@ -487,7 +487,10 @@
   }
 }
 
-.emptyObjectAction {
+.emptyObjectContent {
+  display: flex;
+  align-items: center;
+  color: var(--ui-muted-foreground);
   margin-left: calc(var(--field-indent, 0px) + 16px);
   height: var(--field-control-height, 30px);
   font: inherit;

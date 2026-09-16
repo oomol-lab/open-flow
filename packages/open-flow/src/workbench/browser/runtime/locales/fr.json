@@ -690,19 +690,18 @@
   "runInput": {
     "editMissing": "Ajouter des données de test",
     "editReady": "Modifier les données de test enregistrées",
-    "remembered": "Les données de test sont conservées pendant cette session d’édition et ne modifient pas le workflow.",
+    "remembered": "Conservées uniquement pour cette session de modification.",
     "startTest": "Démarrer le test",
     "testTrigger": "Tester {{name}}",
     "triggerCount": "{{count}} nœuds de départ",
-    "triggerDataHint": "Saisissez des données d’exemple pour ce Trigger, puis démarrez le test.",
-    "triggerData": "Données du déclencheur",
-    "close": "Fermer les entrées d'exécution",
+    "close": "Fermer les données de test",
     "description": "Saisissez les données pour cette exécution. Le workflow ne sera pas modifié.",
     "invalid": "Définissez une valeur JSON valide pour chaque entrée listée avant d'exécuter.",
-    "title": "Entrées d'exécution",
+    "title": "Données de test",
     "trigger": "Nœud de départ",
     "selectTrigger": "Choisir un nœud de départ",
-    "noTrigger": "Ajoutez un déclencheur comme nœud de départ avant de lancer le flux."
+    "noTrigger": "Ajoutez un déclencheur comme nœud de départ avant de lancer le flux.",
+    "triggerSubtitle": "Déclencheur · {{name}}"
   },
   "workspace": {
     "check": "Vérifier le Brouillon actuel",

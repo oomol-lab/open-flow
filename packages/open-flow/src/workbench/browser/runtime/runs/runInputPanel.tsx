@@ -14,12 +14,10 @@ function InputGroup({
   attempted,
   group,
   title,
-  hint,
   theme,
 }: {
   readonly attempted: boolean
   readonly title: string
-  readonly hint?: string
   readonly group: RunInputGroup
   readonly theme: WorkbenchTheme
 }): ReactElement {
@@ -27,7 +25,6 @@ function InputGroup({
     <section className="run-input-group">
       <header>
         <strong>{title}</strong>
-        {hint != null && <p>{hint}</p>}
       </header>
       <FlowRunInputEditor store={group.editor} theme={theme} showErrors={attempted} />
     </section>
@@ -59,11 +56,13 @@ function Form({
   }
 
   return (
-    <form aria-busy={starting} onSubmit={(event) => void submit(event)}>
+    <form className="open-flow-property-panel" aria-busy={starting} onSubmit={(event) => void submit(event)}>
       <header>
         <div>
           <strong>{t('runInput.title')}</strong>
-          <span>{request.triggers.find((trigger) => trigger.nodeId == request.triggerId)?.title ?? request.flow.name}</span>
+          <span>
+            {t('runInput.triggerSubtitle', { name: request.triggers.find((trigger) => trigger.nodeId == request.triggerId)?.title ?? request.flow.name })}
+          </span>
         </div>
         <Button aria-label={t('runInput.close')} disabled={starting} onClick={close} size="icon-sm" type="button" variant="ghost">
           <Icon name="close" />
@@ -82,8 +81,7 @@ function Form({
             attempted={request.attempted}
             group={group}
             key={group.nodeId}
-            title={group.nodeId == request.triggerId ? t('runInput.triggerData') : group.title}
-            hint={group.nodeId == request.triggerId ? t('runInput.triggerDataHint') : undefined}
+            title={group.nodeId == request.triggerId ? t('inspector.ports.outputsTitle') : group.title}
             theme={theme}
           />
         ))}

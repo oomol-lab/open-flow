@@ -218,6 +218,7 @@
   }
 
   .run-input-popover > form {
+    background: var(--ui-card);
     display: flex;
     max-height: min(620px, calc(100dvh - 96px));
     min-height: 0;
@@ -280,21 +281,17 @@
 
   .run-input-group {
     min-width: 0;
+  }
+
+  .run-input-group + .run-input-group {
     padding-top: 16px;
     border-top: 1px solid var(--ui-border);
   }
 
   .run-input-group > header {
-    margin-bottom: 16px;
+    margin-bottom: 8px;
     font-size: 13px;
     overflow-wrap: anywhere;
-  }
-
-  .run-input-group > header p {
-    margin: 6px 0 0;
-    color: var(--ui-muted-foreground);
-    font-size: 12px;
-    line-height: 18px;
   }
 
   .run-input-group > header strong {

@@ -2,7 +2,7 @@
 $wrap-width: 340px;
 
 @mixin columns($wrap-width: $wrap-width) {
-  --field-nullable-width: 0px;
+  --field-nullable-width: var(--field-table-nullable-width, 0px);
   --field-name-track: minmax(0, 1fr);
   --field-type-track: minmax(64px, 0.48fr);
   --field-name-gap: 4px;

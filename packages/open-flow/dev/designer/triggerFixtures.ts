@@ -139,3 +139,33 @@ export function triggerDraft(trigger: TriggerNode, downstream = false): { flow: 
   }
   return { flow, draft }
 }
+
+// Boundary samples use production Webhook definitions and payload schema derivation.
+export const webhookValueFixtures: readonly TriggerFixture[] = [
+  { id: 'Empty fixed object', trigger: { kind: 'webhook', name: 'Empty request', inputsDef: [], options: {} }, payload: {} },
+  {
+    id: 'Nested objects and arrays',
+    trigger: {
+      kind: 'webhook',
+      name: 'Nested request',
+      options: {},
+      inputsDef: [
+        {
+          handle: 'data',
+          nullable: false,
+          jsonSchema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              empty: { type: 'object', additionalProperties: false },
+              fields: { type: 'object', additionalProperties: { type: 'string' } },
+              items: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' } }, additionalProperties: false } },
+            },
+            required: ['empty', 'fields', 'items'],
+          },
+        },
+      ],
+    },
+    payload: { data: { empty: {}, fields: {}, items: [{ name: 'One' }] } },
+  },
+]

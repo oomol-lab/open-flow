@@ -78,6 +78,10 @@
     "editOptions": "Modifier les options…",
     "backToChoices": "Retour aux choix",
     "addOption": "Ajouter une option",
-    "component": "Composant"
+    "component": "Composant",
+    "columnName": "Nom",
+    "columnType": "Type",
+    "columnValue": "Valeur",
+    "emptyObject": "Objet vide"
   }
 }

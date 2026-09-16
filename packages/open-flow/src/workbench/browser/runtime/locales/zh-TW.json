@@ -690,19 +690,18 @@
   "runInput": {
     "editMissing": "填寫測試資料",
     "editReady": "修改已儲存的測試資料",
-    "remembered": "測試資料會在本次編輯工作階段中保留，不會修改工作流程。",
+    "remembered": "測試資料僅在本次編輯工作階段中保留。",
     "startTest": "開始測試",
     "testTrigger": "測試 {{name}}",
     "triggerCount": "共 {{count}} 個起始節點",
-    "triggerDataHint": "填寫這個 Trigger 的模擬資料，然後開始測試。",
-    "triggerData": "觸發資料",
-    "close": "關閉執行輸入",
+    "close": "關閉測試資料",
     "description": "填寫本次執行需要的資料，不會修改工作流程。",
     "invalid": "執行前，請將列出的每個輸入都設為有效的 JSON 值。",
-    "title": "執行輸入",
+    "title": "測試資料",
     "trigger": "起始節點",
     "selectTrigger": "選擇起始節點",
-    "noTrigger": "請先新增一個觸發器作為起始節點。"
+    "noTrigger": "請先新增一個觸發器作為起始節點。",
+    "triggerSubtitle": "觸發器 · {{name}}"
   },
   "workspace": {
     "check": "檢查目前的草稿",

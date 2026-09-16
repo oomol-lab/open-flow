@@ -5,7 +5,9 @@ import type { WorkbenchTheme } from './runtime/contract.ts'
 import { useEffect, useMemo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
+import { FieldTable, FieldTableRow } from '../../form/browser/fieldTable.tsx'
 import { ValueEditor } from '../../form/browser/valueEditor.tsx'
+import { ValueField } from '../../form/browser/valueField.tsx'
 import { FlowRunInputEditorStore } from './flowRunInputEditorStore.ts'
 import { createI18n } from './runtime/i18n.ts'
 
@@ -28,7 +30,7 @@ export function FlowRunInputEditor({
   useEffect(() => () => i18n.dispose(), [i18n])
   return (
     <I18nProvider i18n={i18n}>
-      <div className={`open-flow-theme ${styles.root}`} data-theme={theme}>
+      <div className={`open-flow-theme open-flow-property-panel ${styles.root}`} data-theme={theme}>
         <InputFields store={store} showErrors={showErrors} labelledBy={labelledBy} />
       </div>
     </I18nProvider>
@@ -39,34 +41,39 @@ function InputFields({ store, showErrors, labelledBy }: { store: FlowRunInputEdi
   const t = useTranslate()
   const values = useVal(store.values$)
   const issues = useVal(store.issues$)
-  return (
+  const Editor = labelledBy == null ? ValueField : ValueEditor
+  const renderValue = (definition: FlowRunInputEditorStore['definitions'][number]) => (
     <>
-      {store.definitions.map((definition) => (
-        <fieldset className={styles.field} key={definition.handle} aria-labelledby={labelledBy}>
-          {labelledBy == null && (
-            <legend className={styles.legend}>
-              {definition.handle}
-              {definition.nullable && <span className={styles.optional}>null</span>}
-            </legend>
-          )}
-          {labelledBy == null && definition.description && <p className={styles.description}>{definition.description}</p>}
-          <ValueEditor
-            label={definition.handle}
-            path={`/${definition.handle.replaceAll('~', '~0').replaceAll('/', '~1')}`}
-            schema={definition.jsonSchema}
-            nullable={definition.nullable}
-            invalid={showErrors && issues[definition.handle] != null}
-            value={Object.hasOwn(values, definition.handle) ? values[definition.handle] : undefined}
-            onChange={(value) => store.setValue(definition.handle, value)}
-            onDraftIssue={store.setDraftIssue}
-          />
-          {showErrors && issues[definition.handle] && (
-            <p className={styles.error} role="alert">
-              {issues[definition.handle]!.message ?? t(`valueEditor.${issues[definition.handle]!.kind}`)}
-            </p>
-          )}
-        </fieldset>
-      ))}
+      <Editor
+        description={definition.description}
+        label={definition.handle}
+        path={`/${definition.handle.replaceAll('~', '~0').replaceAll('/', '~1')}`}
+        schema={definition.jsonSchema}
+        nullable={definition.nullable}
+        invalid={showErrors && issues[definition.handle] != null}
+        value={Object.hasOwn(values, definition.handle) ? values[definition.handle] : undefined}
+        onChange={(value) => store.setValue(definition.handle, value)}
+        onDraftIssue={store.setDraftIssue}
+      />
+      {showErrors && issues[definition.handle] && (
+        <p className={styles.error} role="alert">
+          {issues[definition.handle]!.message ?? t(`valueEditor.${issues[definition.handle]!.kind}`)}
+        </p>
+      )}
     </>
+  )
+  if (labelledBy != null) {
+    return store.definitions.map((definition) => (
+      <fieldset className={styles.field} key={definition.handle} aria-labelledby={labelledBy}>
+        {renderValue(definition)}
+      </fieldset>
+    ))
+  }
+  return (
+    <FieldTable layout="ports" fixedTypes nullable empty={store.definitions.length === 0}>
+      {store.definitions.map((definition) => (
+        <FieldTableRow key={definition.handle}>{renderValue(definition)}</FieldTableRow>
+      ))}
+    </FieldTable>
   )
 }

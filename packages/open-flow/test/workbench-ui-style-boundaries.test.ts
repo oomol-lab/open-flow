@@ -444,7 +444,8 @@ test('keeps Run input editing independent of Designer and its theme adapters', a
     readFile(new URL('src/workbench/browser/flowRunInputEditor.module.scss', packageRoot), 'utf8'),
   ])
   assert.doesNotMatch(editor + editorStore + editorStyles, /designer\/|ThemeProvider|HandleRowStore|InputSectionStore|--widget-/)
-  assert.match(editor, /<ValueEditor/)
+  assert.match(editor, /form\/browser\/valueField\.tsx/)
+  assert.doesNotMatch(editor, /runtime\/editor\//)
   assert.match(editor, /store\.values\$/)
 })
 
@@ -466,12 +467,13 @@ test('owns product and canvas surface tokens in one theme entry', async () => {
   ])
   const uiSource = uiSources.join('\n')
   assert.deepEqual(referencedTokens(uiSource, '--ui-'), [...sharedUiTokens, ...controlOverrideTokens].toSorted())
+  const controlSources = uiSources.filter((_, index) => !uiPaths[index]!.pathname.endsWith('/theme.css')).join('\n')
   for (const token of controlOverrideTokens) {
-    const references = [...uiSource.matchAll(new RegExp(`var\\(${token}([,)])`, 'g'))]
+    const references = [...controlSources.matchAll(new RegExp(`var\\(${token}([,)])`, 'g'))]
     assert.ok(references.length > 0, `${token} must be consumed by shared controls.`)
     for (const reference of references) assert.equal(reference[1], ',', `${token} requires a fallback outside property panels.`)
   }
-  assert.deepEqual(Object.keys(declarations(theme, '--ui-')).toSorted(), sharedUiTokens)
+  assert.deepEqual(Object.keys(declarations(theme, '--ui-')).toSorted(), [...sharedUiTokens, ...controlOverrideTokens].toSorted())
   const inheritedTheme = theme.match(/:root,\s*\.open-flow-theme\s*\{([^}]+)\}/)
   assert.ok(inheritedTheme, 'Shared inherited tokens must be available to root and themed surfaces.')
   assert.deepEqual(Object.keys(declarations(inheritedTheme[1]!, '--ui-')).toSorted(), inheritedUiTokens)

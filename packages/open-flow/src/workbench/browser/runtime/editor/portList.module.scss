@@ -1,23 +1,5 @@
-@use '../../../../form/browser/fieldLayout.scss';
-@use './inspectorGeometry.scss' as geometry;
-
-.list {
-  container: value-fields / inline-size;
-  min-width: 0;
-  --field-toggle-width: #{geometry.$toggle-width};
-  --field-value-name-gap: #{geometry.$value-name-gap};
-  --field-grip-width: 0px;
-  padding: 8px 8px 16px geometry.$list-inset;
-  --field-actions-width: 28px;
-  color: var(--ui-foreground);
-}
-
 .row {
-  position: relative;
-  min-width: 0;
   padding: 0;
-  --row-gap: 6px;
-  margin: var(--row-gap) 0;
   &[data-drop]::after {
     content: '';
     position: absolute;
@@ -164,41 +146,6 @@
   opacity: 0.45;
 }
 
-.list[data-fixed-types] {
-  --field-type-width: 32px;
-}
-
-.columns {
-  @include fieldLayout.columns;
-  @container value-fields (max-width: #{fieldLayout.$wrap-width}) {
-    &:not([data-output]) {
-      display: none;
-    }
-  }
-  row-gap: 4px;
-  color: var(--ui-muted-foreground);
-  font-size: 12px;
-  padding: 4px 0;
-  > span {
-    padding-left: 7px;
-  }
-  > span:nth-child(1) {
-    grid-column: handle;
-    grid-row: 1;
-  }
-  > span:nth-child(2) {
-    grid-column: type;
-    grid-row: 1;
-    .list[data-fixed-types] & {
-      padding-left: 0;
-    }
-  }
-  > .valueHeading {
-    grid-column: var(--field-value-heading-column, var(--field-value-column));
-    grid-row: var(--field-value-row);
-  }
-}
-
 .settingsHeading {
   display: flex;
   align-items: center;
@@ -253,12 +200,6 @@
   border-top: 1px solid color-mix(in srgb, var(--ui-border) 60%, transparent);
 }
 .list[data-layout='ports'] {
-  padding-top: 2px;
-
-  .columns {
-    padding-block: 2px;
-  }
-
   .group {
     margin-top: 2px;
   }
@@ -278,32 +219,7 @@
   }
 }
 
-.list[data-empty] {
-  padding-block: 0;
-}
-
 .row[data-editing] [data-value-options] {
   background-color: var(--ui-control-hover-background, var(--ui-muted));
   color: var(--ui-foreground);
-}
-
-.nullableControl,
-.columns > .nullableHeading {
-  display: flex;
-  grid-column: nullable;
-  grid-row: 1;
-  padding: 0;
-  align-items: center;
-  justify-content: center;
-}
-.nullableControl {
-  height: var(--field-control-height);
-}
-.columns > .nullableHeading {
-  white-space: nowrap;
-  overflow: visible;
-}
-.row [data-header]:is([data-layout='values'], [data-layout='ports']),
-.columns:is([data-layout='values'], [data-layout='ports']) {
-  --field-nullable-width: 28px;
 }

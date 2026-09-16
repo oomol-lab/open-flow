@@ -78,6 +78,10 @@
     "editOptions": "编辑选项…",
     "backToChoices": "返回选择",
     "addOption": "添加选项",
-    "component": "组件"
+    "component": "组件",
+    "columnName": "名称",
+    "columnType": "类型",
+    "columnValue": "值",
+    "emptyObject": "空对象"
   }
 }
