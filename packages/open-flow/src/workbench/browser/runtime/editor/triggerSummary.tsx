@@ -11,7 +11,7 @@ import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 
 export function TriggerSummary({ trigger, display }: { readonly trigger: TriggerNode; readonly display?: TriggerDisplay }) {
   const t = useTranslate()
-  if (trigger.kind === 'manual') {
+  if (trigger.kind === 'manual' || trigger.kind === 'cron') {
     return (
       <section className="inspector-port-section" data-inspector-section="outputs">
         <PortDefinitionEditor

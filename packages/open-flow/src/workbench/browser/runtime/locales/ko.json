@@ -850,9 +850,9 @@
     "scheduleWeeks": "주",
     "scheduleMonths": "개월",
     "scheduleExpression": "Cron 표현식",
+    "scheduleExpressionInvalid": "유효한 5필드 Cron 표현식을 입력하세요.",
     "scheduleTimezone": "시간대",
-    "scheduleMissing": "설정된 일정이 없습니다",
-    "scheduleTestHint": "테스트는 {}를, 라이브 실행은 { scheduledAt }을 전송합니다."
+    "scheduleMissing": "설정된 일정이 없습니다"
   },
   "triggerConfig": {
     "configuration": "구성",

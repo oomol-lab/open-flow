@@ -26,20 +26,24 @@ export function validateTriggerSchedule(rules: readonly TriggerSchedule[]): void
       }
       continue
     }
-    if (rule.expression.trim().split(/\s+/).length != 5) throw new TypeError('Cron expression must have exactly five fields.')
     try {
       Intl.DateTimeFormat('en-US', { timeZone: rule.timezone })
     } catch {
       throw new TypeError(`Invalid IANA timezone: ${rule.timezone}`)
     }
-    let cron: Cron
-    try {
-      cron = new Cron(rule.expression, { timezone: rule.timezone })
-    } catch (error) {
-      throw new TypeError(`Invalid cron expression: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
-    }
-    if (cron.nextRun() == null) throw new TypeError('Cron expression has no future occurrence.')
+    validateCronExpression(rule.expression, rule.timezone)
   }
+}
+
+export function validateCronExpression(expression: string, timezone: string): void {
+  if (expression.trim().split(/\s+/).length != 5) throw new TypeError('Cron expression must have exactly five fields.')
+  let cron: Cron
+  try {
+    cron = new Cron(expression, { timezone })
+  } catch (error) {
+    throw new TypeError(`Invalid cron expression: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+  }
+  if (cron.nextRun() == null) throw new TypeError('Cron expression has no future occurrence.')
 }
 
 export function nextTriggerScheduledAt(rules: readonly TriggerSchedule[], afterMs: number): number {

@@ -1,0 +1,22 @@
+.describedControl {
+  position: relative;
+  min-width: 0;
+}
+
+.describedInput {
+  position: relative;
+  z-index: 1;
+}
+
+.descriptionCard {
+  box-sizing: border-box;
+  width: 100%;
+  margin: calc(-1 * var(--ui-control-radius, var(--ui-radius))) 0 0;
+  padding: calc(var(--ui-control-radius, var(--ui-radius)) + 4px) 8px 5px;
+  border-radius: 0 0 var(--ui-control-radius, var(--ui-radius)) var(--ui-control-radius, var(--ui-radius));
+  background: var(--ui-secondary);
+  box-shadow: var(--floating-control-shadow);
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}

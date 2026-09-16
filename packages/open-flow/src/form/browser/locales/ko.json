@@ -41,6 +41,8 @@
     "reorderHint": "드래그하거나 위아래 화살표 키로 순서 변경",
     "notNullable": "null 허용 안 함",
     "nullable": "null 허용",
+    "notNullableDescription": "이 값은 null일 수 없습니다",
+    "nullableDescription": "이 값은 null일 수 있습니다",
     "group": "그룹",
     "groupName": "그룹 이름",
     "addGroup": "그룹 추가",

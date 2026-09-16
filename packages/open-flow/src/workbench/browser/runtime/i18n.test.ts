@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { timeZoneLocales } from '../../../canvas/browser/i18n/timeZoneLocales.ts'
 import formEnglish from '../../../form/browser/locales/en.json'
 import uiEnglish from '../../../ui/browser/locales/en.json'
 import { createI18n, locales } from './i18n.ts'
@@ -18,7 +19,7 @@ function placeholders(message: string): string[] {
   return [...message.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].flatMap((match) => match[1] ?? []).toSorted()
 }
 
-const english = new Map(messages({ ...en, ...uiEnglish, ...formEnglish }))
+const english = new Map(messages({ ...en, ...timeZoneLocales.en, ...uiEnglish, ...formEnglish }))
 
 describe('Workbench i18n', () => {
   it('ships every supported language', () => {
@@ -55,6 +56,7 @@ describe('Workbench i18n', () => {
     expect(i18n.t('resource.flows')).toBe('工作流')
     expect(i18n.t('notice.created', { name: '演示' })).toBe('已创建 演示。')
     expect(i18n.t('agent.assigned', { fields: 'to, cc' })).toBe('已指定参数：to, cc')
+    expect(i18n.t('timeZoneNames.Asia/Shanghai')).toBe('上海')
 
     i18n.dispose()
   })

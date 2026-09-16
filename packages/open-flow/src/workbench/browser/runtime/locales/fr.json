@@ -850,9 +850,9 @@
     "scheduleWeeks": "Semaines",
     "scheduleMonths": "Mois",
     "scheduleExpression": "Expression Cron",
+    "scheduleExpressionInvalid": "Saisissez une expression Cron valide à cinq champs.",
     "scheduleTimezone": "Fuseau horaire",
-    "scheduleMissing": "Aucune planification configurée",
-    "scheduleTestHint": "Les tests envoient {} ; les exécutions en ligne envoient { scheduledAt }."
+    "scheduleMissing": "Aucune planification configurée"
   },
   "triggerConfig": {
     "configuration": "Configuration",

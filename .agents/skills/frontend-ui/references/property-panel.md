@@ -87,6 +87,14 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 
 ## Danger and interaction states
 
+- All validation initiated by node property-panel editors must run asynchronously, even when the
+  underlying check is local and synchronous. Each validation run must be cancelable; a new draft,
+  external value change, editor replacement, or unmount cancels the superseded run. Only the result
+  belonging to the current draft may update pending, valid, or error state or permit persistence.
+  Guard completion with both cancellation state and request identity so an older result cannot
+  overwrite newer input. Blur and Enter must coordinate with the current validation rather than
+  committing a stale last-valid value; invalid drafts remain visible and are never silently replaced
+  or submitted.
 - Unset-required prompts, missing choice options, and validation failures share the same danger
   border and tinted surface. Danger prompt text and affordance icons use the same danger foreground.
   Use the shared theme/state owner. Do not mix separate red opacities, font sizes, or local tint

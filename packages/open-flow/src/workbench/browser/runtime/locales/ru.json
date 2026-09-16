@@ -850,9 +850,9 @@
     "scheduleWeeks": "Недели",
     "scheduleMonths": "Месяцы",
     "scheduleExpression": "Cron-выражение",
+    "scheduleExpressionInvalid": "Введите допустимое Cron-выражение из пяти полей.",
     "scheduleTimezone": "Часовой пояс",
-    "scheduleMissing": "Расписание не настроено",
-    "scheduleTestHint": "Тесты отправляют {}; рабочие запуски отправляют { scheduledAt }."
+    "scheduleMissing": "Расписание не настроено"
   },
   "triggerConfig": {
     "configuration": "Конфигурация",

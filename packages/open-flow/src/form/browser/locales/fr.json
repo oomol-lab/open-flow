@@ -41,6 +41,8 @@
     "reorderHint": "Glissez ou utilisez les flèches haut et bas",
     "notNullable": "Null non autorisé",
     "nullable": "Autoriser null",
+    "notNullableDescription": "Cette valeur ne peut pas être nulle",
+    "nullableDescription": "Cette valeur peut être nulle",
     "group": "Groupe",
     "groupName": "Nom du groupe",
     "addGroup": "Ajouter un groupe",

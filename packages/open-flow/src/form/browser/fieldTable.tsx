@@ -4,6 +4,7 @@ import type { ComponentPropsWithoutRef } from 'react'
 import { forwardRef } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Checkbox } from '../../ui/browser/checkbox.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/tooltip.tsx'
 
 /** Shared field geometry. Callers own definitions, values, actions and persistence. */
 export const FieldTable = forwardRef<
@@ -47,16 +48,19 @@ export function FieldTableRow({ className, ...props }: ComponentPropsWithoutRef<
 export function FieldNullable({ name, checked, onChange }: { name: string; checked: boolean; onChange?: (checked: boolean) => void }) {
   const t = useTranslate()
   return (
-    <span className={styles.nullableControl}>
-      <Checkbox
-        className="not-data-disabled:cursor-pointer"
-        aria-label={`${name} ${t(!onChange && !checked ? 'valueEditor.notNullable' : 'valueEditor.nullable')}`}
-        aria-checked={checked}
-        checked={checked}
-        indeterminate={!onChange && !checked}
-        disabled={!onChange}
-        onCheckedChange={(next) => onChange?.(next === true)}
-      />
-    </span>
+    <Tooltip>
+      <TooltipTrigger render={<span className={styles.nullableControl} />}>
+        <Checkbox
+          className="not-data-disabled:cursor-pointer"
+          aria-label={`${name} ${t('valueEditor.nullable')}`}
+          aria-checked={checked}
+          checked={checked}
+          indeterminate={!onChange && !checked}
+          disabled={!onChange}
+          onCheckedChange={(next) => onChange?.(next === true)}
+        />
+      </TooltipTrigger>
+      <TooltipContent>{t(checked ? 'valueEditor.nullableDescription' : 'valueEditor.notNullableDescription')}</TooltipContent>
+    </Tooltip>
   )
 }

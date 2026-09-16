@@ -41,6 +41,8 @@
     "reorderHint": "ドラッグまたは上下矢印キーで並べ替え",
     "notNullable": "null は許可されません",
     "nullable": "null を許可",
+    "notNullableDescription": "この値に null は指定できません",
+    "nullableDescription": "この値には null を指定できます",
     "group": "グループ",
     "groupName": "グループ名",
     "addGroup": "グループを追加",

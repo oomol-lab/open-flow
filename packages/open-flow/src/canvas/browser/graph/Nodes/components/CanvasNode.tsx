@@ -4,12 +4,12 @@ import type { NodeStore } from '../../../stores/node/node.store.ts'
 
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
+import { cronDescription, cronLabel } from '../../../../../trigger/browser/cronDescription.ts'
+import { timeZoneLabel } from '../../../../../trigger/browser/timeZones.ts'
 import { ContentIcon } from '../../../../../ui/browser/icons/ContentIcon.tsx'
 import { NODE_HANDLE_CLASSNAME } from '../../../base/canvas.ts'
 import { CanvasTooltip } from '../../../components/tooltip.tsx'
 import { nodeCardContent } from '../../FlowCanvas/cardContent.ts'
-import { cronDescription, cronLabel } from '../../FlowCanvas/cronDescription.ts'
-import { timeZoneLabel } from '../../FlowCanvas/timeZoneLabel.ts'
 import { CanvasCard, CardCollapse } from './CanvasCard.tsx'
 import { iconForNodeType } from './constants.ts'
 import { NodeContentRows } from './NodeContentRows.tsx'
@@ -140,7 +140,7 @@ export function CanvasNode({
                             </CanvasTooltip>
                             <CanvasTooltip placement="top" sideOffset={12} title={<code>{schedule.timezone}</code>}>
                               <span className={styles.timezone} tabIndex={0}>
-                                <bdi dir="ltr">{timeZoneLabel(schedule.timezone, t)}</bdi>
+                                <bdi dir="ltr">{timeZoneLabel(schedule.timezone, t, language)}</bdi>
                               </span>
                             </CanvasTooltip>
                           </>

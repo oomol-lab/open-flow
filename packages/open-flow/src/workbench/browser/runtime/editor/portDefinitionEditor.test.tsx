@@ -64,7 +64,7 @@ describe('Property panel port layout', () => {
     const typeDisplay = (markup.match(/<span\b[^>]*>/g) ?? []).find((tag) => tag.includes('aria-label="message type: Text"'))
     expect(typeDisplay).toContain('role="img"')
     expect(typeDisplay).not.toContain('tabindex=')
-    expect(markup).toContain('message Allow null')
+    expect(markup).toContain('message Nullable')
   })
 
   it('passes definition editing through custom input value renderers', () => {

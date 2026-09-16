@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId, validateTriggerSchedule } from '../src/trigger/common/cron.ts'
+import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId, validateCronExpression, validateTriggerSchedule } from '../src/trigger/common/cron.ts'
 
 describe('Cron Trigger protocol', () => {
   it('preserves canonical interval grids', () => {
@@ -13,6 +13,12 @@ describe('Cron Trigger protocol', () => {
     expect(() => validateTriggerSchedule([{ expression: '0 */5 * * * *', timezone: 'UTC', type: 'cron' }])).toThrow('exactly five fields')
     expect(() => validateTriggerSchedule([{ expression: '*/5 * * * *', timezone: 'Not/AZone', type: 'cron' }])).toThrow('Invalid IANA timezone')
     expect(() => validateTriggerSchedule([{ type: 'every', unit: 'month', value: 13 }])).toThrow('must not exceed one year')
+  })
+
+  it('validates individual five-field cron expressions for editors', () => {
+    expect(() => validateCronExpression('0 9 * * *', 'UTC')).not.toThrow()
+    expect(() => validateCronExpression('0 0 9 * * *', 'UTC')).toThrow('exactly five fields')
+    expect(() => validateCronExpression('0 99 * * *', 'UTC')).toThrow('Invalid cron expression')
   })
 
   it('preserves the deployed scheduled occurrence identity', async () => {

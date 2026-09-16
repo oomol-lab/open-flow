@@ -831,7 +831,6 @@ export function NodeInspector({
             key={`schedule:${selection.id}`}
             schedules={selection.trigger.kind === 'cron' ? selection.trigger.cronTimes : selection.trigger.pollTimes}
             disabled={disabled}
-            testHint={selection.trigger.kind === 'cron'}
             onChange={(schedule) => {
               void store.saveTriggerSchedule(selection.id, schedule)
             }}

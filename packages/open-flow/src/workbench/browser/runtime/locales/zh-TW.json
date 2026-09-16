@@ -842,9 +842,9 @@
     "scheduleWeeks": "週",
     "scheduleMonths": "月",
     "scheduleExpression": "Cron 運算式",
+    "scheduleExpressionInvalid": "請輸入有效的五段 Cron 運算式。",
     "scheduleTimezone": "時區",
-    "scheduleMissing": "尚未設定排程",
-    "scheduleTestHint": "測試傳送 {}，線上執行傳送 { scheduledAt }。"
+    "scheduleMissing": "尚未設定排程"
   },
   "triggerConfig": {
     "configuration": "設定",

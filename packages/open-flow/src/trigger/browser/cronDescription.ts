@@ -11,7 +11,7 @@ import type { TFunction } from 'val-i18n'
 
 import { Cron } from 'croner'
 import cronstrue from 'cronstrue'
-import { resolveUiLanguage } from '../../../../localization/common/languages.ts'
+import { resolveUiLanguage } from '../../localization/common/languages.ts'
 
 /** Descriptions are presentation only; Croner remains the scheduling authority. */
 export function cronDescription(expression: string, language: string): string {

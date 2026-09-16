@@ -20,7 +20,6 @@ function ScheduleStory({ dark, language, log }: { dark: boolean; language: UiLan
         <TriggerScheduleEditor
           schedules={schedules}
           disabled={false}
-          testHint
           onChange={(next) => {
             setSchedules(next)
             log('Save schedule', next)

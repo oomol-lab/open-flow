@@ -850,9 +850,9 @@
     "scheduleWeeks": "週間",
     "scheduleMonths": "か月",
     "scheduleExpression": "Cron 式",
+    "scheduleExpressionInvalid": "有効な5フィールドの Cron 式を入力してください。",
     "scheduleTimezone": "タイムゾーン",
-    "scheduleMissing": "スケジュールが未設定です",
-    "scheduleTestHint": "テストは {}、本番実行は { scheduledAt } を送信します。"
+    "scheduleMissing": "スケジュールが未設定です"
   },
   "triggerConfig": {
     "configuration": "設定",

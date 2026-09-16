@@ -850,9 +850,9 @@
     "scheduleWeeks": "Weeks",
     "scheduleMonths": "Months",
     "scheduleExpression": "Cron expression",
+    "scheduleExpressionInvalid": "Enter a valid five-field Cron expression.",
     "scheduleTimezone": "Time zone",
-    "scheduleMissing": "No schedule configured",
-    "scheduleTestHint": "Tests send {}; live runs send { scheduledAt }."
+    "scheduleMissing": "No schedule configured"
   },
   "triggerConfig": {
     "configuration": "Configuration",

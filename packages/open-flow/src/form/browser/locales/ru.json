@@ -41,6 +41,8 @@
     "reorderHint": "Перетащите или используйте стрелки вверх и вниз",
     "notNullable": "Null не допускается",
     "nullable": "Разрешить null",
+    "notNullableDescription": "Это значение не может быть null",
+    "nullableDescription": "Это значение может быть null",
     "group": "Группа",
     "groupName": "Название группы",
     "addGroup": "Добавить группу",

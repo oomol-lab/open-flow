@@ -1,8 +1,8 @@
 import { Cron } from 'croner'
 import { describe, expect, it } from 'vitest'
 import { uiLanguages } from '../../../../localization/common/languages.ts'
+import { cronDescription, cronLabel } from '../../../../trigger/browser/cronDescription.ts'
 import { createI18n } from '../../i18n/i18n-loader.ts'
-import { cronDescription, cronLabel } from './cronDescription.ts'
 
 describe('cronDescription', () => {
   it.each([
