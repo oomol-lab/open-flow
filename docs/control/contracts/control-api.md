@@ -534,10 +534,9 @@ Connector credential 不进入响应、Revision 或 RunEvent。
 subscribeFlowCatalog(listener: (event?: FlowCatalogEvent) => void): { ready: Promise<void>; stop(): void }
 subscribeFlow(flowId: string, listener: (event?: FlowChangeEvent) => void): { ready: Promise<void>; stop(): void }
 
-interface FlowCatalogEvent {
-  kind: 'flows.changed'
-  version: 1
-}
+type FlowCatalogEvent =
+  | { kind: 'flows.changed'; version: 1 }
+  | { kind: 'flow.created'; flowId: string; version: 1 }
 
 type FlowChangeEvent =
   | { flowId: string; kind: 'draft.changed'; revisionId: string; version: 1 }
@@ -550,7 +549,9 @@ type FlowChangeEvent =
 `stop()` 关闭连接、取消重试，并停止后续回调。
 `undefined` 表示首次等待结束后连接重新建立，包含失败或超时后的第一次成功连接，客户端必须 refetch。
 在初始 snapshot 读取期间收到的 invalidation 不能丢弃；Draft revision 与 snapshot 相同时无需重复同步，否则读取当前 Draft。
-事件只做 invalidation。Server 的首次连接等待上限为 5 秒，之后继续尝试连接。Server 同源宿主使用两个独立 SSE 请求：
+事件不携带资源快照，客户端仍通过读取 API 获取内容。`flow.created` 仅在新 Flow 首次创建成功时发送，幂等重放不重复发送。
+Workbench 已完成初始化并停留在 Flows 列表时，收到该事件自动打开新 Flow；已经打开详情、正在本地创建或已开始自动导航时不抢占当前操作。
+初次列表加载、普通 `flows.changed` 和重连 invalidation 只刷新列表，不推断新建并跳转。Server 的首次连接等待上限为 5 秒，之后继续尝试连接。Server 同源宿主使用两个独立 SSE 请求：
 
 - `GET /v1/flows/notifications`
 - `GET /v1/flows/:flowId/notifications`

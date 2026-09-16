@@ -7,6 +7,7 @@ import type {
   Draft,
   DraftChange,
   Flow,
+  FlowCatalogEvent,
   FlowChangeEvent,
   FlowCheck,
   Live,
@@ -73,7 +74,7 @@ export interface PublicationPosition {
 export class ControlService {
   private readonly acceptPublish: (input: PublishInput) => Promise<PublishOperation>
   private readonly clock: () => number
-  private readonly flowCatalogChanged: () => void
+  private readonly flowCatalogChanged: (event?: FlowCatalogEvent) => void
   private readonly flowChanged: (event: FlowChangeEvent) => void
   private readonly llmAvailable: (kind?: 'agent') => boolean
   private readonly publish: (input: PublishInput) => Promise<PublicationAcceptance>
@@ -98,7 +99,7 @@ export class ControlService {
     triggersChanged: () => void,
     triggerDefinitions: readonly TriggerKeySnapshot[],
     testPollTrigger: (flowId: string, triggerNodeId: string) => Promise<PollTriggerTestResult>,
-    flowCatalogChanged: () => void,
+    flowCatalogChanged: (event?: FlowCatalogEvent) => void,
     flowChanged: (event: FlowChangeEvent) => void,
     llmAvailable: (kind?: 'agent') => boolean,
     resolveConnector: () => ConnectorHost | undefined,
@@ -351,7 +352,7 @@ export class ControlService {
       revisionId: identity('revision'),
     })
     if ('kind' in stored) throw new ControlError(controlErrorCode.flowConflict, 'The idempotency key refers to another Flow request.')
-    if (stored.created) this.flowCatalogChanged()
+    if (stored.created) this.flowCatalogChanged({ kind: 'flow.created', flowId: stored.flow.flowId, version: 1 })
     return { created: stored.created, flow: flow(stored.flow) }
   }
 

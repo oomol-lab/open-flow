@@ -450,7 +450,17 @@ it('streams independent Flow catalog and current Flow invalidations', async () =
       method: 'POST',
     })
     const created = (await createdResponse.json()) as { readonly draftRevisionId: string; readonly flowId: string }
-    expect(new TextDecoder().decode((await catalogReader.read()).value)).toBe(`data: ${JSON.stringify({ kind: 'flows.changed', version: 1 })}\n\n`)
+    expect(new TextDecoder().decode((await catalogReader.read()).value)).toBe(
+      `data: ${JSON.stringify({ kind: 'flow.created', flowId: created.flowId, version: 1 })}\n\n`,
+    )
+    const repeated: unknown[] = []
+    const stop = service.subscribeFlowCatalog((event) => repeated.push(event))
+    try {
+      await service.control.createFlow('operator', 'Notifications', 'notifications-flow')
+      expect(repeated).toEqual([])
+    } finally {
+      stop()
+    }
 
     const response = await app.request(`/v1/flows/${created.flowId}/notifications`)
     expect(response.status).toBe(200)
