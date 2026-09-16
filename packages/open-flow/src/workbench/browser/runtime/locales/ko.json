@@ -322,6 +322,7 @@
       "sort": "순서 변경",
       "finishSorting": "순서 변경 완료",
       "inputsTitle": "입력",
+      "noOutputs": "이 노드는 출력 데이터를 제공하지 않습니다.",
       "outputsTitle": "출력",
       "valuesTitle": "값",
       "columnHandle": "Handle",
@@ -874,9 +875,6 @@
     "webhookStatus": "상태 코드",
     "webhookSummary": "HTTP 요청이 도착하면 실행",
     "webhookDescription": "생성된 HTTP 엔드포인트로 JSON 객체를 수신합니다."
-  },
-  "triggerSummary": {
-    "manualPayloadHint": "다운스트림 노드는 빈 객체({})를 받습니다."
   },
   "conditionEditor": {
     "addCondition": "조건 추가",

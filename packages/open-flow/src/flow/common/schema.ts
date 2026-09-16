@@ -5,6 +5,10 @@ import { Validator } from '@cfworker/json-schema'
 import { compareJSONSchema, normalizeNullableSchemaPath } from '../../manifest/common/schemaCompare.ts'
 import { isSchemaKeyword } from './change.ts'
 
+export function triggerOutputPorts(trigger: TriggerNode): Readonly<Record<string, PortDefinition>> {
+  return trigger.kind === 'manual' ? {} : { payload: { jsonSchema: triggerPayloadSchema(trigger), nullable: false } }
+}
+
 export function triggerPayloadSchema(trigger: TriggerNode): JsonValue {
   if (trigger.kind == 'poll' || trigger.kind == 'integration') return trigger.definition.payloadSchema
   if (trigger.kind == 'manual') return { additionalProperties: false, type: 'object' }

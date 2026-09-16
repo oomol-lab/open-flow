@@ -577,7 +577,11 @@ function validateCheckpoint(
       const result = completed.get(id)
       if (result != null) {
         triggers++
-        if (Object.keys(result.outputs).length != 1 || !Object.hasOwn(result.outputs, 'payload')) throw new Error('Checkpoint Trigger output is invalid.')
+        const validOutputs =
+          node.kind === 'manual'
+            ? Object.keys(result.outputs).length === 0
+            : Object.keys(result.outputs).length === 1 && Object.hasOwn(result.outputs, 'payload')
+        if (!validOutputs) throw new Error('Checkpoint Trigger output is invalid.')
       }
       continue
     }
@@ -676,7 +680,7 @@ function runGraph(
       if (resume == null) {
         for (const [id, node] of Object.entries(target.graph.nodes)) {
           if ('inputs' in node) continue
-          if (trigger?.nodeId == id) completed.set(id, { jobId: id, outputs: { payload: trigger.payload } })
+          if (trigger?.nodeId == id) completed.set(id, { jobId: id, outputs: node.kind === 'manual' ? {} : { payload: trigger.payload } })
           else skipped.add(id)
         }
       }

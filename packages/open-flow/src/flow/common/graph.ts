@@ -17,6 +17,7 @@ import type { Diagnostic, SemanticClosure } from './semantics.ts'
 import { portsByHandle, validVariableName } from './change.ts'
 import {
   triggerPayloadSchema,
+  triggerOutputPorts,
   schemaObject,
   schemaList,
   matchesSchema,
@@ -161,7 +162,7 @@ function nodeOutputPorts(document: FlowDocument, node: GraphNode): Readonly<Reco
     case 'poll':
     case 'manual':
     case 'webhook':
-      return { payload: { jsonSchema: triggerPayloadSchema(node), nullable: false } }
+      return triggerOutputPorts(node)
   }
 }
 

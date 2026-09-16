@@ -176,7 +176,7 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
       inputs: [],
       kind: 'trigger',
       label: t('addNode.manual'),
-      outputs: [{ handle: 'payload', jsonSchema: { additionalProperties: false, type: 'object' } }],
+      outputs: [],
       trigger: { kind: 'manual' },
     },
     {

@@ -28,7 +28,7 @@ import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionVi
 
 import { dequal } from 'dequal/lite'
 import { waitOutputPorts } from '../../../flow/common/graph.ts'
-import { triggerPayloadSchema } from '../../../flow/common/schema.ts'
+import { triggerOutputPorts } from '../../../flow/common/schema.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
 
@@ -230,7 +230,7 @@ function edgeId(source: string, sourceHandle: string, target: string, targetHand
 
 function nodePorts(node: ResolvedSelection): NodePorts {
   if (node.kind == 'trigger') {
-    return { inputs: new Map(), outputs: new Map([['payload', { jsonSchema: triggerPayloadSchema(node.trigger), nullable: false }]]) }
+    return { inputs: new Map(), outputs: new Map(Object.entries(triggerOutputPorts(node.trigger))) }
   }
   const inputs = new Map<string, Omit<FlowCanvasViewInput, 'handle' | 'sources' | 'value'>>(Object.keys(node.node.inputs).map((handle) => [handle, {}]))
   const outputs = new Map<string, Omit<FlowCanvasViewOutput, 'handle'>>()
@@ -616,7 +616,7 @@ function triggerDesignerNode(
     id: triggerId,
     inputs: [],
     kind: 'trigger',
-    outputs: [{ handle: 'payload', jsonSchema: triggerPayloadSchema(trigger), nullable: false }],
+    outputs: Object.entries(triggerOutputPorts(trigger)).map(([handle, port]) => Object.assign({ handle }, port)),
     presentation,
     position,
     title: trigger.name,

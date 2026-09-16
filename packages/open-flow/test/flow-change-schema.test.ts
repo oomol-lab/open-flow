@@ -4,7 +4,7 @@ import { applyFlowChanges, changeOperationsSchema, decodeChangeOperations } from
 
 const target = { kind: 'flow' }
 const operations = [
-  { kind: 'graph.node.create', target, nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
+  { kind: 'graph.node.create', target, nodeId: 'start', node: { kind: 'webhook', name: 'Start', inputsDef: [] } },
   {
     kind: 'graph.node.create',
     target,

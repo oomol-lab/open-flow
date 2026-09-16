@@ -138,3 +138,13 @@ describe('Fixed definitions with custom value editors', () => {
     expect(renderValue.mock.calls[0]?.[1]).toMatchObject({ onDefinitionChange: undefined })
   })
 })
+
+it.each([true, false])('shows the no-output state only when fields cannot be edited (disabled=%s)', (disabled) => {
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={createI18n('en')}>
+      <PortDefinitionEditor layout="ports" title="Outputs" output disabled={disabled} values={[]} onChange={vi.fn()} />
+    </I18nProvider>,
+  )
+  expect(markup.includes('This node does not provide output data.')).toBe(disabled)
+  expect(markup.includes('aria-label="Add field"')).toBe(!disabled)
+})

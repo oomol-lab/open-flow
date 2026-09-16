@@ -322,6 +322,7 @@
       "sort": "並べ替え",
       "finishSorting": "並べ替えを完了",
       "inputsTitle": "入力",
+      "noOutputs": "このノードは出力データを提供しません。",
       "outputsTitle": "出力",
       "valuesTitle": "値",
       "columnHandle": "Handle",
@@ -874,9 +875,6 @@
     "webhookStatus": "ステータスコード",
     "webhookSummary": "HTTP リクエストを受信したとき",
     "webhookDescription": "生成された HTTP エンドポイントで JSON オブジェクトを受信します。"
-  },
-  "triggerSummary": {
-    "manualPayloadHint": "後続ノードは空のオブジェクト（{}）を受け取ります。"
   },
   "conditionEditor": {
     "addCondition": "条件を追加",

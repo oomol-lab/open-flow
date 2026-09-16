@@ -322,6 +322,7 @@
       "sort": "排序",
       "finishSorting": "完成排序",
       "inputsTitle": "輸入",
+      "noOutputs": "此節點不提供輸出資料",
       "outputsTitle": "輸出",
       "valuesTitle": "資料",
       "columnHandle": "Handle",
@@ -874,9 +875,6 @@
     "webhookStatus": "狀態碼",
     "webhookSummary": "收到 HTTP 請求時觸發",
     "webhookDescription": "透過產生的 HTTP 端點接收 JSON 物件。"
-  },
-  "triggerSummary": {
-    "manualPayloadHint": "下游節點會收到空物件 {}。"
   },
   "conditionEditor": {
     "addCondition": "新增條件",

@@ -322,6 +322,7 @@
       "sort": "Sort",
       "finishSorting": "Done sorting",
       "inputsTitle": "Inputs",
+      "noOutputs": "This node does not provide output data.",
       "outputsTitle": "Outputs",
       "valuesTitle": "Values",
       "columnHandle": "Handle",
@@ -874,9 +875,6 @@
     "webhookStatus": "Status code",
     "webhookSummary": "When an HTTP request arrives",
     "webhookDescription": "Receive a JSON object through a generated HTTP endpoint."
-  },
-  "triggerSummary": {
-    "manualPayloadHint": "Downstream nodes receive an empty object ({})."
   },
   "conditionEditor": {
     "addCondition": "Add condition",

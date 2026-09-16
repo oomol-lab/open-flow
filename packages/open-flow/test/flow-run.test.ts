@@ -7,7 +7,7 @@ import { runFlow } from '../src/execution/common/scheduler.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
 
 const port = { handle: 'value', jsonSchema: {}, nullable: false } as const
-const start = { kind: 'manual', name: 'Start' } as const
+const start = { kind: 'webhook', name: 'Start', inputsDef: [] } as const
 const other = { kind: 'webhook', name: 'Other', inputsDef: [{ handle: 'entry', jsonSchema: { type: 'string' }, nullable: false }] } as const
 const task = {
   kind: 'task',
@@ -164,4 +164,17 @@ it('checks reachable subflows and includes only their required bindings and modu
 it.each(['missing', 'code'])('rejects selecting %s as the trigger', async (nodeId) => {
   const content = revision({ edges: [{ source: 'start', target: 'code' }], nodes: { start, code: task } })
   expect((await prepareFlow(content, currentEngineContract, nodeId)).kind).toBe('flow-invalid')
+})
+
+it('rejects references to the removed manual trigger payload output', async () => {
+  const content = revision({
+    edges: [{ source: 'start', target: 'code' }],
+    nodes: { start: { kind: 'manual', name: 'Start' }, code: task },
+  })
+  const result = await prepareFlow(content, currentEngineContract, 'start')
+  expect(result.kind).toBe('flow-invalid')
+  if (result.kind !== 'flow-invalid') throw new Error('Expected invalid output reference.')
+  expect(result.validation.diagnostics).toEqual(
+    expect.arrayContaining([expect.objectContaining({ code: 'graph.source-missing', values: { nodeId: 'start', output: 'payload', variant: 'output' } })]),
+  )
 })

@@ -322,6 +322,7 @@
       "sort": "Изменить порядок",
       "finishSorting": "Готово",
       "inputsTitle": "Входы",
+      "noOutputs": "Этот узел не предоставляет выходных данных.",
       "outputsTitle": "Выходы",
       "valuesTitle": "Значения",
       "columnHandle": "Handle",
@@ -874,9 +875,6 @@
     "webhookStatus": "Код статуса",
     "webhookSummary": "При получении HTTP-запроса",
     "webhookDescription": "Получать JSON-объект через сгенерированный HTTP-адрес."
-  },
-  "triggerSummary": {
-    "manualPayloadHint": "Последующие узлы получают пустой объект ({})."
   },
   "conditionEditor": {
     "addCondition": "Добавить условие",

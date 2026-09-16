@@ -6,11 +6,16 @@ import { useEffect } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { schemaObject, triggerPayloadSchema } from '../../../../flow/common/schema.ts'
+import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 
 export function TriggerSummary({ trigger, display }: { readonly trigger: TriggerNode; readonly display?: TriggerDisplay }) {
   const t = useTranslate()
   if (trigger.kind === 'manual') {
-    return <p className="m-0 px-3 py-2 text-xs text-muted-foreground">{t('triggerSummary.manualPayloadHint')}</p>
+    return (
+      <section className="inspector-port-section" data-inspector-section="outputs">
+        <PortDefinitionEditor layout="ports" title={t('inspector.ports.outputsTitle')} output disabled values={[]} onChange={() => {}} />
+      </section>
+    )
   }
   if (trigger.kind === 'cron') return null
   const schema = schemaObject(triggerPayloadSchema(trigger))

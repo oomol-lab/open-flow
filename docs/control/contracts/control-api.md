@@ -334,7 +334,7 @@ Draft Run 只对选中 Trigger 沿执行边可达的节点及其依赖进行语�
 Draft Run 的 `revisionDigest` 标识完整 Revision，`closureDigest` 标识本次入口的执行 closure，可以与全图 check 的 `closureDigest` 不同。读取和恢复 Run 不修改原 Revision。
 Publish 和 Live Run 保持完整 Flow 校验。
 
-Manual Trigger 的节点结构为 `{ kind: "manual", name: string, description?: string, icon?: string }`，无输入和调度配置，`payload` 固定为空对象 `{}`。其执行出口沿普通执行边连接下游，数据输出 `payload` 的 schema 为 `{ type: "object", additionalProperties: false }`。其他 Trigger 可通过显式 payload 模拟执行，仍保留 Draft/Live Run source，不伪造外部 occurrence。
+Manual Trigger 的节点结构为 `{ kind: "manual", name: string, description?: string, icon?: string }`，无输入和调度配置，`payload` 固定为空对象 `{}`。其执行出口沿普通执行边连接下游，不提供数据输出字段，执行结果的 `outputs` 为空对象 `{}`；运行请求中的 `trigger.payload` 仍固定为 `{}`，不暴露为节点输出。引用 Manual Trigger 的 `payload` 输出会被图校验拒绝。其他 Trigger 可通过显式 payload 模拟执行，仍保留 Draft/Live Run source，不伪造外部 occurrence。
 
 首次 Run admission 在创建 Run 的权威 transaction 中确认固定 closure 使用的 Variable 均存在；缺失返回 `binding.unresolved`。幂等重放先于
 该 eligibility 检查。Run 真正开始时再在一个读取 snapshot 中解析所有 Variable value，所以排队期间的更新会用于本次执行；开始后的更新不影响

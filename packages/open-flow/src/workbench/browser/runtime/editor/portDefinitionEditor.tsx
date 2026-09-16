@@ -721,6 +721,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           )}
         </div>
       )}
+      {props.output && disabled && !hasFields && <p className="m-0 pr-3 pb-4 pl-7 text-left text-xs text-muted-foreground">{t('inspector.ports.noOutputs')}</p>}
       <FieldTable
         className={styles.list}
         layout={props.layout}

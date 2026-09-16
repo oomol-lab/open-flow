@@ -2,6 +2,7 @@ import type { Draft } from '../api.ts'
 
 import { expect, it } from 'vitest'
 import { createI18n } from '../i18n.ts'
+import { designerGraph } from '../workspace.ts'
 import { deriveAddNodeOptions } from './addNodeOptions.ts'
 
 it('offers a manual trigger again after the existing one is removed', () => {
@@ -20,11 +21,12 @@ it('offers a manual trigger again after the existing one is removed', () => {
       document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
     },
   }
+  expect(designerGraph(draft, { kind: 'flow' }).nodes).toEqual([expect.objectContaining({ id: 'start', outputs: [] })])
   const t = createI18n('en').t
   const options = deriveAddNodeOptions(draft, { kind: 'flow' }, t)
   expect(options.some((option) => option.id == 'trigger:manual')).toBe(false)
   expect(options.some((option) => option.id == 'trigger:webhook')).toBe(true)
   expect(options.some((option) => option.id == 'trigger:cron')).toBe(true)
   const cleared: Draft = { ...draft, content: { ...draft.content, document: { ...draft.content.document, graph: { edges: [], nodes: {} } } } }
-  expect(deriveAddNodeOptions(cleared, { kind: 'flow' }, t).some((option) => option.id == 'trigger:manual')).toBe(true)
+  expect(deriveAddNodeOptions(cleared, { kind: 'flow' }, t).find((option) => option.id == 'trigger:manual')).toMatchObject({ outputs: [] })
 })

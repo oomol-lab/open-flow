@@ -322,6 +322,7 @@
       "sort": "Réordonner",
       "finishSorting": "Terminer",
       "inputsTitle": "Entrées",
+      "noOutputs": "Ce nœud ne fournit pas de données de sortie.",
       "outputsTitle": "Sorties",
       "valuesTitle": "Valeurs",
       "columnHandle": "Handle",
@@ -874,9 +875,6 @@
     "webhookStatus": "Code de statut",
     "webhookSummary": "À la réception d'une requête HTTP",
     "webhookDescription": "Recevoir un objet JSON via un point de terminaison HTTP généré."
-  },
-  "triggerSummary": {
-    "manualPayloadHint": "Les nœuds en aval reçoivent un objet vide ({})."
   },
   "conditionEditor": {
     "addCondition": "Ajouter une condition",

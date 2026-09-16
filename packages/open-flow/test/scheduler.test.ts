@@ -397,6 +397,7 @@ describe('revision graph scheduler', () => {
 
     expect(first.kind).toBe('waiting')
     if (first.kind != 'waiting') throw new Error('Expected the Flow Run to wait.')
+    expect(first.checkpoint.results.start?.outputs).toEqual({})
     expect(first.checkpoint.waits[0]!).toMatchObject({ nodeId: 'wait' })
     expect(first.checkpoint.waits[0]!.waitId).toMatch(/^[A-Za-z0-9_-]{21}$/)
     expect(invocations).toEqual([])

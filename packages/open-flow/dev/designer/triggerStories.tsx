@@ -639,7 +639,10 @@ export const triggerStories: readonly FrontendStory[] = [
         group: `Trigger ${fixture.trigger.name}`,
         id: `trigger-${fixture.id}-sidebar`,
         title: 'Properties',
-        description: `${fixture.trigger.name} · Node properties in display and edit states. Changes stay in this Lab session.`,
+        description:
+          fixture.trigger.kind === 'manual'
+            ? 'Manual · Read-only and editable properties share a fixed No outputs state. Changes stay in this Lab session.'
+            : `${fixture.trigger.name} · Node properties in display and edit states. Changes stay in this Lab session.`,
         standalone: true,
         render: (log, dark, language) => <SidebarStory fixture={fixture} log={log} dark={dark} language={language} />,
       },

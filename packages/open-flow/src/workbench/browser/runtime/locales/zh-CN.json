@@ -322,6 +322,7 @@
       "sort": "排序",
       "finishSorting": "完成排序",
       "inputsTitle": "输入",
+      "noOutputs": "此节点不提供输出数据",
       "outputsTitle": "输出",
       "valuesTitle": "数据",
       "columnHandle": "Handle",
@@ -874,9 +875,6 @@
     "webhookStatus": "状态码",
     "webhookSummary": "收到 HTTP 请求时触发",
     "webhookDescription": "通过部署后生成的 HTTP 地址接收 JSON 对象。"
-  },
-  "triggerSummary": {
-    "manualPayloadHint": "下游节点会收到空对象 {}。"
   },
   "conditionEditor": {
     "addCondition": "添加条件",
