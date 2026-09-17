@@ -1,7 +1,8 @@
 @use './fieldLayout.scss';
 @use 'sass:selector';
 
-/* Keep the attached feedback behind its control, above neighboring rows. */
+/* Each editor is one stacking unit. The field table raises the active unit;
+   attached feedback stays behind the controls inside it. */
 .root,
 .errorAnchor {
   --ui-danger-border-width: 1px;
@@ -13,6 +14,9 @@
 }
 .root {
   --field-control-height: 30px;
+  --value-editor-feedback-layer: 1;
+  --value-editor-control-layer: 2;
+  --value-editor-overlay-layer: 3;
   display: grid;
   min-width: 0;
   grid-template-columns: minmax(0, 1fr) var(--field-actions-width, 28px);
@@ -139,7 +143,6 @@ $feedback-focus: ':has(#{$feedback-targets})';
 :global([data-value-editor-scope]):has(#{selector.nest('.root', $feedback-targets)}),
 .root#{$feedback-focus} {
   --error-hover-visibility: hidden;
-  --error-hover-layer: auto;
 }
 :is(.body:not([hidden]), .errorAnchor):hover > .error,
 .root:has(> :is(.summary, .arrayItemType, .valueTools):hover) > .summaryError > .error,
@@ -153,10 +156,11 @@ $feedback-focus: ':has(#{$feedback-targets})';
   visibility: visible;
 }
 .root:not(#{$feedback-focus}):has(> :is(.body, .summary, .arrayItemType, .valueTools, .summaryError):hover) {
-  z-index: var(--error-hover-layer, 2);
+  z-index: var(--value-editor-hover-layer, 1);
 }
-.root#{$feedback-focus} {
-  z-index: 3;
+.root#{$feedback-focus},
+.root:has([data-popup-open]) {
+  z-index: var(--value-editor-active-layer, 2);
 }
 
 .srOnly {
@@ -280,11 +284,15 @@ $feedback-focus: ':has(#{$feedback-targets})';
     padding-top: 6px;
   }
 }
-/* Keep child editor stacking inside the body. Summary feedback floats above
-   that body, with the owning control and its actions in front of the base. */
+/* Expanded content is the base layer. Summary feedback covers that content,
+   while the parent control stays in front of its attached feedback. An open
+   descendant overlay raises the content plane above both. */
+.body:has([data-popup-open]) {
+  z-index: var(--value-editor-overlay-layer);
+}
 .summary,
 .arrayItemType {
-  z-index: 2;
+  z-index: var(--value-editor-control-layer);
 }
 .summary {
   --preview-background: var(--ui-control-background, var(--ui-muted));
@@ -328,7 +336,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
   align-items: center;
   height: var(--field-control-height);
   margin-right: calc(var(--value-suffix-width) + 3px);
-  z-index: 3;
+  z-index: var(--value-editor-control-layer);
   color: var(--ui-muted-foreground);
 }
 .root[data-value-tools] {
@@ -375,7 +383,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
   align-items: center;
   justify-content: center;
   width: var(--field-toggle-width, 24px);
-  z-index: 1;
+  z-index: var(--value-editor-control-layer);
   pointer-events: none;
   color: var(--ui-muted-foreground);
   font-variant-numeric: tabular-nums;
@@ -718,7 +726,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 
 .summaryError {
-  z-index: 1;
+  z-index: var(--value-editor-feedback-layer);
   position: relative;
   grid-column: 1;
   grid-row: 1;
