@@ -80,12 +80,14 @@ function SelectedSourceValue({
   bound,
   connected,
   upstream,
+  variableCompatible,
   variableName,
   variables,
 }: {
   readonly bound: boolean
   readonly connected: boolean
   readonly upstream?: NodeInputUpstreamSources
+  readonly variableCompatible: boolean
   readonly variableName?: string
   readonly variables: InputVariables
 }) {
@@ -107,11 +109,13 @@ function SelectedSourceValue({
     ? !variables.enabled
       ? t('variablePicker.variableUnavailableHelp')
       : t('variablePicker.variableMissingHelp', { name: variableName })
-    : checks?.conflict
-      ? t('inspector.sources.sourceConflict', { sources: current?.map((source) => `${source.nodeName} ${source.output}`).join(', ') })
-      : invalidUpstream != null
-        ? inputSourceIssue(invalidUpstream.check, invalidUpstream, t)
-        : undefined
+    : bound && !variableCompatible
+      ? t('variablePicker.variableIncompatibleHelp')
+      : checks?.conflict
+        ? t('inspector.sources.sourceConflict', { sources: current?.map((source) => `${source.nodeName} ${source.output}`).join(', ') })
+        : invalidUpstream != null
+          ? inputSourceIssue(invalidUpstream.check, invalidUpstream, t)
+          : undefined
   const sourceLabel = bound
     ? variableName
     : current?.length
@@ -133,7 +137,18 @@ function SelectedSourceValue({
             tabIndex={sourceIssue ? 0 : undefined}
           >
             {bound ? (
-              <i aria-hidden="true" className="i-heroicons:variable-20-solid mr-2 size-3.5 shrink-0 text-muted-foreground" />
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span role="img" aria-label={t('nodeInput.variable')} className="-my-px mr-2 flex h-[30px] shrink-0 items-center text-muted-foreground" />
+                  }
+                >
+                  <i aria-hidden="true" className="i-lucide-light:sliders-horizontal size-3.5" />
+                </TooltipTrigger>
+                <TooltipContent container={tooltipContainer} sideOffset={0}>
+                  {t('nodeInput.variable')}
+                </TooltipContent>
+              </Tooltip>
             ) : (
               connected &&
               current?.length === 1 && (
@@ -206,6 +221,7 @@ export function NodeInputValue({
   const llm = supportsLlmInput(definition.jsonSchema, value)
   const bound = variableName != null
   const variableCompatible = variableInputCompatible(definition.jsonSchema)
+  const hasVariables = variables.enabled && variables.names.length > 0
   const literalSource = JSON.stringify(['literal'])
   const currentSource = bound
     ? variableSource(variableName)
@@ -261,10 +277,10 @@ export function NodeInputValue({
               <span className="min-w-0 flex-1 truncate">{t('nodeInput.literal')}</span>
             </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
-          {variableCompatible ? (
+          {hasVariables && (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className={`${sourceSubTriggerClass} ${sourceKind === 'variable' ? 'bg-accent' : ''}`}>
-                <i aria-hidden="true" className="i-heroicons:variable-20-solid size-3.5 shrink-0 text-muted-foreground" />
+                <i aria-hidden="true" className="i-lucide-light:sliders-horizontal size-3.5 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate">{t('nodeInput.variable')}</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className={`w-48 min-w-48 ${selectionMenuContentClass}`} container={sourcePortal}>
@@ -277,43 +293,38 @@ export function NodeInputValue({
                 >
                   {bound && !variables.names.includes(variableName) && (
                     <DropdownMenuRadioItem className={sourceItemClass} value={variableSource(variableName)} disabled>
-                      <i aria-hidden="true" className="i-heroicons:variable-20-solid size-3.5 shrink-0 text-muted-foreground" />
+                      <i aria-hidden="true" className="i-lucide-light:sliders-horizontal size-3.5 shrink-0 text-muted-foreground" />
                       <span className="min-w-0 flex-1 truncate font-mono">{variableName}</span>
                     </DropdownMenuRadioItem>
                   )}
-                  {variables.enabled &&
-                    variables.names.map((name) => (
-                      <DropdownMenuRadioItem className={sourceItemClass} key={name} value={variableSource(name)} closeOnClick>
-                        <i aria-hidden="true" className="i-heroicons:variable-20-solid size-3.5 shrink-0 text-muted-foreground" />
+                  {variables.names.map((name) => {
+                    const selected = sourceKind === 'variable' && currentSource === variableSource(name)
+                    const status = variableCompatible ? undefined : t('inspector.sources.incompatible')
+                    return (
+                      <DropdownMenuRadioItem
+                        className={`${sourceItemClass} ${status == null || selected ? 'pr-8' : 'pr-20'}`}
+                        key={name}
+                        value={variableSource(name)}
+                        closeOnClick
+                      >
+                        <i
+                          aria-hidden="true"
+                          className={`${status == null ? 'i-lucide-light:sliders-horizontal text-muted-foreground' : 'i-lucide-light:triangle-alert'} size-3.5 shrink-0`}
+                          style={status == null ? undefined : { color: 'var(--warning-foreground)' }}
+                        />
                         <span className="min-w-0 flex-1 truncate font-mono">{name}</span>
+                        {!selected && status != null && (
+                          <span className="pointer-events-none absolute right-2 shrink-0 text-[10px] leading-4" style={{ color: 'var(--warning-foreground)' }}>
+                            {status}
+                          </span>
+                        )}
+                        {selected && status != null && <span className="sr-only">{status}</span>}
                       </DropdownMenuRadioItem>
-                    ))}
-                  {variables.enabled && variables.loading && variables.names.length === 0 && (
-                    <DropdownMenuItem className={sourceEmptyItemClass} disabled>
-                      {t('variablePicker.variablesLoading')}
-                    </DropdownMenuItem>
-                  )}
-                  {variables.enabled && !variables.loading && variables.names.length === 0 && !bound && (
-                    <DropdownMenuItem className={sourceEmptyItemClass} disabled>
-                      {t('nodeInput.noVariables')}
-                    </DropdownMenuItem>
-                  )}
-                  {!variables.enabled && !bound && (
-                    <DropdownMenuItem className={sourceEmptyItemClass} disabled>
-                      {t('variablePicker.variableUnavailableHelp')}
-                    </DropdownMenuItem>
-                  )}
+                    )
+                  })}
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-          ) : (
-            <DropdownMenuItem className={`${sourceItemClass} data-disabled:opacity-70 ${sourceKind === 'variable' ? 'bg-accent' : ''}`} disabled>
-              <i aria-hidden="true" className="i-heroicons:variable-20-solid size-3.5 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate">{t('nodeInput.variable')}</span>
-              <span className="ml-auto flex h-4 shrink-0 items-center justify-end text-right text-[10px] leading-4 text-muted-foreground">
-                {t('nodeInput.unsupported')}
-              </span>
-            </DropdownMenuItem>
           )}
           <DropdownMenuSeparator className="mx-2 bg-border/50" />
           {candidates.pending || candidates.failed ? (
@@ -408,7 +419,14 @@ export function NodeInputValue({
   )
   const editor =
     connected || bound ? (
-      <SelectedSourceValue bound={bound} connected={connected} upstream={providedUpstream} variableName={variableName} variables={variables} />
+      <SelectedSourceValue
+        bound={bound}
+        connected={connected}
+        upstream={providedUpstream}
+        variableCompatible={variableCompatible}
+        variableName={variableName}
+        variables={variables}
+      />
     ) : llm ? (
       <LlmInputEditor addon={sourceControl} schema={definition.jsonSchema} value={value} disabled={disabled} handleNames={handleNames} onChange={onValue} />
     ) : undefined

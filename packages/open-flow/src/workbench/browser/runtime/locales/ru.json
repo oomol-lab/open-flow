@@ -950,10 +950,8 @@
   },
   "nodeInput": {
     "literal": "Литерал",
-    "variable": "Variable",
-    "noVariables": "Нет объявленных Variable",
+    "variable": "Переменные среды",
     "noUpstreamNodes": "Нет доступных данных",
-    "unsupported": "Не поддерживается",
     "mode": "Тип",
     "connected": "Данные выбраны. Изменить их можно через «Выбрать данные»."
   },

@@ -950,10 +950,8 @@
   },
   "nodeInput": {
     "literal": "固定値",
-    "variable": "Variable",
-    "noVariables": "Variable はまだ宣言されていません",
+    "variable": "環境変数",
     "noUpstreamNodes": "利用できるデータがありません",
-    "unsupported": "非対応",
     "mode": "型",
     "connected": "データが選択されています。「データを選択」から変更できます。"
   },

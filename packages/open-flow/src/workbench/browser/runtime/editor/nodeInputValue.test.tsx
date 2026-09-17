@@ -71,10 +71,32 @@ describe('Independent node inputs', () => {
       </I18nProvider>,
     )
     expect(markup).toContain('MISSING')
-    expect(markup).toContain('i-heroicons:variable-20-solid')
+    expect(markup).toContain('i-lucide-light:sliders-horizontal')
+    expect(markup).toContain('role="img"')
+    expect(markup).toContain('aria-label="Env"')
     expect(markup).toContain('role="alert"')
     expect(onValue).not.toHaveBeenCalled()
     expect(onVariable).not.toHaveBeenCalled()
+  })
+
+  it('explains an incompatible environment variable binding', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <NodeInputValue
+          definition={{ handle: 'count', jsonSchema: { type: 'number' }, nullable: false }}
+          value={undefined}
+          variableName="API_TOKEN"
+          connected={false}
+          variables={variables}
+          disabled={false}
+          onValue={vi.fn()}
+          onVariable={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    expect(markup).toContain('role="alert"')
+    expect(markup).toContain('Environment variables are text and are not compatible with this input.')
   })
 
   it('renders LLM message controls through the product input without writing defaults', () => {

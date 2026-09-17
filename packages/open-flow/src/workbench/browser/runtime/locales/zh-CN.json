@@ -942,10 +942,8 @@
   },
   "nodeInput": {
     "literal": "固定值",
-    "variable": "Variable",
-    "noVariables": "尚未声明 Variable",
+    "variable": "环境变量",
     "noUpstreamNodes": "没有可用数据",
-    "unsupported": "不支持",
     "mode": "类型",
     "connected": "已选择数据，可从“选择数据”中修改。"
   },

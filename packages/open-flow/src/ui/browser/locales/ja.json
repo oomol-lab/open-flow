@@ -5,12 +5,13 @@
     "showMore": "展開"
   },
   "variablePicker": {
-    "variableUnavailableHelp": "Deployment Variable は現在利用できません。",
-    "variableMissingHelp": "Deployment Variable {{name}} は存在しません。",
+    "variableUnavailableHelp": "環境変数は現在利用できません。",
+    "variableMissingHelp": "環境変数 {{name}} は存在しません。",
+    "variableIncompatibleHelp": "環境変数はテキストのため、この入力とは互換性がありません。",
     "variableUnavailable": "{{name}}（現在利用できません）",
     "variableMissing": "{{name}}（見つかりません）",
-    "selectVariable": "Variable を選択",
-    "variablesLoading": "Variable を読み込み中…",
+    "selectVariable": "環境変数を選択",
+    "variablesLoading": "環境変数を読み込み中…",
     "search": "検索",
     "empty": "一致する変数がありません。",
     "clear": "<未設定>"

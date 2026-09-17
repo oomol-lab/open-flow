@@ -5,12 +5,13 @@
     "showMore": "더 보기"
   },
   "variablePicker": {
-    "variableUnavailableHelp": "현재 deployment Variable을 사용할 수 없습니다.",
-    "variableMissingHelp": "현재 deployment에 Variable {{name}}이(가) 더 이상 없습니다.",
+    "variableUnavailableHelp": "현재 환경 변수를 사용할 수 없습니다.",
+    "variableMissingHelp": "환경 변수 {{name}}이(가) 더 이상 없습니다.",
+    "variableIncompatibleHelp": "환경 변수는 텍스트이므로 이 입력과 호환되지 않습니다.",
     "variableUnavailable": "{{name}} (현재 사용할 수 없음)",
     "variableMissing": "{{name}} (누락됨)",
-    "selectVariable": "Variable 선택",
-    "variablesLoading": "Variable 불러오는 중…",
+    "selectVariable": "환경 변수 선택",
+    "variablesLoading": "환경 변수 불러오는 중…",
     "search": "검색",
     "empty": "일치하는 변수가 없습니다.",
     "clear": "<설정 안 됨>"

@@ -157,7 +157,7 @@ describe('Node input ownership', () => {
       revision: {
         graph: () => graph,
         inputSource: () => ({ check: vi.fn(), candidates: vi.fn() }),
-        revision: { content: { document: { graph, subflows: {}, tasks: {} } } },
+        outputDescription: () => 'The complete upstream title.',
       } as never,
       selection: { id: 'condition', kind: 'condition', node } as never,
       store: { $: { flowId: { value: 'flow' } } } as never,

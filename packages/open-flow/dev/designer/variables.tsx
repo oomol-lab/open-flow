@@ -15,7 +15,7 @@ function VariablesStory({ dark, language, log }: { dark: boolean; language: UiLa
     loading: false,
     onChange: (next: string | undefined) => {
       setName(next)
-      log('Bind variable', next ?? null)
+      log('Bind environment variable', next ?? null)
     },
     onOpen: () => log('Refresh variable names'),
   }
@@ -26,7 +26,7 @@ function VariablesStory({ dark, language, log }: { dark: boolean; language: UiLa
           <h3>Available</h3>
           <VariablePicker {...common} name={name} />
         </section>
-        <output aria-label="Saved variable">{name ?? '(unset)'}</output>
+        <output aria-label="Saved environment variable">{name ?? '(unset)'}</output>
         <section>
           <h3>Missing</h3>
           <VariablePicker {...common} name="REMOVED_NAME" />
@@ -54,7 +54,7 @@ function VariablesStory({ dark, language, log }: { dark: boolean; language: UiLa
 export const variablesStory: FrontendStory = {
   group: 'Workbench',
   id: 'variable-picker',
-  title: 'Variable Picker',
+  title: 'Environment Variable Picker',
   standalone: true,
   render: (log, dark, language) => <VariablesStory dark={dark} language={language} log={log} />,
 }

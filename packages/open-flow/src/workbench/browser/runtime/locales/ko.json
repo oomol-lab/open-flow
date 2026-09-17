@@ -950,10 +950,8 @@
   },
   "nodeInput": {
     "literal": "고정 값",
-    "variable": "Variable",
-    "noVariables": "선언된 Variable이 없습니다",
+    "variable": "환경 변수",
     "noUpstreamNodes": "사용 가능한 데이터가 없습니다",
-    "unsupported": "지원되지 않음",
     "mode": "타입",
     "connected": "데이터가 선택되었습니다. 데이터 선택에서 변경할 수 있습니다."
   },

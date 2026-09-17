@@ -31,7 +31,11 @@ function draft(): Draft {
         graph: {
           edges: [{ source: 'source', target: 'task' }],
           nodes: {
-            source: { kind: 'value', inputs: {}, values: [{ handle: 'text', jsonSchema: { type: 'string' }, nullable: false, value: 'hello' }] },
+            source: {
+              kind: 'value',
+              inputs: {},
+              values: [{ description: 'Plain text', handle: 'text', jsonSchema: { type: 'string' }, nullable: false, value: 'hello' }],
+            },
             task: { kind: 'task', taskId: 'task', inputs: {} },
             other: { kind: 'task', taskId: 'task', inputs: {} },
           },
@@ -42,6 +46,13 @@ function draft(): Draft {
 }
 
 describe('Per-field input sources', () => {
+  it('describes node outputs through the revision view', () => {
+    const view = revisionView(draft())
+    expect(view.outputDescription({ kind: 'flow' }, 'source', 'text')).toBe('Plain text')
+    expect(view.outputDescription({ kind: 'flow' }, 'source', 'missing')).toBeUndefined()
+    expect(view.outputDescription({ kind: 'subflow', id: 'missing' }, 'source', 'text')).toBeUndefined()
+  })
+
   it('does no compatibility work until requested and caches each field independently', () => {
     const calculate = vi.spyOn(graph, 'inputSourceCandidates')
     const check = vi.spyOn(graph, 'checkInputSources')

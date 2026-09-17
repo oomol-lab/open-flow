@@ -5,12 +5,13 @@
     "showMore": "Afficher plus"
   },
   "variablePicker": {
-    "variableUnavailableHelp": "Les Variables de deployment ne sont actuellement pas disponibles.",
-    "variableMissingHelp": "La Variable de deployment {{name}} n’existe plus.",
+    "variableUnavailableHelp": "Les variables d’environnement ne sont actuellement pas disponibles.",
+    "variableMissingHelp": "La variable d’environnement {{name}} n’existe plus.",
+    "variableIncompatibleHelp": "Les variables d’environnement sont du texte et ne sont pas compatibles avec cette entrée.",
     "variableUnavailable": "{{name}} (indisponible)",
     "variableMissing": "{{name}} (manquante)",
-    "selectVariable": "Choisir une Variable",
-    "variablesLoading": "Chargement des Variables…",
+    "selectVariable": "Choisir une variable d’environnement",
+    "variablesLoading": "Chargement des variables d’environnement…",
     "search": "Rechercher",
     "empty": "Aucune variable correspondante.",
     "clear": "<non défini>"

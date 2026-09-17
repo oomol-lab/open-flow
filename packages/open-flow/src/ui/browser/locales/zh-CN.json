@@ -5,12 +5,13 @@
     "showMore": "展开"
   },
   "variablePicker": {
-    "variableUnavailableHelp": "当前 deployment 暂不支持 Variable。",
-    "variableMissingHelp": "当前 deployment 中已不存在 Variable {{name}}。",
+    "variableUnavailableHelp": "当前 deployment 暂无可用的环境变量。",
+    "variableMissingHelp": "当前 deployment 中已不存在环境变量 {{name}}。",
+    "variableIncompatibleHelp": "环境变量是文本，与此输入不兼容。",
     "variableUnavailable": "{{name}}（暂不可用）",
     "variableMissing": "{{name}}（已缺失）",
-    "selectVariable": "选择 Variable",
-    "variablesLoading": "正在加载 Variable…",
+    "selectVariable": "选择环境变量",
+    "variablesLoading": "正在加载环境变量…",
     "search": "搜索",
     "empty": "没有匹配的变量。",
     "clear": "<未设值>"

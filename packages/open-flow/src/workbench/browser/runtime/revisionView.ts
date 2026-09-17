@@ -16,7 +16,7 @@ import type {
   WaitNode,
 } from './api.ts'
 
-import { checkInputSources, inputSourceCandidates } from '../../../flow/common/graph.ts'
+import { checkInputSources, inputSourceCandidates, nodeOutputDescription } from '../../../flow/common/graph.ts'
 import { agentActions, codeActions } from '../../../flow/common/semantics.ts'
 
 export interface InputSourceQuery {
@@ -104,6 +104,11 @@ export class RevisionView {
     if (queries == null) this.#inputSourcesByGraph.set(graph, (queries = new Map()))
     queries.set(key, query)
     return query
+  }
+
+  public outputDescription(target: GraphTarget, nodeId: string, output: string): string | undefined {
+    const graph = this.graph(target)
+    return graph == null ? undefined : nodeOutputDescription(this.#document, graph, nodeId, output)
   }
 
   public designerInputs(target: GraphTarget): readonly unknown[] {
