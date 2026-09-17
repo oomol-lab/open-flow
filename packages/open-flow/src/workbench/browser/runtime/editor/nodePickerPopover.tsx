@@ -37,7 +37,9 @@ export function NodePickerPopover(
   return (
     <div ref={mount}>
       <Popover
-        open={open && !props.disabled}
+        // Canvas pickers mount already open. Wait until their local portal container is
+        // known so the popup cannot paint in the document body and jump on reparenting.
+        open={root != null && open && !props.disabled}
         onOpenChange={(value) => {
           if (value) setDragging(false)
           setOpen(value)
