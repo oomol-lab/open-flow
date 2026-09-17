@@ -267,6 +267,7 @@ export function ValueEditor(props: ValueEditorProps) {
                   ),
                 ]
   if (!messages.length && props.invalid && !draftInvalid && props.editor === undefined) messages.push(t('valueEditor.schema'))
+  const errorOnSummary = expandable && compactValue && (structured || !expanded)
   const errorMessage = messages.length > 0 && (
     <div id={`${id}-error`} className={styles.error} role="alert">
       {messages.map((message) => (
@@ -752,7 +753,7 @@ export function ValueEditor(props: ValueEditorProps) {
           )}
         </>
       )}
-      {!expandable && errorMessage}
+      {!errorOnSummary && errorMessage}
     </div>
   )
   return (
@@ -908,7 +909,7 @@ export function ValueEditor(props: ValueEditorProps) {
         </div>
       )}
       {expandable && body}
-      {expandable && errorMessage && <div className={styles.schemaError}>{errorMessage}</div>}
+      {errorOnSummary && errorMessage && <div className={styles.summaryError}>{errorMessage}</div>}
     </div>
   )
 }

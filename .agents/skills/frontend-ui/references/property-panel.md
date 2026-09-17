@@ -99,6 +99,12 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
   border and tinted surface. Danger prompt text and affordance icons use the same danger foreground.
   Use the shared theme/state owner. Do not mix separate red opacities, font sizes, or local tint
   formulas for Set value, selection prompts, and Edit options.
+- Value error messages appear as attached overlays below the control on hover or focus, with a
+  restrained danger background and border. They never reserve document-flow space. Expanded text
+  and JSON errors anchor below their editor; collection errors anchor below the main value control.
+  Within a field table, focus takes priority: only the focused editor shows feedback while other
+  rows retain ordinary hover styling without raising their stacking layer. Hover feedback resumes
+  when focus leaves the editors.
 - Preserve user content and syntax highlighting in invalid editors; consistent danger styling does
   not require painting all entered text red. Focus remains visible without glow.
 - Verify default, hover, open, and focus states. A generic placeholder, hover, or expanded utility

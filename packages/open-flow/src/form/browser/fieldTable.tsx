@@ -23,6 +23,7 @@ export const FieldTable = forwardRef<
       {...props}
       ref={ref}
       className={[styles.list, className].filter(Boolean).join(' ')}
+      data-value-editor-scope
       data-layout={layout}
       data-output={output || undefined}
       data-fixed-types={fixedTypes || undefined}

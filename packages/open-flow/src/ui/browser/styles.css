@@ -86,6 +86,7 @@
 @utility invalid-text-field-focus {
   @apply text-field-focus;
   outline-color: var(--ui-destructive);
+  outline-offset: calc(-1 * var(--ui-danger-border-width, 1px));
 }
 
 .open-flow-code-editor.cm-editor.cm-focused {
@@ -131,6 +132,7 @@
 :is([data-slot='input'], [data-slot='textarea'], [data-slot='native-select'], [data-slot='select-trigger'], button)[aria-invalid='true'],
 [data-slot='input-group']:has([data-slot][aria-invalid='true']),
 .open-flow-code-editor.cm-editor[data-invalid='true'] {
+  border-width: var(--ui-danger-border-width, 1px);
   border-color: var(--ui-destructive);
   background-color: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
   &:not(:disabled):not([readonly]):not([aria-disabled='true']):not(.cm-focused):not(:is(input, textarea):focus):not(

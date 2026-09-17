@@ -1,5 +1,14 @@
 @use './fieldLayout.scss';
 
+/* Keep the attached feedback behind its control, above neighboring rows. */
+.root,
+.errorAnchor {
+  --ui-danger-border-width: 2px;
+  --value-body-inset: 0px;
+  isolation: isolate;
+  position: relative;
+  min-width: 0;
+}
 .root {
   --field-control-height: 30px;
   display: grid;
@@ -10,6 +19,7 @@
   color: var(--ui-foreground);
 }
 .body {
+  position: relative;
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -91,11 +101,49 @@
   color: var(--ui-muted-foreground);
   overflow-wrap: anywhere;
 }
+/* The feedback base tucks under the control; its rounded border stays in front. */
 .error {
-  margin: 0;
+  position: absolute;
+  --error-overlap: var(--ui-control-radius, var(--ui-radius));
+  --error-background: color-mix(in srgb, var(--ui-destructive) 92%, white);
+  --error-foreground: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
+  inset: 100% 0 auto;
+  left: var(--value-body-inset, 0px);
+  z-index: -1;
+  box-sizing: border-box;
+  margin: calc(-1 * var(--error-overlap)) 0 0;
+  // Match the Cron description card height, including this card’s borders.
+  padding: calc(var(--error-overlap) + 4px - var(--ui-danger-border-width)) 8px calc(5px - var(--ui-danger-border-width));
+  border: var(--ui-danger-border-width) solid var(--error-background);
+  border-radius: 0 0 var(--error-overlap) var(--error-overlap);
+  background: var(--error-background);
+  box-shadow: var(--floating-control-shadow);
   font-size: 12px;
-  color: var(--ui-destructive);
+  line-height: 1.25;
+  color: var(--error-foreground);
   overflow-wrap: anywhere;
+  visibility: hidden;
+}
+/* Focus owns feedback within a field table, including nested editor rows. */
+:global([data-value-editor-scope]):has(.root:focus-within),
+.root:focus-within {
+  --error-hover-visibility: hidden;
+  --error-hover-layer: auto;
+}
+:is(.body:not([hidden]), .errorAnchor):hover > .error,
+.root:has(> :is(.summary, .arrayItemType, .valueTools):hover) > .summaryError > .error,
+.summaryError:hover > .error {
+  visibility: var(--error-hover-visibility, visible);
+}
+:is(.body:not([hidden]), .errorAnchor):focus-within > .error,
+.root:has(> :is(.summary, .arrayItemType, .valueTools):focus-within) > .summaryError > .error {
+  visibility: visible;
+}
+.root:not(:focus-within):has(> :is(.body, .summary, .arrayItemType, .valueTools, .summaryError):hover) {
+  z-index: var(--error-hover-layer, 2);
+}
+.root:focus-within {
+  z-index: 3;
 }
 .srOnly {
   position: absolute;
@@ -118,7 +166,6 @@
 .root[data-header] {
   @include fieldLayout.columns;
   --field-row-gap: 4px;
-  position: relative;
   row-gap: var(--field-row-gap);
 }
 .header {
@@ -321,13 +368,13 @@
   }
 }
 .root[data-header][data-collection] > .body {
+  --value-body-inset: calc(var(--field-indent, 0px) + 16px);
   --branch-offset: calc(var(--field-toggle-width, 24px) / 2 + var(--field-name-gap));
   --branch-extension: 0px;
-  position: relative;
   grid-column: handle / content-end;
   grid-row: var(--field-branch-row);
   margin: 0 0 4px;
-  padding: 4px 0 0 calc(var(--field-indent, 0px) + 16px);
+  padding: 4px 0 0 var(--value-body-inset);
 }
 .root[data-header][data-branch] > .body::before {
   content: '';
@@ -357,7 +404,6 @@
   min-height: 30px;
   height: 30px;
   padding: 5px 7px;
-  border: 1px solid var(--ui-input);
   border-radius: var(--ui-control-radius, var(--ui-radius));
   font-size: 12px;
 }
@@ -389,10 +435,6 @@
   margin: 0;
 }
 
-/* Expanded editors occupy the second row and retain their preview control. */
-.root[data-header][data-expanded]:not([data-structured]) {
-  --field-branch-row: 2;
-}
 .root[data-header] > .body [data-slot='native-select-wrapper'] {
   min-width: 0;
   width: 100%;
@@ -400,12 +442,8 @@
 .root[data-header] > .body [data-slot='native-select'] {
   height: 30px;
   padding: 4px 22px 4px 7px;
-  border-color: var(--ui-input);
   border-radius: var(--ui-control-radius, var(--ui-radius));
   font-size: 12px;
-}
-.root[data-header] > .body :is(input, textarea, select)[aria-invalid='true'] {
-  border-color: var(--ui-destructive);
 }
 
 .body .root {
@@ -654,15 +692,27 @@
   }
 }
 
-.schemaError {
-  grid-column: 1 / -1;
-  margin-top: 4px;
+.summaryError {
+  position: relative;
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+  top: var(--field-control-height);
+  height: 0;
+  min-width: 0;
+  > .error {
+    top: 0;
+  }
 }
-.root[data-header] > .schemaError {
+.root[data-header] > .summaryError {
   grid-column: var(--field-value-column);
-  grid-row: calc(var(--field-branch-row) + 1);
+  grid-row: var(--field-value-row);
 }
-.root[data-array-child] > .schemaError {
+.root[data-value-addon] > .summaryError {
+  margin-left: var(--value-addon-width);
+}
+.root[data-array-child] > .summaryError {
   grid-column: handle / content-end;
+  grid-row: 1;
   margin-left: var(--field-indent);
 }

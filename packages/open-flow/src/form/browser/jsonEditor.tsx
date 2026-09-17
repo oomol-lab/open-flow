@@ -100,7 +100,7 @@ export function JsonEditor({
     editor.current?.updateOptions({ readOnly: disabled === true, ariaLabel, invalid: invalid || schemaInvalid === true })
   }, [text, disabled, ariaLabel, invalid, schemaInvalid, ready])
   return (
-    <>
+    <div className={styles.errorAnchor}>
       <div ref={host} className={styles.jsonCode} data-auto-height={autoHeight || undefined} hidden={!ready} />
       {!ready && (
         <Textarea
@@ -119,6 +119,6 @@ export function JsonEditor({
           {t('valueEditor.invalidJson')}
         </p>
       )}
-    </>
+    </div>
   )
 }

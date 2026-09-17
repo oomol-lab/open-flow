@@ -161,7 +161,7 @@ export const valueEditorDangerStory: FrontendStory = {
   id: 'value-editor-danger',
   title: 'Value Editor Danger',
   description:
-    'Compare all 15 production value editors, unset prompts, missing choices and nested errors. Schema failures show localized messages. Number, Integer and JSON drafts show their real inline error messages. Reset restores and expands samples; use the theme and language menus to compare.',
+    'All 15 editors, unset values, missing options, nested Schema errors and invalid drafts. Hover reveals attached errors; focus takes priority within each panel. Reset restores and expands samples. Compare themes, languages and panel widths.',
   group: 'Node Fixed Values',
   standalone: true,
   render: (log, dark, language) => <ValueEditorDanger dark={dark} language={language} log={log} />,

@@ -1,3 +1,4 @@
+import styles from './valueEditor.module.scss'
 import type { ValueEditorProps } from './valueEditor.tsx'
 
 import { useEffect, useRef, useState } from 'react'
@@ -52,7 +53,7 @@ export function ColorEditor({ value, schema, label, disabled, onChange, path, on
   const channels = mode === 'RGB' ? color.toRgb() : color.toHsv()
   const channelNames = mode === 'RGB' ? (['r', 'g', 'b'] as const) : (['h', 's', 'v'] as const)
   return (
-    <div ref={setContainer} className="min-w-0">
+    <div ref={setContainer} className={styles.errorAnchor}>
       <InputGroup className="h-[30px]">
         <InputGroupInput
           className="h-full min-w-0 px-2 text-xs md:text-xs"
@@ -133,7 +134,7 @@ export function ColorEditor({ value, schema, label, disabled, onChange, path, on
         </InputGroupAddon>
       </InputGroup>
       {text !== '' && !valid && (
-        <p className="mt-1 text-xs text-destructive" role="alert">
+        <p className={styles.error} role="alert">
           {t('valueEditor.invalidColor')}
         </p>
       )}
