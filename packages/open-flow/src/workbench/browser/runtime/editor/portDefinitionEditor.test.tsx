@@ -36,12 +36,24 @@ describe('Output definitions', () => {
   it('disables mutations when inspecting fixed task or subflow outputs', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
-        <PortDefinitionEditor groups output disabled values={[{ handle: 'answer', jsonSchema: { type: 'string' }, nullable: true }]} onChange={vi.fn()} />
+        <PortDefinitionEditor
+          groups
+          layout="ports"
+          output
+          disabled
+          values={[{ handle: 'answer', jsonSchema: { type: 'string' }, nullable: true }]}
+          onChange={vi.fn()}
+        />
       </I18nProvider>,
     )
     const controls = markup.match(/<(?:input|button|select|textarea)\b[^>]*>/g) ?? []
     expect(controls.length).toBeGreaterThan(0)
     expect(controls.every((control) => control.includes('disabled'))).toBe(true)
+    expect(markup).toContain('data-field-control="true"')
+    expect(markup).toContain('data-readonly="true"')
+    expect(markup).toContain('border-input')
+    expect(markup).toContain('bg-[var(--ui-control-background,var(--ui-muted))]')
+    expect(markup).toContain('>Text</span>')
   })
 })
 
@@ -65,6 +77,24 @@ describe('Property panel port layout', () => {
     expect(typeDisplay).toContain('role="img"')
     expect(typeDisplay).not.toContain('tabindex=')
     expect(markup).toContain('message Nullable')
+  })
+
+  it('keeps output type icons and names visible in the wider output layout', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <PortDefinitionEditor
+          layout="ports"
+          title="Outputs"
+          output
+          disabled={false}
+          values={[{ handle: 'result', jsonSchema: { type: 'number' }, nullable: false }]}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('data-output="true"')
+    expect(markup).toContain('i-lucide-light:hash')
+    expect(markup).toContain('>Number</span>')
   })
 
   it('passes definition editing through custom input value renderers', () => {

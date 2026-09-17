@@ -24,6 +24,7 @@ export const FieldTable = forwardRef<
       ref={ref}
       className={[styles.list, className].filter(Boolean).join(' ')}
       data-layout={layout}
+      data-output={output || undefined}
       data-fixed-types={fixedTypes || undefined}
       data-nullable={nullable || undefined}
       data-empty={empty || undefined}

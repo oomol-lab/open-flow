@@ -17,6 +17,7 @@ export function EditorComponentSelect({
   readOnly,
   compact = true,
   showIcon = true,
+  readOnlySurface = false,
   onChange,
 }: {
   schema: unknown
@@ -26,6 +27,7 @@ export function EditorComponentSelect({
   readOnly?: boolean
   compact?: boolean
   showIcon?: boolean
+  readOnlySurface?: boolean
   onChange: (schema: Record<string, unknown>) => void
 }) {
   const t = useTranslate()
@@ -40,6 +42,7 @@ export function EditorComponentSelect({
         accessibleLabel={`${t('valueEditor.type', { name })}: ${label}`}
         icon={showIcon && <EditorComponentIcon component={selectedComponent} />}
         compact={compact}
+        surface={readOnlySurface}
       />
     )
   }

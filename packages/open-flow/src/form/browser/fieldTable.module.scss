@@ -46,6 +46,9 @@
 .list[data-fixed-types] {
   --field-type-width: 32px;
 }
+.list[data-output] {
+  --field-type-width: minmax(96px, 0.65fr);
+}
 .list[data-nullable] {
   --field-table-nullable-width: 28px;
 }

@@ -110,6 +110,10 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 - Field-table type selectors show a 16px type icon and the shared chevron in a 56px column, with a
   localized type-name tooltip. Menus and secondary field settings retain the icon and full name.
   Null uses `i-lucide-light:circle-dashed`; the shared editor component icon map owns all type icons.
+- Output tables use their otherwise unused value space for a wider Type column. Editable and
+  read-only output types keep both the 16px icon and the localized type name visible. Read-only
+  output types retain the standard control border and the same steady read-only fill as the Name
+  field without becoming focusable or changing fill on hover.
 - Type-icon and static-label simplification applies only to the Type column. Controls in the Value
   column retain their full labels and existing control appearance, including disabled states.
 - Fixed and read-only types use non-focusable type labels in a 32px column (16px icon and 8px

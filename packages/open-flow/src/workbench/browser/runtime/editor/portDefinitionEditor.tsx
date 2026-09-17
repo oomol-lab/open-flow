@@ -79,6 +79,7 @@ function PortType({
   name = 'Schema',
   id,
   compact = true,
+  readOnlySurface = false,
 }: {
   value: InputPort['jsonSchema']
   disabled: boolean
@@ -86,6 +87,7 @@ function PortType({
   name?: string
   id?: string
   compact?: boolean
+  readOnlySurface?: boolean
 }) {
   return (
     <EditorComponentSelect
@@ -94,6 +96,7 @@ function PortType({
       schema={value}
       name={name}
       readOnly={disabled}
+      readOnlySurface={readOnlySurface}
       onChange={(next) => onChange(next as InputPort['jsonSchema'])}
     />
   )
@@ -546,6 +549,8 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           {tableLayout ? (
             <PortType
               name={port.handle}
+              compact={!props.output}
+              readOnlySurface={!!props.output}
               value={port.jsonSchema}
               disabled={!!disabled}
               onChange={(jsonSchema) =>
