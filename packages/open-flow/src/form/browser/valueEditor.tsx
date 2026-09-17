@@ -27,6 +27,7 @@ import { FieldSorting } from './fieldSorting.ts'
 import { JsonEditor } from './jsonEditor.tsx'
 import { SortableFieldList } from './sortableFieldList.tsx'
 import { useValueIssues } from './useValueIssues.ts'
+import { valueFeedback } from './valueFeedback.ts'
 import { ValueTools } from './valueTools.tsx'
 
 export interface ValueEditorProps {
@@ -147,7 +148,6 @@ export function ValueEditor(props: ValueEditorProps) {
   }, [])
   const needsValidation = !draftInvalid && value !== undefined && !(value === null && allowsNull) && props.editor === undefined
   const issues = useValueIssues(schema, value, language, needsValidation)
-  const invalid = props.invalid === true || issues?.schemaError === true || (issues?.errors.length ?? 0) > 0
   const enumeration = Array.isArray(source.enum) ? source.enum : Object.hasOwn(source, 'const') ? [source.const] : undefined
   const complex = source['ui:widget'] === 'any' || editorComponent(schema) === 'json' || depth > 12
   const choiceOptions = Array.isArray(source.enum)
@@ -248,26 +248,31 @@ export function ValueEditor(props: ValueEditorProps) {
     if (!expanded || !editorFocusRequest || disabled || raw || complex) return
     container?.querySelector<HTMLTextAreaElement>(':scope > [data-value-body] > textarea')?.focus()
   }, [expanded, editorFocusRequest, disabled, raw, complex, container])
-  const messages =
+  // Keep the complete error set authoritative for both control state and feedback.
+  const errors =
     draftInvalid || props.editor !== undefined
       ? []
       : choiceOptions?.length === 0
-        ? [t('valueEditor.noOptions')]
+        ? [{ instancePath: '', message: t('valueEditor.noOptions') }]
         : issues?.schemaError
-          ? [t('valueEditor.invalidSchema')]
+          ? [{ instancePath: '', message: t('valueEditor.invalidSchema') }]
           : value === null && !allowsNull
-            ? [t('valueEditor.notNullableDescription')]
+            ? [{ instancePath: '', message: t('valueEditor.notNullableDescription') }]
             : value === undefined && !allowsNull
-              ? [t('valueEditor.required')]
-              : [
-                  ...new Set(
-                    (issues?.errors ?? [])
-                      .filter((error) => !structured || (compactValue && !expanded) || error.instancePath === '')
-                      .map((error) => `${error.instancePath ? `${error.instancePath}: ` : ''}${error.message ?? t('valueEditor.schema')}`),
-                  ),
-                ]
-  if (!messages.length && props.invalid && !draftInvalid && props.editor === undefined) messages.push(t('valueEditor.schema'))
-  const errorOnSummary = expandable && compactValue && (structured || !expanded)
+              ? [{ instancePath: '', message: t('valueEditor.required') }]
+              : (issues?.errors ?? []).map((error) => ({ instancePath: error.instancePath, message: error.message ?? t('valueEditor.schema') }))
+  if (!errors.length && props.invalid && !draftInvalid && props.editor === undefined) errors.push({ instancePath: '', message: t('valueEditor.schema') })
+  const {
+    editorInvalid: invalid,
+    summaryInvalid,
+    messages,
+    anchor,
+  } = valueFeedback(errors, {
+    expanded,
+    hasSummary: expandable && compactValue,
+    hasChildren: structured,
+    draftInvalid,
+  })
   const errorMessage = messages.length > 0 && (
     <div id={`${id}-error`} className={styles.error} role="alert">
       {messages.map((message) => (
@@ -373,8 +378,9 @@ export function ValueEditor(props: ValueEditorProps) {
           variant="outline"
           size="field"
           className={styles.unsetValue}
+          data-field-prompt={!allowsNull || undefined}
           data-field-control
-          aria-invalid={!allowsNull || undefined}
+          aria-invalid={invalid || undefined}
           aria-label={`${label} ${t('valueEditor.setValue')}`}
           disabled={disabled}
           onClick={() => {
@@ -676,6 +682,7 @@ export function ValueEditor(props: ValueEditorProps) {
             role="switch"
             aria-label={label}
             aria-checked={value === true}
+            data-field-prompt={value === undefined || undefined}
             aria-invalid={invalid || value === undefined}
             disabled={disabled}
             onClick={() => onChange(value !== true)}
@@ -704,6 +711,7 @@ export function ValueEditor(props: ValueEditorProps) {
             size="field"
             variant="outline"
             className={styles.nullValue}
+            data-field-prompt={value === undefined || undefined}
             disabled={disabled}
             aria-label={`${label} ${t('valueEditor.setValue')}: null`}
             aria-invalid={invalid || undefined}
@@ -753,7 +761,7 @@ export function ValueEditor(props: ValueEditorProps) {
           )}
         </>
       )}
-      {!errorOnSummary && errorMessage}
+      {anchor === 'body' && errorMessage}
     </div>
   )
   return (
@@ -819,6 +827,7 @@ export function ValueEditor(props: ValueEditorProps) {
             name={`${label}[]`}
             compact={false}
             showIcon={false}
+            invalid={summaryInvalid}
             disabled={disabled || !props.onDefinitionChange}
             onChange={(items) =>
               props.onDefinitionChange?.(
@@ -836,11 +845,13 @@ export function ValueEditor(props: ValueEditorProps) {
             variant="disclosure"
             size="field"
             className={styles.summary}
+            data-field-prompt={value === undefined || undefined}
             data-readonly={disabled || undefined}
             data-field-control
             disabled={sorting}
             aria-label={`${label} ${t('valueEditor.setValue')}`}
             aria-expanded={expanded}
+            aria-invalid={summaryInvalid}
             aria-controls={`${id}-body`}
             onClick={toggleExpanded}
           >
@@ -909,7 +920,7 @@ export function ValueEditor(props: ValueEditorProps) {
         </div>
       )}
       {expandable && body}
-      {errorOnSummary && errorMessage && <div className={styles.summaryError}>{errorMessage}</div>}
+      {anchor === 'summary' && errorMessage && <div className={styles.summaryError}>{errorMessage}</div>}
     </div>
   )
 }

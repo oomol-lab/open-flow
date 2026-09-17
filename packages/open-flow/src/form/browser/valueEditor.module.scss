@@ -1,4 +1,5 @@
 @use './fieldLayout.scss';
+@use 'sass:selector';
 
 /* Keep the attached feedback behind its control, above neighboring rows. */
 .root,
@@ -19,6 +20,7 @@
   color: var(--ui-foreground);
 }
 .body {
+  isolation: isolate;
   position: relative;
   display: flex;
   min-width: 0;
@@ -124,9 +126,15 @@
   overflow-wrap: anywhere;
   visibility: hidden;
 }
-/* Focus owns feedback within a field table, including nested editor rows. */
-:global([data-value-editor-scope]):has(.root:focus-within),
-.root:focus-within {
+/* Only value-editor focus owns feedback. Pointer-focused disclosures and previews
+   must not suppress hover feedback after collapsing a field. Text inputs retain
+   :focus-visible on pointer focus; keyboard-focused value buttons do as well. */
+// Reuse the same focus targets for field ownership and table-wide suppression.
+$summary-focus: '> .summary:focus-visible, > :is(.arrayItemType, .valueTools) :focus-visible';
+$feedback-targets: '#{$summary-focus}, > .body:not([hidden]) :focus-visible';
+$feedback-focus: ':has(#{$feedback-targets})';
+:global([data-value-editor-scope]):has(#{selector.nest('.root', $feedback-targets)}),
+.root#{$feedback-focus} {
   --error-hover-visibility: hidden;
   --error-hover-layer: auto;
 }
@@ -135,16 +143,17 @@
 .summaryError:hover > .error {
   visibility: var(--error-hover-visibility, visible);
 }
-:is(.body:not([hidden]), .errorAnchor):focus-within > .error,
-.root:has(> :is(.summary, .arrayItemType, .valueTools):focus-within) > .summaryError > .error {
+:is(.body:not([hidden]), .errorAnchor):has(:focus-visible) > .error,
+.root:has(#{$summary-focus}) > .summaryError > .error {
   visibility: visible;
 }
-.root:not(:focus-within):has(> :is(.body, .summary, .arrayItemType, .valueTools, .summaryError):hover) {
+.root:not(#{$feedback-focus}):has(> :is(.body, .summary, .arrayItemType, .valueTools, .summaryError):hover) {
   z-index: var(--error-hover-layer, 2);
 }
-.root:focus-within {
+.root#{$feedback-focus} {
   z-index: 3;
 }
+
 .srOnly {
   position: absolute;
   width: 1px;
@@ -266,6 +275,12 @@
     padding-top: 6px;
   }
 }
+/* Keep child editor stacking inside the body. Summary feedback floats above
+   that body, with the owning control and its actions in front of the base. */
+.summary,
+.arrayItemType {
+  z-index: 2;
+}
 .summary {
   --preview-background: var(--ui-control-background, var(--ui-muted));
   --preview-border: var(--ui-input);
@@ -294,6 +309,11 @@
   grid-row: var(--field-value-row);
   min-width: 0;
 }
+.root[data-expanded] > .summary > .summaryText,
+.root[data-expanded] > .arrayItemType [data-slot='select-value'] {
+  color: color-mix(in srgb, var(--ui-muted-foreground) 70%, transparent);
+}
+
 .valueTools {
   grid-column: var(--field-value-column);
   grid-row: var(--field-value-row);
@@ -303,7 +323,7 @@
   align-items: center;
   height: var(--field-control-height);
   margin-right: calc(var(--value-suffix-width) + 3px);
-  z-index: 1;
+  z-index: 3;
   color: var(--ui-muted-foreground);
 }
 .root[data-value-tools] {
@@ -460,7 +480,7 @@
   padding: 5px 7px;
   border-radius: var(--ui-control-radius, var(--ui-radius));
   background: var(--ui-control-background, var(--ui-muted));
-  color: var(--ui-muted-foreground);
+  color: var(--ui-foreground);
   font-size: 12px;
   font-family: inherit;
   font-weight: 400;
@@ -693,6 +713,7 @@
 }
 
 .summaryError {
+  z-index: 1;
   position: relative;
   grid-column: 1;
   grid-row: 1;

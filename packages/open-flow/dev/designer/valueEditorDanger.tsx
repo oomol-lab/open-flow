@@ -43,6 +43,8 @@ const missingChoices: readonly InputPort[] = [
   { handle: 'multiNoOptions', jsonSchema: { type: 'array', uniqueItems: true, items: { enum: [] } }, nullable: false },
   { handle: 'multiRemoved', jsonSchema: { type: 'array', uniqueItems: true, items: { enum: ['red', 'blue'] } }, nullable: false, value: ['removed'] },
   { handle: 'nonNullableNull', jsonSchema: { type: 'string' }, nullable: false, value: null },
+  { handle: 'nonNullableJsonNull', jsonSchema: { 'ui:widget': 'any' }, nullable: false, value: null },
+  { handle: 'nullableJsonUnset', jsonSchema: { 'ui:widget': 'any' }, nullable: true },
   { handle: 'emptyText', jsonSchema: { type: 'string', minLength: 1 }, nullable: false, value: '' },
   { handle: 'emptyObject', jsonSchema: { type: 'object', required: ['title'], properties: { title: { type: 'string' } } }, nullable: false, value: {} },
   { handle: 'emptyArray', jsonSchema: { type: 'array', minItems: 1, items: { type: 'string' } }, nullable: false, value: [] },
@@ -148,6 +150,7 @@ function ValueEditorDanger({ dark, language, log }: { dark: boolean; language: U
           }}
         >
           <Sample theme={dark ? 'dark' : 'light'} title="All 15 editors · invalid values" initial={invalidValues} expanded log={log} />
+          <Sample theme={dark ? 'dark' : 'light'} title="Collapsed · invalid values" initial={invalidValues} log={log} />
           <Sample theme={dark ? 'dark' : 'light'} title="All 15 editors · unset values" initial={unsetValues} expanded log={log} />
           <Sample theme={dark ? 'dark' : 'light'} title="Draft errors · number / integer / JSON" initial={draftValues} expanded drafts log={log} />
           <Sample theme={dark ? 'dark' : 'light'} title="Missing options · empty values · null" initial={missingChoices} expanded log={log} />
@@ -161,7 +164,7 @@ export const valueEditorDangerStory: FrontendStory = {
   id: 'value-editor-danger',
   title: 'Value Editor Danger',
   description:
-    'All 15 editors, unset values, missing options, nested Schema errors and invalid drafts. Hover reveals attached errors; focus takes priority within each panel. Reset restores and expands samples. Compare themes, languages and panel widths.',
+    'All 15 editors, expanded and collapsed errors, unset values, missing options, nested Schema errors and invalid drafts. Hover reveals attached errors; focus takes priority within each panel. Reset restores initial sample states. Compare themes, languages and panel widths.',
   group: 'Node Fixed Values',
   standalone: true,
   render: (log, dark, language) => <ValueEditorDanger dark={dark} language={language} log={log} />,

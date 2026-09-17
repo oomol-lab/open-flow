@@ -54,7 +54,14 @@ export function FieldSelect({
     )
   }
   const trigger = (
-    <SelectTrigger id={id} size="field" aria-label={label} aria-invalid={invalid || danger} className={fieldSelectTriggerClass}>
+    <SelectTrigger
+      id={id}
+      size="field"
+      aria-label={label}
+      aria-invalid={invalid || danger}
+      data-field-prompt={danger || undefined}
+      className={fieldSelectTriggerClass}
+    >
       <SelectValue>
         {icons?.[value] ? (
           <>

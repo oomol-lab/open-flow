@@ -37,6 +37,35 @@ const cases = [
 ] as const
 
 describe('Field validation presentation', () => {
+  it.each(cases)('keeps %s presence errors and control state consistent', async (_label, schema, _invalid, valid) => {
+    const onChange = vi.fn()
+    const i18n = createI18n('en')
+    const render = (value: unknown, nullable = false) =>
+      renderWithIssues(
+        <I18nProvider i18n={i18n}>
+          <ValueEditor label="sample" schema={schema} value={value} nullable={nullable} onChange={onChange} path="/sample" onDraftIssue={vi.fn()} />
+        </I18nProvider>,
+      )
+    try {
+      for (const value of [undefined, null]) {
+        const markup = await render(value)
+        expect(markup).toContain(value === undefined ? 'Set a value for this input.' : 'This value cannot be null')
+        expect(markup).toContain('role="alert"')
+        expect(markup).toContain('aria-invalid="true"')
+        if (_label === 'JSON') {
+          expect(markup.match(/<textarea\b[^>]*>/)?.[0]).toContain('aria-invalid="true"')
+        }
+        expect(await render(value, true)).not.toContain('role="alert"')
+      }
+      const validMarkup = await render(valid)
+      expect(validMarkup).not.toContain('role="alert"')
+      expect(validMarkup).not.toContain('aria-invalid="true"')
+      expect(onChange).not.toHaveBeenCalled()
+    } finally {
+      i18n.dispose()
+    }
+  })
+
   it.each(cases)('marks %s schema violations without changing the value', async (_label, schema, invalid, valid) => {
     const onChange = vi.fn()
     const i18n = createI18n('en')
@@ -185,6 +214,43 @@ describe('Read-only value controls', () => {
       expect(input).toBeDefined()
       expect(input).toContain('readonly=""')
       expect(input).not.toContain('disabled=""')
+    } finally {
+      i18n.dispose()
+    }
+  })
+})
+
+describe('Collapsed validation presentation', () => {
+  it.each([
+    ['object', { type: 'object', properties: { title: { type: 'string', minLength: 8 } } }, { title: 'short' }, { title: 'valid title' }],
+    ['array', { type: 'array', items: { type: 'number', minimum: 0 } }, [-1], [1]],
+    ['JSON', { 'type': 'object', 'ui:widget': 'any', 'required': ['title'] }, {}, { title: 'ok' }],
+    ['multiline', { 'type': 'string', 'ui:widget': 'text', 'minLength': 8 }, 'short', 'valid text'],
+  ])('marks the collapsed %s value control without marking its disclosure', async (label, schema, invalid, valid) => {
+    const i18n = createI18n('en')
+    const render = (value: unknown) =>
+      renderWithIssues(
+        <I18nProvider i18n={i18n}>
+          <ValueEditor
+            header={<span>sample</span>}
+            label="sample"
+            schema={schema}
+            value={value}
+            onChange={vi.fn()}
+            onDefinitionChange={vi.fn()}
+            path="/sample"
+            onDraftIssue={vi.fn()}
+          />
+        </I18nProvider>,
+      )
+    try {
+      const markup = await render(invalid)
+      const buttons = markup.match(/<button\b[^>]*>/g) ?? []
+      const control = buttons.find((button) => button.includes(label === 'array' ? 'role="combobox"' : 'aria-label="sample Set value"'))
+      expect(control).toContain('aria-invalid="true"')
+      expect(buttons.find((button) => button.includes('aria-label="sample"'))).not.toContain('aria-invalid="true"')
+      expect(markup).toContain('role="alert"')
+      expect(await render(valid)).not.toContain('aria-invalid="true"')
     } finally {
       i18n.dispose()
     }

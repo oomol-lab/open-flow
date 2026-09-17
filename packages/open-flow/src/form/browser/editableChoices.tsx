@@ -71,11 +71,12 @@ export function EditableChoices({
               disabled={disabled}
               aria-label={label}
               aria-invalid={invalid || danger}
+              data-field-prompt={empty || value === undefined || (!multiple && !summary) || undefined}
               className="w-full min-w-0 justify-between"
             />
           }
         >
-          <span className={`min-w-0 truncate ${!danger && !summary ? 'text-muted-foreground' : ''}`}>
+          <span className="min-w-0 truncate">
             {empty
               ? t(onOptionsChange ? 'valueEditor.editOptions' : 'valueEditor.noOptions')
               : summary ||

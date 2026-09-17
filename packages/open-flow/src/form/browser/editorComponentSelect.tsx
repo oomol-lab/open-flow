@@ -14,6 +14,7 @@ export function EditorComponentSelect({
   id,
   name,
   disabled,
+  invalid,
   readOnly,
   compact = true,
   showIcon = true,
@@ -24,6 +25,7 @@ export function EditorComponentSelect({
   id?: string
   name: string
   disabled?: boolean
+  invalid?: boolean
   readOnly?: boolean
   compact?: boolean
   showIcon?: boolean
@@ -61,7 +63,15 @@ export function EditorComponentSelect({
       >
         <Tooltip>
           <TooltipTrigger
-            render={<SelectTrigger id={id} size="field" aria-label={`${t('valueEditor.type', { name })}: ${label}`} className={fieldSelectTriggerClass} />}
+            render={
+              <SelectTrigger
+                id={id}
+                size="field"
+                aria-invalid={invalid}
+                aria-label={`${t('valueEditor.type', { name })}: ${label}`}
+                className={fieldSelectTriggerClass}
+              />
+            }
           >
             <SelectValue>
               {showIcon && <EditorComponentIcon component={selectedComponent} />}

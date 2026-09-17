@@ -104,9 +104,12 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
   and JSON errors anchor below their editor; collection errors anchor below the main value control.
   Within a field table, focus takes priority: only the focused editor shows feedback while other
   rows retain ordinary hover styling without raising their stacking layer. Hover feedback resumes
-  when focus leaves the editors.
-- Preserve user content and syntax highlighting in invalid editors; consistent danger styling does
-  not require painting all entered text red. Focus remains visible without glow.
+  when focus leaves the editors. Pointer focus left on a disclosure or collapsed preview must not
+  suppress hover feedback; keyboard-focused value controls retain focus priority.
+- Invalid controls share danger borders and tinted surfaces. Actual values, collapsed previews,
+  and type names retain their normal text colors; only action prompts such as Set value, Select a
+  value, and Edit options use danger foreground, including their affordance icons. Preserve syntax
+  highlighting in code editors. Focus remains visible without glow.
 - Verify default, hover, open, and focus states. A generic placeholder, hover, or expanded utility
   must not override the danger foreground or remove its tint. Check actual computed colors when
   multiple utility classes or ancestor selectors compete.
@@ -137,7 +140,11 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 
 - All expandable fields, including nested fields, start collapsed when the panel opens.
 - Object, JSON, and Multiline use a compact preview in both collapsed and expanded states. The
-  expanded preview retains the same shallow neutral block, current value text, and standard control border.
+  expanded preview retains the same shallow neutral block and standard control border. Its value
+  summary and the array item-type name use muted foreground while expanded, restoring normal
+  foreground when collapsed. While collapsed, the first-row value control represents all field errors. While
+  expanded, it retains danger styling only for errors whose feedback is anchored to that row, such
+  as array length constraints. Child-field and expanded text/JSON editor errors mark their own controls.
   The attached source addon also retains its border. It remains a real,
   keyboard-accessible button that can collapse the editor and has appropriate hover/focus feedback.
   When the preview has no separate disclosure control, show a directional chevron in the preview so

@@ -142,7 +142,8 @@
   }
 }
 
-:is(button, [data-slot='select-trigger'])[aria-invalid='true'] {
+/* Error surfaces preserve value text; only action prompts use danger foreground. */
+[data-field-prompt='true'][aria-invalid='true'] {
   color: var(--ui-destructive);
   > svg {
     color: inherit;
