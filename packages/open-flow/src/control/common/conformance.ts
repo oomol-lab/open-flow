@@ -573,6 +573,49 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
         'canceled',
         'Second canceled Run status',
       )
+      const createdAt = requiredString(run.createdAt, 'Run createdAt')
+      const createdBefore = new Date(Date.parse(createdAt) + 1).toISOString()
+      const filteredPage = await json(await request(harness, `/v1/flows/${flowId}/runs?limit=1&status=canceled&source=draft`), 200, 'Filter paginated Runs')
+      equal(
+        list(filteredPage.runs, 'Filtered Run page').map((value) => record(value, 'Filtered Run').runId),
+        [secondRunId],
+        'Filtered first Run page',
+      )
+      const filteredCursor = requiredString(filteredPage.nextCursor, 'Filtered Run cursor')
+      const filteredNextPage = await json(
+        await request(harness, `/v1/flows/${flowId}/runs?limit=1&status=canceled&source=draft&cursor=${encodeURIComponent(filteredCursor)}`),
+        200,
+        'Continue filtered Runs',
+      )
+      equal(
+        list(filteredNextPage.runs, 'Next filtered Run page').map((value) => record(value, 'Filtered Run').runId),
+        [runId],
+        'Filtered next Run page',
+      )
+      const filtered = await json(
+        await request(
+          harness,
+          `/v1/flows/${flowId}/runs?status=canceled&source=draft&createdFrom=${encodeURIComponent(createdAt)}&createdBefore=${encodeURIComponent(createdBefore)}&runId=${encodeURIComponent(runId)}`,
+        ),
+        200,
+        'Filter Runs',
+      )
+      equal(
+        list(filtered.runs, 'Filtered Runs').map((value) => record(value, 'Filtered Run').runId),
+        [runId],
+        'Filtered Run list',
+      )
+      const excluded = await json(await request(harness, `/v1/flows/${flowId}/runs?createdBefore=${encodeURIComponent(createdAt)}`), 200, 'Filter Run boundary')
+      equal(list(excluded.runs, 'Boundary Runs'), [], 'Exclusive Run upper boundary')
+      for (const invalidQuery of [
+        'source=manual',
+        'createdFrom=invalid',
+        'createdFrom=2026-02-30T00%3A00%3A00Z',
+        `createdFrom=${encodeURIComponent(createdBefore)}&createdBefore=${encodeURIComponent(createdAt)}`,
+        'runId=',
+      ]) {
+        await error(await request(harness, `/v1/flows/${flowId}/runs?${invalidQuery}`), 400, 'run.invalid', `Reject Run filter ${invalidQuery}`)
+      }
     },
   },
   {

@@ -93,8 +93,12 @@ export class RunViewStore {
     limit: number,
     options: {
       readonly after?: { readonly createdAt: number; readonly runId: string }
-      readonly status?: RunStatus
+      readonly createdBefore?: number
+      readonly createdFrom?: number
       readonly pendingWait?: boolean
+      readonly runId?: string
+      readonly source?: StoredControlRun['source']
+      readonly status?: RunStatus
     } = {},
   ): readonly StoredControlRun[] {
     const conditions = ['runs.flow_id = ?']
@@ -106,6 +110,22 @@ export class RunViewStore {
     if (options.status != null) {
       conditions.push('runs.status = ?')
       parameters.push(options.status)
+    }
+    if (options.source != null) {
+      conditions.push('runs.source = ?')
+      parameters.push(options.source)
+    }
+    if (options.createdFrom != null) {
+      conditions.push('runs.created_at >= ?')
+      parameters.push(options.createdFrom)
+    }
+    if (options.createdBefore != null) {
+      conditions.push('runs.created_at < ?')
+      parameters.push(options.createdBefore)
+    }
+    if (options.runId != null) {
+      conditions.push('runs.run_id = ?')
+      parameters.push(options.runId)
     }
     if (options.pendingWait != null) {
       conditions.push(

@@ -54,6 +54,7 @@ describe('RunsView timeline', () => {
           eventFilter: val('all' as const),
           events: val([]),
           eventsExpiresAt: val<string | undefined>(),
+          filter: val({}),
           historyComplete: val(true),
           loadFailed: val(false),
           loading: val(false),
@@ -68,6 +69,7 @@ describe('RunsView timeline', () => {
           runs: val([run]),
         },
         cancel: vi.fn(),
+        applyFilter: vi.fn(),
         loadMore: vi.fn(),
         retryLoad: vi.fn(),
         retryObservation: vi.fn(),
@@ -94,5 +96,6 @@ describe('RunsView timeline', () => {
     }
     expect(markup).toContain('Timeline')
     expect(markup).toContain('Output')
+    expect(markup).toContain('Filter runs')
   })
 })

@@ -38,6 +38,8 @@ const maxIdempotencyKeyLength = 256
 const maxPageSize = 100
 const defaultPageSize = 50
 const runStatusSet: ReadonlySet<string> = new Set(runStatuses)
+const runSourceSet = new Set(['draft', 'live', 'trigger'])
+const timestampPattern = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/
 const encoder = new TextEncoder()
 const controlDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false })
 
@@ -429,7 +431,11 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     return response(accepted.created ? 202 : 200, accepted.run)
   })
   app.get('/flows/:flowId/runs', (context) => {
-    const parameters = query(context.req.raw, ['cursor', 'limit', 'status', 'pendingWait'], controlErrorCode.runInvalid)
+    const parameters = query(
+      context.req.raw,
+      ['cursor', 'limit', 'status', 'pendingWait', 'source', 'createdFrom', 'createdBefore', 'runId'],
+      controlErrorCode.runInvalid,
+    )
     const flowId = context.req.param('flowId')
     const cursor = parameters.get('cursor')
     const after = cursor == null ? undefined : decodeRunCursor(cursor, flowId)
@@ -437,10 +443,23 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     if (pendingWait != null && pendingWait != 'true' && pendingWait != 'false') invalid(controlErrorCode.runInvalid, 'pendingWait must be true or false.')
     const status = parameters.get('status')
     if (status != null && !runStatusSet.has(status)) invalid(controlErrorCode.runInvalid, 'Run status is invalid.')
+    const source = parameters.get('source')
+    if (source != null && !runSourceSet.has(source)) invalid(controlErrorCode.runInvalid, 'Run source is invalid.')
+    const createdFrom = optionalTimestamp(parameters.get('createdFrom'), controlErrorCode.runInvalid)
+    const createdBefore = optionalTimestamp(parameters.get('createdBefore'), controlErrorCode.runInvalid)
+    if (createdFrom != null && createdBefore != null && createdFrom >= createdBefore) {
+      invalid(controlErrorCode.runInvalid, 'Run time range is invalid.')
+    }
+    const runId = parameters.get('runId')
+    if (runId != null && runId.length == 0) invalid(controlErrorCode.runInvalid, 'Run ID is invalid.')
     const { next, page } = service.runs.listRuns(flowId, pageSize(parameters, controlErrorCode.runInvalid), {
       ...(after == null ? {} : { after }),
       ...(status == null ? {} : { status: status as RunStatus }),
       ...(pendingWait == null ? {} : { pendingWait: pendingWait == 'true' }),
+      ...(source == null ? {} : { source: source as 'draft' | 'live' | 'trigger' }),
+      ...(createdFrom == null ? {} : { createdFrom }),
+      ...(createdBefore == null ? {} : { createdBefore }),
+      ...(runId == null ? {} : { runId }),
     })
     return response(200, { ...page, ...(next == null ? {} : { nextCursor: encodeRunCursor(flowId, next) }) })
   })
@@ -588,6 +607,18 @@ function optionalBoolean(value: string | null, code: InvalidCode): boolean {
   if (value == null || value == 'false') return false
   if (value == 'true') return true
   return invalid(code, 'Query value must be true or false.')
+}
+
+function optionalTimestamp(value: string | null, code: InvalidCode): number | undefined {
+  if (value == null) return
+  const match = timestampPattern.exec(value)
+  if (match == null) invalid(code, 'Query value must be an RFC 3339 timestamp.')
+  const parsed = Date.parse(value)
+  const calendar = Date.parse(`${match[1]}T${match[2]}Z`)
+  if (!Number.isFinite(parsed) || !Number.isFinite(calendar) || new Date(calendar).toISOString().slice(0, 19) != `${match[1]}T${match[2]}`) {
+    invalid(code, 'Query value must be an RFC 3339 timestamp.')
+  }
+  return parsed
 }
 
 function idempotencyKey(request: Request, code: InvalidCode): string {

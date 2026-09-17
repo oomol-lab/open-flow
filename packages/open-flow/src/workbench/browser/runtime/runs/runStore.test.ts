@@ -149,6 +149,103 @@ describe('RunStore', () => {
       store.dispose()
     }
   })
+
+  it('resets pagination, ignores stale filter responses, and preserves filters when loading more', async () => {
+    const stale = Promise.withResolvers<Response>()
+    const completed = { ...run, runId: 'run-completed' }
+    const older = { ...run, runId: 'run-older' }
+    const request = vi.fn(async (path: string) => {
+      if (path == '/v1/flows/flow-1/runs?limit=50') return Response.json({ flowId: 'flow-1', runs: [], version: 1 })
+      if (path == '/v1/flows/flow-1/runs?limit=50&status=failed') return await stale.promise
+      if (path == '/v1/flows/flow-1/runs?limit=50&status=completed') {
+        return Response.json({ flowId: 'flow-1', nextCursor: 'completed-next', runs: [completed], version: 1 })
+      }
+      if (path == '/v1/flows/flow-1/runs?cursor=completed-next&limit=50&status=completed') {
+        return Response.json({ flowId: 'flow-1', runs: [older], version: 1 })
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const store = new RunStore(new WorkbenchClient(request), vi.fn())
+
+    try {
+      await store.load('flow-1')
+      const failed = store.applyFilter({ status: 'failed' })
+      await store.applyFilter({ status: 'completed' })
+      stale.resolve(Response.json({ flowId: 'flow-1', runs: [run], version: 1 }))
+      await failed
+
+      expect(store.$.filter.value).toEqual({ status: 'completed' })
+      expect(store.$.runs.value).toEqual([completed])
+      expect(store.$.nextCursor.value).toBe('completed-next')
+
+      await store.loadMore()
+      expect(store.$.runs.value).toEqual([completed, older])
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('removes a selected Run from a filtered list without closing its details', async () => {
+    let filteredReads = 0
+    const request = vi.fn(async (path: string) => {
+      if (path == '/v1/flows/flow-1/runs?limit=50') return Response.json({ flowId: 'flow-1', runs: [run], version: 1 })
+      if (path == '/v1/flows/flow-1/runs?limit=50&status=completed') {
+        filteredReads += 1
+        return Response.json({ flowId: 'flow-1', runs: filteredReads == 1 ? [run] : [], version: 1 })
+      }
+      if (path == '/v1/runs/run-1') return Response.json(details)
+      if (path == '/v1/runs/run-1/events?after=0&limit=100') {
+        return Response.json({ done: true, events: [], historyComplete: true, nextAfter: 0, runId: run.runId, version: 1 })
+      }
+      if (path == '/v1/runs/run-1/result') {
+        return Response.json({ finishedAt: timestamp, result: null, runId: run.runId, status: 'completed', version: 1 })
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const store = new RunStore(new WorkbenchClient(request), vi.fn())
+
+    try {
+      await store.load('flow-1')
+      await vi.waitFor(() => expect(store.$.run.value).toEqual(details))
+      await store.applyFilter({ status: 'completed' })
+
+      store.changed(run.runId)
+      await vi.waitFor(() => expect(store.$.refreshing.value).toBe(false))
+
+      expect(store.$.runs.value).toEqual([])
+      expect(store.$.run.value).toEqual(details)
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('retries a failed filtered request with the same filter', async () => {
+    let filteredReads = 0
+    const failedRun = { ...run, status: 'failed' as const }
+    const request = vi.fn(async (path: string) => {
+      if (path == '/v1/flows/flow-1/runs?limit=50') return Response.json({ flowId: 'flow-1', runs: [], version: 1 })
+      if (path == '/v1/flows/flow-1/runs?limit=50&status=failed') {
+        filteredReads += 1
+        if (filteredReads == 1) throw new Error('Unavailable')
+        return Response.json({ flowId: 'flow-1', runs: [failedRun], version: 1 })
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const store = new RunStore(new WorkbenchClient(request), vi.fn())
+
+    try {
+      await store.load('flow-1')
+      await store.applyFilter({ status: 'failed' })
+      expect(store.$.loadFailed.value).toBe(true)
+
+      await store.retryLoad()
+      expect(store.$.loadFailed.value).toBe(false)
+      expect(store.$.filter.value).toEqual({ status: 'failed' })
+      expect(store.$.runs.value).toEqual([failedRun])
+    } finally {
+      store.dispose()
+    }
+  })
 })
 
 it('aborts both pending Run reads on reset and ignores their late responses', async () => {

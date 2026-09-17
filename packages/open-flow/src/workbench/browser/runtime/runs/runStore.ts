@@ -35,7 +35,12 @@ interface RunState {
   readonly runById: ReadonlyMap<string, Run | RunDetails>
   readonly runIds: readonly string[]
   readonly selectedRunId?: string
-  readonly target?: { readonly flowId: string }
+  readonly target?: RunTarget
+}
+
+interface RunTarget {
+  readonly filter: RunFilter
+  readonly flowId: string
 }
 
 type Client = Pick<WorkbenchClient, 'cancelRun' | 'getRun' | 'getRunEvents' | 'getRunResult' | 'listRuns' | 'resolveRunWait'>
@@ -46,6 +51,7 @@ export interface Run$ {
   readonly events: ReadonlyVal<readonly RunEvent[]>
   readonly eventsExpiresAt: ReadonlyVal<string | undefined>
   readonly externalRunId: ReadonlyVal<string | undefined>
+  readonly filter: ReadonlyVal<RunFilter>
   readonly historyComplete: ReadonlyVal<boolean>
   readonly loadFailed: ReadonlyVal<boolean>
   readonly loading: ReadonlyVal<boolean>
@@ -61,6 +67,17 @@ export interface Run$ {
 }
 
 export type RunEventFilter = 'all' | 'artifact' | 'lifecycle' | 'log' | 'output' | 'progress'
+
+export interface RunFilter {
+  readonly createdBefore?: string
+  readonly createdFrom?: string
+  readonly pendingWait?: boolean
+  readonly runId?: string
+  readonly source?: Run['source']
+  readonly status?: Run['status']
+}
+
+const noRunFilter: RunFilter = {}
 
 const initialState: RunState = {
   eventCursor: 0,
@@ -97,10 +114,14 @@ function listedRuns(state: RunState, runs: readonly Run[]): Pick<RunState, 'runB
   const runIds = runs.map((run) => run.runId)
   const selected = selectedRun(state)
   if (selected != null) {
-    if (!runById.has(selected.runId)) runIds.unshift(selected.runId)
+    if (!hasRunFilter(state.target?.filter ?? noRunFilter) && !runById.has(selected.runId)) runIds.unshift(selected.runId)
     runById.set(selected.runId, selected)
   }
   return { runById, runIds }
+}
+
+export function hasRunFilter(filter: RunFilter): boolean {
+  return Object.values(filter).some((value) => value != null)
 }
 
 function replaceRun(state: RunState, run: Run | RunDetails): ReadonlyMap<string, Run | RunDetails> {
@@ -129,6 +150,7 @@ export class RunStore {
       events: derive(this.#state, (state) => state.events),
       eventsExpiresAt: derive(this.#state, (state) => state.eventsExpiresAt),
       externalRunId: derive(this.#state, (state) => state.externalRunId),
+      filter: derive(this.#state, (state) => state.target?.filter ?? noRunFilter),
       historyComplete: derive(this.#state, (state) => state.historyComplete),
       loadFailed: derive(this.#state, (state) => state.loadFailed),
       loading: derive(this.#state, (state) => state.loading),
@@ -172,11 +194,12 @@ export class RunStore {
   public async load(flowId: string): Promise<void> {
     const state = this.#state.value
     const warm = state.loaded && state.target?.flowId == flowId
+    const filter = state.target?.flowId == flowId ? state.target.filter : noRunFilter
     const current = this.#lists.begin()
     if (warm) {
       this.#set({ loadFailed: false, loadingMore: false, loadMoreFailed: false, refreshing: true })
       try {
-        const page = await this.#client.listRuns(flowId, { limit: 50 })
+        const page = await this.#client.listRuns(flowId, { ...filter, limit: 50 })
         if (!current() || this.#state.value.target?.flowId != flowId) return
         this.#set({ ...listedRuns(this.#state.value, page.runs), nextCursor: page.nextCursor, refreshing: false })
       } catch (error) {
@@ -195,16 +218,42 @@ export class RunStore {
       ...(cancelingRunId == null ? {} : { cancelingRunId }),
       eventFilter: state.eventFilter,
       loading: true,
-      target: { flowId },
+      target: { filter, flowId },
     })
     try {
-      const page = await this.#client.listRuns(flowId, { limit: 50 })
+      const page = await this.#client.listRuns(flowId, { ...filter, limit: 50 })
       if (!current()) return
       this.#set({ ...listedRuns(this.#state.value, page.runs), loaded: true, loadFailed: false, loading: false, nextCursor: page.nextCursor })
       const first = page.runs[0]
       if (first != null) this.#observe(first)
     } catch (error) {
       if (!current()) return
+      this.#set({ loadFailed: true, loading: false })
+      this.#setNotice(errorNotice(error, this.#i18n.t))
+    }
+  }
+
+  public async applyFilter(filter: RunFilter): Promise<void> {
+    const target = this.#state.value.target
+    if (target == null) return
+    const current = this.#lists.begin()
+    const nextTarget = { filter, flowId: target.flowId }
+    this.#set({
+      loadFailed: false,
+      loading: true,
+      loadingMore: false,
+      loadMoreFailed: false,
+      nextCursor: undefined,
+      refreshing: false,
+      runIds: [],
+      target: nextTarget,
+    })
+    try {
+      const page = await this.#client.listRuns(target.flowId, { ...filter, limit: 50 })
+      if (!current() || this.#state.value.target != nextTarget) return
+      this.#set({ ...listedRuns(this.#state.value, page.runs), loaded: true, loading: false, nextCursor: page.nextCursor })
+    } catch (error) {
+      if (!current() || this.#state.value.target != nextTarget) return
       this.#set({ loadFailed: true, loading: false })
       this.#setNotice(errorNotice(error, this.#i18n.t))
     }
@@ -217,6 +266,7 @@ export class RunStore {
     this.#set({ loadMoreFailed: false, loadingMore: true })
     try {
       const page = await this.#client.listRuns(target.flowId, {
+        ...target.filter,
         cursor: nextCursor,
         limit: 50,
       })
@@ -246,7 +296,7 @@ export class RunStore {
     const state = this.#state.value
     if (state.target == null) return
     if (state.selectedRunId == runId) this.retryObservation()
-    void this.#refreshList(state.target.flowId)
+    void this.#refreshList(state.target)
   }
 
   public select(runId: string): void {
@@ -256,8 +306,10 @@ export class RunStore {
   }
 
   public async retryLoad(): Promise<void> {
-    const target = this.#state.value.target
-    if (target != null) await this.load(target.flowId)
+    const state = this.#state.value
+    if (state.target == null) return
+    if (state.loadFailed) await this.applyFilter(state.target.filter)
+    else await this.load(state.target.flowId)
   }
 
   public retryObservation(): void {
@@ -318,7 +370,7 @@ export class RunStore {
       this.#set({ runById: replaceRun(state, next) })
       this.retryObservation()
       const target = this.#state.value.target
-      if (target != null) void this.#refreshList(target.flowId)
+      if (target != null) void this.#refreshList(target)
     } catch (error) {
       if (this.#state.value.selectedRunId == run.runId) this.#setNotice(errorNotice(error, this.#i18n.t))
     } finally {
@@ -350,17 +402,20 @@ export class RunStore {
   public follow(run: Run, current: Current): boolean {
     if (!current()) return false
     const state = this.#state.value
+    const target = state.target?.flowId == run.flowId ? state.target : { filter: noRunFilter, flowId: run.flowId }
+    const filtered = hasRunFilter(target.filter)
     this.#set({
       events: [],
       externalRunId: undefined,
       loaded: true,
       result: undefined,
       runById: replaceRun(state, run),
-      runIds: [run.runId, ...state.runIds.filter((runId) => runId != run.runId)],
+      runIds: filtered ? state.runIds.filter((runId) => runId != run.runId) : [run.runId, ...state.runIds.filter((runId) => runId != run.runId)],
       selectedRunId: run.runId,
-      target: { flowId: run.flowId },
+      target,
     })
     void this.#poll(run, current)
+    if (filtered) void this.#refreshList(target)
     return true
   }
 
@@ -453,15 +508,15 @@ export class RunStore {
     await Effect.runPromise(Deferred.await(ready))
   }
 
-  async #refreshList(flowId: string): Promise<void> {
+  async #refreshList(target: RunTarget): Promise<void> {
     const current = this.#lists.begin()
     this.#set({ loadingMore: false, refreshing: true })
     try {
-      const page = await this.#client.listRuns(flowId, { limit: 50 })
-      if (!current() || this.#state.value.target?.flowId != flowId) return
+      const page = await this.#client.listRuns(target.flowId, { ...target.filter, limit: 50 })
+      if (!current() || this.#state.value.target != target) return
       this.#set({ ...listedRuns(this.#state.value, page.runs), loaded: true, loadingMore: false, nextCursor: page.nextCursor, refreshing: false })
     } catch {
-      if (current() && this.#state.value.target?.flowId == flowId) this.#set({ refreshing: false })
+      if (current() && this.#state.value.target == target) this.#set({ refreshing: false })
     }
   }
 

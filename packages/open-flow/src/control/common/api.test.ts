@@ -305,6 +305,27 @@ describe('ControlClient Wait API', () => {
   })
 })
 
+it('serializes Run list filters', async () => {
+  const request = vi.fn(async () => Response.json({ flowId: flow.flowId, runs: [], version: 1 }))
+  const client = new ControlClient(request)
+
+  await client.listRuns(flow.flowId, {
+    createdBefore: '2026-09-17T00:00:00.000Z',
+    createdFrom: '2026-09-16T00:00:00.000Z',
+    cursor: 'next page',
+    limit: 25,
+    pendingWait: true,
+    runId: 'run/1',
+    source: 'trigger',
+    status: 'failed',
+  })
+
+  expect(request).toHaveBeenCalledWith(
+    '/v1/flows/flow%2F1/runs?cursor=next+page&limit=25&status=failed&pendingWait=true&source=trigger&createdFrom=2026-09-16T00%3A00%3A00.000Z&createdBefore=2026-09-17T00%3A00%3A00.000Z&runId=run%2F1',
+    expect.anything(),
+  )
+})
+
 const editor = {
   flow,
   draft: {
