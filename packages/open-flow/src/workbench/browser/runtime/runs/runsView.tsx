@@ -1,20 +1,54 @@
 import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
-import type { Run, TriggerRun } from '../api.ts'
+import type { Run, RunStatus, TriggerRun } from '../api.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
+import type { RunFilter } from './runStore.ts'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
+import { Field, FieldError, FieldLabel } from '../../../../ui/browser/field.tsx'
+import { Input } from '../../../../ui/browser/input.tsx'
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Tabs, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Icon } from '../icons.tsx'
+import { WorkbenchSelect } from '../shell/workbenchSelect.tsx'
 import { ActiveWait, duration, initialRunLogFilters, RunLog, RunLogButton, RunLogFilters, runLabel, statusClass } from './runDrawer.tsx'
 import { RunResultView } from './runOutput.tsx'
-import { canCancelRun } from './runStore.ts'
+import { canCancelRun, hasRunFilter } from './runStore.ts'
+
+interface RunFilterDraft {
+  readonly createdBefore: string
+  readonly createdFrom: string
+  readonly pendingWait: boolean
+  readonly runId: string
+  readonly source: Run['source'] | ''
+  readonly status: RunStatus | ''
+}
+
+const emptyFilterDraft: RunFilterDraft = { createdBefore: '', createdFrom: '', pendingWait: false, runId: '', source: '', status: '' }
+
+function localDateTime(value: string | undefined): string {
+  if (value == null) return ''
+  const date = new Date(value)
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+}
+
+function filterDraft(filter: RunFilter): RunFilterDraft {
+  return {
+    createdBefore: localDateTime(filter.createdBefore),
+    createdFrom: localDateTime(filter.createdFrom),
+    pendingWait: filter.pendingWait === true,
+    runId: filter.runId ?? '',
+    source: filter.source ?? '',
+    status: filter.status ?? '',
+  }
+}
 
 function sourceLabel(run: Run, t: TFunction): string {
   switch (run.source) {
@@ -49,6 +83,7 @@ export function RunsView({
   const cancelingRunId = useVal(store.runs.$.cancelingRunId)
   const events = useVal(store.runs.$.events)
   const eventsExpiresAt = useVal(store.runs.$.eventsExpiresAt)
+  const filter = useVal(store.runs.$.filter)
   const historyComplete = useVal(store.runs.$.historyComplete)
   const loadFailed = useVal(store.runs.$.loadFailed)
   const loading = useVal(store.runs.$.loading)
@@ -63,12 +98,39 @@ export function RunsView({
   const observationFailed = useVal(store.runs.$.observationFailed)
   const revision = useVal(store.workspace.$.revision)
   const root = useRef<HTMLElement>(null)
+  const filterId = useId()
+  const filterErrorId = `${filterId}-error`
   const selectedRun = useRef<HTMLButtonElement | null>(null)
   const [narrow, setNarrow] = useState(false)
   const [narrowDetailOpen, setNarrowDetailOpen] = useState(false)
   const [tab, setTab] = useState<'output' | 'timeline'>('timeline')
   const [raw, setRaw] = useState(false)
   const [filters, setFilters] = useState(() => initialRunLogFilters(eventFilter))
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [filterForm, setFilterForm] = useState(() => filterDraft(filter))
+  const filterActive = hasRunFilter(filter)
+  const invalidRange =
+    filterForm.createdFrom.length > 0 && filterForm.createdBefore.length > 0 && Date.parse(filterForm.createdFrom) >= Date.parse(filterForm.createdBefore)
+  const filterField = <Key extends keyof RunFilterDraft>(key: Key, value: RunFilterDraft[Key]): void => {
+    setFilterForm((current) => ({ ...current, [key]: value }))
+  }
+  const statusOptions = [
+    { label: t('run.filterAllStatuses'), value: '' },
+    { label: t('run.statusQueued'), value: 'queued' },
+    { label: t('run.statusStarting'), value: 'starting' },
+    { label: t('run.statusRunning'), value: 'running' },
+    { label: t('run.statusWaiting'), value: 'waiting' },
+    { label: t('run.statusSucceeded'), value: 'completed' },
+    { label: t('run.statusFailed'), value: 'failed' },
+    { label: t('run.statusCanceled'), value: 'canceled' },
+    { label: t('run.statusIndeterminate'), value: 'indeterminate' },
+  ]
+  const sourceOptions = [
+    { label: t('run.filterAllSources'), value: '' },
+    { label: t('run.sourceDraft'), value: 'draft' },
+    { label: t('run.sourceLive'), value: 'live' },
+    { label: t('run.sourceTrigger'), value: 'trigger' },
+  ]
   const triggerRun = run?.source == 'trigger' && 'triggerNodeId' in run ? (run as TriggerRun) : undefined
   const triggerName =
     triggerRun != null && revision?.revision.revisionId == triggerRun.revisionId ? revision.trigger(triggerRun.triggerNodeId)?.name : undefined
@@ -102,6 +164,130 @@ export function RunsView({
       <aside aria-busy={loading || refreshing} className="run-list-panel">
         <header className="run-list-header">
           <strong>{t('run.history')}</strong>
+          <Popover
+            onOpenChange={(open) => {
+              if (open) setFilterForm(filterDraft(filter))
+              setFilterOpen(open)
+            }}
+            open={filterOpen}
+          >
+            <PopoverTrigger
+              render={
+                <Button
+                  aria-label={t('run.filterRuns')}
+                  aria-pressed={filterActive}
+                  size="icon-sm"
+                  title={t('run.filterRuns')}
+                  type="button"
+                  variant={filterActive ? 'secondary' : 'ghost'}
+                />
+              }
+            >
+              <i aria-hidden="true" className="i-lucide-light:funnel size-4" />
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 max-w-[calc(100vw-24px)]" container={root.current} initialFocus>
+              <PopoverTitle>{t('run.filterRuns')}</PopoverTitle>
+              <form
+                className="flex flex-col gap-3"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  if (invalidRange) return
+                  const runId = filterForm.runId.trim()
+                  void store.runs.applyFilter({
+                    ...(filterForm.status == '' ? {} : { status: filterForm.status }),
+                    ...(filterForm.source == '' ? {} : { source: filterForm.source }),
+                    ...(filterForm.pendingWait ? { pendingWait: true } : {}),
+                    ...(filterForm.createdFrom == '' ? {} : { createdFrom: new Date(filterForm.createdFrom).toISOString() }),
+                    ...(filterForm.createdBefore == '' ? {} : { createdBefore: new Date(filterForm.createdBefore).toISOString() }),
+                    ...(runId == '' ? {} : { runId }),
+                  })
+                  setFilterOpen(false)
+                }}
+              >
+                <Field>
+                  <FieldLabel htmlFor={`${filterId}-status`}>{t('run.filterStatus')}</FieldLabel>
+                  <WorkbenchSelect
+                    ariaLabel={t('run.filterStatus')}
+                    className="w-full"
+                    id={`${filterId}-status`}
+                    onValueChange={(value) => filterField('status', value as RunFilterDraft['status'])}
+                    options={statusOptions}
+                    portalRoot={root.current}
+                    value={filterForm.status}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`${filterId}-source`}>{t('run.filterSource')}</FieldLabel>
+                  <WorkbenchSelect
+                    ariaLabel={t('run.filterSource')}
+                    className="w-full"
+                    id={`${filterId}-source`}
+                    onValueChange={(value) => filterField('source', value as RunFilterDraft['source'])}
+                    options={sourceOptions}
+                    portalRoot={root.current}
+                    value={filterForm.source}
+                  />
+                </Field>
+                <Field orientation="horizontal">
+                  <Checkbox
+                    checked={filterForm.pendingWait}
+                    id={`${filterId}-pending-wait`}
+                    onCheckedChange={(checked) => filterField('pendingWait', checked === true)}
+                  />
+                  <FieldLabel htmlFor={`${filterId}-pending-wait`}>{t('run.filterPendingWait')}</FieldLabel>
+                </Field>
+                <Field data-invalid={invalidRange || undefined}>
+                  <FieldLabel htmlFor={`${filterId}-created-from`}>{t('run.filterCreatedFrom')}</FieldLabel>
+                  <Input
+                    aria-describedby={invalidRange ? filterErrorId : undefined}
+                    aria-invalid={invalidRange || undefined}
+                    id={`${filterId}-created-from`}
+                    onChange={(event) => filterField('createdFrom', event.target.value)}
+                    type="datetime-local"
+                    value={filterForm.createdFrom}
+                  />
+                </Field>
+                <Field data-invalid={invalidRange || undefined}>
+                  <FieldLabel htmlFor={`${filterId}-created-before`}>{t('run.filterCreatedBefore')}</FieldLabel>
+                  <Input
+                    aria-describedby={invalidRange ? filterErrorId : undefined}
+                    aria-invalid={invalidRange || undefined}
+                    id={`${filterId}-created-before`}
+                    onChange={(event) => filterField('createdBefore', event.target.value)}
+                    type="datetime-local"
+                    value={filterForm.createdBefore}
+                  />
+                  {invalidRange && <FieldError id={filterErrorId}>{t('run.filterInvalidRange')}</FieldError>}
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`${filterId}-run-id`}>{t('run.filterRunId')}</FieldLabel>
+                  <Input
+                    id={`${filterId}-run-id`}
+                    onChange={(event) => filterField('runId', event.target.value)}
+                    placeholder={t('run.filterRunIdPlaceholder')}
+                    value={filterForm.runId}
+                  />
+                </Field>
+                <div className="flex justify-end gap-2 border-t border-border/50 pt-3">
+                  <Button
+                    onClick={() => {
+                      setFilterForm(emptyFilterDraft)
+                      void store.runs.applyFilter({})
+                      setFilterOpen(false)
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    {t('run.filterClear')}
+                  </Button>
+                  <Button disabled={invalidRange} size="sm" type="submit">
+                    {t('run.filterApply')}
+                  </Button>
+                </div>
+              </form>
+            </PopoverContent>
+          </Popover>
         </header>
         <ScrollArea className="run-list run-content-scroll" defer={false} tabIndex={-1}>
           {loading ? (
@@ -119,9 +305,14 @@ export function RunsView({
                 <EmptyMedia variant="icon">
                   <Icon name="play" />
                 </EmptyMedia>
-                <EmptyTitle>{t('run.historyEmpty')}</EmptyTitle>
-                <EmptyDescription>{t('run.historyEmptyDescription')}</EmptyDescription>
+                <EmptyTitle>{t(filterActive ? 'run.filterEmpty' : 'run.historyEmpty')}</EmptyTitle>
+                <EmptyDescription>{t(filterActive ? 'run.filterEmptyDescription' : 'run.historyEmptyDescription')}</EmptyDescription>
               </EmptyHeader>
+              {filterActive && (
+                <Button onClick={() => void store.runs.applyFilter({})} size="sm" variant="outline">
+                  {t('run.filterClear')}
+                </Button>
+              )}
             </Empty>
           ) : (
             runs.map((candidate) => (

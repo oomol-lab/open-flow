@@ -612,6 +612,8 @@
   .run-list-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 8px;
     padding: 0 16px;
     border-bottom: 1px solid var(--ui-border);
   }

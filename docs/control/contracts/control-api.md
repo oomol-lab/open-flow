@@ -375,7 +375,7 @@ interface RunEvents {
 }
 ```
 
-Run list 按 `createdAt`、`runId` 逆序稳定分页，`status=waiting` 只查询已冻结 Run；`pendingWait=true` 查询所有有待决议项的非终态 Run，包含运行中和排队中，`false` 查询其补集。可与 status 组合，分页时保持过滤条件。
+Run list 按 `createdAt`、`runId` 逆序稳定分页。查询可按单个 `status`、`source`、精确 `runId`、`createdFrom`（包含）和 `createdBefore`（不包含）组合筛选；时间参数使用 RFC 3339，范围必须递增。`status=waiting` 只查询已冻结 Run；`pendingWait=true` 查询所有有待决议项的非终态 Run，包含运行中和排队中，`false` 查询其补集。后续页面继续传同一组筛选参数；cursor 只表达 Flow 范围和分页位置。
 
 `after` 是已观察的最后 sequence，只返回更大的事件。terminal Run 最多有一个 terminal event。非 terminal Run 的 result 返回
 `run.not-terminal`；取消成功与重复取消分别返回 `cancelAccepted: true` 和 `false`。
@@ -584,7 +584,7 @@ Workbench 已完成初始化并停留在 Flows 列表时，收到该事件自动
 | `POST`    | `/v1/flows/:flowId/publications/:publicationId/rollback`   |  201/200 | Rollback                                          |
 | `POST`    | `/v1/flows/:flowId/revisions/:revisionId/runs`             |  202/200 | Draft Run                                         |
 | `POST`    | `/v1/runs`                                                 |  202/200 | Live Run                                          |
-| `GET`     | `/v1/flows/:flowId/runs`                                   |      200 | `cursor`、`limit`、`status`                       |
+| `GET`     | `/v1/flows/:flowId/runs`                                   |      200 | Run page filters                                  |
 | `GET`     | `/v1/runs/:runId`                                          |      200 | Run detail                                        |
 | `GET`     | `/v1/runs/:runId/events`                                   |      200 | `after`、`limit`                                  |
 | `GET`     | `/v1/runs/:runId/result`                                   |      200 | terminal result                                   |

@@ -184,7 +184,15 @@ export class RunControl {
   listRuns(
     flowId: string,
     limit: number,
-    options: { readonly after?: RunPosition; readonly status?: RunStatus; readonly pendingWait?: boolean } = {},
+    options: {
+      readonly after?: RunPosition
+      readonly createdBefore?: number
+      readonly createdFrom?: number
+      readonly pendingWait?: boolean
+      readonly runId?: string
+      readonly source?: StoredControlRun['source']
+      readonly status?: RunStatus
+    } = {},
   ): {
     readonly next?: RunPosition
     readonly page: { readonly flowId: string; readonly runs: readonly Run[]; readonly version: 1 }

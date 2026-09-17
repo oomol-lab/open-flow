@@ -952,13 +952,26 @@ export class ControlClient {
 
   async listRuns(
     flowId: string,
-    options: { readonly cursor?: string; readonly limit?: number; readonly status?: RunStatus; readonly pendingWait?: boolean } = {},
+    options: {
+      readonly createdBefore?: string
+      readonly createdFrom?: string
+      readonly cursor?: string
+      readonly limit?: number
+      readonly pendingWait?: boolean
+      readonly runId?: string
+      readonly source?: Run['source']
+      readonly status?: RunStatus
+    } = {},
   ): Promise<RunPage> {
     const parameters = new URLSearchParams()
     if (options.cursor != null) parameters.set('cursor', options.cursor)
     if (options.limit != null) parameters.set('limit', String(options.limit))
     if (options.status != null) parameters.set('status', options.status)
     if (options.pendingWait != null) parameters.set('pendingWait', String(options.pendingWait))
+    if (options.source != null) parameters.set('source', options.source)
+    if (options.createdFrom != null) parameters.set('createdFrom', options.createdFrom)
+    if (options.createdBefore != null) parameters.set('createdBefore', options.createdBefore)
+    if (options.runId != null) parameters.set('runId', options.runId)
     const query = parameters.size == 0 ? '' : `?${parameters}`
     return runPage(await this.request(`/v1/flows/${segment(flowId)}/runs${query}`))
   }

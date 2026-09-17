@@ -52,7 +52,23 @@ function WaitHistory({ language, log }: { readonly language: UiLanguage; readonl
     let run: RunDetails = { ...base, status: 'waiting' }
     const client = new WorkbenchClient(async (path, init) => {
       const url = new URL(String(path), 'https://lab.invalid')
-      if (url.pathname == '/v1/flows/flow/runs') return Response.json({ flowId: run.flowId, runs: [run], version: 1 })
+      if (url.pathname == '/v1/flows/flow/runs') {
+        const status = url.searchParams.get('status')
+        const source = url.searchParams.get('source')
+        const runId = url.searchParams.get('runId')
+        const createdFrom = url.searchParams.get('createdFrom')
+        const createdBefore = url.searchParams.get('createdBefore')
+        const pendingWait = url.searchParams.get('pendingWait')
+        const hasPendingWait = run.waits.length > 0
+        const visible =
+          (status == null || status == run.status) &&
+          (source == null || source == run.source) &&
+          (runId == null || runId == run.runId) &&
+          (createdFrom == null || Date.parse(run.createdAt) >= Date.parse(createdFrom)) &&
+          (createdBefore == null || Date.parse(run.createdAt) < Date.parse(createdBefore)) &&
+          (pendingWait == null || (pendingWait == 'true') == hasPendingWait)
+        return Response.json({ flowId: run.flowId, runs: visible ? [run] : [], version: 1 })
+      }
       if (url.pathname == '/v1/runs/sample') return Response.json(run)
       if (url.pathname == '/v1/runs/sample/events')
         return Response.json({ runId: run.runId, events: [], done: true, historyComplete: true, nextAfter: 0, version: 1 })
