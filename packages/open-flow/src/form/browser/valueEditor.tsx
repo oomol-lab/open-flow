@@ -670,9 +670,10 @@ export function ValueEditor(props: ValueEditorProps) {
             className={styles.nullValue}
             disabled={disabled}
             aria-label={`${label} ${t('valueEditor.setValue')}: null`}
+            aria-invalid={invalid || undefined}
             onClick={() => onChange(null)}
           >
-            {t('valueEditor.unset')}
+            {value === undefined ? t('valueEditor.unset') : JSON.stringify(value)}
           </Button>
         )
       ) : type === 'string' && source['ui:widget'] === 'color' ? (

@@ -77,6 +77,35 @@ async function session() {
 }
 
 describe('Workspace canvas history', () => {
+  it('saves a type change and its assigned value as one undoable edit', async () => {
+    const { store, saved } = await session()
+    try {
+      await store.setInputValue('code', 'input', 'old value')
+      const before = saved().draft.content
+      const node = before.document.graph.nodes.code
+      if (node?.kind !== 'task' || node.task == null) throw new Error('Expected code task')
+      await store.saveTaskPorts('code', {
+        inputs: [{ handle: 'input', jsonSchema: { type: 'null' }, nullable: true }],
+        outputs: node.task.outputs,
+      })
+      const after = saved().draft.content
+      expect(after.document.graph.nodes.code).toMatchObject({
+        task: { inputs: [{ jsonSchema: { type: 'null' }, nullable: true }] },
+        inputs: { input: { kind: 'value', value: null } },
+      })
+      await store.undo()
+      expect(saved().draft.content).toEqual(before)
+      await store.redo()
+      expect(saved().draft.content).toEqual(after)
+      await store.setInputValue('code', 'input', undefined)
+      expect(saved().draft.content.document.graph.nodes.code).toMatchObject({ inputs: {} })
+      await store.undo()
+      expect(saved().draft.content).toEqual(after)
+    } finally {
+      store.dispose()
+    }
+  })
+
   it.each([['code'], ['code', 'value'], ['note']])('deletes %j without notifying and keeps undo available', async (...selection) => {
     const { store, notices } = await session()
     try {

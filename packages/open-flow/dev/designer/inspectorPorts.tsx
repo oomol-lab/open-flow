@@ -22,7 +22,7 @@ const inputs: (Group | InputPort)[] = [
   { ...port('trackings', 'array'), jsonSchema: { type: 'array', items: { type: 'string' } }, description: '要注册的追踪号。' },
   port('message'),
   port('missing_source'),
-  port('language'),
+  { ...port('language'), nullable: true },
   { group: 'Options' },
   {
     ...port('instructions_for_the_summary'),
@@ -37,6 +37,8 @@ const valueStates: InputPort[] = [
   { ...port('tags', 'array'), jsonSchema: { type: 'array', items: { type: 'string' } }, value: [] },
   { ...port('note'), nullable: true, value: null },
   { ...port('enabled', 'boolean'), value: false },
+  { ...port('nullValue', 'null'), nullable: true, value: null },
+  { ...port('invalidNull', 'null'), nullable: true, value: 'old value' },
 ]
 const portsContent: RevisionContent = {
   modelVersion: 2,

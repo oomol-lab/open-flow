@@ -196,6 +196,16 @@ describe('Code task port changes', () => {
 })
 
 describe('Managed task additional input changes', () => {
+  it('converts assigned values when an additional input changes type', () => {
+    const current = managedDraft()
+    const changes = updateTaskAdditionalInputs(revisionView(current), { kind: 'flow' }, 'task', [
+      { handle: 'start', jsonSchema: { type: 'null' }, nullable: true },
+    ])!
+    expect(applyFlowChanges(current, changes).content.document.graph.nodes.task).toMatchObject({
+      inputs: { start: { kind: 'value', value: null }, message: { kind: 'value', value: 'Hello' } },
+    })
+  })
+
   it('renames and removes only node-local input mappings', () => {
     const current = managedDraft()
 
@@ -730,5 +740,36 @@ describe('Inspector port ordering persistence', () => {
     if (node.kind !== 'task') throw new Error('Expected canvas task')
     expect(node.inputs.map((entry) => ('handle' in entry ? entry.handle : entry.group))).toEqual(['b', 'a'])
     expect(node.outputs.map((entry) => ('handle' in entry ? entry.handle : entry.group))).toEqual(['second', 'first'])
+  })
+})
+
+describe('Input type conversion', () => {
+  it.each([
+    [{ kind: 'value', value: 'old' }, { type: 'null' }, true, { kind: 'value', value: null }],
+    [{ kind: 'value', value: 'old' }, { type: 'object' }, false, { kind: 'value', value: {} }],
+    [{ kind: 'value', value: 'old' }, { type: 'string' }, false, { kind: 'value', value: 'old' }],
+    [{ kind: 'value', value: null }, { type: 'string' }, true, { kind: 'value', value: null }],
+    [undefined, { type: 'null' }, true, undefined],
+    [
+      { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] },
+      { type: 'null' },
+      true,
+      { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] },
+    ],
+  ] as const)('converts literals while preserving compatible, unset and connected inputs (%j)', (mapping, schema, nullable, expected) => {
+    const current = draft('export default () => ({})')
+    const node = current.content.document.graph.nodes.task
+    if (node?.kind !== 'task' || node.task == null) throw new Error('Expected code task')
+    const assigned =
+      mapping == null
+        ? current
+        : applyFlowChanges(current, [{ kind: 'graph.node.input.set', target: { kind: 'flow' }, nodeId: 'task', handle: 'value', value: mapping }])
+    const changes = updateTaskPorts(revisionView(assigned), { kind: 'flow' }, 'task', {
+      inputs: [{ handle: 'value', jsonSchema: schema, nullable }],
+      outputs: node.task.outputs,
+    })!
+    const changed = applyFlowChanges(assigned, changes).content.document.graph.nodes.task
+    if (changed?.kind !== 'task') throw new Error('Expected code task')
+    expect(changed.inputs.value).toEqual(expected)
   })
 })

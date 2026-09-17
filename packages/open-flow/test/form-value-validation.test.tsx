@@ -297,3 +297,26 @@ describe('Fixed schema value presentation', () => {
     expect(markup).toMatch(/aria-label="Remove fixed.0"[^>]*disabled/)
   })
 })
+
+describe('Null editor', () => {
+  it('shows an incompatible stored value instead of calling it unset', () => {
+    const i18n = createI18n('en')
+    const onChange = vi.fn()
+    try {
+      const render = (value: unknown) =>
+        renderToStaticMarkup(
+          <I18nProvider i18n={i18n}>
+            <ValueEditor label="sample" schema={{ type: 'null' }} nullable value={value} onChange={onChange} path="/sample" onDraftIssue={vi.fn()} />
+          </I18nProvider>,
+        )
+      expect(render('old value')).toContain('old value')
+      expect(render('old value')).toContain('aria-invalid="true"')
+      expect(render('old value')).not.toContain('Unset')
+      expect(render(null)).toContain('>null</span>')
+      expect(render(null)).not.toContain('aria-invalid="true"')
+      expect(onChange).not.toHaveBeenCalled()
+    } finally {
+      i18n.dispose()
+    }
+  })
+})

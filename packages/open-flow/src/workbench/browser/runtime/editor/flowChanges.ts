@@ -37,6 +37,7 @@ import {
   setInputVariable as setGraphInputVariable,
   updateSettings,
 } from '../../../../flow/common/nodeChanges.ts'
+import { valueForEditor } from '../../../../form/common/editorComponent.ts'
 import { generateTyping, typescriptOf } from '../../../../manifest/common/meta/block/generateTyping.ts'
 
 export interface NodeClipboard {
@@ -644,6 +645,7 @@ export function updateTaskAdditionalInputs(
   for (const handle of Object.keys(inputs)) {
     if (!handles.has(handle)) delete inputs[handle]
   }
+  convertInputValues(inputs, current.additionalInputs ?? [], additionalInputs, rename)
   const value = additionalInputs.length == 0 ? undefined : additionalInputs
   return cleanVariableBindings(revision.revision.content, [
     { before: current.additionalInputs, kind: 'graph.node.additional-inputs.set', nodeId, target, value },
@@ -703,6 +705,26 @@ function renamedPort(
   return removed.length == 1 && added.length == 1 ? [removed[0]!, added[0]!] : undefined
 }
 
+/** Convert assigned literals together with their definition, preserving sources and unset inputs. */
+function convertInputValues(
+  inputs: Record<string, InputMapping>,
+  previous: readonly (InputPort | { readonly group: string })[],
+  next: readonly (InputPort | { readonly group: string })[],
+  rename: readonly [string, string] | undefined,
+): void {
+  for (const port of next) {
+    if (!('handle' in port)) continue
+    const oldHandle = rename?.[1] === port.handle ? rename[0] : port.handle
+    const before = previous.find((item): item is InputPort => 'handle' in item && item.handle === oldHandle)
+    const mapping = inputs[port.handle]
+    if (before == null || dequal(before.jsonSchema, port.jsonSchema) || mapping?.kind !== 'value') continue
+    if (mapping.value === null && port.nullable) continue
+    const value = valueForEditor(port.jsonSchema, mapping.value) as JsonValue | undefined
+    if (value === undefined) delete inputs[port.handle]
+    else inputs[port.handle] = { kind: 'value', value }
+  }
+}
+
 function changedInputs(
   before: Readonly<Record<string, InputMapping>>,
   value: Readonly<Record<string, InputMapping>>,
@@ -750,6 +772,7 @@ function replaceTaskPorts(revision: RevisionView, target: GraphTarget, nodeId: s
       for (const name of Object.keys(inputs)) {
         if (!inputNames.has(name)) delete inputs[name]
       }
+      convertInputValues(inputs, previous.inputs, task.inputs, inputRename)
     }
 
     for (const [name, mapping] of Object.entries(inputs)) {
