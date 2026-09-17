@@ -12,9 +12,10 @@ describe('Trigger configuration editor', () => {
         <TriggerConfigEditor
           schema={{
             type: 'object',
-            required: ['owner'],
+            required: ['owner', 'events'],
             properties: {
               owner: { type: 'string', title: 'Owner', default: 'example' },
+              events: { type: 'array', title: 'Events', items: { enum: ['issues', 'push'] } },
               limit: { type: 'integer', default: 10 },
             },
           }}
@@ -27,6 +28,7 @@ describe('Trigger configuration editor', () => {
     expect(markup).toContain('data-invalid="true"')
     expect(markup).toContain('value="example"')
     expect(markup).toContain('value="10"')
+    expect((markup.match(/<button\b[^>]*aria-label="Events"[^>]*>/) ?? [])[0]).toContain('aria-invalid="true"')
     expect(onChange).not.toHaveBeenCalled()
   })
 

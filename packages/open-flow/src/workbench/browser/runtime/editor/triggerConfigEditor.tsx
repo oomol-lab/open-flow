@@ -55,7 +55,16 @@ export function TriggerConfigEditor({
                       {t('valueEditor.clear')}
                     </Button>
                   )}
-                  <EditableChoices multiple label={label} options={items.enum} labels={undefined} value={value} disabled={disabled} onChange={change} />
+                  <EditableChoices
+                    multiple
+                    label={label}
+                    options={items.enum}
+                    labels={undefined}
+                    value={value}
+                    disabled={disabled}
+                    invalid={missing}
+                    onChange={change}
+                  />
                 </>
               ) : (
                 <ValueEditor

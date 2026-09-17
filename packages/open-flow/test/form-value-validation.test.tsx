@@ -55,7 +55,9 @@ describe('Field validation presentation', () => {
         if (_label === 'JSON') {
           expect(markup.match(/<textarea\b[^>]*>/)?.[0]).toContain('aria-invalid="true"')
         }
-        expect(await render(value, true)).not.toContain('role="alert"')
+        const nullableMarkup = await render(value, true)
+        expect(nullableMarkup).not.toContain('role="alert"')
+        expect(nullableMarkup.includes('>null<')).toBe(value === null)
       }
       const validMarkup = await render(valid)
       expect(validMarkup).not.toContain('role="alert"')
@@ -81,12 +83,7 @@ describe('Field validation presentation', () => {
       expect(invalidMarkup).toContain('role="alert"')
       expect(invalidMarkup).toContain('aria-describedby=')
       expect(await render(valid)).not.toContain('aria-invalid="true"')
-      // Nullable null follows the existing unset presentation, including selection prompts.
-      if (_label === 'boolean' || _label === 'multiple select') {
-        expect((await render(null, true)).includes('aria-invalid="true"')).toBe((await render(undefined, true)).includes('aria-invalid="true"'))
-      } else {
-        expect(await render(null, true)).not.toContain('aria-invalid="true"')
-      }
+      expect(await render(null, true)).not.toContain('aria-invalid="true"')
       expect(onChange).not.toHaveBeenCalled()
     } finally {
       i18n.dispose()
@@ -162,7 +159,7 @@ describe('JSON component with union schemas', () => {
 })
 
 describe('Nullable field presentation', () => {
-  it('presents a nullable text null as unset without writing a value', () => {
+  it('keeps null distinct from an unset nullable value without writing either', () => {
     const i18n = createI18n('en')
     const onChange = vi.fn()
     try {
@@ -181,14 +178,27 @@ describe('Nullable field presentation', () => {
             />
           </I18nProvider>,
         )
-      for (const value of [null, undefined]) {
-        const markup = render(value)
-        expect(markup).toContain('note Set value')
-        expect(markup).not.toContain('aria-invalid="true"')
-        expect(markup).toContain('>null</span>')
-      }
+      const nullMarkup = render(null)
+      expect(nullMarkup).toContain('aria-label="note null"')
+      expect(nullMarkup).toContain('>null</span>')
+      expect(nullMarkup).not.toContain('note Set value')
+      expect(nullMarkup).not.toContain('aria-invalid="true"')
+      const unsetMarkup = render(undefined)
+      expect(unsetMarkup).toContain('note Set value')
+      expect(unsetMarkup).toContain('>Set value</span>')
+      expect(unsetMarkup).not.toContain('aria-label="note null"')
+      expect(unsetMarkup).not.toContain('aria-invalid="true"')
       expect(render('', { type: 'string' })).toContain('placeholder="Empty string"')
       expect(render(null, { type: 'null' })).toContain('>null</span>')
+      const jsonNull = renderToStaticMarkup(
+        <I18nProvider i18n={i18n}>
+          <ValueEditor label="note" schema={{ 'ui:widget': 'any' }} value={null} nullable onChange={onChange} path="/note" onDraftIssue={vi.fn()} />
+        </I18nProvider>,
+      )
+      expect(jsonNull).toContain('aria-label="note JSON"')
+      expect(jsonNull).toContain('>null</textarea>')
+      expect(jsonNull).not.toContain('Unset')
+      expect(jsonNull).not.toContain('aria-invalid="true"')
       expect(onChange).not.toHaveBeenCalled()
     } finally {
       i18n.dispose()

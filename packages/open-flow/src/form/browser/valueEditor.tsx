@@ -115,7 +115,7 @@ export function ValueControl({ addon, children }: { addon?: ReactNode; children:
 export function ValueEditor(props: ValueEditorProps) {
   const compactValue = props.compact === true || props.header != null || props.valueAddon != null
   const sorting = useContext(FieldSorting)
-  const { schema, value: storedValue, onChange, label, nullable, disabled, path, onDraftIssue, depth = 0 } = props
+  const { schema, value, onChange, label, nullable, disabled, path, onDraftIssue, depth = 0 } = props
   const t = useTranslate()
   const id = useId()
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
@@ -136,7 +136,9 @@ export function ValueEditor(props: ValueEditorProps) {
     source.type === 'null' ||
     (Array.isArray(source.type) && source.type.includes('null')) ||
     (Array.isArray(source.enum) && source.enum.includes(null))
-  const value = storedValue === null && allowsNull && source.type !== 'null' && !source.enum && !Object.hasOwn(source, 'const') ? undefined : storedValue
+  const presence = value === undefined ? 'unset' : value === null ? 'null' : 'value'
+  const missing = presence === 'unset' && !allowsNull
+  const invalidNull = presence === 'null' && !allowsNull
   const type = valueType(schema, value)
   const language = useVal(useI18n(true)?.lang$ ?? 'en')
   const [draftInvalid, setDraftInvalid] = useState(false)
@@ -146,7 +148,7 @@ export function ValueEditor(props: ValueEditorProps) {
     setDraftInvalid(next)
     draftCallback.current(draftPath, next)
   }, [])
-  const needsValidation = !draftInvalid && value !== undefined && !(value === null && allowsNull) && props.editor === undefined
+  const needsValidation = !draftInvalid && presence === 'value' && props.editor === undefined
   const issues = useValueIssues(schema, value, language, needsValidation)
   const enumeration = Array.isArray(source.enum) ? source.enum : Object.hasOwn(source, 'const') ? [source.const] : undefined
   const complex = source['ui:widget'] === 'any' || editorComponent(schema) === 'json' || depth > 12
@@ -162,11 +164,11 @@ export function ValueEditor(props: ValueEditorProps) {
     !itemEnumeration &&
     !choiceOptions &&
     !complex &&
-    (value === undefined || (value === null && !allowsNull)) &&
+    (presence === 'unset' || invalidNull) &&
     props.editor === undefined &&
     props.valueEditable !== false
   useEffect(() => {
-    if (!focusCreatedValue.current || value === undefined || !container) return
+    if (!focusCreatedValue.current || presence === 'unset' || !container) return
     focusCreatedValue.current = false
     const body = container.querySelector<HTMLElement>('[data-value-body]')
     const input = body?.querySelector<HTMLInputElement | HTMLTextAreaElement>('input:not([type="hidden"]), textarea')
@@ -176,7 +178,7 @@ export function ValueEditor(props: ValueEditorProps) {
       popup.click()
     } else if (input) input.focus()
     else body?.querySelector<HTMLButtonElement>('button')?.focus()
-  }, [value, expanded, container])
+  }, [presence, value, expanded, container])
   const optionLabels = objectValue(source['ui:options'])?.labels
   const child = (
     key: string | number,
@@ -256,9 +258,9 @@ export function ValueEditor(props: ValueEditorProps) {
         ? [{ instancePath: '', message: t('valueEditor.noOptions') }]
         : issues?.schemaError
           ? [{ instancePath: '', message: t('valueEditor.invalidSchema') }]
-          : value === null && !allowsNull
+          : invalidNull
             ? [{ instancePath: '', message: t('valueEditor.notNullableDescription') }]
-            : value === undefined && !allowsNull
+            : missing
               ? [{ instancePath: '', message: t('valueEditor.required') }]
               : (issues?.errors ?? []).map((error) => ({ instancePath: error.instancePath, message: error.message ?? t('valueEditor.schema') }))
   if (!errors.length && props.invalid && !draftInvalid && props.editor === undefined) errors.push({ instancePath: '', message: t('valueEditor.schema') })
@@ -281,7 +283,7 @@ export function ValueEditor(props: ValueEditorProps) {
     </div>
   )
   const inlineTools = (props.layout === 'values' || props.layout === 'ports') && props.header != null && props.valueEditable !== false && !disabled && !sorting
-  const canClear = inlineTools && value !== undefined
+  const canClear = inlineTools && presence !== 'unset'
   const canToggleJson = inlineTools && expanded && !complex && !enumeration && !itemEnumeration && !showUnset && (type === 'object' || type === 'array')
   const valueSuffix =
     !expandable && !showUnset && (enumeration || itemEnumeration || source['ui:widget'] === 'color' || isDateFormat(source.format))
@@ -319,7 +321,7 @@ export function ValueEditor(props: ValueEditorProps) {
               ))}
             </FieldSelect>
           )}
-          <span className={styles.presence}>{value === undefined ? t('valueEditor.unset') : value === null ? 'null' : ''}</span>
+          <span className={styles.presence}>{presence === 'unset' ? t('valueEditor.unset') : presence === 'null' ? 'null' : ''}</span>
           {!complex && (
             <Button
               type="button"
@@ -336,25 +338,25 @@ export function ValueEditor(props: ValueEditorProps) {
               JSON
             </Button>
           )}
-          {props.header != null && !complex && type === 'string' && value === undefined && (
+          {props.header != null && !complex && type === 'string' && presence === 'unset' && (
             <Button type="button" size="xs" variant="ghost" disabled={disabled} onClick={() => onChange('')}>
               <i aria-hidden="true" className="i-lucide-light:text-cursor-input" />
               {t('valueEditor.emptyString')}
             </Button>
           )}
-          {nullable && value !== null && (
+          {nullable && presence !== 'null' && (
             <Button type="button" size="xs" variant="ghost" disabled={disabled} onClick={() => onChange(null)}>
               <i aria-hidden="true" className="i-lucide-light:circle-slash" />
               null
             </Button>
           )}
-          {value !== undefined && (
+          {presence !== 'unset' && (
             <Button type="button" size="xs" variant="ghost" disabled={disabled} onClick={() => onChange(undefined)}>
               <i aria-hidden="true" className="i-lucide-light:eraser" />
               {t('valueEditor.clear')}
             </Button>
           )}
-          {value === undefined && (type === 'object' || type === 'array') && (
+          {presence === 'unset' && (type === 'object' || type === 'array') && (
             <Button type="button" size="xs" variant="ghost" disabled={disabled} onClick={() => onChange(type === 'array' ? [] : {})}>
               <i aria-hidden="true" className="i-lucide-light:plus" />
               {t(type === 'array' ? 'valueEditor.createArray' : 'valueEditor.createObject')}
@@ -369,8 +371,8 @@ export function ValueEditor(props: ValueEditorProps) {
   const shouldMountBody = !compactValue || !expandable || expanded || bodyMounted
   const body = shouldMountBody && (
     <div id={`${id}-body`} className={styles.body} data-value-body hidden={compactValue && expandable && !expanded}>
-      {!showUnset && !compactValue && props.valueEditable !== false && (value === undefined || value === null) && (
-        <span className={styles.presence}>{value === null ? 'null' : t('valueEditor.unset')}</span>
+      {!showUnset && !compactValue && props.valueEditable !== false && presence !== 'value' && (
+        <span className={styles.presence}>{presence === 'null' ? 'null' : t('valueEditor.unset')}</span>
       )}
       {showUnset ? (
         <Button
@@ -378,7 +380,7 @@ export function ValueEditor(props: ValueEditorProps) {
           variant="outline"
           size="field"
           className={styles.unsetValue}
-          data-field-prompt={!allowsNull || undefined}
+          data-field-prompt={invalid || undefined}
           data-field-control
           aria-invalid={invalid || undefined}
           aria-label={`${label} ${t('valueEditor.setValue')}`}
@@ -390,13 +392,17 @@ export function ValueEditor(props: ValueEditorProps) {
             if (type === 'object' || type === 'array' || source['ui:widget'] === 'text') setExpanded(true)
           }}
         >
-          {allowsNull ? <span className={styles.nullChip}>null</span> : <span>{t('valueEditor.setValue')}</span>}
+          <span>{t('valueEditor.setValue')}</span>
           <i aria-hidden="true" className="i-lucide-light:pencil" />
         </Button>
       ) : props.valueEditable !== false && (raw || complex) ? (
         <JsonEditor {...props} onDraftIssue={reportDraftIssue} value={value} invalid={invalid} focusRequest={expanded ? editorFocusRequest : 0} />
       ) : props.editor !== undefined ? (
         props.editor
+      ) : presence === 'null' && allowsNull && type !== 'null' && type !== 'boolean' ? (
+        <div className={styles.nullValue} data-field-control data-readonly={disabled || undefined} aria-label={`${label} null`}>
+          <span className={styles.nullChip}>null</span>
+        </div>
       ) : choiceOptions ? (
         <EditableChoices
           options={choiceOptions}
@@ -423,7 +429,7 @@ export function ValueEditor(props: ValueEditorProps) {
           aria-label={label}
           aria-invalid={invalid}
           value={enumIndex(enumeration, value)}
-          danger={value === undefined}
+          danger={invalid}
           disabled={disabled}
           onChange={(nextValue) => onChange(structuredClone(enumeration[Number(nextValue)]))}
         >
@@ -440,10 +446,6 @@ export function ValueEditor(props: ValueEditorProps) {
             </option>
           ))}
         </FieldSelect>
-      ) : value === null && type !== 'null' && type !== 'boolean' ? (
-        <div className={styles.nullValue} data-field-control data-readonly={disabled || undefined} aria-label={`${label} null`}>
-          <span className={styles.nullChip}>null</span>
-        </div>
       ) : type === 'object' ? (
         <div className={styles.collection}>
           <SortableFieldList
@@ -682,12 +684,12 @@ export function ValueEditor(props: ValueEditorProps) {
             role="switch"
             aria-label={label}
             aria-checked={value === true}
-            data-field-prompt={value === undefined || undefined}
-            aria-invalid={invalid || value === undefined}
+            data-field-prompt={invalid || undefined}
+            aria-invalid={invalid || undefined}
             disabled={disabled}
             onClick={() => onChange(value !== true)}
           >
-            {value === undefined ? t('valueEditor.select') : value === true ? 'True' : value === false ? 'False' : String(value)}
+            {presence === 'unset' ? t('valueEditor.select') : value === true ? 'True' : value === false ? 'False' : String(value)}
           </Button>
           <Switch
             render={<span />}
@@ -711,13 +713,13 @@ export function ValueEditor(props: ValueEditorProps) {
             size="field"
             variant="outline"
             className={styles.nullValue}
-            data-field-prompt={value === undefined || undefined}
+            data-field-prompt={invalid || undefined}
             disabled={disabled}
             aria-label={`${label} ${t('valueEditor.setValue')}: null`}
             aria-invalid={invalid || undefined}
             onClick={() => onChange(null)}
           >
-            {value === undefined ? t('valueEditor.unset') : JSON.stringify(value)}
+            {presence === 'unset' ? t('valueEditor.unset') : JSON.stringify(value)}
           </Button>
         )
       ) : type === 'string' && source['ui:widget'] === 'color' ? (
@@ -753,7 +755,7 @@ export function ValueEditor(props: ValueEditorProps) {
               onChange={(event) => onChange(event.target.value)}
             />
           )}
-          {value === undefined && !compactValue && (
+          {presence === 'unset' && !compactValue && (
             <Button type="button" size="xs" variant="ghost" disabled={disabled} onClick={() => onChange('')}>
               <i aria-hidden="true" className="i-lucide-light:text-cursor-input" />
               {t('valueEditor.emptyString')}
@@ -845,7 +847,7 @@ export function ValueEditor(props: ValueEditorProps) {
             variant="disclosure"
             size="field"
             className={styles.summary}
-            data-field-prompt={value === undefined || undefined}
+            data-field-prompt={summaryInvalid || undefined}
             data-readonly={disabled || undefined}
             data-field-control
             disabled={sorting}
@@ -856,7 +858,7 @@ export function ValueEditor(props: ValueEditorProps) {
             onClick={toggleExpanded}
           >
             <span className={styles.summaryText}>
-              {value === undefined
+              {presence === 'unset'
                 ? t('valueEditor.unset')
                 : structured
                   ? JSON.stringify(value)

@@ -36,7 +36,7 @@ export function EditableChoices({
   const [editing, setEditing] = useState(false)
   const popup = useRef<HTMLDivElement>(null)
   const empty = options.length === 0
-  const danger = empty || value === undefined
+  const danger = empty || invalid === true
   const display = (option: unknown, index: number): string =>
     Array.isArray(labels) && typeof labels[index] === 'string'
       ? labels[index]
@@ -70,8 +70,8 @@ export function EditableChoices({
               data-field-control
               disabled={disabled}
               aria-label={label}
-              aria-invalid={invalid || danger}
-              data-field-prompt={empty || value === undefined || (!multiple && !summary) || undefined}
+              aria-invalid={danger}
+              data-field-prompt={danger || undefined}
               className="w-full min-w-0 justify-between"
             />
           }
@@ -80,7 +80,13 @@ export function EditableChoices({
             {empty
               ? t(onOptionsChange ? 'valueEditor.editOptions' : 'valueEditor.noOptions')
               : summary ||
-                (value === undefined ? t(multiple ? 'valueEditor.selectMultiple' : 'valueEditor.select') : multiple ? '[]' : t('valueEditor.select'))}
+                (value === null
+                  ? 'null'
+                  : value === undefined
+                    ? t(multiple ? 'valueEditor.selectMultiple' : 'valueEditor.select')
+                    : multiple
+                      ? '[]'
+                      : t('valueEditor.select'))}
           </span>
           <SelectChevron />
         </PopoverTrigger>
