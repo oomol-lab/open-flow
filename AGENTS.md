@@ -3,142 +3,100 @@
 ## Purpose and authority
 
 Deliver the user's intended outcome with the least unnecessary complexity. Exercise independent
-judgment: raise material errors and tradeoffs, and respect the user's informed decisions.
+judgment: surface material errors, risks, and tradeoffs early, then respect the user's informed
+decision.
 
 The user owns goals, scope, and consequential product choices. The agent owns routine engineering
-decisions, including names, types, decomposition, tools, and execution order. Clarification is
-warranted when missing information changes the intended outcome or exceeds the authorized scope.
+decisions. Ask only when missing information would materially change the outcome, risk, cost, or
+authorized scope.
 
-Preserve unrelated work and staging state. Temporary resources created for a task are the agent's
-responsibility; stop verification servers and confirm termination before delivery.
+Preserve unrelated work and staging state. Clean up temporary resources created for the task,
+including stopping verification servers before delivery.
+
+## Proportionality and coherence
+
+Prefer the least complex solution that satisfies the explicit request and established contracts.
+Start with native platform behavior and existing project primitives. Before adding state, effects,
+observers, DOM measurement, portals, abstractions, compatibility layers, or infrastructure, require
+a concrete user-visible need that simpler options cannot meet. Do not expand small issues to cover
+hypothetical cases. If implementation or maintenance cost exceeds the likely benefit, stop and
+choose the simpler solution. Reassess immediately when the user proposes a simpler approach.
+
+Prefer clear, direct code and existing conventions. Shared behavior belongs in shared production
+code; features compose it instead of duplicating it. Tests and Stories exercise production behavior
+without becoming parallel implementations. Remove obsolete unpublished behavior rather than
+preserving it speculatively.
+
+Keep durable principles in instructions, product boundaries in architecture, exact contracts in
+technical references, and implementation details in code. Historical plans are context, not policy.
 
 ## Ownership and contracts
 
-Each behavior has one authoritative owner. Correct defects at that owner; clients must not
-compensate for incomplete contracts or maintain competing sources of truth.
+Each behavior has one authoritative owner. Correct defects there; clients must not compensate for
+incomplete contracts or maintain competing sources of truth. Preserve established contracts unless
+the task changes them, and update their affected implementations, consumers, and specifications.
 
 `packages/open-flow` owns the public product, `packages/command` owns the CLI, and `apps/` owns
-deployments. Cross-workspace dependencies use public entries. Common code is platform-neutral;
-browser code is independent of Node. Dependencies must make these boundaries visible.
+deployments. Cross-workspace dependencies use public entries. Common code is platform-neutral, and
+browser code is independent of Node. Dependencies should make these boundaries visible.
 
-Preserve established product contracts unless the task calls for changing them. A contract change
-includes its affected implementations, consumers, and specifications.
+Provider, Action, and Connection data keep independent fetching and caching authority, including
+scope, freshness, refresh, and invalidation. Consumers derive combined views at the consumption
+layer. Do not embed one source's state in another or couple cache lifecycles merely because a feature
+uses them together.
 
-Provider, Action, and Connection data retain independent fetching and caching responsibilities,
-including scope, freshness, refresh, and invalidation. Consumers fetch the data they need through
-each source's own interface and derive combined views, filters, and ordering at the consumption
-layer. Do not embed Connection state in Provider metadata, write derived state into another
-source's cache, or couple cache lifecycles merely because a feature uses those sources together.
+Caches store complete responses by request identity and own storage, freshness, conditional requests,
+and coordination. They do not merge business entities across responses or infer authority from
+arrival order. Add a derived multi-source layer only when its benefit and ownership justify it. Keep
+caching simpler than the repeated work it removes.
 
-Cache complete responses by request identity, including scope and representation parameters.
-The cache owns storage, freshness, conditional requests, and request coordination; it does not
-merge business entities across responses or infer data authority from insertion or arrival order.
-Consumers read the response for the query they need. Introduce a separate derived layer for
-multi-source views only when its benefit justifies the complexity and its ownership rules are
-explicit. Keep caching simpler than the repeated work it eliminates.
+## Project invariants
 
-## Simplicity and coherence
+Before implementing or reviewing frontend appearance, layout, components, or interactions, read and
+use the [frontend-ui skill](.agents/skills/frontend-ui/SKILL.md).
 
-Prefer clear, direct code and existing project conventions. Abstractions, compatibility layers,
-and new infrastructure need a concrete benefit to the current product. Remove obsolete unpublished
-behavior rather than preserving it speculatively.
+`ContextPanel` is the property panel's only cross-section stacking context. Sections and field tables
+must not trap feedback or popups in local stacking contexts. Individual editors may isolate internal
+content, but cross-section elevation uses the semantic layers in `context-panel.css`. Do not introduce
+independent z-index scales, portals, DOM measurement, observers, or runtime positioning solely to
+repair stacking that the shared CSS contract can express. Verify stacking changes across adjacent
+sections in a composed panel.
 
-Shared behavior belongs in shared production code. Features compose it rather than duplicate it.
-Tests and Stories exercise the real behavior; their fixtures must not become parallel implementations.
+Lab stories are the design-alignment and visual-inspection surface. Use real production components
+with deterministic data and present meaningful related states together. Every second-level Lab
+navigation directory has an UnoCSS Iconify icon in directory metadata. Put concise story guidance in
+`description`; keep sample labels with their examples. Register sample-only controls through
+`useStoryActions` from `packages/open-flow/dev/designer/storyActions.tsx`; production controls remain
+in production components.
 
-Before implementing or reviewing frontend components, appearance, layout, or interactions, read and
-use the project [frontend-ui skill](.agents/skills/frontend-ui/SKILL.md).
-
-Property panels use `ContextPanel` as their only cross-section stacking context. Field tables,
-groups, and section wrappers must not create stacking contexts that trap feedback or popups inside
-one Inputs, Outputs, or settings region. Individual editors may isolate their internal controls and
-feedback, but cross-section elevation must consume the semantic layers owned by
-`context-panel.css`; do not add independent z-index scales or raw escalation values. Do not add
-Portals, DOM measurement, observers, or runtime positioning solely to repair panel stacking when
-the shared CSS layer contract can express the behavior. Verify stacking changes in a composed panel
-across adjacent sections, including the final invalid input above Outputs and an Outputs menu above
-the following editor content.
-
-Lab stories support design alignment between people and AI and fast visual inspection. Lay out
-meaningful states side by side with clear labels; menus and panels under review should be visible
-on entry without repeated clicks. Use real component and Trigger definitions with deterministic
-sample data. Group related node, menu, and sidebar cases so missing or inconsistent designs are
-easy to spot. Every second-level Lab navigation directory must have an UnoCSS Iconify icon.
-Assign icons to directory metadata, not individual story titles.
-
-Put story-level explanations in the Story's optional `description`; the Lab shell renders them
-in the shared header. Keep descriptions concise and avoid repeating them in the story body.
-Component titles and sample labels remain with the examples they describe.
-
-Register sample helper buttons through `useStoryActions([{ label, onClick, disabled? }])` from
-`packages/open-flow/dev/designer/storyActions.tsx`, with one registering component per Story.
-Keep callbacks and state in the Story; the Lab shell renders these actions beside the description.
-Use this for helpers such as resetting samples or controlling simulated responses. Production
-controls under review, including canvas run, zoom, and node actions, stay in their components.
-
-Agents maintain related Lab stories as part of component changes without separate approval,
-including adding missing states, updating examples, and organizing entries within established
-categories. Confirm broad directory reorganizations, removal of still-useful coverage, or changes
-to the design verification scope with the user unless already authorized by the task.
-
-Keep durable principles in instructions, product boundaries in architecture, exact contracts in
-technical references, and implementation details in code. Historical plans provide context, not
-current policy. A local fix should not become a permanent universal rule.
+Maintain affected Lab stories with component changes. Confirm broad story reorganizations, removal
+of useful coverage, or changes to verification scope unless the task already authorizes them.
 
 ## Verification
 
-Before every Git commit, run `bun run check` from the repository root and require it to pass.
-After a rebase or merge introduces changes, run it again on the resulting code before committing
-or pushing. A check from before those changes does not satisfy this requirement.
+Evidence must support the claimed outcome. Choose verification by behavior, ownership, propagation,
+and risk. Start with the smallest check that can falsify the intended change; broaden only when shared
+contracts, indirect consumers, failures, or unresolved uncertainty justify it. Reuse valid evidence.
 
-Evidence must support the claimed outcome. Choose verification by the affected behavior, consumers,
-and risk, not by a fixed ritual. During iteration, resolve the current uncertainty with focused
-checks. Before delivery, ensure the combined evidence covers the final change and its consequences.
-Reuse valid results; broaden checks when the impact or remaining uncertainty warrants it.
+Tests protect consequential behavior and stable contracts. Favor public outputs, state transitions,
+persistence, side effects, error handling, accessibility semantics, and ownership boundaries. Do not
+test incidental markup, class strings, source layout, or exhaustive inventories unless they are an
+explicit contract. Revise obsolete assertions instead of weakening an intentional design.
 
-Tests protect consequential behavior and stable contracts. Favor assertions about public outputs,
-state transitions, persisted data, side effects, error handling, accessibility semantics, and
-ownership boundaries. A test earns its maintenance cost when a failure identifies a plausible
-product defect or contract violation and tells a maintainer what behavior was lost.
+Use evidence that can observe the claim: pure tests for rules and data contracts, behavioral tests for
+user-visible interaction and semantics, and rendered inspection for appearance and layout. Static
+source checks are reserved for durable architecture or safety boundaries. A shared primitive, public
+entry, schema, persistence or execution contract, cache, localization system, build pipeline, or
+package artifact requires evidence from affected boundaries; a local or visual change usually does
+not justify unrelated suites.
 
-Do not preserve the current implementation merely to make it testable. Exact markup, DOM nesting,
-class strings, selector counts, source layout, import spelling, and exhaustive inventories are not
-contracts unless the product or architecture explicitly makes them so. Avoid assertions that only
-repeat the implementation or reject harmless extensions. When an intentional change preserves or
-improves the governing contract, revise or remove an obsolete assertion instead of weakening the
-production design to satisfy it.
+Use Lab as the preferred visual surface for component appearance and interaction, supplemented by
+the product when integration matters. Browser acceptance is warranted when rendering or real
+interaction is material and cheaper evidence is insufficient. Report material verification gaps
+honestly.
 
-Use the verification level that can actually observe the claim. Exercise pure rules and data
-contracts below the UI; test component behavior through roles, names, states, and user-visible
-effects; inspect appearance and layout in Lab or a browser. Rendered HTML strings may establish
-server-rendered content or semantics, but they do not establish browser interaction or visual
-correctness. Static source checks are reserved for durable architecture or safety boundaries and
-should use structural analysis when textual coincidence would create false positives.
-
-Select test scope from ownership and propagation. A local implementation change starts with the
-owning module's focused tests. Changes to a shared primitive, public entry, schema, persistence or
-execution contract, cache, localization system, build pipeline, or package artifact require evidence
-from the affected consumers and boundary integrations because their consequences cross modules.
-Changes confined to visual styling require visual evidence for the affected states; they do not by
-themselves justify unrelated unit suites. Documentation, comments, and inert fixture changes need
-tests only when they alter generated output or a checked consumer contract. Changes to test
-infrastructure or workspace-wide configuration justify broader coverage because they change the
-meaning or execution of many tests.
-
-The full workspace suite is a response to broad impact or unresolved uncertainty, not a default
-ritual. Prefer the smallest set of tests that can falsify the intended change, then expand only when
-shared ownership, indirect consumers, failure risk, or weak initial evidence makes the narrower
-result insufficient.
-
-For component appearance or interaction changes, use Lab as the preferred surface for visual
-verification. Reuse or update the relevant stories to inspect affected states together; add missing
-cases when needed. Supplement Lab checks with the actual product page when correctness depends on
-integration, layout context, or a complete user flow that the stories do not cover.
-
-Browser acceptance is appropriate when rendering or real interaction is material to correctness
-and other evidence is insufficient. Clear, low-risk edits and non-UI work do not warrant it by default.
-Static tests and successful builds do not establish visual correctness. Report material verification
-gaps honestly, and satisfy required CI before merging.
+Before every Git commit, run `bun run check` from the repository root and require it to pass. Run it
+again after any rebase or merge that changes the result before committing or pushing.
 
 ## References
 
@@ -146,4 +104,4 @@ Consult only references relevant to the task:
 
 - [Architecture](docs/architecture.md): product contracts, persistence, execution, and ownership.
 - [Iconify skill](.agents/skills/iconify-icons/SKILL.md): UI icon selection and integration.
-- [Contributing](CONTRIBUTING.md): environment, check commands, and contribution requirements.
+- [Contributing](CONTRIBUTING.md): environment, checks, and contribution requirements.
