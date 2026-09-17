@@ -295,7 +295,9 @@ export function NodeInputValue({
                   {bound && !variables.names.includes(variableName) && (
                     <DropdownMenuRadioItem className={sourceItemClass} value={variableSource(variableName)} disabled>
                       <i aria-hidden="true" className="i-lucide-light:sliders-horizontal size-3.5 shrink-0 text-muted-foreground" />
-                      <span className="min-w-0 flex-1 truncate font-mono">{variableName}</span>
+                      <span className="min-w-0 flex-1 truncate font-mono" title={variableName}>
+                        {variableName}
+                      </span>
                     </DropdownMenuRadioItem>
                   )}
                   {variables.names.map((name) => {
@@ -313,7 +315,9 @@ export function NodeInputValue({
                           className={`${status == null ? 'i-lucide-light:sliders-horizontal text-muted-foreground' : 'i-lucide-light:triangle-alert'} size-3.5 shrink-0`}
                           style={status == null ? undefined : { color: 'var(--warning-foreground)' }}
                         />
-                        <span className="min-w-0 flex-1 truncate font-mono">{name}</span>
+                        <span className="min-w-0 flex-1 truncate font-mono" title={name}>
+                          {name}
+                        </span>
                         {!selected && status != null && (
                           <span className="pointer-events-none absolute right-2 shrink-0 text-[10px] leading-4" style={{ color: 'var(--warning-foreground)' }}>
                             {status}
@@ -350,7 +354,9 @@ export function NodeInputValue({
                   className="size-3.5 shrink-0 data-[icon-kind=initials]:text-[16px]"
                   fallback={<i aria-hidden="true" className="i-lucide-light:workflow size-3.5 shrink-0 text-muted-foreground" />}
                 />
-                <span className="min-w-0 flex-1 truncate">{group.nodeName}</span>
+                <span className="min-w-0 flex-1 truncate" title={group.nodeName}>
+                  {group.nodeName}
+                </span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className={`w-48 min-w-48 ${selectionMenuContentClass}`} container={sourcePortal}>
                 <DropdownMenuRadioGroup
@@ -371,7 +377,9 @@ export function NodeInputValue({
                     .map((source) => (
                       <DropdownMenuRadioItem className={sourceItemClass} key={source.output} value={upstreamSource(source.nodeId, source.output)} disabled>
                         <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
-                        <span className="min-w-0 flex-1 truncate font-mono">{source.output}</span>
+                        <span className="min-w-0 flex-1 truncate font-mono" title={source.output}>
+                          {source.output}
+                        </span>
                       </DropdownMenuRadioItem>
                     ))}
                   {group.outputs.map(({ output, check }) => {
@@ -400,7 +408,9 @@ export function NodeInputValue({
                           } size-3.5 shrink-0`}
                           style={status == null ? undefined : { color: 'var(--warning-foreground)' }}
                         />
-                        <span className="min-w-0 flex-1 truncate font-mono">{output}</span>
+                        <span className="min-w-0 flex-1 truncate font-mono" title={output}>
+                          {output}
+                        </span>
                         {!selected && status != null && (
                           <span className="pointer-events-none absolute right-2 shrink-0 text-[10px] leading-4" style={{ color: 'var(--warning-foreground)' }}>
                             {status}
