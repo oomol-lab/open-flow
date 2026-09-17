@@ -21,6 +21,7 @@ import { DateEditor } from './dateEditor.tsx'
 import { EditableChoices } from './editableChoices.tsx'
 import { editorComponentIcons } from './editorComponentIcon.tsx'
 import { EditorComponentSelect } from './editorComponentSelect.tsx'
+import { FieldName } from './fieldName.tsx'
 import { FieldSelect } from './fieldSelect.tsx'
 import { FieldSorting } from './fieldSorting.ts'
 import { JsonEditor } from './jsonEditor.tsx'
@@ -192,10 +193,14 @@ export function ValueEditor(props: ValueEditorProps) {
       options={options}
       header={
         <>
-          <span className={styles.fieldName}>
+          <FieldName
+            name={String(key)}
+            description={typeof objectValue(childSchema)?.description === 'string' ? String(objectValue(childSchema)!.description) : undefined}
+            className={styles.fieldName}
+          >
             {typeof key === 'number' ? key + 1 : key}
             {Array.isArray(source.required) && source.required.includes(key) ? ' *' : ''}
-          </span>
+          </FieldName>
           <span className={styles.fieldType}>{valueType(childSchema, childValue)}</span>
         </>
       }
@@ -420,7 +425,7 @@ export function ValueEditor(props: ValueEditorProps) {
                     hideOptions: true,
                     header: (
                       <>
-                        <div data-field-name>
+                        <FieldName name={name} description={typeof fieldSource.description === 'string' ? fieldSource.description : undefined}>
                           {Object.hasOwn(properties, name) && !props.onDefinitionChange ? (
                             <Input aria-label={t('valueEditor.fieldName')} value={name} readOnly />
                           ) : (
@@ -450,7 +455,7 @@ export function ValueEditor(props: ValueEditorProps) {
                               }}
                             />
                           )}
-                        </div>
+                        </FieldName>
                         <div data-field-type>
                           {props.onDefinitionChange ? (
                             <EditorComponentSelect
@@ -740,7 +745,7 @@ export function ValueEditor(props: ValueEditorProps) {
       data-branch={(expandable && !(structured && type === 'object' && names.length === 0 && !canAddObjectField)) || undefined}
     >
       {props.header != null && (
-        <div className={styles.header} title={props.description}>
+        <div className={styles.header}>
           {props.leadingControl != null && <div className={styles.leadingControl}>{props.leadingControl}</div>}
           <div className={styles.toggleControl}>
             {expandable && !sorting && (

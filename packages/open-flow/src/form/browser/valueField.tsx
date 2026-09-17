@@ -4,6 +4,7 @@ import { useTranslate } from 'val-i18n-react'
 import { Input } from '../../ui/browser/input.tsx'
 import { editorComponent } from '../common/editorComponent.ts'
 import { EditorComponentIcon } from './editorComponentIcon.tsx'
+import { FieldName } from './fieldName.tsx'
 import { FieldNullable } from './fieldTable.tsx'
 import { FieldTypeDisplay } from './fieldTypeDisplay.tsx'
 import { ValueEditor } from './valueEditor.tsx'
@@ -19,9 +20,9 @@ export function ValueField(props: Omit<ValueEditorProps, 'header' | 'layout' | '
       layout="ports"
       header={
         <>
-          <span data-field-name>
+          <FieldName name={props.label} description={props.description}>
             <Input aria-label={t('valueEditor.fieldName')} value={props.label} readOnly />
-          </span>
+          </FieldName>
           <span data-field-type>
             <FieldTypeDisplay
               label={type}

@@ -6,6 +6,7 @@ import type { Group, InputPort } from '../api.ts'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { EditorComponentSelect } from '../../../../form/browser/editorComponentSelect.tsx'
+import { FieldName } from '../../../../form/browser/fieldName.tsx'
 import { FieldSorting } from '../../../../form/browser/fieldSorting.ts'
 import { FieldNullable, FieldTable, FieldTableRow } from '../../../../form/browser/fieldTable.tsx'
 import { JsonEditor } from '../../../../form/browser/jsonEditor.tsx'
@@ -530,7 +531,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
     ) : undefined
     const header = (
       <div className={styles.heading}>
-        <span data-field-name className={styles.name} title={[port.handle, port.description].filter(Boolean).join(' — ')}>
+        <FieldName name={port.handle} description={port.description} className={styles.name}>
           {tableLayout ? (
             <PortName
               value={port.handle}
@@ -544,7 +545,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
               {port.nullable ? ' ?' : ''}
             </>
           )}
-        </span>
+        </FieldName>
         <span data-field-type className={styles.type} title={tableLayout ? undefined : portType(port)}>
           {tableLayout ? (
             <PortType

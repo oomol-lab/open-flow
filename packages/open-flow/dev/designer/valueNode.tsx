@@ -12,8 +12,15 @@ import { useStoryActions } from './storyActions.tsx'
 
 function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; language: UiLanguage; log: LogAction; reservedNames?: readonly string[] }) {
   const [values, setValues] = useState<readonly InputPort[]>([
-    { handle: 'emptyText', jsonSchema: { type: 'string' }, nullable: false, value: '' },
-    { handle: 'emptyMultiline', jsonSchema: { 'type': 'string', 'ui:widget': 'text' }, nullable: false, value: '' },
+    { handle: 'emptyText', description: 'A short display label for this record.', jsonSchema: { type: 'string' }, nullable: false, value: '' },
+    {
+      handle: 'emptyMultiline',
+      description:
+        'Summarize the request and explain the expected result.\nKeep issue identifiers, relevant context, and any constraints that the next step needs. Include enough detail for someone unfamiliar with the original request to continue the work.',
+      jsonSchema: { 'type': 'string', 'ui:widget': 'text' },
+      nullable: false,
+      value: '',
+    },
     { handle: 'number', jsonSchema: { type: 'number' }, nullable: false, value: 1.5 },
     { handle: 'integer', jsonSchema: { type: 'integer' }, nullable: false, value: 3 },
     { handle: 'select', jsonSchema: { enum: ['small', 'large'] }, nullable: false, value: 'small' },
@@ -44,7 +51,14 @@ function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; lan
     { handle: 'jsonNull', jsonSchema: { 'ui:widget': 'any' }, nullable: true, value: null },
     {
       handle: 'value',
-      jsonSchema: { type: 'object', properties: { details: { type: 'object', properties: { count: { type: 'number' } } }, count: { type: 'number' } } },
+      description: 'Structured values passed to the next step.',
+      jsonSchema: {
+        type: 'object',
+        properties: {
+          details: { type: 'object', properties: { count: { type: 'number', description: 'Number of records to process.' } } },
+          count: { type: 'number' },
+        },
+      },
       nullable: true,
       value: { details: { count: 1 }, count: 1 },
     },
@@ -79,7 +93,8 @@ function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; lan
 export const valueNodeStory: FrontendStory = {
   id: 'value-node-editor',
   title: 'Fixed Values Editor',
-  description: 'All 15 field types, nested fields, and arrays. Expand collections before sorting to compare drag handles, item order, and read-only controls.',
+  description:
+    'All 15 field types, nested fields, and arrays. Hover field names to compare side descriptions, multiline descriptions, and name fallbacks above. Expand collections to inspect nested fields.',
   group: 'Node Fixed Values',
   standalone: true,
   render: (log, dark, language) => <ValueStory log={log} dark={dark} language={language} />,

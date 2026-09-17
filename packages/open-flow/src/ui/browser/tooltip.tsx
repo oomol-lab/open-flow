@@ -17,6 +17,8 @@ const TooltipTrigger = forwardRef<HTMLButtonElement, TooltipPrimitive.Trigger.Pr
 function TooltipContent({
   className,
   container,
+  positionMethod,
+  collisionBoundary,
   side = 'top',
   sideOffset = 4,
   align = 'center',
@@ -24,10 +26,20 @@ function TooltipContent({
   children,
   ...props
 }: TooltipPrimitive.Popup.Props &
-  Pick<TooltipPrimitive.Positioner.Props, 'align' | 'alignOffset' | 'side' | 'sideOffset'> & { container?: HTMLElement | null }) {
+  Pick<TooltipPrimitive.Positioner.Props, 'align' | 'alignOffset' | 'side' | 'sideOffset' | 'positionMethod' | 'collisionBoundary'> & {
+    container?: HTMLElement | null
+  }) {
   return (
     <TooltipPrimitive.Portal container={container} className="contents">
-      <TooltipPrimitive.Positioner align={align} alignOffset={alignOffset} side={side} sideOffset={sideOffset} className="isolate z-50">
+      <TooltipPrimitive.Positioner
+        positionMethod={positionMethod}
+        collisionBoundary={collisionBoundary}
+        align={align}
+        alignOffset={alignOffset}
+        side={side}
+        sideOffset={sideOffset}
+        className="isolate z-50"
+      >
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"
           className={cn(
