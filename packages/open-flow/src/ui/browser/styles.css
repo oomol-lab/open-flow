@@ -153,7 +153,8 @@
 }
 
 /* Clarity drag-handle-corner-line, matching the Designer resize handle. */
-[data-slot='textarea']::-webkit-resizer {
+[data-slot='textarea']::-webkit-resizer,
+.open-flow-code-editor::-webkit-resizer {
   background: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2036%2036%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2224%22%20r%3D%221.5%22%20fill%3D%22%23888888%22%20class%3D%22clr-i-outline%20clr-i-outline-path-1%22%2F%3E%3Ccircle%20cx%3D%2218%22%20cy%3D%2224%22%20r%3D%221.5%22%20fill%3D%22%23888888%22%20class%3D%22clr-i-outline%20clr-i-outline-path-2%22%2F%3E%3Ccircle%20cx%3D%2218%22%20cy%3D%2218%22%20r%3D%221.5%22%20fill%3D%22%23888888%22%20class%3D%22clr-i-outline%20clr-i-outline-path-3%22%2F%3E%3Ccircle%20cx%3D%2224%22%20cy%3D%2212%22%20r%3D%221.5%22%20fill%3D%22%23888888%22%20class%3D%22clr-i-outline%20clr-i-outline-path-4%22%2F%3E%3Ccircle%20cx%3D%2224%22%20cy%3D%2224%22%20r%3D%221.5%22%20fill%3D%22%23888888%22%20class%3D%22clr-i-outline%20clr-i-outline-path-5%22%2F%3E%3Ccircle%20cx%3D%2224%22%20cy%3D%2218%22%20r%3D%221.5%22%20fill%3D%22%23888888%22%20class%3D%22clr-i-outline%20clr-i-outline-path-6%22%2F%3E%3Cpath%20fill%3D%22none%22%20d%3D%22M0%200h36v36H0z%22%2F%3E%3C%2Fsvg%3E')
     center / contain no-repeat;
 }
