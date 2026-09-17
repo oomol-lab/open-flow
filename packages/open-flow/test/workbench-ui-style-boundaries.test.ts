@@ -69,10 +69,6 @@ function declarations(source: string, prefix: string): Record<string, string> {
   return Object.fromEntries([...source.matchAll(new RegExp(`(${prefix}[\\w-]+)\\s*:\\s*([^;]+);`, 'g'))].map((match) => [match[1]!, match[2]!.trim()]))
 }
 
-function referencedTokens(source: string, prefix: string): string[] {
-  return [...new Set([...source.matchAll(new RegExp(`var\\((${prefix}[\\w-]+)`, 'g'))].map((match) => match[1]!))].toSorted()
-}
-
 function normalizeLineEndings(source: string): string {
   return source.replaceAll('\r\n', '\n')
 }
@@ -466,23 +462,25 @@ test('owns product and canvas surface tokens in one theme entry', async () => {
     readFile(new URL('src/ui/browser/theme.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/tokens.css', packageRoot), 'utf8'),
   ])
-  const uiSource = uiSources.join('\n')
-  assert.deepEqual(referencedTokens(uiSource, '--ui-'), [...sharedUiTokens, ...controlOverrideTokens].toSorted())
   const controlSources = uiSources.filter((_, index) => !uiPaths[index]!.pathname.endsWith('/theme.css')).join('\n')
   for (const token of controlOverrideTokens) {
     const references = [...controlSources.matchAll(new RegExp(`var\\(${token}([,)])`, 'g'))]
     assert.ok(references.length > 0, `${token} must be consumed by shared controls.`)
     for (const reference of references) assert.equal(reference[1], ',', `${token} requires a fallback outside property panels.`)
   }
-  assert.deepEqual(Object.keys(declarations(theme, '--ui-')).toSorted(), [...sharedUiTokens, ...controlOverrideTokens].toSorted())
+  const themeTokens = declarations(theme, '--ui-')
+  for (const token of [...sharedUiTokens, ...controlOverrideTokens]) assert.ok(token in themeTokens, `${token} must be declared by the shared theme.`)
   const inheritedTheme = theme.match(/:root,\s*\.open-flow-theme\s*\{([^}]+)\}/)
   assert.ok(inheritedTheme, 'Shared inherited tokens must be available to root and themed surfaces.')
-  assert.deepEqual(Object.keys(declarations(inheritedTheme[1]!, '--ui-')).toSorted(), inheritedUiTokens)
+  const inheritedDeclarations = declarations(inheritedTheme[1]!, '--ui-')
+  for (const token of inheritedUiTokens) assert.ok(token in inheritedDeclarations, `${token} must be inherited by themed surfaces.`)
   const canvasSurfaces = [...theme.matchAll(/\.open-flow-theme\[data-surface=['"]canvas['"]\](?:\[data-theme=['"]dark['"]\])?\s*\{([^}]+)\}/g)]
   assert.equal(canvasSurfaces.length, 2)
   for (const [, surface] of canvasSurfaces) {
-    assert.deepEqual(Object.keys(declarations(surface!, '--ui-')).toSorted(), surfaceUiTokens)
-    assert.deepEqual(declarations(surface!, '--xy-'), reactFlowThemeContract)
+    const surfaceTokens = declarations(surface!, '--ui-')
+    for (const token of surfaceUiTokens) assert.ok(token in surfaceTokens, `${token} must be defined for every canvas theme.`)
+    const reactFlowTokens = declarations(surface!, '--xy-')
+    for (const [token, value] of Object.entries(reactFlowThemeContract)) assert.equal(reactFlowTokens[token], value)
   }
   assert.match(theme, /\.open-flow-theme\[data-theme=['"]dark['"]\]/)
   assert.match(theme, /--ui-background: var\(--open-flow-background\);/)

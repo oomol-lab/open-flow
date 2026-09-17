@@ -86,6 +86,40 @@ and risk, not by a fixed ritual. During iteration, resolve the current uncertain
 checks. Before delivery, ensure the combined evidence covers the final change and its consequences.
 Reuse valid results; broaden checks when the impact or remaining uncertainty warrants it.
 
+Tests protect consequential behavior and stable contracts. Favor assertions about public outputs,
+state transitions, persisted data, side effects, error handling, accessibility semantics, and
+ownership boundaries. A test earns its maintenance cost when a failure identifies a plausible
+product defect or contract violation and tells a maintainer what behavior was lost.
+
+Do not preserve the current implementation merely to make it testable. Exact markup, DOM nesting,
+class strings, selector counts, source layout, import spelling, and exhaustive inventories are not
+contracts unless the product or architecture explicitly makes them so. Avoid assertions that only
+repeat the implementation or reject harmless extensions. When an intentional change preserves or
+improves the governing contract, revise or remove an obsolete assertion instead of weakening the
+production design to satisfy it.
+
+Use the verification level that can actually observe the claim. Exercise pure rules and data
+contracts below the UI; test component behavior through roles, names, states, and user-visible
+effects; inspect appearance and layout in Lab or a browser. Rendered HTML strings may establish
+server-rendered content or semantics, but they do not establish browser interaction or visual
+correctness. Static source checks are reserved for durable architecture or safety boundaries and
+should use structural analysis when textual coincidence would create false positives.
+
+Select test scope from ownership and propagation. A local implementation change starts with the
+owning module's focused tests. Changes to a shared primitive, public entry, schema, persistence or
+execution contract, cache, localization system, build pipeline, or package artifact require evidence
+from the affected consumers and boundary integrations because their consequences cross modules.
+Changes confined to visual styling require visual evidence for the affected states; they do not by
+themselves justify unrelated unit suites. Documentation, comments, and inert fixture changes need
+tests only when they alter generated output or a checked consumer contract. Changes to test
+infrastructure or workspace-wide configuration justify broader coverage because they change the
+meaning or execution of many tests.
+
+The full workspace suite is a response to broad impact or unresolved uncertainty, not a default
+ritual. Prefer the smallest set of tests that can falsify the intended change, then expand only when
+shared ownership, indirect consumers, failure risk, or weak initial evidence makes the narrower
+result insufficient.
+
 For component appearance or interaction changes, use Lab as the preferred surface for visual
 verification. Reuse or update the relevant stories to inspect affected states together; add missing
 cases when needed. Supplement Lab checks with the actual product page when correctness depends on

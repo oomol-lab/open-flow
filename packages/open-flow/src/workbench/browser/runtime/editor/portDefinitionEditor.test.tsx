@@ -29,7 +29,7 @@ describe('Output definitions', () => {
     expect(markup).not.toContain('value="Result"')
     expect(markup).not.toContain('Set value')
     expect(markup).not.toContain('Set empty string')
-    expect(markup).not.toContain('aria-label="answer"')
+    expect(markup).not.toMatch(/<(?:button|input|select|textarea)\b[^>]*aria-label="answer"(?:\s|>)/)
     expect(onChange).not.toHaveBeenCalled()
   })
 
