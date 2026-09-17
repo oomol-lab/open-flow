@@ -357,17 +357,42 @@ export function NodeInputValue({
                         <span className="min-w-0 flex-1 truncate font-mono">{source.output}</span>
                       </DropdownMenuRadioItem>
                     ))}
-                  {group.outputs.map(({ output, check }) => (
-                    <DropdownMenuRadioItem className={sourceItemClass} key={output} value={upstreamSource(group.nodeId, output)} closeOnClick>
-                      <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
-                      <span className="min-w-0 flex-1 truncate font-mono">{output}</span>
-                      {check.kind != 'available' && (
-                        <span className="ml-auto shrink-0 text-[10px] leading-4 text-[var(--warning-foreground)]">
-                          {t(check.kind == 'schema' ? 'inspector.sources.incompatible' : 'inspector.sources.unverified')}
-                        </span>
-                      )}
-                    </DropdownMenuRadioItem>
-                  ))}
+                  {group.outputs.map(({ output, check }) => {
+                    const selected = sourceKind === 'upstream' && currentSource === upstreamSource(group.nodeId, output)
+                    const status =
+                      check.kind == 'schema'
+                        ? t('inspector.sources.incompatible')
+                        : check.kind == 'schema-error'
+                          ? t('inspector.sources.unverified')
+                          : undefined
+                    return (
+                      <DropdownMenuRadioItem
+                        className={`${sourceItemClass} ${status == null || selected ? 'pr-8' : 'pr-20'}`}
+                        key={output}
+                        value={upstreamSource(group.nodeId, output)}
+                        closeOnClick
+                      >
+                        <i
+                          aria-hidden="true"
+                          className={`${
+                            check.kind == 'available'
+                              ? 'i-lucide-light:corner-down-right text-muted-foreground'
+                              : check.kind == 'schema'
+                                ? 'i-lucide-light:triangle-alert'
+                                : 'i-lucide-light:circle-help'
+                          } size-3.5 shrink-0`}
+                          style={status == null ? undefined : { color: 'var(--warning-foreground)' }}
+                        />
+                        <span className="min-w-0 flex-1 truncate font-mono">{output}</span>
+                        {!selected && status != null && (
+                          <span className="pointer-events-none absolute right-2 shrink-0 text-[10px] leading-4" style={{ color: 'var(--warning-foreground)' }}>
+                            {status}
+                          </span>
+                        )}
+                        {selected && status != null && <span className="sr-only">{status}</span>}
+                      </DropdownMenuRadioItem>
+                    )
+                  })}
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
