@@ -91,7 +91,8 @@
 
 .open-flow-code-editor.cm-editor.cm-focused {
   border-color: var(--ui-ring);
-  outline: none;
+  outline: 2px solid var(--ui-ring);
+  outline-offset: -1px;
   box-shadow: none;
 }
 
@@ -151,6 +152,8 @@
 }
 .open-flow-code-editor.cm-editor.cm-focused[data-invalid='true'] {
   border-color: var(--ui-destructive);
+  outline-color: var(--ui-destructive);
+  outline-offset: calc(-1 * var(--ui-danger-border-width, 1px));
 }
 
 /* Clarity drag-handle-corner-line, matching the Designer resize handle. */
