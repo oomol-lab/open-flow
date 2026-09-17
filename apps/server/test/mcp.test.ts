@@ -271,9 +271,8 @@ it('keeps admitted Runs across client disconnects and exposes Wait and cancellat
         target: { kind: 'flow' },
         nodeId: 'approval',
         node: {
-          kind: 'wait',
+          kind: 'approval',
           name: 'Approval',
-          actions: ['approve', 'reject'],
           prompt: 'Approve?',
           input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: { value: { kind: 'value', value: 42 } },
@@ -311,7 +310,6 @@ it('keeps admitted Runs across client disconnects and exposes Wait and cancellat
 it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait with %s and preserves its first decision', async (action) => {
   const { call, client, control, service } = await fixture()
   const flow = await control.createFlow(`Wait ${action}`)
-  const actions = action == 'continue' ? (['continue'] as const) : (['approve', 'reject'] as const)
   const changed = await call('flow_apply', {
     flowId: flow.flowId,
     expectedRevisionId: flow.draftRevisionId,
@@ -323,9 +321,8 @@ it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait w
         target: { kind: 'flow' },
         nodeId: 'wait',
         node: {
-          kind: 'wait',
+          kind: action == 'continue' ? 'wait' : 'approval',
           name: 'Wait',
-          actions,
           prompt: 'Continue?',
           input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: { value: { kind: 'value', value: 42 } },
