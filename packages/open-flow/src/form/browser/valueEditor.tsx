@@ -2,8 +2,9 @@ import styles from './valueEditor.module.scss'
 import type { CSSProperties, ReactNode } from 'react'
 import type { ValueType } from '../common/value.ts'
 
-import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { useTranslate } from 'val-i18n-react'
+import { useCallback, useContext, useEffect, useId, useRef, useState } from 'react'
+import { useVal } from 'use-value-enhancer'
+import { useI18n, useTranslate } from 'val-i18n-react'
 import { Button } from '../../ui/browser/button.tsx'
 import { Input } from '../../ui/browser/input.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../ui/browser/popover.tsx'
@@ -13,7 +14,6 @@ import { enumIndex } from '../common/choices.ts'
 import { isDateFormat } from '../common/dateValue.ts'
 import { editorComponent, valueForEditor } from '../common/editorComponent.ts'
 import { getDefaultValue, typeOfSchema } from '../common/schemaWidget.ts'
-import { compile } from '../common/validation/validator.ts'
 import { initialValue, objectValue, renameObjectField, setObjectField, valueType } from '../common/value.ts'
 import { ArrayFieldList } from './arrayFieldList.tsx'
 import { ColorEditor } from './colorEditor.tsx'
@@ -26,6 +26,7 @@ import { FieldSelect } from './fieldSelect.tsx'
 import { FieldSorting } from './fieldSorting.ts'
 import { JsonEditor } from './jsonEditor.tsx'
 import { SortableFieldList } from './sortableFieldList.tsx'
+import { useValueIssues } from './useValueIssues.ts'
 import { ValueTools } from './valueTools.tsx'
 
 export interface ValueEditorProps {
@@ -136,9 +137,17 @@ export function ValueEditor(props: ValueEditorProps) {
     (Array.isArray(source.enum) && source.enum.includes(null))
   const value = storedValue === null && allowsNull && source.type !== 'null' && !source.enum && !Object.hasOwn(source, 'const') ? undefined : storedValue
   const type = valueType(schema, value)
-  const needsValidation = props.invalid !== true && value !== undefined && !(value === null && allowsNull)
-  const validator = useMemo(() => (needsValidation ? compile(schema)[0] : undefined), [schema, needsValidation])
-  const invalid = props.invalid === true || validator?.(value) === false
+  const language = useVal(useI18n(true)?.lang$ ?? 'en')
+  const [draftInvalid, setDraftInvalid] = useState(false)
+  const draftCallback = useRef(onDraftIssue)
+  draftCallback.current = onDraftIssue
+  const reportDraftIssue = useCallback((draftPath: string, next: boolean) => {
+    setDraftInvalid(next)
+    draftCallback.current(draftPath, next)
+  }, [])
+  const needsValidation = !draftInvalid && value !== undefined && !(value === null && allowsNull) && props.editor === undefined
+  const issues = useValueIssues(schema, value, language, needsValidation)
+  const invalid = props.invalid === true || issues?.schemaError === true || (issues?.errors.length ?? 0) > 0
   const enumeration = Array.isArray(source.enum) ? source.enum : Object.hasOwn(source, 'const') ? [source.const] : undefined
   const complex = source['ui:widget'] === 'any' || editorComponent(schema) === 'json' || depth > 12
   const choiceOptions = Array.isArray(source.enum)
@@ -239,6 +248,32 @@ export function ValueEditor(props: ValueEditorProps) {
     if (!expanded || !editorFocusRequest || disabled || raw || complex) return
     container?.querySelector<HTMLTextAreaElement>(':scope > [data-value-body] > textarea')?.focus()
   }, [expanded, editorFocusRequest, disabled, raw, complex, container])
+  const messages =
+    draftInvalid || props.editor !== undefined
+      ? []
+      : choiceOptions?.length === 0
+        ? [t('valueEditor.noOptions')]
+        : issues?.schemaError
+          ? [t('valueEditor.invalidSchema')]
+          : value === null && !allowsNull
+            ? [t('valueEditor.notNullableDescription')]
+            : value === undefined && !allowsNull
+              ? [t('valueEditor.required')]
+              : [
+                  ...new Set(
+                    (issues?.errors ?? [])
+                      .filter((error) => !structured || (compactValue && !expanded) || error.instancePath === '')
+                      .map((error) => `${error.instancePath ? `${error.instancePath}: ` : ''}${error.message ?? t('valueEditor.schema')}`),
+                  ),
+                ]
+  if (!messages.length && props.invalid && !draftInvalid && props.editor === undefined) messages.push(t('valueEditor.schema'))
+  const errorMessage = messages.length > 0 && (
+    <div id={`${id}-error`} className={styles.error} role="alert">
+      {messages.map((message) => (
+        <div key={message}>{message}</div>
+      ))}
+    </div>
+  )
   const inlineTools = (props.layout === 'values' || props.layout === 'ports') && props.header != null && props.valueEditable !== false && !disabled && !sorting
   const canClear = inlineTools && value !== undefined
   const canToggleJson = inlineTools && expanded && !complex && !enumeration && !itemEnumeration && !showUnset && (type === 'object' || type === 'array')
@@ -352,7 +387,7 @@ export function ValueEditor(props: ValueEditorProps) {
           <i aria-hidden="true" className="i-lucide-light:pencil" />
         </Button>
       ) : props.valueEditable !== false && (raw || complex) ? (
-        <JsonEditor {...props} value={value} invalid={invalid} focusRequest={expanded ? editorFocusRequest : 0} />
+        <JsonEditor {...props} onDraftIssue={reportDraftIssue} value={value} invalid={invalid} focusRequest={expanded ? editorFocusRequest : 0} />
       ) : props.editor !== undefined ? (
         props.editor
       ) : choiceOptions ? (
@@ -677,11 +712,11 @@ export function ValueEditor(props: ValueEditorProps) {
           </Button>
         )
       ) : type === 'string' && source['ui:widget'] === 'color' ? (
-        <ColorEditor {...props} value={value} invalid={invalid} />
+        <ColorEditor {...props} onDraftIssue={reportDraftIssue} value={value} invalid={invalid} />
       ) : type === 'string' && isDateFormat(source.format) ? (
         <DateEditor {...props} value={value} invalid={invalid} format={source.format} />
       ) : type === 'number' || type === 'integer' ? (
-        <NumberEditor {...props} value={value} invalid={invalid} integer={type === 'integer'} />
+        <NumberEditor {...props} onDraftIssue={reportDraftIssue} value={value} invalid={invalid} integer={type === 'integer'} />
       ) : (
         <>
           <label className={styles.srOnly} htmlFor={id}>
@@ -717,11 +752,15 @@ export function ValueEditor(props: ValueEditorProps) {
           )}
         </>
       )}
+      {!expandable && errorMessage}
     </div>
   )
   return (
     <div
       className={styles.root}
+      role="group"
+      aria-label={label}
+      aria-describedby={messages.length ? `${id}-error` : undefined}
       ref={setContainer}
       data-inline={(props.hideOptions && !props.header) || undefined}
       data-compact={props.compact || undefined}
@@ -869,6 +908,7 @@ export function ValueEditor(props: ValueEditorProps) {
         </div>
       )}
       {expandable && body}
+      {expandable && errorMessage && <div className={styles.schemaError}>{errorMessage}</div>}
     </div>
   )
 }

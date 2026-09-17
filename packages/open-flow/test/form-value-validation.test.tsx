@@ -1,9 +1,27 @@
+import type { ReactElement } from 'react'
+import type { ValueEditorProps } from '../src/form/browser/valueEditor.tsx'
+
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it, vi } from 'vitest'
+import * as validationHooks from '../src/form/browser/useValueIssues.ts'
 import { ValueEditor } from '../src/form/browser/valueEditor.tsx'
 import { ajv } from '../src/form/common/validation/validator.ts'
+import { valueIssues } from '../src/form/common/validation/valueIssues.ts'
 import { createI18n } from '../src/workbench/browser/runtime/i18n.ts'
+
+// Static rendering cannot run effects. Supply the real asynchronous result to test
+// presentation separately; browser acceptance covers the hook and editor interaction.
+async function renderWithIssues(element: ReactElement<{ children: ReactElement<ValueEditorProps> }>) {
+  const { schema, value } = element.props.children.props
+  const result = await valueIssues(schema, value, 'en', new AbortController().signal)
+  const hook = vi.spyOn(validationHooks, 'useValueIssues').mockImplementation((_schema, _value, _language, enabled) => (enabled ? result : undefined))
+  try {
+    return renderToStaticMarkup(element)
+  } finally {
+    hook.mockRestore()
+  }
+}
 
 const cases = [
   ['text', { type: 'string', minLength: 5 }, 'abc', 'valid text'],
@@ -19,23 +37,26 @@ const cases = [
 ] as const
 
 describe('Field validation presentation', () => {
-  it.each(cases)('marks %s schema violations without changing the value', (_label, schema, invalid, valid) => {
+  it.each(cases)('marks %s schema violations without changing the value', async (_label, schema, invalid, valid) => {
     const onChange = vi.fn()
     const i18n = createI18n('en')
     const render = (value: unknown, nullable = false) =>
-      renderToStaticMarkup(
+      renderWithIssues(
         <I18nProvider i18n={i18n}>
           <ValueEditor label="sample" schema={schema} value={value} nullable={nullable} onChange={onChange} path="/sample" onDraftIssue={vi.fn()} />
         </I18nProvider>,
       )
     try {
-      expect(render(invalid)).toContain('aria-invalid="true"')
-      expect(render(valid)).not.toContain('aria-invalid="true"')
+      const invalidMarkup = await render(invalid)
+      expect(invalidMarkup).toContain('aria-invalid="true"')
+      expect(invalidMarkup).toContain('role="alert"')
+      expect(invalidMarkup).toContain('aria-describedby=')
+      expect(await render(valid)).not.toContain('aria-invalid="true"')
       // Nullable null follows the existing unset presentation, including selection prompts.
       if (_label === 'boolean' || _label === 'multiple select') {
-        expect(render(null, true).includes('aria-invalid="true"')).toBe(render(undefined, true).includes('aria-invalid="true"'))
+        expect((await render(null, true)).includes('aria-invalid="true"')).toBe((await render(undefined, true)).includes('aria-invalid="true"'))
       } else {
-        expect(render(null, true)).not.toContain('aria-invalid="true"')
+        expect(await render(null, true)).not.toContain('aria-invalid="true"')
       }
       expect(onChange).not.toHaveBeenCalled()
     } finally {
@@ -73,13 +94,13 @@ describe('Empty string presentation', () => {
 })
 
 describe('JSON component with union schemas', () => {
-  it.each(['oneOf', 'anyOf'])('always uses JSON editing while preserving %s validation', (keyword) => {
+  it.each(['oneOf', 'anyOf'])('always uses JSON editing while preserving %s validation', async (keyword) => {
     const i18n = createI18n('en')
     const onChange = vi.fn()
     const onDefinitionChange = vi.fn()
     const schema = { [keyword]: [{ type: 'string' }, { type: 'number' }] }
     const render = (value: unknown, editDefinition: boolean) =>
-      renderToStaticMarkup(
+      renderWithIssues(
         <I18nProvider i18n={i18n}>
           <ValueEditor
             label="choice"
@@ -93,13 +114,13 @@ describe('JSON component with union schemas', () => {
         </I18nProvider>,
       )
     try {
-      const json = render('hello', true)
+      const json = await render('hello', true)
       expect(json).toContain('aria-label="choice JSON"')
       expect(json).toContain('&quot;hello&quot;')
       expect(json).not.toContain('choice variant')
       expect(json).not.toContain('aria-invalid="true"')
-      expect(render(false, true)).toContain('aria-invalid="true"')
-      const fixedDefinition = render('hello', false)
+      expect(await render(false, true)).toContain('aria-invalid="true"')
+      const fixedDefinition = await render('hello', false)
       expect(fixedDefinition).toContain('aria-label="choice JSON"')
       expect(fixedDefinition).toContain('&quot;hello&quot;')
       expect(fixedDefinition).not.toContain('choice variant')
@@ -237,7 +258,7 @@ it('offers to repair a non-nullable array item cleared to null', () => {
 })
 
 describe('Lazy schema compilation', () => {
-  it('compiles only when a value needs schema validation', () => {
+  it('defers schema compilation until the client validation effect', () => {
     const i18n = createI18n('en')
     const compile = vi.spyOn(ajv, 'compile')
     const onChange = vi.fn()
@@ -253,11 +274,11 @@ describe('Lazy schema compilation', () => {
       render(null, true)
       expect(render('abc', false, true)).toContain('aria-invalid="true"')
       expect(compile).not.toHaveBeenCalled()
-      expect(render('abc')).toContain('aria-invalid="true"')
-      expect(compile).toHaveBeenCalledWith(schema)
+      expect(render('abc')).not.toContain('aria-invalid="true"')
+      expect(compile).not.toHaveBeenCalled()
       expect(render('valid text')).not.toContain('aria-invalid="true"')
       expect(render(null)).toContain('aria-invalid="true"')
-      expect(render('')).toContain('aria-invalid="true"')
+      expect(render('')).not.toContain('aria-invalid="true"')
       expect(onChange).not.toHaveBeenCalled()
     } finally {
       compile.mockRestore()
@@ -299,21 +320,21 @@ describe('Fixed schema value presentation', () => {
 })
 
 describe('Null editor', () => {
-  it('shows an incompatible stored value instead of calling it unset', () => {
+  it('shows an incompatible stored value instead of calling it unset', async () => {
     const i18n = createI18n('en')
     const onChange = vi.fn()
     try {
       const render = (value: unknown) =>
-        renderToStaticMarkup(
+        renderWithIssues(
           <I18nProvider i18n={i18n}>
             <ValueEditor label="sample" schema={{ type: 'null' }} nullable value={value} onChange={onChange} path="/sample" onDraftIssue={vi.fn()} />
           </I18nProvider>,
         )
-      expect(render('old value')).toContain('old value')
-      expect(render('old value')).toContain('aria-invalid="true"')
-      expect(render('old value')).not.toContain('Unset')
-      expect(render(null)).toContain('>null</span>')
-      expect(render(null)).not.toContain('aria-invalid="true"')
+      expect(await render('old value')).toContain('old value')
+      expect(await render('old value')).toContain('aria-invalid="true"')
+      expect(await render('old value')).not.toContain('Unset')
+      expect(await render(null)).toContain('>null</span>')
+      expect(await render(null)).not.toContain('aria-invalid="true"')
       expect(onChange).not.toHaveBeenCalled()
     } finally {
       i18n.dispose()

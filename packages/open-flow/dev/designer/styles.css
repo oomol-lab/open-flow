@@ -80,6 +80,11 @@
   background: var(--ui-background);
   overflow: auto;
 }
+/* Standalone galleries scroll when their content outgrows the preview.
+   Keep production Workbench and nested panel scroll boundaries unchanged. */
+.standalone-stage > .open-flow-workbench {
+  overflow: auto;
+}
 .workflow-story {
   min-width: 0;
   width: 100%;
@@ -480,4 +485,9 @@
   border-radius: var(--ui-radius);
   overflow: auto;
   background: var(--ui-background);
+}
+
+/* These comparison panels grow with their content; the gallery owns scrolling. */
+.value-editor-danger-gallery .context-panel {
+  overscroll-behavior: auto;
 }

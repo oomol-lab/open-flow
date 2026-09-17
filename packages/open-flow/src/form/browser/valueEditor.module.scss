@@ -653,3 +653,16 @@
     }
   }
 }
+
+.schemaError {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+.root[data-header] > .schemaError {
+  grid-column: var(--field-value-column);
+  grid-row: calc(var(--field-branch-row) + 1);
+}
+.root[data-array-child] > .schemaError {
+  grid-column: handle / content-end;
+  margin-left: var(--field-indent);
+}
