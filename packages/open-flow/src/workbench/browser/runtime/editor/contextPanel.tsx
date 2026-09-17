@@ -192,6 +192,7 @@ export function ContextPanel({
         aria-modal={overlay || undefined}
         className={cn('context-panel', className)}
         data-theme={theme}
+        data-tooltip-portal
         ref={panel}
         role={overlay ? 'dialog' : 'complementary'}
         tabIndex={-1}
