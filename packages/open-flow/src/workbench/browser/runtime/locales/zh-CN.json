@@ -250,6 +250,8 @@
       "outputMissing": "“{{source}}”中找不到“{{output}}”，请重新选择。",
       "notReady": "运行到这里时，“{{source}} {{handle}}”可能还没有值。",
       "sourceConflict": "这些字段可能同时有值：{{sources}}。这里只能取一个。",
+      "incompatible": "不兼容",
+      "unverified": "无法验证",
       "schemaIncompatible": "数据格式不匹配。",
       "schemaPathIncompatible": "“{{path}}”的数据格式不匹配。",
       "schemaCompareFailed": "无法检查数据格式，请检查 JSON Schema。",

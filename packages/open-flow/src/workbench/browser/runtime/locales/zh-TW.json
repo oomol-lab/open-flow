@@ -250,6 +250,8 @@
       "outputMissing": "「{{source}}」中找不到「{{output}}」，請重新選擇。",
       "notReady": "執行到這裡時，「{{source}} {{handle}}」可能還沒有值。",
       "sourceConflict": "這些欄位可能同時有值：{{sources}}。這裡只能取一個。",
+      "incompatible": "不相容",
+      "unverified": "無法驗證",
       "schemaIncompatible": "資料格式不符。",
       "schemaPathIncompatible": "「{{path}}」的資料格式不符。",
       "schemaCompareFailed": "無法檢查資料格式，請檢查 JSON Schema。",

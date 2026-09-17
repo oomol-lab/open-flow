@@ -1,5 +1,8 @@
 .open-flow-workbench {
   .context-panel {
+    /* Keep field feedback above section titles, while the panel chrome stays above every editor. */
+    --value-editor-hover-layer: 2;
+    --value-editor-active-layer: 3;
     position: relative;
     display: flex;
     min-width: 0;
@@ -15,7 +18,7 @@
     position: absolute;
     inset: 0 auto 0 0;
     width: 5px;
-    z-index: 4;
+    z-index: 5;
     cursor: col-resize;
     touch-action: none;
     opacity: 0;
@@ -57,7 +60,7 @@
   .context-panel > header {
     position: sticky;
     /* Header popovers must paint above the content's sticky section titles. */
-    z-index: 3;
+    z-index: 4;
     top: 0;
     display: flex;
     min-height: 56px;

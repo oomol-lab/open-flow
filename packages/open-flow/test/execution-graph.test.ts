@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { currentEngineContract } from '../src/execution/common/runtime.ts'
 import { runFlow } from '../src/execution/common/scheduler.ts'
 import { applyFlowChanges } from '../src/flow/common/change.ts'
-import { availableOutputs } from '../src/flow/common/graph.ts'
+import { availableOutputs, inputSourceCandidates } from '../src/flow/common/graph.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
 import { advanceWaiting, waitHost } from './waitHost.ts'
 
@@ -45,6 +45,42 @@ describe('Execution graph contract', () => {
     const result = await prepareFlow(broken, currentEngineContract)
     expect(result.kind).toBe('flow-invalid')
     if (result.kind == 'flow-invalid') expect(result.validation.diagnostics.some((item) => item.code == 'graph.source-unavailable')).toBe(true)
+  })
+
+  it('offers structurally available inputs with their schema compatibility', () => {
+    const source = {
+      inputs: {},
+      kind: 'value' as const,
+      values: [
+        { handle: 'text', jsonSchema: { type: 'string' }, nullable: false, value: 'hello' },
+        { handle: 'count', jsonSchema: { type: 'number' }, nullable: false, value: 1 },
+        { handle: 'unknown', jsonSchema: null, nullable: false, value: null },
+      ],
+    }
+    const target = {
+      ...task,
+      task: {
+        ...task.task,
+        inputs: [{ handle: 'input', jsonSchema: { type: 'string' }, nullable: false }],
+      },
+    }
+    const graph: Graph = {
+      edges: [{ source: 'source', target: 'target' }],
+      nodes: { source, target, unrelated: source },
+    }
+    const content = revision(graph)
+
+    expect(inputSourceCandidates(content.document, graph, 'target', 'input')).toEqual({
+      source: [
+        { output: 'text', check: { kind: 'available' } },
+        {
+          output: 'count',
+          check: { kind: 'schema', mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'number', target: 'string' } },
+        },
+        { output: 'unknown', check: { kind: 'schema-error' } },
+      ],
+    })
+    expect(availableOutputs(content.document, graph, 'target', 'input')).toEqual({ source: ['text'] })
   })
 
   it('offers ancestor outputs even when their branch may be skipped', () => {
@@ -303,6 +339,9 @@ it('only offers resolution outputs on their reachable paths', () => {
   expect(availableOutputs(content.document, graph, 'approvalNotify', 'input')).toEqual({ approval: ['pending'] })
   expect(availableOutputs(content.document, graph, 'approve', 'input')).toEqual({ approval: ['approve'] })
   expect(availableOutputs(content.document, graph, 'reject', 'input')).toEqual({ approval: ['reject'] })
+  expect(inputSourceCandidates(content.document, graph, 'waitNotify', 'input')).toEqual({
+    wait: [{ output: 'pending', check: { kind: 'available' } }],
+  })
 })
 
 it.each([true, false])('runs with null from either an available nullable source or a missing branch source: %s', async (takeSource) => {

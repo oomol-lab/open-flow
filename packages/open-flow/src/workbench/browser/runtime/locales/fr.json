@@ -250,6 +250,8 @@
       "outputMissing": "« {{output}} » est introuvable dans « {{source}} ». Choisissez à nouveau.",
       "notReady": "« {{source}} {{handle}} » peut ne pas avoir de valeur lors de cette étape.",
       "sourceConflict": "Ces champs peuvent avoir une valeur en même temps : {{sources}}. Un seul peut être utilisé ici.",
+      "incompatible": "Incompatible",
+      "unverified": "Non vérifié",
       "schemaIncompatible": "Le format des données ne correspond pas.",
       "schemaPathIncompatible": "Le format de « {{path}} » ne correspond pas.",
       "schemaCompareFailed": "Impossible de vérifier le format. Vérifiez le schéma JSON.",

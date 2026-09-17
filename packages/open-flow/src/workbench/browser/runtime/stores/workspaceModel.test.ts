@@ -43,7 +43,7 @@ function draft(): Draft {
 
 describe('Per-field input sources', () => {
   it('does no compatibility work until requested and caches each field independently', () => {
-    const calculate = vi.spyOn(graph, 'availableOutputs')
+    const calculate = vi.spyOn(graph, 'inputSourceCandidates')
     const check = vi.spyOn(graph, 'checkInputSources')
     try {
       const view = revisionView(draft())
@@ -52,7 +52,7 @@ describe('Per-field input sources', () => {
       expect(check).not.toHaveBeenCalled()
       expect(query.check()).toEqual({ conflict: false, sources: [] })
       expect(check).not.toHaveBeenCalled()
-      expect(query.candidates()).toEqual({ source: ['text'] })
+      expect(query.candidates()).toEqual({ source: [{ output: 'text', check: { kind: 'available' } }] })
       expect(calculate).toHaveBeenCalledTimes(1)
       expect(view.inputSource({ kind: 'flow' }, 'task', 'input0')).toBe(query)
       expect(query.candidates()).toBe(query.candidates())
@@ -91,7 +91,7 @@ describe('Per-field input sources', () => {
       },
     }
 
-    const calculate = vi.spyOn(graph, 'availableOutputs')
+    const calculate = vi.spyOn(graph, 'inputSourceCandidates')
     const check = vi.spyOn(graph, 'checkInputSources')
     try {
       const view = revisionView(source)
@@ -118,6 +118,14 @@ describe('Per-field input sources', () => {
         conflict: false,
         sources: [{ kind: 'schema', mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' } }],
       })
+      expect(revisionView(changed).inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({
+        source: [
+          {
+            output: 'text',
+            check: { kind: 'schema', mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' } },
+          },
+        ],
+      })
     } finally {
       calculate.mockRestore()
       check.mockRestore()
@@ -140,7 +148,9 @@ describe('Per-field input sources', () => {
     }
 
     const view = revisionView(source)
-    expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({ source: ['text'] })
+    expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({
+      source: [{ output: 'text', check: { kind: 'available' } }],
+    })
     expect(view.inputSource({ kind: 'flow' }, 'other', 'input0').candidates()).toEqual({})
     expect(view.inputSource({ kind: 'subflow', id: 'nested' }, 'task', 'input0').candidates()).toEqual({})
     const changed: Draft = {

@@ -4,8 +4,6 @@
 .list {
   container: value-fields / inline-size;
   min-width: 0;
-  --value-editor-hover-layer: 1;
-  --value-editor-active-layer: 2;
   --field-toggle-width: #{geometry.$toggle-width};
   --field-value-name-gap: #{geometry.$value-name-gap};
   --field-grip-width: 0px;

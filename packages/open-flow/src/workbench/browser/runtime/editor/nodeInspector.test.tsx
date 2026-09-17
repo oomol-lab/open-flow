@@ -169,7 +169,7 @@ describe('Node input ownership', () => {
     const props = input!.props as {
       renderSource: (handle: string) => {
         groups: unknown[]
-        describeGroups: (outputs: Record<string, string[]>) => unknown[]
+        describeGroups: (outputs: Record<string, { output: string; check: { kind: 'available' } }[]>) => unknown[]
         onChange: (source: { nodeId: string; output: string }) => void
       }
       entries: { variableName: string; connected: boolean }[]
@@ -178,7 +178,8 @@ describe('Node input ownership', () => {
     }
     const upstream = props.renderSource('message')
     expect(upstream.groups).toEqual([])
-    expect(upstream.describeGroups({ upstream: ['text'] })).toEqual([{ icon: undefined, nodeId: 'upstream', nodeName: 'Source', outputs: ['text'] }])
+    const outputs = [{ output: 'text', check: { kind: 'available' as const } }]
+    expect(upstream.describeGroups({ upstream: outputs })).toEqual([{ icon: undefined, nodeId: 'upstream', nodeName: 'Source', outputs }])
     upstream.onChange({ nodeId: 'upstream', output: 'text' })
     expect(setInputSource).toHaveBeenCalledWith('condition', 'message', { nodeId: 'upstream', output: 'text' })
     expect(props.entries[0]!.variableName).toBe('API_TOKEN')

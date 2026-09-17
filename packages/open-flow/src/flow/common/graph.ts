@@ -426,6 +426,13 @@ export type InputSourceCheck =
   | { readonly kind: 'schema'; readonly mismatch: SchemaMismatch }
   | { readonly kind: 'schema-error' }
 
+export type InputSourceCandidateCheck = Extract<InputSourceCheck, { readonly kind: 'available' | 'schema' | 'schema-error' }>
+
+export interface InputSourceCandidate {
+  readonly output: string
+  readonly check: InputSourceCandidateCheck
+}
+
 export interface InputSourcesCheck {
   readonly conflict: boolean
   readonly sources: readonly InputSourceCheck[]
@@ -468,6 +475,37 @@ export function checkInputSources(
     checks.every((check) => check.kind == 'available') &&
     !mappingAvailable(graph, target, { kind: 'sources', sources: sources.map((source) => ({ kind: 'node', ...source })) }, graphPaths(graph))
   return { conflict, sources: checks }
+}
+
+/** Enumerate structurally available outputs while retaining their compatibility with one input. */
+export function inputSourceCandidates(
+  document: FlowDocument,
+  graph: Graph,
+  target: string,
+  handle: string,
+): Readonly<Record<string, readonly InputSourceCandidate[]>> {
+  const targetNode = graph.nodes[target]
+  const input = targetNode == null ? undefined : nodeInputPorts(document, targetNode)[handle]
+  if (input == null) return {}
+  const analysis = graphPaths(graph)
+  return Object.fromEntries(
+    [...(analysis.ancestors.get(target) ?? [])].flatMap((nodeId) => {
+      const node = graph.nodes[nodeId]
+      if (node == null) return []
+      const outputs = Object.entries(nodeOutputPorts(document, node)).flatMap(([output, definition]) => {
+        if (!mappingAvailable(graph, target, { kind: 'sources', sources: [{ kind: 'node', nodeId, output }] }, analysis)) return []
+        const comparison = comparePorts(definition, input)
+        const check: InputSourceCandidateCheck =
+          comparison.kind == 'compatible'
+            ? { kind: 'available' }
+            : comparison.kind == 'incompatible'
+              ? { kind: 'schema', mismatch: comparison.mismatch }
+              : { kind: 'schema-error' }
+        return [{ output, check }]
+      })
+      return outputs.length == 0 ? [] : [[nodeId, outputs]]
+    }),
+  )
 }
 
 export function availableOutputs(document: FlowDocument, graph: Graph, target: string, handle?: string): Readonly<Record<string, readonly string[]>> {

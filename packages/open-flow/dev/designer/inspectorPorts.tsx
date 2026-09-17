@@ -49,7 +49,15 @@ const portsContent: RevisionContent = {
     subflows: {},
     graph: {
       nodes: {
-        source: { kind: 'value', inputs: {}, name: 'Issue text', values: [{ ...port('text'), value: 'Review the new sidebar' }] },
+        source: {
+          kind: 'value',
+          inputs: {},
+          name: 'Issue text',
+          values: [
+            { ...port('text'), value: 'Review the new sidebar' },
+            { ...port('issue_count', 'integer'), value: 3 },
+          ],
+        },
         summarize: {
           kind: 'task',
           name: 'Summarize issues',
@@ -237,6 +245,6 @@ export const inspectorPortsStory: FrontendStory = {
   title: 'Ports & sources',
   standalone: true,
   description:
-    'Saved sources render before their checks. Compare valid and missing bindings; open each source menu to load compatible outputs. Reload checks saved values and ordering.',
+    'Saved sources render before their checks. Select the incompatible issue_count source, then edit its upstream type to clear the input error. Reload checks saved values and ordering.',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
 }

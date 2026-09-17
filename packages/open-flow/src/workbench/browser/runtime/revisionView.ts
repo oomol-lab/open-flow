@@ -1,4 +1,4 @@
-import type { InputSourcesCheck } from '../../../flow/common/graph.ts'
+import type { InputSourceCandidate, InputSourcesCheck } from '../../../flow/common/graph.ts'
 import type {
   CodeModule,
   ApprovalNode,
@@ -16,12 +16,12 @@ import type {
   WaitNode,
 } from './api.ts'
 
-import { availableOutputs, checkInputSources } from '../../../flow/common/graph.ts'
+import { checkInputSources, inputSourceCandidates } from '../../../flow/common/graph.ts'
 import { agentActions, codeActions } from '../../../flow/common/semantics.ts'
 
 export interface InputSourceQuery {
   readonly check: () => InputSourcesCheck
-  readonly candidates: () => Readonly<Record<string, readonly string[]>>
+  readonly candidates: () => Readonly<Record<string, readonly InputSourceCandidate[]>>
 }
 
 type SubflowDefinition = FlowDocument['subflows'][string]
@@ -96,10 +96,10 @@ export class RevisionView {
     const mapping = 'inputs' in node ? node.inputs[handle] : undefined
     const sources = mapping?.kind === 'sources' ? mapping.sources.filter((source) => source.kind === 'node') : []
     let checks: InputSourcesCheck | undefined = sources.length == 0 ? { conflict: false, sources: [] } : undefined
-    let candidates: ReturnType<typeof availableOutputs> | undefined
+    let candidates: ReturnType<typeof inputSourceCandidates> | undefined
     const query: InputSourceQuery = {
       check: () => (checks ??= checkInputSources(this.#document, graph, nodeId, handle, sources)),
-      candidates: () => (candidates ??= availableOutputs(this.#document, graph, nodeId, handle)),
+      candidates: () => (candidates ??= inputSourceCandidates(this.#document, graph, nodeId, handle)),
     }
     if (queries == null) this.#inputSourcesByGraph.set(graph, (queries = new Map()))
     queries.set(key, query)

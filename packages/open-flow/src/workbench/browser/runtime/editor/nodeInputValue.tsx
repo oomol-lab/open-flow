@@ -1,6 +1,6 @@
 import styles from './nodeInputValue.module.scss'
 import type { TFunction } from 'val-i18n'
-import type { InputSourceCheck, InputSourcesCheck } from '../../../../flow/common/graph.ts'
+import type { InputSourceCandidate, InputSourceCheck, InputSourcesCheck } from '../../../../flow/common/graph.ts'
 import type { ValueEditorProps } from '../../../../form/browser/valueEditor.tsx'
 import type { VariablePickerProps } from '../../../../ui/browser/variable-picker.tsx'
 import type { InputPort, JsonValue } from '../api.ts'
@@ -33,7 +33,7 @@ import { useInputSourceQuery } from './useInputSourceQuery.ts'
 export type InputVariables = Pick<VariablePickerProps, 'enabled' | 'loaded' | 'loading' | 'names' | 'onOpen'>
 export interface NodeInputUpstreamSources {
   readonly query?: InputSourceQuery
-  readonly describeGroups?: (outputs: Readonly<Record<string, readonly string[]>>) => NodeInputUpstreamSources['groups']
+  readonly describeGroups?: (outputs: Readonly<Record<string, readonly InputSourceCandidate[]>>) => NodeInputUpstreamSources['groups']
   readonly current: readonly {
     readonly icon?: string
     readonly nodeId: string
@@ -45,7 +45,7 @@ export interface NodeInputUpstreamSources {
     readonly icon?: string
     readonly nodeId: string
     readonly nodeName: string
-    readonly outputs: readonly string[]
+    readonly outputs: readonly InputSourceCandidate[]
   }[]
   readonly onChange: (source: { readonly nodeId: string; readonly output: string }) => void
 }
@@ -345,17 +345,28 @@ export function NodeInputValue({
                   }}
                 >
                   {upstream.current
-                    .filter((source) => source.nodeId === group.nodeId && source.check != null && source.check.kind != 'available')
+                    .filter(
+                      (source) =>
+                        source.nodeId === group.nodeId &&
+                        source.check != null &&
+                        source.check.kind != 'available' &&
+                        !group.outputs.some((candidate) => candidate.output === source.output),
+                    )
                     .map((source) => (
                       <DropdownMenuRadioItem className={sourceItemClass} key={source.output} value={upstreamSource(source.nodeId, source.output)} disabled>
                         <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
                         <span className="min-w-0 flex-1 truncate font-mono">{source.output}</span>
                       </DropdownMenuRadioItem>
                     ))}
-                  {group.outputs.map((output) => (
+                  {group.outputs.map(({ output, check }) => (
                     <DropdownMenuRadioItem className={sourceItemClass} key={output} value={upstreamSource(group.nodeId, output)} closeOnClick>
                       <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
                       <span className="min-w-0 flex-1 truncate font-mono">{output}</span>
+                      {check.kind != 'available' && (
+                        <span className="ml-auto shrink-0 text-[10px] leading-4 text-[var(--warning-foreground)]">
+                          {t(check.kind == 'schema' ? 'inspector.sources.incompatible' : 'inspector.sources.unverified')}
+                        </span>
+                      )}
                     </DropdownMenuRadioItem>
                   ))}
                 </DropdownMenuRadioGroup>

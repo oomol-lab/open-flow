@@ -54,7 +54,7 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
         icon: providerIcon({ icon: ':simple-icons:github:', serviceId: 'github', serviceName: 'GitHub' }, {}),
         nodeId: 'github',
         nodeName: 'GitHub issue',
-        outputs: ['title'],
+        outputs: [{ output: 'title', check: { kind: 'available' as const } }],
       },
     ],
     onChange: () => log('Select upstream source'),

@@ -250,6 +250,8 @@
       "outputMissing": "“{{output}}” could not be found in “{{source}}”. Choose again.",
       "notReady": "“{{source}} {{handle}}” may not have a value when this step runs.",
       "sourceConflict": "These fields may have values at the same time: {{sources}}. Only one can be used here.",
+      "incompatible": "Mismatch",
+      "unverified": "Unverified",
       "schemaIncompatible": "The data format does not match.",
       "schemaPathIncompatible": "The data format of “{{path}}” does not match.",
       "schemaCompareFailed": "Could not check the data format. Check the JSON Schema.",
