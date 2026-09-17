@@ -182,7 +182,7 @@ describe('Independent node inputs', () => {
   })
 
   const sourceIssues: readonly { readonly check: InputSourceCheck; readonly message: string }[] = [
-    { check: { kind: 'source-missing' }, message: '“Source” could not be found. Choose again.' },
+    { check: { kind: 'source-missing' }, message: 'The original input source no longer exists. Choose again.' },
     { check: { kind: 'output-missing' }, message: '“result” could not be found in “Source”. Choose again.' },
     { check: { kind: 'not-ready' }, message: '“Source result” may not have a value when this step runs.' },
     {
@@ -230,6 +230,33 @@ describe('Independent node inputs', () => {
     expect(markup).toContain(message)
   })
 
+  it('hides a deleted node ID and uses the neutral source icon with its saved output', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <NodeInputValue
+          definition={{ handle: 'message', jsonSchema: { type: 'string' }, nullable: false }}
+          value={undefined}
+          connected
+          upstream={{
+            current: [{ nodeId: '0199b784-internal', output: 'result', check: { kind: 'source-missing' } }],
+            groups: [],
+            onChange: vi.fn(),
+          }}
+          variables={variables}
+          disabled={false}
+          onValue={vi.fn()}
+          onVariable={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    expect(markup).toContain('i-lucide-light:workflow')
+    expect(markup).not.toContain('data-icon-kind="initials"')
+    expect(markup).toContain('>result</span>')
+    expect(markup).not.toContain('0199b784-internal')
+    expect(markup).not.toMatch(/<(?:textarea|select)\b/)
+  })
+
   it('uses concise field-context copy for a type mismatch', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('zh-CN')}>
@@ -260,7 +287,6 @@ describe('Independent node inputs', () => {
     expect(markup).toContain('需要数字，但所选字段是字符串。')
   })
 })
-
 describe('Unset input presentation', () => {
   it.each([false, true])('shows nullable=%s without creating a value', (nullable) => {
     const onValue = vi.fn()

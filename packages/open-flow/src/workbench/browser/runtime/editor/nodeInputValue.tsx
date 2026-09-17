@@ -39,7 +39,7 @@ export interface NodeInputUpstreamSources {
     readonly description?: string
     readonly icon?: string
     readonly nodeId: string
-    readonly nodeName: string
+    readonly nodeName?: string
     readonly output: string
     readonly check: InputSourceCheck | undefined
   }[]
@@ -64,7 +64,7 @@ function inputSourceIssue(check: InputSourceCheck | undefined, source: NodeInput
     case 'available':
       return
     case 'source-missing':
-      return t('inspector.sources.sourceMissing', { source: source.nodeName })
+      return t('inspector.sources.sourceMissing')
     case 'output-missing':
       return t('inspector.sources.outputMissing', { output: source.output, source: source.nodeName })
     case 'not-ready':
@@ -75,7 +75,6 @@ function inputSourceIssue(check: InputSourceCheck | undefined, source: NodeInput
       return t('inspector.sources.schemaCompareFailed')
   }
 }
-
 function SelectedSourceValue({
   bound,
   connected,
@@ -112,14 +111,16 @@ function SelectedSourceValue({
     : bound && !variableCompatible
       ? t('variablePicker.variableIncompatibleHelp')
       : checks?.conflict
-        ? t('inspector.sources.sourceConflict', { sources: current?.map((source) => `${source.nodeName} ${source.output}`).join(', ') })
+        ? t('inspector.sources.sourceConflict', {
+            sources: current?.map((source) => (source.nodeName == null ? source.output : `${source.nodeName} ${source.output}`)).join(', '),
+          })
         : invalidUpstream != null
           ? inputSourceIssue(invalidUpstream.check, invalidUpstream, t)
           : undefined
   const sourceLabel = bound
     ? variableName
     : current?.length
-      ? current.map((source) => `${source.nodeName} ${source.output}`).join(' / ')
+      ? current.map((source) => (source.nodeName == null ? source.output : `${source.nodeName} ${source.output}`)).join(' / ')
       : t('nodeInput.connected')
   const selectedUpstreamIcon = connected && current?.length === 1 ? current[0]?.icon : undefined
   const sourceTooltip = connected && current?.length ? current.map((source) => source.description?.trim() || source.output).join('\n') : undefined

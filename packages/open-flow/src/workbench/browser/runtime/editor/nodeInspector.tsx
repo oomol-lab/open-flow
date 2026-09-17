@@ -100,7 +100,7 @@ function inputUpstreamSources({
         description: revision.outputDescription(target, source.nodeId, source.output),
         icon: sourceNodeIcons?.[source.nodeId],
         nodeId: source.nodeId,
-        nodeName: node?.name ?? source.nodeId,
+        nodeName: node?.name,
         output: source.output,
         check: undefined,
       }

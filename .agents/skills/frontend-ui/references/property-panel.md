@@ -42,6 +42,10 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
   Check the collapsed preview after a type change as well as the expanded editor.
 - Opening a panel or inspecting an unset field must not silently create a value. Value creation and
   type changes use the existing shared rules rather than local guesses about defaults.
+- Deleting an upstream node or output preserves saved source references. Show the missing node or
+  output as invalid until the user explicitly selects another source or switches to a fixed value.
+  A deleted node uses the neutral source icon and its saved output name; never expose its internal
+  node ID as a user-facing fallback or imply a Provider identity that is no longer known.
 - A non-nullable field containing `null` exposes the same explicit value-repair action as an unset
   field. Repair prefers the schema default and otherwise uses the shared type default.
 

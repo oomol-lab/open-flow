@@ -193,6 +193,63 @@ describe('Code task port changes', () => {
     if (changes == null) throw new Error('Expected code task port changes.')
     expect(applyFlowChanges(current, changes).content.modules.module?.source).toBe(current.content.modules.module?.source)
   })
+
+  it('keeps downstream sources invalid when an output is removed', () => {
+    const target = { kind: 'flow' } as const
+    const current = applyFlowChanges(draft('export default () => ({ result: 1 }))\n'), [
+      {
+        kind: 'graph.node.create',
+        nodeId: 'sink',
+        target,
+        node: {
+          cases: [],
+          input: { handle: 'value', jsonSchema: {}, nullable: true },
+          inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'task', output: 'result' }] } },
+          kind: 'condition',
+          name: 'Sink',
+        },
+      },
+      { edge: { source: 'task', sourceHandle: 'result', target: 'sink' }, kind: 'graph.edge.connect', target },
+    ])
+    const task = current.content.document.graph.nodes.task
+    if (task?.kind != 'task' || task.task == null) throw new Error('Expected code Task fixture.')
+
+    const changes = updateTaskPorts(revisionView(current), target, 'task', { inputs: task.task.inputs, outputs: [] })!
+    const changed = applyFlowChanges(current, changes)
+
+    expect(changed.content.document.graph.edges).toEqual([])
+    expect(changed.content.document.graph.nodes.sink).toMatchObject({
+      inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'task', output: 'result' }] } },
+    })
+    expect(revisionView(changed).inputSource(target, 'sink', 'value').check()).toEqual({ conflict: false, sources: [{ kind: 'output-missing' }] })
+  })
+
+  it('keeps downstream sources invalid when their node is deleted', () => {
+    const target = { kind: 'flow' } as const
+    const current = applyFlowChanges(draft('export default () => ({ result: 1 }))\n'), [
+      {
+        kind: 'graph.node.create',
+        nodeId: 'sink',
+        target,
+        node: {
+          cases: [],
+          input: { handle: 'value', jsonSchema: {}, nullable: true },
+          inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'task', output: 'result' }] } },
+          kind: 'condition',
+          name: 'Sink',
+        },
+      },
+      { edge: { source: 'task', sourceHandle: 'result', target: 'sink' }, kind: 'graph.edge.connect', target },
+    ])
+
+    const changed = applyFlowChanges(current, [{ kind: 'graph.node.delete', nodeId: 'task', target }])
+
+    expect(changed.content.document.graph.edges).toEqual([])
+    expect(changed.content.document.graph.nodes.sink).toMatchObject({
+      inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'task', output: 'result' }] } },
+    })
+    expect(revisionView(changed).inputSource(target, 'sink', 'value').check()).toEqual({ conflict: false, sources: [{ kind: 'source-missing' }] })
+  })
 })
 
 describe('Managed task additional input changes', () => {
@@ -295,6 +352,43 @@ describe('Condition changes', () => {
         input: condition.input,
       }),
     ).toEqual([])
+  })
+
+  it('keeps downstream sources invalid when a branch output is removed', () => {
+    const target = { kind: 'flow' } as const
+    const current = applyFlowChanges(draft('export default () => ({})\n'), [
+      {
+        kind: 'graph.node.create',
+        nodeId: 'condition',
+        target,
+        node: {
+          cases: [{ expressions: [{ input: 'value', operator: 'isTrue' }], output: 'yes', relation: 'all' }],
+          input: { handle: 'value', jsonSchema: {}, nullable: true },
+          inputs: {},
+          kind: 'condition',
+          name: 'Condition',
+        },
+      },
+      { edge: { source: 'condition', sourceHandle: 'yes', target: 'task' }, kind: 'graph.edge.connect', target },
+      {
+        handle: 'value',
+        kind: 'graph.node.input.set',
+        nodeId: 'task',
+        target,
+        value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'condition', output: 'yes' }] },
+      },
+    ])
+    const condition = current.content.document.graph.nodes.condition
+    if (condition?.kind != 'condition') throw new Error('Expected Condition fixture.')
+
+    const changes = updateCondition(revisionView(current), target, 'condition', { input: condition.input, cases: [] })!
+    const changed = applyFlowChanges(current, changes)
+
+    expect(changed.content.document.graph.edges).toEqual([])
+    expect(changed.content.document.graph.nodes.task).toMatchObject({
+      inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'condition', output: 'yes' }] } },
+    })
+    expect(revisionView(changed).inputSource(target, 'task', 'value').check()).toEqual({ conflict: false, sources: [{ kind: 'output-missing' }] })
   })
 })
 

@@ -97,6 +97,41 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
         <h3>Invalid sources</h3>
         <div className="editor-context-panel grid grid-cols-3 gap-4">
           <NodeInputValue
+            definition={{ ...definition, handle: 'missingNode' }}
+            value={undefined}
+            connected
+            upstream={{
+              current: [
+                {
+                  nodeId: 'deleted-node',
+                  output: 'result',
+                  check: { kind: 'source-missing' as const },
+                },
+              ],
+              groups: [],
+              onChange: () => log('Replace missing upstream source'),
+            }}
+            variables={variables}
+            disabled={false}
+            onValue={() => {}}
+            onVariable={() => {}}
+          />
+          <NodeInputValue
+            definition={{ ...definition, handle: 'missingOutput' }}
+            value={undefined}
+            connected
+            upstream={{
+              ...providerSource,
+              current: providerSource.current.map((source) =>
+                Object.assign({}, source, { output: 'deleted-output', check: { kind: 'output-missing' as const } }),
+              ),
+            }}
+            variables={variables}
+            disabled={false}
+            onValue={() => {}}
+            onVariable={() => {}}
+          />
+          <NodeInputValue
             definition={{ ...definition, handle: 'invalidUpstream' }}
             value={undefined}
             connected

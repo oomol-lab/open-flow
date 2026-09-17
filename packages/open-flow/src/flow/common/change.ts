@@ -593,18 +593,6 @@ function replaceGraph(document: FlowDocument, target: GraphTarget, value: Graph)
   return { ...document, subflows: { ...document.subflows, [target.id]: { ...subflow, graph: value } } }
 }
 
-function withoutNodeSources(node: GraphNode, removed: ReadonlySet<string>): GraphNode {
-  if (!('inputs' in node)) return node
-  const inputs = { ...node.inputs }
-  for (const [handle, mapping] of Object.entries(inputs)) {
-    if (mapping.kind != 'sources') continue
-    const remaining = mapping.sources.filter((source) => source.kind != 'node' || !removed.has(source.nodeId))
-    if (remaining.length == 0) delete inputs[handle]
-    else inputs[handle] = { kind: 'sources', sources: remaining }
-  }
-  return { ...node, inputs }
-}
-
 export function applyFlowChanges(content: RevisionContent, operations: readonly ChangeOperation[]): RevisionContent {
   const document = { ...content.document }
   const modules = { ...content.modules }
@@ -691,9 +679,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const graph = selectedGraph(document, operation.target)
         if (graph.nodes[operation.nodeId] == null) invalid('The Node does not exist in the target graph.')
         const removed = new Set([operation.nodeId])
-        const nodes = Object.fromEntries(
-          Object.entries(graph.nodes).flatMap(([nodeId, node]) => (removed.has(nodeId) ? [] : [[nodeId, withoutNodeSources(node, removed)]])),
-        )
+        const nodes = Object.fromEntries(Object.entries(graph.nodes).filter(([nodeId]) => !removed.has(nodeId)))
         Object.assign(
           document,
           replaceGraph(document, operation.target, {
@@ -702,14 +688,6 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
             nodes,
           }),
         )
-        if (operation.target.kind == 'subflow') {
-          const subflow = document.subflows[operation.target.id]!
-          const outputs = subflow.outputs.map((output) => ({
-            ...output,
-            sources: output.sources.filter((source) => source.kind != 'node' || !removed.has(source.nodeId)),
-          }))
-          document.subflows = { ...document.subflows, [operation.target.id]: { ...subflow, outputs } }
-        }
         break
       }
       case 'graph.node.field.set': {

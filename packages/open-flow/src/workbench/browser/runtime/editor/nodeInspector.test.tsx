@@ -182,6 +182,40 @@ describe('Node input ownership', () => {
     ])
   })
 
+  it('does not expose a deleted upstream node ID as its display name', () => {
+    const input = { handle: 'message', jsonSchema: { type: 'string' }, nullable: false }
+    const node = {
+      kind: 'condition',
+      name: 'Condition',
+      input,
+      inputs: { message: { kind: 'sources', sources: [{ kind: 'node', nodeId: '0199b784-internal', output: 'title' }] } },
+      cases: [],
+    }
+    const element = NodeInspector({
+      variables: { enabled: true, names: [], loaded: true, loading: false, onOpen: vi.fn() },
+      connectorAuthorizationPending: false,
+      connectorLoading: false,
+      connectors: {} as never,
+      disabled: false,
+      revision: {
+        graph: () => ({ nodes: { condition: node } }),
+        inputSource: () => ({ check: vi.fn(), candidates: vi.fn() }),
+        outputDescription: () => undefined,
+      } as never,
+      selection: { id: 'condition', kind: 'condition', node } as never,
+      store: { $: { flowId: { value: 'flow' } } } as never,
+      target: { kind: 'flow' },
+      theme: 'light',
+      triggerAuthorizationPending: false,
+      triggerConnectionLoading: false,
+      triggers: {} as never,
+    })
+    const inputs = find(element, (item) => typeof item.type === 'function' && item.type.name === 'NodeInputs')
+    const upstream = (inputs!.props as { renderSource: (handle: string) => { current: { nodeName?: string }[] } }).renderSource('message')
+
+    expect(upstream.current[0]?.nodeName).toBeUndefined()
+  })
+
   it.each(['approval', 'condition', 'wait', 'subflow', 'task'] as const)('resolves %s variable bindings and sends edits directly to the workspace', (kind) => {
     const setInputSource = vi.fn()
     const setInputValue = vi.fn()

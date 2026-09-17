@@ -169,7 +169,7 @@ describe('Flow changes', () => {
     expect(removed).toEqual(revision())
   })
 
-  it('connects, replaces, disconnects, and deletes graph nodes while removing their sources', () => {
+  it('connects, replaces, disconnects, and deletes graph nodes while preserving their sources', () => {
     const created = applyFlowChanges(revision(), [
       { kind: 'graph.node.create', node: valueNode(1), nodeId: 'source', target },
       { kind: 'graph.node.create', node: taskNode(), nodeId: 'target', target },
@@ -205,9 +205,21 @@ describe('Flow changes', () => {
         kind: 'graph.edge.connect',
         target,
       },
+      {
+        handle: 'input',
+        kind: 'graph.node.input.set',
+        nodeId: 'target',
+        target,
+        value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] },
+      },
       { kind: 'graph.node.delete', nodeId: 'source', target },
     ])
-    expect(connected.document.graph.nodes).toEqual({ target: expect.objectContaining({ inputs: {} }) })
+    expect(connected.document.graph.edges).toEqual([])
+    expect(connected.document.graph.nodes).toEqual({
+      target: expect.objectContaining({
+        inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
+      }),
+    })
   })
 
   it('preserves Variable bindings when adding an execution dependency', () => {
@@ -240,7 +252,7 @@ describe('Flow changes', () => {
     })
   })
 
-  it('removes deleted Subflow node sources from its boundary outputs', () => {
+  it('preserves deleted Subflow node sources in its boundary outputs', () => {
     const source = revision()
     const withSubflow = applyFlowChanges(source, [
       {
@@ -256,7 +268,10 @@ describe('Flow changes', () => {
       { kind: 'graph.node.delete', nodeId: 'source', target: { id: 'child', kind: 'subflow' } },
     ])
 
-    expect(withSubflow.document.subflows.child).toMatchObject({ graph: { edges: [], nodes: {} }, outputs: [{ handle: 'output', sources: [] }] })
+    expect(withSubflow.document.subflows.child).toMatchObject({
+      graph: { edges: [], nodes: {} },
+      outputs: [{ handle: 'output', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] }],
+    })
   })
 
   it.each([

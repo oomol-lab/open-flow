@@ -247,7 +247,7 @@
       "checkFailed": "Impossible de vérifier cette source.",
       "select": "Sélectionner la source d’entrée",
       "title": "Source d’entrée",
-      "sourceMissing": "« {{source}} » est introuvable. Choisissez à nouveau.",
+      "sourceMissing": "La source d’entrée d’origine n’existe plus. Choisissez-en une autre.",
       "outputMissing": "« {{output}} » est introuvable dans « {{source}} ». Choisissez à nouveau.",
       "notReady": "« {{source}} {{handle}} » peut ne pas avoir de valeur lors de cette étape.",
       "sourceConflict": "Ces champs peuvent avoir une valeur en même temps : {{sources}}. Un seul peut être utilisé ici.",

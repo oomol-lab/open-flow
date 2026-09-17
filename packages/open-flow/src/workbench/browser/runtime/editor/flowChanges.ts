@@ -491,14 +491,13 @@ export function updateCondition(revision: RevisionView, target: GraphTarget, nod
 
     for (const [name, mapping] of Object.entries(inputs)) {
       if (mapping.kind != 'sources') continue
-      const sources = mapping.sources.flatMap((source) => {
-        if (source.kind != 'node' || source.nodeId != nodeId) return [source]
-        if (outputRename != null && source.output == outputRename[0]) return [{ ...source, output: outputRename[1] }]
-        return outputNames.has(source.output) ? [source] : []
+      const sources = mapping.sources.map((source) => {
+        if (source.kind != 'node' || source.nodeId != nodeId) return source
+        if (outputRename != null && source.output == outputRename[0]) return { ...source, output: outputRename[1] }
+        return source
       })
-      if (sources.length == mapping.sources.length && sources.every((source, index) => source === mapping.sources[index])) continue
-      if (sources.length == 0) delete inputs[name]
-      else inputs[name] = { kind: 'sources', sources }
+      if (sources.every((source, index) => source === mapping.sources[index])) continue
+      inputs[name] = { kind: 'sources', sources }
     }
 
     if (currentNodeId == nodeId) {
@@ -758,14 +757,13 @@ function replaceTaskPorts(revision: RevisionView, target: GraphTarget, nodeId: s
 
     for (const [name, mapping] of Object.entries(inputs)) {
       if (mapping.kind != 'sources') continue
-      const sources = mapping.sources.flatMap((source) => {
-        if (source.kind != 'node' || source.nodeId != nodeId) return [source]
-        if (outputRename != null && source.output == outputRename[0]) return [{ ...source, output: outputRename[1] }]
-        return outputNames.has(source.output) ? [source] : []
+      const sources = mapping.sources.map((source) => {
+        if (source.kind != 'node' || source.nodeId != nodeId) return source
+        if (outputRename != null && source.output == outputRename[0]) return { ...source, output: outputRename[1] }
+        return source
       })
-      if (sources.length == mapping.sources.length && sources.every((source, index) => source === mapping.sources[index])) continue
-      if (sources.length == 0) delete inputs[name]
-      else inputs[name] = { kind: 'sources', sources }
+      if (sources.every((source, index) => source === mapping.sources[index])) continue
+      inputs[name] = { kind: 'sources', sources }
     }
 
     if (currentNodeId == nodeId && current.task != null) {

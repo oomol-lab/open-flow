@@ -247,7 +247,7 @@
       "checkFailed": "无法检查此来源。",
       "select": "选择输入来源",
       "title": "输入来源",
-      "sourceMissing": "找不到“{{source}}”，请重新选择。",
+      "sourceMissing": "原输入来源已不存在，请重新选择。",
       "outputMissing": "“{{source}}”中找不到“{{output}}”，请重新选择。",
       "notReady": "运行到这里时，“{{source}} {{handle}}”可能还没有值。",
       "sourceConflict": "这些字段可能同时有值：{{sources}}。这里只能取一个。",
