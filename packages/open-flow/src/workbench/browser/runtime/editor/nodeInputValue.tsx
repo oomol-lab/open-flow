@@ -9,6 +9,7 @@ import type { InputSourceQuery } from '../revisionView.ts'
 import { useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { variableInputCompatible } from '../../../../flow/common/schema.ts'
+import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
 import { ValueEditor, ValueEditorFeedback } from '../../../../form/browser/valueEditor.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import {
@@ -53,9 +54,9 @@ export interface NodeInputUpstreamSources {
 const draftIssue = () => {}
 const variableSource = (name: string) => JSON.stringify(['variable', name])
 const upstreamSource = (nodeId: string, output: string) => JSON.stringify(['upstream', nodeId, output])
-const sourceItemClass = 'min-h-8 gap-2 px-2 py-1 text-xs'
+const sourceItemClass = `${selectionMenuItemClass} gap-2 px-2`
 const sourceEmptyItemClass = `${sourceItemClass} font-normal text-muted-foreground data-disabled:opacity-100`
-const sourceSubTriggerClass = 'min-h-8 gap-2 px-2 py-1 text-xs'
+const sourceSubTriggerClass = sourceItemClass
 
 function inputSourceIssue(check: InputSourceCheck | undefined, source: NodeInputUpstreamSources['current'][number], t: TFunction): string | undefined {
   switch (check?.kind) {
@@ -245,14 +246,9 @@ export function NodeInputValue({
           />
           <TooltipContent container={sourcePortal}>{t('inspector.sources.title')}</TooltipContent>
         </Tooltip>
-        <DropdownMenuContent
-          align="start"
-          sideOffset={6}
-          className="w-44 min-w-44 rounded-[var(--ui-control-radius,var(--ui-radius))] p-1"
-          container={sourcePortal}
-        >
+        <DropdownMenuContent align="start" sideOffset={6} className={`w-44 min-w-44 ${selectionMenuContentClass}`} container={sourcePortal}>
           <div className="px-2 py-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">{t('inspector.sources.title')}</div>
-          <DropdownMenuSeparator className="mx-1 bg-border/50" />
+          <DropdownMenuSeparator className="mx-2 bg-border/50" />
           <DropdownMenuRadioGroup
             value={sourceKind === 'literal' ? literalSource : ''}
             onValueChange={() => {
@@ -267,11 +263,11 @@ export function NodeInputValue({
           </DropdownMenuRadioGroup>
           {variableCompatible ? (
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger className={`${sourceSubTriggerClass} ${sourceKind === 'variable' ? 'bg-accent/60' : ''}`}>
+              <DropdownMenuSubTrigger className={`${sourceSubTriggerClass} ${sourceKind === 'variable' ? 'bg-accent' : ''}`}>
                 <i aria-hidden="true" className="i-heroicons:variable-20-solid size-3.5 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate">{t('nodeInput.variable')}</span>
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-48 min-w-48 rounded-[var(--ui-control-radius,var(--ui-radius))] p-1" container={sourcePortal}>
+              <DropdownMenuSubContent className={`w-48 min-w-48 ${selectionMenuContentClass}`} container={sourcePortal}>
                 <DropdownMenuRadioGroup
                   value={sourceKind === 'variable' ? currentSource : ''}
                   onValueChange={(next) => {
@@ -311,7 +307,7 @@ export function NodeInputValue({
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           ) : (
-            <DropdownMenuItem className={`${sourceItemClass} data-disabled:opacity-70 ${sourceKind === 'variable' ? 'bg-accent/60' : ''}`} disabled>
+            <DropdownMenuItem className={`${sourceItemClass} data-disabled:opacity-70 ${sourceKind === 'variable' ? 'bg-accent' : ''}`} disabled>
               <i aria-hidden="true" className="i-heroicons:variable-20-solid size-3.5 shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1 truncate">{t('nodeInput.variable')}</span>
               <span className="ml-auto flex h-4 shrink-0 items-center justify-end text-right text-[10px] leading-4 text-muted-foreground">
@@ -319,7 +315,7 @@ export function NodeInputValue({
               </span>
             </DropdownMenuItem>
           )}
-          <DropdownMenuSeparator className="mx-1 bg-border/50" />
+          <DropdownMenuSeparator className="mx-2 bg-border/50" />
           {candidates.pending || candidates.failed ? (
             <DropdownMenuItem className={sourceEmptyItemClass} disabled>
               {t(candidates.failed ? 'inspector.sources.loadFailed' : 'inspector.sources.loading')}
@@ -335,7 +331,7 @@ export function NodeInputValue({
           {upstream?.groups.map((group) => (
             <DropdownMenuSub key={group.nodeId}>
               <DropdownMenuSubTrigger
-                className={`${sourceSubTriggerClass} ${connected && upstream.current.some((source) => source.nodeId === group.nodeId) ? 'bg-accent/60' : ''}`}
+                className={`${sourceSubTriggerClass} ${connected && upstream.current.some((source) => source.nodeId === group.nodeId) ? 'bg-accent' : ''}`}
               >
                 <ContentIcon
                   src={group.icon}
@@ -344,7 +340,7 @@ export function NodeInputValue({
                 />
                 <span className="min-w-0 flex-1 truncate">{group.nodeName}</span>
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-48 min-w-48 rounded-[var(--ui-control-radius,var(--ui-radius))] p-1" container={sourcePortal}>
+              <DropdownMenuSubContent className={`w-48 min-w-48 ${selectionMenuContentClass}`} container={sourcePortal}>
                 <DropdownMenuRadioGroup
                   value={sourceKind === 'upstream' && upstream.current.length === 1 && upstream.current[0]?.nodeId === group.nodeId ? currentSource : ''}
                   onValueChange={(next) => {

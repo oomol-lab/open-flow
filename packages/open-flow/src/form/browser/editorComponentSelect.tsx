@@ -6,8 +6,9 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, Select
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/tooltip.tsx'
 import { editorComponent, editorGroups, schemaForEditor } from '../common/editorComponent.ts'
 import { EditorComponentIcon } from './editorComponentIcon.tsx'
-import { fieldSelectTriggerClass, selectionMenuRowClass } from './fieldSelect.tsx'
+import { fieldSelectTriggerClass } from './fieldSelect.tsx'
 import { FieldTypeDisplay } from './fieldTypeDisplay.tsx'
+import { selectionMenuContentClass, selectionMenuItemClass } from './selectionMenuStyles.ts'
 
 export function EditorComponentSelect({
   schema,
@@ -80,13 +81,18 @@ export function EditorComponentSelect({
           </TooltipTrigger>
           {compact && <TooltipContent container={container}>{label}</TooltipContent>}
         </Tooltip>
-        <SelectContent container={container} align="start" alignItemWithTrigger={false} className="min-w-44 p-2 [scrollbar-width:thin]">
+        <SelectContent
+          container={container}
+          align="start"
+          alignItemWithTrigger={false}
+          className={`min-w-44 [scrollbar-width:thin] ${selectionMenuContentClass}`}
+        >
           {Object.entries(editorGroups).map(([group, components], index) => (
             <Fragment key={group}>
               {index > 0 && <SelectSeparator className="mx-2 bg-border/50" />}
               <SelectGroup aria-label={t(`valueEditor.componentGroups.${group}`)} className="p-0">
                 {components.map((component) => (
-                  <SelectItem key={component} value={component} className={selectionMenuRowClass}>
+                  <SelectItem key={component} value={component} className={selectionMenuItemClass}>
                     {showIcon && <EditorComponentIcon component={component} />}
                     {t(`valueEditor.components.${component}`)}
                   </SelectItem>

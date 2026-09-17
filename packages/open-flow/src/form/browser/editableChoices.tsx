@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../../ui/browser/popove
 import { SelectChevron } from '../../ui/browser/select.tsx'
 import { enumIndex } from '../common/choices.ts'
 import { ChoiceOptions } from './choiceOptions.tsx'
-import { selectionMenuRowClass } from './fieldSelect.tsx'
+import { selectionMenuContentClass, selectionMenuItemClass } from './selectionMenuStyles.ts'
 
 /** A selection and its definition share one popup, with separate selection and editing views. */
 export function EditableChoices({
@@ -94,7 +94,7 @@ export function EditableChoices({
           container={container}
           align="start"
           aria-label={`${label} ${t('valueEditor.choiceOptions')}`}
-          className="w-(--anchor-width) min-w-48 max-w-[calc(100vw-24px)] gap-1 rounded-[var(--ui-control-radius,calc(var(--ui-radius)_+_2px))] p-1"
+          className={`w-(--anchor-width) min-w-48 max-w-[calc(100vw-24px)] gap-1 ${selectionMenuContentClass}`}
         >
           <div ref={popup} className="flex flex-col">
             {editing && onOptionsChange ? (
@@ -117,7 +117,7 @@ export function EditableChoices({
                     {options.map((option, index) => (
                       <label
                         key={index}
-                        className={`relative flex cursor-default items-center gap-2 rounded-[var(--ui-control-radius,var(--ui-radius))] px-2 focus-within:bg-accent ${selectionMenuRowClass}`}
+                        className={`relative flex cursor-default items-center gap-2 px-2 focus-within:bg-accent ${selectionMenuItemClass}`}
                         onPointerMove={(event) => {
                           if (event.pointerType === 'mouse') event.currentTarget.querySelector('input')?.focus({ preventScroll: true })
                         }}
@@ -145,14 +145,14 @@ export function EditableChoices({
                   </div>
                 )}
                 {onOptionsChange && !empty && <div role="separator" className="mx-2 my-1 h-px bg-border/50" />}
-                {empty && !onOptionsChange && <span className={`px-2 text-muted-foreground ${selectionMenuRowClass}`}>{t('valueEditor.noOptions')}</span>}
+                {empty && !onOptionsChange && <span className={`px-2 text-muted-foreground ${selectionMenuItemClass}`}>{t('valueEditor.noOptions')}</span>}
                 {onOptionsChange && (
                   <div>
                     <Button
                       type="button"
                       variant={empty ? 'destructive' : 'ghost'}
                       size="sm"
-                      className={`w-full justify-start px-2 ${selectionMenuRowClass}`}
+                      className={`w-full justify-start px-2 ${selectionMenuItemClass}`}
                       onPointerMove={(event) => {
                         if (event.pointerType === 'mouse') event.currentTarget.focus({ preventScroll: true })
                       }}

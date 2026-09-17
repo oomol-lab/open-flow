@@ -4,7 +4,8 @@ import type { TriggerSchedule } from '../api.ts'
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
-import { FieldSelect, fieldSelectTriggerClass, selectionMenuRowClass } from '../../../../form/browser/fieldSelect.tsx'
+import { FieldSelect, fieldSelectTriggerClass } from '../../../../form/browser/fieldSelect.tsx'
+import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
 import { cronDescription } from '../../../../trigger/browser/cronDescription.ts'
 import { selectableTimeZones, timeZoneLabel, timeZoneLongLabel, timeZoneOffset, timeZoneOffsetMinutes } from '../../../../trigger/browser/timeZones.ts'
 import { validateCronExpression } from '../../../../trigger/common/cron.ts'
@@ -169,9 +170,9 @@ function TimeZoneSelect({
         <SelectTrigger id={id} size="field" aria-label={label} className={fieldSelectTriggerClass}>
           <SelectValue>{timeZoneLabel(value, t, language)}</SelectValue>
         </SelectTrigger>
-        <SelectContent container={container} align="start" alignItemWithTrigger={false} className="p-1">
+        <SelectContent container={container} align="start" alignItemWithTrigger={false} className={selectionMenuContentClass}>
           {timezones.map((timezone) => (
-            <SelectItem key={timezone} value={timezone} className={selectionMenuRowClass}>
+            <SelectItem key={timezone} value={timezone} className={selectionMenuItemClass}>
               <span className="flex w-full min-w-0 items-baseline gap-3">
                 <span className="w-[72px] shrink-0 font-mono text-[11px] text-muted-foreground">{timeZoneOffset(timezone, at) ?? '—'}</span>
                 <span className="min-w-0 flex-1 truncate">{timeZoneLongLabel(timezone, language)}</span>

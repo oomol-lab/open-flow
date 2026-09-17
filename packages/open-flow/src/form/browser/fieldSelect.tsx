@@ -4,8 +4,7 @@ import { Children, isValidElement, useState } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/browser/select.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/tooltip.tsx'
 import { FieldTypeDisplay } from './fieldTypeDisplay.tsx'
-
-export const selectionMenuRowClass = 'min-h-7 py-1 text-xs leading-5 font-normal'
+import { selectionMenuContentClass, selectionMenuItemClass } from './selectionMenuStyles.ts'
 
 export const fieldSelectTriggerClass = 'w-full min-w-0 px-2 text-xs font-normal text-foreground'
 
@@ -92,11 +91,11 @@ export function FieldSelect({
         ) : (
           trigger
         )}
-        <SelectContent container={container} align="start" alignItemWithTrigger={false} className="p-1">
+        <SelectContent container={container} align="start" alignItemWithTrigger={false} className={selectionMenuContentClass}>
           {options
             .filter((option) => !option.disabled)
             .map((option) => (
-              <SelectItem key={option.value} value={option.value} disabled={option.disabled} className={selectionMenuRowClass}>
+              <SelectItem key={option.value} value={option.value} disabled={option.disabled} className={selectionMenuItemClass}>
                 {icons?.[option.value] && <i aria-hidden="true" className={`${icons[option.value]} inline-block shrink-0 text-base`} />}
                 {option.label}
               </SelectItem>
