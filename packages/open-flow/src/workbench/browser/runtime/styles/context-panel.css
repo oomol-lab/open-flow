@@ -551,10 +551,14 @@
     }
 
     [data-slot='field-label'] {
-      color: var(--ui-muted-foreground);
+      color: var(--ui-foreground);
       font-size: 12px;
       font-weight: 400;
       line-height: 18px;
+    }
+
+    [data-slot='field']:has(> [data-slot='input'][readonly], > [data-slot='native-select']:disabled) > [data-slot='field-label'] {
+      color: var(--ui-muted-foreground);
     }
 
     [data-slot='input'],

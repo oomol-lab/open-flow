@@ -178,39 +178,41 @@ function GeneralSettings({
     <Field className="inspector-field-section" data-inspector-section="node">
       <FieldLabel className="inspector-section-title">{t('inspector.node.title')}</FieldLabel>
       <div className="node-settings">
-        <Field data-invalid={limitError != null}>
-          <FieldLabel htmlFor={`node-${nodeId}-limit`}>{t('inspector.node.maxExecutions')}</FieldLabel>
-          <Input
-            aria-invalid={limitError != null}
-            readOnly={disabled}
-            id={`node-${nodeId}-limit`}
-            min="1"
-            step="1"
-            onChange={(event) => setLimit(event.target.value)}
-            onBlur={(event) => saveLimit(event.currentTarget.value)}
-            placeholder="1000"
-            type="number"
-            value={limit}
-          />
-          {limitError != null && <FieldError>{limitError}</FieldError>}
-        </Field>
-        {node.kind != 'approval' && node.kind != 'wait' && (
-          <Field data-invalid={error != null}>
-            <FieldLabel htmlFor={inputId}>{t('inspector.node.timeout')}</FieldLabel>
+        <FieldGroup>
+          <Field data-invalid={limitError != null}>
+            <FieldLabel htmlFor={`node-${nodeId}-limit`}>{t('inspector.node.maxExecutions')}</FieldLabel>
             <Input
-              aria-invalid={error != null}
+              aria-invalid={limitError != null}
               readOnly={disabled}
-              id={inputId}
+              id={`node-${nodeId}-limit`}
               min="1"
-              onChange={(event) => setTimeoutValue(event.target.value)}
-              onBlur={(event) => save(event.currentTarget.value)}
-              placeholder={t('common.default')}
+              step="1"
+              onChange={(event) => setLimit(event.target.value)}
+              onBlur={(event) => saveLimit(event.currentTarget.value)}
+              placeholder="1000"
               type="number"
-              value={timeout}
+              value={limit}
             />
-            {error != null && <FieldError>{error}</FieldError>}
+            {limitError != null && <FieldError>{limitError}</FieldError>}
           </Field>
-        )}
+          {node.kind != 'approval' && node.kind != 'wait' && (
+            <Field data-invalid={error != null}>
+              <FieldLabel htmlFor={inputId}>{t('inspector.node.timeout')}</FieldLabel>
+              <Input
+                aria-invalid={error != null}
+                readOnly={disabled}
+                id={inputId}
+                min="1"
+                onChange={(event) => setTimeoutValue(event.target.value)}
+                onBlur={(event) => save(event.currentTarget.value)}
+                placeholder={t('common.default')}
+                type="number"
+                value={timeout}
+              />
+              {error != null && <FieldError>{error}</FieldError>}
+            </Field>
+          )}
+        </FieldGroup>
       </div>
     </Field>
   )
