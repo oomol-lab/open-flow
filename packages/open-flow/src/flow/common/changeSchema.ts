@@ -342,21 +342,25 @@ const variants = new Map(
 )
 const operations = z.array(z.union([...variants.values()])).min(1)
 
+export function parseOperation<Value>(candidate: unknown, index: number, parse: (value: unknown) => Value): Value {
+  try {
+    return parse(candidate)
+  } catch (error) {
+    if (!(error instanceof z.ZodError)) throw error
+    throw new TypeError(`operations[${index}]: ${error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`, { cause: error })
+  }
+}
+
+export function decodeChangeOperation(candidate: unknown, index: number): ChangeOperation {
+  const { kind } = parseOperation(candidate, index, z.object({ kind: text }).parse)
+  const schema = variants.get(kind)
+  if (schema == null) throw new TypeError(`operations[${index}]: Unknown operation ${JSON.stringify(kind)}.`)
+  return parseOperation<unknown>(candidate, index, schema.parse) as ChangeOperation
+}
+
 export function decodeChangeOperations(value: unknown): readonly ChangeOperation[] {
   checkJsonDepth(value)
-  return z
-    .array(z.unknown())
-    .min(1)
-    .parse(value)
-    .map((candidate, index) => {
-      const { kind } = z.object({ kind: text }).parse(candidate)
-      const schema = variants.get(kind)
-      if (schema == null) throw new TypeError(`operations[${index}]: Unknown operation ${JSON.stringify(kind)}.`)
-      const result = schema.safeParse(candidate)
-      if (!result.success)
-        throw new TypeError(`operations[${index}]: ${result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`)
-      return result.data as ChangeOperation
-    })
+  return z.array(z.unknown()).min(1).parse(value).map(decodeChangeOperation)
 }
 
 export function changeOperationsSchema(kind?: string): JsonValue {

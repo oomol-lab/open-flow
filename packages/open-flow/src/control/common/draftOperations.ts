@@ -1,7 +1,8 @@
 import type { ChangeOperation, JsonValue, TriggerKeySnapshot, TriggerSchedule } from '../../flow/common/change.ts'
 
 import { z } from 'zod'
-import { changeOperationsSchema, decodeChangeOperations } from '../../flow/common/change.ts'
+import { changeOperationsSchema } from '../../flow/common/change.ts'
+import { decodeChangeOperation, parseOperation } from '../../flow/common/changeSchema.ts'
 import { checkJsonDepth } from '../../flow/common/json.ts'
 import { createProviderTrigger } from '../../flow/common/nodeChanges.ts'
 import { triggerScheduleSchema } from '../../flow/common/triggerScheduleSchema.ts'
@@ -38,9 +39,9 @@ export function decodeDraftOperations(value: unknown): readonly DraftOperation[]
     .array(z.unknown())
     .min(1)
     .parse(value)
-    .map((candidate) => {
-      const { kind } = z.object({ kind: text }).parse(candidate)
-      return kind == 'graph.trigger.create' ? triggerCreate.parse(candidate) : decodeChangeOperations([candidate])[0]!
+    .map((candidate, index) => {
+      const { kind } = parseOperation(candidate, index, z.object({ kind: text }).parse)
+      return kind == 'graph.trigger.create' ? parseOperation(candidate, index, triggerCreate.parse) : decodeChangeOperation(candidate, index)
     })
 }
 
