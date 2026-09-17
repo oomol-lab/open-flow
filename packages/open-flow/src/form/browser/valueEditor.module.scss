@@ -572,7 +572,7 @@
       > [data-object-field-content]
       > .root
       > .header
-      > :is(.toggleControl, .leadingControl:not(:empty))
+      > :is(.toggleControl:not(:empty), .leadingControl:not(:empty))
   )::before,
   &:has(
     > .collection
@@ -581,7 +581,7 @@
       > [data-array-field-content]
       > .root
       > .header
-      > :is(.toggleControl, .leadingControl:not(:empty), .arrayIndex)
+      > :is(.toggleControl:not(:empty), .leadingControl:not(:empty), .arrayIndex)
   )::before {
     width: 6px;
   }

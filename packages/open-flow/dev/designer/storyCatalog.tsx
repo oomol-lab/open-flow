@@ -32,6 +32,7 @@ import { scheduleStory } from './schedule.tsx'
 import { stories } from './stories.tsx'
 import { triggerConfigStory } from './triggerConfig.tsx'
 import { triggerStories } from './triggerStories.tsx'
+import { valueEditorDangerStory } from './valueEditorDanger.tsx'
 import { additionalInputsStory, lazyFieldsStory, groupedInputsStory, outputPortsStory, valueNodeStory } from './valueNode.tsx'
 import { variablesStory } from './variables.tsx'
 import { waitRunsStory } from './waitRuns.tsx'
@@ -104,6 +105,7 @@ export const labStories: readonly FrontendStory[] = [
   eventPickerStory,
   nodeInputStory,
   valueNodeStory,
+  valueEditorDangerStory,
   fieldTypesStory,
   lazyFieldsStory,
   fieldSettingsStory,
