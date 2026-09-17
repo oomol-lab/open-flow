@@ -289,7 +289,7 @@ const pathsByGraph = new WeakMap<
   {
     readonly paths: Map<string, readonly Route[]>
     readonly ancestors: Map<string, Set<string>>
-    readonly resolvedWaits: Map<string, Set<string>>
+    readonly resolutionOutputs: Map<string, Set<string>>
   }
 >()
 
@@ -305,12 +305,16 @@ function routesCompatible(left: Route, right: Route): boolean {
   return Object.entries(left).every(([key, value]) => right[key] == null || right[key] == value)
 }
 
+function resolutionOutputKey(nodeId: string, output: string): string {
+  return JSON.stringify([nodeId, output])
+}
+
 function graphPaths(graph: Graph) {
   const cached = pathsByGraph.get(graph)
   if (cached != null) return cached
   const paths = new Map<string, readonly Route[]>()
   const ancestors = new Map<string, Set<string>>()
-  const resolvedWaits = new Map<string, Set<string>>()
+  const resolutionOutputs = new Map<string, Set<string>>()
   const incoming = new Map<string, Graph['edges'][number][]>()
   for (const edge of graph.edges) {
     const edges = incoming.get(edge.target) ?? []
@@ -325,12 +329,12 @@ function graphPaths(graph: Graph) {
       const node = graph.nodes[id]!
       const edges = incoming.get(id) ?? []
       const parents = new Set<string>()
-      const decisions = new Set<string>()
+      const resolutions = new Set<string>()
       const routes: Route[] = []
       for (const edge of edges) {
         parents.add(edge.source)
-        for (const waitId of resolvedWaits.get(edge.source) ?? []) decisions.add(waitId)
-        if (isResolutionNode(graph.nodes[edge.source]) && edge.sourceHandle != 'pending') decisions.add(edge.source)
+        for (const output of resolutionOutputs.get(edge.source) ?? []) resolutions.add(output)
+        if (isResolutionNode(graph.nodes[edge.source]) && edge.sourceHandle != null) resolutions.add(resolutionOutputKey(edge.source, edge.sourceHandle))
         for (const parent of ancestors.get(edge.source) ?? []) parents.add(parent)
         for (const route of paths.get(edge.source) ?? []) {
           const next =
@@ -348,17 +352,17 @@ function graphPaths(graph: Graph) {
       const previous = paths.get(id) ?? []
       if (
         parents.size != (ancestors.get(id)?.size ?? 0) ||
-        decisions.size != (resolvedWaits.get(id)?.size ?? 0) ||
+        resolutions.size != (resolutionOutputs.get(id)?.size ?? 0) ||
         nextRoutes.length != previous.length ||
         nextRoutes.some((route) => !previous.some((known) => routeCovers(known, route) && routeCovers(route, known)))
       )
         changed = true
       ancestors.set(id, parents)
-      resolvedWaits.set(id, decisions)
+      resolutionOutputs.set(id, resolutions)
       paths.set(id, nextRoutes)
     }
   }
-  const analysis = { ancestors, paths, resolvedWaits }
+  const analysis = { ancestors, paths, resolutionOutputs }
   pathsByGraph.set(graph, analysis)
   return analysis
 }
@@ -382,8 +386,7 @@ function mappingAvailable(graph: Graph, target: string | undefined, mapping: Inp
       (source) =>
         source.kind == 'node' &&
         isResolutionNode(graph.nodes[source.nodeId]) &&
-        source.output != 'pending' &&
-        !analysis.resolvedWaits.get(target)?.has(source.nodeId),
+        !analysis.resolutionOutputs.get(target)?.has(resolutionOutputKey(source.nodeId, source.output)),
     )
   )
     return false
@@ -446,7 +449,7 @@ export function checkInputSource(
   if (input == null) return { kind: 'not-ready' }
   const analysis = graphPaths(graph)
   if (analysis.ancestors.get(target)?.has(source.nodeId) !== true) return { kind: 'not-ready' }
-  if (isResolutionNode(node) && source.output != 'pending' && !analysis.resolvedWaits.get(target)?.has(source.nodeId)) return { kind: 'not-ready' }
+  if (isResolutionNode(node) && !analysis.resolutionOutputs.get(target)?.has(resolutionOutputKey(source.nodeId, source.output))) return { kind: 'not-ready' }
   const result = comparePorts(output, input)
   if (result.kind == 'compatible') return { kind: 'available' }
   return result.kind == 'incompatible' ? { kind: 'schema', mismatch: result.mismatch } : { kind: 'schema-error' }

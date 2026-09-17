@@ -1,3 +1,4 @@
+import { isLogicEmptyObject } from '../../json-schema-subset/compiler/common.ts'
 import { SubsetCompareResult } from '../../json-schema-subset/index.ts'
 import { createSchemaComparer } from './schemaComparer.ts'
 
@@ -41,8 +42,16 @@ export function normalizeNullableSchemaPath(
 export function compareJSONSchema(fromSchema: CompareSchemaInfo, toSchema: CompareSchemaInfo): CompareResult {
   try {
     const error: { message?: string } = {}
-    const from = comparer.compile(nullableSchema(resolveLocalRefs(fromSchema.schema), fromSchema.nullable), { ...fromSchema, error })
-    const to = comparer.compile(nullableSchema(resolveLocalRefs(toSchema.schema), toSchema.nullable), { ...toSchema, error })
+    const fromResolved = resolveLocalRefs(fromSchema.schema)
+    const toResolved = resolveLocalRefs(toSchema.schema)
+    // The subset compiler ignores unknown annotation keywords, including every `ui:*`
+    // extension. Preserve the direction of an unconstrained schema before AnySchema's
+    // symmetric plugin comparison: any target accepts all sources, while an any source
+    // cannot guarantee a constrained target.
+    if (isLogicEmptyObject(toResolved)) return { kind: 'compatible' }
+    if (isLogicEmptyObject(fromResolved)) return { kind: 'incompatible' }
+    const from = comparer.compile(nullableSchema(fromResolved, fromSchema.nullable), { ...fromSchema, error })
+    const to = comparer.compile(nullableSchema(toResolved, toSchema.nullable), { ...toSchema, error })
     const { result, errorPath } = comparer.isSubset(from, to)
     if (result == SubsetCompareResult.True) {
       return { kind: 'compatible' }

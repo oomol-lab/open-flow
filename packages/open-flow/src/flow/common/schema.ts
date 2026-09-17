@@ -68,10 +68,9 @@ export type PortCompareResult =
   | { readonly kind: 'incompatible'; readonly mismatch: SchemaMismatch }
 
 function compareSchemas(sourceSchema: JsonValue, targetSchema: JsonValue, sourceNullable = false, targetNullable = false): SchemaCompareResult {
-  if (targetSchema === true || jsonEqual(targetSchema, {})) return { kind: 'compatible' }
-  if (sourceSchema === true || jsonEqual(sourceSchema, {})) return { kind: 'incompatible' }
+  if (targetSchema === true) return { kind: 'compatible' }
   if (sourceSchema === false || targetSchema === false) return { kind: 'incompatible' }
-  const source = schemaObject(sourceSchema)
+  const source = sourceSchema === true ? {} : schemaObject(sourceSchema)
   const target = schemaObject(targetSchema)
   if (source == null || target == null) return { kind: 'compare-error', message: 'Port schema must be an object or boolean.' }
   const result = compareJSONSchema(

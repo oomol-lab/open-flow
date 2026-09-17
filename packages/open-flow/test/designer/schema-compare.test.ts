@@ -5,6 +5,17 @@ import { compareJSONSchema, normalizeNullableSchemaPath } from '../../src/manife
 const port = (jsonSchema: Parameters<typeof comparePorts>[0]['jsonSchema'], nullable = false) => ({ handle: 'value', jsonSchema, nullable })
 
 describe('Port compatibility diagnostics', () => {
+  it('treats the JSON editor schema as accepting any upstream JSON value', () => {
+    expect(comparePorts(port({}, true), port({ 'ui:widget': 'any' }, true))).toEqual({ kind: 'compatible' })
+    expect(comparePorts(port({ type: 'object' }), port({ 'title': 'Payload', 'description': 'Any JSON value.', 'ui:widget': 'any' }))).toEqual({
+      kind: 'compatible',
+    })
+    expect(comparePorts(port({ 'ui:widget': 'any' }), port({ type: 'object' }))).toEqual({
+      kind: 'incompatible',
+      mismatch: { kind: 'keyword', keyword: 'type', path: [], source: undefined, target: 'object' },
+    })
+  })
+
   it('describes a root type mismatch even when a nullable wrapper hides the comparison path', () => {
     expect(comparePorts(port({ type: 'string' }), port({ type: 'number' }, true))).toEqual({
       kind: 'incompatible',
@@ -38,6 +49,42 @@ describe('Port compatibility diagnostics', () => {
 })
 
 describe('In-process schema compare', () => {
+  it('compares ui-only schemas as directional unconstrained schemas', () => {
+    expect(compareJSONSchema({ schema: { 'ui:widget': 'any' }, packageId: undefined }, { schema: { type: 'object' }, packageId: undefined })).toEqual({
+      kind: 'incompatible',
+    })
+    expect(compareJSONSchema({ schema: { type: 'object' }, packageId: undefined }, { schema: { 'ui:widget': 'any' }, packageId: undefined })).toEqual({
+      kind: 'compatible',
+    })
+  })
+
+  it('ignores ui-prefixed keywords at every schema level', () => {
+    expect(
+      compareJSONSchema(
+        {
+          schema: {
+            'type': 'object',
+            'properties': {
+              'payload': { 'type': 'string', 'ui:widget': 'text', 'ui:options': { rows: 4 } },
+              'ui:value': { type: 'number' },
+            },
+            'required': ['payload', 'ui:value'],
+            'ui:order': ['payload', 'ui:value'],
+          },
+          packageId: undefined,
+        },
+        {
+          schema: {
+            type: 'object',
+            properties: { 'payload': { type: 'string' }, 'ui:value': { type: 'number' } },
+            required: ['payload', 'ui:value'],
+          },
+          packageId: undefined,
+        },
+      ),
+    ).toEqual({ kind: 'compatible' })
+  })
+
   it('uses the extracted comparer for compatible and incompatible schemas', () => {
     expect(compareJSONSchema({ schema: { type: 'string' }, packageId: undefined }, { schema: { type: 'string' }, packageId: undefined })).toEqual({
       kind: 'compatible',

@@ -275,6 +275,36 @@ it('does not treat eventual action values as available on the notification path'
   expect(availableOutputs(content.document, graph, 'notify')).toEqual({ wait: ['pending'] })
 })
 
+it('only offers resolution outputs on their reachable paths', () => {
+  const wait = { kind: 'wait' as const, inputs: {}, input: { ...port, handle: 'value', value: null }, prompt: 'Continue?' }
+  const approval = { kind: 'approval' as const, inputs: {}, input: { ...port, handle: 'value', value: null }, prompt: 'Approve?' }
+  const jsonTask = { ...task, task: { ...task.task, inputs: [{ ...port, handle: 'input', jsonSchema: { 'ui:widget': 'any' } }] } }
+  const graph: Graph = {
+    nodes: {
+      wait,
+      approval,
+      waitNotify: task,
+      continue: jsonTask,
+      approvalNotify: task,
+      approve: task,
+      reject: task,
+    },
+    edges: [
+      { source: 'wait', sourceHandle: 'pending', target: 'waitNotify' },
+      { source: 'wait', sourceHandle: 'continue', target: 'continue' },
+      { source: 'approval', sourceHandle: 'pending', target: 'approvalNotify' },
+      { source: 'approval', sourceHandle: 'approve', target: 'approve' },
+      { source: 'approval', sourceHandle: 'reject', target: 'reject' },
+    ],
+  }
+  const content = revision(graph)
+  expect(availableOutputs(content.document, graph, 'waitNotify', 'input')).toEqual({ wait: ['pending'] })
+  expect(availableOutputs(content.document, graph, 'continue', 'input')).toEqual({ wait: ['continue'] })
+  expect(availableOutputs(content.document, graph, 'approvalNotify', 'input')).toEqual({ approval: ['pending'] })
+  expect(availableOutputs(content.document, graph, 'approve', 'input')).toEqual({ approval: ['approve'] })
+  expect(availableOutputs(content.document, graph, 'reject', 'input')).toEqual({ approval: ['reject'] })
+})
+
 it.each([true, false])('runs with null from either an available nullable source or a missing branch source: %s', async (takeSource) => {
   const prepared = await prepareFlow(
     revision({
