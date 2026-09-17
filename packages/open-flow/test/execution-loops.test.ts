@@ -1,5 +1,5 @@
-import type { FlowRunOptions, SchedulerEvent } from '../src/execution/common/scheduler.ts'
-import type { Graph, GraphNode, RevisionContent } from '../src/flow/common/change.ts'
+import type { FlowRunOptions, SchedulerEvent, WaitRequest } from '../src/execution/common/scheduler.ts'
+import type { Graph, GraphNode, RevisionContent, WaitAction } from '../src/flow/common/change.ts'
 
 import * as Effect from 'effect/Effect'
 import { describe, expect, it } from 'vitest'
@@ -178,6 +178,69 @@ describe('Repeated node executions', () => {
     const completed = events.filter((event) => event.type == 'node.completed').filter((event) => event.nodeId == 'pause')
     expect(completed.map((event) => event.outputs.continue).toSorted()).toEqual(['a', 'b'])
     expect(new Set(completed.map((event) => event.jobId)).size).toBe(2)
+  })
+
+  it('notifies once per Wait entry, never again on checkpoint recovery or resolution', async () => {
+    const prepared = await prepare(
+      revision({
+        nodes: {
+          start: { kind: 'manual', name: 'Start' },
+          pause: { ...pause, actions: ['approve', 'reject'], maxExecutions: 2 },
+          send: { kind: 'task', inputs: {}, task: { name: 'Send notification', moduleId: 'counter', inputs: [], outputs: [] } },
+        },
+        edges: [
+          { source: 'start', target: 'pause' },
+          { source: 'pause', sourceHandle: 'notification', target: 'send' },
+          { source: 'pause', sourceHandle: 'approve', target: 'pause' },
+        ],
+      }),
+    )
+    const events: SchedulerEvent[] = []
+    const requests: WaitRequest[] = []
+    const decisions: Record<string, WaitAction> = {}
+    const config = {
+      ...options(events),
+      invokeTask: () => Effect.succeed({}),
+      waits: {
+        ...waitHost(decisions),
+        create: (request: WaitRequest) =>
+          Effect.sync(() => {
+            requests.push(request)
+            return {
+              value: request.value,
+              prompt: request.prompt,
+              actions: request.actions.map((action) => ({ action, url: `https://example.com/${request.waitId}/${action}` })),
+              expiresAt: '2030-01-01T00:00:00.000Z',
+            }
+          }),
+      },
+    }
+    const notifications = () => events.filter((event) => event.type == 'node.completed' && event.nodeId == 'send')
+    const first = await advanceWaiting(runFlow(prepared, config))
+    if (first.kind != 'waiting') throw new Error('Expected first wait')
+    expect(requests).toHaveLength(1)
+    expect(notifications()).toHaveLength(1)
+
+    const { trigger: _, ...resume } = config
+    const recovered = await advanceWaiting(runFlow(prepared, { ...resume, resume: { checkpoint: JSON.parse(JSON.stringify(first.checkpoint)) } }))
+    if (recovered.kind != 'waiting') throw new Error('Expected recovered wait')
+    expect(recovered.checkpoint.waits).toEqual(first.checkpoint.waits)
+    expect(requests).toHaveLength(1)
+    expect(notifications()).toHaveLength(1)
+
+    decisions[requests[0]!.waitId] = 'approve'
+    const second = await advanceWaiting(runFlow(prepared, { ...resume, resume: { checkpoint: recovered.checkpoint } }))
+    if (second.kind != 'waiting') throw new Error('Expected next loop entry')
+    expect(requests).toHaveLength(2)
+    expect(requests[1]!.waitId).not.toBe(requests[0]!.waitId)
+    expect(notifications()).toHaveLength(2)
+
+    decisions[requests[1]!.waitId] = 'reject'
+    const result = await Effect.runPromise(runFlow(prepared, { ...resume, resume: { checkpoint: second.checkpoint } }))
+    expect(result.kind).toBe('node-results')
+    expect(requests).toHaveLength(2)
+    expect(notifications()).toHaveLength(2)
+    expect(events.filter((event) => event.type == 'node.completed' && event.nodeId == 'pause')).toHaveLength(2)
   })
 
   it('shares the per-node budget across repeated calls of a Subflow in one Run', async () => {
