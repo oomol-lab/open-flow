@@ -129,6 +129,59 @@ describe('Node execution settings', () => {
 })
 
 describe('Node input ownership', () => {
+  it('resolves the selected upstream output description from the graph definition', () => {
+    const input = { handle: 'message', jsonSchema: { type: 'string' }, nullable: false }
+    const node = {
+      kind: 'condition',
+      name: 'Condition',
+      input,
+      inputs: { message: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'upstream', output: 'title' }] } },
+      cases: [],
+    }
+    const graph = {
+      nodes: {
+        condition: node,
+        upstream: {
+          kind: 'value',
+          name: 'Source',
+          values: [{ handle: 'title', description: 'The complete upstream title.', jsonSchema: { type: 'string' }, nullable: false }],
+        },
+      },
+    }
+    const element = NodeInspector({
+      variables: { enabled: true, names: [], loaded: true, loading: false, onOpen: vi.fn() },
+      connectorAuthorizationPending: false,
+      connectorLoading: false,
+      connectors: {} as never,
+      disabled: false,
+      revision: {
+        graph: () => graph,
+        inputSource: () => ({ check: vi.fn(), candidates: vi.fn() }),
+        revision: { content: { document: { graph, subflows: {}, tasks: {} } } },
+      } as never,
+      selection: { id: 'condition', kind: 'condition', node } as never,
+      store: { $: { flowId: { value: 'flow' } } } as never,
+      target: { kind: 'flow' },
+      theme: 'light',
+      triggerAuthorizationPending: false,
+      triggerConnectionLoading: false,
+      triggers: {} as never,
+    })
+    const inputs = find(element, (item) => typeof item.type === 'function' && item.type.name === 'NodeInputs')
+    const upstream = (inputs!.props as { renderSource: (handle: string) => { current: unknown[] } }).renderSource('message')
+
+    expect(upstream.current).toEqual([
+      {
+        check: undefined,
+        description: 'The complete upstream title.',
+        icon: undefined,
+        nodeId: 'upstream',
+        nodeName: 'Source',
+        output: 'title',
+      },
+    ])
+  })
+
   it.each(['approval', 'condition', 'wait', 'subflow', 'task'] as const)('resolves %s variable bindings and sends edits directly to the workspace', (kind) => {
     const setInputSource = vi.fn()
     const setInputValue = vi.fn()

@@ -35,6 +35,7 @@ export interface NodeInputUpstreamSources {
   readonly query?: InputSourceQuery
   readonly describeGroups?: (outputs: Readonly<Record<string, readonly InputSourceCandidate[]>>) => NodeInputUpstreamSources['groups']
   readonly current: readonly {
+    readonly description?: string
     readonly icon?: string
     readonly nodeId: string
     readonly nodeName: string
@@ -88,6 +89,7 @@ function SelectedSourceValue({
   readonly variables: InputVariables
 }) {
   const t = useTranslate()
+  const [tooltipContainer, setTooltipContainer] = useState<HTMLDivElement | null>(null)
   let checks: InputSourcesCheck | undefined
   let checkFailed = false
   if (upstream?.query != null && upstream.current.length > 0) {
@@ -115,11 +117,13 @@ function SelectedSourceValue({
       ? current.map((source) => `${source.nodeName} ${source.output}`).join(' / ')
       : t('nodeInput.connected')
   const selectedUpstreamIcon = connected && current?.length === 1 ? current[0]?.icon : undefined
+  const sourceTooltip = connected && current?.length ? current.map((source) => source.description?.trim() || source.output).join('\n') : undefined
   return (
     <>
       <ValueEditorFeedback error={sourceIssue}>
         {(errorId) => (
           <div
+            ref={setTooltipContainer}
             data-field-control
             data-value-control
             className={`${styles.sourceControl} flex h-[30px] min-w-0 items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-[7px] text-xs`}
@@ -139,7 +143,12 @@ function SelectedSourceValue({
                 />
               )
             )}
-            <span className="truncate">{sourceLabel}</span>
+            <Tooltip disabled={sourceTooltip == null}>
+              <TooltipTrigger render={<span className="min-w-0 flex-1 truncate" aria-description={sourceTooltip} />}>{sourceLabel}</TooltipTrigger>
+              <TooltipContent container={tooltipContainer} sideOffset={11} positionMethod="fixed" collisionBoundary={[]} className="whitespace-pre-wrap">
+                {sourceTooltip}
+              </TooltipContent>
+            </Tooltip>
           </div>
         )}
       </ValueEditorFeedback>

@@ -17,7 +17,7 @@ import type { InputVariables, NodeInputUpstreamSources } from './nodeInputValue.
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
-import { resolutionOutputPorts } from '../../../../flow/common/graph.ts'
+import { nodeOutputDescription, resolutionOutputPorts } from '../../../../flow/common/graph.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
@@ -94,13 +94,17 @@ function inputUpstreamSources({
   const mapping = selection.node.inputs[handleName]
   const sources = mapping?.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node') : []
   return {
-    current: sources.map((source) => ({
-      icon: sourceNodeIcons?.[source.nodeId],
-      nodeId: source.nodeId,
-      nodeName: graph.nodes[source.nodeId]?.name ?? source.nodeId,
-      output: source.output,
-      check: undefined,
-    })),
+    current: sources.map((source) => {
+      const node = graph.nodes[source.nodeId]
+      return {
+        description: nodeOutputDescription(revision.revision.content.document, graph, source.nodeId, source.output),
+        icon: sourceNodeIcons?.[source.nodeId],
+        nodeId: source.nodeId,
+        nodeName: node?.name ?? source.nodeId,
+        output: source.output,
+        check: undefined,
+      }
+    }),
     query: revision.inputSource(target, selection.id, handleName),
     groups: [],
     describeGroups: (candidates) =>

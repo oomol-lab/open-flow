@@ -171,6 +171,11 @@ function nodeOutputPorts(document: FlowDocument, node: GraphNode): Readonly<Reco
   }
 }
 
+export function nodeOutputDescription(document: FlowDocument, graph: Graph, nodeId: string, output: string): string | undefined {
+  const node = graph.nodes[nodeId]
+  return node == null ? undefined : nodeOutputPorts(document, node)[output]?.description
+}
+
 function checkSource(
   source: BindingSource | FlowSource | NodeSource,
   graph: Graph,

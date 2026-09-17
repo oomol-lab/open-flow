@@ -120,7 +120,11 @@ describe('Independent node inputs', () => {
     expect(onValue).not.toHaveBeenCalled()
   })
 
-  it('shows the selected upstream node icon with its value label', () => {
+  it.each([
+    ['The issue title returned by GitHub.', 'The issue title returned by GitHub.'],
+    [undefined, 'title'],
+    ['   ', 'title'],
+  ])('shows the selected upstream node icon and uses its description or port name in a tooltip', (description, tooltip) => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <NodeInputValue
@@ -130,6 +134,7 @@ describe('Independent node inputs', () => {
           upstream={{
             current: [
               {
+                description,
                 icon: 'data:application/vnd.open-flow.initials,GH',
                 nodeId: 'github',
                 nodeName: 'GitHub issue',
@@ -150,6 +155,8 @@ describe('Independent node inputs', () => {
 
     expect(markup).toContain('data-icon-kind="initials"')
     expect(markup).toContain('GitHub issue title')
+    expect(markup).toContain('data-slot="tooltip-trigger"')
+    expect(markup).toContain(`aria-description="${tooltip}"`)
   })
 
   const sourceIssues: readonly { readonly check: InputSourceCheck; readonly message: string }[] = [
