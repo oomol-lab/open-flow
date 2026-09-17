@@ -47,6 +47,27 @@ Do not apply these compact-panel dimensions to unrelated product surfaces.
 
 ## Geometry and surfaces
 
+### Stacking and overlays
+
+- `ContextPanel` is the sole stacking context shared by property-panel sections. It isolates the
+  panel from the canvas and owns this semantic order: ordinary content `0`, sticky section titles
+  `1`, hovered field feedback `2`, focused or open editors `3`, panel header `4`, and resize handle
+  `5`. Define and consume these values through the semantic custom properties in
+  `context-panel.css`; do not repeat their numeric values in field tables or editors.
+- Inputs, Outputs, settings sections, groups, and field tables must remain in the panel stacking
+  context. Do not add `isolation`, a positioned `z-index`, paint containment, transforms, filters,
+  or opacity to those wrappers without checking whether they create a stacking context. An
+  individual `ValueEditor` may isolate its internal feedback and controls because the complete
+  editor is elevated through the panel-owned hover and active layers.
+- Keep attached errors and editor popups in their existing DOM and CSS positioning model. Do not
+  introduce Portals, element measurement, scroll observers, or runtime repositioning solely to
+  escape a property-panel section. Such infrastructure requires a separate interaction or clipping
+  requirement that the panel layer contract cannot satisfy.
+- Verify a stacking change in the composed inspector, not only a standalone field table. At
+  minimum, inspect an error attached to the final Input above Outputs, an Input popup crossing the
+  Outputs title, an Outputs popup crossing the following Code or settings content, and nested
+  Object or Array feedback competing with its parent editor.
+
 - Compact field controls use a 30px height, 12px text, and 6px corner radius. Consume the panel's
   control-size and `--ui-control-radius` conventions instead of independently sizing each control.
   Collection add actions match adjacent field typography and height; copying an Options button's

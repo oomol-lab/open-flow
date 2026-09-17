@@ -2,6 +2,7 @@
 @use './fieldGeometry.scss' as geometry;
 
 .list {
+  /* Stay in the containing panel's stacking context so rows can cross section boundaries. */
   container: value-fields / inline-size;
   min-width: 0;
   --field-toggle-width: #{geometry.$toggle-width};

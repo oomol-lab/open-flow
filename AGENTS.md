@@ -49,6 +49,16 @@ Tests and Stories exercise the real behavior; their fixtures must not become par
 Before implementing or reviewing frontend components, appearance, layout, or interactions, read and
 use the project [frontend-ui skill](.agents/skills/frontend-ui/SKILL.md).
 
+Property panels use `ContextPanel` as their only cross-section stacking context. Field tables,
+groups, and section wrappers must not create stacking contexts that trap feedback or popups inside
+one Inputs, Outputs, or settings region. Individual editors may isolate their internal controls and
+feedback, but cross-section elevation must consume the semantic layers owned by
+`context-panel.css`; do not add independent z-index scales or raw escalation values. Do not add
+Portals, DOM measurement, observers, or runtime positioning solely to repair panel stacking when
+the shared CSS layer contract can express the behavior. Verify stacking changes in a composed panel
+across adjacent sections, including the final invalid input above Outputs and an Outputs menu above
+the following editor content.
+
 Lab stories support design alignment between people and AI and fast visual inspection. Lay out
 meaningful states side by side with clear labels; menus and panels under review should be visible
 on entry without repeated clicks. Use real component and Trigger definitions with deterministic

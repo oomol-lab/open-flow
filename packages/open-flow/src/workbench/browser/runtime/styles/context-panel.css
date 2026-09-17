@@ -1,9 +1,15 @@
 .open-flow-workbench {
   .context-panel {
-    /* Keep field feedback above section titles, while the panel chrome stays above every editor. */
-    --value-editor-hover-layer: 2;
-    --value-editor-active-layer: 3;
+    /* This is the sole stacking context shared by inspector sections. */
+    --context-panel-section-layer: 1;
+    --context-panel-feedback-layer: 2;
+    --context-panel-active-layer: 3;
+    --context-panel-header-layer: 4;
+    --context-panel-resizer-layer: 5;
+    --value-editor-hover-layer: var(--context-panel-feedback-layer);
+    --value-editor-active-layer: var(--context-panel-active-layer);
     position: relative;
+    isolation: isolate;
     display: flex;
     min-width: 0;
     min-height: 0;
@@ -18,7 +24,7 @@
     position: absolute;
     inset: 0 auto 0 0;
     width: 5px;
-    z-index: 5;
+    z-index: var(--context-panel-resizer-layer);
     cursor: col-resize;
     touch-action: none;
     opacity: 0;
@@ -60,7 +66,7 @@
   .context-panel > header {
     position: sticky;
     /* Header popovers must paint above the content's sticky section titles. */
-    z-index: 4;
+    z-index: var(--context-panel-header-layer);
     top: 0;
     display: flex;
     min-height: 56px;
@@ -337,7 +343,7 @@
   .inspector-section-title {
     position: sticky;
     top: 0;
-    z-index: 1;
+    z-index: var(--context-panel-section-layer);
     display: flex;
     min-height: 44px;
     width: 100%;
