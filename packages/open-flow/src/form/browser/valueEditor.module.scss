@@ -4,7 +4,8 @@
 /* Keep the attached feedback behind its control, above neighboring rows. */
 .root,
 .errorAnchor {
-  --ui-danger-border-width: 2px;
+  --ui-danger-border-width: 1px;
+  --ui-danger-focus-width: 2px;
   --value-body-inset: 0px;
   isolation: isolate;
   position: relative;
@@ -106,17 +107,19 @@
 /* The feedback base tucks under the control; its rounded border stays in front. */
 .error {
   position: absolute;
+  --error-border-width: var(--ui-danger-border-width);
+  --error-inline-outset: 0px;
   --error-overlap: var(--ui-control-radius, var(--ui-radius));
   --error-background: color-mix(in srgb, var(--ui-destructive) 92%, white);
   --error-foreground: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
-  inset: 100% 0 auto;
-  left: var(--value-body-inset, 0px);
+  inset: 100% calc(-1 * var(--error-inline-outset)) auto;
+  left: calc(var(--value-body-inset, 0px) - var(--error-inline-outset));
   z-index: -1;
   box-sizing: border-box;
   margin: calc(-1 * var(--error-overlap)) 0 0;
   // Match the Cron description card height, including this card’s borders.
-  padding: calc(var(--error-overlap) + 4px - var(--ui-danger-border-width)) 8px calc(5px - var(--ui-danger-border-width));
-  border: var(--ui-danger-border-width) solid var(--error-background);
+  padding: calc(var(--error-overlap) + 4px - var(--error-border-width)) 8px calc(5px - var(--error-border-width));
+  border: var(--error-border-width) solid var(--ui-destructive);
   border-radius: 0 0 var(--error-overlap) var(--error-overlap);
   background: var(--error-background);
   box-shadow: var(--floating-control-shadow);
@@ -145,6 +148,8 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 :is(.body:not([hidden]), .errorAnchor):has(:focus-visible) > .error,
 .root:has(#{$summary-focus}) > .summaryError > .error {
+  --error-border-width: var(--ui-danger-focus-width);
+  --error-inline-outset: calc(var(--ui-danger-focus-width) - var(--ui-danger-border-width));
   visibility: visible;
 }
 .root:not(#{$feedback-focus}):has(> :is(.body, .summary, .arrayItemType, .valueTools, .summaryError):hover) {
