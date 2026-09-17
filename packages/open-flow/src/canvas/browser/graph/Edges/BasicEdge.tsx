@@ -2,11 +2,12 @@ import styles from './BasicEdge.module.scss'
 import type { EdgeProps } from '@xyflow/react'
 import type { RFEdge } from '../../base/rfHelpers.ts'
 
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, Position } from '@xyflow/react'
+import { BaseEdge, EdgeLabelRenderer, Position, useInternalNode } from '@xyflow/react'
 import { useId, useMemo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { ErrorCircle } from '../../components/errorCircle.tsx'
 import { useCanvasStore } from '../CanvasStoreContext.tsx'
+import { connectionNodeBounds, connectionPortIndex, getConnectionPath } from './connectionPath.ts'
 import { EdgeGradient } from './EdgeGradient.tsx'
 
 export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
@@ -21,7 +22,13 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
   const targetX = props.targetX + (props.targetPosition == Position.Left ? -gap : props.targetPosition == Position.Right ? gap : 0)
   const targetY = props.targetY + (props.targetPosition == Position.Top ? -gap : props.targetPosition == Position.Bottom ? gap : 0)
 
-  const [path, labelX, labelY] = getBezierPath({
+  const sourceNode = useInternalNode(props.source)
+  const targetNode = useInternalNode(props.target)
+  const [path, labelX, labelY] = getConnectionPath({
+    sourceBounds: connectionNodeBounds(sourceNode),
+    sourcePortIndex: connectionPortIndex(sourceNode, props.sourceHandleId),
+    targetPortIndex: connectionPortIndex(targetNode, props.targetHandleId),
+    targetBounds: connectionNodeBounds(targetNode),
     sourceX: props.sourceX,
     sourceY: props.sourceY,
     sourcePosition: props.sourcePosition,

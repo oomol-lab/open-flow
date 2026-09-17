@@ -2,14 +2,16 @@ import type { ConnectionLineComponentProps } from '@xyflow/react'
 import type { NodeId } from '../../../../schema/index.ts'
 import type { RFNodeId } from '../../base/rfHelpers.ts'
 
-import { getBezierPath } from '@xyflow/react'
 import { useId } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { toManifestNodeId } from '../../base/rfHelpers.ts'
 import { useCanvasStore } from '../CanvasStoreContext.tsx'
+import { connectionNodeBounds, connectionPortIndex, getConnectionPath } from '../Edges/connectionPath.ts'
 import { EdgeGradient } from '../Edges/EdgeGradient.tsx'
 
 export const ConnectionLine: React.FC<ConnectionLineComponentProps> = ({
+  fromHandle,
+  toHandle,
   fromX,
   fromY,
   fromPosition,
@@ -22,7 +24,11 @@ export const ConnectionLine: React.FC<ConnectionLineComponentProps> = ({
 }: ConnectionLineComponentProps) => {
   const canvasStore = useCanvasStore()
 
-  const [edgePath] = getBezierPath({
+  const [edgePath] = getConnectionPath({
+    sourceBounds: connectionNodeBounds(rfStartNode),
+    sourcePortIndex: connectionPortIndex(rfStartNode, fromHandle.id),
+    targetPortIndex: connectionPortIndex(rfEndNode, toHandle?.id),
+    targetBounds: connectionNodeBounds(rfEndNode),
     sourceX: fromX,
     sourceY: fromY,
     sourcePosition: fromPosition,
