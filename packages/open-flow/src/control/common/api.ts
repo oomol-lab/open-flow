@@ -1,3 +1,6 @@
+import type { DraftOperation } from './draftOperations.ts'
+export { inspectFlowDraft } from './flowInspection.ts'
+export type { DraftOperation } from './draftOperations.ts'
 import type { SchemaMismatch } from '../../flow/common/change.ts'
 import type { CreateEventSource, UpdateEventSource, EventSource } from './eventSources.ts'
 
@@ -23,15 +26,7 @@ export {
   type ResultQuery,
 } from './results.ts'
 import type { RunStatus } from '../../execution/common/runLifecycle.ts'
-import type {
-  ChangeOperation,
-  InputPortDefinition,
-  JsonValue,
-  PortDefinition,
-  RevisionContent,
-  TriggerKeySnapshot,
-  WaitAction,
-} from '../../flow/common/change.ts'
+import type { InputPortDefinition, JsonValue, PortDefinition, RevisionContent, TriggerKeySnapshot, WaitAction } from '../../flow/common/change.ts'
 
 import { flowCheck } from './checkDecoders.ts'
 import { connection, connectorAction } from './connectorDecoders.ts'
@@ -848,7 +843,7 @@ export class ControlClient {
   async changeDraft(
     flowId: string,
     expectedRevisionId: string,
-    operations: readonly ChangeOperation[],
+    operations: readonly DraftOperation[],
     changeId = operationKey('change'),
   ): Promise<DraftChange> {
     return draftChange(
@@ -873,7 +868,7 @@ export class ControlClient {
   async checkFlow(flowId: string, revisionId: string): Promise<FlowCheck> {
     return flowCheck(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/check`, {
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v4', version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v5', version: 1 }),
         method: 'POST',
       }),
     )
@@ -899,7 +894,7 @@ export class ControlClient {
   async createDraftRun(flowId: string, revisionId: string, options: RunOptions): Promise<DraftRun> {
     const created = runDetails(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/runs`, {
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v4', inputs: options.inputs ?? {}, trigger: options.trigger, version: 2 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v5', inputs: options.inputs ?? {}, trigger: options.trigger, version: 2 }),
         headers: { 'idempotency-key': options.idempotencyKey ?? operationKey('run') },
         method: 'POST',
       }),
@@ -930,7 +925,7 @@ export class ControlClient {
   async publishFlow(flowId: string, revisionId: string, expectedLivePublicationId: string | null, options: PublicationOptions = {}): Promise<PublishOperation> {
     return publishOperation(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/publications`, {
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v4', expectedLivePublicationId, version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v5', expectedLivePublicationId, version: 1 }),
         headers: { 'idempotency-key': options.idempotencyKey ?? operationKey('publication') },
         method: 'POST',
       }),

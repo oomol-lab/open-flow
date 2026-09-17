@@ -29,6 +29,10 @@ export async function verifyWorkbenchHost(
     events.length = 0
     await driver.emit({ kind: 'flows.changed', version: 1 })
     assert(events.length == 1, 'Catalog changes must reach the catalog subscription.')
+    events.length = 0
+    const created = { kind: 'flow.created', flowId: 'new-flow', version: 1 } as const
+    await driver.emit(created)
+    assert(JSON.stringify(events) == JSON.stringify([created]), 'Flow creation must retain its identity on the catalog subscription.')
   } finally {
     catalog.stop()
   }

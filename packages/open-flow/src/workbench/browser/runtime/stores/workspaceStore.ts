@@ -126,6 +126,7 @@ export class WorkspaceStore {
   #draftInvalidation = 0
   #draftUpdateNotice = false
   #disposed = false
+  #started = false
   #draftSyncQueued = false
   #nodeFocusId = 0
   #pendingRepair?: { readonly changeId: string; readonly expectedRevisionId: string }
@@ -140,6 +141,7 @@ export class WorkspaceStore {
     i18n: I18n = createI18n(),
     runChanged: (event: Extract<FlowChangeEvent, { readonly kind: 'run.changed' | 'run.created' }>) => void = () => {},
     public readonly catalogs = new CatalogStores(client),
+    private readonly flowCreated: (flowId: string) => void = () => {},
   ) {
     this.#client = client
     this.#setNotice = setNotice
@@ -183,14 +185,20 @@ export class WorkspaceStore {
   }
 
   public async start(flowId?: string): Promise<void> {
+    this.#started = false
     if (this.#stopCatalogWatch == null) {
-      const subscription = this.#client.watchFlowCatalog(() => void this.reloadFlows())
+      const subscription = this.#client.watchFlowCatalog((event) => {
+        if (this.#disposed) return
+        void this.reloadFlows()
+        if (event?.kind == 'flow.created' && this.#started && this.#model.value.flowId == null && this.#model.value.busy == null) this.flowCreated(event.flowId)
+      })
       this.#stopCatalogWatch = subscription.stop
       await subscription.ready
     }
     if (this.#disposed) return
     await this.reloadFlows()
     if (!this.#disposed) await this.selectFlow(flowId)
+    this.#started = !this.#disposed
   }
 
   public async reloadFlows(): Promise<void> {

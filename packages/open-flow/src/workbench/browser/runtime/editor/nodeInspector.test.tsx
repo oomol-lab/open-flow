@@ -96,10 +96,10 @@ describe('Wait Inspector', () => {
   })
 })
 
-describe('Node timeout settings', () => {
-  it('saves timeout on blur, preserves the name, and rejects invalid values', () => {
+describe('Node execution settings', () => {
+  it('saves execution limits and timeout, preserves sibling settings, and rejects invalid values', () => {
     const saveNodeSettings = vi.fn()
-    const node = { inputs: {}, kind: 'subflow', name: 'Review', subflowId: 'review', timeoutMs: 100 }
+    const node = { inputs: {}, kind: 'subflow', name: 'Review', subflowId: 'review', timeoutMs: 100, maxExecutions: 25 }
     const revision = {
       graph: () => ({ nodes: { current: node, other: { inputs: {}, kind: 'value', name: 'Review', values: [] } } }),
     }
@@ -128,9 +128,19 @@ describe('Node timeout settings', () => {
     for (const value of ['100', '0', '-1', '1.5', 'Infinity']) blur({ currentTarget: { value } })
     expect(saveNodeSettings).not.toHaveBeenCalled()
     blur({ currentTarget: { value: '200' } })
-    expect(saveNodeSettings).toHaveBeenLastCalledWith('current', { name: 'Review', timeoutMs: 200 })
+    expect(saveNodeSettings).toHaveBeenLastCalledWith('current', { name: 'Review', timeoutMs: 200, maxExecutions: 25 })
     blur({ currentTarget: { value: '' } })
-    expect(saveNodeSettings).toHaveBeenLastCalledWith('current', { name: 'Review' })
+    expect(saveNodeSettings).toHaveBeenLastCalledWith('current', { name: 'Review', maxExecutions: 25 })
+    const limit = find(rendered, (item) => (item.props as { readonly id?: string }).id == 'node-current-limit')
+    if (limit == null) throw new Error('Expected execution limit input.')
+    const saveLimit = (limit.props as { readonly onBlur: (event: { currentTarget: { value: string } }) => void }).onBlur
+    saveNodeSettings.mockClear()
+    for (const value of ['25', '0', '-1', '1.5', 'Infinity', '9007199254740992']) saveLimit({ currentTarget: { value } })
+    expect(saveNodeSettings).not.toHaveBeenCalled()
+    saveLimit({ currentTarget: { value: '1000' } })
+    expect(saveNodeSettings).toHaveBeenLastCalledWith('current', { name: 'Review', timeoutMs: 100, maxExecutions: 1000 })
+    saveLimit({ currentTarget: { value: '' } })
+    expect(saveNodeSettings).toHaveBeenLastCalledWith('current', { name: 'Review', timeoutMs: 100, maxExecutions: undefined })
   })
 })
 

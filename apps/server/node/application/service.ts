@@ -232,7 +232,7 @@ export class ServerService {
       () => this.#maintenance.wake(),
       snapshots,
       (flowId, triggerNodeId) => this.#listeners.test(flowId, triggerNodeId),
-      () => this.#notifyFlowCatalog(),
+      (event) => this.#notifyFlowCatalog(event),
       (event) => this.#notifyFlow(event),
       (kind) => (kind == 'agent' ? this.#resolveLlm()?.config != null : this.#resolveLlm() != null),
       this.#resolveConnector,
@@ -463,8 +463,7 @@ export class ServerService {
     for (const listener of this.#flowSubscribers.get(event.flowId) ?? []) listener(event)
   }
 
-  #notifyFlowCatalog(): void {
-    const event = { kind: 'flows.changed', version: 1 } as const
+  #notifyFlowCatalog(event: FlowCatalogEvent = { kind: 'flows.changed', version: 1 }): void {
     for (const listener of this.#flowCatalogSubscribers) listener(event)
   }
 

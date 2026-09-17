@@ -31,7 +31,8 @@ function help(runtime: Runtime, args: readonly string[]) {
       notes: [
         '--timeout is a wait budget in milliseconds (default 60000), except node set where it changes the node execution timeout.',
         '--follow --json writes NDJSON pages immediately; resume from nextAfter.',
-        'Use schema apply for complete atomic edits and schema operations for the lower contract.',
+        'Use schema examples to discover complete creation batches, or schema example.connector for a Connector Task.',
+        'Use schema apply for atomic edits. graph.trigger.create resolves a provider key into a fixed definition at commit.',
         'Retry mutations with the same idempotency key, fixed revision/publication and identical arguments.',
       ],
     }

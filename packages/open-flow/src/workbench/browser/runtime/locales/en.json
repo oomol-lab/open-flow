@@ -187,6 +187,8 @@
       "nameDuplicate": "A node with this name already exists in this graph.",
       "nameEmpty": "Node name cannot be empty.",
       "timeout": "Timeout (ms)",
+      "maxExecutions": "Maximum executions per run",
+      "maxExecutionsError": "Maximum executions must be a positive integer.",
       "timeoutError": "Timeout must be a positive integer in milliseconds.",
       "title": "Node settings",
       "description": "Purpose",

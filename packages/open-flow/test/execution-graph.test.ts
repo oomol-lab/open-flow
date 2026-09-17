@@ -151,14 +151,14 @@ describe('Execution graph scheduling', () => {
     expect(calls).toEqual([{ input: input ? 1 : 2 }])
     expect(eventNodes).not.toContain(input ? 'no' : 'yes')
     expect(eventNodes).toContain('join')
-    const ambiguous = revision({
+    const parallel = revision({
       ...graph,
       edges: [
         { source: 'yes', target: 'join' },
         { source: 'no', target: 'join' },
       ],
     })
-    expect((await prepareFlow(ambiguous, currentEngineContract)).kind).toBe('flow-invalid')
+    expect((await prepareFlow(parallel, currentEngineContract)).kind).toBe('prepared')
   })
 
   it('restores transitive ancestor values and refuses incomplete checkpoint dependencies', async () => {
@@ -208,7 +208,7 @@ describe('Execution graph scheduling', () => {
     expect(calls).toEqual([{ nodeId: 'after', input: { input: 42 } }])
     for (const checkpoint of [
       { ...first.checkpoint, results: {} },
-      { ...first.checkpoint, skipped: ['before'], results: {} },
+      { ...first.checkpoint, counts: {} },
       { ...first.checkpoint, results: { ...first.checkpoint.results, after: { jobId: 'after', outputs: {} } } },
       { ...first.checkpoint, results: { before: { jobId: 'before', outputs: {} } } },
       { ...first.checkpoint, inputs: { before: { unknown: true } } },
@@ -226,12 +226,8 @@ describe('Execution graph scheduling', () => {
     }
   })
 
-  it('rejects cycles and invalid branch endpoints without inferring execution from inputs', async () => {
+  it('rejects invalid branch endpoints without inferring execution from inputs', async () => {
     for (const edges of [
-      [
-        { source: 'a', target: 'b' },
-        { source: 'b', target: 'a' },
-      ],
       [{ source: 'a', sourceHandle: 'value', target: 'b' }],
       [{ source: 'missing', target: 'b' }],
       [
@@ -335,7 +331,7 @@ it.each([true, false])('runs with null from either an available nullable source 
   if (first.kind != 'waiting') throw new Error('Expected waiting')
   expect(calls.map((call) => call.nodeId).toSorted()).toEqual(['after', 'independent', 'join'])
   expect(calls.find((call) => call.nodeId == 'join')?.input).toEqual({ input: null })
-  expect(first.checkpoint.skipped).not.toContain('join')
+  expect(first.checkpoint.counts['']?.join).toBe(1)
   expect(logs).toEqual([])
   if (takeSource) {
     const checkpoint = structuredClone(first.checkpoint)

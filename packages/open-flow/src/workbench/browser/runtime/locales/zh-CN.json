@@ -187,6 +187,8 @@
       "nameDuplicate": "当前图中已存在同名节点。",
       "nameEmpty": "节点名称不能为空。",
       "timeout": "超时时间（毫秒）",
+      "maxExecutions": "每次运行的最大执行次数",
+      "maxExecutionsError": "最大执行次数必须是正整数。",
       "timeoutError": "超时时间必须是以毫秒为单位的正整数。",
       "title": "节点设置",
       "description": "用途说明",

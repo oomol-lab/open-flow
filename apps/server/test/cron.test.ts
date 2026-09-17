@@ -9,6 +9,8 @@ import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AcceptanceError } from '../node/error.ts'
+import { Database } from '../node/storage/database.ts'
+import { Store } from '../node/storage/store.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
 
 const directories: string[] = []
@@ -58,6 +60,78 @@ afterEach(async () => {
 })
 
 describe('Server Cron Trigger', () => {
+  it.each([1, 2])('isolates an unreadable model %i publication and recovers after republishing', async (modelVersion) => {
+    const file = await databaseFile()
+    let now = Date.parse('2026-08-21T00:00:30.000Z')
+    let service = await openService(file, { clock: () => now })
+    const content = revision([{ type: 'every', unit: 'minute', value: 1 }])
+    const broken = await service.publisher.publish({
+      expectedLivePublicationId: null,
+      flowId: 'broken',
+      idempotencyKey: 'publish-broken',
+      revision: content,
+      revisionId: 'revision-broken',
+    })
+    if (broken.kind != 'published') throw new Error('Initial Publication unexpectedly conflicted.')
+    await service.publisher.publish({
+      expectedLivePublicationId: null,
+      flowId: 'healthy',
+      idempotencyKey: 'publish-healthy',
+      revision: content,
+      revisionId: 'revision-healthy',
+    })
+    const database = new DatabaseSync(file)
+    const unreadable = JSON.stringify({
+      ...content,
+      modelVersion,
+      document: {
+        ...content.document,
+        graph: { ...content.document.graph, nodes: { ...content.document.graph.nodes, hook: { kind: 'webhook', name: 'Old webhook', inputsDef: [] } } },
+      },
+    })
+    try {
+      database.prepare('UPDATE revisions SET content = ? WHERE revision_id = ?').run(unreadable, 'revision-broken')
+      now = Date.parse('2026-08-21T00:01:00.000Z')
+      await startService(service)
+      await service.waitForIdle()
+      expect(database.prepare('SELECT flow_id AS flowId, status FROM runs').all()).toEqual([{ flowId: 'healthy', status: 'completed' }])
+      expect(
+        database
+          .prepare("SELECT next_at AS nextAt, last_error_code AS errorCode, operator_state AS operatorState FROM cron_bindings WHERE flow_id = 'broken'")
+          .get(),
+      ).toEqual({ nextAt: null, errorCode: 'revision-invalid', operatorState: 'active' })
+      expect(database.prepare('SELECT kind, error_code AS errorCode FROM trigger_activities').all()).toEqual([
+        { kind: 'health.failed', errorCode: 'revision-invalid' },
+      ])
+      expect(database.prepare("SELECT content FROM revisions WHERE revision_id = 'revision-broken'").get()).toEqual({ content: unreadable })
+      const connection = Database.open(file)
+      try {
+        expect(new Store(connection).triggers.listTriggerBindings('broken')).toMatchObject([{ health: 'failed', lastErrorCode: 'revision-invalid' }])
+      } finally {
+        connection.close()
+      }
+      await closeService(service)
+      service = await openService(file, { clock: () => now })
+      await service.tickCron()
+      expect(database.prepare('SELECT COUNT(*) AS count FROM trigger_activities').get()).toEqual({ count: 1 })
+      const recovered = await service.publisher.publish({
+        expectedLivePublicationId: broken.publicationId,
+        flowId: 'broken',
+        idempotencyKey: 'publish-recovered',
+        revision: content,
+        revisionId: 'revision-recovered',
+      })
+      expect(recovered.kind).toBe('published')
+      expect(database.prepare("SELECT last_error_code AS errorCode FROM cron_bindings WHERE flow_id = 'broken'").get()).toEqual({ errorCode: null })
+      now = Date.parse('2026-08-21T00:02:00.000Z')
+      await service.tickCron()
+      expect(database.prepare("SELECT COUNT(*) AS count FROM runs WHERE flow_id = 'broken'").get()).toEqual({ count: 1 })
+    } finally {
+      database.close()
+      await closeService(service)
+    }
+  })
+
   it('keeps disabled schedules stopped across restart and resumes them when enabled', async () => {
     const file = await databaseFile()
     let service = await openService(file, { clock: () => Date.parse('2026-08-21T00:00:30.000Z') })

@@ -69,7 +69,7 @@ try {
 | ----------------------- | --------------------------------------------------------------------- | ------------------------------------------------ |
 | `flow_list`             | `cursor?`、`limit?`                                                   | Flow 列表和 `nextCursor?`                        |
 | `flow_get`              | `flowId`                                                              | Flow、完整 Draft、Live                           |
-| `flow_schema`           | `kind?`                                                               | change operations schema 与示例                  |
+| `flow_schema`           | `kind?` 或 `example?`                                                 | Draft operations schema 或完整创建批次           |
 | `flow_create`           | `name`、`idempotencyKey`、`teamId?`                                   | Flow，包含初始 `draftRevisionId`                 |
 | `flow_apply`            | `flowId`、`expectedRevisionId`、`idempotencyKey`、`operations`        | 新 Revision identity                             |
 | `flow_check`            | `flowId`、`revisionId`                                                | 固定 Revision 的 diagnostics                     |
@@ -105,7 +105,7 @@ Flow、Run 分页游标与 Control API 相同；Run cursor 绑定 Flow。`run_li
 典型步骤：
 
 1. 通过 `flow_list`、`flow_get` 定位 Flow；创建时调用 `flow_create`。OOMOL Connector 部署可先通过 `connector_teams` 选择具体 Team。
-2. 调用 `flow_schema`，按公共 change operations 定义提交 `flow_apply`。节点 title 非空且在图内唯一；ID 显式指定。
+2. 优先调用 `flow_schema {"example":"index"}` 查看简短示例索引，或按 kind 查询单个操作。`example: "connector"`、`"poll"`、`"poll-notification"` 返回完整创建批次；替换真实账号、Action 和端口后提交 flow_apply。节点 title 非空且在图内唯一；ID 显式指定。
 3. 新 Flow 没有 Trigger，需显式添加 Manual 或其他 Trigger。编辑返回新 Revision，用该 identity 调用 `flow_check`。
 4. 上线时调用 `flow_publish`，固定 `flowId`、`revisionId`，并传入从 `flow_get` 观察到的 `expectedLivePublicationId`；首次发布传 `null`。
    轮询 `flow_publish_status`，`pending` 表示仍在进行，`succeeded` 才确认发布成功，`failed` 返回 `issue`。
@@ -131,6 +131,10 @@ MCP JSON-RPC request ID 与业务幂等 key 是不同身份。
 Draft head 冲突返回 `flow.revision-conflict`，调用方重新读取后决定修改。
 mutation 内部发生无法确定结果的异常时返回 `flow.mutation-outcome-unknown` 与原 key；连接断开没有响应时也应以原参数和原 key 重试。
 不要因为客户端超时自动换 key 或换到新的 Draft/Live。
+
+`graph.trigger.create` 允许按 Provider key 创建节点，服务端将解析后的定义固定进 Revision，重试不会重新解析目录。CLI 的 `schema example.NAME` / `apply` 使用相同示例与输入合同，详见 [Flow 命令调用合同](../authoring/flow-command.md#创建示例与-provider-trigger)。
+
+`flow_get` 在 Draft 返回 `flow.invalid` 或 `flow.revision-upgrade-required` 时保留 Flow 元信息，并返回 `draft: null` 与 `draftIssue`（code、message、revisionId）；此时省略依赖 Draft 的 live 详情，已发布版本身份仍在 flow.live。CLI inspect 使用相同降级规则。该结果不表示 Draft 可编辑或可运行；权限和其他错误不降级。
 
 请求取消会传播给该请求中的 Connector 查询；Server 关闭会中止正在进行的 MCP 请求。
 已接受的 Run 独立于 MCP 连接继续执行。显式取消使用 `run_cancel`，完成与取消竞争时以部署返回的权威状态为准。

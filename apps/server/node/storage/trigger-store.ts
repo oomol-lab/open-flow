@@ -211,7 +211,8 @@ export class TriggerStore {
            WHERE bindings.flow_id = ?
            UNION ALL
            SELECT bindings.binding_id, bindings.current_publication_id, publications.revision_id,
-                  NULL, bindings.flow_id, 'healthy', 'cron', NULL, bindings.operator_state,
+                  NULL, bindings.flow_id, CASE WHEN bindings.last_error_code IS NULL THEN 'healthy' ELSE 'failed' END,
+                  'cron', bindings.last_error_code, bindings.operator_state,
                   bindings.runtime_version, bindings.trigger_node_id, bindings.updated_at
            FROM cron_bindings AS bindings
            LEFT JOIN publications ON publications.publication_id = bindings.current_publication_id
@@ -482,6 +483,20 @@ export class TriggerStore {
       }
       this.#database.prepare('UPDATE cron_bindings SET next_at = ? WHERE binding_id = ?').run(input.nextScheduledAt, input.bindingId)
       return accepted
+    })
+  }
+
+  failCronTarget(target: StoredCronTarget, now: number, errorCode: string, errorMessage: string): void {
+    this.#transaction(() => {
+      const changed = this.#database
+        .prepare(
+          `UPDATE cron_bindings SET next_at = NULL, last_error_code = ?, updated_at = ?
+           WHERE binding_id = ? AND runtime_version = ? AND current_publication_id = ?`,
+        )
+        .run(errorCode, now, target.bindingId, target.runtimeVersion, target.publicationId)
+      if (changed.changes == 0) return
+      insertTriggerActivity(this.#database, target.bindingId, 'health.failed', now, errorCode, errorMessage)
+      pruneTriggerActivities(this.#database, now, 100)
     })
   }
 

@@ -7,6 +7,7 @@ import type {
   Draft,
   DraftChange,
   Flow,
+  FlowCatalogEvent,
   FlowChangeEvent,
   FlowCheck,
   Live,
@@ -19,7 +20,8 @@ import type {
   TriggerKeySummary,
   Variable,
 } from '@oomol-lab/open-flow/control-api'
-import type { ChangeOperation, JsonValue, RevisionContent, TriggerKeySnapshot } from '@oomol-lab/open-flow/flow-change'
+import type { DraftOperation } from '@oomol-lab/open-flow/control-requests'
+import type { JsonValue, RevisionContent, TriggerKeySnapshot } from '@oomol-lab/open-flow/flow-change'
 import type { ConnectorHost } from '../deployment/connector.ts'
 import type { EventSourceRuntime } from '../runtime/event-source-runtime.ts'
 import type { StoredFlow, StoredFlowRevision } from '../storage/flow-store.ts'
@@ -27,6 +29,7 @@ import type { PublicationAcceptance } from '../storage/publication-store.ts'
 import type { StoredTriggerBinding } from '../storage/trigger-store.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
+import { resolveDraftOperations } from '@oomol-lab/open-flow/control-requests'
 import { applyFlowChanges, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
 import { canonicalJsonBytes, digestBytes, encodeRevision, repairRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { flowClosure, validateFlow } from '@oomol-lab/open-flow/flow-semantics'
@@ -71,7 +74,7 @@ export interface PublicationPosition {
 export class ControlService {
   private readonly acceptPublish: (input: PublishInput) => Promise<PublishOperation>
   private readonly clock: () => number
-  private readonly flowCatalogChanged: () => void
+  private readonly flowCatalogChanged: (event?: FlowCatalogEvent) => void
   private readonly flowChanged: (event: FlowChangeEvent) => void
   private readonly llmAvailable: (kind?: 'agent') => boolean
   private readonly publish: (input: PublishInput) => Promise<PublicationAcceptance>
@@ -96,7 +99,7 @@ export class ControlService {
     triggersChanged: () => void,
     triggerDefinitions: readonly TriggerKeySnapshot[],
     testPollTrigger: (flowId: string, triggerNodeId: string) => Promise<PollTriggerTestResult>,
-    flowCatalogChanged: () => void,
+    flowCatalogChanged: (event?: FlowCatalogEvent) => void,
     flowChanged: (event: FlowChangeEvent) => void,
     llmAvailable: (kind?: 'agent') => boolean,
     resolveConnector: () => ConnectorHost | undefined,
@@ -349,7 +352,7 @@ export class ControlService {
       revisionId: identity('revision'),
     })
     if ('kind' in stored) throw new ControlError(controlErrorCode.flowConflict, 'The idempotency key refers to another Flow request.')
-    if (stored.created) this.flowCatalogChanged()
+    if (stored.created) this.flowCatalogChanged({ kind: 'flow.created', flowId: stored.flow.flowId, version: 1 })
     return { created: stored.created, flow: flow(stored.flow) }
   }
 
@@ -431,17 +434,27 @@ export class ControlService {
     actorId: string,
     flowId: string,
     expectedRevisionId: string,
-    operations: readonly ChangeOperation[],
+    operations: readonly DraftOperation[],
     changeId: string = randomUUID(),
   ): Promise<DraftChange> {
     this.requireDraft(flowId)
+    const requestDigest = await digestBytes(canonicalJsonBytes({ expectedRevisionId, operations: operations as unknown as JsonValue }))
+    const previous = this.store.flows.change(flowId, changeId)
+    if (previous != null) {
+      if (previous.requestDigest != requestDigest) throw new ControlError(controlErrorCode.flowConflict, 'The change identity refers to another Draft change.')
+      return { revision: revisionMetadata(this.store.flows.revision(flowId, previous.revisionId)!), version: 1 }
+    }
     const base = this.store.flows.revision(flowId, expectedRevisionId)
     if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
     let content: RevisionContent
     try {
-      content = applyFlowChanges(revisionContent(base), operations)
+      content = applyFlowChanges(
+        revisionContent(base),
+        resolveDraftOperations(operations, (key) => this.getTriggerKey(key)),
+      )
     } catch (error) {
       if (error instanceof FlowChangeError) invalidFlow(`The Draft change could not be applied. ${error.message}`)
+      if (error instanceof ControlError) throw error
       throw new ControlError(controlErrorCode.flowInvalid, 'The Draft operation has an invalid structure.', { cause: error })
     }
     let bytes: Uint8Array
@@ -452,7 +465,6 @@ export class ControlService {
     }
     const digest = await digestBytes(bytes)
     if (digest == base.digest) invalidFlow('The Draft change does not modify the Flow.')
-    const requestDigest = await digestBytes(canonicalJsonBytes({ expectedRevisionId, operations: operations as unknown as JsonValue }))
     const stored = this.store.flows.commitRevision({
       actorId,
       changeId,

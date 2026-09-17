@@ -270,7 +270,7 @@ export function graphOrder(graph: Graph): readonly string[] {
       if (parents?.size == 0) ready.push(child)
     }
   }
-  return ready
+  return [...ready, ...[...pending.keys()].toSorted()]
 }
 
 const pathsByGraph = new WeakMap<
@@ -306,32 +306,46 @@ function graphPaths(graph: Graph) {
     edges.push(edge)
     incoming.set(edge.target, edges)
   }
-  for (const id of graphOrder(graph)) {
-    const node = graph.nodes[id]!
-    const edges = incoming.get(id) ?? []
-    const parents = new Set<string>()
-    const decisions = new Set<string>()
-    const routes: Route[] = []
-    for (const edge of edges) {
-      parents.add(edge.source)
-      for (const waitId of resolvedWaits.get(edge.source) ?? []) decisions.add(waitId)
-      if (graph.nodes[edge.source]?.kind == 'wait' && edge.sourceHandle != 'notification') decisions.add(edge.source)
-      for (const parent of ancestors.get(edge.source) ?? []) parents.add(parent)
-      for (const route of paths.get(edge.source) ?? []) {
-        const next =
-          edge.sourceHandle == null || (graph.nodes[edge.source]?.kind == 'wait' && edge.sourceHandle == 'notification')
-            ? route
-            : { ...route, [edge.source]: edge.sourceHandle }
-        if (routes.some((known) => routeCovers(known, next))) continue
-        for (let index = routes.length - 1; index >= 0; index--) {
-          if (routeCovers(next, routes[index]!)) routes.splice(index, 1)
+  const order = graphOrder(graph)
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const id of order) {
+      const node = graph.nodes[id]!
+      const edges = incoming.get(id) ?? []
+      const parents = new Set<string>()
+      const decisions = new Set<string>()
+      const routes: Route[] = []
+      for (const edge of edges) {
+        parents.add(edge.source)
+        for (const waitId of resolvedWaits.get(edge.source) ?? []) decisions.add(waitId)
+        if (graph.nodes[edge.source]?.kind == 'wait' && edge.sourceHandle != 'notification') decisions.add(edge.source)
+        for (const parent of ancestors.get(edge.source) ?? []) parents.add(parent)
+        for (const route of paths.get(edge.source) ?? []) {
+          const next =
+            edge.sourceHandle == null || (graph.nodes[edge.source]?.kind == 'wait' && edge.sourceHandle == 'notification')
+              ? route
+              : { ...route, [edge.source]: edge.sourceHandle }
+          if (routes.some((known) => routeCovers(known, next))) continue
+          for (let index = routes.length - 1; index >= 0; index--) {
+            if (routeCovers(next, routes[index]!)) routes.splice(index, 1)
+          }
+          routes.push(next)
         }
-        routes.push(next)
       }
+      const nextRoutes = edges.length == 0 ? ('inputs' in node ? [{}] : [{ $trigger: id }]) : routes
+      const previous = paths.get(id) ?? []
+      if (
+        parents.size != (ancestors.get(id)?.size ?? 0) ||
+        decisions.size != (resolvedWaits.get(id)?.size ?? 0) ||
+        nextRoutes.length != previous.length ||
+        nextRoutes.some((route) => !previous.some((known) => routeCovers(known, route) && routeCovers(route, known)))
+      )
+        changed = true
+      ancestors.set(id, parents)
+      resolvedWaits.set(id, decisions)
+      paths.set(id, nextRoutes)
     }
-    ancestors.set(id, parents)
-    resolvedWaits.set(id, decisions)
-    paths.set(id, edges.length == 0 ? ('inputs' in node ? [{}] : [{ $trigger: id }]) : routes)
   }
   const analysis = { ancestors, paths, resolvedWaits }
   pathsByGraph.set(graph, analysis)
@@ -366,7 +380,18 @@ function mappingAvailable(graph: Graph, target: string | undefined, mapping: Inp
   const targetPaths = target == null ? [{}] : (paths.get(target) ?? [])
   // Sources may be absent, but must never overlap on the same execution path.
   for (const [index, routes] of sources.entries()) {
-    for (const other of sources.slice(index + 1)) {
+    for (const [offset, other] of sources.slice(index + 1).entries()) {
+      const leftSource = mapping.sources[index]!
+      const rightSource = mapping.sources[index + offset + 1]!
+      if (
+        target != null &&
+        leftSource.kind == 'node' &&
+        rightSource.kind == 'node' &&
+        leftSource.nodeId != rightSource.nodeId &&
+        !ancestors.get(leftSource.nodeId)?.has(rightSource.nodeId) &&
+        !ancestors.get(rightSource.nodeId)?.has(leftSource.nodeId)
+      )
+        continue
       for (const left of routes) {
         for (const targetRoute of targetPaths) {
           if (!routesCompatible(left, targetRoute)) continue
@@ -448,7 +473,7 @@ export function availableOutputs(document: FlowDocument, graph: Graph, target: s
 }
 
 function validateWait(nodeId: string, node: Extract<GraphNode, { readonly kind: 'wait' }>, allowed: boolean, path: string, diagnostics: Diagnostic[]): void {
-  const fields = new Set(['actions', 'description', 'icon', 'input', 'inputs', 'kind', 'name', 'prompt'])
+  const fields = new Set(['actions', 'description', 'icon', 'input', 'inputs', 'kind', 'maxExecutions', 'name', 'prompt'])
   const unsupported = Object.keys(node).filter((field) => !fields.has(field))
   if (unsupported.length > 0) {
     diagnostics.push(
@@ -508,11 +533,11 @@ function validateGraph(
     if (seen.has(key)) diagnostics.push(graphDiagnostic('graph.edge-duplicate', 'Execution edge is duplicated.', edgePath))
     seen.add(key)
   }
-  if (graphOrder(graph).length != Object.keys(graph.nodes).length) {
-    diagnostics.push(graphDiagnostic('graph.cycle', 'Graph contains an execution dependency cycle.', path))
-  }
   for (const [nodeId, node] of Object.entries(graph.nodes)) {
     const nodePath = `${path}/nodes/${nodeId}`
+    if ('inputs' in node && node.maxExecutions != null && (!Number.isSafeInteger(node.maxExecutions) || node.maxExecutions < 1)) {
+      diagnostics.push(graphDiagnostic('node.max-executions-invalid', 'Maximum executions must be a positive safe integer.', `${nodePath}/maxExecutions`))
+    }
     if (!('inputs' in node)) {
       if (triggerOutputDefinitions(node).some((port) => hasRetiredRef(port.jsonSchema))) {
         diagnostics.push(graphDiagnostic('graph.schema-unsupported', 'Runtime Ref schemas are not supported.', nodePath))

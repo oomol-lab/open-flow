@@ -5,8 +5,8 @@ export interface EngineContract {
   readonly platformSource: string
 }
 
-export const currentEngineContract = 'open-flow-engine/v4'
-export const nodejsEngineContract = 'open-flow-engine/v4/nodejs-compat-v1'
+export const currentEngineContract = 'open-flow-engine/v5'
+export const nodejsEngineContract = 'open-flow-engine/v5/nodejs-compat-v1'
 
 const currentContract: EngineContract = {
   platformExports: new Set(['engineContract', 'identity']),

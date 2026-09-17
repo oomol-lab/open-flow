@@ -258,6 +258,12 @@ export class FlowStore {
       .get(flowId, revisionId) as StoredFlowRevision | undefined
   }
 
+  change(flowId: string, changeId: string): { readonly requestDigest: string; readonly revisionId: string } | undefined {
+    return this.#database
+      .prepare('SELECT change_request_digest AS requestDigest, revision_id AS revisionId FROM flow_revisions WHERE flow_id = ? AND change_id = ?')
+      .get(flowId, changeId) as { readonly requestDigest: string; readonly revisionId: string } | undefined
+  }
+
   commitRevision(input: {
     readonly actorId: string
     readonly changeId: string
@@ -270,12 +276,7 @@ export class FlowStore {
     readonly revisionId: string
   }): { readonly kind: 'busy' | 'conflict' | 'not-found' | 'request-conflict' } | { readonly kind: 'committed'; readonly revision: StoredFlowRevision } {
     return this.#transaction(() => {
-      const existing = this.#database
-        .prepare(
-          `SELECT change_request_digest AS requestDigest, revision_id AS revisionId
-           FROM flow_revisions WHERE flow_id = ? AND change_id = ?`,
-        )
-        .get(input.flowId, input.changeId) as { readonly requestDigest: string; readonly revisionId: string } | undefined
+      const existing = this.change(input.flowId, input.changeId)
       if (existing != null) {
         if (existing.requestDigest != input.requestDigest) return { kind: 'request-conflict' }
         return { kind: 'committed', revision: this.revision(input.flowId, existing.revisionId)! }

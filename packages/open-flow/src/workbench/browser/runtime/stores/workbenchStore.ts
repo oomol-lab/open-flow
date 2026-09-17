@@ -95,6 +95,7 @@ export class WorkbenchStore {
   #variableNamesStale = true
   #variableRequest: Promise<void> | undefined
   #disposed = false
+  #openingCreatedFlow = false
 
   public readonly preferences: WorkbenchPreferences
   public readonly $: Workbench$
@@ -132,6 +133,7 @@ export class WorkbenchStore {
         else this.runs.changed(event.runId)
       },
       new CatalogStores(client, host.connectorCache),
+      (flowId) => void this.#openCreatedFlow(flowId),
     )
     this.connectors = new ConnectorStore(client, this.workspace, setNotice, host, i18n)
     this.triggers = new TriggerStore(client, this.workspace, setNotice, host, i18n)
@@ -299,6 +301,16 @@ export class WorkbenchStore {
     this.runRequests.reset()
     this.runs.reset()
     return true
+  }
+
+  async #openCreatedFlow(flowId: string): Promise<void> {
+    if (this.#disposed || this.#openingCreatedFlow || this.workspace.$.flowId.value != null) return
+    this.#openingCreatedFlow = true
+    try {
+      await this.selectFlow(flowId)
+    } finally {
+      this.#openingCreatedFlow = false
+    }
   }
 
   public async createFlow(name: string, create?: (name: string) => Promise<string>): Promise<boolean> {

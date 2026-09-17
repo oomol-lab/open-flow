@@ -48,7 +48,7 @@ function revision(agent = task()): RevisionContent {
         edges: [{ source: 'trigger', target: 'agent' }],
         nodes: {
           trigger: { kind: 'manual', name: 'Start' },
-          agent: { kind: 'task', name: 'Agent', taskId: 'agent', inputs: { email: { kind: 'value', value: 'customer@example.com' } } },
+          agent: { kind: 'task', maxExecutions: 1, name: 'Agent', taskId: 'agent', inputs: { email: { kind: 'value', value: 'customer@example.com' } } },
         },
       },
     },
@@ -380,13 +380,13 @@ describe('Agent Scheduler continuation', () => {
         return pause(`call-${calls}`)
       })
     const first = waiting(await execute(value, invoke))
-    expect(first.checkpoint.agents.agent!.remainingMs).toBeLessThan(100)
+    expect(first.checkpoint.agents[first.checkpoint.waits[0]!.jobId]!.remainingMs).toBeLessThan(100)
     const corrupt = {
       ...first,
       checkpoint: {
         ...first.checkpoint,
         agents: {
-          agent: { ...first.checkpoint.agents.agent!, remainingMs: undefined },
+          [first.checkpoint.waits[0]!.jobId]: { ...first.checkpoint.agents[first.checkpoint.waits[0]!.jobId]!, remainingMs: undefined },
         },
       },
     }
@@ -403,7 +403,7 @@ describe('Agent Scheduler continuation', () => {
     { to: 'customer@example.com', subject: 'Hello', tag: 'support', extra: true },
   ])('rejects invalid saved arguments even when the approval value agrees: %j', async (input) => {
     const first = waiting(await execute(revision(), () => Effect.succeed(pause('call'))))
-    const saved = first.checkpoint.agents.agent!
+    const saved = first.checkpoint.agents[first.checkpoint.waits[0]!.jobId]!
     let calls = 0
     await expect(
       execute(
@@ -417,7 +417,7 @@ describe('Agent Scheduler continuation', () => {
           ...first,
           checkpoint: {
             ...first.checkpoint,
-            agents: { agent: { ...saved, checkpoint: { ...saved.checkpoint, input } } },
+            agents: { [first.checkpoint.waits[0]!.jobId]: { ...saved, checkpoint: { ...saved.checkpoint, input } } },
             waits: [
               {
                 ...first.checkpoint.waits[0]!,

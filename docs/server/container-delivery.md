@@ -154,6 +154,7 @@ setup。Operator 登录与 setup authorization 共享部署实例级限速，超
 
 达到 `OPEN_FLOW_MAX_PENDING_RUNS` 后，新 Run admission 返回 429；已接受请求的幂等重放仍返回原 Run。Cron 与 Poll 保留当前调度位置并短暂重试。
 Cron 所属 Flow 已有未终结 Run 时同样保留当前调度位置；前一个 Run 结束后只补入最早未处理 occurrence，并把下一次计划推进到当前时间之后。
+Cron 的已发布 Revision 无法读取或校验失败时，仅停止该 binding 的调度，并记录 failed health 与错误活动；其他后台任务继续运行。升级或修复 Draft 后重新发布可恢复调度，历史 Publication 不变。
 Callback 请求限流只为已存在的 Webhook / Integration endpoint 或验证通过的 Wait capability 建立内存窗口，超过限制时返回 429 和 `Retry-After`。
 Wait 的 `GET`、`HEAD`、`POST` 及其不同 action 共用该 capability 的额度，不同 capability 独立计数；无效 capability 或不属于该 Wait 的 action 不占用额度。
 被限流的 Wait `POST` 不提交决议。限流状态属于当前 Server app 实例，进程重启后重置。

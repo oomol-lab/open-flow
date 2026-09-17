@@ -120,8 +120,10 @@ async function readEvents<Event>(
 }
 
 function decodeCatalogEvent(value: unknown): FlowCatalogEvent | undefined {
+  if (value == null || typeof value != 'object') return
   const event = value as Partial<FlowCatalogEvent>
   if (event.version == 1 && event.kind == 'flows.changed') return event as FlowCatalogEvent
+  if (event.version == 1 && event.kind == 'flow.created' && typeof event.flowId == 'string' && event.flowId.length > 0) return event as FlowCatalogEvent
 }
 
 function decodeFlowEvent(value: unknown): FlowChangeEvent | undefined {

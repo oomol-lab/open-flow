@@ -16,7 +16,7 @@ afterAll(async () => await host.close())
 
 function program(source: string): RuntimeProgram {
   return {
-    engineContract: 'open-flow-engine/v4',
+    engineContract: 'open-flow-engine/v5',
     engineDigest: isolatedVmEngineDigest,
     entryModuleId: 'main',
     modules: { main: { imports: [], source } },

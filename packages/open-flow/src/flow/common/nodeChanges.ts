@@ -26,6 +26,7 @@ const codeTaskTemplate = `export default async function (inputs, context) {
 
 export interface Settings {
   readonly name?: string
+  readonly maxExecutions?: number
   readonly timeoutMs?: number
 }
 
@@ -331,6 +332,9 @@ export function updateSettings(content: RevisionContent, target: GraphTarget, no
   const operations: ChangeOperation[] = []
 
   if (node.name != settings.name) operations.push({ before: node.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value: settings.name })
+  if (node.maxExecutions != settings.maxExecutions) {
+    operations.push({ before: node.maxExecutions, field: 'maxExecutions', kind: 'graph.node.field.set', nodeId, target, value: settings.maxExecutions })
+  }
   if (node.timeoutMs != settings.timeoutMs) {
     operations.push({ before: node.timeoutMs, field: 'timeoutMs', kind: 'graph.node.field.set', nodeId, target, value: settings.timeoutMs })
   }

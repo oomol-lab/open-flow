@@ -112,7 +112,7 @@ function waitActionLabel(action: WaitAction, t: TFunction): string {
   }
 }
 
-function ActiveWait({
+export function ActiveWait({
   onLocate,
   onResolve,
   resolvingActions,
@@ -128,32 +128,33 @@ function ActiveWait({
   const waits = 'waits' in run ? run.waits : []
   return (
     <>
-      {' '}
       {waits.map((waiting) => (
-        <Alert key={waiting.waitId} className="mx-2 mt-2 shrink-0">
-          <Icon name="wait" />
-          <AlertTitle>{waiting.prompt}</AlertTitle>
-          <AlertDescription>
-            <div>{t('run.waitExpires', { date: new Date(waiting.expiresAt).toLocaleString(language) })}</div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {waiting.actions.map((action) => (
-                <Button
-                  disabled={resolvingActions.has(waiting.waitId)}
-                  key={action}
-                  onClick={() => onResolve(waiting.waitId, action)}
-                  size="sm"
-                  type="button"
-                  variant={action == 'reject' ? 'destructive' : 'default'}
-                >
-                  {resolvingActions.get(waiting.waitId) == action ? t('run.resolving') : waitActionLabel(action, t)}
+        <div key={waiting.waitId} className="shrink-0 px-2 pt-2">
+          <Alert>
+            <Icon name="wait" />
+            <AlertTitle>{waiting.prompt}</AlertTitle>
+            <AlertDescription>
+              <div>{t('run.waitExpires', { date: new Date(waiting.expiresAt).toLocaleString(language) })}</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {waiting.actions.map((action) => (
+                  <Button
+                    disabled={resolvingActions.has(waiting.waitId)}
+                    key={action}
+                    onClick={() => onResolve(waiting.waitId, action)}
+                    size="sm"
+                    type="button"
+                    variant={action == 'reject' ? 'destructive' : 'default'}
+                  >
+                    {resolvingActions.get(waiting.waitId) == action ? t('run.resolving') : waitActionLabel(action, t)}
+                  </Button>
+                ))}
+                <Button onClick={() => onLocate(waiting.nodeId)} size="sm" type="button" variant="secondary">
+                  <Icon name="fit" /> {t('run.locateWait')}
                 </Button>
-              ))}
-              <Button onClick={() => onLocate(waiting.nodeId)} size="sm" type="button" variant="secondary">
-                <Icon name="fit" /> {t('run.locateWait')}
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
       ))}
     </>
   )

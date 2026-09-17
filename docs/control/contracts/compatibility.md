@@ -8,7 +8,7 @@
 | Revision envelope | `kind: open-flow-flow-revision`、`version: 1`       | 固定 UTF-8 JSON 信封字段和 canonical bytes 规则。                |
 | Flow model        | `modelVersion: 2`                                   | 固定 document、modules、节点和端口的序列化结构。                 |
 | Control API       | `/v1`、Run 创建请求 `version: 2`，其他 `version: 1` | 固定请求字段、响应、错误码、CAS 和幂等行为。                     |
-| Engine Contract   | `open-flow-engine/v4`                               | 固定执行、Trigger、Task 返回、Wait 和取消语义。                  |
+| Engine Contract   | `open-flow-engine/v5`                               | 固定执行、Trigger、Task 返回、Wait 和取消语义。                  |
 | MCP               | `2026-07-28`                                        | 固定 Streamable HTTP 协商；工具的产品语义复用 Control API。      |
 
 这些数字相同或不同都不表示兼容。旧版本也可能曾使用 `modelVersion: 1`；不得仅凭版本字段接受其内容。完整结构解码必须先于语义验证和执行。

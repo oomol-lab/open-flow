@@ -1,5 +1,5 @@
+import type { DraftOperation } from '@oomol-lab/open-flow/control-requests'
 import type {
-  ChangeOperation,
   ConnectorCapability,
   InputPortDefinition,
   JsonValue,
@@ -8,6 +8,7 @@ import type {
   TriggerSchedule,
 } from '@oomol-lab/open-flow/flow-change'
 
+import { decodeDraftOperations } from '@oomol-lab/open-flow/control-requests'
 import { decodeChangeOperations, decodeConnectorCapabilities } from '@oomol-lab/open-flow/flow-change'
 import { CliError, triggerSchedule } from './support.ts'
 
@@ -56,7 +57,7 @@ type ApplyTrigger =
     }
 
 interface ApplySpec {
-  readonly operations?: readonly ChangeOperation[]
+  readonly operations?: readonly DraftOperation[]
   readonly edges: readonly ApplyEdge[]
   readonly nodes: Readonly<Record<string, ApplyNode>>
   readonly triggers: Readonly<Record<string, ApplyTrigger>>
@@ -155,7 +156,7 @@ export function applySpec(source: string): ApplySpec {
     applyKeys(root, ['version', 'operations'], 'Flow apply input')
     if (root.version != 1) throw new CliError('flow.apply-invalid', 'Flow apply version must be 1.')
     try {
-      return { version: 1, nodes: {}, triggers: {}, edges: [], operations: decodeChangeOperations(root.operations) }
+      return { version: 1, nodes: {}, triggers: {}, edges: [], operations: decodeDraftOperations(root.operations) }
     } catch (error) {
       throw new CliError('flow.apply-invalid', error instanceof Error ? error.message : String(error))
     }

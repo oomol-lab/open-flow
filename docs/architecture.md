@@ -130,13 +130,16 @@ Engine Contract、部署中立 Runtime invocation、Scheduler 图执行语义、
 `engineContract` 约束公共图执行语义；`engineDigest` 标识具体 RuntimeHost 的隔离环境与宿主能力，不编码分支、Wait 或输入来源调度规则。
 checkpoint 的格式版本和状态一致性由 Scheduler decoder 校验，恢复时同时检查所需 Engine Contract 与隔离运行时是否受支持。
 
-Flow 与每次 Subflow invocation 使用无环执行图。连线表示节点之间的执行依赖，输入映射独立声明数据来源；保存或删除执行边不会隐式创建或删除输入映射。
-每个节点在一次图调用内最多运行一次。节点等待全部直接前驱完成或跳过，在至少一条入边被选中时执行；Flow Run 必须固定一个 Trigger 起始节点，未连接入口的普通根节点跳过；Subflow 的普通根节点由调用启动，无依赖的分支可以并行。
-Condition 只选择首个匹配分支或 default，Wait 登记后释放 notification，决议后释放所选 action；未选中的分支传播跳过状态。Trigger occurrence 只选择对应 Trigger，其他 Trigger 分支跳过。
-未执行节点的跳过状态仅属于内部调度和恢复，不创建节点执行身份、不产生公开节点事件，也不进入最终节点执行结果。
+Flow 和 Subflow graph 允许自连接和回边。连线表示执行触发，输入映射独立声明数据来源；保存或删除执行边不会隐式创建或删除输入映射。
+每条被选中的入边到达都创建一次独立节点 invocation，不等待其他前驱，也不合并多个到达。Flow Run 固定一个 Trigger 起始节点；未被该 Trigger 路径触达的节点不执行。Subflow 的无入边普通根节点由调用启动，不同到达可以并行。
+Condition 只选择首个匹配分支或 default。每次 Wait invocation 登记后释放 notification，决议后释放所选 action，notification 不重复触发。未选中的分支不产生到达或公开节点事件。
 
-节点输入只能引用本图中经执行边可达的祖先 output，不要求来源覆盖目标的所有路径。多个 source 表示互斥分支的备选值；调度仅依据执行边和分支状态。收集输入时，零个来源补 `null`，一个来源取其值，禁止同时有多个值；实际输出 `null` 仍算一个来源。输入按端口声明校验，失败时报错，不跳过节点。
-不能按值到达次数重复启动节点。Subflow 的输入和最终输出保持显式声明，不能越过图边界直接引用内部或外部节点。
+每个可执行节点可设置正整数 `maxExecutions`，未设置时为 1000。计数按一次 Flow Run 累计，并按 graph 与 node ID 区分；同一 Subflow 中的节点跨多次调用累计。
+达到上限后，下一次到达使 Run 报错终止，不再执行该节点。每次 invocation 有独立 job/execution identity；Wait 和 Agent 的决议恢复继续原 invocation，不额外计次。暂停检查点保留累计次数、各等待 invocation 的输入路径和 Agent continuation。
+
+节点输入只能引用本图中经执行边可达的 output，包括回边上之前执行的自身 output。每次 invocation 继承触发路径上的结果快照，重复节点更新该路径中的自身结果；并行路径的结果不共享。
+多个 source 表示当前路径上的备选值；零个可用来源补 `null`，一个来源取其值，同时有多个值时报错；实际输出 `null` 仍算一个来源。输入按端口声明校验，失败时报错，不跳过节点。首次进入循环时尚未产生的回边来源也按缺失处理。
+Subflow 的输入和最终输出保持显式声明，不能越过图边界直接引用内部或外部节点。Flow 最终结果保留每个已完成末端节点的最后一次完成结果，完整执行次数和每次输出由运行事件记录。循环的最终执行次数无法预知，Scheduler 不按已完成节点数估算进度，仅在图执行完成时报告 100%。
 
 Task 仅通过返回对象一次性提交最终 output，全部声明和可序列化性校验成功后才向下游提供结果。已声明但缺失或为 `undefined` 的 output 补为 `null` 后按端口声明校验；整个返回值为 `undefined` 时按空对象处理，显式 `null` 等非对象返回值仍非法。
 归一化仅作用于端口值，不改写内部对象字段或数组元素；Condition、Wait 未选中的控制分支不补输出。普通 Flow 数据在 Runtime invocation、Scheduler、Subflow、RunEvent 和 terminal result 边界保持可序列化。

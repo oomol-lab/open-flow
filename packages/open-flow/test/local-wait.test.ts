@@ -162,7 +162,7 @@ it('continues a quiet graph in its original session before the retention deadlin
   expect(f.requests).toHaveLength(1)
 })
 
-it('keeps an ordinary join blocked until both notification and action paths finish', async () => {
+it('executes the merge separately for notification and action arrivals', async () => {
   const f = await fixture()
   const prepared = {
     ...f.prepared,
@@ -195,7 +195,7 @@ it('keeps an ordinary join blocked until both notification and action paths fini
   expect(f.events.some((event) => event.type == 'node.started' && event.nodeId == 'join')).toBe(false)
   sent.resolve({})
   await run
-  expect(f.events.filter((event) => event.type == 'node.completed' && event.nodeId == 'join')).toHaveLength(1)
+  expect(f.events.filter((event) => event.type == 'node.completed' && event.nodeId == 'join')).toHaveLength(2)
 })
 
 it('does not extend the retention window after a wake without a decision', async () => {

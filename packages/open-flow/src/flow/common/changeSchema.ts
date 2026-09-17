@@ -2,6 +2,7 @@ import type { ChangeOperation, FlowDocument, JsonValue, RevisionContent } from '
 
 import { z } from 'zod'
 import { checkJsonDepth } from './json.ts'
+import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
 
 const text = z.string()
 const json = z.json()
@@ -107,12 +108,6 @@ const webhook = {
     })
     .optional(),
 }
-const schedule = z.array(
-  z.union([
-    z.object({ type: z.literal('cron'), expression: text, timezone: text }),
-    z.object({ type: z.literal('every'), unit: z.enum(['day', 'hour', 'minute', 'month', 'week']), value: z.number() }),
-  ]),
-)
 const definition = {
   configSchema: json,
   definitionVersion: z.literal(2),
@@ -131,7 +126,14 @@ const endpoint = z.object({
   successStatus: z.number(),
 })
 const trigger = { name: text, description: text.optional(), icon: text.optional() }
-const base = { inputs, name: text.optional(), description: text.optional(), icon: text.optional(), timeoutMs: z.number().optional() }
+const base = {
+  maxExecutions: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+  inputs,
+  name: text.optional(),
+  description: text.optional(),
+  icon: text.optional(),
+  timeoutMs: z.number().optional(),
+}
 const node = z.union([
   z.object({ ...base, kind: z.literal('condition'), ...condition }),
   z.object({
@@ -149,14 +151,14 @@ const node = z.union([
   z.strictObject({ ...base, kind: z.literal('wait'), input, ...wait }).omit({ timeoutMs: true }),
   z.object({ ...trigger, kind: z.literal('manual') }),
   z.object({ ...trigger, kind: z.literal('webhook'), ...webhook }),
-  z.object({ ...trigger, kind: z.literal('cron'), cronTimes: schedule }),
+  z.object({ ...trigger, kind: z.literal('cron'), cronTimes: triggerScheduleSchema }),
   z.object({
     ...trigger,
     kind: z.literal('poll'),
     bindingId: text,
     config: z.record(text, json),
     definition: z.object({ ...definition, type: z.literal('poll') }),
-    pollTimes: schedule,
+    pollTimes: triggerScheduleSchema,
   }),
   z.object({
     ...trigger,
@@ -298,6 +300,13 @@ const shapes = {
     z.object({
       ...at,
       kind: z.literal('graph.node.field.set'),
+      field: z.literal('maxExecutions'),
+      before: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+      value: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+    }),
+    z.object({
+      ...at,
+      kind: z.literal('graph.node.field.set'),
       field: z.literal('timeoutMs'),
       before: z.number().optional(),
       value: z.number().optional(),
@@ -313,7 +322,7 @@ const shapes = {
   'graph.node.task.name.set': { ...at, before: text, value: text },
   'graph.node.task.capabilities.set': { ...at, before: z.array(capability).optional(), value: z.array(capability).optional() },
   'graph.trigger.config.set': { nodeId: text, name: text, before: json.optional(), value: json.optional() },
-  'graph.trigger.schedule.set': { nodeId: text, before: schedule, value: schedule },
+  'graph.trigger.schedule.set': { nodeId: text, before: triggerScheduleSchema, value: triggerScheduleSchema },
   'module.create': { moduleId: text, module },
   'module.delete': { moduleId: text },
   'module.rename': { moduleId: text, before: text, name: text },
@@ -333,21 +342,25 @@ const variants = new Map(
 )
 const operations = z.array(z.union([...variants.values()])).min(1)
 
+export function parseOperation<Value>(candidate: unknown, index: number, parse: (value: unknown) => Value): Value {
+  try {
+    return parse(candidate)
+  } catch (error) {
+    if (!(error instanceof z.ZodError)) throw error
+    throw new TypeError(`operations[${index}]: ${error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`, { cause: error })
+  }
+}
+
+export function decodeChangeOperation(candidate: unknown, index: number): ChangeOperation {
+  const { kind } = parseOperation(candidate, index, z.object({ kind: text }).parse)
+  const schema = variants.get(kind)
+  if (schema == null) throw new TypeError(`operations[${index}]: Unknown operation ${JSON.stringify(kind)}.`)
+  return parseOperation<unknown>(candidate, index, schema.parse) as ChangeOperation
+}
+
 export function decodeChangeOperations(value: unknown): readonly ChangeOperation[] {
   checkJsonDepth(value)
-  return z
-    .array(z.unknown())
-    .min(1)
-    .parse(value)
-    .map((candidate, index) => {
-      const { kind } = z.object({ kind: text }).parse(candidate)
-      const schema = variants.get(kind)
-      if (schema == null) throw new TypeError(`operations[${index}]: Unknown operation ${JSON.stringify(kind)}.`)
-      const result = schema.safeParse(candidate)
-      if (!result.success)
-        throw new TypeError(`operations[${index}]: ${result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`)
-      return result.data as ChangeOperation
-    })
+  return z.array(z.unknown()).min(1).parse(value).map(decodeChangeOperation)
 }
 
 export function changeOperationsSchema(kind?: string): JsonValue {

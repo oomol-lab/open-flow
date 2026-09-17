@@ -20,6 +20,7 @@ const taskInputDefinitions = taskFields.map(({ value: _value, ...definition }) =
 
 type Fixture = { id: string; group: string; node: GraphNode; content?: Partial<RevisionContent['document']> }
 const fixtures: readonly Fixture[] = [
+  { id: 'execution-limit', group: 'Fixed Values', node: { kind: 'value', name: 'Loop step', inputs: {}, values: [], maxExecutions: 1000 } },
   { id: 'value', group: 'Fixed Values', node: { kind: 'value', name: 'Fixed values', inputs: {}, values } },
   {
     id: 'task',
@@ -58,6 +59,7 @@ const fixtures: readonly Fixture[] = [
     node: {
       kind: 'wait',
       name: 'Approve release',
+      maxExecutions: 25,
       inputs: { report: { kind: 'value', value: 'Release notes are ready for review.' } },
       input: field('report'),
       actions: ['approve', 'reject'],
@@ -232,11 +234,13 @@ function PropertiesStory({ fixture, dark, language, log }: { fixture: Fixture; d
 export const nodePropertiesStories: readonly FrontendStory[] = fixtures.map((fixture) => ({
   group: `Node ${fixture.group}`,
   id: `node-${fixture.id}-properties`,
-  title: 'Properties',
+  title: fixture.id == 'execution-limit' ? 'Execution limit' : 'Properties',
   standalone: true,
   description:
-    fixture.id === 'value'
-      ? 'Editable and read-only properties, including typed dates, calendar selection, and time editing with timezone preservation. Use Sort to reorder fields and nested object properties; Done sorting restores disclosure arrows. Samples save independently.'
-      : 'Editable, read-only and fixed-type value panels. Inspector samples save independently; reload verifies saved values.',
+    fixture.id == 'execution-limit'
+      ? 'Per-run node execution limits. Change the limit, test invalid values, or clear it to restore the default of 1000; reload verifies persistence.'
+      : fixture.id === 'value'
+        ? 'Editable and read-only properties, including typed dates, calendar selection, and time editing with timezone preservation. Use Sort to reorder fields and nested object properties; Done sorting restores disclosure arrows. Samples save independently.'
+        : 'Editable, read-only and fixed-type value panels. Inspector samples save independently; reload verifies saved values.',
   render: (log, dark, language) => <PropertiesStory fixture={fixture} dark={dark} language={language} log={log} />,
 }))

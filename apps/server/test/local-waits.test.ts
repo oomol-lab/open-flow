@@ -40,10 +40,11 @@ function fixture() {
     (waitId): WaitRequest => ({ waitId, nodeId: waitId, jobId: waitId, actions: ['approve', 'reject'], prompt: waitId, value: null, notify: true }),
   )
   const checkpoint: FlowRunCheckpoint = {
-    version: 4,
+    version: 5,
     agents: {},
     results: {},
-    skipped: [],
+    counts: {},
+    frames: Object.fromEntries(waits.map((wait) => [wait.jobId, {}])),
     inputs: {},
     bindingValues: {},
     waits: waits.map((wait) => {

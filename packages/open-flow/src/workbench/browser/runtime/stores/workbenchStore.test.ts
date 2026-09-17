@@ -1,9 +1,98 @@
+import type { FlowCatalogEvent } from '../contract.ts'
+
 import { val } from 'value-enhancer'
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
+import { NavigationStore } from '../navigation.ts'
 import { WorkbenchStore } from './workbenchStore.ts'
 
 const timestamp = '2026-09-01T00:00:00.000Z'
+
+function catalogSession(initialFlowId?: string) {
+  let emit: ((event?: FlowCatalogEvent) => void) | undefined
+  const client = new WorkbenchClient(vi.fn(), undefined, (listener) => {
+    emit = listener
+    return { ready: Promise.resolve(), stop: vi.fn() }
+  })
+  const list = vi.spyOn(client, 'listFlows').mockResolvedValue({ flows: [], version: 1 })
+  vi.spyOn(client, 'getEditor').mockImplementation(async (flowId) => ({
+    flow: { flowId, name: flowId, createdAt: timestamp, updatedAt: timestamp, draftRevisionId: 'revision', status: 'active', version: 1 },
+    draft: {
+      flowId,
+      revisionId: 'revision',
+      actorId: 'actor',
+      createdAt: timestamp,
+      digest: 'digest',
+      modelVersion: 2,
+      parentRevisionId: null,
+      version: 1,
+      content: { modelVersion: 2, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: {}, edges: [] } } },
+    },
+    live: { flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 },
+    presentation: { revision: 1, updatedAt: timestamp, value: {}, version: 1 },
+    version: 1,
+  }))
+  const store = new WorkbenchStore(client, { getItem: () => null, setItem: () => {} })
+  const navigate = vi.fn()
+  const navigation = new NavigationStore(store, { flowId: initialFlowId, view: 'design' }, navigate)
+  return { store, navigation, navigate, list, emit: (event?: FlowCatalogEvent) => emit!(event) }
+}
+
+describe('Flow creation notifications', () => {
+  it('opens a newly created Flow from the catalog and ignores a burst once navigation starts', async () => {
+    const { store, navigation, navigate, emit } = catalogSession()
+    try {
+      await navigation.start()
+      emit({ kind: 'flow.created', flowId: 'new-flow', version: 1 })
+      emit({ kind: 'flow.created', flowId: 'second-flow', version: 1 })
+      await vi.waitFor(() => expect(store.workspace.$.draft.value?.flowId).toBe('new-flow'))
+      expect(navigate).toHaveBeenCalledTimes(1)
+      expect(navigate).toHaveBeenCalledWith({ flowId: 'new-flow', view: 'design' }, { replace: true })
+      emit({ kind: 'flow.created', flowId: 'third-flow', version: 1 })
+      expect(store.workspace.$.flowId.value).toBe('new-flow')
+    } finally {
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
+  it('refreshes without navigation on initial load, catalog changes and reconnection', async () => {
+    const { store, navigation, navigate, list, emit } = catalogSession()
+    try {
+      await navigation.start()
+      emit({ kind: 'flows.changed', version: 1 })
+      emit()
+      expect(list).toHaveBeenCalledTimes(3)
+      expect(navigate).not.toHaveBeenCalled()
+      expect(store.workspace.$.flowId.value).toBeUndefined()
+      store.dispose()
+      emit({ kind: 'flow.created', flowId: 'late-flow', version: 1 })
+      expect(navigate).not.toHaveBeenCalled()
+    } finally {
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
+  it('does not replace an initial detail route with a creation received during startup', async () => {
+    const { store, navigation, navigate, list, emit } = catalogSession('existing-flow')
+    const loading = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['listFlows']>>>()
+    list.mockReturnValueOnce(loading.promise)
+    try {
+      const started = navigation.start()
+      await vi.waitFor(() => expect(list).toHaveBeenCalled())
+      emit({ kind: 'flow.created', flowId: 'new-flow', version: 1 })
+      loading.resolve({ flows: [], version: 1 })
+      await started
+      expect(store.workspace.$.flowId.value).toBe('existing-flow')
+      expect(navigate).not.toHaveBeenCalled()
+    } finally {
+      loading.resolve({ flows: [], version: 1 })
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+})
 
 describe('WorkbenchStore Variables', () => {
   it('does not request Variable names when the host disables Variables', async () => {
@@ -104,7 +193,7 @@ describe('WorkbenchStore diagnostics', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v4',
+          engineContract: 'open-flow-engine/v5',
           flowId: flow.flowId,
           modelVersion: 2,
           revisionDigest: draft.digest,

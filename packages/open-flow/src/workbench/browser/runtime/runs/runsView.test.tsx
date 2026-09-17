@@ -1,4 +1,4 @@
-import type { Run, RunResult } from '../api.ts'
+import type { RunDetails, RunResult } from '../api.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -9,16 +9,34 @@ import { createI18n } from '../i18n.ts'
 import { RunsView } from './runsView.tsx'
 
 describe('RunsView timeline', () => {
-  it('shows the shared inline terminal error while keeping the output view', () => {
+  it.each(['failed', 'running', 'waiting'] as const)('shows actions and results for a %s run', (status) => {
     const finishedAt = '2026-08-27T10:00:01.000Z'
-    const run: Run = {
+    const run: RunDetails = {
+      closureDigest: 'closure',
+      engineContract: 'open-flow-engine/v5',
+      engineDigest: 'engine',
+      modelVersion: 2,
+      revisionDigest: 'revision',
+      waits:
+        status == 'failed'
+          ? []
+          : [
+              {
+                actions: ['continue'],
+                expiresAt: '2026-09-03T10:00:00.000Z',
+                nodeId: 'wait',
+                prompt: 'Review before continuing',
+                waitId: 'wait',
+                waitingSince: '2026-08-27T10:00:00.000Z',
+              },
+            ],
       createdAt: '2026-08-27T10:00:00.000Z',
       finishedAt,
       flowId: 'flow',
       revisionId: 'revision',
       runId: 'run',
       source: 'draft',
-      status: 'failed',
+      status,
       version: 1,
     }
     const result: RunResult = {
@@ -44,7 +62,8 @@ describe('RunsView timeline', () => {
           nextCursor: val<string | undefined>(),
           observationFailed: val(false),
           refreshing: val(false),
-          result: val(result),
+          resolvingActions: val(new Map()),
+          result: val(status == 'failed' ? result : undefined),
           run: val(run),
           runs: val([run]),
         },
@@ -60,12 +79,19 @@ describe('RunsView timeline', () => {
 
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
-        <RunsView onLocateEvent={() => undefined} store={store} />
+        <RunsView onLocateEvent={() => undefined} onLocateWait={() => undefined} store={store} />
       </I18nProvider>,
     )
 
-    expect(markup).toContain('binding.unresolved')
-    expect(markup).toContain('Variable API_TOKEN could not be resolved.')
+    if (status == 'failed') {
+      expect(markup).toContain('binding.unresolved')
+      expect(markup).toContain('Variable API_TOKEN could not be resolved.')
+      expect(markup).not.toContain('>Continue<')
+    } else {
+      expect(markup).toContain('Review before continuing')
+      expect(markup).toContain('>Continue<')
+      expect(markup).toContain('Locate Wait node')
+    }
     expect(markup).toContain('Timeline')
     expect(markup).toContain('Output')
   })

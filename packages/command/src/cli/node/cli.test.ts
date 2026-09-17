@@ -1,6 +1,7 @@
 import type { ChangeOperation, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { UiLanguage } from '@oomol-lab/open-flow/localization'
 
+import { authoringExample } from '@oomol-lab/open-flow/control-requests'
 import { applyFlowChanges } from '@oomol-lab/open-flow/flow-change'
 import { uiLanguages } from '@oomol-lab/open-flow/localization'
 import { describe, expect, it, vi } from 'vitest'
@@ -175,7 +176,7 @@ describe('CLI', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v4',
+          engineContract: 'open-flow-engine/v5',
           flowId: flow.flowId,
           modelVersion: 2,
           revisionDigest: 'digest-1',
@@ -276,7 +277,7 @@ it.each([
         version: 1,
         waits: [],
         closureDigest: 'closure',
-        engineContract: 'open-flow-engine/v4',
+        engineContract: 'open-flow-engine/v5',
         engineDigest: 'engine',
         modelVersion: 2,
         revisionDigest: 'digest',
@@ -303,7 +304,7 @@ const runFixture = {
   version: 1,
   waits: [],
   closureDigest: 'closure',
-  engineContract: 'open-flow-engine/v4',
+  engineContract: 'open-flow-engine/v5',
   engineDigest: 'engine',
   modelVersion: 2,
   revisionDigest: 'digest',
@@ -447,6 +448,25 @@ describe('agent command contract', () => {
     expect(request).not.toHaveBeenCalled()
   })
 
+  it('advertises pending-wait as a flag and forwards the filter to the host', async () => {
+    const help = runtime()
+    const request = vi.fn(async (path: string) => {
+      if (path == '/v1/flows/flow-1') return Response.json(flow)
+      expect(path).toBe('/v1/flows/flow-1/runs?limit=100&pendingWait=true')
+      return Response.json({ flowId: flow.flowId, runs: [], version: 1 })
+    })
+    expect(await runCli(['runs', 'list', '--help', '--json'], { request }, help.value)).toBe(0)
+    expect(JSON.parse(help.stdout())).toMatchObject({
+      commands: [{ options: expect.arrayContaining([expect.objectContaining({ name: '--pending-wait', value: false, type: 'boolean' })]) }],
+    })
+    expect(request).not.toHaveBeenCalled()
+
+    const output = runtime()
+    expect(await runCli(['runs', 'list', '--flow', 'flow-1', '--pending-wait', '--json'], { request }, output.value), output.stderr()).toBe(0)
+    expect(JSON.parse(output.stdout())).toMatchObject({ kind: 'run.list', runs: [] })
+    expect(request).toHaveBeenCalledTimes(2)
+  })
+
   it('returns one page and its continuation cursor', async () => {
     const output = runtime()
     const request = vi.fn(async (path: string) => {
@@ -506,7 +526,7 @@ describe('agent command contract', () => {
               waits: [],
               closureDigest: 'closure',
               diagnostics: [],
-              engineContract: 'open-flow-engine/v4',
+              engineContract: 'open-flow-engine/v5',
               flowId: flow.flowId,
               modelVersion: 2,
               revisionDigest: 'digest',
@@ -578,7 +598,7 @@ it('applies a complete operation batch atomically and reports validation separat
         waits: [],
         closureDigest: 'closure',
         diagnostics: [],
-        engineContract: 'open-flow-engine/v4',
+        engineContract: 'open-flow-engine/v5',
         flowId: flow.flowId,
         modelVersion: 2,
         revisionDigest: 'digest',
@@ -591,6 +611,41 @@ it('applies a complete operation batch atomically and reports validation separat
   expect(await runCli(['apply', 'flow-1', '--file=changes.json', '--json'], { request }, output.value), output.stderr()).toBe(0)
   expect(changes).toBe(1)
   expect(JSON.parse(output.stdout())).toMatchObject({ changed: true, valid: false, revisionId: 'revision-2' })
+})
+
+it('discovers and submits the shared compact trigger example without inlining a definition', async () => {
+  const help = runtime()
+  expect(await runCli(['schema', 'example.poll', '--json'], { request: vi.fn() }, help.value)).toBe(0)
+  expect(JSON.parse(help.stdout())).toEqual(authoringExample('poll'))
+  const output = runtime()
+  output.value.readFile = async () => help.stdout()
+  const request = async (path: string, init?: RequestInit) => {
+    if (path == '/v1/flows/flow-1') return Response.json(flow)
+    if (path.endsWith('/revisions/revision-1')) return Response.json(revisionFixture)
+    if (path.endsWith('/draft/changes')) {
+      expect(JSON.parse(String(init?.body)).operations).toEqual(authoringExample('poll').operations)
+      return Response.json({ version: 1, revision: { ...revisionFixture, content: undefined, revisionId: 'revision-2', parentRevisionId: 'revision-1' } })
+    }
+    throw new Error('Check unavailable')
+  }
+  expect(await runCli(['apply', 'flow-1', '--file', 'changes.json', '--json'], { request }, output.value), output.stderr()).toBe(0)
+  expect(JSON.parse(output.stdout())).toMatchObject({ changed: true, revisionId: 'revision-2', valid: null })
+})
+
+it.each(['flow.invalid', 'flow.revision-upgrade-required'])('keeps inspect metadata when the Draft reports %s', async (code) => {
+  const output = runtime()
+  const request = async (path: string) =>
+    path == '/v1/flows/flow-1' ? Response.json(flow) : Response.json({ error: { code, message: 'Draft needs attention' } }, { status: 409 })
+  expect(await runCli(['inspect', 'flow-1', '--json'], { request }, output.value)).toBe(0)
+  expect(JSON.parse(output.stdout())).toMatchObject({ flow, draft: null, draftIssue: { code, revisionId: 'revision-1' } })
+})
+
+it('does not hide authorization failures as an unreadable Draft', async () => {
+  const output = runtime()
+  const request = async (path: string) =>
+    path == '/v1/flows/flow-1' ? Response.json(flow) : Response.json({ error: { code: 'authorization.denied', message: 'Denied' } }, { status: 403 })
+  expect(await runCli(['inspect', 'flow-1', '--json'], { request }, output.value)).toBe(1)
+  expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'authorization.denied' } })
 })
 
 it('inspects complete editable content without invoking check', async () => {

@@ -1,7 +1,6 @@
-export interface FlowCatalogEvent {
-  readonly kind: 'flows.changed'
-  readonly version: 1
-}
+export type FlowCatalogEvent =
+  | { readonly kind: 'flows.changed'; readonly version: 1 }
+  | { readonly kind: 'flow.created'; readonly flowId: string; readonly version: 1 }
 
 export type FlowChangeEvent =
   | {

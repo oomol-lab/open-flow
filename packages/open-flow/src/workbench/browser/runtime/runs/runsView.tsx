@@ -12,7 +12,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '..
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Tabs, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Icon } from '../icons.tsx'
-import { duration, initialRunLogFilters, RunLog, RunLogButton, RunLogFilters, runLabel, statusClass } from './runDrawer.tsx'
+import { ActiveWait, duration, initialRunLogFilters, RunLog, RunLogButton, RunLogFilters, runLabel, statusClass } from './runDrawer.tsx'
 import { RunResultView } from './runOutput.tsx'
 import { canCancelRun } from './runStore.ts'
 
@@ -34,10 +34,12 @@ function shortRunId(runId: string): string {
 export function RunsView({
   onConfigureConnector,
   onLocateEvent,
+  onLocateWait,
   store,
 }: {
   readonly onConfigureConnector?: (() => void) | undefined
   readonly onLocateEvent: (sequence: number) => void
+  readonly onLocateWait: (nodeId: string) => void
   readonly store: WorkbenchStore
 }): ReactElement {
   const language = useLang()
@@ -56,6 +58,7 @@ export function RunsView({
   const result = useVal(store.runs.$.result)
   const refreshing = useVal(store.runs.$.refreshing)
   const run = useVal(store.runs.$.run)
+  const resolvingActions = useVal(store.runs.$.resolvingActions)
   const runs = useVal(store.runs.$.runs)
   const observationFailed = useVal(store.runs.$.observationFailed)
   const revision = useVal(store.workspace.$.revision)
@@ -163,46 +166,54 @@ export function RunsView({
           <div className="run-detail-empty">{t('run.selectRun')}</div>
         ) : (
           <>
-            <header className="run-detail-header">
-              {narrow && (
-                <Button onClick={closeNarrowDetail} size="sm" variant="ghost">
-                  <Icon name="chevron-left" /> {t('run.history')}
-                </Button>
-              )}
-              <div>
-                <span className={`status-dot ${statusClass(run)}`} />
-                <strong>{runLabel(run, t)}</strong>
-                <Badge variant="secondary">{sourceLabel(run, t)}</Badge>
-              </div>
-              <div className="run-detail-actions">
-                <div className="run-detail-meta">
-                  <span>
-                    {t('run.duration')}: {duration(run)}
-                  </span>
-                  <time dateTime={run.createdAt}>{new Date(run.createdAt).toLocaleString(language)}</time>
-                  {triggerRun != null && (
-                    <>
-                      <span title={triggerRun.triggerNodeId}>
-                        {t('run.triggerNode')}: {triggerName ?? triggerRun.triggerNodeId}
-                      </span>
-                      <span title={triggerRun.occurrenceId}>
-                        {t('run.triggerOccurrence')}: {triggerRun.occurrenceId}
-                      </span>
-                      <span title={triggerRun.publicationId}>
-                        {t('run.triggerPublication')}: {triggerRun.publicationId}
-                      </span>
-                    </>
-                  )}
-                  <code>{run.runId}</code>
-                </div>
-                <RunLogButton events={events} eventsExpiresAt={eventsExpiresAt} historyComplete={historyComplete} run={run} />
-                {canCancelRun(run) && (
-                  <Button disabled={cancelingRunId != null} onClick={() => void store.runs.cancel()} size="sm" variant="destructive">
-                    {t(cancelingRunId == run.runId ? 'run.canceling' : 'run.cancel')}
+            <div>
+              <header className="run-detail-header">
+                {narrow && (
+                  <Button onClick={closeNarrowDetail} size="sm" variant="ghost">
+                    <Icon name="chevron-left" /> {t('run.history')}
                   </Button>
                 )}
-              </div>
-            </header>
+                <div>
+                  <span className={`status-dot ${statusClass(run)}`} />
+                  <strong>{runLabel(run, t)}</strong>
+                  <Badge variant="secondary">{sourceLabel(run, t)}</Badge>
+                </div>
+                <div className="run-detail-actions">
+                  <div className="run-detail-meta">
+                    <span>
+                      {t('run.duration')}: {duration(run)}
+                    </span>
+                    <time dateTime={run.createdAt}>{new Date(run.createdAt).toLocaleString(language)}</time>
+                    {triggerRun != null && (
+                      <>
+                        <span title={triggerRun.triggerNodeId}>
+                          {t('run.triggerNode')}: {triggerName ?? triggerRun.triggerNodeId}
+                        </span>
+                        <span title={triggerRun.occurrenceId}>
+                          {t('run.triggerOccurrence')}: {triggerRun.occurrenceId}
+                        </span>
+                        <span title={triggerRun.publicationId}>
+                          {t('run.triggerPublication')}: {triggerRun.publicationId}
+                        </span>
+                      </>
+                    )}
+                    <code>{run.runId}</code>
+                  </div>
+                  <RunLogButton events={events} eventsExpiresAt={eventsExpiresAt} historyComplete={historyComplete} run={run} />
+                  {canCancelRun(run) && (
+                    <Button disabled={cancelingRunId != null} onClick={() => void store.runs.cancel()} size="sm" variant="destructive">
+                      {t(cancelingRunId == run.runId ? 'run.canceling' : 'run.cancel')}
+                    </Button>
+                  )}
+                </div>
+              </header>
+              <ActiveWait
+                onLocate={onLocateWait}
+                onResolve={(waitId, action) => void store.runs.resolve(waitId, action)}
+                resolvingActions={resolvingActions}
+                run={run}
+              />
+            </div>
             <div className="run-history-content">
               <div className="run-toolbar">
                 <Tabs className="run-tabs-root" onValueChange={(value) => value != null && setTab(value as 'output' | 'timeline')} value={tab}>
