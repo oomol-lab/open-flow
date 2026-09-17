@@ -2,6 +2,7 @@ import type { ChangeOperation, FlowDocument, JsonValue, RevisionContent } from '
 
 import { z } from 'zod'
 import { checkJsonDepth } from './json.ts'
+import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
 
 const text = z.string()
 const json = z.json()
@@ -107,12 +108,6 @@ const webhook = {
     })
     .optional(),
 }
-export const triggerScheduleSchema = z.array(
-  z.union([
-    z.object({ type: z.literal('cron'), expression: text, timezone: text }),
-    z.object({ type: z.literal('every'), unit: z.enum(['day', 'hour', 'minute', 'month', 'week']), value: z.number() }),
-  ]),
-)
 const definition = {
   configSchema: json,
   definitionVersion: z.literal(2),

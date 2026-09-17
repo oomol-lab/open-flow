@@ -639,7 +639,7 @@ export class PublicationStore {
           .prepare(
             `UPDATE cron_bindings
              SET current_publication_id = ?, runtime_version = runtime_version + 1,
-                 trigger_json = ?, schedule_json = ?, next_at = ?, updated_at = ?
+                 trigger_json = ?, schedule_json = ?, next_at = ?, updated_at = ?, last_error_code = NULL
              WHERE binding_id = ?`,
           )
           .run(publicationId, cron.triggerJson, cron.scheduleJson, cron.nextAt, input.publishedAt, binding.bindingId)
@@ -649,7 +649,7 @@ export class PublicationStore {
           .prepare(
             `UPDATE cron_bindings
              SET current_publication_id = NULL, runtime_version = runtime_version + 1,
-                 trigger_json = NULL, schedule_json = NULL, next_at = NULL, updated_at = ?
+                 trigger_json = NULL, schedule_json = NULL, next_at = NULL, updated_at = ?, last_error_code = NULL
              WHERE binding_id = ?`,
           )
           .run(input.publishedAt, binding.bindingId)

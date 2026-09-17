@@ -31,7 +31,7 @@ it('shares compact trigger transactions and example discovery between MCP and RE
   const current = await control.getDraft(created.flowId)
   expect(current.content.document.graph.nodes.mail).toMatchObject({
     kind: 'poll',
-    definition: { key: 'gmail.on_message_received', payloadSchema: { required: ['events'] } },
+    definition: { key: 'gmail.on_message_received', outputs: [{ handle: 'payload', jsonSchema: { required: ['events'] } }] },
   })
   expect(current.content.document.bindings['mail-account']).toEqual({ kind: 'connection', target: 'CONNECTION_ID' })
   const lookup = vi.spyOn(service.control, 'getTriggerKey').mockImplementation(() => {

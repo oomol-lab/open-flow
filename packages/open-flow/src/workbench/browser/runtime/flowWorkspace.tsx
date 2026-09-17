@@ -610,7 +610,14 @@ export default function FlowWorkspace({
             theme={theme}
           />
         ) : view == 'runs' ? (
-          <RunsView onConfigureConnector={onConfigureConnector} onLocateEvent={locateRunEvent} store={store} />
+          <RunsView
+            onConfigureConnector={onConfigureConnector}
+            onLocateEvent={locateRunEvent}
+            onLocateWait={(nodeId) => {
+              if (store.locateRunWait(nodeId)) navigation.open('design')
+            }}
+            store={store}
+          />
         ) : (
           <PublicationsView store={store} />
         )}

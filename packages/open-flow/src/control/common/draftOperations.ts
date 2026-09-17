@@ -1,14 +1,14 @@
-import type { ChangeOperation, JsonValue, TriggerKeySnapshot } from '../../flow/common/change.ts'
+import type { ChangeOperation, JsonValue, TriggerKeySnapshot, TriggerSchedule } from '../../flow/common/change.ts'
 
 import { z } from 'zod'
 import { changeOperationsSchema, decodeChangeOperations } from '../../flow/common/change.ts'
-import { triggerScheduleSchema } from '../../flow/common/changeSchema.ts'
 import { checkJsonDepth } from '../../flow/common/json.ts'
 import { createProviderTrigger } from '../../flow/common/nodeChanges.ts'
+import { triggerScheduleSchema } from '../../flow/common/triggerScheduleSchema.ts'
 
 const text = z.string().min(1)
 const json: z.ZodType<JsonValue> = z.json()
-const triggerCreate = z.strictObject({
+const triggerCreate: z.ZodType<Extract<DraftOperation, { kind: 'graph.trigger.create' }>> = z.strictObject({
   kind: z.literal('graph.trigger.create'),
   nodeId: text,
   bindingId: text,
@@ -19,7 +19,18 @@ const triggerCreate = z.strictObject({
   schedule: triggerScheduleSchema.readonly().optional(),
 })
 
-export type DraftOperation = ChangeOperation | z.infer<typeof triggerCreate>
+export type DraftOperation =
+  | ChangeOperation
+  | {
+      readonly kind: 'graph.trigger.create'
+      readonly nodeId: string
+      readonly bindingId: string
+      readonly key: string
+      readonly connectionId?: string
+      readonly name?: string
+      readonly config: Readonly<Record<string, JsonValue>>
+      readonly schedule?: readonly TriggerSchedule[]
+    }
 
 export function decodeDraftOperations(value: unknown): readonly DraftOperation[] {
   checkJsonDepth(value)

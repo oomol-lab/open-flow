@@ -40,7 +40,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(19)
+    expect(version(database)).toBe(20)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -81,7 +81,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(19)
+    expect(version(reopened)).toBe(20)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -111,7 +111,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(19)
+    expect(version(reopened)).toBe(20)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -159,13 +159,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 20')
+  database.exec('PRAGMA user_version = 21')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 20 is newer than the supported version 19.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 21 is newer than the supported version 20.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(20)
+  expect(version(reopened)).toBe(21)
   reopened.close()
 })
 
@@ -203,7 +203,7 @@ it('preserves old checkpoint bytes for explicit recovery validation', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(19)
+    expect(version(reopened)).toBe(20)
     expect(reopened.prepare('SELECT * FROM run_checkpoints').get()).toEqual({
       run_id: 'run-a',
       checkpoint_json: '{"value":42}',
@@ -236,9 +236,27 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(19)
+    expect(version(upgraded)).toBe(20)
     expect(tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())).toEqual(before)
     expect(upgraded.prepare('SELECT * FROM listener_work').all()).toEqual([])
+  } finally {
+    upgraded.close()
+  }
+})
+
+it('adds Cron health without changing existing schedules', async () => {
+  const file = await databaseFile()
+  const database = legacyDatabase(file, 19)
+  database
+    .prepare(`INSERT INTO cron_bindings (binding_id, flow_id, trigger_node_id, current_publication_id, runtime_version, next_at, updated_at)
+    VALUES ('binding', 'flow', 'cron', 'publication', 3, 60000, 0)`)
+    .run()
+  const before = database.prepare('SELECT * FROM cron_bindings').get()
+  database.close()
+  Database.open(file).close()
+  const upgraded = new DatabaseSync(file)
+  try {
+    expect(upgraded.prepare('SELECT * FROM cron_bindings').get()).toEqual({ ...before, last_error_code: null })
   } finally {
     upgraded.close()
   }

@@ -2,10 +2,13 @@ import type { RunDetails, RunEvent } from '../../src/control/common/api.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
+import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { RunDrawer } from '../../src/workbench/browser/runtime/runs/runDrawer.tsx'
+import { RunsView } from '../../src/workbench/browser/runtime/runs/runsView.tsx'
+import { WorkbenchStore } from '../../src/workbench/browser/runtime/stores/workbenchStore.ts'
 import { useStoryActions } from './storyActions.tsx'
 
 const waits: RunDetails['waits'] = [
@@ -43,9 +46,53 @@ const base: RunDetails = {
   waits,
 }
 
+function WaitHistory({ language, log }: { readonly language: UiLanguage; readonly log: LogAction }) {
+  const [store, setStore] = useState<WorkbenchStore>()
+  useEffect(() => {
+    let run: RunDetails = { ...base, status: 'waiting' }
+    const client = new WorkbenchClient(async (path, init) => {
+      const url = new URL(String(path), 'https://lab.invalid')
+      if (url.pathname == '/v1/flows/flow/runs') return Response.json({ flowId: run.flowId, runs: [run], version: 1 })
+      if (url.pathname == '/v1/runs/sample') return Response.json(run)
+      if (url.pathname == '/v1/runs/sample/events')
+        return Response.json({ runId: run.runId, events: [], done: true, historyComplete: true, nextAfter: 0, version: 1 })
+      if (url.pathname.endsWith('/resolve')) {
+        const waitId = url.pathname.split('/').at(-2)!
+        const { action } = JSON.parse(String(init?.body))
+        log('history.wait.resolve', { waitId, action })
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        run = { ...run, status: 'running', waits: run.waits.filter((wait) => wait.waitId != waitId) }
+        return Response.json({ runId: run.runId, waitId, action, status: run.status, resolutionAccepted: true, resolvedAt: base.createdAt, version: 1 })
+      }
+      throw new Error(`Unexpected Lab request: ${path}`)
+    })
+    const next = new WorkbenchStore(client, { getItem: () => null, setItem: () => {} }, undefined, createI18n(language))
+    setStore(next)
+    void next.runs.load('flow')
+    return () => next.dispose()
+  }, [language, log])
+  return (
+    <section className="min-w-0 xl:col-span-2">
+      <h3 className="mb-2 font-medium">Run history · resolve waits without opening the canvas</h3>
+      <div className="open-flow-workbench grid" style={{ height: 560 }}>
+        {store != null && <RunsView store={store} onLocateEvent={() => {}} onLocateWait={(nodeId) => log('history.wait.locate', nodeId)} />}
+      </div>
+    </section>
+  )
+}
+
 function WaitRuns({ language, log }: { readonly language: UiLanguage; readonly log: LogAction }) {
   const [pending, setPending] = useState(waits)
-  useStoryActions([{ label: 'Reset approvals', onClick: () => setPending(waits) }])
+  const [generation, setGeneration] = useState(0)
+  useStoryActions([
+    {
+      label: 'Reset approvals',
+      onClick: () => {
+        setPending(waits)
+        setGeneration((value) => value + 1)
+      },
+    },
+  ])
   const states = [
     { title: 'Notification running · independent approvals', run: { ...base, waits: pending }, events: [] as RunEvent[] },
     { title: 'Frozen · all waits remain actionable', run: { ...base, status: 'waiting' as const }, events: [] as RunEvent[] },
@@ -71,36 +118,39 @@ function WaitRuns({ language, log }: { readonly language: UiLanguage; readonly l
   return (
     <I18nProvider i18n={createI18n(language)}>
       <div className="grid gap-4 p-4 xl:grid-cols-2">
+        <WaitHistory key={generation} language={language} log={log} />
         {states.map(({ title, run, events }, index) => (
-          <section key={title} className="open-flow-workbench min-w-0">
+          <section key={title} className="min-w-0">
             <h3 className="mb-2 font-medium">{title}</h3>
-            <RunDrawer
-              cancelDisabled={false}
-              canceling={false}
-              events={events}
-              eventsExpiresAt={undefined}
-              eventFilter="all"
-              eventNodes={new Map()}
-              historyComplete
-              onCancel={() => log('run.cancel', run.runId)}
-              onClose={() => {}}
-              onEventFilterChange={() => {}}
-              onLocateEvent={() => {}}
-              onLocateWait={(nodeId) => log('run.locate', nodeId)}
-              onResolve={(waitId, action) => {
-                log('wait.resolve', { waitId, action })
-                if (index == 0) setPending((items) => items.filter((item) => item.waitId != waitId))
-              }}
-              onRetryObservation={() => {}}
-              onToggle={() => {}}
-              open
-              observationFailed={false}
-              result={undefined}
-              resolvingActions={new Map()}
-              run={run}
-              submitting={false}
-              visible
-            />
+            <div className="open-flow-workbench" style={{ height: 360 }}>
+              <RunDrawer
+                cancelDisabled={false}
+                canceling={false}
+                events={events}
+                eventsExpiresAt={undefined}
+                eventFilter="all"
+                eventNodes={new Map()}
+                historyComplete
+                onCancel={() => log('run.cancel', run.runId)}
+                onClose={() => {}}
+                onEventFilterChange={() => {}}
+                onLocateEvent={() => {}}
+                onLocateWait={(nodeId) => log('run.locate', nodeId)}
+                onResolve={(waitId, action) => {
+                  log('wait.resolve', { waitId, action })
+                  if (index == 0) setPending((items) => items.filter((item) => item.waitId != waitId))
+                }}
+                onRetryObservation={() => {}}
+                onToggle={() => {}}
+                open
+                observationFailed={false}
+                result={undefined}
+                resolvingActions={new Map()}
+                run={run}
+                submitting={false}
+                visible
+              />
+            </div>
           </section>
         ))}
       </div>

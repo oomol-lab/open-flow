@@ -265,7 +265,18 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
     )
     const connectorActionDeclaration = await readFile(path.join(declarationRoot, 'connector/common/actionSchema.d.ts'), 'utf8')
     const connectorProxyDeclaration = await readFile(path.join(declarationRoot, 'connector/common/proxy.d.ts'), 'utf8')
+    await Promise.all(
+      ['draftOperations', 'flowInspection', 'authoringExamples'].map(async (name) => {
+        const declaration = (await readFile(path.join(declarationRoot, `control/common/${name}.d.ts`), 'utf8'))
+          .replaceAll("'./api.ts'", "'./control-api.js'")
+          .replaceAll("'./draftOperations.ts'", "'./draftOperations.js'")
+          .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
+        await writeFile(path.join(commonOutputPath, `${name}.d.ts`), declaration)
+      }),
+    )
     const controlApiDeclaration = (await readFile(path.join(declarationRoot, 'control/common/api.d.ts'), 'utf8'))
+      .replaceAll("'./draftOperations.ts'", "'./draftOperations.js'")
+      .replaceAll("'./flowInspection.ts'", "'./flowInspection.js'")
       .replaceAll("'./eventSources.ts'", "'./event-sources.js'")
       .replaceAll("'../../execution/common/runLifecycle.ts'", "'./run-lifecycle.js'")
       .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
@@ -374,10 +385,10 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(commonOutputPath, 'connector-proxy.d.ts'), connectorProxyDeclaration),
       writeFile(
         path.join(commonOutputPath, 'control-requests.d.ts'),
-        (await readFile(path.join(declarationRoot, 'control/common/requests.d.ts'), 'utf8')).replaceAll(
-          "'../../flow/common/change.ts'",
-          "'../browser/flow-change.js'",
-        ),
+        (await readFile(path.join(declarationRoot, 'control/common/requests.d.ts'), 'utf8'))
+          .replaceAll("'./draftOperations.ts'", "'./draftOperations.js'")
+          .replaceAll("'./authoringExamples.ts'", "'./authoringExamples.js'")
+          .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'"),
       ),
       writeFile(
         path.join(commonOutputPath, 'mcp.d.ts'),

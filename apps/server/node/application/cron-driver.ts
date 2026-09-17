@@ -8,6 +8,7 @@ import { canonicalJsonBytes, decodeRevision, digestBytes } from '@oomol-lab/open
 import { matchesTriggerOutputs } from '@oomol-lab/open-flow/flow-semantics'
 import * as Effect from 'effect/Effect'
 import { isDeepStrictEqual } from 'node:util'
+import { AcceptanceError } from '../error.ts'
 
 const admissionRetryMs = 1_000
 const cronBatchSize = 100
@@ -66,9 +67,24 @@ export class CronDriver {
   #admit(target: StoredCronTarget, now: number): Effect.Effect<'admitted' | 'overloaded', unknown> {
     return Effect.gen({ self: this }, function* () {
       const fixed = yield* Effect.tryPromise({
-        try: () => this.#validate(decodeRevision(new TextEncoder().encode(target.content))),
+        try: () => {
+          let revision
+          try {
+            revision = decodeRevision(new TextEncoder().encode(target.content))
+          } catch {
+            throw new AcceptanceError('revision-invalid', 'Published Revision cannot be read. Upgrade or repair the Draft and publish it again.')
+          }
+          return this.#validate(revision)
+        },
         catch: (error) => error,
-      })
+      }).pipe(
+        Effect.catch((error) => {
+          if (!(error instanceof AcceptanceError)) return Effect.fail(error)
+          this.#store.triggers.failCronTarget(target, now, error.code, error.message)
+          return Effect.succeed(undefined)
+        }),
+      )
+      if (fixed == null) return 'admitted'
       const trigger = fixed.prepared.graph.nodes[target.triggerNodeId]
       if (
         fixed.revisionDigest != target.revisionDigest ||
