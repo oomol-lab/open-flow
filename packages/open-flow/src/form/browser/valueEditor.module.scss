@@ -114,6 +114,7 @@
   --error-border-width: var(--ui-danger-border-width);
   --error-inline-outset: 0px;
   --error-overlap: var(--ui-control-radius, var(--ui-radius));
+  --error-transition-duration: 160ms;
   --error-background: color-mix(in srgb, var(--ui-destructive) 92%, white);
   --error-foreground: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
   inset: 100% calc(-1 * var(--error-inline-outset)) auto;
@@ -130,7 +131,11 @@
   font-size: 12px;
   line-height: 1.25;
   color: var(--error-foreground);
+  opacity: 0;
   overflow-wrap: anywhere;
+  transition:
+    opacity var(--error-transition-duration) ease,
+    visibility 0s linear var(--error-transition-duration);
   visibility: hidden;
 }
 /* Only value-editor focus owns feedback. Pointer-focused disclosures and previews
@@ -142,18 +147,28 @@ $feedback-targets: '#{$summary-focus}, > .body:not([hidden]) :focus-visible';
 $feedback-focus: ':has(#{$feedback-targets})';
 :global([data-value-editor-scope]):has(#{selector.nest('.root', $feedback-targets)}),
 .root#{$feedback-focus} {
+  --error-hover-opacity: 0;
   --error-hover-visibility: hidden;
 }
 :is(.body:not([hidden]), .errorAnchor):hover > .error,
 .root:has(> :is(.summary, .arrayItemType, .valueTools):hover) > .summaryError > .error,
 .summaryError:hover > .error {
+  opacity: var(--error-hover-opacity, 1);
+  transition: opacity var(--error-transition-duration) ease;
   visibility: var(--error-hover-visibility, visible);
 }
 :is(.body:not([hidden]), .errorAnchor):has(:focus-visible) > .error,
 .root:has(#{$summary-focus}) > .summaryError > .error {
   --error-border-width: var(--ui-danger-focus-width);
   --error-inline-outset: calc(var(--ui-danger-focus-width) - var(--ui-danger-border-width));
+  opacity: 1;
+  transition: opacity var(--error-transition-duration) ease;
   visibility: visible;
+}
+@media (prefers-reduced-motion: reduce) {
+  .error {
+    --error-transition-duration: 0s;
+  }
 }
 .root:not(#{$feedback-focus}):has(> :is(.body, .summary, .arrayItemType, .valueTools, .summaryError):hover) {
   z-index: var(--value-editor-hover-layer, 1);
