@@ -187,6 +187,8 @@
       "nameDuplicate": "이 그래프에 같은 이름의 노드가 이미 있습니다.",
       "nameEmpty": "노드 이름은 비워 둘 수 없습니다.",
       "timeout": "제한 시간(ms)",
+      "maxExecutions": "실행당 최대 실행 횟수",
+      "maxExecutionsError": "최대 실행 횟수는 양의 정수여야 합니다.",
       "timeoutError": "제한 시간은 밀리초 단위의 양의 정수여야 합니다.",
       "title": "노드 설정",
       "description": "목적",

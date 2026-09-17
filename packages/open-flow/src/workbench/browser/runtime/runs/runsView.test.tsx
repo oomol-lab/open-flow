@@ -13,7 +13,7 @@ describe('RunsView timeline', () => {
     const finishedAt = '2026-08-27T10:00:01.000Z'
     const run: RunDetails = {
       closureDigest: 'closure',
-      engineContract: 'open-flow-engine/v4',
+      engineContract: 'open-flow-engine/v5',
       engineDigest: 'engine',
       modelVersion: 2,
       revisionDigest: 'revision',

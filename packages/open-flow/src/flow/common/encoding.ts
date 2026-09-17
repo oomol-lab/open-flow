@@ -101,6 +101,7 @@ function canonicalNode(value: GraphNode): JsonValue {
     ...(value.icon == null ? {} : { icon: value.icon }),
     inputs: canonicalInputs(value.inputs),
     ...(value.name == null ? {} : { name: value.name }),
+    ...(value.maxExecutions == null ? {} : { maxExecutions: value.maxExecutions }),
     ...(value.timeoutMs == null ? {} : { timeoutMs: value.timeoutMs }),
   }
   switch (value.kind) {

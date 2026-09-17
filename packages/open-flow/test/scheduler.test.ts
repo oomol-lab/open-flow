@@ -891,7 +891,7 @@ describe('revision graph scheduler', () => {
   it.each([
     ['a', 20],
     ['b', 20],
-  ] as const)('waits for both parallel predecessors when %s is slower', async (slow, delay) => {
+  ] as const)('executes once per arrival with isolated inputs when %s is slower', async (slow, delay) => {
     const source = revision(
       {
         bindings: {},
@@ -930,13 +930,14 @@ describe('revision graph scheduler', () => {
             finished.push(invocation.nodeId)
             return { item: invocation.nodeId }
           }
-          expect(finished.toSorted()).toEqual(['a', 'b'])
+          expect(finished.length).toBe(calls + 1)
+          expect(invocation.input).toEqual(finished.at(-1) == 'a' ? { a: 'a', b: null } : { a: null, b: 'b' })
           calls++
           return { seen: [invocation.input.a, invocation.input.b] }
         }),
     })
-    expect(calls).toBe(1)
-    expect(result.nodes[0]).toMatchObject({ status: 'completed', outputs: { seen: ['a', 'b'] } })
+    expect(calls).toBe(2)
+    expect(result.nodes[0]).toMatchObject({ status: 'completed', outputs: { seen: slow == 'a' ? ['a', null] : [null, 'b'] } })
   })
 
   it('publishes all final outputs in one completion before starting downstream work', async () => {
@@ -1388,7 +1389,7 @@ it('validates formed Webhook outputs at launch and checkpoint recovery without p
   const outputs = { headers: { test: 'original' }, query: { tag: ['a', 'b'] }, body: {}, webhookUrl: 'https://example.com/webhook' }
   const first = await runOutcome(prepared, { runId: 'webhook-checkpoint', trigger: { nodeId: 'start', outputs }, invokeTask: () => Effect.succeed({}) })
   if (first.kind !== 'waiting') throw new Error('Expected a checkpoint.')
-  expect(first.checkpoint.version).toBe(4)
+  expect(first.checkpoint.version).toBe(5)
   expect(first.checkpoint.results.start?.outputs).toEqual(outputs)
   expect(() => decodeFlowRunCheckpoint({ ...first.checkpoint, version: 3 })).toThrow(/version/)
   const invalidOutputs: readonly Readonly<Record<string, JsonValue>>[] = [{ payload: outputs }, { ...outputs, webhookUrl: 2 }, { ...outputs, extra: null }]

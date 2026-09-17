@@ -131,6 +131,7 @@ interface GraphNodeBase {
   readonly icon?: string
   readonly inputs: Readonly<Record<string, InputMapping>>
   readonly name?: string
+  readonly maxExecutions?: number
   readonly timeoutMs?: number
 }
 
@@ -471,7 +472,7 @@ export type ChangeOperation =
   | { readonly kind: 'graph.node.delete'; readonly nodeId: string; readonly target: GraphTarget }
   | {
       readonly before?: number | string
-      readonly field: 'description' | 'icon' | 'name' | 'timeoutMs'
+      readonly field: 'description' | 'icon' | 'maxExecutions' | 'name' | 'timeoutMs'
       readonly kind: 'graph.node.field.set'
       readonly nodeId: string
       readonly target: GraphTarget

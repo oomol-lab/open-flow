@@ -187,6 +187,8 @@
       "nameDuplicate": "Un nœud portant ce nom existe déjà dans ce graphe.",
       "nameEmpty": "Le nom du nœud ne peut pas être vide.",
       "timeout": "Délai d'expiration (ms)",
+      "maxExecutions": "Nombre maximal d’exécutions par run",
+      "maxExecutionsError": "Le nombre maximal d’exécutions doit être un entier positif.",
       "timeoutError": "Le délai d'expiration doit être un entier positif exprimé en millisecondes.",
       "title": "Paramètres du nœud",
       "description": "Objectif",

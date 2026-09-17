@@ -131,7 +131,7 @@ describe('ControlClient Flow API', () => {
           values: { taskId: 'missing', variant: 'task' },
         },
       ],
-      engineContract: 'open-flow-engine/v4',
+      engineContract: 'open-flow-engine/v5',
       flowId: flow.flowId,
       modelVersion: 2,
       revisionDigest: 'revision-digest-1',
@@ -176,7 +176,7 @@ describe('ControlClient Publish API', () => {
       1,
       '/v1/flows/flow%2F1/revisions/revision-1/publications',
       expect.objectContaining({
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v4', expectedLivePublicationId: null, version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v5', expectedLivePublicationId: null, version: 1 }),
         method: 'POST',
       }),
     )
@@ -247,7 +247,7 @@ describe('ControlClient Wait API', () => {
   const waiting = {
     closureDigest: 'closure-1',
     createdAt: '2026-09-01T00:00:00.000Z',
-    engineContract: 'open-flow-engine/v4',
+    engineContract: 'open-flow-engine/v5',
     engineDigest: 'engine-1',
     flowId: flow.flowId,
     modelVersion: 2,

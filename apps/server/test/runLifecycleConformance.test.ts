@@ -100,7 +100,16 @@ for (const conformance of runLifecycleConformanceCases) {
               runId,
               {
                 kind: 'waiting',
-                checkpoint: { bindingValues: {}, inputs: {}, results: {}, skipped: [], version: 4, agents: {}, waits: [{ ...wait, value: null }] },
+                checkpoint: {
+                  bindingValues: {},
+                  inputs: {},
+                  results: {},
+                  counts: {},
+                  frames: { [wait.jobId]: {} },
+                  version: 5,
+                  agents: {},
+                  waits: [{ ...wait, value: null }],
+                },
               },
               1_000,
             ) != null

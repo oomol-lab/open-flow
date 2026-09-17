@@ -174,7 +174,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         source.kind == 'comment' ||
         destination.kind == 'comment' ||
         destination.kind == 'trigger' ||
-        edge.source == edge.target ||
         edge.targetHandle != '$in'
       )
         return false

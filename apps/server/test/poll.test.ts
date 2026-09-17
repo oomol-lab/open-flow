@@ -394,7 +394,7 @@ describe('Server Poll Trigger', () => {
         { binding: { kind: 'connection', target: 'connection-main' }, bindingId: 'connection', kind: 'binding.create' },
         { kind: 'graph.node.create', node: content.document.graph.nodes.poll!, nodeId: 'poll', target: { kind: 'flow' } },
       ])
-      await service.control.publishFlow('operator', created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v4', null, 'poll-control-publication')
+      await service.control.publishFlow('operator', created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v5', null, 'poll-control-publication')
       await service.tickListeners()
       await service.tickMaintenance()
       const before = service.pollState(created.flow.flowId, 'poll')
@@ -459,7 +459,7 @@ describe('Server Poll Trigger', () => {
         { binding: { kind: 'connection', target: 'connection-main' }, bindingId: 'connection', kind: 'binding.create' },
         { kind: 'graph.node.create', node: revision().document.graph.nodes.poll!, nodeId: 'poll', target: { kind: 'flow' } },
       ])
-      await service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v4', null, 'poll-preview-publication')
+      await service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v5', null, 'poll-preview-publication')
       await service.tickListeners()
       await service.tickMaintenance()
       const before = service.pollState(flowId, 'poll')

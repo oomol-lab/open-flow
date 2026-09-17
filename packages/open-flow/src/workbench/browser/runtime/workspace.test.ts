@@ -222,7 +222,7 @@ describe('Designer port projection', () => {
     const waiting = {
       closureDigest: 'closure',
       createdAt: '2026-09-02T00:00:00.000Z',
-      engineContract: 'open-flow-engine/v4',
+      engineContract: 'open-flow-engine/v5',
       engineDigest: 'sha256:engine',
       flowId: draft.flowId,
       modelVersion: 2,
@@ -490,6 +490,39 @@ describe('Canvas run records', () => {
         finishedAt: events[3]?.createdAt,
         logs: [{ level: 'info', message: 'Ready.' }],
       },
+    })
+  })
+  it('keeps a repeated node active after another invocation completes', () => {
+    const repeated = [
+      events[0]!,
+      events[1]!,
+      {
+        sequence: 3,
+        kind: 'node.started' as const,
+        createdAt: '2026-09-05T01:00:02Z',
+        payload: { flowId: 'flow', scopeId: 'root', executionId: 'second-job', nodeId: 'task' },
+      },
+      events[3]!,
+    ]
+    const active = { ...run, status: 'running' as const }
+    expect(designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, undefined, active, repeated).nodes[0]).toMatchObject({
+      run: { status: 'running', successCount: 1 },
+    })
+    const waiting = {
+      ...active,
+      waits: [
+        {
+          nodeId: 'task',
+          waitId: 'pending',
+          actions: ['continue'] as const,
+          prompt: 'Continue?',
+          expiresAt: '2026-09-06T01:00:02Z',
+          waitingSince: '2026-09-05T01:00:02Z',
+        },
+      ],
+    }
+    expect(designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, undefined, waiting, repeated).nodes[0]).toMatchObject({
+      run: { status: 'waiting', successCount: 1 },
     })
   })
   it('does not attach historical results to a changed draft', () => {

@@ -362,6 +362,7 @@ function runProjection(
   if ('waits' in run) for (const wait of run.waits) nodes.set(wait.nodeId, { runId: run.runId, status: 'waiting' })
   const rootScopeId = events.find((event) => event.kind == 'run.started' && event.payload.flowId == revision.revision.flowId)?.payload.scopeId
   if (typeof rootScopeId != 'string') return { nodes, status: active ? 'running' : 'idle' }
+  const running = new Map<string, string>()
   for (const event of events) {
     if (event.payload.scopeId != rootScopeId || event.payload.flowId != revision.revision.flowId) continue
     const nodeId = event.payload.nodeId
@@ -369,6 +370,7 @@ function runProjection(
     const current = nodes.get(nodeId)
     switch (event.kind) {
       case 'node.started':
+        running.set(event.payload.executionId, nodeId)
         nodes.set(nodeId, { ...current, runId: run.runId, startedAt: event.createdAt, status: 'running' })
         break
       case 'node.progress': {
@@ -377,6 +379,7 @@ function runProjection(
         break
       }
       case 'node.completed':
+        running.delete(event.payload.executionId)
         nodes.set(nodeId, {
           ...current,
           runId: run.runId,
@@ -388,6 +391,7 @@ function runProjection(
         })
         break
       case 'node.failed':
+        running.delete(event.payload.executionId)
         nodes.set(nodeId, { ...current, runId: run.runId, finishedAt: event.createdAt, error: event.payload.error, status: 'error' })
         break
       case 'node.log':
@@ -408,7 +412,18 @@ function runProjection(
         break
     }
   }
-  if (!active) {
+  if (active) {
+    const runningCounts = new Map<string, number>()
+    for (const nodeId of running.values()) {
+      runningCounts.set(nodeId, (runningCounts.get(nodeId) ?? 0) + 1)
+      nodes.set(nodeId, { ...nodes.get(nodeId), runId: run.runId, status: 'running' })
+    }
+    const waitingCounts = new Map<string, number>()
+    if ('waits' in run) for (const wait of run.waits) waitingCounts.set(wait.nodeId, (waitingCounts.get(wait.nodeId) ?? 0) + 1)
+    for (const [nodeId, count] of waitingCounts) {
+      if ((runningCounts.get(nodeId) ?? 0) <= count) nodes.set(nodeId, { ...nodes.get(nodeId), runId: run.runId, status: 'waiting' })
+    }
+  } else {
     for (const [nodeId, state] of nodes) {
       if (state.status == 'running' || state.status == 'waiting') nodes.set(nodeId, { ...state, status: 'idle' })
     }

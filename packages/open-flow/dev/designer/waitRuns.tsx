@@ -39,7 +39,7 @@ const base: RunDetails = {
   createdAt: '2026-09-15T08:00:00Z',
   startedAt: '2026-09-15T08:00:00Z',
   closureDigest: 'lab',
-  engineContract: 'open-flow-engine/v4',
+  engineContract: 'open-flow-engine/v5',
   engineDigest: 'lab',
   modelVersion: 2,
   revisionDigest: 'lab',

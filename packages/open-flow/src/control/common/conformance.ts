@@ -15,7 +15,7 @@ export interface ControlApiConformanceCase {
 
 type RecordValue = Readonly<Record<string, unknown>>
 
-const engineContract = 'open-flow-engine/v4'
+const engineContract = 'open-flow-engine/v5'
 
 function fail(message: string): never {
   throw new Error(message)

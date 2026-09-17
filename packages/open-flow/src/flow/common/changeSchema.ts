@@ -126,7 +126,14 @@ const endpoint = z.object({
   successStatus: z.number(),
 })
 const trigger = { name: text, description: text.optional(), icon: text.optional() }
-const base = { inputs, name: text.optional(), description: text.optional(), icon: text.optional(), timeoutMs: z.number().optional() }
+const base = {
+  maxExecutions: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+  inputs,
+  name: text.optional(),
+  description: text.optional(),
+  icon: text.optional(),
+  timeoutMs: z.number().optional(),
+}
 const node = z.union([
   z.object({ ...base, kind: z.literal('condition'), ...condition }),
   z.object({
@@ -289,6 +296,13 @@ const shapes = {
       field: z.enum(['description', 'icon', 'name']),
       before: text.optional(),
       value: text.optional(),
+    }),
+    z.object({
+      ...at,
+      kind: z.literal('graph.node.field.set'),
+      field: z.literal('maxExecutions'),
+      before: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+      value: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
     }),
     z.object({
       ...at,

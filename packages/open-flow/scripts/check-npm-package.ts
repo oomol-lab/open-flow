@@ -343,7 +343,7 @@ async function verifyConsumer(): Promise<void> {
         "const controlError: ControlErrorCode = 'flow.not-found'",
         "const uiLanguage: UiLanguage = resolveUiLanguage(['fr-CA'])",
         "const transition = transitionRun('queued', { kind: 'claim' })",
-        "const runtimeProgram: RuntimeProgram = { engineContract: 'open-flow-engine/v4', engineDigest: 'sha256:test', entryModuleId: 'main', modules: {} }",
+        "const runtimeProgram: RuntimeProgram = { engineContract: 'open-flow-engine/v5', engineDigest: 'sha256:test', entryModuleId: 'main', modules: {} }",
         "const location: WorkbenchLocation = { view: 'design' }",
         'const host: WorkbenchHost = {',
         '  notify: () => undefined, openExternalPage: async () => false,',

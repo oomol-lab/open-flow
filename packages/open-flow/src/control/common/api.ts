@@ -868,7 +868,7 @@ export class ControlClient {
   async checkFlow(flowId: string, revisionId: string): Promise<FlowCheck> {
     return flowCheck(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/check`, {
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v4', version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v5', version: 1 }),
         method: 'POST',
       }),
     )
@@ -894,7 +894,7 @@ export class ControlClient {
   async createDraftRun(flowId: string, revisionId: string, options: RunOptions): Promise<DraftRun> {
     const created = runDetails(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/runs`, {
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v4', inputs: options.inputs ?? {}, trigger: options.trigger, version: 2 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v5', inputs: options.inputs ?? {}, trigger: options.trigger, version: 2 }),
         headers: { 'idempotency-key': options.idempotencyKey ?? operationKey('run') },
         method: 'POST',
       }),
@@ -925,7 +925,7 @@ export class ControlClient {
   async publishFlow(flowId: string, revisionId: string, expectedLivePublicationId: string | null, options: PublicationOptions = {}): Promise<PublishOperation> {
     return publishOperation(
       await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}/publications`, {
-        body: JSON.stringify({ engineContract: 'open-flow-engine/v4', expectedLivePublicationId, version: 1 }),
+        body: JSON.stringify({ engineContract: 'open-flow-engine/v5', expectedLivePublicationId, version: 1 }),
         headers: { 'idempotency-key': options.idempotencyKey ?? operationKey('publication') },
         method: 'POST',
       }),

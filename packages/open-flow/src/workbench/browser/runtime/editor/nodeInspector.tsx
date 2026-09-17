@@ -129,6 +129,8 @@ function GeneralSettings({
 }): ReactElement {
   const t = useTranslate()
   const [timeout, setTimeoutValue] = useState(node.timeoutMs == null ? '' : String(node.timeoutMs))
+  const [limit, setLimit] = useState(node.maxExecutions == null ? '' : String(node.maxExecutions))
+  const [limitError, setLimitError] = useState<string>()
   const [error, setError] = useState<string>()
   const inputId = `node-${nodeId}-timeout`
 
@@ -136,6 +138,22 @@ function GeneralSettings({
     setTimeoutValue(node.timeoutMs == null ? '' : String(node.timeoutMs))
     setError(undefined)
   }, [node.timeoutMs, nodeId])
+
+  useEffect(() => {
+    setLimit(node.maxExecutions == null ? '' : String(node.maxExecutions))
+    setLimitError(undefined)
+  }, [node.maxExecutions, nodeId])
+
+  function saveLimit(source: string): void {
+    const value = source.trim() == '' ? undefined : Number(source)
+    if (value != null && (!Number.isSafeInteger(value) || value < 1)) {
+      setLimitError(t('inspector.node.maxExecutionsError'))
+      return
+    }
+    setLimitError(undefined)
+    if (value == node.maxExecutions) return
+    void store.saveNodeSettings(nodeId, { name: node.name, timeoutMs: node.timeoutMs, maxExecutions: value })
+  }
 
   function save(source: string): void {
     const value = source.trim() == '' ? undefined : Number(source)
@@ -145,28 +163,50 @@ function GeneralSettings({
     }
     setError(undefined)
     if (value == node.timeoutMs) return
-    void store.saveNodeSettings(nodeId, { name: node.name, ...(value == null ? {} : { timeoutMs: value }) })
+    void store.saveNodeSettings(nodeId, {
+      name: node.name,
+      ...(node.maxExecutions == null ? {} : { maxExecutions: node.maxExecutions }),
+      ...(value == null ? {} : { timeoutMs: value }),
+    })
   }
 
   return (
     <Field className="inspector-field-section" data-inspector-section="node">
       <FieldLabel className="inspector-section-title">{t('inspector.node.title')}</FieldLabel>
       <div className="node-settings">
-        <Field data-invalid={error != null}>
-          <FieldLabel htmlFor={inputId}>{t('inspector.node.timeout')}</FieldLabel>
+        <Field data-invalid={limitError != null}>
+          <FieldLabel htmlFor={`node-${nodeId}-limit`}>{t('inspector.node.maxExecutions')}</FieldLabel>
           <Input
-            aria-invalid={error != null}
+            aria-invalid={limitError != null}
             readOnly={disabled}
-            id={inputId}
+            id={`node-${nodeId}-limit`}
             min="1"
-            onChange={(event) => setTimeoutValue(event.target.value)}
-            onBlur={(event) => save(event.currentTarget.value)}
-            placeholder={t('common.default')}
+            step="1"
+            onChange={(event) => setLimit(event.target.value)}
+            onBlur={(event) => saveLimit(event.currentTarget.value)}
+            placeholder="1000"
             type="number"
-            value={timeout}
+            value={limit}
           />
-          {error != null && <FieldError>{error}</FieldError>}
+          {limitError != null && <FieldError>{limitError}</FieldError>}
         </Field>
+        {node.kind != 'wait' && (
+          <Field data-invalid={error != null}>
+            <FieldLabel htmlFor={inputId}>{t('inspector.node.timeout')}</FieldLabel>
+            <Input
+              aria-invalid={error != null}
+              readOnly={disabled}
+              id={inputId}
+              min="1"
+              onChange={(event) => setTimeoutValue(event.target.value)}
+              onBlur={(event) => save(event.currentTarget.value)}
+              placeholder={t('common.default')}
+              type="number"
+              value={timeout}
+            />
+            {error != null && <FieldError>{error}</FieldError>}
+          </Field>
+        )}
       </div>
     </Field>
   )
@@ -1040,9 +1080,10 @@ export function NodeInspector({
               </TaskDefinition>
             ) : selection.kind == 'wait' ? (
               <WaitDefinition disabled={disabled} selection={selection} store={store} />
-            ) : selection.kind == 'subflow' ? (
-              <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
             ) : null}
+            {selection.kind != 'trigger' && selection.kind != 'task' && (
+              <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
+            )}
             {selection.kind == 'subflow' && (
               <section className="inspector-section">
                 <h3>{t('inspector.subflow.referenced')}</h3>

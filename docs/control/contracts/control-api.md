@@ -172,11 +172,12 @@ Revision 的根图和每个 Subflow graph 必须包含 `nodes` 和 `edges`；没
 为兼容旧 Draft，解码时将缺失的 `edges` 补为 `[]`；显式提供的 `edges` 仍须通过数组及边结构校验。
 Value Node 没有数据输入端口。解码时将其 `inputs` 统一归一化为 `{}`，忽略缺失或任意旧输入数据；执行入边保持不变，仍决定节点何时执行。根图和 Subflow graph 均适用。
 执行边使用 `{ source: nodeId, target: nodeId, sourceHandle?: branch }`。普通节点不得设置 `sourceHandle`；Condition 和 Wait 必须指定已声明的分支或 action。
-边不含目标 input handle。重复边、缺失端点、指向 Trigger 的边和环不能通过 validation。边集合按规范顺序参与 Revision digest。
+边不含目标 input handle。重复边、缺失端点和指向 Trigger 的边不能通过 validation；允许自连接和回边。边集合按规范顺序参与 Revision digest。
 
 `inputs[handle]` 使用 `{ kind: 'value', value }` 或 `{ kind: 'sources', sources }`。Node source 使用
 `{ kind: 'node', nodeId, output }`；Flow input 与 Variable binding 的 source 形式保持不变。Node source 必须指向经执行边可达的祖先，
-不要求覆盖目标的每一条执行路径。多个 source 必须互斥，不能在同一路径同时产生多个值；并行前驱的两个结果不能合并到同一个 input。
+不要求覆盖目标的每一条执行路径。每条被选中的执行入边分别启动一次 invocation，不等待其他前驱。输入只读取这次到达路径上的结果快照，多个 source 不能在该快照同时提供值；并行前驱的结果分别传给各自触发的 invocation。
+所有可执行节点支持可选正整数 `maxExecutions`，默认 1000；按一次 Flow Run 累计，同一 Subflow 节点跨调用共享计数。下一次到达会超过上限时，Run 报错终止。Wait/Agent 决议恢复不增加次数。
 调度仅依据执行连线及分支状态；输入来源缺失不导致跳过。零个可用来源补 `null`，一个来源取其值，多个来源报错；实际输出 `null` 仍算一个已提供的值。收集后按端口声明校验，失败则报错。
 Subflow 的最终输出采用相同规则，来源可以不覆盖所有返回路径。
 `graph.edge.connect` 与 `graph.edge.disconnect` 只修改执行边，`graph.node.input.set` 独立修改数据映射。节点不保存 `concurrency`。
@@ -215,7 +216,7 @@ interface FlowCheck {
 }
 ```
 
-Check body 是 `{ engineContract: 'open-flow-engine/v4', version: 1 }`，始终验证 path 中固定的 Flow Revision。
+Check body 是 `{ engineContract: 'open-flow-engine/v5', version: 1 }`，始终验证 path 中固定的 Flow Revision。
 `message` 是稳定的 canonical English fallback；Workbench 可以使用 `code`、可选 `values.variant` 和其余 `values` 显示本地化文案，未知 code 或 variant
 必须回退到 `message`。
 
@@ -699,32 +700,34 @@ Scheduler checkpoint 的精确对象为：
 {
   "bindingValues": {},
   "inputs": {},
-  "results": { "source": { "jobId": "job-1", "outputs": { "value": 42 } } },
-  "skipped": [],
-  "version": 3,
+  "results": { "start": { "jobId": "start", "outputs": {} }, "source": { "jobId": "job-1", "outputs": { "value": 42 } } },
+  "counts": { "": { "source": 1, "approval": 1 } },
+  "frames": { "job-2": { "start": {}, "source": { "value": 42 } } },
+  "version": 5,
   "agents": {},
   "waits": [{ "jobId": "job-2", "nodeId": "approval", "value": 42, "waitId": "opaque-id" }]
 }
 ```
 
 `inputs` 保存按 node ID 和 input handle 索引的启动输入，`bindingValues` 保存本次 Run 的 Variable binding 快照。
-`results` 保存已完成节点的最终 output，`skipped` 保存已跳过节点。`waits` 保存所有待应用决议的等待，已发布通知时每项还保存完整 `notification` 输出。`agents` 按 node ID 保存
+`results` 保存各节点最后一次完成的 output。`counts` 按 graph scope 和 node ID 保存累计执行次数，根 Flow 的 scope 为 `""`，Subflow 的 scope 为 subflow ID。
+`frames` 按等待 job ID 保存其到达时的节点结果快照。`waits` 保存所有待应用决议的等待，允许同一 node ID 的多个不同 job；已发布通知时每项还保存完整 `notification` 输出。`agents` 按 job ID 保存
 `{ invocationId, input, remainingMs?, checkpoint }`，其中 checkpoint 是 Agent continuation 合同。配置了节点 timeoutMs 时，
 remainingMs 必须为正且不得超过原上限。总 JSON 大小不得超过 16 MiB。
-恢复必须验证精确字段、节点状态不冲突、结果符合声明、依赖完整且符合分支选择；当前 Wait 不能已经完成或跳过。
+恢复必须验证精确字段、job/wait identity 唯一、计数符合节点上限、结果符合声明、等待输入与保存路径一致，以及 Agent continuation 的输入和剩余预算。旧版检查点不能按 v5 恢复。
 
-未进入执行路径的节点不创建 job 或 execution identity，也不产生节点事件；分支跳过状态只用于内部调度和 checkpoint 恢复。
+未进入执行路径的节点不创建 job 或 execution identity，也不产生节点事件。每次到达创建独立 identity，暂停恢复保持原 identity。
 普通 Task 已声明但缺失或为 `undefined` 的 output 补为 `null`；整个返回值为 `undefined` 时按空对象处理，显式非对象返回值仍非法。端口内部的数据不递归归一化，Condition、Wait 未选中的分支端口保持缺失。
 Runtime 在 JSON 传输前校验并复制返回数据；仅允许整个返回值及顶层端口的 `undefined`，拒绝函数、Symbol、BigInt、非有限数字、循环引用、非普通对象及端口内部的 `undefined` 或稀疏数组。传输不调用返回对象的 `toJSON`，不依赖 JSON 序列化静默丢弃或转换非法值。
 `node.completed` 仅在节点完整 output 校验成功后产生，payload 的 `outputs` 是按 handle 索引的完整最终结果对象，无输出时为 `{}`。
 每次节点 invocation 只产生一条完成事件，且先于下游节点的 `node.started`；不再产生逐 handle 的 `node.output`，普通 Task 不支持运行中的中间 output。Wait 的 notification 出口在登记后可用，Wait 本身仍只在决议后完成一次。
 
-Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保存已执行完成的图末端节点，按 node ID 排序。
+Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保存已执行完成的图末端节点的最后一次完成结果，按 node ID 排序；每次 invocation 的完整输出保存在运行事件中。
 每项为 `{ nodeId, status: 'completed', jobId, outputs }`，不包含未执行节点或重复执行的 jobs 数组；没有已执行完成的末端节点时为 `[]`。
 
 ## 10. Code Action 合同
 
-当前脚本合同为 `open-flow-engine/v4`。它用 `context.actions` 替代 v1 的 `context.connector`，不提供旧名转发；
+当前脚本合同为 `open-flow-engine/v5`，执行调度采用每条入边到达分别执行和每节点累计次数限制；v4 及更早的 Publication / Run 不能按此合同执行，需要重新发布或新建 Run。它用 `context.actions` 替代 v1 的 `context.connector`，不提供旧名转发；
 固定为 v1 的 Publication / Run 必须由相应 Engine 执行，当前 Server 对 v1 明确返回不支持。
 升级已有 Code Task 时，将单账号 capability 改为以下允许集合，并更新源码后创建 v2 Publication。
 

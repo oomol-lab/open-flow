@@ -55,7 +55,19 @@ function pause(store: Store, clock: () => number, flowId: string, notify = false
   expect(
     store.runs.wait(
       runId,
-      { kind: 'waiting', checkpoint: { bindingValues: {}, inputs: {}, results: {}, skipped: [], version: 4, agents: {}, waits: [{ ...wait, value: null }] } },
+      {
+        kind: 'waiting',
+        checkpoint: {
+          bindingValues: {},
+          inputs: {},
+          results: {},
+          counts: {},
+          frames: { [wait.jobId]: {} },
+          version: 5,
+          agents: {},
+          waits: [{ ...wait, value: null }],
+        },
+      },
       1000,
     ),
   ).toBe(true)
