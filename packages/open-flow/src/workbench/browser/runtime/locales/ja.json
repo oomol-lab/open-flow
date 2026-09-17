@@ -242,10 +242,11 @@
     },
     "title": "インスペクター",
     "sources": {
-      "loading": "利用可能なデータを読み込み中…",
-      "loadFailed": "ソースを読み込めません。メニューを開き直してください。",
+      "loading": "入力元を読み込み中…",
+      "loadFailed": "入力元を読み込めません。メニューを開き直してください。",
       "checkFailed": "このソースを確認できませんでした。",
-      "title": "データを選択",
+      "select": "入力元を選択",
+      "title": "入力元",
       "sourceMissing": "「{{source}}」が見つかりません。選択し直してください。",
       "outputMissing": "「{{source}}」に「{{output}}」が見つかりません。選択し直してください。",
       "notReady": "ここを実行するとき、「{{source}} {{handle}}」にまだ値がない可能性があります。",
@@ -951,9 +952,9 @@
   "nodeInput": {
     "literal": "固定値",
     "variable": "環境変数",
-    "noUpstreamNodes": "利用できるデータがありません",
+    "noUpstreamNodes": "利用可能な上流出力がありません",
     "mode": "型",
-    "connected": "データが選択されています。「データを選択」から変更できます。"
+    "connected": "入力元が選択されています。「入力元を選択」から変更できます。"
   },
   "history": {
     "edit": "ノードのプロパティを編集",

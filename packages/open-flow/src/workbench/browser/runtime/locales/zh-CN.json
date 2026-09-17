@@ -242,10 +242,11 @@
     },
     "title": "检查器",
     "sources": {
-      "loading": "正在加载可用数据…",
-      "loadFailed": "无法加载来源，请重新打开菜单重试。",
+      "loading": "正在加载输入来源…",
+      "loadFailed": "无法加载输入来源，请重新打开菜单重试。",
       "checkFailed": "无法检查此来源。",
-      "title": "选择数据",
+      "select": "选择输入来源",
+      "title": "输入来源",
       "sourceMissing": "找不到“{{source}}”，请重新选择。",
       "outputMissing": "“{{source}}”中找不到“{{output}}”，请重新选择。",
       "notReady": "运行到这里时，“{{source}} {{handle}}”可能还没有值。",
@@ -943,9 +944,9 @@
   "nodeInput": {
     "literal": "固定值",
     "variable": "环境变量",
-    "noUpstreamNodes": "没有可用数据",
+    "noUpstreamNodes": "暂无可引用的上游输出",
     "mode": "类型",
-    "connected": "已选择数据，可从“选择数据”中修改。"
+    "connected": "已选择输入来源，可从“选择输入来源”中修改。"
   },
   "history": {
     "edit": "修改节点属性",

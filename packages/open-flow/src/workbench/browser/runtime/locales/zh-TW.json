@@ -242,10 +242,11 @@
     },
     "title": "檢查器",
     "sources": {
-      "loading": "正在載入可用資料…",
-      "loadFailed": "無法載入來源，請重新開啟選單重試。",
+      "loading": "正在載入輸入來源…",
+      "loadFailed": "無法載入輸入來源，請重新開啟選單重試。",
       "checkFailed": "無法檢查此來源。",
-      "title": "選擇資料",
+      "select": "選擇輸入來源",
+      "title": "輸入來源",
       "sourceMissing": "找不到「{{source}}」，請重新選擇。",
       "outputMissing": "「{{source}}」中找不到「{{output}}」，請重新選擇。",
       "notReady": "執行到這裡時，「{{source}} {{handle}}」可能還沒有值。",
@@ -943,9 +944,9 @@
   "nodeInput": {
     "literal": "固定值",
     "variable": "環境變數",
-    "noUpstreamNodes": "沒有可用資料",
+    "noUpstreamNodes": "暫無可引用的上游輸出",
     "mode": "類型",
-    "connected": "已選擇資料，可從「選擇資料」中修改。"
+    "connected": "已選擇輸入來源，可從「選擇輸入來源」中修改。"
   },
   "history": {
     "edit": "修改節點屬性",

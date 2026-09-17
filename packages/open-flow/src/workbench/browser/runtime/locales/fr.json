@@ -242,10 +242,11 @@
     },
     "title": "Inspecteur",
     "sources": {
-      "loading": "Chargement des données disponibles…",
-      "loadFailed": "Impossible de charger les sources. Rouvrez le menu pour réessayer.",
+      "loading": "Chargement des sources d’entrée…",
+      "loadFailed": "Impossible de charger les sources d’entrée. Rouvrez le menu pour réessayer.",
       "checkFailed": "Impossible de vérifier cette source.",
-      "title": "Sélectionner des données",
+      "select": "Sélectionner la source d’entrée",
+      "title": "Source d’entrée",
       "sourceMissing": "« {{source}} » est introuvable. Choisissez à nouveau.",
       "outputMissing": "« {{output}} » est introuvable dans « {{source}} ». Choisissez à nouveau.",
       "notReady": "« {{source}} {{handle}} » peut ne pas avoir de valeur lors de cette étape.",
@@ -951,9 +952,9 @@
   "nodeInput": {
     "literal": "Littéral",
     "variable": "Environnement",
-    "noUpstreamNodes": "Aucune donnée disponible",
+    "noUpstreamNodes": "Aucune sortie en amont disponible",
     "mode": "Type",
-    "connected": "Données sélectionnées. Utilisez Sélectionner des données pour les modifier."
+    "connected": "Une source d’entrée est sélectionnée. Utilisez « Sélectionner la source d’entrée » pour la modifier."
   },
   "history": {
     "edit": "Modifier les propriétés du nœud",

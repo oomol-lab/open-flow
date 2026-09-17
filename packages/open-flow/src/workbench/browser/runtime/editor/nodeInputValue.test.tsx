@@ -27,7 +27,7 @@ describe('Independent node inputs', () => {
     expect(markup).toContain('aria-label="items Set value"')
     expect(markup).toContain('aria-expanded="false"')
     expect(markup).not.toContain('data-value-body')
-    expect(markup.indexOf('aria-label="items Select data"')).toBeLessThan(markup.indexOf('aria-label="items Set value"'))
+    expect(markup.indexOf('aria-label="items Select input source"')).toBeLessThan(markup.indexOf('aria-label="items Set value"'))
     expect(onValue).not.toHaveBeenCalled()
   })
 
@@ -136,9 +136,9 @@ describe('Independent node inputs', () => {
         />
       </I18nProvider>,
     )
-    expect(markup).toContain('Data selected')
+    expect(markup).toContain('Input source selected')
     expect(markup).not.toMatch(/<(?:textarea|select)\b/)
-    expect(markup).toContain('aria-label="message Select data"')
+    expect(markup).toContain('aria-label="message Select input source"')
     expect(onValue).not.toHaveBeenCalled()
   })
 

@@ -250,7 +250,7 @@ export function NodeInputValue({
                     variant="ghost"
                     size="icon-xs"
                     className="aria-pressed:bg-[var(--ui-control-hover-background,var(--ui-muted))] aria-pressed:text-foreground"
-                    aria-label={`${definition.handle} ${t('inspector.sources.title')}`}
+                    aria-label={`${definition.handle} ${t('inspector.sources.select')}`}
                     aria-pressed={sourceKind !== 'literal'}
                     disabled={disabled}
                   >
@@ -260,7 +260,7 @@ export function NodeInputValue({
               />
             }
           />
-          <TooltipContent container={sourcePortal}>{t('inspector.sources.title')}</TooltipContent>
+          <TooltipContent container={sourcePortal}>{t('inspector.sources.select')}</TooltipContent>
         </Tooltip>
         <DropdownMenuContent align="start" sideOffset={6} className={`w-44 min-w-44 ${selectionMenuContentClass}`} container={sourcePortal}>
           <div className="px-2 py-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">{t('inspector.sources.title')}</div>
@@ -334,7 +334,7 @@ export function NodeInputValue({
           ) : (
             (upstream?.groups.length ?? 0) === 0 && (
               <DropdownMenuItem className={sourceEmptyItemClass} disabled>
-                <i aria-hidden="true" className="i-lucide-light:workflow size-3.5 shrink-0 text-muted-foreground" />
+                <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate">{t('nodeInput.noUpstreamNodes')}</span>
               </DropdownMenuItem>
             )

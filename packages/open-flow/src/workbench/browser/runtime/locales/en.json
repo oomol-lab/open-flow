@@ -242,10 +242,11 @@
     },
     "title": "Inspector",
     "sources": {
-      "loading": "Loading available data…",
-      "loadFailed": "Could not load sources. Reopen the menu to retry.",
+      "loading": "Loading input sources…",
+      "loadFailed": "Could not load input sources. Reopen the menu to retry.",
       "checkFailed": "Could not check this source.",
-      "title": "Select data",
+      "select": "Select input source",
+      "title": "Input source",
       "sourceMissing": "“{{source}}” could not be found. Choose again.",
       "outputMissing": "“{{output}}” could not be found in “{{source}}”. Choose again.",
       "notReady": "“{{source}} {{handle}}” may not have a value when this step runs.",
@@ -951,9 +952,9 @@
   "nodeInput": {
     "literal": "Literal",
     "variable": "Env",
-    "noUpstreamNodes": "No data available",
+    "noUpstreamNodes": "No upstream outputs available",
     "mode": "Type",
-    "connected": "Data selected. Use Select data to change it."
+    "connected": "Input source selected. Use Select input source to change it."
   },
   "history": {
     "edit": "Edit node properties",
