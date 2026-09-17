@@ -555,7 +555,7 @@
   "view": "表示",
   "canvasCard": {
     "waitBranch": {
-      "notification": "通知",
+      "pending": "確認待ち",
       "approve": "承認",
       "reject": "拒否",
       "continue": "続行"

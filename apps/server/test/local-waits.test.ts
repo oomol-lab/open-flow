@@ -49,7 +49,7 @@ function fixture() {
     bindingValues: {},
     waits: waits.map((wait) => {
       const notification = store.runs.createWait(runId, wait, 'https://flows.example')!
-      return { jobId: wait.jobId, nodeId: wait.nodeId, waitId: wait.waitId, value: wait.value, notification }
+      return { jobId: wait.jobId, nodeId: wait.nodeId, waitId: wait.waitId, value: wait.value, pending: notification }
     }),
   }
   return {
@@ -75,7 +75,7 @@ it('persists multiple waits immediately and resumes locally without a checkpoint
   expect(await pending).toEqual({ second: 'reject' })
   expect(f.store.runViews.activeWaits(f.runId).map((wait) => wait.waitId)).toEqual(['first'])
   expect(f.store.runViews.listControlRuns('flow', 10, { pendingWait: true })).toHaveLength(1)
-  expect(f.store.runs.createWait(f.runId, f.waits[0]!, 'https://different.example')).toEqual(f.checkpoint.waits[0]!.notification)
+  expect(f.store.runs.createWait(f.runId, f.waits[0]!, 'https://different.example')).toEqual(f.checkpoint.waits[0]!.pending)
   expect(f.database.connection.prepare('SELECT * FROM run_checkpoints').all()).toEqual([])
 })
 
@@ -175,4 +175,17 @@ it('releases the same-flow queue after freezing while honoring active worker exc
   expect(f.store.runs.claim(['flow'])).toBeUndefined()
   f.pause()
   expect(f.store.runs.claim()?.runId).toBe(accepted.runId)
+})
+
+it('rejects a version 5 checkpoint with the obsolete notification field without replaying it', () => {
+  const f = fixture()
+  f.pause()
+  const checkpoint = {
+    ...f.checkpoint,
+    waits: f.checkpoint.waits.map(({ pending, ...wait }) => ({ ...wait, notification: pending })),
+  }
+  f.database.connection.prepare('UPDATE run_checkpoints SET checkpoint_json = ? WHERE run_id = ?').run(JSON.stringify(checkpoint), f.runId)
+  const recovered = new Store(f.database, () => 1001)
+  expect(recovered.runViews.run(f.runId)).toMatchObject({ status: 'indeterminate', result: { error: { code: 'execution.resume-unavailable' } } })
+  expect(recovered.runs.claim()).toBeUndefined()
 })

@@ -234,7 +234,7 @@
       "continue": "Continuer",
       "mode": "Traitement",
       "inputsLoading": "Chargement des paramètres de notification…",
-      "notificationDescription": "Reliez la sortie de notification pour envoyer un message ou exécuter d’autres étapes pendant l’attente.",
+      "pendingDescription": "La sortie en attente se déclenche une fois au début de l’attente et fournit les liens de confirmation et les données associées. Reliez-la pour envoyer un message ou exécuter d’autres étapes.",
       "prompt": "Invite",
       "promptError": "L’invite doit contenir entre 1 et 1 000 caractères."
     },

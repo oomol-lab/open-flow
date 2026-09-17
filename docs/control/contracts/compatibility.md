@@ -56,10 +56,18 @@ Server 的 `isolatedVmEngineDigest` 由隔离执行器协议、isolated-vm／Nod
 不包含 Wait、分支汇合或输入来源等 Scheduler 规则。图规则变更不单独修改该 digest。
 checkpoint 使用自己的格式版本和状态一致性校验，不能用隔离运行时 digest 代替这些检查。
 
-当前 Engine v4 将执行调度与输入来源分离。节点仅因执行分支关闭而跳过；缺失输入及普通数据输出补 `null` 后按端口声明校验，实际 `null` 仍算一个可用来源。
-本次直接替换 v3，不提供旧执行合同或旧运行迁移。公共包、Command、Server 和客户端同步升级；checkpoint 结构为 version 4，恢复验证采用 v4 语义并要求完整的归一化输出。
+此前 Engine v4 将执行调度与输入来源分离。节点仅因执行分支关闭而跳过；缺失输入及普通数据输出补 `null` 后按端口声明校验，实际 `null` 仍算一个可用来源。
+当时直接替换 v3，不提供旧执行合同或旧运行迁移。公共包、Command、Server 和客户端同步升级；当时 checkpoint 结构为 version 4，恢复验证采用 v4 语义并要求完整的归一化输出。
 
-本次移除 digest 中历史的图语义标签会使隔离运行时标识变化一次。固定旧 digest 的 Run 沿用既有不匹配拒绝路径；
+此前移除 digest 中历史的图语义标签曾使隔离运行时标识变化一次。固定旧 digest 的 Run 沿用既有不匹配拒绝路径；
 不重写历史 Run 的标识，也不增加旧标识别名。此后仅修改 Scheduler 规则不会再造成隔离运行时 digest 变化。
 
-Trigger 输出协议使用有序 outputs 定义，Provider definitionVersion 和 Webhook revision 为 2；定义摘要协议版本为 2。Scheduler checkpoint 版本为 4，拒绝旧版本恢复。SQLite migration 19 只重命名输出存储列，不将旧内容转换成新契约。
+Trigger 输出协议使用有序 outputs 定义，Provider definitionVersion 和 Webhook revision 为 2；定义摘要协议版本为 2。该次升级的 Scheduler checkpoint 版本为 4；当前为 version 5，拒绝旧版本恢复。SQLite migration 19 只重命名输出存储列，不将旧内容转换成新契约。
+
+## 未发布阶段的 Wait pending 修订
+
+当前 Engine Contract 保持 `open-flow-engine/v5`，Scheduler checkpoint 保持 version 5。
+Wait 的提前输出端口及等待记录中的输出字段直接由 `notification` 改为 `pending`，表示等待建立时触发一次并提供确认链接及相关数据。
+本次是未发布阶段的合同修订，同版本号不保证兼容此前开发快照；不提供旧名称别名、隐式转换或兼容恢复。
+旧 Wait 端口和数据引用由图语义校验拒绝，checkpoint 等待记录中的旧 `notification` 字段由严格解码拒绝，不静默丢弃或重放通知。
+历史 Revision 和 Run 不改写；Flow model、Control API 信封和隔离运行时 digest 不变。Agent 的 notification 配置仍表示实际通知，不受此次端口改名影响。

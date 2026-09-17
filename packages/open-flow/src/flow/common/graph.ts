@@ -102,7 +102,7 @@ export function nodeInputPorts(document: FlowDocument, node: GraphNode): Readonl
 
 export function waitOutputPorts(node: Extract<GraphNode, { readonly kind: 'wait' }>): Readonly<Record<string, PortDefinition>> {
   return {
-    notification: {
+    pending: {
       nullable: false,
       jsonSchema: {
         type: 'object',
@@ -319,11 +319,11 @@ function graphPaths(graph: Graph) {
       for (const edge of edges) {
         parents.add(edge.source)
         for (const waitId of resolvedWaits.get(edge.source) ?? []) decisions.add(waitId)
-        if (graph.nodes[edge.source]?.kind == 'wait' && edge.sourceHandle != 'notification') decisions.add(edge.source)
+        if (graph.nodes[edge.source]?.kind == 'wait' && edge.sourceHandle != 'pending') decisions.add(edge.source)
         for (const parent of ancestors.get(edge.source) ?? []) parents.add(parent)
         for (const route of paths.get(edge.source) ?? []) {
           const next =
-            edge.sourceHandle == null || (graph.nodes[edge.source]?.kind == 'wait' && edge.sourceHandle == 'notification')
+            edge.sourceHandle == null || (graph.nodes[edge.source]?.kind == 'wait' && edge.sourceHandle == 'pending')
               ? route
               : { ...route, [edge.source]: edge.sourceHandle }
           if (routes.some((known) => routeCovers(known, next))) continue
@@ -356,7 +356,7 @@ function sourcePaths(graph: Graph, paths: ReturnType<typeof graphPaths>['paths']
   if (source.kind != 'node') return [{}]
   const node = graph.nodes[source.nodeId]
   const routes = paths.get(source.nodeId) ?? []
-  return node?.kind == 'condition' || (node?.kind == 'wait' && source.output != 'notification')
+  return node?.kind == 'condition' || (node?.kind == 'wait' && source.output != 'pending')
     ? routes.map((route) => ({ ...route, [source.nodeId]: source.output }))
     : routes
 }
@@ -371,7 +371,7 @@ function mappingAvailable(graph: Graph, target: string | undefined, mapping: Inp
       (source) =>
         source.kind == 'node' &&
         graph.nodes[source.nodeId]?.kind == 'wait' &&
-        source.output != 'notification' &&
+        source.output != 'pending' &&
         !analysis.resolvedWaits.get(target)?.has(source.nodeId),
     )
   )
@@ -435,7 +435,7 @@ export function checkInputSource(
   if (input == null) return { kind: 'not-ready' }
   const analysis = graphPaths(graph)
   if (analysis.ancestors.get(target)?.has(source.nodeId) !== true) return { kind: 'not-ready' }
-  if (node.kind == 'wait' && source.output != 'notification' && !analysis.resolvedWaits.get(target)?.has(source.nodeId)) return { kind: 'not-ready' }
+  if (node.kind == 'wait' && source.output != 'pending' && !analysis.resolvedWaits.get(target)?.has(source.nodeId)) return { kind: 'not-ready' }
   const result = comparePorts(output, input)
   if (result.kind == 'compatible') return { kind: 'available' }
   return result.kind == 'incompatible' ? { kind: 'schema', mismatch: result.mismatch } : { kind: 'schema-error' }
@@ -521,7 +521,7 @@ function validateGraph(
     } else if (source.kind == 'condition' || source.kind == 'wait') {
       const exits =
         source.kind == 'wait'
-          ? ['notification', ...source.actions]
+          ? Object.keys(waitOutputPorts(source))
           : [...source.cases.map((item) => item.output), ...(source.defaultOutput == null ? [] : [source.defaultOutput])]
       if (edge.sourceHandle == null || !exits.some((exit) => exit == edge.sourceHandle)) {
         diagnostics.push(graphDiagnostic('graph.edge-invalid', 'Choose a declared execution branch.', edgePath))

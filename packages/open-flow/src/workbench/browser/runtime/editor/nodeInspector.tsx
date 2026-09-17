@@ -402,7 +402,7 @@ function WaitDefinition({
             <ToggleGroupItem value="continue">{t('inspector.wait.continue')}</ToggleGroupItem>
             <ToggleGroupItem value="approval">{t('inspector.wait.approval')}</ToggleGroupItem>
           </ToggleGroup>
-          <FieldDescription>{t('inspector.wait.notificationDescription')}</FieldDescription>
+          <FieldDescription>{t('inspector.wait.pendingDescription')}</FieldDescription>
         </Field>
         {error != null && <FieldError>{error}</FieldError>}
       </FieldGroup>

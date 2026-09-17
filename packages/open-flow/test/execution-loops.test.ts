@@ -190,7 +190,7 @@ describe('Repeated node executions', () => {
         },
         edges: [
           { source: 'start', target: 'pause' },
-          { source: 'pause', sourceHandle: 'notification', target: 'send' },
+          { source: 'pause', sourceHandle: 'pending', target: 'send' },
           { source: 'pause', sourceHandle: 'approve', target: 'pause' },
         ],
       }),

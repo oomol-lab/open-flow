@@ -234,7 +234,7 @@
       "continue": "Continue",
       "mode": "Resolution",
       "inputsLoading": "Loading notification parameters…",
-      "notificationDescription": "Connect the notification output to send a message or run other steps while waiting.",
+      "pendingDescription": "The pending output fires once when waiting begins and provides confirmation links and related data. Connect it to send a message or run other steps.",
       "prompt": "Prompt",
       "promptError": "Prompt must contain 1 to 1,000 characters."
     },

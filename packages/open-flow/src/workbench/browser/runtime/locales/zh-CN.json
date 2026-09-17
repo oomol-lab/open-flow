@@ -234,7 +234,7 @@
       "continue": "继续",
       "mode": "处理方式",
       "inputsLoading": "正在加载通知参数…",
-      "notificationDescription": "连接通知出口，可在等待期间发送消息或执行其他步骤。",
+      "pendingDescription": "待确认出口在开始等待时触发一次，提供确认链接及相关数据。连接此出口可发送消息或执行其他步骤。",
       "prompt": "提示",
       "promptError": "提示必须包含 1 到 1,000 个字符。"
     },

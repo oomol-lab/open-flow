@@ -218,7 +218,7 @@ describe('Designer port projection', () => {
     }
     const projected = designerGraph(draft, { kind: 'flow' }).nodes[0]!
     if (projected.kind != 'wait') throw new Error('Expected Wait')
-    expect(projected.outputs.flatMap((port) => ('handle' in port ? [port.handle] : []))).toEqual(['notification', ...actions])
+    expect(projected.outputs.flatMap((port) => ('handle' in port ? [port.handle] : []))).toEqual(['pending', ...actions])
     const waiting = {
       closureDigest: 'closure',
       createdAt: '2026-09-02T00:00:00.000Z',

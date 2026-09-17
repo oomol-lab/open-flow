@@ -86,15 +86,15 @@ export interface FlowRunResult {
   }[]
 }
 
-function usesNotification(graph: Graph, nodeId: string): boolean {
+function usesPending(graph: Graph, nodeId: string): boolean {
   return (
-    graph.edges.some((edge) => edge.source == nodeId && edge.sourceHandle == 'notification') ||
+    graph.edges.some((edge) => edge.source == nodeId && edge.sourceHandle == 'pending') ||
     Object.values(graph.nodes).some(
       (node) =>
         'inputs' in node &&
         Object.values(node.inputs).some(
           (mapping) =>
-            mapping.kind == 'sources' && mapping.sources.some((source) => source.kind == 'node' && source.nodeId == nodeId && source.output == 'notification'),
+            mapping.kind == 'sources' && mapping.sources.some((source) => source.kind == 'node' && source.nodeId == nodeId && source.output == 'pending'),
         ),
     )
   )
@@ -105,7 +105,7 @@ export interface PendingWait {
   readonly nodeId: string
   readonly value: JsonValue
   readonly waitId: string
-  readonly notification?: JsonValue
+  readonly pending?: JsonValue
 }
 
 export interface WaitRequest {
@@ -359,7 +359,7 @@ export function decodeFlowRunCheckpoint(input: unknown): FlowRunCheckpoint {
     nodeId: z.string().min(1),
     value: z.json(),
     waitId: z.string().min(1),
-    notification: z.json().optional(),
+    pending: z.json().optional(),
   })
   const pendingWaits = z.array(savedWait).min(1).parse(source.waits)
   const agents = z
@@ -587,7 +587,7 @@ function validateCheckpoint(
           (node.kind == 'condition' && (count > 1 || (node.defaultOutput != null && count != 1))) ||
           (node.kind == 'wait' &&
             (node.actions.filter((action) => Object.hasOwn(outputs, action)).length > 1 ||
-              (!node.actions.some((action) => Object.hasOwn(outputs, action)) && !(frame && Object.hasOwn(outputs, 'notification')))))
+              (!node.actions.some((action) => Object.hasOwn(outputs, action)) && !(frame && Object.hasOwn(outputs, 'pending')))))
         )
           throw new Error('Checkpoint branch result is invalid.')
       }
@@ -632,9 +632,9 @@ function validateCheckpoint(
       if (saved != null) throw new Error('Checkpoint Wait contains Agent state.')
       if (node.kind != 'wait' || !jsonEqual(resolveInputs(waiting.nodeId, node, waiting.jobId)[node.input.handle]!, waiting.value))
         throw new Error('Checkpoint Wait input changed.')
-      const notify = usesNotification(target.graph, waiting.nodeId)
-      if (notify != (waiting.notification != null)) throw new Error('Checkpoint Wait notification is missing or unexpected.')
-      if (waiting.notification != null) validateOutputs(prepared, waiting.nodeId, node, { notification: waiting.notification })
+      const notify = usesPending(target.graph, waiting.nodeId)
+      if (notify != (waiting.pending != null)) throw new Error('Checkpoint Wait pending output is missing or unexpected.')
+      if (waiting.pending != null) validateOutputs(prepared, waiting.nodeId, node, { pending: waiting.pending })
     }
     if (checkpoint.counts['']?.[waiting.nodeId] == null) throw new Error('Checkpoint waiting execution count is missing.')
   }
@@ -729,29 +729,23 @@ function runGraph(
           ]),
         )
       }
-      const commit = (nodeId: string, jobId: string, outputs: Readonly<Record<string, JsonValue>>) =>
+      const commit = (nodeId: string, jobId: string, outputs: Readonly<Record<string, JsonValue>>, releasedHandles: readonly string[] = Object.keys(outputs)) =>
         Effect.uninterruptible(
           Effect.gen(function* () {
             yield* context.emit({ jobId, nodeId, outputs, runId, type: 'node.completed' })
             completed.set(nodeId, { jobId, outputs })
             const frame = { ...frames[jobId], [nodeId]: outputs }
             delete frames[jobId]
-            dispatch(nodeId, outputs, frame, true)
+            dispatch(nodeId, releasedHandles, frame)
           }),
         )
       const ready: { nodeId: string; frame: Readonly<Record<string, Readonly<Record<string, JsonValue>>>> }[] = []
       const scheduleReady = (nodeId: string, frame: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>) => {
         ready.push({ nodeId, frame })
       }
-      const dispatch = (
-        nodeId: string,
-        outputs: Readonly<Record<string, JsonValue>>,
-        frame: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>,
-        settled: boolean,
-      ) => {
+      const dispatch = (nodeId: string, releasedHandles: readonly string[], frame: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>) => {
         for (const edge of outgoing.get(nodeId) ?? []) {
-          if (settled && edge.sourceHandle == 'notification') continue
-          if (edge.sourceHandle == null || Object.hasOwn(outputs, edge.sourceHandle)) scheduleReady(edge.target, frame)
+          if (edge.sourceHandle == null || releasedHandles.includes(edge.sourceHandle)) scheduleReady(edge.target, frame)
         }
       }
       const executeNode = (
@@ -877,8 +871,8 @@ function runGraph(
           if (target.kind != 'flow' || context.waits == null) return yield* Effect.fail(new Error('Wait host is unavailable.'))
           const node = target.graph.nodes[nodeId] as ExecutableNode
           const waitId = nanoid()
-          const notify = node.kind == 'wait' && usesNotification(target.graph, nodeId)
-          const notification = yield* context.waits.create({
+          const notify = node.kind == 'wait' && usesPending(target.graph, nodeId)
+          const pending = yield* context.waits.create({
             jobId,
             nodeId,
             value,
@@ -889,11 +883,11 @@ function runGraph(
             ...(node.kind == 'wait' ? {} : { notification: agentNotice(context.prepared, node, agents[jobId]!.input) }),
           })
           if (notify) {
-            validateOutputs(context.prepared, nodeId, node, { notification: notification! })
-            const frame = { ...frames[jobId], [nodeId]: { notification: notification! } }
-            dispatch(nodeId, { notification: notification! }, frame, false)
+            validateOutputs(context.prepared, nodeId, node, { pending: pending! })
+            const frame = { ...frames[jobId], [nodeId]: { pending: pending! } }
+            dispatch(nodeId, ['pending'], frame)
           }
-          pendingWaits.set(jobId, { jobId, nodeId, value, waitId, ...(notify ? { notification: notification! } : {}) })
+          pendingWaits.set(jobId, { jobId, nodeId, value, waitId, ...(notify ? { pending: pending! } : {}) })
           yield* Queue.offer(changes, undefined)
         })
       const settleNode = (nodeId: string, jobId: string, result: NodeResult): Effect.Effect<void, Error> => {
@@ -976,7 +970,7 @@ function runGraph(
         })
       }
       if (resume == null) {
-        if (trigger != null) dispatch(trigger.nodeId, trigger.outputs, { [trigger.nodeId]: trigger.outputs }, true)
+        if (trigger != null) dispatch(trigger.nodeId, Object.keys(trigger.outputs), { [trigger.nodeId]: trigger.outputs })
         else for (const nodeId of order) if (!incoming.has(nodeId)) scheduleReady(nodeId, {})
       }
 
@@ -1001,9 +995,10 @@ function runGraph(
                     saved.nodeId,
                     saved.jobId,
                     validateOutputs(context.prepared, saved.nodeId, node, {
-                      ...(saved.notification == null ? {} : { notification: saved.notification }),
+                      ...(saved.pending == null ? {} : { pending: saved.pending }),
                       [action]: saved.value,
                     }),
+                    [action],
                   )
                 } else {
                   if (action == 'continue') return yield* Effect.fail(new Error('Agent requires approve or reject.'))

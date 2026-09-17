@@ -686,7 +686,7 @@ capability 摘要；完整 capability 是 bearer credential，消费端不得把
 
 ### Wait 局部执行与冻结
 
-Wait 移除内联 notification 配置，声明固定 notification 出口。该输出为 `{ value, prompt, actions: [{ action, url }], expiresAt }`，actions 使用节点固定操作集合，value 保持输入 schema。
+Wait 移除内联 notification 配置，声明固定 pending 出口，在等待建立时触发一次。该输出为 `{ value, prompt, actions: [{ action, url }], expiresAt }`，actions 使用节点固定操作集合，value 保持输入 schema。
 通知边和所选 action 边可同时执行，不互斥；approve/reject 互斥。通知后续按普通节点执行，决议不取消通知，没有通知专属时限。
 图静止且尚有等待时保留 session 120,000 ms，期间不序列化或保存完整 checkpoint、不扣执行预算。再次静止重新计时，无效唤醒不续期。
 到期重新读取决议再提交 checkpoint，竞争中的已决议 Run 重新排队。Wait 记录及决议立即持久化；原地批准无需保存 checkpoint。
@@ -711,7 +711,7 @@ Scheduler checkpoint 的精确对象为：
 
 `inputs` 保存按 node ID 和 input handle 索引的启动输入，`bindingValues` 保存本次 Run 的 Variable binding 快照。
 `results` 保存各节点最后一次完成的 output。`counts` 按 graph scope 和 node ID 保存累计执行次数，根 Flow 的 scope 为 `""`，Subflow 的 scope 为 subflow ID。
-`frames` 按等待 job ID 保存其到达时的节点结果快照。`waits` 保存所有待应用决议的等待，允许同一 node ID 的多个不同 job；已发布通知时每项还保存完整 `notification` 输出。`agents` 按 job ID 保存
+`frames` 按等待 job ID 保存其到达时的节点结果快照。`waits` 保存所有待应用决议的等待，允许同一 node ID 的多个不同 job；已释放 pending 时每项还保存完整 `pending` 输出。`agents` 按 job ID 保存
 `{ invocationId, input, remainingMs?, checkpoint }`，其中 checkpoint 是 Agent continuation 合同。配置了节点 timeoutMs 时，
 remainingMs 必须为正且不得超过原上限。总 JSON 大小不得超过 16 MiB。
 恢复必须验证精确字段、job/wait identity 唯一、计数符合节点上限、结果符合声明、等待输入与保存路径一致，以及 Agent continuation 的输入和剩余预算。旧版检查点不能按 v5 恢复。
@@ -720,7 +720,7 @@ remainingMs 必须为正且不得超过原上限。总 JSON 大小不得超过 1
 普通 Task 已声明但缺失或为 `undefined` 的 output 补为 `null`；整个返回值为 `undefined` 时按空对象处理，显式非对象返回值仍非法。端口内部的数据不递归归一化，Condition、Wait 未选中的分支端口保持缺失。
 Runtime 在 JSON 传输前校验并复制返回数据；仅允许整个返回值及顶层端口的 `undefined`，拒绝函数、Symbol、BigInt、非有限数字、循环引用、非普通对象及端口内部的 `undefined` 或稀疏数组。传输不调用返回对象的 `toJSON`，不依赖 JSON 序列化静默丢弃或转换非法值。
 `node.completed` 仅在节点完整 output 校验成功后产生，payload 的 `outputs` 是按 handle 索引的完整最终结果对象，无输出时为 `{}`。
-每次节点 invocation 只产生一条完成事件，且先于下游节点的 `node.started`；不再产生逐 handle 的 `node.output`，普通 Task 不支持运行中的中间 output。Wait 的 notification 出口在登记后可用，Wait 本身仍只在决议后完成一次。
+每次节点 invocation 只产生一条完成事件，且先于其完成阶段释放的下游节点的 `node.started`；不再产生逐 handle 的 `node.output`，普通 Task 不支持运行中的中间 output。Wait 的 pending 出口在登记后可用，Wait 本身仍只在决议后完成一次。
 
 Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保存已执行完成的图末端节点的最后一次完成结果，按 node ID 排序；每次 invocation 的完整输出保存在运行事件中。
 每项为 `{ nodeId, status: 'completed', jobId, outputs }`，不包含未执行节点或重复执行的 jobs 数组；没有已执行完成的末端节点时为 `[]`。

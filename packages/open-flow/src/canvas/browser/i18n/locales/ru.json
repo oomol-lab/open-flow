@@ -555,7 +555,7 @@
   "view": "Вид",
   "canvasCard": {
     "waitBranch": {
-      "notification": "Уведомление",
+      "pending": "Ожидает подтверждения",
       "approve": "Одобрено",
       "reject": "Отклонено",
       "continue": "Продолжить"

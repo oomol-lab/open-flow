@@ -244,7 +244,7 @@ function notificationFlow(): RevisionContent {
           ...source.document.graph.nodes,
           notify: {
             kind: 'task',
-            inputs: { notification: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'approval', output: 'notification' }] } },
+            inputs: { notification: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'approval', output: 'pending' }] } },
             task: {
               name: 'Notify',
               moduleId: 'notify',
@@ -254,7 +254,7 @@ function notificationFlow(): RevisionContent {
             },
           },
         },
-        edges: [{ source: 'approval', sourceHandle: 'notification', target: 'notify' }],
+        edges: [{ source: 'approval', sourceHandle: 'pending', target: 'notify' }],
       },
     },
   }
@@ -498,7 +498,7 @@ describe('Server application service', () => {
         ...source.document,
         graph: {
           nodes: { ...source.document.graph.nodes, after: { kind: 'value', inputs: {}, values: [] } },
-          edges: [{ source: 'approval', sourceHandle: 'notification', target: 'after' }],
+          edges: [{ source: 'approval', sourceHandle: 'pending', target: 'after' }],
         },
       },
     }

@@ -20,6 +20,7 @@ import type { ConnectorActionView } from '../workspace.ts'
 
 import { dequal } from 'dequal/lite'
 import { applyFlowChanges as reduceFlowChanges, nextNodeName, normalizeNodeName } from '../../../../flow/common/change.ts'
+import { waitOutputPorts } from '../../../../flow/common/graph.ts'
 import {
   cleanVariableBindings,
   createAgentTask,
@@ -541,7 +542,7 @@ export function updateWait(
     actions: settings.actions,
     prompt: settings.prompt,
   }
-  const outputs = new Set<string>(['notification', ...settings.actions])
+  const outputs = new Set(Object.keys(waitOutputPorts({ ...current, ...settings })))
   const changes: ChangeOperation[] = []
   for (const edge of graph.edges) {
     if (edge.source == nodeId && edge.sourceHandle != null && !outputs.has(edge.sourceHandle)) changes.push({ kind: 'graph.edge.disconnect', edge, target })

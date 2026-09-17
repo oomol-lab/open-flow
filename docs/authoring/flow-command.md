@@ -103,10 +103,10 @@ oo flow schema graph.node.wait.set --json
 oo flow apply FLOW_ID --file changes.json --expected-revision REVISION_ID --json
 ```
 
-Wait 的通知出口固定为 `notification`，可用 `connect FLOW_ID WAIT_NODE NOTIFY_NODE notification` 连接后续通知节点。
+Wait 在等待建立时触发固定的 `pending` 出口，可用 `connect FLOW_ID WAIT_NODE NOTIFY_NODE pending` 连接后续通知节点。
 操作出口为 `continue` 或 `approve/reject`，同样通过 `connect` 的最后一个参数选择。
 执行连线与输入映射独立；传递通知数据时，还需使用 `node input` 或 `graph.node.input.set` 配置输入来源。
-`notification` 不是可决议的操作，不能传给 `runs resolve`。
+`pending` 不是可决议的操作，不能传给 `runs resolve`。
 
 查询待处理等待使用 `runs list --flow FLOW_ID --pending-wait --json`；`--pending-wait` 是无参数开关。
 Run 即使仍为 `running`，也可能包含需要决议的 `waits`。决议时必须指定其中的 `waitId`。

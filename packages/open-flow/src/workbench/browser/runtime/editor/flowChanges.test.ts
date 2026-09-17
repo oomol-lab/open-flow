@@ -299,7 +299,7 @@ describe('Condition changes', () => {
 })
 
 describe('Wait changes', () => {
-  it('creates Wait only in the root graph and removes edges for actions that no longer exist', () => {
+  it('preserves the pending branch while removing retired actions and allows Wait only in the root graph', () => {
     const current = draft('export default (input) => ({ result: input.value })\n')
     const created = addNode(revisionView(current), { kind: 'flow' }, 'wait', { kind: 'wait', name: 'Wait' }, () => 'unused')
     if (created == null) throw new Error('Expected Wait changes.')
@@ -333,6 +333,7 @@ describe('Wait changes', () => {
 
     changed = applyFlowChanges(changed, [
       { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'wait', sourceHandle: 'continue', target: 'task' } },
+      { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'wait', sourceHandle: 'pending', target: 'review' } },
     ])
     const updated = updateWait(revisionView(changed), { kind: 'flow' }, 'wait', {
       actions: ['approve', 'reject'],
@@ -342,7 +343,7 @@ describe('Wait changes', () => {
     if (updated == null) throw new Error('Expected updated Wait changes.')
     changed = applyFlowChanges(changed, updated)
 
-    expect(changed.content.document.graph.edges).toEqual([])
+    expect(changed.content.document.graph.edges).toEqual([{ source: 'wait', sourceHandle: 'pending', target: 'review' }])
     expect(changed.content.document.graph.nodes.wait).toMatchObject({ actions: ['approve', 'reject'], name: 'Approval', prompt: 'Approve this request?' })
     expect(changed.content.document.graph.nodes.task).toMatchObject({ inputs: {} })
     expect(addNode(revisionView(changed), { id: 'child', kind: 'subflow' }, 'nested-wait', { kind: 'wait', name: 'Wait' }, () => 'unused')).toBeUndefined()

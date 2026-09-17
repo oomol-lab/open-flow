@@ -837,7 +837,7 @@ export default () => value`,
       document: {
         bindings: { recipient: { kind: 'variable', target: 'RECIPIENT' } },
         graph: {
-          edges: [{ source: 'wait', sourceHandle: 'notification', target: 'notify' }],
+          edges: [{ source: 'wait', sourceHandle: 'pending', target: 'notify' }],
           nodes: {
             notify: {
               kind: 'task',

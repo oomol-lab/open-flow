@@ -267,13 +267,13 @@ it('does not treat eventual action values as available on the notification path'
     },
     edges: [
       { source: 'start', target: 'wait' },
-      { source: 'wait', sourceHandle: 'notification', target: 'notify' },
+      { source: 'wait', sourceHandle: 'pending', target: 'notify' },
     ],
   }
   const content = revision(graph)
   const result = await prepareFlow(content, currentEngineContract)
   expect(result.kind).toBe('flow-invalid')
-  expect(availableOutputs(content.document, graph, 'notify')).toEqual({ wait: ['notification'] })
+  expect(availableOutputs(content.document, graph, 'notify')).toEqual({ wait: ['pending'] })
 })
 
 it.each([true, false])('runs with null from either an available nullable source or a missing branch source: %s', async (takeSource) => {
@@ -391,4 +391,65 @@ it('runs a shared descendant with null when its only input source belongs to ano
   )
   expect(result.kind).toBe('node-results')
   expect(invoked).toBe(true)
+})
+
+it.each(['notification', 'pending'])('dispatches an ordinary Condition branch named %s', async (branch) => {
+  const prepared = await prepareFlow(
+    revision({
+      nodes: {
+        start: { kind: 'manual', name: 'Start' },
+        condition: {
+          kind: 'condition',
+          input: { handle: 'value', ...port },
+          inputs: { value: { kind: 'value', value: null } },
+          cases: [],
+          defaultOutput: branch,
+        },
+        after: value,
+      },
+      edges: [
+        { source: 'start', target: 'condition' },
+        { source: 'condition', sourceHandle: branch, target: 'after' },
+      ],
+    }),
+    currentEngineContract,
+  )
+  if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
+  let nextId = 0
+  const completed: string[] = []
+  await Effect.runPromise(
+    runFlow(prepared.flow, {
+      flowId: 'main',
+      runId: 'run',
+      trigger: { nodeId: 'start', outputs: {} },
+      createId: () => `job-${++nextId}`,
+      emit: (event) =>
+        Effect.sync(() => {
+          if (event.type == 'node.completed') completed.push(event.nodeId)
+        }),
+      invokeTask: () => Effect.succeed({}),
+    }),
+  )
+  expect(completed).toEqual(['condition', 'after'])
+})
+
+it.each(['edge', 'input'] as const)('rejects the old Wait notification %s reference', async (reference) => {
+  const result = await prepareFlow(
+    revision({
+      nodes: {
+        start: { kind: 'manual', name: 'Start' },
+        wait: { kind: 'wait', input: { handle: 'value', ...port }, inputs: {}, actions: ['continue'], prompt: 'Continue?' },
+        after: {
+          ...task,
+          inputs: reference == 'input' ? { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'notification' }] } } : {},
+        },
+      },
+      edges: [
+        { source: 'start', target: 'wait' },
+        { source: 'wait', sourceHandle: reference == 'edge' ? 'notification' : 'pending', target: 'after' },
+      ],
+    }),
+    currentEngineContract,
+  )
+  expect(result.kind).not.toBe('prepared')
 })

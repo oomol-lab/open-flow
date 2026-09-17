@@ -521,7 +521,7 @@ export class RunStore {
           row.nodeId != wait.nodeId ||
           row.jobId != wait.jobId ||
           row.value != JSON.stringify(wait.value) ||
-          row.output != (wait.notification == null ? null : JSON.stringify(wait.notification))
+          row.output != (wait.pending == null ? null : JSON.stringify(wait.pending))
         )
           throw new Error('Wait checkpoint changed registered values.')
       }
