@@ -34,7 +34,7 @@ export function CanvasNode({
   const selected = useVal(nodeStore.$.selected)
   const node = useVal(nodeStore.content$)
   const title = node.title
-  const icon = node.icon ?? (node.kind == 'wait' ? ':carbon:time:' : undefined)
+  const icon = node.icon ?? (node.kind == 'wait' ? ':carbon:hourglass:' : node.kind == 'approval' ? ':carbon:stamp:' : undefined)
   const { values, summary, schedules, images, tools, inline, hidden } = nodeCardContent(node)
   const kind = node?.kind ?? 'task'
   const triggerSource =

@@ -92,7 +92,6 @@ const condition = {
   defaultOutput: text.optional(),
 }
 const wait = {
-  actions: z.union([z.tuple([z.literal('continue')]), z.tuple([z.literal('approve'), z.literal('reject')])]),
   prompt: text,
 }
 const webhook = {
@@ -148,6 +147,7 @@ const node = z.union([
   z.object({ ...base, kind: z.literal('subflow'), subflowId: text }),
   z.object({ ...base, kind: z.literal('task'), task: inline, additionalInputs: z.array(input).optional() }),
   z.object({ ...base, kind: z.literal('task'), taskId: text, additionalInputs: z.array(input).optional() }),
+  z.strictObject({ ...base, kind: z.literal('approval'), input, ...wait }).omit({ timeoutMs: true }),
   z.strictObject({ ...base, kind: z.literal('wait'), input, ...wait }).omit({ timeoutMs: true }),
   z.object({ ...trigger, kind: z.literal('manual') }),
   z.object({ ...trigger, kind: z.literal('webhook'), ...webhook }),
@@ -316,7 +316,7 @@ const shapes = {
   'graph.node.additional-inputs.set': { ...at, before: z.array(input).optional(), value: z.array(input).optional() },
   'graph.node.condition.set': { ...at, before: z.object(condition), value: z.object(condition) },
   'graph.node.values.set': { ...at, before: z.array(input), value: z.array(input) },
-  'graph.node.wait.set': { ...at, target: z.object({ kind: z.literal('flow') }), before: z.object(wait), value: z.object(wait) },
+  'graph.node.resolution.set': { ...at, target: z.object({ kind: z.literal('flow') }), before: z.object(wait), value: z.object(wait) },
   'graph.node.webhook.set': { ...at, target: z.object({ kind: z.literal('flow') }), before: z.object(webhook), value: z.object(webhook) },
   'graph.node.task.ports.set': { ...at, before: z.object(ports), value: z.object(ports) },
   'graph.node.task.name.set': { ...at, before: text, value: text },

@@ -9,7 +9,7 @@ const operations = [
     kind: 'graph.node.create',
     target,
     nodeId: 'pause',
-    node: { kind: 'wait', name: 'Pause', inputs: {}, input: { handle: 'value', jsonSchema: {}, nullable: true }, actions: ['continue'], prompt: 'Continue?' },
+    node: { kind: 'wait', name: 'Pause', inputs: {}, input: { handle: 'value', jsonSchema: {}, nullable: true }, prompt: 'Continue?' },
   },
   { kind: 'graph.edge.connect', target, edge: { source: 'start', target: 'pause' } },
   {
@@ -56,6 +56,21 @@ describe('ChangeOperation wire contract', () => {
 
   it('publishes a schema that accepts the same complete batch', () => {
     expect(new Validator(changeOperationsSchema() as object).validate(operations).valid).toBe(true)
+  })
+
+  it('accepts Approval as a separate node and rejects legacy actions on both resolution nodes', () => {
+    const approval = {
+      kind: 'graph.node.create',
+      target,
+      nodeId: 'approval',
+      node: { kind: 'approval', inputs: {}, input: { handle: 'value', jsonSchema: {}, nullable: true }, prompt: 'Approve?' },
+    }
+    expect(decodeChangeOperations([approval])).toEqual([approval])
+    for (const nodeKind of ['approval', 'wait']) {
+      const legacy = [{ ...approval, node: { ...approval.node, kind: nodeKind, actions: nodeKind == 'wait' ? ['continue'] : ['approve', 'reject'] } }]
+      expect(() => decodeChangeOperations(legacy)).toThrow()
+      expect(new Validator(changeOperationsSchema() as object).validate(legacy).valid).toBe(false)
+    }
   })
 })
 

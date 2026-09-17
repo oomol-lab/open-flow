@@ -17,15 +17,14 @@ import type { InputVariables, NodeInputUpstreamSources } from './nodeInputValue.
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
-import { waitOutputPorts } from '../../../../flow/common/graph.ts'
+import { resolutionOutputPorts } from '../../../../flow/common/graph.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
+import { Field, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
 import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
-import { ToggleGroup, ToggleGroupItem } from '../../../../ui/browser/toggle-group.tsx'
 import { contextName } from '../../typeScriptShadow.ts'
 import { Icon } from '../icons.tsx'
 import { AgentSettings } from './agentSettings.tsx'
@@ -48,6 +47,7 @@ export function inspectorIcon(node: ResolvedSelection | undefined, target: Graph
   if (node?.kind == 'trigger') return 'trigger'
   if (node?.kind == 'condition') return 'condition'
   if (node?.kind == 'value') return 'value'
+  if (node?.kind == 'approval') return 'check'
   if (node?.kind == 'wait') return 'wait'
   if (node?.kind == 'subflow' || (node == null && target.kind == 'subflow')) return 'subflow'
   if (node?.kind == 'task' && node.definition != null && 'executor' in node.definition) {
@@ -190,7 +190,7 @@ function GeneralSettings({
           />
           {limitError != null && <FieldError>{limitError}</FieldError>}
         </Field>
-        {node.kind != 'wait' && (
+        {node.kind != 'approval' && node.kind != 'wait' && (
           <Field data-invalid={error != null}>
             <FieldLabel htmlFor={inputId}>{t('inspector.node.timeout')}</FieldLabel>
             <Input
@@ -334,13 +334,13 @@ function ConnectorAccount({
   )
 }
 
-function WaitDefinition({
+function ResolutionDefinition({
   disabled,
   selection,
   store,
 }: {
   readonly disabled: boolean
-  readonly selection: Extract<ResolvedNode, { readonly kind: 'wait' }>
+  readonly selection: Extract<ResolvedNode, { readonly kind: 'approval' | 'wait' }>
   readonly store: WorkspaceStore
 }): ReactElement {
   const t = useTranslate()
@@ -351,19 +351,19 @@ function WaitDefinition({
     setPrompt(node.prompt)
     setError(undefined)
   }, [node])
-  const save = async (actions = node.actions, text = prompt): Promise<void> => {
+  const save = async (text = prompt): Promise<void> => {
     const value = text.trim()
     if (value.length == 0 || [...value].length > 1000) {
       setError(t('inspector.wait.promptError'))
       return
     }
     setError(undefined)
-    await store.saveWait(selection.id, { actions, name: node.name, prompt: value })
+    await store.saveResolution(selection.id, { name: node.name, prompt: value })
   }
   return (
     <form
       className="inspector-form wait-form"
-      data-inspector-section="wait"
+      data-inspector-section="resolution"
       onSubmit={(event) => {
         event.preventDefault()
         void save()
@@ -381,28 +381,9 @@ function WaitDefinition({
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
             onBlur={(event) => {
-              if (event.currentTarget.value.trim() != node.prompt) void save(node.actions, event.currentTarget.value)
+              if (event.currentTarget.value.trim() != node.prompt) void save(event.currentTarget.value)
             }}
           />
-        </Field>
-        <Field className="inspector-field-section">
-          <FieldLabel className="inspector-section-title">{t('inspector.wait.mode')}</FieldLabel>
-          <ToggleGroup<'approval' | 'continue'>
-            aria-label={t('inspector.wait.mode')}
-            className="wait-mode-switcher"
-            disabled={disabled}
-            spacing={0}
-            size="sm"
-            value={[node.actions.length == 1 ? 'continue' : 'approval']}
-            onValueChange={(values) => {
-              const mode = values.at(-1)
-              if (mode != null) void save(mode == 'continue' ? ['continue'] : ['approve', 'reject'])
-            }}
-          >
-            <ToggleGroupItem value="continue">{t('inspector.wait.continue')}</ToggleGroupItem>
-            <ToggleGroupItem value="approval">{t('inspector.wait.approval')}</ToggleGroupItem>
-          </ToggleGroup>
-          <FieldDescription>{t('inspector.wait.pendingDescription')}</FieldDescription>
         </Field>
         {error != null && <FieldError>{error}</FieldError>}
       </FieldGroup>
@@ -913,7 +894,11 @@ export function NodeInspector({
           />
         )}
         {selection?.kind === 'trigger' && <TriggerInspectorSummary trigger={selection.trigger} catalog={triggers.catalog} />}
-        {(selection?.kind === 'condition' || selection?.kind === 'wait' || selection?.kind === 'subflow' || selection?.kind === 'task') &&
+        {(selection?.kind === 'condition' ||
+          selection?.kind === 'approval' ||
+          selection?.kind === 'wait' ||
+          selection?.kind === 'subflow' ||
+          selection?.kind === 'task') &&
           (() => {
             const definitions: (InputPort | Group)[] =
               selection.kind === 'task'
@@ -1040,7 +1025,7 @@ export function NodeInspector({
             />
           </section>
         )}
-        {(selection?.kind === 'subflow' || selection?.kind === 'wait') && (
+        {(selection?.kind === 'subflow' || selection?.kind === 'approval' || selection?.kind === 'wait') && (
           <section className="inspector-port-section">
             <PortDefinitionEditor
               groups
@@ -1051,7 +1036,7 @@ export function NodeInspector({
               values={
                 selection.kind === 'subflow'
                   ? (selection.definition?.outputs ?? [])
-                  : Object.entries(waitOutputPorts(selection.node)).map(([handle, port]) => Object.assign({ handle }, port))
+                  : Object.entries(resolutionOutputPorts(selection.node)).map(([handle, port]) => Object.assign({ handle }, port))
               }
               onChange={() => {}}
             />
@@ -1078,8 +1063,8 @@ export function NodeInspector({
               >
                 <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
               </TaskDefinition>
-            ) : selection.kind == 'wait' ? (
-              <WaitDefinition disabled={disabled} selection={selection} store={store} />
+            ) : selection.kind == 'approval' || selection.kind == 'wait' ? (
+              <ResolutionDefinition disabled={disabled} selection={selection} store={store} />
             ) : null}
             {selection.kind != 'trigger' && selection.kind != 'task' && (
               <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />

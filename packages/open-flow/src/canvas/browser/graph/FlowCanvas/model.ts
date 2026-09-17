@@ -160,7 +160,7 @@ export type FlowCanvasViewNode =
   | FlowCanvasViewTriggerNode
   | FlowCanvasViewValueNode
   | (FlowCanvasViewNodeBase & {
-      readonly kind: 'wait'
+      readonly kind: 'approval' | 'wait'
       readonly notice?: { readonly icon?: string; readonly text: string }
     })
 

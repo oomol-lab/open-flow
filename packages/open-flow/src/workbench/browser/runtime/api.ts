@@ -45,6 +45,7 @@ export type {
 } from '../../../control/common/api.ts'
 
 export type {
+  ApprovalNode,
   ChangeOperation,
   CodeModule,
   ConditionOperator,

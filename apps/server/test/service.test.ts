@@ -191,11 +191,9 @@ function waitFlow(): RevisionContent {
         edges: [],
         nodes: {
           approval: {
-            actions: ['approve', 'reject'],
-
             input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
             inputs: { value: { kind: 'value', value: { request: 1 } } },
-            kind: 'wait',
+            kind: 'approval',
             name: 'Approval',
             prompt: 'Approve request 1?',
           },
@@ -386,7 +384,6 @@ describe('Server application service', () => {
           name: 'Unused Wait',
           inputs: {},
           input: { handle: 'value', jsonSchema: {}, nullable: true },
-          actions: ['continue'],
           prompt: 'Continue?',
         },
       },

@@ -27,7 +27,7 @@ import type {
 import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionView.ts'
 
 import { dequal } from 'dequal/lite'
-import { waitOutputPorts } from '../../../flow/common/graph.ts'
+import { resolutionOutputPorts } from '../../../flow/common/graph.ts'
 import { triggerOutputPorts } from '../../../trigger/common/contract.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
@@ -131,8 +131,10 @@ function nodeTitle(node: ResolvedNode, t?: TFunction): string {
       return t?.('addNode.condition') ?? 'Condition'
     case 'value':
       return t?.('addNode.value') ?? 'Fixed Values'
+    case 'approval':
+      return t?.('addNode.approval') ?? 'Approval'
     case 'wait':
-      return 'Wait'
+      return t?.('addNode.wait') ?? 'Wait'
     case 'subflow':
       return node.definition?.name ?? node.node.subflowId
     case 'task':
@@ -148,8 +150,10 @@ function nodeIcon(node: ResolvedNode): string | undefined {
       return ':carbon:subflow:'
     case 'value':
       return ':oomol:value:'
+    case 'approval':
+      return ':carbon:stamp:'
     case 'wait':
-      return ':carbon:time:'
+      return ':carbon:hourglass:'
     case 'task': {
       const task = node.definition
       if (task == null) return
@@ -254,6 +258,7 @@ function nodePorts(node: ResolvedSelection): NodePorts {
       }
       break
     }
+    case 'approval':
     case 'wait':
       inputs.set(node.node.input.handle, {
         defaultValue: node.node.input.value,
@@ -261,7 +266,7 @@ function nodePorts(node: ResolvedSelection): NodePorts {
         jsonSchema: node.node.input.jsonSchema,
         nullable: node.node.input.nullable,
       })
-      for (const [handle, port] of Object.entries(waitOutputPorts(node.node))) outputs.set(handle, port)
+      for (const [handle, port] of Object.entries(resolutionOutputPorts(node.node))) outputs.set(handle, port)
       break
     case 'subflow': {
       const definition = node.definition
@@ -708,6 +713,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
       }
     case 'value':
       return { ...common, kind: node.kind, values: node.values.map((port) => Object.assign({}, port)) }
+    case 'approval':
     case 'wait':
       return { ...common, kind: node.kind }
   }

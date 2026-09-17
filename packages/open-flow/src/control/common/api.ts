@@ -454,6 +454,7 @@ export function decodeRunEvent(value: unknown) {
           const nodeKind = payload.nodeKind
           if (
             nodeKind !== undefined &&
+            nodeKind !== 'approval' &&
             nodeKind !== 'condition' &&
             nodeKind !== 'connector' &&
             nodeKind !== 'javascript' &&

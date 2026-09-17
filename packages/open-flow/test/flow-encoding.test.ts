@@ -197,17 +197,21 @@ describe('Flow Revision encoding', () => {
     })
   })
 
-  it('encodes Wait actions and rejects obsolete inline notification fields', () => {
+  it('encodes Approval and rejects legacy actions and inline notification fields', () => {
     const source = revision()
     const wait = {
-      actions: ['approve', 'reject'],
       input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
       inputs: { value: { kind: 'value', value: { request: 1 } } },
-      kind: 'wait',
+      kind: 'approval',
       prompt: 'Approve request 1?',
     } as const
     const content = { ...source, document: { ...source.document, graph: { edges: [], nodes: { wait } } } }
     expect(JSON.parse(decoder.decode(encodeRevision(content))).document.graph.nodes.wait).toEqual(wait)
+    const legacy = {
+      ...content,
+      document: { ...content.document, graph: { edges: [], nodes: { wait: { ...wait, actions: ['approve', 'reject'] } } } },
+    }
+    expect(() => decodeRevision(new TextEncoder().encode(JSON.stringify(legacy)))).toThrow()
     const obsolete = {
       ...content,
       document: {

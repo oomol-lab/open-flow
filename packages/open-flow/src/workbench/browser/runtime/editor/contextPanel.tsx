@@ -305,6 +305,8 @@ function fallbackIcon(item: LibraryNodeItem): IconName {
       return 'connection'
     case 'llm':
       return 'llm'
+    case 'approval':
+      return 'task'
     case 'trigger':
       return 'trigger'
     case 'value':

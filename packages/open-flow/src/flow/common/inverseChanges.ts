@@ -94,7 +94,7 @@ export function inverseFlowChanges(content: RevisionContent, operations: readonl
       case 'graph.node.values.set':
         restore.push({ ...operation, before: operation.value, value: operation.before })
         break
-      case 'graph.node.wait.set':
+      case 'graph.node.resolution.set':
         restore.push({ ...operation, before: operation.value, value: operation.before })
         break
       case 'graph.node.webhook.set':

@@ -18,6 +18,8 @@ interface FlowNodeListProps {
 
 function fallbackIcon(node: FlowCanvasViewNode): ReactElement {
   if (node.kind == 'comment') return <i aria-hidden="true" className="i-codicon:note" />
+  if (node.kind == 'approval') return <i aria-hidden="true" className="i-carbon:stamp" />
+  if (node.kind == 'wait') return <i aria-hidden="true" className="i-carbon:hourglass" />
   return <Icon name={node.kind} />
 }
 

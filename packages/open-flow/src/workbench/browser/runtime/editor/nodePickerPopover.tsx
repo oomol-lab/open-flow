@@ -119,7 +119,9 @@ export function CanvasNodePicker({
       centered={centered}
       isOptionDisabled={(option) =>
         request.connectionSide != null &&
-        (option.kind == 'trigger' || option.kind == 'comment' || (request.connectionSide == 'left' && (option.kind == 'condition' || option.kind == 'wait')))
+        (option.kind == 'trigger' ||
+          option.kind == 'comment' ||
+          (request.connectionSide == 'left' && (option.kind == 'approval' || option.kind == 'condition' || option.kind == 'wait')))
       }
     />
   )

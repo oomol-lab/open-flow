@@ -15,7 +15,7 @@ const counter: GraphNode = {
   inputs: { previous: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'counter', output: 'count' }] } },
   task: { name: 'Counter', moduleId: 'counter', inputs: [{ ...port, handle: 'previous' }], outputs: [{ ...port, handle: 'count' }] },
 }
-const pause: GraphNode = { kind: 'wait', inputs: {}, input: { ...port, handle: 'value', value: 42 }, actions: ['continue'], prompt: 'Continue?' }
+const pause: GraphNode = { kind: 'wait', inputs: {}, input: { ...port, handle: 'value', value: 42 }, prompt: 'Continue?' }
 function revision(graph: Graph): RevisionContent {
   return {
     modelVersion: 2,
@@ -185,7 +185,7 @@ describe('Repeated node executions', () => {
       revision({
         nodes: {
           start: { kind: 'manual', name: 'Start' },
-          pause: { ...pause, actions: ['approve', 'reject'], maxExecutions: 2 },
+          pause: { ...pause, kind: 'approval', maxExecutions: 2 },
           send: { kind: 'task', inputs: {}, task: { name: 'Send notification', moduleId: 'counter', inputs: [], outputs: [] } },
         },
         edges: [

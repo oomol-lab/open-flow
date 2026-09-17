@@ -176,7 +176,10 @@ describe('Designer port projection', () => {
     expect(authenticatedNode).toMatchObject({ diagnostics: 1, executorName: 'connector · Hacker News', connectionRequired: true })
   })
 
-  it.each([['approve', 'reject'], ['continue']] as const)('projects notification first and active waiting state for %j', (...actions) => {
+  it.each([
+    ['approval', ['approve', 'reject']],
+    ['wait', ['continue']],
+  ] as const)('projects %s notification first and active waiting state', (kind, actions) => {
     const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
       actorId: 'actor',
       content: {
@@ -186,11 +189,9 @@ describe('Designer port projection', () => {
             edges: [],
             nodes: {
               wait: {
-                actions,
-
                 input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
                 inputs: {},
-                kind: 'wait',
+                kind,
                 prompt: 'Review this request.',
               },
             },
@@ -217,7 +218,7 @@ describe('Designer port projection', () => {
       version: 1,
     }
     const projected = designerGraph(draft, { kind: 'flow' }).nodes[0]!
-    if (projected.kind != 'wait') throw new Error('Expected Wait')
+    if (projected.kind != kind) throw new Error(`Expected ${kind}`)
     expect(projected.outputs.flatMap((port) => ('handle' in port ? [port.handle] : []))).toEqual(['pending', ...actions])
     const waiting = {
       closureDigest: 'closure',

@@ -177,7 +177,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         edge.targetHandle != '$in'
       )
         return false
-      return source.kind == 'condition' || source.kind == 'wait'
+      return source.kind == 'condition' || source.kind == 'approval' || source.kind == 'wait'
         ? source.outputs.some((port) => 'handle' in port && `$branch:${port.handle}` == edge.sourceHandle)
         : edge.sourceHandle == '$out'
     }

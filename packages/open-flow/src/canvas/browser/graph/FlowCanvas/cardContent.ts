@@ -21,7 +21,7 @@ export function nodeSummary(node: NodeContent): string {
   if (node.kind == 'condition') {
     return node.description?.trim() || ''
   }
-  if (node.kind == 'wait') return node.description?.trim() || node.notice?.text.trim() || ''
+  if (node.kind == 'approval' || node.kind == 'wait') return node.description?.trim() || node.notice?.text.trim() || ''
   return node.description?.trim() || ''
 }
 

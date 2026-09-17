@@ -43,6 +43,7 @@ type AddTrigger =
 export type AddNodeOption = AddNodeOptionBase &
   (
     | { readonly kind: 'comment' }
+    | { readonly kind: 'approval' }
     | { readonly kind: 'condition' }
     | { readonly connector: ConnectorActionView; readonly kind: 'connector' }
     | {
@@ -203,10 +204,23 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
       trigger: { kind: 'cron' },
     },
     {
+      description: t('addNode.approvalDescription'),
+      group: t('addNode.blocks'),
+      id: 'approval',
+      icon: ':carbon:stamp:',
+      inputs: [{ handle: 'value', jsonSchema: {} }],
+      kind: 'approval',
+      label: t('addNode.approval'),
+      outputs: [
+        { handle: 'approve', jsonSchema: {} },
+        { handle: 'reject', jsonSchema: {} },
+      ],
+    },
+    {
       description: t('addNode.waitDescription'),
       group: t('addNode.blocks'),
       id: 'wait',
-      icon: ':carbon:time:',
+      icon: ':carbon:hourglass:',
       inputs: [{ handle: 'value', jsonSchema: {} }],
       kind: 'wait',
       label: t('addNode.wait'),
@@ -263,6 +277,8 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, tar
       return
     case 'condition':
       return { kind: 'condition', name: t('addNode.condition') }
+    case 'approval':
+      return target.kind == 'flow' ? { kind: 'approval', name: t('addNode.approval') } : undefined
     case 'value':
       return { kind: 'value', name: t('addNode.value') }
     case 'wait':

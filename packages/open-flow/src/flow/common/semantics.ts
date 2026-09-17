@@ -83,6 +83,7 @@ export function flowDependencies(content: RevisionContent, triggerId?: string): 
           break
         case 'value':
           break
+        case 'approval':
         case 'wait':
           break
         case 'poll':

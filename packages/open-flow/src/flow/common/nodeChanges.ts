@@ -43,6 +43,8 @@ export function defaultNodeName(content: RevisionContent, node: GraphNode): stri
       return 'Condition'
     case 'value':
       return 'Fixed Values'
+    case 'approval':
+      return 'Approval'
     case 'wait':
       return 'Wait'
     case 'subflow':
@@ -240,10 +242,26 @@ export function createWait(target: Extract<GraphTarget, { readonly kind: 'flow' 
     {
       kind: 'graph.node.create',
       node: {
-        actions: ['continue'],
         input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
         inputs: { value: { kind: 'value', value: null } },
         kind: 'wait',
+        name,
+        prompt: name,
+      },
+      nodeId,
+      target,
+    },
+  ]
+}
+
+export function createApproval(target: Extract<GraphTarget, { readonly kind: 'flow' }>, nodeId: string, name: string): readonly ChangeOperation[] {
+  return [
+    {
+      kind: 'graph.node.create',
+      node: {
+        input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+        inputs: { value: { kind: 'value', value: null } },
+        kind: 'approval',
         name,
         prompt: name,
       },

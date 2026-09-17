@@ -147,13 +147,21 @@ export interface ValueNode extends GraphNodeBase {
 
 export type WaitAction = 'approve' | 'continue' | 'reject'
 
-export interface WaitNode extends GraphNodeBase {
-  readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
+interface ResolutionNodeBase extends GraphNodeBase {
   readonly input: InputPort
-  readonly kind: 'wait'
   readonly prompt: string
   readonly timeoutMs?: never
 }
+
+export interface WaitNode extends ResolutionNodeBase {
+  readonly kind: 'wait'
+}
+
+export interface ApprovalNode extends ResolutionNodeBase {
+  readonly kind: 'approval'
+}
+
+export type ResolutionNode = ApprovalNode | WaitNode
 
 export type ConditionOperator =
   | '!='
@@ -377,7 +385,7 @@ export type TriggerNode =
       readonly kind: 'integration'
     })
 
-export type GraphNode = ConditionNode | SubflowNode | TaskNode | TriggerNode | ValueNode | WaitNode
+export type GraphNode = ApprovalNode | ConditionNode | SubflowNode | TaskNode | TriggerNode | ValueNode | WaitNode
 
 export interface FlowDocument {
   readonly bindings: Readonly<Record<string, { readonly kind: 'connection' | 'variable'; readonly target: string }>>
@@ -508,11 +516,11 @@ export type ChangeOperation =
       readonly value: readonly InputPort[]
     }
   | {
-      readonly before: Pick<WaitNode, 'actions' | 'prompt'>
-      readonly kind: 'graph.node.wait.set'
+      readonly before: Pick<ResolutionNode, 'prompt'>
+      readonly kind: 'graph.node.resolution.set'
       readonly nodeId: string
       readonly target: Extract<GraphTarget, { readonly kind: 'flow' }>
-      readonly value: Pick<WaitNode, 'actions' | 'prompt'>
+      readonly value: Pick<ResolutionNode, 'prompt'>
     }
   | {
       readonly before: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'bodyFields' | 'options'>
@@ -775,22 +783,13 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         )
         break
       }
-      case 'graph.node.wait.set': {
+      case 'graph.node.resolution.set': {
         const graph = document.graph
         const node = graph.nodes[operation.nodeId]
-        if (
-          node?.kind != 'wait' ||
-          !dequal(
-            {
-              actions: node.actions,
-              prompt: node.prompt,
-            },
-            operation.before,
-          )
-        ) {
-          invalid('The Wait Node changed before this operation was applied.')
+        if ((node?.kind != 'wait' && node?.kind != 'approval') || !dequal({ prompt: node.prompt }, operation.before)) {
+          invalid('The resolution node changed before this operation was applied.')
         }
-        const updated: WaitNode = { ...node, ...operation.value }
+        const updated: ResolutionNode = { ...node, ...operation.value }
         document.graph = { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }
         break
       }

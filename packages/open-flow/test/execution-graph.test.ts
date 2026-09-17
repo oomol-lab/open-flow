@@ -169,7 +169,7 @@ describe('Execution graph scheduling', () => {
       ],
       nodes: {
         before: { ...task, task: { ...task.task, outputs: [{ ...port, handle: 'value' }] } },
-        pause: { kind: 'wait', inputs: {}, input: { ...port, handle: 'value', value: null }, actions: ['continue'], prompt: 'Continue?' },
+        pause: { kind: 'wait', inputs: {}, input: { ...port, handle: 'value', value: null }, prompt: 'Continue?' },
         after: { ...task, inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'before', output: 'value' }] } } },
       },
     }
@@ -242,10 +242,9 @@ describe('Execution graph scheduling', () => {
 
 it('does not treat eventual action values as available on the notification path', async () => {
   const wait = {
-    kind: 'wait' as const,
+    kind: 'approval' as const,
     inputs: {},
     input: { ...port, handle: 'value', value: null },
-    actions: ['approve', 'reject'] as const,
     prompt: 'Approve?',
   }
   const graph: Graph = {
@@ -293,7 +292,7 @@ it.each([true, false])('runs with null from either an available nullable source 
         join: { ...task, inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } } },
         after: task,
         independent: task,
-        pause: { kind: 'wait', inputs: {}, input: { ...port, handle: 'value', value: null }, actions: ['continue'], prompt: 'Continue?' },
+        pause: { kind: 'wait', inputs: {}, input: { ...port, handle: 'value', value: null }, prompt: 'Continue?' },
       },
       edges: [
         { source: 'start', target: 'choice' },
@@ -438,7 +437,7 @@ it.each(['edge', 'input'] as const)('rejects the old Wait notification %s refere
     revision({
       nodes: {
         start: { kind: 'manual', name: 'Start' },
-        wait: { kind: 'wait', input: { handle: 'value', ...port }, inputs: {}, actions: ['continue'], prompt: 'Continue?' },
+        wait: { kind: 'wait', input: { handle: 'value', ...port }, inputs: {}, prompt: 'Continue?' },
         after: {
           ...task,
           inputs: reference == 'input' ? { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'notification' }] } } : {},

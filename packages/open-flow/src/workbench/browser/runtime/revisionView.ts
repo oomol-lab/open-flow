@@ -1,6 +1,7 @@
 import type { InputSourcesCheck } from '../../../flow/common/graph.ts'
 import type {
   CodeModule,
+  ApprovalNode,
   ConditionNode,
   Draft,
   Graph,
@@ -36,6 +37,7 @@ export type ResolvedNode =
       readonly node: TaskNode
     }
   | { readonly id: string; readonly kind: 'value'; readonly node: ValueNode }
+  | { readonly id: string; readonly kind: 'approval'; readonly node: ApprovalNode }
   | { readonly id: string; readonly kind: 'wait'; readonly node: WaitNode }
 
 export interface ResolvedTrigger {
@@ -144,6 +146,9 @@ export class RevisionView {
         break
       }
       case 'value':
+        resolved = { id: nodeId, kind: node.kind, node }
+        break
+      case 'approval':
         resolved = { id: nodeId, kind: node.kind, node }
         break
       case 'wait':

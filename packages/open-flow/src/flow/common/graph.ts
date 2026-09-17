@@ -17,6 +17,10 @@ import type { Diagnostic, SemanticClosure } from './semantics.ts'
 import { triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/common/contract.ts'
 import { portsByHandle, validVariableName } from './change.ts'
 import { schemaObject, schemaList, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
+
+export function isResolutionNode(node: GraphNode | undefined): node is Extract<GraphNode, { readonly kind: 'approval' | 'wait' }> {
+  return node?.kind == 'approval' || node?.kind == 'wait'
+}
 function graphDiagnostic(
   code: string,
   message: string,
@@ -89,6 +93,7 @@ export function nodeInputPorts(document: FlowDocument, node: GraphNode): Readonl
       return portsByHandle(document.subflows[node.subflowId]?.inputs ?? [])
     case 'task':
       return portsByHandle([...(node.task != null ? node.task.inputs : (document.tasks[node.taskId]?.inputs ?? [])), ...(node.additionalInputs ?? [])])
+    case 'approval':
     case 'wait':
       return { [node.input.handle]: node.input }
     case 'cron':
@@ -100,7 +105,12 @@ export function nodeInputPorts(document: FlowDocument, node: GraphNode): Readonl
   }
 }
 
-export function waitOutputPorts(node: Extract<GraphNode, { readonly kind: 'wait' }>): Readonly<Record<string, PortDefinition>> {
+export function resolutionActions(node: Extract<GraphNode, { readonly kind: 'approval' | 'wait' }>): readonly ['continue'] | readonly ['approve', 'reject'] {
+  return node.kind == 'wait' ? ['continue'] : ['approve', 'reject']
+}
+
+export function resolutionOutputPorts(node: Extract<GraphNode, { readonly kind: 'approval' | 'wait' }>): Readonly<Record<string, PortDefinition>> {
+  const actions = resolutionActions(node)
   return {
     pending: {
       nullable: false,
@@ -113,7 +123,7 @@ export function waitOutputPorts(node: Extract<GraphNode, { readonly kind: 'wait'
             type: 'array',
             items: {
               type: 'object',
-              properties: { action: { enum: node.actions }, url: { type: 'string' } },
+              properties: { action: { enum: actions }, url: { type: 'string' } },
               required: ['action', 'url'],
               additionalProperties: false,
             },
@@ -125,7 +135,7 @@ export function waitOutputPorts(node: Extract<GraphNode, { readonly kind: 'wait'
       },
     },
     ...Object.fromEntries(
-      node.actions.map((action) => [
+      actions.map((action) => [
         action,
         {
           jsonSchema: node.input.jsonSchema,
@@ -149,8 +159,9 @@ function nodeOutputPorts(document: FlowDocument, node: GraphNode): Readonly<Reco
       return portsByHandle(document.subflows[node.subflowId]?.outputs ?? [])
     case 'task':
       return portsByHandle(node.task != null ? node.task.outputs : (document.tasks[node.taskId]?.outputs ?? []))
+    case 'approval':
     case 'wait':
-      return waitOutputPorts(node)
+      return resolutionOutputPorts(node)
     case 'cron':
     case 'integration':
     case 'poll':
@@ -319,11 +330,11 @@ function graphPaths(graph: Graph) {
       for (const edge of edges) {
         parents.add(edge.source)
         for (const waitId of resolvedWaits.get(edge.source) ?? []) decisions.add(waitId)
-        if (graph.nodes[edge.source]?.kind == 'wait' && edge.sourceHandle != 'pending') decisions.add(edge.source)
+        if (isResolutionNode(graph.nodes[edge.source]) && edge.sourceHandle != 'pending') decisions.add(edge.source)
         for (const parent of ancestors.get(edge.source) ?? []) parents.add(parent)
         for (const route of paths.get(edge.source) ?? []) {
           const next =
-            edge.sourceHandle == null || (graph.nodes[edge.source]?.kind == 'wait' && edge.sourceHandle == 'pending')
+            edge.sourceHandle == null || (isResolutionNode(graph.nodes[edge.source]) && edge.sourceHandle == 'pending')
               ? route
               : { ...route, [edge.source]: edge.sourceHandle }
           if (routes.some((known) => routeCovers(known, next))) continue
@@ -356,7 +367,7 @@ function sourcePaths(graph: Graph, paths: ReturnType<typeof graphPaths>['paths']
   if (source.kind != 'node') return [{}]
   const node = graph.nodes[source.nodeId]
   const routes = paths.get(source.nodeId) ?? []
-  return node?.kind == 'condition' || (node?.kind == 'wait' && source.output != 'pending')
+  return node?.kind == 'condition' || (isResolutionNode(node) && source.output != 'pending')
     ? routes.map((route) => ({ ...route, [source.nodeId]: source.output }))
     : routes
 }
@@ -370,7 +381,7 @@ function mappingAvailable(graph: Graph, target: string | undefined, mapping: Inp
     mapping.sources.some(
       (source) =>
         source.kind == 'node' &&
-        graph.nodes[source.nodeId]?.kind == 'wait' &&
+        isResolutionNode(graph.nodes[source.nodeId]) &&
         source.output != 'pending' &&
         !analysis.resolvedWaits.get(target)?.has(source.nodeId),
     )
@@ -435,7 +446,7 @@ export function checkInputSource(
   if (input == null) return { kind: 'not-ready' }
   const analysis = graphPaths(graph)
   if (analysis.ancestors.get(target)?.has(source.nodeId) !== true) return { kind: 'not-ready' }
-  if (node.kind == 'wait' && source.output != 'pending' && !analysis.resolvedWaits.get(target)?.has(source.nodeId)) return { kind: 'not-ready' }
+  if (isResolutionNode(node) && source.output != 'pending' && !analysis.resolvedWaits.get(target)?.has(source.nodeId)) return { kind: 'not-ready' }
   const result = comparePorts(output, input)
   if (result.kind == 'compatible') return { kind: 'available' }
   return result.kind == 'incompatible' ? { kind: 'schema', mismatch: result.mismatch } : { kind: 'schema-error' }
@@ -472,27 +483,29 @@ export function availableOutputs(document: FlowDocument, graph: Graph, target: s
   )
 }
 
-function validateWait(nodeId: string, node: Extract<GraphNode, { readonly kind: 'wait' }>, allowed: boolean, path: string, diagnostics: Diagnostic[]): void {
-  const fields = new Set(['actions', 'description', 'icon', 'input', 'inputs', 'kind', 'maxExecutions', 'name', 'prompt'])
+function validateResolution(
+  nodeId: string,
+  node: Extract<GraphNode, { readonly kind: 'approval' | 'wait' }>,
+  allowed: boolean,
+  path: string,
+  diagnostics: Diagnostic[],
+): void {
+  const fields = new Set(['description', 'icon', 'input', 'inputs', 'kind', 'maxExecutions', 'name', 'prompt'])
+  const label = node.kind == 'wait' ? 'Wait' : 'Approval'
   const unsupported = Object.keys(node).filter((field) => !fields.has(field))
   if (unsupported.length > 0) {
     diagnostics.push(
-      graphDiagnostic('wait.field-unsupported', `Wait node "${nodeId}" contains unsupported fields: ${unsupported.join(', ')}.`, path, {
+      graphDiagnostic(`${node.kind}.field-unsupported`, `${label} node "${nodeId}" contains unsupported fields: ${unsupported.join(', ')}.`, path, {
         fields: unsupported.join(', '),
         nodeId,
       }),
     )
   }
-  if (!allowed) diagnostics.push(graphDiagnostic('wait.not-allowed', 'Wait nodes are only allowed in Flows.', path))
-  if (node.input.handle != 'value') diagnostics.push(graphDiagnostic('wait.input-invalid', 'Wait input handle must be "value".', `${path}/input/handle`))
+  if (!allowed) diagnostics.push(graphDiagnostic(`${node.kind}.not-allowed`, `${label} nodes are only allowed in Flows.`, path))
+  if (node.input.handle != 'value')
+    diagnostics.push(graphDiagnostic(`${node.kind}.input-invalid`, `${label} input handle must be "value".`, `${path}/input/handle`))
   if (typeof node.prompt != 'string' || node.prompt.trim().length == 0 || [...node.prompt].length > 1_000) {
-    diagnostics.push(graphDiagnostic('wait.prompt-invalid', 'Wait prompt must contain between 1 and 1,000 Unicode code points.', `${path}/prompt`))
-  }
-  if (
-    !Array.isArray(node.actions) ||
-    !((node.actions.length == 1 && node.actions[0] == 'continue') || (node.actions.length == 2 && node.actions[0] == 'approve' && node.actions[1] == 'reject'))
-  ) {
-    diagnostics.push(graphDiagnostic('wait.actions-invalid', 'Wait actions must be ["continue"] or ["approve", "reject"].', `${path}/actions`))
+    diagnostics.push(graphDiagnostic(`${node.kind}.prompt-invalid`, `${label} prompt must contain between 1 and 1,000 Unicode code points.`, `${path}/prompt`))
   }
 }
 
@@ -518,11 +531,10 @@ function validateGraph(
     const target = graph.nodes[edge.target]
     if (source == null || target == null || !('inputs' in target)) {
       diagnostics.push(graphDiagnostic('graph.edge-invalid', 'Execution edges require an existing source and an executable target.', edgePath))
-    } else if (source.kind == 'condition' || source.kind == 'wait') {
-      const exits =
-        source.kind == 'wait'
-          ? Object.keys(waitOutputPorts(source))
-          : [...source.cases.map((item) => item.output), ...(source.defaultOutput == null ? [] : [source.defaultOutput])]
+    } else if (source.kind == 'condition' || isResolutionNode(source)) {
+      const exits = isResolutionNode(source)
+        ? Object.keys(resolutionOutputPorts(source))
+        : [...source.cases.map((item) => item.output), ...(source.defaultOutput == null ? [] : [source.defaultOutput])]
       if (edge.sourceHandle == null || !exits.some((exit) => exit == edge.sourceHandle)) {
         diagnostics.push(graphDiagnostic('graph.edge-invalid', 'Choose a declared execution branch.', edgePath))
       }
@@ -609,7 +621,7 @@ function validateGraph(
         for (const source of mapping.sources) checkSource(source, graph, document, flowInputs, inputPorts[handle], mappingPath, diagnostics)
       }
     }
-    if (node.kind == 'wait') validateWait(nodeId, node, allowTriggers, nodePath, diagnostics)
+    if (isResolutionNode(node)) validateResolution(nodeId, node, allowTriggers, nodePath, diagnostics)
     if (node.kind != 'condition') continue
     const outputs = new Set<string>()
     for (const [index, condition] of node.cases.entries()) {

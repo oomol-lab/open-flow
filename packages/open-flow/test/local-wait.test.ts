@@ -35,8 +35,7 @@ async function fixture(notify = true, action: WaitAction = 'approve') {
         nodes: {
           start: { kind: 'manual', name: 'Start' },
           wait: {
-            kind: 'wait',
-            actions: action == 'continue' ? ['continue'] : ['approve', 'reject'],
+            kind: action == 'continue' ? 'wait' : 'approval',
             prompt: 'Ready?',
             inputs: {},
             input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },

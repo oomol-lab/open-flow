@@ -848,11 +848,9 @@ export default () => value`,
               },
             },
             wait: {
-              actions: ['approve', 'reject'],
-
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: null } },
-              kind: 'wait',
+              kind: 'approval',
               prompt: 'Approve this request?',
             },
           },
@@ -881,7 +879,7 @@ export default () => value`,
     expect([...dependencies.inputBindings]).toEqual(['recipient'])
   })
 
-  it('preserves the Wait input schema on action outputs', async () => {
+  it('preserves the Approval input schema on decision outputs', async () => {
     const source = revision('export default ({ input }) => ({ input })')
     const task = source.document.graph.nodes.task
     if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
@@ -898,11 +896,9 @@ export default () => value`,
               task: { ...task.task, inputs: [{ handle: 'input', jsonSchema: { type: 'string' }, nullable: false }] },
             },
             wait: {
-              actions: ['approve', 'reject'],
-
               input: { handle: 'value', jsonSchema: { type: 'string' }, nullable: false },
               inputs: { value: { kind: 'value', value: 'request-1' } },
-              kind: 'wait',
+              kind: 'approval',
               prompt: 'Approve this request?',
             },
           },
@@ -914,7 +910,7 @@ export default () => value`,
   })
 
   it.each([
-    [{ actions: ['approve'] }, 'wait.actions-invalid'],
+    [{ legacy: true }, 'wait.field-unsupported'],
     [{ input: { handle: 'other', jsonSchema: {}, nullable: true } }, 'wait.input-invalid'],
     [{ prompt: '' }, 'wait.prompt-invalid'],
     [{ timeoutMs: 1_000 }, 'wait.field-unsupported'],
@@ -926,8 +922,6 @@ export default () => value`,
           edges: [],
           nodes: {
             wait: {
-              actions: ['continue'],
-
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: null } },
               kind: 'wait',
@@ -960,8 +954,6 @@ export default () => value`,
               subflowId: 'child',
             },
             wait: {
-              actions: ['continue'],
-
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: null } },
               kind: 'wait',
@@ -975,8 +967,6 @@ export default () => value`,
               edges: [],
               nodes: {
                 wait: {
-                  actions: ['continue'],
-
                   input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
                   inputs: { value: { kind: 'value', value: null } },
                   kind: 'wait',

@@ -345,13 +345,11 @@ describe('Flow changes', () => {
     })
   })
 
-  it('updates Wait settings and rejects a stale change', () => {
+  it('updates resolution prompts and rejects a stale change', () => {
     const source = applyFlowChanges(revision(), [
       {
         kind: 'graph.node.create',
         node: {
-          actions: ['continue'],
-
           input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
           inputs: {},
           kind: 'wait',
@@ -364,27 +362,24 @@ describe('Flow changes', () => {
     ])
     const changed = applyFlowChanges(source, [
       {
-        before: {
-          actions: ['continue'],
-          prompt: 'Continue?',
-        },
-        kind: 'graph.node.wait.set',
+        before: { prompt: 'Continue?' },
+        kind: 'graph.node.resolution.set',
         nodeId: 'wait',
         target,
-        value: { actions: ['approve', 'reject'], prompt: 'Approve?' },
+        value: { prompt: 'Continue now?' },
       },
     ])
 
-    expect(changed.document.graph.nodes.wait).toMatchObject({ actions: ['approve', 'reject'], prompt: 'Approve?' })
+    expect(changed.document.graph.nodes.wait).toMatchObject({ kind: 'wait', prompt: 'Continue now?' })
     expect(changed.document.graph.nodes.wait).not.toHaveProperty('notification')
     expect(() =>
       applyFlowChanges(changed, [
         {
-          before: { actions: ['continue'], prompt: 'Continue?' },
-          kind: 'graph.node.wait.set',
+          before: { prompt: 'Continue?' },
+          kind: 'graph.node.resolution.set',
           nodeId: 'wait',
           target,
-          value: { actions: ['continue'], prompt: 'Continue again?' },
+          value: { prompt: 'Continue again?' },
         },
       ]),
     ).toThrow(FlowChangeError)

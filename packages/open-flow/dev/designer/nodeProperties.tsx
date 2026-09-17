@@ -58,11 +58,22 @@ const fixtures: readonly Fixture[] = [
     group: 'Wait',
     node: {
       kind: 'wait',
+      name: 'Wait for review',
+      maxExecutions: 25,
+      inputs: { report: { kind: 'value', value: 'Release notes are ready for review.' } },
+      input: field('report'),
+      prompt: 'Continue after reviewing the release notes.',
+    },
+  },
+  {
+    id: 'approval',
+    group: 'Approval',
+    node: {
+      kind: 'approval',
       name: 'Approve release',
       maxExecutions: 25,
       inputs: { report: { kind: 'value', value: 'Release notes are ready for review.' } },
       input: field('report'),
-      actions: ['approve', 'reject'],
       prompt: 'Review the release notes before publishing.',
     },
   },

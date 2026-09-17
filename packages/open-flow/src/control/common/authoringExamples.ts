@@ -1,6 +1,7 @@
 import type { DraftOperation } from './draftOperations.ts'
 
 import {
+  createApproval,
   createBuiltinTrigger,
   createCodeTask,
   createCondition,
@@ -21,6 +22,7 @@ const descriptions = {
   'code': 'A JavaScript module and its node. Use Code for custom computation; use Connector Tasks for existing actions.',
   'condition': 'A condition with true and false execution branches.',
   'value': 'A fixed value node.',
+  'approval': 'An Approval with approve and reject decision branches and a built-in notification output.',
   'wait': 'A Wait with a continue action and a built-in notification output.',
   'agent': 'An Agent with code computation enabled. Configure a model available in the deployment.',
   'llm-chat': 'An LLM chat Task and its node; configure a model available in the deployment.',
@@ -122,6 +124,9 @@ export function authoringExample(name: string): { version: 1; operations: readon
       break
     case 'value':
       operations = createValue(target, 'value', 'Value')
+      break
+    case 'approval':
+      operations = createApproval(target, 'approval', 'Approve?')
       break
     case 'wait':
       operations = createWait(target, 'wait', 'Continue?')

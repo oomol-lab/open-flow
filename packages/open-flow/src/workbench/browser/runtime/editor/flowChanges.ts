@@ -20,9 +20,9 @@ import type { ConnectorActionView } from '../workspace.ts'
 
 import { dequal } from 'dequal/lite'
 import { applyFlowChanges as reduceFlowChanges, nextNodeName, normalizeNodeName } from '../../../../flow/common/change.ts'
-import { waitOutputPorts } from '../../../../flow/common/graph.ts'
 import {
   cleanVariableBindings,
+  createApproval,
   createAgentTask,
   createCodeTask,
   createBuiltinTrigger,
@@ -124,6 +124,7 @@ export interface SubflowSettings {
 
 export type AddNodeIntent =
   | { readonly kind: 'agent'; readonly name: string }
+  | { readonly kind: 'approval'; readonly name: string }
   | { readonly kind: 'code'; readonly name: string; readonly ports?: TaskPorts }
   | { readonly action: ConnectorActionView; readonly kind: 'connector' }
   | { readonly kind: 'condition'; readonly name: string }
@@ -222,6 +223,9 @@ export function addNode(revision: RevisionView, target: GraphTarget, nodeId: str
       break
     case 'condition':
       changes = createCondition(target, nodeId, intent.name)
+      break
+    case 'approval':
+      changes = target.kind == 'flow' ? createApproval(target, nodeId, intent.name) : undefined
       break
     case 'value':
       changes = createValue(target, nodeId, intent.name)
@@ -522,55 +526,31 @@ export function updateValue(revision: RevisionView, target: GraphTarget, nodeId:
   return [{ before: node.values, kind: 'graph.node.values.set', nodeId, target, value: values }]
 }
 
-export function updateWait(
+export function updateResolution(
   revision: RevisionView,
   target: GraphTarget,
   nodeId: string,
-  settings: Pick<Extract<GraphNode, { readonly kind: 'wait' }>, 'actions' | 'prompt'> & {
+  settings: Pick<Extract<GraphNode, { readonly kind: 'approval' | 'wait' }>, 'prompt'> & {
     readonly name?: string
   },
 ): FlowChanges | undefined {
   if (target.kind != 'flow') return
   const graph = revision.graph(target)
   const current = graph?.nodes[nodeId]
-  if (graph == null || current?.kind != 'wait') return
+  if (graph == null || (current?.kind != 'approval' && current?.kind != 'wait')) return
   const before = {
-    actions: current.actions,
     prompt: current.prompt,
   }
   const value = {
-    actions: settings.actions,
     prompt: settings.prompt,
   }
-  const outputs = new Set(Object.keys(waitOutputPorts({ ...current, ...settings })))
   const changes: ChangeOperation[] = []
-  for (const edge of graph.edges) {
-    if (edge.source == nodeId && edge.sourceHandle != null && !outputs.has(edge.sourceHandle)) changes.push({ kind: 'graph.edge.disconnect', edge, target })
-  }
   if (current.name != settings.name) {
     changes.push({ before: current.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value: settings.name })
   }
-  if (!dequal(before, value)) changes.push({ before, kind: 'graph.node.wait.set', nodeId, target, value })
-  for (const [currentNodeId, node] of Object.entries(graph.nodes)) {
-    if (currentNodeId == nodeId) continue
-    if (!('inputs' in node)) continue
-    for (const [handle, mapping] of Object.entries(node.inputs)) {
-      if (mapping.kind != 'sources') continue
-      const sources = mapping.sources.filter((source) => source.kind != 'node' || source.nodeId != nodeId || outputs.has(source.output))
-      if (sources.length == mapping.sources.length) continue
-      changes.push({
-        before: mapping,
-        handle,
-        kind: 'graph.node.input.set',
-        nodeId: currentNodeId,
-        target,
-        value: sources.length == 0 ? undefined : { kind: 'sources', sources },
-      })
-    }
-  }
+  if (!dequal(before, value)) changes.push({ before, kind: 'graph.node.resolution.set', nodeId, target, value })
   if (changes.length == 0) return []
-  const cleaned = cleanVariableBindings(revision.revision.content, changes)
-  return cleaned
+  return changes
 }
 
 export function updateTask(revision: RevisionView, target: GraphTarget, nodeId: string, settings: TaskSettings): FlowChanges | undefined {

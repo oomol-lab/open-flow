@@ -19,7 +19,7 @@ import {
   updateTaskPorts,
   updateCondition,
   updateTaskAdditionalInputs,
-  updateWait,
+  updateResolution,
 } from './flowChanges.ts'
 import { movePort } from './portOrder.ts'
 
@@ -298,55 +298,28 @@ describe('Condition changes', () => {
   })
 })
 
-describe('Wait changes', () => {
-  it('preserves the pending branch while removing retired actions and allows Wait only in the root graph', () => {
+describe('Resolution node changes', () => {
+  it('creates separate Wait and Approval nodes, updates prompts, and allows them only in the root graph', () => {
     const current = draft('export default (input) => ({ result: input.value })\n')
-    const created = addNode(revisionView(current), { kind: 'flow' }, 'wait', { kind: 'wait', name: 'Wait' }, () => 'unused')
-    if (created == null) throw new Error('Expected Wait changes.')
-    let changed = applyFlowChanges(current, created)
-    const task = changed.content.document.graph.nodes.task
-    if (task?.kind != 'task') throw new Error('Expected Task fixture.')
-    changed = applyFlowChanges(changed, [
-      {
-        before: task.inputs.value,
-        handle: 'value',
-        kind: 'graph.node.input.set',
-        nodeId: 'task',
-        target: { kind: 'flow' },
-        value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'continue' }] },
-      },
-      {
-        kind: 'graph.node.create',
-        node: {
-          actions: ['continue'],
-
-          input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
-          inputs: { value: { kind: 'value', value: null } },
-          kind: 'wait',
-          name: 'Review',
-          prompt: 'Review?',
-        },
-        nodeId: 'review',
-        target: { kind: 'flow' },
-      },
-    ])
-
-    changed = applyFlowChanges(changed, [
-      { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'wait', sourceHandle: 'continue', target: 'task' } },
-      { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'wait', sourceHandle: 'pending', target: 'review' } },
-    ])
-    const updated = updateWait(revisionView(changed), { kind: 'flow' }, 'wait', {
-      actions: ['approve', 'reject'],
-      name: 'Approval',
+    const wait = addNode(revisionView(current), { kind: 'flow' }, 'wait', { kind: 'wait', name: 'Wait' }, () => 'unused')
+    if (wait == null) throw new Error('Expected Wait changes.')
+    let changed = applyFlowChanges(current, wait)
+    const approval = addNode(revisionView(changed), { kind: 'flow' }, 'approval', { kind: 'approval', name: 'Approval' }, () => 'unused')
+    if (approval == null) throw new Error('Expected Approval changes.')
+    changed = applyFlowChanges(changed, approval)
+    const updated = updateResolution(revisionView(changed), { kind: 'flow' }, 'approval', {
+      name: 'Release approval',
       prompt: 'Approve this request?',
     })
-    if (updated == null) throw new Error('Expected updated Wait changes.')
+    if (updated == null) throw new Error('Expected updated Approval changes.')
     changed = applyFlowChanges(changed, updated)
 
-    expect(changed.content.document.graph.edges).toEqual([{ source: 'wait', sourceHandle: 'pending', target: 'review' }])
-    expect(changed.content.document.graph.nodes.wait).toMatchObject({ actions: ['approve', 'reject'], name: 'Approval', prompt: 'Approve this request?' })
-    expect(changed.content.document.graph.nodes.task).toMatchObject({ inputs: {} })
+    expect(changed.content.document.graph.nodes.wait).toMatchObject({ kind: 'wait', prompt: 'Wait' })
+    expect(changed.content.document.graph.nodes.approval).toMatchObject({ kind: 'approval', name: 'Release approval', prompt: 'Approve this request?' })
     expect(addNode(revisionView(changed), { id: 'child', kind: 'subflow' }, 'nested-wait', { kind: 'wait', name: 'Wait' }, () => 'unused')).toBeUndefined()
+    expect(
+      addNode(revisionView(changed), { id: 'child', kind: 'subflow' }, 'nested-approval', { kind: 'approval', name: 'Approval' }, () => 'unused'),
+    ).toBeUndefined()
   })
 })
 

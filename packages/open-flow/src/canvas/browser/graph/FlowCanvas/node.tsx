@@ -70,6 +70,7 @@ export function createNodeEntry(node: FlowCanvasViewSemanticNode, contentKey: st
   const content$ = val<NodeContent>(nodeContent(node))
   const duplicateNode = (offset?: FlowCanvasViewPosition) => canvasStore.onDuplicate?.([node.id as NodeId], offset)
   const types = {
+    approval: NODE_TYPE.TaskNode,
     condition: NODE_TYPE.ConditionNode,
     subflow: NODE_TYPE.SubflowNode,
     task: NODE_TYPE.TaskNode,

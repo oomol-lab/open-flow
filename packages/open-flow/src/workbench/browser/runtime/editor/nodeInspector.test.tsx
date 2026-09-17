@@ -29,7 +29,11 @@ function find(element: ReactElement, predicate: (item: ReactElement) => boolean)
   }
 }
 
-function waitDefinition(node: unknown, revision: unknown, saveWait: ReturnType<typeof vi.fn>): ReactElement {
+function resolutionDefinition(
+  node: { readonly kind: 'approval' | 'wait' } & Readonly<Record<string, unknown>>,
+  revision: unknown,
+  saveResolution: ReturnType<typeof vi.fn>,
+): ReactElement {
   const view = { graph: () => ({ nodes: { wait: node } }), ...(revision as object) }
   const element = NodeInspector({
     variables: { enabled: true, names: [], loaded: false, loading: false, onOpen: vi.fn() },
@@ -39,60 +43,40 @@ function waitDefinition(node: unknown, revision: unknown, saveWait: ReturnType<t
     connectors: {} as never,
     disabled: false,
     revision: view as never,
-    selection: { id: 'wait', kind: 'wait', node } as never,
-    store: { $: { flowId: { value: 'flow' } }, saveWait } as never,
+    selection: { id: 'wait', kind: node.kind, node } as never,
+    store: { $: { flowId: { value: 'flow' } }, saveResolution } as never,
     target: { kind: 'flow' },
     theme: 'light',
     triggerAuthorizationPending: false,
     triggerConnectionLoading: false,
     triggers: {} as never,
   })
-  const wait = find(element, (item) => typeof item.type == 'function' && item.type.name == 'WaitDefinition')
-  if (wait == null || typeof wait.type != 'function') throw new Error('Expected Wait settings.')
-  return (wait.type as (props: unknown) => ReactElement)(wait.props)
+  const resolution = find(element, (item) => typeof item.type == 'function' && item.type.name == 'ResolutionDefinition')
+  if (resolution == null || typeof resolution.type != 'function') throw new Error('Expected resolution settings.')
+  return (resolution.type as (props: unknown) => ReactElement)(resolution.props)
 }
 
-describe('Wait Inspector', () => {
-  it('saves a resolution change immediately', () => {
-    const saveWait = vi.fn().mockResolvedValue(true)
-    const definition = waitDefinition(
-      { actions: ['continue'], input: { handle: 'value', jsonSchema: {}, nullable: true }, inputs: {}, kind: 'wait', name: 'Wait', prompt: 'Continue?' },
+describe('Resolution Inspector', () => {
+  it.each(['approval', 'wait'] as const)('saves the latest %s prompt on blur and preserves the node name', (kind) => {
+    const saveResolution = vi.fn().mockResolvedValue(true)
+    const definition = resolutionDefinition(
+      { input: { handle: 'value', jsonSchema: {}, nullable: true }, inputs: {}, kind, name: 'Renamed', prompt: 'Continue?' },
       {},
-      saveWait,
-    )
-    const switcher = find(definition, (item) => (item.props as { readonly className?: string }).className == 'wait-mode-switcher')
-    if (switcher == null) throw new Error('Expected resolution switcher.')
-
-    ;(switcher.props as { readonly onValueChange: (values: readonly string[]) => void }).onValueChange(['approval'])
-
-    expect(saveWait).toHaveBeenCalledWith('wait', {
-      actions: ['approve', 'reject'],
-      name: 'Wait',
-      prompt: 'Continue?',
-    })
-  })
-
-  it('saves the latest prompt on blur and preserves the node name', () => {
-    const saveWait = vi.fn().mockResolvedValue(true)
-    const definition = waitDefinition(
-      { actions: ['continue'], input: { handle: 'value', jsonSchema: {}, nullable: true }, inputs: {}, kind: 'wait', name: 'Renamed', prompt: 'Continue?' },
-      {},
-      saveWait,
+      saveResolution,
     )
     const input = find(definition, (item) => (item.props as { readonly id?: string }).id == 'wait-wait-prompt')
     if (input == null) throw new Error('Expected prompt.')
     const blur = (input.props as { readonly onBlur: (event: { currentTarget: { value: string } }) => void }).onBlur
     blur({ currentTarget: { value: 'Continue?' } })
-    expect(saveWait).not.toHaveBeenCalled()
+    expect(saveResolution).not.toHaveBeenCalled()
     blur({ currentTarget: { value: '  Review this request  ' } })
-    expect(saveWait).toHaveBeenCalledWith('wait', {
-      actions: ['continue'],
+    expect(saveResolution).toHaveBeenCalledWith('wait', {
       name: 'Renamed',
       prompt: 'Review this request',
     })
-    saveWait.mockClear()
+    saveResolution.mockClear()
     blur({ currentTarget: { value: '  ' } })
-    expect(saveWait).not.toHaveBeenCalled()
+    expect(saveResolution).not.toHaveBeenCalled()
   })
 })
 
@@ -145,7 +129,7 @@ describe('Node execution settings', () => {
 })
 
 describe('Node input ownership', () => {
-  it.each(['condition', 'wait', 'subflow', 'task'] as const)('resolves %s variable bindings and sends edits directly to the workspace', (kind) => {
+  it.each(['approval', 'condition', 'wait', 'subflow', 'task'] as const)('resolves %s variable bindings and sends edits directly to the workspace', (kind) => {
     const setInputSource = vi.fn()
     const setInputValue = vi.fn()
     const setInputVariable = vi.fn()
@@ -167,7 +151,7 @@ describe('Node input ownership', () => {
         graph: () => ({ nodes: { upstream: { name: 'Source' } } }),
         inputSource: () => ({ check: vi.fn(), candidates: vi.fn() }),
       } as never,
-      selection: { id: 'condition', kind, node: { ...node, kind, actions: ['continue'] }, definition: { inputs: [node.input] } } as never,
+      selection: { id: 'condition', kind, node: { ...node, kind }, definition: { inputs: [node.input] } } as never,
       store: {
         $: { flowId: { value: 'flow' } },
         setInputSource,

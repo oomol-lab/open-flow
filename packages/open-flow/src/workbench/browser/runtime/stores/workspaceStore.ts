@@ -64,7 +64,7 @@ import {
   updateSubflow,
   updateTask,
   updateValue,
-  updateWait,
+  updateResolution,
   updateWebhook,
 } from '../editor/flowChanges.ts'
 import { createI18n } from '../i18n.ts'
@@ -684,16 +684,16 @@ export class WorkspaceStore {
     return changes != null && (await this.#editDraft(changes)) != null
   }
 
-  public async saveWait(
+  public async saveResolution(
     nodeId: string,
-    settings: Pick<Extract<GraphNode, { readonly kind: 'wait' }>, 'actions' | 'prompt'> & {
+    settings: Pick<Extract<GraphNode, { readonly kind: 'approval' | 'wait' }>, 'prompt'> & {
       readonly name?: string
     },
   ): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target?.kind != 'flow') return false
-    const changes = updateWait(revision, target, nodeId, settings)
+    const changes = updateResolution(revision, target, nodeId, settings)
     return changes != null && (await this.#editDraft(changes)) != null
   }
 

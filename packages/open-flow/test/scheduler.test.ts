@@ -20,7 +20,7 @@ let nextId = 0
 async function runOutcome(prepared: PreparedFlow, options: Omit<FlowRunOptions, 'createId' | 'flowId'> & { readonly decision?: WaitAction }) {
   const { bindingValues, inputs, resume, trigger, decision, ...rest } = options
   const waits = resume == null ? waitHost() : waitHost({ [decodeFlowRunCheckpoint(resume.checkpoint).waits[0]!.waitId]: decision ?? 'continue' })
-  const execute = Object.values(prepared.graph.nodes).some((node) => node.kind == 'wait') ? advanceWaiting : Effect.runPromise
+  const execute = Object.values(prepared.graph.nodes).some((node) => node.kind == 'approval' || node.kind == 'wait') ? advanceWaiting : Effect.runPromise
   return await execute(
     scheduleFlow(prepared, {
       createId: () => `scheduler-${++nextId}`,
@@ -359,8 +359,6 @@ describe('revision graph scheduler', () => {
               values: [{ handle: 'value', jsonSchema: {}, nullable: true, value: { id: 42 } }],
             },
             wait: {
-              actions: ['continue'],
-
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
               kind: 'wait',
@@ -447,7 +445,6 @@ describe('revision graph scheduler', () => {
             nodes: {
               a: { inputs: {}, kind: 'task', task: task('a', [], ['result']) },
               wait: {
-                actions: ['continue'],
                 input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
                 inputs: {},
                 kind: 'wait',
@@ -503,11 +500,9 @@ describe('revision graph scheduler', () => {
           ],
           nodes: {
             wait: {
-              actions: ['approve', 'reject'],
-
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: 'request-1' } },
-              kind: 'wait',
+              kind: 'approval',
               prompt: 'Approve this request?',
             },
             approved: {
@@ -564,16 +559,12 @@ describe('revision graph scheduler', () => {
           edges: [{ source: 'first', sourceHandle: 'continue', target: 'second' }],
           nodes: {
             first: {
-              actions: ['continue'],
-
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'value', value: 1 } },
               kind: 'wait',
               prompt: 'First wait',
             },
             second: {
-              actions: ['continue'],
-
               input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'first', output: 'continue' }] } },
               kind: 'wait',
@@ -1374,7 +1365,6 @@ it('validates formed Webhook outputs at launch and checkpoint recovery without p
           start: { kind: 'webhook', name: 'Webhook', bodyFields: [] },
           wait: {
             kind: 'wait',
-            actions: ['continue'],
             prompt: 'Continue?',
             inputs: {},
             input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },

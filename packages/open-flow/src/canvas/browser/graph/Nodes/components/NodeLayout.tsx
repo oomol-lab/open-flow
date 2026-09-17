@@ -42,7 +42,9 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const modelNode = useVal(NodeStore.to(nodeStore)?.content$)
 
   const branches =
-    modelNode?.kind == 'condition' || modelNode?.kind == 'wait' ? modelNode.outputs.flatMap((port) => ('handle' in port ? [port.handle] : [])) : undefined
+    modelNode?.kind == 'condition' || modelNode?.kind == 'approval' || modelNode?.kind == 'wait'
+      ? modelNode.outputs.flatMap((port) => ('handle' in port ? [port.handle] : []))
+      : undefined
   const executionInput = modelNode != null && modelNode.kind != 'trigger' && modelNode.kind != 'value'
   const editable = useVal(canvasStore.$.editable)
   const contentWidth$ = nodeStore.interaction.contentWidth
@@ -93,7 +95,11 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
       problem={problem}
       branches={branches?.map((branch) => {
         const summary =
-          conditionNode != null ? conditionBranchSummary(conditionNode, branch, t) : modelNode?.kind == 'wait' ? t(`canvasCard.waitBranch.${branch}`) : ''
+          conditionNode != null
+            ? conditionBranchSummary(conditionNode, branch, t)
+            : modelNode?.kind == 'approval' || modelNode?.kind == 'wait'
+              ? t(`canvasCard.waitBranch.${branch}`)
+              : ''
         return (
           <div key={branch} className={clsx(styles.executionBranch, styles.branchRow)}>
             {summary && (
