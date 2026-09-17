@@ -143,10 +143,10 @@ describe('Independent node inputs', () => {
   })
 
   it.each([
-    ['The issue title returned by GitHub.', 'The issue title returned by GitHub.'],
-    [undefined, 'title'],
-    ['   ', 'title'],
-  ])('shows the selected upstream node icon and uses its description or port name in a tooltip', (description, tooltip) => {
+    ['The issue title returned by GitHub.', 'GitHub issue · title\nThe issue title returned by GitHub.'],
+    [undefined, 'GitHub issue · title'],
+    ['   ', 'GitHub issue · title'],
+  ])('shows the selected upstream node icon and keeps its full label in the tooltip', (description, tooltip) => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <NodeInputValue
@@ -176,7 +176,7 @@ describe('Independent node inputs', () => {
     )
 
     expect(markup).toContain('data-icon-kind="initials"')
-    expect(markup).toContain('GitHub issue title')
+    expect(markup).toContain('GitHub issue · title')
     expect(markup).toContain('data-slot="tooltip-trigger"')
     expect(markup).toContain(`aria-description="${tooltip}"`)
   })
@@ -336,7 +336,7 @@ it('checks a saved binding synchronously without enumerating candidates', () => 
         />
       </I18nProvider>,
     )
-    expect(html).toContain('Saved source text')
+    expect(html).toContain('Saved source · text')
     expect(html).not.toContain('Checking mapping…')
     expect(html).not.toContain('aria-busy')
     expect(html).toContain('aria-invalid="true"')

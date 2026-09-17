@@ -120,10 +120,11 @@ function SelectedSourceValue({
   const sourceLabel = bound
     ? variableName
     : current?.length
-      ? current.map((source) => (source.nodeName == null ? source.output : `${source.nodeName} ${source.output}`)).join(' / ')
+      ? current.map((source) => (source.nodeName == null ? source.output : `${source.nodeName} · ${source.output}`)).join(' / ')
       : t('nodeInput.connected')
   const selectedUpstreamIcon = connected && current?.length === 1 ? current[0]?.icon : undefined
-  const sourceTooltip = connected && current?.length ? current.map((source) => source.description?.trim() || source.output).join('\n') : undefined
+  const sourceDescriptions = connected && current?.length ? current.map((source) => source.description?.trim()).filter(Boolean) : []
+  const sourceTooltip = connected && current?.length ? [sourceLabel, ...sourceDescriptions].join('\n') : undefined
   return (
     <>
       <ValueEditorFeedback error={sourceIssue}>
