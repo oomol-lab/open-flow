@@ -40,7 +40,7 @@ export function JsonEditor({
     if (ready) editor.current?.focus()
     else fallback.current?.focus()
   }, [focusRequest, disabled, ready])
-  const latest = useRef({ text, disabled, ariaLabel, change: (_nextText: string) => {} })
+  const latest = useRef({ text, disabled, ariaLabel, invalid: false, change: (_nextText: string) => {} })
   const change = (nextText: string) => {
     setText(nextText)
     try {
@@ -55,7 +55,7 @@ export function JsonEditor({
       onDraftIssue(path, true)
     }
   }
-  latest.current = { text, disabled, ariaLabel, change }
+  latest.current = { text, disabled, ariaLabel, invalid: invalid || schemaInvalid === true, change }
   useEffect(() => {
     let disposed = false
     let current: Awaited<ReturnType<typeof createCodeEditor>> | undefined
@@ -68,6 +68,7 @@ export function JsonEditor({
       // Leave room for the editor border and the surrounding panel padding.
       cursorScrollMargin: autoHeight ? 24 : undefined,
       value: latest.current.text,
+      invalid: latest.current.invalid,
       readOnly: latest.current.disabled === true,
       ariaLabel: latest.current.ariaLabel,
     })
@@ -79,7 +80,11 @@ export function JsonEditor({
         current = created
         editor.current = created
         created.setValue(latest.current.text)
-        created.updateOptions({ readOnly: latest.current.disabled === true, ariaLabel: latest.current.ariaLabel })
+        created.updateOptions({
+          readOnly: latest.current.disabled === true,
+          ariaLabel: latest.current.ariaLabel,
+          invalid: latest.current.invalid,
+        })
         created.onChange(() => {
           const next = created.getValue()
           if (next !== latest.current.text) latest.current.change(next)
@@ -97,7 +102,7 @@ export function JsonEditor({
   }, [path, autoHeight])
   useEffect(() => {
     editor.current?.setValue(text)
-    editor.current?.updateOptions({ readOnly: disabled === true, ariaLabel, invalid: invalid || schemaInvalid === true })
+    editor.current?.updateOptions({ readOnly: disabled === true, ariaLabel, invalid: latest.current.invalid })
   }, [text, disabled, ariaLabel, invalid, schemaInvalid, ready])
   return (
     <div className={styles.errorAnchor}>
