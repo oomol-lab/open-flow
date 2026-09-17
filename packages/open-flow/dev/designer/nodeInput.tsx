@@ -93,7 +93,7 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
           onVariable={() => {}}
         />
         <h3>Invalid sources</h3>
-        <div className="editor-context-panel grid grid-cols-2 gap-4">
+        <div className="editor-context-panel grid grid-cols-3 gap-4">
           <NodeInputValue
             definition={{ ...definition, handle: 'invalidUpstream' }}
             value={undefined}
@@ -101,6 +101,27 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
             upstream={{
               ...providerSource,
               current: providerSource.current.map((source) => Object.assign({}, source, { check: { kind: 'not-ready' as const } })),
+            }}
+            variables={variables}
+            disabled={false}
+            onValue={() => {}}
+            onVariable={() => {}}
+          />
+          <NodeInputValue
+            definition={{ handle: 'typeMismatch', jsonSchema: { type: 'number' }, nullable: false }}
+            value={undefined}
+            connected
+            upstream={{
+              ...providerSource,
+              current: providerSource.current.map((source) =>
+                Object.assign({}, source, {
+                  output: 'result',
+                  check: {
+                    kind: 'schema' as const,
+                    mismatch: { kind: 'keyword' as const, keyword: 'type' as const, path: [], source: 'string', target: 'number' },
+                  },
+                }),
+              ),
             }}
             variables={variables}
             disabled={false}

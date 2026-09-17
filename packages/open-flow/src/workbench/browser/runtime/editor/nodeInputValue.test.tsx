@@ -195,6 +195,9 @@ describe('Independent node inputs', () => {
     )
 
     expect(markup).toContain('role="alert"')
+    const errorId = markup.match(/aria-describedby="([^"]+)"/)?.[1]
+    expect(errorId).toBeDefined()
+    expect(markup).toContain(`id="${errorId}"`)
     expect(markup).toContain(message)
   })
 

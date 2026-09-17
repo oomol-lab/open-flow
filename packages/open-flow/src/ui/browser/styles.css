@@ -129,7 +129,7 @@
 }
 
 /* Tint the control surface once, including grouped inputs and code editors. */
-:is([data-slot='input'], [data-slot='textarea'], [data-slot='native-select'], [data-slot='select-trigger'], button)[aria-invalid='true'],
+:is([data-slot='input'], [data-slot='textarea'], [data-slot='native-select'], [data-slot='select-trigger'], [data-field-control], button)[aria-invalid='true'],
 [data-slot='input-group']:has([data-slot][aria-invalid='true']),
 .open-flow-code-editor.cm-editor[data-invalid='true'] {
   border-width: var(--ui-danger-border-width, 1px);

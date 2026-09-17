@@ -6,10 +6,10 @@ import type { VariablePickerProps } from '../../../../ui/browser/variable-picker
 import type { InputPort, JsonValue } from '../api.ts'
 import type { InputSourceQuery } from '../revisionView.ts'
 
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { variableInputCompatible } from '../../../../flow/common/schema.ts'
-import { ValueEditor } from '../../../../form/browser/valueEditor.tsx'
+import { ValueEditor, ValueEditorFeedback } from '../../../../form/browser/valueEditor.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import {
   DropdownMenu,
@@ -88,7 +88,6 @@ function SelectedSourceValue({
   readonly variables: InputVariables
 }) {
   const t = useTranslate()
-  const sourceErrorId = useId()
   let checks: InputSourcesCheck | undefined
   let checkFailed = false
   if (upstream?.query != null && upstream.current.length > 0) {
@@ -117,39 +116,39 @@ function SelectedSourceValue({
       : t('nodeInput.connected')
   const selectedUpstreamIcon = connected && current?.length === 1 ? current[0]?.icon : undefined
   return (
-    <div className={styles.sourceValue}>
-      <div
-        data-value-control
-        className="flex h-[30px] min-w-0 items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-[7px] text-xs aria-invalid:border-destructive"
-        aria-invalid={sourceIssue != null}
-        aria-describedby={sourceIssue ? sourceErrorId : undefined}
-        tabIndex={sourceIssue ? 0 : undefined}
-      >
-        {bound ? (
-          <i aria-hidden="true" className="i-heroicons:variable-20-solid mr-2 size-3.5 shrink-0 text-muted-foreground" />
-        ) : (
-          connected &&
-          current?.length === 1 && (
-            <ContentIcon
-              src={selectedUpstreamIcon}
-              className="mr-2 size-3.5 shrink-0 data-[icon-kind=initials]:text-[16px]"
-              fallback={<i aria-hidden="true" className="i-lucide-light:workflow mr-2 size-3.5 shrink-0 text-muted-foreground" />}
-            />
-          )
+    <>
+      <ValueEditorFeedback error={sourceIssue}>
+        {(errorId) => (
+          <div
+            data-field-control
+            data-value-control
+            className={`${styles.sourceControl} flex h-[30px] min-w-0 items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-[7px] text-xs`}
+            aria-invalid={sourceIssue != null}
+            aria-describedby={errorId}
+            tabIndex={sourceIssue ? 0 : undefined}
+          >
+            {bound ? (
+              <i aria-hidden="true" className="i-heroicons:variable-20-solid mr-2 size-3.5 shrink-0 text-muted-foreground" />
+            ) : (
+              connected &&
+              current?.length === 1 && (
+                <ContentIcon
+                  src={selectedUpstreamIcon}
+                  className="mr-2 size-3.5 shrink-0 data-[icon-kind=initials]:text-[16px]"
+                  fallback={<i aria-hidden="true" className="i-lucide-light:workflow mr-2 size-3.5 shrink-0 text-muted-foreground" />}
+                />
+              )
+            )}
+            <span className="truncate">{sourceLabel}</span>
+          </div>
         )}
-        <span className="truncate">{sourceLabel}</span>
-      </div>
+      </ValueEditorFeedback>
       {checkFailed && (
         <p role="status" className="text-xs text-muted-foreground">
           {t('inspector.sources.checkFailed')}
         </p>
       )}
-      {sourceIssue && (
-        <p id={sourceErrorId} role="alert" className={styles.sourceError}>
-          {sourceIssue}
-        </p>
-      )}
-    </div>
+    </>
   )
 }
 

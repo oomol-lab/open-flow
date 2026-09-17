@@ -58,6 +58,22 @@ export interface ValueEditorProps {
   readonly depth?: number
 }
 
+/** Gives custom value controls the same attached validation feedback as built-in editors. */
+export function ValueEditorFeedback({ children, error }: { readonly children: (errorId: string | undefined) => ReactNode; readonly error?: ReactNode }) {
+  const id = useId()
+  const errorId = error == null ? undefined : `${id}-error`
+  return (
+    <div className={styles.errorAnchor}>
+      {children(errorId)}
+      {error != null && (
+        <div id={errorId} className={styles.error} role="alert">
+          {error}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const types: readonly ValueType[] = ['string', 'number', 'boolean', 'object', 'array', 'null']
 
 function PropertyName({ name, onRename, disabled }: { name: string; onRename: (name: string) => boolean; disabled?: boolean }) {
