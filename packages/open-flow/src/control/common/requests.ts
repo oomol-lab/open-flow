@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { resourceNameIssue } from '../../flow/common/change.ts'
 import { createEventSourceSchema, updateEventSourceSchema, eventSourceRevisionSchema } from './eventSourceSchemas.ts'
 
-export const waitActionBodySchema = z.strictObject({ comment: waitCommentSchema })
+export const waitActionBodySchema: { parse(value: unknown): { comment?: string | null } } = z.strictObject({ comment: waitCommentSchema })
 
 const json: z.ZodType<JsonValue> = z.json()
 const id = z.string().min(1)

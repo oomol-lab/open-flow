@@ -1,9 +1,6 @@
-import type { WaitResolution } from './wait.ts'
-export { normalizeWaitComment } from './wait.ts'
-export type { WaitResolution } from './wait.ts'
 import type * as Cause from 'effect/Cause'
 import type { AgentConfig } from '../../flow/common/agent.ts'
-import type { ConnectorCapability, Graph, GraphNode, InputMapping, InputPortDefinition, JsonValue, TriggerNode } from '../../flow/common/change.ts'
+import type { ConnectorCapability, Graph, GraphNode, InputMapping, InputPortDefinition, JsonValue, TriggerNode, WaitAction } from '../../flow/common/change.ts'
 import type { PreparedFlow } from '../../flow/common/semantics.ts'
 import type { AgentCheckpoint, AgentResult } from './runtime.ts'
 
@@ -18,6 +15,15 @@ import { portsByHandle } from '../../flow/common/change.ts'
 import { isResolutionNode, resolutionActions, resolutionOutputPorts } from '../../flow/common/graph.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
 import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
+import { normalizeWaitComment as normalizeComment } from './wait.ts'
+
+export const normalizeWaitComment: (value?: string | null) => string | null = normalizeComment
+
+export interface WaitResolution {
+  readonly action: WaitAction
+  readonly resolvedAt: string
+  readonly comment: string | null
+}
 
 type ExecutableNode = Exclude<GraphNode, TriggerNode>
 

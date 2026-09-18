@@ -1,5 +1,3 @@
-import type { WaitAction } from '../../flow/common/change.ts'
-
 import { z } from 'zod'
 
 /** Shared by decision entry points, the editor, and durable decision storage. */
@@ -12,10 +10,4 @@ export const waitCommentSchema = z
 
 export function normalizeWaitComment(value?: string | null): string | null {
   return waitCommentSchema.parse(value) || null
-}
-
-export interface WaitResolution {
-  readonly action: WaitAction
-  readonly resolvedAt: string
-  readonly comment: string | null
 }
