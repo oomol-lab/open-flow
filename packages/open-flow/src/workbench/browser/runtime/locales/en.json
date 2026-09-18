@@ -210,10 +210,6 @@
     },
     "task": {
       "chatText": "Chat text",
-      "codeDirty": "Unsaved",
-      "codeFailed": "Save failed",
-      "codeSaved": "Saved",
-      "codeSaving": "Saving…",
       "connectorAction": "Connector action",
       "definition": "Task definition",
       "discardCode": "Discard changes",

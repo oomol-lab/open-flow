@@ -210,10 +210,6 @@
     },
     "task": {
       "chatText": "Текст чата",
-      "codeDirty": "Не сохранено",
-      "codeFailed": "Не удалось сохранить",
-      "codeSaved": "Сохранено",
-      "codeSaving": "Сохранение…",
       "connectorAction": "Действие Connector",
       "definition": "Определение задачи",
       "discardCode": "Отменить изменения",

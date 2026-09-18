@@ -210,10 +210,6 @@
     },
     "task": {
       "chatText": "대화 텍스트",
-      "codeDirty": "저장되지 않음",
-      "codeFailed": "저장 실패",
-      "codeSaved": "저장됨",
-      "codeSaving": "저장 중…",
       "connectorAction": "Connector 액션",
       "definition": "태스크 정의",
       "discardCode": "변경 사항 버리기",

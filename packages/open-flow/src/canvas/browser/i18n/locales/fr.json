@@ -562,8 +562,8 @@
     },
     "waitBranchDescription": {
       "pending": {
-        "approval": "Déclenché dès que le flux atteint ce nœud et crée un lien d’approbation. Le flux continue après l’ouverture du lien et la validation. Connectez ce port pour envoyer le lien par messagerie, e-mail ou un autre canal.",
-        "wait": "Déclenché dès que le flux atteint ce nœud et crée un lien pour continuer. L’ouverture du lien poursuit le flux. Connectez ce port pour envoyer le lien par messagerie, e-mail ou un autre canal."
+        "approval": "Lorsque le flux atteint ce nœud, un lien d’approbation est immédiatement créé et le flux se met en attente. Le flux continue après l’ouverture du lien et la validation. Connectez ce port pour envoyer le lien par messagerie, e-mail ou un autre canal.",
+        "wait": "Lorsque le flux atteint ce nœud, un lien pour continuer est immédiatement créé et le flux se met en attente. L’ouverture du lien poursuit le flux. Connectez ce port pour envoyer le lien par messagerie, e-mail ou un autre canal."
       },
       "approve": "Déclenché lorsque le résultat de l’approbation est Approuver.",
       "reject": "Déclenché lorsque le résultat de l’approbation est Refuser.",

@@ -210,10 +210,6 @@
     },
     "task": {
       "chatText": "對話文字",
-      "codeDirty": "待儲存",
-      "codeFailed": "儲存失敗",
-      "codeSaved": "已儲存",
-      "codeSaving": "儲存中…",
       "connectorAction": "Connector 操作",
       "definition": "任務定義",
       "discardCode": "放棄變更",

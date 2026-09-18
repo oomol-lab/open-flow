@@ -143,20 +143,6 @@
     }
   }
 
-  .inspector-task-tabs {
-    min-height: 0;
-    flex: 0 0 auto;
-    overflow: visible;
-  }
-
-  .inspector-task-tab-panel {
-    min-height: 0;
-  }
-
-  .inspector-task-tab-panel.code-tab:not([hidden]) {
-    display: flex;
-  }
-
   .block-library {
     display: flex;
     height: 100%;
@@ -770,14 +756,6 @@
     color: var(--ui-muted-foreground);
   }
 
-  .inspector-task-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 4px 12px 0;
-  }
-
   .code-action-panel {
     flex: none;
     min-width: 0;
@@ -1071,34 +1049,6 @@
     user-select: text;
   }
 
-  .code-save-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    color: var(--ui-muted-foreground);
-    font-size: 10px;
-    font-weight: 500;
-  }
-
-  .code-save-status > span {
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
-    background: currentColor;
-  }
-
-  .code-save-status.dirty {
-    color: var(--warning);
-  }
-
-  .code-save-status.failed {
-    color: var(--ui-destructive);
-  }
-
-  .code-save-status.saved {
-    color: var(--success);
-  }
-
   .code-editor {
     position: relative;
     height: 280px;
@@ -1108,15 +1058,15 @@
     background: color-mix(in srgb, var(--ui-background) 88%, var(--ui-card));
   }
 
-  .code-tab .code-section {
-    flex: 1;
-    min-height: 0;
-    border-bottom: 0;
+  .code-section {
+    border-bottom: 1px solid var(--ui-border);
   }
 
-  .code-tab .code-editor {
-    min-height: 280px;
-    flex: 1 0 280px;
+  .code-section-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 2px 12px 16px;
   }
 
   .code-actions {

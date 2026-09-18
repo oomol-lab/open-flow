@@ -210,10 +210,6 @@
     },
     "task": {
       "chatText": "チャットテキスト",
-      "codeDirty": "未保存",
-      "codeFailed": "保存に失敗",
-      "codeSaved": "保存済み",
-      "codeSaving": "保存中…",
       "connectorAction": "Connector アクション",
       "definition": "タスク定義",
       "discardCode": "変更を破棄",

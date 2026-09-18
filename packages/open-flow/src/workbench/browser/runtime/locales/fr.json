@@ -210,10 +210,6 @@
     },
     "task": {
       "chatText": "Texte de conversation",
-      "codeDirty": "Non enregistré",
-      "codeFailed": "Échec de l'enregistrement",
-      "codeSaved": "Enregistré",
-      "codeSaving": "Enregistrement…",
       "connectorAction": "Action Connector",
       "definition": "Définition de la tâche",
       "discardCode": "Abandonner les modifications",

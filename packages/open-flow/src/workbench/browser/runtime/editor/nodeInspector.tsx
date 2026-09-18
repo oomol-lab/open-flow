@@ -7,7 +7,6 @@ import type { IconName } from '../icons.tsx'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from '../revisionView.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { TriggerStore } from '../stores/triggerStore.ts'
-import type { ModuleEditorStatus } from '../stores/workspaceModel.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 import type { DiagnosticFocus } from './diagnostics.ts'
 import type { SubflowSettings } from './flowChanges.ts'
@@ -23,7 +22,6 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browse
 import { Input } from '../../../../ui/browser/input.tsx'
 import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
 import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { contextName } from '../../typeScriptShadow.ts'
 import { Icon } from '../icons.tsx'
@@ -36,7 +34,6 @@ import { codeTyping } from './flowChanges.ts'
 import { LinearTriggerConfig } from './linearTriggerConfig.tsx'
 import { NodeDescription } from './nodeDescription.tsx'
 import { NodeInputs } from './nodeInputs.tsx'
-import { taskDiagnosticReady, taskInspectorSection } from './nodeInspectorBehavior.ts'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 import { TriggerScheduleEditor } from './triggerScheduleEditor.tsx'
@@ -64,19 +61,6 @@ function arrayValue<Value extends readonly unknown[]>(value: string, label: stri
   const parsed = JSON.parse(value) as unknown
   if (!Array.isArray(parsed)) throw new TypeError(t('inspector.errors.portDefinitions', { label }))
   return parsed as unknown as Value
-}
-
-function codeStatusLabel(status: ModuleEditorStatus, t: TFunction): string {
-  switch (status) {
-    case 'dirty':
-      return t('inspector.task.codeDirty')
-    case 'failed':
-      return t('inspector.task.codeFailed')
-    case 'saved':
-      return t('inspector.task.codeSaved')
-    case 'saving':
-      return t('inspector.task.codeSaving')
-  }
 }
 
 function inputUpstreamSources({
@@ -402,8 +386,6 @@ function TaskDefinition({
   connectors,
   disabled,
   focus,
-  onSectionChange,
-  section,
   selection,
   store,
   theme,
@@ -412,8 +394,6 @@ function TaskDefinition({
   readonly connectors: ConnectorStore
   readonly disabled: boolean
   readonly focus?: DiagnosticFocus
-  readonly onSectionChange: (section: 'code' | 'settings') => void
-  readonly section: 'code' | 'settings'
   readonly selection: Extract<ResolvedNode, { readonly kind: 'task' }>
   readonly store: WorkspaceStore
   readonly theme: WorkbenchTheme
@@ -431,7 +411,7 @@ function TaskDefinition({
   const codeEditor =
     module != null && 'moduleId' in task && moduleEditor?.moduleId == task.moduleId ? (
       <form
-        className="inspector-section inspector-form code-section"
+        className="inspector-form code-section"
         data-inspector-section="module"
         onKeyDown={(event) => {
           if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() == 's') {
@@ -445,41 +425,44 @@ function TaskDefinition({
           void store.saveModuleEditor()
         }}
       >
-        <CodeActions
-          key={`${moduleEditor.moduleId}-${selection.id}`}
-          capabilities={task.capabilities ?? []}
-          connectors={connectors}
-          disabled={disabled || moduleEditor.status == 'saving'}
-          nodeId={selection.id}
-          store={store}
-          context={contextName(moduleEditor.source) ?? 'context'}
-        />
-        <CodeEditor
-          ariaLabel={t('inspector.task.source')}
-          disabled={disabled}
-          errorLabel={t('inspector.task.editorUnavailable')}
-          loadingLabel={t('inspector.task.editorLoading')}
-          location={moduleLocation == null ? undefined : { column: moduleLocation.column, line: moduleLocation.line }}
-          onBlur={() => {
-            if (store.hasUnsavedCode) void store.saveModuleEditor()
-          }}
-          onChange={(value) => store.updateModuleSource(value)}
-          theme={theme}
-          typing={codeTyping(task, task.capabilities, actionCatalog)}
-          uri={`file:///modules/${moduleEditor.moduleId}.js`}
-          value={moduleEditor.source}
-        />
-        <span className="code-source-note">{t('inspector.task.importsFromSource')}</span>
-        {moduleEditor.status == 'failed' && (
-          <div className="form-actions code-actions">
-            <Button disabled={disabled} onClick={() => store.discardModuleChanges()} size="sm" type="button" variant="secondary">
-              {t('inspector.task.discardCode')}
-            </Button>
-            <Button disabled={disabled} size="sm" type="submit">
-              {t('inspector.task.retrySave')}
-            </Button>
-          </div>
-        )}
+        <div className="inspector-section-title">{t('inspector.task.javascriptModule')}</div>
+        <div className="code-section-content">
+          <CodeActions
+            key={`${moduleEditor.moduleId}-${selection.id}`}
+            capabilities={task.capabilities ?? []}
+            connectors={connectors}
+            disabled={disabled || moduleEditor.status == 'saving'}
+            nodeId={selection.id}
+            store={store}
+            context={contextName(moduleEditor.source) ?? 'context'}
+          />
+          <CodeEditor
+            ariaLabel={t('inspector.task.source')}
+            disabled={disabled}
+            errorLabel={t('inspector.task.editorUnavailable')}
+            loadingLabel={t('inspector.task.editorLoading')}
+            location={moduleLocation == null ? undefined : { column: moduleLocation.column, line: moduleLocation.line }}
+            onBlur={() => {
+              if (store.hasUnsavedCode) void store.saveModuleEditor()
+            }}
+            onChange={(value) => store.updateModuleSource(value)}
+            theme={theme}
+            typing={codeTyping(task, task.capabilities, actionCatalog)}
+            uri={`file:///modules/${moduleEditor.moduleId}.js`}
+            value={moduleEditor.source}
+          />
+          <span className="code-source-note">{t('inspector.task.importsFromSource')}</span>
+          {moduleEditor.status == 'failed' && (
+            <div className="form-actions code-actions">
+              <Button disabled={disabled} onClick={() => store.discardModuleChanges()} size="sm" type="button" variant="secondary">
+                {t('inspector.task.discardCode')}
+              </Button>
+              <Button disabled={disabled} size="sm" type="submit">
+                {t('inspector.task.retrySave')}
+              </Button>
+            </div>
+          )}
+        </div>
       </form>
     ) : undefined
   const settingsPanel = (
@@ -522,33 +505,8 @@ function TaskDefinition({
   )
   return (
     <>
-      {codeEditor == null ? (
-        settingsPanel
-      ) : (
-        <Tabs className="inspector-task-tabs gap-0" onValueChange={(value) => value != null && onSectionChange(value as 'code' | 'settings')} value={section}>
-          <div className="inspector-task-toolbar">
-            <TabsList aria-label={t('inspector.title')} className="min-w-0 justify-start" variant="line">
-              <TabsTrigger className="flex-none" value="code">
-                {t('inspector.task.javascriptModule')}
-              </TabsTrigger>
-              <TabsTrigger className="flex-none" value="settings">
-                {t('inspector.node.title')}
-              </TabsTrigger>
-            </TabsList>
-            {moduleEditor != null && (
-              <span className={`code-save-status ${moduleEditor.status}`} aria-live="polite">
-                <span /> {codeStatusLabel(moduleEditor.status, t)}
-              </span>
-            )}
-          </div>
-          <TabsContent className="inspector-task-tab-panel code-tab" keepMounted value="code">
-            {codeEditor}
-          </TabsContent>
-          <TabsContent className="inspector-task-tab-panel settings-tab" value="settings">
-            {settingsPanel}
-          </TabsContent>
-        </Tabs>
-      )}
+      {codeEditor}
+      {settingsPanel}
     </>
   )
 }
@@ -775,16 +733,9 @@ export function NodeInspector({
   const connector = task != null && 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
   const taskId = selection?.kind == 'task' && selection.node.task == null ? selection.node.taskId : undefined
   const locatedRequest = useRef<number>()
-  const [taskSection, setTaskSection] = useState<'code' | 'settings'>(() => taskInspectorSection(focus?.section))
-
-  useEffect(() => {
-    setTaskSection(taskInspectorSection(focus?.section))
-  }, [focus?.requestId, focus?.section, selection?.id])
-
   useEffect(() => {
     if (focus == null) return
     if (locatedRequest.current == focus.requestId) return
-    if (selection?.kind == 'task' && !taskDiagnosticReady(focus.section, taskSection)) return
     const section = content.current?.querySelector<HTMLElement>(`[data-inspector-section="${focus.section}"]`)
     if (section == null) return
     locatedRequest.current = focus.requestId
@@ -798,7 +749,7 @@ export function NodeInspector({
     section.classList.add('diagnostic-located')
     const timer = globalThis.setTimeout(() => section.classList.remove('diagnostic-located'), 1_200)
     return () => globalThis.clearTimeout(timer)
-  }, [focus, selection?.id, selection?.kind, taskSection])
+  }, [focus, selection?.id, selection?.kind])
 
   return (
     <NativeScrollArea className="inspector-scroll" tabIndex={-1}>
@@ -1068,16 +1019,7 @@ export function NodeInspector({
         ) : (
           <>
             {selection.kind == 'trigger' ? null : selection.kind == 'task' ? (
-              <TaskDefinition
-                connectors={connectors}
-                disabled={disabled}
-                focus={focus}
-                onSectionChange={setTaskSection}
-                section={taskSection}
-                selection={selection}
-                store={store}
-                theme={theme}
-              >
+              <TaskDefinition connectors={connectors} disabled={disabled} focus={focus} selection={selection} store={store} theme={theme}>
                 <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
               </TaskDefinition>
             ) : selection.kind == 'approval' || selection.kind == 'wait' ? (

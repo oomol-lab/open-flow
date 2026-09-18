@@ -562,8 +562,8 @@
     },
     "waitBranchDescription": {
       "pending": {
-        "approval": "Triggered as soon as the flow reaches this node and creates an approval link. The flow continues after someone opens the link and completes the approval. Connect this port to send the link through chat, email, or another channel.",
-        "wait": "Triggered as soon as the flow reaches this node and creates a continue link. Opening the link continues the flow. Connect this port to send the link through chat, email, or another channel."
+        "approval": "When the flow reaches this node, it immediately creates an approval link and waits. The flow continues after the link is opened and the approval is completed. Connect this port to send the link through chat, email, or another channel.",
+        "wait": "When the flow reaches this node, it immediately creates a continue link and waits. Opening the link continues the flow. Connect this port to send the link through chat, email, or another channel."
       },
       "approve": "Triggered when the approval result is Approve.",
       "reject": "Triggered when the approval result is Reject.",

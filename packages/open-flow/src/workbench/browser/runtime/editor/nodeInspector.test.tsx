@@ -128,6 +128,64 @@ describe('Node execution settings', () => {
   })
 })
 
+describe('Code task sections', () => {
+  it('renders Code and Node settings as consecutive sections instead of tabs', () => {
+    const node = {
+      kind: 'task',
+      name: 'Transform',
+      inputs: {},
+      task: { name: 'Transform', moduleId: 'module', inputs: [], outputs: [] },
+    }
+    const definition = node.task
+    const moduleEditor: {
+      value: { moduleId: string; source: string; status: 'failed' | 'saved' }
+    } = {
+      value: { moduleId: 'module', source: 'export default () => ({})', status: 'saved' },
+    }
+    const element = NodeInspector({
+      variables: { enabled: true, names: [], loaded: true, loading: false, onOpen: vi.fn() },
+      activeConnectorConnections: [],
+      connectorAuthorizationPending: false,
+      connectorLoading: false,
+      connectors: { $: { actions: { value: {} } } } as never,
+      disabled: false,
+      revision: { graph: () => ({ nodes: { task: node } }) } as never,
+      selection: {
+        id: 'task',
+        kind: 'task',
+        node,
+        definition,
+        module: { name: 'Transform', imports: [], source: 'export default () => ({})' },
+      } as never,
+      store: {
+        $: {
+          flowId: { value: 'flow' },
+          moduleEditor,
+        },
+      } as never,
+      target: { kind: 'flow' },
+      theme: 'light',
+      triggerAuthorizationPending: false,
+      triggerConnectionLoading: false,
+      triggers: {} as never,
+    })
+    const task = find(element, (item) => typeof item.type == 'function' && item.type.name == 'TaskDefinition')
+    if (task == null || typeof task.type != 'function') throw new Error('Expected task definition.')
+    const rendered = (task.type as (props: unknown) => ReactElement)(task.props)
+    const sections = Children.toArray((rendered.props as { readonly children?: ReactNode }).children)
+
+    expect(sections).toHaveLength(2)
+    expect(isValidElement(sections[0]) && sections[0].props['data-inspector-section']).toBe('module')
+    expect(isValidElement(sections[1]) && find(sections[1], (item) => typeof item.type == 'function' && item.type.name == 'GeneralSettings')).toBeDefined()
+    expect(find(rendered, (item) => item.props.className == 'form-actions code-actions')).toBeUndefined()
+
+    moduleEditor.value = { ...moduleEditor.value, status: 'failed' }
+    const failed = (task.type as (props: unknown) => ReactElement)(task.props)
+    expect(find(failed, (item) => item.props.className == 'form-actions code-actions')).toBeDefined()
+    expect(find(failed, (item) => item.props.role == 'status')).toBeUndefined()
+  })
+})
+
 describe('Node input ownership', () => {
   it('resolves the selected upstream output description from the graph definition', () => {
     const input = { handle: 'message', jsonSchema: { type: 'string' }, nullable: false }
