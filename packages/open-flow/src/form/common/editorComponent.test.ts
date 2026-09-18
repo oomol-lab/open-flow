@@ -31,4 +31,13 @@ describe('Editor component selection', () => {
     const schema = { type: 'object', properties: { name: { type: 'string' } } }
     expect(schemaForEditor('object', schema)).toEqual(schema)
   })
+  it('uses an unconstrained schema as the canonical JSON definition', () => {
+    expect(schemaForEditor('json', { type: 'string' })).toEqual({})
+    expect(schemaForEditor('json', { type: 'object', title: 'Payload', description: 'Any JSON value.' })).toEqual({
+      title: 'Payload',
+      description: 'Any JSON value.',
+    })
+    expect(schemaForEditor('json', { 'title': 'Payload', 'ui:widget': 'any' })).toEqual({ title: 'Payload' })
+    expect(editorComponent({ 'ui:widget': 'any' })).toBe('json')
+  })
 })

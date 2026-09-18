@@ -28,7 +28,7 @@ const invalidValues: readonly InputPort[] = [
     value: { title: 'short' },
   },
   { handle: 'array', jsonSchema: { type: 'array', minItems: 2, items: { type: 'number', minimum: 0 } }, nullable: false, value: [-1] },
-  { handle: 'json', jsonSchema: { 'type': 'object', 'ui:widget': 'any', 'required': ['title'] }, nullable: false, value: { count: 2 } },
+  { handle: 'requiredObject', jsonSchema: { type: 'object', required: ['title'] }, nullable: false, value: { count: 2 } },
   { handle: 'null', jsonSchema: { type: 'null' }, nullable: true, value: 'invalid' },
 ]
 
@@ -43,8 +43,8 @@ const missingChoices: readonly InputPort[] = [
   { handle: 'multiNoOptions', jsonSchema: { type: 'array', uniqueItems: true, items: { enum: [] } }, nullable: false },
   { handle: 'multiRemoved', jsonSchema: { type: 'array', uniqueItems: true, items: { enum: ['red', 'blue'] } }, nullable: false, value: ['removed'] },
   { handle: 'nonNullableNull', jsonSchema: { type: 'string' }, nullable: false, value: null },
-  { handle: 'nonNullableJsonNull', jsonSchema: { 'ui:widget': 'any' }, nullable: false, value: null },
-  { handle: 'nullableJsonUnset', jsonSchema: { 'ui:widget': 'any' }, nullable: true },
+  { handle: 'nonNullableJsonNull', jsonSchema: {}, nullable: false, value: null },
+  { handle: 'nullableJsonUnset', jsonSchema: {}, nullable: true },
   { handle: 'emptyText', jsonSchema: { type: 'string', minLength: 1 }, nullable: false, value: '' },
   { handle: 'emptyObject', jsonSchema: { type: 'object', required: ['title'], properties: { title: { type: 'string' } } }, nullable: false, value: {} },
   { handle: 'emptyArray', jsonSchema: { type: 'array', minItems: 1, items: { type: 'string' } }, nullable: false, value: [] },
@@ -53,7 +53,7 @@ const missingChoices: readonly InputPort[] = [
 const draftValues: readonly InputPort[] = [
   { handle: 'numberDraft', jsonSchema: { type: 'number' }, nullable: false, value: 1 },
   { handle: 'integerDraft', jsonSchema: { type: 'integer' }, nullable: false, value: 1 },
-  { handle: 'jsonDraft', jsonSchema: { 'ui:widget': 'any' }, nullable: false, value: {} },
+  { handle: 'jsonDraft', jsonSchema: {}, nullable: false, value: {} },
 ]
 
 function Sample({

@@ -95,6 +95,9 @@ the product when integration matters. Browser acceptance is warranted when rende
 interaction is material and cheaper evidence is insufficient. Report material verification gaps
 honestly.
 
+Run the Open Flow test suite with `bun run test` from `packages/open-flow`. Do not invoke `bun test`
+directly because it bypasses the project's Vitest configuration.
+
 Before every Git commit, run `bun run check` from the repository root and require it to pass. Run it
 again after any rebase or merge that changes the result before committing or pushing.
 

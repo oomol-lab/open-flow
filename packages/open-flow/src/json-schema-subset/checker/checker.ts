@@ -189,6 +189,7 @@ function findMismatchPath<E>(source: Schema<E>, target: Schema<E>): SchemaPath |
       if ((sourceSchema.minLength ?? 0) < (targetSchema.minLength ?? 0)) return [...targetPath, 'minLength']
       if ((sourceSchema.maxLength ?? Number.POSITIVE_INFINITY) > (targetSchema.maxLength ?? Number.POSITIVE_INFINITY)) return [...targetPath, 'maxLength']
       if (sourceSchema.pattern !== targetSchema.pattern && targetSchema.pattern) return [...targetPath, 'pattern']
+      if (sourceSchema.format !== targetSchema.format && targetSchema.format) return [...targetPath, 'format']
       break
     }
     case CompiledKind.Numeric: {
@@ -210,6 +211,7 @@ function findMismatchPath<E>(source: Schema<E>, target: Schema<E>): SchemaPath |
     case CompiledKind.Array: {
       if ((sourceSchema.minItems ?? 0) < (targetSchema.minItems ?? 0)) return [...targetPath, 'minItems']
       if ((sourceSchema.maxItems ?? Number.POSITIVE_INFINITY) > (targetSchema.maxItems ?? Number.POSITIVE_INFINITY)) return [...targetPath, 'maxItems']
+      if (!sourceSchema.uniqueItems && targetSchema.uniqueItems) return [...targetPath, 'uniqueItems']
       break
     }
     case CompiledKind.Object: {

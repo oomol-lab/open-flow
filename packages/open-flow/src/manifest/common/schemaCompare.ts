@@ -1,4 +1,3 @@
-import { isLogicEmptyObject } from '../../json-schema-subset/compiler/common.ts'
 import { SubsetCompareResult } from '../../json-schema-subset/index.ts'
 import { createSchemaComparer } from './schemaComparer.ts'
 
@@ -44,12 +43,8 @@ export function compareJSONSchema(fromSchema: CompareSchemaInfo, toSchema: Compa
     const error: { message?: string } = {}
     const fromResolved = resolveLocalRefs(fromSchema.schema)
     const toResolved = resolveLocalRefs(toSchema.schema)
-    // The subset compiler ignores unknown annotation keywords, including every `ui:*`
-    // extension. Preserve the direction of an unconstrained schema before AnySchema's
-    // symmetric plugin comparison: any target accepts all sources, while an any source
-    // cannot guarantee a constrained target.
-    if (isLogicEmptyObject(toResolved)) return { kind: 'compatible' }
-    if (isLogicEmptyObject(fromResolved)) return { kind: 'incompatible' }
+    assertComparableSchema(fromResolved)
+    assertComparableSchema(toResolved)
     const from = comparer.compile(nullableSchema(fromResolved, fromSchema.nullable), { ...fromSchema, error })
     const to = comparer.compile(nullableSchema(toResolved, toSchema.nullable), { ...toSchema, error })
     const { result, errorPath } = comparer.isSubset(from, to)
@@ -61,6 +56,49 @@ export function compareJSONSchema(fromSchema: CompareSchemaInfo, toSchema: Compa
   } catch (error) {
     return { kind: 'compare-error', message: error instanceof Error ? error.message : String(error) }
   }
+}
+
+const unsupportedComparisonKeywords: ReadonlySet<string> = new Set([
+  'contains',
+  'dependencies',
+  'dependentRequired',
+  'dependentSchemas',
+  'else',
+  'if',
+  'maxContains',
+  'minContains',
+  'prefixItems',
+  'then',
+  'unevaluatedItems',
+  'unevaluatedProperties',
+])
+
+function assertComparableSchema(schema: object): void {
+  function visit(value: unknown, path: readonly (string | number)[]): void {
+    if (value == null || typeof value != 'object' || Array.isArray(value)) return
+    const source = value as Readonly<Record<string, unknown>>
+    for (const keyword of unsupportedComparisonKeywords) {
+      if (Object.hasOwn(source, keyword)) throw new TypeError(`Unsupported schema comparison keyword at ${schemaPath([...path, keyword])}.`)
+    }
+    for (const keyword of ['additionalItems', 'additionalProperties', 'not', 'propertyNames'] as const) visit(source[keyword], [...path, keyword])
+    const items = source.items
+    if (Array.isArray(items)) items.forEach((item, index) => visit(item, [...path, 'items', index]))
+    else visit(items, [...path, 'items'])
+    for (const keyword of ['allOf', 'anyOf', 'oneOf'] as const) {
+      const variants = source[keyword]
+      if (Array.isArray(variants)) variants.forEach((item, index) => visit(item, [...path, keyword, index]))
+    }
+    for (const keyword of ['patternProperties', 'properties'] as const) {
+      const entries = source[keyword]
+      if (entries == null || typeof entries != 'object' || Array.isArray(entries)) continue
+      for (const [name, child] of Object.entries(entries)) visit(child, [...path, keyword, name])
+    }
+  }
+  visit(schema, [])
+}
+
+function schemaPath(path: readonly (string | number)[]): string {
+  return path.length == 0 ? '#' : `#/${path.map((part) => String(part).replaceAll('~', '~0').replaceAll('/', '~1')).join('/')}`
 }
 
 function resolveLocalRefs(schema: object): object {

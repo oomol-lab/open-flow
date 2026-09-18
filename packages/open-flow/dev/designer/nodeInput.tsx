@@ -193,7 +193,7 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
               { label: 'Boolean', schema: { type: 'boolean' }, value: false },
               { label: 'Select', schema: { type: 'string', enum: ['one', 'two'] }, value: 'one' },
               { label: 'Multi-select', schema: { type: 'array', uniqueItems: true, items: { enum: ['one', 'two'] } }, value: ['one'] },
-              { label: 'JSON', schema: { 'ui:widget': 'any' }, value: { answer: 42 } },
+              { label: 'JSON', schema: {}, value: { answer: 42 } },
               { label: 'Date', schema: { type: 'string', format: 'date' }, value: '2026-09-15' },
               { label: 'Color', schema: { 'type': 'string', 'ui:widget': 'color' }, value: '#ff6600' },
               { label: 'Object', schema: { type: 'object', properties: { name: { type: 'string' } } }, value: { name: 'sample' } },

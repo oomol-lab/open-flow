@@ -21,7 +21,7 @@ export function editorComponent(schema: unknown): EditorComponent {
 
 /** Changing the editor replaces incompatible constraints, retaining descriptive metadata. */
 export function schemaForEditor(component: EditorComponent, previous: unknown): Record<string, unknown> {
-  if (editorComponent(previous) === component) return { ...objectValue(previous) }
+  if (component !== 'json' && editorComponent(previous) === component) return { ...objectValue(previous) }
   const source = objectValue(previous) ?? {}
   const metadata = Object.fromEntries(
     ['title', 'description', '$comment', 'readOnly', 'writeOnly'].filter((key) => key in source).map((key) => [key, source[key]]),
@@ -41,7 +41,7 @@ export function schemaForEditor(component: EditorComponent, previous: unknown): 
     case 'multiSelect':
       return { ...metadata, type: 'array', uniqueItems: true, items: { enum: Array.isArray(options) ? options : [] } }
     case 'json':
-      return { ...metadata, 'ui:widget': 'any' }
+      return metadata
     default:
       return { ...metadata, type: component }
   }

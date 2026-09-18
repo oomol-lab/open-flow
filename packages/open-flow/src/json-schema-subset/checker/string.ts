@@ -15,6 +15,8 @@ import { createRangeSplitter, toExpressionSingleResult } from './range.ts'
 const splitRange = createRangeSplitter(0)
 
 export function calculateString<E>(schema1: CompiledSchema<E>, schema2: CompiledSchema<E>): ExpressionResult {
+  if (schema2.format && !schema1.format) return ExpressionContaining
+  if (schema1.format && schema2.format && schema1.format !== schema2.format) return ExpressionAny
   const splitResult = splitRange(schema1.minLength, schema1.maxLength, schema2.minLength, schema2.maxLength)
   const expression = toExpressionSingleResult(splitResult)
   const hasPattern1 = !!schema1.pattern

@@ -98,6 +98,8 @@ export function calculateArray<E>({ calculate }: Context<E>, schema1: CompiledSc
         break
       }
     }
+    if (schema1.uniqueItems && !schema2.uniqueItems && (schema2.maxItems ?? Number.POSITIVE_INFINITY) > 1) variable.hasExtra2 = true
+    else if (!schema1.uniqueItems && schema2.uniqueItems && (schema1.maxItems ?? Number.POSITIVE_INFINITY) > 1) variable.hasExtra1 = true
     if (schema1.maxItems === 0 || schema2.maxItems === 0) {
       // An unconstrained empty array can match any array schema.
       variable.hasCommon = true

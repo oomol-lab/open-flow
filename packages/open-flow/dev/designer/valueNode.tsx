@@ -48,7 +48,7 @@ function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; lan
     { handle: 'unsetText', jsonSchema: { type: 'string' }, nullable: false },
     { handle: 'jsonEmpty', jsonSchema: {}, nullable: false },
     { handle: 'jsonObject', jsonSchema: {}, nullable: true, value: { enabled: true, tags: ['sample'], count: 2 } },
-    { handle: 'jsonNull', jsonSchema: { 'ui:widget': 'any' }, nullable: true, value: null },
+    { handle: 'jsonNull', jsonSchema: {}, nullable: true, value: null },
     {
       handle: 'value',
       description: 'Structured values passed to the next step.',
@@ -243,7 +243,7 @@ function FlatInputsSample({ log }: { log: LogAction }) {
               nullable: !['receiveId', 'contentKind'].includes(handle),
               jsonSchema:
                 handle === 'rawContent'
-                  ? { 'ui:widget': 'any' }
+                  ? {}
                   : ['receiveIdType', 'contentKind', 'fileType'].includes(handle)
                     ? { type: 'string', enum: ['text', 'image', 'file'] }
                     : { type: 'string' },
@@ -281,7 +281,7 @@ function LazyFieldsSample({ sample, log }: { sample: string; log: LogAction }) {
       jsonSchema: { type: 'array', items: { type: 'string' } },
       value: Array.from({ length: 40 }, (_, index) => `${sample}-${index}`),
     },
-    { nullable: false, handle: 'json', jsonSchema: { 'ui:widget': 'any' }, value: { sample, enabled: true } },
+    { nullable: false, handle: 'json', jsonSchema: {}, value: { sample, enabled: true } },
     { nullable: false, handle: 'multiline', jsonSchema: { 'type': 'string', 'ui:widget': 'text' }, value: `Sample ${sample}\nSecond line` },
     { nullable: false, handle: 'unsetObject', jsonSchema: { type: 'object', properties: { name: { type: 'string' } } } },
   ])
