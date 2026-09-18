@@ -44,7 +44,19 @@ const conditionModel: FlowCanvasViewModel = {
       kind: 'condition',
       title: 'One condition',
       position: { x: 380, y: 0 },
-      cases: [{ output: 'matched', groups: [{ expressions: [{ left: 'count', operator: '>', right: String(0) }] }] }],
+      cases: [
+        {
+          output: 'matched',
+          groups: [
+            {
+              expressions: [
+                { left: { kind: 'environment', label: 'Env' }, operator: 'is not null' },
+                { left: { icon: ':carbon:code:', kind: 'node', label: 'Transform · count' }, operator: '>', right: String(0) },
+              ],
+            },
+          ],
+        },
+      ],
       inputs: [],
       outputs: [{ handle: 'matched' }, { handle: 'otherwise' }],
       defaultOutput: 'otherwise' as const,

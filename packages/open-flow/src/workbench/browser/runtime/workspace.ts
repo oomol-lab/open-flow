@@ -1,6 +1,7 @@
 import type { TFunction } from 'val-i18n'
 import type {
   FlowCanvasViewConditionOperator,
+  FlowCanvasViewConditionOperand,
   FlowCanvasViewInput,
   FlowCanvasViewModel,
   FlowCanvasViewNode,
@@ -8,7 +9,7 @@ import type {
   FlowCanvasViewOutput,
   FlowCanvasViewTriggerNode,
 } from '../../../canvas/browser/graph/FlowCanvas/model.ts'
-import type { GraphTarget } from '../../../flow/common/change.ts'
+import type { ConditionOperand, GraphTarget } from '../../../flow/common/change.ts'
 import type {
   ConnectorActionMetadata,
   ConnectorConnection,
@@ -100,10 +101,24 @@ interface NodeProjectionContext {
   readonly connectionCatalogs: Readonly<Record<string, ConnectionCatalog>>
   readonly connectorActions: Readonly<Record<string, ConnectorActionView>>
   readonly diagnostics: readonly Diagnostic[]
+  readonly nodes: ReadonlyMap<string, ResolvedSelection>
+  readonly providers: Readonly<Record<string, ConnectorProvider>>
   readonly revision: RevisionView
   readonly runNodes: ReadonlyMap<string, FlowCanvasViewNodeRun>
   readonly t: TFunction | undefined
   readonly target: GraphTarget
+}
+
+function semanticNodeIcon(node: ResolvedNode, connectorActions: Readonly<Record<string, ConnectorActionView>>): string | undefined {
+  if (node.node.icon != null) return node.node.icon
+  if (node.kind != 'task' || node.definition == null || !('executor' in node.definition) || node.definition.executor.kind != 'connector') return nodeIcon(node)
+  const action = connectorActions[node.definition.executor.action]
+  return action == null ? nodeIcon(node) : providerIcon(action)
+}
+
+function sourceNodePresentation(node: ResolvedSelection, context: NodeProjectionContext): { readonly icon?: string; readonly title: string } {
+  if (node.kind != 'trigger') return { icon: semanticNodeIcon(node, context.connectorActions), title: nodeTitle(node, context.t) }
+  return { icon: triggerNodeIcon(node.trigger, context.providers), title: node.trigger.name }
 }
 
 export function connectionCatalog(connections: readonly ConnectorConnection[]): ConnectionCatalog {
@@ -334,6 +349,20 @@ function conditionOperator(operator: import('./api.ts').ConditionOperator): Flow
   }
 }
 
+function conditionOperand(operand: ConditionOperand, context: NodeProjectionContext): FlowCanvasViewConditionOperand {
+  if (operand.kind == 'value') return JSON.stringify(operand.value) ?? '…'
+  const source = operand.source
+  if (source.kind == 'flow') return source.input
+  if (source.kind == 'binding') return { kind: 'environment', label: context.t?.('nodeInput.variable') ?? 'Env' }
+  const sourceNode = context.nodes.get(source.nodeId)
+  const presentation = sourceNode == null ? undefined : sourceNodePresentation(sourceNode, context)
+  return {
+    icon: presentation?.icon,
+    kind: 'node',
+    label: `${presentation?.title ?? source.nodeId} · ${source.output}`,
+  }
+}
+
 function nodeDiagnosticCount(target: GraphTarget, node: ResolvedNode, diagnostics: readonly Diagnostic[]): number {
   const graphPath = target.kind == 'flow' ? `/document/graph/nodes/${node.id}` : `/document/subflows/${target.id}/graph/nodes/${node.id}`
   const paths = [graphPath]
@@ -450,6 +479,12 @@ function triggerIcon(trigger: TriggerNode): string {
     case 'webhook':
       return ':carbon:webhook:'
   }
+}
+
+function triggerNodeIcon(trigger: TriggerNode, providers: Readonly<Record<string, ConnectorProvider>>): string {
+  if (trigger.icon != null) return trigger.icon
+  if (trigger.kind != 'integration' && trigger.kind != 'poll') return triggerIcon(trigger)
+  return providerIcon(providers[trigger.definition.provider] ?? { serviceId: trigger.definition.provider, serviceName: trigger.definition.provider })
 }
 
 function triggerDiagnostics(triggerId: string, diagnostics: readonly Diagnostic[]): readonly Diagnostic[] {
@@ -621,11 +656,7 @@ function triggerDesignerNode(
     description: trigger.description,
     diagnostics: problems.length,
     connectionRequired,
-    icon:
-      trigger.icon ??
-      (trigger.kind == 'integration' || trigger.kind == 'poll'
-        ? providerIcon(provider ?? { serviceId: trigger.definition.provider, serviceName: trigger.definition.provider })
-        : triggerIcon(trigger)),
+    icon: triggerNodeIcon(trigger, providers),
     id: triggerId,
     inputs: [],
     kind: 'trigger',
@@ -652,7 +683,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
   const common = {
     description: node.description,
     diagnostics: nodeDiagnosticCount(context.target, resolved, context.diagnostics),
-    icon: node.icon ?? (connectorAction == null ? nodeIcon(resolved) : providerIcon(connectorAction)),
+    icon: semanticNodeIcon(resolved, context.connectorActions),
     id: nodeId,
     inputs,
     outputs,
@@ -668,25 +699,9 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
         cases: node.cases.map((item) => ({
           groups: item.groups.map((group) => ({
             expressions: group.expressions.map((expression) => ({
-              left:
-                expression.left.kind === 'source'
-                  ? expression.left.source.kind === 'node'
-                    ? expression.left.source.output
-                    : expression.left.source.kind === 'flow'
-                      ? expression.left.source.input
-                      : (context.t?.('nodeInput.variable') ?? 'Env')
-                  : (JSON.stringify(expression.left.value) ?? '…'),
+              left: conditionOperand(expression.left, context),
               operator: conditionOperator(expression.operator),
-              right:
-                expression.right == null
-                  ? undefined
-                  : expression.right.kind === 'source'
-                    ? expression.right.source.kind === 'node'
-                      ? expression.right.source.output
-                      : expression.right.source.kind === 'flow'
-                        ? expression.right.source.input
-                        : (context.t?.('nodeInput.variable') ?? 'Env')
-                    : (JSON.stringify(expression.right.value) ?? '…'),
+              right: expression.right == null ? undefined : conditionOperand(expression.right, context),
             })),
           })),
           output: item.output,
@@ -759,6 +774,8 @@ export function designerGraph(
     connectionCatalogs,
     connectorActions,
     diagnostics,
+    nodes: definitions,
+    providers,
     revision,
     runNodes: projectedRun.nodes,
     t,

@@ -70,13 +70,34 @@ describe('Canvas content', () => {
     }
     const t = createI18n('en').t
     expect(nodeSummary(node)).toBe('Route qualified applications.')
-    expect(conditionBranchSummary(node, 'qualified', t)).toBe('score ≥ 80 ∧ active is true')
+    expect(conditionBranchSummary(node, 'qualified', t)).toBe('score ≥ 80 ∧ active = true')
     expect(conditionBranchSummary(node, 'otherwise', t)).toBe('Otherwise')
     expect(conditionBranchSummary(node, 'unused', t)).toBe('')
     expect(conditionBranchSummary({ ...node, diagnostics: 1 }, 'qualified', t)).toBe('Invalid condition')
     expect(conditionBranchSummary({ ...node, run: { status: 'error' } }, 'qualified', t)).toBe('Invalid condition')
     expect(conditionBranchSummary({ ...node, diagnostics: 1 }, 'otherwise', t)).toBe('Otherwise')
-    expect(conditionBranchSummary({ ...node, diagnostics: 0 }, 'qualified', t)).toBe('score ≥ 80 ∧ active is true')
+    expect(conditionBranchSummary({ ...node, diagnostics: 0 }, 'qualified', t)).toBe('score ≥ 80 ∧ active = true')
+  })
+  it('uses compact symbols for unary boolean and null comparisons', () => {
+    const t = createI18n('en').t
+    expect(
+      conditionCaseSummary(
+        {
+          output: 'matched',
+          groups: [
+            {
+              expressions: [
+                { left: 'optional', operator: 'is null' },
+                { left: 'required', operator: 'is not null' },
+                { left: 'enabled', operator: 'is true' },
+                { left: 'disabled', operator: 'is false' },
+              ],
+            },
+          ],
+        },
+        t,
+      ),
+    ).toBe('optional = null ∧ required ≠ null ∧ enabled = true ∧ disabled = false')
   })
   it('describes cases without conditions instead of leaving the branch summary empty', () => {
     const t = createI18n('en').t

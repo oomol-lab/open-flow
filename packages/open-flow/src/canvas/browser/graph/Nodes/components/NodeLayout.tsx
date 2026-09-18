@@ -1,10 +1,12 @@
 import styles from './NodeLayout.module.scss'
 import type { CSSProperties } from 'react'
+import type { TFunction } from 'val-i18n'
 import type { Val } from 'value-enhancer'
 import type { HandleName } from '../../../../../schema/index.ts'
 import type { RFNodeId } from '../../../base/rfHelpers.ts'
 import type { HandleProps } from '../../../components/handle.tsx'
 import type { CanvasStore } from '../../../stores/canvas/canvas.store.ts'
+import type { FlowCanvasViewConditionCase, FlowCanvasViewConditionOperand } from '../../FlowCanvas/model.ts'
 
 import { useConnection, useNodeConnections, useStore, useStoreApi } from '@xyflow/react'
 import { clsx } from 'clsx'
@@ -12,6 +14,7 @@ import { Zap } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
+import { ContentIcon } from '../../../../../ui/browser/icons/ContentIcon.tsx'
 import { DEFAULT_POSITION } from '../../../base/canvas.ts'
 import { toRFHandleName } from '../../../base/rfHelpers.ts'
 import { Handle } from '../../../components/handle.tsx'
@@ -22,7 +25,7 @@ import { NODE_MINIMAP_PHASE1_CLASSNAME, NODE_MINIMAP_PHASE2_CLASSNAME } from '..
 import { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 import { DEFAULT_NODE_WIDTH, FITTING_VIEW_CLASSNAME, MIN_NODE_WIDTH, NODE_TYPE } from '../../../stores/node/constants.ts'
 import { NodeStore } from '../../../stores/node/node.store.ts'
-import { conditionBranchSummary } from '../../FlowCanvas/cardContent.ts'
+import { conditionBranchSummary, conditionCaseHasExpressions, conditionGroupNeedsParentheses, conditionOperatorSummary } from '../../FlowCanvas/cardContent.ts'
 import { NodeStoreContext } from '../NodeStoreContext.tsx'
 import { CanvasNode } from './CanvasNode.tsx'
 import { CommentCard } from './CommentCard.tsx'
@@ -37,6 +40,40 @@ export interface NodeLayoutProps {
 }
 
 const CARD_WIDTH = 320
+
+function ConditionOperand({ operand }: { readonly operand: FlowCanvasViewConditionOperand }) {
+  if (typeof operand == 'string') return operand
+  if (operand.kind == 'environment') {
+    return <i aria-label={operand.label} className="i-lucide-light:sliders-horizontal" role="img" />
+  }
+  return (
+    <span aria-label={operand.label} className={styles.branchOperandIcon} role="img">
+      <ContentIcon src={operand.icon} fallback={<i aria-hidden="true" className="i-lucide-light:workflow" />} />
+    </span>
+  )
+}
+
+function ConditionRule({ item, t }: { readonly item: FlowCanvasViewConditionCase; readonly t: TFunction }) {
+  return item.groups.map((group, groupIndex) => {
+    const parenthesized = conditionGroupNeedsParentheses(item, group.expressions.length)
+    const expressions = group.expressions.map((expression, expressionIndex) => (
+      <span className={styles.branchExpression} key={expressionIndex}>
+        <ConditionOperand operand={expression.left} />
+        <span>{conditionOperatorSummary(expression.operator, t)}</span>
+        {expression.right !== undefined && <ConditionOperand operand={expression.right} />}
+        {expressionIndex < group.expressions.length - 1 && <span>∧</span>}
+      </span>
+    ))
+    return (
+      <span className={styles.branchGroup} key={groupIndex}>
+        {parenthesized && '('}
+        {expressions}
+        {parenthesized && ')'}
+        {groupIndex < item.groups.length - 1 && <span>∨</span>}
+      </span>
+    )
+  })
+}
 
 export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ canvasStore, nodeStore, visible }) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -96,6 +133,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
       compactContent={compactContent}
       problem={problem}
       branches={branches?.map((branch) => {
+        const conditionCase = conditionNode?.cases.find((item) => item.output == branch)
         const summary =
           conditionNode != null
             ? conditionBranchSummary(conditionNode, branch, t)
@@ -117,7 +155,14 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
                   style={conditionNode && branch !== conditionNode.defaultOutput ? { color: problemColor } : undefined}
                   title={conditionNode && !tooltip ? summary : undefined}
                 >
-                  {summary}
+                  {conditionCase != null &&
+                  conditionCaseHasExpressions(conditionCase) &&
+                  (conditionNode?.diagnostics ?? 0) === 0 &&
+                  conditionNode?.run?.status !== 'error' ? (
+                    <ConditionRule item={conditionCase} t={t} />
+                  ) : (
+                    summary
+                  )}
                 </span>
               )}
               {summary && (

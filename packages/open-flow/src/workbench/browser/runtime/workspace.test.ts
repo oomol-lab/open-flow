@@ -99,7 +99,7 @@ describe('Designer port projection', () => {
     ])
   })
 
-  it('localizes environment variable sources in Condition summaries', () => {
+  it('projects environment and node sources for compact Condition summaries', () => {
     const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
       actorId: 'actor',
       content: {
@@ -118,6 +118,10 @@ describe('Designer port projection', () => {
                             left: { kind: 'source', source: { bindingId: 'token', kind: 'binding' } },
                             operator: 'isNotNull',
                           },
+                          {
+                            left: { kind: 'source', source: { kind: 'node', nodeId: 'source', output: 'count' } },
+                            operator: 'isNotNull',
+                          },
                         ],
                       },
                     ],
@@ -128,6 +132,13 @@ describe('Designer port projection', () => {
                 kind: 'condition',
                 matchMode: 'first',
                 name: 'Check token',
+              },
+              source: {
+                icon: ':carbon:code:',
+                inputs: {},
+                kind: 'value',
+                name: 'Transform',
+                values: [{ handle: 'count', jsonSchema: { type: 'number' }, nullable: false, value: 1 }],
               },
             },
           },
@@ -146,10 +157,11 @@ describe('Designer port projection', () => {
       version: 1,
     }
 
-    const node = designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, createI18n('zh-CN').t).nodes[0]
+    const node = designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, createI18n('zh-CN').t).nodes.find((item) => item.id == 'condition')
     if (node?.kind != 'condition') throw new Error('Expected a Condition node.')
 
-    expect(node.cases[0]?.groups[0]?.expressions[0]?.left).toBe('环境变量')
+    expect(node.cases[0]?.groups[0]?.expressions[0]?.left).toEqual({ kind: 'environment', label: '环境变量' })
+    expect(node.cases[0]?.groups[0]?.expressions[1]?.left).toEqual({ icon: ':carbon:code:', kind: 'node', label: 'Transform · count' })
   })
 
   it('only requires a Connection for authenticated Connector Actions', () => {

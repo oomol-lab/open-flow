@@ -176,6 +176,30 @@
   font-family: var(--font-monospace);
 }
 
+.branchGroup,
+.branchExpression {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+}
+
+.branchGroup + .branchGroup {
+  margin-left: 0.45em;
+}
+
+.branchOperandIcon {
+  display: inline-flex;
+  align-items: center;
+  width: 1em;
+  height: 1em;
+  flex: none;
+
+  > * {
+    width: 100%;
+    height: 100%;
+  }
+}
+
 .branchArrow {
   flex: none;
   color: var(--text-1);

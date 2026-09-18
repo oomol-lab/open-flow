@@ -1,6 +1,33 @@
 import type { TFunction } from 'val-i18n'
-import type { FlowCanvasViewConditionCase, FlowCanvasViewConditionNode } from './model.ts'
+import type { FlowCanvasViewConditionCase, FlowCanvasViewConditionNode, FlowCanvasViewConditionOperand, FlowCanvasViewConditionOperator } from './model.ts'
 import type { NodeContent } from './nodeContent.ts'
+
+export function conditionOperandSummary(operand: FlowCanvasViewConditionOperand): string {
+  return typeof operand == 'string' ? operand : operand.label
+}
+
+export function conditionOperatorSummary(operator: FlowCanvasViewConditionOperator, t: TFunction): string {
+  switch (operator) {
+    case 'is null':
+      return '= null'
+    case 'is not null':
+      return '≠ null'
+    case 'is true':
+      return '= true'
+    case 'is false':
+      return '= false'
+    default:
+      return t(`condition.operator.${operator.replace(/\s+/g, '_')}`)
+  }
+}
+
+export function conditionCaseHasExpressions(item: FlowCanvasViewConditionCase): boolean {
+  return item.groups.some((group) => group.expressions.length > 0)
+}
+
+export function conditionGroupNeedsParentheses(item: FlowCanvasViewConditionCase, expressionCount: number): boolean {
+  return item.groups.length > 1 && expressionCount > 1
+}
 
 export function conditionCaseSummary(item: FlowCanvasViewConditionCase, t: TFunction): string {
   if (item.groups.length === 0) return t('condition.emptyCase')
@@ -8,12 +35,12 @@ export function conditionCaseSummary(item: FlowCanvasViewConditionCase, t: TFunc
     .map((group) => {
       const text = group.expressions
         .map((expression) => {
-          const operator = t(`condition.operator.${expression.operator.replace(/\s+/g, '_')}`)
-          return `${expression.left} ${operator}${expression.right === undefined ? '' : ` ${expression.right}`}`
+          const operator = conditionOperatorSummary(expression.operator, t)
+          return `${conditionOperandSummary(expression.left)} ${operator}${expression.right === undefined ? '' : ` ${conditionOperandSummary(expression.right)}`}`
         })
         .join(' ∧ ')
       if (!text) return t('condition.emptyCase')
-      return item.groups.length > 1 && group.expressions.length > 1 ? `(${text})` : text
+      return conditionGroupNeedsParentheses(item, group.expressions.length) ? `(${text})` : text
     })
     .join(' ∨ ')
 }

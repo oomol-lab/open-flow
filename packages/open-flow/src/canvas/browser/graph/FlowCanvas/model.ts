@@ -49,12 +49,17 @@ export type FlowCanvasViewConditionOperator =
   | 'not has value'
   | 'starts with'
 
+export type FlowCanvasViewConditionOperand =
+  | string
+  | { readonly kind: 'environment'; readonly label: string }
+  | { readonly icon?: string; readonly kind: 'node'; readonly label: string }
+
 export interface FlowCanvasViewConditionCase {
   readonly groups: readonly {
     readonly expressions: readonly {
-      readonly left: string
+      readonly left: FlowCanvasViewConditionOperand
       readonly operator: FlowCanvasViewConditionOperator
-      readonly right?: string
+      readonly right?: FlowCanvasViewConditionOperand
     }[]
   }[]
   readonly output: string
