@@ -111,7 +111,7 @@
     display: grid;
     column-gap: 8px;
     row-gap: 8px;
-    grid-template-columns: repeat(auto-fit, minmax(max(232px, calc(50% - 4px)), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(max(232px, calc(50% - 4px)), 1fr));
   }
 
   .inspector-node-editor {
