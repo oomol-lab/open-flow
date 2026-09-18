@@ -64,6 +64,7 @@ describe('Property panel port layout', () => {
         <PortDefinitionEditor
           layout="ports"
           title="Input ports"
+          titleIcon="input"
           disabled
           values={[{ handle: 'message', jsonSchema: { type: 'string' }, nullable: true, value: 'Hello' }]}
           onChange={vi.fn()}
@@ -71,6 +72,7 @@ describe('Property panel port layout', () => {
       </I18nProvider>,
     )
     expect(markup).toContain('Input ports')
+    expect(markup).toContain('i-carbon:port-input')
     expect(markup).toContain('data-layout="ports"')
     expect(markup).toContain('aria-label="Field name"')
     const typeDisplay = (markup.match(/<span\b[^>]*>/g) ?? []).find((tag) => tag.includes('aria-label="message type: Text"'))
@@ -93,6 +95,7 @@ describe('Property panel port layout', () => {
       </I18nProvider>,
     )
     expect(markup).toContain('data-output="true"')
+    expect(markup).toContain('i-carbon:port-output')
     expect(markup).toContain('i-lucide-light:hash')
     expect(markup).toContain('>Number</span>')
   })
@@ -176,5 +179,15 @@ it.each([true, false])('shows the no-output state only when fields cannot be edi
     </I18nProvider>,
   )
   expect(markup.includes('This node does not provide output data.')).toBe(disabled)
+  expect(markup.includes('aria-label="Add field"')).toBe(!disabled)
+})
+
+it.each([true, false])('shows the no-input state only when fields cannot be edited (disabled=%s)', (disabled) => {
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={createI18n('en')}>
+      <PortDefinitionEditor layout="ports" title="Inputs" titleIcon="input" disabled={disabled} values={[]} onChange={vi.fn()} />
+    </I18nProvider>,
+  )
+  expect(markup.includes('This node does not require input data.')).toBe(disabled)
   expect(markup.includes('aria-label="Add field"')).toBe(!disabled)
 })

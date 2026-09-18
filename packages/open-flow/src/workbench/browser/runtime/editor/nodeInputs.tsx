@@ -36,6 +36,7 @@ export function NodeInputs({
       groups
       layout="ports"
       title={title}
+      titleIcon={title == null ? undefined : 'input'}
       allowAddGroup={allowAddGroup}
       values={entries.map((entry) => ('group' in entry ? entry : entry.definition))}
       disabled={disabled || onDefinitions == null}

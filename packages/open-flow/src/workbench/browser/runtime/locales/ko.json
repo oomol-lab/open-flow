@@ -327,6 +327,7 @@
       "sort": "순서 변경",
       "finishSorting": "순서 변경 완료",
       "inputsTitle": "입력",
+      "noInputs": "이 노드에는 입력 데이터가 필요하지 않습니다.",
       "noOutputs": "이 노드는 출력 데이터를 제공하지 않습니다.",
       "outputsTitle": "출력",
       "valuesTitle": "값",

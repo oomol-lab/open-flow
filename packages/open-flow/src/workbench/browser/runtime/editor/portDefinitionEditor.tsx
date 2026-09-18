@@ -345,6 +345,7 @@ export function PortSettingsPanel({
 type PortEditorProps = {
   layout?: 'values' | 'ports' | 'definition'
   title?: ReactNode
+  titleIcon?: 'input' | 'output'
   defaultNullable?: boolean
   reservedNames?: readonly string[]
   disabled: boolean
@@ -377,9 +378,13 @@ export function PortDefinitionEditor(props: PortEditorProps) {
     else props.onChange(next.filter((port): port is InputPort => 'handle' in port))
   }
   const t = useTranslate()
+  const title = props.title ?? (props.layout === 'values' ? t('inspector.ports.valuesTitle') : undefined)
+  const titleIcon = props.titleIcon ?? (props.output && props.layout === 'ports' && props.title != null ? 'output' : undefined)
   const [sorting, setSorting] = useState(false)
   const fieldCount = values.filter((port) => 'handle' in port).length
   const hasFields = fieldCount > 0
+  const emptyMessage =
+    disabled && !hasFields ? (props.output ? t('inspector.ports.noOutputs') : titleIcon === 'input' ? t('inspector.ports.noInputs') : undefined) : undefined
   const canSort = fieldCount > 1
   const sortingEnabled = sorting && !disabled && canSort
   useEffect(() => {
@@ -693,7 +698,15 @@ export function PortDefinitionEditor(props: PortEditorProps) {
       {(props.title != null || props.layout === 'values' || !disabled) && (
         <FieldSectionHeader
           ref={heading}
-          title={props.title ?? (props.layout === 'values' ? t('inspector.ports.valuesTitle') : undefined)}
+          title={
+            title == null ? undefined : (
+              <>
+                {titleIcon === 'input' && <i aria-hidden="true" className="i-carbon:port-input text-base" />}
+                {titleIcon === 'output' && <i aria-hidden="true" className="i-carbon:port-output text-base" />}
+                {title}
+              </>
+            )
+          }
           disabled={disabled}
           canSort={canSort}
           sorting={sortingEnabled}
@@ -705,7 +718,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           onAdd={addField}
         />
       )}
-      {props.output && disabled && !hasFields && <p className="m-0 pr-3 pb-4 pl-7 text-left text-xs text-muted-foreground">{t('inspector.ports.noOutputs')}</p>}
+      {emptyMessage != null && <p className="m-0 pr-3 pb-4 pl-8 text-left text-xs text-muted-foreground">{emptyMessage}</p>}
       <FieldTable
         className={styles.list}
         layout={props.layout}

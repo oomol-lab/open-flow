@@ -148,6 +148,7 @@ function GroupedInputsStory({ dark, language, log, output = false }: { dark: boo
           groups
           layout="ports"
           title={output ? 'Outputs' : 'Inputs'}
+          titleIcon={output ? 'output' : 'input'}
           output={output}
           disabled={false}
           values={singleValue}
@@ -158,6 +159,7 @@ function GroupedInputsStory({ dark, language, log, output = false }: { dark: boo
           groups
           layout="ports"
           title={output ? 'Outputs' : 'Inputs'}
+          titleIcon={output ? 'output' : 'input'}
           output={output}
           values={emptyValues}
           disabled={false}
@@ -167,7 +169,16 @@ function GroupedInputsStory({ dark, language, log, output = false }: { dark: boo
           }}
         />
         <h3>Empty read-only {output ? 'outputs' : 'inputs'}</h3>
-        <PortDefinitionEditor groups layout="ports" title={output ? 'Outputs' : 'Inputs'} output={output} values={[]} disabled onChange={() => {}} />
+        <PortDefinitionEditor
+          groups
+          layout="ports"
+          title={output ? 'Outputs' : 'Inputs'}
+          titleIcon={output ? 'output' : 'input'}
+          output={output}
+          values={[]}
+          disabled
+          onChange={() => {}}
+        />
         <pre aria-label="Saved ports">{JSON.stringify(values, null, 2)}</pre>
       </div>
     </I18nProvider>

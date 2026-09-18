@@ -327,6 +327,7 @@
       "sort": "排序",
       "finishSorting": "完成排序",
       "inputsTitle": "輸入",
+      "noInputs": "此節點不需要輸入資料",
       "noOutputs": "此節點不提供輸出資料",
       "outputsTitle": "輸出",
       "valuesTitle": "資料",
