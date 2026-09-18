@@ -353,6 +353,13 @@ it('loads an encoded Flow editor in one request', async () => {
   expect(request).toHaveBeenCalledWith('/v1/flows/flow%2F1/editor', expect.anything())
 })
 
+it('loads a compatible model v2 Flow editor', async () => {
+  const draft = { ...editor.draft, content: { ...editor.draft.content, modelVersion: 2 }, modelVersion: 2 }
+  const legacyEditor = { ...editor, draft }
+
+  await expect(new ControlClient(async () => Response.json(legacyEditor)).getEditor(flow.flowId)).resolves.toEqual(legacyEditor)
+})
+
 it('ignores additional editor and Presentation response fields', async () => {
   const presentation = { ...editor.presentation, createdAt: flow.createdAt }
   const client = new ControlClient(async (path) => Response.json(path.endsWith('/editor') ? { ...editor, extra: true, presentation } : presentation))

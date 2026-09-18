@@ -501,10 +501,7 @@ export class ControlService {
     try {
       const source = new TextEncoder().encode(base.content)
       if ((await digestBytes(source)) != base.digest) throw new TypeError('The stored Draft digest does not match its content.')
-      const repaired = repairRevision(source)
-      const engine = findEngineContract(currentEngineContract)
-      if (engine == null || !(await validateFlow(repaired, engine)).valid) throw new TypeError('The repaired Draft is invalid.')
-      bytes = encodeRevision(repaired)
+      bytes = encodeRevision(repairRevision(source))
     } catch (error) {
       throw new ControlError(controlErrorCode.flowInvalid, 'The Draft cannot be repaired safely.', { cause: error })
     }

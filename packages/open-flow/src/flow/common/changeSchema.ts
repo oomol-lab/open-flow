@@ -184,7 +184,6 @@ const document = z.object({
   tasks: z.record(text, managed),
 })
 const revision = z.object({ modelVersion: z.union([z.literal(2), z.literal(currentFlowModelVersion)]), document, modules: z.record(text, module) })
-const currentRevision = revision.extend({ modelVersion: z.literal(currentFlowModelVersion) })
 const envelope = revision.extend({ kind: z.literal('open-flow-flow-revision'), version: z.literal(1) })
 
 function record(value: unknown): Record<string, unknown> {
@@ -224,8 +223,8 @@ function upgradeLegacyGraph(value: unknown): { readonly graph: unknown; readonly
       else if (Array.isArray(actions) && actions.length == 2 && actions[0] == 'approve' && actions[1] == 'reject') kind = 'approval'
       else throw new TypeError('Legacy Wait actions are invalid.')
       resolutionIds.add(id)
-      const { actions: _, ...upgraded } = graphNode
-      return [id, { ...upgraded, kind }]
+      const { actions: _, input: legacyInput, ...upgraded } = graphNode
+      return [id, { ...upgraded, inputDefinitions: [legacyInput], kind }]
     }),
   )
   for (const [id, nodeCandidate] of Object.entries(nodes)) {
@@ -349,7 +348,7 @@ export function decodeFlowDocument(value: unknown): FlowDocument {
 
 export function decodeRevisionContent(value: unknown): RevisionContent {
   checkJsonDepth(value)
-  return currentRevision.parse(value) as RevisionContent
+  return revision.parse(value) as RevisionContent
 }
 
 export function decodeRevisionEnvelope(value: unknown): RevisionContent {

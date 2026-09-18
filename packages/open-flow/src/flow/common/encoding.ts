@@ -197,11 +197,14 @@ function canonicalLegacyGraph(graph: Graph): JsonValue {
         if (node.kind != 'approval' && node.kind != 'wait') {
           return [id, 'inputs' in node ? { ...value, inputs: canonicalLegacyInputs(node.inputs, resolutionIds) } : value]
         }
+        const { inputDefinitions: _, ...legacyValue } = value
+        const legacyInput = node.inputDefinitions[0]!
         return [
           id,
           {
-            ...value,
+            ...legacyValue,
             actions: node.kind == 'wait' ? ['continue'] : ['approve', 'reject'],
+            input: { handle: legacyInput.handle, ...canonicalPort(legacyInput) },
             inputs: canonicalLegacyInputs(node.inputs, resolutionIds),
             kind: 'wait',
           },

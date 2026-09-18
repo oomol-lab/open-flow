@@ -1366,7 +1366,10 @@ describe('Server application service', () => {
       version: 1,
       document: {
         ...source.content.document,
-        graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' }, broken: { kind: 'unknown' } } },
+        graph: {
+          edges: [],
+          nodes: { start: { kind: 'manual', name: 'Start' }, other: { kind: 'manual', name: 'Other' }, broken: { kind: 'unknown' } },
+        },
       },
     })
     const database = new DatabaseSync(file)
@@ -1379,7 +1382,10 @@ describe('Server application service', () => {
       const repaired = await service.control.repairDraft('test', source.flowId, source.revisionId, 'repair-request')
       expect(repaired.revision.parentRevisionId).toBe(source.revisionId)
       expect(await service.control.getEditor(source.flowId)).toMatchObject({
-        draft: { revisionId: repaired.revision.revisionId, content: { modelVersion: currentFlowModelVersion, document: { graph: { nodes: { start: {} } } } } },
+        draft: {
+          revisionId: repaired.revision.revisionId,
+          content: { modelVersion: currentFlowModelVersion, document: { graph: { nodes: { start: {}, other: {} } } } },
+        },
       })
       expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(source.revisionId)).toEqual({ content: legacy })
       await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'repair-request')).resolves.toEqual(repaired)
