@@ -1,4 +1,4 @@
-import type { ComponentProps, FormEvent, ReactElement } from 'react'
+import type { ComponentProps, FormEvent, MouseEvent, ReactElement } from 'react'
 import type { Flow } from '../api.ts'
 import type { WorkbenchLanguage } from '../contract.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
@@ -28,8 +28,10 @@ import { WorkbenchSelect } from './workbenchSelect.tsx'
 const CreateResourceDialog = lazy(() => import('./createResourceDialog.tsx'))
 
 const languageOptions = uiLanguages.map((language) => ({ label: uiLanguageNames[language], value: language }))
+const flowIdTooltipAlignOffset = 44
 const renamePopoverAlignOffset = -12
 const renamePopoverVerticalShift = 8
+const rowControlSelector = 'a, button, input, select, textarea, [data-slot="tooltip-trigger"]'
 
 interface LanguageSelectProps {
   readonly language: WorkbenchLanguage
@@ -79,6 +81,10 @@ function formatUpdatedAt(updatedAt: string, locale: string): string {
   })
 }
 
+function clickedRowControl(event: MouseEvent<HTMLDivElement>): boolean {
+  return event.target instanceof Element && event.target.closest(rowControlSelector) != null
+}
+
 function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): ReactElement {
   const [root, setRoot] = useState<HTMLDivElement | null>(null)
   const renameAnchor = useRef<HTMLSpanElement>(null)
@@ -123,9 +129,13 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
     if (await store.workspace.deleteFlow(flow.flowId)) setMode('idle')
   }
 
+  function openFromRow(event: MouseEvent<HTMLDivElement>): void {
+    if (!clickedRowControl(event)) onSelect(flow)
+  }
+
   return (
     <div className="resource-item-row" ref={setRoot}>
-      <div className="resource-list-row flow-columns">
+      <div className="resource-list-row flow-columns" onClick={openFromRow}>
         <span className="resource-primary-cell">
           <span aria-hidden="true" className="resource-flow-icon">
             <i className="i-lucide-light:workflow" />
@@ -227,7 +237,7 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
             <TooltipTrigger render={<code className="resource-flow-id" tabIndex={0} translate="no" />}>{compactFlowId(flow.flowId)}</TooltipTrigger>
             <TooltipContent
               align="start"
-              arrowOffset={16}
+              alignOffset={flowIdTooltipAlignOffset}
               className="resource-flow-id-tooltip"
               collisionBoundary={[]}
               container={root}
@@ -272,7 +282,7 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
           )}
         </span>
       </div>
-      <div className="resource-live-controls" aria-busy={pending != null}>
+      <div className="resource-live-controls" aria-busy={pending != null} onClick={openFromRow}>
         {flow.live != null && (
           <Switch
             aria-label={t('resource.enableFlow', { name: flow.name })}

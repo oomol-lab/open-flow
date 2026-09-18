@@ -1397,6 +1397,38 @@ describe('Server application service', () => {
     }
   })
 
+  it('replaces an unreadable Draft with an empty child Revision so the editor can open', async () => {
+    const file = await databaseFile()
+    const service = await openService(file)
+    const created = await service.control.createFlow('test', 'Unreadable', 'unreadable')
+    const source = service.control.getRevision(created.flow.flowId, created.flow.draftRevisionId)
+    const unreadable = 'not a revision'
+    const database = new DatabaseSync(file)
+    try {
+      database
+        .prepare('UPDATE revisions SET content = ?, digest = ? WHERE revision_id = ?')
+        .run(unreadable, await digestBytes(new TextEncoder().encode(unreadable)), source.revisionId)
+      await expect(service.control.getEditor(source.flowId)).rejects.toMatchObject({ code: controlErrorCode.flowInvalid, status: 400 })
+
+      const repaired = await service.control.repairDraft('test', source.flowId, source.revisionId, 'empty-repair')
+
+      expect(repaired.revision.parentRevisionId).toBe(source.revisionId)
+      expect(await service.control.getEditor(source.flowId)).toMatchObject({
+        draft: {
+          revisionId: repaired.revision.revisionId,
+          content: {
+            modelVersion: currentFlowModelVersion,
+            document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
+            modules: {},
+          },
+        },
+      })
+      expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(source.revisionId)).toEqual({ content: unreadable })
+    } finally {
+      database.close()
+    }
+  })
+
   it('reads and runs a fixed model v2 Approval without rewriting its Revision', async () => {
     const file = await databaseFile()
     const service = await openService(file)

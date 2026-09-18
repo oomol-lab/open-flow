@@ -294,7 +294,7 @@ export class WorkspaceStore {
       const kind =
         error instanceof ApiError && error.code == controlErrorCode.flowUpgradeRequired
           ? 'upgrade'
-          : error instanceof ApiError && error.code == controlErrorCode.flowRepairRequired
+          : error instanceof ApiError && (error.code == controlErrorCode.flowRepairRequired || error.code == controlErrorCode.flowInvalid)
             ? 'repair'
             : 'failed'
       this.#set({

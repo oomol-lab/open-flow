@@ -191,6 +191,38 @@ describe('WorkspaceStore', () => {
     }
   })
 
+  it('offers repair when invalid Draft content prevents the editor from opening', async () => {
+    let repaired = false
+    const repairedFlow = { ...flow, draftRevisionId: 'revision-2' }
+    const repairedDraft = { ...draft, parentRevisionId: draft.revisionId, revisionId: 'revision-2' }
+    const request = vi.fn(async (path: string) => {
+      if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows: [repaired ? repairedFlow : flow], total: 1, version: 1 })
+      if (path == `/v1/flows/${flow.flowId}/editor`) {
+        return repaired
+          ? Response.json({ ...editor, flow: repairedFlow, draft: repairedDraft })
+          : Response.json({ error: { code: 'flow.invalid', message: 'The stored Draft is invalid.' }, version: 1 }, { status: 400 })
+      }
+      if (path == `/v1/flows/${flow.flowId}/draft/repair`) {
+        repaired = true
+        return Response.json({ revision: repairedDraft, version: 1 })
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const store = new WorkspaceStore(new WorkbenchClient(request), vi.fn())
+
+    try {
+      await store.start(flow.flowId)
+      expect(store.$.workspaceLoadProblem.value).toEqual({ kind: 'repair' })
+
+      await store.repairWorkspace()
+
+      expect(store.$.draft.value?.revisionId).toBe('revision-2')
+      expect(store.$.workspaceLoadProblem.value).toBeUndefined()
+    } finally {
+      store.dispose()
+    }
+  })
+
   it('repairs an older Draft from the page state without emitting notices', async () => {
     const setNotice = vi.fn()
     let repaired = false

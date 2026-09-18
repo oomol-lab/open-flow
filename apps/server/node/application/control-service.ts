@@ -497,14 +497,17 @@ export class ControlService {
     this.requireDraft(flowId)
     const base = this.store.flows.revision(flowId, expectedRevisionId)
     if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
-    let bytes: Uint8Array
+    let content: RevisionContent
     try {
       const source = new TextEncoder().encode(base.content)
       if ((await digestBytes(source)) != base.digest) throw new TypeError('The stored Draft digest does not match its content.')
-      bytes = encodeRevision(repairRevision(source))
-    } catch (error) {
-      throw new ControlError(controlErrorCode.flowInvalid, 'The Draft cannot be repaired safely.', { cause: error })
+      content = repairRevision(source)
+    } catch {
+      // The source Revision remains immutable. When none of it is readable, create a blank
+      // child Draft so the user can still enter the workspace and rebuild the Flow.
+      content = emptyRevision()
     }
+    const bytes = encodeRevision(content)
     const digest = await digestBytes(bytes)
     const requestDigest = await digestBytes(canonicalJsonBytes({ expectedRevisionId, version: 1 }))
     const stored = this.store.flows.commitRevision({
