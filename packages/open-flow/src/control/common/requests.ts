@@ -32,7 +32,9 @@ const schemas = {
   createDraftRun: z.strictObject({ engineContract: id, inputs, trigger, version: z.literal(2) }),
   createLiveRun: z.strictObject({ publicationId: id, inputs, trigger, version: z.literal(2) }),
   resolveWait: z.strictObject({ action: z.enum(['approve', 'continue', 'reject']), comment: waitCommentSchema, version }),
-  putVariable: z.strictObject({ value: z.string().refine((value) => new TextEncoder().encode(value).byteLength <= 65_536, 'Variable value is too large.') }),
+  putVariable: z.strictObject({
+    value: z.string().refine((value) => new TextEncoder().encode(value).byteLength <= 65_536, 'Environment variable value is too large.'),
+  }),
   versionOnly: z.strictObject({ version }),
 }
 

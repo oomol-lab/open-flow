@@ -1,5 +1,6 @@
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
+import { createI18n } from './i18n.ts'
 import { providerIcon } from './providerIcon.ts'
 import { designerGraph, setComment, setFlowViewport, setNodePositions, setNodeContentHidden, targetPresentation } from './workspace.ts'
 
@@ -96,6 +97,59 @@ describe('Designer port projection', () => {
       { collapsed: true, group: 'Other' },
       expect.objectContaining({ handle: 'result-a' }),
     ])
+  })
+
+  it('localizes environment variable sources in Condition summaries', () => {
+    const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+      actorId: 'actor',
+      content: {
+        document: {
+          bindings: { token: { kind: 'variable', target: 'API_TOKEN' } },
+          graph: {
+            edges: [],
+            nodes: {
+              condition: {
+                cases: [
+                  {
+                    groups: [
+                      {
+                        expressions: [
+                          {
+                            left: { kind: 'source', source: { bindingId: 'token', kind: 'binding' } },
+                            operator: 'isNotNull',
+                          },
+                        ],
+                      },
+                    ],
+                    output: 'available',
+                  },
+                ],
+                inputs: {},
+                kind: 'condition',
+                matchMode: 'first',
+                name: 'Check token',
+              },
+            },
+          },
+          subflows: {},
+          tasks: {},
+        },
+        modelVersion: currentFlowModelVersion,
+        modules: {},
+      },
+      createdAt: '2026-09-18T00:00:00.000Z',
+      digest: 'digest',
+      flowId: 'flow',
+      modelVersion: currentFlowModelVersion,
+      parentRevisionId: null,
+      revisionId: 'revision',
+      version: 1,
+    }
+
+    const node = designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, createI18n('zh-CN').t).nodes[0]
+    if (node?.kind != 'condition') throw new Error('Expected a Condition node.')
+
+    expect(node.cases[0]?.groups[0]?.expressions[0]?.left).toBe('环境变量')
   })
 
   it('only requires a Connection for authenticated Connector Actions', () => {

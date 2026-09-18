@@ -4,7 +4,21 @@ import type { FormEvent, ReactElement } from 'react'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { validVariableName } from '@oomol-lab/open-flow/flow-change'
-import { Button, Input, Label, Textarea } from '@oomol-lab/open-flow/ui'
+import {
+  Button,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  Label,
+  Textarea,
+} from '@oomol-lab/open-flow/ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslate } from 'val-i18n-react'
@@ -13,6 +27,12 @@ import { posthog } from './posthog.ts'
 const maxCount = 200
 const maxValueBytes = 64 * 1024
 
+interface VariableEditor {
+  readonly kind: 'create' | 'edit'
+  readonly name: string
+  readonly value: string
+}
+
 export function VariablesPage({ client, language }: { readonly client: ControlClient; readonly language: WorkbenchLanguage }): ReactElement {
   const t = useTranslate()
   const [variables, setVariables] = useState<readonly Variable[]>([])
@@ -20,11 +40,12 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
   const [failed, setFailed] = useState(false)
   const [pending, setPending] = useState(false)
   const [filter, setFilter] = useState('')
-  const [editing, setEditing] = useState<string>()
-  const [name, setName] = useState('')
-  const [value, setValue] = useState('')
+  const [editor, setEditor] = useState<VariableEditor>()
   const [removing, setRemoving] = useState<string>()
   const loadSequence = useRef(0)
+  const portal = useRef<HTMLElement>(null)
+  const nameInput = useRef<HTMLInputElement>(null)
+  const valueInput = useRef<HTMLTextAreaElement>(null)
   const load = useCallback(async (): Promise<void> => {
     const sequence = ++loadSequence.current
     setLoading(true)
@@ -56,22 +77,29 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
     const query = filter.trim().toLocaleLowerCase()
     return query == '' ? variables : variables.filter((variable) => variable.name.toLocaleLowerCase().includes(query))
   }, [filter, variables])
-  const valueTooLarge = new TextEncoder().encode(value).byteLength > maxValueBytes
-  const nameExists = editing == '' && variables.some((variable) => variable.name == name)
-  const nameInvalid = editing == '' && (!validVariableName(name) || nameExists)
+  const valueTooLarge = editor != null && new TextEncoder().encode(editor.value).byteLength > maxValueBytes
+  const nameExists = editor?.kind == 'create' && variables.some((variable) => variable.name == editor.name)
+  const nameInvalid = editor?.kind == 'create' && (!validVariableName(editor.name) || nameExists)
+
+  function createVariable(): void {
+    setEditor({ kind: 'create', name: '', value: '' })
+    setRemoving(undefined)
+  }
+
+  function editVariable(variable: Variable): void {
+    setEditor({ kind: 'edit', name: variable.name, value: variable.value })
+    setRemoving(undefined)
+  }
 
   async function save(event: FormEvent): Promise<void> {
     event.preventDefault()
-    const target = editing == '' ? name : editing
-    if (target == null || !validVariableName(target) || nameExists || valueTooLarge || loading || failed || pending) return
+    if (editor == null || !validVariableName(editor.name) || nameExists || valueTooLarge || loading || failed || pending) return
     setPending(true)
     try {
-      await client.putVariable(target, value)
-      posthog?.capture(editing == '' ? 'variable_created' : 'variable_updated')
+      await client.putVariable(editor.name, editor.value)
+      posthog?.capture(editor.kind == 'create' ? 'variable_created' : 'variable_updated')
       await load()
-      setEditing(undefined)
-      setName('')
-      setValue('')
+      setEditor(undefined)
     } catch {
       toast.error(t('variables.saveFailed'))
     } finally {
@@ -87,7 +115,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
       posthog?.capture('variable_deleted')
       await load()
       setRemoving(undefined)
-      if (editing == variableName) setEditing(undefined)
+      if (editor?.name == variableName) setEditor(undefined)
     } catch {
       toast.error(t('variables.deleteFailed'))
     } finally {
@@ -96,24 +124,26 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
   }
 
   return (
-    <main className="variables-page">
+    <main ref={portal} className="variables-page">
       <div className="variables-content">
         <header className="variables-header">
           <h1>{t('variables.title')}</h1>
         </header>
-        <section aria-busy={loading || pending} aria-labelledby="variables-title" className="variables-section">
+        <section aria-busy={loading || pending} aria-labelledby="variables-title" className="variables-section rounded-lg">
           <div className="variables-toolbar">
             <div className="variables-heading">
               <h2 id="variables-title">{t('variables.all')}</h2>
               <span>{t('variables.count', { count: variables.length })}</span>
             </div>
             <div className="variables-actions">
-              <div className="server-input-group">
-                <svg aria-hidden="true" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} viewBox="0 0 24 24">
-                  <circle cx="11" cy="11" r="6" />
-                  <path d="m16 16 4 4" />
-                </svg>
-                <Input
+              <InputGroup className="variable-search">
+                <InputGroupAddon>
+                  <svg aria-hidden="true" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="6" />
+                    <path d="m16 16 4 4" />
+                  </svg>
+                </InputGroupAddon>
+                <InputGroupInput
                   aria-label={t('variables.search')}
                   autoComplete="off"
                   name="variable-search"
@@ -122,88 +152,31 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                   type="search"
                   value={filter}
                 />
-              </div>
+              </InputGroup>
               <Button
-                aria-label={t('variables.refresh')}
-                variant="outline"
-                size="icon"
-                disabled={loading || pending}
-                onClick={() => void load()}
-                title={t('variables.refresh')}
-                type="button"
-              >
-                <svg aria-hidden="true" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} viewBox="0 0 24 24">
-                  <path d="M20 6v5h-5" />
-                  <path d="M4 18v-5h5" />
-                  <path d="M6.1 9a7 7 0 0 1 11.7-2.6L20 11M4 13l2.2 4.6A7 7 0 0 0 17.9 15" />
-                </svg>
-              </Button>
-              <Button
+                className="pr-3"
                 variant="default"
                 size="default"
                 disabled={loading || failed || pending || variables.length >= maxCount}
-                onClick={() => {
-                  setEditing('')
-                  setName('')
-                  setValue('')
-                  setRemoving(undefined)
-                }}
+                onClick={createVariable}
                 type="button"
               >
-                <svg aria-hidden="true" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} viewBox="0 0 24 24">
+                <svg
+                  aria-hidden="true"
+                  data-icon="inline-start"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                  viewBox="0 0 24 24"
+                >
                   <path d="M12 5v14M5 12h14" />
                 </svg>
                 {t('variables.create')}
               </Button>
             </div>
           </div>
-          {editing != null && (
-            <form className="variable-form" onSubmit={(event) => void save(event)}>
-              <Label htmlFor="variable-name">{t('variables.name')}</Label>
-              <Input
-                aria-describedby={nameInvalid && name != '' ? 'variable-name-error' : undefined}
-                aria-invalid={nameInvalid && name != ''}
-                autoComplete="off"
-                disabled={editing != ''}
-                id="variable-name"
-                maxLength={256}
-                name="variable-name"
-                onChange={(event) => setName(event.target.value)}
-                spellCheck={false}
-                value={editing == '' ? name : editing}
-              />
-              {nameInvalid && name != '' && (
-                <span className="variable-error" id="variable-name-error">
-                  {t(nameExists ? 'variables.nameExists' : 'variables.invalidName')}
-                </span>
-              )}
-              <Label htmlFor="variable-value">{t('variables.value')}</Label>
-              <Textarea
-                aria-describedby={valueTooLarge ? 'variable-value-error' : undefined}
-                aria-invalid={valueTooLarge}
-                autoComplete="off"
-                id="variable-value"
-                name="variable-value"
-                onChange={(event) => setValue(event.target.value)}
-                rows={6}
-                spellCheck={false}
-                value={value}
-              />
-              {valueTooLarge && (
-                <span className="variable-error" id="variable-value-error">
-                  {t('variables.valueTooLarge')}
-                </span>
-              )}
-              <div className="variable-form-actions">
-                <Button variant="outline" size="default" disabled={pending} onClick={() => setEditing(undefined)} type="button">
-                  {t('variables.cancel')}
-                </Button>
-                <Button variant="default" size="default" disabled={loading || failed || pending || nameInvalid || valueTooLarge} type="submit">
-                  {t('variables.save')}
-                </Button>
-              </div>
-            </form>
-          )}
           <div className="variable-columns" aria-hidden="true">
             <span>{t('variables.name')}</span>
             <span>{t('variables.value')}</span>
@@ -239,18 +212,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                 <strong>{t(filter.trim() == '' ? 'variables.empty' : 'variables.noMatch')}</strong>
                 <span>{t('variables.description')}</span>
                 {filter.trim() == '' && (
-                  <Button
-                    variant="outline"
-                    size="default"
-                    disabled={pending || variables.length >= maxCount}
-                    onClick={() => {
-                      setEditing('')
-                      setName('')
-                      setValue('')
-                      setRemoving(undefined)
-                    }}
-                    type="button"
-                  >
+                  <Button variant="outline" size="default" disabled={pending || variables.length >= maxCount} onClick={createVariable} type="button">
                     {t('variables.create')}
                   </Button>
                 )}
@@ -274,18 +236,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                       </span>
                     ) : (
                       <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={pending}
-                          onClick={() => {
-                            setEditing(variable.name)
-                            setName(variable.name)
-                            setValue(variable.value)
-                            setRemoving(undefined)
-                          }}
-                          type="button"
-                        >
+                        <Button variant="outline" size="sm" disabled={pending} onClick={() => editVariable(variable)} type="button">
                           {t('variables.edit')}
                         </Button>
                         <Button variant="destructive" size="sm" disabled={pending} onClick={() => setRemoving(variable.name)} type="button">
@@ -299,6 +250,76 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
             )}
           </div>
         </section>
+        <Dialog
+          onOpenChange={(open) => {
+            if (!open && !pending) setEditor(undefined)
+          }}
+          open={editor != null}
+        >
+          <DialogContent
+            closeLabel={t('variables.cancel')}
+            container={portal.current}
+            initialFocus={() => (editor?.kind == 'create' ? nameInput.current : valueInput.current)}
+          >
+            <form className="flex flex-col gap-4" onSubmit={(event) => void save(event)}>
+              <DialogHeader>
+                <DialogTitle>
+                  {editor?.kind == 'create' ? t('variables.create') : t('variables.edit')}
+                  {editor?.kind == 'edit' && <span className="ml-2">{editor.name}</span>}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-2">
+                <Label htmlFor="variable-name">{t('variables.name')}</Label>
+                <Input
+                  aria-describedby={nameInvalid && editor?.name != '' ? 'variable-name-error' : undefined}
+                  aria-invalid={nameInvalid && editor?.name != ''}
+                  autoComplete="off"
+                  id="variable-name"
+                  maxLength={256}
+                  name="variable-name"
+                  onChange={(event) => setEditor((current) => (current == null ? current : { ...current, name: event.target.value }))}
+                  readOnly={editor?.kind == 'edit'}
+                  ref={nameInput}
+                  spellCheck={false}
+                  value={editor?.name ?? ''}
+                />
+                {nameInvalid && editor?.name != '' && (
+                  <span className="variable-error" id="variable-name-error">
+                    {t(nameExists ? 'variables.nameExists' : 'variables.invalidName')}
+                  </span>
+                )}
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="variable-value">{t('variables.value')}</Label>
+                <Textarea
+                  aria-describedby={valueTooLarge ? 'variable-value-error' : undefined}
+                  aria-invalid={valueTooLarge}
+                  autoComplete="off"
+                  id="variable-value"
+                  name="variable-value"
+                  onChange={(event) => setEditor((current) => (current == null ? current : { ...current, value: event.target.value }))}
+                  ref={valueInput}
+                  rows={6}
+                  spellCheck={false}
+                  value={editor?.value ?? ''}
+                />
+                {valueTooLarge && (
+                  <span className="variable-error" id="variable-value-error">
+                    {t('variables.valueTooLarge')}
+                  </span>
+                )}
+              </div>
+              <DialogFooter>
+                <DialogClose render={<Button variant="outline" />} disabled={pending} type="button">
+                  {t('variables.cancel')}
+                </DialogClose>
+                <Button variant="default" size="default" disabled={loading || failed || pending || nameInvalid || valueTooLarge} type="submit">
+                  {t('variables.save')}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </main>
   )

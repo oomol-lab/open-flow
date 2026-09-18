@@ -345,7 +345,7 @@
     "error": {
       "authenticationRequired": "请登录后继续。",
       "authorizationDenied": "你没有执行此操作的权限。",
-      "bindingUnresolved": "缺少必需的 Connection 或 Variable。请完成配置后重试。",
+      "bindingUnresolved": "缺少必需的 Connection 或环境变量。请完成配置后重试。",
       "connectorActionNotFound": "所选 Connector action 已不可用。请选择其他 action。",
       "connectorConnectionRequired": "需要有效的 Connection。请连接或重新连接账号后重试。",
       "connectorUnavailable": "Connector 暂时不可用，请稍后重试。",
@@ -376,9 +376,9 @@
       "triggerKeyInvalid": "此 Trigger 无法激活，请检查 Connection 和配置后重试。",
       "triggerKeyNotFound": "此 Trigger 端点已失效，请从 Flow 中复制最新端点。",
       "triggerNotFound": "找不到此 Trigger，请刷新 Trigger 列表。",
-      "variableInvalid": "Variable 名称或值不符合要求，请检查后重试。",
-      "variableLimitReached": "当前部署的 Variable 已达到上限。",
-      "variableNotFound": "找不到此 Variable，请刷新 Variable 列表。",
+      "variableInvalid": "环境变量名称或值不符合要求，请检查后重试。",
+      "variableLimitReached": "当前部署的环境变量已达到上限。",
+      "variableNotFound": "找不到此环境变量，请刷新环境变量列表。",
       "connectorConsoleUnconfigured": "尚未配置 Connector 授权控制台地址。请前往“设置 → Connector → 授权控制台地址”完成配置后重试。"
     },
     "flowDeleted": "已删除 {{name}}。",
@@ -655,7 +655,7 @@
     "locateIssue": "打开问题：{{message}}",
     "messages": {
       "binding": {
-        "variable-invalid": "Variable 绑定“{{bindingId}}”的目标无效。"
+        "variable-invalid": "环境变量绑定“{{bindingId}}”的目标无效。"
       },
       "condition": {
         "input-missing": "条件表达式引用了未知输入“{{input}}”。",
@@ -672,7 +672,7 @@
         }
       },
       "graph": {
-        "binding-invalid": "绑定“{{bindingId}}”必须是 Variable。",
+        "binding-invalid": "绑定“{{bindingId}}”必须是环境变量。",
         "binding-missing": "绑定“{{bindingId}}”不存在。",
         "cycle": "节点之间存在依赖循环：{{nodes}}。",
         "flow-input-incompatible": "Flow 输入“{{input}}”与此输入不兼容。",
@@ -693,8 +693,8 @@
         "subflow-output-incompatible": "有来源与 Subflow 输出“{{output}}”的声明类型不兼容。",
         "subflow-output-schema-incompatible": "Subflow 输出“{{output}}”的数据格式不匹配：{{issue}}",
         "trigger-not-allowed": "Trigger 节点只能用于 Flow。",
-        "variable-incompatible": "Variable 绑定“{{bindingId}}”与此输入不兼容。",
-        "variable-source-mixed": "Variable 必须是一个输入的唯一来源。"
+        "variable-incompatible": "环境变量绑定“{{bindingId}}”与此输入不兼容。",
+        "variable-source-mixed": "环境变量必须是一个输入的唯一来源。"
       },
       "llm": {
         "unconfigured": "当前部署尚未配置 LLM。请配置 OPEN_FLOW_LLM_ORIGIN 和 OPEN_FLOW_LLM_TOKEN。"

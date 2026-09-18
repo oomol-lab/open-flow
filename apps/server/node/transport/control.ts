@@ -573,7 +573,7 @@ function text(value: unknown, code: InvalidCode): string {
 
 function variableName(value: unknown): string {
   const name = text(value, controlErrorCode.variableInvalid)
-  if (!validVariableName(name)) invalid(controlErrorCode.variableInvalid, 'Variable name is invalid.')
+  if (!validVariableName(name)) invalid(controlErrorCode.variableInvalid, 'Environment variable name is invalid.')
   return name
 }
 

@@ -13,7 +13,7 @@
     "selectVariable": "选择环境变量",
     "variablesLoading": "正在加载环境变量…",
     "search": "搜索",
-    "empty": "没有匹配的变量。",
+    "empty": "没有匹配的环境变量。",
     "clear": "<未设值>"
   },
   "markdown": {

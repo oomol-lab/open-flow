@@ -1,4 +1,3 @@
-import './styles.css'
 export { EventSourcesPage } from './eventSources.tsx'
 import type { FormEvent, ReactElement } from 'react'
 import type { WorkbenchHost, WorkbenchLanguage, WorkbenchLocation, WorkbenchNavigationOptions, WorkbenchPreferences, WorkbenchTheme } from './contract.ts'

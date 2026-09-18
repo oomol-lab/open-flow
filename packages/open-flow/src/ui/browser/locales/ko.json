@@ -13,7 +13,7 @@
     "selectVariable": "환경 변수 선택",
     "variablesLoading": "환경 변수 불러오는 중…",
     "search": "검색",
-    "empty": "일치하는 변수가 없습니다.",
+    "empty": "일치하는 환경 변수가 없습니다.",
     "clear": "<설정 안 됨>"
   },
   "markdown": {

@@ -45,11 +45,12 @@
     "./theme.css": "./src/ui/browser/theme.css",
     "./webhook-trigger": "./src/trigger/common/webhook.ts",
     "./workbench": "./src/workbench/browser/runtime/openFlowWorkbench.tsx",
+    "./workbench.css": "./src/workbench/browser/runtime/styles.css",
     "./mcp": "./src/control/common/mcp.ts",
     "./control-requests": "./src/control/common/requests.ts",
     "./workbench-host-conformance": "./src/workbench/browser/runtime/hostConformance.ts",
     "./ui": "./src/ui/browser/public.ts",
-    "./ui.css": "./src/ui/browser/styles.css",
+    "./ui.css": "./src/ui/browser/public.css",
     "./trigger-locales-plugin": "./src/build/node/triggerLocales.ts"
   },
   "scripts": {

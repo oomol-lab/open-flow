@@ -22,7 +22,7 @@
     "flows": "Flow",
     "notifications": "Notifications",
     "settings": "Paramètres",
-    "variables": "Variables"
+    "variables": "Variables d’environnement"
   },
   "settings": {
     "callbackKey": "Clé de callback",
@@ -75,29 +75,28 @@
     "selectForCreation": "Sélectionner l’équipe du Connector pour le nouveau Flow"
   },
   "variables": {
-    "nameExists": "Une Variable portant ce nom existe déjà. Modifiez la Variable existante.",
-    "all": "Toutes les Variables",
+    "nameExists": "Une variable d’environnement portant ce nom existe déjà. Modifiez la variable d’environnement existante.",
+    "all": "Toutes",
     "cancel": "Annuler",
-    "count": "{{count}} sur 200",
-    "create": "Nouvelle Variable",
+    "count": "Variables : {{count}} · Limite : 200",
+    "create": "Nouvelle variable",
     "delete": "Supprimer",
     "deleteConfirm": "Supprimer {{name}} ?",
-    "description": "Configuration de deployment disponible pour les entrées Flow liées à une Variable.",
+    "description": "Configuration de deployment disponible pour les entrées Flow liées à une variable d’environnement.",
     "edit": "Modifier",
-    "empty": "Aucune Variable n’a été créée.",
+    "empty": "Aucune variable d’environnement n’a été créée.",
     "invalidName": "Utilisez entre 1 et 256 lettres, chiffres ou traits de soulignement, commencez par une lettre ou un trait de soulignement et n’utilisez pas le préfixe réservé OO_.",
-    "loadFailed": "Impossible de charger les Variables.",
+    "loadFailed": "Impossible de charger les variables d’environnement.",
     "name": "Nom",
-    "noMatch": "Aucune Variable ne correspond à cette recherche.",
-    "refresh": "Actualiser",
+    "noMatch": "Aucune variable d’environnement ne correspond à cette recherche.",
     "retry": "Réessayer",
     "save": "Enregistrer",
-    "saveFailed": "Impossible d’enregistrer la Variable.",
-    "search": "Rechercher des Variables",
-    "title": "Variables",
+    "saveFailed": "Impossible d’enregistrer la variable d’environnement.",
+    "search": "Rechercher par nom",
+    "title": "Variables d’environnement",
     "updated": "Mise à jour",
     "value": "Valeur",
     "valueTooLarge": "La valeur encodée en UTF-8 ne doit pas dépasser 64 KiB.",
-    "deleteFailed": "Impossible de supprimer la Variable."
+    "deleteFailed": "Impossible de supprimer la variable d’environnement."
   }
 }

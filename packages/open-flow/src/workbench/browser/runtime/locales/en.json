@@ -345,7 +345,7 @@
     "error": {
       "authenticationRequired": "Sign in to continue.",
       "authorizationDenied": "You do not have permission to perform this action.",
-      "bindingUnresolved": "A required Connection or Variable is missing. Complete the configuration and try again.",
+      "bindingUnresolved": "A required Connection or environment variable is missing. Complete the configuration and try again.",
       "connectorActionNotFound": "The selected Connector action is no longer available. Choose another action.",
       "connectorConnectionRequired": "An active Connection is required. Connect or reconnect the account and try again.",
       "connectorUnavailable": "Connector is temporarily unavailable. Try again later.",
@@ -376,9 +376,9 @@
       "triggerKeyInvalid": "This Trigger cannot be activated. Check its Connection and configuration, then try again.",
       "triggerKeyNotFound": "This Trigger endpoint no longer exists. Copy the latest endpoint from the Flow.",
       "triggerNotFound": "This Trigger does not exist or was deleted. Refresh the Trigger list.",
-      "variableInvalid": "The Variable name or value is invalid. Review it and try again.",
-      "variableLimitReached": "The deployment has reached its Variable limit.",
-      "variableNotFound": "This Variable does not exist or was deleted. Refresh the Variable list.",
+      "variableInvalid": "The environment variable name or value is invalid. Review it and try again.",
+      "variableLimitReached": "The deployment has reached its environment variable limit.",
+      "variableNotFound": "This environment variable does not exist or was deleted. Refresh the Env list.",
       "connectorConsoleUnconfigured": "The Connector authorization console URL is not configured. Set it in Settings → Connector → Authorization console URL, then try again."
     },
     "flowDeleted": "Deleted {{name}}.",
@@ -655,7 +655,7 @@
     "locateIssue": "Open issue: {{message}}",
     "messages": {
       "binding": {
-        "variable-invalid": "Variable binding \"{{bindingId}}\" has an invalid target."
+        "variable-invalid": "Environment variable binding \"{{bindingId}}\" has an invalid target."
       },
       "condition": {
         "input-missing": "Condition expression references unknown input \"{{input}}\".",
@@ -672,7 +672,7 @@
         }
       },
       "graph": {
-        "binding-invalid": "Binding \"{{bindingId}}\" must be a Variable.",
+        "binding-invalid": "Binding \"{{bindingId}}\" must be an environment variable.",
         "binding-missing": "Binding \"{{bindingId}}\" does not exist.",
         "cycle": "Graph contains a dependency cycle among nodes: {{nodes}}.",
         "flow-input-incompatible": "Flow input \"{{input}}\" is not compatible with this input.",
@@ -693,8 +693,8 @@
         "subflow-output-incompatible": "A source is not compatible with Subflow output \"{{output}}\".",
         "subflow-output-schema-incompatible": "The data format for Subflow output \"{{output}}\" does not match: {{issue}}",
         "trigger-not-allowed": "Trigger nodes are only allowed in Flows.",
-        "variable-incompatible": "Variable binding \"{{bindingId}}\" is not compatible with this input.",
-        "variable-source-mixed": "A Variable must be the only source for an input."
+        "variable-incompatible": "Environment variable binding \"{{bindingId}}\" is not compatible with this input.",
+        "variable-source-mixed": "An environment variable must be the only source for an input."
       },
       "llm": {
         "unconfigured": "LLM is not configured for this deployment. Configure OPEN_FLOW_LLM_ORIGIN and OPEN_FLOW_LLM_TOKEN."

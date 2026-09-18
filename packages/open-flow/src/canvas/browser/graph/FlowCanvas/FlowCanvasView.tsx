@@ -1,7 +1,3 @@
-import 'virtual:uno.css'
-import '../../styles/root.scss'
-import '../../../../ui/browser/styles.css'
-import '../../../../ui/browser/theme.css'
 import type { IsValidConnection, OnMoveEnd, OnNodeDrag, OnSelectionChangeFunc, Edge as RFEdge, Node as RFNode } from '@xyflow/react'
 import type { ReactElement } from 'react'
 import type { RFHandleName, RFNodeId } from '../../base/rfHelpers.ts'

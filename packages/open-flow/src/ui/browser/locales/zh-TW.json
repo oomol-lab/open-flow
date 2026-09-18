@@ -13,7 +13,7 @@
     "selectVariable": "選擇環境變數",
     "variablesLoading": "正在載入環境變數…",
     "search": "搜尋",
-    "empty": "沒有符合的變數。",
+    "empty": "沒有符合的環境變數。",
     "clear": "<未設定>"
   },
   "markdown": {

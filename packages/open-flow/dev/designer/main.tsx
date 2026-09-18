@@ -1,7 +1,5 @@
 import 'virtual:uno.css'
-import '../../src/ui/browser/styles.css'
-import '../../src/canvas/browser/styles/root.scss'
-import '../../src/workbench/browser/runtime/styles.css'
+import '@oomol-lab/open-flow/workbench.css'
 import './styles.css'
 import './lab.css'
 

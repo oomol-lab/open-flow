@@ -22,7 +22,7 @@
     "flows": "Flow",
     "notifications": "알림",
     "settings": "설정",
-    "variables": "Variables"
+    "variables": "환경 변수"
   },
   "settings": {
     "callbackKey": "Callback key",
@@ -75,29 +75,28 @@
     "selectForCreation": "새 Flow의 Connector 팀 선택"
   },
   "variables": {
-    "nameExists": "같은 이름의 Variable이 이미 있습니다. 기존 Variable을 편집하세요.",
-    "all": "모든 Variable",
+    "nameExists": "같은 이름의 환경 변수가 이미 있습니다. 기존 환경 변수를 편집하세요.",
+    "all": "전체",
     "cancel": "취소",
-    "count": "{{count}} / 200",
-    "create": "Variable 만들기",
+    "count": "변수 {{count}}개 · 최대 200개",
+    "create": "새 변수",
     "delete": "삭제",
     "deleteConfirm": "{{name}}을(를) 삭제하시겠습니까?",
-    "description": "Variable에 바인딩된 Flow 입력에서 사용할 수 있는 deployment 설정입니다.",
+    "description": "환경 변수에 바인딩된 Flow 입력에서 사용할 수 있는 deployment 설정입니다.",
     "edit": "편집",
-    "empty": "생성된 Variable이 없습니다.",
+    "empty": "생성된 환경 변수가 없습니다.",
     "invalidName": "이름은 1~256자의 영문자, 숫자 또는 밑줄이어야 하며 영문자나 밑줄로 시작해야 합니다. 예약된 OO_ 접두사는 사용할 수 없습니다.",
-    "loadFailed": "Variable을 불러올 수 없습니다.",
+    "loadFailed": "환경 변수를 불러올 수 없습니다.",
     "name": "이름",
-    "noMatch": "검색과 일치하는 Variable이 없습니다.",
-    "refresh": "새로 고침",
+    "noMatch": "검색과 일치하는 환경 변수가 없습니다.",
     "retry": "다시 시도",
     "save": "저장",
-    "saveFailed": "Variable을 저장할 수 없습니다.",
-    "search": "Variable 검색",
-    "title": "Variables",
+    "saveFailed": "환경 변수를 저장할 수 없습니다.",
+    "search": "이름으로 검색",
+    "title": "환경 변수",
     "updated": "업데이트 시간",
     "value": "값",
     "valueTooLarge": "UTF-8로 인코딩한 값은 64 KiB 이하여야 합니다.",
-    "deleteFailed": "Variable을 삭제할 수 없습니다."
+    "deleteFailed": "환경 변수를 삭제할 수 없습니다."
   }
 }

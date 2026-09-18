@@ -90,7 +90,7 @@ const workflow: FlowCanvasViewModel = {
       id: 'task',
       kind: 'task',
       title: 'Task · Fetch records',
-      description: 'Grouped inputs, connected ports and a Variable binding.',
+      description: 'Grouped inputs, connected ports and an environment variable binding.',
       reference: 'lab/fetch-records',
       executorName: 'JavaScript',
       icon: ':carbon:code:',

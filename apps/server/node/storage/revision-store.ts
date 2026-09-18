@@ -59,7 +59,7 @@ export class RevisionStore {
     if (![...dependencies.tasks].some((id) => revision.document.tasks[id]?.executor.kind == 'agent')) return
     const model = this.#llmConfig()
     const bindings = this.#variables.resolve(variableBindings(revision, dependencies.inputBindings))
-    if (model == null || bindings == null) throw new AcceptanceError('flow-invalid', 'Agent model or Variable configuration is unavailable.')
+    if (model == null || bindings == null) throw new AcceptanceError('flow-invalid', 'Agent model or environment variable configuration is unavailable.')
     return { model, bindings }
   }
 }

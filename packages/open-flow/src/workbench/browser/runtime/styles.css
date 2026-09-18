@@ -1,5 +1,5 @@
-@import '../../../ui/browser/theme.css';
-@import '../../../ui/browser/styles.css';
+@import '../../../ui/browser/public.css';
+@import '../../../canvas/browser/styles/root.css';
 @import './styles/tokens.css';
 @import './styles/shell.css';
 @import './styles/resource-browser.css';

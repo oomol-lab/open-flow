@@ -22,7 +22,7 @@
     "flows": "Flows",
     "notifications": "Notifications",
     "settings": "Settings",
-    "variables": "Variables"
+    "variables": "Env"
   },
   "settings": {
     "callbackKey": "Callback key",
@@ -75,29 +75,28 @@
     "selectForCreation": "Select the Connector Team for the new Flow"
   },
   "variables": {
-    "nameExists": "A Variable with this name already exists. Edit the existing Variable instead.",
-    "all": "All Variables",
+    "nameExists": "An environment variable with this name already exists. Edit the existing environment variable instead.",
+    "all": "All",
     "cancel": "Cancel",
-    "count": "{{count}} of 200",
-    "create": "New Variable",
+    "count": "Variables: {{count}} · Limit: 200",
+    "create": "New variable",
     "delete": "Delete",
     "deleteConfirm": "Delete {{name}}?",
-    "description": "Deployment configuration available to Variable-bound Flow inputs.",
+    "description": "Deployment configuration available to Flow inputs bound to environment variables.",
     "edit": "Edit",
-    "empty": "No Variables have been created.",
+    "empty": "No environment variables have been created.",
     "invalidName": "Use 1–256 letters, numbers, or underscores, start with a letter or underscore, and do not use the reserved OO_ prefix.",
-    "loadFailed": "Variables could not be loaded.",
+    "loadFailed": "Environment variables could not be loaded.",
     "name": "Name",
-    "noMatch": "No Variables match this search.",
-    "refresh": "Refresh",
+    "noMatch": "No environment variables match this search.",
     "retry": "Retry",
     "save": "Save",
-    "saveFailed": "The Variable could not be saved.",
-    "search": "Search Variables",
-    "title": "Variables",
+    "saveFailed": "The environment variable could not be saved.",
+    "search": "Search by name",
+    "title": "Env",
     "updated": "Updated",
     "value": "Value",
     "valueTooLarge": "Value must be no larger than 64 KiB when encoded as UTF-8.",
-    "deleteFailed": "The Variable could not be deleted."
+    "deleteFailed": "The environment variable could not be deleted."
   }
 }

@@ -22,7 +22,7 @@
     "flows": "Flow",
     "notifications": "通知",
     "settings": "設定",
-    "variables": "Variables"
+    "variables": "環境変数"
   },
   "settings": {
     "callbackKey": "Callback key",
@@ -75,29 +75,28 @@
     "selectForCreation": "新しい Flow の Connector チームを選択"
   },
   "variables": {
-    "nameExists": "同じ名前の Variable が既に存在します。既存の Variable を編集してください。",
-    "all": "すべての Variable",
+    "nameExists": "同じ名前の環境変数が既に存在します。既存の環境変数を編集してください。",
+    "all": "すべて",
     "cancel": "キャンセル",
-    "count": "{{count}} / 200",
-    "create": "Variable を作成",
+    "count": "変数 {{count}} 件・上限 200 件",
+    "create": "新規作成",
     "delete": "削除",
     "deleteConfirm": "{{name}} を削除しますか？",
-    "description": "Variable にバインドされた Flow 入力で使用できる deployment 設定です。",
+    "description": "環境変数にバインドされた Flow 入力で使用できる deployment 設定です。",
     "edit": "編集",
-    "empty": "Variable はまだ作成されていません。",
+    "empty": "環境変数はまだ作成されていません。",
     "invalidName": "名前は 1～256 文字の英字、数字、アンダースコアで指定し、英字またはアンダースコアで始めてください。予約済みの OO_ 接頭辞は使用できません。",
-    "loadFailed": "Variable を読み込めませんでした。",
+    "loadFailed": "環境変数を読み込めませんでした。",
     "name": "名前",
-    "noMatch": "検索に一致する Variable はありません。",
-    "refresh": "更新",
+    "noMatch": "検索に一致する環境変数はありません。",
     "retry": "再試行",
     "save": "保存",
-    "saveFailed": "Variable を保存できませんでした。",
-    "search": "Variable を検索",
-    "title": "Variables",
+    "saveFailed": "環境変数を保存できませんでした。",
+    "search": "名前で検索",
+    "title": "環境変数",
     "updated": "更新日時",
     "value": "値",
     "valueTooLarge": "UTF-8 でエンコードした値は 64 KiB 以下にしてください。",
-    "deleteFailed": "Variable を削除できませんでした。"
+    "deleteFailed": "環境変数を削除できませんでした。"
   }
 }

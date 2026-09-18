@@ -171,20 +171,20 @@ export class ControlService {
 
   getVariable(name: string): Variable {
     const stored = this.store.variables.get(name)
-    if (stored == null) throw new ControlError(controlErrorCode.variableNotFound, 'The Variable was not found.')
+    if (stored == null) throw new ControlError(controlErrorCode.variableNotFound, 'The environment variable was not found.')
     return variable(stored)
   }
 
   putVariable(name: string, value: string): Variable {
     const saved = this.store.variables.put(name, value)
     if (saved.kind == 'limit-reached') {
-      throw new ControlError(controlErrorCode.variableLimitReached, 'The deployment has reached its Variable limit.')
+      throw new ControlError(controlErrorCode.variableLimitReached, 'The deployment has reached its environment variable limit.')
     }
     return variable(saved.variable)
   }
 
   deleteVariable(name: string): void {
-    if (!this.store.variables.delete(name)) throw new ControlError(controlErrorCode.variableNotFound, 'The Variable was not found.')
+    if (!this.store.variables.delete(name)) throw new ControlError(controlErrorCode.variableNotFound, 'The environment variable was not found.')
   }
 
   getTriggerKey(key: string): TriggerKeySnapshot {
@@ -762,7 +762,7 @@ export class ControlService {
     }
     switch (accepted.kind) {
       case 'binding-unresolved':
-        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required Variable is unresolved.')
+        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required environment variable is unresolved.')
       case 'busy':
         throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
       case 'conflict':

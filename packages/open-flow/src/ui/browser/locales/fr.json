@@ -13,7 +13,7 @@
     "selectVariable": "Choisir une variable d’environnement",
     "variablesLoading": "Chargement des variables d’environnement…",
     "search": "Rechercher",
-    "empty": "Aucune variable correspondante.",
+    "empty": "Aucune variable d’environnement correspondante.",
     "clear": "<non défini>"
   },
   "markdown": {

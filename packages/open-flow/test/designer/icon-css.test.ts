@@ -15,6 +15,8 @@ describe('Designer icon CSS', () => {
 
     expect(light.css).toContain("stroke-width='1.5'")
     expect(standard.css).toContain("stroke-width='2'")
+    expect(light.css).toContain('.open-flow-workbench')
+    expect(light.css).not.toContain('.server-host')
   })
 
   it('resolves every statically scanned Iconify token', async () => {

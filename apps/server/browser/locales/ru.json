@@ -22,7 +22,7 @@
     "flows": "Flow",
     "notifications": "Уведомления",
     "settings": "Настройки",
-    "variables": "Variables"
+    "variables": "Переменные среды"
   },
   "settings": {
     "callbackKey": "Ключ callback",
@@ -75,29 +75,28 @@
     "selectForCreation": "Выбрать команду Connector для нового Flow"
   },
   "variables": {
-    "nameExists": "Variable с таким именем уже существует. Отредактируйте существующую Variable.",
-    "all": "Все Variables",
+    "nameExists": "Переменная среды с таким именем уже существует. Отредактируйте существующую переменную среды.",
+    "all": "Все",
     "cancel": "Отмена",
-    "count": "{{count}} из 200",
-    "create": "Создать Variable",
+    "count": "Переменных: {{count}} · Лимит: 200",
+    "create": "Новая переменная",
     "delete": "Удалить",
     "deleteConfirm": "Удалить {{name}}?",
-    "description": "Конфигурация deployment, доступная входам Flow, привязанным к Variable.",
+    "description": "Конфигурация deployment, доступная входам Flow, привязанным к переменной среды.",
     "edit": "Изменить",
-    "empty": "Variables ещё не созданы.",
+    "empty": "Переменные среды ещё не созданы.",
     "invalidName": "Используйте от 1 до 256 букв, цифр или знаков подчёркивания; имя должно начинаться с буквы или знака подчёркивания и не может иметь зарезервированный префикс OO_.",
-    "loadFailed": "Не удалось загрузить Variables.",
+    "loadFailed": "Не удалось загрузить переменные среды.",
     "name": "Имя",
-    "noMatch": "Нет Variables, соответствующих поиску.",
-    "refresh": "Обновить",
+    "noMatch": "Нет переменных среды, соответствующих поиску.",
     "retry": "Повторить",
     "save": "Сохранить",
-    "saveFailed": "Не удалось сохранить Variable.",
-    "search": "Поиск Variables",
-    "title": "Variables",
+    "saveFailed": "Не удалось сохранить переменную среды.",
+    "search": "Поиск по имени",
+    "title": "Переменные среды",
     "updated": "Обновлено",
     "value": "Значение",
     "valueTooLarge": "Значение в кодировке UTF-8 не должно превышать 64 KiB.",
-    "deleteFailed": "Не удалось удалить Variable."
+    "deleteFailed": "Не удалось удалить переменную среды."
   }
 }

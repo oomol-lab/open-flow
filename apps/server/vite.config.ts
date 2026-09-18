@@ -1,6 +1,6 @@
 import { generateScopedName } from '@oomol-lab/open-flow/designer-css-modules'
 import { twemojiCollectionPlugin } from '@oomol-lab/open-flow/designer-twemoji-plugin'
-import designerUnoConfig from '@oomol-lab/open-flow/designer-vite-config'
+import designerUnoConfig, { designerUnoScopes, scopeDesignerSelector } from '@oomol-lab/open-flow/designer-vite-config'
 import { fullReloadPlugin } from '@oomol-lab/open-flow/full-reload-plugin'
 import { providerIconsPlugin } from '@oomol-lab/open-flow/provider-icons-plugin'
 import { triggerLocalesPlugin } from '@oomol-lab/open-flow/trigger-locales-plugin'
@@ -22,7 +22,14 @@ export default defineConfig(({ command }) => ({
     providerIconsPlugin(),
     twemojiCollectionPlugin(),
     tailwindcss(),
-    UnoCSS(designerUnoConfig),
+    UnoCSS({
+      ...designerUnoConfig,
+      postprocess: [
+        (utility) => {
+          utility.selector = scopeDesignerSelector(utility.selector, [...designerUnoScopes, '.server-host'])
+        },
+      ],
+    }),
     react(),
     fullReloadPlugin(),
   ],

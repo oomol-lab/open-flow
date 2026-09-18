@@ -376,9 +376,9 @@
       "triggerKeyInvalid": "Не удалось активировать этот Trigger. Проверьте Connection и настройки, затем повторите попытку.",
       "triggerKeyNotFound": "Эта конечная точка Trigger больше не существует. Скопируйте актуальную конечную точку из Flow.",
       "triggerNotFound": "Этот Trigger не существует или был удалён. Обновите список Trigger.",
-      "variableInvalid": "Имя или значение Variable недопустимо. Проверьте данные и повторите попытку.",
-      "variableLimitReached": "Достигнут предел Variable для этого развертывания.",
-      "variableNotFound": "Эта Variable не существует или была удалена. Обновите список Variable.",
+      "variableInvalid": "Имя или значение переменной среды недопустимо. Проверьте данные и повторите попытку.",
+      "variableLimitReached": "Достигнут предел переменных среды для этого развертывания.",
+      "variableNotFound": "Эта переменная среды не существует или была удалена. Обновите список переменных среды.",
       "connectorConsoleUnconfigured": "URL консоли авторизации Connector не настроен. Укажите его в разделе «Настройки → Connector → URL консоли авторизации» и повторите попытку."
     },
     "flowDeleted": "Удалено: {{name}}.",
@@ -655,7 +655,7 @@
     "locateIssue": "Открыть проблему: {{message}}",
     "messages": {
       "binding": {
-        "variable-invalid": "Привязка Variable «{{bindingId}}» указывает на недопустимую цель."
+        "variable-invalid": "Привязка переменной среды «{{bindingId}}» указывает на недопустимую цель."
       },
       "condition": {
         "input-missing": "Выражение условия ссылается на неизвестный вход «{{input}}».",
@@ -672,7 +672,7 @@
         }
       },
       "graph": {
-        "binding-invalid": "Привязка «{{bindingId}}» должна быть Variable.",
+        "binding-invalid": "Привязка «{{bindingId}}» должна быть переменной среды.",
         "binding-missing": "Привязка «{{bindingId}}» не существует.",
         "cycle": "Граф содержит цикл зависимостей между узлами: {{nodes}}.",
         "flow-input-incompatible": "Вход Flow «{{input}}» несовместим с этим входом.",
@@ -693,8 +693,8 @@
         "subflow-output-incompatible": "Источник несовместим с выходом Subflow «{{output}}».",
         "subflow-output-schema-incompatible": "Формат данных выхода Subflow «{{output}}» не совпадает: {{issue}}",
         "trigger-not-allowed": "Узлы Trigger разрешены только во Flow.",
-        "variable-incompatible": "Привязка Variable «{{bindingId}}» несовместима с этим входом.",
-        "variable-source-mixed": "Variable должна быть единственным источником входа."
+        "variable-incompatible": "Привязка переменной среды «{{bindingId}}» несовместима с этим входом.",
+        "variable-source-mixed": "Переменная среды должна быть единственным источником входа."
       },
       "llm": {
         "unconfigured": "Для этого развертывания не настроена LLM. Настройте OPEN_FLOW_LLM_ORIGIN и OPEN_FLOW_LLM_TOKEN."

@@ -22,7 +22,7 @@
     "flows": "Flow",
     "notifications": "通知",
     "settings": "设置",
-    "variables": "Variables"
+    "variables": "环境变量"
   },
   "settings": {
     "callbackKey": "回调密钥",
@@ -75,29 +75,28 @@
     "selectForCreation": "选择新 Flow 使用的 Connector 团队"
   },
   "variables": {
-    "nameExists": "同名 Variable 已存在，请编辑已有 Variable。",
-    "all": "全部 Variable",
+    "nameExists": "同名环境变量已存在，请编辑已有环境变量。",
+    "all": "全部",
     "cancel": "取消",
-    "count": "已使用 {{count}} / 200",
-    "create": "新建 Variable",
+    "count": "{{count}} 个变量 · 上限 200 个",
+    "create": "新建变量",
     "delete": "删除",
     "deleteConfirm": "删除 {{name}}？",
-    "description": "供 Flow 的 Variable 输入绑定使用的 deployment 配置。",
+    "description": "供绑定环境变量的 Flow 输入使用的 deployment 配置。",
     "edit": "编辑",
-    "empty": "尚未创建 Variable。",
+    "empty": "尚未创建环境变量。",
     "invalidName": "名称应为 1–256 个字母、数字或下划线，以字母或下划线开头，且不能使用保留的 OO_ 前缀。",
-    "loadFailed": "无法加载 Variable。",
+    "loadFailed": "无法加载环境变量。",
     "name": "名称",
-    "noMatch": "没有匹配的 Variable。",
-    "refresh": "刷新",
+    "noMatch": "没有匹配的环境变量。",
     "retry": "重试",
     "save": "保存",
-    "saveFailed": "无法保存 Variable。",
-    "search": "搜索 Variable",
-    "title": "Variables",
+    "saveFailed": "无法保存环境变量。",
+    "search": "搜索名称",
+    "title": "环境变量",
     "updated": "更新时间",
     "value": "值",
     "valueTooLarge": "值经 UTF-8 编码后不能超过 64 KiB。",
-    "deleteFailed": "无法删除 Variable。"
+    "deleteFailed": "无法删除环境变量。"
   }
 }

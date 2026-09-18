@@ -13,7 +13,7 @@
     "selectVariable": "Choose environment variable",
     "variablesLoading": "Loading environment variables…",
     "search": "Search",
-    "empty": "No matching variables.",
+    "empty": "No matching environment variables.",
     "clear": "<unset>"
   },
   "markdown": {

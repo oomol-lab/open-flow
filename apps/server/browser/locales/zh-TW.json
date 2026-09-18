@@ -22,7 +22,7 @@
     "flows": "Flow",
     "notifications": "通知",
     "settings": "設定",
-    "variables": "Variables"
+    "variables": "環境變數"
   },
   "settings": {
     "callbackKey": "回呼金鑰",
@@ -75,29 +75,28 @@
     "selectForCreation": "選擇新 Flow 使用的 Connector 團隊"
   },
   "variables": {
-    "nameExists": "同名 Variable 已存在，請編輯現有 Variable。",
-    "all": "全部 Variable",
+    "nameExists": "同名環境變數已存在，請編輯現有環境變數。",
+    "all": "全部",
     "cancel": "取消",
-    "count": "已使用 {{count}} / 200",
-    "create": "新增 Variable",
+    "count": "{{count}} 個變數 · 上限 200 個",
+    "create": "新增變數",
     "delete": "刪除",
     "deleteConfirm": "刪除 {{name}}？",
-    "description": "供 Flow 的 Variable 輸入綁定使用的 deployment 設定。",
+    "description": "供綁定環境變數的 Flow 輸入使用的 deployment 設定。",
     "edit": "編輯",
-    "empty": "尚未建立 Variable。",
+    "empty": "尚未建立環境變數。",
     "invalidName": "名稱須為 1–256 個字母、數字或底線，以字母或底線開頭，且不能使用保留的 OO_ 前綴。",
-    "loadFailed": "無法載入 Variable。",
+    "loadFailed": "無法載入環境變數。",
     "name": "名稱",
-    "noMatch": "沒有符合搜尋條件的 Variable。",
-    "refresh": "重新整理",
+    "noMatch": "沒有符合搜尋條件的環境變數。",
     "retry": "重試",
     "save": "儲存",
-    "saveFailed": "無法儲存 Variable。",
-    "search": "搜尋 Variable",
-    "title": "Variables",
+    "saveFailed": "無法儲存環境變數。",
+    "search": "搜尋名稱",
+    "title": "環境變數",
     "updated": "更新時間",
     "value": "值",
     "valueTooLarge": "值經 UTF-8 編碼後不能超過 64 KiB。",
-    "deleteFailed": "無法刪除 Variable。"
+    "deleteFailed": "無法刪除環境變數。"
   }
 }

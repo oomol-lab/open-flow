@@ -37,8 +37,10 @@ const schedulerEntryPath = 'src/execution/common/scheduler.ts'
 const webhookTriggerEntryPath = 'src/trigger/common/webhook.ts'
 const localizationEntryPath = 'src/localization/common/languages.ts'
 const hostConformanceEntryPath = 'src/workbench/browser/runtime/hostConformance.ts'
-const uiEntryPath = 'src/ui/browser/public.ts'
-const workbenchEntryPath = 'src/workbench/browser/runtime/openFlowWorkbench.tsx'
+const uiEntryPath = 'src/distribution/browser/ui.ts'
+const uiDeclarationEntryPath = 'src/ui/browser/public.ts'
+const workbenchEntryPath = 'src/distribution/browser/workbench.ts'
+const workbenchDeclarationEntryPath = 'src/workbench/browser/runtime/openFlowWorkbench.tsx'
 
 interface BuildBrowserPackageOptions {
   readonly packageRoot: string
@@ -198,8 +200,8 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         path.join(options.sourceRoot, flowAuthoringEntryPath),
         path.join(options.sourceRoot, flowChangeEntryPath),
         path.join(options.sourceRoot, hostConformanceEntryPath),
-        path.join(options.sourceRoot, workbenchEntryPath),
-        path.join(options.sourceRoot, uiEntryPath),
+        path.join(options.sourceRoot, workbenchDeclarationEntryPath),
+        path.join(options.sourceRoot, uiDeclarationEntryPath),
       ],
       { cwd: options.sourceRoot },
     )
@@ -224,16 +226,12 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       }),
     )
     const uiDeclaration = (await readFile(path.join(declarationRoot, 'ui/browser/public.d.ts'), 'utf8'))
-      .replaceAll("import './theme.css';", '')
-      .replaceAll("import './styles.css';", '')
       .replaceAll("'./input.tsx'", "'./ui-input.js'")
       .replaceAll("'./label.tsx'", "'./ui-label.js'")
       .replaceAll("'./textarea.tsx'", "'./ui-textarea.js'")
     await writeFile(path.join(browserOutputPath, 'ui.d.ts'), uiDeclaration)
     await writeFile(path.join(browserOutputPath, 'ui.css.d.ts'), 'export {}\n')
     const workbenchDeclaration = await readFile(path.join(declarationRoot, 'workbench/browser/runtime/openFlowWorkbench.d.ts'), 'utf8')
-    const workbenchStyleImport = "import './styles.css';\n"
-    if (!workbenchDeclaration.startsWith(workbenchStyleImport)) throw new Error('Workbench declaration did not contain the expected style import.')
     const workbenchContract = (await readFile(path.join(declarationRoot, 'workbench/browser/runtime/contract.d.ts'), 'utf8'))
       .replaceAll("'../../../control/common/flowNotifications.ts'", "'./flow-notifications.js'")
       .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'")
@@ -360,7 +358,6 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(
         path.join(browserOutputPath, 'workbench.d.ts'),
         workbenchDeclaration
-          .slice(workbenchStyleImport.length)
           .replaceAll("'./contract.ts'", "'./workbench-contract.js'")
           .replaceAll("'./eventSources.tsx'", "'./event-sources.js'")
           .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'"),

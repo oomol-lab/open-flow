@@ -674,7 +674,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
                     ? expression.left.source.output
                     : expression.left.source.kind === 'flow'
                       ? expression.left.source.input
-                      : 'Variable'
+                      : (context.t?.('nodeInput.variable') ?? 'Env')
                   : (JSON.stringify(expression.left.value) ?? '…'),
               operator: conditionOperator(expression.operator),
               right:
@@ -685,7 +685,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
                       ? expression.right.source.output
                       : expression.right.source.kind === 'flow'
                         ? expression.right.source.input
-                        : 'Variable'
+                        : (context.t?.('nodeInput.variable') ?? 'Env')
                     : (JSON.stringify(expression.right.value) ?? '…'),
             })),
           })),

@@ -8,6 +8,12 @@ import { fileIcons } from './fileIcons.ts'
 
 const sourceRoot = path.resolve(import.meta.dirname, '../../..')
 
+export const designerUnoScopes = ['.open-flow-workbench', '.open-flow-canvas-root', '.open-flow-notifications'] as const
+
+export function scopeDesignerSelector(selector: string, scopes: readonly string[] = designerUnoScopes): string {
+  return `:where(${scopes.join(', ')}) ${selector}`
+}
+
 async function readBrowserSources(): Promise<{ code: string; id: string }> {
   const files: string[] = []
   for await (const file of glob('src/{canvas,form,ui,workbench}/browser/**/*.{ts,tsx}', { cwd: sourceRoot })) files.push(file)
@@ -22,7 +28,7 @@ export default defineConfig({
   },
   postprocess: [
     (utility) => {
-      utility.selector = `:where(.open-flow-workbench, .open-flow-canvas-root, .open-flow-notifications) ${utility.selector}`
+      utility.selector = scopeDesignerSelector(utility.selector)
     },
   ],
   presets: [

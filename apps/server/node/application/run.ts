@@ -139,7 +139,7 @@ export class RunExecutor {
         }
       }
       if (Object.values(prepared.flow.tasks).some((task) => task.executor.kind == 'agent') && run.bindingValues == null)
-        return yield* Effect.fail(new Error('The fixed Agent Variable snapshot is unavailable.'))
+        return yield* Effect.fail(new Error('The fixed Agent environment variable snapshot is unavailable.'))
       const bindingValues =
         run.bindingValues ?? this.#store.variables.resolve(variableBindings(revision, prepared.validation.closure.dependencies.inputBindings))
       if (bindingValues == null) return { kind: 'binding-unresolved' as const }
@@ -191,7 +191,7 @@ export class RunExecutor {
       )
       if (start?.kind == 'binding-unresolved') {
         this.#store.runs.failStarting(run.runId, {
-          error: { code: controlErrorCode.bindingUnresolved, message: 'A required Variable is unresolved.' },
+          error: { code: controlErrorCode.bindingUnresolved, message: 'A required environment variable is unresolved.' },
         })
         return
       }

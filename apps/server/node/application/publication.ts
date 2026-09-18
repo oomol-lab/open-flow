@@ -115,7 +115,7 @@ export class Publisher {
         this.#wakeMaintenance()
         return accepted.operation
       case 'binding-unresolved':
-        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required Variable is unresolved.')
+        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required environment variable is unresolved.')
       case 'busy':
         throw new ControlError(controlErrorCode.flowBusy, 'Another Publish operation is already pending for this Flow.')
       case 'conflict':
@@ -315,7 +315,7 @@ export class Publisher {
         case 'binding-unresolved':
           this.#store.publications.failPublishOperation(target.operationId, {
             code: controlErrorCode.bindingUnresolved,
-            message: 'A required Variable is unresolved.',
+            message: 'A required environment variable is unresolved.',
           })
           break
         case 'busy':

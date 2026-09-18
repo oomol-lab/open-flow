@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 import path from 'node:path'
 import { defineConfig } from 'vite'
 import { generateScopedName } from '../../src/build/node/cssModules.ts'
-import designerUnoConfig from '../../src/build/node/designerUnoConfig.ts'
+import designerUnoConfig, { scopeDesignerSelector } from '../../src/build/node/designerUnoConfig.ts'
 import { fullReloadPlugin } from '../../src/build/node/fullReload.ts'
 import { providerIconsPlugin } from '../../src/build/node/providerIcons.ts'
 import { triggerLocalesPlugin } from '../../src/build/node/triggerLocales.ts'
@@ -43,7 +43,7 @@ export default defineConfig({
       // Include the theme menu because its portal sits outside the Lab shell.
       postprocess: [
         (utility) => {
-          utility.selector = `.lab-shell ${utility.selector}, .lab-theme-menu ${utility.selector}`
+          utility.selector = scopeDesignerSelector(utility.selector, ['.lab-shell', '.lab-theme-menu'])
         },
       ],
     }),

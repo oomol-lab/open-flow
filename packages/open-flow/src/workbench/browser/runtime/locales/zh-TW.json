@@ -345,7 +345,7 @@
     "error": {
       "authenticationRequired": "請登入後繼續。",
       "authorizationDenied": "你沒有執行此操作的權限。",
-      "bindingUnresolved": "缺少必要的 Connection 或 Variable。請完成設定後再試一次。",
+      "bindingUnresolved": "缺少必要的 Connection 或環境變數。請完成設定後再試一次。",
       "connectorActionNotFound": "所選的 Connector action 已無法使用。請選擇其他 action。",
       "connectorConnectionRequired": "需要有效的 Connection。請連線或重新連線帳號後再試一次。",
       "connectorUnavailable": "Connector 暫時無法使用，請稍後再試一次。",
@@ -376,9 +376,9 @@
       "triggerKeyInvalid": "此 Trigger 無法啟用，請檢查 Connection 和設定後再試一次。",
       "triggerKeyNotFound": "此 Trigger 端點已失效，請從 Flow 中複製最新端點。",
       "triggerNotFound": "找不到此 Trigger，請重新整理 Trigger 列表。",
-      "variableInvalid": "Variable 名稱或值不符合要求，請檢查後再試一次。",
-      "variableLimitReached": "目前部署的 Variable 已達上限。",
-      "variableNotFound": "找不到此 Variable，請重新整理 Variable 列表。",
+      "variableInvalid": "環境變數名稱或值不符合要求，請檢查後再試一次。",
+      "variableLimitReached": "目前部署的環境變數已達上限。",
+      "variableNotFound": "找不到此環境變數，請重新整理環境變數列表。",
       "connectorConsoleUnconfigured": "尚未設定 Connector 授權控制台地址。請前往「設定 → Connector → 授權控制台地址」完成設定後重試。"
     },
     "flowDeleted": "已刪除 {{name}}。",
@@ -655,7 +655,7 @@
     "locateIssue": "開啟問題：{{message}}",
     "messages": {
       "binding": {
-        "variable-invalid": "Variable 繫結「{{bindingId}}」的目標無效。"
+        "variable-invalid": "環境變數繫結「{{bindingId}}」的目標無效。"
       },
       "condition": {
         "input-missing": "條件運算式參照了未知輸入「{{input}}」。",
@@ -672,7 +672,7 @@
         }
       },
       "graph": {
-        "binding-invalid": "繫結「{{bindingId}}」必須是 Variable。",
+        "binding-invalid": "繫結「{{bindingId}}」必須是環境變數。",
         "binding-missing": "繫結「{{bindingId}}」不存在。",
         "cycle": "節點之間存在相依性循環：{{nodes}}。",
         "flow-input-incompatible": "Flow 輸入「{{input}}」與此輸入不相容。",
@@ -693,8 +693,8 @@
         "subflow-output-incompatible": "有來源與 Subflow 輸出「{{output}}」的宣告類型不相容。",
         "subflow-output-schema-incompatible": "Subflow 輸出「{{output}}」的資料格式不相符：{{issue}}",
         "trigger-not-allowed": "Trigger 節點只能用於 Flow。",
-        "variable-incompatible": "Variable 繫結「{{bindingId}}」與此輸入不相容。",
-        "variable-source-mixed": "Variable 必須是輸入的唯一來源。"
+        "variable-incompatible": "環境變數繫結「{{bindingId}}」與此輸入不相容。",
+        "variable-source-mixed": "環境變數必須是輸入的唯一來源。"
       },
       "llm": {
         "unconfigured": "目前部署尚未設定 LLM。請設定 OPEN_FLOW_LLM_ORIGIN 和 OPEN_FLOW_LLM_TOKEN。"

@@ -105,7 +105,8 @@ it.each([
   { editing: '', name: 'NEW', loading: false, failed: true, accepted: false },
 ])('protects Variable writes: %j', async ({ editing, name, loading, failed, accepted }) => {
   const variables = [{ name: 'TOKEN', value: 'original', updatedAt: '2026-08-27T00:00:00.000Z', version: 1 }] as const
-  hooks.states = [variables, loading, failed, false, '', editing, name, 'replacement', undefined]
+  const editor = { kind: editing == '' ? 'create' : 'edit', name, value: 'replacement' }
+  hooks.states = [variables, loading, failed, false, '', editor, undefined]
   const putVariable = vi.fn().mockResolvedValue(undefined)
   const client = { listVariables: vi.fn().mockResolvedValue({ variables }), putVariable } as unknown as ControlClient
   const page = VariablesPage({ client, language: 'en' })

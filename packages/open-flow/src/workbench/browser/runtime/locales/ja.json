@@ -345,7 +345,7 @@
     "error": {
       "authenticationRequired": "続行するにはログインしてください。",
       "authorizationDenied": "この操作を実行する権限がありません。",
-      "bindingUnresolved": "必要な Connection または Variable がありません。設定を完了してから再試行してください。",
+      "bindingUnresolved": "必要な Connection または環境変数がありません。設定を完了してから再試行してください。",
       "connectorActionNotFound": "選択した Connector action は使用できなくなりました。別の action を選択してください。",
       "connectorConnectionRequired": "有効な Connection が必要です。アカウントを接続または再接続してから再試行してください。",
       "connectorUnavailable": "Connector は一時的に利用できません。しばらくしてから再試行してください。",
@@ -376,9 +376,9 @@
       "triggerKeyInvalid": "この Trigger を有効化できません。Connection と設定を確認してから再試行してください。",
       "triggerKeyNotFound": "この Trigger エンドポイントは存在しません。Flow から最新のエンドポイントをコピーしてください。",
       "triggerNotFound": "この Trigger は存在しないか、削除されています。Trigger 一覧を更新してください。",
-      "variableInvalid": "Variable の名前または値が無効です。確認してから再試行してください。",
-      "variableLimitReached": "このデプロイでは Variable が上限に達しました。",
-      "variableNotFound": "この Variable は存在しないか、削除されています。Variable 一覧を更新してください。",
+      "variableInvalid": "環境変数の名前または値が無効です。確認してから再試行してください。",
+      "variableLimitReached": "このデプロイでは環境変数が上限に達しました。",
+      "variableNotFound": "この環境変数は存在しないか、削除されています。環境変数一覧を更新してください。",
       "connectorConsoleUnconfigured": "Connector の認証コンソール URL が未設定です。「設定 → Connector → 認証コンソール URL」で設定してから再試行してください。"
     },
     "flowDeleted": "{{name}} を削除しました。",
@@ -655,7 +655,7 @@
     "locateIssue": "問題を開く：{{message}}",
     "messages": {
       "binding": {
-        "variable-invalid": "Variable バインディング「{{bindingId}}」の参照先が無効です。"
+        "variable-invalid": "環境変数バインディング「{{bindingId}}」の参照先が無効です。"
       },
       "condition": {
         "input-missing": "条件式が不明な入力「{{input}}」を参照しています。",
@@ -672,7 +672,7 @@
         }
       },
       "graph": {
-        "binding-invalid": "バインディング「{{bindingId}}」は Variable である必要があります。",
+        "binding-invalid": "バインディング「{{bindingId}}」は環境変数である必要があります。",
         "binding-missing": "バインディング「{{bindingId}}」は存在しません。",
         "cycle": "ノード間に依存関係の循環があります：{{nodes}}。",
         "flow-input-incompatible": "Flow 入力「{{input}}」はこの入力と互換性がありません。",
@@ -693,8 +693,8 @@
         "subflow-output-incompatible": "ソースが Subflow 出力「{{output}}」の宣言型と互換性がありません。",
         "subflow-output-schema-incompatible": "Subflow 出力「{{output}}」のデータ形式が一致しません：{{issue}}",
         "trigger-not-allowed": "Trigger ノードは Flow 内でのみ使用できます。",
-        "variable-incompatible": "Variable バインディング「{{bindingId}}」はこの入力と互換性がありません。",
-        "variable-source-mixed": "Variable は入力の唯一のソースである必要があります。"
+        "variable-incompatible": "環境変数バインディング「{{bindingId}}」はこの入力と互換性がありません。",
+        "variable-source-mixed": "環境変数は入力の唯一のソースである必要があります。"
       },
       "llm": {
         "unconfigured": "このデプロイには LLM が設定されていません。OPEN_FLOW_LLM_ORIGIN と OPEN_FLOW_LLM_TOKEN を設定してください。"

@@ -4,8 +4,8 @@ import { test } from 'vitest'
 
 const packageRoot = new URL('..', import.meta.url)
 const workbenchStyleImports = [
-  "@import '../../../ui/browser/theme.css';",
-  "@import '../../../ui/browser/styles.css';",
+  "@import '../../../ui/browser/public.css';",
+  "@import '../../../canvas/browser/styles/root.css';",
   "@import './styles/tokens.css';",
   "@import './styles/shell.css';",
   "@import './styles/resource-browser.css';",
@@ -84,6 +84,28 @@ function contrastRatio(foreground: string, background: string): number {
   const backgroundLuminance = relativeLuminance(background)
   return (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
 }
+
+test('keeps global CSS ownership in explicit package entries', async () => {
+  const [manifestSource, uiPublic, workbenchPublic, canvasView, uiStyles, workbenchStyles, packagedUi, packagedWorkbench] = await Promise.all([
+    readFile(new URL('package.json', packageRoot), 'utf8'),
+    readFile(new URL('src/ui/browser/public.ts', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/openFlowWorkbench.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/ui/browser/public.css', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/styles.css', packageRoot), 'utf8'),
+    readFile(new URL('src/distribution/browser/ui.ts', packageRoot), 'utf8'),
+    readFile(new URL('src/distribution/browser/workbench.ts', packageRoot), 'utf8'),
+  ])
+  const manifest = JSON.parse(manifestSource) as { exports: Record<string, string> }
+
+  for (const source of [uiPublic, workbenchPublic, canvasView]) assert.doesNotMatch(source, /^import ['"][^'"]+\.(?:css|scss)['"]/m)
+  assert.equal(manifest.exports['./ui.css'], './src/ui/browser/public.css')
+  assert.equal(manifest.exports['./workbench.css'], './src/workbench/browser/runtime/styles.css')
+  assert.equal(normalizeLineEndings(uiStyles).trim(), "@import './theme.css';\n@import './styles.css';")
+  assert.match(workbenchStyles, /^@import '\.\.\/\.\.\/\.\.\/ui\/browser\/public\.css';/)
+  assert.match(packagedUi, /^import '\.\.\/\.\.\/ui\/browser\/public\.css'/)
+  assert.match(packagedWorkbench, /^import '\.\.\/\.\.\/workbench\/browser\/runtime\/styles\.css'/)
+})
 
 test('keeps development stories on production component boundaries', async () => {
   for await (const path of glob('dev/**/*.{ts,tsx}', { cwd: packageRoot })) {
@@ -202,7 +224,7 @@ test('keeps the public session gate on shared form primitives', async () => {
 
 test('keeps canvas root styling from overriding control appearance', async () => {
   const [designerRootStyles, toggleGroup] = await Promise.all([
-    readFile(new URL('src/canvas/browser/styles/root.scss', packageRoot), 'utf8'),
+    readFile(new URL('src/canvas/browser/styles/root.css', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/toggle-group.tsx', packageRoot), 'utf8'),
   ])
 
