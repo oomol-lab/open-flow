@@ -153,6 +153,7 @@
   },
   "condition": {
     "emptyCase": "条件未設定",
+    "invalidCase": "条件にエラーがあります",
     "addCondition": "条件を追加",
     "configPanelTitle": "設定",
     "default": "その他",

@@ -153,6 +153,7 @@
   },
   "condition": {
     "emptyCase": "No conditions configured",
+    "invalidCase": "Invalid condition",
     "addCondition": "Add condition",
     "configPanelTitle": "Config",
     "default": "Otherwise",

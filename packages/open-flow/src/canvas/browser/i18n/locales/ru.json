@@ -153,6 +153,7 @@
   },
   "condition": {
     "emptyCase": "Условия не настроены",
+    "invalidCase": "Ошибка в условии",
     "addCondition": "Добавить условие",
     "configPanelTitle": "Настройки",
     "default": "Иначе",

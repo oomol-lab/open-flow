@@ -20,7 +20,7 @@ export function conditionCaseSummary(item: FlowCanvasViewConditionCase, t: TFunc
 
 export function conditionBranchSummary(node: Omit<FlowCanvasViewConditionNode, 'position'>, output: string, t: TFunction): string {
   const item = node.cases.find((candidate) => candidate.output == output)
-  if (item != null) return conditionCaseSummary(item, t)
+  if (item != null) return (node.diagnostics ?? 0) > 0 || node.run?.status === 'error' ? t('condition.invalidCase') : conditionCaseSummary(item, t)
   return node.defaultOutput == output ? t('condition.default') : ''
 }
 

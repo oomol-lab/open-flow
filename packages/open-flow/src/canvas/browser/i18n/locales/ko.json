@@ -153,6 +153,7 @@
   },
   "condition": {
     "emptyCase": "조건 미설정",
+    "invalidCase": "조건 오류",
     "addCondition": "조건 추가",
     "configPanelTitle": "설정",
     "default": "그 외",

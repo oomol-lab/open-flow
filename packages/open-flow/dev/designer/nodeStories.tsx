@@ -598,7 +598,7 @@ export const nodeStories: readonly FrontendStory[] = [
     group: 'Node Condition',
     id: 'node-condition',
     description:
-      'Condition nodes · Empty, single, multiple, invalid input and overflowing branch labels. Hover for two seconds to see connection hints; Invalid input suppresses them.',
+      'Condition nodes · Empty, single, multiple, invalid input and overflowing branch labels. Hover for two seconds to see connection hints; Invalid input replaces its rule summary with an error label and suppresses connection hints.',
     title: 'Node States',
     standalone: true,
     render: (log, dark, language) => <ConditionStory dark={dark} language={language} log={log} />,

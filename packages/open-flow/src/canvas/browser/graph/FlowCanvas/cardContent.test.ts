@@ -73,6 +73,10 @@ describe('Canvas content', () => {
     expect(conditionBranchSummary(node, 'qualified', t)).toBe('score ≥ 80 ∧ active is true')
     expect(conditionBranchSummary(node, 'otherwise', t)).toBe('Otherwise')
     expect(conditionBranchSummary(node, 'unused', t)).toBe('')
+    expect(conditionBranchSummary({ ...node, diagnostics: 1 }, 'qualified', t)).toBe('Invalid condition')
+    expect(conditionBranchSummary({ ...node, run: { status: 'error' } }, 'qualified', t)).toBe('Invalid condition')
+    expect(conditionBranchSummary({ ...node, diagnostics: 1 }, 'otherwise', t)).toBe('Otherwise')
+    expect(conditionBranchSummary({ ...node, diagnostics: 0 }, 'qualified', t)).toBe('score ≥ 80 ∧ active is true')
   })
   it('describes cases without conditions instead of leaving the branch summary empty', () => {
     const t = createI18n('en').t

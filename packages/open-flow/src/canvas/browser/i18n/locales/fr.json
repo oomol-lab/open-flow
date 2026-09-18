@@ -153,6 +153,7 @@
   },
   "condition": {
     "emptyCase": "Aucune condition configurée",
+    "invalidCase": "Condition invalide",
     "addCondition": "Ajouter une condition",
     "configPanelTitle": "Configuration",
     "default": "Sinon",

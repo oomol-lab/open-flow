@@ -111,7 +111,11 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
           <CanvasTooltip key={branch} placement="top" sideOffset={12} title={tooltip}>
             <div className={clsx(styles.executionBranch, styles.branchRow)} tabIndex={tooltip ? 0 : undefined}>
               {summary && (
-                <span className={styles.branchRule} title={conditionNode && !tooltip ? summary : undefined}>
+                <span
+                  className={styles.branchRule}
+                  style={conditionNode && branch !== conditionNode.defaultOutput ? { color: problemColor } : undefined}
+                  title={conditionNode && !tooltip ? summary : undefined}
+                >
                   {summary}
                 </span>
               )}
@@ -120,13 +124,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
                   →
                 </span>
               )}
-              <span className={styles.branchName}>
-                {conditionNode?.defaultOutput === branch
-                  ? 'default'
-                  : conditionNode?.matchMode === 'first'
-                    ? `${conditionNode.cases.findIndex((item) => item.output === branch) + 1}. ${branch}`
-                    : branch}
-              </span>
+              <span className={styles.branchName}>{conditionNode?.defaultOutput === branch ? 'default' : branch}</span>
               <ExecutionHandle id={toRFHandleName(`$branch:${branch}` as HandleName)} type="output" isConnectable={editable} hintRequested={hintRequested} />
             </div>
           </CanvasTooltip>

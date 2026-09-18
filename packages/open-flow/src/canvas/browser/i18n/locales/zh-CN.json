@@ -153,6 +153,7 @@
   },
   "condition": {
     "emptyCase": "未配置条件",
+    "invalidCase": "条件有误",
     "addCondition": "添加条件",
     "configPanelTitle": "配置",
     "default": "其他情况",
