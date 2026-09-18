@@ -1015,6 +1015,7 @@
     "needsSetupDescription": "Add or reauthorize an account to use these apps.",
     "clearSearch": "Clear search",
     "search": "Search nodes, apps, or actions…",
+    "searchActions": "Search actions…",
     "apps": "Apps",
     "searching": "Searching…",
     "browseNodes": "Browse all nodes",

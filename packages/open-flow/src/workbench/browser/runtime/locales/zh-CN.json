@@ -1007,6 +1007,7 @@
     "needsSetupDescription": "添加或重新授权账号后即可使用。",
     "clearSearch": "清空搜索",
     "search": "搜索节点、应用或操作…",
+    "searchActions": "搜索操作…",
     "apps": "应用",
     "searching": "正在搜索…",
     "browseNodes": "浏览全部节点",

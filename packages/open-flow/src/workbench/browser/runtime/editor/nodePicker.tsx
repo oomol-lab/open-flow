@@ -259,6 +259,7 @@ export function NodePickerContent({
     items.filter((item) => `${item.label} ${item.description}`.toLowerCase().includes(appQuery.trim().toLowerCase()))
   const visibleActions = filterAppOptions(actions)
   const visibleTriggers = filterAppOptions(app?.triggers ?? [])
+  const searchLabel = t(app == null ? 'nodePicker.search' : 'nodePicker.searchActions')
   const appRow = (item: App, description = false) => (
     <Button
       variant="ghost"
@@ -288,8 +289,8 @@ export function NodePickerContent({
           <InputGroupInput
             ref={searchInput}
             autoFocus
-            aria-label={t('nodePicker.search')}
-            placeholder={t('nodePicker.search')}
+            aria-label={searchLabel}
+            placeholder={searchLabel}
             value={inputQuery}
             onChange={(event) => setInputQuery(event.target.value)}
             onKeyDown={(event) => {

@@ -1015,6 +1015,7 @@
     "needsSetupDescription": "アカウントを追加または再認証すると利用できます。",
     "clearSearch": "検索をクリア",
     "search": "ノード、アプリ、操作を検索…",
+    "searchActions": "操作を検索…",
     "apps": "アプリ",
     "searching": "検索中…",
     "browseNodes": "すべてのノードを表示",
