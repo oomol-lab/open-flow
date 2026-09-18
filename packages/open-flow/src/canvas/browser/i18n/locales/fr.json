@@ -560,6 +560,15 @@
       "reject": "Refusé",
       "continue": "Continuer"
     },
+    "waitBranchDescription": {
+      "pending": {
+        "approval": "Déclenché dès que le flux atteint ce nœud et crée un lien d’approbation. Le flux continue après l’ouverture du lien et la validation. Connectez ce port pour envoyer le lien par messagerie, e-mail ou un autre canal.",
+        "wait": "Déclenché dès que le flux atteint ce nœud et crée un lien pour continuer. L’ouverture du lien poursuit le flux. Connectez ce port pour envoyer le lien par messagerie, e-mail ou un autre canal."
+      },
+      "approve": "Déclenché lorsque le résultat de l’approbation est Approuver.",
+      "reject": "Déclenché lorsque le résultat de l’approbation est Refuser.",
+      "continue": "Déclenché à la réception d’une action Continuer."
+    },
     "run": "Exécution",
     "result": "Résultat",
     "logs": "Journaux ({{count}})",

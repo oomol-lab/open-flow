@@ -16,6 +16,7 @@ import { DEFAULT_POSITION } from '../../../base/canvas.ts'
 import { toRFHandleName } from '../../../base/rfHelpers.ts'
 import { Handle } from '../../../components/handle.tsx'
 import { NodeMiniMapPhase, NodeMiniMapProvider, useNodeMiniMapPhase } from '../../../components/minimap.tsx'
+import { CanvasTooltip } from '../../../components/tooltip.tsx'
 import { NODE_MINIMAP_PHASE1_CLASSNAME, NODE_MINIMAP_PHASE2_CLASSNAME } from '../../../stores/canvas/nodeMiniMap.ts'
 import { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 import { DEFAULT_NODE_WIDTH, FITTING_VIEW_CLASSNAME, MIN_NODE_WIDTH, NODE_TYPE } from '../../../stores/node/constants.ts'
@@ -100,21 +101,27 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
             : modelNode?.kind == 'approval' || modelNode?.kind == 'wait'
               ? t(`canvasCard.waitBranch.${branch}`)
               : ''
+        const tooltip =
+          modelNode?.kind == 'approval' || modelNode?.kind == 'wait'
+            ? t(`canvasCard.waitBranchDescription.${branch == 'pending' ? `${branch}.${modelNode.kind}` : branch}`)
+            : undefined
         return (
-          <div key={branch} className={clsx(styles.executionBranch, styles.branchRow)}>
-            {summary && (
-              <span className={styles.branchRule} title={summary}>
-                {summary}
-              </span>
-            )}
-            {summary && (
-              <span aria-hidden="true" className={styles.branchArrow}>
-                →
-              </span>
-            )}
-            <span className={styles.branchName}>{branch}</span>
-            <ExecutionHandle id={toRFHandleName(`$branch:${branch}` as HandleName)} type="output" isConnectable={editable} hintRequested={hintRequested} />
-          </div>
+          <CanvasTooltip key={branch} placement="top" sideOffset={12} title={tooltip}>
+            <div className={clsx(styles.executionBranch, styles.branchRow)} tabIndex={tooltip ? 0 : undefined}>
+              {summary && (
+                <span className={styles.branchRule} title={conditionNode ? summary : undefined}>
+                  {summary}
+                </span>
+              )}
+              {summary && (
+                <span aria-hidden="true" className={styles.branchArrow}>
+                  →
+                </span>
+              )}
+              <span className={styles.branchName}>{branch}</span>
+              <ExecutionHandle id={toRFHandleName(`$branch:${branch}` as HandleName)} type="output" isConnectable={editable} hintRequested={hintRequested} />
+            </div>
+          </CanvasTooltip>
         )
       })}
     />

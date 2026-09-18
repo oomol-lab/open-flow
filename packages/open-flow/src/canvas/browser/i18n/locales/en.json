@@ -560,6 +560,15 @@
       "reject": "Rejected",
       "continue": "Continue"
     },
+    "waitBranchDescription": {
+      "pending": {
+        "approval": "Triggered as soon as the flow reaches this node and creates an approval link. The flow continues after someone opens the link and completes the approval. Connect this port to send the link through chat, email, or another channel.",
+        "wait": "Triggered as soon as the flow reaches this node and creates a continue link. Opening the link continues the flow. Connect this port to send the link through chat, email, or another channel."
+      },
+      "approve": "Triggered when the approval result is Approve.",
+      "reject": "Triggered when the approval result is Reject.",
+      "continue": "Triggered when a Continue action is received."
+    },
     "run": "Run",
     "result": "Result",
     "logs": "Logs ({{count}})",

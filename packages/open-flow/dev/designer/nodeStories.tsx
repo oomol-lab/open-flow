@@ -510,8 +510,24 @@ const contentModel: FlowCanvasViewModel = {
       position: { x: 0, y: 280 },
       cases: [{ output: 'matched', relation: 'all', expressions: [{ input: 'count', operator: '>', value: 0 }] }],
     },
-    { id: 'empty', kind: 'value', title: 'Empty · no collapse action', inputs: [], outputs: [], position: { x: 380, y: 280 }, values: [] },
-    { id: 'comment', kind: 'comment', title: 'Comment content', content: 'Keep the **report** concise.', position: { x: 760, y: 280 } },
+    {
+      id: 'approval',
+      kind: 'approval',
+      title: 'Approval branches',
+      inputs: [],
+      outputs: [{ handle: 'pending' }, { handle: 'approve' }, { handle: 'reject' }],
+      position: { x: 380, y: 280 },
+    },
+    {
+      id: 'wait',
+      kind: 'wait',
+      title: 'Wait branches',
+      inputs: [],
+      outputs: [{ handle: 'pending' }, { handle: 'continue' }],
+      position: { x: 760, y: 280 },
+    },
+    { id: 'empty', kind: 'value', title: 'Empty · no collapse action', inputs: [], outputs: [], position: { x: 380, y: 560 }, values: [] },
+    { id: 'comment', kind: 'comment', title: 'Comment content', content: 'Keep the **report** concise.', position: { x: 760, y: 560 } },
   ],
 }
 
@@ -556,7 +572,7 @@ function NodeZoomStory({ dark, language, log }: { readonly dark: boolean; readon
                 ...contentModel,
                 viewport: { x: 24, y: 32, zoom },
                 nodes: contentModel.nodes
-                  .filter((node) => node.kind !== 'comment')
+                  .filter((node) => node.kind !== 'comment' && node.kind !== 'approval' && node.kind !== 'wait')
                   .map((node, index) =>
                     Object.assign({}, node, {
                       title: zoomTitles[node.id] ?? node.title,
@@ -595,7 +611,7 @@ export const nodeStories: readonly FrontendStory[] = [
     id: 'node-content',
     title: 'Node content',
     description:
-      'Compare height transitions with Toggle all content or each node toolbar. Read-only, empty and Condition nodes omit the collapse action. Run status and branches remain visible.',
+      'Compare height transitions with Toggle all content or each node toolbar. Read-only, empty and Condition nodes omit the collapse action. Hover or focus Wait and Approval branch labels for their output semantics.',
     standalone: true,
     render: (log, dark, language) => <NodeContentStory dark={dark} language={language} log={log} initialModel={contentModel} initialSelection="schedule" />,
   },
