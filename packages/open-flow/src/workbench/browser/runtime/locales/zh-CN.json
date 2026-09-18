@@ -984,6 +984,16 @@
   },
   "history": {
     "edit": "修改节点属性",
+    "deleted": {
+      "field": "已删除字段“{{name}}”。",
+      "group": "已删除分组“{{name}}”。",
+      "objectItem": "已删除对象字段“{{name}}”。",
+      "arrayItem": "已删除数组项“{{name}}”。",
+      "option": "已删除选项“{{name}}”。",
+      "case": "已删除分支“{{name}}”。",
+      "condition": "已删除条件。",
+      "conditionGroup": "已删除条件组。"
+    },
     "undo": "撤销",
     "redo": "重做",
     "add": "新增 {{count}} 个节点",

@@ -984,6 +984,16 @@
   },
   "history": {
     "edit": "노드 속성 편집",
+    "deleted": {
+      "field": "필드 ‘{{name}}’을(를) 삭제했습니다.",
+      "group": "그룹 ‘{{name}}’을(를) 삭제했습니다.",
+      "objectItem": "객체 필드 ‘{{name}}’을(를) 삭제했습니다.",
+      "arrayItem": "배열 항목 ‘{{name}}’을(를) 삭제했습니다.",
+      "option": "옵션 ‘{{name}}’을(를) 삭제했습니다.",
+      "case": "케이스 ‘{{name}}’을(를) 삭제했습니다.",
+      "condition": "조건을 삭제했습니다.",
+      "conditionGroup": "조건 그룹을 삭제했습니다."
+    },
     "undo": "실행 취소",
     "redo": "다시 실행",
     "add": "노드 {{count}}개 추가",

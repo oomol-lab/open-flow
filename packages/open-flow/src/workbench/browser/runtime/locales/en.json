@@ -984,6 +984,16 @@
   },
   "history": {
     "edit": "Edit node properties",
+    "deleted": {
+      "field": "Deleted field “{{name}}”.",
+      "group": "Deleted group “{{name}}”.",
+      "objectItem": "Deleted object field “{{name}}”.",
+      "arrayItem": "Deleted array item “{{name}}”.",
+      "option": "Deleted option “{{name}}”.",
+      "case": "Deleted case “{{name}}”.",
+      "condition": "Deleted condition.",
+      "conditionGroup": "Deleted condition group."
+    },
     "undo": "Undo",
     "redo": "Redo",
     "add": "Add {{count}} nodes",

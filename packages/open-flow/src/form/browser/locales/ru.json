@@ -49,8 +49,6 @@
     "groupName": "Название группы",
     "addGroup": "Добавить группу",
     "collapsed": "Свёрнута",
-    "removeFieldConfirm": "Удалить «{{name}}»?",
-    "removeGroupConfirm": "Удалить «{{name}}»? Поля группы сохранятся.",
     "options": "Параметры значения {{name}}",
     "hours": "Часы",
     "minutes": "Минуты",

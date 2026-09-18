@@ -1,7 +1,9 @@
 import './conditionBranchesEditor.scss'
 import type { ConditionExpression, ConditionOperand, JsonValue, Source } from '../../../../flow/common/change.ts'
+import type { ValueEditorDeletion } from '../../../../form/browser/valueEditor.tsx'
 import type { ConditionSettings } from './flowChanges.ts'
 import type { InputVariables, NodeInputUpstreamSources } from './nodeInputValue.tsx'
+import type { PropertyDeletion } from './propertyDeletion.ts'
 
 import { useEffect, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
@@ -87,7 +89,7 @@ export function ConditionBranchesEditor({
 }: {
   readonly value: ConditionSettings
   readonly disabled: boolean
-  readonly onChange: (value: ConditionSettings) => void
+  readonly onChange: (value: ConditionSettings, deletion?: PropertyDeletion) => void
   readonly renderSource?: (handle: string) => NodeInputUpstreamSources | undefined
   readonly variables?: InputVariables
   readonly variableName?: (source: Source) => string | undefined
@@ -168,7 +170,7 @@ export function ConditionBranchesEditor({
         />
         <div ref={setMenuContainer} className="condition-editor-content">
           {value.cases.map((item, c) => {
-            const save = (next: typeof item) => onChange({ ...value, cases: value.cases.with(c, next) })
+            const save = (next: typeof item, deletion?: ValueEditorDeletion) => onChange({ ...value, cases: value.cases.with(c, next) }, deletion)
             const open = !collapsed.has(item.output)
             const groupErrors = item.groups.map((group, g) =>
               group.expressions.length === 0
@@ -283,7 +285,7 @@ export function ConditionBranchesEditor({
                     iconButton(
                       t('conditionEditor.deleteCondition'),
                       'i-tabler-light:square-rounded-minus text-lg',
-                      () => onChange({ ...value, cases: value.cases.toSpliced(c, 1) }),
+                      () => onChange({ ...value, cases: value.cases.toSpliced(c, 1) }, { target: 'case', name: item.output }),
                       true,
                     )}
                 </div>
@@ -325,8 +327,8 @@ export function ConditionBranchesEditor({
                           <div className="condition-expressions" hidden={!groupOpen}>
                             {group.expressions.length === 0 && <div className="flex items-center justify-between">{!disabled && addMenu(g, -1)}</div>}
                             {group.expressions.map((expression, e) => {
-                              const change = (next: typeof expression) =>
-                                save({ ...item, groups: item.groups.with(g, { expressions: group.expressions.with(e, next) }) })
+                              const change = (next: typeof expression, deletion?: ValueEditorDeletion) =>
+                                save({ ...item, groups: item.groups.with(g, { expressions: group.expressions.with(e, next) }) }, deletion)
                               const available = operatorsForType(operandType(expression.left))
                               const issue = comparisonIssue(expression.operator, operandType(expression.left), operandType(expression.right))
                               const invalid = issue?.target === 'operator'
@@ -338,15 +340,18 @@ export function ConditionBranchesEditor({
                                   operand.kind === 'value'
                                     ? (operand.jsonSchema ?? { type: operand.value === undefined ? 'string' : valueType(operand.value) })
                                     : {}
-                                const changeDefinition = (jsonSchema: unknown, next: unknown) =>
-                                  change({
-                                    ...expression,
-                                    [side]: {
-                                      kind: 'value',
-                                      jsonSchema: jsonSchema as JsonValue,
-                                      ...(next === undefined ? {} : { value: next as JsonValue }),
+                                const changeDefinition = (jsonSchema: unknown, next: unknown, deletion?: ValueEditorDeletion) =>
+                                  change(
+                                    {
+                                      ...expression,
+                                      [side]: {
+                                        kind: 'value',
+                                        jsonSchema: jsonSchema as JsonValue,
+                                        ...(next === undefined ? {} : { value: next as JsonValue }),
+                                      },
                                     },
-                                  })
+                                    deletion,
+                                  )
                                 return (
                                   <div className="condition-operand">
                                     <NodeInputValue
@@ -383,15 +388,18 @@ export function ConditionBranchesEditor({
                                       variables={variables}
                                       disabled={disabled}
                                       upstream={renderSource?.(handle)}
-                                      onValue={(next) =>
-                                        change({
-                                          ...expression,
-                                          [side]: {
-                                            kind: 'value',
-                                            jsonSchema: schema,
-                                            ...(next === undefined ? {} : { value: next }),
+                                      onValue={(next, deletion) =>
+                                        change(
+                                          {
+                                            ...expression,
+                                            [side]: {
+                                              kind: 'value',
+                                              jsonSchema: schema,
+                                              ...(next === undefined ? {} : { value: next }),
+                                            },
                                           },
-                                        })
+                                          deletion,
+                                        )
                                       }
                                       onVariable={(name) => onVariable?.(handle, name)}
                                     />
@@ -433,13 +441,19 @@ export function ConditionBranchesEditor({
                                         t('valueEditor.remove'),
                                         'i-tabler-light:square-rounded-minus text-lg',
                                         () =>
-                                          save({
-                                            ...item,
-                                            groups:
-                                              group.expressions.length === 1
-                                                ? item.groups.toSpliced(g, 1)
-                                                : item.groups.with(g, { expressions: group.expressions.toSpliced(e, 1) }),
-                                          }),
+                                          onChange(
+                                            {
+                                              ...value,
+                                              cases: value.cases.with(c, {
+                                                ...item,
+                                                groups:
+                                                  group.expressions.length === 1
+                                                    ? item.groups.toSpliced(g, 1)
+                                                    : item.groups.with(g, { expressions: group.expressions.toSpliced(e, 1) }),
+                                              }),
+                                            },
+                                            { target: group.expressions.length === 1 ? 'conditionGroup' : 'condition' },
+                                          ),
                                         true,
                                       )}
                                     </div>

@@ -1,7 +1,7 @@
 import styles from './nodeInputValue.module.scss'
 import type { TFunction } from 'val-i18n'
 import type { InputSourceCandidate, InputSourceCheck, InputSourcesCheck } from '../../../../flow/common/graph.ts'
-import type { ValueEditorProps } from '../../../../form/browser/valueEditor.tsx'
+import type { ValueEditorDeletion, ValueEditorProps } from '../../../../form/browser/valueEditor.tsx'
 import type { VariablePickerProps } from '../../../../ui/browser/variable-picker.tsx'
 import type { InputPort, JsonValue } from '../api.ts'
 import type { InputSourceQuery } from '../revisionView.ts'
@@ -234,7 +234,7 @@ export function NodeInputValue({
   readonly variableName?: string
   readonly variables: InputVariables
   readonly disabled: boolean
-  readonly onValue: (value: JsonValue | undefined) => void
+  readonly onValue: (value: JsonValue | undefined, deletion?: ValueEditorDeletion) => void
   readonly onVariable: (name: string | undefined) => void
 }) {
   const t = useTranslate()
@@ -470,7 +470,15 @@ export function NodeInputValue({
         variables={variables}
       />
     ) : llm ? (
-      <LlmInputEditor addon={sourceControl} schema={definition.jsonSchema} value={value} disabled={disabled} handleNames={handleNames} onChange={onValue} />
+      <LlmInputEditor
+        addon={sourceControl}
+        schema={definition.jsonSchema}
+        value={value}
+        disabled={disabled}
+        handleNames={handleNames}
+        label={definition.handle}
+        onChange={onValue}
+      />
     ) : undefined
   return (
     <Field className={embedded ? 'gap-0' : 'p-3'}>
@@ -490,7 +498,7 @@ export function NodeInputValue({
         valueEditable={!connected && !bound && !sourceMissing}
         editor={editor}
         onDraftIssue={draftIssue}
-        onChange={(next) => onValue(next as JsonValue | undefined)}
+        onChange={(next, deletion) => onValue(next as JsonValue | undefined, deletion)}
       />
     </Field>
   )

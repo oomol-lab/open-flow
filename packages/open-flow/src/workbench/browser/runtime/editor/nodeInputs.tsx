@@ -1,6 +1,8 @@
 import type { ComponentProps, ReactNode } from 'react'
+import type { ValueEditorDeletion } from '../../../../form/browser/valueEditor.tsx'
 import type { Group, InputPort, JsonValue } from '../api.ts'
 import type { InputVariables, NodeInputUpstreamSources } from './nodeInputValue.tsx'
+import type { PropertyDeletion } from './propertyDeletion.ts'
 
 import { NodeInputValue } from './nodeInputValue.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
@@ -20,14 +22,14 @@ export function NodeInputs({
   title,
 }: {
   allowAddGroup?: boolean
-  onDefinitions?: (values: readonly (InputPort | Group)[]) => void
+  onDefinitions?: (values: readonly (InputPort | Group)[], deletion?: PropertyDeletion) => void
   reservedNames?: readonly string[]
   renderSource?: (handle: string) => NodeInputUpstreamSources | undefined
   title?: ReactNode
   entries: readonly (Group | NodeInputField)[]
   variables: InputVariables
   disabled: boolean
-  onValue: (handle: string, value: JsonValue | undefined) => void
+  onValue: (handle: string, value: JsonValue | undefined, deletion?: ValueEditorDeletion) => void
   onVariable: (handle: string, name: string | undefined) => void
 }) {
   const handleNames = entries.flatMap((entry) => ('group' in entry ? [] : [entry.definition.handle]))
@@ -41,7 +43,7 @@ export function NodeInputs({
       values={entries.map((entry) => ('group' in entry ? entry : entry.definition))}
       disabled={disabled || onDefinitions == null}
       reservedNames={reservedNames}
-      onChange={(values) => onDefinitions?.(values)}
+      onChange={(values, deletion) => onDefinitions?.(values, deletion)}
       renderValue={(port, presentation) => {
         const entry = entries.find((candidate): candidate is NodeInputField => !('group' in candidate) && candidate.definition.handle === port.handle)
         if (entry == null) return null
@@ -56,7 +58,7 @@ export function NodeInputs({
               handleNames={handleNames}
               variables={variables}
               disabled={disabled}
-              onValue={(value) => onValue(port.handle, value)}
+              onValue={(value, deletion) => onValue(port.handle, value, deletion)}
               onVariable={(name) => onVariable(port.handle, name)}
             />
           </>

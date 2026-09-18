@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { ValueEditorDeletion } from '../../../../form/browser/valueEditor.tsx'
 import type { JsonValue } from '../api.ts'
 
 import { useState } from 'react'
@@ -30,6 +31,7 @@ export function LlmInputEditor({
   value,
   disabled,
   handleNames,
+  label: fieldLabel,
   onChange,
 }: {
   schema: unknown
@@ -37,7 +39,8 @@ export function LlmInputEditor({
   value: JsonValue | undefined
   disabled: boolean
   handleNames: readonly string[]
-  onChange: (value: JsonValue | undefined) => void
+  label: string
+  onChange: (value: JsonValue | undefined, deletion?: ValueEditorDeletion) => void
 }) {
   const t = useTranslate()
   const [expanded, setExpanded] = useState(false)
@@ -72,7 +75,12 @@ export function LlmInputEditor({
                 disabled={disabled || messages.length <= minimum}
                 size="icon-xs"
                 variant="ghost"
-                onClick={() => onChange(messages.filter((_, i) => i !== index))}
+                onClick={() =>
+                  onChange(
+                    messages.filter((_, i) => i !== index),
+                    { target: 'arrayItem', name: `${fieldLabel}.${index}` },
+                  )
+                }
               >
                 <i className="i-codicon:trash" />
               </Button>

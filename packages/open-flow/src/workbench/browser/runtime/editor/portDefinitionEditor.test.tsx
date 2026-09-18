@@ -216,7 +216,7 @@ describe('Property panel port layout', () => {
 
     expect(changeDefinition).toBeTypeOf('function')
     changeDefinition?.({ type: 'string', enum: ['high'] }, 'high')
-    expect(onChange).toHaveBeenCalledWith([{ handle: 'priority', jsonSchema: { type: 'string', enum: ['high'] }, nullable: false, value: 'high' }])
+    expect(onChange).toHaveBeenCalledWith([{ handle: 'priority', jsonSchema: { type: 'string', enum: ['high'] }, nullable: false, value: 'high' }], undefined)
   })
 })
 

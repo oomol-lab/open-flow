@@ -37,8 +37,8 @@ export interface ValueEditorProps {
   readonly layout?: 'values' | 'ports' | 'definition'
   readonly schema: unknown
   readonly value: unknown
-  readonly onChange: (value: unknown) => void
-  readonly onDefinitionChange?: (schema: unknown, value: unknown) => void
+  readonly onChange: (value: unknown, deletion?: ValueEditorDeletion) => void
+  readonly onDefinitionChange?: (schema: unknown, value: unknown, deletion?: ValueEditorDeletion) => void
   readonly label: string
   readonly invalid?: boolean
   readonly validationError?: string
@@ -63,6 +63,11 @@ export interface ValueEditorProps {
   readonly actions?: ReactNode
   readonly options?: ReactNode
   readonly depth?: number
+}
+
+export interface ValueEditorDeletion {
+  readonly target: 'objectItem' | 'arrayItem' | 'option'
+  readonly name: string
 }
 
 /** Gives custom value controls the same attached validation feedback as built-in editors. */
@@ -221,7 +226,7 @@ export function ValueEditor(props: ValueEditorProps) {
     key: string | number,
     childSchema: unknown,
     childValue: unknown,
-    change: (value: unknown) => void,
+    change: (value: unknown, deletion?: ValueEditorDeletion) => void,
     options?: ReactNode,
     presentation?: Pick<
       ValueEditorProps,
@@ -463,11 +468,11 @@ export function ValueEditor(props: ValueEditorProps) {
           onChange={onChange}
           onOptionsChange={
             props.onDefinitionChange
-              ? (options) => {
+              ? (options, deletion) => {
                   const nextSchema = Array.isArray(source.enum)
                     ? { ...source, enum: options }
                     : { ...source, items: { ...objectValue(source.items), enum: options } }
-                  props.onDefinitionChange!(nextSchema, valueForEditor(nextSchema, value))
+                  props.onDefinitionChange!(nextSchema, valueForEditor(nextSchema, value), deletion)
                 }
               : undefined
           }
@@ -506,10 +511,14 @@ export function ValueEditor(props: ValueEditorProps) {
               const fieldValue = object && Object.hasOwn(object, name) ? object[name] : undefined
               return (
                 <div data-object-field-content>
-                  {child(name, fieldSchema, fieldValue, (next) => onChange(setObjectField(value, name, next)), undefined, {
+                  {child(name, fieldSchema, fieldValue, (next, deletion) => onChange(setObjectField(value, name, next), deletion), undefined, {
                     onDefinitionChange: props.onDefinitionChange
-                      ? (nextSchema, nextValue) =>
-                          props.onDefinitionChange!({ ...source, properties: { ...properties, [name]: nextSchema } }, setObjectField(value, name, nextValue))
+                      ? (nextSchema, nextValue, deletion) =>
+                          props.onDefinitionChange!(
+                            { ...source, properties: { ...properties, [name]: nextSchema } },
+                            setObjectField(value, name, nextValue),
+                            deletion,
+                          )
                       : undefined,
                     leadingControl: handle,
                     objectChild: true,
@@ -634,8 +643,9 @@ export function ValueEditor(props: ValueEditorProps) {
                                   ...(Array.isArray(source.required) ? { required: source.required.filter((key) => key !== name) } : {}),
                                 },
                                 next,
+                                { target: 'objectItem', name: `${label}.${name}` },
                               )
-                            else onChange(next)
+                            else onChange(next, { target: 'objectItem', name: `${label}.${name}` })
                           }}
                         >
                           <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg" />
@@ -671,53 +681,65 @@ export function ValueEditor(props: ValueEditorProps) {
               const itemSchema = Array.isArray(source.items) ? (source.items[index] ?? source.additionalItems ?? {}) : (source.items ?? {})
               return (
                 <div data-array-field-content>
-                  {child(index, itemSchema, item, (next) => onChange(array.map((entry, at) => (at === index ? (next ?? null) : entry))), undefined, {
-                    objectChild: true,
-                    arrayChild: true,
-                    header: handle ? <></> : <span className={styles.arrayIndex}>{index}.</span>,
-                    leadingControl: handle || undefined,
-                    onDefinitionChange:
-                      props.onDefinitionChange && !Array.isArray(source.items)
-                        ? (items, nextValue) =>
-                            props.onDefinitionChange!(
-                              { ...source, items },
-                              array.map((entry, at) => (at === index ? nextValue : entry)),
-                            )
-                        : undefined,
-                    hideOptions: true,
-                    actions: (
-                      <>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          aria-label={`${t('valueEditor.addItem')} ${label}.${index}`}
-                          disabled={disabled || (typeof source.maxItems === 'number' && array.length >= source.maxItems)}
-                          onClick={() =>
-                            onChange(
-                              array.toSpliced(
-                                index + 1,
-                                0,
-                                initialValue(Array.isArray(source.items) ? (source.items[index + 1] ?? source.additionalItems ?? {}) : (source.items ?? {})),
-                              ),
-                            )
-                          }
-                        >
-                          <i aria-hidden="true" className="i-tabler-light:square-rounded-plus text-lg" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          aria-label={`${t('valueEditor.remove')} ${label}.${index}`}
-                          disabled={disabled || (typeof source.minItems === 'number' && array.length <= source.minItems)}
-                          onClick={() => onChange(array.toSpliced(index, 1))}
-                        >
-                          <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg" />
-                        </Button>
-                      </>
-                    ),
-                  })}
+                  {child(
+                    index,
+                    itemSchema,
+                    item,
+                    (next, deletion) =>
+                      onChange(
+                        array.map((entry, at) => (at === index ? (next ?? null) : entry)),
+                        deletion,
+                      ),
+                    undefined,
+                    {
+                      objectChild: true,
+                      arrayChild: true,
+                      header: handle ? <></> : <span className={styles.arrayIndex}>{index}.</span>,
+                      leadingControl: handle || undefined,
+                      onDefinitionChange:
+                        props.onDefinitionChange && !Array.isArray(source.items)
+                          ? (items, nextValue, deletion) =>
+                              props.onDefinitionChange!(
+                                { ...source, items },
+                                array.map((entry, at) => (at === index ? nextValue : entry)),
+                                deletion,
+                              )
+                          : undefined,
+                      hideOptions: true,
+                      actions: (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`${t('valueEditor.addItem')} ${label}.${index}`}
+                            disabled={disabled || (typeof source.maxItems === 'number' && array.length >= source.maxItems)}
+                            onClick={() =>
+                              onChange(
+                                array.toSpliced(
+                                  index + 1,
+                                  0,
+                                  initialValue(Array.isArray(source.items) ? (source.items[index + 1] ?? source.additionalItems ?? {}) : (source.items ?? {})),
+                                ),
+                              )
+                            }
+                          >
+                            <i aria-hidden="true" className="i-tabler-light:square-rounded-plus text-lg" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`${t('valueEditor.remove')} ${label}.${index}`}
+                            disabled={disabled || (typeof source.minItems === 'number' && array.length <= source.minItems)}
+                            onClick={() => onChange(array.toSpliced(index, 1), { target: 'arrayItem', name: `${label}.${index}` })}
+                          >
+                            <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg" />
+                          </Button>
+                        </>
+                      ),
+                    },
+                  )}
                 </div>
               )
             }}

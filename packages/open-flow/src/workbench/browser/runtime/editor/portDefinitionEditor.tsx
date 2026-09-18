@@ -1,8 +1,9 @@
 import styles from './portList.module.scss'
 import type { ComponentProps, ReactNode } from 'react'
 import type { FieldDisclosure } from '../../../../form/browser/fieldTypeDisplay.tsx'
-import type { ValueEditorProps } from '../../../../form/browser/valueEditor.tsx'
+import type { ValueEditorDeletion, ValueEditorProps } from '../../../../form/browser/valueEditor.tsx'
 import type { Group, InputPort } from '../api.ts'
+import type { PropertyDeletion } from './propertyDeletion.ts'
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
@@ -226,26 +227,12 @@ function PortSettingsFields({
   )
 }
 
-function RemoveFooter({ confirmLabel, onRemove }: { confirmLabel: string; onRemove: () => void }) {
+function RemoveFooter({ onRemove }: { onRemove: () => void }) {
   const t = useTranslate()
-  const [confirming, setConfirming] = useState(false)
-  if (!confirming) {
-    return (
-      <Button type="button" size="field" variant="destructive" className="ml-auto" onClick={() => setConfirming(true)}>
-        {t('valueEditor.remove')}
-      </Button>
-    )
-  }
   return (
-    <>
-      <span className="min-w-0 flex-1 text-muted-foreground">{confirmLabel}</span>
-      <Button autoFocus type="button" size="field" variant="ghost" onClick={() => setConfirming(false)}>
-        {t('common.cancel')}
-      </Button>
-      <Button type="button" size="field" variant="destructive" onClick={onRemove}>
-        {t('valueEditor.remove')}
-      </Button>
-    </>
+    <Button type="button" size="field" variant="destructive" className="ml-auto" onClick={onRemove}>
+      {t('valueEditor.remove')}
+    </Button>
   )
 }
 
@@ -290,19 +277,7 @@ export function GroupSettingsPanel({
   const t = useTranslate()
   const id = useId()
   return (
-    <PopoverPanelContent
-      {...props}
-      title={t('inspector.ports.groupSettings')}
-      closeLabel={t('common.close')}
-      footer={
-        <RemoveFooter
-          confirmLabel={t('valueEditor.removeGroupConfirm', {
-            name: group.group,
-          })}
-          onRemove={onRemove}
-        />
-      }
-    >
+    <PopoverPanelContent {...props} title={t('inspector.ports.groupSettings')} closeLabel={t('common.close')} footer={<RemoveFooter onRemove={onRemove} />}>
       <Field className="gap-1.5">
         <FieldLabel htmlFor={`${id}-name`} className="text-xs font-normal text-muted-foreground">
           {t('valueEditor.groupName')}
@@ -333,16 +308,7 @@ export function PortSettingsPanel({
       {...props}
       title={t('valueEditor.fieldSettings')}
       closeLabel={t('common.close')}
-      footer={
-        !disabled && (
-          <RemoveFooter
-            confirmLabel={t('valueEditor.removeFieldConfirm', {
-              name: port.handle,
-            })}
-            onRemove={onRemove}
-          />
-        )
-      }
+      footer={!disabled && <RemoveFooter onRemove={onRemove} />}
     >
       <PortSettingsFields showNullable={showNullable} port={port} names={names} disabled={disabled} onChange={onChange} />
     </PopoverPanelContent>
@@ -369,20 +335,24 @@ type PortEditorProps = {
   | {
       groups: true
       values: readonly (InputPort | Group)[]
-      onChange: (values: readonly (InputPort | Group)[]) => void
+      onChange: (values: readonly (InputPort | Group)[], deletion?: PropertyDeletion) => void
     }
   | {
       groups?: false
       values: readonly InputPort[]
-      onChange: (values: readonly InputPort[]) => void
+      onChange: (values: readonly InputPort[], deletion?: PropertyDeletion) => void
     }
 )
 
 export function PortDefinitionEditor(props: PortEditorProps) {
   const { defaultNullable = true, reservedNames = [], values, disabled } = props
-  const onChange = (next: readonly (InputPort | Group)[]) => {
-    if (props.groups) props.onChange(next)
-    else props.onChange(next.filter((port): port is InputPort => 'handle' in port))
+  const onChange = (next: readonly (InputPort | Group)[], deletion?: PropertyDeletion) => {
+    if (props.groups) props.onChange(next, deletion)
+    else
+      props.onChange(
+        next.filter((port): port is InputPort => 'handle' in port),
+        deletion,
+      )
   }
   const t = useTranslate()
   const title = props.title ?? (props.layout === 'values' ? t('inspector.ports.valuesTitle') : undefined)
@@ -642,20 +612,30 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             onChange={(next) => update(index, next)}
             onRemove={() => {
               setEditingIndex(undefined)
-              onChange(values.filter((_, i) => i !== index))
+              onChange(
+                values.filter((_, i) => i !== index),
+                { target: 'field', name: port.handle },
+              )
             }}
           />
         </Popover>
       ) : null
     const onDefinitionChange =
       tableLayout && !disabled
-        ? (jsonSchema: unknown, value: unknown) => {
+        ? (jsonSchema: unknown, value: unknown, deletion?: ValueEditorDeletion) => {
             const { value: _value, ...rest } = port
-            update(index, {
-              ...rest,
-              jsonSchema: jsonSchema as InputPort['jsonSchema'],
-              ...(props.output || value === undefined ? {} : { value: value as InputPort['value'] }),
-            })
+            onChange(
+              values.map((entry, i) =>
+                i === index
+                  ? {
+                      ...rest,
+                      jsonSchema: jsonSchema as InputPort['jsonSchema'],
+                      ...(props.output || value === undefined ? {} : { value: value as InputPort['value'] }),
+                    }
+                  : entry,
+              ),
+              deletion,
+            )
           }
         : undefined
     return (
@@ -695,12 +675,19 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             path={`/${index}`}
             onDraftIssue={onDraftIssue}
             onDefinitionChange={onDefinitionChange}
-            onChange={(value) => {
+            onChange={(value, deletion) => {
               const { value: _value, ...rest } = port
-              update(index, {
-                ...rest,
-                ...(value === undefined ? {} : { value: value as InputPort['value'] }),
-              })
+              onChange(
+                values.map((entry, i) =>
+                  i === index
+                    ? {
+                        ...rest,
+                        ...(value === undefined ? {} : { value: value as InputPort['value'] }),
+                      }
+                    : entry,
+                ),
+                deletion,
+              )
             }}
           />
         )}
@@ -809,7 +796,10 @@ export function PortDefinitionEditor(props: PortEditorProps) {
                         onChange={(next) => update(section.index!, next)}
                         onRemove={() => {
                           setEditingGroupIndex(undefined)
-                          onChange(values.filter((_, index) => index !== section.index))
+                          onChange(
+                            values.filter((_, index) => index !== section.index),
+                            { target: 'group', name: section.group!.group },
+                          )
                         }}
                       />
                     </Popover>

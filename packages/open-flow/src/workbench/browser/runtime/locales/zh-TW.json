@@ -984,6 +984,16 @@
   },
   "history": {
     "edit": "修改節點屬性",
+    "deleted": {
+      "field": "已刪除欄位「{{name}}」。",
+      "group": "已刪除群組「{{name}}」。",
+      "objectItem": "已刪除物件欄位「{{name}}」。",
+      "arrayItem": "已刪除陣列項目「{{name}}」。",
+      "option": "已刪除選項「{{name}}」。",
+      "case": "已刪除分支「{{name}}」。",
+      "condition": "已刪除條件。",
+      "conditionGroup": "已刪除條件群組。"
+    },
     "undo": "復原",
     "redo": "重做",
     "add": "新增 {{count}} 個節點",

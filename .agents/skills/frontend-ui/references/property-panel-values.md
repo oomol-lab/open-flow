@@ -88,4 +88,5 @@ collections, definitions, and field, node, or group settings. Also read the
   in the secondary panel.
 - Edit JSON Schema with the shared minimal CodeMirror JSON editor. Preserve invalid drafts, validate the Schema before saving, and keep the type selector synchronized with the same definition.
 - Input/output group settings use the same secondary-panel pattern, opened by a settings control aligned with the field gears. The panel edits the group name and default collapsed state and keeps removal in a separate footer.
-- Removing a field or group requires a second confirmation within its settings panel. Removing a group retains its fields and removes only the group marker.
+- Removing a field, group, collection item, case, or condition takes effect immediately without a second confirmation. After the save succeeds,
+  show a notification with an Undo action backed by the canvas history. Removing a group retains its fields and removes only the group marker.

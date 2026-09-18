@@ -110,6 +110,30 @@ describe('Workspace canvas history', () => {
     }
   })
 
+  it('notifies after a property deletion saves and only undoes that current history entry', async () => {
+    const { store, saved, notices } = await session()
+    try {
+      const field = { handle: 'answer', jsonSchema: { type: 'number' }, nullable: false, value: 42 } as const
+      await store.saveValue('value', [field])
+      notices.mockClear()
+      await store.saveValue('value', [], { target: 'field', name: 'answer' })
+
+      const notice = notices.mock.lastCall?.[0]
+      expect(notice).toMatchObject({ kind: 'success', message: 'Deleted field “answer”.', undo: { label: 'Undo' } })
+      expect(saved().draft.content.document.graph.nodes.value).toMatchObject({ values: [] })
+
+      await notice?.undo?.run()
+      expect(saved().draft.content.document.graph.nodes.value).toMatchObject({ values: [field] })
+
+      await store.redo()
+      await store.saveNodeTitle('value', 'Renamed')
+      await notice?.undo?.run()
+      expect(saved().draft.content.document.graph.nodes.value).toMatchObject({ name: 'Renamed', values: [] })
+    } finally {
+      store.dispose()
+    }
+  })
+
   it.each([['code'], ['code', 'value'], ['note']])('deletes %j without notifying and keeps undo available', async (...selection) => {
     const { store, notices } = await session()
     try {

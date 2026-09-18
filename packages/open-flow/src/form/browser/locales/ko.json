@@ -49,8 +49,6 @@
     "groupName": "그룹 이름",
     "addGroup": "그룹 추가",
     "collapsed": "접힘",
-    "removeFieldConfirm": "‘{{name}}’을(를) 삭제할까요?",
-    "removeGroupConfirm": "‘{{name}}’을(를) 삭제할까요? 그룹의 필드는 유지됩니다.",
     "options": "{{name}} 값 옵션",
     "hours": "시",
     "minutes": "분",

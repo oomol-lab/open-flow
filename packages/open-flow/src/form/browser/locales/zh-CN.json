@@ -49,8 +49,6 @@
     "groupName": "分组名称",
     "addGroup": "添加分组",
     "collapsed": "默认折叠",
-    "removeFieldConfirm": "确定移除“{{name}}”吗？",
-    "removeGroupConfirm": "确定移除“{{name}}”吗？组内字段会保留。",
     "options": "{{name}} 的值选项",
     "hours": "时",
     "minutes": "分",

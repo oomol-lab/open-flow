@@ -49,8 +49,6 @@
     "groupName": "グループ名",
     "addGroup": "グループを追加",
     "collapsed": "折りたたむ",
-    "removeFieldConfirm": "「{{name}}」を削除しますか？",
-    "removeGroupConfirm": "「{{name}}」を削除しますか？グループ内のフィールドは残ります。",
     "options": "{{name}} の値オプション",
     "hours": "時",
     "minutes": "分",

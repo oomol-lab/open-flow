@@ -18,9 +18,10 @@ import type {
   ValueSettings,
   WebhookSettings,
 } from '../editor/flowChanges.ts'
+import type { PropertyDeletion } from '../editor/propertyDeletion.ts'
 import type { RevisionView } from '../revisionView.ts'
 import type { DesignerEdge, DesignerGraph, DesignerViewport, Point } from '../workspace.ts'
-import type { CanvasAction } from './canvasHistory.ts'
+import type { CanvasAction, CanvasHistoryEntry } from './canvasHistory.ts'
 import type { DraftChangeContext } from './draftChanges.ts'
 import type { PresentationUpdate } from './presentationChanges.ts'
 import type { SetNotice } from './workbenchNotice.ts'
@@ -82,6 +83,16 @@ import { errorNotice } from './workbenchNotice.ts'
 import { moduleEditorStatus, selectedModuleEditor, WorkspaceModel } from './workspaceModel.ts'
 
 const PASTE_OFFSET: Point = { x: 40, y: 40 }
+const deletionMessageKeys = {
+  field: 'history.deleted.field',
+  group: 'history.deleted.group',
+  objectItem: 'history.deleted.objectItem',
+  arrayItem: 'history.deleted.arrayItem',
+  option: 'history.deleted.option',
+  case: 'history.deleted.case',
+  condition: 'history.deleted.condition',
+  conditionGroup: 'history.deleted.conditionGroup',
+} as const satisfies Readonly<Record<PropertyDeletion['target'], string>>
 
 interface Clipboard {
   readonly hiddenNodeIds: readonly string[]
@@ -642,12 +653,12 @@ export class WorkspaceStore {
     return changes != null && (await this.#editDraft(changes)) != null
   }
 
-  public async setInputValue(nodeId: string, handle: string, value: JsonValue | undefined): Promise<boolean> {
+  public async setInputValue(nodeId: string, handle: string, value: JsonValue | undefined, deletion?: PropertyDeletion): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = changeInputValue(revision, target, nodeId, handle, value)
-    return changes != null && (await this.#editDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
   public async setInputSource(nodeId: string, handle: string, source: { readonly nodeId: string; readonly output: string }): Promise<boolean> {
@@ -668,20 +679,20 @@ export class WorkspaceStore {
     return changes != null && (await this.#editDraft(changes)) != null
   }
 
-  public async saveCondition(nodeId: string, settings: ConditionSettings): Promise<boolean> {
+  public async saveCondition(nodeId: string, settings: ConditionSettings, deletion?: PropertyDeletion): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateCondition(revision, target, nodeId, settings)
-    return changes != null && (await this.#editDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
-  public async saveValue(nodeId: string, values: readonly ValueSettings[]): Promise<boolean> {
+  public async saveValue(nodeId: string, values: readonly ValueSettings[], deletion?: PropertyDeletion): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateValue(revision, target, nodeId, values)
-    return changes != null && (await this.#editDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
   public async saveResolution(
@@ -690,12 +701,13 @@ export class WorkspaceStore {
       readonly name?: string
       readonly inputDefinitions?: readonly InputPort[]
     },
+    deletion?: PropertyDeletion,
   ): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target?.kind != 'flow') return false
     const changes = updateResolution(revision, target, nodeId, settings)
-    return changes != null && (await this.#editDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
   public async saveNodeContentHidden(nodeId: string, hidden: boolean): Promise<void> {
@@ -729,20 +741,20 @@ export class WorkspaceStore {
     return changes == null || (await this.#editDraft(changes)) != null
   }
 
-  public async saveTaskPorts(nodeId: string, ports: TaskPorts): Promise<boolean> {
+  public async saveTaskPorts(nodeId: string, ports: TaskPorts, deletion?: PropertyDeletion): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateTaskPorts(revision, target, nodeId, ports)
-    return changes != null && (await this.#editDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
-  public async saveTaskAdditionalInputs(nodeId: string, inputs: readonly InputPort[]): Promise<boolean> {
+  public async saveTaskAdditionalInputs(nodeId: string, inputs: readonly InputPort[], deletion?: PropertyDeletion): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateTaskAdditionalInputs(revision, target, nodeId, inputs)
-    return changes != null && (await this.#editDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
   public async setConnectorConnection(taskId: string, connectionId: string): Promise<boolean> {
@@ -820,12 +832,12 @@ export class WorkspaceStore {
     return changes != null && (await this.#editDraft(changes)) != null
   }
 
-  public async saveWebhook(triggerId: string, settings: WebhookSettings): Promise<boolean> {
+  public async saveWebhook(triggerId: string, settings: WebhookSettings, deletion?: PropertyDeletion): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target?.kind != 'flow') return false
     const changes = updateWebhook(revision, target, triggerId, settings)
-    return changes != null && (await this.#editDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
   public async setTriggerConnection(triggerId: string, connectionId: string): Promise<boolean> {
@@ -1016,8 +1028,23 @@ export class WorkspaceStore {
     return nodeId
   }
 
-  async #editDraft(changes: FlowChanges): Promise<Draft | undefined> {
-    return (await this.#canvasChange('edit', 1, changes)) ? this.#model.value.draft : undefined
+  async #editDraft(changes: FlowChanges, deletion?: PropertyDeletion): Promise<Draft | undefined> {
+    return (await this.#canvasChange('edit', 1, changes, undefined, undefined, deletion)) ? this.#model.value.draft : undefined
+  }
+
+  #notifyDeletion(deletion: PropertyDeletion, entry: CanvasHistoryEntry): void {
+    this.#setNotice({
+      kind: 'success',
+      message:
+        'name' in deletion ? this.#i18n.t(deletionMessageKeys[deletion.target], { name: deletion.name }) : this.#i18n.t(deletionMessageKeys[deletion.target]),
+      undo: {
+        label: this.#i18n.t('history.undo'),
+        run: async () => {
+          if (this.history$.value.undo !== entry) return
+          await this.undo()
+        },
+      },
+    })
   }
 
   async #changeDraft(changes: FlowChanges, manageBusy = true, historyOwned = false): Promise<Draft | undefined> {
@@ -1106,6 +1133,7 @@ export class WorkspaceStore {
     changes: FlowChanges,
     update?: PresentationUpdate,
     selection = this.#model.value.selectedNodeIds,
+    deletion?: PropertyDeletion,
   ): Promise<boolean> {
     if (this.#disposed || this.#history.applying || this.#history.failed) return false
     const { draft, target, presentation, selectedNodeIds } = this.#model.value
@@ -1116,7 +1144,7 @@ export class WorkspaceStore {
     const generation = this.#history.generation
     const inverse = inverseFlowChanges(draft.content, changes)
     this.#history.pending++
-    const retained = this.#history.record({
+    const entry: CanvasHistoryEntry = {
       action,
       count,
       target,
@@ -1125,14 +1153,17 @@ export class WorkspaceStore {
       presentation: presentationChange,
       beforeSelection: selectedNodeIds,
       afterSelection: selection,
-    })
+    }
+    const retained = this.#history.record(entry)
     try {
       const change = changes.length == 0 ? Promise.resolve(draft) : this.#changeDraft(changes, true, true)
       const layout = update == null ? Promise.resolve(true) : this.#changePresentation(update, true)
       this.selectNodes(selection)
       if (!retained) this.#setNotice({ kind: 'success', message: this.#i18n.t('history.tooLarge') })
       const [saved, positioned] = await Promise.all([change, layout])
-      return saved != null && positioned && (!retained || generation == this.#history.generation)
+      const complete = saved != null && positioned && (!retained || generation == this.#history.generation)
+      if (complete && retained && deletion != null && this.history$.value.undo === entry) this.#notifyDeletion(deletion, entry)
+      return complete
     } catch (error) {
       this.#setNotice(errorNotice(error, this.#i18n.t))
       void this.retryHistorySync()

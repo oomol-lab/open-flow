@@ -1,5 +1,6 @@
 import type { InputPort, WebhookOptions } from '../api.ts'
 import type { WebhookSettings } from './flowChanges.ts'
+import type { PropertyDeletion } from './propertyDeletion.ts'
 
 import { useId, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
@@ -60,17 +61,18 @@ export function WebhookEditor({
   readonly bodyFields: readonly InputPort[]
   readonly options: WebhookOptions
   readonly disabled: boolean
-  readonly onChange: (settings: WebhookSettings) => void
+  readonly onChange: (settings: WebhookSettings, deletion?: PropertyDeletion) => void
 }) {
   const t = useTranslate()
   const headers = options.responseHeaders ?? {}
-  const changeOption = <K extends keyof WebhookOptions>(key: K, value: WebhookOptions[K] | undefined) => {
+  const changeOption = <K extends keyof WebhookOptions>(key: K, value: WebhookOptions[K] | undefined, deletion?: PropertyDeletion) => {
     const next = { ...options }
     if (value === undefined) delete next[key]
     else next[key] = value
-    onChange({ bodyFields, options: next })
+    onChange({ bodyFields, options: next }, deletion)
   }
-  const changeHeaders = (next: Readonly<Record<string, string>>) => changeOption('responseHeaders', Object.keys(next).length === 0 ? undefined : next)
+  const changeHeaders = (next: Readonly<Record<string, string>>, deletion?: PropertyDeletion) =>
+    changeOption('responseHeaders', Object.keys(next).length === 0 ? undefined : next, deletion)
   return (
     <section className="inspector-section" data-inspector-section="trigger">
       <h3>{t('webhookEditor.webhookRequest')}</h3>
@@ -102,7 +104,7 @@ export function WebhookEditor({
             values={bodyFields}
             defaultNullable={false}
             disabled={disabled}
-            onChange={(next) => onChange({ bodyFields: next, options })}
+            onChange={(next, deletion) => onChange({ bodyFields: next, options }, deletion)}
           />
         </Field>
         <p className="text-sm text-muted-foreground">{t('webhookEditor.webhookTestHint')}</p>
@@ -173,7 +175,7 @@ export function WebhookEditor({
                   size="sm"
                   variant="ghost"
                   disabled={disabled}
-                  onClick={() => changeHeaders(Object.fromEntries(Object.entries(headers).filter(([key]) => key !== name)))}
+                  onClick={() => changeHeaders(Object.fromEntries(Object.entries(headers).filter(([key]) => key !== name)), { target: 'objectItem', name })}
                 >
                   {t('webhookEditor.webhookDeleteHeader')}
                 </Button>

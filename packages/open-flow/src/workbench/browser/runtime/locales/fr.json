@@ -984,6 +984,16 @@
   },
   "history": {
     "edit": "Modifier les propriétés du nœud",
+    "deleted": {
+      "field": "Champ « {{name}} » supprimé.",
+      "group": "Groupe « {{name}} » supprimé.",
+      "objectItem": "Champ d’objet « {{name}} » supprimé.",
+      "arrayItem": "Élément de tableau « {{name}} » supprimé.",
+      "option": "Option « {{name}} » supprimée.",
+      "case": "Cas « {{name}} » supprimé.",
+      "condition": "Condition supprimée.",
+      "conditionGroup": "Groupe de conditions supprimé."
+    },
     "undo": "Annuler",
     "redo": "Rétablir",
     "add": "Ajouter {{count}} nœuds",

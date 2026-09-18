@@ -49,8 +49,6 @@
     "groupName": "Nom du groupe",
     "addGroup": "Ajouter un groupe",
     "collapsed": "Replié",
-    "removeFieldConfirm": "Supprimer « {{name}} » ?",
-    "removeGroupConfirm": "Supprimer « {{name}} » ? Ses champs seront conservés.",
     "options": "Options de valeur pour {{name}}",
     "hours": "Heures",
     "minutes": "Minutes",

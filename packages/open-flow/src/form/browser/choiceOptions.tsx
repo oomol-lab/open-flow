@@ -1,9 +1,19 @@
+import type { ValueEditorDeletion } from './valueEditor.tsx'
+
 import { useEffect } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../ui/browser/button.tsx'
 import { Input } from '../../ui/browser/input.tsx'
 
-export function ChoiceOptions({ options, disabled, onChange }: { options: readonly unknown[]; disabled?: boolean; onChange: (options: unknown[]) => void }) {
+export function ChoiceOptions({
+  options,
+  disabled,
+  onChange,
+}: {
+  options: readonly unknown[]
+  disabled?: boolean
+  onChange: (options: unknown[], deletion?: ValueEditorDeletion) => void
+}) {
   const t = useTranslate()
   const createOptionLabel = (list: readonly unknown[], offset: number) => {
     let index = offset
@@ -55,7 +65,12 @@ export function ChoiceOptions({ options, disabled, onChange }: { options: readon
               disabled={disabled}
               className="-ml-px -mr-0.5"
               aria-label={`${t('valueEditor.remove')} ${t('valueEditor.option', { index: index + 1 })}`}
-              onClick={() => onChange(options.toSpliced(index, 1))}
+              onClick={() =>
+                onChange(options.toSpliced(index, 1), {
+                  target: 'option',
+                  name: typeof option === 'string' ? option : t('valueEditor.option', { index: index + 1 }),
+                })
+              }
             >
               <i aria-hidden="true" className="i-tabler-light:square-rounded-minus text-lg text-muted-foreground" />
             </Button>

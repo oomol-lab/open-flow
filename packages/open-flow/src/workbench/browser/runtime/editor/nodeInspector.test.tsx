@@ -334,7 +334,7 @@ describe('Node input ownership', () => {
     expect(props.entries[0]!.connected).toBe(false)
     props.onValue('message', null)
     props.onVariable('message', undefined)
-    expect(setInputValue).toHaveBeenCalledWith('condition', 'message', null)
+    expect(setInputValue).toHaveBeenCalledWith('condition', 'message', null, undefined)
     expect(setInputVariable).toHaveBeenCalledWith('condition', 'message', undefined)
   })
 })

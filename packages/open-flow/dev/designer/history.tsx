@@ -187,11 +187,20 @@ function HistorySample({
   const [session, setSession] = useState<ReturnType<typeof createSession>>()
   useEffect(() => {
     const toastIds = new Set<string | number>()
+    let undoToastId: string | number | undefined
+    const forgetToast = (id: string | number) => {
+      toastIds.delete(id)
+      if (undoToastId === id) undoToastId = undefined
+    }
     const next = createSession(
       language,
       (name, value) => logRef.current(name, value),
       (notice) => {
         if (!interactive) return
+        if (notice.undo != null && undoToastId != null) {
+          toast.dismiss(undoToastId)
+          forgetToast(undoToastId)
+        }
         const options = {
           toasterId,
           action:
@@ -200,16 +209,17 @@ function HistorySample({
               : {
                   label: <NotificationUndoLabel>{notice.undo.label}</NotificationUndoLabel>,
                   onClick: () => {
-                    toastIds.delete(toastId)
+                    forgetToast(toastId)
                     void notice.undo?.run()
                   },
                 },
           duration: notice.kind == 'error' ? 8000 : 4000,
-          onDismiss: ({ id }: { id: string | number }) => toastIds.delete(id),
-          onAutoClose: ({ id }: { id: string | number }) => toastIds.delete(id),
+          onDismiss: ({ id }: { id: string | number }) => forgetToast(id),
+          onAutoClose: ({ id }: { id: string | number }) => forgetToast(id),
         }
         const toastId: string | number = notice.kind == 'error' ? toast.error(notice.message, options) : toast.success(notice.message, options)
         toastIds.add(toastId)
+        if (notice.undo != null) undoToastId = toastId
       },
     )
     let disposed = false
@@ -373,9 +383,17 @@ function HistorySession({
 function HistoryCanvasActions({ session }: { session: ReturnType<typeof createSession> }) {
   const { store } = session
   const history = useVal(store.history$)
+  const draft = useVal(store.$.draft)
+  const value = draft?.content.document.graph.nodes.value
+  const valueField = value?.kind == 'value' ? value.values[0] : undefined
   useStoryActions([
     { label: 'Select mixed group', onClick: () => store.selectNodes(['trigger', 'value', 'code', 'note']) },
     { label: 'Edit title (undoable)', disabled: history.failed || history.applying, onClick: () => void store.saveNodeTitle('code', 'Edited transform') },
+    {
+      label: 'Delete value field',
+      disabled: history.failed || history.applying || valueField == null,
+      onClick: () => void store.saveValue('value', [], { target: 'field', name: valueField?.handle ?? 'value' }),
+    },
     { label: 'Hold saves', onClick: () => session.hold() },
     { label: 'Release saves', onClick: () => session.release() },
   ])
@@ -406,7 +424,8 @@ export const historyStory: FrontendStory = {
   group: 'Undo & Redo',
   id: 'canvas-history',
   title: 'Canvas operations',
-  description: 'Delete Input and undo/redo: the other edge and Transform’s simulated error stay visible. Hold saves to inspect pending changes.',
+  description:
+    'Delete Input and undo/redo: the other edge and Transform’s simulated error stay visible. Delete the value field to inspect the saved notification and Undo action. Hold saves to inspect pending changes.',
   standalone: true,
   render: (log, dark, language) => (
     <div
