@@ -1,6 +1,6 @@
-import type { ConnectorCapability, JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
+import type { ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { RuntimeCapabilityResponse, RuntimeProgram } from '@oomol-lab/open-flow/runtime-contract'
-import type { FlowRunOutcome, SchedulerEvent, TaskInvocation, WaitOperation } from '@oomol-lab/open-flow/scheduler'
+import type { FlowRunOutcome, SchedulerEvent, TaskInvocation, WaitOperation, WaitResolution } from '@oomol-lab/open-flow/scheduler'
 import type * as Scope from 'effect/Scope'
 import type IsolatedVM from 'isolated-vm'
 import type { CapabilityResult, ExecutorMessage, InvokeContext, InvokeRequest, IsolatedVmLimits, ParentMessage } from './isolated-vm.ts'
@@ -580,9 +580,20 @@ function executeFlow(
         remote(call({ operation: { kind: 'resolutions', waitIds, block }, type: 'wait' })).pipe(
           Effect.map((value) => {
             if (value == null || typeof value != 'object' || Array.isArray(value)) throw new Error('Invalid Wait resolutions.')
-            for (const [id, action] of Object.entries(value))
-              if (!waitIds.includes(id) || !['approve', 'reject', 'continue'].includes(String(action))) throw new Error('Invalid Wait resolution.')
-            return value as Readonly<Record<string, WaitAction>>
+            for (const [id, resolution] of Object.entries(value)) {
+              if (
+                !waitIds.includes(id) ||
+                resolution == null ||
+                typeof resolution != 'object' ||
+                Array.isArray(resolution) ||
+                !['approve', 'reject', 'continue'].includes(String(resolution.action)) ||
+                typeof resolution.resolvedAt != 'string' ||
+                !Number.isFinite(Date.parse(resolution.resolvedAt)) ||
+                (resolution.comment !== null && typeof resolution.comment != 'string')
+              )
+                throw new Error('Invalid Wait resolution.')
+            }
+            return value as unknown as Readonly<Record<string, WaitResolution>>
           }),
         ),
     },

@@ -589,6 +589,8 @@
     "timelineEmpty": "Запустите выбранный черновик, чтобы посмотреть его хронологию и выходные данные.",
     "submitting": "Отправка зафиксированной ревизии и создание записи о запуске…",
     "waiting": "Ожидание первого события…",
+    "waitComment": "Комментарий (необязательно)",
+    "waitCommentTooLong": "Не более 2 000 символов.",
     "waitExpires": "Истекает {{date}}",
     "savedResults": "Saved tool results",
     "refreshResults": "Refresh",

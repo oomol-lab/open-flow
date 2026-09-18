@@ -137,7 +137,7 @@ function canonicalNode(value: GraphNode): JsonValue {
     case 'wait':
       return {
         ...common,
-        input: { handle: value.input.handle, ...canonicalPort(value.input) },
+        inputDefinitions: canonicalPorts(value.inputDefinitions),
         kind: value.kind,
         prompt: value.prompt,
       }

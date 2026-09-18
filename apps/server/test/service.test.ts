@@ -192,7 +192,7 @@ function waitFlow(): RevisionContent {
         edges: [],
         nodes: {
           approval: {
-            input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+            inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
             inputs: { value: { kind: 'value', value: { request: 1 } } },
             kind: 'approval',
             name: 'Approval',
@@ -384,7 +384,7 @@ describe('Server application service', () => {
           kind: 'wait',
           name: 'Unused Wait',
           inputs: {},
-          input: { handle: 'value', jsonSchema: {}, nullable: true },
+          inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true }],
           prompt: 'Continue?',
         },
       },
@@ -581,10 +581,13 @@ describe('Server application service', () => {
     expect(await head.text()).toBe('')
     expect(service.run(accepted.runId)?.status).toBe('running')
 
-    const approved = await app.request(approvePath, { method: 'POST' })
-    expect(await approved.json()).toMatchObject({ action: 'approve', resolutionAccepted: true, state: 'resolved', version: 1 })
+    for (const body of ['{', JSON.stringify({ comment: 42 }), JSON.stringify({ comment: 'x'.repeat(2001) })]) {
+      expect((await app.request(approvePath, { method: 'POST', body })).status).toBe(400)
+    }
+    const approved = await app.request(approvePath, { method: 'POST', body: JSON.stringify({ comment: '  Looks good  ' }) })
+    expect(await approved.json()).toMatchObject({ action: 'approve', comment: 'Looks good', resolutionAccepted: true, state: 'resolved', version: 1 })
     const replay = await app.request(approvePath, { method: 'POST' })
-    expect(await replay.json()).toMatchObject({ action: 'approve', resolutionAccepted: true, state: 'resolved' })
+    expect(await replay.json()).toMatchObject({ action: 'approve', comment: 'Looks good', resolutionAccepted: true, state: 'resolved' })
     const rejected = await app.request(rejectPath, { method: 'POST' })
     expect(await rejected.json()).toMatchObject({ action: 'approve', resolutionAccepted: false, state: 'resolved' })
     const inspectedResolved = await app.request(rejectPath)
@@ -710,7 +713,16 @@ describe('Server application service', () => {
     await service.waitForIdle()
 
     expect(service.control.runs.getRunResult(accepted.runId)).toMatchObject({
-      result: { kind: 'node-results', nodes: [{ status: 'completed', outputs: { approve: { request: 1 } }, nodeId: 'approval' }] },
+      result: {
+        kind: 'node-results',
+        nodes: [
+          {
+            status: 'completed',
+            outputs: { approve: { inputs: { value: { request: 1 } }, action: 'approve', resolvedAt: expect.any(String), comment: null } },
+            nodeId: 'approval',
+          },
+        ],
+      },
       status: 'completed',
     })
     const events = service.events(accepted.runId)

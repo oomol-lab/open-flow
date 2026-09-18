@@ -589,6 +589,8 @@
     "timelineEmpty": "Run the selected Draft to inspect its timeline and output.",
     "submitting": "Submitting this fixed revision and creating its run record…",
     "waiting": "Waiting for the first event…",
+    "waitComment": "Comment (optional)",
+    "waitCommentTooLong": "Use at most 2,000 characters.",
     "waitExpires": "Expires {{date}}",
     "savedResults": "Saved tool results",
     "refreshResults": "Refresh",

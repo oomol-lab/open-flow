@@ -589,6 +589,8 @@
     "timelineEmpty": "运行当前选中的草稿后，可查看时间线和输出。",
     "submitting": "正在提交当前固定修订并创建运行记录…",
     "waiting": "正在等待第一个事件…",
+    "waitComment": "备注（可选）",
+    "waitCommentTooLong": "备注最多 2,000 个字符。",
     "waitExpires": "到期时间：{{date}}",
     "savedResults": "工具执行结果",
     "refreshResults": "刷新",

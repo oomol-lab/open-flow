@@ -630,7 +630,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
           {
             kind: 'graph.node.create',
             node: {
-              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+              inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
               inputs: { value: { kind: 'value', value: { request: 1 } } },
               kind: 'approval',
               name: 'Approval',

@@ -93,6 +93,7 @@ const condition = {
   defaultOutput: text.optional(),
 }
 const wait = {
+  inputDefinitions: z.array(input),
   prompt: text,
 }
 const webhook = {
@@ -148,8 +149,8 @@ const node = z.union([
   z.object({ ...base, kind: z.literal('subflow'), subflowId: text }),
   z.object({ ...base, kind: z.literal('task'), task: inline, additionalInputs: z.array(input).optional() }),
   z.object({ ...base, kind: z.literal('task'), taskId: text, additionalInputs: z.array(input).optional() }),
-  z.strictObject({ ...base, kind: z.literal('approval'), input, ...wait }).omit({ timeoutMs: true }),
-  z.strictObject({ ...base, kind: z.literal('wait'), input, ...wait }).omit({ timeoutMs: true }),
+  z.strictObject({ ...base, kind: z.literal('approval'), ...wait }).omit({ timeoutMs: true }),
+  z.strictObject({ ...base, kind: z.literal('wait'), ...wait }).omit({ timeoutMs: true }),
   z.object({ ...trigger, kind: z.literal('manual') }),
   z.object({ ...trigger, kind: z.literal('webhook'), ...webhook }),
   z.object({ ...trigger, kind: z.literal('cron'), cronTimes: triggerScheduleSchema }),

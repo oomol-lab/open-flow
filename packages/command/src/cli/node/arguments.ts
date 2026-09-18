@@ -31,6 +31,7 @@ export interface ParsedArguments {
   readonly status?: RunStatus
   readonly summary: boolean
   readonly sets: readonly string[]
+  readonly comment?: string
   readonly timeoutMs?: number
   readonly timezone?: string
   readonly unsets: readonly string[]
@@ -67,6 +68,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
   let pendingWait: boolean | undefined
   let status: RunStatus | undefined
   let summary = false
+  let comment: string | undefined
   let timeoutMs: number | undefined
   let timezone: string | undefined
   const unsets: string[] = []
@@ -117,6 +119,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       argument == '--cursor' ||
       argument == '--limit' ||
       argument == '--after' ||
+      argument == '--comment' ||
       argument == '--timeout' ||
       argument == '--timezone' ||
       argument == '--set' ||
@@ -135,6 +138,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       else if (argument == '--file') file = value
       else if (argument == '--flow') flow = value
       else if (argument == '--name') name = value
+      else if (argument == '--comment') comment = value
       else if (argument == '--input') input = value
       else if (argument == '--trigger') trigger = value
       else if (argument == '--outputs') outputs = value
@@ -167,6 +171,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
 
   return {
     idempotencyKey,
+    ...(comment == null ? {} : { comment }),
     ...(expectedPublication == null ? {} : { expectedPublication }),
     ...(after == null ? {} : { after }),
     ...(code == null ? {} : { code }),

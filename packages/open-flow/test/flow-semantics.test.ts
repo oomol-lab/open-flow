@@ -849,7 +849,7 @@ export default () => value`,
               },
             },
             wait: {
-              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+              inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
               inputs: { value: { kind: 'value', value: null } },
               kind: 'approval',
               prompt: 'Approve this request?',
@@ -880,7 +880,7 @@ export default () => value`,
     expect([...dependencies.inputBindings]).toEqual(['recipient'])
   })
 
-  it('preserves the Approval input schema on decision outputs', async () => {
+  it('exposes a structured Approval decision instead of forwarding its input type', async () => {
     const source = revision('export default ({ input }) => ({ input })')
     const task = source.document.graph.nodes.task
     if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
@@ -894,10 +894,10 @@ export default () => value`,
             task: {
               ...task,
               inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'approve' }] } },
-              task: { ...task.task, inputs: [{ handle: 'input', jsonSchema: { type: 'string' }, nullable: false }] },
+              task: { ...task.task, inputs: [{ handle: 'input', jsonSchema: { type: 'object' }, nullable: false }] },
             },
             wait: {
-              input: { handle: 'value', jsonSchema: { type: 'string' }, nullable: false },
+              inputDefinitions: [{ handle: 'value', jsonSchema: { type: 'string' }, nullable: false }],
               inputs: { value: { kind: 'value', value: 'request-1' } },
               kind: 'approval',
               prompt: 'Approve this request?',
@@ -912,7 +912,15 @@ export default () => value`,
 
   it.each([
     [{ legacy: true }, 'wait.field-unsupported'],
-    [{ input: { handle: 'other', jsonSchema: {}, nullable: true } }, 'wait.input-invalid'],
+    [
+      {
+        inputDefinitions: [
+          { handle: 'value', jsonSchema: {}, nullable: true },
+          { handle: 'value', jsonSchema: {}, nullable: true },
+        ],
+      },
+      'wait.input-invalid',
+    ],
     [{ prompt: '' }, 'wait.prompt-invalid'],
     [{ timeoutMs: 1_000 }, 'wait.field-unsupported'],
   ] as const)('rejects an invalid Wait shape: %s', async (fields, code) => {
@@ -923,7 +931,7 @@ export default () => value`,
           edges: [],
           nodes: {
             wait: {
-              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+              inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
               inputs: { value: { kind: 'value', value: null } },
               kind: 'wait',
               prompt: 'Continue?',
@@ -955,7 +963,7 @@ export default () => value`,
               subflowId: 'child',
             },
             wait: {
-              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+              inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
               inputs: { value: { kind: 'value', value: null } },
               kind: 'wait',
               prompt: 'Continue?',
@@ -968,7 +976,7 @@ export default () => value`,
               edges: [],
               nodes: {
                 wait: {
-                  input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+                  inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
                   inputs: { value: { kind: 'value', value: null } },
                   kind: 'wait',
                   prompt: 'Not allowed here',

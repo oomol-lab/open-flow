@@ -2,7 +2,7 @@ import type { RunEventKind } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { RunStatus, RunTerminalStatus } from '@oomol-lab/open-flow/run-lifecycle'
-import type { FlowRunCheckpoint, WaitRequest, FlowRunOptions, FlowRunOutcome, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
+import type { FlowRunCheckpoint, WaitRequest, WaitResolution, FlowRunOptions, FlowRunOutcome, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
 import type { DatabaseSync } from 'node:sqlite'
 import type { LlmConfig } from '../deployment/llm.ts'
 import type { ConnectorTeamStore } from './connector-team-store.ts'
@@ -14,7 +14,7 @@ import type { RunAdmission, TriggerOccurrenceInput } from './trigger-store.ts'
 import type { VariableStore } from './variable-store.ts'
 
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
-import { decodeFlowRunCheckpoint } from '@oomol-lab/open-flow/scheduler'
+import { decodeFlowRunCheckpoint, normalizeWaitComment } from '@oomol-lab/open-flow/scheduler'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { isolatedVmEngineDigest } from '../runtime/isolated-vm.ts'
 
@@ -407,7 +407,12 @@ export class RunStore {
       const links =
         capability == null ? [] : wait.actions.map((action) => ({ action, url: new URL(`/v1/wait-actions/${capability}/${action}`, publicOrigin!).href }))
       const output: JsonValue | undefined = wait.notify
-        ? { value: wait.value, prompt: wait.prompt, actions: links, expiresAt: new Date(expiresAt).toISOString() }
+        ? {
+            inputs: wait.value,
+            prompt: wait.prompt,
+            ...Object.fromEntries(links.map(({ action, url }) => [`${action}Url`, url])),
+            expiresAt: new Date(expiresAt).toISOString(),
+          }
         : undefined
       this.#database
         .prepare(
@@ -458,21 +463,21 @@ export class RunStore {
     })
   }
 
-  resolutions(runId: string, waitIds: readonly string[]): Readonly<Record<string, WaitAction>> {
+  resolutions(runId: string, waitIds: readonly string[]): Readonly<Record<string, WaitResolution>> {
     const run = this.#database.prepare('SELECT status FROM runs WHERE run_id = ?').get(runId) as { status: RunStatus } | undefined
     if (run?.status != 'running') throw new Error('Run execution is no longer active.')
-    const results: Record<string, WaitAction> = {}
+    const results: Record<string, WaitResolution> = {}
     for (const waitId of waitIds) {
-      const row = this.#database.prepare('SELECT action FROM wait_receipts WHERE run_id = ? AND wait_id = ?').get(runId, waitId) as
-        | { action: WaitAction | null }
-        | undefined
+      const row = this.#database
+        .prepare('SELECT action, resolved_at AS resolvedAt, comment FROM wait_receipts WHERE run_id = ? AND wait_id = ?')
+        .get(runId, waitId) as { action: WaitAction | null; resolvedAt: number; comment: string | null } | undefined
       if (row == null) throw new Error('Waiting node is not registered.')
-      if (row.action != null) results[waitId] = row.action
+      if (row.action != null) results[waitId] = { action: row.action, resolvedAt: new Date(row.resolvedAt).toISOString(), comment: row.comment }
     }
     return results
   }
 
-  waitForResolutions(runId: string, waitIds: readonly string[], signal: AbortSignal): Promise<Readonly<Record<string, WaitAction>>> {
+  waitForResolutions(runId: string, waitIds: readonly string[], signal: AbortSignal): Promise<Readonly<Record<string, WaitResolution>>> {
     return new Promise((resolve, reject) => {
       const listeners = this.#waitListeners.get(runId) ?? new Set<() => void>()
       this.#waitListeners.set(runId, listeners)
@@ -557,20 +562,23 @@ export class RunStore {
     runId: string,
     waitId: string,
     requested: WaitAction,
+    comment?: string | null,
   ):
     | { readonly kind: 'invalid-action' | 'not-found' }
     | {
         readonly action: WaitAction | null
+        readonly comment: string | null
         readonly changed: boolean
         readonly kind: 'resolved'
         readonly resolutionAccepted: boolean
         readonly resolvedAt: number | null
         readonly status: RunStatus
       } {
+    const normalizedComment = normalizeWaitComment(comment)
     return this.#transaction(() => {
       const row = this.#database
         .prepare(
-          `SELECT wait_receipts.action, wait_receipts.actions, wait_receipts.expires_at AS expiresAt,
+          `SELECT wait_receipts.comment, wait_receipts.action, wait_receipts.actions, wait_receipts.expires_at AS expiresAt,
                   wait_receipts.resolved_at AS resolvedAt, runs.status
            FROM wait_receipts JOIN runs USING (run_id)
            WHERE wait_receipts.run_id = ? AND wait_receipts.wait_id = ?`,
@@ -579,6 +587,7 @@ export class RunStore {
         | {
             readonly actions: string
             readonly action: WaitAction | null
+            readonly comment: string | null
             readonly expiresAt: number
             readonly resolvedAt: number | null
             readonly status: RunStatus
@@ -589,6 +598,7 @@ export class RunStore {
       if (row.action != null && row.resolvedAt != null) {
         return {
           action: row.action,
+          comment: row.comment,
           changed: false,
           kind: 'resolved' as const,
           resolutionAccepted: row.action == requested,
@@ -597,7 +607,7 @@ export class RunStore {
         }
       }
       if (!['running', 'waiting', 'queued', 'starting'].includes(row.status)) {
-        return { action: null, changed: false, kind: 'resolved' as const, resolutionAccepted: false, resolvedAt: null, status: row.status }
+        return { action: null, comment: null, changed: false, kind: 'resolved' as const, resolutionAccepted: false, resolvedAt: null, status: row.status }
       }
       const resolvedAt = this.#clock()
       if (resolvedAt >= row.expiresAt) {
@@ -608,18 +618,21 @@ export class RunStore {
           "status IN ('running', 'waiting', 'queued', 'starting')",
           resolvedAt,
         )
-        return { action: null, changed: true, kind: 'resolved' as const, resolutionAccepted: false, resolvedAt: null, status: 'failed' as const }
+        return { action: null, comment: null, changed: true, kind: 'resolved' as const, resolutionAccepted: false, resolvedAt: null, status: 'failed' as const }
       }
       this.#database.prepare("UPDATE runs SET status = 'queued' WHERE run_id = ? AND status = 'waiting'").run(runId)
-      this.#database.prepare('UPDATE wait_receipts SET action = ?, resolved_at = ? WHERE run_id = ? AND wait_id = ?').run(requested, resolvedAt, runId, waitId)
+      this.#database
+        .prepare('UPDATE wait_receipts SET action = ?, resolved_at = ?, comment = ? WHERE run_id = ? AND wait_id = ?')
+        .run(requested, resolvedAt, normalizedComment, runId, waitId)
       this.#database.prepare('DELETE FROM wait_notifications WHERE run_id = ? AND wait_id = ?').run(runId, waitId)
       for (const listener of this.#waitListeners.get(runId) ?? []) listener()
-      const payload = { action: requested, resolvedAt: new Date(resolvedAt).toISOString(), waitId }
+      const payload = { action: requested, comment: normalizedComment, resolvedAt: new Date(resolvedAt).toISOString(), waitId }
       this.#insertEvent(runId, 'run.resolved', payload)
       const bytes = encoder.encode(JSON.stringify({ kind: 'run.resolved', payload })).byteLength
       this.#database.prepare('UPDATE runs SET event_count = event_count + 1, event_bytes = event_bytes + ? WHERE run_id = ?').run(bytes, runId)
       return {
         action: requested,
+        comment: normalizedComment,
         changed: true,
         kind: 'resolved' as const,
         resolutionAccepted: true,

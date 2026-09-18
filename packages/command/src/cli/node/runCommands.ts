@@ -109,10 +109,10 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
       }
     }
     case 'resolve': {
-      requireCount(references, 3, 'oo flow runs resolve <run> <wait> <continue|approve|reject> [--json]')
+      requireCount(references, 3, 'oo flow runs resolve <run> <wait> <continue|approve|reject> [--comment <text>] [--json]')
       const [runId, waitId, action] = references
       if (action != 'continue' && action != 'approve' && action != 'reject') throw new CliError('cli.invalid-arguments', 'Invalid Wait action.')
-      const resolution = await client.resolveRunWait(runId!, waitId!, action)
+      const resolution = await client.resolveRunWait(runId!, waitId!, action, args.comment)
       write(runtime, args.json, { kind: 'run.resolve', resolution, version: 1 }, JSON.stringify(resolution))
       return
     }

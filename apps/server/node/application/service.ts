@@ -490,15 +490,17 @@ export class ServerService {
     capability: string,
     requested: WaitAction,
     admit: (digest: string) => number | undefined,
+    comment?: string | null,
   ):
     | {
         readonly action: WaitAction | null
+        readonly comment: string | null
         readonly resolutionAccepted: boolean
         readonly resolvedAt: string | null
         readonly state: 'resolved' | 'unavailable' | 'waiting'
       }
     | { readonly retryAfter: number }
     | undefined {
-    return this.#waitActions.resolve(capability, requested, admit)
+    return this.#waitActions.resolve(capability, requested, admit, comment)
   }
 }

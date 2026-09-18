@@ -39,7 +39,7 @@ const commands = [
   ['runs list', '--flow <flow>', ['flow', 'status', 'pending-wait', ...page]],
   ['runs show', '<run>', []],
   ['runs wait', '<run>', ['timeout']],
-  ['runs resolve', '<run> <wait> <continue|approve|reject>', []],
+  ['runs resolve', '<run> <wait> <continue|approve|reject>', ['comment']],
   ['runs events', '<run>', ['after', 'limit', 'follow', 'timeout']],
   ['runs result', '<run>', []],
   ['runs results', '<run> [<after>]', []],
@@ -78,6 +78,7 @@ const optionDetails: Record<
   'limit': { description: 'Maximum items in one page.', type: 'integer', minimum: 1, maximum: 100, default: 100 },
   'after': { description: 'Resume events after this sequence number; use nextAfter from the preceding response.', type: 'integer', minimum: 0, default: 0 },
   'cursor': { description: 'Opaque nextCursor from the preceding page; keep the same filters.', type: 'string' },
+  'comment': { description: 'Optional plain-text Wait decision comment (up to 2,000 Unicode code points).', type: 'string' },
   'pending-wait': { description: 'List runs with unresolved waits, including running and queued runs.', type: 'boolean' },
   'status': {
     description: 'Filter runs by status.',

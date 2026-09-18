@@ -8,7 +8,9 @@ export function waitHost(decisions: Readonly<Record<string, WaitAction>> = {}): 
   return {
     create: () => Effect.succeed(undefined),
     resolutions: (ids, block) => {
-      const values = Object.fromEntries(ids.filter((id) => decisions[id] != null).map((id) => [id, decisions[id]!]))
+      const values = Object.fromEntries(
+        ids.filter((id) => decisions[id] != null).map((id) => [id, { action: decisions[id]!, resolvedAt: '2026-09-18T08:30:00.000Z', comment: null }]),
+      )
       return block && Object.keys(values).length == 0 ? Effect.never : Effect.succeed(values)
     },
   }

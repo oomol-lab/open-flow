@@ -39,7 +39,7 @@ function fixture() {
   expect(store.runs.claim()?.runId).toBe(runId)
   expect(store.runs.start(runId, { kind: 'run.started', payload: { flowId: 'flow', scopeId: runId } })).toBe(true)
   const waits = ['first', 'second'].map(
-    (waitId): WaitRequest => ({ waitId, nodeId: waitId, jobId: waitId, actions: ['approve', 'reject'], prompt: waitId, value: null, notify: true }),
+    (waitId): WaitRequest => ({ waitId, nodeId: waitId, jobId: waitId, actions: ['approve', 'reject'], prompt: waitId, value: {}, notify: true }),
   )
   const checkpoint: FlowRunCheckpoint = {
     version: 5,
@@ -74,7 +74,7 @@ it('persists multiple waits immediately and resumes locally without a checkpoint
   const controller = new AbortController()
   const pending = f.store.runs.waitForResolutions(f.runId, ['first', 'second'], controller.signal)
   expect(f.store.runs.resolveWait(f.runId, 'second', 'reject')).toMatchObject({ status: 'running', changed: true })
-  expect(await pending).toEqual({ second: 'reject' })
+  expect(await pending).toEqual({ second: resolution('reject') })
   expect(f.store.runViews.activeWaits(f.runId).map((wait) => wait.waitId)).toEqual(['first'])
   expect(f.store.runViews.listControlRuns('flow', 10, { pendingWait: true })).toHaveLength(1)
   expect(f.store.runs.createWait(f.runId, f.waits[0]!, 'https://different.example')).toEqual(f.checkpoint.waits[0]!.pending)
@@ -90,7 +90,7 @@ it.each(['queued', 'starting'] as const)('accepts a second decision during %s an
   if (status == 'queued') expect(f.store.runs.claim()?.runId).toBe(f.runId)
   expect(f.store.runs.resume(f.runId)).toBe(true)
   expect(f.store.runs.resume(f.runId)).toBe(false)
-  expect(f.store.runs.resolutions(f.runId, ['first', 'second'])).toEqual({ first: 'approve', second: 'reject' })
+  expect(f.store.runs.resolutions(f.runId, ['first', 'second'])).toEqual({ first: resolution('approve'), second: resolution('reject') })
 })
 
 it.each(['before', 'after'] as const)('cannot lose a decision committed %s the freeze transaction', (order) => {
@@ -102,7 +102,7 @@ it.each(['before', 'after'] as const)('cannot lose a decision committed %s the f
   const claimed = f.store.runs.claim()!
   expect(claimed.resume?.checkpoint).toEqual(f.checkpoint)
   expect(f.store.runs.resume(f.runId)).toBe(true)
-  expect(f.store.runs.resolutions(f.runId, ['first', 'second'])).toEqual({ first: 'approve' })
+  expect(f.store.runs.resolutions(f.runId, ['first', 'second'])).toEqual({ first: resolution('approve') })
 })
 
 it.each(['queued', 'starting'] as const)('expires unresolved waits during %s without reviving claimed work', (status) => {
@@ -125,7 +125,7 @@ it('rereads durable decisions after a lost in-memory wake', async () => {
     const pending = f.store.runs.waitForResolutions(f.runId, ['first'], new AbortController().signal)
     f.database.connection.prepare("UPDATE wait_receipts SET action = 'approve', resolved_at = 1001 WHERE run_id = ? AND wait_id = 'first'").run(f.runId)
     await vi.advanceTimersByTimeAsync(1000)
-    expect(await pending).toEqual({ first: 'approve' })
+    expect(await pending).toEqual({ first: resolution('approve', 1001) })
   } finally {
     vi.useRealTimers()
   }
@@ -193,4 +193,40 @@ it('loads a version 5 checkpoint with the legacy notification field as pending',
   const recovered = new Store(f.database, () => 1001)
   recovered.runs.resolveWait(f.runId, 'first', 'approve')
   expect(recovered.runs.claim()?.resume?.checkpoint).toEqual(f.checkpoint)
+})
+
+function resolution(action: 'approve' | 'reject', time = 1000, comment: string | null = null) {
+  return { action, resolvedAt: new Date(time).toISOString(), comment }
+}
+
+it('persists the first comment and decision timestamp across retries and restart', () => {
+  const f = fixture()
+  f.pause()
+  f.setTime(1500)
+  expect(f.store.runs.resolveWait(f.runId, 'first', 'reject', '  Missing sign-off  ')).toMatchObject({
+    comment: 'Missing sign-off',
+    resolvedAt: 1500,
+    changed: true,
+  })
+  f.setTime(2000)
+  for (const action of ['approve', 'reject'] as const) {
+    expect(f.store.runs.resolveWait(f.runId, 'first', action, 'replacement')).toMatchObject({
+      action: 'reject',
+      comment: 'Missing sign-off',
+      resolvedAt: 1500,
+      changed: false,
+    })
+  }
+  const reopened = new Store(f.database, () => 2500)
+  expect(reopened.runs.claim()?.runId).toBe(f.runId)
+  expect(reopened.runs.resume(f.runId)).toBe(true)
+  expect(reopened.runs.resolutions(f.runId, ['first'])).toEqual({ first: resolution('reject', 1500, 'Missing sign-off') })
+})
+
+it('normalizes optional comments and rejects invalid comments without resolving', () => {
+  const f = fixture()
+  expect(() => f.store.runs.resolveWait(f.runId, 'first', 'approve', 'a'.repeat(2001))).toThrow('2,000')
+  expect(f.store.runs.resolutions(f.runId, ['first'])).toEqual({})
+  expect(f.store.runs.resolveWait(f.runId, 'first', 'approve', '  \n ')).toMatchObject({ comment: null })
+  expect(f.store.runs.resolveWait(f.runId, 'second', 'reject', '🙂'.repeat(2000))).toMatchObject({ comment: '🙂'.repeat(2000) })
 })

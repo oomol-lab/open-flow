@@ -206,7 +206,7 @@ describe('Execution graph scheduling', () => {
       ],
       nodes: {
         before: { ...task, task: { ...task.task, outputs: [{ ...port, handle: 'value' }] } },
-        pause: { kind: 'wait', inputs: {}, input: { ...port, handle: 'value', value: null }, prompt: 'Continue?' },
+        pause: { kind: 'wait', inputs: {}, inputDefinitions: [{ ...port, handle: 'value', value: null }], prompt: 'Continue?' },
         after: { ...task, inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'before', output: 'value' }] } } },
       },
     }
@@ -281,7 +281,7 @@ it('does not treat eventual action values as available on the notification path'
   const wait = {
     kind: 'approval' as const,
     inputs: {},
-    input: { ...port, handle: 'value', value: null },
+    inputDefinitions: [{ ...port, handle: 'value', value: null }],
     prompt: 'Approve?',
   }
   const graph: Graph = {
@@ -313,8 +313,8 @@ it('does not treat eventual action values as available on the notification path'
 })
 
 it('only offers resolution outputs on their reachable paths', () => {
-  const wait = { kind: 'wait' as const, inputs: {}, input: { ...port, handle: 'value', value: null }, prompt: 'Continue?' }
-  const approval = { kind: 'approval' as const, inputs: {}, input: { ...port, handle: 'value', value: null }, prompt: 'Approve?' }
+  const wait = { kind: 'wait' as const, inputs: {}, inputDefinitions: [{ ...port, handle: 'value', value: null }], prompt: 'Continue?' }
+  const approval = { kind: 'approval' as const, inputs: {}, inputDefinitions: [{ ...port, handle: 'value', value: null }], prompt: 'Approve?' }
   const jsonTask = { ...task, task: { ...task.task, inputs: [{ ...port, handle: 'input', jsonSchema: {} }] } }
   const graph: Graph = {
     nodes: {
@@ -362,7 +362,7 @@ it.each([true, false])('runs with null from either an available nullable source 
         join: { ...task, inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } } },
         after: task,
         independent: task,
-        pause: { kind: 'wait', inputs: {}, input: { ...port, handle: 'value', value: null }, prompt: 'Continue?' },
+        pause: { kind: 'wait', inputs: {}, inputDefinitions: [{ ...port, handle: 'value', value: null }], prompt: 'Continue?' },
       },
       edges: [
         { source: 'start', target: 'choice' },
@@ -507,7 +507,7 @@ it.each(['edge', 'input'] as const)('rejects the old Wait notification %s refere
     revision({
       nodes: {
         start: { kind: 'manual', name: 'Start' },
-        wait: { kind: 'wait', input: { handle: 'value', ...port }, inputs: {}, prompt: 'Continue?' },
+        wait: { kind: 'wait', inputDefinitions: [{ handle: 'value', ...port }], inputs: {}, prompt: 'Continue?' },
         after: {
           ...task,
           inputs: reference == 'input' ? { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'wait', output: 'notification' }] } } : {},

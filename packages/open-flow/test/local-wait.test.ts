@@ -1,5 +1,5 @@
 import type { SchedulerEvent, WaitRequest } from '../src/execution/common/scheduler.ts'
-import type { WaitAction, RevisionContent } from '../src/flow/common/change.ts'
+import type { WaitAction, RevisionContent, InputPort } from '../src/flow/common/change.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
@@ -16,7 +16,11 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-async function fixture(notify = true, action: WaitAction = 'approve') {
+async function fixture(
+  notify = true,
+  action: WaitAction = 'approve',
+  inputDefinitions: readonly InputPort[] = [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
+) {
   const content: RevisionContent = {
     modelVersion: currentFlowModelVersion,
     modules: {},
@@ -39,7 +43,7 @@ async function fixture(notify = true, action: WaitAction = 'approve') {
             kind: action == 'continue' ? 'wait' : 'approval',
             prompt: 'Ready?',
             inputs: {},
-            input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+            inputDefinitions,
           },
           ...(notify
             ? {
@@ -98,9 +102,9 @@ async function fixture(notify = true, action: WaitAction = 'approve') {
             requests.push(wait)
             return wait.notify
               ? {
-                  value: wait.value,
+                  inputs: wait.value,
                   prompt: wait.prompt,
-                  actions: wait.actions.map((choice) => ({ action: choice, url: `https://example.com/${choice}` })),
+                  ...Object.fromEntries(wait.actions.map((choice) => [`${choice}Url`, `https://example.com/${choice}`])),
                   expiresAt: '2030-01-01T00:00:00.000Z',
                 }
               : undefined
@@ -108,7 +112,9 @@ async function fixture(notify = true, action: WaitAction = 'approve') {
         resolutions: (ids: readonly string[], block: boolean) =>
           Effect.tryPromise(async () => {
             if (block && !ids.some((id) => decisions[id] != null)) await changed.promise
-            return Object.fromEntries(ids.filter((id) => decisions[id] != null).map((id) => [id, decisions[id]!]))
+            return Object.fromEntries(
+              ids.filter((id) => decisions[id] != null).map((id) => [id, { action: decisions[id]!, resolvedAt: '2026-09-18T08:30:00.000Z', comment: null }]),
+            )
           }),
       },
     },
@@ -267,14 +273,14 @@ it.each(['continue', 'approve', 'reject'] as const)('does not notify nullable co
   )
   await sent.promise
   expect(calls.map((call) => call.nodeId)).toEqual(['send'])
-  expect(calls[0]!.inputs.notice).toMatchObject({ prompt: 'Ready?', value: null })
+  expect(calls[0]!.inputs.notice).toMatchObject({ prompt: 'Ready?', inputs: { value: null } })
   expect(f.events.some((event) => event.type == 'node.completed' && event.nodeId == 'wait')).toBe(false)
   f.resolve()
   expect((await run).kind).toBe('node-results')
   expect(calls.map((call) => call.nodeId)).toEqual(['send', 'after'])
   expect(f.requests).toHaveLength(1)
   expect(f.events.find((event) => event.type == 'node.completed' && event.nodeId == 'wait')).toMatchObject({
-    outputs: { pending: calls[0]!.inputs.notice, [action]: null },
+    outputs: { pending: calls[0]!.inputs.notice, [action]: { inputs: { value: null }, action, resolvedAt: '2026-09-18T08:30:00.000Z', comment: null } },
   })
 })
 
@@ -293,7 +299,7 @@ it.each(['continue', 'approve', 'reject'] as const)('does not replay notificatio
   if (frozen.kind != 'waiting') throw new Error('Expected waiting')
   expect(calls).toEqual(['send'])
   const saved = frozen.checkpoint.waits[0]!
-  expect(saved.pending).toMatchObject({ prompt: 'Ready?', value: null })
+  expect(saved.pending).toMatchObject({ prompt: 'Ready?', inputs: { value: null } })
   const { pending, ...legacy } = saved
   expect(decodeFlowRunCheckpoint({ ...frozen.checkpoint, waits: [{ ...legacy, notification: pending }] })).toEqual(frozen.checkpoint)
   expect(() => decodeFlowRunCheckpoint({ ...frozen.checkpoint, waits: [{ ...saved, notification: pending }] })).toThrow()
@@ -340,3 +346,66 @@ it('notifies once for each new Wait invocation in a loop', async () => {
   expect((await run).kind).toBe('node-results')
   expect(calls).toEqual(['send', 'after', 'send'])
 })
+
+it.each(['continue', 'approve', 'reject'] as const)('restores %s with multiple inputs and the authoritative comment and time', async (action) => {
+  const f = await fixture(true, action, [
+    { handle: 'orderId', jsonSchema: { type: 'string' }, nullable: false, value: 'order-1' },
+    { handle: 'amount', jsonSchema: { type: 'number' }, nullable: false, value: 500 },
+  ])
+  vi.useFakeTimers()
+  const pending = Effect.runPromise(runFlow(f.prepared, { ...f.options, invokeTask: emptyTask }))
+  await vi.advanceTimersByTimeAsync(120_000)
+  const frozen = await pending
+  if (frozen.kind != 'waiting') throw new Error('Expected waiting')
+  const { trigger: _, ...options } = f.options
+  const resolution = { action, resolvedAt: '2026-09-18T01:02:03.000Z', comment: 'Reviewed the order' }
+  const result = await Effect.runPromise(
+    runFlow(f.prepared, {
+      ...options,
+      invokeTask: emptyTask,
+      resume: { checkpoint: JSON.parse(JSON.stringify(frozen.checkpoint)) },
+      waits: { ...options.waits, resolutions: () => Effect.succeed({ [f.requests[0]!.waitId]: resolution }) },
+    }),
+  )
+  expect(result.kind).toBe('node-results')
+  expect(f.events.find((event) => event.type == 'node.completed' && event.nodeId == 'wait')).toMatchObject({
+    outputs: {
+      pending: { inputs: { orderId: 'order-1', amount: 500 } },
+      [action]: { inputs: { orderId: 'order-1', amount: 500 }, ...resolution },
+    },
+  })
+  expect(f.requests).toHaveLength(1)
+})
+
+it('executes a zero-input Wait and returns an empty inputs object', async () => {
+  const f = await fixture(false, 'continue', [])
+  await Effect.runPromise(
+    runFlow(f.prepared, {
+      ...f.options,
+      invokeTask: () => Effect.succeed({}),
+      waits: {
+        create: f.options.waits.create,
+        resolutions: (ids) =>
+          Effect.succeed(
+            Object.fromEntries(
+              ids.map((id) => [
+                id,
+                {
+                  action: 'continue' as const,
+                  resolvedAt: '2026-09-18T01:02:03.000Z',
+                  comment: null,
+                },
+              ]),
+            ),
+          ),
+      },
+    }),
+  )
+  expect(f.events.find((event) => event.type == 'node.completed' && event.nodeId == 'wait')).toMatchObject({
+    outputs: { continue: { inputs: {}, action: 'continue', comment: null } },
+  })
+})
+
+function emptyTask() {
+  return Effect.succeed({})
+}

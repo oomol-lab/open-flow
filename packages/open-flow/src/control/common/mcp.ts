@@ -2,6 +2,7 @@ import type { JsonValue } from '../../flow/common/change.ts'
 
 import { z } from 'zod'
 import { runStatuses } from '../../execution/common/runLifecycle.ts'
+import { waitCommentSchema } from '../../execution/common/wait.ts'
 import { resourceNameIssue } from '../../flow/common/change.ts'
 import { resultQuerySchema } from './resultQuery.ts'
 
@@ -145,8 +146,8 @@ export const mcpTools = {
     true,
   ),
   run_resolve_wait: tool(
-    'Explicitly resolve the waitId observed in run_get with one of its allowed actions. The first decision wins; inspect resolutionAccepted and action. Resume the same Run and poll run_get; do not create a replacement Run.',
-    z.strictObject({ runId: run, waitId: id, action: z.enum(['approve', 'continue', 'reject']) }),
+    'Explicitly resolve the waitId observed in run_get with one of its allowed actions. Optional comment records the reason (up to 2,000 Unicode code points). The first decision and comment win; inspect resolutionAccepted and action. Resume the same Run and poll run_get; do not create a replacement Run.',
+    z.strictObject({ runId: run, waitId: id, action: z.enum(['approve', 'continue', 'reject']), comment: waitCommentSchema }),
     false,
   ),
   run_cancel: tool(

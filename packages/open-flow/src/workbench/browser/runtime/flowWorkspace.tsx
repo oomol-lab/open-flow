@@ -74,7 +74,7 @@ function RunDrawerContainer({
       onLocateWait={(nodeId) => {
         if (store.locateRunWait(nodeId)) onClose()
       }}
-      onResolve={(waitId, action) => void store.runs.resolve(waitId, action)}
+      onResolve={(waitId, action, comment) => void store.runs.resolve(waitId, action, comment)}
       onRetryObservation={() => store.runs.retryObservation()}
       onToggle={onToggle}
       observationFailed={observationFailed}

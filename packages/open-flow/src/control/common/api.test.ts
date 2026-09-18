@@ -274,6 +274,7 @@ describe('ControlClient Wait API', () => {
   it('decodes the active waiting projection and resolves a fixed action', async () => {
     const response = {
       action: 'approve',
+      comment: 'Reviewed',
       resolutionAccepted: true,
       resolvedAt: '2026-09-01T00:00:03.000Z',
       runId: waiting.runId,
@@ -289,10 +290,10 @@ describe('ControlClient Wait API', () => {
     const client = new ControlClient(request)
 
     await expect(client.getRun(waiting.runId)).resolves.toEqual(waiting)
-    await expect(client.resolveRunWait(waiting.runId, waiting.waits[0].waitId, 'approve')).resolves.toEqual(response)
+    await expect(client.resolveRunWait(waiting.runId, waiting.waits[0].waitId, 'approve', 'Reviewed')).resolves.toEqual(response)
     expect(request).toHaveBeenLastCalledWith(
       `/v1/runs/${waiting.runId}/waits/${waiting.waits[0].waitId}/resolve`,
-      expect.objectContaining({ body: JSON.stringify({ action: 'approve', version: 1 }), method: 'POST' }),
+      expect.objectContaining({ body: JSON.stringify({ action: 'approve', comment: 'Reviewed', version: 1 }), method: 'POST' }),
     )
   })
 
@@ -424,7 +425,7 @@ describe('Run event contract', () => {
     ['run.progress', { flowId: 'flow', scopeId: 'scope', progress: 25 }],
     ['run.waiting', { waitIds: ['wait'] }],
     ['wait.created', { expiresAt: 'later', nodeId: 'node', waitId: 'wait', waitingSince: 'now' }],
-    ['run.resolved', { action: 'approve', resolvedAt: 'now', waitId: 'wait' }],
+    ['run.resolved', { action: 'approve', comment: 'Reviewed', resolvedAt: 'now', waitId: 'wait' }],
     ['run.completed', { result: { nested: [null, true, 1, 'value'] } }],
     ['run.failed', { result: { error: { code: 'run.failed', message: 'Failed.' } } }],
     ['run.indeterminate', { result: {} }],
@@ -455,7 +456,7 @@ describe('Run event contract', () => {
     ['node.log', { ...node, level: 'verbose', message: 'Message.' }],
     ['node.progress', { ...node, progress: -1 }],
     ['run.progress', { flowId: 'flow', scopeId: 'scope', progress: 101 }],
-    ['run.resolved', { action: 'cancel', resolvedAt: 'now', waitId: 'wait' }],
+    ['run.resolved', { action: 'cancel', comment: null, resolvedAt: 'now', waitId: 'wait' }],
     ['node.artifact', { ...node, artifact: { kind: 'artifact', id: 'artifact', name: 'File', size: -1, digest: 'invalid' } }],
   ])('rejects invalid %s payload values', async (kind, payload) => {
     const client = new ControlClient(async () =>

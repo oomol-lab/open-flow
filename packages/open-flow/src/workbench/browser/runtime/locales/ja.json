@@ -589,6 +589,8 @@
     "timelineEmpty": "選択中のドラフトを実行すると、タイムラインと出力を確認できます。",
     "submitting": "この固定リビジョンを送信し、実行記録を作成しています…",
     "waiting": "最初のイベントを待っています…",
+    "waitComment": "コメント（任意）",
+    "waitCommentTooLong": "2,000文字以内で入力してください。",
     "waitExpires": "期限: {{date}}",
     "savedResults": "Saved tool results",
     "refreshResults": "Refresh",

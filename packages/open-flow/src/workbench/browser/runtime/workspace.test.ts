@@ -190,7 +190,7 @@ describe('Designer port projection', () => {
             edges: [],
             nodes: {
               wait: {
-                input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+                inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
                 inputs: {},
                 kind,
                 prompt: 'Review this request.',

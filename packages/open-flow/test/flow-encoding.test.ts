@@ -202,7 +202,7 @@ describe('Flow Revision encoding', () => {
   it('encodes Approval and rejects legacy actions and inline notification fields', () => {
     const source = revision()
     const wait = {
-      input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+      inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
       inputs: { value: { kind: 'value', value: { request: 1 } } },
       kind: 'approval',
       prompt: 'Approve request 1?',

@@ -1,7 +1,9 @@
+import type { InputPort } from '../../../../flow/common/change.ts'
 import type { Draft } from '../api.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
+import { inverseFlowChanges } from '../../../../flow/common/inverseChanges.ts'
 import { setTriggerConnection, updateTriggerSchedule } from '../../../../flow/common/nodeChanges.ts'
 import { revisionView } from '../revisionView.ts'
 import { designerGraph } from '../workspace.ts'
@@ -841,4 +843,47 @@ describe('Input type conversion', () => {
     if (changed?.kind !== 'task') throw new Error('Expected code task')
     expect(changed.inputs.value).toEqual(expected)
   })
+})
+
+it.each(['wait', 'approval'] as const)('edits %s input definitions, preserves renamed bindings, and supports undo', (kind) => {
+  const target = { kind: 'flow' } as const
+  let current = draft('export default (input) => ({ result: input.value })')
+  current = applyFlowChanges(
+    current,
+    addNode(revisionView(current), target, 'resolution', { kind, name: 'Review' }, () => 'unused')!,
+  )
+  const save = (inputDefinitions: readonly InputPort[]) =>
+    updateResolution(revisionView(current), target, 'resolution', { name: 'Review', prompt: 'Review', inputDefinitions })!
+  expect(current.content.document.graph.nodes.resolution).toMatchObject({ inputDefinitions: [], inputs: {} })
+  current = applyFlowChanges(current, save([{ handle: 'amount', jsonSchema: { type: 'number' }, nullable: false }]))
+  current = applyFlowChanges(current, setInputValue(revisionView(current), target, 'resolution', 'amount', 500)!)
+  const original = current
+  const renamed = save([{ handle: 'total', jsonSchema: { type: 'number' }, nullable: false }])
+  current = applyFlowChanges(current, renamed)
+  expect(current.content.document.graph.nodes.resolution).toMatchObject({ inputs: { total: { kind: 'value', value: 500 } } })
+  const restored = applyFlowChanges(current, inverseFlowChanges(original.content, renamed))
+  expect(restored.content).toEqual(original.content)
+  current = applyFlowChanges(current, save([]))
+  expect(current.content.document.graph.nodes.resolution).toMatchObject({ inputs: {}, inputDefinitions: [] })
+})
+
+it.each(['wait', 'approval'] as const)('preserves %s bindings when only the prompt changes', (kind) => {
+  const target = { kind: 'flow' } as const
+  let current = draft('export default () => ({})')
+  current = applyFlowChanges(
+    current,
+    addNode(revisionView(current), target, 'resolution', { kind, name: 'Review' }, () => 'unused')!,
+  )
+  current = applyFlowChanges(current, setInputValue(revisionView(current), target, 'resolution', 'unavailable', 'keep for repair')!)
+  const changes = updateResolution(revisionView(current), target, 'resolution', {
+    name: 'Review',
+    prompt: 'Updated prompt',
+    inputDefinitions: [],
+  })!
+  const saved = applyFlowChanges(current, changes)
+  expect(saved.content.document.graph.nodes.resolution).toMatchObject({
+    prompt: 'Updated prompt',
+    inputs: { unavailable: { kind: 'value', value: 'keep for repair' } },
+  })
+  expect(applyFlowChanges(saved, inverseFlowChanges(current.content, changes)).content).toEqual(current.content)
 })

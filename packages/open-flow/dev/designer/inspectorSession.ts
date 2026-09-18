@@ -68,7 +68,7 @@ export function createInspectorTransport(log: LogAction, initialContent: Revisio
         modelVersion: currentFlowModelVersion,
         revisionDigest: revision().digest,
         revisionId: revision().revisionId,
-        check: { kind: 'available' },
+        valid: true,
         version: 1,
       })
     throw new Error(`Unexpected inspector Lab request: ${url.pathname}`)

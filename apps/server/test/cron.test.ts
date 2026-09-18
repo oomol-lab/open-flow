@@ -270,7 +270,7 @@ describe('Server Cron Trigger', () => {
           nodes: {
             ...scheduled.document.graph.nodes,
             approval: {
-              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+              inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'scheduled', output: 'scheduledAt' }] } },
               kind: 'wait',
               prompt: 'Continue?',

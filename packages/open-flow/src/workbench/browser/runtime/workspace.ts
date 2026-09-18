@@ -260,12 +260,13 @@ function nodePorts(node: ResolvedSelection): NodePorts {
     }
     case 'approval':
     case 'wait':
-      inputs.set(node.node.input.handle, {
-        defaultValue: node.node.input.value,
-        description: node.node.input.description,
-        jsonSchema: node.node.input.jsonSchema,
-        nullable: node.node.input.nullable,
-      })
+      for (const port of node.node.inputDefinitions)
+        inputs.set(port.handle, {
+          defaultValue: port.value,
+          description: port.description,
+          jsonSchema: port.jsonSchema,
+          nullable: port.nullable,
+        })
       for (const [handle, port] of Object.entries(resolutionOutputPorts(node.node))) outputs.set(handle, port)
       break
     case 'subflow': {

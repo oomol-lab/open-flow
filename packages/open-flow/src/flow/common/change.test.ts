@@ -366,7 +366,7 @@ describe('Flow changes', () => {
       {
         kind: 'graph.node.create',
         node: {
-          input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+          inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
           inputs: {},
           kind: 'wait',
           name: 'Wait',
@@ -378,11 +378,11 @@ describe('Flow changes', () => {
     ])
     const changed = applyFlowChanges(source, [
       {
-        before: { prompt: 'Continue?' },
+        before: { inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }], prompt: 'Continue?' },
         kind: 'graph.node.resolution.set',
         nodeId: 'wait',
         target,
-        value: { prompt: 'Continue now?' },
+        value: { inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }], prompt: 'Continue now?' },
       },
     ])
 
@@ -391,11 +391,11 @@ describe('Flow changes', () => {
     expect(() =>
       applyFlowChanges(changed, [
         {
-          before: { prompt: 'Continue?' },
+          before: { inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }], prompt: 'Continue?' },
           kind: 'graph.node.resolution.set',
           nodeId: 'wait',
           target,
-          value: { prompt: 'Continue again?' },
+          value: { inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }], prompt: 'Continue again?' },
         },
       ]),
     ).toThrow(FlowChangeError)

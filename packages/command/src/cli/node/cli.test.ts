@@ -410,9 +410,10 @@ describe('agent command contract', () => {
     const output = runtime()
     const request = vi.fn(async (path: string, init?: RequestInit) => {
       expect(path).toBe('/v1/runs/run-1/waits/wait-1/resolve')
-      expect(JSON.parse(String(init?.body))).toEqual({ action: 'approve', version: 1 })
+      expect(JSON.parse(String(init?.body))).toEqual({ action: 'approve', comment: 'Reviewed', version: 1 })
       return Response.json({
         action: 'approve',
+        comment: 'Reviewed',
         resolutionAccepted: true,
         resolvedAt: flow.createdAt,
         runId: 'run-1',
@@ -421,7 +422,7 @@ describe('agent command contract', () => {
         waitId: 'wait-1',
       })
     })
-    expect(await runCli(['runs', 'resolve', 'run-1', 'wait-1', 'approve', '--json'], { request }, output.value)).toBe(0)
+    expect(await runCli(['runs', 'resolve', 'run-1', 'wait-1', 'approve', '--comment', 'Reviewed', '--json'], { request }, output.value)).toBe(0)
   })
 
   it.each([

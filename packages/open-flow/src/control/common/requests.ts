@@ -1,11 +1,14 @@
 import type { JsonValue } from '../../flow/common/change.ts'
 import type { DraftOperation } from './draftOperations.ts'
 
+import { waitCommentSchema } from '../../execution/common/wait.ts'
 import { decodeDraftOperations, draftOperationsSchema } from './draftOperations.ts'
 export { decodeDraftOperations, draftOperationsSchema, resolveDraftOperations, type DraftOperation } from './draftOperations.ts'
 import { z } from 'zod'
 import { resourceNameIssue } from '../../flow/common/change.ts'
 import { createEventSourceSchema, updateEventSourceSchema, eventSourceRevisionSchema } from './eventSourceSchemas.ts'
+
+export const waitActionBodySchema = z.strictObject({ comment: waitCommentSchema })
 
 const json: z.ZodType<JsonValue> = z.json()
 const id = z.string().min(1)
@@ -28,7 +31,7 @@ const schemas = {
   rollbackFlow: z.strictObject({ expectedLivePublicationId: id, version }),
   createDraftRun: z.strictObject({ engineContract: id, inputs, trigger, version: z.literal(2) }),
   createLiveRun: z.strictObject({ publicationId: id, inputs, trigger, version: z.literal(2) }),
-  resolveWait: z.strictObject({ action: z.enum(['approve', 'continue', 'reject']), version }),
+  resolveWait: z.strictObject({ action: z.enum(['approve', 'continue', 'reject']), comment: waitCommentSchema, version }),
   putVariable: z.strictObject({ value: z.string().refine((value) => new TextEncoder().encode(value).byteLength <= 65_536, 'Variable value is too large.') }),
   versionOnly: z.strictObject({ version }),
 }

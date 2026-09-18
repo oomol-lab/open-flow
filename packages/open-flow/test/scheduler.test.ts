@@ -360,7 +360,7 @@ describe('revision graph scheduler', () => {
               values: [{ handle: 'value', jsonSchema: {}, nullable: true, value: { id: 42 } }],
             },
             wait: {
-              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+              inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
               kind: 'wait',
               prompt: 'Continue processing?',
@@ -427,7 +427,9 @@ describe('revision graph scheduler', () => {
 
     expect(completed).toEqual({
       kind: 'node-results',
-      nodes: [{ status: 'completed', jobId: expect.any(String), outputs: { result: { token: '', value: { id: 42 } } }, nodeId: 'after' }],
+      nodes: [
+        { status: 'completed', jobId: expect.any(String), outputs: { result: { token: '', value: decisionOutput('continue', { id: 42 }) } }, nodeId: 'after' },
+      ],
     })
     expect(invocations).toHaveLength(1)
     expect(events.filter((event) => event.type == 'run.started')).toHaveLength(1)
@@ -446,7 +448,7 @@ describe('revision graph scheduler', () => {
             nodes: {
               a: { inputs: {}, kind: 'task', task: task('a', [], ['result']) },
               wait: {
-                input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+                inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
                 inputs: {},
                 kind: 'wait',
                 prompt: 'Continue?',
@@ -472,7 +474,7 @@ describe('revision graph scheduler', () => {
     expect(first.checkpoint.waits[0]!).toEqual({
       jobId: first.checkpoint.waits[0]!.jobId,
       nodeId: 'wait',
-      value: null,
+      value: { value: null },
       waitId: first.checkpoint.waits[0]!.waitId,
     })
 
@@ -485,7 +487,7 @@ describe('revision graph scheduler', () => {
       kind: 'node-results',
       nodes: [
         { nodeId: 'a', status: 'completed', outputs: { result: 42 } },
-        { nodeId: 'wait', status: 'completed', outputs: { continue: null } },
+        { nodeId: 'wait', status: 'completed', outputs: { continue: decisionOutput('continue', null) } },
       ],
     })
   })
@@ -501,7 +503,7 @@ describe('revision graph scheduler', () => {
           ],
           nodes: {
             wait: {
-              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+              inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
               inputs: { value: { kind: 'value', value: 'request-1' } },
               kind: 'approval',
               prompt: 'Approve this request?',
@@ -548,7 +550,7 @@ describe('revision graph scheduler', () => {
     expect(completed.kind).toBe('node-results')
     expect(invoked).toEqual([action == 'approve' ? 'approved' : 'rejected'])
     expect(events.filter((event) => event.type == 'node.completed' && event.nodeId == 'wait')).toEqual([
-      expect.objectContaining({ outputs: { [action]: 'request-1' } }),
+      expect.objectContaining({ outputs: { [action]: decisionOutput(action, 'request-1') } }),
     ])
   })
 
@@ -560,13 +562,13 @@ describe('revision graph scheduler', () => {
           edges: [{ source: 'first', sourceHandle: 'continue', target: 'second' }],
           nodes: {
             first: {
-              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+              inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
               inputs: { value: { kind: 'value', value: 1 } },
               kind: 'wait',
               prompt: 'First wait',
             },
             second: {
-              input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+              inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
               inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'first', output: 'continue' }] } },
               kind: 'wait',
               prompt: 'Second wait',
@@ -599,7 +601,12 @@ describe('revision graph scheduler', () => {
 
     expect(second.checkpoint.waits[0]!.nodeId).toBe('second')
     expect(second.checkpoint.waits[0]!.waitId).not.toBe(first.checkpoint.waits[0]!.waitId)
-    expect(completed).toEqual({ kind: 'node-results', nodes: [{ status: 'completed', jobId: expect.any(String), outputs: { continue: 1 }, nodeId: 'second' }] })
+    expect(completed).toEqual({
+      kind: 'node-results',
+      nodes: [
+        { status: 'completed', jobId: expect.any(String), outputs: { continue: decisionOutput('continue', decisionOutput('continue', 1)) }, nodeId: 'second' },
+      ],
+    })
     expect(events.filter((event) => event.type == 'run.started')).toHaveLength(1)
   })
 
@@ -1368,7 +1375,7 @@ it('validates formed Webhook outputs at launch and checkpoint recovery without p
             kind: 'wait',
             prompt: 'Continue?',
             inputs: {},
-            input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+            inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
           },
         },
         edges: [{ source: 'start', target: 'wait' }],
@@ -1397,3 +1404,7 @@ it('validates formed Webhook outputs at launch and checkpoint recovery without p
     (await runOutcome(prepared, { runId: 'webhook-checkpoint', resume: { checkpoint: first.checkpoint }, invokeTask: () => Effect.succeed({}) })).kind,
   ).toBe('node-results')
 })
+
+function decisionOutput(action: 'continue' | 'approve' | 'reject', value: unknown) {
+  return { inputs: { value }, action, resolvedAt: '2026-09-18T08:30:00.000Z', comment: null }
+}

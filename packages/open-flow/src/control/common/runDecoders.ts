@@ -123,12 +123,13 @@ export function runCancellation(value: unknown): RunCancellation {
 
 export function waitResolution(value: unknown) {
   const source = record(value)
-  exact(source, ['action', 'resolutionAccepted', 'resolvedAt', 'runId', 'status', 'version', 'waitId'])
+  exact(source, ['action', 'comment', 'resolutionAccepted', 'resolvedAt', 'runId', 'status', 'version', 'waitId'])
   const action = source.action
   const resolvedAt = source.resolvedAt
   if (
     source.version != 1 ||
     typeof source.resolutionAccepted != 'boolean' ||
+    (source.comment !== null && typeof source.comment != 'string') ||
     (action !== null && action != 'approve' && action != 'continue' && action != 'reject') ||
     (resolvedAt !== null && typeof resolvedAt != 'string') ||
     (action === null) != (resolvedAt === null) ||
@@ -138,6 +139,7 @@ export function waitResolution(value: unknown) {
   }
   return {
     action: action as WaitAction | null,
+    comment: source.comment as string | null,
     resolutionAccepted: source.resolutionAccepted,
     resolvedAt: resolvedAt as string | null,
     runId: string(source.runId),

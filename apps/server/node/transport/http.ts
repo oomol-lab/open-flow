@@ -6,6 +6,7 @@ import type { ResolveControlActor } from './control.ts'
 
 import { serveStatic } from '@hono/node-server/serve-static'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
+import { waitActionBodySchema } from '@oomol-lab/open-flow/control-requests'
 import { resourceNameIssue } from '@oomol-lab/open-flow/flow-change'
 import { integrationEndpointId } from '@oomol-lab/open-flow/integration-trigger'
 import { maximumWebhookBodyBytes, webhookEndpointId, webhookOccurrenceId } from '@oomol-lab/open-flow/webhook-trigger'
@@ -144,13 +145,25 @@ export function createServerApp(service: ServerService, options: ServerAppOption
       notifications((listener) => service.subscribeFlow(context.req.param('flowId'), listener), [context.req.raw.signal, options.shutdownSignal]),
     )
   })
-  app.all('/v1/wait-actions/:capability/:action', (context) => {
+  app.all('/v1/wait-actions/:capability/:action', async (context) => {
     const method = context.req.method
     if (method != 'GET' && method != 'HEAD' && method != 'POST') {
       const response = json(405, { error: { code: 'wait-action.method-not-allowed', message: 'Method is not allowed.' }, version: 1 })
       response.headers.set('allow', 'GET, HEAD, POST')
       response.headers.set('cache-control', 'no-store')
       return response
+    }
+    let comment: string | null | undefined
+    if (method == 'POST') {
+      try {
+        const bodyText = await context.req.text()
+        const body = waitActionBodySchema.parse(bodyText.trim() == '' ? {} : JSON.parse(bodyText))
+        comment = body.comment
+      } catch {
+        const response = json(400, { error: { code: 'wait-action.invalid', message: 'Invalid Wait comment request.' }, version: 1 })
+        response.headers.set('cache-control', 'no-store')
+        return response
+      }
     }
     const capability = context.req.param('capability')
     const action = context.req.param('action')
@@ -160,7 +173,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
       requested == null || !/^[A-Za-z0-9_-]{43}$/.test(capability)
         ? undefined
         : method == 'POST'
-          ? service.resolveWaitAction(capability, requested, admit)
+          ? service.resolveWaitAction(capability, requested, admit, comment)
           : service.inspectWaitAction(capability, requested, admit)
     if (result != null && 'retryAfter' in result) {
       const response = json(429, { error: { code: 'wait-action.rate-limited', message: 'Too many requests.' }, version: 1 })

@@ -6,14 +6,17 @@ import type { JsonValue, Run, RunDetails, RunEvent, RunResult, WaitAction } from
 import type { IconName } from '../icons.tsx'
 import type { RunEventFilter } from './runStore.ts'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
+import { waitCommentSchema } from '../../../../execution/common/wait.ts'
 import { Alert, AlertDescription, AlertTitle } from '../../../../ui/browser/alert.tsx'
 import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
+import { Field, FieldLabel, FieldError } from '../../../../ui/browser/field.tsx'
 import { collapseAllNested, CompactValue, JSONViewer } from '../../../../ui/browser/json-viewer/index.ts'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
+import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Icon } from '../icons.tsx'
 import { eventSubject } from '../workspace.ts'
 import { groupEvents, nodeSummary, agentSummary } from './runGroups.ts'
@@ -84,7 +87,7 @@ interface Props {
   readonly onEventFilterChange: (filter: RunEventFilter) => void
   readonly onLocateEvent: (sequence: number) => void
   readonly onLocateWait: (nodeId: string) => void
-  readonly onResolve: (waitId: string, action: WaitAction) => void
+  readonly onResolve: (waitId: string, action: WaitAction, comment?: string) => void
   readonly onRetryObservation: () => void
   readonly onToggle: () => void
   readonly open: boolean
@@ -112,49 +115,73 @@ function waitActionLabel(action: WaitAction, t: TFunction): string {
   }
 }
 
-export function ActiveWait({
+type ActiveWaitProps = {
+  readonly onLocate: (nodeId: string) => void
+  readonly onResolve: (waitId: string, action: WaitAction, comment?: string) => void
+  readonly resolvingActions: ReadonlyMap<string, WaitAction>
+  readonly run: Run | RunDetails
+}
+
+function WaitDecision({
+  waiting,
   onLocate,
   onResolve,
   resolvingActions,
-  run,
-}: {
-  readonly onLocate: (nodeId: string) => void
-  readonly onResolve: (waitId: string, action: WaitAction) => void
-  readonly resolvingActions: ReadonlyMap<string, WaitAction>
-  readonly run: Run | RunDetails
-}): ReactElement | null {
+}: Omit<ActiveWaitProps, 'run'> & { readonly waiting: RunDetails['waits'][number] }): ReactElement {
   const language = useLang()
   const t = useTranslate()
+  const [comment, setComment] = useState('')
+  const commentId = useId()
+  const resolving = resolvingActions.has(waiting.waitId)
+  const tooLong = !waitCommentSchema.safeParse(comment).success
+  return (
+    <div className="shrink-0 px-2 pt-2">
+      <Alert>
+        <Icon name="wait" />
+        <AlertTitle>{waiting.prompt}</AlertTitle>
+        <AlertDescription>
+          <div>{t('run.waitExpires', { date: new Date(waiting.expiresAt).toLocaleString(language) })}</div>
+          <Field className="mt-2">
+            <FieldLabel htmlFor={commentId}>{t('run.waitComment')}</FieldLabel>
+            <Textarea
+              id={commentId}
+              rows={2}
+              value={comment}
+              disabled={resolving}
+              aria-invalid={tooLong}
+              onChange={(event) => setComment(event.target.value)}
+            />
+            {tooLong && <FieldError>{t('run.waitCommentTooLong')}</FieldError>}
+          </Field>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {waiting.actions.map((action) => (
+              <Button
+                disabled={resolving || tooLong}
+                key={action}
+                onClick={() => onResolve(waiting.waitId, action, comment)}
+                size="sm"
+                type="button"
+                variant={action == 'reject' ? 'destructive' : 'default'}
+              >
+                {resolvingActions.get(waiting.waitId) == action ? t('run.resolving') : waitActionLabel(action, t)}
+              </Button>
+            ))}
+            <Button onClick={() => onLocate(waiting.nodeId)} size="sm" type="button" variant="secondary">
+              <Icon name="fit" /> {t('run.locateWait')}
+            </Button>
+          </div>
+        </AlertDescription>
+      </Alert>
+    </div>
+  )
+}
+
+export function ActiveWait({ run, ...props }: ActiveWaitProps): ReactElement {
   const waits = 'waits' in run ? run.waits : []
   return (
     <>
       {waits.map((waiting) => (
-        <div key={waiting.waitId} className="shrink-0 px-2 pt-2">
-          <Alert>
-            <Icon name="wait" />
-            <AlertTitle>{waiting.prompt}</AlertTitle>
-            <AlertDescription>
-              <div>{t('run.waitExpires', { date: new Date(waiting.expiresAt).toLocaleString(language) })}</div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {waiting.actions.map((action) => (
-                  <Button
-                    disabled={resolvingActions.has(waiting.waitId)}
-                    key={action}
-                    onClick={() => onResolve(waiting.waitId, action)}
-                    size="sm"
-                    type="button"
-                    variant={action == 'reject' ? 'destructive' : 'default'}
-                  >
-                    {resolvingActions.get(waiting.waitId) == action ? t('run.resolving') : waitActionLabel(action, t)}
-                  </Button>
-                ))}
-                <Button onClick={() => onLocate(waiting.nodeId)} size="sm" type="button" variant="secondary">
-                  <Icon name="fit" /> {t('run.locateWait')}
-                </Button>
-              </div>
-            </AlertDescription>
-          </Alert>
-        </div>
+        <WaitDecision key={`${run.runId}/${waiting.waitId}`} waiting={waiting} {...props} />
       ))}
     </>
   )

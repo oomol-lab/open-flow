@@ -12,7 +12,7 @@ const operations = [
     kind: 'graph.node.create',
     target,
     nodeId: 'pause',
-    node: { kind: 'wait', name: 'Pause', inputs: {}, input: { handle: 'value', jsonSchema: {}, nullable: true }, prompt: 'Continue?' },
+    node: { kind: 'wait', name: 'Pause', inputs: {}, inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true }], prompt: 'Continue?' },
   },
   { kind: 'graph.edge.connect', target, edge: { source: 'start', target: 'pause' } },
   {
@@ -70,10 +70,12 @@ describe('ChangeOperation wire contract', () => {
       kind: 'graph.node.create',
       target,
       nodeId: 'approval',
-      node: { kind: 'approval', inputs: {}, input: { handle: 'value', jsonSchema: {}, nullable: true }, prompt: 'Approve?' },
+      node: { kind: 'approval', inputs: {}, inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true }], prompt: 'Approve?' },
     }
     expect(decodeChangeOperations([approval])).toEqual([approval])
     for (const nodeKind of ['approval', 'wait']) {
+      const oldInput = [{ ...approval, node: { ...approval.node, kind: nodeKind, input: { handle: 'value', jsonSchema: {}, nullable: true } } }]
+      expect(() => decodeChangeOperations(oldInput)).toThrow()
       const legacy = [{ ...approval, node: { ...approval.node, kind: nodeKind, actions: nodeKind == 'wait' ? ['continue'] : ['approve', 'reject'] } }]
       expect(() => decodeChangeOperations(legacy)).toThrow()
       expect(new Validator(changeOperationsSchema() as object).validate(legacy).valid).toBe(false)

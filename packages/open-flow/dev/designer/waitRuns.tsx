@@ -5,6 +5,7 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
+import { normalizeWaitComment } from '../../src/execution/common/wait.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { RunDrawer } from '../../src/workbench/browser/runtime/runs/runDrawer.tsx'
@@ -75,11 +76,20 @@ function WaitHistory({ language, log }: { readonly language: UiLanguage; readonl
         return Response.json({ runId: run.runId, events: [], done: true, historyComplete: true, nextAfter: 0, version: 1 })
       if (url.pathname.endsWith('/resolve')) {
         const waitId = url.pathname.split('/').at(-2)!
-        const { action } = JSON.parse(String(init?.body))
-        log('history.wait.resolve', { waitId, action })
+        const { action, comment } = JSON.parse(String(init?.body))
+        log('history.wait.resolve', { waitId, action, comment })
         await new Promise((resolve) => setTimeout(resolve, 500))
         run = { ...run, status: 'running', waits: run.waits.filter((wait) => wait.waitId != waitId) }
-        return Response.json({ runId: run.runId, waitId, action, status: run.status, resolutionAccepted: true, resolvedAt: base.createdAt, version: 1 })
+        return Response.json({
+          runId: run.runId,
+          waitId,
+          action,
+          comment: normalizeWaitComment(comment),
+          status: run.status,
+          resolutionAccepted: true,
+          resolvedAt: base.createdAt,
+          version: 1,
+        })
       }
       throw new Error(`Unexpected Lab request: ${path}`)
     })
@@ -153,8 +163,8 @@ function WaitRuns({ language, log }: { readonly language: UiLanguage; readonly l
                 onEventFilterChange={() => {}}
                 onLocateEvent={() => {}}
                 onLocateWait={(nodeId) => log('run.locate', nodeId)}
-                onResolve={(waitId, action) => {
-                  log('wait.resolve', { waitId, action })
+                onResolve={(waitId, action, comment) => {
+                  log('wait.resolve', { waitId, action, comment })
                   if (index == 0) setPending((items) => items.filter((item) => item.waitId != waitId))
                 }}
                 onRetryObservation={() => {}}
@@ -180,6 +190,7 @@ export const waitRunsStory: FrontendStory = {
   id: 'wait-runs',
   title: 'Run decisions',
   standalone: true,
-  description: 'Approve either wait independently while the notification branch continues. Frozen waits and ordinary notification failure are shown alongside.',
+  description:
+    'Add separate optional comments and resolve either wait while the notification branch continues. Frozen waits and ordinary notification failure are shown alongside.',
   render: (log, _dark, language) => <WaitRuns language={language} log={log} />,
 }

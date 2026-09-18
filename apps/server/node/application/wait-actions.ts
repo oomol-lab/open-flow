@@ -42,9 +42,11 @@ export class WaitActions {
     capability: string,
     requested: WaitAction,
     admit: (digest: string) => number | undefined,
+    comment?: string | null,
   ):
     | {
         readonly action: WaitAction | null
+        readonly comment: string | null
         readonly resolutionAccepted: boolean
         readonly resolvedAt: string | null
         readonly state: 'resolved' | 'unavailable' | 'waiting'
@@ -58,7 +60,7 @@ export class WaitActions {
     if (wait == null || !wait.actions.some((action) => action == requested) || receipt.expiresAt <= this.#clock()) return
     const retryAfter = admit(digest)
     if (retryAfter != null) return { retryAfter }
-    const result = this.#store.runs.resolveWait(receipt.runId, receipt.waitId, requested)
+    const result = this.#store.runs.resolveWait(receipt.runId, receipt.waitId, requested, comment)
     if (result.kind != 'resolved') return
     if (result.changed) {
       this.#runChanged(receipt.flowId, receipt.runId)
@@ -66,6 +68,7 @@ export class WaitActions {
     }
     return {
       action: result.action,
+      comment: result.comment,
       resolutionAccepted: result.resolutionAccepted,
       resolvedAt: result.resolvedAt == null ? null : new Date(result.resolvedAt).toISOString(),
       state: result.action != null ? 'resolved' : ['running', 'waiting', 'queued', 'starting'].includes(result.status) ? 'waiting' : 'unavailable',

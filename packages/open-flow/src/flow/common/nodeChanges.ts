@@ -242,8 +242,8 @@ export function createWait(target: Extract<GraphTarget, { readonly kind: 'flow' 
     {
       kind: 'graph.node.create',
       node: {
-        input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
-        inputs: { value: { kind: 'value', value: null } },
+        inputDefinitions: [],
+        inputs: {},
         kind: 'wait',
         name,
         prompt: name,
@@ -259,8 +259,8 @@ export function createApproval(target: Extract<GraphTarget, { readonly kind: 'fl
     {
       kind: 'graph.node.create',
       node: {
-        input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
-        inputs: { value: { kind: 'value', value: null } },
+        inputDefinitions: [],
+        inputs: {},
         kind: 'approval',
         name,
         prompt: name,

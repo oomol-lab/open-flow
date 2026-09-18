@@ -274,7 +274,7 @@ it('keeps admitted Runs across client disconnects and exposes Wait and cancellat
           kind: 'approval',
           name: 'Approval',
           prompt: 'Approve?',
-          input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+          inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
           inputs: { value: { kind: 'value', value: 42 } },
         },
       },
@@ -324,7 +324,7 @@ it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait w
           kind: action == 'continue' ? 'wait' : 'approval',
           name: 'Wait',
           prompt: 'Continue?',
-          input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
+          inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
           inputs: { value: { kind: 'value', value: 42 } },
         },
       },
@@ -342,14 +342,19 @@ it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait w
   await startService(service)
   await expect.poll(async () => (await control.getRun(runId)).waits.length).toBe(1)
   const waiting = (await control.getRun(runId)).waits[0]!
-  const args = { runId, waitId: waiting.waitId, action }
+  const args = { runId, waitId: waiting.waitId, action, comment: '  Reviewed through MCP  ' }
   const invalid = await client.callTool({ name: 'run_resolve_wait', arguments: { ...args, action: action == 'continue' ? 'approve' : 'continue' } })
   expect(invalid.structuredContent).toMatchObject({ error: { code: 'run.invalid' } })
   expect((await control.getRun(runId)).status).toBe('running')
   const decision = await call('run_resolve_wait', args)
-  expect(decision).toMatchObject({ action, resolutionAccepted: true, runId, waitId: waiting.waitId })
+  expect(decision).toMatchObject({ action, comment: 'Reviewed through MCP', resolutionAccepted: true, runId, waitId: waiting.waitId })
   await expect.poll(async () => (await control.getRun(runId)).status).toBe('completed')
-  expect(await call('run_resolve_wait', args)).toMatchObject({ action, resolutionAccepted: true, resolvedAt: decision.resolvedAt })
+  expect(await call('run_resolve_wait', { ...args, comment: 'replacement' })).toMatchObject({
+    action,
+    comment: 'Reviewed through MCP',
+    resolutionAccepted: true,
+    resolvedAt: decision.resolvedAt,
+  })
   if (action != 'continue') {
     expect(await call('run_resolve_wait', { ...args, action: action == 'approve' ? 'reject' : 'approve' })).toMatchObject({
       action,

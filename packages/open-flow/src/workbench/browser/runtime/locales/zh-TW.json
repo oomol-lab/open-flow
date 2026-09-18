@@ -589,6 +589,8 @@
     "timelineEmpty": "執行選取的草稿後，就可以檢視它的時間軸與輸出。",
     "submitting": "正在提交這個固定修訂並建立執行紀錄…",
     "waiting": "正在等待第一個事件…",
+    "waitComment": "備註（選填）",
+    "waitCommentTooLong": "備註最多 2,000 個字元。",
     "waitExpires": "到期時間：{{date}}",
     "savedResults": "Saved tool results",
     "refreshResults": "Refresh",

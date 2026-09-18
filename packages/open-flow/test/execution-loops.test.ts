@@ -16,7 +16,7 @@ const counter: GraphNode = {
   inputs: { previous: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'counter', output: 'count' }] } },
   task: { name: 'Counter', moduleId: 'counter', inputs: [{ ...port, handle: 'previous' }], outputs: [{ ...port, handle: 'count' }] },
 }
-const pause: GraphNode = { kind: 'wait', inputs: {}, input: { ...port, handle: 'value', value: 42 }, prompt: 'Continue?' }
+const pause: GraphNode = { kind: 'wait', inputs: {}, inputDefinitions: [{ ...port, handle: 'value', value: 42 }], prompt: 'Continue?' }
 function revision(graph: Graph): RevisionContent {
   return {
     modelVersion: currentFlowModelVersion,
@@ -166,7 +166,7 @@ describe('Repeated node executions', () => {
     const config = options(events)
     const first = await advanceWaiting(runFlow(prepared, { ...config, waits: waitHost() }))
     if (first.kind != 'waiting') throw new Error('Expected waiting')
-    expect(first.checkpoint.waits.map((wait) => wait.value).toSorted()).toEqual(['a', 'b'])
+    expect(first.checkpoint.waits.map((wait) => (wait.value as { value: string }).value).toSorted()).toEqual(['a', 'b'])
     const { trigger: _, ...resume } = config
     const [a, b] = first.checkpoint.waits
     const second = await advanceWaiting(
@@ -177,7 +177,7 @@ describe('Repeated node executions', () => {
     expect(second.checkpoint.counts['']?.pause).toBe(2)
     await Effect.runPromise(runFlow(prepared, { ...resume, resume: { checkpoint: second.checkpoint }, waits: waitHost({ [b!.waitId]: 'continue' }) }))
     const completed = events.filter((event) => event.type == 'node.completed').filter((event) => event.nodeId == 'pause')
-    expect(completed.map((event) => event.outputs.continue).toSorted()).toEqual(['a', 'b'])
+    expect(completed.map((event) => (event.outputs.continue as { inputs: { value: string } }).inputs.value).toSorted()).toEqual(['a', 'b'])
     expect(new Set(completed.map((event) => event.jobId)).size).toBe(2)
   })
 
@@ -208,9 +208,9 @@ describe('Repeated node executions', () => {
           Effect.sync(() => {
             requests.push(request)
             return {
-              value: request.value,
+              inputs: request.value,
               prompt: request.prompt,
-              actions: request.actions.map((action) => ({ action, url: `https://example.com/${request.waitId}/${action}` })),
+              ...Object.fromEntries(request.actions.map((action) => [`${action}Url`, `https://example.com/${request.waitId}/${action}`])),
               expiresAt: '2030-01-01T00:00:00.000Z',
             }
           }),

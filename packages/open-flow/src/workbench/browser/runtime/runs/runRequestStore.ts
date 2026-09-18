@@ -68,7 +68,7 @@ function inputPorts(node: ResolvedNode): Readonly<Record<string, InputPortDefini
       return {}
     case 'approval':
     case 'wait':
-      return { [node.node.input.handle]: node.node.input }
+      return portsByHandle(node.node.inputDefinitions)
   }
 }
 

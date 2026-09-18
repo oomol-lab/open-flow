@@ -6,6 +6,7 @@ import type {
   GraphNode,
   InputMapping,
   InputPortDefinition,
+  JsonValue,
   NodeSource,
   PortDefinition,
   RevisionContent,
@@ -95,7 +96,7 @@ export function nodeInputPorts(document: FlowDocument, node: GraphNode): Readonl
       return portsByHandle([...(node.task != null ? node.task.inputs : (document.tasks[node.taskId]?.inputs ?? [])), ...(node.additionalInputs ?? [])])
     case 'approval':
     case 'wait':
-      return { [node.input.handle]: node.input }
+      return portsByHandle(node.inputDefinitions)
     case 'cron':
     case 'integration':
     case 'poll':
@@ -109,39 +110,36 @@ export function resolutionActions(node: Extract<GraphNode, { readonly kind: 'app
   return node.kind == 'wait' ? ['continue'] : ['approve', 'reject']
 }
 
+const objectPort = (properties: Record<string, JsonValue>): PortDefinition => ({
+  nullable: false,
+  jsonSchema: { type: 'object', properties, required: Object.keys(properties), additionalProperties: false },
+})
+
 export function resolutionOutputPorts(node: Extract<GraphNode, { readonly kind: 'approval' | 'wait' }>): Readonly<Record<string, PortDefinition>> {
   const actions = resolutionActions(node)
+  const inputs = {
+    type: 'object',
+    properties: Object.fromEntries(node.inputDefinitions.map((port) => [port.handle, {}])),
+    required: node.inputDefinitions.map((port) => port.handle),
+    additionalProperties: false,
+  }
+
   return {
-    pending: {
-      nullable: false,
-      jsonSchema: {
-        type: 'object',
-        properties: {
-          value: node.input.nullable ? { anyOf: [node.input.jsonSchema, { type: 'null' }] } : node.input.jsonSchema,
-          prompt: { type: 'string' },
-          actions: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: { action: { enum: actions }, url: { type: 'string' } },
-              required: ['action', 'url'],
-              additionalProperties: false,
-            },
-          },
-          expiresAt: { type: 'string' },
-        },
-        required: ['value', 'prompt', 'actions', 'expiresAt'],
-        additionalProperties: false,
-      },
-    },
+    pending: objectPort({
+      inputs,
+      prompt: { type: 'string' },
+      ...Object.fromEntries(actions.map((action) => [`${action}Url`, { type: 'string' }])),
+      expiresAt: { type: 'string' },
+    }),
     ...Object.fromEntries(
       actions.map((action) => [
         action,
-        {
-          jsonSchema: node.input.jsonSchema,
-          nullable: node.input.nullable,
-          ...(node.input.description == null ? {} : { description: node.input.description }),
-        },
+        objectPort({
+          inputs,
+          action: { const: action },
+          resolvedAt: { type: 'string' },
+          comment: { type: ['string', 'null'] },
+        }),
       ]),
     ),
   }
@@ -536,7 +534,7 @@ function validateResolution(
   path: string,
   diagnostics: Diagnostic[],
 ): void {
-  const fields = new Set(['description', 'icon', 'input', 'inputs', 'kind', 'maxExecutions', 'name', 'prompt'])
+  const fields = new Set(['description', 'icon', 'inputDefinitions', 'inputs', 'kind', 'maxExecutions', 'name', 'prompt'])
   const label = node.kind == 'wait' ? 'Wait' : 'Approval'
   const unsupported = Object.keys(node).filter((field) => !fields.has(field))
   if (unsupported.length > 0) {
@@ -548,8 +546,9 @@ function validateResolution(
     )
   }
   if (!allowed) diagnostics.push(graphDiagnostic(`${node.kind}.not-allowed`, `${label} nodes are only allowed in Flows.`, path))
-  if (node.input.handle != 'value')
-    diagnostics.push(graphDiagnostic(`${node.kind}.input-invalid`, `${label} input handle must be "value".`, `${path}/input/handle`))
+  const names = node.inputDefinitions.map((port) => port.handle)
+  if (new Set(names).size != names.length)
+    diagnostics.push(graphDiagnostic(`${node.kind}.input-invalid`, `${label} input names must be unique.`, `${path}/inputDefinitions`))
   if (typeof node.prompt != 'string' || node.prompt.trim().length == 0 || [...node.prompt].length > 1_000) {
     diagnostics.push(graphDiagnostic(`${node.kind}.prompt-invalid`, `${label} prompt must contain between 1 and 1,000 Unicode code points.`, `${path}/prompt`))
   }

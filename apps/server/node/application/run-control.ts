@@ -146,8 +146,10 @@ export class RunControl {
     runId: string,
     waitId: string,
     action: WaitAction,
+    comment?: string | null,
   ): {
     readonly action: WaitAction | null
+    readonly comment: string | null
     readonly resolutionAccepted: boolean
     readonly resolvedAt: string | null
     readonly runId: string
@@ -158,7 +160,7 @@ export class RunControl {
     const stored = this.requireRun(runId)
     const receipt = this.store.runViews.waitReceipt(runId, waitId)
     if (receipt == null) throw new ControlError(controlErrorCode.runWaitNotFound, 'The active Wait was not found.')
-    const result = this.store.runs.resolveWait(runId, waitId, action)
+    const result = this.store.runs.resolveWait(runId, waitId, action, comment)
     switch (result.kind) {
       case 'invalid-action':
         throw new ControlError(controlErrorCode.runInvalid, 'The Wait action is invalid.')
@@ -171,6 +173,7 @@ export class RunControl {
         }
         return {
           action: result.action,
+          comment: result.comment,
           resolutionAccepted: result.resolutionAccepted,
           resolvedAt: result.resolvedAt == null ? null : timestamp(result.resolvedAt),
           runId,

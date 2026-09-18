@@ -60,7 +60,7 @@ describe('Resolution Inspector', () => {
   it.each(['approval', 'wait'] as const)('saves the latest %s prompt on blur and preserves the node name', (kind) => {
     const saveResolution = vi.fn().mockResolvedValue(true)
     const definition = resolutionDefinition(
-      { input: { handle: 'value', jsonSchema: {}, nullable: true }, inputs: {}, kind, name: 'Renamed', prompt: 'Continue?' },
+      { inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true }], inputs: {}, kind, name: 'Renamed', prompt: 'Continue?' },
       {},
       saveResolution,
     )
@@ -224,6 +224,7 @@ describe('Node input ownership', () => {
       kind: 'condition',
       name: 'Condition',
       input: { handle: 'message', jsonSchema: { type: 'string' }, nullable: false },
+      inputDefinitions: [{ handle: 'message', jsonSchema: { type: 'string' }, nullable: false }],
       inputs: { message: { kind: 'sources', sources: [{ kind: 'binding', bindingId: 'binding' }] } },
       cases: [],
     }
@@ -254,6 +255,7 @@ describe('Node input ownership', () => {
     const input = find(element, (item) => typeof item.type === 'function' && item.type.name === 'NodeInputs')
     expect(input).toBeDefined()
     const props = input!.props as {
+      allowAddGroup: boolean
       renderSource: (handle: string) => {
         groups: unknown[]
         describeGroups: (outputs: Record<string, { output: string; check: { kind: 'available' } }[]>) => unknown[]
@@ -263,6 +265,7 @@ describe('Node input ownership', () => {
       onValue: (handle: string, value: unknown) => void
       onVariable: (handle: string, name: string | undefined) => void
     }
+    expect(props.allowAddGroup).toBe(kind !== 'wait' && kind !== 'approval')
     const upstream = props.renderSource('message')
     expect(upstream.groups).toEqual([])
     const outputs = [{ output: 'text', check: { kind: 'available' as const } }]

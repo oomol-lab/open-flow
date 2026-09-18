@@ -349,7 +349,7 @@ export class RunStore {
     }
   }
 
-  public async resolve(waitId: string, action: WaitAction): Promise<void> {
+  public async resolve(waitId: string, action: WaitAction, comment?: string): Promise<void> {
     const run = selectedRun(this.#state.value)
     const waiting = run != null && 'waits' in run ? run.waits.find((wait) => wait.waitId == waitId) : undefined
     if (
@@ -362,7 +362,7 @@ export class RunStore {
       return
     this.#set({ resolvingActions: new Map(this.#state.value.resolvingActions).set(waitId, action) })
     try {
-      const resolution = await this.#client.resolveRunWait(run.runId, waiting.waitId, action)
+      const resolution = await this.#client.resolveRunWait(run.runId, waiting.waitId, action, comment)
       const state = this.#state.value
       const selected = selectedRun(state)
       if (selected?.runId != run.runId || !('waits' in selected)) return

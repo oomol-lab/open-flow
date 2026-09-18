@@ -428,7 +428,12 @@ export function decodeRunEvent(value: unknown) {
     case 'run.resolved': {
       const action = payload.action
       if (action !== 'approve' && action !== 'continue' && action !== 'reject') return invalidResponse()
-      return { ...base, kind, payload: { action, resolvedAt: string(payload.resolvedAt), waitId: string(payload.waitId) } } as const
+      if (payload.comment !== null && typeof payload.comment != 'string') return invalidResponse()
+      return {
+        ...base,
+        kind,
+        payload: { action, comment: payload.comment as string | null, resolvedAt: string(payload.resolvedAt), waitId: string(payload.waitId) },
+      } as const
     }
     case 'run.completed':
     case 'run.canceled':
@@ -1015,8 +1020,10 @@ export class ControlClient {
     runId: string,
     waitId: string,
     action: WaitAction,
+    comment?: string | null,
   ): Promise<{
     readonly action: WaitAction | null
+    readonly comment: string | null
     readonly resolutionAccepted: boolean
     readonly resolvedAt: string | null
     readonly runId: string
@@ -1026,7 +1033,7 @@ export class ControlClient {
   }> {
     return waitResolution(
       await this.request(`/v1/runs/${segment(runId)}/waits/${segment(waitId)}/resolve`, {
-        body: JSON.stringify({ action, version: 1 }),
+        body: JSON.stringify({ action, comment, version: 1 }),
         method: 'POST',
       }),
     )

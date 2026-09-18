@@ -400,7 +400,7 @@ export function RunsView({
               </header>
               <ActiveWait
                 onLocate={onLocateWait}
-                onResolve={(waitId, action) => void store.runs.resolve(waitId, action)}
+                onResolve={(waitId, action, comment) => void store.runs.resolve(waitId, action, comment)}
                 resolvingActions={resolvingActions}
                 run={run}
               />

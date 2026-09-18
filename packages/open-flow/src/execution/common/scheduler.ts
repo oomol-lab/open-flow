@@ -1,6 +1,9 @@
+import type { WaitResolution } from './wait.ts'
+export { normalizeWaitComment } from './wait.ts'
+export type { WaitResolution } from './wait.ts'
 import type * as Cause from 'effect/Cause'
 import type { AgentConfig } from '../../flow/common/agent.ts'
-import type { ConnectorCapability, Graph, GraphNode, InputMapping, InputPortDefinition, JsonValue, TriggerNode, WaitAction } from '../../flow/common/change.ts'
+import type { ConnectorCapability, Graph, GraphNode, InputMapping, InputPortDefinition, JsonValue, TriggerNode } from '../../flow/common/change.ts'
 import type { PreparedFlow } from '../../flow/common/semantics.ts'
 import type { AgentCheckpoint, AgentResult } from './runtime.ts'
 
@@ -129,7 +132,7 @@ export type WaitOperation =
 
 export interface WaitHost {
   readonly create: (wait: WaitRequest) => Effect.Effect<JsonValue | undefined, Error>
-  readonly resolutions: (waitIds: readonly string[], block: boolean) => Effect.Effect<Readonly<Record<string, WaitAction>>, Error>
+  readonly resolutions: (waitIds: readonly string[], block: boolean) => Effect.Effect<Readonly<Record<string, WaitResolution>>, Error>
 }
 
 export const waitRetentionMs = 120_000
@@ -258,7 +261,7 @@ function nodePorts(prepared: PreparedFlow, node: ExecutableNode): Readonly<Recor
       return portsByHandle([...(node.task != null ? node.task.inputs : prepared.tasks[node.taskId]!.inputs), ...(node.additionalInputs ?? [])])
     case 'approval':
     case 'wait':
-      return { [node.input.handle]: node.input }
+      return portsByHandle(node.inputDefinitions)
   }
 }
 
@@ -638,7 +641,7 @@ function validateCheckpoint(
       if (!jsonEqual(resolveInputs(waiting.nodeId, node, waiting.jobId), saved.input)) throw new Error('Checkpoint Agent inputs changed.')
     } else {
       if (saved != null) throw new Error('Checkpoint Wait contains Agent state.')
-      if (!isResolutionNode(node) || !jsonEqual(resolveInputs(waiting.nodeId, node, waiting.jobId)[node.input.handle]!, waiting.value))
+      if (!isResolutionNode(node) || !jsonEqual(resolveInputs(waiting.nodeId, node, waiting.jobId), waiting.value))
         throw new Error('Checkpoint resolution input changed.')
       const notify = usesPending(target.graph, waiting.nodeId)
       if (notify != (waiting.pending != null)) throw new Error('Checkpoint Wait pending output is missing or unexpected.')
@@ -772,7 +775,6 @@ function runGraph(
           const title = nodeTitle(context.prepared, node)
           const projectedInputs = Object.fromEntries(
             Object.entries(nodeInputs).filter(([handle]) => {
-              if (isResolutionNode(node)) return handle == node.input.handle
               const mapping = node.inputs[handle]
               return mapping?.kind != 'sources' || mapping.sources.every((source) => source.kind != 'binding')
             }),
@@ -950,12 +952,13 @@ function runGraph(
                 catch: (error) => (error instanceof Error ? error : new Error(String(error))),
               })
               if (isResolutionNode(node)) {
-                const mapping = node.inputs[node.input.handle]
                 yield* context.emit({
-                  inputs:
-                    mapping?.kind == 'sources' && mapping.sources.some((source) => source.kind == 'binding')
-                      ? {}
-                      : { [node.input.handle]: nodeInputs[node.input.handle]! },
+                  inputs: Object.fromEntries(
+                    Object.entries(nodeInputs).filter(([handle]) => {
+                      const mapping = node.inputs[handle]
+                      return mapping?.kind != 'sources' || mapping.sources.every((source) => source.kind != 'binding')
+                    }),
+                  ),
                   jobId,
                   nodeId,
                   nodeKind: node.kind,
@@ -963,7 +966,7 @@ function runGraph(
                   runId,
                   type: 'node.started',
                 })
-                yield* createWait(nodeId, jobId, nodeInputs[node.input.handle]!)
+                yield* createWait(nodeId, jobId, nodeInputs)
                 return
               }
               const result = yield* executeNode(nodeId, node, jobId, nodeInputs)
@@ -983,10 +986,11 @@ function runGraph(
         else for (const nodeId of order) if (!incoming.has(nodeId)) scheduleReady(nodeId, {})
       }
 
-      const applyResolutions = (resolutions: Readonly<Record<string, WaitAction>>, now: number) => {
+      const applyResolutions = (resolutions: Readonly<Record<string, WaitResolution>>, now: number) => {
         for (const saved of pendingWaits.values()) {
-          const action = resolutions[saved.waitId]
-          if (action == null) continue
+          const resolution = resolutions[saved.waitId]
+          if (resolution == null) continue
+          const { action, resolvedAt, comment } = resolution
           if (idleSince != null) {
             idleSince = undefined
             measuredAt = now
@@ -1006,7 +1010,7 @@ function runGraph(
                     saved.jobId,
                     validateOutputs(context.prepared, saved.nodeId, node, {
                       ...(saved.pending == null ? {} : { pending: saved.pending }),
-                      [action]: saved.value,
+                      [action]: { inputs: saved.value, action, resolvedAt, comment },
                     }),
                     [action],
                   )

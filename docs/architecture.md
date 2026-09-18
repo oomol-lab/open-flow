@@ -169,7 +169,7 @@ Wait 在同一个 Run 内局部等待。Run owner 先持久化独立等待记录
 已冻结 Run 收到决议进入 queued；queued、starting 中其他等待仍可决议和过期。恢复读取最新决议，保留结果、到达路径快照、pending 输出及 Agent continuation，不重放副作用。
 活动执行或内存等待期间崩溃，无安全 checkpoint 时按既有规则标记 indeterminate。损坏、不完整或旧版 checkpoint 均不得从起点猜测性重放。
 
-Approval 是 Wait 对 action 集合 `approve/reject` 的一种产品语义，不是独立执行节点或部署认证机制。部署内部的 Control API resolve 使用 Operator
+Wait 与 Approval 使用同一个等待执行机制，分别提供固定的 `continue` 与 `approve/reject` 决议出口，不属于部署认证机制。部署内部的 Control API resolve 使用 Operator
 认证；外部通知可以携带只绑定一个 Wait 的 opaque capability。公开 hook 只提供 JSON inspection 和显式 POST action，不拥有 HTML 页面或特定消费端
 界面。一次 Wait 的所有 resolve 入口共享同一个 first-writer-wins 决议事实。
 各等待保留独立决议事实，后续等待和 Run terminal 不覆盖旧决议；这些事实不受 RunEvent retention 影响，随 Flow 物理删除清理。
@@ -186,7 +186,11 @@ Agent 工具的完整结果属于 Run，由部署独立持久化，不依赖日�
 不能通过复制完整正文传递恢复事实。宿主结果读取工具仅可访问当前 invocation 已取得的结果；Operator 通过同一 Run 读取权限查看和下载。
 恢复必须验证引用与完整性，不能通过重新调用外部工具补回缺失结果。结果随所属 Flow 的物理删除清理。
 
-普通 Wait 除决议出口外，还有固定 pending 出口，在等待建立时触发一次，输出包含 value、prompt、actions 中的完整 action/url 和 expiresAt。用户将通知处理连接为普通图节点；其失败、取消、超时和恢复遵守普通执行规则。
+Wait 与 Approval 的 `inputDefinitions` 定义可编辑的多个输入，`inputs` 保存输入绑定；新节点允许零输入。
+两种节点都有非空 pending 出口，等待建立时触发一次，输出包含 inputs、prompt、expiresAt；Wait 固定输出 continueUrl，Approval 固定输出 approveUrl 和 rejectUrl。
+决议出口输出非空对象 `{ inputs, action, resolvedAt, comment }`。inputs 保留执行时的输入快照；其输出 schema 声明配置的全部 key，但不映射字段类型。
+resolvedAt 为持久化的实际决议时间；可选纯文本 comment 去除首尾空白，空白归一为 null，最多 2,000 个 Unicode 码点。决议和备注原子保存，重复提交不得覆盖首次决议。
+用户将通知处理连接为普通图节点；其失败、取消、超时和恢复遵守普通执行规则。
 公开 origin 由部署提供，普通 Wait 不在 Run/Publish 准入阶段特判；实际需要输出链接却缺少 origin 时执行失败。没有连接或引用通知出口时不生成链接。
 完整通知输出属于有权限边界的 Run 恢复数据；公开 capability 查找索引只存摘要，URL 不写入 Revision 或普通服务日志。
 Agent 仍可使用内联 Connector 通知，先登记等待和通知 work，再在事务外至少一次发送，稳定 invocation identity 支持幂等。Agent 通知发送失败不自动决议，原有重试和次数上限保留。

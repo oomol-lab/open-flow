@@ -513,7 +513,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   app.post('/runs/:runId/waits/:waitId/resolve', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.runInvalid, controlRequests.resolveWait)
     const action = body.action
-    return response(200, service.runs.resolveRunWait(context.req.param('runId'), context.req.param('waitId'), action))
+    return response(200, service.runs.resolveRunWait(context.req.param('runId'), context.req.param('waitId'), action, body.comment))
   })
   return app
 }

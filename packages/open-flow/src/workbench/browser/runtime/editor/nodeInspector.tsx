@@ -911,7 +911,9 @@ export function NodeInspector({
                 ? [...(selection.definition?.inputs ?? [])]
                 : selection.kind === 'subflow'
                   ? [...(selection.definition?.inputs ?? [])]
-                  : [selection.node.input]
+                  : selection.kind === 'condition'
+                    ? [selection.node.input]
+                    : [...selection.node.inputDefinitions]
             const handles = new Set(definitions.flatMap((definition) => ('handle' in definition ? [definition.handle] : [])))
             for (const handle of Object.keys(selection.node.inputs)) {
               if (!handles.has(handle) && !(selection.kind === 'task' && selection.node.additionalInputs?.some((port) => port.handle === handle)))
@@ -932,6 +934,7 @@ export function NodeInspector({
             const fields = (
               <NodeInputs
                 key={`inputs:${selection.id}`}
+                allowAddGroup={selection.kind !== 'wait' && selection.kind !== 'approval'}
                 title={t('inspector.ports.inputsTitle')}
                 entries={entries}
                 onDefinitions={
@@ -939,7 +942,15 @@ export function NodeInspector({
                     ? (inputs) => {
                         void store.saveTaskPorts(selection.id, { inputs, outputs: selection.definition!.outputs })
                       }
-                    : undefined
+                    : selection.kind === 'wait' || selection.kind === 'approval'
+                      ? (inputs) => {
+                          void store.saveResolution(selection.id, {
+                            name: selection.node.name,
+                            prompt: selection.node.prompt,
+                            inputDefinitions: inputs.filter((port): port is InputPort => 'handle' in port),
+                          })
+                        }
+                      : undefined
                 }
                 renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle })}
                 variables={variables}

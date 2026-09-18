@@ -156,7 +156,7 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
   register('run_result', mcpTools.run_result, ({ runId }) => control.runs.getRunResult(runId))
   register('run_results', mcpTools.run_results, ({ runId, after }) => control.runs.listRunResults(runId, after))
   register('run_result_read', mcpTools.run_result_read, ({ runId, resultId, ...query }) => control.runs.readRunResult(runId, resultId, query))
-  register('run_resolve_wait', mcpTools.run_resolve_wait, ({ runId, waitId, action }) => control.runs.resolveRunWait(runId, waitId, action))
+  register('run_resolve_wait', mcpTools.run_resolve_wait, ({ runId, waitId, action, comment }) => control.runs.resolveRunWait(runId, waitId, action, comment))
   register('run_cancel', mcpTools.run_cancel, ({ runId }) => control.runs.cancelRun(runId))
   register('connector_teams', mcpTools.connector_teams, (_, context) => service.connectorTeams(context.mcpReq.signal))
   register('connector_list', mcpTools.connector_list, async ({ flowId }, context) => ({

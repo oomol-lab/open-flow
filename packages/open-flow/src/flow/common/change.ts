@@ -149,7 +149,7 @@ export interface ValueNode extends GraphNodeBase {
 export type WaitAction = 'approve' | 'continue' | 'reject'
 
 interface ResolutionNodeBase extends GraphNodeBase {
-  readonly input: InputPort
+  readonly inputDefinitions: readonly InputPort[]
   readonly prompt: string
   readonly timeoutMs?: never
 }
@@ -517,11 +517,11 @@ export type ChangeOperation =
       readonly value: readonly InputPort[]
     }
   | {
-      readonly before: Pick<ResolutionNode, 'prompt'>
+      readonly before: Pick<ResolutionNode, 'inputDefinitions' | 'prompt'>
       readonly kind: 'graph.node.resolution.set'
       readonly nodeId: string
       readonly target: Extract<GraphTarget, { readonly kind: 'flow' }>
-      readonly value: Pick<ResolutionNode, 'prompt'>
+      readonly value: Pick<ResolutionNode, 'inputDefinitions' | 'prompt'>
     }
   | {
       readonly before: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'bodyFields' | 'options'>
@@ -765,7 +765,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
       case 'graph.node.resolution.set': {
         const graph = document.graph
         const node = graph.nodes[operation.nodeId]
-        if ((node?.kind != 'wait' && node?.kind != 'approval') || !dequal({ prompt: node.prompt }, operation.before)) {
+        if ((node?.kind != 'wait' && node?.kind != 'approval') || !dequal({ inputDefinitions: node.inputDefinitions, prompt: node.prompt }, operation.before)) {
           invalid('The resolution node changed before this operation was applied.')
         }
         const updated: ResolutionNode = { ...node, ...operation.value }

@@ -688,6 +688,7 @@ export class WorkspaceStore {
     nodeId: string,
     settings: Pick<Extract<GraphNode, { readonly kind: 'approval' | 'wait' }>, 'prompt'> & {
       readonly name?: string
+      readonly inputDefinitions?: readonly InputPort[]
     },
   ): Promise<boolean> {
     const revision = this.$.revision.value

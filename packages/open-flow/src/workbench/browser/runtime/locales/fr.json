@@ -589,6 +589,8 @@
     "timelineEmpty": "Exécutez le Brouillon sélectionné pour inspecter sa chronologie et sa sortie.",
     "submitting": "Envoi de cette révision figée et création de son enregistrement d'exécution…",
     "waiting": "En attente du premier événement…",
+    "waitComment": "Commentaire (facultatif)",
+    "waitCommentTooLong": "Utilisez au maximum 2 000 caractères.",
     "waitExpires": "Expire le {{date}}",
     "savedResults": "Saved tool results",
     "refreshResults": "Refresh",
