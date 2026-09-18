@@ -1,5 +1,6 @@
 import type { Draft } from '../api.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { expect, it } from 'vitest'
 import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 import { createI18n } from '../i18n.ts'
@@ -12,12 +13,12 @@ it('offers a manual trigger again after the existing one is removed', () => {
     createdAt: '2026-09-07T00:00:00.000Z',
     digest: 'digest',
     flowId: 'flow',
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     parentRevisionId: null,
     revisionId: 'revision',
     version: 1,
     content: {
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: {},
       document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
     },

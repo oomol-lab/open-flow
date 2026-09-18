@@ -3,6 +3,7 @@ import type { PollDefinition, PollResult } from '@oomol-lab/open-flow/poll-trigg
 import type { DestinationStream, Logger } from 'pino'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import {
   payloadPollOutputs,
   maximumPollCheckpointBytes,
@@ -106,7 +107,7 @@ function revision(source = 'primary', definition: PollDefinition['snapshot'] = s
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: { 'module-main': { imports: [], name: 'Main', source: 'export default function run() { return {} }' } },
   }
 }

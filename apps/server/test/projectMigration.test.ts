@@ -1,3 +1,4 @@
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { convertProjectFlow, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -80,7 +81,7 @@ it.each([1, 2])('imports a version %s draft while archiving the complete WAL-bac
       expect(target.prepare('SELECT * FROM flow_live').all()).toEqual([])
       expect(target.prepare('SELECT flow_id, name FROM flows').all()).toEqual([{ flow_id: 'main', name: 'Original Flow' }])
       const content = JSON.parse((target.prepare('SELECT content FROM revisions').get() as { content: string }).content)
-      expect(content.modelVersion).toBe(2)
+      expect(content.modelVersion).toBe(currentFlowModelVersion)
       expect(content.document.graph.edges).toEqual([{ source: 'clock', target: 'echo' }])
       expect(content.modules).toEqual(revision().modules)
     } finally {

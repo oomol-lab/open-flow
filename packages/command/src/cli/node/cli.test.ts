@@ -2,6 +2,7 @@ import type { ChangeOperation, RevisionContent } from '@oomol-lab/open-flow/flow
 import type { UiLanguage } from '@oomol-lab/open-flow/localization'
 
 import { authoringExample } from '@oomol-lab/open-flow/control-requests'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { applyFlowChanges } from '@oomol-lab/open-flow/flow-change'
 import { uiLanguages } from '@oomol-lab/open-flow/localization'
 import { describe, expect, it, vi } from 'vitest'
@@ -49,7 +50,7 @@ function runtime(language: UiLanguage = 'en') {
 describe('CLI', () => {
   it('edits execution order and input sources independently through revision changes', async () => {
     let content: RevisionContent = {
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: {},
       document: {
         bindings: {},
@@ -71,7 +72,7 @@ describe('CLI', () => {
       createdAt: flow.createdAt,
       digest: 'digest',
       flowId: flow.flowId,
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       parentRevisionId: null,
       revisionId: `revision-${sequence}`,
       version: 1,
@@ -178,7 +179,7 @@ describe('CLI', () => {
           diagnostics: [],
           engineContract: 'open-flow-engine/v5',
           flowId: flow.flowId,
-          modelVersion: 2,
+          modelVersion: currentFlowModelVersion,
           revisionDigest: 'digest-1',
           revisionId: flow.draftRevisionId,
           valid: true,
@@ -244,12 +245,12 @@ it.each([
         createdAt: flow.createdAt,
         digest: 'digest',
         flowId: flow.flowId,
-        modelVersion: 2,
+        modelVersion: currentFlowModelVersion,
         parentRevisionId: null,
         revisionId: 'revision-1',
         version: 1,
         content: {
-          modelVersion: 2,
+          modelVersion: currentFlowModelVersion,
           modules: {},
           document: {
             bindings: {},
@@ -279,7 +280,7 @@ it.each([
         closureDigest: 'closure',
         engineContract: 'open-flow-engine/v5',
         engineDigest: 'engine',
-        modelVersion: 2,
+        modelVersion: currentFlowModelVersion,
         revisionDigest: 'digest',
       })
     }
@@ -306,7 +307,7 @@ const runFixture = {
   closureDigest: 'closure',
   engineContract: 'open-flow-engine/v5',
   engineDigest: 'engine',
-  modelVersion: 2,
+  modelVersion: currentFlowModelVersion,
   revisionDigest: 'digest',
 } as const
 const revisionFixture = {
@@ -314,12 +315,12 @@ const revisionFixture = {
   createdAt: flow.createdAt,
   digest: 'digest',
   flowId: flow.flowId,
-  modelVersion: 2,
+  modelVersion: currentFlowModelVersion,
   parentRevisionId: null,
   revisionId: 'revision-1',
   version: 1,
   content: {
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
     document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
   },
@@ -528,7 +529,7 @@ describe('agent command contract', () => {
               diagnostics: [],
               engineContract: 'open-flow-engine/v5',
               flowId: flow.flowId,
-              modelVersion: 2,
+              modelVersion: currentFlowModelVersion,
               revisionDigest: 'digest',
               revisionId: 'revision-1',
               valid: false,
@@ -600,7 +601,7 @@ it('applies a complete operation batch atomically and reports validation separat
         diagnostics: [],
         engineContract: 'open-flow-engine/v5',
         flowId: flow.flowId,
-        modelVersion: 2,
+        modelVersion: currentFlowModelVersion,
         revisionDigest: 'digest',
         revisionId: 'revision-2',
         valid: false,

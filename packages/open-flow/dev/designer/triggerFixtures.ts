@@ -1,6 +1,7 @@
 import type { JsonValue, TriggerNode } from '../../src/flow/common/change.ts'
 import type { Draft, Flow } from '../../src/workbench/browser/runtime/api.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import snapshots from 'virtual:lab-trigger-snapshots'
 import { schemaObject } from '../../src/flow/common/schema.ts'
 import { triggerOutputDefinitions } from '../../src/trigger/common/contract.ts'
@@ -115,12 +116,12 @@ export function triggerDraft(trigger: TriggerNode, downstream = false): { flow: 
     createdAt: timestamp,
     digest: 'lab',
     flowId: flow.flowId,
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     parentRevisionId: null,
     revisionId: flow.draftRevisionId,
     version: 1,
     content: {
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: {},
       document: {
         bindings: { account: { kind: 'connection', target: 'lab-account' } },

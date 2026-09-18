@@ -1,5 +1,6 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -11,7 +12,7 @@ import { Store } from '../node/storage/store.ts'
 /** An Agent Run whose closure reads a deployment Variable. */
 function revision(): RevisionContent {
   return {
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
     document: {
       bindings: { email: { kind: 'variable', target: 'TOKEN' } },
@@ -64,7 +65,7 @@ describe('Agent Run admission with a deployment Variable', () => {
         flowId: 'flow',
         idempotencyKey: 'run',
         inputs: {},
-        modelVersion: 2,
+        modelVersion: currentFlowModelVersion,
         requestDigest: 'run',
         revisionDigest: 'revision',
         revisionId: 'revision',

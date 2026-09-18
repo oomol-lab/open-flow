@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { checkJsonDepth } from './json.ts'
 import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
 
+export const currentFlowModelVersion = 3
 const text = z.string()
 const json = z.json()
 const strings = z.array(text)
@@ -181,11 +182,83 @@ const document = z.object({
   subflows: z.record(text, subflow.extend({ graph })),
   tasks: z.record(text, managed),
 })
-const revision = z.object({ modelVersion: z.literal(2), document, modules: z.record(text, module) })
+const revision = z.object({ modelVersion: z.union([z.literal(2), z.literal(currentFlowModelVersion)]), document, modules: z.record(text, module) })
+const currentRevision = revision.extend({ modelVersion: z.literal(currentFlowModelVersion) })
 const envelope = revision.extend({ kind: z.literal('open-flow-flow-revision'), version: z.literal(1) })
 
 function record(value: unknown): Record<string, unknown> {
   return value != null && typeof value == 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
+}
+
+function upgradeLegacySources(value: unknown, resolutionIds: ReadonlySet<string>): unknown {
+  if (!Array.isArray(value)) return value
+  return value.map((sourceCandidate) => {
+    const candidate = record(sourceCandidate)
+    return candidate.kind == 'node' && typeof candidate.nodeId == 'string' && resolutionIds.has(candidate.nodeId) && candidate.output == 'notification'
+      ? { ...candidate, output: 'pending' }
+      : sourceCandidate
+  })
+}
+
+function upgradeLegacyInputs(value: unknown, resolutionIds: ReadonlySet<string>): unknown {
+  return Object.fromEntries(
+    Object.entries(record(value)).map(([handle, inputCandidate]) => {
+      const inputMapping = record(inputCandidate)
+      return [handle, inputMapping.kind == 'sources' ? { ...inputMapping, sources: upgradeLegacySources(inputMapping.sources, resolutionIds) } : inputCandidate]
+    }),
+  )
+}
+
+function upgradeLegacyGraph(value: unknown): { readonly graph: unknown; readonly resolutionIds: ReadonlySet<string> } {
+  const candidate = record(value)
+  const resolutionIds = new Set<string>()
+  const nodes = Object.fromEntries(
+    Object.entries(record(candidate.nodes)).map(([id, nodeCandidate]) => {
+      const graphNode = record(nodeCandidate)
+      if (graphNode.kind == 'approval') throw new TypeError('Legacy Flow models do not support Approval nodes.')
+      if (graphNode.kind != 'wait') return [id, nodeCandidate]
+      const actions = graphNode.actions
+      let kind: 'approval' | 'wait'
+      if (Array.isArray(actions) && actions.length == 1 && actions[0] == 'continue') kind = 'wait'
+      else if (Array.isArray(actions) && actions.length == 2 && actions[0] == 'approve' && actions[1] == 'reject') kind = 'approval'
+      else throw new TypeError('Legacy Wait actions are invalid.')
+      resolutionIds.add(id)
+      const { actions: _, ...upgraded } = graphNode
+      return [id, { ...upgraded, kind }]
+    }),
+  )
+  for (const [id, nodeCandidate] of Object.entries(nodes)) {
+    const graphNode = record(nodeCandidate)
+    if (graphNode.inputs != null) nodes[id] = { ...graphNode, inputs: upgradeLegacyInputs(graphNode.inputs, resolutionIds) }
+  }
+  const edges = Array.isArray(candidate.edges)
+    ? candidate.edges.map((edgeCandidate) => {
+        const graphEdge = record(edgeCandidate)
+        return typeof graphEdge.source == 'string' && resolutionIds.has(graphEdge.source) && graphEdge.sourceHandle == 'notification'
+          ? { ...graphEdge, sourceHandle: 'pending' }
+          : edgeCandidate
+      })
+    : candidate.edges
+  return { graph: { ...candidate, nodes, edges }, resolutionIds }
+}
+
+function upgradeLegacyDocument(value: unknown): unknown {
+  const candidate = record(value)
+  const root = upgradeLegacyGraph(candidate.graph)
+  const subflows = Object.fromEntries(
+    Object.entries(record(candidate.subflows)).map(([id, subflowCandidate]) => {
+      const legacySubflow = record(subflowCandidate)
+      const upgraded = upgradeLegacyGraph(legacySubflow.graph)
+      const outputs = Array.isArray(legacySubflow.outputs)
+        ? legacySubflow.outputs.map((outputCandidate) => {
+            const output = record(outputCandidate)
+            return { ...output, sources: upgradeLegacySources(output.sources, upgraded.resolutionIds) }
+          })
+        : legacySubflow.outputs
+      return [id, { ...legacySubflow, graph: upgraded.graph, outputs }]
+    }),
+  )
+  return { ...candidate, graph: root.graph, subflows }
 }
 
 function repairedEntries<Value>(value: unknown, schema: z.ZodType<Value>, repair?: (value: unknown) => unknown): Record<string, Value> {
@@ -243,8 +316,11 @@ export function repairRevisionEnvelope(value: unknown): RevisionContent {
   checkJsonDepth(value)
   const envelopeSource = record(value)
   if (envelopeSource.kind != 'open-flow-flow-revision' || envelopeSource.version != 1) throw new TypeError('The value is not an Open Flow Revision envelope.')
-  if (typeof envelopeSource.modelVersion == 'number' && envelopeSource.modelVersion > 2) throw new TypeError('The Flow model is newer than this package.')
-  const sourceDocument = record(envelopeSource.document)
+  if (typeof envelopeSource.modelVersion == 'number' && envelopeSource.modelVersion > currentFlowModelVersion)
+    throw new TypeError('The Flow model is newer than this package.')
+  const sourceDocument = record(
+    envelopeSource.modelVersion == 1 || envelopeSource.modelVersion == 2 ? upgradeLegacyDocument(envelopeSource.document) : envelopeSource.document,
+  )
   const sourceGraph = repairGraph(sourceDocument.graph)
   const subflows = Object.fromEntries(
     Object.entries(record(sourceDocument.subflows)).flatMap(([id, subflowCandidate]) => {
@@ -254,7 +330,7 @@ export function repairRevisionEnvelope(value: unknown): RevisionContent {
     }),
   )
   return decodeRevisionContent({
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     document: {
       bindings: repairedEntries(sourceDocument.bindings, binding),
       graph: sourceGraph,
@@ -272,12 +348,14 @@ export function decodeFlowDocument(value: unknown): FlowDocument {
 
 export function decodeRevisionContent(value: unknown): RevisionContent {
   checkJsonDepth(value)
-  return revision.parse(value) as RevisionContent
+  return currentRevision.parse(value) as RevisionContent
 }
 
 export function decodeRevisionEnvelope(value: unknown): RevisionContent {
   checkJsonDepth(value)
-  const content = envelope.parse(value) as RevisionContent
+  const revisionSource = record(value)
+  const candidate = revisionSource.modelVersion == 2 ? { ...revisionSource, document: upgradeLegacyDocument(revisionSource.document) } : value
+  const content = envelope.parse(candidate) as RevisionContent
   return { modelVersion: content.modelVersion, document: content.document, modules: content.modules }
 }
 

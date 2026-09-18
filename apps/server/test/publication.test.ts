@@ -1,5 +1,6 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -50,7 +51,7 @@ function revision(name = 'Incoming', webhook = true): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
   }
 }
@@ -77,7 +78,7 @@ function variableRevision(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: { main: { imports: [], name: 'Main', source: 'export default () => ({})' } },
   }
 }

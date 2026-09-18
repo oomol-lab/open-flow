@@ -1,6 +1,7 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -244,7 +245,7 @@ function codeFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: { code: { imports: [], name: 'Code', source: 'export default () => ({ result: 42 })' } },
   }
 }

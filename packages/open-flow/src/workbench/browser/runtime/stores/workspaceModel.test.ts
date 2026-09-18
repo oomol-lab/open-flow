@@ -1,5 +1,6 @@
 import type { Draft } from '../api.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
 import * as graph from '../../../../flow/common/graph.ts'
 import { revisionView } from '../revisionView.ts'
@@ -10,12 +11,12 @@ function draft(): Draft {
     createdAt: '2026-09-15T00:00:00.000Z',
     digest: 'd1',
     flowId: 'flow',
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     parentRevisionId: null,
     revisionId: 'r1',
     version: 1,
     content: {
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: {},
       document: {
         bindings: {},

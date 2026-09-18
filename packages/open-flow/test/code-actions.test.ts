@@ -1,5 +1,6 @@
 import type { ConnectorCapability, RevisionContent } from '../src/flow/common/change.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import { currentEngineContract } from '../src/execution/common/engineContract.ts'
 import { createActions, resolveAction } from '../src/execution/common/runtime.ts'
@@ -16,7 +17,7 @@ const action: ConnectorCapability = {
 }
 function revision(): RevisionContent {
   return applyFlowChanges(
-    { document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} }, modules: {}, modelVersion: 2 },
+    { document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} }, modules: {}, modelVersion: currentFlowModelVersion },
     createCodeTask(target, { nodeId: 'code', moduleId: 'code' }, 'Code'),
   )
 }

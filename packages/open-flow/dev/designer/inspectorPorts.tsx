@@ -3,6 +3,7 @@ import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { Group, InputPort, JsonValue } from '../../src/workbench/browser/runtime/api.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
@@ -41,7 +42,7 @@ const valueStates: InputPort[] = [
   { ...port('invalidNull', 'null'), nullable: true, value: 'old value' },
 ]
 const portsContent: RevisionContent = {
-  modelVersion: 2,
+  modelVersion: currentFlowModelVersion,
   modules: { module: { name: 'Summarize', imports: [], source: 'export default (inputs) => ({ summary: inputs.message, issues: [], count: 0 })' } },
   document: {
     bindings: {},

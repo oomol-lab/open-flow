@@ -10,6 +10,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
+import { currentFlowModelVersion } from '../../../../flow/common/change.ts'
 import { decodeRevisionContent } from '../../../../flow/common/changeSchema.ts'
 import { getDefaultValue, typeOfSchema } from '../../../../form/common/schemaWidget.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
@@ -186,7 +187,7 @@ export function AgentSettings({
         const definition = current?.kind == 'task' ? current.definition : undefined
         if (definition == null || !('executor' in definition) || !dequal(definition.executor, before)) return false
         const decoded = decodeRevisionContent({
-          modelVersion: 2,
+          modelVersion: currentFlowModelVersion,
           modules: {},
           document: { bindings: {}, subflows: {}, graph: { nodes: {}, edges: [] }, tasks: { agent: { ...definition, executor: value } } },
         }).document.tasks.agent!

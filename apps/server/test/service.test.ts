@@ -3,7 +3,8 @@ import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { InvokeLlmTask } from '@oomol-lab/open-flow/runtime-contract'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { digestBytes } from '@oomol-lab/open-flow/flow-encoding'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import * as Effect from 'effect/Effect'
 import { TestClock } from 'effect/testing'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -85,7 +86,7 @@ function fullFlow(value = 2): RevisionContent {
       },
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {
       double: { imports: [], name: 'Double', source: 'export default ({ value }) => ({ value: value * 2 })' },
       increment: {
@@ -120,7 +121,7 @@ function hangingFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {
       main: {
         imports: [],
@@ -149,7 +150,7 @@ function oversizedOutputsFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {
       main: { imports: [], name: 'Main', source: "export default async () => ({ value: 'x'.repeat(2_000_000) })" },
     },
@@ -178,7 +179,7 @@ function variableFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: { main: { imports: [], name: 'Main', source: 'export default ({ token }) => ({ token })' } },
   }
 }
@@ -202,7 +203,7 @@ function waitFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
   }
 }
@@ -284,7 +285,7 @@ function llmFlow(): RevisionContent {
         },
       },
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
   }
 }
@@ -315,7 +316,7 @@ function connectorFlow(): RevisionContent {
         },
       },
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
   }
 }
@@ -1366,13 +1367,64 @@ describe('Server application service', () => {
       const repaired = await service.control.repairDraft('test', source.flowId, source.revisionId, 'repair-request')
       expect(repaired.revision.parentRevisionId).toBe(source.revisionId)
       expect(await service.control.getEditor(source.flowId)).toMatchObject({
-        draft: { revisionId: repaired.revision.revisionId, content: { modelVersion: 2, document: { graph: { nodes: { start: {} } } } } },
+        draft: { revisionId: repaired.revision.revisionId, content: { modelVersion: currentFlowModelVersion, document: { graph: { nodes: { start: {} } } } } },
       })
       expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(source.revisionId)).toEqual({ content: legacy })
       await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'repair-request')).resolves.toEqual(repaired)
       await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'another-repair')).rejects.toMatchObject({
         code: controlErrorCode.flowRevisionConflict,
       })
+    } finally {
+      database.close()
+    }
+  })
+
+  it('reads and runs a fixed model v2 Approval without rewriting its Revision', async () => {
+    const file = await databaseFile()
+    const service = await openService(file)
+    const created = await service.control.createFlow('test', 'Legacy approval', 'legacy-approval')
+    const source = service.control.getRevision(created.flow.flowId, created.flow.draftRevisionId)
+    const legacy = {
+      kind: 'open-flow-flow-revision',
+      version: 1,
+      modelVersion: 2,
+      modules: {},
+      document: {
+        bindings: {},
+        tasks: {},
+        subflows: {},
+        graph: {
+          nodes: {
+            start: { kind: 'manual', name: 'Start' },
+            approval: {
+              kind: 'wait',
+              actions: ['approve', 'reject'],
+              inputs: {},
+              input: { handle: 'value', jsonSchema: {}, nullable: true },
+              prompt: 'Approve?',
+            },
+          },
+          edges: [{ source: 'start', target: 'approval' }],
+        },
+      },
+    } as const
+    const bytes = canonicalJsonBytes(legacy)
+    const content = new TextDecoder().decode(bytes)
+    const database = new DatabaseSync(file)
+    try {
+      database.prepare('UPDATE revisions SET content = ?, digest = ? WHERE revision_id = ?').run(content, await digestBytes(bytes), source.revisionId)
+
+      expect(await service.control.getEditor(source.flowId)).toMatchObject({
+        draft: { content: { modelVersion: 2, document: { graph: { nodes: { approval: { kind: 'approval' } } } } } },
+      })
+      expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(source.revisionId)).toEqual({ content })
+
+      const accepted = await service.control.runs.createDraftRun(source.flowId, source.revisionId, 'open-flow-engine/v5', {}, 'legacy-run', {
+        nodeId: 'start',
+        outputs: {},
+      })
+      await startService(service)
+      await expect.poll(() => service.control.runs.getRun(accepted.run.runId).waits).toMatchObject([{ actions: ['approve', 'reject'] }])
     } finally {
       database.close()
     }

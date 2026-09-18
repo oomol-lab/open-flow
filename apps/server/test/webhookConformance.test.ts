@@ -1,6 +1,7 @@
 import type { JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { WebhookConformanceFixture, WebhookConformanceHarness } from '@oomol-lab/open-flow/webhook-trigger'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { webhookConformanceCases } from '@oomol-lab/open-flow/webhook-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -37,7 +38,7 @@ function revision(fixture: WebhookConformanceFixture, enabled = true): RevisionC
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
   }
 }

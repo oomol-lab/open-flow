@@ -1,4 +1,5 @@
 import { createCodeTask } from '@oomol-lab/open-flow/flow-authoring'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { applyFlowChanges } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import { applySpec } from './applySpec.ts'
@@ -11,7 +12,7 @@ describe('Flow apply Code Actions', () => {
     const node = spec.nodes.code
     if (node?.kind != 'code') throw new Error('Expected Code node.')
     const content = applyFlowChanges(
-      { modelVersion: 2, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } } },
+      { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } } },
       createCodeTask({ kind: 'flow' }, { moduleId: 'main', nodeId: 'code' }, node.name, undefined, {
         inputs: [],
         outputs: [],

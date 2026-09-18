@@ -1,6 +1,7 @@
 import type { JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { IntegrationConformanceFixture, IntegrationConformanceHarness, IntegrationDefinition } from '@oomol-lab/open-flow/integration-trigger'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { integrationCallbackSecret, integrationConformanceCases, listenerConformanceCases } from '@oomol-lab/open-flow/integration-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -78,7 +79,7 @@ function revision(fixture: IntegrationConformanceFixture, enabled = true): Revis
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: { 'module-main': { imports: [], name: 'Main', source: 'export default function run() { return {} }' } },
   }
 }

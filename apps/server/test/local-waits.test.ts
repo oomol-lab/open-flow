@@ -1,5 +1,7 @@
 import type { FlowRunCheckpoint, WaitRequest } from '@oomol-lab/open-flow/scheduler'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { createHash } from 'node:crypto'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
@@ -25,7 +27,7 @@ function fixture() {
     flowId: 'flow',
     idempotencyKey: 'run',
     inputs: {},
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     requestDigest: 'run',
     revisionDigest: 'revision',
     revisionId: 'revision',
@@ -164,7 +166,7 @@ it('releases the same-flow queue after freezing while honoring active worker exc
     flowId: 'flow',
     idempotencyKey: 'next',
     inputs: {},
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     requestDigest: 'next',
     revisionDigest: 'revision',
     revisionId: 'revision',
@@ -177,15 +179,18 @@ it('releases the same-flow queue after freezing while honoring active worker exc
   expect(f.store.runs.claim()?.runId).toBe(accepted.runId)
 })
 
-it('rejects a version 5 checkpoint with the obsolete notification field without replaying it', () => {
+it('loads a version 5 checkpoint with the legacy notification field as pending', () => {
   const f = fixture()
   f.pause()
   const checkpoint = {
     ...f.checkpoint,
     waits: f.checkpoint.waits.map(({ pending, ...wait }) => ({ ...wait, notification: pending })),
   }
-  f.database.connection.prepare('UPDATE run_checkpoints SET checkpoint_json = ? WHERE run_id = ?').run(JSON.stringify(checkpoint), f.runId)
+  const source = JSON.stringify(checkpoint)
+  f.database.connection
+    .prepare('UPDATE run_checkpoints SET checkpoint_json = ?, checkpoint_digest = ?, checkpoint_bytes = ? WHERE run_id = ?')
+    .run(source, `sha256:${createHash('sha256').update(source).digest('hex')}`, new TextEncoder().encode(source).byteLength, f.runId)
   const recovered = new Store(f.database, () => 1001)
-  expect(recovered.runViews.run(f.runId)).toMatchObject({ status: 'indeterminate', result: { error: { code: 'execution.resume-unavailable' } } })
-  expect(recovered.runs.claim()).toBeUndefined()
+  recovered.runs.resolveWait(f.runId, 'first', 'approve')
+  expect(recovered.runs.claim()?.resume?.checkpoint).toEqual(f.checkpoint)
 })

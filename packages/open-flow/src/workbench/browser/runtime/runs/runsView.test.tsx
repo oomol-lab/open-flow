@@ -1,6 +1,7 @@
 import type { RunDetails, RunResult } from '../api.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { val } from 'value-enhancer'
@@ -15,7 +16,7 @@ describe('RunsView timeline', () => {
       closureDigest: 'closure',
       engineContract: 'open-flow-engine/v5',
       engineDigest: 'engine',
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       revisionDigest: 'revision',
       waits:
         status == 'failed'

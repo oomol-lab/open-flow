@@ -3,6 +3,7 @@ import type { RevisionContent } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useMemo, useState } from 'react'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { initialsIcon } from '../../src/ui/browser/icons/ContentIcon.tsx'
@@ -35,7 +36,7 @@ const triggerNode: FlowCanvasViewTriggerNode = {
   presentation: { kind: 'manual', schedules: [] },
 }
 const content: RevisionContent = {
-  modelVersion: 2,
+  modelVersion: currentFlowModelVersion,
   modules: { review: { name: 'Review', imports: [], source: 'export default () => ({ summary: "Ready for review" })' } },
   document: {
     bindings: {},

@@ -2,6 +2,7 @@ import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { spawn } from 'node:child_process'
 import { cp, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -36,7 +37,7 @@ function hangingFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: { main: { imports: [], name: 'Main', source: 'export default async () => await new Promise(() => {})' } },
   }
 }

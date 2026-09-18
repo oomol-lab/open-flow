@@ -1,3 +1,4 @@
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
 import { RunStore } from './runStore.ts'
@@ -19,7 +20,7 @@ const details = {
   closureDigest: 'closure-1',
   engineContract: 'open-flow-engine/v5',
   engineDigest: 'engine-1',
-  modelVersion: 2,
+  modelVersion: currentFlowModelVersion,
   revisionDigest: 'digest-1',
 } as const
 

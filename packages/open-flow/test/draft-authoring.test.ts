@@ -1,4 +1,5 @@
 import { Validator } from '@cfworker/json-schema'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { expect, it } from 'vitest'
 import { authoringExample, authoringExamples } from '../src/control/common/authoringExamples.ts'
 import { decodeDraftOperations, draftOperationsSchema, resolveDraftOperations } from '../src/control/common/draftOperations.ts'
@@ -15,7 +16,7 @@ it.each(authoringExamples)('validates and applies the complete $name example', a
   const decoded = decodeDraftOperations(example.operations)
   const operations = resolveDraftOperations(decoded, definitions)
   const content = applyFlowChanges(
-    { modelVersion: 2, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: {}, edges: [] } } },
+    { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: {}, edges: [] } } },
     operations,
   )
   const checked = await validateFlow(content, findEngineContract(currentEngineContract)!)

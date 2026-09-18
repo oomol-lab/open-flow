@@ -1,12 +1,17 @@
 import type { ChangeOperation, RevisionContent } from './change.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import { applyFlowChanges } from './change.ts'
 import { inverseFlowChanges } from './inverseChanges.ts'
 import { createCodeTask, createValue, deleteNodes } from './nodeChanges.ts'
 
 const target = { kind: 'flow' } as const
-const empty: RevisionContent = { modelVersion: 2, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {} } }
+const empty: RevisionContent = {
+  modelVersion: currentFlowModelVersion,
+  modules: {},
+  document: { bindings: {}, graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {} },
+}
 function roundTrip(before: RevisionContent, operations: readonly ChangeOperation[]) {
   const after = applyFlowChanges(before, operations)
   const restored = applyFlowChanges(after, inverseFlowChanges(before, operations))

@@ -30,7 +30,7 @@ import type { StoredTriggerBinding } from '../storage/trigger-store.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { resolveDraftOperations } from '@oomol-lab/open-flow/control-requests'
-import { applyFlowChanges, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
+import { applyFlowChanges, currentFlowModelVersion, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
 import { canonicalJsonBytes, digestBytes, encodeRevision, repairRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { flowClosure, validateFlow } from '@oomol-lab/open-flow/flow-semantics'
 import { PermanentPollError, PollConnectionError } from '@oomol-lab/open-flow/poll-trigger'
@@ -501,7 +501,10 @@ export class ControlService {
     try {
       const source = new TextEncoder().encode(base.content)
       if ((await digestBytes(source)) != base.digest) throw new TypeError('The stored Draft digest does not match its content.')
-      bytes = encodeRevision(repairRevision(source))
+      const repaired = repairRevision(source)
+      const engine = findEngineContract(currentEngineContract)
+      if (engine == null || !(await validateFlow(repaired, engine)).valid) throw new TypeError('The repaired Draft is invalid.')
+      bytes = encodeRevision(repaired)
     } catch (error) {
       throw new ControlError(controlErrorCode.flowInvalid, 'The Draft cannot be repaired safely.', { cause: error })
     }
@@ -830,7 +833,7 @@ export class ControlService {
 function emptyRevision(): RevisionContent {
   return {
     document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
   }
 }

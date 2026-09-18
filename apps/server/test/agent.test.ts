@@ -3,6 +3,7 @@ import type { JsonValue, ManagedTaskDefinition } from '@oomol-lab/open-flow/flow
 import type { AgentResult } from '@oomol-lab/open-flow/runtime-contract'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -470,7 +471,7 @@ it('resumes a streamed gateway batch after restart and retains earlier receipts 
       idempotencyKey: 'agent-run',
       revisionId: 'revision',
       revision: {
-        modelVersion: 2,
+        modelVersion: currentFlowModelVersion,
         modules: {},
         document: {
           bindings: {},
@@ -706,7 +707,7 @@ it('runs a code-only Agent through the service without a Connector deployment', 
       idempotencyKey: 'code-run',
       revisionId: 'revision',
       revision: {
-        modelVersion: 2,
+        modelVersion: currentFlowModelVersion,
         modules: {},
         document: {
           bindings: {},

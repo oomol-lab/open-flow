@@ -2,6 +2,7 @@ import type { RunDetails, RunEvent } from '../../src/control/common/api.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
@@ -41,7 +42,7 @@ const base: RunDetails = {
   closureDigest: 'lab',
   engineContract: 'open-flow-engine/v5',
   engineDigest: 'lab',
-  modelVersion: 2,
+  modelVersion: currentFlowModelVersion,
   revisionDigest: 'lab',
   waits,
 }

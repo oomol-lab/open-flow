@@ -360,13 +360,16 @@ export function decodeFlowRunCheckpoint(input: unknown): FlowRunCheckpoint {
   )
   const counts = z.record(z.string(), z.record(z.string(), z.number().int().positive().max(Number.MAX_SAFE_INTEGER))).parse(source.counts)
   const frames = z.record(z.string(), z.record(z.string(), z.record(z.string(), z.json()))).parse(source.frames)
-  const savedWait = z.strictObject({
+  const savedWaitFields = {
     jobId: z.string().min(1),
     nodeId: z.string().min(1),
     value: z.json(),
     waitId: z.string().min(1),
-    pending: z.json().optional(),
-  })
+  }
+  const savedWait = z.union([
+    z.strictObject({ ...savedWaitFields, pending: z.json().optional() }),
+    z.strictObject({ ...savedWaitFields, notification: z.json().optional() }).transform(({ notification, ...wait }) => ({ ...wait, pending: notification })),
+  ])
   const pendingWaits = z.array(savedWait).min(1).parse(source.waits)
   const agents = z
     .record(

@@ -4,6 +4,7 @@ import type { Draft } from '../../src/workbench/browser/runtime/api.ts'
 import type { CanvasNodePickerRequest } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
@@ -20,11 +21,11 @@ const pickerDraft: Draft = {
   createdAt: '2026-09-13T00:00:00.000Z',
   digest: 'lab',
   flowId: 'lab',
-  modelVersion: 2,
+  modelVersion: currentFlowModelVersion,
   parentRevisionId: null,
   revisionId: 'lab',
   version: 1,
-  content: { modelVersion: 2, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } } },
+  content: { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } } },
 }
 
 const workflowViewport = { x: 35, y: 40, zoom: 0.9 }

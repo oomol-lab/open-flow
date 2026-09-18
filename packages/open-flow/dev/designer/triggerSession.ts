@@ -3,6 +3,7 @@ import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { WorkbenchHost } from '../../src/workbench/browser/runtime/contract.ts'
 import type { LogAction } from './stories.tsx'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { applyFlowChanges } from '../../src/flow/common/change.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
@@ -88,7 +89,7 @@ export function createTriggerSession(
         diagnostics: [],
         engineContract: 'open-flow-engine/v5',
         flowId: flow.flowId,
-        modelVersion: 2,
+        modelVersion: currentFlowModelVersion,
         revisionDigest: revision().digest,
         revisionId: revision().revisionId,
         check: { kind: 'available' },

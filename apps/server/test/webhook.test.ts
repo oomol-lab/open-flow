@@ -1,5 +1,6 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { webhookEndpointId } from '@oomol-lab/open-flow/webhook-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -61,7 +62,7 @@ function webhookFlow(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {
       capture: { imports: [], name: 'Capture', source: 'export default ({ event }) => ({ message: event.message })' },
     },

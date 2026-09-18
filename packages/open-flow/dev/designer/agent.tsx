@@ -3,6 +3,7 @@ import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { ConnectorAction } from '../../src/workbench/browser/runtime/api.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
@@ -42,7 +43,7 @@ function createSession(language: UiLanguage, log: LogAction) {
     version: 1,
   }
   let content: RevisionContent = applyFlowChanges(
-    { modelVersion: 2, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] }, subflows: {}, tasks: {} } },
+    { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] }, subflows: {}, tasks: {} } },
     createAgentTask({ kind: 'flow' }, { nodeId: 'agent', taskId: 'agent-task' }, 'Research agent'),
   )
   let sequence = 1
@@ -51,7 +52,7 @@ function createSession(language: UiLanguage, log: LogAction) {
     createdAt: timestamp,
     digest: `digest-${sequence}`,
     flowId: flow.flowId,
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     parentRevisionId: sequence === 1 ? null : `revision-${sequence - 1}`,
     revisionId: `revision-${sequence}`,
     version: 1,
@@ -80,7 +81,7 @@ function createSession(language: UiLanguage, log: LogAction) {
         diagnostics: [],
         engineContract: 'open-flow-engine/v5',
         flowId: flow.flowId,
-        modelVersion: 2,
+        modelVersion: currentFlowModelVersion,
         revisionDigest: revision().digest,
         revisionId: revision().revisionId,
         check: { kind: 'available' },

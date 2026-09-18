@@ -1,6 +1,7 @@
 import { dequal } from 'dequal/lite'
+import { currentFlowModelVersion } from './changeSchema.ts'
 
-export { changeOperationsSchema, decodeChangeOperations } from './changeSchema.ts'
+export { changeOperationsSchema, currentFlowModelVersion, decodeChangeOperations } from './changeSchema.ts'
 
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
@@ -412,7 +413,7 @@ export interface CodeModule {
 
 export interface RevisionContent {
   readonly document: FlowDocument
-  readonly modelVersion: 2
+  readonly modelVersion: 2 | typeof currentFlowModelVersion
   readonly modules: Readonly<Record<string, CodeModule>>
 }
 
@@ -894,5 +895,5 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
       }
     }
   }
-  return { document, modelVersion: content.modelVersion, modules }
+  return { document, modelVersion: currentFlowModelVersion, modules }
 }

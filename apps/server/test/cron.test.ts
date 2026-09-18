@@ -1,6 +1,7 @@
 import type { RevisionContent, TriggerSchedule } from '@oomol-lab/open-flow/flow-change'
 
 import { scheduledTriggerOccurrenceId } from '@oomol-lab/open-flow/cron-trigger'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
 import { TestClock } from 'effect/testing'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -44,7 +45,7 @@ function revision(rules: readonly TriggerSchedule[]): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
   }
 }

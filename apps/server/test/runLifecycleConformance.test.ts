@@ -1,5 +1,6 @@
 import type { RunLifecycleHarness } from '@oomol-lab/open-flow/run-lifecycle'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { isRunTerminal, runLifecycleConformanceCases } from '@oomol-lab/open-flow/run-lifecycle'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -33,7 +34,7 @@ for (const conformance of runLifecycleConformanceCases) {
             closureDigest: 'closure',
             flowId: 'flow',
             inputs: {},
-            modelVersion: 2,
+            modelVersion: currentFlowModelVersion,
             revisionDigest: 'revision',
             revisionId: 'revision',
             trigger: { nodeId: 'start', outputs: {} },

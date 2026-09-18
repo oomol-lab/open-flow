@@ -6,6 +6,7 @@ import type { DraftRun, TriggerBinding } from '../../src/workbench/browser/runti
 import type { FrontendStory, LogAction } from './stories.tsx'
 import type { TriggerFixture } from './triggerFixtures.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
@@ -255,7 +256,7 @@ function RunSample({ fixture, dark, language, log, state, downstream = false, la
         closureDigest: 'lab',
         engineContract: 'open-flow-engine/v5',
         engineDigest: 'lab',
-        modelVersion: 2,
+        modelVersion: currentFlowModelVersion,
         revisionDigest: draft.digest,
       }
     }

@@ -1,3 +1,4 @@
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
 import * as Semaphore from 'effect/Semaphore'
 import { expect, it, onTestFinished, vi } from 'vitest'
@@ -34,7 +35,7 @@ function pause(store: Store, clock: () => number, flowId: string, notify = false
     flowId,
     idempotencyKey: `run:${flowId}`,
     inputs: {},
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     requestDigest: flowId,
     revisionDigest: 'revision',
     revisionId,

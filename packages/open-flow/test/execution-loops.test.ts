@@ -1,6 +1,7 @@
 import type { FlowRunOptions, SchedulerEvent, WaitRequest } from '../src/execution/common/scheduler.ts'
 import type { Graph, GraphNode, RevisionContent, WaitAction } from '../src/flow/common/change.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
 import { describe, expect, it } from 'vitest'
 import { currentEngineContract } from '../src/execution/common/runtime.ts'
@@ -18,7 +19,7 @@ const counter: GraphNode = {
 const pause: GraphNode = { kind: 'wait', inputs: {}, input: { ...port, handle: 'value', value: 42 }, prompt: 'Continue?' }
 function revision(graph: Graph): RevisionContent {
   return {
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: { counter: { name: 'Counter', imports: [], source: 'export default () => ({ count: 1 })' } },
     document: { bindings: {}, tasks: {}, subflows: {}, graph },
   }

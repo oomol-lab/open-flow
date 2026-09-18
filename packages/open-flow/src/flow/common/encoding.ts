@@ -18,7 +18,7 @@ import type {
   WebhookOptions,
 } from '@oomol-lab/open-flow/flow-change'
 
-import { nextNodeName } from '@oomol-lab/open-flow/flow-change'
+import { currentFlowModelVersion, nextNodeName } from '@oomol-lab/open-flow/flow-change'
 import { z } from 'zod'
 import { decodeRevisionContent, decodeRevisionEnvelope, repairRevisionEnvelope } from './changeSchema.ts'
 export { maxJsonDepth } from './json.ts'
@@ -157,6 +157,79 @@ export function canonicalGraph(value: Graph): JsonValue {
   }
 }
 
+function resolutionNodeIds(graph: Graph): ReadonlySet<string> {
+  return new Set(Object.entries(graph.nodes).flatMap(([id, node]) => (node.kind == 'approval' || node.kind == 'wait' ? [id] : [])))
+}
+
+function canonicalLegacySource(source: JsonValue, resolutionIds: ReadonlySet<string>): JsonValue {
+  const object = source != null && typeof source == 'object' && !Array.isArray(source) ? (source as Readonly<Record<string, JsonValue>>) : undefined
+  return object?.kind == 'node' && typeof object.nodeId == 'string' && resolutionIds.has(object.nodeId) && object.output == 'pending'
+    ? { ...object, output: 'notification' }
+    : source
+}
+
+function canonicalLegacyInputs(value: Readonly<Record<string, InputMapping>>, resolutionIds: ReadonlySet<string>): JsonValue {
+  const inputs = canonicalInputs(value) as Readonly<Record<string, JsonValue>>
+  return Object.fromEntries(
+    entries(inputs).map(([handle, mapping]) => {
+      const object = mapping != null && typeof mapping == 'object' && !Array.isArray(mapping) ? (mapping as Readonly<Record<string, JsonValue>>) : undefined
+      if (object?.kind != 'sources' || !Array.isArray(object.sources)) {
+        return [handle, mapping]
+      }
+      return [handle, { ...object, sources: object.sources.map((source) => canonicalLegacySource(source, resolutionIds)) }]
+    }),
+  )
+}
+
+function canonicalLegacyGraph(graph: Graph): JsonValue {
+  const resolutionIds = resolutionNodeIds(graph)
+  return {
+    edges: graph.edges
+      .map((edge) => (resolutionIds.has(edge.source) && edge.sourceHandle == 'pending' ? { ...edge, sourceHandle: 'notification' } : { ...edge }))
+      .toSorted((left, right) => {
+        const a = canonicalText(left)
+        const b = canonicalText(right)
+        return a < b ? -1 : a > b ? 1 : 0
+      }),
+    nodes: Object.fromEntries(
+      entries(graph.nodes).map(([id, node]) => {
+        const value = canonicalNode(node) as Readonly<Record<string, JsonValue>>
+        if (node.kind != 'approval' && node.kind != 'wait') {
+          return [id, 'inputs' in node ? { ...value, inputs: canonicalLegacyInputs(node.inputs, resolutionIds) } : value]
+        }
+        return [
+          id,
+          {
+            ...value,
+            actions: node.kind == 'wait' ? ['continue'] : ['approve', 'reject'],
+            inputs: canonicalLegacyInputs(node.inputs, resolutionIds),
+            kind: 'wait',
+          },
+        ]
+      }),
+    ),
+  }
+}
+
+function canonicalLegacyOutputs(value: readonly (OutputMapping & Port)[], graph: Graph): JsonValue {
+  const resolutionIds = resolutionNodeIds(graph)
+  return value.map((output) => ({
+    ...(output.description == null ? {} : { description: output.description }),
+    handle: output.handle,
+    jsonSchema: output.jsonSchema,
+    nullable: output.nullable,
+    sources: output.sources.map((source) => canonicalLegacySource(source as unknown as JsonValue, resolutionIds)),
+  }))
+}
+
+export function canonicalRevisionGraph(content: RevisionContent, graph: Graph): JsonValue {
+  return content.modelVersion == 2 ? canonicalLegacyGraph(graph) : canonicalGraph(graph)
+}
+
+export function canonicalRevisionOutputs(content: RevisionContent, value: readonly (OutputMapping & Port)[], graph: Graph): JsonValue {
+  return content.modelVersion == 2 ? canonicalLegacyOutputs(value, graph) : canonicalOutputs(value)
+}
+
 export function canonicalTask(task: FlowDocument['tasks'][string]): JsonValue {
   return {
     executor: task.executor as unknown as JsonValue,
@@ -287,13 +360,34 @@ export function canonicalDocument(document: FlowDocument): JsonValue {
   }
 }
 
+function canonicalRevisionDocument(content: RevisionContent): JsonValue {
+  if (content.modelVersion != 2) return canonicalDocument(content.document)
+  const { document } = content
+  return {
+    bindings: Object.fromEntries(entries(document.bindings)),
+    graph: canonicalLegacyGraph(document.graph),
+    subflows: Object.fromEntries(
+      entries(document.subflows).map(([id, subflow]) => [
+        id,
+        {
+          graph: canonicalLegacyGraph(subflow.graph),
+          inputs: canonicalPorts(subflow.inputs),
+          name: subflow.name,
+          outputs: canonicalLegacyOutputs(subflow.outputs, subflow.graph),
+        },
+      ]),
+    ),
+    tasks: Object.fromEntries(entries(document.tasks).map(([id, task]) => [id, canonicalTask(task)])),
+  }
+}
+
 export function canonicalModule(module: CodeModule): JsonValue {
   return { imports: module.imports.toSorted(), name: module.name, source: module.source }
 }
 
 function canonicalRevision(content: RevisionContent): JsonValue {
   return {
-    document: canonicalDocument(content.document),
+    document: canonicalRevisionDocument(content),
     kind: 'open-flow-flow-revision',
     modelVersion: content.modelVersion,
     modules: Object.fromEntries(entries(content.modules).map(([id, module]) => [id, canonicalModule(module)])),
@@ -331,7 +425,7 @@ export function revisionRepairKind(bytes: Uint8Array): RevisionRepairKind | unde
     return
   }
   const source = value as { readonly modelVersion?: unknown }
-  return typeof source.modelVersion == 'number' && source.modelVersion < 2 ? 'upgrade' : 'repair'
+  return typeof source.modelVersion == 'number' && source.modelVersion < currentFlowModelVersion ? 'upgrade' : 'repair'
 }
 
 export function repairRevision(bytes: Uint8Array): RevisionContent {
@@ -405,7 +499,7 @@ export function convertProjectFlow(value: unknown, flowId: string): { name: stri
     }),
   )
   const revision = decodeRevisionContent({
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: source.modules,
     document: { bindings: {}, subflows: {}, tasks: {}, graph: { nodes, edges: [] } },
   })

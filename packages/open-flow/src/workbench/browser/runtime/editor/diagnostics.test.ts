@@ -1,5 +1,6 @@
 import type { Diagnostic } from '../api.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
@@ -100,13 +101,13 @@ describe('Workbench Diagnostic messages', () => {
           subflows: {},
           tasks: {},
         },
-        modelVersion: 2,
+        modelVersion: currentFlowModelVersion,
         modules: {},
       },
       createdAt: '2026-08-31T00:00:00.000Z',
       digest: 'digest',
       flowId: 'flow',
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       parentRevisionId: null,
       revisionId: 'revision',
       version: 1,
@@ -128,7 +129,7 @@ describe('Workbench Diagnostic messages', () => {
       diagnostics: [diagnostic, flowDiagnostic],
       engineContract: 'open-flow-engine/v5',
       flowId: 'flow',
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       revisionDigest: 'digest',
       revisionId: 'revision',
       valid: false,

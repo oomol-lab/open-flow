@@ -1,5 +1,6 @@
 import type { JsonValue, RevisionContent as RevisionFixture } from '../src/flow/common/change.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import { currentEngineContract, nodejsEngineContract, findEngineContract } from '../src/execution/common/runtime.ts'
 import { validateModules } from '../src/flow/common/modules.ts'
@@ -21,7 +22,7 @@ function revision(source: string, imports: readonly string[] = [], modules: Revi
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {
       'module-main': { imports, name: 'Main', source },
       ...modules,
@@ -312,7 +313,7 @@ export default () => value`,
           },
         },
       },
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: {},
     }
 
@@ -353,7 +354,7 @@ export default () => value`,
         subflows: {},
         tasks: {},
       },
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: {},
     }
 
@@ -650,7 +651,7 @@ export default () => value`,
         },
         tasks: {},
       },
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: {},
     }
 
@@ -868,7 +869,7 @@ export default () => value`,
           },
         },
       },
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: {},
     }
 
@@ -933,7 +934,7 @@ export default () => value`,
         subflows: {},
         tasks: {},
       },
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: {},
     }
 
@@ -988,7 +989,7 @@ export default () => value`,
           },
         },
       },
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: {},
     }
 

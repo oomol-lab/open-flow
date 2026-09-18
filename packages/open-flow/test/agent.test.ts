@@ -1,6 +1,7 @@
 import type { FlowRunOutcome, FlowRunOptions, TaskInvocation } from '../src/execution/common/scheduler.ts'
 import type { AgentTool, JsonValue, ManagedTaskDefinition, RevisionContent } from '../src/flow/common/change.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
 import { describe, expect, it } from 'vitest'
 import { currentEngineContract, findEngineContract } from '../src/execution/common/engineContract.ts'
@@ -38,7 +39,7 @@ function task(tools: readonly AgentTool[] = [tool]): ManagedTaskDefinition {
 
 function revision(agent = task()): RevisionContent {
   return {
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
     document: {
       bindings: {},

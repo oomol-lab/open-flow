@@ -7,7 +7,15 @@ import type { ConnectorCapability, FlowDocument, Graph, InputMapping, RevisionCo
 import { findEngineContract } from '../../execution/common/engineContract.ts'
 import { agentConfigIssues } from './agent.ts'
 import { decodeConnectorCapabilities } from './change.ts'
-import { canonicalGraph, canonicalJsonBytes, canonicalModule, canonicalOutputs, canonicalPorts, canonicalTask, digestBytes } from './encoding.ts'
+import {
+  canonicalJsonBytes,
+  canonicalModule,
+  canonicalPorts,
+  canonicalRevisionGraph,
+  canonicalRevisionOutputs,
+  canonicalTask,
+  digestBytes,
+} from './encoding.ts'
 import { nodeInputPorts, validateFlowGraph } from './graph.ts'
 import { compareDiagnostics, validateModuleGraph } from './modules.ts'
 import { hasRetiredRef } from './schema.ts'
@@ -116,7 +124,7 @@ export async function flowClosure(content: RevisionContent): Promise<SemanticClo
 
   const bytes = canonicalJsonBytes({
     bindings: Object.fromEntries([...bindings].toSorted().map((id) => [id, content.document.bindings[id] ?? null])),
-    graph: canonicalGraph(content.document.graph),
+    graph: canonicalRevisionGraph(content, content.document.graph),
     kind: 'open-flow-semantic-closure',
     modelVersion: content.modelVersion,
     modules: Object.fromEntries([...modules].toSorted().map((id) => [id, content.modules[id] == null ? null : canonicalModule(content.modules[id])])),
@@ -128,10 +136,10 @@ export async function flowClosure(content: RevisionContent): Promise<SemanticClo
         return [
           id,
           {
-            graph: canonicalGraph(subflow.graph),
+            graph: canonicalRevisionGraph(content, subflow.graph),
             inputs: canonicalPorts(subflow.inputs),
             name: subflow.name,
-            outputs: canonicalOutputs(subflow.outputs),
+            outputs: canonicalRevisionOutputs(content, subflow.outputs, subflow.graph),
           },
         ]
       }),

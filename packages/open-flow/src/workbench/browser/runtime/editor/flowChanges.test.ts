@@ -1,5 +1,6 @@
 import type { Draft } from '../api.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import { setTriggerConnection, updateTriggerSchedule } from '../../../../flow/common/nodeChanges.ts'
 import { revisionView } from '../revisionView.ts'
@@ -48,13 +49,13 @@ function draft(source: string): Draft {
         subflows: {},
         tasks: {},
       },
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: { module: { imports: [], name: 'Code', source } },
     },
     createdAt: '2026-08-26T00:00:00.000Z',
     digest: 'digest',
     flowId: 'flow',
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     parentRevisionId: null,
     revisionId: 'revision',
     version: 1,

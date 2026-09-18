@@ -1,5 +1,6 @@
 import type { RevisionContent } from '../src/flow/common/change.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
 import { expect, it } from 'vitest'
 import { currentEngineContract } from '../src/execution/common/runtime.ts'
@@ -10,7 +11,7 @@ import { prepareFlow } from '../src/flow/common/semantics.ts'
 
 it('requires an entry and skips unrelated roots and other trigger branches', async () => {
   const content: RevisionContent = {
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
     document: {
       bindings: {},
@@ -60,7 +61,7 @@ it('requires an entry and skips unrelated roots and other trigger branches', asy
 
 it('rejects adding a second manual trigger and allows replacing the existing one', () => {
   const content: RevisionContent = {
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
     document: { bindings: {}, subflows: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
   }
@@ -73,7 +74,7 @@ it('rejects adding a second manual trigger and allows replacing the existing one
 
 it('rejects imported graphs with multiple manual triggers during preparation', async () => {
   const content: RevisionContent = {
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
     document: {
       bindings: {},

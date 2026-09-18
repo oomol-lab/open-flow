@@ -2,6 +2,7 @@ import type { GraphNode, InputPort, RevisionContent } from '../../src/flow/commo
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
@@ -149,7 +150,7 @@ const fixtures: readonly Fixture[] = [
 
 function contentFor(fixture: Fixture): RevisionContent {
   return {
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: { module: { name: 'Prepare report', imports: [], source: 'export default (inputs) => ({ report: inputs.message, count: inputs.count })' } },
     document: { bindings: {}, tasks: {}, subflows: {}, ...fixture.content, graph: { nodes: { sample: fixture.node }, edges: [] } },
   }

@@ -1,5 +1,6 @@
 import type { ChangeOperation, GraphNode, RevisionContent } from './change.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { assert, describe, expect, it } from 'vitest'
 import { createAuthoringId } from './authoring.ts'
 import { applyFlowChanges, FlowChangeError, nextNodeName } from './change.ts'
@@ -18,7 +19,7 @@ function revision(): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
   }
 }

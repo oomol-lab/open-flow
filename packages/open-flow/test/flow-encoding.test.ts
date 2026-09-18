@@ -1,5 +1,6 @@
 import type { JsonValue, RevisionContent } from '../src/flow/common/change.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import {
   canonicalJsonBytes,
@@ -11,6 +12,7 @@ import {
   repairRevision,
   revisionRepairKind,
 } from '../src/flow/common/encoding.ts'
+import { flowClosure } from '../src/flow/common/semantics.ts'
 
 const decoder = new TextDecoder()
 const port = { jsonSchema: { type: 'number' }, nullable: false } as const
@@ -61,7 +63,7 @@ function revision(reverse = false): RevisionContent {
         },
       },
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: reverse ? { main: modules.main, helper: modules.helper } : modules,
   }
 }
@@ -106,11 +108,11 @@ describe('Flow Revision encoding', () => {
         tasks: { managed: { executor: { kind: 'llm', mode: 'json' }, name: 'LLM' } },
       },
       kind: 'open-flow-flow-revision',
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: { helper: { imports: [] }, main: { imports: ['helper'] } },
       version: 1,
     })
-    await expect(digestBytes(first)).resolves.toBe('sha256:7b012e2b374aa09762b3a37c2573f4eebe3059ade582990b0ce56dd5bf904abe')
+    await expect(digestBytes(first)).resolves.toBe('sha256:926a4a57dac06b5e4d13313053af1a5f9d17330d40a4b61f58be4c990b0d7833')
   })
 
   it('changes the encoded Revision when workflow semantics change', () => {
@@ -232,6 +234,100 @@ describe('Revision decoding', () => {
     expect(decodeFlowDocument(revision().document)).toEqual(revision().document)
   })
 
+  it('reads canonical model v2 Resolution nodes without changing their immutable bytes or closure identity', async () => {
+    const sink = { kind: 'task', taskId: 'sink', inputs: { notice: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'pause', output: 'notification' }] } } }
+    const legacy = {
+      kind: 'open-flow-flow-revision',
+      version: 1,
+      modelVersion: 2,
+      modules: {},
+      document: {
+        bindings: {},
+        tasks: {
+          sink: {
+            name: 'Sink',
+            inputs: [{ handle: 'notice', jsonSchema: {}, nullable: false }],
+            outputs: [],
+            executor: { kind: 'connector', action: 'test.sink' },
+          },
+        },
+        graph: {
+          nodes: {
+            pause: {
+              kind: 'wait',
+              actions: ['approve', 'reject'],
+              inputs: {},
+              input: { handle: 'value', jsonSchema: {}, nullable: true },
+              prompt: 'Approve?',
+            },
+            sink,
+          },
+          edges: [{ source: 'pause', sourceHandle: 'notification', target: 'sink' }],
+        },
+        subflows: {
+          child: {
+            name: 'Child',
+            inputs: [],
+            outputs: [{ handle: 'notice', jsonSchema: {}, nullable: false, sources: [{ kind: 'node', nodeId: 'pause', output: 'notification' }] }],
+            graph: {
+              nodes: {
+                pause: {
+                  kind: 'wait',
+                  actions: ['continue'],
+                  inputs: {},
+                  input: { handle: 'value', jsonSchema: {}, nullable: true },
+                  prompt: 'Continue?',
+                },
+              },
+              edges: [],
+            },
+          },
+        },
+      },
+    }
+    const bytes = canonicalJsonBytes(legacy as JsonValue)
+
+    expect(revisionRepairKind(bytes)).toBeUndefined()
+    const decoded = decodeRevision(bytes)
+    expect(decoded).toMatchObject({
+      modelVersion: 2,
+      document: {
+        graph: {
+          nodes: {
+            pause: { kind: 'approval' },
+            sink: { inputs: { notice: { sources: [{ nodeId: 'pause', output: 'pending' }] } } },
+          },
+          edges: [{ source: 'pause', sourceHandle: 'pending', target: 'sink' }],
+        },
+        subflows: {
+          child: {
+            graph: { nodes: { pause: { kind: 'wait' } } },
+            outputs: [{ sources: [{ nodeId: 'pause', output: 'pending' }] }],
+          },
+        },
+      },
+    })
+    expect(encodeRevision(decoded)).toEqual(bytes)
+    await expect(flowClosure(decoded)).resolves.toMatchObject({ digest: 'sha256:456e14b04b9cd379eb5f4f0dc9be4a7c78226ab701a7a546b8ff9d926536f38f' })
+  })
+
+  it('refuses malformed model v2 Resolution nodes instead of repairing by deletion', () => {
+    const legacy = JSON.parse(decoder.decode(encodeRevision(revision())))
+    legacy.modelVersion = 2
+    legacy.document.graph.nodes.pause = {
+      kind: 'wait',
+      actions: ['approve'],
+      inputs: {},
+      input: { handle: 'value', jsonSchema: {}, nullable: true },
+      prompt: 'Approve?',
+    }
+    const bytes = canonicalJsonBytes(legacy)
+
+    expect(revisionRepairKind(bytes)).toBeUndefined()
+    expect(() => decodeRevision(bytes)).toThrow(/Legacy Wait actions are invalid/)
+    expect(() => repairRevision(bytes)).toThrow(/Legacy Wait actions are invalid/)
+  })
+
   it('repairs an older Trigger contract and drops invalid collection entries', () => {
     const legacy = JSON.parse(decoder.decode(encodeRevision(revision())))
     legacy.modelVersion = 1
@@ -250,7 +346,7 @@ describe('Revision decoding', () => {
 
     expect(revisionRepairKind(bytes)).toBe('upgrade')
     const repaired = repairRevision(bytes)
-    expect(repaired.modelVersion).toBe(2)
+    expect(repaired.modelVersion).toBe(currentFlowModelVersion)
     expect(repaired.document.graph.nodes).not.toHaveProperty('broken')
     expect(repaired.modules).not.toHaveProperty('broken')
     expect(repaired.document.graph.nodes.hook).toMatchObject({ kind: 'webhook', bodyFields: [{ handle: 'value' }] })
@@ -267,17 +363,17 @@ describe('Revision decoding', () => {
     const damaged = {
       kind: 'open-flow-flow-revision',
       version: 1,
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       document: { graph: { nodes: { valid: { kind: 'manual', name: 'Start' }, invalid: null }, edges: [null] } },
     }
     const bytes = new TextEncoder().encode(JSON.stringify(damaged))
     expect(revisionRepairKind(bytes)).toBe('repair')
     expect(repairRevision(bytes)).toEqual({
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       document: { bindings: {}, graph: { nodes: { valid: { kind: 'manual', name: 'Start' } }, edges: [] }, subflows: {}, tasks: {} },
       modules: {},
     })
-    for (const value of [{ ...damaged, modelVersion: 3 }, { ...damaged, kind: 'other' }, 'not json']) {
+    for (const value of [{ ...damaged, modelVersion: 4 }, { ...damaged, kind: 'other' }, 'not json']) {
       const candidate = new TextEncoder().encode(typeof value == 'string' ? value : JSON.stringify(value))
       expect(revisionRepairKind(candidate)).toBeUndefined()
       expect(() => repairRevision(candidate)).toThrow()
@@ -341,7 +437,7 @@ describe('Revision decoding', () => {
 
   it('ignores unknown fields before validation and canonical encoding', () => {
     const content = {
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: {},
       document: { bindings: {}, subflows: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
     } as const

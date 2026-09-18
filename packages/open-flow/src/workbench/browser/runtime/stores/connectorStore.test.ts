@@ -1,3 +1,4 @@
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
 import { providerIcon } from '../providerIcon.ts'
@@ -26,13 +27,13 @@ function draft(flowId: string, revisionId: string) {
         subflows: {},
         tasks: {},
       },
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: {},
     },
     createdAt: timestamp,
     digest: `digest-${flowId}`,
     flowId,
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     parentRevisionId: null,
     revisionId,
     version: 1,
@@ -59,7 +60,7 @@ describe('ConnectorStore', () => {
             diagnostics: [],
             engineContract: 'open-flow-engine/v5',
             flowId: flow!.flowId,
-            modelVersion: 2,
+            modelVersion: currentFlowModelVersion,
             revisionDigest: `digest-${flow!.flowId}`,
             revisionId: flow!.draftRevisionId,
             valid: true,

@@ -4,6 +4,7 @@ import type { JsonValue } from '../../src/workbench/browser/runtime/api.ts'
 import type { SetNotice } from '../../src/workbench/browser/runtime/stores/workbenchNotice.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Toaster, toast } from 'sonner'
 import { useVal } from 'use-value-enhancer'
@@ -30,7 +31,7 @@ function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) 
   let sequence = 1
   let layoutRevision = 1
   let content: RevisionContent = applyFlowChanges(
-    { modelVersion: 2, document: { graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {}, bindings: {} }, modules: {} },
+    { modelVersion: currentFlowModelVersion, document: { graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {}, bindings: {} }, modules: {} },
     [
       ...createBuiltinTrigger(target, 'trigger', { kind: 'cron', name: 'Schedule', cronTimes: [] }),
       ...createValue(target, 'value', 'Input'),
@@ -64,7 +65,7 @@ function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) 
     createdAt: timestamp,
     digest: `digest-${sequence}`,
     flowId: flow.flowId,
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     parentRevisionId: sequence == 1 ? null : `r${sequence - 1}`,
     revisionId: `r${sequence}`,
     version: 1,
@@ -120,7 +121,7 @@ function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) 
               ],
         engineContract: 'open-flow-engine/v5',
         flowId: flow.flowId,
-        modelVersion: 2,
+        modelVersion: currentFlowModelVersion,
         revisionDigest: revision().digest,
         revisionId: revision().revisionId,
         valid: content.document.graph.nodes.code == null,

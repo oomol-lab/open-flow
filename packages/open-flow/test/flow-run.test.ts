@@ -1,5 +1,6 @@
 import type { Graph, JsonValue, RevisionContent } from '../src/flow/common/change.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
 import { expect, it } from 'vitest'
 import { currentEngineContract } from '../src/execution/common/runtime.ts'
@@ -17,7 +18,7 @@ const task = {
 
 function revision(graph: Graph): RevisionContent {
   return {
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: { main: { name: 'Main', imports: [], source: 'export default () => ({})' } },
     document: { bindings: {}, subflows: {}, tasks: {}, graph },
   }

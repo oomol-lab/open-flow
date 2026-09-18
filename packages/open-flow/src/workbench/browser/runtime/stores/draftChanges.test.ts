@@ -1,5 +1,6 @@
 import type { Draft } from '../api.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
 import { createI18n } from '../i18n.ts'
@@ -28,13 +29,13 @@ function draft(revisionId: string, name?: string, description?: string): Draft {
         subflows: {},
         tasks: {},
       },
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       modules: { module: { imports: [], name: 'Task', source: 'export default () => ({})' } },
     },
     createdAt: '2026-09-02T00:00:00.000Z',
     digest: `digest-${revisionId}`,
     flowId: 'flow',
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     parentRevisionId: null,
     revisionId,
     version: 1,
@@ -54,7 +55,7 @@ describe('DraftChanges', () => {
           createdAt: '2026-09-02T00:00:01.000Z',
           digest: 'digest-revision-2',
           flowId: 'flow',
-          modelVersion: 2,
+          modelVersion: currentFlowModelVersion,
           parentRevisionId: 'revision-1',
           revisionId: 'revision-2',
           version: 1,
@@ -97,7 +98,7 @@ describe('DraftChanges', () => {
           createdAt: remote.createdAt,
           digest: 'digest-revision-3',
           flowId: remote.flowId,
-          modelVersion: 2,
+          modelVersion: currentFlowModelVersion,
           parentRevisionId: remote.revisionId,
           revisionId: 'revision-3',
           version: 1,
@@ -142,7 +143,7 @@ describe('DraftChanges', () => {
           createdAt: '2026-09-02T00:00:01.000Z',
           digest: 'digest-revision-2',
           flowId: 'flow',
-          modelVersion: 2,
+          modelVersion: currentFlowModelVersion,
           parentRevisionId: 'revision-1',
           revisionId: 'revision-2',
           version: 1,
@@ -188,7 +189,7 @@ describe('DraftChanges', () => {
           createdAt: '2026-09-02T00:00:02.000Z',
           digest: 'digest-revision-3',
           flowId: 'flow',
-          modelVersion: 2,
+          modelVersion: currentFlowModelVersion,
           parentRevisionId: 'revision-2',
           revisionId: 'revision-3',
           version: 1,

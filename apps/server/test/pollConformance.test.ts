@@ -2,6 +2,7 @@ import type { JsonValue, RevisionContent, TriggerSchedule } from '@oomol-lab/ope
 import type { PollConformanceFixture, PollConformanceHarness, PollDefinition, PollResult } from '@oomol-lab/open-flow/poll-trigger'
 
 import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId } from '@oomol-lab/open-flow/cron-trigger'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { payloadPollOutputs, pollConformanceCases } from '@oomol-lab/open-flow/poll-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -83,7 +84,7 @@ function revision(config: Readonly<Record<string, JsonValue>>, connectionId: str
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: { 'module-main': { imports: [], name: 'Main', source: 'export default function run() { return {} }' } },
   }
 }

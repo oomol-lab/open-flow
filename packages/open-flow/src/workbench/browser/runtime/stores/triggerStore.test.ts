@@ -1,5 +1,6 @@
 import type { ConnectorConnection } from '../api.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
 import { createI18n } from '../i18n.ts'
@@ -65,13 +66,13 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
               subflows: {},
               tasks: {},
             },
-            modelVersion: 2,
+            modelVersion: currentFlowModelVersion,
             modules: {},
           },
           createdAt: timestamp,
           digest: 'digest',
           flowId: flow.flowId,
-          modelVersion: 2,
+          modelVersion: currentFlowModelVersion,
           parentRevisionId: null,
           revisionId: flow.draftRevisionId,
           version: 1,
@@ -88,7 +89,7 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
           createdAt: timestamp,
           digest: 'next-digest',
           flowId: flow.flowId,
-          modelVersion: 2,
+          modelVersion: currentFlowModelVersion,
           parentRevisionId: flow.draftRevisionId,
           revisionId: 'revision-2',
           version: 1,
@@ -105,7 +106,7 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
         diagnostics: [],
         engineContract: 'open-flow-engine/v5',
         flowId: flow.flowId,
-        modelVersion: 2,
+        modelVersion: currentFlowModelVersion,
         revisionDigest: 'digest',
         revisionId: flow.draftRevisionId,
         valid: true,

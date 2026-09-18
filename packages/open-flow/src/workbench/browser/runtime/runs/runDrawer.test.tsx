@@ -1,5 +1,6 @@
 import type { Run, RunDetails, RunEvent, RunResult } from '../api.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it } from 'vitest'
@@ -85,7 +86,7 @@ describe('RunDrawer terminal result', () => {
       engineContract: 'open-flow-engine/v5',
       engineDigest: 'sha256:engine',
       flowId: 'flow',
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       revisionDigest: 'sha256:revision',
       revisionId: 'revision',
       runId: 'run',

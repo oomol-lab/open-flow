@@ -4,6 +4,7 @@ import type { PollDefinition } from '@oomol-lab/open-flow/poll-trigger'
 import type { DestinationStream, Logger } from 'pino'
 import type { ServerServiceOptions } from '../node/application/service.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '@oomol-lab/open-flow/integration-trigger'
 import { payloadPollOutputs } from '@oomol-lab/open-flow/poll-trigger'
 import { integrationDefinitions } from '@oomol-lab/open-flow/provider-triggers'
@@ -121,7 +122,7 @@ function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient', defi
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: { 'module-main': { imports: [], name: 'Main', source: 'export default function run() { return {} }' } },
   }
 }
@@ -728,7 +729,7 @@ describe('Server change listener', () => {
         idempotencyKey: next('publish'),
         revisionId: next('revision'),
         revision: {
-          modelVersion: 2,
+          modelVersion: currentFlowModelVersion,
           modules: {},
           document: {
             bindings: { connection: { kind: 'connection', target: 'connection-main' } },

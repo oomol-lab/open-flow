@@ -1,5 +1,6 @@
 import type { Draft, Presentation } from '../api.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
 import { applyFlowChanges, decodeChangeOperations } from '../../../../flow/common/change.ts'
 import { createCodeTask, createValue } from '../../../../flow/common/nodeChanges.ts'
@@ -13,15 +14,18 @@ async function session() {
   const flow = { flowId: 'flow', name: 'Flow', status: 'active', createdAt: timestamp, updatedAt: timestamp, draftRevisionId: 'r1', version: 1 } as const
   let draft: Draft = {
     actorId: 'test',
-    content: applyFlowChanges({ modelVersion: 2, document: { graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {}, bindings: {} }, modules: {} }, [
-      ...createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Code'),
-      ...createValue(target, 'value', 'Value'),
-      { kind: 'graph.edge.connect', target, edge: { source: 'value', target: 'code' } },
-    ]),
+    content: applyFlowChanges(
+      { modelVersion: currentFlowModelVersion, document: { graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {}, bindings: {} }, modules: {} },
+      [
+        ...createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Code'),
+        ...createValue(target, 'value', 'Value'),
+        { kind: 'graph.edge.connect', target, edge: { source: 'value', target: 'code' } },
+      ],
+    ),
     createdAt: timestamp,
     digest: 'digest',
     flowId: 'flow',
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     parentRevisionId: null,
     revisionId: 'r1',
     version: 1,
@@ -63,7 +67,7 @@ async function session() {
     diagnostics: [],
     engineContract: 'open-flow-engine/v5',
     flowId: 'flow',
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     revisionDigest: 'digest',
     revisionId: 'r1',
     valid: true,

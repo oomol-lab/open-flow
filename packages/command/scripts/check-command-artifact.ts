@@ -1,3 +1,4 @@
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
@@ -123,7 +124,7 @@ const host = {
         diagnostics: [],
         engineContract: 'open-flow-engine/v5',
         flowId: 'flow-1',
-        modelVersion: 2,
+        modelVersion: ${currentFlowModelVersion},
         revisionDigest: 'digest-revision-1',
         revisionId: 'revision-1',
         valid: true,

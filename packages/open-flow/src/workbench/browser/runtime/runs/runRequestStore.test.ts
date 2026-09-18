@@ -1,5 +1,6 @@
 import type { Draft, Flow } from '../api.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
 import { RunRequestStore } from './runRequestStore.ts'
 
@@ -39,13 +40,13 @@ const draft: Draft = {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: { module: { imports: [], name: 'Code', source: 'export default () => ({})' } },
   },
   createdAt: timestamp,
   digest: 'digest',
   flowId: flow.flowId,
-  modelVersion: 2,
+  modelVersion: currentFlowModelVersion,
   parentRevisionId: null,
   revisionId: flow.draftRevisionId,
   version: 1,

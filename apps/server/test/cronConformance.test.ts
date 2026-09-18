@@ -2,6 +2,7 @@ import type { CronConformanceFixture, CronConformanceHarness } from '@oomol-lab/
 import type { JsonValue, RevisionContent, TriggerSchedule } from '@oomol-lab/open-flow/flow-change'
 
 import { cronConformanceCases } from '@oomol-lab/open-flow/cron-trigger'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -36,7 +37,7 @@ function revision(rules?: readonly TriggerSchedule[]): RevisionContent {
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
   }
 }

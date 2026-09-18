@@ -1,4 +1,7 @@
+import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
+
 import { Validator } from '@cfworker/json-schema'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import { applyFlowChanges, changeOperationsSchema, decodeChangeOperations } from '../src/flow/common/change.ts'
 
@@ -23,7 +26,11 @@ const operations = [
 
 describe('ChangeOperation wire contract', () => {
   it('decodes an atomic creation and mapping batch without changing its meaning', () => {
-    const content = { modelVersion: 2 as const, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } } }
+    const content: RevisionContent = {
+      modelVersion: currentFlowModelVersion,
+      modules: {},
+      document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } },
+    }
     expect(applyFlowChanges(content, decodeChangeOperations(operations)).document.graph.nodes.pause).toMatchObject({
       kind: 'wait',
       inputs: { value: operations[3]?.value },

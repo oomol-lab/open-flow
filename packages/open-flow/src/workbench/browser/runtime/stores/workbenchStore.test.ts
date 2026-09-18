@@ -1,5 +1,6 @@
 import type { FlowCatalogEvent } from '../contract.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { val } from 'value-enhancer'
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
@@ -23,10 +24,10 @@ function catalogSession(initialFlowId?: string) {
       actorId: 'actor',
       createdAt: timestamp,
       digest: 'digest',
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       parentRevisionId: null,
       version: 1,
-      content: { modelVersion: 2, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: {}, edges: [] } } },
+      content: { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: {}, edges: [] } } },
     },
     live: { flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 },
     presentation: { revision: 1, updatedAt: timestamp, value: {}, version: 1 },
@@ -166,13 +167,13 @@ describe('WorkbenchStore diagnostics', () => {
             },
           },
         },
-        modelVersion: 2,
+        modelVersion: currentFlowModelVersion,
         modules: {},
       },
       createdAt: timestamp,
       digest: 'digest-1',
       flowId: flow.flowId,
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       parentRevisionId: null,
       revisionId: flow.draftRevisionId,
       version: 1,
@@ -195,7 +196,7 @@ describe('WorkbenchStore diagnostics', () => {
           diagnostics: [],
           engineContract: 'open-flow-engine/v5',
           flowId: flow.flowId,
-          modelVersion: 2,
+          modelVersion: currentFlowModelVersion,
           revisionDigest: draft.digest,
           revisionId: draft.revisionId,
           valid: true,

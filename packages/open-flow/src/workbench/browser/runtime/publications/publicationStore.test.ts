@@ -1,3 +1,4 @@
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
 import { WorkspaceStore } from '../stores/workspaceStore.ts'
@@ -10,7 +11,7 @@ const publication = {
   createdAt: timestamp,
   engineContract: 'open-flow-engine/v5',
   flowId: 'flow-1',
-  modelVersion: 2,
+  modelVersion: currentFlowModelVersion,
   operation: 'publish',
   publicationId: 'publication-1',
   revisionDigest: 'digest-1',

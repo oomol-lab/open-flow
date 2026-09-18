@@ -2,6 +2,7 @@ import type { ConnectorAction, ConnectorConnection, ConnectorProvider } from '@o
 import type { ConnectorCapability, JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { ConnectorHost } from '../node/deployment/connector.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -60,7 +61,7 @@ function connectorFlow(timeoutMs?: number, optionalNull = false): RevisionConten
         },
       },
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
   }
 }
@@ -103,7 +104,7 @@ function capabilityFlow(
       subflows: {},
       tasks: {},
     },
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {
       capability: {
         imports: [],

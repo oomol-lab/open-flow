@@ -1,6 +1,7 @@
 import type { SchedulerEvent, WaitRequest } from '../src/execution/common/scheduler.ts'
 import type { WaitAction, RevisionContent } from '../src/flow/common/change.ts'
 
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
 import { afterEach, expect, it, vi } from 'vitest'
 import { currentEngineContract } from '../src/execution/common/runtime.ts'
@@ -17,7 +18,7 @@ function deferred<T>() {
 
 async function fixture(notify = true, action: WaitAction = 'approve') {
   const content: RevisionContent = {
-    modelVersion: 2,
+    modelVersion: currentFlowModelVersion,
     modules: {},
     document: {
       bindings: {},
@@ -294,7 +295,7 @@ it.each(['continue', 'approve', 'reject'] as const)('does not replay notificatio
   const saved = frozen.checkpoint.waits[0]!
   expect(saved.pending).toMatchObject({ prompt: 'Ready?', value: null })
   const { pending, ...legacy } = saved
-  expect(() => decodeFlowRunCheckpoint({ ...frozen.checkpoint, waits: [{ ...legacy, notification: pending }] })).toThrow()
+  expect(decodeFlowRunCheckpoint({ ...frozen.checkpoint, waits: [{ ...legacy, notification: pending }] })).toEqual(frozen.checkpoint)
   expect(() => decodeFlowRunCheckpoint({ ...frozen.checkpoint, waits: [{ ...saved, notification: pending }] })).toThrow()
   f.resolve()
   const { trigger: _, ...options } = f.options
