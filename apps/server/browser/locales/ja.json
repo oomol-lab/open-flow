@@ -66,7 +66,6 @@
     "createFailed": "この Connector チームで Flow を作成できませんでした。",
     "defaultNamed": "{{name}}（デフォルト）",
     "fixedHint": "作成後、この Flow は常にこのチームを使用します。",
-    "flowBadge": "チーム: {{name}}",
     "label": "OOMOL チーム",
     "loadFailed": "チームを読み込めませんでした。",
     "loading": "チームを読み込んでいます…",

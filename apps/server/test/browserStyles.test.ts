@@ -35,6 +35,7 @@ describe('Browser style boundaries', () => {
     expect(styles).not.toMatch(/--ui-(?:background|foreground|primary|border|radius):\s*#/)
     expect(styles).not.toMatch(/calc\(var\(--ui-radius\)/)
     expect(styles).toMatch(/\.server-host\s*\{[^}]*--ui-radius:\s*6px;/)
+    expect(styles).toMatch(/\.server-host \.open-flow-workbench\s*\{[^}]*--ui-radius:\s*inherit;/)
     expect(styles).not.toContain('.resource-page-header')
     expect(styles).not.toContain('.workspace-actions')
     expect(styles).not.toMatch(/\.server-host\[data-theme='dark'\]\s+\./)

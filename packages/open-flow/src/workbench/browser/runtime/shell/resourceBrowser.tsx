@@ -9,17 +9,16 @@ import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { resourceNameIssue, resourceNameMaxLength } from '../../../../flow/common/change.ts'
 import { uiLanguageNames, uiLanguages } from '../../../../localization/common/languages.ts'
-import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../../ui/browser/dialog.tsx'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
 import { Field, FieldError, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
-import { Label } from '../../../../ui/browser/label.tsx'
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { Skeleton } from '../../../../ui/browser/skeleton.tsx'
 import { Switch } from '../../../../ui/browser/switch.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
 import { followWorkbenchLink } from '../navigationLink.ts'
@@ -29,6 +28,8 @@ import { WorkbenchSelect } from './workbenchSelect.tsx'
 const CreateResourceDialog = lazy(() => import('./createResourceDialog.tsx'))
 
 const languageOptions = uiLanguages.map((language) => ({ label: uiLanguageNames[language], value: language }))
+const renamePopoverAlignOffset = -12
+const renamePopoverVerticalShift = 8
 
 interface LanguageSelectProps {
   readonly language: WorkbenchLanguage
@@ -62,17 +63,44 @@ interface FlowItemProps {
   readonly store: WorkbenchStore
 }
 
+function compactFlowId(flowId: string): string {
+  return flowId.length <= 20 ? flowId : `${flowId.slice(0, 10)}…${flowId.slice(-6)}`
+}
+
+function formatUpdatedAt(updatedAt: string, locale: string): string {
+  const date = new Date(updatedAt)
+  const current = new Date()
+  return date.toLocaleString(locale, {
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+    year: date.getFullYear() == current.getFullYear() ? undefined : 'numeric',
+  })
+}
+
 function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): ReactElement {
   const [root, setRoot] = useState<HTMLDivElement | null>(null)
-  const more = useRef<HTMLButtonElement>(null)
+  const renameAnchor = useRef<HTMLSpanElement>(null)
+  const deleteButton = useRef<HTMLButtonElement>(null)
   const nameInput = useRef<HTMLInputElement>(null)
   const cancelDelete = useRef<HTMLButtonElement>(null)
   const locale = useLang()
   const t = useTranslate()
   const [mode, setMode] = useState<'delete' | 'idle' | 'rename'>('idle')
   const [name, setName] = useState(flow.name)
+  const [copied, setCopied] = useState(false)
   const [pending, setPending] = useState<'publish' | 'enabled' | undefined>()
   const changed = flow.live != null && flow.live.revisionId != flow.draftRevisionId
+  const publicationStatus =
+    flow.status == 'retiring'
+      ? 'resource.retiring'
+      : flow.live == null
+        ? 'resource.notPublished'
+        : changed
+          ? 'resource.unpublishedChanges'
+          : 'resource.isPublished'
+  const publicationTone = flow.status == 'retiring' ? 'danger' : flow.live == null ? 'neutral' : changed ? 'running' : 'success'
 
   async function update(action: 'publish' | boolean): Promise<void> {
     setPending(action == 'publish' ? 'publish' : 'enabled')
@@ -97,66 +125,168 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
 
   return (
     <div className="resource-item-row" ref={setRoot}>
-      <Button
-        aria-disabled={flow.status == 'retiring'}
-        className="resource-list-row flow-columns"
-        nativeButton={false}
-        onClick={(event) => {
-          if (flow.status == 'retiring') {
-            event.preventDefault()
-            return
-          }
-          followWorkbenchLink(event, () => onSelect(flow))
-        }}
-        render={<a href={flow.status == 'retiring' ? undefined : href} />}
-        tabIndex={flow.status == 'retiring' ? -1 : undefined}
-        variant="ghost"
-      >
+      <div className="resource-list-row flow-columns">
         <span className="resource-primary-cell">
-          <span className="resource-icon">
-            <Icon name="flow" />
+          <span aria-hidden="true" className="resource-flow-icon">
+            <i className="i-lucide-light:workflow" />
           </span>
-          <span>
-            <span className="flex min-w-0 items-center gap-2">
-              <strong className="min-w-0 truncate">{flow.name}</strong>
-              {badge != null && (
-                <Badge className="min-w-0 shrink" title={badge} variant="secondary">
-                  <span className="truncate">{badge}</span>
-                </Badge>
+          <span className="resource-primary-copy">
+            <span className="resource-primary-heading" ref={renameAnchor}>
+              <Button
+                aria-disabled={flow.status == 'retiring'}
+                className="resource-primary-title"
+                nativeButton={false}
+                onClick={(event) => {
+                  if (flow.status == 'retiring') {
+                    event.preventDefault()
+                    return
+                  }
+                  followWorkbenchLink(event, () => onSelect(flow))
+                }}
+                render={<a href={flow.status == 'retiring' ? undefined : href} />}
+                tabIndex={flow.status == 'retiring' ? -1 : undefined}
+                title={flow.name}
+                variant="link"
+              >
+                {flow.name}
+              </Button>
+              {flow.status == 'active' && (
+                <Popover
+                  onOpenChange={(open) => {
+                    setMode(open ? 'rename' : 'idle')
+                    if (open) setName(flow.name)
+                  }}
+                  open={mode == 'rename'}
+                >
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        aria-label={t('sidebar.renameFlow', { name: flow.name })}
+                        className="resource-rename-trigger"
+                        size="icon-xs"
+                        type="button"
+                        variant="ghost"
+                      />
+                    }
+                  >
+                    <i aria-hidden="true" className="i-lucide-light:pencil" />
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="start"
+                    alignOffset={renamePopoverAlignOffset}
+                    anchor={renameAnchor}
+                    className="resource-rename-popover"
+                    collisionBoundary={[]}
+                    container={root}
+                    initialFocus={nameInput}
+                    positionMethod="fixed"
+                    side="top"
+                    sideOffset={({ anchor, positioner }) => -(anchor.height + positioner.height) / 2 - renamePopoverVerticalShift}
+                  >
+                    <PopoverTitle className="sr-only">{t('sidebar.renameFlow', { name: flow.name })}</PopoverTitle>
+                    <form className="resource-rename-form" onSubmit={(event) => void rename(event)}>
+                      <Field className="min-w-0 flex-1" data-invalid={name.length > 0 && issue != null}>
+                        <FieldLabel className="sr-only" htmlFor={`rename-flow-${flow.flowId}`}>
+                          {t('resource.flowName')}
+                        </FieldLabel>
+                        <Input
+                          autoComplete="off"
+                          aria-invalid={name.length > 0 && issue != null}
+                          aria-describedby={name.length > 0 && issue != null ? `rename-error-${flow.flowId}` : undefined}
+                          id={`rename-flow-${flow.flowId}`}
+                          name="flow-name"
+                          onChange={(event) => setName(event.target.value)}
+                          ref={nameInput}
+                          required
+                          value={name}
+                        />
+                        {name.length > 0 && issue != null && (
+                          <FieldError id={`rename-error-${flow.flowId}`}>{t(`resource.nameIssue.${issue}`, { max: resourceNameMaxLength })}</FieldError>
+                        )}
+                      </Field>
+                      <Button onClick={() => setMode('idle')} size="sm" type="button" variant="ghost">
+                        {t('common.cancel')}
+                      </Button>
+                      <Button disabled={busy != null || issue != null} size="sm" type="submit">
+                        {t('common.save')}
+                      </Button>
+                    </form>
+                  </PopoverContent>
+                </Popover>
               )}
             </span>
-            <code translate="no">{flow.flowId}</code>
+            {badge != null && (
+              <span className="resource-team-label" title={badge}>
+                {badge}
+              </span>
+            )}
           </span>
         </span>
-        <time dateTime={flow.updatedAt}>{new Date(flow.updatedAt).toLocaleString(locale)}</time>
+        <span className="resource-flow-id-cell">
+          <Tooltip>
+            <TooltipTrigger render={<code className="resource-flow-id" tabIndex={0} translate="no" />}>{compactFlowId(flow.flowId)}</TooltipTrigger>
+            <TooltipContent
+              align="start"
+              arrowOffset={16}
+              className="resource-flow-id-tooltip"
+              collisionBoundary={[]}
+              container={root}
+              positionMethod="fixed"
+              side="top"
+              sideOffset={6}
+            >
+              <Button
+                aria-label={t(copied ? 'resource.flowIdCopied' : 'resource.copyFlowId')}
+                className="resource-tooltip-icon-button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(flow.flowId).then(() => setCopied(true))
+                }}
+                size="icon-xs"
+                type="button"
+                variant="ghost"
+              >
+                <i aria-hidden="true" className="i-lucide-light:copy" />
+              </Button>
+              <code translate="no">{flow.flowId}</code>
+            </TooltipContent>
+          </Tooltip>
+        </span>
+        <Tooltip>
+          <TooltipTrigger render={<time className="resource-updated-at" dateTime={flow.updatedAt} tabIndex={0} />}>
+            {formatUpdatedAt(flow.updatedAt, locale)}
+          </TooltipTrigger>
+          <TooltipContent align="center" collisionBoundary={[]} container={root} positionMethod="fixed" side="top" sideOffset={6}>
+            {new Date(flow.updatedAt).toLocaleString(locale)}
+          </TooltipContent>
+        </Tooltip>
         <span className="resource-status">
-          {t(
-            flow.status == 'retiring'
-              ? 'resource.retiring'
-              : flow.live == null
-                ? 'resource.notPublished'
-                : changed
-                  ? 'resource.unpublishedChanges'
-                  : 'resource.isPublished',
+          <span aria-hidden="true" className={cn('status-dot', publicationTone)} />
+          {t(publicationStatus)}
+          {flow.live != null && (
+            <>
+              <span aria-hidden="true" className="resource-status-separator">
+                ·
+              </span>
+              <span>{t(flow.live.enabled ? 'resource.enabled' : 'resource.disabled')}</span>
+            </>
           )}
         </span>
-      </Button>
+      </div>
       <div className="resource-live-controls" aria-busy={pending != null}>
-        {flow.live == null ? (
-          <span className="resource-status" title={t('resource.publishFirst')}>
-            —
-          </span>
-        ) : (
-          <Label className="resource-enable" title={t('resource.enabledHint')}>
-            <Switch
-              aria-label={t('resource.enableFlow', { name: flow.name })}
-              checked={flow.live?.enabled ?? false}
-              disabled={flow.status != 'active' || flow.live == null || busy != null || pending != null}
-              onCheckedChange={(enabled) => void update(enabled)}
-              size="sm"
-            />
-            <span>{t(flow.live?.enabled ? 'resource.enabled' : 'resource.disabled')}</span>
-          </Label>
+        {flow.live != null && (
+          <Switch
+            aria-label={t('resource.enableFlow', { name: flow.name })}
+            checked={flow.live.enabled}
+            disabled={flow.status != 'active' || busy != null || pending != null}
+            onCheckedChange={(enabled) => void update(enabled)}
+            size="sm"
+            title={t('resource.enabledHint')}
+          />
+        )}
+        {flow.status == 'active' && (
+          <Button onClick={() => onSelect(flow)} size="sm" variant="outline">
+            {t('resource.edit')}
+          </Button>
         )}
         <Button
           disabled={flow.status != 'active' || busy != null || pending != null || (flow.live != null && !changed)}
@@ -166,79 +296,35 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
         >
           {t(pending == 'publish' ? 'workspace.publishing' : flow.live == null ? 'resource.publish' : 'resource.publishUpdate')}
         </Button>
-      </div>
-      {flow.status == 'active' && (
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            aria-label={t('sidebar.flowActions', { name: flow.name })}
-            disabled={busy != null || pending != null}
-            render={
-              <Button className="resource-row-more" ref={more} size="icon-sm" variant="ghost">
-                <Icon name="more" />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="end" className="min-w-36" container={root} finalFocus={mode == 'idle'}>
-            <DropdownMenuItem
-              onClick={() => {
-                setName(flow.name)
-                setMode('rename')
-              }}
+        {flow.status == 'active' && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  aria-label={t('sidebar.deleteFlow', { name: flow.name })}
+                  ref={deleteButton}
+                  disabled={busy != null || pending != null}
+                  onClick={() => setMode('delete')}
+                  size="icon-sm"
+                  variant="destructive"
+                />
+              }
             >
-              {t('common.rename')}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setMode('delete')} variant="destructive">
+              <i aria-hidden="true" className="i-lucide-light:trash-2" />
+            </TooltipTrigger>
+            <TooltipContent align="center" collisionBoundary={[]} container={root} positionMethod="fixed" side="top">
               {t('common.delete')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-      <Dialog
-        open={mode == 'rename'}
-        onOpenChange={(open) => {
-          if (!open) setMode('idle')
-        }}
-      >
-        <DialogContent container={root} initialFocus={nameInput} finalFocus={more} closeLabel={t('common.cancel')}>
-          <form className="flex flex-col gap-4" onSubmit={(event) => void rename(event)}>
-            <DialogHeader>
-              <DialogTitle>{t('sidebar.renameFlow', { name: flow.name })}</DialogTitle>
-            </DialogHeader>
-            <Field data-invalid={name.length > 0 && issue != null}>
-              <FieldLabel htmlFor={`rename-flow-${flow.flowId}`}>{t('resource.flowName')}</FieldLabel>
-              <Input
-                autoComplete="off"
-                aria-invalid={name.length > 0 && issue != null}
-                aria-describedby={name.length > 0 && issue != null ? `rename-error-${flow.flowId}` : undefined}
-                id={`rename-flow-${flow.flowId}`}
-                name="flow-name"
-                onChange={(event) => setName(event.target.value)}
-                ref={nameInput}
-                required
-                value={name}
-              />
-              {name.length > 0 && issue != null && (
-                <FieldError id={`rename-error-${flow.flowId}`}>{t(`resource.nameIssue.${issue}`, { max: resourceNameMaxLength })}</FieldError>
-              )}
-            </Field>
-            <DialogFooter>
-              <DialogClose render={<Button variant="outline" />} type="button">
-                {t('common.cancel')}
-              </DialogClose>
-              <Button disabled={busy != null || issue != null} type="submit">
-                {t('common.save')}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
       <Dialog
         open={mode == 'delete'}
         onOpenChange={(open) => {
           if (!open) setMode('idle')
         }}
       >
-        <DialogContent container={root} initialFocus={cancelDelete} finalFocus={more} showCloseButton={false}>
+        <DialogContent container={root} initialFocus={cancelDelete} finalFocus={deleteButton} showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>{t('sidebar.deleteFlowConfirm', { name: flow.name })}</DialogTitle>
             <DialogDescription>{t('resource.deleteDescription')}</DialogDescription>
@@ -257,16 +343,20 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
 
 function FlowSkeleton(): ReactElement {
   return (
-    <div aria-hidden="true" className="resource-list-row resource-skeleton-row flow-columns">
-      <span className="resource-primary-cell">
-        <Skeleton className="size-8 shrink-0" />
+    <div aria-hidden="true" className="resource-item-row">
+      <div className="resource-list-row resource-skeleton-row flow-columns">
         <span className="resource-skeleton-copy">
-          <Skeleton className="h-3.5 w-36" />
-          <Skeleton className="h-2.5 w-48 max-w-full" />
+          <Skeleton className="h-3.5 w-36 max-w-full" />
+          <Skeleton className="h-3 w-24 max-w-full" />
         </span>
-      </span>
-      <Skeleton className="h-3 w-28" />
-      <Skeleton className="h-3 w-16" />
+        <Skeleton className="h-3 w-36 max-w-full" />
+        <Skeleton className="h-3 w-28 max-w-full" />
+        <Skeleton className="h-3 w-16" />
+      </div>
+      <div className="resource-live-controls">
+        <Skeleton className="h-7 w-16" />
+        <Skeleton className="h-7 w-14" />
+      </div>
     </div>
   )
 }
@@ -325,13 +415,13 @@ export function FlowBrowser({
   }
 
   return (
-    <main className="resource-browser">
+    <main className="resource-browser" data-tooltip-portal>
       <div className={cn('resource-page', catalogWidth != 'default' && 'resource-page-full')}>
         <h1 className="sr-only">{t('resource.flows')}</h1>
-        <section aria-labelledby="flow-list-title" className="resource-list-section">
+        <section aria-labelledby="flow-list-title" className="resource-list-section rounded-lg">
           <div className="resource-list-title">
             <div className="resource-list-heading">
-              <h2 id="flow-list-title">{t('resource.allFlows')}</h2>
+              <h2 id="flow-list-title">{t('resource.all')}</h2>
               {!loading && <span>{t('resource.flowCount', { count: total ?? flows.length })}</span>}
             </div>
             <div className="resource-list-actions">
@@ -342,35 +432,28 @@ export function FlowBrowser({
                 </InputGroupAddon>
                 <InputGroupInput
                   autoComplete="off"
-                  aria-label={t('resource.searchFlows')}
+                  aria-label={t('resource.searchByName')}
                   name="flow-search"
                   onChange={(event) => setFilter(event.target.value)}
-                  placeholder={t('resource.searchFlows')}
+                  placeholder={t('resource.searchByName')}
                   value={filter}
                 />
               </InputGroup>
-              <Button
-                aria-label={t('common.refresh')}
-                disabled={loading || refreshing || busy != null}
-                onClick={() => void store.workspace.reloadFlows()}
-                size="icon"
-                title={t('common.refresh')}
-                variant="outline"
-              >
-                <Icon className={refreshing ? 'animate-spin' : undefined} name="refresh" />
-              </Button>
-              <Button className="resource-page-primary-action" disabled={busy != null} onClick={() => setCreating(true)}>
+              <Button className="pr-3" disabled={busy != null} onClick={() => setCreating(true)}>
                 <Icon data-icon="inline-start" name="plus" />
                 {t('resource.newFlow')}
               </Button>
               {hostAction != null && hostTitle != null && onHostAction != null && <HostMenu action={hostAction} onAction={onHostAction} title={hostTitle} />}
             </div>
           </div>
-          <div aria-hidden="true" className="resource-list-columns flow-columns">
-            <span>{t('resource.name')}</span>
-            <span>{t('resource.updated')}</span>
-            <span>{t('resource.publication')}</span>
-            <span>{t('resource.enabledColumn')}</span>
+          <div aria-hidden="true" className="resource-list-columns-shell">
+            <div className="resource-list-columns flow-columns">
+              <span>{t('resource.name')}</span>
+              <span className="resource-flow-id-heading">{t('resource.flowId')}</span>
+              <span className="resource-updated-heading">{t('resource.updated')}</span>
+              <span>{t('resource.status')}</span>
+            </div>
+            <span className="resource-actions-heading">{t('resource.actions')}</span>
           </div>
           <div className="resource-list">
             {loading ? (

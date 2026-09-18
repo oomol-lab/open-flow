@@ -35,6 +35,10 @@ body {
   color: var(--ui-foreground);
 }
 
+.server-host .open-flow-workbench {
+  --ui-radius: inherit;
+}
+
 .workbench-frame {
   min-width: 0;
   min-height: 0;

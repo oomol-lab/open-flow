@@ -332,8 +332,7 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
     flowBadges = Object.fromEntries(
       team.bindings.map((binding) => {
         const bound = teams.get(binding.teamId)
-        const name = bound?.systemCreated ? t('team.defaultNamed', { name: bound.name }) : (bound?.name ?? binding.teamId)
-        return [binding.flowId, t('team.flowBadge', { name })]
+        return [binding.flowId, bound?.name ?? binding.teamId]
       }),
     )
   }

@@ -66,7 +66,6 @@
     "createFailed": "이 Connector 팀에서 Flow를 만들지 못했습니다.",
     "defaultNamed": "{{name}} (기본)",
     "fixedHint": "Flow를 만든 후에는 항상 이 팀을 사용합니다.",
-    "flowBadge": "팀: {{name}}",
     "label": "OOMOL 팀",
     "loadFailed": "팀을 불러오지 못했습니다.",
     "loading": "팀을 불러오는 중…",

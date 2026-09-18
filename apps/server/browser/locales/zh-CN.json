@@ -66,7 +66,6 @@
     "createFailed": "无法在这个 Connector 团队中创建 Flow。",
     "defaultNamed": "{{name}}（默认）",
     "fixedHint": "Flow 创建后将始终使用这个团队。",
-    "flowBadge": "团队：{{name}}",
     "label": "OOMOL 团队",
     "loadFailed": "无法加载团队。",
     "loading": "正在加载团队…",
