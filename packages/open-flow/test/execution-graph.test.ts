@@ -314,7 +314,7 @@ it('does not treat eventual action values as available on the notification path'
 it('only offers resolution outputs on their reachable paths', () => {
   const wait = { kind: 'wait' as const, inputs: {}, input: { ...port, handle: 'value', value: null }, prompt: 'Continue?' }
   const approval = { kind: 'approval' as const, inputs: {}, input: { ...port, handle: 'value', value: null }, prompt: 'Approve?' }
-  const jsonTask = { ...task, task: { ...task.task, inputs: [{ ...port, handle: 'input', jsonSchema: { 'ui:widget': 'any' } }] } }
+  const jsonTask = { ...task, task: { ...task.task, inputs: [{ ...port, handle: 'input', jsonSchema: {} }] } }
   const graph: Graph = {
     nodes: {
       wait,

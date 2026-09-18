@@ -52,6 +52,8 @@ describe('In-process schema compare', () => {
   it('compares ui-only schemas as directional unconstrained schemas', () => {
     expect(compareJSONSchema({ schema: { 'ui:widget': 'any' }, packageId: undefined }, { schema: { type: 'object' }, packageId: undefined })).toEqual({
       kind: 'incompatible',
+      error: undefined,
+      errorPath: ['type'],
     })
     expect(compareJSONSchema({ schema: { type: 'object' }, packageId: undefined }, { schema: { 'ui:widget': 'any' }, packageId: undefined })).toEqual({
       kind: 'compatible',
@@ -83,6 +85,35 @@ describe('In-process schema compare', () => {
         },
       ),
     ).toEqual({ kind: 'compatible' })
+  })
+
+  it('compares nested unconstrained schemas directionally', () => {
+    const anyProperty = { type: 'object', properties: { payload: {} }, required: ['payload'] }
+    const stringProperty = { type: 'object', properties: { payload: { type: 'string' } }, required: ['payload'] }
+    const anyItems = { type: 'array', items: {} }
+    const stringItems = { type: 'array', items: { type: 'string' } }
+
+    expect(compareJSONSchema({ schema: stringProperty, packageId: undefined }, { schema: anyProperty, packageId: undefined })).toEqual({ kind: 'compatible' })
+    expect(compareJSONSchema({ schema: anyProperty, packageId: undefined }, { schema: stringProperty, packageId: undefined })).toMatchObject({
+      kind: 'incompatible',
+      errorPath: ['properties', 'payload', 'type'],
+    })
+    expect(compareJSONSchema({ schema: stringItems, packageId: undefined }, { schema: anyItems, packageId: undefined })).toEqual({ kind: 'compatible' })
+    expect(compareJSONSchema({ schema: anyItems, packageId: undefined }, { schema: stringItems, packageId: undefined })).toMatchObject({
+      kind: 'incompatible',
+      errorPath: ['items', 'type'],
+    })
+  })
+
+  it.each([
+    [{ type: 'array', contains: { type: 'string' } }, '#/contains'],
+    [{ type: 'object', dependentRequired: { name: ['id'] } }, '#/dependentRequired'],
+    [{ type: 'object', properties: { payload: { unevaluatedProperties: false } } }, '#/properties/payload/unevaluatedProperties'],
+  ])('fails closed for unsupported comparison constraints in %j', (schema, path) => {
+    expect(compareJSONSchema({ schema, packageId: undefined }, { schema: {}, packageId: undefined })).toEqual({
+      kind: 'compare-error',
+      message: `Unsupported schema comparison keyword at ${path}.`,
+    })
   })
 
   it('uses the extracted comparer for compatible and incompatible schemas', () => {
@@ -197,6 +228,8 @@ describe('In-process schema compare', () => {
       name: 'missing target pattern guarantee',
       to: { pattern: '^a', type: 'string' },
     },
+    { from: { format: 'email', type: 'string' }, kind: 'compatible', name: 'formatted string to plain string', to: { type: 'string' } },
+    { from: { type: 'string' }, kind: 'incompatible', name: 'plain string to formatted string', to: { format: 'email', type: 'string' } },
     { from: { type: 'integer' }, kind: 'compatible', name: 'integer to number', to: { type: 'number' } },
     { from: { type: 'number' }, kind: 'incompatible', name: 'number to integer', to: { type: 'integer' } },
     {
@@ -216,6 +249,18 @@ describe('In-process schema compare', () => {
       kind: 'incompatible',
       name: 'wider array items',
       to: { items: { minLength: 2, type: 'string' }, type: 'array' },
+    },
+    {
+      from: { items: { type: 'string' }, minItems: 1, type: 'array', uniqueItems: true },
+      kind: 'compatible',
+      name: 'unique array to ordinary array',
+      to: { items: { type: 'string' }, minItems: 1, type: 'array' },
+    },
+    {
+      from: { items: { type: 'string' }, minItems: 1, type: 'array' },
+      kind: 'incompatible',
+      name: 'ordinary array to unique array',
+      to: { items: { type: 'string' }, minItems: 1, type: 'array', uniqueItems: true },
     },
     {
       from: { properties: { name: { type: 'string' } }, required: ['name'], type: 'object' },

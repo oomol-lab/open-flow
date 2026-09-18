@@ -1,6 +1,7 @@
 import type { ExtendsSchema, SubsetCompare } from '../../json-schema-subset/index.ts'
 
-import { isDefined, isString, toPlainObject } from '@wopjs/cast'
+import { isString, toPlainObject } from '@wopjs/cast'
+import { CompiledKind, getKind, isCompiledSchema } from '../../json-schema-subset/compiler/index.ts'
 import { ExpressionSingleResult, makeSubsetCompare } from '../../json-schema-subset/index.ts'
 
 export interface SchemaCompareContext {
@@ -12,30 +13,8 @@ interface StringSchemaValue {
   readonly type: 'string'
 }
 
-interface ArraySchemaValue {
-  readonly type: 'array'
-}
-
-interface StringArraySchemaValue extends ArraySchemaValue {
-  readonly items: StringSchemaValue
-}
-
 function isStringLikeSchema(value: unknown): value is StringSchemaValue {
   return toPlainObject(value)?.type === 'string'
-}
-
-function isArrayLikeSchema(value: unknown): value is ArraySchemaValue {
-  return value instanceof MultiSelectSchema || toPlainObject(value)?.type === 'array'
-}
-
-function isArrayOfString(value: unknown): value is StringArraySchemaValue {
-  const object = toPlainObject(value)
-  return object?.type === 'array' && toPlainObject(object.items)?.type === 'string'
-}
-
-function isEmptyObject(value: unknown): value is Record<string, never> {
-  const object = toPlainObject(value)
-  return object != null && Object.keys(object).length === 0
 }
 
 function assertSchemaCompareContext(value: unknown): asserts value is SchemaCompareContext {
@@ -72,20 +51,13 @@ abstract class SpecialSchema<T = unknown> implements ExtendsSchema {
   }
 
   public compare(other: unknown): readonly ExpressionSingleResult[] {
-    const passThroughResult = this.passThrough(other)
-    if (passThroughResult) return passThroughResult
+    if (isCompiledSchema(other) && getKind(other) === CompiledKind.Any) return [ExpressionSingleResult.ContainedBy]
     return this.compareImpl(other)
   }
 
   protected abstract compareImpl(other: unknown): readonly ExpressionSingleResult[]
 
   public abstract equals(other: unknown): boolean
-
-  private passThrough(other: unknown): readonly ExpressionSingleResult[] | undefined {
-    if (other instanceof AnySchema) {
-      return [ExpressionSingleResult.Equals]
-    }
-  }
 }
 
 interface SingleSelectSchemaValue {
@@ -144,116 +116,6 @@ class SingleSelectSchema extends SpecialSchema<SingleSelectSchemaValue> {
   }
 }
 
-interface MultiSelectSchemaValue {
-  readonly type: 'array'
-  readonly uniqueItems: true
-  readonly items: { readonly enum: readonly string[] }
-}
-
-class MultiSelectSchema extends SpecialSchema<MultiSelectSchemaValue> {
-  public static isMatch(value: unknown): value is MultiSelectSchemaValue {
-    const object = toPlainObject(value)
-    const enumValues = toPlainObject(object?.items)?.enum
-    return object?.type === 'array' && object.uniqueItems === true && Array.isArray(enumValues) && enumValues.every((v) => isString(v))
-  }
-
-  public constructor(id: number, value: unknown, context?: unknown) {
-    if (!MultiSelectSchema.isMatch(value)) throw new TypeError('Invalid multi-select schema.')
-    super(id, value, context)
-  }
-
-  protected compareImpl(other: unknown): readonly ExpressionSingleResult[] {
-    if (other instanceof ArrayOfAny || isArrayOfString(other)) {
-      return [ExpressionSingleResult.ContainedBy]
-    }
-
-    if (other instanceof MultiSelectSchema) {
-      const f = new Set(this.value.items.enum)
-      let result: ExpressionSingleResult = ExpressionSingleResult.Equals
-      for (const v of other.value.items.enum) {
-        if (!f.has(v)) {
-          result = ExpressionSingleResult.ContainedBy
-        }
-        f.delete(v)
-      }
-      if (f.size === 0) {
-        return [result]
-      }
-      if (f.size === this.value.items.enum.length) {
-        return [ExpressionSingleResult.Rejection]
-      }
-      return [ExpressionSingleResult.Intersection]
-    }
-
-    return [ExpressionSingleResult.Rejection]
-  }
-
-  public equals(other: unknown): boolean {
-    if (other instanceof MultiSelectSchema) {
-      const f = new Set(this.value.items.enum)
-      for (const v of other.value.items.enum) {
-        if (!f.has(v)) {
-          return false
-        }
-        f.delete(v)
-      }
-      return f.size === 0
-    }
-    return false
-  }
-}
-
-interface ArrayOfAnySchemaValue {
-  readonly type: 'array'
-  readonly uniqueItems?: false
-  readonly items?: Record<string, never>
-}
-
-class ArrayOfAny extends SpecialSchema<ArrayOfAnySchemaValue> {
-  public static isMatch(value: unknown): value is ArrayOfAnySchemaValue {
-    const object = toPlainObject(value)
-    return object?.type === 'array' && !object.uniqueItems && (!isDefined(object.items) || isEmptyObject(object.items))
-  }
-
-  public constructor(id: number, value: unknown, context?: unknown) {
-    if (!ArrayOfAny.isMatch(value)) throw new TypeError('Invalid array schema.')
-    super(id, value, context)
-  }
-
-  protected compareImpl(other: unknown): readonly ExpressionSingleResult[] {
-    if (other instanceof ArrayOfAny || isArrayLikeSchema(other)) {
-      return [ExpressionSingleResult.Equals]
-    }
-
-    return [ExpressionSingleResult.Rejection]
-  }
-
-  public equals(other: unknown): boolean {
-    return other instanceof ArrayOfAny
-  }
-}
-
-type AnySchemaValue = Record<string, never>
-
-class AnySchema extends SpecialSchema<AnySchemaValue> {
-  public static isMatch(value: unknown): value is AnySchemaValue {
-    return isEmptyObject(value)
-  }
-
-  public constructor(id: number, value: unknown, context?: unknown) {
-    if (!AnySchema.isMatch(value)) throw new TypeError('Invalid empty schema.')
-    super(id, value, context)
-  }
-
-  protected compareImpl(_other: unknown): readonly ExpressionSingleResult[] {
-    return [ExpressionSingleResult.Equals]
-  }
-
-  public equals(_other: unknown): boolean {
-    return true
-  }
-}
-
 interface BinarySchemaValue {
   readonly contentMediaType: 'oomol/bin'
 }
@@ -309,7 +171,7 @@ class ArtifactSchema extends SpecialSchema<ArtifactSchemaValue> {
 
 export function createSchemaComparer(): SubsetCompare<unknown> {
   const comparer = makeSubsetCompare({
-    extendsSchemaClasses: [ArrayOfAny, AnySchema, SingleSelectSchema, MultiSelectSchema, BinarySchema, ArtifactSchema],
+    extendsSchemaClasses: [SingleSelectSchema, BinarySchema, ArtifactSchema],
   })
 
   return comparer

@@ -8,10 +8,10 @@ import { recordError, isJSONSchemaKey, recordWarn } from './common.ts'
 import { CompiledKind, wrapCompiledSchema } from './wrapper.ts'
 
 type NumericKeys = 'type' | 'multipleOf' | 'maximum' | 'exclusiveMaximum' | 'minimum' | 'exclusiveMinimum'
-type StringKeys = 'type' | 'maxLength' | 'minLength' | 'pattern'
+type StringKeys = 'type' | 'format' | 'maxLength' | 'minLength' | 'pattern'
 
 const NUMERIC_KEYS = new Set<NumericKeys>(['type', 'multipleOf', 'maximum', 'exclusiveMaximum', 'minimum', 'exclusiveMinimum'])
-const STRING_KEYS = new Set<StringKeys>(['type', 'maxLength', 'minLength', 'pattern'])
+const STRING_KEYS = new Set<StringKeys>(['type', 'format', 'maxLength', 'minLength', 'pattern'])
 
 export type PrimitiveInputSchema = InputSchema & {
   readonly type: Exclude<JSONSchema7TypeName, 'object' | 'array'>

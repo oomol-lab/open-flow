@@ -41,7 +41,7 @@ export function schemaForEditor(component: EditorComponent, previous: unknown): 
     case 'multiSelect':
       return { ...metadata, type: 'array', uniqueItems: true, items: { enum: Array.isArray(options) ? options : [] } }
     case 'json':
-      return { ...metadata, 'ui:widget': 'any' }
+      return metadata
     default:
       return { ...metadata, type: component }
   }

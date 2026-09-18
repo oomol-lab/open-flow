@@ -189,6 +189,7 @@ function findMismatchPath<E>(source: Schema<E>, target: Schema<E>): SchemaPath |
       if ((sourceSchema.minLength ?? 0) < (targetSchema.minLength ?? 0)) return [...targetPath, 'minLength']
       if ((sourceSchema.maxLength ?? Number.POSITIVE_INFINITY) > (targetSchema.maxLength ?? Number.POSITIVE_INFINITY)) return [...targetPath, 'maxLength']
       if (sourceSchema.pattern !== targetSchema.pattern && targetSchema.pattern) return [...targetPath, 'pattern']
+      if (sourceSchema.format !== targetSchema.format && targetSchema.format) return [...targetPath, 'format']
       break
     }
     case CompiledKind.Numeric: {

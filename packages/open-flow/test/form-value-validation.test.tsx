@@ -192,7 +192,7 @@ describe('Nullable field presentation', () => {
       expect(render(null, { type: 'null' })).toContain('>null</span>')
       const jsonNull = renderToStaticMarkup(
         <I18nProvider i18n={i18n}>
-          <ValueEditor label="note" schema={{ 'ui:widget': 'any' }} value={null} nullable onChange={onChange} path="/note" onDraftIssue={vi.fn()} />
+          <ValueEditor label="note" schema={{}} value={null} nullable onChange={onChange} path="/note" onDraftIssue={vi.fn()} />
         </I18nProvider>,
       )
       expect(jsonNull).toContain('aria-label="note JSON"')
@@ -271,7 +271,7 @@ describe('Collapsed field mounting', () => {
   it.each([
     [{ type: 'object', properties: { child: { type: 'string' } } }, { child: 'hello' }],
     [{ type: 'array', items: { type: 'string' } }, ['hello']],
-    [{ 'ui:widget': 'any' }, { child: 'hello' }],
+    [{}, { child: 'hello' }],
     [{ 'type': 'string', 'ui:widget': 'text' }, 'hello'],
   ])('defers compact bodies while keeping standalone editors mounted', (schema, value) => {
     const i18n = createI18n('en')

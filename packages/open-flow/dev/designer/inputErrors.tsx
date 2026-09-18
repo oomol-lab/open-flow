@@ -23,7 +23,7 @@ const cases = [
   { label: 'Select', schema: { enum: ['one', 'two'] }, value: 'missing' },
   { label: 'Boolean', schema: { type: 'boolean' }, value: 'missing' },
   { label: 'Multiple select', schema: { type: 'array', uniqueItems: true, items: { enum: ['one', 'two'] }, minItems: 1 }, value: [] },
-  { label: 'JSON', schema: { 'type': 'object', 'ui:widget': 'any', 'required': ['title'] }, value: { count: 2 } },
+  { label: 'Required object', schema: { type: 'object', required: ['title'] }, value: { count: 2 } },
 ] as const
 
 function ErrorPanel({ theme }: { theme: 'light' | 'dark' }) {
@@ -32,7 +32,7 @@ function ErrorPanel({ theme }: { theme: 'light' | 'dark' }) {
     { handle: 'validTime', jsonSchema: { type: 'string', format: 'time' }, nullable: false, value: '09:30:00Z' },
     { handle: 'invalidTime', jsonSchema: { type: 'string', format: 'time' }, nullable: false, value: '09:30:00' },
     { handle: 'invalidText', jsonSchema: { type: 'string', minLength: 5 }, nullable: false, value: 'abc' },
-    { handle: 'invalidJSON', jsonSchema: { 'type': 'object', 'ui:widget': 'any', 'required': ['title'] }, nullable: false, value: { count: 2 } },
+    { handle: 'invalidObject', jsonSchema: { type: 'object', required: ['title'] }, nullable: false, value: { count: 2 } },
     { handle: 'requiredUnset', jsonSchema: { type: 'string' }, nullable: false },
     { handle: 'nullableUnset', jsonSchema: { type: 'string' }, nullable: true },
   ])

@@ -167,7 +167,7 @@ export function ValueEditor(props: ValueEditorProps) {
   const needsValidation = !draftInvalid && presence === 'value' && props.editor === undefined
   const issues = useValueIssues(schema, value, language, needsValidation)
   const enumeration = Array.isArray(source.enum) ? source.enum : Object.hasOwn(source, 'const') ? [source.const] : undefined
-  const complex = source['ui:widget'] === 'any' || editorComponent(schema) === 'json' || depth > 12
+  const complex = editorComponent(schema) === 'json' || depth > 12
   const choiceOptions = Array.isArray(source.enum)
     ? source.enum
     : source.uniqueItems === true && Array.isArray(objectValue(source.items)?.enum)

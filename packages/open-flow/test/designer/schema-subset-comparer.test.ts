@@ -57,82 +57,23 @@ describe('json-subset-comparer', () => {
   })
 
   describe('any', () => {
-    it('should return true if one is any', () => {
-      expect(
-        compare(
-          {
-            schema: {},
-          },
-          {
-            schema: { type: 'number' },
-          },
-        ),
-      ).toEqual({ isSubset: true })
-      expect(
-        compare(
-          {
-            schema: { type: 'string' },
-          },
-          {
-            schema: {},
-          },
-        ),
-      ).toEqual({ isSubset: true })
-      expect(
-        compare(
-          {
-            schema: {},
-          },
-          {
-            schema: {},
-          },
-        ),
-      ).toEqual({ isSubset: true })
-      expect(
-        compare(
-          {
-            schema: {},
-          },
-          {
-            schema: { type: 'array' },
-          },
-        ),
-      ).toEqual({ isSubset: true })
+    it('compares unconstrained schemas directionally', () => {
+      expect(compare({ schema: {} }, { schema: { type: 'number' } })).toEqual({ isSubset: false, error: undefined })
+      expect(compare({ schema: { type: 'string' } }, { schema: {} })).toEqual({ isSubset: true })
+      expect(compare({ schema: {} }, { schema: {} })).toEqual({ isSubset: true })
+      expect(compare({ schema: {} }, { schema: { type: 'array' } })).toEqual({ isSubset: false, error: undefined })
     })
   })
 
   describe('array of any', () => {
-    it('should return true if one is array of any and other is array', () => {
-      expect(
-        compare(
-          {
-            schema: { type: 'array', items: { type: 'string' } },
-          },
-          {
-            schema: { type: 'array' },
-          },
-        ),
-      ).toEqual({ isSubset: true })
-      expect(
-        compare(
-          {
-            schema: { type: 'array', items: { type: 'object' } },
-          },
-          {
-            schema: { type: 'array' },
-          },
-        ),
-      ).toEqual({ isSubset: true })
-      expect(
-        compare(
-          {
-            schema: { type: 'array', items: {} },
-          },
-          {
-            schema: { type: 'array', items: { type: 'string' } },
-          },
-        ),
-      ).toEqual({ isSubset: true })
+    it('compares unconstrained items directionally', () => {
+      expect(compare({ schema: { type: 'array', items: { type: 'string' } } }, { schema: { type: 'array' } })).toEqual({ isSubset: true })
+      expect(compare({ schema: { type: 'array', items: { type: 'object' } } }, { schema: { type: 'array' } })).toEqual({ isSubset: true })
+      expect(compare({ schema: { type: 'array', items: {} } }, { schema: { type: 'array', items: { type: 'string' } } })).toEqual({
+        isSubset: false,
+        error: undefined,
+      })
+      expect(compare({ schema: { type: 'array', items: { type: 'string' } } }, { schema: { type: 'array', items: {} } })).toEqual({ isSubset: true })
     })
 
     it('accepts an object array with nested type unions', () => {
@@ -333,7 +274,7 @@ describe('json-subset-comparer', () => {
       ).toEqual({ isSubset: true })
     })
 
-    it('should return true if from is anyOf any', () => {
+    it('rejects an unconstrained source for a constrained target', () => {
       expect(
         compare(
           {
@@ -343,7 +284,7 @@ describe('json-subset-comparer', () => {
             schema: { type: 'number' },
           },
         ),
-      ).toEqual({ isSubset: true })
+      ).toEqual({ isSubset: false, error: undefined })
     })
     it('should return false if from is anyOf any with other and to is not any', () => {
       expect(

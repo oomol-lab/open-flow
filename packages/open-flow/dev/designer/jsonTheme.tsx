@@ -26,7 +26,7 @@ const samples: readonly InputPort[] = [
       metadata: { owner: 'Open Flow', note: 'Line one\nLine two', empty: '' },
     },
   },
-  { handle: 'message', jsonSchema: { 'ui:widget': 'any' }, nullable: false, value: 'Editable field' },
+  { handle: 'message', jsonSchema: {}, nullable: false, value: 'Editable field' },
   { handle: 'unset', jsonSchema: {}, nullable: false },
 ]
 
