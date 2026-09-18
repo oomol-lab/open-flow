@@ -7,6 +7,7 @@ import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { schemaObject } from '../../../../flow/common/schema.ts'
 import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
+import { presentBuiltInTriggerOutputs } from './builtInOutputPresentation.ts'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 
 export function TriggerSummary({ trigger, display }: { readonly trigger: TriggerNode; readonly display?: TriggerDisplay }) {
@@ -19,7 +20,7 @@ export function TriggerSummary({ trigger, display }: { readonly trigger: Trigger
           title={t('inspector.ports.outputsTitle')}
           output
           disabled
-          values={triggerOutputDefinitions(trigger)}
+          values={presentBuiltInTriggerOutputs(trigger, t)}
           onChange={() => {}}
         />
       </section>

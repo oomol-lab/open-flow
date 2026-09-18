@@ -334,7 +334,12 @@
       "columnHandle": "Handle",
       "columnName": "Nom",
       "columnType": "Type",
-      "columnValue": "Valeur"
+      "columnValue": "Valeur",
+      "builtIn": {
+        "cron": {
+          "scheduledAt": "Heure planifiée ayant déclenché cette exécution, au format ISO 8601."
+        }
+      }
     }
   },
   "language": {

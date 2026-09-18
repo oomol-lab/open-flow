@@ -334,7 +334,12 @@
       "columnHandle": "Handle",
       "columnName": "名称",
       "columnType": "类型",
-      "columnValue": "值"
+      "columnValue": "值",
+      "builtIn": {
+        "cron": {
+          "scheduledAt": "本次运行的计划触发时间，采用 ISO 8601 格式。"
+        }
+      }
     }
   },
   "language": {

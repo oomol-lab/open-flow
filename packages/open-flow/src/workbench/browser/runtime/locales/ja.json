@@ -334,7 +334,12 @@
       "columnHandle": "Handle",
       "columnName": "名前",
       "columnType": "型",
-      "columnValue": "値"
+      "columnValue": "値",
+      "builtIn": {
+        "cron": {
+          "scheduledAt": "この実行をトリガーした予定時刻（ISO 8601 形式）です。"
+        }
+      }
     }
   },
   "language": {

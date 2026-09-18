@@ -334,7 +334,12 @@
       "columnHandle": "Handle",
       "columnName": "Имя",
       "columnType": "Тип",
-      "columnValue": "Значение"
+      "columnValue": "Значение",
+      "builtIn": {
+        "cron": {
+          "scheduledAt": "Запланированное время этого запуска в формате ISO 8601."
+        }
+      }
     }
   },
   "language": {

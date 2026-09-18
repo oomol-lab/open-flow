@@ -17,7 +17,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { nodeInputMappings } from '../../../../flow/common/condition.ts'
-import { resolutionOutputPorts } from '../../../../flow/common/graph.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
@@ -27,6 +26,7 @@ import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { contextName } from '../../typeScriptShadow.ts'
 import { Icon } from '../icons.tsx'
 import { AgentSettings } from './agentSettings.tsx'
+import { presentResolutionOutputs } from './builtInOutputPresentation.ts'
 import { CodeActions } from './codeActions.tsx'
 import { CodeEditor } from './codeEditor.tsx'
 import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
@@ -1003,11 +1003,7 @@ export function NodeInspector({
               title={t('inspector.ports.outputsTitle')}
               output
               disabled
-              values={
-                selection.kind === 'subflow'
-                  ? (selection.definition?.outputs ?? [])
-                  : Object.entries(resolutionOutputPorts(selection.node)).map(([handle, port]) => Object.assign({ handle }, port))
-              }
+              values={selection.kind === 'subflow' ? (selection.definition?.outputs ?? []) : presentResolutionOutputs(selection.node, t)}
               onChange={() => {}}
             />
           </section>

@@ -17,6 +17,7 @@ import { toRFHandleName } from '../../../base/rfHelpers.ts'
 import { Handle } from '../../../components/handle.tsx'
 import { NodeMiniMapPhase, NodeMiniMapProvider, useNodeMiniMapPhase } from '../../../components/minimap.tsx'
 import { CanvasTooltip } from '../../../components/tooltip.tsx'
+import { waitBranchDescription } from '../../../i18n/waitBranchLocales.ts'
 import { NODE_MINIMAP_PHASE1_CLASSNAME, NODE_MINIMAP_PHASE2_CLASSNAME } from '../../../stores/canvas/nodeMiniMap.ts'
 import { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 import { DEFAULT_NODE_WIDTH, FITTING_VIEW_CLASSNAME, MIN_NODE_WIDTH, NODE_TYPE } from '../../../stores/node/constants.ts'
@@ -103,7 +104,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
               : ''
         const tooltip =
           modelNode?.kind == 'approval' || modelNode?.kind == 'wait'
-            ? t(`canvasCard.waitBranchDescription.${branch == 'pending' ? `${branch}.${modelNode.kind}` : branch}`)
+            ? waitBranchDescription(t, modelNode.kind, branch)
             : conditionNode?.defaultOutput === branch
               ? t('condition.defaultHelp')
               : undefined

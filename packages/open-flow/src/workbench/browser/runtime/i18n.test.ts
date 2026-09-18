@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { timeZoneLocales } from '../../../canvas/browser/i18n/timeZoneLocales.ts'
+import { waitBranchLocales } from '../../../canvas/browser/i18n/waitBranchLocales.ts'
 import formEnglish from '../../../form/browser/locales/en.json'
 import uiEnglish from '../../../ui/browser/locales/en.json'
 import { createI18n, locales } from './i18n.ts'
@@ -19,7 +20,7 @@ function placeholders(message: string): string[] {
   return [...message.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].flatMap((match) => match[1] ?? []).toSorted()
 }
 
-const english = new Map(messages({ ...en, ...timeZoneLocales.en, ...uiEnglish, ...formEnglish }))
+const english = new Map(messages({ ...en, ...waitBranchLocales.en, ...timeZoneLocales.en, ...uiEnglish, ...formEnglish }))
 
 describe('Workbench i18n', () => {
   it('ships every supported language', () => {

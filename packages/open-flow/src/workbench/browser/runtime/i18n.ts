@@ -4,6 +4,7 @@ import type { WorkbenchLanguage } from './contract.ts'
 
 import { I18n } from 'val-i18n'
 import { timeZoneLocales } from '../../../canvas/browser/i18n/timeZoneLocales.ts'
+import { waitBranchLocales } from '../../../canvas/browser/i18n/waitBranchLocales.ts'
 import { formLocales } from '../../../form/browser/locales.ts'
 import { defaultUiLanguage, resolveUiLanguage, uiLanguages } from '../../../localization/common/languages.ts'
 import { uiLocales } from '../../../ui/browser/locales.ts'
@@ -26,7 +27,10 @@ const resources: Readonly<Record<UiLanguage, Locale>> = {
 }
 
 export const locales: Locales = Object.fromEntries(
-  uiLanguages.map((language) => [language, { ...resources[language], ...timeZoneLocales[language], ...uiLocales[language], ...formLocales[language] }]),
+  uiLanguages.map((language) => [
+    language,
+    { ...resources[language], ...waitBranchLocales[language], ...timeZoneLocales[language], ...uiLocales[language], ...formLocales[language] },
+  ]),
 )
 
 export function createI18n(initialLanguage: string = defaultUiLanguage): I18n {

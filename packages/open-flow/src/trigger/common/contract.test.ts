@@ -21,7 +21,7 @@ it('declares ordered built-in ports', () => {
 
 it('validates the Cron scheduled time as a direct output', () => {
   const trigger: TriggerNode = { kind: 'cron', name: 'Cron', cronTimes: [] }
-  expect(triggerOutputDefinitions(trigger)[0]?.description).toBe('The scheduled time that triggered this run, in ISO 8601 format.')
+  expect(triggerOutputDefinitions(trigger)[0]?.description).toBeUndefined()
   expect(matchesTriggerOutputs(trigger, { scheduledAt: '2026-08-21T00:01:00.000Z' })).toBe(true)
   expect(matchesTriggerOutputs(trigger, { scheduledAt: 1 })).toBe(false)
   expect(matchesTriggerOutputs(trigger, { payload: { scheduledAt: '2026-08-21T00:01:00.000Z' } })).toBe(false)

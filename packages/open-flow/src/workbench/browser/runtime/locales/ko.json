@@ -334,7 +334,12 @@
       "columnHandle": "Handle",
       "columnName": "이름",
       "columnType": "유형",
-      "columnValue": "값"
+      "columnValue": "값",
+      "builtIn": {
+        "cron": {
+          "scheduledAt": "이 실행을 트리거한 예약 시간이며 ISO 8601 형식입니다."
+        }
+      }
     }
   },
   "language": {

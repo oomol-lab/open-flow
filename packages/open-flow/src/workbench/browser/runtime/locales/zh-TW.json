@@ -334,7 +334,12 @@
       "columnHandle": "Handle",
       "columnName": "名稱",
       "columnType": "類型",
-      "columnValue": "值"
+      "columnValue": "值",
+      "builtIn": {
+        "cron": {
+          "scheduledAt": "本次執行的排程觸發時間，採用 ISO 8601 格式。"
+        }
+      }
     }
   },
   "language": {
