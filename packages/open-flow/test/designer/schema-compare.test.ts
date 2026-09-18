@@ -129,6 +129,9 @@ describe('In-process schema compare', () => {
       { kind: 'incompatible', error: undefined, errorPath: ['minLength'] },
     )
     expect(
+      compareJSONSchema({ schema: { type: 'array' }, packageId: undefined }, { schema: { type: 'array', uniqueItems: true }, packageId: undefined }),
+    ).toEqual({ kind: 'incompatible', error: undefined, errorPath: ['uniqueItems'] })
+    expect(
       compareJSONSchema(
         { schema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] }, packageId: undefined },
         { schema: { type: 'object', properties: { name: { type: 'string', minLength: 1 } }, required: ['name'] }, packageId: undefined },

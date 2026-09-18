@@ -37,6 +37,7 @@ describe('Editor component selection', () => {
       title: 'Payload',
       description: 'Any JSON value.',
     })
+    expect(schemaForEditor('json', { 'title': 'Payload', 'ui:widget': 'any' })).toEqual({ title: 'Payload' })
     expect(editorComponent({ 'ui:widget': 'any' })).toBe('json')
   })
 })

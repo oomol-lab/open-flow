@@ -225,6 +225,14 @@ describe('json-subset-comparer', () => {
       expect(compare({ schema: two }, { schema: { type: 'array', items: { type: 'string' } } })).toEqual({ isSubset: true })
     })
 
+    it('treats arrays with at most one item as inherently unique', () => {
+      const bounded = { type: 'array', maxItems: 1, items: { type: 'string' } }
+      const unique = { type: 'array', uniqueItems: true, items: { type: 'string' } }
+
+      expect(compare({ schema: bounded }, { schema: unique })).toEqual({ isSubset: true })
+      expect(compare({ schema: unique }, { schema: bounded })).toEqual({ isSubset: false })
+    })
+
     it('should return true if one is multi select and other is array of string', () => {
       expect(
         compare(

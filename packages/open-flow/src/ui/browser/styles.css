@@ -89,6 +89,10 @@
   outline-offset: calc(-1 * var(--ui-danger-border-width, 1px));
 }
 
+.npm__react-simple-code-editor__textarea:focus {
+  outline: none;
+}
+
 .open-flow-code-editor.cm-editor.cm-focused {
   border-color: var(--ui-ring);
   outline: 2px solid var(--ui-ring);

@@ -211,6 +211,7 @@ function findMismatchPath<E>(source: Schema<E>, target: Schema<E>): SchemaPath |
     case CompiledKind.Array: {
       if ((sourceSchema.minItems ?? 0) < (targetSchema.minItems ?? 0)) return [...targetPath, 'minItems']
       if ((sourceSchema.maxItems ?? Number.POSITIVE_INFINITY) > (targetSchema.maxItems ?? Number.POSITIVE_INFINITY)) return [...targetPath, 'maxItems']
+      if (!sourceSchema.uniqueItems && targetSchema.uniqueItems) return [...targetPath, 'uniqueItems']
       break
     }
     case CompiledKind.Object: {

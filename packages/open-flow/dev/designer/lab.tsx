@@ -11,6 +11,7 @@ import { Input } from '../../src/ui/browser/input.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
 import { StoryActions, StoryActionsProvider } from './storyActions.tsx'
 import { labStories } from './storyCatalog.tsx'
+import { normalizeStorySearch } from './storySearch.ts'
 import { StorySidebarLayout } from './storySidebar.tsx'
 import { StoryStage } from './storyStage.tsx'
 
@@ -139,14 +140,14 @@ function storyFromUrl() {
 
 export function FrontendLab() {
   const [search, setSearch] = useState('')
-  const query = search.trim().toLowerCase()
+  const query = normalizeStorySearch(search.trim())
   const visibleSections = storySections
     .map((section) => ({
       ...section,
       groups: section.groups
         .map((group) => ({
           ...group,
-          entries: group.entries.filter((entry) => `${section.name} ${group.name} ${entry.title} ${entry.id}`.toLowerCase().includes(query)),
+          entries: group.entries.filter((entry) => normalizeStorySearch(`${section.name} ${group.name} ${entry.title} ${entry.id}`).includes(query)),
         }))
         .filter((group) => group.entries.length > 0),
     }))
