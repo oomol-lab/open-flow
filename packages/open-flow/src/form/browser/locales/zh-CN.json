@@ -9,6 +9,7 @@
     "fieldName": "字段名",
     "type": "{{name}} 类型",
     "typeTitle": "类型",
+    "arrayItemTypeTitle": "项目类型",
     "string": "字符串",
     "number": "数字",
     "boolean": "布尔值",
@@ -85,8 +86,10 @@
     "component": "组件",
     "columnName": "名称",
     "columnType": "类型",
+    "arrayOf": "的",
     "columnValue": "值",
     "noOptions": "无可用选项",
-    "emptyObject": "仅允许空对象"
+    "emptyObject": "仅允许空对象",
+    "emptyObjectReadonly": "空对象"
   }
 }

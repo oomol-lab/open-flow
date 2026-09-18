@@ -9,6 +9,7 @@
     "fieldName": "Field name",
     "type": "{{name}} type",
     "typeTitle": "Type",
+    "arrayItemTypeTitle": "Item type",
     "string": "String",
     "number": "Number",
     "boolean": "Boolean",
@@ -85,8 +86,10 @@
     "component": "Component",
     "columnName": "Name",
     "columnType": "Type",
+    "arrayOf": "of",
     "columnValue": "Value",
     "noOptions": "No options available",
-    "emptyObject": "Empty object only"
+    "emptyObject": "Empty object only",
+    "emptyObjectReadonly": "Empty object"
   }
 }

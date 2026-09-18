@@ -1,5 +1,6 @@
 import styles from './portList.module.scss'
 import type { ComponentProps, ReactNode } from 'react'
+import type { FieldDisclosure } from '../../../../form/browser/fieldTypeDisplay.tsx'
 import type { ValueEditorProps } from '../../../../form/browser/valueEditor.tsx'
 import type { Group, InputPort } from '../api.ts'
 
@@ -82,6 +83,8 @@ function PortType({
   id,
   compact = true,
   readOnlySurface = false,
+  showArrayItemType = false,
+  disclosure,
 }: {
   value: InputPort['jsonSchema']
   disabled: boolean
@@ -90,6 +93,8 @@ function PortType({
   id?: string
   compact?: boolean
   readOnlySurface?: boolean
+  showArrayItemType?: boolean
+  disclosure?: FieldDisclosure
 }) {
   return (
     <EditorComponentSelect
@@ -99,6 +104,8 @@ function PortType({
       name={name}
       readOnly={disabled}
       readOnlySurface={readOnlySurface}
+      showArrayItemType={showArrayItemType}
+      disclosure={disclosure}
       onChange={(next) => onChange(next as InputPort['jsonSchema'])}
     />
   )
@@ -383,6 +390,13 @@ export function PortDefinitionEditor(props: PortEditorProps) {
   const [sorting, setSorting] = useState(false)
   const fieldCount = values.filter((port) => 'handle' in port).length
   const hasFields = fieldCount > 0
+  const hasCompositeOutput =
+    props.output === true &&
+    values.some((value) => {
+      if (!('handle' in value)) return false
+      const type = objectValue(value.jsonSchema)?.type
+      return type === 'array' || type === 'object'
+    })
   const emptyMessage =
     disabled && !hasFields ? (props.output ? t('inspector.ports.noOutputs') : titleIcon === 'input' ? t('inspector.ports.noInputs') : undefined) : undefined
   const canSort = fieldCount > 1
@@ -535,7 +549,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         <i aria-hidden="true" className="i-lucide-light:grip-vertical" />
       </Button>
     ) : undefined
-    const header = (
+    const header = (disclosure?: FieldDisclosure) => (
       <div className={styles.heading}>
         <FieldName name={port.handle} description={port.description} className={styles.name}>
           {tableLayout ? (
@@ -558,6 +572,8 @@ export function PortDefinitionEditor(props: PortEditorProps) {
               name={port.handle}
               compact={!props.output}
               readOnlySurface={!!props.output}
+              showArrayItemType={!!props.output}
+              disclosure={disabled && props.output ? disclosure : undefined}
               value={port.jsonSchema}
               disabled={!!disabled}
               onChange={(jsonSchema) =>
@@ -638,7 +654,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             update(index, {
               ...rest,
               jsonSchema: jsonSchema as InputPort['jsonSchema'],
-              ...(value === undefined ? {} : { value: value as InputPort['value'] }),
+              ...(props.output || value === undefined ? {} : { value: value as InputPort['value'] }),
             })
           }
         : undefined
@@ -675,8 +691,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             label={port.handle}
             nullable={port.nullable}
             disabled={disabled}
-            valueEditable={!props.output}
-            editor={props.output ? null : undefined}
+            definitionOnly={props.output}
             path={`/${index}`}
             onDraftIssue={onDraftIssue}
             onDefinitionChange={onDefinitionChange}
@@ -727,6 +742,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         nullable={tableLayout}
         empty={!hasFields}
         data-inputs={props.renderValue != null || undefined}
+        data-composite-types={hasCompositeOutput || undefined}
         ref={list}
       >
         <span className="sr-only" role="status" aria-live="polite">

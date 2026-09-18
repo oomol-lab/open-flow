@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it, vi } from 'vitest'
+import { ValueEditor } from '../../../../form/browser/valueEditor.tsx'
 import { createI18n } from '../i18n.ts'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 
@@ -98,6 +99,100 @@ describe('Property panel port layout', () => {
     expect(markup).toContain('i-carbon:port-output')
     expect(markup).toContain('i-lucide-light:hash')
     expect(markup).toContain('>Number</span>')
+  })
+
+  it('exposes nested object output definitions without value controls', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <PortDefinitionEditor
+          layout="ports"
+          title="Outputs"
+          output
+          disabled={false}
+          values={[
+            {
+              handle: 'result',
+              jsonSchema: {
+                type: 'object',
+                properties: {
+                  status: { type: 'string' },
+                  details: { type: 'object', properties: { count: { type: 'integer' } } },
+                  tags: { type: 'array', items: { type: 'string' } },
+                },
+              },
+              nullable: false,
+            },
+            { handle: 'items', jsonSchema: { type: 'array', items: { type: 'string' } }, nullable: false },
+          ]}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('aria-label="result" aria-expanded="false"')
+    expect(markup).toContain('data-composite-types="true"')
+    expect(markup).toContain('aria-label="items[] type: Text"')
+    expect(markup).toContain('>of</span>')
+    expect(markup).not.toContain('aria-label="items" aria-expanded')
+    expect(markup).not.toContain('aria-label="result.status Set value"')
+    expect(markup).not.toContain('aria-label="result Set value"')
+  })
+
+  it('uses read-only object type surfaces as disclosure controls', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <PortDefinitionEditor
+          layout="ports"
+          output
+          disabled
+          values={[{ handle: 'result', jsonSchema: { type: 'object', properties: { status: { type: 'string' } } }, nullable: false }]}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toMatch(/<button[^>]*aria-label="result type: Object"[^>]*aria-expanded="false"[^>]*aria-controls=/)
+  })
+
+  it('renders nested read-only output types with the output control surface', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <ValueEditor
+          layout="ports"
+          label="result"
+          path="/result"
+          schema={{ type: 'object', properties: { status: { type: 'string' }, details: { type: 'object', properties: { count: { type: 'integer' } } } } }}
+          value={undefined}
+          disabled
+          valueEditable={false}
+          definitionOnly
+          onChange={vi.fn()}
+          onDraftIssue={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toMatch(/aria-label="result.status type: Text"[^>]*data-field-control="true"/)
+    expect(markup).toMatch(/<button[^>]*aria-label="result.details type: Object"[^>]*aria-expanded="false"/)
+    expect(markup).toContain('>Text</span>')
+    expect(markup).toContain('>Object</span>')
+    expect(markup.match(/data-readonly-object-action-slots/g)).toHaveLength(2)
+    expect(markup).not.toContain('aria-label="Add field result.status"')
+    expect(markup).not.toContain('aria-label="Remove status"')
+  })
+
+  it('does not place an empty value body over output array type controls', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <PortDefinitionEditor
+          layout="ports"
+          output
+          disabled={false}
+          values={[{ handle: 'items', jsonSchema: { type: 'array' }, nullable: false }]}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('aria-label="items type: Array"')
+    expect(markup).toContain('aria-label="items[] type: JSON"')
+    expect(markup).not.toContain('data-value-body')
   })
 
   it('passes definition editing through custom input value renderers', () => {

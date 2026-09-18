@@ -9,6 +9,7 @@
     "fieldName": "Nom du champ",
     "type": "Type de {{name}}",
     "typeTitle": "Type",
+    "arrayItemTypeTitle": "Type d’élément",
     "string": "Chaîne",
     "number": "Nombre",
     "boolean": "Booléen",
@@ -85,8 +86,10 @@
     "component": "Composant",
     "columnName": "Nom",
     "columnType": "Type",
+    "arrayOf": "de",
     "columnValue": "Valeur",
     "noOptions": "Aucune option disponible",
-    "emptyObject": "Objet vide uniquement"
+    "emptyObject": "Objet vide uniquement",
+    "emptyObjectReadonly": "Objet vide"
   }
 }

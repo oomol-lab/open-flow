@@ -50,6 +50,9 @@
 .list[data-output] {
   --field-type-width: minmax(96px, 0.65fr);
 }
+.list[data-output][data-composite-types] {
+  --field-type-width: minmax(176px, 1.15fr);
+}
 .list[data-nullable] {
   --field-table-nullable-width: 28px;
 }

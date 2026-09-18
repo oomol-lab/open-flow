@@ -65,6 +65,8 @@ the [property panel entry](property-panel.md) for shared scope.
   coherent at multiple nesting levels; do not tune one screenshot with independent offsets.
 - Adjacent field/action rows use the same 8px gap. Avoid adding a second bottom margin to an expanded
   collection, or a gap from an empty wrapper. Check both sides of a full-row empty-collection action.
+- Read-only output object children omit their add and remove buttons while retaining both action
+  slots, so hiding unavailable actions does not shift any row columns.
 - Internal popup separators are light and inset: the compact reference is `mx-2 h-px bg-border/50`.
   Apply the same separator treatment above actions and below back controls. Outer panel borders
   have a different role.
@@ -113,10 +115,12 @@ the [property panel entry](property-panel.md) for shared scope.
 - Output tables use their otherwise unused value space for a wider Type column. Editable and
   read-only output types keep both the 16px icon and the localized type name visible. Read-only
   output types retain the standard control border and the same steady read-only fill as the Name
-  field without becoming focusable or changing fill on hover.
+  field. Object type controls are keyboard-focusable disclosure buttons that toggle their children;
+  scalar type controls remain non-focusable and do not change fill on hover. Nested output fields use
+  the same read-only type surfaces, including the inline Array “of” item-type presentation.
 - Type-icon and static-label simplification applies only to the Type column. Controls in the Value
   column retain their full labels and existing control appearance, including disabled states.
-- Fixed and read-only types use non-focusable type labels in a 32px column (16px icon and 8px
+- Fixed and read-only input/value types use non-focusable type labels in a 32px column (16px icon and 8px
   padding on each side), normal muted text color, and a type-name tooltip. Table headings and
   nested rows share this column width, releasing the unused selector space. They have no visible control border,
   fill, dropdown arrow, or click feedback. Temporary disabling retains the selector's disabled
@@ -142,8 +146,10 @@ the [property panel entry](property-panel.md) for shared scope.
   its expand and collapse behavior remains identifiable in both states.
   Neither invisible layout space nor an empty-looking input satisfies this contract.
 - Arrays keep their shared item-type selector in the parent value region rather than substituting
-  the object-style preview for it. This selector shows the full type name without an icon and
-  retains its control border and dropdown arrow. Non-editable item types use the disabled selector.
+  the object-style preview for it. Output definitions, which have no Value column, combine a compact
+  Array icon selector, a localized “of” separator, and the full item-type selector on one line in the
+  Type column. The item selector shows the full type name without an icon and retains its control
+  border and dropdown arrow. Non-editable item types use the disabled selector.
 - Manually expanding JSON or Multiline focuses its editor. Initial rendering does not steal focus.
   Handle lazy CodeMirror initialization and its textarea fallback, repeated expansion, and disabled
   fields. Use the shared minimal CodeMirror editor with no line numbers or active-line decoration;

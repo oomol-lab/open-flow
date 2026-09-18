@@ -9,6 +9,7 @@
     "fieldName": "欄位名稱",
     "type": "{{name}} 類型",
     "typeTitle": "類型",
+    "arrayItemTypeTitle": "項目類型",
     "string": "字串",
     "number": "數字",
     "boolean": "布林值",
@@ -85,8 +86,10 @@
     "component": "元件",
     "columnName": "名稱",
     "columnType": "類型",
+    "arrayOf": "的",
     "columnValue": "值",
     "noOptions": "無可用選項",
-    "emptyObject": "僅允許空物件"
+    "emptyObject": "僅允許空物件",
+    "emptyObjectReadonly": "空物件"
   }
 }

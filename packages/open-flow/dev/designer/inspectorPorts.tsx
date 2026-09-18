@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
 import { ValueEditor } from '../../src/form/browser/valueEditor.tsx'
+import { EditorContextPanel } from '../../src/workbench/browser/runtime/editor/editorContextPanel.tsx'
 import { NodeInspector } from '../../src/workbench/browser/runtime/editor/nodeInspector.tsx'
 import { PortDefinitionEditor } from '../../src/workbench/browser/runtime/editor/portDefinitionEditor.tsx'
 import { WorkbenchCanvas } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
@@ -18,6 +19,14 @@ import { useStoryActions } from './storyActions.tsx'
 
 const target = { kind: 'flow' } as const
 const port = (handle: string, type = 'string') => ({ handle, jsonSchema: { type } as const, nullable: false })
+const reportSchema = {
+  type: 'object',
+  properties: {
+    status: { type: 'string' },
+    metrics: { type: 'object', properties: { count: { type: 'integer' }, score: { type: 'number' } } },
+    tags: { type: 'array', items: { type: 'string' } },
+  },
+} as const
 const inputs: (Group | InputPort)[] = [
   { group: 'Request' },
   { ...port('trackings', 'array'), jsonSchema: { type: 'array', items: { type: 'string' } }, description: '要注册的追踪号。' },
@@ -32,7 +41,33 @@ const inputs: (Group | InputPort)[] = [
   },
   { ...port('limit', 'integer'), value: 10 },
 ]
-const outputs = [port('summary'), port('issues', 'array'), port('count', 'integer')]
+const outputs = [
+  port('summary'),
+  {
+    ...port('report', 'object'),
+    jsonSchema: reportSchema,
+  },
+  port('issues', 'array'),
+  port('count', 'integer'),
+]
+const readOnlyCompositeOutputs: (Group | InputPort)[] = [
+  { group: 'Objects' },
+  {
+    ...port('emptyObject', 'object'),
+    jsonSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    ...port('report', 'object'),
+    jsonSchema: { ...reportSchema, additionalProperties: false },
+  },
+  { group: 'Arrays' },
+  port('untypedItems', 'array'),
+  { ...port('textItems', 'array'), jsonSchema: { type: 'array', items: { type: 'string' } } },
+  {
+    ...port('objectItems', 'array'),
+    jsonSchema: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, enabled: { type: 'boolean' } } } },
+  },
+]
 const valueStates: InputPort[] = [
   port('message'),
   { ...port('tags', 'array'), jsonSchema: { type: 'array', items: { type: 'string' } }, value: [] },
@@ -231,6 +266,24 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
             <h3 className="px-3 pt-3 text-xs font-medium">Fixed interface · read only</h3>
             <PortDefinitionEditor groups output disabled values={inputs} onChange={() => {}} />
           </section>
+          <div className="col-span-full h-[520px] w-full max-w-[520px] overflow-hidden rounded-lg border border-border">
+            <EditorContextPanel
+              focusOnOpen={false}
+              icon="flow"
+              onClose={() => {}}
+              showClose={false}
+              theme={dark ? 'dark' : 'light'}
+              title="Read-only output types"
+            >
+              <div className="inspector-scroll overflow-y-auto">
+                <div className="inspector-content">
+                  <section className="inspector-port-section">
+                    <PortDefinitionEditor groups layout="ports" title="Outputs" output disabled values={readOnlyCompositeOutputs} onChange={() => {}} />
+                  </section>
+                </div>
+              </div>
+            </EditorContextPanel>
+          </div>
           <section className="inspector-port-section">
             <h3 className="px-3 pt-3 text-xs font-medium">Values · unset, empty, null, false</h3>
             <PortDefinitionEditor disabled={disabled} values={emptyValues} onChange={(next) => setEmptyValues([...next] as typeof emptyValues)} />
@@ -246,6 +299,6 @@ export const inspectorPortsStory: FrontendStory = {
   title: 'Ports & sources',
   standalone: true,
   description:
-    'Saved sources render before their checks. Select the incompatible issue_count source, then edit its upstream type to clear the input error. Reload checks saved values and ordering.',
+    'Saved sources render before their checks. Expand the report output to edit its nested object definition. The read-only output sample covers empty and nested objects plus untyped, text, and object arrays. Select the incompatible issue_count source, then edit its upstream type to clear the input error. Reload checks saved values and ordering.',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
 }

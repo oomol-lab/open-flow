@@ -9,6 +9,7 @@
     "fieldName": "フィールド名",
     "type": "{{name}} の型",
     "typeTitle": "型",
+    "arrayItemTypeTitle": "要素の型",
     "string": "文字列",
     "number": "数値",
     "boolean": "真偽値",
@@ -85,8 +86,10 @@
     "component": "コンポーネント",
     "columnName": "名前",
     "columnType": "型",
+    "arrayOf": "の",
     "columnValue": "値",
     "noOptions": "選択肢がありません",
-    "emptyObject": "空のオブジェクトのみ"
+    "emptyObject": "空のオブジェクトのみ",
+    "emptyObjectReadonly": "空のオブジェクト"
   }
 }

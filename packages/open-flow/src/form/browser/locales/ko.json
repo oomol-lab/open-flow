@@ -9,6 +9,7 @@
     "fieldName": "필드 이름",
     "type": "{{name}} 유형",
     "typeTitle": "유형",
+    "arrayItemTypeTitle": "항목 유형",
     "string": "문자열",
     "number": "숫자",
     "boolean": "불리언",
@@ -85,8 +86,10 @@
     "component": "컴포넌트",
     "columnName": "이름",
     "columnType": "유형",
+    "arrayOf": "의",
     "columnValue": "값",
     "noOptions": "사용 가능한 옵션 없음",
-    "emptyObject": "빈 객체만 허용"
+    "emptyObject": "빈 객체만 허용",
+    "emptyObjectReadonly": "빈 객체"
   }
 }

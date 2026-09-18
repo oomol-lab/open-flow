@@ -1,4 +1,5 @@
 import type { EditorComponent } from '../common/editorComponent.ts'
+import type { FieldDisclosure } from './fieldTypeDisplay.tsx'
 
 import { Fragment, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
@@ -6,6 +7,7 @@ import { MenuHeader } from '../../ui/browser/menu-header.tsx'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '../../ui/browser/select.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/tooltip.tsx'
 import { editorComponent, editorGroups, schemaForEditor } from '../common/editorComponent.ts'
+import { objectValue } from '../common/value.ts'
 import { EditorComponentIcon } from './editorComponentIcon.tsx'
 import { fieldSelectTriggerClass } from './fieldSelect.tsx'
 import { FieldTypeDisplay } from './fieldTypeDisplay.tsx'
@@ -21,7 +23,10 @@ export function EditorComponentSelect({
   compact = true,
   showIcon = true,
   readOnlySurface = false,
+  showArrayItemType = false,
+  menuTitle,
   addon = false,
+  disclosure,
   onChange,
 }: {
   schema: unknown
@@ -33,13 +38,48 @@ export function EditorComponentSelect({
   compact?: boolean
   showIcon?: boolean
   readOnlySurface?: boolean
+  showArrayItemType?: boolean
+  menuTitle?: string
   addon?: boolean
+  disclosure?: FieldDisclosure
   onChange: (schema: Record<string, unknown>) => void
 }) {
   const t = useTranslate()
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const selectedComponent = editorComponent(schema)
   const label = t(`valueEditor.components.${selectedComponent}`)
+  if (showArrayItemType && selectedComponent === 'array' && !Array.isArray(objectValue(schema)?.items)) {
+    const source = objectValue(schema) ?? {}
+    return (
+      <div className="flex min-w-0 items-center gap-1">
+        <div className="w-14 shrink-0">
+          <EditorComponentSelect
+            schema={schema}
+            name={name}
+            disabled={disabled}
+            invalid={invalid}
+            readOnly={readOnly}
+            compact
+            readOnlySurface={readOnlySurface}
+            onChange={onChange}
+          />
+        </div>
+        <span className="shrink-0 text-xs text-muted-foreground">{t('valueEditor.arrayOf')}</span>
+        <div className="min-w-0 flex-1">
+          <EditorComponentSelect
+            schema={source.items ?? {}}
+            name={`${name}[]`}
+            menuTitle={t('valueEditor.arrayItemTypeTitle')}
+            disabled={disabled}
+            readOnly={readOnly}
+            compact={false}
+            readOnlySurface={readOnlySurface}
+            onChange={(items) => onChange({ ...source, items })}
+          />
+        </div>
+      </div>
+    )
+  }
   if (readOnly) {
     return (
       <FieldTypeDisplay
@@ -49,6 +89,7 @@ export function EditorComponentSelect({
         icon={showIcon && <EditorComponentIcon component={selectedComponent} />}
         compact={compact}
         surface={readOnlySurface}
+        disclosure={selectedComponent === 'object' ? disclosure : undefined}
       />
     )
   }
@@ -91,8 +132,8 @@ export function EditorComponentSelect({
           alignItemWithTrigger={false}
           className={`min-w-44 [scrollbar-width:thin] ${selectionMenuContentClass}`}
         >
-          <SelectGroup className="p-0" aria-label={t('valueEditor.typeTitle')}>
-            <MenuHeader>{t('valueEditor.typeTitle')}</MenuHeader>
+          <SelectGroup className="p-0" aria-label={menuTitle ?? t('valueEditor.typeTitle')}>
+            <MenuHeader>{menuTitle ?? t('valueEditor.typeTitle')}</MenuHeader>
             {Object.entries(editorGroups).map(([group, components], index) => (
               <Fragment key={group}>
                 {index > 0 && <SelectSeparator className="mx-2 bg-border/50" />}

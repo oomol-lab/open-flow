@@ -62,7 +62,8 @@ collections, definitions, and field, node, or group settings. Also read the
 - Fixed definitions omit option editing and all nested definition mutations while values remain editable.
   Empty fixed choices show "No options available". Closed empty objects retain the standard preview
   and disclosure; the expanded child row uses the disabled add-action surface to explain that an empty
-  object is required and fields cannot be added. Open objects retain their add-field action.
+  object is required and fields cannot be added. Read-only empty objects use the shorter "Empty object"
+  label. Open objects retain their add-field action.
 - Missing editable choice definitions show a danger "Edit options…" entry point. Choice editing shares the
   selection popup, with a back chevron and an Add option button matching the list's typography.
 - Object children and array items use the established rounded plus/minus buttons. Plus inserts

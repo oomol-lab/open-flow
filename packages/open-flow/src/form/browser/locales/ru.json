@@ -9,6 +9,7 @@
     "fieldName": "Имя поля",
     "type": "Тип {{name}}",
     "typeTitle": "Тип",
+    "arrayItemTypeTitle": "Тип элемента",
     "string": "Строка",
     "number": "Число",
     "boolean": "Логическое значение",
@@ -85,8 +86,10 @@
     "component": "Компонент",
     "columnName": "Имя",
     "columnType": "Тип",
+    "arrayOf": "из",
     "columnValue": "Значение",
     "noOptions": "Нет доступных вариантов",
-    "emptyObject": "Только пустой объект"
+    "emptyObject": "Только пустой объект",
+    "emptyObjectReadonly": "Пустой объект"
   }
 }

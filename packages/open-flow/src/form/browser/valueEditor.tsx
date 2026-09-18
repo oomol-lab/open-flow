@@ -1,6 +1,7 @@
 import styles from './valueEditor.module.scss'
 import type { CSSProperties, ReactNode } from 'react'
 import type { ValueType } from '../common/value.ts'
+import type { FieldDisclosure } from './fieldTypeDisplay.tsx'
 
 import { useCallback, useContext, useEffect, useId, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -46,7 +47,7 @@ export interface ValueEditorProps {
   readonly path: string
   readonly onInvalidChange?: (invalid: boolean) => void
   readonly onDraftIssue: (path: string, invalid: boolean) => void
-  readonly header?: ReactNode
+  readonly header?: ReactNode | ((disclosure: FieldDisclosure | undefined) => ReactNode)
   readonly leadingControl?: ReactNode
   readonly valueAddon?: ReactNode
   readonly valueSuffix?: ReactNode
@@ -54,6 +55,8 @@ export interface ValueEditorProps {
   readonly description?: string
   readonly editor?: ReactNode
   readonly valueEditable?: boolean
+  /** Renders schema structure without a value editor. */
+  readonly definitionOnly?: boolean
   readonly hideOptions?: boolean
   readonly arrayChild?: boolean
   readonly objectChild?: boolean
@@ -79,6 +82,15 @@ export function ValueEditorFeedback({ children, error }: { readonly children: (e
 }
 
 const types: readonly ValueType[] = ['string', 'number', 'boolean', 'object', 'array', 'null']
+
+function ReservedObjectActionSlots() {
+  return (
+    <span aria-hidden="true" className="flex h-6 shrink-0 gap-0.5" data-readonly-object-action-slots>
+      <span className="size-6" />
+      <span className="size-6" />
+    </span>
+  )
+}
 
 function PropertyName({ name, onRename, disabled }: { name: string; onRename: (name: string) => boolean; disabled?: boolean }) {
   const t = useTranslate()
@@ -151,6 +163,9 @@ export function ValueEditor(props: ValueEditorProps) {
   const [editorFocusRequest, setEditorFocusRequest] = useState(0)
   const [optionsOpen, setOptionsOpen] = useState(false)
   const source = objectValue(schema) ?? {}
+  const definitionOnly = props.definitionOnly === true
+  const valueEditable = props.valueEditable !== false && !definitionOnly
+  const readOnlyDefinition = definitionOnly && disabled
   const allowsNull =
     nullable === true ||
     source.type === 'null' ||
@@ -188,7 +203,7 @@ export function ValueEditor(props: ValueEditorProps) {
     !complex &&
     (presence === 'unset' || invalidNull) &&
     props.editor === undefined &&
-    props.valueEditable !== false
+    valueEditable
   useEffect(() => {
     if (!focusCreatedValue.current || presence === 'unset' || !container) return
     focusCreatedValue.current = false
@@ -218,6 +233,8 @@ export function ValueEditor(props: ValueEditorProps) {
       schema={childSchema}
       value={childValue}
       onChange={change}
+      valueEditable={valueEditable}
+      definitionOnly={props.definitionOnly}
       disabled={disabled}
       label={`${label}.${key}`}
       path={`${path}/${String(key).replaceAll('~', '~0').replaceAll('/', '~1')}`}
@@ -249,6 +266,7 @@ export function ValueEditor(props: ValueEditorProps) {
     : []
   const names = [...new Set([...savedOrder, ...availableNames])]
   const canAddObjectField = props.onDefinitionChange != null || source.additionalProperties !== false
+  const showAddObjectField = canAddObjectField && !disabled
   const addObjectField = (after?: string) => {
     let name = 'field'
     let index = 1
@@ -266,8 +284,11 @@ export function ValueEditor(props: ValueEditorProps) {
   const array = Array.isArray(value) ? value : []
   const canChooseType = source.type == null || Array.isArray(source.type)
   const availableTypes = Array.isArray(source.type) ? types.filter((candidate) => (source.type as unknown[]).includes(candidate)) : types
-  const structured = !raw && !complex && !enumeration && (type === 'object' || (type === 'array' && !itemEnumeration)) && props.editor === undefined
-  const expandable = !showUnset && (structured || (props.valueEditable !== false && (raw || complex || (type === 'string' && source['ui:widget'] === 'text'))))
+  const structured =
+    !raw && !complex && !enumeration && (type === 'object' || (type === 'array' && !itemEnumeration)) && (props.editor === undefined || definitionOnly)
+  const expandable =
+    !showUnset &&
+    ((structured && (!definitionOnly || type === 'object')) || (valueEditable && (raw || complex || (type === 'string' && source['ui:widget'] === 'text'))))
   useEffect(() => {
     if (!expanded || !editorFocusRequest || disabled || raw || complex) return
     container?.querySelector<HTMLTextAreaElement>(':scope > [data-value-body] > textarea')?.focus()
@@ -308,7 +329,7 @@ export function ValueEditor(props: ValueEditorProps) {
       ))}
     </div>
   )
-  const inlineTools = (props.layout === 'values' || props.layout === 'ports') && props.valueEditable !== false && !disabled && !sorting
+  const inlineTools = (props.layout === 'values' || props.layout === 'ports') && valueEditable && !disabled && !sorting
   const canClear = inlineTools && presence !== 'unset'
   const canToggleJson = inlineTools && expanded && !complex && !enumeration && !itemEnumeration && !showUnset && (type === 'object' || type === 'array')
   const valueSuffix =
@@ -331,7 +352,7 @@ export function ValueEditor(props: ValueEditorProps) {
           setOptionsOpen(false)
       }}
     >
-      {props.valueEditable !== false && !inlineTools && (
+      {valueEditable && !inlineTools && (
         <>
           {canChooseType && !complex && !enumeration && (
             <FieldSelect
@@ -395,10 +416,10 @@ export function ValueEditor(props: ValueEditorProps) {
       {props.options}
     </div>
   )
-  const shouldMountBody = !compactValue || !expandable || expanded || bodyMounted
+  const shouldMountBody = (!definitionOnly || type === 'object') && (!compactValue || !expandable || expanded || bodyMounted)
   const body = shouldMountBody && (
     <div id={`${id}-body`} className={styles.body} data-value-body hidden={compactValue && expandable && !expanded}>
-      {!showUnset && !compactValue && props.valueEditable !== false && presence !== 'value' && (
+      {!showUnset && !compactValue && valueEditable && presence !== 'value' && (
         <span className={styles.presence}>{presence === 'null' ? 'null' : t('valueEditor.unset')}</span>
       )}
       {showUnset ? (
@@ -422,7 +443,7 @@ export function ValueEditor(props: ValueEditorProps) {
           <span>{t('valueEditor.setValue')}</span>
           <i aria-hidden="true" className="i-lucide-light:pencil" />
         </Button>
-      ) : props.valueEditable !== false && (raw || complex) ? (
+      ) : valueEditable && (raw || complex) ? (
         <JsonEditor {...props} onDraftIssue={reportDraftIssue} value={value} invalid={invalid} focusRequest={expanded ? editorFocusRequest : 0} />
       ) : props.editor !== undefined ? (
         props.editor
@@ -494,7 +515,7 @@ export function ValueEditor(props: ValueEditorProps) {
                     objectChild: true,
                     layout: 'values',
                     hideOptions: true,
-                    header: (
+                    header: (disclosure) => (
                       <>
                         <FieldName name={name} description={typeof fieldSource.description === 'string' ? fieldSource.description : undefined}>
                           {Object.hasOwn(properties, name) && !props.onDefinitionChange ? (
@@ -504,10 +525,9 @@ export function ValueEditor(props: ValueEditorProps) {
                               name={name}
                               disabled={disabled}
                               onRename={(nextName) => {
-                                const next = renameObjectField(value, name, nextName)
-                                if (!next) return false
                                 if (props.onDefinitionChange) {
-                                  if (nextName !== name && Object.hasOwn(properties, nextName)) return false
+                                  if (!nextName || (nextName !== name && Object.hasOwn(properties, nextName))) return false
+                                  const next = object && Object.hasOwn(object, name) ? renameObjectField(value, name, nextName) : value
                                   props.onDefinitionChange(
                                     {
                                       ...source,
@@ -521,18 +541,34 @@ export function ValueEditor(props: ValueEditorProps) {
                                     },
                                     next,
                                   )
-                                } else onChange(next)
+                                } else {
+                                  const next = renameObjectField(value, name, nextName)
+                                  if (!next) return false
+                                  onChange(next)
+                                }
                                 return true
                               }}
                             />
                           )}
                         </FieldName>
                         <div data-field-type>
-                          {props.onDefinitionChange ? (
+                          {readOnlyDefinition ? (
+                            <EditorComponentSelect
+                              schema={fieldSchema}
+                              name={`${label}.${name}`}
+                              readOnly
+                              readOnlySurface
+                              compact={false}
+                              showArrayItemType
+                              disclosure={disclosure}
+                              onChange={() => {}}
+                            />
+                          ) : props.onDefinitionChange ? (
                             <EditorComponentSelect
                               schema={fieldSchema}
                               name={`${label}.${name}`}
                               readOnly={disabled}
+                              showArrayItemType={definitionOnly}
                               onChange={(nextSchema) =>
                                 props.onDefinitionChange!(
                                   { ...source, properties: { ...properties, [name]: nextSchema } },
@@ -564,7 +600,9 @@ export function ValueEditor(props: ValueEditorProps) {
                         </div>
                       </>
                     ),
-                    actions: (
+                    actions: readOnlyDefinition ? (
+                      <ReservedObjectActionSlots />
+                    ) : (
                       <>
                         <Button
                           type="button"
@@ -617,18 +655,18 @@ export function ValueEditor(props: ValueEditorProps) {
                 size="field"
                 className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectContent} ${canAddObjectField ? '' : styles.emptyObjectConstraint}`}
                 disabled={disabled || !canAddObjectField}
-                aria-label={`${t(canAddObjectField ? 'valueEditor.addField' : 'valueEditor.emptyObject')} ${label}`}
-                onClick={canAddObjectField ? () => addObjectField() : undefined}
+                aria-label={`${t(showAddObjectField ? 'valueEditor.addField' : disabled ? 'valueEditor.emptyObjectReadonly' : 'valueEditor.emptyObject')} ${label}`}
+                onClick={showAddObjectField ? () => addObjectField() : undefined}
               >
-                {canAddObjectField && <i aria-hidden="true" className="i-lucide-light:plus" />}
-                {t(canAddObjectField ? 'valueEditor.addField' : 'valueEditor.emptyObject')}
+                {showAddObjectField && <i aria-hidden="true" className="i-lucide-light:plus" />}
+                {t(showAddObjectField ? 'valueEditor.addField' : disabled ? 'valueEditor.emptyObjectReadonly' : 'valueEditor.emptyObject')}
               </Button>
             )}
           </div>
         </div>
       ) : type === 'array' ? (
         <div className={styles.collection}>
-          <ArrayFieldList values={array} onReorder={!disabled && props.valueEditable !== false ? onChange : undefined} label={label}>
+          <ArrayFieldList values={array} onReorder={!disabled && valueEditable ? onChange : undefined} label={label}>
             {(item, index, handle) => {
               const itemSchema = Array.isArray(source.items) ? (source.items[index] ?? source.additionalItems ?? {}) : (source.items ?? {})
               return (
@@ -816,7 +854,7 @@ export function ValueEditor(props: ValueEditorProps) {
       data-layout={props.layout}
       data-header={props.header != null || undefined}
       data-collection={expandable || undefined}
-      data-output={props.editor === null || undefined}
+      data-output={definitionOnly || undefined}
       data-value-addon={props.valueAddon != null || undefined}
       data-value-suffix={props.valueSuffix != null || undefined}
       data-expanded={(expandable && expanded) || undefined}
@@ -842,7 +880,17 @@ export function ValueEditor(props: ValueEditorProps) {
               </Button>
             )}
           </div>
-          {props.header}
+          {typeof props.header === 'function'
+            ? props.header(
+                expandable && type === 'object'
+                  ? {
+                      controls: `${id}-body`,
+                      expanded,
+                      onToggle: toggleExpanded,
+                    }
+                  : undefined,
+              )
+            : props.header}
         </div>
       )}
       {props.valueAddon != null && (
@@ -850,11 +898,12 @@ export function ValueEditor(props: ValueEditorProps) {
           {props.valueAddon}
         </div>
       )}
-      {props.header != null && expandable && structured && type === 'array' && !Array.isArray(source.items) ? (
+      {props.header != null && expandable && structured && type === 'array' && !Array.isArray(source.items) && !definitionOnly ? (
         <div className={styles.arrayItemType}>
           <EditorComponentSelect
             schema={source.items ?? {}}
             name={`${label}[]`}
+            menuTitle={t('valueEditor.arrayItemTypeTitle')}
             compact={false}
             showIcon={false}
             invalid={summaryInvalid}
@@ -869,7 +918,8 @@ export function ValueEditor(props: ValueEditorProps) {
         </div>
       ) : (
         compactValue &&
-        expandable && (
+        expandable &&
+        !definitionOnly && (
           <Button
             type="button"
             variant="disclosure"

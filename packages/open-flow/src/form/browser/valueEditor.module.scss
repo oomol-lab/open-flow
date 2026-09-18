@@ -477,9 +477,6 @@ $feedback-focus: ':has(#{$feedback-targets})';
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.root[data-output] > .body {
-  display: none;
-}
 .actions > button {
   justify-content: flex-start;
   color: var(--ui-muted-foreground);

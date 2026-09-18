@@ -363,10 +363,20 @@ describe('Lazy schema compilation', () => {
   })
 })
 
-const renderFixedValue = (schema: unknown, value: unknown, compact = true) =>
+const renderFixedValue = (schema: unknown, value: unknown, compact = true, disabled = false) =>
   renderToStaticMarkup(
     <I18nProvider i18n={createI18n('en')}>
-      <ValueEditor compact={compact} label="fixed" schema={schema} value={value} onChange={vi.fn()} path="/fixed" onDraftIssue={vi.fn()} hideOptions />
+      <ValueEditor
+        compact={compact}
+        label="fixed"
+        schema={schema}
+        value={value}
+        disabled={disabled}
+        onChange={vi.fn()}
+        path="/fixed"
+        onDraftIssue={vi.fn()}
+        hideOptions
+      />
     </I18nProvider>,
   )
 describe('Fixed schema value presentation', () => {
@@ -378,6 +388,9 @@ describe('Fixed schema value presentation', () => {
     expect(expandedContent).toContain('Empty object only')
     expect(expandedContent).toMatch(/disabled=""[^>]*aria-label="Empty object only fixed"/)
     expect(expandedContent).not.toContain('aria-label="Add field fixed"')
+    const readOnlyContent = renderFixedValue({ type: 'object', additionalProperties: false }, {}, false, true)
+    expect(readOnlyContent).toContain('Empty object')
+    expect(readOnlyContent).not.toContain('Empty object only')
     expect(renderFixedValue({ type: 'object' }, {})).toContain('aria-expanded="false"')
     expect(renderFixedValue({ type: 'object', additionalProperties: false }, undefined)).toContain('Set value')
   })
